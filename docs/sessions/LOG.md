@@ -142,4 +142,3 @@ Découvertes (CI, PR #1) : la CI est rouge sur `main` comme sur la PR, pour deux
 | 2026-10-22 | Alertes Telegram : prise en main après une remise, takeover_ended et send_failed publiés (R-G4) | done | `log/2026-10-22-telegram-events.md` |
 | 2026-10-22 | CI : installation de ffmpeg bornée et réessayée | done | `log/2026-10-22-ci-ffmpeg-timeout.md` |
 | 2026-10-22 | Refonte du design system : coquille et Dashboard (D-01) | done | `log/2026-10-22-d-01-coquille-dashboard.md` |
-| 2026-10-22 | `pnpm check`, les tests et les hooks git verts sous Windows (recette) | done | `log/2026-10-22-windows-tests.md` |
