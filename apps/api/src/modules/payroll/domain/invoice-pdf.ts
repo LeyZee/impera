@@ -1,5 +1,7 @@
 import {
+  addressLines,
   INVOICE_RETENTION_YEARS,
+  invoiceFooterOf,
   PLATFORM_NAMES,
   type Currency,
   type InvoiceAgency,
@@ -199,11 +201,6 @@ export interface InvoicePdfContent {
 /** « : » as French sets it, after a space that never breaks. */
 const COLON = '\u00a0: ';
 const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-const WHOLE_EUROS = new Intl.NumberFormat('fr-FR', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
 const PERCENT = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 2 });
 const RATE = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 const COUNTRIES = new Intl.DisplayNames(['fr'], { type: 'region' });
@@ -239,11 +236,6 @@ function pdfEuros(minor: number): string {
   return EUROS.format(minor / 100);
 }
 
-/** A share capital: « 1 000 € » when it is whole euros, to the cent otherwise. */
-function capital(minor: number): string {
-  return minor % 100 === 0 ? WHOLE_EUROS.format(minor / 100) : pdfEuros(minor);
-}
-
 const percent = (bps: number): string => PERCENT.format(bps / 10_000);
 
 function inCurrency(minor: number, currency: Currency): string {
@@ -260,13 +252,6 @@ function rateWords(currency: Currency, rateMicros: number, rateOn: string | null
   }).format(1);
   return `${one} = ${RATE.format(rateMicros / 1_000_000)}\u00a0€ (cours BCE du ${longDay(rateOn)})`;
 }
-
-/** A postal address as written, one printed line per line of it. */
-const addressLines = (address: string): string[] =>
-  address
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
 
 const countryName = (code: string): string => COUNTRIES.of(code) ?? code;
 
@@ -334,21 +319,6 @@ function agencyParty(agency: InvoiceAgency): PdfParty {
     lines: placeLines(agency.address, 'FR'),
     ids: [businessIdWords(agency.siren), { label: 'TVA intracommunautaire', value: agency.vatNumber }],
   };
-}
-
-/** The agency in the foot of each page (art. R123-237 C. com.), with what it is to the contractor. */
-function footerOf(agency: InvoiceAgency): string {
-  const parts = [`Document établi par ${agency.legalName}, ${addressLines(agency.address).join(', ')}`];
-  const form = agency.legalForm ?? null;
-  const shareCapital = agency.shareCapitalMinor ?? null;
-  if (form !== null) {
-    parts.push(shareCapital === null ? form : `${form} au capital de ${capital(shareCapital)}`);
-  }
-  if (agency.rcsCity !== undefined && agency.rcsCity !== null) {
-    // The register and its number never break apart.
-    parts.push(`RCS\u00a0${agency.rcsCity}\u00a0${businessIdWords(agency.siren).value}`);
-  }
-  return `${parts.join(' · ')}, mandataire de facturation du prestataire.`;
 }
 
 /** « 24 novembre 2026, 10 h 30 (heure de Paris) »: a deadline is an instant, printed where the agency is. */
@@ -535,7 +505,7 @@ export function invoicePdfContent(source: PdfDocumentSource): InvoicePdfContent 
               : 'Mentions du régime (reprises de la facture d’origine)',
             items: source.regimeMentions,
           },
-    footer: footerOf(source.agency),
+    footer: invoiceFooterOf(source.agency),
     continued: `${heading} ${source.number} (suite)`,
     annex: source.annex === null ? null : annexContent(source, source.annex, contractor.name),
   };

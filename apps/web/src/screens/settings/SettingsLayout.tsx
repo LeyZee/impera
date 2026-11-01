@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
+import { BillingSection } from '@/settings/billing/BillingSection';
 import { PayRulesSection } from '@/settings/pay/PayRulesSection';
 import { ServicesSection } from '@/settings/services/ServicesSection';
 import { TelegramSection } from '@/settings/telegram/TelegramSection';
@@ -13,7 +14,7 @@ import { screenLabel, type ScreenPath } from '@/shell/nav';
 /**
  * Réglages is the owner's alone (NAV-18): every page of it is served to the owner only, and the appearance, which is
  * everyone's, lives in the account's menu (NAV-03). The AI keys and the bots and groups (P3-03, P3-07), the alerts
- * (P4-01), the accounts' pay rules (EQ-03) and the backups (ADR 0028).
+ * (P4-01), the accounts' pay rules (EQ-03), what each invoice prints (EQ-06) and the backups (ADR 0028).
  */
 const TABS: readonly SubNavItem[] = (
   [
@@ -21,6 +22,7 @@ const TABS: readonly SubNavItem[] = (
     '/reglages/alertes',
     '/reglages/telegram',
     '/reglages/regles-de-paie',
+    '/reglages/facturation',
     '/reglages/sauvegardes',
   ] satisfies readonly ScreenPath[]
 ).map((to) => ({ to, label: screenLabel(to) }));
@@ -63,6 +65,11 @@ export function TelegramPage({
 /** Réglages › Règles de paie: each account's currency, VAT, platform commission and source of sales (EQ-03). */
 export function PayRulesPage(): JSX.Element {
   return <PayRulesSection />;
+}
+
+/** Réglages › Facturation: the agency's identity, service, payment terms and logo on each invoice (EQ-06). */
+export function BillingPage(): JSX.Element {
+  return <BillingSection />;
 }
 
 /** Réglages › Sauvegardes: the nightly export and the restore test (EQ-17, ADR 0028). */

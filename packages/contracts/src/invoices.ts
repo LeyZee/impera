@@ -261,6 +261,31 @@ export const VatNumberSchema = z
   .string()
   .regex(new RegExp(VAT_NUMBER_PATTERN, 'u'), 'Un numéro de TVA intracommunautaire');
 
+/**
+ * Whether a SIREN's last digit is its check key (Luhn, as INSEE computes it). Only some SIRETs of La Poste escape the
+ * rule, never a SIREN.
+ */
+export function sirenChecksOut(siren: string): boolean {
+  if (!/^[0-9]{9}$/u.test(siren)) return false;
+  let sum = 0;
+  for (let index = 0; index < siren.length; index += 1) {
+    // From the right, every second digit counts twice, its two digits added.
+    const digit = Number(siren[siren.length - 1 - index]);
+    const counted = index % 2 === 1 ? digit * 2 : digit;
+    sum += counted > 9 ? counted - 9 : counted;
+  }
+  return sum % 10 === 0;
+}
+
+/**
+ * The intra-community VAT number of a French company, from its SIREN: `FR`, a two-digit key, then the SIREN; the key is
+ * (12 + 3 × (SIREN mod 97)) mod 97.
+ */
+export function frenchVatNumberOf(siren: string): string {
+  const key = (12 + 3 * (Number(siren) % 97)) % 97;
+  return `FR${String(key).padStart(2, '0')}${siren}`;
+}
+
 export const AgencyLogoMediaTypeSchema = z.enum(AGENCY_LOGO_MEDIA_TYPES);
 export type AgencyLogoMediaType = z.infer<typeof AgencyLogoMediaTypeSchema>;
 
@@ -341,6 +366,53 @@ export const InvoiceAgencySchema = z.object({
   rcsCity: trimmed(RCS_CITY_MAX).nullable().optional(),
 });
 export type InvoiceAgency = z.infer<typeof InvoiceAgencySchema>;
+
+const WHOLE_EUROS = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+
+/** A postal address as written, one printed line per line of it: blank lines and the spaces around each dropped. */
+export const addressLines = (address: string): string[] =>
+  address
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+
+/** « 10 000 € », « 1 000,50 € »: a share capital as an invoice prints it, the cents only when there are some. */
+export const shareCapitalWords = (minor: number): string =>
+  minor % 100 === 0 ? WHOLE_EUROS.format(minor / 100) : EUROS.format(minor / 100);
+
+/** « SAS au capital de 10 000 € », the form alone without a capital, `null` without a form (a copy made before lot 4). */
+export function legalFormWords(agency: InvoiceAgency): string | null {
+  const form = agency.legalForm ?? null;
+  const capital = agency.shareCapitalMinor ?? null;
+  if (form === null) return null;
+  return capital === null ? form : `${form} au capital de ${shareCapitalWords(capital)}`;
+}
+
+/** « 123 456 789 »: a SIREN in its three groups, which never break apart. */
+export const sirenWords = (siren: string): string =>
+  [siren.slice(0, 3), siren.slice(3, 6), siren.slice(6)].join('\u00a0');
+
+/**
+ * The foot of each page of an invoice or a credit note (art. R123-237 of the Code de commerce): the agency and its
+ * address, its form and capital, its register and SIREN, and what it is to the contractor. One text, which the PDF
+ * prints and Réglages › Facturation shows: the owner reads there what the contractor will.
+ */
+export function invoiceFooterOf(agency: InvoiceAgency): string {
+  const parts = [`Document établi par ${agency.legalName}, ${addressLines(agency.address).join(', ')}`];
+  const form = legalFormWords(agency);
+  if (form !== null) parts.push(form);
+  if (agency.rcsCity !== undefined && agency.rcsCity !== null) {
+    // The register and its number never break apart either.
+    parts.push(`RCS\u00a0${agency.rcsCity}\u00a0${sirenWords(agency.siren)}`);
+  }
+  return `${parts.join(' · ')}, mandataire de facturation du prestataire.`;
+}
 
 /**
  * A contractor's file: who his invoices are in the name of. He fills it himself, the owner checks it; any change of
@@ -444,12 +516,31 @@ export type BillingSettingsView = z.infer<typeof BillingSettingsViewSchema>;
 /**
  * The agency as the owner sets it: what an invoice prints, its foot included. The legal form, the share capital and the
  * town of the trade register are optional in a copy made before lot 4, never in a setting saved from now on (art.
- * R123-237 of the Code de commerce).
+ * R123-237 of the Code de commerce). The SIREN carries its check key, and the VAT number is the one this SIREN gives
+ * (`frenchVatNumberOf`): a copy already made is read as it is, a setting saved from now on is checked.
  */
 export const BillingAgencyBodySchema = InvoiceAgencySchema.extend({
   legalForm: trimmed(AGENCY_LEGAL_FORM_MAX),
   shareCapitalMinor: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   rcsCity: trimmed(RCS_CITY_MAX),
+}).superRefine((agency, context) => {
+  // A typo in either number would be printed on every invoice from now on: both are checked before they are saved.
+  if (!sirenChecksOut(agency.siren)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['siren'],
+      message: 'Ce numéro n’est pas un SIREN : sa clé de contrôle (le dernier chiffre) ne correspond pas.',
+    });
+    return;
+  }
+  const expected = frenchVatNumberOf(agency.siren);
+  if (agency.vatNumber !== expected) {
+    context.addIssue({
+      code: 'custom',
+      path: ['vatNumber'],
+      message: `Le numéro de TVA intracommunautaire de ce SIREN est ${expected}.`,
+    });
+  }
 });
 export type BillingAgencyBody = z.infer<typeof BillingAgencyBodySchema>;
 

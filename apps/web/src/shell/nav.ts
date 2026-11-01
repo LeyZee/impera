@@ -258,6 +258,7 @@ const SCREENS = {
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
+  '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
 } as const;
 export type ScreenPath = keyof typeof SCREENS;

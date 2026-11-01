@@ -27,8 +27,9 @@ const SETTINGS: UpdateBillingSettingsBody = {
   agency: {
     legalName: 'Agence Inventée SAS',
     address: '12 rue Fictive\n69002 Lyon',
-    siren: '987654321',
-    vatNumber: 'FR45987654321',
+    // Invented, with a right check key and the VAT number it gives.
+    siren: '987654324',
+    vatNumber: 'FR14987654324',
     legalForm: 'SAS',
     shareCapitalMinor: 1_000_000,
     rcsCity: 'Lyon',
@@ -232,6 +233,9 @@ describe('Réglages › Facturation : l’identité de l’agence, la prestation
     const refused: readonly [object, number, string][] = [
       [{ ...SETTINGS, agency: withoutForm }, 400, 'request_invalid'],
       [{ ...SETTINGS, agency: { ...SETTINGS.agency, siren: '12345' } }, 400, 'request_invalid'],
+      // A SIREN whose check key is wrong, a VAT number another SIREN gives.
+      [{ ...SETTINGS, agency: { ...SETTINGS.agency, siren: '987654321' } }, 400, 'request_invalid'],
+      [{ ...SETTINGS, agency: { ...SETTINGS.agency, vatNumber: 'FR45987654324' } }, 400, 'request_invalid'],
       [{ ...SETTINGS, agency: { ...SETTINGS.agency, shareCapitalMinor: 0 } }, 400, 'request_invalid'],
       [{ ...SETTINGS, serviceDescription: '   ' }, 400, 'request_invalid'],
       [{ ...SETTINGS, dueDays: 61 }, 400, 'request_invalid'],

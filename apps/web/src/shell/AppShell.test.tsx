@@ -171,9 +171,16 @@ describe('Réglages › Sauvegardes', () => {
     );
   });
 
-  it('is a tab of the owner, after Telegram and the pay rules', async () => {
+  it('is a tab of the owner, after Telegram, the pay rules and the billing (EQ-06)', async () => {
     const router = renderApp(owner, '/reglages/sauvegardes');
-    expect(await subTabs()).toEqual(['Modèles IA', 'Alertes', 'Telegram', 'Règles de paie', 'Sauvegardes']);
+    expect(await subTabs()).toEqual([
+      'Modèles IA',
+      'Alertes',
+      'Telegram',
+      'Règles de paie',
+      'Facturation',
+      'Sauvegardes',
+    ]);
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
 
@@ -183,6 +190,7 @@ describe('Réglages › Sauvegardes', () => {
       '/reglages/sauvegardes',
       '/reglages/alertes',
       '/reglages/regles-de-paie',
+      '/reglages/facturation',
       '/reglages/apparence',
     ]) {
       for (const user of [
