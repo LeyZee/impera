@@ -17,6 +17,7 @@ import {
   TERMS,
   frenchCharged,
   frenchFranchise,
+  sampleCorrectiveInvoice,
   sampleCreditNote,
   sampleInvoice,
   worstCase,
@@ -514,6 +515,56 @@ describe('Équipe › Factures : ce que l’avoir imprime (ADR 0036)', () => {
         }),
       ),
     ).toThrow(/mentions/u);
+  });
+});
+
+describe('Équipe › Factures : ce que la facture rectificative imprime (ADR 0040)', () => {
+  const content = invoicePdfContent(sampleCorrectiveInvoice());
+
+  it('says it corrects an invoice, which it names with its day, for that invoice’s period, and falls due', () => {
+    expect([content.heading, content.title]).toEqual([
+      'Facture rectificative',
+      'Facture rectificative AEX-2026-0025',
+    ]);
+    expect(content.meta.map((one) => [one.label, plain(one.value), one.strong])).toEqual([
+      ['Numéro', 'AEX-2026-0025', true],
+      ['Date d’émission', '2 décembre 2026', false],
+      ['Facture rectifiée', 'AEX-2026-0021 du 17 novembre 2026', true],
+      ['Période de la prestation', 'du 1er au 15 novembre 2026', false],
+      ['Échéance', '31 janvier 2027', true],
+    ]);
+  });
+
+  it('prints its frozen first mention in its object, keeps the regime of the invoice it replaces, and joins no annex', () => {
+    expect(content.object.map((one) => plain(one.text))).toEqual([
+      ` : ${SERVICE}`,
+      'Facture rectificative de la facture AEX-2026-0021 du 17 novembre 2026, annulée par avoir. Elle en reprend la période, le régime de TVA et les mentions.',
+      'Catégorie de l’opération : prestation de services.',
+    ]);
+    expect(content.mentions).toEqual({
+      heading: 'Mentions du régime (reprises de la facture d’origine)',
+      items: REGIME_MENTIONS,
+    });
+    expect(content.blocks.map((block) => block.heading)).toEqual(['Conditions de paiement', 'Acceptation']);
+    expect(plain(content.blocks[0]?.paragraphs[0] ?? '')).toBe('Échéance : 31 janvier 2027.');
+    expect(content.totals.map((one) => [one.label, plain(one.value), one.grand])).toEqual([
+      ['Total HT', '930,96 €', false],
+      ['TVA', 'Autoliquidation', false],
+      ['Net à payer', '930,96 €', true],
+    ]);
+    expect(content.annex).toBeNull();
+    expect(content.parties[0].lines.join(' ')).toContain('Lot 12, quartier Exemple');
+  });
+
+  it('refuses a corrective invoice whose first mention does not name the invoice it replaces, never printing half', () => {
+    const terms = paymentTermsMention('2027-01-31', TERMS);
+    for (const mentions of [
+      [...REGIME_MENTIONS, terms],
+      ['Facture rectificative de la facture AEX-2026-0020 du 17 novembre 2026', ...REGIME_MENTIONS, terms],
+      [...REGIME_MENTIONS, 'Facture rectificative de la facture AEX-2026-0021 du 17 novembre 2026', terms],
+    ]) {
+      expect(() => invoicePdfContent(sampleCorrectiveInvoice({ mentions }))).toThrow(/mentions/u);
+    }
   });
 });
 

@@ -1,5 +1,7 @@
 import {
+  BillingRegimeIdSchema,
   CommissionStatementIdSchema,
+  ContractorRegimeIdSchema,
   EVENT_PAYLOADS,
   InvoiceAcceptanceViewSchema,
   JOB_MAX_ATTEMPTS,
@@ -25,6 +27,7 @@ const Q3 = PayPeriodSchema.parse('2025-06-01');
 const Q4 = PayPeriodSchema.parse('2025-06-16');
 const Q5 = PayPeriodSchema.parse('2025-07-01');
 const Q6 = PayPeriodSchema.parse('2025-07-16');
+const Q7 = PayPeriodSchema.parse('2025-08-01');
 
 const DAY = 86_400_000;
 const quiet = { warn: () => undefined, error: () => undefined };
@@ -56,13 +59,44 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     } finally {
       shift = 0;
     }
+    // The statement's own invoice, never a corrective one it issued (ADR 0040).
     const [invoice] = await db()
       .select({ id: schema.invoices.id })
       .from(schema.invoices)
-      .where(and(eq(schema.invoices.statementId, id), eq(schema.invoices.kind, 'invoice')));
+      .where(
+        and(
+          eq(schema.invoices.statementId, id),
+          eq(schema.invoices.kind, 'invoice'),
+          sql`${schema.invoices.reissuedInvoiceId} is null`,
+        ),
+      );
     if (invoice === undefined) throw new Error('no invoice');
     return InvoiceIdSchema.parse(invoice.id);
   }
+
+  /** The documents a statement issued, in the order of their numbers. */
+  const documentsOf = (statementId: string) =>
+    db()
+      .select()
+      .from(schema.invoices)
+      .where(eq(schema.invoices.statementId, statementId))
+      .orderBy(schema.invoices.sequence);
+
+  /** A document's lines, in their order. */
+  const linesOf = (invoiceId: string) =>
+    db()
+      .select()
+      .from(schema.invoiceLines)
+      .where(eq(schema.invoiceLines.invoiceId, invoiceId))
+      .orderBy(schema.invoiceLines.position);
+
+  /** Whether the job that renders `invoiceId`'s PDF is enqueued, as for any document (ADR 0037). */
+  const renderQueued = async (invoiceId: string) =>
+    (
+      await db().execute(
+        sql`select 1 from graphile_worker._private_jobs where key = ${`payroll.render_invoice_pdf:${invoiceId}`}`,
+      )
+    ).rows.length === 1;
 
   const send = (cookie: string, invoiceId: InvoiceId, step: string, payload?: object) =>
     team.call('POST', `/payroll/invoices/${invoiceId}/${step}`, cookie, payload);
@@ -360,7 +394,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
       .where(eq(schema.payAdjustments.contestedInvoiceId, invoiceId))
       .orderBy(schema.payAdjustments.amountMinor);
 
-  it('upholds a contest with the cancel and reissue of the invoice, which leave together with the next invoice', async () => {
+  it('upholds a contest with the cancel and reissue of the invoice: its cancel and a corrective invoice, under its regime (ADR 0040)', async () => {
     // Léa's first half of July, contested for an error of text; her second half is open, a draft. (June is closed.)
     await team.report(lea, Q5, 10_000);
     await team.recalculate(Q5);
@@ -443,46 +477,152 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     }
     expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
 
-    // Léa's second half of July: its invoice bills the line again, and the cancel leaves with it, citing the invoice.
+    // Léa leaves the regime of her July invoice before her second half is issued: from that day, another VAT.
+    const exempt = newId(BillingRegimeIdSchema);
+    await db()
+      .insert(schema.billingRegimes)
+      .values({
+        id: exempt,
+        name: 'France, franchise en base',
+        countries: ['FR'],
+        vatTreatment: 'exempt',
+        vatRateBps: null,
+        withholding: 'none',
+        mentions: ['Autofacturation', 'TVA non applicable, art. 293 B du CGI'],
+        documents: ['urssaf_vigilance'],
+        taxIdRequired: true,
+        createdBy: team.ownerId,
+      });
+    await db()
+      .insert(schema.billingRegimeValidations)
+      .values({ regimeId: exempt, validatedOn: '2025-01-01', recordedBy: team.ownerId });
+    await db()
+      .insert(schema.contractorRegimes)
+      .values({
+        id: newId(ContractorRegimeIdSchema),
+        memberId: lea.id,
+        regimeId: exempt,
+        effectiveFrom: invoice.issuedOn,
+        createdBy: team.ownerId,
+      });
+
+    // Léa's second half of July: its own invoice under the regime of the day; then the cancel, citing the July
+    // invoice, and the corrective invoice of the same amount, numbered next, under the July invoice's regime.
     await team.recalculate(Q6);
-    const next = await issued(lea, Q6);
-    const lines = await db()
-      .select()
-      .from(schema.invoiceLines)
-      .where(eq(schema.invoiceLines.invoiceId, next))
-      .orderBy(schema.invoiceLines.position);
-    const reissued = lines.at(-1);
-    expect([reissued?.kind, reissued?.amountMinor]).toEqual(['adjustment', invoice.exclVatMinor]);
-    expect(reissued?.detail).toContain(`Refacturation de ${which}`);
-    const cancels = await db()
-      .select({
-        id: schema.invoices.id,
-        exclVatMinor: schema.invoices.exclVatMinor,
-        period: schema.invoices.period,
-      })
-      .from(schema.invoices)
-      .where(and(eq(schema.invoices.creditedInvoiceId, id), eq(schema.invoices.kind, 'credit_note')));
-    expect(cancels.map(({ exclVatMinor, period }) => ({ exclVatMinor, period }))).toEqual([
-      { exclVatMinor: -invoice.exclVatMinor, period: Q5 },
+    const own = await issued(lea, Q6);
+    const second = (await team.statementOf(lea, Q6)).id;
+    const [regular, cancel, corrective, ...more] = await documentsOf(second);
+    if (regular === undefined || cancel === undefined || corrective === undefined) throw new Error('no pair');
+    expect(more).toEqual([]);
+    expect(regular).toMatchObject({ id: own, kind: 'invoice', period: Q6, regimeId: exempt, vatMinor: 0 });
+    expect((await linesOf(own)).some((line) => line.detail?.includes('Refacturation') ?? false)).toBe(false);
+    expect(cancel).toMatchObject({
+      kind: 'credit_note',
+      creditedInvoiceId: id,
+      reissuedInvoiceId: id,
+      period: Q5,
+      regimeId: invoice.regimeId,
+      exclVatMinor: -invoice.exclVatMinor,
+      vatMinor: -invoice.vatMinor,
+    });
+    expect(corrective).toMatchObject({
+      kind: 'invoice',
+      creditedInvoiceId: null,
+      reissuedInvoiceId: id,
+      period: Q5,
+      regimeId: invoice.regimeId,
+      regime: invoice.regime,
+      exclVatMinor: invoice.exclVatMinor,
+      vatMinor: invoice.vatMinor,
+      inclVatMinor: invoice.inclVatMinor,
+      sequence: cancel.sequence + 1,
+    });
+    // Its own first mention, the regime's as the July invoice froze them, then its own payment terms.
+    expect(corrective.mentions.slice(0, -1)).toEqual([
+      `Facture rectificative de la facture ${invoice.number} du ${longDay(invoice.issuedOn)}`,
+      ...invoice.mentions.slice(0, -1),
     ]);
+    expect(corrective.mentions.at(-1)).toMatch(/^Échéance/u);
+    const [line, ...otherLines] = await linesOf(corrective.id);
+    expect(otherLines).toEqual([]);
+    expect([line?.kind, line?.amountMinor]).toEqual(['adjustment', invoice.exclVatMinor]);
+    expect(line?.detail).toContain(`Refacturation de ${which}`);
+    // Each rendered and kept as any document (ADR 0037).
+    for (const one of [cancel, corrective]) expect(await renderQueued(one.id)).toBe(true);
 
     // A credit note is never cancelled and reissued: upholding its contest so is refused, with the reason, before
     // anything is written.
-    const cancel = InvoiceIdSchema.parse(cancels[0]?.id);
+    const cancelId = InvoiceIdSchema.parse(cancel.id);
     expect(
-      (await send(leaCookie, cancel, 'contest', { reason: 'Cet avoir me retire tout' })).statusCode,
+      (await send(leaCookie, cancelId, 'contest', { reason: 'Cet avoir me retire tout' })).statusCode,
     ).toBe(200);
-    const notReissued = await send(team.owner, cancel, 'contest/uphold', body);
+    const notReissued = await send(team.owner, cancelId, 'contest/uphold', body);
     expect([notReissued.statusCode, team.refusal(notReissued)]).toEqual([
       422,
       { code: 'invoice_correction_unprocessable', details: { reason: 'reissue_credit_note' } },
     ]);
-    expect(await correctionOf(cancel)).toEqual([]);
-    expect((await read(leaCookie, cancel)).acceptance.state).toBe('contested');
+    expect(await correctionOf(cancelId)).toEqual([]);
+    expect((await read(leaCookie, cancelId)).acceptance.state).toBe('contested');
+    // What the cancel took off counts: nothing is left of the July invoice, and no credit note of an amount on it.
+    const tooMuch = await send(team.owner, cancelId, 'contest/uphold', {
+      reason: 'Avoir de trop',
+      correction: { kind: 'amount', amountMinor: -1 },
+    });
+    expect([tooMuch.statusCode, team.refusal(tooMuch)]).toEqual([
+      422,
+      { code: 'credit_note_amount_unprocessable', details: { leftMinor: 0 } },
+    ]);
+    expect(await correctionOf(cancelId)).toEqual([]);
 
     // Nothing is left of the invoice now: the same uphold sent again is still the one recorded.
     const replay = await send(team.owner, id, 'contest/uphold', body);
     expect([replay.statusCode, view(replay)]).toEqual([200, view(upheld)]);
+
+    // The corrective invoice stays an invoice: contested in its turn, it is cancelled and billed again. Its pair
+    // corrects the period it bills, July's first half, never the statement that issued it, and lands on Léa's first
+    // open period; its own corrective invoice keeps July's period and regime, whatever the regime of the day.
+    const replacing = InvoiceIdSchema.parse(corrective.id);
+    expect(
+      (await send(leaCookie, replacing, 'contest', { reason: 'Mon nom est mal écrit' })).statusCode,
+    ).toBe(200);
+    await team.report(lea, Q7, 10_000);
+    await team.recalculate(Q7);
+    const upheldTwice = await send(team.owner, replacing, 'contest/uphold', {
+      ...body,
+      reason: 'Nom corrigé',
+    });
+    expect(upheldTwice.statusCode, upheldTwice.body).toBe(200);
+    const twice = `la facture ${corrective.number} du ${longDay(corrective.issuedOn)}`;
+    expect(
+      (await correctionOf(replacing)).map((one) => [
+        one.period,
+        one.amountMinor,
+        one.correctsStatementId,
+        one.reason,
+      ]),
+    ).toEqual([
+      [Q7, -invoice.exclVatMinor, corrected, `Annulation de ${twice}`],
+      [Q7, invoice.exclVatMinor, corrected, `Refacturation de ${twice}`],
+    ]);
+    await team.recalculate(Q7);
+    await issued(lea, Q7);
+    const [, recancel, recorrective, ...rest] = await documentsOf((await team.statementOf(lea, Q7)).id);
+    expect(rest).toEqual([]);
+    expect(recancel).toMatchObject({
+      kind: 'credit_note',
+      creditedInvoiceId: replacing,
+      reissuedInvoiceId: replacing,
+    });
+    expect(recorrective).toMatchObject({
+      kind: 'invoice',
+      reissuedInvoiceId: replacing,
+      period: Q5,
+      regimeId: invoice.regimeId,
+      exclVatMinor: invoice.exclVatMinor,
+    });
+    expect(recorrective?.mentions[0]).toBe(
+      `Facture rectificative de la facture ${corrective.number} du ${longDay(corrective.issuedOn)}`,
+    );
   });
 
   it('upholds a contest with an amount, in either favour, never crediting the invoice below zero', async () => {

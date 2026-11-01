@@ -177,8 +177,10 @@ async function writeStep(
 
 /**
  * The contested document as its correction reads it (ADR 0039 § 3), and the statement each adjustment of it corrects:
- * an invoice's own; for a credit note, the invoice it cites, whose period it corrected. What the invoice has left is
- * its total excluding VAT less what its issued credit notes took off.
+ * the member's statement of the document's period, which a credit note on it keeps (`keep_contest_correction`). That
+ * is an invoice's own statement, the cited invoice's for a credit note, and for a corrective invoice, issued by a later
+ * statement, the statement of the period it bills again (ADR 0040). What the invoice has left is its total excluding
+ * VAT less what its issued credit notes took off.
  */
 async function contestedOf(
   tx: Transaction,
@@ -191,10 +193,13 @@ async function contestedOf(
     .select({
       number: invoices.number,
       issuedOn: invoices.issuedOn,
-      statementId: invoices.statementId,
+      // Written by hand with the outer table named: Drizzle leaves a column of a one-table select unqualified, and
+      // inside the subquery it would name the subquery's own row.
+      statementId: sql<string | null>`(
+        select s.id from commission_statements s
+        where s.member_id = invoices.member_id and s.period = invoices.period
+      )`,
       exclVatMinor: invoices.exclVatMinor,
-      // The outer table named by hand: Drizzle leaves a column of a one-table select unqualified, and inside the
-      // subquery it would name the credit note itself, reading every invoice as never credited.
       creditedMinor: sql<string>`coalesce((
         select -sum(n.excl_vat_minor) from invoices n
         where n.credited_invoice_id = invoices.id and n.kind = 'credit_note'

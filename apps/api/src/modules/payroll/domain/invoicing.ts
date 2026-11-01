@@ -24,6 +24,9 @@ import {
   invoiceTotals,
   paymentTermsMention,
   planCreditNotes,
+  reissueLines,
+  reissueMention,
+  reissuesDue,
   type CreditDue,
   type InvoiceLine,
   type InvoiceSource,
@@ -31,9 +34,10 @@ import {
 } from './invoices';
 
 /**
- * What the validation of a statement issues (EQ-06 lot 3, ADR 0023 § Factures, ADR 0036), the pure plan: its invoice,
- * and the credit notes its period owes, each on the invoice that can take it whole. The job reads the facts, hands them
- * here, then numbers and writes each document in its one transaction. A document is named by its key: a rerun skips
+ * What the validation of a statement issues (EQ-06 lot 3, ADR 0023 § Factures, ADR 0036, ADR 0040), the pure plan: its
+ * invoice, the credit notes its period owes, each on the invoice that can take it whole, and the corrective invoice of
+ * each cancel and reissue. The job reads the facts, hands them here, then numbers and writes all the documents in one
+ * transaction. A document is named by its key: a rerun skips
  * what was issued and plans only what is missing.
  */
 
@@ -98,7 +102,12 @@ export interface DocumentToIssue {
   readonly key: string;
   readonly kind: InvoiceKind;
   readonly creditedInvoiceId: string | null;
-  /** The period of the service: the statement's for an invoice, the cited invoice's for a credit note. */
+  /** The invoice a cancel and reissue cancels and bills again, on both its documents (ADR 0040); else `null`. */
+  readonly reissuedInvoiceId: string | null;
+  /**
+   * The period of the service: the statement's for its invoice, the cited invoice's for a credit note or a corrective
+   * invoice.
+   */
   readonly period: PayPeriod;
   readonly issuedOn: string;
   readonly dueOn: string;
@@ -106,7 +115,7 @@ export interface DocumentToIssue {
   readonly agency: InvoiceAgency;
   readonly regime: InvoiceRegime;
   readonly mentions: readonly string[];
-  /** An invoice's designation of the service; `null` on a credit note, which cites its invoice. */
+  /** An invoice's designation of the service, a corrective one's too; `null` on a credit note, which cites its invoice. */
   readonly serviceDescription: string | null;
   readonly logoSha256: string | null;
   readonly lines: readonly InvoiceLine[];
@@ -123,7 +132,10 @@ export interface DocumentNotIssued {
 }
 
 export interface InvoicingPlan {
-  /** The invoice first, then the credit notes in the order the period owes them. */
+  /**
+   * The invoice first, then the credit notes in the order the period owes them, the cancel of each cancel and reissue
+   * first and its corrective invoice right after it, numbered next.
+   */
   readonly documents: readonly DocumentToIssue[];
   readonly notIssued: readonly DocumentNotIssued[];
   /** The amber warnings of the invoice, which goes out all the same. */
@@ -137,6 +149,10 @@ export const invoiceKey = (statementId: string): string => `invoice:${statementI
 export const creditNoteKey = (statementId: string, index: number): string =>
   `credit:${statementId}:${String(index)}`;
 
+/** The key of the `index`-th corrective invoice a statement's period owes, in the order of `reissuesDue`. */
+export const reissueKey = (statementId: string, index: number): string =>
+  `reissue:${statementId}:${String(index)}`;
+
 const sum = (amounts: readonly number[]): number => amounts.reduce((total, one) => total + one, 0);
 
 /**
@@ -146,7 +162,10 @@ const sum = (amounts: readonly number[]): number => amounts.reduce((total, one) 
  * the period owes (`creditsDue`), on the invoice `planCreditNotes` finds for it: it keeps that invoice's period, regime
  * and the regime's mentions (ADR 0036), and prints the parties of the day and the invoice it cites. A due
  * no invoice can take whole is not issued, and neither is one without the agency's identity, the contractor's or a
- * mandate: each is said to the owner.
+ * mandate: each is said to the owner. The cancel of a cancel and reissue leaves with its corrective invoice or not at
+ * all (ADR 0039 § 3, ADR 0040): the corrective invoice bills the same amount again under the cancelled invoice's
+ * period, regime and mentions, never the regime of the day, citing it first and ending with the payment terms; it
+ * prints the parties, the designation and the terms of the day, which is the error of text it corrects.
  */
 export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
   const { statementId, source, issuedOn, issuedAt, settings, mandate } = facts;
@@ -186,6 +205,7 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
         key: invoiceKey(statementId),
         kind: 'invoice',
         creditedInvoiceId: null,
+        reissuedInvoiceId: null,
         period: source.period,
         issuedOn,
         dueOn,
@@ -204,32 +224,39 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     }
   }
 
-  // The cancel of a cancel and reissue leaves with the invoice that bills it again, or not at all (ADR 0039 § 3): while
-  // that invoice is due but cannot be issued, the cancel waits, said to the owner for the same reason, and both leave
-  // at the next pass. A period with nothing to invoice has no such invoice to wait for: its credit due takes the line.
-  const invoiceOut =
-    facts.issuedKeys.has(invoiceKey(statementId)) || documents.some((one) => one.kind === 'invoice');
-  const invoiceHeld = invoiceOut || decision.kind === 'issue' ? null : decision.reason;
+  // The cancel of each cancel and reissue is placed first: its amount is what its invoice had left when the contest was
+  // upheld, and another due of the same period placed before it would leave it short. A cancel whose key is issued
+  // went out with its corrective invoice, in one transaction. Each key stays its place in `creditsDue`.
   const pending = creditsDue(source)
     .map((due, index) => ({ due, key: creditNoteKey(statementId, index) }))
-    .filter((one) => !facts.issuedKeys.has(one.key))
-    .filter((one) => {
-      if (one.due.kind !== 'adjustment' || !one.due.withInvoice) return true;
-      if (invoiceHeld === null || invoiceHeld === 'nothing_to_invoice') return true;
-      notIssued.push({ document: 'credit_note', reason: invoiceHeld, amountMinor: one.due.amountMinor });
-      return false;
-    });
+    .filter((one) => !facts.issuedKeys.has(one.key));
   const keyOf = new Map<CreditDue, string>(pending.map((one) => [one.due, one.key]));
-  // The cancel of a pair is placed first: its amount is what the invoice had left when the contest was upheld, and
-  // another due of the same period placed before it would leave it short while its reissued line goes out. Its key
-  // stays its place in `creditsDue`.
-  const paired = (due: CreditDue): boolean => due.kind === 'adjustment' && due.withInvoice;
+  const cancelOf = (due: CreditDue): string | null => (due.kind === 'adjustment' ? due.reissueOf : null);
   const { notes, unplaced } = planCreditNotes(
-    [...pending.filter((one) => paired(one.due)), ...pending.filter((one) => !paired(one.due))].map(
-      (one) => one.due,
-    ),
+    [
+      ...pending.filter((one) => cancelOf(one.due) !== null),
+      ...pending.filter((one) => cancelOf(one.due) === null),
+    ].map((one) => one.due),
     facts.invoices,
   );
+  // The corrective invoice of each cancel, by the invoice both name; one already issued is never planned again.
+  const reissues = new Map(
+    reissuesDue(source).map((due, index) => [due.invoiceId, { due, key: reissueKey(statementId, index) }]),
+  );
+  const reissueFor = (due: CreditDue) => {
+    const invoiceId = cancelOf(due);
+    if (invoiceId === null) return null;
+    const reissue = reissues.get(invoiceId);
+    if (reissue === undefined) throw new Error('A cancel without its corrective invoice');
+    return facts.issuedKeys.has(reissue.key) ? null : reissue;
+  };
+  /** A due not issued, said to the owner, and with a cancel its corrective invoice, held for the same reason. */
+  const hold = (due: CreditDue, reason: InvoiceNotIssuedReason): void => {
+    notIssued.push({ document: 'credit_note', reason, amountMinor: due.amountMinor });
+    const reissue = reissueFor(due);
+    if (reissue !== null)
+      notIssued.push({ document: 'invoice', reason, amountMinor: reissue.due.amountMinor });
+  };
   const credited = new Map(facts.invoices.map((one) => [one.id, one.creditedMinor]));
   for (const note of notes) {
     const cited = facts.invoices.find((one) => one.number === note.invoiceNumber);
@@ -237,23 +264,20 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     if (cited === undefined || key === undefined) throw new Error('A credit note planned off its invoices');
     const until = deadline();
     const identity = facts.identity;
-    const skip = (reason: InvoiceNotIssuedReason): void => {
-      notIssued.push({ document: 'credit_note', reason, amountMinor: note.request.amountMinor });
-    };
     if (settings === null) {
-      skip('agency_missing');
+      hold(note.request, 'agency_missing');
       continue;
     }
     if (!identityComplete(identity, cited.regime)) {
-      skip('identity_incomplete');
+      hold(note.request, 'identity_incomplete');
       continue;
     }
     if (until === null) {
-      skip('no_mandate');
+      hold(note.request, 'no_mandate');
       continue;
     }
     if (facts.prefix === null) {
-      skip('prefix_missing');
+      hold(note.request, 'prefix_missing');
       continue;
     }
     const creditedMinor = credited.get(cited.id) ?? 0;
@@ -266,6 +290,7 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
       key,
       kind: 'credit_note',
       creditedInvoiceId: cited.id,
+      reissuedInvoiceId: cancelOf(note.request),
       period: cited.period,
       issuedOn,
       dueOn: invoiceDueOn(issuedOn, settings.dueDays),
@@ -281,9 +306,36 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
       totals: invoiceTotals(noteLines, cited.regime.vat),
       acceptanceDeadline: until,
     });
+    const reissue = reissueFor(note.request);
+    if (reissue === null) continue;
+    if (reissue.due.amountMinor !== note.request.amountMinor) {
+      throw new Error('A corrective invoice that does not bill again what its cancel takes off');
+    }
+    const dueOn = invoiceDueOn(issuedOn, settings.dueDays);
+    const lines = reissueLines(reissue.due);
+    documents.push({
+      key: reissue.key,
+      kind: 'invoice',
+      creditedInvoiceId: null,
+      reissuedInvoiceId: cited.id,
+      period: cited.period,
+      issuedOn,
+      dueOn,
+      contractor: identity,
+      agency: settings.agency,
+      regime: cited.regime,
+      mentions: [
+        reissueMention(cited.number, cited.issuedOn),
+        ...cited.regime.mentions,
+        paymentTermsMention(dueOn, settings.paymentTerms),
+      ],
+      serviceDescription: settings.serviceDescription,
+      logoSha256: settings.logoSha256,
+      lines,
+      totals: invoiceTotals(lines, cited.regime.vat),
+      acceptanceDeadline: until,
+    });
   }
-  for (const due of unplaced) {
-    notIssued.push({ document: 'credit_note', reason: 'no_invoice_to_credit', amountMinor: due.amountMinor });
-  }
+  for (const due of unplaced) hold(due, 'no_invoice_to_credit');
   return { documents, notIssued, warnings: decision.warnings };
 }

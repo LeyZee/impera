@@ -34,8 +34,11 @@ async function failure(promise: Promise<unknown>): Promise<string> {
   return 'no error';
 }
 
-/** The migrations' triggers (0041, 0050): every refusal names EQ-06 or ADR 0036, and ADR 0039 for an upheld contest. */
-const KEPT = /\((EQ-06|ADR 0036)(, ADR 0039)?\)/u;
+/**
+ * The migrations' triggers (0041, 0050, 0052): every refusal names EQ-06 or ADR 0036, ADR 0039 for an upheld contest,
+ * ADR 0040 for a cancel and reissue.
+ */
+const KEPT = /\((EQ-06|ADR 0036|ADR 0040)(, ADR 00(39|40))?\)/u;
 const RLS = /row-level security/u;
 const DENIED = /permission denied/u;
 const HASH = 'a'.repeat(64);
@@ -198,76 +201,87 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
     readonly invoice?: Partial<typeof s.invoices.$inferInsert>;
   }
 
+  type Tx = Parameters<Parameters<typeof withAdmin>[1]>[0];
+
   /**
-   * Issues an invoice or a credit note as lot 3 will, in one transaction: the counter locked `FOR UPDATE` and moved
-   * by one, the invoice with its number, its lines, its event `issued`.
+   * Writes an invoice or a credit note as lot 3 does: the counter locked `FOR UPDATE` and moved by one, the invoice
+   * with its number, its lines, its event `issued`.
    */
-  const issue = (o: Issue): Promise<{ id: string; number: string }> => {
-    const write = async (tx: Parameters<Parameters<typeof withAdmin>[1]>[0]) => {
-      const memberId = member(o.userId);
-      const where = and(eq(s.invoiceCounters.memberId, memberId), eq(s.invoiceCounters.year, year));
-      const [counter] = await tx.select().from(s.invoiceCounters).where(where).for('update');
-      const next = (counter?.lastSequence ?? 0) + 1;
-      if (counter === undefined) {
-        await tx.insert(s.invoiceCounters).values({ memberId, year, lastSequence: next });
-      } else {
-        await tx.update(s.invoiceCounters).set({ lastSequence: next }).where(where);
-      }
-      const sequence = o.skip === true ? next + 1 : next;
-      const own = o.invoice?.prefix ?? prefix(o.userId);
-      const number = `${own}-${String(year)}-${String(sequence).padStart(4, '0')}`;
-      const id = newId(InvoiceIdSchema);
-      await tx.insert(s.invoices).values({
-        id,
-        kind: o.creditedInvoiceId === undefined ? 'invoice' : 'credit_note',
-        memberId,
-        statementId: o.statementId,
-        creditedInvoiceId: o.creditedInvoiceId ?? null,
-        period: o.period,
-        prefix: own,
-        year,
-        sequence,
-        number,
-        idempotencyKey: `test:${id}`,
-        issuedOn: today,
-        issuedBy: o.by,
-        dueOn: today,
-        contractor: CONTRACTOR,
-        agency: AGENCY,
-        regimeId: benin.id,
-        regime: regimeCopy(benin, '2026-10-30'),
-        mentions: ['Autofacturation', 'Autoliquidation'],
-        exclVatMinor: o.amountMinor,
-        vatMinor: 0,
-        inclVatMinor: o.amountMinor,
-        selfAssessedVatMinor: Math.trunc(o.amountMinor / 5),
-        acceptanceDeadline: new Date(Date.now() + 7 * DAY),
-        // What an invoice bills, required at its commit from 0045 on; a credit note cites its invoice instead.
-        serviceDescription: o.creditedInvoiceId === undefined ? 'Animation commerciale de comptes' : null,
-        ...o.invoice,
-      });
-      const amounts = o.lines ?? [o.amountMinor];
-      if (amounts.length > 0) {
-        await tx.insert(s.invoiceLines).values(
-          amounts.map((amountMinor, index) => ({
-            invoiceId: id,
-            position: index + 1,
-            kind: amountMinor < 0 ? 'reduction' : 'commission',
-            label: amountMinor < 0 ? 'Réduction' : 'Commission',
-            detail: null,
-            amountMinor,
-          })),
-        );
-      }
-      if (o.withoutIssued !== true) {
-        await tx
-          .insert(s.invoiceEvents)
-          .values({ id: newId(InvoiceEventIdSchema), invoiceId: id, kind: 'issued', by: o.by });
-      }
-      return { id, number };
-    };
-    return o.by === null ? admin(write) : as(o.by, write);
+  const writeIssue = async (tx: Tx, o: Issue): Promise<{ id: string; number: string }> => {
+    const memberId = member(o.userId);
+    const where = and(eq(s.invoiceCounters.memberId, memberId), eq(s.invoiceCounters.year, year));
+    const [counter] = await tx.select().from(s.invoiceCounters).where(where).for('update');
+    const next = (counter?.lastSequence ?? 0) + 1;
+    if (counter === undefined) {
+      await tx.insert(s.invoiceCounters).values({ memberId, year, lastSequence: next });
+    } else {
+      await tx.update(s.invoiceCounters).set({ lastSequence: next }).where(where);
+    }
+    const sequence = o.skip === true ? next + 1 : next;
+    const own = o.invoice?.prefix ?? prefix(o.userId);
+    const number = `${own}-${String(year)}-${String(sequence).padStart(4, '0')}`;
+    const id = newId(InvoiceIdSchema);
+    await tx.insert(s.invoices).values({
+      id,
+      kind: o.creditedInvoiceId === undefined ? 'invoice' : 'credit_note',
+      memberId,
+      statementId: o.statementId,
+      creditedInvoiceId: o.creditedInvoiceId ?? null,
+      period: o.period,
+      prefix: own,
+      year,
+      sequence,
+      number,
+      idempotencyKey: `test:${id}`,
+      issuedOn: today,
+      issuedBy: o.by,
+      dueOn: today,
+      contractor: CONTRACTOR,
+      agency: AGENCY,
+      regimeId: benin.id,
+      regime: regimeCopy(benin, '2026-10-30'),
+      mentions: ['Autofacturation', 'Autoliquidation'],
+      exclVatMinor: o.amountMinor,
+      vatMinor: 0,
+      inclVatMinor: o.amountMinor,
+      selfAssessedVatMinor: Math.trunc(o.amountMinor / 5),
+      acceptanceDeadline: new Date(Date.now() + 7 * DAY),
+      // What an invoice bills, required at its commit from 0045 on; a credit note cites its invoice instead.
+      serviceDescription: o.creditedInvoiceId === undefined ? 'Animation commerciale de comptes' : null,
+      ...o.invoice,
+    });
+    const amounts = o.lines ?? [o.amountMinor];
+    if (amounts.length > 0) {
+      await tx.insert(s.invoiceLines).values(
+        amounts.map((amountMinor, index) => ({
+          invoiceId: id,
+          position: index + 1,
+          kind: amountMinor < 0 ? 'reduction' : 'commission',
+          label: amountMinor < 0 ? 'Réduction' : 'Commission',
+          detail: null,
+          amountMinor,
+        })),
+      );
+    }
+    if (o.withoutIssued !== true) {
+      await tx
+        .insert(s.invoiceEvents)
+        .values({ id: newId(InvoiceEventIdSchema), invoiceId: id, kind: 'issued', by: o.by });
+    }
+    return { id, number };
   };
+
+  /** Issues an invoice or a credit note in a transaction of its own, as the owner or the job. */
+  const issue = (o: Issue): Promise<{ id: string; number: string }> =>
+    o.by === null ? admin((tx) => writeIssue(tx, o)) : as(o.by, (tx) => writeIssue(tx, o));
+
+  /** Issues documents in one transaction, in order, as the job does a validation's (ADR 0040: a cancel and reissue). */
+  const issueTogether = (list: readonly Issue[]): Promise<{ id: string; number: string }[]> =>
+    admin(async (tx) => {
+      const written: { id: string; number: string }[] = [];
+      for (const one of list) written.push(await writeIssue(tx, one));
+      return written;
+    });
 
   /** An event of invoice `invoiceId`, by `by` in the application, or by the job when `by` is `null`. */
   const event = (
@@ -1234,6 +1248,130 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await failure(adjustment(statement(ama, '2026-08-01')))).toMatch(KEPT);
       expect(await failure(adjustment(statement(kofi, '2026-09-16')))).toMatch(KEPT);
       await adjustment(statement(kofi, '2026-08-16'));
+    });
+
+    it('a cancel and reissue: the cancel takes all that is left, the corrective invoice bills it again under its period, regime and mentions, both or neither (ADR 0040)', async () => {
+      const cancelled = invoices.get('ama-aug1');
+      if (cancelled === undefined) throw new Error('no invoice');
+      // 12 000, of which a credit note took 1 000: 11 000 left. Its cancel and reissue leave with a later statement.
+      const later = await validated(ama, '2026-08-16');
+      statements.set(`${ama}:2026-08-16`, later);
+      const amas = { ...CONTRACTOR, legalName: 'Ama Exemple' };
+      const reference = (number: string) => `Facture rectificative de la facture ${number} du ${today}`;
+      const terms = `Échéance : ${today}. Aucun escompte.`;
+      const cancel = (
+        values: Partial<Issue> = {},
+        invoice: Partial<typeof s.invoices.$inferInsert> = {},
+      ): Issue => ({
+        by: null,
+        userId: ama,
+        statementId: later,
+        period: '2026-08-01',
+        creditedInvoiceId: cancelled.id,
+        amountMinor: -11_000,
+        invoice: { contractor: amas, reissuedInvoiceId: cancelled.id, ...invoice },
+        ...values,
+      });
+      const corrective = (
+        values: Partial<Issue> = {},
+        invoice: Partial<typeof s.invoices.$inferInsert> = {},
+      ): Issue => ({
+        by: null,
+        userId: ama,
+        statementId: later,
+        period: '2026-08-01',
+        amountMinor: 11_000,
+        invoice: {
+          contractor: amas,
+          reissuedInvoiceId: cancelled.id,
+          mentions: [reference(cancelled.number), ...benin.mentions, terms],
+          ...invoice,
+        },
+        ...values,
+      });
+      const [creditNote] = await admin((tx) =>
+        tx
+          .select({ id: s.invoices.id })
+          .from(s.invoices)
+          .where(and(eq(s.invoices.memberId, member(ama)), eq(s.invoices.kind, 'credit_note'))),
+      );
+      if (creditNote === undefined) throw new Error('no credit note');
+
+      // Never one without the other: the corrective invoice alone at its insert, the cancel alone at the commit.
+      expect(await failure(issueTogether([corrective()]))).toMatch(/what the cancel written before it/u);
+      expect(await failure(issueTogether([cancel()]))).toMatch(/written with the other one/u);
+      // The cancel takes all that is left; the corrective invoice bills again exactly what it took off.
+      expect(
+        await failure(issueTogether([cancel({ amountMinor: -10_000 }), corrective({ amountMinor: 10_000 })])),
+      ).toMatch(/takes off all that is left/u);
+      expect(await failure(issueTogether([cancel(), corrective({ amountMinor: 10_000 })]))).toMatch(
+        /what the cancel written before it/u,
+      );
+      // Its period, its regime, the regime's mentions framed by its own, an invoice it names: never the day's.
+      for (const wrong of [
+        corrective({}, { regime: { ...regimeCopy(benin, '2026-10-30'), mentions: [] } }),
+        corrective({}, { regimeId: france.id, regime: regimeCopy(france, '2026-10-30') }),
+        corrective({}, { mentions: [reference(`AMA-${String(year)}-0009`), ...benin.mentions, terms] }),
+        corrective({}, { mentions: [reference(cancelled.number), 'Autre mention', terms] }),
+        corrective({}, { mentions: [...benin.mentions, terms] }),
+        corrective({}, { reissuedInvoiceId: creditNote.id }),
+      ]) {
+        expect(await failure(issueTogether([cancel(), wrong]))).toMatch(
+          /citing it, with its period, its regime and the regime's mentions \(ADR 0040\)/u,
+        );
+      }
+      // Owed by a later statement, never by the period's own.
+      expect(await failure(issueTogether([cancel(), corrective({ period: '2026-08-16' })]))).toMatch(
+        /a corrective invoice is owed by a later one/u,
+      );
+
+      const [cancelNote, replacing] = await issueTogether([cancel(), corrective()]);
+      if (cancelNote === undefined || replacing === undefined) throw new Error('no pair');
+      // Numbered one after the other in the contractor's sequence: the failed transactions left no hole.
+      expect([cancelNote.number, replacing.number]).toEqual([
+        `AMA-${String(year)}-0003`,
+        `AMA-${String(year)}-0004`,
+      ]);
+      // Once: nothing is left of the invoice to cancel again.
+      expect(await failure(issueTogether([cancel(), corrective()]))).toMatch(
+        /never takes more than what is left/u,
+      );
+      // The later statement still bills its own period, once.
+      const own = { by: null, userId: ama, statementId: later, period: '2026-08-16', amountMinor: 12_000 };
+      await issue({ ...own, invoice: { contractor: amas } });
+      expect(await failure(issue({ ...own, invoice: { contractor: amas } }))).toMatch(
+        /invoices_statement_unique/u,
+      );
+
+      // Contested in its turn, the corrective invoice is corrected on the period it bills again, never on the
+      // statement that issued it; cancelled and billed again, its own corrective invoice keeps that period.
+      await event(ama, replacing.id, 'contested', { reason: 'Mon adresse est encore fausse' });
+      const pair = (correctsStatementId: string) =>
+        [-11_000, 11_000].map((amountMinor) =>
+          correction(owner, replacing.id, {
+            memberId: member(ama),
+            amountMinor,
+            reason: amountMinor < 0 ? 'Annulation' : 'Refacturation',
+            correctsStatementId,
+          }),
+        );
+      expect(await failure(uphold(owner, replacing.id, pair(later)))).toMatch(/and that document's period/u);
+      await uphold(owner, replacing.id, pair(statement(ama, '2026-08-01')));
+      const next = await validated(ama, '2026-09-01');
+      const chained = await issueTogether([
+        cancel({ statementId: next, creditedInvoiceId: replacing.id }, { reissuedInvoiceId: replacing.id }),
+        corrective(
+          { statementId: next },
+          {
+            reissuedInvoiceId: replacing.id,
+            mentions: [reference(replacing.number), ...benin.mentions, terms],
+          },
+        ),
+      ]);
+      expect(chained.map((one) => one.number)).toEqual([
+        `AMA-${String(year)}-0006`,
+        `AMA-${String(year)}-0007`,
+      ]);
     });
   });
 });

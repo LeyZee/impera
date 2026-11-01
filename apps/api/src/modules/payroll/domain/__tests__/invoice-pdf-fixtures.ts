@@ -6,11 +6,11 @@ import {
 } from '@nirvana/contracts';
 
 import type { PdfDocumentSource } from '../invoice-pdf';
-import { creditNoteMention, paymentTermsMention } from '../invoices';
+import { creditNoteMention, paymentTermsMention, reissueMention } from '../invoices';
 
 /**
  * Documents to render in the tests, every party and figure invented (ADR 0010): the audit's mockup (01/11/2026) in
- * data, a credit note on it, and the worst case the limits allow.
+ * data, a credit note on it, a corrective invoice of it (ADR 0040), and the worst case the limits allow.
  */
 
 export const AGENCY: InvoiceAgency = {
@@ -90,6 +90,7 @@ export function sampleInvoice(patch: Partial<PdfDocumentSource> = {}): PdfDocume
     ],
     totals: { exclVatMinor: 93_096, vatMinor: 0, inclVatMinor: 93_096 },
     credited: null,
+    reissued: null,
     annex: {
       validatedOn: '2026-11-17',
       commissionRateBps: 4_000,
@@ -146,6 +147,39 @@ export function sampleCreditNote(patch: Partial<PdfDocumentSource> = {}): PdfDoc
     ],
     totals: { exclVatMinor: -4_500, vatMinor: 0, inclVatMinor: -4_500 },
     credited: { number: 'AEX-2026-0021', issuedOn: '2026-11-17' },
+    annex: null,
+    ...patch,
+  };
+}
+
+/**
+ * The corrective invoice of the mockup (ADR 0040): its address was wrong, the contest upheld; issued with its cancel
+ * at the next validation, it bills the same amount again under its period, regime and mentions, with the file of the
+ * day.
+ */
+export function sampleCorrectiveInvoice(patch: Partial<PdfDocumentSource> = {}): PdfDocumentSource {
+  return {
+    ...sampleInvoice(),
+    number: 'AEX-2026-0025',
+    issuedOn: '2026-12-02',
+    dueOn: '2027-01-31',
+    contractor: { ...CONTRACTOR, address: 'Lot 12, quartier Exemple\nCotonou' },
+    mentions: [
+      reissueMention('AEX-2026-0021', '2026-11-17'),
+      ...REGIME_MENTIONS,
+      paymentTermsMention('2027-01-31', TERMS),
+    ],
+    acceptanceDeadline: new Date('2026-12-09T09:30:00.000Z'),
+    lines: [
+      {
+        kind: 'adjustment',
+        label: 'Régularisation',
+        detail:
+          'Période du 1er au 15 novembre 2026\u00a0: «\u00a0Refacturation de la facture AEX-2026-0021 du 17 novembre 2026\u00a0»',
+        amountMinor: 93_096,
+      },
+    ],
+    reissued: { number: 'AEX-2026-0021', issuedOn: '2026-11-17' },
     annex: null,
     ...patch,
   };

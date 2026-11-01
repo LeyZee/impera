@@ -282,7 +282,7 @@ async function factsOf(
     .select({ key: invoices.idempotencyKey })
     .from(invoices)
     .where(
-      sql`${invoices.idempotencyKey} = ${`invoice:${statement.id}`} or ${invoices.idempotencyKey} like ${`credit:${statement.id}:%`}`,
+      sql`${invoices.idempotencyKey} = ${`invoice:${statement.id}`} or ${invoices.idempotencyKey} like ${`credit:${statement.id}:%`} or ${invoices.idempotencyKey} like ${`reissue:${statement.id}:%`}`,
     );
   return {
     statementId: statement.id,
@@ -359,6 +359,7 @@ async function writeDocument(
     memberId: statement.memberId,
     statementId: statement.id,
     creditedInvoiceId: document.creditedInvoiceId,
+    reissuedInvoiceId: document.reissuedInvoiceId,
     period: document.period,
     prefix,
     year,
@@ -409,7 +410,10 @@ async function writeDocument(
       number,
       statementId: statement.id,
       key: document.key,
-      ...(document.kind === 'invoice' && warnings.length > 0 ? { warnings } : {}),
+      ...(document.reissuedInvoiceId === null ? {} : { reissuedInvoiceId: document.reissuedInvoiceId }),
+      ...(document.kind === 'invoice' && document.reissuedInvoiceId === null && warnings.length > 0
+        ? { warnings }
+        : {}),
     },
     ip: null,
   });

@@ -13,6 +13,9 @@ import {
   longDay,
   periodWords,
   planCreditNotes,
+  reissueLines,
+  reissueMention,
+  reissuesDue,
   type CreditDue,
   type InvoiceLine,
   type InvoiceSource,
@@ -132,7 +135,7 @@ describe('the lines of a statement’s invoice (EQ-06)', () => {
         amountMinor: 3_000,
         reason: 'PPV remboursé',
         correctsPeriod: period('2026-10-01'),
-        withInvoice: false,
+        reissueOf: null,
       },
     ]);
     // The spaces around a quotation and before a colon never break.
@@ -397,11 +400,62 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
         amountMinor: 3_000,
         reason: 'PPV remboursé',
         correctsPeriod: period('2026-10-01'),
-        withInvoice: false,
+        reissueOf: null,
       },
       { kind: 'negative_period', amountMinor: 1_100, period: period('2026-10-16') },
     ]);
     expect(creditsDue(simple('2026-10-16', 0))).toEqual([]);
+  });
+
+  it('owes a corrective invoice for the positive half of a cancel and reissue, which is no line of the period’s invoice', () => {
+    const named = (amountMinor: number, reason: string, contestedInvoiceId: string) => ({
+      amountMinor,
+      reason,
+      correctsPeriod: period('2026-10-01'),
+      contestedInvoiceId,
+    });
+    const corrected = simple('2026-10-16', 4_000, {
+      adjustments: [
+        named(-20_000, 'Annulation de la facture NORA-2026-0001 du 17 octobre 2026', 'inv-1001'),
+        named(20_000, 'Refacturation de la facture NORA-2026-0001 du 17 octobre 2026', 'inv-1001'),
+        // An upheld contest corrected by an amount in the contractor's favour: a line of the period's invoice.
+        named(700, 'Vente oubliée', 'inv-0916'),
+      ],
+    });
+    expect(invoiceLines(corrected).map((line) => [line.kind, line.amountMinor])).toEqual([
+      ['commission', 4_000],
+      ['adjustment', 700],
+    ]);
+    expect(reissuesDue(corrected)).toEqual([
+      {
+        invoiceId: 'inv-1001',
+        amountMinor: 20_000,
+        reason: 'Refacturation de la facture NORA-2026-0001 du 17 octobre 2026',
+        correctsPeriod: period('2026-10-01'),
+      },
+    ]);
+    expect(creditsDue(corrected)).toEqual([
+      {
+        kind: 'adjustment',
+        amountMinor: 20_000,
+        reason: 'Annulation de la facture NORA-2026-0001 du 17 octobre 2026',
+        correctsPeriod: period('2026-10-01'),
+        reissueOf: 'inv-1001',
+      },
+    ]);
+    expect(reissueMention('NORA-2026-0001', '2026-10-17')).toBe(
+      'Facture rectificative de la facture NORA-2026-0001 du 17 octobre 2026',
+    );
+    const [due] = reissuesDue(corrected);
+    if (due === undefined) throw new Error('no corrective invoice due');
+    const [line] = reissueLines(due);
+    expect({ ...line, detail: plain(line?.detail ?? null) }).toEqual({
+      kind: 'adjustment',
+      label: 'Régularisation',
+      detail:
+        'Période du 1er au 15 octobre 2026 : « Refacturation de la facture NORA-2026-0001 du 17 octobre 2026 »',
+      amountMinor: 20_000,
+    });
   });
 
   it('prints a credit a period owes as the adjustment with its period, or as the negative balance of a period', () => {
@@ -412,7 +466,7 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
         amountMinor: 3_000,
         reason: 'PPV remboursé',
         correctsPeriod: period('2026-10-01'),
-        withInvoice: false,
+        reissueOf: null,
       }).map((line) => ({ ...line, detail: plain(line.detail) })),
     ).toEqual([
       {
@@ -442,6 +496,7 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
   });
 
   const issued = (number: string, day: string, exclVatMinor: number, creditedMinor = 0): IssuedInvoice => ({
+    id: `id-${number}`,
     number,
     period: period(day),
     exclVatMinor,
@@ -452,7 +507,7 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
     amountMinor,
     reason: 'PPV remboursé',
     correctsPeriod: corrects === null ? null : period(corrects),
-    withInvoice: false,
+    reissueOf: null,
   });
   const negative = (amountMinor: number, day: string): CreditDue => ({
     kind: 'negative_period',
@@ -478,6 +533,28 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
     ]) {
       expect(planCreditNotes([due], invoices)).toEqual({ notes: [], unplaced: [due] });
     }
+  });
+
+  it('credits the cancel of a cancel and reissue on the invoice it cancels, never another invoice of its period', () => {
+    const invoices = [
+      issued('NORA-2026-0002', '2026-10-01', 30_000),
+      issued('NORA-2026-0003', '2026-10-01', 20_000),
+    ];
+    const cancel: CreditDue = {
+      kind: 'adjustment',
+      amountMinor: 20_000,
+      reason: 'Annulation de la facture NORA-2026-0003 du 2 novembre 2026',
+      correctsPeriod: period('2026-10-01'),
+      reissueOf: 'id-NORA-2026-0003',
+    };
+    expect(planCreditNotes([cancel], invoices).notes).toEqual([
+      { invoiceNumber: 'NORA-2026-0003', request: cancel },
+    ]);
+    // Less left on it than the cancel takes: never moved to the other one.
+    const short = [invoices[0], issued('NORA-2026-0003', '2026-10-01', 20_000, 1)].filter(
+      (one) => one !== undefined,
+    );
+    expect(planCreditNotes([cancel], short)).toEqual({ notes: [], unplaced: [cancel] });
   });
 
   it('credits a negative period on the latest earlier invoice that has enough left, counting the notes before it', () => {

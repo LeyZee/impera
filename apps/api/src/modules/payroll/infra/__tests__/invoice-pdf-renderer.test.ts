@@ -7,6 +7,7 @@ import {
   frenchCharged,
   frenchFranchise,
   REGIME_MENTIONS,
+  sampleCorrectiveInvoice,
   sampleCreditNote,
   sampleInvoice,
   worstCase,
@@ -180,6 +181,23 @@ describe('Équipe › Factures : le PDF rendu (EQ-06 lot 4, ADR 0037 § 2)', { t
     // « Il n’a pas d’échéance » only: neither the label nor the day the copy keeps.
     expect(page).not.toContain(squeeze('Échéance :'));
     expect(page).not.toContain(squeeze('31 janvier 2027'));
+  });
+
+  it('renders the corrective invoice on one page, naming the invoice it replaces, with its due date', async () => {
+    const content = invoicePdfContent(sampleCorrectiveInvoice());
+    const pages = await pagesOf(await render(content));
+    expect(pages).toHaveLength(1);
+    const [page = ''] = pages.map(squeeze);
+    for (const word of [
+      content.heading,
+      content.number,
+      ...content.meta.flatMap((one) => [one.label, one.value]),
+      ...content.object.map((one) => one.text),
+      ...content.blocks.flatMap((block) => block.paragraphs),
+      'Page 1/1',
+    ]) {
+      expect(page, word).toContain(squeeze(word));
+    }
   });
 
   it('carries the worst case the limits allow over its pages, losing no word, each page with its foot', async () => {
