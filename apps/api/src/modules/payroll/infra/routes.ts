@@ -1,4 +1,5 @@
 import {
+  AcceptContractTextBodySchema,
   AgencyLogoParamsSchema,
   AgencyLogoSchema,
   BillingSettingsViewSchema,
@@ -9,6 +10,14 @@ import {
   CommissionStatementIdSchema,
   CommissionStatementSchema,
   ContestInvoiceBodySchema,
+  ContractAcceptanceSchema,
+  ContractorFileSchema,
+  ContractorParamsSchema,
+  ContractorProfileBodySchema,
+  ContractTextParamsSchema,
+  ContractTextSchema,
+  ContractTextsSchema,
+  CreateContractTextBodySchema,
   CreateBonusBodySchema,
   CreateBonusTierSetBodySchema,
   CreateCollectiveGoalBodySchema,
@@ -18,6 +27,7 @@ import {
   ExchangeRatesSchema,
   InvoiceAcceptanceViewSchema,
   InvoiceParamsSchema,
+  InvoicePrefixBodySchema,
   PageQuerySchema,
   PayAdjustmentSchema,
   PayCommissionStatementBodySchema,
@@ -36,6 +46,7 @@ import {
   UpholdInvoiceContestBodySchema,
   UserIdSchema,
   ValidateCommissionStatementBodySchema,
+  VerifyContractorProfileBodySchema,
   type InvoiceId,
   type UserId,
   type UserRole,
@@ -50,7 +61,7 @@ import type { PayrollInvoiceAcceptance } from '../application/invoice-acceptance
 import type { DownloadedPdf } from '../application/invoice-pdfs';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
-import type { Actor, JobLogger, PayrollRuleStore } from '../domain/ports';
+import type { Actor, JobLogger, PayrollContractorStore, PayrollRuleStore } from '../domain/ports';
 
 /** An invoice's PDF as its reader may download it (ADR 0037 § 7). */
 export type InvoicePdfDownload = (
@@ -89,7 +100,9 @@ const LOGO_BODY_LIMIT_BYTES = 1_048_576;
  * and values gives back what was recorded (200). A document is answered by its contractor only, and its contest refused
  * or upheld with its correction by the owner only (ADR 0039); the same answer sent again gives back what was recorded
  * (200). Réglages › Facturation
- * (`/payroll/billing-settings`) is the owner's alone.
+ * (`/payroll/billing-settings`) is the owner's alone. A contractor's file (`/payroll/contractors/:memberId/…`) is
+ * written by himself or the owner, checked and prefixed by the owner only; the contract's and the mandate's versions
+ * (`/payroll/contract-texts`) are added by the owner and accepted by the contractor himself (EQ-06 lot 5a).
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -99,6 +112,7 @@ export function createPayrollRoutes(
   downloadPdf: InvoicePdfDownload,
   acceptance: PayrollInvoiceAcceptance,
   billing: PayrollBillingSettings,
+  contractors: PayrollContractorStore,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -394,6 +408,102 @@ export function createPayrollRoutes(
           .header('cache-control', 'private, max-age=31536000, immutable')
           .header('x-content-type-options', 'nosniff')
           .send(Buffer.from(bytes));
+      },
+    );
+
+    app.get(
+      '/payroll/contractors/:memberId/file',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: ContractorParamsSchema, response: { 200: ContractorFileSchema } },
+      },
+      (request) => contractors.file(userOf(request), request.params.memberId),
+    );
+
+    app.put(
+      '/payroll/contractors/:memberId/profile',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: ContractorParamsSchema,
+          body: ContractorProfileBodySchema,
+          response: { 200: ContractorFileSchema, 201: ContractorFileSchema },
+        },
+      },
+      async (request, reply) => {
+        const { file, created } = await contractors.writeProfile(
+          actorOf(request),
+          request.params.memberId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(file);
+      },
+    );
+
+    app.post(
+      '/payroll/contractors/:memberId/profile/verify',
+      {
+        preValidation: owner,
+        schema: {
+          params: ContractorParamsSchema,
+          body: VerifyContractorProfileBodySchema,
+          response: { 200: ContractorFileSchema },
+        },
+      },
+      (request) => contractors.verifyProfile(actorOf(request), request.params.memberId, request.body),
+    );
+
+    app.put(
+      '/payroll/contractors/:memberId/profile/prefix',
+      {
+        preValidation: owner,
+        schema: {
+          params: ContractorParamsSchema,
+          body: InvoicePrefixBodySchema,
+          response: { 200: ContractorFileSchema },
+        },
+      },
+      (request) => contractors.setPrefix(actorOf(request), request.params.memberId, request.body),
+    );
+
+    app.get(
+      '/payroll/contract-texts',
+      { preValidation: ownerOrMember, schema: { response: { 200: ContractTextsSchema } } },
+      (request) => contractors.texts(userOf(request)),
+    );
+
+    app.post(
+      '/payroll/contract-texts',
+      {
+        preValidation: owner,
+        schema: {
+          body: CreateContractTextBodySchema,
+          response: { 200: ContractTextSchema, 201: ContractTextSchema },
+        },
+      },
+      async (request, reply) => {
+        const { text, created } = await contractors.addText(actorOf(request), request.body);
+        return reply.code(created ? 201 : 200).send(text);
+      },
+    );
+
+    app.post(
+      '/payroll/contract-texts/:textId/accept',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: ContractTextParamsSchema,
+          body: AcceptContractTextBodySchema,
+          response: { 200: ContractAcceptanceSchema, 201: ContractAcceptanceSchema },
+        },
+      },
+      async (request, reply) => {
+        const { acceptance, created } = await contractors.accept(
+          actorOf(request),
+          request.params.textId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(acceptance);
       },
     );
     return Promise.resolve();

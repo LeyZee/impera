@@ -10,7 +10,9 @@ import {
   BillingSettingsViewSchema,
   BusinessIdSchema,
   ContestInvoiceBodySchema,
+  ContractorProfileBodySchema,
   ContractorProfileSchema,
+  CreateContractTextBodySchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
   INVOICE_ERROR_CODES,
@@ -409,5 +411,76 @@ describe('invoices', () => {
       InvoiceAcceptanceViewSchema.safeParse({ ...view, acceptance: { ...view.acceptance, state: 'lost' } })
         .success,
     ).toBe(false);
+  });
+
+  describe('Équipe › Dossier prestataire, contrat et mandat (lot 5a)', () => {
+    /** An invented French company: its SIREN has a right check key, its VAT number is the one it gives. */
+    const company = {
+      legalName: 'Théo Inventé SARL',
+      address: '3 rue Imaginaire\n69001 Lyon',
+      taxId: null,
+      businessId: '12345678200011',
+      vatNumber: 'FR11123456782',
+      individualEntrepreneur: false,
+      legalForm: 'SARL',
+      shareCapitalMinor: 100_000,
+      rcsCity: 'Lyon',
+      email: 'theo@example.test',
+    };
+
+    it('takes a file whose SIREN, VAT number and company mentions hold together', () => {
+      expect(ContractorProfileBodySchema.parse(company)).toEqual(company);
+      // Abroad: no SIREN, a VAT number of another country is not checked against one.
+      const abroad = {
+        ...company,
+        businessId: null,
+        vatNumber: null,
+        legalForm: null,
+        shareCapitalMinor: null,
+        rcsCity: null,
+      };
+      expect(ContractorProfileBodySchema.safeParse(abroad).success).toBe(true);
+      expect(ContractorProfileBodySchema.safeParse({ ...company, vatNumber: 'BE0123456789' }).success).toBe(
+        true,
+      );
+    });
+
+    it('refuses a SIREN with a wrong key, a French VAT number of another SIREN, a company half told', () => {
+      const refused = (body: object): string[] => {
+        const result = ContractorProfileBodySchema.safeParse(body);
+        return result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
+      };
+      expect(refused({ ...company, businessId: '12345678900011' })).toEqual(['businessId']);
+      expect(refused({ ...company, vatNumber: 'FR12123456782' })).toEqual(['vatNumber']);
+      expect(refused({ ...company, shareCapitalMinor: null })).toEqual(['legalForm']);
+      expect(refused({ ...company, individualEntrepreneur: true })).toEqual(['legalForm']);
+      expect(refused({ ...company, shareCapitalMinor: 0 })).toEqual(['shareCapitalMinor']);
+    });
+
+    it('keeps a contract text exactly as pasted, a mandate with its delay to contest', () => {
+      const id = '0190a0b0-0000-7000-8000-000000000020';
+      const body = '  Contrat de prestation (texte inventé).\n';
+      expect(CreateContractTextBodySchema.parse({ id, kind: 'service_contract', body })).toEqual({
+        id,
+        kind: 'service_contract',
+        body,
+      });
+      expect(
+        CreateContractTextBodySchema.safeParse({ id, kind: 'service_contract', body: ' \n ' }).success,
+      ).toBe(false);
+      expect(CreateContractTextBodySchema.safeParse({ id, kind: 'billing_mandate', body }).success).toBe(
+        false,
+      );
+      for (const contestDelayDays of [0, 61, 7.5]) {
+        expect(
+          CreateContractTextBodySchema.safeParse({ id, kind: 'billing_mandate', body, contestDelayDays })
+            .success,
+        ).toBe(false);
+      }
+      expect(
+        CreateContractTextBodySchema.safeParse({ id, kind: 'billing_mandate', body, contestDelayDays: 7 })
+          .success,
+      ).toBe(true);
+    });
   });
 });

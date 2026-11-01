@@ -749,6 +749,134 @@ export const InvoiceAcceptanceViewSchema = z.object({
 export type InvoiceAcceptanceView = z.infer<typeof InvoiceAcceptanceViewSchema>;
 
 /**
+ * The contractor's file and texts (EQ-06 lot 5a). `memberId` names the contractor; the owner, an active manager and
+ * the contractor himself read his file, anyone else gets `team_member_not_found`.
+ */
+export const ContractorParamsSchema = z.object({ memberId: TeamMemberIdSchema });
+
+/**
+ * `PUT /v1/payroll/contractors/:memberId/profile`, the contractor himself or the owner: who his invoices are in the name
+ * of. The same values sent again change nothing; any change of identity clears the owner's check (the base's trigger),
+ * and the statements whose invoice waits for it are tried again (`payroll.requeue_invoice_issues`). The country is his
+ * member record's; the prefix and the check are the owner's (their own routes). A typo in a SIREN or in a French VAT
+ * number would be printed on every invoice: both are checked before they are saved.
+ */
+export const ContractorProfileBodySchema = ContractorProfileSchema.pick({
+  legalName: true,
+  address: true,
+  taxId: true,
+  businessId: true,
+  vatNumber: true,
+  individualEntrepreneur: true,
+  legalForm: true,
+  shareCapitalMinor: true,
+  rcsCity: true,
+  email: true,
+}).superRefine((profile, context) => {
+  const company = [profile.legalForm, profile.shareCapitalMinor, profile.rcsCity];
+  if (company.some((value) => value === null) && company.some((value) => value !== null)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['legalForm'],
+      message: 'Une société donne sa forme, son capital et la ville de son RCS, les trois ensemble.',
+    });
+  }
+  if (profile.individualEntrepreneur && profile.legalForm !== null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['legalForm'],
+      message: 'Un entrepreneur individuel n’a ni forme de société, ni capital, ni RCS.',
+    });
+  }
+  if (profile.businessId === null) return;
+  const siren = profile.businessId.slice(0, 9);
+  if (!sirenChecksOut(siren)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['businessId'],
+      message: 'Ce numéro n’est pas un SIREN : sa clé de contrôle (le 9e chiffre) ne correspond pas.',
+    });
+    return;
+  }
+  const expected = frenchVatNumberOf(siren);
+  if (profile.vatNumber?.startsWith('FR') === true && profile.vatNumber !== expected) {
+    context.addIssue({
+      code: 'custom',
+      path: ['vatNumber'],
+      message: `Le numéro de TVA intracommunautaire de ce SIREN est ${expected}.`,
+    });
+  }
+});
+export type ContractorProfileBody = z.infer<typeof ContractorProfileBodySchema>;
+
+/**
+ * `POST /v1/payroll/contractors/:memberId/profile/verify`, the owner only: he checked the file as he read it, at its
+ * `updatedAt`. A file changed since is `contractor_profile_changed_conflict`, never checked unseen; a file checked
+ * already is given back as it is.
+ */
+export const VerifyContractorProfileBodySchema = z.object({ updatedAt: z.iso.datetime() });
+export type VerifyContractorProfileBody = z.infer<typeof VerifyContractorProfileBodySchema>;
+
+/**
+ * `PUT /v1/payroll/contractors/:memberId/profile/prefix`, the owner only: the contractor's own prefix, which no one else
+ * holds (`invoice_prefix_taken_conflict`), frozen by his first invoice (`invoice_prefix_frozen_conflict`).
+ */
+export const InvoicePrefixBodySchema = z.object({ invoicePrefix: InvoicePrefixSchema });
+export type InvoicePrefixBody = z.infer<typeof InvoicePrefixBodySchema>;
+
+/**
+ * `GET /v1/payroll/contractors/:memberId/file`: his file (`null` until it is first written), his country, whether his
+ * first invoice froze his prefix, and the texts he accepted, the newest version of each kind first.
+ */
+export const ContractorFileSchema = z.object({
+  memberId: TeamMemberIdSchema,
+  country: CountryCodeSchema,
+  profile: ContractorProfileSchema.nullable(),
+  prefixFrozen: z.boolean(),
+  acceptances: z.array(ContractAcceptanceSchema),
+});
+export type ContractorFile = z.infer<typeof ContractorFileSchema>;
+
+/** A text as the owner pastes it, never trimmed nor rewritten: its SHA-256 is the proof of what is accepted. */
+const ContractTextBodySchema = z
+  .string()
+  .min(1)
+  .max(CONTRACT_TEXT_MAX)
+  .refine((body) => body.trim() !== '', 'Un texte vide ne s’accepte pas');
+
+/**
+ * `POST /v1/payroll/contract-texts`, the owner only: a new version of the service contract or of the mandate, the
+ * agency's text as its accountant validated it. The server numbers it (the next of its kind) and computes its SHA-256;
+ * the same `id` sent again with the same text gives it back, with another text is `contract_text_id_conflict`. The
+ * mandate fixes the delay to contest, in whole days.
+ */
+export const CreateContractTextBodySchema = z.discriminatedUnion('kind', [
+  z.object({ id: ContractTextIdSchema, kind: z.literal('service_contract'), body: ContractTextBodySchema }),
+  z.object({
+    id: ContractTextIdSchema,
+    kind: z.literal('billing_mandate'),
+    body: ContractTextBodySchema,
+    contestDelayDays: z.number().int().min(1).max(CONTEST_DELAY_MAX_DAYS),
+  }),
+]);
+export type CreateContractTextBody = z.infer<typeof CreateContractTextBodySchema>;
+
+/** `GET /v1/payroll/contract-texts`, any member: every version of each kind, the newest first. */
+export const ContractTextsSchema = z.object({ texts: z.array(ContractTextSchema) });
+export type ContractTexts = z.infer<typeof ContractTextsSchema>;
+
+export const ContractTextParamsSchema = z.object({ textId: ContractTextIdSchema });
+
+/**
+ * `POST /v1/payroll/contract-texts/:textId/accept`, the contractor himself (`contract_acceptance_forbidden` for anyone
+ * else, the owner included): he accepts the version he read, whose SHA-256 his screen sends. Another text than the one
+ * read is `contract_text_changed_conflict`; a version a newer one replaced, `contract_text_superseded_conflict`. An
+ * acceptance sent again gives back the first. A mandate accepted tries again the statements that waited for it.
+ */
+export const AcceptContractTextBodySchema = z.object({ sha256: Sha256Schema });
+export type AcceptContractTextBody = z.infer<typeof AcceptContractTextBodySchema>;
+
+/**
  * The refusals of the invoices' rules (EQ-06), each suffix setting its status (api.md). Kept apart from
  * `PAYROLL_ERROR_CODES` until the invoices' screens word them (lot 8).
  */
@@ -774,5 +902,24 @@ export const INVOICE_ERROR_CODES = [
   'invoice_pdf_not_found',
   /** Neither bucket gave the PDF with its fingerprint: never an altered file (ADR 0037 § 7). */
   'invoice_pdf_unavailable',
+  /** Only the contractor accepts his contract and his mandate, never the owner nor a manager for him. */
+  'contract_acceptance_forbidden',
+  /** The text the screen showed is not this version's: the contractor accepts only what he read. */
+  'contract_text_changed_conflict',
+  /** The same id sent again with another text. */
+  'contract_text_id_conflict',
+  'contract_text_not_found',
+  /** A newer version of this kind replaced it: the contractor reads and accepts that one. */
+  'contract_text_superseded_conflict',
+  /** The file changed since the owner read it: he checks again what he sees. */
+  'contractor_profile_changed_conflict',
+  /** A manager, or another member, writing a contractor's file: only the contractor and the owner write it. */
+  'contractor_profile_forbidden',
+  /** The contractor has not written his file yet. */
+  'contractor_profile_not_found',
+  /** The contractor's first invoice froze his prefix. */
+  'invoice_prefix_frozen_conflict',
+  /** Another contractor holds this prefix. */
+  'invoice_prefix_taken_conflict',
 ] as const;
 export type InvoiceErrorCode = (typeof INVOICE_ERROR_CODES)[number];

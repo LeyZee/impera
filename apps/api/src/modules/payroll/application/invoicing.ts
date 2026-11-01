@@ -1,7 +1,7 @@
-import type { CommissionStatementId } from '@nirvana/contracts';
+import type { CommissionStatementId, TeamMemberId } from '@nirvana/contracts';
 
 import { planInvoicing } from '../domain/invoicing';
-import type { InvoicingOutcome, JobLogger, PayrollInvoiceStore } from '../domain/ports';
+import type { InvoicingOutcome, JobLogger, PayrollInvoiceStore, PayrollRequeueStore } from '../domain/ports';
 
 /**
  * `payroll.issue_invoices` (EQ-06 lot 3): a validated statement's invoice and the credit notes its period owes, each
@@ -28,4 +28,16 @@ export async function issueInvoices(
     );
   }
   return outcome;
+}
+
+/**
+ * `payroll.requeue_invoice_issues` (EQ-06 lot 5a): once a contractor's file, prefix, check or mandate changes (or the
+ * agency's settings, `null`), the statements whose invoice waited get their `payroll.issue_invoices` again. Returns how
+ * many were enqueued.
+ */
+export function requeueInvoiceIssues(
+  store: PayrollRequeueStore,
+  memberId: TeamMemberId | null,
+): Promise<number> {
+  return store.requeueUnscoped(memberId);
 }

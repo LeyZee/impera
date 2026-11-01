@@ -4,6 +4,7 @@ import type {
   ForeignCurrency,
   InvoiceId,
   PayPeriod,
+  TeamMemberId,
   UserId,
 } from '@nirvana/contracts';
 import type { Database } from '@nirvana/db';
@@ -29,12 +30,16 @@ import {
   type MirrorOutcome,
   type RenderOutcome,
 } from './application/invoice-pdfs';
-import { issueInvoices } from './application/invoicing';
+import { issueInvoices, requeueInvoiceIssues } from './application/invoicing';
 import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
 import type { InvoiceObjectStore, InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
 import { createDrizzlePayrollBillingSettingsStore } from './infra/billing-settings-store';
+import {
+  createDrizzlePayrollContractorStore,
+  createDrizzlePayrollRequeueStore,
+} from './infra/contractor-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
 import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
@@ -99,6 +104,12 @@ export interface PayrollModule {
       statementId: CommissionStatementId,
       logger: JobLogger,
     ) => Promise<InvoicingOutcome>;
+    /**
+     * `payroll.requeue_invoice_issues` (EQ-06 lot 5a): once a contractor's file, prefix, check or mandate changes (or
+     * the agency's settings, `null`), each statement of his for which `invoice_not_issued` was said gets its
+     * `payroll.issue_invoices` again. Returns how many.
+     */
+    readonly requeueInvoiceIssues: (memberId: TeamMemberId | null) => Promise<number>;
     /**
      * `payroll.render_invoice_pdf` (EQ-06 lot 4, ADR 0037 § 5): an issued document's PDF, rendered once from its frozen
      * data and written under lock; its row then enqueues its copy. Never replaces an object; its last failed attempt
@@ -201,6 +212,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
         createPayrollInvoiceAcceptance(acceptanceStore),
         createPayrollBillingSettings(createDrizzlePayrollBillingSettingsStore(deps.db, now), readPng),
+        createDrizzlePayrollContractorStore(deps.db, now),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),
@@ -209,6 +221,8 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       recalculateOpen: (logger) => createRecalculation(jobStore, logger, now).recalculateOpen(),
       fetchExchangeRates: (logger) => fetchExchangeRates(rateJob, logger),
       issueInvoices: (statementId, logger) => issueInvoices(invoiceStore, statementId, logger),
+      requeueInvoiceIssues: (memberId) =>
+        requeueInvoiceIssues(createDrizzlePayrollRequeueStore(deps.adminDb), memberId),
       renderInvoicePdf: (invoiceId, attempt, logger) => renderInvoicePdf(pdfs, invoiceId, attempt, logger),
       mirrorInvoicePdf: (invoiceId, attempt, logger) => mirrorInvoicePdf(pdfs, invoiceId, attempt, logger),
       lapseInvoice: (invoiceId, logger) => lapseInvoice(acceptanceStore, invoiceId, logger),

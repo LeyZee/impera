@@ -1,4 +1,5 @@
 import type {
+  AcceptContractTextBody,
   AgencyLogo,
   AgencyLogoMediaType,
   BillingSettingsView,
@@ -9,6 +10,13 @@ import type {
   CommissionStatement,
   CommissionStatementId,
   ContestCorrection,
+  ContractAcceptance,
+  ContractorFile,
+  ContractorProfileBody,
+  ContractText,
+  ContractTextId,
+  ContractTexts,
+  CreateContractTextBody,
   CreateBonusBody,
   CreateBonusTierSetBody,
   CreateCollectiveGoalBody,
@@ -21,6 +29,7 @@ import type {
   InvoiceAcceptanceView,
   InvoiceId,
   InvoiceKind,
+  InvoicePrefixBody,
   InvoicePdfCopyProvider,
   InvoicePdfPlace,
   PayAdjustment,
@@ -42,6 +51,7 @@ import type {
   UpdateBillingSettingsBody,
   UpdatePayrollSettingsBody,
   UserId,
+  VerifyContractorProfileBody,
 } from '@nirvana/contracts';
 
 import type { PngSize } from './agency-logo';
@@ -471,4 +481,44 @@ export interface PayrollBillingSettingsStore {
   addLogo(actor: Actor, bytes: Uint8Array, size: PngSize): Promise<{ logo: AgencyLogo; created: boolean }>;
   /** A logo's bytes for its owner's screen, `null` when none has this fingerprint. */
   logoBytes(userId: UserId, sha256: string): Promise<Uint8Array | null>;
+}
+
+/**
+ * The contractor's file and the texts he accepts (EQ-06 lot 5a), under the reader's member context (`withMember`): the
+ * policies and the triggers of `contractor_profiles`, `contract_texts` and `contract_acceptances` say it again. Each
+ * write that may unblock an invoice (the file, its check, its prefix, a mandate accepted) enqueues
+ * `payroll.requeue_invoice_issues` for the contractor in its transaction.
+ */
+export interface PayrollContractorStore {
+  /** The file of `memberId` for the owner, an active manager or the contractor himself; `team_member_not_found` else. */
+  file(userId: UserId, memberId: TeamMemberId): Promise<ContractorFile>;
+  /** The contractor himself or the owner; the same values again write nothing. `created` on the first write. */
+  writeProfile(
+    actor: Actor,
+    memberId: TeamMemberId,
+    body: ContractorProfileBody,
+  ): Promise<{ file: ContractorFile; created: boolean }>;
+  /** The owner checks the file he read (`updatedAt`); a file checked already is given back. */
+  verifyProfile(
+    actor: Actor,
+    memberId: TeamMemberId,
+    body: VerifyContractorProfileBody,
+  ): Promise<ContractorFile>;
+  /** The owner sets the prefix, his own to the contractor, until his first invoice. */
+  setPrefix(actor: Actor, memberId: TeamMemberId, body: InvoicePrefixBody): Promise<ContractorFile>;
+  /** Every version of each kind, the newest first. */
+  texts(userId: UserId): Promise<ContractTexts>;
+  /** The owner adds the next version of a kind; the same `id` and text again give it back. */
+  addText(actor: Actor, body: CreateContractTextBody): Promise<{ text: ContractText; created: boolean }>;
+  /** The contractor accepts the newest version of a kind, as he read it (its SHA-256); again gives back the first. */
+  accept(
+    actor: Actor,
+    textId: ContractTextId,
+    body: AcceptContractTextBody,
+  ): Promise<{ acceptance: ContractAcceptance; created: boolean }>;
+}
+
+/** `payroll.requeue_invoice_issues`, as the jobs (`withAdmin`): enqueues the statements to try again, and counts them. */
+export interface PayrollRequeueStore {
+  requeueUnscoped(memberId: TeamMemberId | null): Promise<number>;
 }

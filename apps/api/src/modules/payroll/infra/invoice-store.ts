@@ -425,10 +425,10 @@ async function writeDocument(
 
 /**
  * Tells the owner of each document the plan could not issue (`invoice_not_issued`, and its line of `audit_log`), once:
- * a rerun (a retry, or lot 5's enqueue once a regime is validated) republishes nothing already said for this statement,
- * document, reason and amount, and a new reason is said. Two equal refusals of one run (two credit notes of the same
- * amount without an invoice) are two alerts: what was published is counted, never only looked for. Read in the job's
- * transaction, under the contractor's lock.
+ * a rerun (a retry, or `payroll.requeue_invoice_issues` once a file changed) republishes nothing already said for this
+ * statement, document, reason and amount, and a new reason is said. Two equal refusals of one run (two credit notes of
+ * the same amount without an invoice) are two alerts: what was published is counted, never only looked for. Read in
+ * the job's transaction, under the contractor's lock.
  */
 async function publishNotIssued(
   tx: Transaction,

@@ -704,6 +704,18 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         );
       },
     ),
+    'payroll.requeue_invoice_issues': defineTask(
+      'payroll.requeue_invoice_issues',
+      JOB_PAYLOADS['payroll.requeue_invoice_issues'],
+      logger,
+      async (payload, context) => {
+        const enqueued = await modules.payroll.jobs.requeueInvoiceIssues(payload.memberId);
+        context.logger.info(
+          { memberId: payload.memberId, enqueued },
+          'payroll: waiting invoices tried again',
+        );
+      },
+    ),
     'payroll.render_invoice_pdf': defineTask(
       'payroll.render_invoice_pdf',
       JOB_PAYLOADS['payroll.render_invoice_pdf'],
