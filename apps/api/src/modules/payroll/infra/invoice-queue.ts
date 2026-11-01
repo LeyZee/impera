@@ -54,3 +54,37 @@ export async function enqueueInvoicePdfMirror(tx: Transaction, invoiceId: string
     )`,
   );
 }
+
+/**
+ * `payroll.lapse_invoice` for a document, to run at its deadline (EQ-06 lot 6, ADR 0039 § 1): enqueued in the
+ * transaction that issues it, so an issued document always has its tacit acceptance waiting. One key per document; a
+ * run that comes before the deadline puts it back there (`replace` moves the waiting run).
+ */
+export async function enqueueInvoiceLapse(tx: Transaction, invoiceId: string, deadline: Date): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'payroll.lapse_invoice',
+      payload => ${JSON.stringify({ invoiceId })}::jsonb,
+      run_at => ${deadline.toISOString()}::timestamptz,
+      max_attempts => ${JOB_MAX_ATTEMPTS['payroll.lapse_invoice']}::int,
+      job_key => ${`payroll.lapse_invoice:${invoiceId}`},
+      job_key_mode => 'replace'
+    )`,
+  );
+}
+
+/**
+ * `payroll.announce_invoice_contest` for a document, in the transaction that records its contest (ADR 0039 § 2): a
+ * contest always has its alert's job. One key per document; the run says it once.
+ */
+export async function enqueueInvoiceContestAnnounce(tx: Transaction, invoiceId: InvoiceId): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'payroll.announce_invoice_contest',
+      payload => ${JSON.stringify({ invoiceId })}::jsonb,
+      max_attempts => ${JOB_MAX_ATTEMPTS['payroll.announce_invoice_contest']}::int,
+      job_key => ${`payroll.announce_invoice_contest:${invoiceId}`},
+      job_key_mode => 'preserve_run_at'
+    )`,
+  );
+}

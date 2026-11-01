@@ -15,6 +15,7 @@ import type {
   ExchangeRate,
   ExchangeRates,
   ForeignCurrency,
+  InvoiceAcceptanceView,
   InvoiceId,
   InvoiceKind,
   InvoicePdfCopyProvider,
@@ -398,4 +399,34 @@ export interface PayrollInvoicePdfStore {
     readonly number: string;
     readonly pdf: StoredInvoicePdf | null;
   } | null>;
+}
+
+/** « J'accepte » or « Je conteste » with its reason: the contractor's answer to their document (ADR 0039 § 1). */
+type InvoiceAnswer = { readonly kind: 'accept' } | { readonly kind: 'contest'; readonly reason: string };
+
+/**
+ * A document's acceptance (EQ-06 lot 6, ADR 0039): the contractor answers and the owner refuses a contest as
+ * themselves (`withMember`, the policies of `invoice_events` say who writes what), the dated jobs as admin. Every write
+ * holds the document's lock (one answer, one end of a contest, even from two requests at once) and checks the delay on
+ * the database's clock, the one its trigger checks.
+ */
+export interface PayrollInvoiceAcceptanceStore {
+  /** The document's acceptance as `userId` may read it; `null` when it does not exist or is not theirs to read. */
+  read(userId: UserId, invoiceId: InvoiceId): Promise<InvoiceAcceptanceView | null>;
+  /**
+   * Records the contractor's answer, its line of `audit_log`, and for a contest the job that tells the owner
+   * (`payroll.announce_invoice_contest`). The same answer sent again writes nothing and gives the view back.
+   */
+  answer(actor: Actor, invoiceId: InvoiceId, answer: InvoiceAnswer): Promise<InvoiceAcceptanceView>;
+  /** The owner refuses a contest, with its reason and its line of `audit_log`; the same refusal sent again, nothing. */
+  refuseContest(actor: Actor, invoiceId: InvoiceId, reason: string): Promise<InvoiceAcceptanceView>;
+  /**
+   * The tacit acceptance of a document nobody answered, at its deadline (`withAdmin`): `early` when the database's
+   * clock is not there yet (the job is put back at the deadline), `answered` when an answer came first.
+   */
+  lapseUnscoped(invoiceId: InvoiceId): Promise<'lapsed' | 'answered' | 'early' | 'not_found'>;
+  /** Publishes `invoice_contested` and its line of `audit_log`, once per document: `already` after. */
+  announceContestUnscoped(
+    invoiceId: InvoiceId,
+  ): Promise<'published' | 'already' | 'not_contested' | 'not_found'>;
 }

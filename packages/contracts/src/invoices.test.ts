@@ -5,15 +5,19 @@ import {
   BillingRegimeSchema,
   BillingSettingsSchema,
   BusinessIdSchema,
+  ContestInvoiceBodySchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
   INVOICE_ERROR_CODES,
+  INVOICE_REASON_MAX,
+  InvoiceAcceptanceViewSchema,
   InvoiceAgencySchema,
   InvoiceContractorSchema,
   InvoiceNumberSchema,
-  InvoicePdfParamsSchema,
+  InvoiceParamsSchema,
   InvoicePrefixSchema,
   InvoiceSchema,
+  RefuseInvoiceContestBodySchema,
   RegimeVatSchema,
   SERVICE_DESCRIPTION_MAX,
   ServiceDescriptionSchema,
@@ -182,8 +186,61 @@ describe('invoices', () => {
     expect(ServiceDescriptionSchema.safeParse('  ').success).toBe(false);
   });
 
-  it('name a PDF to download by its invoice’s id', () => {
-    expect(InvoicePdfParamsSchema.safeParse({ invoiceId: invoice.id }).success).toBe(true);
-    expect(InvoicePdfParamsSchema.safeParse({ invoiceId: 'KOFI-2026-0001' }).success).toBe(false);
+  it('name a document by its id, never by its number', () => {
+    expect(InvoiceParamsSchema.safeParse({ invoiceId: invoice.id }).success).toBe(true);
+    expect(InvoiceParamsSchema.safeParse({ invoiceId: 'KOFI-2026-0001' }).success).toBe(false);
+  });
+
+  it('take a contest and its refusal with a reason of 1 to 500 characters, trimmed (ADR 0039 § 1)', () => {
+    for (const schema of [ContestInvoiceBodySchema, RefuseInvoiceContestBodySchema]) {
+      expect(schema.parse({ reason: '  Une vente du 3 manque ' })).toEqual({
+        reason: 'Une vente du 3 manque',
+      });
+      expect(schema.safeParse({ reason: 'x'.repeat(INVOICE_REASON_MAX) }).success).toBe(true);
+      for (const reason of ['', '   ', 'x'.repeat(INVOICE_REASON_MAX + 1)]) {
+        expect(schema.safeParse({ reason }).success, reason).toBe(false);
+      }
+      expect(schema.safeParse({}).success).toBe(false);
+    }
+  });
+
+  it('read a document’s acceptance with its steps, the issue first', () => {
+    const view = {
+      invoiceId: invoice.id,
+      kind: 'invoice',
+      memberId: invoice.memberId,
+      number: invoice.number,
+      acceptance: {
+        state: 'contested',
+        deadline: '2026-11-24T09:00:00.000Z',
+        reason: 'Une vente du 3 manque',
+      },
+      events: [
+        {
+          id: '0190a0b0-0000-7000-8000-000000000010',
+          invoiceId: invoice.id,
+          kind: 'issued',
+          reason: null,
+          statementId: null,
+          by: null,
+          at: '2026-11-17T09:00:00.000Z',
+        },
+        {
+          id: '0190a0b0-0000-7000-8000-000000000011',
+          invoiceId: invoice.id,
+          kind: 'contested',
+          reason: 'Une vente du 3 manque',
+          statementId: null,
+          by: '0190a0b0-0000-7000-8000-000000000012',
+          at: '2026-11-18T10:00:00.000Z',
+        },
+      ],
+    };
+    expect(InvoiceAcceptanceViewSchema.parse(view)).toEqual(view);
+    expect(InvoiceAcceptanceViewSchema.safeParse({ ...view, events: [] }).success).toBe(false);
+    expect(
+      InvoiceAcceptanceViewSchema.safeParse({ ...view, acceptance: { ...view.acceptance, state: 'lost' } })
+        .success,
+    ).toBe(false);
   });
 });

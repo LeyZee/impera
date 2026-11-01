@@ -330,6 +330,13 @@
       "when": 1793531434711,
       "tag": "0046_telegram_invoice_pdf",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793541674127,
+      "tag": "0047_invoice_contested",
+      "breakpoints": true
     }
   ]
 }

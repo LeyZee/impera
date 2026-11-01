@@ -12,6 +12,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
+  announceInvoiceContest,
+  createPayrollInvoiceAcceptance,
+  lapseInvoice,
+  type ContestAnnounceOutcome,
+  type LapseOutcome,
+} from './application/invoice-acceptance';
+import {
   downloadInvoicePdf,
   mirrorInvoicePdf,
   renderInvoicePdf,
@@ -26,6 +33,7 @@ import { createPayrollValidation } from './application/validation';
 import type { InvoiceObjectStore, InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
+import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
 import { createPdfkitInvoiceRenderer, loadInvoiceFonts } from './infra/invoice-pdf-renderer';
 import { createDrizzlePayrollInvoicePdfStore } from './infra/invoice-pdf-store';
 import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
@@ -102,6 +110,19 @@ export interface PayrollModule {
       attempt: JobAttempt,
       logger: JobLogger,
     ) => Promise<MirrorOutcome>;
+    /**
+     * `payroll.lapse_invoice` (EQ-06 lot 6, ADR 0039 § 1): enqueued at the issue to start at the deadline, accepts
+     * tacitly a document left without an answer; does nothing once it is answered.
+     */
+    readonly lapseInvoice: (invoiceId: InvoiceId, logger: JobLogger) => Promise<LapseOutcome>;
+    /**
+     * `payroll.announce_invoice_contest` (ADR 0039 § 2): enqueued with a contest, publishes `invoice_contested` once per
+     * document, without the reason nor a name.
+     */
+    readonly announceInvoiceContest: (
+      invoiceId: InvoiceId,
+      logger: JobLogger,
+    ) => Promise<ContestAnnounceOutcome>;
   };
 }
 
@@ -151,6 +172,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
     primary: deps.invoicePdfs.primary,
     copy: deps.invoicePdfs.copy,
   };
+  const acceptanceStore = createDrizzlePayrollInvoiceAcceptanceStore(deps.db, deps.adminDb);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),
@@ -167,6 +189,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         entries,
         rules,
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
+        createPayrollInvoiceAcceptance(acceptanceStore),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),
@@ -177,6 +200,9 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       issueInvoices: (statementId, logger) => issueInvoices(invoiceStore, statementId, logger),
       renderInvoicePdf: (invoiceId, attempt, logger) => renderInvoicePdf(pdfs, invoiceId, attempt, logger),
       mirrorInvoicePdf: (invoiceId, attempt, logger) => mirrorInvoicePdf(pdfs, invoiceId, attempt, logger),
+      lapseInvoice: (invoiceId, logger) => lapseInvoice(acceptanceStore, invoiceId, logger),
+      announceInvoiceContest: (invoiceId, logger) =>
+        announceInvoiceContest(acceptanceStore, invoiceId, logger),
     },
   };
 }

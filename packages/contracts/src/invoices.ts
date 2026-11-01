@@ -213,6 +213,9 @@ export const DOCUMENT_REMINDER_MAX_DAYS = 120;
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 
+/** A contest's reason, or the reason of its refusal: the contractor's or the owner's words, 1 to 500 characters. */
+export const InvoiceReasonSchema = trimmed(INVOICE_REASON_MAX);
+
 /** One text a regime prints on each invoice, in its order: the regime's own words, never the code's. */
 export const InvoiceMentionSchema = trimmed(INVOICE_MENTION_MAX);
 
@@ -415,6 +418,17 @@ export const InvoiceTotalsSchema = z.object({
 export type InvoiceTotals = z.infer<typeof InvoiceTotalsSchema>;
 
 /**
+ * Where a document stands with its contractor: its state, the end of the delay to answer (the issue plus the mandate's
+ * delay, to the second), and the reason of its contest once contested (kept after the contest ends).
+ */
+export const InvoiceAcceptanceSchema = z.object({
+  state: InvoiceAcceptanceStateSchema,
+  deadline: z.iso.datetime(),
+  reason: InvoiceReasonSchema.nullable(),
+});
+export type InvoiceAcceptance = z.infer<typeof InvoiceAcceptanceSchema>;
+
+/**
  * An invoice or a credit note as its reader reads it, frozen at its issue. An invoice belongs to the validated
  * statement it bills, one per statement; a credit note cites the invoice it credits, and the statement that made it
  * due when a period owed it (ADR 0036).
@@ -441,11 +455,7 @@ export const InvoiceSchema = z
     logoSha256: Sha256Schema.nullable(),
     lines: z.array(InvoiceLineSchema).min(1),
     totals: InvoiceTotalsSchema,
-    acceptance: z.object({
-      state: InvoiceAcceptanceStateSchema,
-      deadline: z.iso.datetime(),
-      reason: trimmed(INVOICE_REASON_MAX).nullable(),
-    }),
+    acceptance: InvoiceAcceptanceSchema,
     pdfSha256: Sha256Schema.nullable(),
   })
   .refine(
@@ -464,7 +474,7 @@ export const InvoiceEventSchema = z.object({
   id: InvoiceEventIdSchema,
   invoiceId: InvoiceIdSchema,
   kind: InvoiceEventKindSchema,
-  reason: trimmed(INVOICE_REASON_MAX).nullable(),
+  reason: InvoiceReasonSchema.nullable(),
   statementId: CommissionStatementIdSchema.nullable(),
   by: UserIdSchema.nullable(),
   at: z.iso.datetime(),
@@ -472,12 +482,43 @@ export const InvoiceEventSchema = z.object({
 export type InvoiceEvent = z.infer<typeof InvoiceEventSchema>;
 
 /**
- * `GET /v1/payroll/invoices/:invoiceId/pdf` (EQ-06 lot 4, ADR 0037 § 7): the PDF of an issued invoice or credit note,
- * to whoever reads the invoice (the contractor, the owner, an active manager), as `application/pdf` named after its
- * number. Only ever a file whose SHA-256 is the one recorded at its render; `invoice_pdf_not_found` while it is being
- * rendered, `invoice_pdf_unavailable` when neither bucket gives it intact.
+ * An invoice or a credit note in a path, for whoever reads it (the contractor, the owner, an active manager):
+ *
+ * - `GET /v1/payroll/invoices/:invoiceId/pdf` (EQ-06 lot 4, ADR 0037 § 7): its PDF, as `application/pdf` named after
+ *   its number. Only ever a file whose SHA-256 is the one recorded at its render; `invoice_pdf_not_found` while it is
+ *   being rendered, `invoice_pdf_unavailable` when neither bucket gives it intact.
+ * - `GET /v1/payroll/invoices/:invoiceId/acceptance` (lot 6) → `InvoiceAcceptanceViewSchema`.
+ * - `POST /v1/payroll/invoices/:invoiceId/accept` (lot 6, the contractor alone, ADR 0039 § 1) → the view, 200; the
+ *   same answer sent again gives the view back.
+ * - `POST /v1/payroll/invoices/:invoiceId/contest` (the contractor alone), body `ContestInvoiceBodySchema` → the view;
+ *   the same reason sent again gives it back. The owner is told (`invoice_contested`).
+ * - `POST /v1/payroll/invoices/:invoiceId/contest/refuse` (the owner alone, ADR 0039 § 3), body
+ *   `RefuseInvoiceContestBodySchema` → the view; the same reason sent again gives it back.
+ *
+ * `invoice_not_found` (unknown, or not the reader's), `invoice_answer_forbidden` (another's document to answer),
+ * `payroll_forbidden` (a refusal by anyone but the owner), `invoice_acceptance_conflict` (a step its state or its
+ * delay no longer allows, or another answer than the one recorded).
  */
-export const InvoicePdfParamsSchema = z.object({ invoiceId: InvoiceIdSchema });
+export const InvoiceParamsSchema = z.object({ invoiceId: InvoiceIdSchema });
+
+/** « Je conteste » : the contractor's reason. */
+export const ContestInvoiceBodySchema = z.object({ reason: InvoiceReasonSchema });
+export type ContestInvoiceBody = z.infer<typeof ContestInvoiceBodySchema>;
+
+/** The owner refuses a contest, with the reason the contractor reads. */
+export const RefuseInvoiceContestBodySchema = z.object({ reason: InvoiceReasonSchema });
+export type RefuseInvoiceContestBody = z.infer<typeof RefuseInvoiceContestBodySchema>;
+
+/** A document's acceptance as its reader reads it: its state and each dated step, in order (`issued` first). */
+export const InvoiceAcceptanceViewSchema = z.object({
+  invoiceId: InvoiceIdSchema,
+  kind: InvoiceKindSchema,
+  memberId: TeamMemberIdSchema,
+  number: InvoiceNumberSchema,
+  acceptance: InvoiceAcceptanceSchema,
+  events: z.array(InvoiceEventSchema).min(1),
+});
+export type InvoiceAcceptanceView = z.infer<typeof InvoiceAcceptanceViewSchema>;
 
 /**
  * The refusals of the invoices' rules (EQ-06), each suffix setting its status (api.md). Kept apart from
@@ -487,6 +528,8 @@ export const INVOICE_ERROR_CODES = [
   'billing_regime_backdated_unprocessable',
   'credit_note_amount_unprocessable',
   'invoice_acceptance_conflict',
+  /** Only the contractor answers their document: never the owner, a manager or another member (ADR 0039 § 1). */
+  'invoice_answer_forbidden',
   /** The invoice does not exist, or is not the reader's. */
   'invoice_not_found',
   /** Its PDF is not rendered yet (« PDF en préparation », ADR 0037 § 5). */

@@ -198,6 +198,7 @@ export const EVENT_TYPES = [
   'invoice_not_issued',
   'invoice_pdf_conflict',
   'invoice_pdf_missing',
+  'invoice_contested',
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
@@ -363,6 +364,17 @@ export const EVENT_PAYLOADS = {
     place: InvoicePdfPlaceSchema,
   }),
   /**
+   * A contractor contested one of their documents, with a reason, before its delay ended (EQ-06 lot 6, ADR 0039 § 2):
+   * published once per document by `payroll.announce_invoice_contest`, with no creator, for the owner, who alone
+   * refuses the contest or upholds it. Never the reason nor a name: the owner reads them in the Paie.
+   */
+  invoice_contested: z.object({
+    invoiceId: InvoiceIdSchema,
+    memberId: TeamMemberIdSchema,
+    number: InvoiceNumberSchema,
+    document: InvoiceKindSchema,
+  }),
+  /**
    * Automatique closed on its own (ADR 0019): the live rate fell under its target, or the voice version changed and
    * has not proved itself yet. Every conversation in automatic went back to the copilot. Published once, for the owner.
    */
@@ -426,6 +438,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('invoice_not_issued'),
   typedEvent('invoice_pdf_conflict'),
   typedEvent('invoice_pdf_missing'),
+  typedEvent('invoice_contested'),
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),

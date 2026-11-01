@@ -178,6 +178,11 @@ export interface AppOptions {
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
   readonly invoiceBuckets?: { readonly primary: InvoiceObjectStore; readonly copy: InvoiceObjectStore };
+  /**
+   * Tests set pay's clock here, to issue a document whose delay to answer is already over (EQ-06 lot 6); the system's
+   * otherwise. The database keeps its own: every step of an acceptance is checked on `now()`.
+   */
+  readonly payrollClock?: () => Date;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -324,6 +329,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     rateJobSince: rateJobSince(config, adminDb.db),
     invoicePdfs: { fontsDir: INVOICE_FONTS_DIR, ...(options.invoiceBuckets ?? invoiceBuckets(config)) },
+    ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
   const playground =
     options.withPlayground === false
@@ -709,6 +715,24 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
           context.logger,
         );
         context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice PDF copied');
+      },
+    ),
+    'payroll.lapse_invoice': defineTask(
+      'payroll.lapse_invoice',
+      JOB_PAYLOADS['payroll.lapse_invoice'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.lapseInvoice(payload.invoiceId, context.logger);
+        context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice lapse checked');
+      },
+    ),
+    'payroll.announce_invoice_contest': defineTask(
+      'payroll.announce_invoice_contest',
+      JOB_PAYLOADS['payroll.announce_invoice_contest'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.announceInvoiceContest(payload.invoiceId, context.logger);
+        context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice contest announced');
       },
     ),
     'rate_limit.purge': defineTask(
