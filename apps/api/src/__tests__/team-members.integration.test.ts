@@ -30,6 +30,7 @@ import { createTeamModule } from '../modules/team';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { parisDay } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /** Invented people and rates only (ADR 0010). */
@@ -123,6 +124,14 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
       .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
       .from(schema.auditLog)
       .where(eq(schema.auditLog.action, action));
+
+  const leftOnOf = async (memberId: string) => {
+    const [row] = await test.admin.db
+      .select({ leftOn: schema.teamMembers.leftOn })
+      .from(schema.teamMembers)
+      .where(eq(schema.teamMembers.id, memberId));
+    return row?.leftOn;
+  };
 
   const theoBody = () => ({
     email: 'Theo@Example.test',
@@ -535,9 +544,14 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
   });
 
   it('marks a member who left: no creator, no session, and his record no longer changes', async () => {
+    const before = parisDay();
     const response = await call('PUT', `/team/members/${theo.id}/status`, owner, { status: 'left' });
+    const after = parisDay();
     expect(response.statusCode).toBe(200);
     expect(TeamMemberSchema.parse(response.json())).toMatchObject({ status: 'left', creatorIds: [] });
+    // The day he left is the agency's day of the click, never typed (EQ-14): pay reads his closing fortnight from it.
+    const leftOn = await leftOnOf(theo.id);
+    expect([before, after]).toContain(leftOn);
     expect((await call('GET', '/me', theoCookie)).statusCode).toBe(401);
     const sessions = await test.admin.db
       .select()
@@ -555,7 +569,9 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
     const [left] = await auditOf('team_member.status_change').then((rows) =>
       rows.filter((row) => JSON.stringify(row.details).includes('"left"')),
     );
-    expect(left?.details).toEqual({ from: 'active', to: 'left', sessionsEnded: 1 });
+    expect(left?.details).toEqual({ from: 'active', to: 'left', sessionsEnded: 1, leftOn });
+    // Asked again, the same status writes nothing: the day stays the first one.
+    expect(await leftOnOf(theo.id)).toBe(leftOn);
 
     // Signing in again is refused like a wrong password: the page does not learn the account exists (ADR 0023).
     const signInAs = (password: string) =>

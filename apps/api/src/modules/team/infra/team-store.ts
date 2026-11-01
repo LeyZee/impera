@@ -310,15 +310,18 @@ export function createDrizzleTeamStore(
         );
       }),
 
-    changeStatus: (actor, id, status) =>
+    changeStatus: (actor, id, status, today) =>
       withMember(db, actor.userId, async (tx, scope) => {
         assertOwnerScope(scope);
         const current = await lockMember(tx, id);
         // Asked twice, the same status changes nothing and writes nothing.
         if (current.status === status) return;
         assertStillInTeam(current.status);
-        await tx.update(teamMembers).set({ status, updatedAt: now() }).where(eq(teamMembers.id, id));
         const leaving = leavesTeam(current.status, status);
+        await tx
+          .update(teamMembers)
+          .set({ status, ...(leaving && { leftOn: today }), updatedAt: now() })
+          .where(eq(teamMembers.id, id));
         let sessionsEnded = 0;
         if (leaving) {
           await tx.update(user).set({ creatorIds: [], updatedAt: now() }).where(eq(user.id, current.userId));
@@ -333,7 +336,7 @@ export function createDrizzleTeamStore(
           actor,
           'team_member.status_change',
           { entity: 'team_member', id },
-          { from: current.status, to: status, ...(leaving && { sessionsEnded }) },
+          { from: current.status, to: status, ...(leaving && { sessionsEnded, leftOn: today }) },
         );
       }),
 

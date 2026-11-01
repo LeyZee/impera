@@ -24,6 +24,8 @@ export interface MemberForPay {
   readonly teamRole: TeamRole;
   readonly status: TeamMemberStatus;
   readonly joinedOn: string;
+  /** The day he left, in the agency's zone, `null` while he has not (EQ-14): his closing fortnight follows it. */
+  readonly leftOn: string | null;
   /** `null` when no rate is in force on that day yet. */
   readonly rate: { readonly rateBps: number; readonly teamShareBps: number | null } | null;
 }
@@ -33,6 +35,7 @@ const RowSchema = z.object({
   team_role: TeamRoleSchema,
   status: TeamMemberStatusSchema,
   joined_on: z.iso.date(),
+  left_on: z.iso.date().nullable(),
   rate_bps: z.number().int().nullable(),
   team_share_bps: z.number().int().nullable(),
 });
@@ -47,7 +50,7 @@ const RowSchema = z.object({
 export async function membersForPay(tx: Transaction, day: string): Promise<MemberForPay[]> {
   const result = await tx.execute(sql`
     select m.id, coalesce(role.team_role, m.team_role) as team_role, m.status, m.joined_on::text as joined_on,
-      rate.rate_bps, rate.team_share_bps
+      m.left_on::text as left_on, rate.rate_bps, rate.team_share_bps
     from team_members m
     left join lateral (
       select r.team_role from member_roles r
@@ -67,6 +70,7 @@ export async function membersForPay(tx: Transaction, day: string): Promise<Membe
       teamRole: row.team_role,
       status: row.status,
       joinedOn: row.joined_on,
+      leftOn: row.left_on,
       rate: row.rate_bps === null ? null : { rateBps: row.rate_bps, teamShareBps: row.team_share_bps },
     };
   });

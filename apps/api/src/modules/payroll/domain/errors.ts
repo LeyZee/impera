@@ -96,6 +96,20 @@ export class CommissionStatementChanged extends DomainError {
   }
 }
 
+/**
+ * A final statement of a member who left while some of his documents still await an answer or stay contested (EQ-14,
+ * ADR 0039 § 6): it waits for them, its period carrying their corrections.
+ */
+export class CommissionStatementDocumentsOpen extends DomainError {
+  constructor(count: number) {
+    super(
+      'commission_statement_documents_open_conflict',
+      'Ce relevé final attend que ses factures et avoirs soient acceptés ou que leurs contestations soient tranchées',
+      { details: { count } },
+    );
+  }
+}
+
 /** A period that has not ended in the agency's zone. */
 export class CommissionStatementOpen extends DomainError {
   constructor() {

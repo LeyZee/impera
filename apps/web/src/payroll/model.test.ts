@@ -488,6 +488,14 @@ describe('words', () => {
       ),
     ).toBe('Valide d’abord le relevé de Basile du 16 au 31 octobre.');
     expect(
+      payRefusalText(
+        { kind: 'refused', code: 'commission_statement_documents_open_conflict', details: { count: 2 } },
+        theirs,
+      ),
+    ).toBe(
+      '2 factures ou avoirs attendent encore une réponse ou la décision sur une contestation : le relevé final de Basile se valide ensuite.',
+    );
+    expect(
       payRefusalText({ kind: 'refused', code: 'commission_statement_open_conflict', details: {} }, theirs),
     ).toBe('La quinzaine n’est pas finie : elle se valide à partir du lundi 16 novembre.');
     const status = { kind: 'refused', code: 'commission_statement_status_conflict', details: {} } as const;

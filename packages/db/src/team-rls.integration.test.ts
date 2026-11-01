@@ -167,7 +167,7 @@ describe('team tables (EQ-01): one policy per account, through withMember', () =
         withMember(test.app.db, manager, (tx) =>
           tx
             .update(s.teamMembers)
-            .set({ status: 'left' })
+            .set({ status: 'left', leftOn: '2025-03-10' })
             .where(eq(s.teamMembers.userId, chatterA))
             .returning(),
         ).then((rows) => (rows.length === 0 ? Promise.reject(new Error('nothing updated')) : rows)),

@@ -183,6 +183,11 @@ export interface AppOptions {
    * otherwise. The database keeps its own: every step of an acceptance is checked on `now()`.
    */
   readonly payrollClock?: () => Date;
+  /**
+   * Tests set the team's clock here, to make a member leave on a day already past and read his closing fortnight
+   * (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
+   */
+  readonly teamClock?: () => Date;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -307,6 +312,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     // The links' table is read through `withAdmin` only (EQ-10): the module gets this function, never the table.
     invitationLinks: { live: (memberIds) => liveInvitationLinksUnscoped(adminDb.db, memberIds) },
     enqueuePayRecalculation,
+    ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
   const scheduling = createSchedulingModule({
     db: db.db,

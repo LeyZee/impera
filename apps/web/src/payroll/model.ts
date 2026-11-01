@@ -504,6 +504,9 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return period === null
         ? `Un relevé plus ancien ${member === null ? 'de ce membre' : `de ${member}`} attend sa validation.`
         : `Valide d’abord le relevé ${member === null ? '' : `de ${member} `}${period}.`;
+    case 'commission_statement_documents_open_conflict':
+      // A member who left (ADR 0039 § 6): his last documents may still bring a correction, which this period carries.
+      return `${countOf(details.count, 'facture ou avoir attend', 'factures ou avoirs attendent')} encore une réponse ou la décision sur une contestation : le relevé final ${member === null ? 'de ce membre' : `de ${member}`} se valide ensuite.`;
     case 'pay_period_order_conflict':
       return period === null
         ? 'Une quinzaine plus ancienne attend sa validation.'
