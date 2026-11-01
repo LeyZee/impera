@@ -1,10 +1,13 @@
 import {
+  payPeriodLastDay,
   CUSTOM_ALERT_TOPIC,
   SYSTEM_ALERT_LABELS,
   SYSTEM_ALERT_TOPICS,
   type AlertRef,
   type AutomaticMissing,
   type HandoffCause,
+  type InvoiceNotIssuedReason,
+  type PayPeriod,
   type SystemAlertCode,
   type TelegramTopic,
 } from '@nirvana/contracts';
@@ -36,6 +39,7 @@ export const SCANNED_EVENT_TYPES = [
   'send_failed',
   'backup_overdue',
   'exchange_rate_overdue',
+  'invoice_not_issued',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -136,6 +140,29 @@ const parisMoment = (at: Date): string => {
 /** « le 24 oct. », for a day as the ECB writes it (`2026-10-24`): a calendar day, no time zone to apply. */
 const calendarDay = (day: string): string =>
   `le ${new Date(`${day}T12:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC', day: 'numeric', month: 'short' })}`;
+
+/** « la quinzaine du 16 au 31 oct. »: calendar days, no time zone to apply. */
+const periodText = (period: PayPeriod): string => {
+  const last = payPeriodLastDay(period);
+  const month = new Date(`${last}T12:00:00Z`).toLocaleDateString('fr-FR', {
+    timeZone: 'UTC',
+    month: 'short',
+  });
+  const first = period.endsWith('-01') ? '1er' : '16';
+  return `la quinzaine du ${first} au ${String(Number(last.slice(8)))} ${month}`;
+};
+
+/** Why a document was not issued, as the owner settles it; the contractor is never named in Telegram. */
+const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
+  no_mandate: 'le prestataire n’a pas accepté de mandat de facturation',
+  no_regime: 'aucun régime de facturation n’était attribué au prestataire à la date de la facture',
+  regime_not_validated:
+    'le régime de facturation du prestataire n’était pas validé par le comptable à la date de la facture',
+  identity_incomplete: 'le dossier prestataire est incomplet pour son régime de facturation',
+  prefix_missing: 'le prestataire n’a pas de préfixe de facture',
+  agency_missing: 'les réglages de facturation de l’agence ne sont pas remplis',
+  no_invoice_to_credit: 'aucune facture ne peut prendre l’avoir entier, à voir avec le comptable',
+};
 
 const conversationLink = (conversationId: string | null): { label: string; path: string } => ({
   label: 'Ouvrir la conversation',
@@ -294,6 +321,16 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
             ? `Aucun taux ${signal.currency} de la BCE n’est encore arrivé : une quinzaine payée en ${signal.currency} ne peut pas être clôturée.`
             : `Pas de nouveau taux ${signal.currency} de la BCE depuis ${calendarDay(signal.lastRateDay)} : une quinzaine qui finit sans taux récent ne pourra pas être clôturée.`,
         link: { label: 'Ouvrir le Dashboard', path: '/' },
+      };
+    // Important, not urgent: the statement stays validated and nothing is paid wrong, a document is only missing.
+    case 'invoice_not_issued':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: `${signal.document === 'invoice' ? 'La facture d’un relevé validé de' : 'Un avoir dû par'} ${periodText(signal.period)} n’a pas été ${signal.document === 'invoice' ? 'émise' : 'émis'} : ${INVOICE_NOT_ISSUED_TEXT[signal.reason]}. Le relevé reste validé.`,
+        link: { label: 'Ouvrir la quinzaine', path: `/paie/quinzaine?quinzaine=${signal.period}` },
       };
     case 'automatic_closed': {
       // Important, not urgent: no fan is at risk, the agent just asks a human to approve again (ADR 0019).

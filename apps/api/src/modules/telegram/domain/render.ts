@@ -63,19 +63,36 @@ export function renderNotice(notice: Notice, creatorName: string | null, webOrig
   return { text: lines.join('\n'), summary: notice.body };
 }
 
-/** Several messages waiting for the same group go out as one (ADR 0020 §8), cut to Telegram's limit. */
+/**
+ * Several messages waiting for the same group go out as one (ADR 0020 §8), cut to Telegram's limit. Identical texts
+ * are said once, their count on the first line (« (×20) »): twenty statements refused for the same reason name no
+ * one, so they read the same.
+ */
 export function joinTexts(texts: readonly string[]): string {
-  const joined = texts.join('\n\n');
+  const counts = new Map<string, number>();
+  for (const text of texts) counts.set(text, (counts.get(text) ?? 0) + 1);
+  const groups = [...counts].map(([text, count]) => ({
+    text: count === 1 ? text : withCount(text, count),
+    count,
+  }));
+  const joined = groups.map((group) => group.text).join('\n\n');
   if (joined.length <= MAX_TEXT) return joined;
   const kept: string[] = [];
   let length = 0;
-  for (const text of texts) {
-    if (length + text.length + 2 > MAX_TEXT - 60) break;
-    kept.push(text);
-    length += text.length + 2;
+  let rest = texts.length;
+  for (const group of groups) {
+    if (length + group.text.length + 2 > MAX_TEXT - 60) break;
+    kept.push(group.text);
+    length += group.text.length + 2;
+    rest -= group.count;
   }
-  const rest = texts.length - kept.length;
   return `${kept.join('\n\n')}\n\n… et ${String(rest)} autre${rest > 1 ? 's' : ''} dans le CRM.`;
+}
+
+function withCount(text: string, count: number): string {
+  const end = text.indexOf('\n');
+  const mark = ` (×${String(count)})`;
+  return end === -1 ? `${text}${mark}` : `${text.slice(0, end)}${mark}${text.slice(end)}`;
 }
 
 /** The original message, closed by a person: « ✓ Pris en main par Théo », « ✓ Rendu à l’agent par Théo ». */

@@ -4,7 +4,10 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   HandoffCauseSchema,
+  InvoiceKindSchema,
+  InvoiceNotIssuedReasonSchema,
   KillSwitchScopeSchema,
+  PayPeriodSchema,
 } from '@nirvana/contracts';
 import { z } from 'zod';
 
@@ -77,6 +80,14 @@ const BackupOverdueSchema = z.object({ lastSucceededAt: z.iso.datetime().nullabl
 const ExchangeRateOverdueSchema = z.object({
   currency: z.string().regex(/^[A-Z]{3}$/),
   lastRateDay: z.iso.date().nullable(),
+});
+
+// The period, the document and the reason only: the member and the amount stay in Nirvana (no figure of the pay goes to
+// Telegram, ADR 0033).
+const InvoiceNotIssuedSchema = z.object({
+  period: PayPeriodSchema,
+  document: InvoiceKindSchema,
+  reason: InvoiceNotIssuedReasonSchema,
 });
 
 function signalOf(type: string, payload: unknown): Signal | null {
@@ -155,6 +166,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = ExchangeRateOverdueSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'exchange_rate_overdue', ...parsed.data };
+    }
+    case 'invoice_not_issued': {
+      const parsed = InvoiceNotIssuedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_not_issued', ...parsed.data };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);
