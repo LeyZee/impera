@@ -61,4 +61,6 @@ Date : AAAA-MM-JJ
 | 0034 | Le test à l'aveugle est une séance : le serveur calcule le taux, à partir de 40 situations | proposed (complète 0019 ; exception à 0023 à valider) |
 | 0035 | Paie : une saisie verrouille sa quinzaine et chacune des suivantes | accepted (complète 0032 § Verrous) |
 | 0036 | Factures : ce qu'une quinzaine doit rendre devient un avoir sur une facture déjà émise | accepted (précise 0023 § Factures) |
-| 0038 | Paie : un petit montant est reporté deux fois au plus, pour que chaque facture soit payée avant son échéance | accepted (remplace dans 0023 le report sans limite d'un montant positif ; 0037 réservée au PDF des factures) |
+| 0037 | Factures : un PDF/A rendu une fois par PDFKit, gardé dix ans sous verrou de conformité, en deux copies | accepted (précise 0023 § Factures et 0028 § 4) |
+| 0038 | Paie : un petit montant est reporté deux fois au plus, pour que chaque facture soit payée avant son échéance | accepted (remplace dans 0023 le report sans limite d'un montant positif) |
+| 0039 | Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main | accepted (remplace dans 0036 la phrase sur l'état « créditée » ; précise 0023 § Factures) |

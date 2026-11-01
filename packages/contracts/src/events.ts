@@ -19,13 +19,19 @@ import {
   CreatorIdSchema,
   DraftIdSchema,
   FanIdSchema,
+  InvoiceIdSchema,
   MediaAssetIdSchema,
   MessageIdSchema,
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
-import { InvoiceKindSchema, InvoiceNotIssuedReasonSchema } from './invoices';
+import {
+  InvoiceKindSchema,
+  InvoiceNotIssuedReasonSchema,
+  InvoiceNumberSchema,
+  InvoicePdfPlaceSchema,
+} from './invoices';
 import { CurrencySchema } from './money';
 import { PayPeriodSchema } from './pay-periods';
 
@@ -190,6 +196,9 @@ export const EVENT_TYPES = [
   'backup_overdue',
   'exchange_rate_overdue',
   'invoice_not_issued',
+  'invoice_pdf_conflict',
+  'invoice_pdf_missing',
+  'invoice_contested',
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
@@ -329,6 +338,43 @@ export const EVENT_PAYLOADS = {
     amountMinor: z.number().int().min(1),
   }),
   /**
+   * An invoice's key does not hold its PDF as the base records it (ADR 0037 § 5 to 7). By stage: `render`, other bytes
+   * in the first bucket after a crash, nothing written; `copy`, at `primary` the PDF missing or other bytes, nothing
+   * copied, at a copy other bytes or a lock that is not the PDF's (none, or a longer one), nothing written;
+   * `download`, the file at that place missing or other bytes, not served (the other place is tried, and served only
+   * if it matches). Nothing is ever replaced; the owner looks into it. Published once per document, place and stage.
+   * Never a name: the member by id, the document by its number.
+   */
+  invoice_pdf_conflict: z.object({
+    invoiceId: InvoiceIdSchema,
+    memberId: TeamMemberIdSchema,
+    number: InvoiceNumberSchema,
+    place: InvoicePdfPlaceSchema,
+    stage: z.enum(['render', 'copy', 'download']),
+  }),
+  /**
+   * The job gave up after its last attempt (ADR 0037 § 5 and 6): an invoice still has no PDF (`primary`), or its PDF
+   * no copy at the provider named. The invoice stays valid; never published while the job still retries, and once
+   * per document and place.
+   */
+  invoice_pdf_missing: z.object({
+    invoiceId: InvoiceIdSchema,
+    memberId: TeamMemberIdSchema,
+    number: InvoiceNumberSchema,
+    place: InvoicePdfPlaceSchema,
+  }),
+  /**
+   * A contractor contested one of their documents, with a reason, before its delay ended (EQ-06 lot 6, ADR 0039 § 2):
+   * published once per document by `payroll.announce_invoice_contest`, with no creator, for the owner, who alone
+   * refuses the contest or upholds it. Never the reason nor a name: the owner reads them in the Paie.
+   */
+  invoice_contested: z.object({
+    invoiceId: InvoiceIdSchema,
+    memberId: TeamMemberIdSchema,
+    number: InvoiceNumberSchema,
+    document: InvoiceKindSchema,
+  }),
+  /**
    * Automatique closed on its own (ADR 0019): the live rate fell under its target, or the voice version changed and
    * has not proved itself yet. Every conversation in automatic went back to the copilot. Published once, for the owner.
    */
@@ -390,6 +436,9 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('backup_overdue'),
   typedEvent('exchange_rate_overdue'),
   typedEvent('invoice_not_issued'),
+  typedEvent('invoice_pdf_conflict'),
+  typedEvent('invoice_pdf_missing'),
+  typedEvent('invoice_contested'),
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),

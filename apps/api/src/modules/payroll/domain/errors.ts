@@ -1,4 +1,4 @@
-import { DomainError, type PayPeriod } from '@nirvana/contracts';
+import { DomainError, type AgencyLogoRefusal, type PayPeriod } from '@nirvana/contracts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
 
@@ -289,5 +289,76 @@ export class CollectiveGoalLate extends DomainError {
     super('collective_goal_late_invalid', 'L’objectif d’une quinzaine se pose au plus tard son 3e jour', {
       details: { period },
     });
+  }
+}
+
+/** The document does not exist, or is not the reader's to read (the invoice's policy). */
+export class InvoiceNotFound extends DomainError {
+  constructor() {
+    super('invoice_not_found', 'Facture introuvable');
+  }
+}
+
+/** Only the contractor answers their invoice or credit note (ADR 0039 § 1): never the owner, a manager or another. */
+export class InvoiceAnswerForbidden extends DomainError {
+  constructor() {
+    super('invoice_answer_forbidden', 'Seul le prestataire répond à sa facture');
+  }
+}
+
+/** The document's PDF is not rendered yet (ADR 0037 § 5): the screen says « PDF en préparation ». */
+export class InvoicePdfNotFound extends DomainError {
+  constructor() {
+    super('invoice_pdf_not_found', 'PDF en préparation, réessaie dans quelques minutes');
+  }
+}
+
+/**
+ * Neither bucket gave the PDF with its fingerprint (ADR 0037 § 7): both unreachable, or the copy missing too. An
+ * altered file is never served; the owner is alerted of a wrong one.
+ */
+export class InvoicePdfUnavailable extends DomainError {
+  constructor() {
+    super('invoice_pdf_unavailable', 'Le PDF est momentanément indisponible, réessaie dans un instant');
+  }
+}
+
+/** A bucket did not answer, or answered an error: a passing failure, never a wrong file (ADR 0037 § 7). */
+export class InvoiceStorageUnavailable extends Error {
+  constructor(message: string, options?: { readonly cause?: unknown }) {
+    super(message, options);
+    this.name = 'InvoiceStorageUnavailable';
+  }
+}
+
+/** A character the PDF would print that its font has no glyph for: the PDF is not rendered (ADR 0037 § 2). */
+export class InvoicePdfGlyphMissing extends Error {
+  constructor(readonly codePoints: readonly number[]) {
+    super(
+      `The invoice font has no glyph for ${codePoints.map((one) => `U+${one.toString(16).toUpperCase().padStart(4, '0')}`).join(', ')}`,
+    );
+    this.name = 'InvoicePdfGlyphMissing';
+  }
+}
+
+const LOGO_REFUSALS: Readonly<Record<AgencyLogoRefusal, string>> = {
+  too_heavy: 'Le logo pèse plus de 512 Ko',
+  not_png: 'Le logo n’est pas un PNG',
+  damaged: 'Le PNG est abîmé ou incomplet',
+  opaque: 'Le PNG n’a aucun pixel transparent',
+  dimensions: 'Le logo doit mesurer de 64 à 4 000 pixels de côté, 4 millions de pixels au plus',
+};
+
+/** A logo the server refuses to keep (400), `details.reason` saying why (`AGENCY_LOGO_REFUSALS`). */
+export class AgencyLogoInvalid extends DomainError {
+  constructor(readonly reason: AgencyLogoRefusal) {
+    super('agency_logo_invalid', LOGO_REFUSALS[reason], { details: { reason } });
+  }
+}
+
+/** The settings name a logo nobody added (404). */
+export class AgencyLogoNotFound extends DomainError {
+  constructor() {
+    super('agency_logo_not_found', 'Logo introuvable : dépose-le d’abord');
   }
 }

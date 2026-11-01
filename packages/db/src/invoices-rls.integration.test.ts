@@ -242,6 +242,8 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
         inclVatMinor: o.amountMinor,
         selfAssessedVatMinor: Math.trunc(o.amountMinor / 5),
         acceptanceDeadline: new Date(Date.now() + 7 * DAY),
+        // What an invoice bills, required at its commit from 0045 on; a credit note cites its invoice instead.
+        serviceDescription: o.creditedInvoiceId === undefined ? 'Animation commerciale de comptes' : null,
         ...o.invoice,
       });
       const amounts = o.lines ?? [o.amountMinor];
@@ -509,6 +511,22 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(moved?.verifiedAt).toBeNull();
       await update(owner, { verifiedAt: new Date(), verifiedBy: owner });
       expect(await failure(update(kofi, { verifiedAt: null, verifiedBy: null }))).toMatch(KEPT);
+      // His SIREN, his VAT number and « EI » are his identity too (lot 4): each change clears the check.
+      for (const change of [
+        { businessId: '912345678' },
+        { vatNumber: 'FR00912345678' },
+        { individualEntrepreneur: true },
+      ]) {
+        await update(owner, { verifiedAt: new Date(), verifiedBy: owner });
+        const [changed] = await update(kofi, change);
+        expect(changed?.verifiedAt).toBeNull();
+      }
+      expect(await failure(update(kofi, { businessId: '91234567' }))).toMatch(
+        /contractor_profiles_ids_check/u,
+      );
+      expect(await failure(update(kofi, { vatNumber: 'fr00912345678' }))).toMatch(
+        /contractor_profiles_ids_check/u,
+      );
       // The owner opens Ama's file with her prefix.
       await as(owner, (tx) =>
         tx.insert(s.contractorProfiles).values({
@@ -780,7 +798,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       ).toEqual([{ last: 2 }]);
     });
 
-    it('at its commit, an invoice has lines that add up to its total and its event issued; no line comes after', async () => {
+    it('at its commit, an invoice has lines that add up to its total, its event issued and its service; no line comes after', async () => {
       const sep1 = {
         by: owner,
         userId: kofi,
@@ -792,6 +810,9 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await failure(issue({ ...sep1, amountMinor: 12_000, withoutIssued: true }))).toMatch(
         /with its event issued/u,
       );
+      expect(
+        await failure(issue({ ...sep1, amountMinor: 12_000, invoice: { serviceDescription: null } })),
+      ).toMatch(/names the service it bills/u);
       expect(
         await failure(
           as(owner, (tx) =>
@@ -851,7 +872,25 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
           ),
         ),
       ).toMatch(KEPT);
-      const pdf = { invoiceId: id, storageKey: `invoices/${id}.pdf`, sha256: HASH };
+      // Issued today under a calendar year: locked through the end of the year ten years on.
+      const retainUntil = new Date(Date.UTC(year + 11, 0, 1));
+      const pdf = {
+        invoiceId: id,
+        storageKey: `invoices/${String(year)}/${id}.pdf`,
+        sha256: HASH,
+        retainUntil,
+      };
+      expect(
+        await failure(
+          admin((tx) => tx.insert(s.invoicePdfs).values({ ...pdf, retainUntil: new Date('2020-01-01') })),
+        ),
+      ).toMatch(/locked ten years after its issue at least/u);
+      // Never shorter than ten years after the issue, whatever a bucket gave back (ADR 0037 § 4): the trigger answers
+      // before the CHECK on `created_at`.
+      const nineYears = new Date(`${String(year + 9)}${today.slice(4)}T00:00:00.000Z`);
+      expect(
+        await failure(admin((tx) => tx.insert(s.invoicePdfs).values({ ...pdf, retainUntil: nineYears }))),
+      ).toMatch(/locked ten years after its issue at least/u);
       expect(await failure(as(owner, (tx) => tx.insert(s.invoicePdfs).values(pdf)))).toMatch(DENIED);
       await admin((tx) => tx.insert(s.invoicePdfs).values(pdf));
       expect(
@@ -864,6 +903,80 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       );
       expect(await as(kofi, (tx) => tx.select().from(s.invoicePdfs))).toHaveLength(1);
       expect(await as(ama, (tx) => tx.select().from(s.invoicePdfs))).toHaveLength(0);
+
+      // Its copy at the second provider (ADR 0037 § 6): the same bytes under the same lock, written once by the job.
+      const copy = { ...pdf, provider: 'ovhcloud' };
+      expect(await failure(as(owner, (tx) => tx.insert(s.invoicePdfCopies).values(copy)))).toMatch(DENIED);
+      expect(
+        await failure(
+          admin((tx) => tx.insert(s.invoicePdfCopies).values({ ...copy, sha256: 'b'.repeat(64) })),
+        ),
+      ).toMatch(/ADR 0037/u);
+      expect(
+        await failure(
+          admin((tx) =>
+            tx
+              .insert(s.invoicePdfCopies)
+              .values({ ...copy, retainUntil: new Date(Date.UTC(year + 12, 0, 1)) }),
+          ),
+        ),
+      ).toMatch(/ADR 0037/u);
+      expect(
+        await failure(admin((tx) => tx.insert(s.invoicePdfCopies).values({ ...copy, provider: 'aws' }))),
+      ).toMatch(/invoice_pdf_copies_provider_check/u);
+      await admin((tx) => tx.insert(s.invoicePdfCopies).values(copy));
+      expect(await failure(admin((tx) => tx.insert(s.invoicePdfCopies).values(copy)))).toMatch(
+        /invoice_pdf_copies_pkey/u,
+      );
+      expect(
+        await failure(admin((tx) => tx.update(s.invoicePdfCopies).set({ storageKey: 'ailleurs.pdf' }))),
+      ).toMatch(KEPT);
+      expect(await failure(admin((tx) => tx.delete(s.invoicePdfCopies)))).toMatch(KEPT);
+      expect(await as(kofi, (tx) => tx.select().from(s.invoicePdfCopies))).toHaveLength(1);
+      expect(await as(ama, (tx) => tx.select().from(s.invoicePdfCopies))).toHaveLength(0);
+      expect(await as(manager, (tx) => tx.select().from(s.invoicePdfCopies))).toHaveLength(1);
+    });
+
+    it('the owner adds a logo, kept by its fingerprint and never changed; the settings and an invoice name it', async () => {
+      // The 8-byte signature of a PNG and a few invented bytes: the base checks the fingerprint, never the image.
+      const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02]);
+      const sha256 = createHash('sha256').update(bytes).digest('hex');
+      const logo = { sha256, mediaType: 'image/png', bytes, createdBy: owner };
+      expect(
+        await failure(as(manager, (tx) => tx.insert(s.agencyLogos).values({ ...logo, createdBy: manager }))),
+      ).toMatch(RLS);
+      expect(
+        await failure(as(owner, (tx) => tx.insert(s.agencyLogos).values({ ...logo, sha256: HASH }))),
+      ).toMatch(/agency_logos_bytes_check/u);
+      expect(
+        await failure(
+          as(owner, (tx) => tx.insert(s.agencyLogos).values({ ...logo, mediaType: 'image/svg+xml' })),
+        ),
+      ).toMatch(/agency_logos_media_type_check/u);
+      await as(owner, (tx) => tx.insert(s.agencyLogos).values(logo));
+      expect(
+        await failure(as(owner, (tx) => tx.update(s.agencyLogos).set({ createdAt: new Date() }))),
+      ).toMatch(DENIED);
+      expect(await failure(admin((tx) => tx.delete(s.agencyLogos)))).toMatch(KEPT);
+      expect(await as(manager, (tx) => tx.select().from(s.agencyLogos))).toHaveLength(1);
+      expect(await as(kofi, (tx) => tx.select().from(s.agencyLogos))).toHaveLength(0);
+      await as(owner, (tx) =>
+        tx.update(s.billingSettings).set({
+          logoSha256: sha256,
+          serviceDescription: 'Animation commerciale de comptes',
+          updatedBy: owner,
+        }),
+      );
+      expect(
+        await failure(
+          as(owner, (tx) => tx.update(s.billingSettings).set({ logoSha256: HASH, updatedBy: owner })),
+        ),
+      ).toMatch(/billing_settings_logo_sha256_agency_logos_sha256_fk/u);
+      expect(
+        await failure(
+          as(owner, (tx) => tx.update(s.billingSettings).set({ serviceDescription: '', updatedBy: owner })),
+        ),
+      ).toMatch(/billing_settings_service_check/u);
     });
 
     it('the contractor accepts or contests before the delay, once; the job accepts tacitly after it', async () => {

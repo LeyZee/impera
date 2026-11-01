@@ -316,6 +316,34 @@
       "when": 1793454615366,
       "tag": "0044_telegram_invoice_not_issued",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1793531374711,
+      "tag": "0045_invoice_pdf_copies",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793531434711,
+      "tag": "0046_telegram_invoice_pdf",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793541674127,
+      "tag": "0047_invoice_contested",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793545248346,
+      "tag": "0048_billing_accounts_optional",
+      "breakpoints": true
     }
   ]
 }

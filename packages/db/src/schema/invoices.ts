@@ -1,7 +1,11 @@
 import {
+  AGENCY_LOGO_MAX_BYTES,
+  AGENCY_LOGO_MEDIA_TYPES,
+  BUSINESS_ID_PATTERN,
   CONTRACT_TEXT_KINDS,
   CONTRACT_TEXT_MAX,
   CONTEST_DELAY_MAX_DAYS,
+  DEFAULT_FISCAL_YEAR_END_MONTH,
   CONTRACTOR_DOCUMENT_KINDS,
   DOCUMENT_REMINDER_MAX_DAYS,
   INVOICE_DOCUMENT_MENTIONS_MAX,
@@ -13,6 +17,7 @@ import {
   INVOICE_LINE_KINDS,
   INVOICE_LINE_LABEL_MAX,
   INVOICE_MENTIONS_MAX,
+  INVOICE_PDF_COPY_PROVIDERS,
   INVOICE_PREFIX_PATTERN,
   INVOICE_REASON_MAX,
   LEGAL_NAME_MAX,
@@ -20,9 +25,11 @@ import {
   PAYMENT_TERMS_MAX,
   POSTAL_ADDRESS_MAX,
   REGIME_NAME_MAX,
+  SERVICE_DESCRIPTION_MAX,
   STORAGE_KEY_MAX,
   TAX_ID_MAX,
   BILLING_EMAIL_MAX,
+  VAT_NUMBER_PATTERN,
   VAT_TREATMENTS,
   WITHHOLDINGS,
 } from '@nirvana/contracts';
@@ -30,6 +37,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -82,8 +90,40 @@ const num = (value: number): SQL => sql.raw(String(value));
 const textBetween = (column: PgColumn, max: number): SQL =>
   sql`char_length(${column}) between 1 and ${num(max)}`;
 const sha256Check = (column: PgColumn): SQL => sql`${column} ~ '^[0-9a-f]{64}$'`;
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 const kinds = (values: readonly string[]): SQL =>
   sql.raw(`array[${values.map((value) => `'${value}'`).join(', ')}]::text[]`);
+
+/**
+ * The agency's logos (EQ-06 lot 4), each kept by its fingerprint, never changed nor removed: an invoice names the one
+ * it printed (`invoices.logo_sha256`), so that its PDF renders again byte for byte whatever logo the settings hold
+ * since (ADR 0037 § 2). An image of a few hundred kilobytes, set by the owner in Réglages > Facturation; the bytes stay
+ * here, unlike the documents and the PDFs, because each render reads them and nothing else does.
+ */
+export const agencyLogos = pgTable(
+  'agency_logos',
+  {
+    sha256: text('sha256').primaryKey(),
+    mediaType: text('media_type').notNull(),
+    bytes: bytea('bytes').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    enumCheck('agency_logos', t.mediaType, AGENCY_LOGO_MEDIA_TYPES),
+    check(
+      'agency_logos_bytes_check',
+      sql`${sha256Check(t.sha256)} and octet_length(${t.bytes}) between 1 and ${num(AGENCY_LOGO_MAX_BYTES)} and ${t.sha256} = encode(sha256(${t.bytes}), 'hex')`,
+    ),
+    pgPolicy('team_read', { for: 'select', using: readsTeam }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser}`,
+    }),
+  ],
+);
 
 /**
  * One row at most (`id = 1`): the agency's identity and payment terms on each invoice, the delays, the journal's
@@ -97,7 +137,17 @@ export const billingSettings = pgTable(
     paymentTerms: text('payment_terms').notNull(),
     dueDays: smallint('due_days').notNull(),
     documentReminderDays: smallint('document_reminder_days').notNull(),
-    accounts: jsonb('accounts').notNull(),
+    /** The month the fiscal year closes, on its last day: how long each PDF stays locked (ADR 0037 § 4). */
+    fiscalYearEndMonth: smallint('fiscal_year_end_month').notNull().default(DEFAULT_FISCAL_YEAR_END_MONTH),
+    /** What each invoice designates above its lines; without it nothing is issued (`agency_missing`). */
+    serviceDescription: text('service_description'),
+    /** The logo each document prints in its head, `null` for none. */
+    logoSha256: text('logo_sha256').references(() => agencyLogos.sha256),
+    /**
+     * The purchase journal's accounts, as the accountant gives them; `null` until then. Only the accounting export
+     * reads them (EQ-06 lot 7), which never leaves without them: an invoice is issued without.
+     */
+    accounts: jsonb('accounts'),
     updatedBy: text('updated_by')
       .notNull()
       .references(() => user.id),
@@ -107,12 +157,17 @@ export const billingSettings = pgTable(
     check('billing_settings_single_check', sql`${t.id} = 1`),
     check(
       'billing_settings_json_check',
-      sql`jsonb_typeof(${t.agency}) = 'object' and jsonb_typeof(${t.accounts}) = 'object'`,
+      sql`jsonb_typeof(${t.agency}) = 'object' and (${t.accounts} is null or jsonb_typeof(${t.accounts}) = 'object')`,
     ),
     check('billing_settings_payment_terms_check', textBetween(t.paymentTerms, PAYMENT_TERMS_MAX)),
     check(
       'billing_settings_delays_check',
       sql`${t.dueDays} between ${num(INVOICE_DUE_MIN_DAYS)} and ${num(INVOICE_DUE_MAX_DAYS)} and ${t.documentReminderDays} between 1 and ${num(DOCUMENT_REMINDER_MAX_DAYS)}`,
+    ),
+    check('billing_settings_fiscal_year_check', sql`${t.fiscalYearEndMonth} between 1 and 12`),
+    check(
+      'billing_settings_service_check',
+      sql`${t.serviceDescription} is null or ${textBetween(t.serviceDescription, SERVICE_DESCRIPTION_MAX)}`,
     ),
     pgPolicy('team_read', { for: 'select', using: readsTeam }),
     pgPolicy('owner_insert', {
@@ -239,6 +294,12 @@ export const contractorProfiles = pgTable(
     legalName: text('legal_name').notNull(),
     address: text('address').notNull(),
     taxId: text('tax_id'),
+    /** Established in France: his SIREN or SIRET (lot 4). */
+    businessId: text('business_id'),
+    /** Charging VAT: his intra-community VAT number (lot 4). */
+    vatNumber: text('vat_number'),
+    /** An individual entrepreneur, whose invoices print « EI » after his name (lot 4). */
+    individualEntrepreneur: boolean('individual_entrepreneur').notNull().default(false),
     email: text('email').notNull(),
     invoicePrefix: text('invoice_prefix').unique('contractor_profiles_prefix_unique'),
     verifiedAt: timestampTz('verified_at'),
@@ -253,6 +314,10 @@ export const contractorProfiles = pgTable(
     check(
       'contractor_profiles_texts_check',
       sql`${textBetween(t.legalName, LEGAL_NAME_MAX)} and ${textBetween(t.address, POSTAL_ADDRESS_MAX)} and (${t.taxId} is null or ${textBetween(t.taxId, TAX_ID_MAX)}) and ${textBetween(t.email, BILLING_EMAIL_MAX)}`,
+    ),
+    check(
+      'contractor_profiles_ids_check',
+      sql`(${t.businessId} is null or ${t.businessId} ~ ${sql.raw(`'${BUSINESS_ID_PATTERN}'`)}) and (${t.vatNumber} is null or ${t.vatNumber} ~ ${sql.raw(`'${VAT_NUMBER_PATTERN}'`)})`,
     ),
     check(
       'contractor_profiles_prefix_check',
@@ -442,6 +507,10 @@ export const invoices = pgTable(
     inclVatMinor: integer('incl_vat_minor').notNull(),
     selfAssessedVatMinor: integer('self_assessed_vat_minor').notNull(),
     acceptanceDeadline: timestampTz('acceptance_deadline').notNull(),
+    /** An invoice's designation of the service, copied at the issue (lot 4); `null` on a credit note. */
+    serviceDescription: text('service_description'),
+    /** The agency's logo at the issue, which its PDF prints (lot 4); `null` for none. */
+    logoSha256: text('logo_sha256').references(() => agencyLogos.sha256),
     createdAt: createdAt(),
   },
   (t) => [
@@ -468,6 +537,10 @@ export const invoices = pgTable(
       sql`${t.prefix} ~ ${sql.raw(`'${INVOICE_PREFIX_PATTERN}'`)} and ${t.year} between 2000 and 9999 and ${t.sequence} >= 1 and ${t.number} = ${t.prefix} || '-' || ${t.year} || '-' || lpad(${t.sequence}::text, greatest(4, char_length(${t.sequence}::text)), '0') and ${t.year} = extract(year from ${t.issuedOn})`,
     ),
     check('invoices_key_check', sql`char_length(${t.idempotencyKey}) between 1 and 200`),
+    check(
+      'invoices_service_check',
+      sql`${t.serviceDescription} is null or (${t.kind} = 'invoice' and ${textBetween(t.serviceDescription, SERVICE_DESCRIPTION_MAX)})`,
+    ),
     check(
       'invoices_totals_check',
       sql`${t.inclVatMinor} = ${t.exclVatMinor} + ${t.vatMinor} and abs(${t.vatMinor}) <= abs(${t.exclVatMinor}) and abs(${t.selfAssessedVatMinor}) <= abs(${t.exclVatMinor})`,
@@ -583,11 +656,42 @@ export const invoicePdfs = pgTable(
       .references(() => invoices.id),
     storageKey: text('storage_key').notNull(),
     sha256: text('sha256').notNull(),
+    /** Until when the bucket's compliance lock holds the object, as posed at the upload (ADR 0037 § 4). */
+    retainUntil: timestampTz('retain_until').notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     check(
       'invoice_pdfs_file_check',
+      sql`${textBetween(t.storageKey, STORAGE_KEY_MAX)} and ${sha256Check(t.sha256)}`,
+    ),
+    check('invoice_pdfs_retention_check', sql`${t.retainUntil} > ${t.createdAt}`),
+    pgPolicy('member_read', { for: 'select', using: ofInvoice(t.invoiceId, sql`true`) }),
+  ],
+);
+
+/**
+ * A copy of an invoice's PDF at another provider (ADR 0037 § 6): one row per copy, written once by the copy job after
+ * it checked the bytes, never after (the migration's trigger). Same key, same bytes and same lock as its PDF: the
+ * migration refuses a copy whose SHA-256 or lock differs from its PDF's row.
+ */
+export const invoicePdfCopies = pgTable(
+  'invoice_pdf_copies',
+  {
+    invoiceId: uuid('invoice_id')
+      .notNull()
+      .references(() => invoicePdfs.invoiceId),
+    provider: text('provider').notNull(),
+    storageKey: text('storage_key').notNull(),
+    sha256: text('sha256').notNull(),
+    retainUntil: timestampTz('retain_until').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'invoice_pdf_copies_pkey', columns: [t.invoiceId, t.provider] }),
+    enumCheck('invoice_pdf_copies', t.provider, INVOICE_PDF_COPY_PROVIDERS),
+    check(
+      'invoice_pdf_copies_file_check',
       sql`${textBetween(t.storageKey, STORAGE_KEY_MAX)} and ${sha256Check(t.sha256)}`,
     ),
     pgPolicy('member_read', { for: 'select', using: ofInvoice(t.invoiceId, sql`true`) }),

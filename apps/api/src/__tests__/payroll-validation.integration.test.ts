@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import {
   BonusIdSchema,
   CommissionRateIdSchema,
@@ -16,7 +18,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import type { App } from '../composition-root';
 import { createLogger } from '../logger';
-import { createPayrollModule } from '../modules/payroll';
+import { createMemoryInvoiceStore, createPayrollModule } from '../modules/payroll';
 import { buildServer } from '../server';
 
 import { testConfig } from './support/config';
@@ -301,6 +303,11 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
         creatorIds: () => Promise.resolve([anna]),
       },
       rateJobSince: null,
+      invoicePdfs: {
+        fontsDir: fileURLToPath(new URL('../modules/payroll/infra/fonts/', import.meta.url)),
+        primary: createMemoryInvoiceStore(),
+        copy: createMemoryInvoiceStore(),
+      },
     });
     const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
     const blindServer = await buildServer({

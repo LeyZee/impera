@@ -18,6 +18,8 @@ Rien n'envoie à un fan tant que `connector_config.writes` n'est pas ouvert pour
 
 Le tout est décrit par `docker-compose.prod.yml`. L'API n'a pas de domaine : le navigateur l'atteint par `https://<domaine>/v1/`, à travers le nginx de `web`.
 
+**Réseau sortant de l'API et du worker : les buckets des factures.** Le worker envoie chaque PDF chez Hetzner puis chez OVHcloud, et l'API les relit pour un téléchargement (ADR 0037 ; § 4.3 ci-dessous). Si un hôte est coupé, le job réessaie environ une heure puis alerte le propriétaire ; le téléchargement lit l'autre copie.
+
 **Réseau sortant du worker : la BCE.** Le job `payroll.fetch_exchange_rates` lit chaque heure, à la 7ᵉ minute, les taux de référence de la BCE sur `https://www.ecb.europa.eu` (ADR 0033). La requête part en HTTPS, sans clé, et n'envoie aucune donnée de l'agence. Si un pare-feu coupe cet hôte, le job échoue à chaque passage et n'écrit rien. Les brouillons gardent le dernier taux connu. Une clôture est refusée (`exchange_rate_missing_conflict`) dès que le dernier taux date de plus de quatre jours avant la fin de la quinzaine. Rien n'est payé sur un taux deviné. Quand l'hôte revient, le passage suivant rattrape les jours manqués, sur 90 jours au plus.
 
 ## 1. Première mise en service
@@ -122,7 +124,7 @@ Une PR fusionnée dans `main` déclenche le déploiement. Rien à faire à la ma
 Une fois, avant toute donnée réelle qu'on ne pourrait pas recréer, et dans tous les cas avant la paie (EQ-17). Une session Remote Control peut faire les étapes 1 et 4 sur le PC ; Charles fait les étapes 2 et 3 dans les consoles.
 
 1. **La paire de clés `age`, sur le PC**, jamais sur le serveur : `age-keygen -o nirvana-backup.key`. La ligne `# public key: age1…` donne `BACKUP_AGE_RECIPIENT`. Le fichier `nirvana-backup.key` est la clé privée : deux copies, le gestionnaire de mots de passe et une copie papier, avec à côté `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` (sans elles, une restauration rend illisibles les sessions et les clés stockées). Chaque rotation de ces clés (`rotate-secrets.md`) met cette copie à jour.
-2. **Le bucket**, Hetzner → Object Storage, même région que le VPS : un bucket `nirvana-backups` avec le **versioning** et le **verrou d'objets** (Object Lock, mode gouvernance, 30 jours), une règle de cycle de vie qui supprime les objets de plus de 30 jours. Les factures sur dix ans (EQ-17) auront **leur propre bucket**, jamais celui-ci.
+2. **Le bucket**, Hetzner → Object Storage, même région que le VPS : un bucket `nirvana-backups` avec le **versioning** et le **verrou d'objets** (Object Lock, mode gouvernance, 30 jours), une règle de cycle de vie qui supprime les objets de plus de 30 jours. Les factures sur dix ans ont **leurs propres buckets**, dans un autre projet (§ 4.3), jamais celui-ci.
 3. **Deux clés d'accès** : une pour le serveur, qui peut écrire et rien d'autre (ni lister, ni supprimer) ; une en lecture seule pour l'essai trimestriel, gardée avec la clé privée. Dans Coolify, avec la première : `BACKUP_S3_ENDPOINT` (`https://<région>.your-objectstorage.com`), `BACKUP_S3_REGION` (`fsn1`, `nbg1`…), `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, et `BACKUP_AGE_RECIPIENT`. `BACKUP_DATABASE_URL` reste vide : le service prend `DATABASE_ADMIN_URL`, dont le rôle a `BYPASSRLS` (§ 1.1), sans quoi `pg_dump` échoue sur les tables en `FORCE ROW LEVEL SECURITY`.
 4. **Premier export sans attendre la nuit** : Coolify → `backup` → Terminal, `/app/export.sh`. Il affiche `backup: backups/nirvana-<date>.tar.age (<taille> bytes, sha256 <empreinte>)` et la ligne de `backup_runs` passe à `succeeded`. Puis jouer tout de suite l'essai de `restore.md` § C.
 5. **Vérifier la copie des clés** (§ 4.2).
@@ -136,6 +138,38 @@ node dist/scripts/ops-check-keys.js
 ```
 
 Coller les deux valeurs **de la copie gardée** quand la commande les demande (rien ne s'affiche à la frappe ; elle ne lit pas celles du serveur). Elle ouvre en mémoire chaque session de plateforme, chaque clé de service IA et chaque jeton de bot Telegram, sur une connexion que la base garde en lecture seule, sans rien appeler ni rien afficher de déchiffré. Attendu : « La copie des clés ouvre toutes les données chiffrées. » Sinon, elle nomme ce qui ne s'ouvre pas (compte, service, bot) : remettre la copie à jour depuis Coolify, puis relancer.
+
+### 4.3 Les buckets des factures
+
+Avant la première facture réelle (EQ-06 lot 4, ADR 0037). En production, l'API et le worker refusent de démarrer sans les dix réglages `INVOICES_*` : jamais un PDF gardé en mémoire. Charles ouvre le compte OVHcloud et crée le projet Hetzner (aucune commande à taper) ; la session de mise en service fait le reste, sans jamais coller une clé dans un chat.
+
+1. **Hetzner, un projet pour les factures seules** (`nirvana-factures`) : une clé S3 Hetzner vaut pour tous les buckets de son projet, donc la clé de l'application ne doit pas voir les sauvegardes, ni celle de `backup` les factures. Object Storage, même région que le VPS : un bucket avec le **versioning** et le **verrou d'objets** activés à la création (il ne s'active pas après), verrou par défaut en **mode conformité, 10 ans** (filet pour un objet arrivé sans date), et **aucune règle de cycle de vie**.
+2. **OVHcloud, la copie** : Object Storage S3 en France (Gravelines ou Paris), un bucket avec versioning et verrou d'objets, verrou par défaut en mode conformité, 10 ans, sans cycle de vie.
+3. **Une clé par hébergeur, pour l'application seule** (API et worker) : lire et écrire des objets, poser leur verrou et le prolonger, et lister le bucket. Lister est nécessaire : sans ce droit, un fournisseur répond « accès refusé » au lieu de « absent » pour une clé vide, et le job lit toujours avant d'écrire. Prolonger aussi : un PDF trouvé sous un verrou plus court que dix ans après son émission est prolongé avant d'être enregistré (le mode conformité refuse de toute façon de raccourcir un verrou). Jamais le droit de supprimer ni de contourner un verrou, là où le fournisseur permet de le retirer (OVHcloud) ; chez Hetzner, le projet séparé et le mode conformité en tiennent lieu.
+4. **Coolify**, sur `api` et `worker` (ils partagent leurs variables) : `INVOICES_S3_ENDPOINT` (`https://<région>.your-objectstorage.com`), `INVOICES_S3_REGION` (`fsn1`, `nbg1`…), `INVOICES_S3_BUCKET`, `INVOICES_S3_ACCESS_KEY_ID`, `INVOICES_S3_SECRET_ACCESS_KEY` ; puis `INVOICES_COPY_S3_ENDPOINT` (`https://s3.<région>.io.cloud.ovh.net`), `INVOICES_COPY_S3_REGION` (`gra`, `eu-west-par`…), `INVOICES_COPY_S3_BUCKET`, `INVOICES_COPY_S3_ACCESS_KEY_ID`, `INVOICES_COPY_S3_SECRET_ACCESS_KEY`. Les cinq d'un bucket ensemble, chaque adresse en `https`, et la copie chez un autre hôte que le premier bucket : sinon l'API refuse de démarrer en nommant le réglage.
+5. **L'essai, sur chaque bucket**, avec la clé de l'application et un objet de quelques octets **verrouillé un jour**, sous `essais/` (seuls les jobs écrivent sous `invoices/` et `archives/`). Le mode conformité ne pardonne pas : jamais plus d'un jour, jamais plus que quelques octets.
+
+   ```sh
+   demain=$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)
+   printf 'essai' > essai.txt
+   aws s3api put-object --endpoint-url "$ENDPOINT" --bucket "$BUCKET" \
+     --key essais/verrou.txt --body essai.txt \
+     --object-lock-mode COMPLIANCE --object-lock-retain-until-date "$demain"
+   # Attendus : chacune des trois commandes suivantes est refusée.
+   # 412 : une clé écrite ne l'est plus.
+   aws s3api put-object --endpoint-url "$ENDPOINT" --bucket "$BUCKET" \
+     --key essais/verrou.txt --body essai.txt --if-none-match '*'
+   # Refusé : la version est verrouillée (VersionId rendu par le premier put-object).
+   aws s3api delete-object --endpoint-url "$ENDPOINT" --bucket "$BUCKET" \
+     --key essais/verrou.txt --version-id "<VersionId>"
+   # Refusé : un verrou ne se raccourcit pas.
+   aws s3api put-object-retention --endpoint-url "$ENDPOINT" --bucket "$BUCKET" \
+     --key essais/verrou.txt --version-id "<VersionId>" \
+     --retention "Mode=COMPLIANCE,RetainUntilDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+   ```
+
+   Puis, chez Hetzner : la clé de l'application ne liste pas le bucket des sauvegardes, et la clé de `backup` ne liste pas celui des factures (deux `aws s3api list-objects-v2`, refusés). Le verrou de l'objet d'essai tombe le lendemain ; l'objet reste, quelques octets, sans gêne.
+6. **Après la première facture réelle** : `invoice_pdfs` et `invoice_pdf_copies` ont chacune sa ligne, avec la même empreinte, et le téléchargement (`GET /v1/payroll/invoices/<id>/pdf`) rend le PDF. Sinon, le job dit pourquoi dans son journal, et le propriétaire reçoit `invoice_pdf_missing` après environ une heure.
 
 ## 5. Coupe-circuit
 

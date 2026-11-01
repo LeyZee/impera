@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { CreatorIdSchema, JOB_PAYLOADS, type JobName } from '@nirvana/contracts';
+import { CreatorIdSchema, JOB_MAX_ATTEMPTS, JOB_PAYLOADS, type JobName } from '@nirvana/contracts';
 import { createDbClient, parseEncryptionKeys, type Database, type DbClient } from '@nirvana/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, loadPrompt, type LlmCallStore } from '@nirvana/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -18,7 +18,7 @@ import {
   type RequireRole,
 } from './auth';
 import { publishBudgetThreshold } from './budget-events';
-import { secretOrNull, type Config } from './config';
+import { invoiceBucket, secretOrNull, type Config } from './config';
 import { cronKnownSince } from './crontab';
 import { assertDatabaseRoles } from './database-roles';
 import { createInvitationLinkRoutes, liveInvitationLinksUnscoped } from './invitation-links';
@@ -52,7 +52,14 @@ import {
   missingMediaBinaries,
   type MediaModule,
 } from './modules/media';
-import { createPayrollModule, enqueuePayRecalculation, type PayrollModule } from './modules/payroll';
+import {
+  createMemoryInvoiceStore,
+  createPayrollModule,
+  createS3InvoiceStore,
+  enqueuePayRecalculation,
+  type InvoiceObjectStore,
+  type PayrollModule,
+} from './modules/payroll';
 import { createPersonaModule, type PersonaModule } from './modules/persona';
 import { startPlaygroundModule, type PlaygroundModule } from './modules/playground';
 import { startProvidersModule, type ProvidersModule } from './modules/providers';
@@ -127,6 +134,29 @@ const fromRepoRoot = (path: string): string =>
   resolve(fileURLToPath(new URL('../../../', import.meta.url)), path);
 
 /**
+ * The fonts of the invoices' PDFs, beside their renderer: `src/` in development and `dist/` once built both sit one
+ * level under `apps/api`, and the image copies the folder to the same place (Dockerfile).
+ */
+const INVOICE_FONTS_DIR = fileURLToPath(new URL('../src/modules/payroll/infra/fonts/', import.meta.url));
+
+/**
+ * The invoices' two buckets (ADR 0037 § 4 and § 6): the configured ones (always in production, `loadConfig` refuses
+ * to start without), or one store in memory each, shared by the API and its inline worker, lost with the process:
+ * `volatile`, so that a PDF forgotten by a restart is never alerted as a damaged one.
+ */
+function invoiceBuckets(config: Config): {
+  readonly primary: InvoiceObjectStore;
+  readonly copy: InvoiceObjectStore;
+} {
+  const primary = invoiceBucket(config, 'primary');
+  const copy = invoiceBucket(config, 'copy');
+  return {
+    primary: primary === null ? createMemoryInvoiceStore({ volatile: true }) : createS3InvoiceStore(primary),
+    copy: copy === null ? createMemoryInvoiceStore({ volatile: true }) : createS3InvoiceStore(copy),
+  };
+}
+
+/**
  * Production only: when the rate job was first scheduled, so that a currency that never got a rate is alerted too
  * (ADR 0033). Elsewhere a database without rates is the normal case, and pay gets `null`: no such alert, ever. A
  * failed read throws, never reads as « never scheduled ».
@@ -146,6 +176,13 @@ export interface AppOptions {
   readonly composer?: DraftComposer;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
+  /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
+  readonly invoiceBuckets?: { readonly primary: InvoiceObjectStore; readonly copy: InvoiceObjectStore };
+  /**
+   * Tests set pay's clock here, to issue a document whose delay to answer is already over (EQ-06 lot 6); the system's
+   * otherwise. The database keeps its own: every step of an acceptance is checked on `now()`.
+   */
+  readonly payrollClock?: () => Date;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -291,6 +328,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
     },
     rateJobSince: rateJobSince(config, adminDb.db),
+    invoicePdfs: { fontsDir: INVOICE_FONTS_DIR, ...(options.invoiceBuckets ?? invoiceBuckets(config)) },
+    ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
   const playground =
     options.withPlayground === false
@@ -649,6 +688,61 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
               }
             : { statementId: payload.statementId, outcome: outcome.kind },
           'payroll: invoices issued',
+        );
+      },
+    ),
+    'payroll.render_invoice_pdf': defineTask(
+      'payroll.render_invoice_pdf',
+      JOB_PAYLOADS['payroll.render_invoice_pdf'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.renderInvoicePdf(
+          payload.invoiceId,
+          { current: context.attempt, max: JOB_MAX_ATTEMPTS['payroll.render_invoice_pdf'] },
+          context.logger,
+        );
+        context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice PDF rendered');
+      },
+    ),
+    'payroll.mirror_invoice_pdf': defineTask(
+      'payroll.mirror_invoice_pdf',
+      JOB_PAYLOADS['payroll.mirror_invoice_pdf'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.mirrorInvoicePdf(
+          payload.invoiceId,
+          { current: context.attempt, max: JOB_MAX_ATTEMPTS['payroll.mirror_invoice_pdf'] },
+          context.logger,
+        );
+        context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice PDF copied');
+      },
+    ),
+    'payroll.lapse_invoice': defineTask(
+      'payroll.lapse_invoice',
+      JOB_PAYLOADS['payroll.lapse_invoice'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.lapseInvoice(payload.invoiceId, context.logger);
+        context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice lapse checked');
+      },
+    ),
+    'payroll.announce_invoice_contest': defineTask(
+      'payroll.announce_invoice_contest',
+      JOB_PAYLOADS['payroll.announce_invoice_contest'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.announceInvoiceContest(payload.invoiceId, context.logger);
+        context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice contest announced');
+      },
+    ),
+    'payroll.sweep_invoice_acceptance': defineTask(
+      'payroll.sweep_invoice_acceptance',
+      JOB_PAYLOADS['payroll.sweep_invoice_acceptance'],
+      logger,
+      async (_payload, context) => {
+        context.logger.info(
+          { outcome: await modules.payroll.jobs.sweepInvoiceAcceptance(context.logger) },
+          'payroll: invoice acceptance swept',
         );
       },
     ),

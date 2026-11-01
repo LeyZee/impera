@@ -68,6 +68,21 @@ const configSchema = z
     PLAYGROUND_PERSONA_PATH: optionalValue,
     /** Where the playground ratings are kept, out of the repository; `.scratch/training` when absent. */
     NIRVANA_TRAINING_DIR: optionalValue,
+    /**
+     * The invoices' PDFs (ADR 0037 § 4): the Hetzner bucket of ADR 0028, under compliance lock, in its own project.
+     * Its key can write and read, never delete. Production only: elsewhere a store in memory takes its place.
+     */
+    INVOICES_S3_ENDPOINT: optionalValue,
+    INVOICES_S3_REGION: optionalValue,
+    INVOICES_S3_BUCKET: optionalValue,
+    INVOICES_S3_ACCESS_KEY_ID: optionalValue,
+    INVOICES_S3_SECRET_ACCESS_KEY: optionalValue,
+    /** Their second copy (ADR 0037 § 6), at OVHcloud, under the same lock: a provider that shares nothing with Hetzner. */
+    INVOICES_COPY_S3_ENDPOINT: optionalValue,
+    INVOICES_COPY_S3_REGION: optionalValue,
+    INVOICES_COPY_S3_BUCKET: optionalValue,
+    INVOICES_COPY_S3_ACCESS_KEY_ID: optionalValue,
+    INVOICES_COPY_S3_SECRET_ACCESS_KEY: optionalValue,
   })
   .refine(
     // `.env.example` placeholders are long enough to pass `min(32)`; production must not start with one.
@@ -95,9 +110,95 @@ const configSchema = z
       message: 'EXTENSION_DEVICE_TOKEN is missing, too short or still holds the .env.example placeholder',
       path: ['EXTENSION_DEVICE_TOKEN'],
     },
-  );
+  )
+  .superRefine((config, context) => {
+    const production = config.NODE_ENV === 'production';
+    const whole: {
+      readonly prefix: (typeof INVOICE_BUCKETS)[number];
+      readonly at: URL;
+      readonly bucket: string;
+    }[] = [];
+    for (const prefix of INVOICE_BUCKETS) {
+      const set = BUCKET_FIELDS.filter((field) => secretOrNull(config[`${prefix}${field}`]) !== null);
+      if (set.length === BUCKET_FIELDS.length) {
+        // A typo in an endpoint would start the API and show only at the first job (Bilan on #335).
+        const at = endpointOf(config[`${prefix}ENDPOINT`]);
+        if (at === null || (production && at.protocol !== 'https:')) {
+          context.addIssue({
+            code: 'custom',
+            message: `${prefix}ENDPOINT must be an ${production ? 'https' : 'http(s)'} URL, without a bucket`,
+            path: [`${prefix}ENDPOINT`],
+          });
+        } else {
+          whole.push({ prefix, at, bucket: config[`${prefix}BUCKET`] ?? '' });
+        }
+        continue;
+      }
+      // Half a bucket is a mistake, never a reason to fall back to memory; production needs both whole.
+      if (set.length === 0 && !production) continue;
+      context.addIssue({
+        code: 'custom',
+        message: `${prefix}* must all be set${production ? ' in production (ADR 0037)' : ', or none'}`,
+        path: [`${prefix}BUCKET`],
+      });
+    }
+    const [primary, copy] = INVOICE_BUCKETS.map((prefix) => whole.find((one) => one.prefix === prefix));
+    if (primary === undefined || copy === undefined) return;
+    // The second copy lives elsewhere (ADR 0037 § 6): the same bucket would find each PDF « already there », and the
+    // copy would not exist with nothing to say so. In production, another provider: never the first one's host.
+    const sameBucket =
+      locationOf(primary.at) === locationOf(copy.at) &&
+      primary.bucket.toLowerCase() === copy.bucket.toLowerCase();
+    if (sameBucket || (production && primary.at.hostname === copy.at.hostname)) {
+      context.addIssue({
+        code: 'custom',
+        message: sameBucket
+          ? 'INVOICES_COPY_S3_* names the bucket of INVOICES_S3_*: the copy lives in another one (ADR 0037 § 6)'
+          : 'INVOICES_COPY_S3_ENDPOINT is the host of INVOICES_S3_ENDPOINT: the copy lives at another provider in production (ADR 0037 § 6)',
+        path: ['INVOICES_COPY_S3_ENDPOINT'],
+      });
+    }
+  });
+
+const INVOICE_BUCKETS = ['INVOICES_S3_', 'INVOICES_COPY_S3_'] as const;
+const BUCKET_FIELDS = ['ENDPOINT', 'REGION', 'BUCKET', 'ACCESS_KEY_ID', 'SECRET_ACCESS_KEY'] as const;
+
+/** A bucket's endpoint: an http(s) URL with no query, credentials nor fragment; `null` otherwise. */
+function endpointOf(value: string | undefined): URL | null {
+  if (value === undefined || !URL.canParse(value)) return null;
+  const url = new URL(value);
+  const plain = url.search === '' && url.hash === '' && url.username === '' && url.password === '';
+  return plain && (url.protocol === 'https:' || url.protocol === 'http:') ? url : null;
+}
+
+/** Where an endpoint points, as the store builds its URLs (`<endpoint>/<bucket>/<key>`). */
+const locationOf = (url: URL): string => `${url.origin}${url.pathname.replace(/\/+$/u, '')}`.toLowerCase();
 
 export type Config = Readonly<z.infer<typeof configSchema>>;
+
+/** A bucket of invoices as the configuration gives it, `null` when unset (development, the tests). */
+export function invoiceBucket(
+  config: Config,
+  which: 'primary' | 'copy',
+): {
+  readonly endpoint: string;
+  readonly region: string;
+  readonly bucket: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+} | null {
+  const prefix = which === 'primary' ? 'INVOICES_S3_' : 'INVOICES_COPY_S3_';
+  const [endpoint, region, bucket, accessKeyId, secretAccessKey] = BUCKET_FIELDS.map((field) =>
+    secretOrNull(config[`${prefix}${field}`]),
+  );
+  return endpoint == null ||
+    region == null ||
+    bucket == null ||
+    accessKeyId == null ||
+    secretAccessKey == null
+    ? null
+    : { endpoint, region, bucket, accessKeyId, secretAccessKey };
+}
 
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
