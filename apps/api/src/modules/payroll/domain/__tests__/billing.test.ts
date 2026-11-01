@@ -48,6 +48,8 @@ const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
   mandate: { acceptedVersion: 1, currentVersion: 1 },
   assignments: [{ regimeId: 'abroad', from: '2026-10-01' }],
   regimes: [ABROAD, FRANCHISE],
+  // Every regime of the test counts as one of his country, unless a test says otherwise.
+  regimesOfCountry: new Set(['abroad', 'franchise']),
   identity: {
     legalName: 'Théo Martin',
     address: '12 rue des Lilas, Cotonou',
@@ -137,7 +139,7 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     expect(issueDecision(facts())).toEqual({ kind: 'issue', regime: ABROAD, warnings: [] });
   });
 
-  it('issues nothing without a mandate, a regime, a validated regime or the identity the mentions need', () => {
+  it('issues nothing without a mandate, a regime validated and of his country, or the identity the mentions need', () => {
     expect(issueDecision(facts({ mandate: { acceptedVersion: null, currentVersion: 2 } }))).toMatchObject({
       kind: 'none',
       reason: 'no_mandate',
@@ -153,6 +155,20 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     // Validated after the day of the validation: not yet.
     expect(
       issueDecision(facts({ regimes: [{ ...ABROAD, validatedOn: '2026-11-03' }, FRANCHISE] })),
+    ).toMatchObject({ reason: 'regime_not_validated' });
+    // His record now gives a country the regime was not written for (« ok pays »): its mentions would be another
+    // country's. Said before his file, which a regime of his country may ask otherwise.
+    expect(issueDecision(facts({ regimesOfCountry: new Set(['franchise']) }))).toMatchObject({
+      kind: 'none',
+      reason: 'regime_country_mismatch',
+    });
+    expect(issueDecision(facts({ regimesOfCountry: new Set(['franchise']), identity: null }))).toMatchObject({
+      reason: 'regime_country_mismatch',
+    });
+    expect(
+      issueDecision(
+        facts({ regimesOfCountry: new Set(['franchise']), regimes: [{ ...ABROAD, validatedOn: null }] }),
+      ),
     ).toMatchObject({ reason: 'regime_not_validated' });
     expect(issueDecision(facts({ identity: null }))).toMatchObject({ reason: 'identity_incomplete' });
     // Complete but not checked by the owner as it stands (never checked, or a change of identity cleared it).
@@ -270,6 +286,7 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
       facts({
         assignments: [{ regimeId: 'charged', from: '2026-10-01' }],
         regimes: [charged],
+        regimesOfCountry: new Set(['charged']),
         identity: {
           legalName: 'Basile Roux',
           address: '3 place Bellecour, Lyon',

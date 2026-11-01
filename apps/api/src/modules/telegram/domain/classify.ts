@@ -162,6 +162,7 @@ const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
   no_regime: 'aucun régime de facturation n’était attribué au prestataire à la date de la facture',
   regime_not_validated:
     'le régime de facturation du prestataire n’était pas validé par le comptable à la date de la facture',
+  regime_country_mismatch: 'le régime de facturation du prestataire n’est pas celui du pays de sa fiche',
   identity_incomplete: 'le dossier prestataire est incomplet pour son régime de facturation',
   identity_unverified: 'le dossier prestataire n’est pas encore vérifié',
   tax_residence_missing:

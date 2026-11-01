@@ -262,6 +262,12 @@ async function factsOf(
     .select({ regimeId: contractorRegimes.regimeId, from: contractorRegimes.effectiveFrom })
     .from(contractorRegimes)
     .where(eq(contractorRegimes.memberId, memberId));
+  // The country his member record gives today, and the regimes written for it (« ok pays »).
+  const regimesOfCountry = await tx
+    .select({ id: billingRegimes.id })
+    .from(billingRegimes)
+    .innerJoin(teamMembers, eq(teamMembers.id, memberId))
+    .where(sql`${teamMembers.country} = any(${billingRegimes.countries})`);
   const [profile] = await tx
     .select({ profile: contractorProfiles, country: teamMembers.country })
     .from(contractorProfiles)
@@ -297,6 +303,7 @@ async function factsOf(
     },
     assignments,
     regimes: await regimesOf(tx),
+    regimesOfCountry: new Set(regimesOfCountry.map((one) => one.id)),
     identity:
       profile === undefined
         ? null

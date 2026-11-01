@@ -222,6 +222,8 @@ export interface IssueFacts {
   readonly mandate: MandateFacts;
   readonly assignments: readonly RegimeAssignment[];
   readonly regimes: readonly BillingRegime[];
+  /** The ids of the regimes written for the country of the contractor's member record, as it reads today. */
+  readonly regimesOfCountry: ReadonlySet<string>;
   readonly identity: ContractorIdentity | null;
   /** The owner checked the file as it stands: a change of identity clears his check (the base's trigger). */
   readonly identityVerified: boolean;
@@ -267,11 +269,12 @@ export function identityComplete(
 
 /**
  * Whether the validation of a statement issues its invoice. A period that brings nothing to invoice issues none, and
- * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated,
- * an identity that lacks a mention the regime prints or that the owner has not checked as it stands, under a tax
- * treaty no tax residence certificate of the period's year accepted by the owner, no prefix or no identity of the
- * agency: no invoice, since an issued invoice never changes. Other documents missing or out of date, or a mandate of
- * an older version: the invoice goes out, with a warning.
+ * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated or
+ * not written for the contractor's country as his member record now says it, an identity that lacks a mention the
+ * regime prints or that the owner has not checked as it stands, under a tax treaty no tax residence certificate of the
+ * period's year accepted by the owner, no prefix or no identity of the agency: no invoice, since an issued invoice
+ * never changes. Other documents missing or out of date, or a mandate of an older version: the invoice goes out, with
+ * a warning.
  */
 export function issueDecision(facts: IssueFacts): IssueDecision {
   const assignment = regimeOn(facts.assignments, facts.day);
@@ -297,6 +300,9 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (acceptedVersion === null) return none('no_mandate');
   if (regime === null) return none('no_regime');
   if (regime.validatedOn === null || regime.validatedOn > facts.day) return none('regime_not_validated');
+  // His record moved to another country since the regime was given (« ok pays », Charles, 01/11): another country's
+  // mentions and VAT would be printed. The owner gives him a regime of his country, from today.
+  if (!facts.regimesOfCountry.has(regime.id)) return none('regime_country_mismatch');
   if (!identityComplete(facts.identity, regime)) return none('identity_incomplete');
   if (!facts.identityVerified) return none('identity_unverified');
   if (residenceBlocks) {
