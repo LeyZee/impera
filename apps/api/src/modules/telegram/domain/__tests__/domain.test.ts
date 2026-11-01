@@ -194,6 +194,52 @@ describe('classification (ADR 0020 §2)', () => {
     }
   });
 
+  it('says a PDF of a document met another file, by its number and place, without the member', () => {
+    expect(
+      classify({ kind: 'invoice_pdf_conflict', number: 'DEMO-2026-0001', place: 'primary', stage: 'render' }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'Un autre fichier occupe déjà la place du PDF du document DEMO-2026-0001 chez l’hébergeur principal : rien n’a été remplacé. À vérifier.',
+      link: { label: 'Ouvrir la Paie', path: '/paie' },
+    });
+    const copy = classify({
+      kind: 'invoice_pdf_conflict',
+      number: 'DEMO-2026-0001',
+      place: 'ovhcloud',
+      stage: 'copy',
+    });
+    expect(copy?.kind === 'notice' ? copy.body : '').toBe(
+      'Un autre fichier occupe déjà la place du PDF du document DEMO-2026-0001 chez OVHcloud (la copie) : rien n’a été remplacé. À vérifier.',
+    );
+    const download = classify({
+      kind: 'invoice_pdf_conflict',
+      number: 'DEMO-2026-0001',
+      place: 'primary',
+      stage: 'download',
+    });
+    expect(download?.kind === 'notice' ? download.body : '').toBe(
+      'Le PDF du document DEMO-2026-0001 chez l’hébergeur principal ne correspond pas à celui de la base : l’autre exemplaire a été servi, rien n’a été remplacé. À vérifier.',
+    );
+  });
+
+  it('says a document still has no PDF, or no copy, after the last attempt', () => {
+    expect(classify({ kind: 'invoice_pdf_missing', number: 'DEMO-2026-0002', place: 'primary' })).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'Le document DEMO-2026-0002 n’a toujours pas de PDF après plusieurs essais. Il reste valable. À vérifier.',
+      link: { label: 'Ouvrir la Paie', path: '/paie' },
+    });
+    const copy = classify({ kind: 'invoice_pdf_missing', number: 'DEMO-2026-0002', place: 'ovhcloud' });
+    expect(copy?.kind === 'notice' ? copy.body : '').toBe(
+      'Le PDF du document DEMO-2026-0002 n’a pas pu être copié chez OVHcloud après plusieurs essais. Il reste valable. À vérifier.',
+    );
+  });
+
   it('says a message could not leave, as important, in the conversation’s thread', () => {
     expect(classify({ kind: 'send_failed', conversationId })).toEqual({
       kind: 'notice',

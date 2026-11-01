@@ -7,6 +7,8 @@ import {
   type AutomaticMissing,
   type HandoffCause,
   type InvoiceNotIssuedReason,
+  type InvoicePdfCopyProvider,
+  type InvoicePdfPlace,
   type PayPeriod,
   type SystemAlertCode,
   type TelegramTopic,
@@ -40,6 +42,8 @@ export const SCANNED_EVENT_TYPES = [
   'backup_overdue',
   'exchange_rate_overdue',
   'invoice_not_issued',
+  'invoice_pdf_conflict',
+  'invoice_pdf_missing',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -163,6 +167,15 @@ const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
   agency_missing: 'les réglages de facturation de l’agence ne sont pas remplis',
   no_invoice_to_credit: 'aucune facture ne peut prendre l’avoir entier, à voir avec le comptable',
 };
+
+/** The provider that keeps a document's copy (ADR 0037), as the owner knows it. */
+const COPY_PROVIDER_NAMES: Record<InvoicePdfCopyProvider, string> = { ovhcloud: 'OVHcloud' };
+
+/** Where a document's PDF lies: the first provider, or the copy at the second. */
+const pdfPlaceText = (place: InvoicePdfPlace): string =>
+  place === 'primary' ? 'chez l’hébergeur principal' : `chez ${COPY_PROVIDER_NAMES[place]} (la copie)`;
+
+const PAY_LINK = { label: 'Ouvrir la Paie', path: '/paie' };
 
 const conversationLink = (conversationId: string | null): { label: string; path: string } => ({
   label: 'Ouvrir la conversation',
@@ -331,6 +344,32 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         title: 'Important',
         body: `${signal.document === 'invoice' ? 'La facture d’un relevé validé de' : 'Un avoir dû par'} ${periodText(signal.period)} n’a pas été ${signal.document === 'invoice' ? 'émise' : 'émis'} : ${INVOICE_NOT_ISSUED_TEXT[signal.reason]}. Le relevé reste validé.`,
         link: { label: 'Ouvrir la quinzaine', path: `/paie/quinzaine?quinzaine=${signal.period}` },
+      };
+    // Important, not urgent: nothing was replaced and nothing altered was served; the owner looks into it.
+    case 'invoice_pdf_conflict':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body:
+          signal.stage === 'download'
+            ? `Le PDF du document ${signal.number} ${pdfPlaceText(signal.place)} ne correspond pas à celui de la base : l’autre exemplaire a été servi, rien n’a été remplacé. À vérifier.`
+            : `Un autre fichier occupe déjà la place du PDF du document ${signal.number} ${pdfPlaceText(signal.place)} : rien n’a été remplacé. À vérifier.`,
+        link: PAY_LINK,
+      };
+    // Important, not urgent: the document stays valid, only its file (or its copy) is missing.
+    case 'invoice_pdf_missing':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body:
+          signal.place === 'primary'
+            ? `Le document ${signal.number} n’a toujours pas de PDF après plusieurs essais. Il reste valable. À vérifier.`
+            : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${COPY_PROVIDER_NAMES[signal.place]} après plusieurs essais. Il reste valable. À vérifier.`,
+        link: PAY_LINK,
       };
     case 'automatic_closed': {
       // Important, not urgent: no fan is at risk, the agent just asks a human to approve again (ADR 0019).

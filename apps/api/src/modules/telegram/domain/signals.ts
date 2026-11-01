@@ -6,6 +6,7 @@ import type {
   HandoffCause,
   InvoiceKind,
   InvoiceNotIssuedReason,
+  InvoicePdfPlace,
   KillSwitchScope,
   PayPeriod,
   TelegramTopic,
@@ -89,6 +90,22 @@ export type Signal =
       readonly period: PayPeriod;
       readonly document: InvoiceKind;
       readonly reason: InvoiceNotIssuedReason;
+    }
+  | {
+      /**
+       * Other bytes than the base's lie under a document's key (ADR 0037): nothing was replaced, nothing altered was
+       * served. Its number and where, never the member.
+       */
+      readonly kind: 'invoice_pdf_conflict';
+      readonly number: string;
+      readonly place: InvoicePdfPlace;
+      readonly stage: 'render' | 'copy' | 'download';
+    }
+  | {
+      /** A document still has no PDF (`primary`), or its PDF no copy at the provider named, after the last attempt. */
+      readonly kind: 'invoice_pdf_missing';
+      readonly number: string;
+      readonly place: InvoicePdfPlace;
     }
   | {
       /** Automatique closed on its own (ADR 0019): its conversations went back to the copilot. */

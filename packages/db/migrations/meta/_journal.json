@@ -323,6 +323,13 @@
       "when": 1793531374711,
       "tag": "0045_invoice_pdf_copies",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793531434711,
+      "tag": "0046_telegram_invoice_pdf",
+      "breakpoints": true
     }
   ]
 }
