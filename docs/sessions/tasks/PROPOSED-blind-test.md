@@ -1,7 +1,7 @@
 # Test à l'aveugle avant l'Automatique (ID à valider par Charles)
 Statut : proposed (demande du coordinateur le 28/10 à 8h17 ; ID à valider par Charles)
 Phase : 3
-Dépend de : ADR 0034 (proposée), capture Reveal (des réponses humaines réelles à comparer), P3-08 (recette du copilote), clé xAI ; ADR 0019, 0022, 0023
+Dépend de : ADR 0034 (acceptée le 01/11), capture Reveal (des réponses humaines réelles à comparer), P3-08 (recette du copilote), clé xAI ; ADR 0019, 0022, 0023
 Branche : claude/project-thread-e0j3ow
 
 ## Objectif
@@ -91,7 +91,7 @@ Elle peut revenir sur la carte précédente, jamais plus loin. Une séance peut 
 - **Le propriétaire peut l'abandonner** pendant la préparation ou en cours : elle passe `abandoned` (`cancelled`). Une séance abandonnée ne s'enregistre jamais ; ses verdicts restent lisibles par le propriétaire seul.
 - **Rétention** : quand la purge d'un fan efface ses messages ou ses faits (`docs/conventions/security.md`), les références de ses cartes (message, appel `llm_calls`) passent à NULL et leur texte est effacé. Le taux enregistré dans `blind_tests` reste.
 - **Rien dans l'outbox** : aucun événement de séance ne porte le texte d'une carte. Un éventuel avis Telegram « test enregistré » ne porte que le taux et la version.
-- Le minimum de 40, le taux calculé par le serveur et le `POST { sessionId }` sont décidés par l'**ADR 0034** (proposée).
+- Le minimum de 40, le taux calculé par le serveur et le `POST { sessionId }` sont décidés par l'**ADR 0034** (acceptée le 01/11).
 
 ## Ce que ça demande
 - **Agent (playground)** :
@@ -131,8 +131,8 @@ Elle peut revenir sur la carte précédente, jamais plus loin. Une séance peut 
 
 ## Questions pour Charles (défauts pris en attendant)
 1. Exception à l'ADR 0023 : Messa voit des extraits de vraies conversations, noms masqués, sur ta session et à ton écran, sans aucun droit nouveau pour son compte. Défaut : oui. Si c'est non, le test se fait sur des conversations inventées.
-2. Le taux de « jamais » et l'indiscernabilité restent des informations, sans devenir des conditions. En faire des conditions demanderait une nouvelle ADR. Défaut : informations seulement.
-3. 50 situations (100 cartes) et un minimum de 40. Défaut : 50 et 40.
+2. Le taux de « jamais » et l'indiscernabilité restent des informations, sans devenir des conditions. Réglé : ADR 0034 acceptée le 01/11 (« Ok » de Charles).
+3. 50 situations (100 cartes) et un minimum de 40. Réglé : ADR 0034 acceptée le 01/11.
 
 ## Hors périmètre
 L'ouverture de l'Automatique elle-même (déjà dans le verrou), la transformation d'une carte en cas d'éval (vrai texte de fan), les vocaux, les médias et les étapes de script dans le test, une autre créatrice que Messa.

@@ -58,7 +58,7 @@ Date : AAAA-MM-JJ
 | 0031 | Congés et échanges de shift : le congé appartient au membre, l'échange se fait entre chatteurs | accepted (remplace en partie 0023 : congés) |
 | 0032 | Paie : la quinzaine se clôture pour toute l'équipe à sa première validation | accepted (complète 0023 § Paie) |
 | 0033 | Paie : le taux dollar → euro vient de la BCE, lu chaque heure par un job | accepted (complète 0023 § Paie et 0032) |
-| 0034 | Le test à l'aveugle est une séance : le serveur calcule le taux, à partir de 40 situations | proposed (complète 0019 ; exception à 0023 à valider) |
+| 0034 | Le test à l'aveugle est une séance : le serveur calcule le taux, à partir de 40 situations | accepted (complète 0019 ; exception à 0023 à valider) |
 | 0035 | Paie : une saisie verrouille sa quinzaine et chacune des suivantes | accepted (complète 0032 § Verrous) |
 | 0036 | Factures : ce qu'une quinzaine doit rendre devient un avoir sur une facture déjà émise | accepted (précise 0023 § Factures) |
 | 0037 | Factures : un PDF/A rendu une fois par PDFKit, gardé dix ans sous verrou de conformité, en deux copies | accepted (précise 0023 § Factures et 0028 § 4) |

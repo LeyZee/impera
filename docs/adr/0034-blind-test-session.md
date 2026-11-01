@@ -1,6 +1,6 @@
 # 0034. Le test à l'aveugle est une séance : le serveur calcule le taux, à partir de 40 situations
 
-Statut : proposed
+Statut : accepted (Charles, 01/11/2026 19h00, « Ok » ; l'exception à l'ADR 0023 reste à valider par Charles, et sans elle le test se fait sur des conversations inventées)
 Date : 2026-10-28
 Complète : ADR 0019 (troisième condition du mode Automatique), ADR 0022 (version de la persona)
 Fait exception, si Charles le valide : ADR 0023 § Rôles (la créatrice ne voit jamais une conversation ni un fan)
