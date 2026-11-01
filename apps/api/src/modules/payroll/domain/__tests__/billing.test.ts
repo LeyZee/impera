@@ -47,6 +47,7 @@ const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
     shareCapitalMinor: null,
     rcsCity: null,
   },
+  identityVerified: true,
   prefix: 'THEO',
   agency: {
     legalName: 'Agence Exemple SAS',
@@ -140,6 +141,15 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
       issueDecision(facts({ regimes: [{ ...ABROAD, validatedOn: '2026-11-03' }, FRANCHISE] })),
     ).toMatchObject({ reason: 'regime_not_validated' });
     expect(issueDecision(facts({ identity: null }))).toMatchObject({ reason: 'identity_incomplete' });
+    // Complete but not checked by the owner as it stands (never checked, or a change of identity cleared it).
+    expect(issueDecision(facts({ identityVerified: false }))).toMatchObject({
+      kind: 'none',
+      reason: 'identity_unverified',
+    });
+    // An incomplete file says what it lacks first: a check would not fill it.
+    expect(issueDecision(facts({ identity: null, identityVerified: false }))).toMatchObject({
+      reason: 'identity_incomplete',
+    });
     expect(
       issueDecision(
         facts({

@@ -104,15 +104,17 @@ export type InvoiceEventKind = z.infer<typeof InvoiceEventKindSchema>;
 
 /**
  * Why a document a validated statement makes due is not issued (EQ-06): its invoice, for want of an accepted mandate,
- * of a regime the accountant validated, of a full identity, of a prefix or of the agency's identity; a credit note the
- * period owes, when no invoice can take it whole (ADR 0036). The statement stays validated and the owner is told
- * (`invoice_not_issued`).
+ * of a regime the accountant validated, of a full identity the owner checked, of a prefix or of the agency's identity;
+ * a credit note the period owes, when no invoice can take it whole (ADR 0036). The statement stays validated and the
+ * owner is told (`invoice_not_issued`).
  */
 export const INVOICE_NOT_ISSUED_REASONS = [
   'no_mandate',
   'no_regime',
   'regime_not_validated',
   'identity_incomplete',
+  /** The file is complete, but the owner has not checked it, or a change of identity cleared his check (EQ-06). */
+  'identity_unverified',
   'prefix_missing',
   'agency_missing',
   'no_invoice_to_credit',

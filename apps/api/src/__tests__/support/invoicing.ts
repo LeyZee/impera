@@ -8,7 +8,7 @@ import {
   newId,
   type TeamMember,
 } from '@nirvana/contracts';
-import { schema } from '@nirvana/db';
+import { eq, schema } from '@nirvana/db';
 
 import type { PayrollTeam } from './payroll-team';
 
@@ -50,7 +50,7 @@ export interface Invoicing {
 
 /**
  * What an issue needs before the first invoice (EQ-06): the agency's settings and logo, one validated regime, the
- * billing mandate (seven days to contest), and each contractor's regime and profile. No mandate is accepted here.
+ * billing mandate (seven days to contest), and each contractor's regime and profile, checked by the owner. No mandate is accepted here.
  * Without `logo`, neither the logo nor the settings are written: the test saves them through Réglages › Facturation.
  */
 export async function setUpInvoicing(
@@ -128,6 +128,11 @@ export async function setUpInvoicing(
       invoicePrefix: prefix,
       updatedBy: member.userId,
     });
+    // Checked by the owner once written, as an issue asks (`identity_unverified`); the trigger refuses it at the insert.
+    await admin
+      .update(schema.contractorProfiles)
+      .set({ verifiedAt: new Date(), verifiedBy: team.ownerId, updatedBy: team.ownerId })
+      .where(eq(schema.contractorProfiles.memberId, member.id));
   }
   return {
     regimeId,

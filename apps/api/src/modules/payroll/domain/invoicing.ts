@@ -74,6 +74,8 @@ export interface InvoicingFacts {
   readonly assignments: readonly RegimeAssignment[];
   readonly regimes: readonly InvoiceRegime[];
   readonly identity: ContractorIdentity | null;
+  /** The owner checked the file as it stands (`contractor_profiles.verified_at`). */
+  readonly identityVerified: boolean;
   readonly prefix: string | null;
   readonly documents: readonly ContractorDocument[];
   /**
@@ -161,8 +163,8 @@ const sum = (amounts: readonly number[]): number => amounts.reduce((total, one) 
  * Its mentions are its regime's, then its payment terms (art. L441-9 of the Code de commerce). Then each credit note
  * the period owes (`creditsDue`), on the invoice `planCreditNotes` finds for it: it keeps that invoice's period, regime
  * and the regime's mentions (ADR 0036), and prints the parties of the day and the invoice it cites. A due
- * no invoice can take whole is not issued, and neither is one without the agency's identity, the contractor's or a
- * mandate: each is said to the owner. The cancel of a cancel and reissue leaves with its corrective invoice or not at
+ * no invoice can take whole is not issued, and neither is one without the agency's identity, the contractor's (complete
+ * and checked by the owner) or a mandate: each is said to the owner. The cancel of a cancel and reissue leaves with its corrective invoice or not at
  * all (ADR 0039 § 3, ADR 0040): the corrective invoice bills the same amount again under the cancelled invoice's
  * period, regime and mentions, never the regime of the day, citing it first and ending with the payment terms; it
  * prints the parties, the designation and the terms of the day, which is the error of text it corrects.
@@ -179,6 +181,7 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     assignments: facts.assignments,
     regimes: facts.regimes,
     identity: facts.identity,
+    identityVerified: facts.identityVerified,
     prefix: facts.prefix,
     agency: settings?.agency ?? null,
     documents: facts.documents,
@@ -270,6 +273,11 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     }
     if (!identityComplete(identity, cited.regime)) {
       hold(note.request, 'identity_incomplete');
+      continue;
+    }
+    // A credit note prints the parties of the day: never a file the owner has not checked as it stands.
+    if (!facts.identityVerified) {
+      hold(note.request, 'identity_unverified');
       continue;
     }
     if (until === null) {

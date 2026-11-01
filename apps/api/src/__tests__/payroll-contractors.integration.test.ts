@@ -356,13 +356,27 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
       acceptance,
     ]);
 
-    // His mandate accepted: the statement that waited for it is tried again, and its invoice goes out.
+    // His mandate accepted: the statement that waited for it is tried again.
     expect(await jobsAt(`payroll.requeue_invoice_issues:${theo.id}`)).toEqual([{ memberId: theo.id }]);
     await forgetJobs('payroll.issue_invoices:%');
     expect(await payroll().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
     expect(await jobsAt(`payroll.issue_invoices:${statementId}`)).toEqual([{ statementId }]);
     // Nobody else's statement waits.
     expect(await payroll().jobs.requeueInvoiceIssues(lou.id)).toBe(0);
+    const unchecked = await payroll().jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statementId),
+      quiet,
+    );
+    // His new address cleared the owner's check: nothing goes out on a file nobody checked as it stands.
+    expect(unchecked).toMatchObject({ issued: [], notIssued: [{ reason: 'identity_unverified' }] });
+    expect(await invoiceOf(theo, Q1)).toBeUndefined();
+
+    // The owner checks it: the statement is tried again, and its invoice goes out.
+    await forgetJobs('payroll.requeue_invoice_issues:%');
+    const file = ContractorFileSchema.parse((await fileOf(theo.id, team.owner)).json());
+    expect((await verify(theo.id, team.owner, file.profile?.updatedAt ?? '')).statusCode).toBe(200);
+    expect(await jobsAt(`payroll.requeue_invoice_issues:${theo.id}`)).toEqual([{ memberId: theo.id }]);
+    expect(await payroll().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
     const issued = await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
     expect(issued).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
     const invoice = await invoiceOf(theo, Q1);

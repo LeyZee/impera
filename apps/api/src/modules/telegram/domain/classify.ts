@@ -163,6 +163,7 @@ const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
   regime_not_validated:
     'le régime de facturation du prestataire n’était pas validé par le comptable à la date de la facture',
   identity_incomplete: 'le dossier prestataire est incomplet pour son régime de facturation',
+  identity_unverified: 'le dossier prestataire n’est pas encore vérifié',
   prefix_missing: 'le prestataire n’a pas de préfixe de facture',
   agency_missing: 'les réglages de facturation de l’agence ne sont pas remplis',
   no_invoice_to_credit: 'aucune facture ne peut prendre l’avoir entier, à voir avec le comptable',
