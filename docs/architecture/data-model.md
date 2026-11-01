@@ -348,14 +348,15 @@ invoices                   id, kind (invoice|credit_note), member_id, statement_
                            text[] (celles du régime, puis les conditions de paiement d'une facture, ou la facture citée
                            en tête d'un avoir : 25 au plus, migration 0042), excl_vat_minor (> 0 facture, < 0 avoir), vat_minor, incl_vat_minor,
                            self_assessed_vat_minor, acceptance_deadline, service_description (facture seule, copiée
-                           des réglages, 0045), logo_sha256 (le logo du jour, 0045), created_at (propriétaire ou job,
+                           des réglages, exigée au commit de toute facture écrite depuis 0045), logo_sha256 (le logo du jour, 0045), created_at (propriétaire ou job,
                            jamais pour soi ; une facture par relevé ; ajout seul)
 invoice_lines              (invoice_id, position) clé, kind, label, detail, amount_minor (écrites avec leur facture, ajout
                            seul)
 invoice_events             id, invoice_id, kind (issued|accepted|contested|lapsed|credited|contest_refused|paid), reason,
                            statement_id (paid seul), by (null pour un job), created_at (ajout seul ; l'état de la facture)
-invoice_pdfs               invoice_id (clé), storage_key, sha256, retain_until (fin du verrou posée à l'envoi, 0045),
-                           created_at (écrit une fois par le job, lot 4, ADR 0037 ; ajout seul)
+invoice_pdfs               invoice_id (clé), storage_key, sha256, retain_until (fin du verrou posée à l'envoi, 0045 ;
+                           jamais avant dix ans après l'émission), created_at (écrit une fois par le job, lot 4,
+                           ADR 0037 ; ajout seul)
 invoice_pdf_copies         (invoice_id, provider) clé, storage_key, sha256, retain_until, created_at (la copie chez le
                            second hébergeur, ovhcloud ; écrite une fois par le job, ajout seul ; la base refuse une
                            copie dont l'empreinte ou le verrou diffère de son PDF, 0045)
