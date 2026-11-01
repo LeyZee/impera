@@ -208,9 +208,8 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
         await lockDocument(tx, invoiceId);
         const document = await documentOf(tx, invoiceId);
         if (document === null) return 'not_found';
-        if (!recorded(await stepsOf(tx, invoiceId)).some((step) => step.kind === 'contested')) {
-          return 'not_contested';
-        }
+        const steps = recorded(await stepsOf(tx, invoiceId));
+        if (!steps.some((step) => step.kind === 'contested')) return 'not_contested';
         const [said] = await tx
           .select({ id: domainEvents.id })
           .from(domainEvents)
@@ -222,6 +221,8 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
           )
           .limit(1);
         if (said !== undefined) return 'already';
+        // Ended before its alert went out (refused, say, while the job waited): the owner, who ended it, knows.
+        if (standingOf(steps).state !== 'contested') return 'closed';
         const payload = EVENT_PAYLOADS.invoice_contested.parse({
           invoiceId,
           memberId: document.memberId,
@@ -246,6 +247,37 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
           ip: null,
         });
         return 'published';
+      }),
+
+    dueUnscoped: (limit) =>
+      withAdmin(adminDb, async (tx) => {
+        const answered = sql`exists (select 1 from ${invoiceEvents} where ${invoiceEvents.invoiceId} = ${invoices.id}
+          and ${invoiceEvents.kind} in ('accepted', 'contested', 'lapsed'))`;
+        const unanswered = await tx
+          .select({ id: invoices.id })
+          .from(invoices)
+          .where(and(sql`${invoices.acceptanceDeadline} <= now()`, sql`not ${answered}`))
+          .orderBy(invoices.acceptanceDeadline, invoices.id)
+          .limit(limit);
+        const unannounced = await tx
+          .select({ id: invoices.id })
+          .from(invoices)
+          .where(
+            and(
+              sql`exists (select 1 from ${invoiceEvents} where ${invoiceEvents.invoiceId} = ${invoices.id}
+                and ${invoiceEvents.kind} = 'contested')`,
+              sql`not exists (select 1 from ${invoiceEvents} where ${invoiceEvents.invoiceId} = ${invoices.id}
+                and ${invoiceEvents.kind} in ('credited', 'contest_refused'))`,
+              sql`not exists (select 1 from ${domainEvents} where ${domainEvents.type} = 'invoice_contested'
+                and ${domainEvents.payload}->>'invoiceId' = ${invoices.id}::text)`,
+            ),
+          )
+          .orderBy(invoices.issuedAt, invoices.id)
+          .limit(limit);
+        return {
+          unanswered: unanswered.map((row) => InvoiceIdSchema.parse(row.id)),
+          unannounced: unannounced.map((row) => InvoiceIdSchema.parse(row.id)),
+        };
       }),
   };
 }

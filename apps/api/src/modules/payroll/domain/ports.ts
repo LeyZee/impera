@@ -425,8 +425,19 @@ export interface PayrollInvoiceAcceptanceStore {
    * clock is not there yet (the job is put back at the deadline), `answered` when an answer came first.
    */
   lapseUnscoped(invoiceId: InvoiceId): Promise<'lapsed' | 'answered' | 'early' | 'not_found'>;
-  /** Publishes `invoice_contested` and its line of `audit_log`, once per document: `already` after. */
+  /**
+   * Publishes `invoice_contested` and its line of `audit_log`, once per document: `already` after, `closed` when the
+   * contest has ended before (the owner, who ended it, knows).
+   */
   announceContestUnscoped(
     invoiceId: InvoiceId,
-  ): Promise<'published' | 'already' | 'not_contested' | 'not_found'>;
+  ): Promise<'published' | 'already' | 'closed' | 'not_contested' | 'not_found'>;
+  /**
+   * What the hourly sweep catches up (`withAdmin`), `limit` of each, oldest first: the documents still unanswered after
+   * their deadline, and the open contests without their alert.
+   */
+  dueUnscoped(limit: number): Promise<{
+    readonly unanswered: readonly InvoiceId[];
+    readonly unannounced: readonly InvoiceId[];
+  }>;
 }

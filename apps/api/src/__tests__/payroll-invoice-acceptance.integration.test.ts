@@ -2,6 +2,7 @@ import {
   CommissionStatementIdSchema,
   EVENT_PAYLOADS,
   InvoiceAcceptanceViewSchema,
+  JOB_MAX_ATTEMPTS,
   InvoiceIdSchema,
   newId,
   PayPeriodSchema,
@@ -19,6 +20,8 @@ import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 /** Periods of 2025: they have ended. */
 const Q1 = PayPeriodSchema.parse('2025-05-01');
 const Q2 = PayPeriodSchema.parse('2025-05-16');
+const Q3 = PayPeriodSchema.parse('2025-06-01');
+const Q4 = PayPeriodSchema.parse('2025-06-16');
 
 const DAY = 86_400_000;
 const quiet = { warn: () => undefined, error: () => undefined };
@@ -31,6 +34,8 @@ describe('Équipe › Factures : l’acceptation, la contestation et son refus (
   let theoCookie: string;
   let lea: TeamMember;
   let leaCookie: string;
+  let noa: TeamMember;
+  let noaCookie: string;
   let miaCookie: string;
   /** Pay's clock: the system's, unless a test issues in the past. */
   let shift = 0;
@@ -92,15 +97,17 @@ describe('Équipe › Factures : l’acceptation, la contestation et son refus (
     });
     ({ member: theo, cookie: theoCookie } = await team.addMember('theo@example.test', 'Théo'));
     ({ member: lea, cookie: leaCookie } = await team.addMember('lea@example.test', 'Léa'));
+    ({ member: noa, cookie: noaCookie } = await team.addMember('noa@example.test', 'Noa'));
     ({ cookie: miaCookie } = await team.addMember('mia@example.test', 'Mia', 'manager'));
     const invoicing = await setUpInvoicing(team, inventedLogo(), [
       { member: theo, prefix: 'THEO', legalName: 'Théo Inventé' },
       { member: lea, prefix: 'LEA', legalName: 'Léa Inventée' },
+      { member: noa, prefix: 'NOA', legalName: 'Noa Inventée' },
     ]);
-    for (const member of [theo, lea]) {
-      await invoicing.acceptMandate(member);
-      for (const period of [Q1, Q2]) await team.report(member, period, 10_000);
-    }
+    for (const member of [theo, lea, noa]) await invoicing.acceptMandate(member);
+    for (const period of [Q1, Q2, Q3, Q4]) await team.report(theo, period, 10_000);
+    for (const period of [Q1, Q2]) await team.report(lea, period, 10_000);
+    await team.report(noa, Q1, 10_000);
     await team.recalculate(Q1);
   });
 
@@ -111,7 +118,11 @@ describe('Équipe › Factures : l’acceptation, la contestation et son refus (
     const [invoice] = await db().select().from(schema.invoices).where(eq(schema.invoices.id, id));
     if (invoice === undefined) throw new Error('no invoice');
     expect(await jobOf(`payroll.lapse_invoice:${id}`)).toEqual([
-      { payload: { invoiceId: id }, run_at: invoice.acceptanceDeadline, max_attempts: 5 },
+      {
+        payload: { invoiceId: id },
+        run_at: invoice.acceptanceDeadline,
+        max_attempts: JOB_MAX_ATTEMPTS['payroll.lapse_invoice'],
+      },
     ]);
 
     const pending = await read(theoCookie, id);
@@ -192,7 +203,10 @@ describe('Équipe › Factures : l’acceptation, la contestation et son refus (
 
     // The alert goes through a job enqueued with the contest, once, whatever the number of runs.
     expect(await jobOf(`payroll.announce_invoice_contest:${id}`)).toEqual([
-      expect.objectContaining({ payload: { invoiceId: id }, max_attempts: 5 }),
+      expect.objectContaining({
+        payload: { invoiceId: id },
+        max_attempts: JOB_MAX_ATTEMPTS['payroll.announce_invoice_contest'],
+      }),
     ]);
     expect(await contestAlerts(id)).toEqual([]);
     expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('published');
@@ -279,11 +293,59 @@ describe('Équipe › Factures : l’acceptation, la contestation et son refus (
     );
     expect(await payroll().jobs.lapseInvoice(id, quiet)).toBe('early');
     expect(await jobOf(`payroll.lapse_invoice:${id}`)).toEqual([
-      { payload: { invoiceId: id }, run_at: invoice.acceptanceDeadline, max_attempts: 5 },
+      {
+        payload: { invoiceId: id },
+        run_at: invoice.acceptanceDeadline,
+        max_attempts: JOB_MAX_ATTEMPTS['payroll.lapse_invoice'],
+      },
     ]);
     expect((await read(leaCookie, id)).acceptance.state).toBe('pending');
     // The contractor still answers in time.
     const accepted = await send(leaCookie, id, 'accept');
     expect([accepted.statusCode, view(accepted).acceptance.state]).toEqual([200, 'accepted']);
+  });
+
+  it('says nothing of a contest the owner ended before its alert went out', async () => {
+    await team.recalculate(Q3);
+    const id = await issued(theo, Q3);
+    expect((await send(theoCookie, id, 'contest', { reason: REASON })).statusCode).toBe(200);
+    expect((await send(team.owner, id, 'contest/refuse', { reason: 'La vente est du 18' })).statusCode).toBe(
+      200,
+    );
+    // The job ran late: the owner, who refused the contest, knows of it.
+    expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
+    expect(await contestAlerts(id)).toEqual([]);
+    expect(await team.audited('invoice.contest_alert')).toBe(1);
+  });
+
+  it('catches up each hour what a job left undone: a tacit acceptance, an alert', async () => {
+    // Noa's document, issued ten days ago, and Théo's contest, each without its job (lost, or failed for good).
+    const late = await issued(noa, Q1, 10);
+    await team.recalculate(Q4);
+    const contested = await issued(theo, Q4);
+    expect((await send(theoCookie, contested, 'contest', { reason: REASON })).statusCode).toBe(200);
+    for (const key of [`payroll.lapse_invoice:${late}`, `payroll.announce_invoice_contest:${contested}`]) {
+      await db().execute(sql`delete from graphile_worker._private_jobs where key = ${key}`);
+      expect(await jobOf(key)).toEqual([]);
+    }
+
+    // Answered documents, ended contests and alerts already said are left as they are.
+    expect(await payroll().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
+      lapsed: 1,
+      announced: 1,
+      failed: 0,
+    });
+    expect(await read(noaCookie, late)).toMatchObject({
+      acceptance: { state: 'tacitly_accepted' },
+      events: [{ kind: 'issued' }, { kind: 'lapsed', by: null }],
+    });
+    const alerts = await contestAlerts(contested);
+    expect(alerts).toEqual([expect.objectContaining({ creatorId: null, actor: 'system' })]);
+    expect(EVENT_PAYLOADS.invoice_contested.parse(alerts[0]?.payload).memberId).toBe(theo.id);
+    expect(await payroll().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
+      lapsed: 0,
+      announced: 0,
+      failed: 0,
+    });
   });
 });

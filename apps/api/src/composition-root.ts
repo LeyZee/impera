@@ -735,6 +735,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice contest announced');
       },
     ),
+    'payroll.sweep_invoice_acceptance': defineTask(
+      'payroll.sweep_invoice_acceptance',
+      JOB_PAYLOADS['payroll.sweep_invoice_acceptance'],
+      logger,
+      async (_payload, context) => {
+        context.logger.info(
+          { outcome: await modules.payroll.jobs.sweepInvoiceAcceptance(context.logger) },
+          'payroll: invoice acceptance swept',
+        );
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

@@ -15,8 +15,10 @@ import {
   announceInvoiceContest,
   createPayrollInvoiceAcceptance,
   lapseInvoice,
+  sweepInvoiceAcceptance,
   type ContestAnnounceOutcome,
   type LapseOutcome,
+  type SweepOutcome,
 } from './application/invoice-acceptance';
 import {
   downloadInvoicePdf,
@@ -117,12 +119,17 @@ export interface PayrollModule {
     readonly lapseInvoice: (invoiceId: InvoiceId, logger: JobLogger) => Promise<LapseOutcome>;
     /**
      * `payroll.announce_invoice_contest` (ADR 0039 § 2): enqueued with a contest, publishes `invoice_contested` once per
-     * document, without the reason nor a name.
+     * document, without the reason nor a name; nothing once the contest has ended.
      */
     readonly announceInvoiceContest: (
       invoiceId: InvoiceId,
       logger: JobLogger,
     ) => Promise<ContestAnnounceOutcome>;
+    /**
+     * `payroll.sweep_invoice_acceptance`, each hour: a document unanswered after its deadline accepted tacitly, an open
+     * contest without its alert said, should their own job have failed or been lost.
+     */
+    readonly sweepInvoiceAcceptance: (logger: JobLogger) => Promise<SweepOutcome>;
   };
 }
 
@@ -203,6 +210,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       lapseInvoice: (invoiceId, logger) => lapseInvoice(acceptanceStore, invoiceId, logger),
       announceInvoiceContest: (invoiceId, logger) =>
         announceInvoiceContest(acceptanceStore, invoiceId, logger),
+      sweepInvoiceAcceptance: (logger) => sweepInvoiceAcceptance(acceptanceStore, logger),
     },
   };
 }

@@ -71,7 +71,8 @@ export type ContestAnnounceOutcome = Awaited<
 
 /**
  * `payroll.announce_invoice_contest`, enqueued with the contest: publishes `invoice_contested` once per document, as the
- * system (`domain_events` is written as admin), without the reason nor a name (ADR 0039 § 2).
+ * system (`domain_events` is written as admin), without the reason nor a name (ADR 0039 § 2). A contest that has ended
+ * before (refused while the job waited) is not said: the owner, who ended it, knows.
  */
 export async function announceInvoiceContest(
   store: PayrollInvoiceAcceptanceStore,
@@ -83,4 +84,53 @@ export async function announceInvoiceContest(
     logger.warn({ invoiceId, outcome }, 'payroll.announce_invoice_contest: nothing to announce');
   }
   return outcome;
+}
+
+/** How many documents of each kind one run of the sweep takes; the next hour takes the rest. */
+const SWEEP_BATCH = 200;
+
+export interface SweepOutcome {
+  readonly lapsed: number;
+  readonly announced: number;
+  readonly failed: number;
+}
+
+/**
+ * `payroll.sweep_invoice_acceptance`, each hour: the net under `payroll.lapse_invoice` and
+ * `payroll.announce_invoice_contest`. A document still unanswered after its deadline is accepted tacitly, an open
+ * contest without its alert is said, whatever became of their job (its last attempt failed, or it was lost). Each
+ * document is its own transaction under its lock, so a run beside the job writes nothing twice; one that fails is
+ * logged and the others go on, the next hour tries it again.
+ */
+export async function sweepInvoiceAcceptance(
+  store: PayrollInvoiceAcceptanceStore,
+  logger: JobLogger,
+): Promise<SweepOutcome> {
+  const due = await store.dueUnscoped(SWEEP_BATCH);
+  let lapsed = 0;
+  let announced = 0;
+  let failed = 0;
+  // One document that fails is logged; the others go on.
+  const attempt = async (invoiceId: InvoiceId, run: () => Promise<void>): Promise<void> => {
+    try {
+      await run();
+    } catch (error) {
+      failed += 1;
+      logger.error({ invoiceId, err: error }, 'payroll.sweep_invoice_acceptance: a document failed');
+    }
+  };
+  for (const invoiceId of due.unanswered) {
+    await attempt(invoiceId, async () => {
+      if ((await store.lapseUnscoped(invoiceId)) === 'lapsed') lapsed += 1;
+    });
+  }
+  for (const invoiceId of due.unannounced) {
+    await attempt(invoiceId, async () => {
+      if ((await store.announceContestUnscoped(invoiceId)) === 'published') announced += 1;
+    });
+  }
+  if (lapsed + announced > 0) {
+    logger.warn({ lapsed, announced }, 'payroll.sweep_invoice_acceptance: caught up what a job missed');
+  }
+  return { lapsed, announced, failed };
 }
