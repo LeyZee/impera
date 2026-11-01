@@ -125,6 +125,25 @@ describe('Réglages › Facturation : lire un PNG sans lui faire confiance', () 
     expect(read(handMade([2, 1, 8, 3, 0, 0, 0], [0, 0, 0]))).toEqual({ kind: 'damaged' });
   });
 
+  it('tells a palette index past the palette, in a late pass of an interlaced image too', () => {
+    const indexed = (bitDepth: 2 | 8, entries: number, interlaced: boolean, last: number) =>
+      inventedPng({
+        width: 70,
+        height: 64,
+        colorType: 3,
+        bitDepth,
+        interlaced,
+        palette: Array.from({ length: entries }, (_, index) => [index * 40, 30, 61] as const),
+        transparency: new Uint8Array([255, 0]),
+        pixel: (x, y) => [x === 69 && y === 63 ? last : (x + y) % 2],
+      });
+    expect(read(indexed(2, 3, false, 3))).toEqual({ kind: 'damaged' });
+    expect(read(indexed(2, 3, true, 3))).toEqual({ kind: 'damaged' });
+    expect(read(indexed(8, 2, false, 200))).toEqual({ kind: 'damaged' });
+    expect(read(indexed(2, 4, true, 3))).toMatchObject({ kind: 'read', transparent: true }); // the four entries 2 bits reach
+    expect(read(indexed(8, 3, false, 2))).toMatchObject({ kind: 'read', transparent: true });
+  });
+
   it('tells pixel data of another size than the header gives, or an unknown filter', () => {
     const row = [0, 1, 2, 3, 0]; // filter 0, then one RGBA pixel, transparent
     expect(read(handMade([1, 1, 8, 6, 0, 0, 0], row))).toMatchObject({ kind: 'read', transparent: true });

@@ -4,8 +4,9 @@ import type { PngReading, PngSize } from '../domain/agency-logo';
 
 /**
  * Reads a file as a PNG (ISO/IEC 15948) without trusting it: every chunk whole and its CRC right, a header PNG allows,
- * the pixel data inflated to exactly the size its header gives (never more: a small file cannot swell in memory) and
- * every scanline unfiltered, interlaced or not. Then whether one pixel at least is transparent: an alpha below its
+ * the pixel data inflated to exactly the size its header gives (never more: a small file cannot swell in memory),
+ * every scanline unfiltered, interlaced or not, and every palette index within the palette. Then whether one pixel at
+ * least is transparent: an alpha below its
  * maximum, or a colour the `tRNS` chunk makes transparent, actually used. PDFKit draws every PNG this accepts (its test
  * renders each kind).
  */
@@ -221,6 +222,22 @@ function transparencyReader(chunks: Chunks): ((line: Uint8Array, width: number) 
   };
 }
 
+/**
+ * A check that each palette index of a scanline names an entry of `PLTE`: an index past it has no colour, and each PDF
+ * reader would draw it its own way. `null` when the image has no palette, or when its bit depth cannot reach past it.
+ */
+function paletteCheck(chunks: Chunks): RowReader | null {
+  const { bitDepth, colorType } = chunks.header;
+  if (colorType !== 3 || chunks.palette === null) return null;
+  const entries = chunks.palette.length / 3;
+  if (entries >= 1 << bitDepth) return null;
+  return (line, width) => {
+    for (let pixel = 0; pixel < width; pixel += 1) {
+      if (sampleAt(line, pixel, bitDepth) >= entries) throw new Damaged();
+    }
+  };
+}
+
 /** The size from the header alone, for a logo already kept (its bytes were read whole when it was added). */
 export function pngSize(bytes: Uint8Array): PngSize {
   const reading = readPng(bytes, () => false);
@@ -250,9 +267,11 @@ export function readPng(bytes: Uint8Array, decodable: (size: PngSize) => boolean
     }
     if (raw.length !== length) throw new Damaged();
     const transparentRow = transparencyReader(chunks);
+    const inPalette = paletteCheck(chunks);
     let transparent = false;
     const bytesPerPixel = Math.max(1, ((CHANNELS[header.colorType] ?? 1) * header.bitDepth) >> 3);
     unfilter(raw, passes, bytesPerPixel, (line, width) => {
+      inPalette?.(line, width);
       if (!transparent && transparentRow !== null) transparent = transparentRow(line, width);
     });
     return { kind: 'read', size, transparent };
