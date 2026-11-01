@@ -1,4 +1,7 @@
 import {
+  AgencyLogoParamsSchema,
+  AgencyLogoSchema,
+  BillingSettingsViewSchema,
   BonusIdSchema,
   BonusSchema,
   BonusTierSetSchema,
@@ -25,6 +28,7 @@ import {
   PayrollSettingsSchema,
   PayoutMinimumSchema,
   CreatePayoutMinimumBodySchema,
+  UpdateBillingSettingsBodySchema,
   UpdatePayrollSettingsBodySchema,
   PenaltyIdSchema,
   PenaltySchema,
@@ -39,6 +43,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import type { PayrollBillingSettings } from '../application/billing-settings';
 import type { PayrollEntries } from '../application/entries';
 import type { PayrollInvoiceAcceptance } from '../application/invoice-acceptance';
 import type { DownloadedPdf } from '../application/invoice-pdfs';
@@ -69,12 +74,20 @@ function userOf(request: FastifyRequest): UserId {
 const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), ip: request.ip });
 
 /**
+ * A logo arrives as its bytes (`content-type: image/png`), never wrapped in JSON. The body may weigh up to the server's
+ * limit, so that a file over 512 KB gets its reason (`too_heavy`) instead of a bare 413; the screen checks the weight
+ * before sending too.
+ */
+const LOGO_BODY_LIMIT_BYTES = 1_048_576;
+
+/**
  * `/v1/payroll` (EQ-04): the owner and the team's accounts reach it, a creator never. What each one reads and writes
  * is the database's call (`withMember`): every statement for the owner and an active manager, one's own for anyone
  * else; a validation, a bonus, a penalty or an adjustment by the owner or an active manager, never for oneself; a
  * payment and the team's rules (tiers, goals, minimum payout) by the owner only. A create sent again with the same `id`
  * and values gives back what was recorded (200). A document is answered by its contractor only, and its contest refused
- * by the owner only (ADR 0039); the same answer sent again gives back what was recorded (200).
+ * by the owner only (ADR 0039); the same answer sent again gives back what was recorded (200). Réglages › Facturation
+ * (`/payroll/billing-settings`) is the owner's alone.
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -83,10 +96,20 @@ export function createPayrollRoutes(
   rules: PayrollRuleStore,
   downloadPdf: InvoicePdfDownload,
   acceptance: PayrollInvoiceAcceptance,
+  billing: PayrollBillingSettings,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
+  const owner = requireRole('owner');
   return (app) => {
+    app.addContentTypeParser(
+      'image/png',
+      { parseAs: 'buffer', bodyLimit: LOGO_BODY_LIMIT_BYTES },
+      (_request, body, done) => {
+        done(null, body);
+      },
+    );
+
     // A file, never JSON: kept out of every cache, named after its number, its type never guessed by the browser.
     app.get(
       '/payroll/invoices/:invoiceId/pdf',
@@ -317,6 +340,46 @@ export function createPayrollRoutes(
       '/payroll/exchange-rates',
       { preValidation: ownerOrMember, schema: { response: { 200: ExchangeRatesSchema } } },
       (request) => reads.exchangeRates(userOf(request)),
+    );
+
+    app.get(
+      '/payroll/billing-settings',
+      { preValidation: owner, schema: { response: { 200: BillingSettingsViewSchema } } },
+      (request) => billing.read(userOf(request)),
+    );
+
+    app.put(
+      '/payroll/billing-settings',
+      {
+        preValidation: owner,
+        schema: { body: UpdateBillingSettingsBodySchema, response: { 200: BillingSettingsViewSchema } },
+      },
+      (request) => billing.update(actorOf(request), request.body),
+    );
+
+    app.post(
+      '/payroll/billing-settings/logos',
+      { preValidation: owner, schema: { response: { 200: AgencyLogoSchema, 201: AgencyLogoSchema } } },
+      async (request, reply) => {
+        // Anything but the bytes of a file (JSON, a form) is not a PNG.
+        const bytes = Buffer.isBuffer(request.body) ? new Uint8Array(request.body) : new Uint8Array();
+        const { logo, created } = await billing.addLogo(actorOf(request), bytes);
+        return reply.code(created ? 201 : 200).send(logo);
+      },
+    );
+
+    // The bytes under their fingerprint never change: the browser keeps them.
+    app.get(
+      '/payroll/billing-settings/logos/:sha256',
+      { preValidation: owner, schema: { params: AgencyLogoParamsSchema } },
+      async (request, reply) => {
+        const bytes = await billing.logo(userOf(request), request.params.sha256);
+        return reply
+          .header('content-type', 'image/png')
+          .header('cache-control', 'private, max-age=31536000, immutable')
+          .header('x-content-type-options', 'nosniff')
+          .send(Buffer.from(bytes));
+      },
     );
     return Promise.resolve();
   };

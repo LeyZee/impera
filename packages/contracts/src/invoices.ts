@@ -171,6 +171,24 @@ export const RCS_CITY_MAX = 60;
  */
 export const AGENCY_LOGO_MEDIA_TYPES = ['image/png'] as const;
 export const AGENCY_LOGO_MAX_BYTES = 512 * 1024;
+/**
+ * A logo's sides, in pixels: at least 64 (smaller, it is a smudge), at most 4 000, and 4 million pixels in all, so that
+ * checking each pixel of a 512 KB file never takes the server more than a few dozen megabytes.
+ */
+export const AGENCY_LOGO_MIN_SIDE = 64;
+export const AGENCY_LOGO_MAX_SIDE = 4000;
+export const AGENCY_LOGO_MAX_PIXELS = 4_000_000;
+/**
+ * The head of a document prints the logo about 12 mm high: under 150 pixels high it is printed under 300 dpi and may
+ * look blurred. A warning on the screen, never a refusal.
+ */
+export const AGENCY_LOGO_SHARP_HEIGHT = 150;
+/**
+ * Why a logo is refused, checked by the server before it is kept: heavier than `AGENCY_LOGO_MAX_BYTES`, not a PNG,
+ * a PNG damaged or cut short, without a single transparent pixel (its background would print as a box), or sides out of
+ * bounds.
+ */
+export const AGENCY_LOGO_REFUSALS = ['too_heavy', 'not_png', 'damaged', 'opaque', 'dimensions'] as const;
 export const INVOICE_LINE_LABEL_MAX = 200;
 export const INVOICE_LINE_DETAIL_MAX = 400;
 export const INVOICE_REASON_MAX = 500;
@@ -243,6 +261,22 @@ export const VatNumberSchema = z
 
 export const AgencyLogoMediaTypeSchema = z.enum(AGENCY_LOGO_MEDIA_TYPES);
 export type AgencyLogoMediaType = z.infer<typeof AgencyLogoMediaTypeSchema>;
+
+export const AgencyLogoRefusalSchema = z.enum(AGENCY_LOGO_REFUSALS);
+export type AgencyLogoRefusal = z.infer<typeof AgencyLogoRefusalSchema>;
+
+/** A logo the agency added, kept by its fingerprint and never changed (`agency_logos`), as the screen shows it. */
+export const AgencyLogoSchema = z.object({
+  sha256: Sha256Schema,
+  mediaType: AgencyLogoMediaTypeSchema,
+  width: z.number().int().min(AGENCY_LOGO_MIN_SIDE).max(AGENCY_LOGO_MAX_SIDE),
+  height: z.number().int().min(AGENCY_LOGO_MIN_SIDE).max(AGENCY_LOGO_MAX_SIDE),
+  byteLength: z.number().int().min(1).max(AGENCY_LOGO_MAX_BYTES),
+});
+export type AgencyLogo = z.infer<typeof AgencyLogoSchema>;
+
+/** `GET …/billing-settings/logos/:sha256`: a logo's bytes, by its fingerprint. */
+export const AgencyLogoParamsSchema = z.object({ sha256: Sha256Schema });
 
 /**
  * A billing regime, as the owner sets it and the accountant validates it, for one or more countries (Benin and
@@ -389,10 +423,48 @@ export const BillingSettingsSchema = z.object({
   serviceDescription: ServiceDescriptionSchema.nullable(),
   /** The fingerprint of the logo each document prints in its head, `null` for none. */
   logoSha256: Sha256Schema.nullable(),
-  accounts: JournalAccountsSchema,
+  /** The purchase journal's accounts, `null` until the accountant gives them: the export never leaves without. */
+  accounts: JournalAccountsSchema.nullable(),
   updatedAt: z.iso.datetime(),
 });
 export type BillingSettings = z.infer<typeof BillingSettingsSchema>;
+
+/**
+ * Réglages › Facturation as the owner reads it: the settings, `null` until first saved (no invoice is issued until
+ * then, `agency_missing`), and the facts of the logo they name.
+ */
+export const BillingSettingsViewSchema = z.object({
+  settings: BillingSettingsSchema.nullable(),
+  logo: AgencyLogoSchema.nullable(),
+});
+export type BillingSettingsView = z.infer<typeof BillingSettingsViewSchema>;
+
+/**
+ * The agency as the owner sets it: what an invoice prints, its foot included. The legal form, the share capital and the
+ * town of the trade register are optional in a copy made before lot 4, never in a setting saved from now on (art.
+ * R123-237 of the Code de commerce).
+ */
+export const BillingAgencyBodySchema = InvoiceAgencySchema.extend({
+  legalForm: trimmed(AGENCY_LEGAL_FORM_MAX),
+  shareCapitalMinor: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  rcsCity: trimmed(RCS_CITY_MAX),
+});
+export type BillingAgencyBody = z.infer<typeof BillingAgencyBodySchema>;
+
+/**
+ * `PUT /v1/payroll/billing-settings`, the owner only: what every invoice issued from now on copies. An invoice issued
+ * before keeps its own copy, its PDF never changes. The logo is one the owner added before (`POST …/logos`), or `null`
+ * for none; the accounts and the reminder delay are set elsewhere and kept.
+ */
+export const UpdateBillingSettingsBodySchema = z.object({
+  agency: BillingAgencyBodySchema,
+  serviceDescription: ServiceDescriptionSchema,
+  paymentTerms: PaymentTermsSchema,
+  dueDays: z.number().int().min(INVOICE_DUE_MIN_DAYS).max(INVOICE_DUE_MAX_DAYS),
+  fiscalYearEndMonth: z.number().int().min(1).max(12),
+  logoSha256: Sha256Schema.nullable(),
+});
+export type UpdateBillingSettingsBody = z.infer<typeof UpdateBillingSettingsBodySchema>;
 
 /** The regime as an invoice copies it at its issue. */
 export const InvoiceRegimeSchema = BillingRegimeSchema.omit({ createdAt: true, countries: true });
@@ -525,6 +597,10 @@ export type InvoiceAcceptanceView = z.infer<typeof InvoiceAcceptanceViewSchema>;
  * `PAYROLL_ERROR_CODES` until the invoices' screens word them (lot 8).
  */
 export const INVOICE_ERROR_CODES = [
+  /** A logo the server refuses to keep, with its reason in `details.reason` (`AGENCY_LOGO_REFUSALS`). */
+  'agency_logo_invalid',
+  /** No logo was added with this fingerprint. */
+  'agency_logo_not_found',
   'billing_regime_backdated_unprocessable',
   'credit_note_amount_unprocessable',
   'invoice_acceptance_conflict',
