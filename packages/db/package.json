@@ -11,8 +11,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
+    "test:integration": "vitest run --config vitest.integration.config.ts --fsModuleCachePath node_modules/.vitest-cache",
     "drift": "tsx scripts/check-drift.mjs",
     "generate": "drizzle-kit generate",
     "migrate": "tsx --env-file-if-exists=../../.env src/scripts/migrate.ts",

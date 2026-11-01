@@ -278,6 +278,111 @@ describe('Créatrices › Persona, recette 28/10', () => {
   });
 });
 
+/** A persona file as picked in « Importer un fichier »: the demo, renumbered and renamed, or any text. */
+const draftFile = (text: string, name = 'brouillon.yaml'): File =>
+  new File([text], name, { type: 'text/yaml' });
+const DRAFT_YAML = blocksYaml
+  .replace('version: 0.2.0', 'version: 1.0.0')
+  .replace('first_name: Elena', 'first_name: Zoé');
+
+const pick = (file: File): void => {
+  fireEvent.change(screen.getByLabelText('Fichier de persona'), { target: { files: [file] } });
+};
+
+describe('Créatrices › Persona, « Importer un fichier »', () => {
+  it('puts the file in the draft to read, then saves it under its own number, never active', async () => {
+    const fake = await serveVersions([SUMMARY], () => [201, { ...NEWEST, version: '1.0.0' }]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    pick(draftFile(DRAFT_YAML));
+
+    expect(
+      await screen.findByText(
+        'Importé de « brouillon.yaml » : relis chaque onglet avant d’enregistrer. Ce sera la version 1.0.0, inactive jusqu’à ce que tu l’actives.',
+      ),
+    ).toBeDefined();
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Zoé');
+    // The head still says her stored version, and nothing was sent.
+    expect(screen.getByText('Version 0.2.0')).toBeDefined();
+    // Her first name, and the file's own number and date: the fields the file changes.
+    expect(screen.getByText(/^\d+ modifications, prête à enregistrer$/u)).toBeDefined();
+    expect(fake.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    // What waits on screen is never replaced by a file: « Tout annuler » first.
+    expect(screen.queryByRole('button', { name: 'Importer un fichier' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer une version' }));
+    await waitFor(() => {
+      expect(fake.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    });
+    const [url, init] = fake.mock.calls.find(([, i]) => i?.method === 'POST') ?? [];
+    expect(url).toBe(`/v1/creators/${CREATOR}/persona/versions`);
+    if (typeof init?.body !== 'string') throw new Error('a save sends its body as JSON text');
+    const body: unknown = JSON.parse(init.body);
+    expect(body).toMatchObject({
+      basedOn: SUMMARY.contentHash,
+      persona: { meta: { version: '1.0.0', creator: CREATOR }, details: { first_name: 'Zoé' } },
+    });
+  });
+
+  it('undoes an import with « Tout annuler », and numbers a file older than her versions after them', async () => {
+    await serveVersions([SUMMARY], () => [500, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    pick(draftFile(DRAFT_YAML.replace('version: 1.0.0', 'version: 0.1.0')));
+    expect(await screen.findByText(/Ce sera la version 0\.2\.1,/u)).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tout annuler' }));
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elena');
+    expect(screen.queryByText(/^Importé de/u)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Importer un fichier' })).toBeDefined();
+  });
+
+  it('says what a file lacks and where, or that it is not a persona, and changes nothing', async () => {
+    await serveVersions([SUMMARY], () => [500, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+
+    pick(draftFile(DRAFT_YAML.replace('first_name: Zoé', 'first_name: ""')));
+    expect(
+      await screen.findByText(
+        'Ce fichier ne passe pas la vérification de la persona : un problème, dans « Détails » (details.first_name) : À remplir. Rien n’a changé.',
+      ),
+    ).toBeDefined();
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elena');
+
+    pick(draftFile('meta: [ pas du yaml', 'notes.txt'));
+    expect(
+      await screen.findByText(
+        'Ce fichier ne se lit pas comme une persona : il faut le fichier YAML de sa fiche. Rien n’a changé.',
+      ),
+    ).toBeDefined();
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elena');
+  });
+
+  it('offers no import to a chatter, nor before a creator exists', async () => {
+    await serveVersions([SUMMARY], () => [500, {}]);
+    const { unmount } = render(
+      <PersonaSection creatorId={CREATOR} canSave={false} timezone="Europe/Paris" />,
+    );
+    await screen.findByLabelText('Prénom');
+    expect(screen.queryByRole('button', { name: 'Importer un fichier' })).toBeNull();
+    unmount();
+
+    render(<PersonaSection creatorId={null} canSave timezone={null} />);
+    await screen.findByLabelText('Prénom');
+    expect(screen.queryByRole('button', { name: 'Importer un fichier' })).toBeNull();
+  });
+
+  it('starts her first version from a file, under the number it carries', async () => {
+    await serveVersions([], () => [500, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    expect(await screen.findByText(/deviendra sa version 0\.0\.1\./u)).toBeDefined();
+    pick(draftFile(DRAFT_YAML));
+    expect(await screen.findByText(/deviendra sa version 1\.0\.0\./u)).toBeDefined();
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Zoé');
+  });
+});
+
 describe('Créatrices › Persona, the tabs past an edge (CREA-01)', () => {
   /** A bar 300 px wide scrolled by `scroll`, its tabs 100 px each, side by side. */
   const barOf = (ids: readonly string[], scroll: number): HTMLElement => {

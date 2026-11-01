@@ -46,6 +46,11 @@ import {
   matchOptions,
   nextVersion,
   togglePick,
+  fileRefusal,
+  importedDraft,
+  schemaIssues,
+  UNREADABLE_FILE,
+  versionOnSave,
 } from './model';
 import { parsePersonaYaml } from './source';
 
@@ -246,6 +251,46 @@ describe('Persona screen rules', () => {
     expect(nextVersion(['0.0.0'])).toBe('0.0.1');
     expect(nextVersion(['0.1.2', '0.0.9', '0.1.10'])).toBe('0.1.11');
     expect(nextVersion(['1.0.0', '0.9.9'])).toBe('1.0.1');
+  });
+});
+
+describe('Importing a draft from a file', () => {
+  const at = async (version: string): Promise<Persona> => {
+    const persona = await demo();
+    return { ...persona, meta: { ...persona.meta, version } };
+  };
+
+  it('keeps the number of an imported file after every stored version, the next one otherwise', async () => {
+    expect(versionOnSave(await at('1.0.0'), ['0.2.0', '0.1.0'], true)).toBe('1.0.0');
+    expect(versionOnSave(await at('1.0.0'), [], true)).toBe('1.0.0');
+    // Taken, or behind her newest: the next number, as for any edit.
+    expect(versionOnSave(await at('0.2.0'), ['0.2.0'], true)).toBe('0.2.1');
+    expect(versionOnSave(await at('0.1.0'), ['0.2.0'], true)).toBe('0.2.1');
+    // Not imported: one patch above, even when the draft's own number is ahead.
+    expect(versionOnSave(await at('1.0.0'), ['0.2.0'], false)).toBe('1.0.1');
+    expect(versionOnSave(await at('0.0.0'), [], false)).toBe('0.0.1');
+  });
+
+  it('makes the file hers: the creator it names is the one importing it, the rest as written', async () => {
+    const persona = await demo();
+    const mine = importedDraft(persona, '6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b');
+    expect(mine.meta.creator).toBe('6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b');
+    expect({ ...mine, meta: persona.meta }).toEqual(persona);
+  });
+
+  it('says how many problems a file has, and the first under its tab and its key', async () => {
+    const persona = await demo();
+    const broken = {
+      ...persona,
+      meta: { ...persona.meta, version: 'un' },
+      details: { ...persona.details, first_name: '' },
+    };
+    const issues = schemaIssues(broken);
+    expect(issues.length).toBe(2);
+    expect(fileRefusal(issues)).toBe(
+      'Ce fichier ne passe pas la vérification de la persona : 2 problèmes ; le premier, dans l’en-tête du fichier (meta.version) : Version semver attendue (ex. 1.2.0). Rien n’a changé.',
+    );
+    expect(fileRefusal([])).toBe(UNREADABLE_FILE);
   });
 });
 

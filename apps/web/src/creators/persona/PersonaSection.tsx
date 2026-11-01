@@ -36,21 +36,24 @@ import {
   IN_DEPTH_BLOCKS,
   issueCountByTab,
   isPlaceholder,
+  fileRefusal,
+  importedDraft,
   localDay,
-  nextVersion,
   NOTHING_REFUSED,
   refusedReplyIssues,
   stillRefused,
   TABS,
   tabOf,
   validate,
+  UNREADABLE_FILE,
+  versionOnSave,
   withoutPlaceholders,
   type BlockId,
   type FieldIssue,
   type RefusedReplies,
   type TabId,
 } from './model';
-import { activateVersion, saveVersion, usePersona, type PersonaReady } from './source';
+import { activateVersion, readPersonaFile, saveVersion, usePersona, type PersonaReady } from './source';
 import {
   AdditionalInfoTab,
   BehaviorTab,
@@ -195,6 +198,8 @@ function Editor({
   const [focusField, setFocusField] = useState<string | null>(null);
   /** The sample replies the server refused at the last save (422), shown on their field until their text changes. */
   const [refused, setRefused] = useState<RefusedReplies>(NOTHING_REFUSED);
+  /** The name of the file the draft was imported from (« Importer un fichier »), until it is saved or undone. */
+  const [imported, setImported] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
 
@@ -207,6 +212,12 @@ function Editor({
   const form = useMemo(() => ({ issues: flagged, changed }), [flagged, changed]);
 
   const dirty = changed.length > 0;
+  /** The number the next save gives: shown before it is made, by the note and after an import. */
+  const upcoming = versionOnSave(
+    draft,
+    ready.versions.map((v) => v.version),
+    imported !== null,
+  );
   useEffect(() => {
     onDirty(dirty);
   }, [dirty, onDirty]);
@@ -250,14 +261,13 @@ function Editor({
     if (creatorId === null) return;
     setSaving(true);
     setProblem(null);
-    const taken = [...ready.versions.map((v) => v.version), draft.meta.version];
     // The model reads the zone from the persona; the code goes by the creator's, so the copy follows hers.
     // Her zone and the new number do not go through `validate`: a refusal here is a failed save, never a throw.
     const persona = PersonaSchema.safeParse(
       withoutPlaceholders({
         ...draft,
         details: { ...draft.details, timezone: timezone ?? draft.details.timezone },
-        meta: { ...draft.meta, version: nextVersion(taken), created_at: localDay() },
+        meta: { ...draft.meta, version: upcoming, created_at: localDay() },
       }),
     );
     const result = persona.success
@@ -290,6 +300,28 @@ function Editor({
         });
         break;
     }
+  };
+
+  /**
+   * « Importer un fichier »: a persona file written outside Nirvana (ADR 0010: never in the repository) replaces the
+   * draft, field by field, as if typed. Nothing is stored until « Enregistrer une version », and a version saved is
+   * never active until it is activated: her active version and what the agent writes stay as they are.
+   */
+  const importFile = async (file: File): Promise<void> => {
+    if (creatorId === null) return;
+    const read = await readPersonaFile(file).catch(() => ({ kind: 'unreadable' as const }));
+    if (read.kind !== 'persona') {
+      setProblem({
+        text: read.kind === 'invalid' ? fileRefusal(read.issues) : UNREADABLE_FILE,
+        reload: false,
+      });
+      return;
+    }
+    setDraft(importedDraft(read.persona, creatorId));
+    setImported(file.name);
+    setProblem(null);
+    setRefused(NOTHING_REFUSED);
+    onEdit();
   };
 
   const activate = async (): Promise<void> => {
@@ -336,6 +368,7 @@ function Editor({
     setDraft(saved);
     setProblem(null);
     setRefused(NOTHING_REFUSED);
+    setImported(null);
   };
   /** A block of the persona: its tab, then its folded section opened and brought into view. */
   const show = (field: string): void => {
@@ -362,6 +395,9 @@ function Editor({
           saving={saving}
           blocked={blocked}
           canActivate={canSave && changed.length === 0 && ready.versions[0]?.isActive === false}
+          canImport={canSave && creatorId !== null && changed.length === 0}
+          imported={changed.length > 0 ? imported : null}
+          upcoming={upcoming}
           notice={notice}
           problem={problem}
           onSave={() => {
@@ -372,6 +408,9 @@ function Editor({
           }}
           onReload={onReload}
           onReset={reset}
+          onImport={(file) => {
+            void importFile(file);
+          }}
           onShowBlock={show}
           onShowIssue={(issue) => {
             show(issue.field);
@@ -453,10 +492,10 @@ const CONFIRM_MS = 4000;
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
 
 /** What the note under the head says: where this persona comes from and what a save does. */
-function noteOf(ready: PersonaReady, known: boolean): string {
+function noteOf(ready: PersonaReady, known: boolean, upcoming: string): string {
   if (!known) return 'Ceci est un exemple : tu peux tout modifier pour essayer, rien ne sera enregistré.';
   if (ready.source === 'example') {
-    return 'Pars de cet exemple : ton premier enregistrement deviendra sa version 0.0.1.';
+    return `Pars de cet exemple ou importe un fichier : ton premier enregistrement deviendra sa version ${upcoming}.`;
   }
   const active = ready.versions.find((v) => v.isActive);
   // The agent reads her active version at each draft; without one he writes nothing (recette 28/10, G4).
@@ -484,12 +523,16 @@ function Head({
   saving,
   blocked,
   canActivate,
+  canImport,
+  imported,
+  upcoming,
   notice,
   problem,
   onSave,
   onActivate,
   onReload,
   onReset,
+  onImport,
   onShowIssue,
   onShowBlock,
 }: {
@@ -509,16 +552,24 @@ function Head({
   blocked: string | null;
   /** Her newest version is stored, unchanged here and not yet the one the agent writes with. */
   canActivate: boolean;
+  /** Nothing waits in the draft, and it can be saved: a file may replace it. */
+  canImport: boolean;
+  /** The file the draft comes from, while its import waits to be saved. */
+  imported: string | null;
+  /** The number the next save gives. */
+  upcoming: string;
   notice: string | null;
   problem: { text: string; reload: boolean } | null;
   onSave: () => void;
   onActivate: () => void;
   onReload: () => void;
   onReset: () => void;
+  onImport: (file: File) => void;
   onShowIssue: (issue: FieldIssue) => void;
   onShowBlock: (block: BlockId) => void;
 }): JSX.Element {
   const name = draft.details.first_name.trim();
+  const fileRef = useRef<HTMLInputElement>(null);
   /** Activating changes what the agent writes: a second click confirms it. */
   const [confirming, setConfirming] = useState(false);
   useEffect(() => {
@@ -554,7 +605,7 @@ function Head({
             : notice !== null
               ? { dot: 'ok', text: notice }
               : null;
-  const created = fullDay(draft.meta.created_at);
+  const created = fullDay(ready.persona.meta.created_at);
 
   return (
     <div className="nv-plate ps-head" ref={headRef}>
@@ -575,7 +626,8 @@ function Head({
                 >
                   {current?.isActive === true ? 'Active' : 'Pas encore active'}
                 </span>
-                <span>Version {draft.meta.version}</span>
+                {/* Her newest stored version: an imported draft carries its own number and date until saved. */}
+                <span>Version {ready.persona.meta.version}</span>
                 <span aria-hidden="true">·</span>
                 <span>{created}</span>
               </>
@@ -583,6 +635,33 @@ function Head({
           </p>
         </div>
         <div className="ps-head__actions">
+          {canImport && !saving ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".yaml,.yml"
+                hidden
+                aria-label="Fichier de persona"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  // Emptied, so that the same file picked again after a fix is read again.
+                  event.target.value = '';
+                  if (file !== undefined) onImport(file);
+                }}
+              />
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain nv-btn--sm ps-pop"
+                title="Un fichier YAML de persona remplace ce qui est à l’écran, à relire avant d’enregistrer."
+                onClick={() => {
+                  fileRef.current?.click();
+                }}
+              >
+                Importer un fichier
+              </button>
+            </>
+          ) : null}
           {changes > 0 && !saving ? (
             <button type="button" className="nv-btn nv-btn--plain nv-btn--sm ps-pop" onClick={onReset}>
               Tout annuler
@@ -642,9 +721,15 @@ function Head({
           </button>
         ) : null}
       </div>
+      {imported === null ? null : (
+        <p className="ps-muted ps-pop">
+          Importé de « {imported} » : relis chaque onglet avant d’enregistrer. Ce sera la version {upcoming},
+          inactive jusqu’à ce que tu l’actives.
+        </p>
+      )}
       <Completion completion={completion} onShowBlock={onShowBlock} />
       <p className="ps-muted" id="ps-save-note">
-        {noteOf(ready, known)}
+        {noteOf(ready, known, upcoming)}
       </p>
     </div>
   );

@@ -14,7 +14,6 @@ import { LogSink } from './support/log-sink';
 import { createSlowTask, enqueueSlow, SLOW_TASK } from './support/slow-task';
 
 const API_ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const TSX = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
 
 describe('graceful shutdown (operations.md)', () => {
   let test: TestDb;
@@ -50,8 +49,10 @@ describe('graceful shutdown (operations.md)', () => {
     expect(sink.withMessage('slow finished')).toHaveLength(1);
   });
 
-  it('stops on SIGTERM and exits with code 0', async () => {
-    const child = spawn(TSX, ['src/worker.ts'], {
+  // Windows has no SIGTERM: `kill` ends the process at once, so the graceful path only exists on Linux and macOS.
+  it.skipIf(process.platform === 'win32')('stops on SIGTERM and exits with code 0', async () => {
+    // Node with tsx's loader rather than `node_modules/.bin/tsx`, a shell script that `spawn` cannot run on Windows.
+    const child = spawn(process.execPath, ['--import', 'tsx', 'src/worker.ts'], {
       cwd: API_ROOT,
       env: {
         PATH: process.env['PATH'],
