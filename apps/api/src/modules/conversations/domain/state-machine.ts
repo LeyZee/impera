@@ -1,4 +1,4 @@
-import type { ConversationState, DraftStatus } from '@nirvana/contracts';
+import { ConversationStateSchema, type ConversationState, type DraftStatus } from '@nirvana/contracts';
 
 /**
  * What can happen to a conversation, and where it leads (message-flow.md). `drafting` is reserved for the engine
@@ -70,6 +70,11 @@ const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
 /** The state after `command`, or `null` when the command is not allowed in `state`. */
 export function nextState(state: ConversationState, command: ConversationCommand): ConversationState | null {
   return TRANSITIONS[command][state] ?? null;
+}
+
+/** The states `command` is allowed in, in the contract's order: what a search for such conversations filters on. */
+export function statesAllowing(command: ConversationCommand): readonly ConversationState[] {
+  return ConversationStateSchema.options.filter((state) => nextState(state, command) !== null);
 }
 
 const DRAFT_TRANSITIONS: Readonly<Record<DraftStatus, readonly DraftStatus[]>> = {

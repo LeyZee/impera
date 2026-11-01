@@ -98,6 +98,7 @@ Mode auto : `CreatorSettings.auto_approve_categories` (ex. `['small_talk','kyc',
 - `takeover(conversationId, by)` : state `human`, event, le bot ne génère plus. Permis aussi sur une conversation déjà à `human` (après une remise à l'humain) : la prise en main ferme l'alerte Telegram. L'humain écrit depuis le dashboard (envoi via le même `conversation.send`, `author: human`).
 - `release(conversationId, by, note?)` : state `idle`, la note est ajoutée en `fan_fact` catégorie `operator_note`, le bot relit tout l'historique à sa prochaine réponse.
 - `handoff` demandé par la politique : state `human` + notification urgente ; la conversation ne redevient automatique qu'à `release`.
+- **Main rendue automatiquement** (EQ-13, « oui » de Charles le 01/11) : un membre qui n'est plus `active` (en congé, malade, en déplacement, suspendu, parti) ne lit plus aucune conversation dès sa requête suivante (`routedCreatorIds` vide, `auth.ts`). Ce qu'il tenait encore (une conversation routée vers lui, ou à `human` dont sa prise en main est le dernier mot, sans `release` ni `handoff` depuis) est rendu par le job `conversation.release_unavailable`, chaque minute : un `takeover_ended` par le système, sans note, avec la raison qui dit son statut (« Rendue automatiquement : le membre qui la tenait est en congé. »). Chaque conversation est sa propre transaction, revérifiée sous son verrou ; un second passage n'écrit rien. Le routage d'EQ-08 ne route jamais vers un membre qui n'est pas `active`.
 
 ## 6. Interrupteurs
 

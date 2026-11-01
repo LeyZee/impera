@@ -1,7 +1,7 @@
 import { ConversationStateSchema, DraftStatusSchema } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { canDraftBecome, nextState } from '../state-machine';
+import { canDraftBecome, nextState, statesAllowing } from '../state-machine';
 
 describe('conversation state machine', () => {
   it('moves a fan message to pending, except where a human or an error holds the conversation', () => {
@@ -58,5 +58,10 @@ describe('conversation state machine', () => {
     expect(canDraftBecome('rejected', 'approved')).toBe(false);
     expect(canDraftBecome('pending', 'edited')).toBe(true);
     expect(canDraftBecome('approved', 'sent')).toBe(true);
+  });
+
+  it('lists the states a command is allowed in, as a search for such conversations filters on them', () => {
+    expect([...statesAllowing('release')].sort()).toEqual(['error', 'human']);
+    for (const state of statesAllowing('takeover')) expect(nextState(state, 'takeover')).toBe('human');
   });
 });

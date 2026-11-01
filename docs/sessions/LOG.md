@@ -67,7 +67,7 @@ Depuis le 16/10/2026 (soir), chaque session écrit son entrée dans son propre f
 
 ## Incidents (liste vivante)
 
-_Aucun pour l'instant._
+- 2026-11-01 — CI de #347 : un test d'intégration de la paie sur le stockage objet (MinIO, socket coupée) rouge une fois, vert à la relance, sans lien avec la PR. Une seconde fois = à traiter (délai ou nouvel essai côté client objet).
 
 ## Candidats à suppression (liste vivante)
 

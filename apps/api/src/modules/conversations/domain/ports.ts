@@ -41,6 +41,7 @@ import type {
   VerifyResult,
 } from '@nirvana/contracts';
 
+import type { AwayStatus } from './away';
 import type { ConversationProjection } from './projection';
 
 /** Ports of the `conversations` module (ADR 0002): what it needs, implemented in `infra/` or by other modules. */
@@ -118,6 +119,27 @@ interface ConversationRepository {
   idsInMode(mode: ConversationMode): Promise<readonly ConversationId[]>;
   /** The creator's conversations in this state, the one whose fan wrote first at the head. */
   idsInState(state: ConversationState): Promise<readonly ConversationId[]>;
+  /**
+   * Whether `userId` holds the conversation (EQ-13): it is routed to him, or it is in `human` and his takeover is the
+   * last word on who holds it (no release nor handoff since).
+   */
+  isHeldBy(id: ConversationId, userId: UserId): Promise<boolean>;
+}
+
+/** A conversation still held by a team member who is no longer `active` (EQ-13). */
+interface AwayHold {
+  readonly creatorId: CreatorId;
+  readonly conversationId: ConversationId;
+  readonly userId: UserId;
+  readonly status: AwayStatus;
+}
+
+/**
+ * The conversations held by members who are away, read across creators on the admin connection: the job that hands
+ * them back runs for no creator and no account. At most `limit`, the next run takes the rest.
+ */
+export interface AwayHolds {
+  list(limit: number): Promise<readonly AwayHold[]>;
 }
 
 interface MessageRepository {

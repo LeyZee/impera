@@ -19,6 +19,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.dispatch'] },
   },
+  // What a member no longer `active` still held (a takeover, a routed conversation) is handed back within the minute
+  // (EQ-13): he already reads none of it. No backfill: the next run finds them all anyway.
+  {
+    task: 'conversation.release_unavailable',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['conversation.release_unavailable'] },
+  },
   // Re-checks the saved AI service keys (ADR 0016): credit, revoked keys, recovery after a refusal. No backfill:
   // the next run checks everything anyway.
   {
