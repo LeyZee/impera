@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "dependencies": {
     "@nirvana/contracts": "workspace:*",

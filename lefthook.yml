@@ -31,6 +31,4 @@ pre-push:
 commit-msg:
   commands:
     conventional:
-      run: |
-        head -1 "{1}" | grep -Eq '^(Merge |(feat|fix|docs|style|chore|refactor|test|perf|build|ci|revert)(\([a-z0-9-]+\))?!?: .{1,72}$)' \
-          || { echo "Commit message does not follow Conventional Commits (see docs/conventions/git-and-pr.md)"; exit 1; }
+      run: node scripts/commit-msg.mjs {1}

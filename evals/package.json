@@ -9,7 +9,7 @@
     "probe": "tsx probe/run.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
     "probe:vision": "tsx probe/vision.ts"
   },
   "devDependencies": {
