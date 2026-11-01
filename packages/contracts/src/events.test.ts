@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ConversationEventSchema, DomainEventSchema, EVENT_PAYLOADS, EVENT_TYPES } from './events';
 import {
   CommissionStatementIdSchema,
+  ContractorDocumentIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   FanIdSchema,
@@ -188,6 +189,24 @@ describe('events', () => {
       flags: {},
     });
     expect(EVENT_PAYLOADS.fan_flag_set.safeParse({ ...body, flag: 'vip' }).success).toBe(false);
+  });
+
+  it('tells a document coming to its end by ids, a kind and a day, never a name (EQ-06 lot 5c-2)', () => {
+    const body = {
+      memberId: newId(TeamMemberIdSchema),
+      documentId: newId(ContractorDocumentIdSchema),
+      kind: 'tax_residence',
+      lastDay: '2026-12-31',
+    };
+    expect(EVENT_PAYLOADS.contractor_document_expiring.parse({ ...body, legalName: 'Kofi Inventé' })).toEqual(
+      body,
+    );
+    expect(EVENT_PAYLOADS.contractor_document_expiring.safeParse({ ...body, kind: 'passport' }).success).toBe(
+      false,
+    );
+    expect(
+      EVENT_PAYLOADS.contractor_document_expiring.safeParse({ ...body, lastDay: '31/12/2026' }).success,
+    ).toBe(false);
   });
 
   it('accepts a human actor only with a user id', () => {

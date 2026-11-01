@@ -69,6 +69,23 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '29 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.sweep_invoice_acceptance'] },
   },
+  // The documents a contractor's regime asks for that come to their end (EQ-06 lot 5c-2): each said once to the owner, a
+  // tax residence certificate from 1 December of its year. The next hour is the retry, no backfill.
+  {
+    task: 'payroll.remind_documents',
+    match: '37 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.remind_documents'] },
+  },
+  // The waiting invoices tried again once a day, whatever their trigger (EQ-06 « ok pays »): a member whose country goes
+  // back to that of his regime, or any change no trigger of this module sees (the team module never calls payroll),
+  // lets his invoices go out within the day. Each statement that waited is enqueued under its own key (a run that waits
+  // is replaced, never doubled) and a run issues only what is missing.
+  {
+    task: 'payroll.requeue_invoice_issues',
+    match: '13 4 * * *',
+    payload: { memberId: null },
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.requeue_invoice_issues'] },
+  },
   // The ECB's rates (ADR 0033), published around 16:00 CET each working day: read each hour, before the hour's
   // recalculation, so that a new rate reaches the drafts within the hour. The file holds 90 days: a run missed during
   // an outage is caught up by the next one, no backfill. Its retries are the contract's.

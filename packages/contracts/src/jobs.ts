@@ -52,6 +52,7 @@ export const JOB_NAMES = [
   'payroll.lapse_invoice',
   'payroll.announce_invoice_contest',
   'payroll.sweep_invoice_acceptance',
+  'payroll.remind_documents',
   'media.describe',
   'providers.check_credentials',
   'telegram.scan',
@@ -177,6 +178,11 @@ export const JOB_PAYLOADS = {
    * tacitly, an open contest without its alert is said, whatever became of their own job (failed, lost).
    */
   'payroll.sweep_invoice_acceptance': z.object({}),
+  /**
+   * Each hour (crontab, EQ-06 lot 5c-2): each document a contractor's regime asks for that comes to its end, or passed
+   * it, with no newer one filed, is said once to the owner (`contractor_document_expiring`).
+   */
+  'payroll.remind_documents': z.object({}),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -231,6 +237,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.announce_invoice_contest': 25,
   // Each hour: the next run is the retry.
   'payroll.sweep_invoice_acceptance': 1,
+  // Each hour: the next run is the retry, and a document is said once.
+  'payroll.remind_documents': 1,
   'media.describe': 3,
   'providers.check_credentials': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
