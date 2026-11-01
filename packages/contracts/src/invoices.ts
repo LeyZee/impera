@@ -365,6 +365,53 @@ export const InvoiceAgencySchema = z.object({
 });
 export type InvoiceAgency = z.infer<typeof InvoiceAgencySchema>;
 
+const WHOLE_EUROS = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+
+/** A postal address as written, one printed line per line of it: blank lines and the spaces around each dropped. */
+export const addressLines = (address: string): string[] =>
+  address
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+
+/** « 10 000 € », « 1 000,50 € »: a share capital as an invoice prints it, the cents only when there are some. */
+export const shareCapitalWords = (minor: number): string =>
+  minor % 100 === 0 ? WHOLE_EUROS.format(minor / 100) : EUROS.format(minor / 100);
+
+/** « SAS au capital de 10 000 € », the form alone without a capital, `null` without a form (a copy made before lot 4). */
+export function legalFormWords(agency: InvoiceAgency): string | null {
+  const form = agency.legalForm ?? null;
+  const capital = agency.shareCapitalMinor ?? null;
+  if (form === null) return null;
+  return capital === null ? form : `${form} au capital de ${shareCapitalWords(capital)}`;
+}
+
+/** « 123 456 789 »: a SIREN in its three groups, which never break apart. */
+export const sirenWords = (siren: string): string =>
+  [siren.slice(0, 3), siren.slice(3, 6), siren.slice(6)].join('\u00a0');
+
+/**
+ * The foot of each page of an invoice or a credit note (art. R123-237 of the Code de commerce): the agency and its
+ * address, its form and capital, its register and SIREN, and what it is to the contractor. One text, which the PDF
+ * prints and Réglages › Facturation shows: the owner reads there what the contractor will.
+ */
+export function invoiceFooterOf(agency: InvoiceAgency): string {
+  const parts = [`Document établi par ${agency.legalName}, ${addressLines(agency.address).join(', ')}`];
+  const form = legalFormWords(agency);
+  if (form !== null) parts.push(form);
+  if (agency.rcsCity !== undefined && agency.rcsCity !== null) {
+    // The register and its number never break apart either.
+    parts.push(`RCS\u00a0${agency.rcsCity}\u00a0${sirenWords(agency.siren)}`);
+  }
+  return `${parts.join(' · ')}, mandataire de facturation du prestataire.`;
+}
+
 /**
  * A contractor's file: who his invoices are in the name of. He fills it himself, the owner checks it; any change of
  * identity asks for a new check. The country is his member record's (EQ-01). The prefix is frozen at his first invoice.

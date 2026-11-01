@@ -1,20 +1,15 @@
-import type { AgencyLogo, BillingSettings } from '@nirvana/contracts';
+import {
+  invoiceFooterOf,
+  legalFormWords,
+  sirenWords,
+  type AgencyLogo,
+  type BillingSettings,
+} from '@nirvana/contracts';
 import { useState, type JSX, type ReactNode } from 'react';
 
 import { BillingDialog } from './BillingDialog';
 import { logoUrl, useBillingSettings } from './api';
-import {
-  ALL_STEPS,
-  dueText,
-  closeChoiceText,
-  footText,
-  formLine,
-  isReady,
-  logoLine,
-  logoWarning,
-  sirenText,
-  type StepKey,
-} from './model';
+import { ALL_STEPS, dueText, closeChoiceText, isReady, logoLine, logoWarning, type StepKey } from './model';
 
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
@@ -134,7 +129,7 @@ function Cards({
   onChange: (opened: Opened) => void;
 }): JSX.Element {
   const { agency } = settings;
-  const form = formLine(agency);
+  const form = legalFormWords(agency);
   const warning = logo === null ? null : logoWarning(logo);
   return (
     <>
@@ -170,7 +165,7 @@ function Cards({
             <span className="bf-lines">{agency.address}</span>
           </Fact>
           <Fact label="SIREN">
-            <span className="nv-num">{sirenText(agency.siren)}</span>
+            <span className="nv-num">{sirenWords(agency.siren)}</span>
           </Fact>
           <Fact label="RCS">{agency.rcsCity ?? <span className="bf-missing">À remplir</span>}</Fact>
           <Fact label="TVA intracommunautaire">
@@ -179,7 +174,7 @@ function Cards({
           <Fact label="Clôture de l’exercice">{closeChoiceText(settings.fiscalYearEndMonth)}</Fact>
         </dl>
         <p className="bf-label">Pied de chaque page</p>
-        <p className="bf-paper bf-paper--foot">{footText(agency)}</p>
+        <p className="bf-paper bf-paper--foot">{invoiceFooterOf(agency)}</p>
       </Card>
       <Card
         index={2}

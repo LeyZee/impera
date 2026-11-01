@@ -15,10 +15,11 @@ import {
   SERVICE_DESCRIPTION_MAX,
   UpdateBillingSettingsBodySchema,
   VAT_NUMBER_PATTERN,
+  frenchVatNumberOf,
+  sirenChecksOut,
   type AgencyLogo,
   type AgencyLogoRefusal,
   type BillingSettings,
-  type InvoiceAgency,
   type UpdateBillingSettingsBody,
 } from '@nirvana/contracts';
 
@@ -108,26 +109,13 @@ export function parseEuros(text: string): number | null {
 const digitsOf = (text: string): string => text.replace(/[\s.]/gu, '');
 
 /**
- * Whether a text is a SIREN: nine digits carrying the Luhn key every SIREN carries (La Poste's included). A typo is
- * said here, before an accountant finds it on an invoice; the server refuses it too.
+ * Whether a text is a SIREN, as the owner types it: nine digits carrying their check key (`sirenChecksOut`, the
+ * server's rule). A typo is said here, before an accountant finds it on an invoice.
  */
-export function isSiren(text: string): boolean {
-  const digits = digitsOf(text);
-  if (!/^\d{9}$/u.test(digits)) return false;
-  let sum = 0;
-  for (let index = 0; index < digits.length; index += 1) {
-    const value = Number(digits.charAt(index)) * (index % 2 === 1 ? 2 : 1);
-    sum += value > 9 ? value - 9 : value;
-  }
-  return sum % 10 === 0;
-}
+export const isSiren = (text: string): boolean => sirenChecksOut(digitsOf(text));
 
-/** The French VAT number of a SIREN: « FR », its key ((12 + 3 × (SIREN mod 97)) mod 97), then the SIREN. */
-export function vatOfSiren(siren: string): string {
-  const digits = digitsOf(siren);
-  const key = (12 + 3 * (Number(digits) % 97)) % 97;
-  return `FR${String(key).padStart(2, '0')}${digits}`;
-}
+/** The French VAT number of a SIREN as the owner types it (`frenchVatNumberOf`, the server's rule). */
+export const vatOfSiren = (siren: string): string => frenchVatNumberOf(digitsOf(siren));
 
 /** « fr 12 123 456 789 » → « FR12123456789 ». */
 const vatOf = (text: string): string => text.replace(/[\s.-]/gu, '').toUpperCase();
@@ -255,48 +243,6 @@ const LAST_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
 export function closeChoiceText(month: number): string {
   const name = MONTHS[month - 1] ?? MONTHS[11];
   return month === 2 ? `Fin ${name}` : `${String(LAST_DAYS[month - 1] ?? 31)} ${name}`;
-}
-
-const WHOLE_EUROS = new Intl.NumberFormat('fr-FR', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-
-/** « 10 000 € », « 1 000,50 € »: a share capital as the invoice prints it, cents only when there are some. */
-export const capitalText = (minor: number): string =>
-  minor % 100 === 0 ? WHOLE_EUROS.format(minor / 100) : EUROS.format(minor / 100);
-
-/** « SAS au capital de 10 000 € », or the form alone, or `null`. */
-export function formLine(agency: InvoiceAgency): string | null {
-  const form = agency.legalForm ?? null;
-  const capital = agency.shareCapitalMinor ?? null;
-  if (form === null) return null;
-  return capital === null ? form : `${form} au capital de ${capitalText(capital)}`;
-}
-
-/** « 123 456 789 »: a SIREN in its three groups, never broken apart. */
-export const sirenText = (siren: string): string =>
-  digitsOf(siren).replace(/^(\d{3})(\d{3})(\d{3})$/u, '$1\u00a0$2\u00a0$3');
-
-/**
- * The foot of each page of an invoice, as the PDF prints it (`footerOf` in the payroll module, art. R123-237 C. com.):
- * the owner reads here what the contractor will.
- */
-export function footText(agency: InvoiceAgency): string {
-  const address = agency.address
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-  const parts = [`Document établi par ${agency.legalName}, ${address.join(', ')}`];
-  const form = formLine(agency);
-  if (form !== null) parts.push(form);
-  if (agency.rcsCity !== undefined && agency.rcsCity !== null) {
-    parts.push(`RCS\u00a0${agency.rcsCity}\u00a0${sirenText(agency.siren)}`);
-  }
-  return `${parts.join(' · ')}, mandataire de facturation du prestataire.`;
 }
 
 /** « 433 Ko », « 1,2 Mo »: a file's weight, the number and its unit never broken apart. */

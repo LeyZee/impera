@@ -27,8 +27,13 @@ import {
   ServiceDescriptionSchema,
   UpdateBillingSettingsBodySchema,
   VatNumberSchema,
+  addressLines,
   frenchVatNumberOf,
+  invoiceFooterOf,
+  legalFormWords,
+  shareCapitalWords,
   sirenChecksOut,
+  sirenWords,
 } from './invoices';
 
 // Invented parties (ADR 0010): no real name, address nor identifier.
@@ -246,6 +251,40 @@ describe('invoices', () => {
     expect(
       InvoiceAgencySchema.safeParse({ ...agency, siren: '123456789', vatNumber: 'FR12123456789' }).success,
     ).toBe(true);
+  });
+
+  it('print one foot of the page, the PDF’s and Réglages › Facturation’s: form, capital, register (art. R123-237)', () => {
+    const agency = {
+      legalName: 'Agence Exemple SAS',
+      address: '1 place Fictive\r\n\n69000 Lyon ',
+      siren: '123456782',
+      vatNumber: 'FR11123456782',
+      legalForm: 'SAS',
+      shareCapitalMinor: 1_000_000,
+      rcsCity: 'Lyon',
+    };
+    expect(addressLines(agency.address)).toEqual(['1 place Fictive', '69000 Lyon']);
+    expect(shareCapitalWords(1_000_000)).toBe('10\u202f000\u00a0€');
+    expect(shareCapitalWords(100_050)).toBe('1\u202f000,50\u00a0€');
+    expect(sirenWords('123456782')).toBe('123\u00a0456\u00a0782');
+    expect(legalFormWords(agency)).toBe('SAS au capital de 10\u202f000\u00a0€');
+    expect(legalFormWords({ ...agency, shareCapitalMinor: null })).toBe('SAS');
+    expect(legalFormWords({ ...agency, legalForm: null })).toBeNull();
+    expect(invoiceFooterOf(agency)).toBe(
+      'Document établi par Agence Exemple SAS, 1 place Fictive, 69000 Lyon · SAS au capital de 10\u202f000\u00a0€ · ' +
+        'RCS\u00a0Lyon\u00a0123\u00a0456\u00a0782, mandataire de facturation du prestataire.',
+    );
+    // A copy made before lot 4: the agency and its address alone.
+    expect(
+      invoiceFooterOf({
+        legalName: agency.legalName,
+        address: agency.address,
+        siren: agency.siren,
+        vatNumber: agency.vatNumber,
+      }),
+    ).toBe(
+      'Document établi par Agence Exemple SAS, 1 place Fictive, 69000 Lyon, mandataire de facturation du prestataire.',
+    );
   });
 
   it('describe a kept logo by its fingerprint, its sides and its weight, and name each reason to refuse one', () => {
