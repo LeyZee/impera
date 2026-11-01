@@ -15,8 +15,11 @@ import {
   REGIME_MENTIONS,
   SERVICE,
   TERMS,
+  frenchCharged,
+  frenchFranchise,
   sampleCreditNote,
   sampleInvoice,
+  worstCase,
 } from './invoice-pdf-fixtures';
 
 /** The spaces French sets that never break, as plain spaces, to read a text in a test. */
@@ -227,11 +230,14 @@ describe('Équipe › Factures : ce que la facture imprime (EQ-06 lot 4, audit d
       ...source,
       annex: {
         ...annex,
-        accounts: [{ ...first, currency: 'USD', grossMinor: 250_746, rateMicros: 923_456 }, second],
+        accounts: [
+          { ...first, currency: 'USD', grossMinor: 250_746, rateMicros: 923_456, rateOn: '2026-11-13' },
+          second,
+        ],
       },
     });
     expect(content.annex?.accounts.rows.map((row) => row.detail && plain(row.detail))).toEqual([
-      '2 507,46 $US convertis au cours BCE de 0,923456 €',
+      '2 507,46 $US convertis à 1 $US = 0,923456 € (cours BCE du 13 novembre 2026)',
       null,
     ]);
   });
@@ -264,6 +270,37 @@ describe('Équipe › Factures : ce que la facture imprime (EQ-06 lot 4, audit d
         sampleInvoice({ totals: { exclVatMinor: 93_000, vatMinor: 0, inclVatMinor: 93_000 } }),
       ),
     ).toThrow(/do not add up/u);
+  });
+
+  it('refuses a statement whose commissions are not the invoice’s, or a foreign rate without its day', () => {
+    const source = sampleInvoice();
+    const annex = source.annex;
+    if (annex === null) throw new Error('no annex');
+    const [first, second] = annex.accounts;
+    if (first === undefined || second === undefined) throw new Error('two accounts');
+    expect(() =>
+      invoicePdfContent({
+        ...source,
+        annex: { ...annex, accounts: [{ ...first, commissionMinor: 74_000 }, second] },
+      }),
+    ).toThrow(/does not give its commissions/u);
+    expect(() =>
+      invoicePdfContent({
+        ...source,
+        annex: {
+          ...annex,
+          accounts: [{ ...first, currency: 'USD', rateMicros: 923_456, rateOn: null }, second],
+        },
+      }),
+    ).toThrow(/has no day/u);
+  });
+
+  it('keeps the worst case consistent: its statement gives the commissions it invoices', () => {
+    const content = invoicePdfContent(worstCase());
+    const annex = content.annex;
+    if (annex === null) throw new Error('no annex');
+    const [commissions] = annex.elements.rows;
+    expect(plain(commissions?.[1]?.text ?? '')).toBe(plain(annex.accounts.total.at(-1)?.text ?? ''));
   });
 
   it('refuses mentions that are not the regime’s then the payment terms, never printing half of them', () => {
@@ -385,6 +422,41 @@ describe('Équipe › Factures : un prestataire français qui facture la TVA', (
       ['TVA', 'Non applicable', true],
       ['Net à payer', '100,00 €', false],
     ]);
+  });
+});
+
+describe('Équipe › Factures : les deux spécimens France (constats A4 et A8 de l’audit)', () => {
+  it('prints the franchise: « EI », the SIRET, no VAT number, « TVA non applicable, art. 293 B du CGI »', () => {
+    const content = invoicePdfContent(frenchFranchise());
+    expect(content.parties[0]).toMatchObject({
+      name: 'Basile Exemple EI',
+      ids: [{ label: 'SIRET', value: '123\u00a0456\u00a0789\u00a000011' }],
+    });
+    expect(content.vatNote.lead).toBe('TVA non applicable, art. 293 B du CGI');
+    expect(content.totals.map((one) => [one.label, plain(one.value)])).toEqual([
+      ['Total HT', '400,00 €'],
+      ['TVA', 'Non applicable'],
+      ['Net à payer', '400,00 €'],
+    ]);
+  });
+
+  it('prints the VAT a company charges: its SIREN and VAT number, the rate, the VAT and the total with it', () => {
+    const content = invoicePdfContent(frenchCharged());
+    expect(content.parties[0]).toEqual({
+      label: 'Prestataire (fournisseur)',
+      name: 'Chloé Exemple SARL',
+      lines: ['5 avenue Inventée', '13001 Marseille', 'France'],
+      ids: [
+        { label: 'SIREN', value: '987\u00a0654\u00a0321' },
+        { label: 'TVA intracommunautaire', value: 'FR45987654321' },
+      ],
+    });
+    expect(content.totals.map((one) => [plain(one.label), plain(one.value)])).toEqual([
+      ['Total HT', '450,00 €'],
+      ['TVA à 20 %', '90,00 €'],
+      ['Net à payer TTC', '540,00 €'],
+    ]);
+    expect(content.mentions).toBeNull();
   });
 });
 

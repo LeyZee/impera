@@ -113,13 +113,25 @@ async function annexOf(
       commissionStatementLines.vatBps,
       commissionStatementLines.platformFeeBps,
     );
+  const rules = CommissionStatementRulesSchema.parse(statement.rules);
+  /** The day of the rate a line was converted at: the statement's copy of it, never a rate read again. */
+  const rateOn = (currency: string, rateMicros: number): string | null => {
+    if (currency === 'EUR') return null;
+    const rate = rules.exchangeRates.find(
+      (one) => one.currency === currency && one.rateMicros === rateMicros,
+    );
+    if (rate === undefined)
+      throw new Error(`The statement ${statementId} does not hold its ${currency} rate`);
+    return rate.day;
+  };
   return {
     validatedOn: calendarDayAt(statement.validatedAt, timeZone),
-    commissionRateBps: CommissionStatementRulesSchema.parse(statement.rules).commissionRateBps,
+    commissionRateBps: rules.commissionRateBps,
     accounts: rows.map((row) => ({
       ...row,
       platform: PlatformSchema.parse(row.platform),
       currency: CurrencySchema.parse(row.currency),
+      rateOn: rateOn(row.currency, row.rateMicros),
     })),
   };
 }

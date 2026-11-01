@@ -109,6 +109,8 @@ export interface StatementAnnexSource {
     readonly currency: Currency;
     /** The ECB rate the gross was converted at, in millionths of a euro per unit (ADR 0033); 1 000 000 for euros. */
     readonly rateMicros: number;
+    /** The day of that rate, as the statement copied it; `null` for euros. */
+    readonly rateOn: string | null;
     readonly grossMinor: number;
     readonly grossEurMinor: number;
     readonly exclVatMinor: number;
@@ -246,6 +248,17 @@ const percent = (bps: number): string => PERCENT.format(bps / 10_000);
 
 function inCurrency(minor: number, currency: Currency): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(minor / 100);
+}
+
+/** « 1 $US = 0,923456 € (cours BCE du 14 novembre 2026) »: what one unit was worth, and on which day. */
+function rateWords(currency: Currency, rateMicros: number, rateOn: string | null): string {
+  if (rateOn === null) throw new Error(`The rate of ${currency} has no day`);
+  const one = new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(1);
+  return `${one} = ${RATE.format(rateMicros / 1_000_000)}\u00a0€ (cours BCE du ${longDay(rateOn)})`;
 }
 
 /** A postal address as written, one printed line per line of it. */
@@ -565,7 +578,7 @@ function annexContent(
     detail:
       account.currency === 'EUR'
         ? null
-        : `${inCurrency(account.grossMinor, account.currency)} convertis au cours BCE de ${RATE.format(account.rateMicros / 1_000_000)}\u00a0€`,
+        : `${inCurrency(account.grossMinor, account.currency)} convertis à ${rateWords(account.currency, account.rateMicros, account.rateOn)}`,
   }));
   const total = (pick: (account: StatementAnnexSource['accounts'][number]) => number): string =>
     pdfEuros(sum(annex.accounts.map(pick)));
@@ -575,8 +588,15 @@ function annexContent(
     left(ELEMENT_NAMES[kind]),
     right(pdfEuros(sum(source.lines.filter((line) => line.kind === kind).map((line) => line.amountMinor)))),
   ]);
+  // The annex explains the invoice, never another one: its commissions are the invoice's, its lines its total.
   if (sum(source.lines.map((line) => line.amountMinor)) !== source.totals.exclVatMinor) {
     throw new Error(`The lines of ${source.number} do not add up to its total`);
+  }
+  const commissions = source.lines
+    .filter((line) => line.kind === 'commission')
+    .map((line) => line.amountMinor);
+  if (sum(annex.accounts.map((account) => account.commissionMinor)) !== sum(commissions)) {
+    throw new Error(`The statement of ${source.number} does not give its commissions`);
   }
   return {
     ref: ['Annexe de la facture', source.number, `du ${longDay(source.issuedOn)}`],

@@ -46,6 +46,8 @@ const SIDE = 18 * MM;
 const TOP = 16 * MM;
 const FOOT = 9 * MM;
 const WIDTH = PAGE_WIDTH - 2 * SIDE;
+/** The annex's first column (the account) never narrower than this while a header can break instead. */
+const FIRST_COLUMN_MIN = 40 * MM;
 const RIGHT = PAGE_WIDTH - SIDE;
 
 const COLORS = {
@@ -73,12 +75,16 @@ interface Style {
 }
 
 const BODY: Style = { weight: 'regular', size: 8.6, color: COLORS.ink, lineHeight: 1.45 };
+/**
+ * Capitals spaced a little, never as much as a tenth of an em: beyond it, a reader that extracts the text (pdf.js,
+ * pdftotext, an accountant's OCR) reads each letter as a word (« D É S I G N A T I O N »).
+ */
 const LABEL: Style = {
   weight: 'semibold',
   size: 6.6,
   color: COLORS.muted,
   lineHeight: 1.45,
-  tracking: 0.12,
+  tracking: 0.06,
   upper: true,
 };
 const AMOUNT: Style = { ...BODY, weight: 'medium', figures: true };
@@ -387,7 +393,9 @@ class Layout {
       lineHeight: 1,
       tracking: -0.01,
     };
-    const badge: Style = { ...LABEL, color: COLORS.navy, tracking: 0.16 };
+    // « Autofacturation » is a mention the law asks for (art. 242 nonies A of annex II to the CGI): drawn without any
+    // spacing, so that every reader finds the word whole.
+    const badge: Style = { ...LABEL, color: COLORS.navy, tracking: 0 };
     const label: Style = { ...BODY, size: 8, color: COLORS.muted };
     const value = (strong: boolean): Style => ({ ...BODY, size: 8, weight: strong ? 'semibold' : 'medium' });
     const labelWidth = Math.max(...content.meta.map((row) => this.width(row.label, label)));
@@ -726,7 +734,8 @@ class Layout {
 
   /**
    * A table of the annex: the first column takes what the figures leave, each figure column the width of its widest
-   * cell or of its header's longest word, so that a header breaks between words and never a figure.
+   * cell or of its whole header. While the first column would be narrower than `FIRST_COLUMN_MIN`, the header that
+   * saves the most breaks between its words, never inside a figure.
    */
   private table(
     header: readonly PdfCell[],
@@ -737,13 +746,31 @@ class Layout {
     const strong: Style = { ...BODY, weight: 'semibold', figures: true };
     const figure: Style = { ...BODY, figures: true };
     const detail: Style = { ...BODY, size: 7.6, color: COLORS.muted };
-    const columns = header.map((cell, index) => {
-      if (index === 0) return 0;
-      const words = cell.text.split(/\s+/u).map((word) => this.width(word, LABEL));
+    const bounds = header.map((cell, index) => {
+      if (index === 0) return { whole: 0, broken: 0 };
       const cells = [...rows.map((row) => row.cells[index]?.text ?? ''), total[index]?.text ?? ''];
-      return Math.max(...words, ...cells.map((text) => this.width(text, strong))) + 1;
+      const figures = Math.max(...cells.map((text) => this.width(text, strong)));
+      const words = cell.text.split(/\s+/u).map((word) => this.width(word, LABEL));
+      return {
+        whole: Math.max(figures, this.width(cell.text, LABEL)) + 1,
+        broken: Math.max(figures, ...words) + 1,
+      };
     });
-    const firstWidth = WIDTH - columns.reduce((sum, width) => sum + (width === 0 ? 0 : width + 6 * MM), 0);
+    const columns = bounds.map((bound) => bound.whole);
+    const firstOf = (): number =>
+      WIDTH - columns.reduce((sum, width, index) => sum + (index === 0 ? 0 : width + 6 * MM), 0);
+    for (;;) {
+      if (firstOf() >= FIRST_COLUMN_MIN) break;
+      let widest = -1;
+      columns.forEach((width, index) => {
+        const saving = width - (bounds[index]?.broken ?? width);
+        const best = widest === -1 ? 0 : (columns[widest] ?? 0) - (bounds[widest]?.broken ?? 0);
+        if (saving > 0 && saving > best) widest = index;
+      });
+      if (widest === -1) break;
+      columns[widest] = bounds[widest]?.broken ?? 0;
+    }
+    const firstWidth = firstOf();
     const widths = columns.map((width, index) => (index === 0 ? firstWidth : width));
     const xOf = (index: number): number =>
       SIDE +
@@ -763,10 +790,11 @@ class Layout {
       this.rule(this.y, COLORS.ink, 0.8);
       this.y += 0.8;
     };
+    const cellsHeight = (cells: readonly PdfCell[], style: Style): number =>
+      Math.max(...cells.map((cell, index) => this.height(cell.text, style, widths[index] ?? 0)));
+    // A row's detail (a conversion) runs under the whole row: in the first column alone, it would break word by word.
     const rowHeight = (cells: readonly PdfCell[], below: string | null, style: Style): number =>
-      4 * MM +
-      Math.max(...cells.map((cell, index) => this.height(cell.text, style, widths[index] ?? 0))) +
-      (below === null ? 0 : this.height(below, detail, widths[0] ?? 0));
+      4 * MM + cellsHeight(cells, style) + (below === null ? 0 : this.height(below, detail, WIDTH));
     const drawRow = (cells: readonly PdfCell[], below: string | null, style: Style): number => {
       const top = this.y + 2 * MM;
       cells.forEach((cell, index) => {
@@ -774,11 +802,7 @@ class Layout {
         if (cell.align === 'right') this.line(cell.text, xOf(index) + width, top, style);
         else this.text(cell.text, xOf(index), top, width, { ...style, figures: false });
       });
-      if (below !== null) {
-        const first = cells[0];
-        const above = first === undefined ? 0 : this.height(first.text, style, widths[0] ?? 0);
-        this.text(below, SIDE, top + above, widths[0] ?? 0, detail);
-      }
+      if (below !== null) this.text(below, SIDE, top + cellsHeight(cells, style), WIDTH, detail);
       return rowHeight(cells, below, style);
     };
     this.y += 5 * MM;
@@ -826,7 +850,7 @@ class Layout {
           size: 6.5,
           color: COLORS.red,
           lineHeight: 1.45,
-          tracking: 0.18,
+          tracking: 0.06,
           upper: true,
         };
         this.text(this.specimen, SIDE, 6 * MM, WIDTH, style, 'center');

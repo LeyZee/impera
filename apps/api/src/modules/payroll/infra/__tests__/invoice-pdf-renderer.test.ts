@@ -4,6 +4,8 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  frenchCharged,
+  frenchFranchise,
   REGIME_MENTIONS,
   sampleCreditNote,
   sampleInvoice,
@@ -23,16 +25,22 @@ const ISSUED_AT = new Date('2026-11-17T08:12:00.000Z');
 const squeeze = (text: string): string => text.replace(/\s+/gu, '').toLocaleLowerCase('fr');
 
 /** The text of each page, as a reader extracts it (pdf.js): the fonts' ToUnicode maps must give the words back. */
-async function pagesOf(bytes: Uint8Array): Promise<string[]> {
+async function itemsOf(bytes: Uint8Array): Promise<string[][]> {
   const task = getDocument({ data: Uint8Array.from(bytes), useSystemFonts: false });
   const pdf = await task.promise;
-  const pages: string[] = [];
+  const pages: string[][] = [];
   for (let number = 1; number <= pdf.numPages; number += 1) {
     const text = await (await pdf.getPage(number)).getTextContent();
-    pages.push(text.items.map((item) => ('str' in item ? item.str : '')).join(' '));
+    pages.push(
+      text.items.map((item) => ('str' in item ? item.str : '')).filter((item) => item.trim() !== ''),
+    );
   }
   await task.destroy();
   return pages;
+}
+
+async function pagesOf(bytes: Uint8Array): Promise<string[]> {
+  return (await itemsOf(bytes)).map((items) => items.join(' '));
 }
 
 const ascii = (bytes: Uint8Array): string => Buffer.from(bytes).toString('latin1');
@@ -105,6 +113,52 @@ describe('Équipe › Factures : le PDF rendu (EQ-06 lot 4, ADR 0037 § 2)', () 
       'Page 2/2',
     ]) {
       expect(annex, word).toContain(squeeze(word));
+    }
+  });
+
+  it('prints each label as whole words a machine finds, never letter by letter', async () => {
+    const pages = await itemsOf(await render(invoicePdfContent(sampleInvoice())));
+    const [first = [], annex = []] = pages;
+    // « Autofacturation » is a mention the law asks for: found whole, as a word, by any reader.
+    for (const label of [
+      'AUTOFACTURATION',
+      'PRESTATAIRE (FOURNISSEUR)',
+      'CLIENT (PRENEUR)',
+      'DÉSIGNATION',
+      'MONTANT HT',
+      'CONDITIONS DE PAIEMENT',
+      'ACCEPTATION',
+      'MENTIONS DU RÉGIME',
+    ]) {
+      expect(first, label).toContain(label);
+    }
+    // A header that fits stays on one line.
+    for (const label of [
+      'VENTES BRUTES',
+      'COMMISSION PLATEFORME',
+      'MONTANT FACTURÉ (FACTURE AEX-2026-0021)',
+    ]) {
+      expect(
+        annex.map((item) => item.toLocaleUpperCase('fr')),
+        label,
+      ).toContain(label);
+    }
+  });
+
+  it('renders the two French cases: the franchise and the VAT a company charges', async () => {
+    for (const source of [frenchFranchise(), frenchCharged()]) {
+      const content = invoicePdfContent(source);
+      const pages = await pagesOf(await render(content));
+      expect(pages).toHaveLength(2);
+      const [first = ''] = pages.map(squeeze);
+      for (const word of [
+        content.parties[0].name,
+        ...content.parties[0].ids.map((id) => `${id.label} : ${id.value}`),
+        content.vatNote.lead,
+        ...content.totals.flatMap((one) => [one.label, one.value]),
+      ]) {
+        expect(first, word).toContain(squeeze(word));
+      }
     }
   });
 
