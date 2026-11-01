@@ -9,6 +9,7 @@ import type {
 import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { createPayrollBillingSettings } from './application/billing-settings';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
@@ -33,6 +34,7 @@ import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
 import type { InvoiceObjectStore, InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
+import { createDrizzlePayrollBillingSettingsStore } from './infra/billing-settings-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
 import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
@@ -41,6 +43,7 @@ import { createDrizzlePayrollInvoicePdfStore } from './infra/invoice-pdf-store';
 import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
 import { createDrizzlePayrollJobStore } from './infra/job-store';
 import { createLatestRateRead } from './infra/latest-rate';
+import { readPng } from './infra/png';
 import { createPostgresRateAlerts } from './infra/rate-alerts';
 import { createDrizzlePayrollRateStore } from './infra/rate-store';
 import { createDrizzlePayrollReadStore } from './infra/read-store';
@@ -197,6 +200,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         rules,
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
         createPayrollInvoiceAcceptance(acceptanceStore),
+        createPayrollBillingSettings(createDrizzlePayrollBillingSettingsStore(deps.db, now), readPng),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),

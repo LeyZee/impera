@@ -143,7 +143,11 @@ export const billingSettings = pgTable(
     serviceDescription: text('service_description'),
     /** The logo each document prints in its head, `null` for none. */
     logoSha256: text('logo_sha256').references(() => agencyLogos.sha256),
-    accounts: jsonb('accounts').notNull(),
+    /**
+     * The purchase journal's accounts, as the accountant gives them; `null` until then. Only the accounting export
+     * reads them (EQ-06 lot 7), which never leaves without them: an invoice is issued without.
+     */
+    accounts: jsonb('accounts'),
     updatedBy: text('updated_by')
       .notNull()
       .references(() => user.id),
@@ -153,7 +157,7 @@ export const billingSettings = pgTable(
     check('billing_settings_single_check', sql`${t.id} = 1`),
     check(
       'billing_settings_json_check',
-      sql`jsonb_typeof(${t.agency}) = 'object' and jsonb_typeof(${t.accounts}) = 'object'`,
+      sql`jsonb_typeof(${t.agency}) = 'object' and (${t.accounts} is null or jsonb_typeof(${t.accounts}) = 'object')`,
     ),
     check('billing_settings_payment_terms_check', textBetween(t.paymentTerms, PAYMENT_TERMS_MAX)),
     check(

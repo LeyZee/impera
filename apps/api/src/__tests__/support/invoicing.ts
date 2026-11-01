@@ -51,14 +51,14 @@ export interface Invoicing {
 /**
  * What an issue needs before the first invoice (EQ-06): the agency's settings and logo, one validated regime, the
  * billing mandate (seven days to contest), and each contractor's regime and profile. No mandate is accepted here.
+ * Without `logo`, neither the logo nor the settings are written: the test saves them through Réglages › Facturation.
  */
 export async function setUpInvoicing(
   team: PayrollTeam,
-  logo: Logo,
+  logo: Logo | null,
   contractors: readonly Contractor[],
 ): Promise<Invoicing> {
   const admin = team.test.admin.db;
-  const logoSha256 = createHash('sha256').update(logo.bytes).digest('hex');
   const regimeId = newId(BillingRegimeIdSchema);
   const mandate = {
     id: newId(ContractTextIdSchema),
@@ -67,23 +67,26 @@ export async function setUpInvoicing(
     body: 'Mandat de facturation (texte inventé pour le test). Délai de contestation : sept jours.',
     contestDelayDays: 7,
   };
-  await admin.insert(schema.agencyLogos).values({
-    sha256: logoSha256,
-    mediaType: logo.mediaType,
-    bytes: Buffer.from(logo.bytes),
-    createdBy: team.ownerId,
-  });
-  await admin.insert(schema.billingSettings).values({
-    id: 1,
-    agency: AGENCY,
-    paymentTerms: TERMS,
-    dueDays: 60,
-    serviceDescription: SERVICE,
-    logoSha256,
-    documentReminderDays: 30,
-    accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
-    updatedBy: team.ownerId,
-  });
+  if (logo !== null) {
+    const logoSha256 = createHash('sha256').update(logo.bytes).digest('hex');
+    await admin.insert(schema.agencyLogos).values({
+      sha256: logoSha256,
+      mediaType: logo.mediaType,
+      bytes: Buffer.from(logo.bytes),
+      createdBy: team.ownerId,
+    });
+    await admin.insert(schema.billingSettings).values({
+      id: 1,
+      agency: AGENCY,
+      paymentTerms: TERMS,
+      dueDays: 60,
+      serviceDescription: SERVICE,
+      logoSha256,
+      documentReminderDays: 30,
+      accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
+      updatedBy: team.ownerId,
+    });
+  }
   await admin.insert(schema.billingRegimes).values({
     id: regimeId,
     name: 'France, TVA facturée',

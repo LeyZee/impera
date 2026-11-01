@@ -1,5 +1,7 @@
 import type {
+  AgencyLogo,
   AgencyLogoMediaType,
+  BillingSettingsView,
   Bonus,
   BonusId,
   BonusTierSet,
@@ -36,10 +38,12 @@ import type {
   PenaltyId,
   TeamMemberId,
   TeamScope,
+  UpdateBillingSettingsBody,
   UpdatePayrollSettingsBody,
   UserId,
 } from '@nirvana/contracts';
 
+import type { PngSize } from './agency-logo';
 import type { IssueWarning } from './billing';
 import type { InvoicePdfContent, PdfDocumentSource } from './invoice-pdf';
 import type { DocumentNotIssued, InvoicingFacts, InvoicingPlan } from './invoicing';
@@ -440,4 +444,18 @@ export interface PayrollInvoiceAcceptanceStore {
     readonly unanswered: readonly InvoiceId[];
     readonly unannounced: readonly InvoiceId[];
   }>;
+}
+
+/**
+ * Réglages › Facturation (EQ-06), the owner's alone: what each invoice issued from now on copies, and the logos, each
+ * kept by its fingerprint and never changed (an invoice names the one it printed, ADR 0037 § 2).
+ */
+export interface PayrollBillingSettingsStore {
+  read(userId: UserId): Promise<BillingSettingsView>;
+  /** Saves the settings (the same values again write nothing); the logo named must have been added. */
+  update(actor: Actor, body: UpdateBillingSettingsBody): Promise<BillingSettingsView>;
+  /** Keeps a logo already checked (`agencyLogoVerdict`); the same bytes again give back the same logo. */
+  addLogo(actor: Actor, bytes: Uint8Array, size: PngSize): Promise<{ logo: AgencyLogo; created: boolean }>;
+  /** A logo's bytes for its owner's screen, `null` when none has this fingerprint. */
+  logoBytes(userId: UserId, sha256: string): Promise<Uint8Array | null>;
 }

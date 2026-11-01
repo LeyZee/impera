@@ -318,7 +318,8 @@ Mêmes portées que la paie (migration 0041, ADR 0023 § Données et RLS) : un m
 billing_settings           id = 1, agency (jsonb : raison sociale, adresse, SIREN, TVA, et depuis 0045 forme juridique,
                            capital, ville du RCS), payment_terms (texte de 1 à 360 caractères imprimé après l'échéance :
                            escompte, pénalités, indemnité ; 0042), due_days (de 45 à 60, ADR 0038, 0043),
-                           document_reminder_days, accounts (jsonb : comptes du journal des achats),
+                           document_reminder_days, accounts (jsonb : comptes du journal des achats, null tant que
+                           le comptable ne les a pas donnés, 0048),
                            fiscal_year_end_month (1 à 12, 12 par défaut : fin du verrou des PDF, 0045),
                            service_description (désignation de la prestation, 1 à 400 caractères ; sans elle rien
                            n'est émis, 0045), logo_sha256 (→ agency_logos, 0045), updated_by, updated_at (propriétaire)

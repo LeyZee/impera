@@ -43,6 +43,7 @@ export const SCANNED_EVENT_TYPES = [
   'invoice_not_issued',
   'invoice_pdf_conflict',
   'invoice_pdf_missing',
+  'invoice_contested',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -383,6 +384,16 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
           signal.place === 'primary'
             ? `Le document ${signal.number} n’a toujours pas de PDF après plusieurs essais : il reste émis, mais ne se télécharge pas encore. À vérifier.`
             : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`,
+        link: PAY_LINK,
+      };
+    // Important, not urgent: only the owner settles a contest, upheld or refused (ADR 0039); the reason is read in Nirvana.
+    case 'invoice_contested':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: `${signal.document === 'invoice' ? `La facture ${signal.number} est contestée` : `L’avoir ${signal.number} est contesté`} par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.`,
         link: PAY_LINK,
       };
     case 'automatic_closed': {
