@@ -8,7 +8,15 @@ import {
   type TeamRole,
 } from '@nirvana/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { z } from 'zod';
 
@@ -145,15 +153,16 @@ export function AddMemberPanel({
     if (!busy) onClose(created?.member ?? null);
   };
 
-  // Each step on its first field; once added, on « Copier le message », the gesture expected next (EQ-12).
-  useEffect(() => {
+  // Each step on its first field; once added, on « Copier le message », the gesture expected next (EQ-12). Set in
+  // the commit that shows the step, before it is painted: never a frame with the focus elsewhere, and never late.
+  useLayoutEffect(() => {
     dialog.current
       ?.querySelector<HTMLElement>(created === null ? 'input, select' : 'button.tm-primary')
       ?.focus();
   }, [step, created]);
 
-  // A step that cannot go on puts the focus on its first problem.
-  useEffect(() => {
+  // A step that cannot go on puts the focus on its first problem, in the same commit.
+  useLayoutEffect(() => {
     dialog.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [shown]);
 
