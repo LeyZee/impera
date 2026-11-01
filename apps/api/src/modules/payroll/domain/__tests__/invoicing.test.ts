@@ -58,8 +58,8 @@ const source = (patch: Partial<InvoiceSource> = {}): InvoiceSource => ({
     totalMinor: 30_555,
   },
   accounts: new Map([
-    ['acc-reveal', { handle: 'noravidal', platform: 'Reveal' }],
-    ['acc-desirely', { handle: 'nora.v', platform: 'Desirely' }],
+    ['acc-reveal', { handle: 'noravidal', platform: 'reveal' }],
+    ['acc-desirely', { handle: 'nora.v', platform: 'onlyfans' }],
   ]),
   bonuses: [{ amountMinor: 2_000, reason: 'Nuit du samedi tenue seule' }],
   penalties: [
@@ -105,7 +105,7 @@ const firstHalf = (patch: Partial<StoredInvoice> = {}): StoredInvoice => ({
   lines: [
     {
       kind: 'commission',
-      label: 'Commission, compte noravidal sur Reveal',
+      label: 'Commission, compte @noravidal sur Reveal',
       detail: '20 % de 1 000,00 € de net',
       amountMinor: 20_000,
     },
@@ -116,6 +116,7 @@ const firstHalf = (patch: Partial<StoredInvoice> = {}): StoredInvoice => ({
 /** The agency's payment terms, invented: its words, never the code's. */
 const TERMS =
   'Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement.';
+const SERVICE = 'Prestations de chatting pour le compte des créatrices de l’agence';
 const ISSUED_AT = new Date('2026-11-02T09:30:00.000Z');
 
 const facts = (patch: Partial<InvoicingFacts> = {}): InvoicingFacts => ({
@@ -126,7 +127,15 @@ const facts = (patch: Partial<InvoicingFacts> = {}): InvoicingFacts => ({
   mandate: { acceptedVersion: 1, currentVersion: 1, contestDelayDays: 15 },
   assignments: [{ regimeId: ABROAD.id, from: '2026-10-01' }],
   regimes: [ABROAD, FRANCHISE],
-  identity: { legalName: 'Nora Vidal', address: '12 rue des Lilas, Cotonou', country: 'BJ', taxId: null },
+  identity: {
+    legalName: 'Nora Vidal',
+    address: '12 rue des Lilas, Cotonou',
+    country: 'BJ',
+    taxId: null,
+    businessId: null,
+    vatNumber: null,
+    individualEntrepreneur: false,
+  },
   prefix: 'NORA',
   documents: [{ kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null }],
   settings: {
@@ -138,6 +147,8 @@ const facts = (patch: Partial<InvoicingFacts> = {}): InvoicingFacts => ({
     },
     paymentTerms: TERMS,
     dueDays: 60,
+    serviceDescription: SERVICE,
+    logoSha256: null,
   },
   invoices: [firstHalf()],
   issuedKeys: new Set(),
@@ -167,6 +178,8 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
       agency: facts().settings?.agency,
       regime: ABROAD,
       mentions: [...ABROAD.mentions, paymentTermsMention('2027-01-01', TERMS)],
+      serviceDescription: SERVICE,
+      logoSha256: null,
       lines,
       totals: invoiceTotals(lines, ABROAD.vat),
       acceptanceDeadline: new Date('2026-11-17T09:30:00.000Z'),
@@ -184,6 +197,9 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
         'Autoliquidation',
       ],
       totals: { exclVatMinor: -3_000, vatMinor: 0, inclVatMinor: -3_000, selfAssessedVatMinor: -600 },
+      // The service is an invoice's designation; a credit note cites its invoice instead.
+      serviceDescription: null,
+      logoSha256: null,
     });
     expect(note?.lines).toEqual([
       expect.objectContaining({ kind: 'adjustment', label: 'Régularisation', amountMinor: -3_000 }),
@@ -219,6 +235,9 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
           address: '3 rue Neuve, 69001 Lyon',
           country: 'FR',
           taxId: '12345678900011',
+          businessId: '12345678900011',
+          vatNumber: null,
+          individualEntrepreneur: true,
         },
         documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-10-01', validUntil: null }],
       }),

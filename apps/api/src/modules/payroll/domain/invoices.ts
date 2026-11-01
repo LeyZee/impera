@@ -1,8 +1,10 @@
 import {
   INVOICE_PREFIX_PATTERN,
+  PLATFORM_NAMES,
   payPeriodLastDay,
   type InvoiceLineKind,
   type PayPeriod,
+  type Platform,
   type RegimeVat,
 } from '@nirvana/contracts';
 
@@ -59,7 +61,7 @@ export interface InvoiceSource {
   readonly period: PayPeriod;
   readonly statement: StatementForInvoice;
   /** The accounts of the statement's lines: a platform and a handle, never a fan. */
-  readonly accounts: ReadonlyMap<string, { readonly handle: string; readonly platform: string }>;
+  readonly accounts: ReadonlyMap<string, { readonly handle: string; readonly platform: Platform }>;
   readonly bonuses: readonly { readonly amountMinor: number; readonly reason: string }[];
   readonly penalties: readonly PenaltyForInvoice[];
   readonly adjustments: readonly {
@@ -163,7 +165,7 @@ export function invoiceLines(source: InvoiceSource): InvoiceLine[] {
     if (account === undefined) throw new RangeError(`Account ${line.platformAccountId} has no name`);
     return {
       kind: 'commission',
-      label: `Commission, compte ${account.handle} sur ${account.platform}`,
+      label: `Commission, compte @${account.handle} sur ${PLATFORM_NAMES[account.platform]}`,
       detail: `${percent(statement.commissionRateBps)} de ${euros(line.netMinor)} de net`,
       amountMinor: line.commissionMinor,
     };

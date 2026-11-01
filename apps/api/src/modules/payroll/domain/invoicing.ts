@@ -72,12 +72,19 @@ export interface InvoicingFacts {
   readonly identity: ContractorIdentity | null;
   readonly prefix: string | null;
   readonly documents: readonly ContractorDocument[];
-  /** The agency's billing settings, `null` before the owner writes them. */
+  /**
+   * The agency's billing settings, `null` before the owner writes them, or while they lack the designation of the
+   * service (`agency_missing`: an invoice without it would not say what it bills).
+   */
   readonly settings: {
     readonly agency: InvoiceAgency;
     /** What an invoice prints after its due date, the agency's words (a setting, never the code's). */
     readonly paymentTerms: string;
     readonly dueDays: number;
+    /** What each invoice designates above its lines, the agency's words. */
+    readonly serviceDescription: string;
+    /** The logo each document prints, by its fingerprint; `null` for none. */
+    readonly logoSha256: string | null;
   } | null;
   /** The contractor's issued invoices (never his credit notes), what their credit notes took off counted. */
   readonly invoices: readonly StoredInvoice[];
@@ -99,6 +106,9 @@ export interface DocumentToIssue {
   readonly agency: InvoiceAgency;
   readonly regime: InvoiceRegime;
   readonly mentions: readonly string[];
+  /** An invoice's designation of the service; `null` on a credit note, which cites its invoice. */
+  readonly serviceDescription: string | null;
+  readonly logoSha256: string | null;
   readonly lines: readonly InvoiceLine[];
   readonly totals: InvoiceTotals;
   readonly acceptanceDeadline: Date;
@@ -183,6 +193,8 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
         agency: settings.agency,
         regime,
         mentions: [...regime.mentions, paymentTermsMention(dueOn, settings.paymentTerms)],
+        serviceDescription: settings.serviceDescription,
+        logoSha256: settings.logoSha256,
         lines,
         totals: invoiceTotals(lines, regime.vat),
         acceptanceDeadline: until,
@@ -245,6 +257,8 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
       // The mentions of the regime it keeps, never the invoice's payment terms: a credit note is set off against a
       // payout, nothing falls due on it.
       mentions: [creditNoteMention(cited.number, cited.issuedOn), ...cited.regime.mentions],
+      serviceDescription: null,
+      logoSha256: settings.logoSha256,
       lines: noteLines,
       totals: invoiceTotals(noteLines, cited.regime.vat),
       acceptanceDeadline: until,

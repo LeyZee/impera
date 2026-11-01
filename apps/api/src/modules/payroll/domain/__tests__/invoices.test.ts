@@ -48,8 +48,8 @@ const source = (patch: Partial<InvoiceSource> = {}): InvoiceSource => ({
     totalMinor: 30_555,
   },
   accounts: new Map([
-    ['acc-reveal', { handle: 'noravidal', platform: 'Reveal' }],
-    ['acc-desirely', { handle: 'nora.v', platform: 'Desirely' }],
+    ['acc-reveal', { handle: 'noravidal', platform: 'reveal' }],
+    ['acc-desirely', { handle: 'nora.v', platform: 'onlyfans' }],
   ]),
   bonuses: [{ amountMinor: 2_000, reason: 'Nuit du samedi tenue seule ' }],
   penalties: [
@@ -80,13 +80,13 @@ describe('the lines of a statement’s invoice (EQ-06)', () => {
     expect(lines.map((line) => ({ ...line, detail: plain(line.detail) }))).toEqual([
       {
         kind: 'commission',
-        label: 'Commission, compte noravidal sur Reveal',
+        label: 'Commission, compte @noravidal sur Reveal',
         detail: '20 % de 1 200,00 € de net',
         amountMinor: 24_000,
       },
       {
         kind: 'commission',
-        label: 'Commission, compte nora.v sur Desirely',
+        label: 'Commission, compte @nora.v sur OnlyFans',
         detail: '20 % de 450,50 € de net',
         amountMinor: 9_010,
       },
@@ -287,7 +287,7 @@ describe('a credit note (EQ-06)', () => {
     expect(total(credit)).toBe(-32_321);
     expect(credit[0]).toEqual({
       ...lines[0],
-      label: 'Annulation\u00a0: Commission, compte noravidal sur Reveal',
+      label: 'Annulation\u00a0: Commission, compte @noravidal sur Reveal',
       amountMinor: -24_000,
     });
     expect(credit[4]?.amountMinor).toBe(1_500);

@@ -35,7 +35,15 @@ const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
   mandate: { acceptedVersion: 1, currentVersion: 1 },
   assignments: [{ regimeId: 'abroad', from: '2026-10-01' }],
   regimes: [ABROAD, FRANCHISE],
-  identity: { legalName: 'Théo Martin', address: '12 rue des Lilas, Cotonou', country: 'BJ', taxId: null },
+  identity: {
+    legalName: 'Théo Martin',
+    address: '12 rue des Lilas, Cotonou',
+    country: 'BJ',
+    taxId: null,
+    businessId: null,
+    vatNumber: null,
+    individualEntrepreneur: false,
+  },
   prefix: 'THEO',
   agency: {
     legalName: 'Agence Exemple SAS',
@@ -131,24 +139,64 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     expect(issueDecision(facts({ identity: null }))).toMatchObject({ reason: 'identity_incomplete' });
     expect(
       issueDecision(
-        facts({ identity: { legalName: 'Théo Martin', address: '  ', country: 'BJ', taxId: null } }),
-      ),
-    ).toMatchObject({ reason: 'identity_incomplete' });
-    // In France, the SIREN is a mention: without it, no invoice.
-    expect(
-      issueDecision(
         facts({
-          assignments: [{ regimeId: 'franchise', from: '2026-10-01' }],
           identity: {
-            legalName: 'Basile Roux EI',
-            address: '3 place Bellecour, Lyon',
-            country: 'FR',
+            legalName: 'Théo Martin',
+            address: '  ',
+            country: 'BJ',
             taxId: null,
+            businessId: null,
+            vatNumber: null,
+            individualEntrepreneur: false,
           },
-          documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null }],
         }),
       ),
     ).toMatchObject({ reason: 'identity_incomplete' });
+    // In France, the SIREN or SIRET is a mention (art. 242 nonies A, annexe II CGI): without it, no invoice.
+    const french = (patch: Partial<NonNullable<IssueFacts['identity']>>): IssueFacts =>
+      facts({
+        assignments: [{ regimeId: 'franchise', from: '2026-10-01' }],
+        identity: {
+          legalName: 'Basile Roux',
+          address: '3 place Bellecour, Lyon',
+          country: 'FR',
+          taxId: '12345678900011',
+          businessId: null,
+          vatNumber: null,
+          individualEntrepreneur: true,
+          ...patch,
+        },
+        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null }],
+      });
+    expect(issueDecision(french({}))).toMatchObject({ reason: 'identity_incomplete' });
+    expect(issueDecision(french({ businessId: '  ' }))).toMatchObject({ reason: 'identity_incomplete' });
+    expect(issueDecision(french({ businessId: '12345678900011' }))).toMatchObject({ kind: 'issue' });
+  });
+
+  it('asks the VAT number of a contractor who charges VAT, and no SIREN of one established abroad', () => {
+    const charged: BillingRegime = {
+      ...ABROAD,
+      id: 'charged',
+      vat: { treatment: 'charged', rateBps: 2000 },
+    };
+    const french = (vatNumber: string | null): IssueFacts =>
+      facts({
+        assignments: [{ regimeId: 'charged', from: '2026-10-01' }],
+        regimes: [charged],
+        identity: {
+          legalName: 'Basile Roux',
+          address: '3 place Bellecour, Lyon',
+          country: 'FR',
+          taxId: null,
+          businessId: '12345678900011',
+          vatNumber,
+          individualEntrepreneur: false,
+        },
+      });
+    expect(issueDecision(french(null))).toMatchObject({ reason: 'identity_incomplete' });
+    expect(issueDecision(french('FR12123456789'))).toMatchObject({ kind: 'issue' });
+    // Abroad, no SIREN exists: the regime's own tax identifier is what it asks.
+    expect(issueDecision(facts())).toMatchObject({ kind: 'issue' });
   });
 
   it('issues nothing without the contractor’s prefix or the agency’s identity, both the owner’s settings', () => {

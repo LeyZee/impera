@@ -291,3 +291,45 @@ export class CollectiveGoalLate extends DomainError {
     });
   }
 }
+
+/** The document does not exist, or is not the reader's to read (the invoice's policy). */
+export class InvoiceNotFound extends DomainError {
+  constructor() {
+    super('invoice_not_found', 'Facture introuvable');
+  }
+}
+
+/** The document's PDF is not rendered yet (ADR 0037 § 5): the screen says « PDF en préparation ». */
+export class InvoicePdfNotFound extends DomainError {
+  constructor() {
+    super('invoice_pdf_not_found', 'PDF en préparation, réessaie dans quelques minutes');
+  }
+}
+
+/**
+ * Neither bucket gave the PDF with its fingerprint (ADR 0037 § 7): both unreachable, or the copy missing too. An
+ * altered file is never served; the owner is alerted of a wrong one.
+ */
+export class InvoicePdfUnavailable extends DomainError {
+  constructor() {
+    super('invoice_pdf_unavailable', 'Le PDF est momentanément indisponible, réessaie dans un instant');
+  }
+}
+
+/** A bucket did not answer, or answered an error: a passing failure, never a wrong file (ADR 0037 § 7). */
+export class InvoiceStorageUnavailable extends Error {
+  constructor(message: string, options?: { readonly cause?: unknown }) {
+    super(message, options);
+    this.name = 'InvoiceStorageUnavailable';
+  }
+}
+
+/** A character the PDF would print that its font has no glyph for: the PDF is not rendered (ADR 0037 § 2). */
+export class InvoicePdfGlyphMissing extends Error {
+  constructor(readonly codePoints: readonly number[]) {
+    super(
+      `The invoice font has no glyph for ${codePoints.map((one) => `U+${one.toString(16).toUpperCase().padStart(4, '0')}`).join(', ')}`,
+    );
+    this.name = 'InvoicePdfGlyphMissing';
+  }
+}

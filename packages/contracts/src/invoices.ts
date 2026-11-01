@@ -156,6 +156,21 @@ export const INVOICE_DOCUMENT_MENTIONS_MAX = INVOICE_MENTIONS_MAX + 1;
  * the longest date take 30 characters of its 400).
  */
 export const PAYMENT_TERMS_MAX = 360;
+/**
+ * What the agency sells, as each invoice designates it above its lines (art. 242 nonies A of annex II to the CGI: « la
+ * dénomination précise des services rendus »): a setting its accountant validates, copied into each invoice.
+ */
+export const SERVICE_DESCRIPTION_MAX = 400;
+/** The agency's legal form as its documents print it (« SAS »), and the town of its trade register (R123-237). */
+export const AGENCY_LEGAL_FORM_MAX = 40;
+export const RCS_CITY_MAX = 60;
+/**
+ * The agency's logo, a setting kept by its fingerprint (EQ-06 lot 4): a PNG of at most 512 KB, transparent so that it
+ * sits on the white page. Neither a JPEG (no transparency, CMYK breaks PDF/A) nor an SVG (PDFKit draws none, and an
+ * extra library would put PDF/A in doubt).
+ */
+export const AGENCY_LOGO_MEDIA_TYPES = ['image/png'] as const;
+export const AGENCY_LOGO_MAX_BYTES = 512 * 1024;
 export const INVOICE_LINE_LABEL_MAX = 200;
 export const INVOICE_LINE_DETAIL_MAX = 400;
 export const INVOICE_REASON_MAX = 500;
@@ -173,6 +188,25 @@ export const CONTEST_DELAY_MAX_DAYS = 60;
 export const DEFAULT_INVOICE_DUE_DAYS = 60;
 export const INVOICE_DUE_MIN_DAYS = 45;
 export const INVOICE_DUE_MAX_DAYS = 60;
+/**
+ * The month the agency's fiscal year closes, on its last day (a setting its accountant confirms): the calendar year by
+ * default. It fixes how long each invoice's PDF stays locked (ADR 0037 § 4).
+ */
+export const DEFAULT_FISCAL_YEAR_END_MONTH = 12;
+/** An invoice is kept ten years after the close of its fiscal year (art. L123-22 of the Code de commerce). */
+export const INVOICE_RETENTION_YEARS = 10;
+/**
+ * Where the second copy of each PDF is kept, at a provider that shares nothing with the first bucket's (ADR 0037 § 6).
+ * One row per copy in `invoice_pdf_copies`: a third provider, one day, is one more value here.
+ */
+export const INVOICE_PDF_COPY_PROVIDERS = ['ovhcloud'] as const;
+export const InvoicePdfCopyProviderSchema = z.enum(INVOICE_PDF_COPY_PROVIDERS);
+export type InvoicePdfCopyProvider = z.infer<typeof InvoicePdfCopyProviderSchema>;
+/** Where a PDF was found missing or different: the first bucket (Hetzner) or a copy (ADR 0037 § 5 to 7). */
+export const INVOICE_PDF_PLACES = ['primary', ...INVOICE_PDF_COPY_PROVIDERS] as const;
+export const InvoicePdfPlaceSchema = z.enum(INVOICE_PDF_PLACES);
+export type InvoicePdfPlace = z.infer<typeof InvoicePdfPlaceSchema>;
+
 /** How long before a document's end the reminder goes out (a setting). */
 export const DEFAULT_DOCUMENT_REMINDER_DAYS = 30;
 export const DOCUMENT_REMINDER_MAX_DAYS = 120;
@@ -188,6 +222,24 @@ export const InvoiceMentionSchema = trimmed(INVOICE_MENTION_MAX);
  * at the least), the 40 € indemnity (art. L441-9, L441-10 and D441-5 of the Code de commerce).
  */
 export const PaymentTermsSchema = trimmed(PAYMENT_TERMS_MAX);
+
+/** The designation of the service each invoice prints above its lines (`SERVICE_DESCRIPTION_MAX`). */
+export const ServiceDescriptionSchema = trimmed(SERVICE_DESCRIPTION_MAX);
+
+/** A French company's SIREN (nine digits) or the SIRET of one of its establishments (fourteen). */
+export const BUSINESS_ID_PATTERN = '^([0-9]{9}|[0-9]{14})$';
+export const BusinessIdSchema = z
+  .string()
+  .regex(new RegExp(BUSINESS_ID_PATTERN, 'u'), 'Un SIREN (9 chiffres) ou un SIRET (14 chiffres)');
+
+/** An intra-community VAT number: the country's two letters, then two to thirteen digits or capitals. */
+export const VAT_NUMBER_PATTERN = '^[A-Z]{2}[0-9A-Z]{2,13}$';
+export const VatNumberSchema = z
+  .string()
+  .regex(new RegExp(VAT_NUMBER_PATTERN, 'u'), 'Un numéro de TVA intracommunautaire');
+
+export const AgencyLogoMediaTypeSchema = z.enum(AGENCY_LOGO_MEDIA_TYPES);
+export type AgencyLogoMediaType = z.infer<typeof AgencyLogoMediaTypeSchema>;
 
 /**
  * A billing regime, as the owner sets it and the accountant validates it, for one or more countries (Benin and
@@ -218,21 +270,36 @@ export const ContractorRegimeSchema = z.object({
 });
 export type ContractorRegime = z.infer<typeof ContractorRegimeSchema>;
 
-/** The contractor as his invoice prints him, copied at the issue. */
+/**
+ * The contractor as his invoice prints him, copied at the issue. A contractor established in France adds his SIREN or
+ * SIRET, his VAT number when he charges VAT, and « EI » after his name when he is an individual entrepreneur (art.
+ * L526-22 and R526-27 of the Code de commerce). Those three are absent from a copy made before they existed (lot 4):
+ * a frozen copy is printed as it was written.
+ */
 export const InvoiceContractorSchema = z.object({
   legalName: trimmed(LEGAL_NAME_MAX),
   address: trimmed(POSTAL_ADDRESS_MAX),
   country: CountryCodeSchema,
   taxId: trimmed(TAX_ID_MAX).nullable(),
+  businessId: BusinessIdSchema.nullable().optional(),
+  vatNumber: VatNumberSchema.nullable().optional(),
+  individualEntrepreneur: z.boolean().optional(),
 });
 export type InvoiceContractor = z.infer<typeof InvoiceContractorSchema>;
 
-/** The agency as each invoice prints it, a setting copied at the issue: never written in the code. */
+/**
+ * The agency as each invoice prints it, a setting copied at the issue: never written in the code. Its legal form,
+ * share capital and trade-register town go in the invoice's foot (art. R123-237 of the Code de commerce); absent from
+ * a copy made before lot 4.
+ */
 export const InvoiceAgencySchema = z.object({
   legalName: trimmed(LEGAL_NAME_MAX),
   address: trimmed(POSTAL_ADDRESS_MAX),
   siren: z.string().regex(/^[0-9]{9}$/u, 'Neuf chiffres'),
-  vatNumber: z.string().regex(/^[A-Z]{2}[0-9A-Z]{2,13}$/u, 'Un numéro de TVA intracommunautaire'),
+  vatNumber: VatNumberSchema,
+  legalForm: trimmed(AGENCY_LEGAL_FORM_MAX).nullable().optional(),
+  shareCapitalMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+  rcsCity: trimmed(RCS_CITY_MAX).nullable().optional(),
 });
 export type InvoiceAgency = z.infer<typeof InvoiceAgencySchema>;
 
@@ -245,6 +312,12 @@ export const ContractorProfileSchema = z.object({
   legalName: trimmed(LEGAL_NAME_MAX),
   address: trimmed(POSTAL_ADDRESS_MAX),
   taxId: trimmed(TAX_ID_MAX).nullable(),
+  /** Established in France: his SIREN or SIRET, which his invoices print and require. */
+  businessId: BusinessIdSchema.nullable(),
+  /** Charging VAT: his intra-community VAT number, which his invoices print and require. */
+  vatNumber: VatNumberSchema.nullable(),
+  /** An individual entrepreneur: his invoices print « EI » after his name. */
+  individualEntrepreneur: z.boolean(),
   email: z.email().max(BILLING_EMAIL_MAX),
   invoicePrefix: InvoicePrefixSchema.nullable(),
   verifiedAt: z.iso.datetime().nullable(),
@@ -308,6 +381,11 @@ export const BillingSettingsSchema = z.object({
   paymentTerms: PaymentTermsSchema,
   dueDays: z.number().int().min(INVOICE_DUE_MIN_DAYS).max(INVOICE_DUE_MAX_DAYS),
   documentReminderDays: z.number().int().min(1).max(DOCUMENT_REMINDER_MAX_DAYS),
+  fiscalYearEndMonth: z.number().int().min(1).max(12),
+  /** Without it, no invoice is issued (`agency_missing`). */
+  serviceDescription: ServiceDescriptionSchema.nullable(),
+  /** The fingerprint of the logo each document prints in its head, `null` for none. */
+  logoSha256: Sha256Schema.nullable(),
   accounts: JournalAccountsSchema,
   updatedAt: z.iso.datetime(),
 });
@@ -357,6 +435,10 @@ export const InvoiceSchema = z
     agency: InvoiceAgencySchema,
     regime: InvoiceRegimeSchema,
     mentions: z.array(InvoiceMentionSchema).max(INVOICE_DOCUMENT_MENTIONS_MAX),
+    /** An invoice's designation of the service, copied at the issue; `null` on a credit note. */
+    serviceDescription: ServiceDescriptionSchema.nullable(),
+    /** The agency's logo at the issue, by its fingerprint; `null` for none. */
+    logoSha256: Sha256Schema.nullable(),
     lines: z.array(InvoiceLineSchema).min(1),
     totals: InvoiceTotalsSchema,
     acceptance: z.object({
@@ -390,6 +472,14 @@ export const InvoiceEventSchema = z.object({
 export type InvoiceEvent = z.infer<typeof InvoiceEventSchema>;
 
 /**
+ * `GET /v1/payroll/invoices/:invoiceId/pdf` (EQ-06 lot 4, ADR 0037 § 7): the PDF of an issued invoice or credit note,
+ * to whoever reads the invoice (the contractor, the owner, an active manager), as `application/pdf` named after its
+ * number. Only ever a file whose SHA-256 is the one recorded at its render; `invoice_pdf_not_found` while it is being
+ * rendered, `invoice_pdf_unavailable` when neither bucket gives it intact.
+ */
+export const InvoicePdfParamsSchema = z.object({ invoiceId: InvoiceIdSchema });
+
+/**
  * The refusals of the invoices' rules (EQ-06), each suffix setting its status (api.md). Kept apart from
  * `PAYROLL_ERROR_CODES` until the invoices' screens word them (lot 8).
  */
@@ -397,5 +487,11 @@ export const INVOICE_ERROR_CODES = [
   'billing_regime_backdated_unprocessable',
   'credit_note_amount_unprocessable',
   'invoice_acceptance_conflict',
+  /** The invoice does not exist, or is not the reader's. */
+  'invoice_not_found',
+  /** Its PDF is not rendered yet (« PDF en préparation », ADR 0037 § 5). */
+  'invoice_pdf_not_found',
+  /** Neither bucket gave the PDF with its fingerprint: never an altered file (ADR 0037 § 7). */
+  'invoice_pdf_unavailable',
 ] as const;
 export type InvoiceErrorCode = (typeof INVOICE_ERROR_CODES)[number];

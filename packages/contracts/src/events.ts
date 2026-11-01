@@ -19,13 +19,19 @@ import {
   CreatorIdSchema,
   DraftIdSchema,
   FanIdSchema,
+  InvoiceIdSchema,
   MediaAssetIdSchema,
   MessageIdSchema,
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
-import { InvoiceKindSchema, InvoiceNotIssuedReasonSchema } from './invoices';
+import {
+  InvoiceKindSchema,
+  InvoiceNotIssuedReasonSchema,
+  InvoiceNumberSchema,
+  InvoicePdfPlaceSchema,
+} from './invoices';
 import { CurrencySchema } from './money';
 import { PayPeriodSchema } from './pay-periods';
 
@@ -190,6 +196,8 @@ export const EVENT_TYPES = [
   'backup_overdue',
   'exchange_rate_overdue',
   'invoice_not_issued',
+  'invoice_pdf_conflict',
+  'invoice_pdf_missing',
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
@@ -329,6 +337,28 @@ export const EVENT_PAYLOADS = {
     amountMinor: z.number().int().min(1),
   }),
   /**
+   * Other bytes than the base's lie under an invoice's key (ADR 0037): at the render after a crash, at the copy, or at a
+   * download, which then served the other place. Nothing was replaced, nothing altered was served; the owner looks
+   * into it. Never a name: the member by id, the document by its number.
+   */
+  invoice_pdf_conflict: z.object({
+    invoiceId: InvoiceIdSchema,
+    memberId: TeamMemberIdSchema,
+    number: InvoiceNumberSchema,
+    place: InvoicePdfPlaceSchema,
+    stage: z.enum(['render', 'copy', 'download']),
+  }),
+  /**
+   * The job gave up after its last attempt (ADR 0037 § 5 and 6): an invoice still has no PDF (`primary`), or its PDF
+   * no copy at the provider named. The invoice stays valid; never published while the job still retries.
+   */
+  invoice_pdf_missing: z.object({
+    invoiceId: InvoiceIdSchema,
+    memberId: TeamMemberIdSchema,
+    number: InvoiceNumberSchema,
+    place: InvoicePdfPlaceSchema,
+  }),
+  /**
    * Automatique closed on its own (ADR 0019): the live rate fell under its target, or the voice version changed and
    * has not proved itself yet. Every conversation in automatic went back to the copilot. Published once, for the owner.
    */
@@ -390,6 +420,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('backup_overdue'),
   typedEvent('exchange_rate_overdue'),
   typedEvent('invoice_not_issued'),
+  typedEvent('invoice_pdf_conflict'),
+  typedEvent('invoice_pdf_missing'),
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),

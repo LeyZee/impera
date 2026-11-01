@@ -152,6 +152,16 @@ jobs:
             echo "AUTH_BASE_URL=http://127.0.0.1:8080"
             echo "WEB_ORIGIN=http://127.0.0.1:8080"
             echo "EXTENSION_DEVICE_TOKEN=$(openssl rand -hex 24)"
+            # The invoices' buckets (ADR 0037), required in production at two https hosts: nothing is issued in this
+            # run, so none is reached (`.invalid` never resolves); the boot only checks them.
+            for bucket in INVOICES_S3:primary INVOICES_COPY_S3:copy; do
+              prefix="${bucket%%:*}"
+              echo "${prefix}_ENDPOINT=https://objects-${bucket#*:}.invalid"
+              echo "${prefix}_REGION=eu-central"
+              echo "${prefix}_BUCKET=ci-throwaway-${bucket#*:}"
+              echo "${prefix}_ACCESS_KEY_ID=ci"
+              echo "${prefix}_SECRET_ACCESS_KEY=$(openssl rand -hex 24)"
+            done
           } > .env.prod
       - run: docker compose up -d --wait postgres
       - run: $COMPOSE up -d --build
