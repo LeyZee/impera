@@ -50,6 +50,7 @@ const {
   invoiceEvents,
   invoiceLines,
   invoices,
+  payAdjustments,
   platformAccounts,
   teamMembers,
 } = schema;
@@ -111,6 +112,17 @@ async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceS
           .from(commissionStatements)
           .where(inArray(commissionStatements.id, corrected));
   const periodOf = new Map(correctedPeriods.map((row) => [row.id, PayPeriodSchema.parse(row.period)]));
+  // The document whose upheld contest each adjustment corrects (ADR 0039 § 3): read from the row, which never changes,
+  // and not from the statement's copy of the entries, whose shape its inputs' hash keeps.
+  const adjustmentIds = counted.adjustments.map((one) => one.id);
+  const contested =
+    adjustmentIds.length === 0
+      ? []
+      : await tx
+          .select({ id: payAdjustments.id, contestedInvoiceId: payAdjustments.contestedInvoiceId })
+          .from(payAdjustments)
+          .where(inArray(payAdjustments.id, adjustmentIds));
+  const contestedOf = new Map(contested.map((row) => [row.id, row.contestedInvoiceId]));
   const rules = CommissionStatementRulesSchema.parse(statement.rules);
   const tier = BonusTierSchema.nullable().parse(statement.tierBonus);
   return {
@@ -148,6 +160,7 @@ async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceS
       reason: one.reason,
       correctsPeriod:
         one.correctsStatementId === null ? null : (periodOf.get(one.correctsStatementId) ?? null),
+      contestedInvoiceId: contestedOf.get(one.id) ?? null,
     })),
   };
 }

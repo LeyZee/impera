@@ -57,7 +57,14 @@ const source = (patch: Partial<InvoiceSource> = {}): InvoiceSource => ({
     { kind: 'percent', bps: 250, reason: 'Script envoyé deux fois' },
     { kind: 'percent', bps: 125, reason: 'Note du fan oubliée' },
   ],
-  adjustments: [{ amountMinor: -3_000, reason: 'PPV remboursé', correctsPeriod: period('2026-10-01') }],
+  adjustments: [
+    {
+      amountMinor: -3_000,
+      reason: 'PPV remboursé',
+      correctsPeriod: period('2026-10-01'),
+      contestedInvoiceId: null,
+    },
+  ],
   ...patch,
 });
 
@@ -125,6 +132,7 @@ describe('the lines of a statement’s invoice (EQ-06)', () => {
         amountMinor: 3_000,
         reason: 'PPV remboursé',
         correctsPeriod: period('2026-10-01'),
+        withInvoice: false,
       },
     ]);
     // The spaces around a quotation and before a colon never break.
@@ -149,7 +157,9 @@ describe('the lines of a statement’s invoice (EQ-06)', () => {
         },
         bonuses: [],
         penalties: [],
-        adjustments: [{ amountMinor: 3_000, reason: 'Vente oubliée', correctsPeriod: null }],
+        adjustments: [
+          { amountMinor: 3_000, reason: 'Vente oubliée', correctsPeriod: null, contestedInvoiceId: null },
+        ],
       }),
     );
     expect(
@@ -363,8 +373,18 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
     // Refunds above sales on the account, and a sale of the first half refunded since.
     const refunds = simple('2026-10-16', -1_600, {
       adjustments: [
-        { amountMinor: -3_000, reason: 'PPV remboursé', correctsPeriod: period('2026-10-01') },
-        { amountMinor: 500, reason: 'Vente oubliée', correctsPeriod: period('2026-10-01') },
+        {
+          amountMinor: -3_000,
+          reason: 'PPV remboursé',
+          correctsPeriod: period('2026-10-01'),
+          contestedInvoiceId: null,
+        },
+        {
+          amountMinor: 500,
+          reason: 'Vente oubliée',
+          correctsPeriod: period('2026-10-01'),
+          contestedInvoiceId: null,
+        },
       ],
     });
     expect(invoiceLines(refunds).map((line) => [line.kind, line.amountMinor])).toEqual([
@@ -377,6 +397,7 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
         amountMinor: 3_000,
         reason: 'PPV remboursé',
         correctsPeriod: period('2026-10-01'),
+        withInvoice: false,
       },
       { kind: 'negative_period', amountMinor: 1_100, period: period('2026-10-16') },
     ]);
@@ -391,6 +412,7 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
         amountMinor: 3_000,
         reason: 'PPV remboursé',
         correctsPeriod: period('2026-10-01'),
+        withInvoice: false,
       }).map((line) => ({ ...line, detail: plain(line.detail) })),
     ).toEqual([
       {
@@ -430,6 +452,7 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
     amountMinor,
     reason: 'PPV remboursé',
     correctsPeriod: corrects === null ? null : period(corrects),
+    withInvoice: false,
   });
   const negative = (amountMinor: number, day: string): CreditDue => ({
     kind: 'negative_period',
@@ -486,7 +509,14 @@ describe('what a period owes back (EQ-06, ADR 0036)', () => {
     // zero, carried over; October's first half sells 500 € and pays 400 €. Then a half with refunds above sales.
     const september = simple('2026-09-01', 30_000);
     const refunded = simple('2026-09-16', 0, {
-      adjustments: [{ amountMinor: -10_000, reason: 'PPV remboursé', correctsPeriod: period('2026-09-01') }],
+      adjustments: [
+        {
+          amountMinor: -10_000,
+          reason: 'PPV remboursé',
+          correctsPeriod: period('2026-09-01'),
+          contestedInvoiceId: null,
+        },
+      ],
     });
     const october = simple('2026-10-01', 50_000, { carryOversInMinor: -10_000 });
     const refunds = simple('2026-10-16', -8_000);

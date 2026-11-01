@@ -69,6 +69,8 @@ export interface InvoiceSource {
     readonly reason: string;
     /** The period whose statement the adjustment corrects, when it is known. */
     readonly correctsPeriod: PayPeriod | null;
+    /** The document whose upheld contest it corrects (ADR 0039 § 3), or `null`. */
+    readonly contestedInvoiceId: string | null;
   }[];
 }
 
@@ -250,15 +252,27 @@ export type CreditDue =
       readonly amountMinor: number;
       readonly reason: string;
       readonly correctsPeriod: PayPeriod | null;
+      /**
+       * The cancel of a cancel and reissue (ADR 0039 § 3): it leaves only with the invoice of this period, which bills
+       * the line again; the contractor never has an invoice cancelled with nothing in its place.
+       */
+      readonly withInvoice: boolean;
     }
   /** What the period's own lines leave below zero, refunds above sales for instance: the period has no invoice. */
   | { readonly kind: 'negative_period'; readonly amountMinor: number; readonly period: PayPeriod };
 
 /**
  * The credit notes a validated statement makes due: one per adjustment in the agency's favour, then what its invoice's
- * lines leave below zero. Every amount the statement pays less is on a document: its invoice, or one of these.
+ * lines leave below zero. Every amount the statement pays less is on a document: its invoice, or one of these. The
+ * negative half of a cancel and reissue (an adjustment that names a contested document beside a positive one naming
+ * the same) waits for the invoice that bills it again.
  */
 export function creditsDue(source: InvoiceSource): CreditDue[] {
+  const reissued = new Set(
+    source.adjustments
+      .filter((one) => one.amountMinor > 0 && one.contestedInvoiceId !== null)
+      .map((one) => one.contestedInvoiceId),
+  );
   const dues: CreditDue[] = source.adjustments
     .filter((one) => one.amountMinor < 0)
     .map((one) => ({
@@ -266,6 +280,7 @@ export function creditsDue(source: InvoiceSource): CreditDue[] {
       amountMinor: minus(one.amountMinor),
       reason: one.reason,
       correctsPeriod: one.correctsPeriod,
+      withInvoice: one.contestedInvoiceId !== null && reissued.has(one.contestedInvoiceId),
     }));
   const leftMinor = sum(invoiceLines(source).map((line) => line.amountMinor));
   if (leftMinor < 0)

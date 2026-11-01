@@ -67,7 +67,14 @@ const source = (patch: Partial<InvoiceSource> = {}): InvoiceSource => ({
     { kind: 'percent', bps: 250, reason: 'Script envoyé deux fois' },
     { kind: 'percent', bps: 125, reason: 'Note du fan oubliée' },
   ],
-  adjustments: [{ amountMinor: -3_000, reason: 'PPV remboursé', correctsPeriod: period('2026-10-01') }],
+  adjustments: [
+    {
+      amountMinor: -3_000,
+      reason: 'PPV remboursé',
+      correctsPeriod: period('2026-10-01'),
+      contestedInvoiceId: null,
+    },
+  ],
   ...patch,
 });
 
@@ -329,8 +336,18 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
     const two = source({
       statement: { ...source().statement, adjustmentsMinor: -15_000, totalMinor: 18_555 },
       adjustments: [
-        { amountMinor: -9_000, reason: 'PPV remboursé', correctsPeriod: period('2026-10-01') },
-        { amountMinor: -6_000, reason: 'Pack remboursé', correctsPeriod: period('2026-10-01') },
+        {
+          amountMinor: -9_000,
+          reason: 'PPV remboursé',
+          correctsPeriod: period('2026-10-01'),
+          contestedInvoiceId: null,
+        },
+        {
+          amountMinor: -6_000,
+          reason: 'Pack remboursé',
+          correctsPeriod: period('2026-10-01'),
+          contestedInvoiceId: null,
+        },
       ],
     });
     const plan = planInvoicing(facts({ source: two, invoices: [firstHalf({ creditedMinor: 8_000 })] }));
@@ -341,6 +358,129 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
     ]);
     expect(plan.notIssued).toEqual([
       { document: 'credit_note', reason: 'no_invoice_to_credit', amountMinor: 6_000 },
+    ]);
+  });
+});
+
+/** The pair of a cancel and reissue of the first half's invoice (ADR 0039 § 3): what it had left, both ways. */
+const pair = (leftMinor = 20_000): InvoiceSource['adjustments'] => [
+  {
+    amountMinor: -leftMinor,
+    reason: 'Annulation de la facture NORA-2026-0001 du 17 octobre 2026',
+    correctsPeriod: period('2026-10-01'),
+    contestedInvoiceId: 'inv-1001',
+  },
+  {
+    amountMinor: leftMinor,
+    reason: 'Refacturation de la facture NORA-2026-0001 du 17 octobre 2026',
+    correctsPeriod: period('2026-10-01'),
+    contestedInvoiceId: 'inv-1001',
+  },
+];
+
+/** The second half of October with the pair alone: it pays the same, its invoice bills the line again. */
+const reissued = (): InvoiceSource =>
+  source({
+    statement: { ...source().statement, adjustmentsMinor: 0, totalMinor: 33_555 },
+    adjustments: pair(),
+  });
+
+describe('a cancel and reissue leaves whole (EQ-06 lot 6, ADR 0039 § 3)', () => {
+  it('issues the cancel with the invoice that bills the line again', () => {
+    const plan = planInvoicing(facts({ source: reissued() }));
+    expect(plan.notIssued).toEqual([]);
+    expect(plan.documents.map((one) => [one.key, one.creditedInvoiceId, one.totals.exclVatMinor])).toEqual([
+      ['invoice:st-1016', null, 52_321],
+      ['credit:st-1016:0', 'inv-1001', -20_000],
+    ]);
+    const line = plan.documents[0]?.lines.at(-1);
+    expect([line?.kind, line?.label, line?.amountMinor]).toEqual(['adjustment', 'Régularisation', 20_000]);
+    expect(line?.detail).toContain('Refacturation de la facture NORA-2026-0001');
+  });
+
+  it('holds the cancel while that invoice cannot be issued, for the same reason, and issues it at the next pass', () => {
+    // No regime of the day for the invoice, while the cancel keeps the first half's: alone, it could leave.
+    const held = planInvoicing(facts({ source: reissued(), assignments: [] }));
+    expect(held.documents).toEqual([]);
+    expect(held.notIssued).toEqual([
+      { document: 'invoice', reason: 'no_regime', amountMinor: 52_321 },
+      { document: 'credit_note', reason: 'no_regime', amountMinor: 20_000 },
+    ]);
+
+    const next = planInvoicing(facts({ source: reissued() }));
+    expect(next.documents.map((one) => one.key)).toEqual(['invoice:st-1016', 'credit:st-1016:0']);
+
+    // The invoice went out at a pass where the cancel did not: the rerun issues the cancel alone.
+    const rerun = planInvoicing(
+      facts({ source: reissued(), assignments: [], issuedKeys: new Set([invoiceKey('st-1016')]) }),
+    );
+    expect(rerun.documents.map((one) => one.key)).toEqual(['credit:st-1016:0']);
+    expect(rerun.notIssued).toEqual([]);
+  });
+
+  it('holds only the pair: another credit due of the period leaves without the invoice', () => {
+    const both = source({
+      statement: { ...source().statement, adjustmentsMinor: -3_000, totalMinor: 30_555 },
+      adjustments: [...source().adjustments, ...pair(10_000)],
+    });
+    const plan = planInvoicing(facts({ source: both, assignments: [] }));
+    expect(plan.documents.map((one) => [one.key, one.totals.exclVatMinor])).toEqual([
+      ['credit:st-1016:0', -3_000],
+    ]);
+    expect(plan.notIssued).toEqual([
+      { document: 'invoice', reason: 'no_regime', amountMinor: 42_321 },
+      { document: 'credit_note', reason: 'no_regime', amountMinor: 10_000 },
+    ]);
+  });
+
+  it('places the cancel before the other credit dues of its period, which cannot leave it short', () => {
+    const crowded = source({
+      statement: { ...source().statement, adjustmentsMinor: -3_000, totalMinor: 30_555 },
+      adjustments: [...source().adjustments, ...pair()],
+    });
+    const plan = planInvoicing(facts({ source: crowded }));
+    expect(plan.documents.map((one) => [one.key, one.totals.exclVatMinor])).toEqual([
+      ['invoice:st-1016', 52_321],
+      ['credit:st-1016:1', -20_000],
+    ]);
+    expect(plan.notIssued).toEqual([
+      { document: 'credit_note', reason: 'no_invoice_to_credit', amountMinor: 3_000 },
+    ]);
+  });
+
+  it('waits for no invoice in a period that has nothing to invoice: the reissued line counts in its negative balance', () => {
+    const below = source({
+      statement: {
+        lines: [{ platformAccountId: 'acc-reveal', netMinor: -125_000, commissionMinor: -25_000 }],
+        netMinor: -125_000,
+        commissionRateBps: 2_000,
+        teamShare: null,
+        tierBonus: null,
+        collectiveBonusMinor: 0,
+        manualBonusesMinor: 0,
+        penaltiesRequestedMinor: 0,
+        penaltiesMinor: 0,
+        carryOversInMinor: 0,
+        adjustmentsMinor: 0,
+        totalMinor: -25_000,
+      },
+      bonuses: [],
+      penalties: [],
+      adjustments: pair(),
+    });
+    const plan = planInvoicing(
+      facts({
+        source: below,
+        invoices: [
+          firstHalf({ id: 'inv-0916', number: 'NORA-2026-0000', period: period('2026-09-16') }),
+          firstHalf(),
+        ],
+      }),
+    );
+    expect(plan.notIssued).toEqual([]);
+    expect(plan.documents.map((one) => [one.key, one.creditedInvoiceId, one.totals.exclVatMinor])).toEqual([
+      ['credit:st-1016:0', 'inv-1001', -20_000],
+      ['credit:st-1016:1', 'inv-0916', -5_000],
     ]);
   });
 });

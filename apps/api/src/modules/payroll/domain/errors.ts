@@ -1,4 +1,9 @@
-import { DomainError, type AgencyLogoRefusal, type PayPeriod } from '@nirvana/contracts';
+import {
+  DomainError,
+  PAY_AMOUNT_MAX_MINOR,
+  type AgencyLogoRefusal,
+  type PayPeriod,
+} from '@nirvana/contracts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
 
@@ -271,6 +276,31 @@ export class CreditNoteExceedsInvoice extends DomainError {
     super('credit_note_amount_unprocessable', 'L’avoir dépasse ce qui reste de la facture', {
       details: { leftMinor },
     });
+  }
+}
+
+/** « 50 000 € »: the most one adjustment of pay carries, in whole euros, from the ceiling itself. */
+const PAY_AMOUNT_MAX_WORDS = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+}).format(PAY_AMOUNT_MAX_MINOR / 100);
+
+/** What the owner reads when a correction is refused, by its reason. */
+const CORRECTION_REFUSALS = {
+  reissue_credit_note: 'Seule une facture s’annule et se refacture, jamais un avoir',
+  nothing_left: 'Les avoirs ont déjà repris toute cette facture : il n’y a rien à refacturer',
+  above_pay_amount_max: `Il reste plus de ${PAY_AMOUNT_MAX_WORDS} HT sur cette facture : c’est plus qu’un ajustement de paie ne porte, elle ne s’annule pas et ne se refacture pas en une fois`,
+} as const;
+
+/**
+ * A correction of an upheld contest that the document does not allow (ADR 0039 § 3): only an invoice is cancelled and
+ * reissued, only for what its credit notes left of it, and only while that fits in one adjustment of pay.
+ */
+export class InvoiceCorrectionUnprocessable extends DomainError {
+  constructor(reason: keyof typeof CORRECTION_REFUSALS) {
+    super('invoice_correction_unprocessable', CORRECTION_REFUSALS[reason], { details: { reason } });
   }
 }
 

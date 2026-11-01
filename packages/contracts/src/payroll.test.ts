@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema } from './pay-periods';
 import {
   BonusTierSetSchema,
@@ -15,7 +16,6 @@ import {
   CreatePenaltyBodySchema,
   ExchangeRateSchema,
   mayValidateStatement,
-  PAY_AMOUNT_MAX_MINOR,
   PAY_PERIOD_BLOCK_CODES,
   PAYMENT_METHODS,
   PAYROLL_ERROR_CODES,

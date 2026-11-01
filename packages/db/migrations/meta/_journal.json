@@ -351,6 +351,13 @@
       "when": 1793545308346,
       "tag": "0049_telegram_invoice_contested",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793549754605,
+      "tag": "0050_contest_upheld",
+      "breakpoints": true
     }
   ]
 }

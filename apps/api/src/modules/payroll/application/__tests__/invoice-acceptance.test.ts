@@ -26,6 +26,7 @@ function storeWith(
     read: unexpected,
     answer: unexpected,
     refuseContest: unexpected,
+    upholdContest: unexpected,
     dueUnscoped: (limit) => {
       expect(limit).toBe(200);
       return Promise.resolve({ unanswered, unannounced });

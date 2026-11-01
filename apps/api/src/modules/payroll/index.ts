@@ -182,7 +182,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
     primary: deps.invoicePdfs.primary,
     copy: deps.invoicePdfs.copy,
   };
-  const acceptanceStore = createDrizzlePayrollInvoiceAcceptanceStore(deps.db, deps.adminDb);
+  const acceptanceStore = createDrizzlePayrollInvoiceAcceptanceStore(deps.db, deps.adminDb, deps.reads, now);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),

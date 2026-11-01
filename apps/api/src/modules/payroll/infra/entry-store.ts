@@ -160,13 +160,37 @@ function raced<T>(
   return replayed;
 }
 
-async function enqueueChanged(
+/** Puts back in the recalculation queue the periods a write from `from` to `to` changes: none after today's. */
+export async function enqueueChanged(
   tx: Transaction,
   from: PayPeriod,
   to: PayPeriod,
   current: PayPeriod,
 ): Promise<void> {
   for (const period of periodsChanged(from, to, current)) await enqueuePayRecalculation(tx, period);
+}
+
+/**
+ * The period a new adjustment of the member goes on, its locks held (ADR 0035): the member's first open period. It is
+ * chosen before the locks, then checked under them: a validation that came in between closes it for the member and
+ * moves the choice later, to periods the transaction holds already or after today's. The member has joined by then
+ * and has a rate in force there. An adjustment typed by a manager and the correction of an upheld contest (ADR 0039)
+ * go there alike.
+ */
+export async function lockAdjustmentPeriod(
+  tx: Transaction,
+  reads: PayInputReads,
+  memberId: TeamMemberId,
+  current: PayPeriod,
+): Promise<PayPeriod> {
+  const known = await memberOn(tx, reads, memberId, current);
+  const guessed = adjustmentPeriod(await factsOf(tx, known, current));
+  const locked = await lockFrom(tx, known.id, guessed, current);
+  const facts = await factsOf(tx, known, current);
+  const period = isOpenFor(facts, guessed) ? guessed : adjustmentPeriod(facts);
+  await lockFrom(tx, known.id, period, current, locked);
+  await paidMemberOn(tx, reads, known.id, period);
+  return period;
 }
 
 /**
@@ -364,15 +388,7 @@ export function createDrizzlePayrollEntryStore(
           }
         }
         const current = await currentIn(tx);
-        const known = await memberOn(tx, reads, body.memberId, current);
-        // The period is chosen before the locks, then checked under them: a validation that came in between closes it
-        // for the member and moves the choice later, to periods the transaction holds already or after today's.
-        const guessed = adjustmentPeriod(await factsOf(tx, known, current));
-        const locked = await lockFrom(tx, known.id, guessed, current);
-        const facts = await factsOf(tx, known, current);
-        const period = isOpenFor(facts, guessed) ? guessed : adjustmentPeriod(facts);
-        await lockFrom(tx, known.id, period, current, locked);
-        await paidMemberOn(tx, reads, known.id, period);
+        const period = await lockAdjustmentPeriod(tx, reads, body.memberId, current);
         const [row] = await tx
           .insert(payAdjustments)
           .values({ ...body, period, createdBy: actor.userId })

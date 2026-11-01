@@ -496,7 +496,12 @@ export const commissionStatementLines = pgTable(
   ],
 );
 
-/** A correction landed on the member's first open period; added only. */
+/**
+ * A correction landed on the member's first open period; added only. `contested_invoice_id` names the document whose
+ * upheld contest it corrects (ADR 0039 § 3, migration 0050): of its member, correcting its period, written in the
+ * transaction of the `contest_upheld` it goes with. Its foreign key to `invoices` is the migration's: `invoices.ts`
+ * imports this file, and the schema keeps no cycle.
+ */
 export const payAdjustments = pgTable(
   'pay_adjustments',
   {
@@ -508,6 +513,7 @@ export const payAdjustments = pgTable(
     amountMinor: integer('amount_minor').notNull(),
     reason: text('reason').notNull(),
     correctsStatementId: uuid('corrects_statement_id').references(() => commissionStatements.id),
+    contestedInvoiceId: uuid('contested_invoice_id'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -515,6 +521,12 @@ export const payAdjustments = pgTable(
   },
   (t) => [
     periodCheck('pay_adjustments_period_check', t.period),
+    // A correction of a contest corrects the document's period: it always names the statement.
+    check(
+      'pay_adjustments_contest_check',
+      sql`${t.contestedInvoiceId} is null or ${t.correctsStatementId} is not null`,
+    ),
+    index('pay_adjustments_contested_idx').on(t.contestedInvoiceId),
     check(
       'pay_adjustments_amount_check',
       sql`${t.amountMinor} between -${amountMax} and ${amountMax} and ${t.amountMinor} <> 0`,

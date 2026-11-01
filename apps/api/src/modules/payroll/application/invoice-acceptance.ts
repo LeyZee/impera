@@ -3,6 +3,7 @@ import type {
   InvoiceAcceptanceView,
   InvoiceId,
   RefuseInvoiceContestBody,
+  UpholdInvoiceContestBody,
   UserId,
 } from '@nirvana/contracts';
 
@@ -10,10 +11,11 @@ import { InvoiceNotFound } from '../domain/errors';
 import type { Actor, JobLogger, PayrollInvoiceAcceptanceStore } from '../domain/ports';
 
 /**
- * A document's acceptance (EQ-06 lot 6, ADR 0039 § 1 to 3): the contractor alone answers « J'accepte » or « Je conteste »
- * with a reason before the deadline, to the second; the owner alone refuses a contest with a reason; the dated job
- * `payroll.lapse_invoice` accepts tacitly once the deadline has passed. Every write is dated in `invoice_events` and
- * `audit_log`; the same answer sent again gives back what was recorded, another one is a conflict (409).
+ * A document's acceptance (EQ-06 lot 6, ADR 0039 § 1 to 5): the contractor alone answers « J'accepte » or « Je conteste »
+ * with a reason before the deadline, to the second; the owner alone ends a contest with a reason, refused, or upheld
+ * with its correction by pay in the same action; the dated job `payroll.lapse_invoice` accepts tacitly once the deadline
+ * has passed. Every write is dated in `invoice_events` and `audit_log`; the same answer sent again gives back what was
+ * recorded, another one is a conflict (409).
  */
 export interface PayrollInvoiceAcceptance {
   /** The document's acceptance and its steps, for whoever reads the document (its policy), else `invoice_not_found`. */
@@ -24,6 +26,15 @@ export interface PayrollInvoiceAcceptance {
     actor: Actor,
     invoiceId: InvoiceId,
     body: RefuseInvoiceContestBody,
+  ): Promise<InvoiceAcceptanceView>;
+  /**
+   * Upholds a contest and corrects it by pay (ADR 0039 § 3): an amount, in either favour, or for an invoice the cancel
+   * and reissue of what it has left. The adjustments name the document and land on the member's first open period.
+   */
+  upholdContest(
+    actor: Actor,
+    invoiceId: InvoiceId,
+    body: UpholdInvoiceContestBody,
   ): Promise<InvoiceAcceptanceView>;
 }
 
@@ -40,6 +51,8 @@ export function createPayrollInvoiceAcceptance(
     contest: (actor, invoiceId, body) =>
       store.answer(actor, invoiceId, { kind: 'contest', reason: body.reason }),
     refuseContest: (actor, invoiceId, body) => store.refuseContest(actor, invoiceId, body.reason),
+    upholdContest: (actor, invoiceId, body) =>
+      store.upholdContest(actor, invoiceId, body.reason, body.correction),
   };
 }
 
