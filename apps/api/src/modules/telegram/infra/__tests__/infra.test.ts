@@ -314,6 +314,21 @@ describe('reading the outbox', () => {
       toScannedEvent({ ...base, type: 'invoice_pdf_missing', payload: { ...pdf, number: '<b>x</b>' } })
         ?.signal,
     ).toBeUndefined();
+    // ADR 0039: the document's number and kind; the contractor stays in Nirvana (the payload carries no reason).
+    const contested = (payload: object) =>
+      toScannedEvent({ ...base, type: 'invoice_contested', payload })?.signal;
+    const contest = {
+      invoiceId: '018f3e5c-0000-7000-8000-000000000003',
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      number: 'DEMO-2026-0003',
+      document: 'credit_note',
+    };
+    expect(contested(contest)).toEqual({
+      kind: 'invoice_contested',
+      number: 'DEMO-2026-0003',
+      document: 'credit_note',
+    });
+    expect(contested({ ...contest, document: 'receipt' })).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

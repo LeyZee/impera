@@ -108,6 +108,12 @@ export type Signal =
       readonly place: InvoicePdfPlace;
     }
   | {
+      /** A contractor contested one of their documents (ADR 0039 § 2): its number and kind, never the reason nor a name. */
+      readonly kind: 'invoice_contested';
+      readonly number: string;
+      readonly document: InvoiceKind;
+    }
+  | {
       /** Automatique closed on its own (ADR 0019): its conversations went back to the copilot. */
       readonly kind: 'automatic_closed';
       /** What the lock misses now, with the server's figures. */
