@@ -17,6 +17,7 @@ import type { InvoiceLogo, InvoicePdfRenderer } from '../../domain/ports';
 import { createPdfkitInvoiceRenderer, loadInvoiceFonts } from '../invoice-pdf-renderer';
 
 import { inventedLogo } from './invented-logo';
+import { TRANSPARENT_KINDS } from './invented-png';
 
 const FONTS_DIR = fileURLToPath(new URL('../fonts/', import.meta.url));
 const ISSUED_AT = new Date('2026-11-17T08:12:00.000Z');
@@ -211,6 +212,14 @@ describe('Équipe › Factures : le PDF rendu (EQ-06 lot 4, ADR 0037 § 2)', { t
     expect(Buffer.from(first).equals(Buffer.from(second))).toBe(true);
     expect(Buffer.from(first).equals(Buffer.from(await render(content)))).toBe(false);
     expect(ascii(first).match(/\/Subtype\s*\/Image/gu)?.length).toBe(2); // the image and its transparency
+  });
+
+  it('draws every kind of PNG Réglages › Facturation keeps: depths, palette, grey, interlaced', async () => {
+    const content = invoicePdfContent(sampleInvoice());
+    for (const [kind, bytes] of Object.entries(TRANSPARENT_KINDS)) {
+      const pdf = await render(content, { mediaType: 'image/png', bytes });
+      expect(ascii(pdf).match(/\/Subtype\s*\/Image/gu)?.length, kind).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it('refuses a logo that is not a PNG', async () => {

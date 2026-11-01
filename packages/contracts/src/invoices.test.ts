@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AGENCY_LOGO_REFUSALS,
   AgencyLogoMediaTypeSchema,
+  AgencyLogoSchema,
   BillingRegimeSchema,
   BillingSettingsSchema,
+  BillingSettingsViewSchema,
   BusinessIdSchema,
   ContestInvoiceBodySchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
@@ -21,6 +24,7 @@ import {
   RegimeVatSchema,
   SERVICE_DESCRIPTION_MAX,
   ServiceDescriptionSchema,
+  UpdateBillingSettingsBodySchema,
   VatNumberSchema,
 } from './invoices';
 
@@ -149,6 +153,73 @@ describe('invoices', () => {
     for (const wrong of [0, 13, 6.5])
       expect(BillingSettingsSchema.safeParse(settings(wrong)).success).toBe(false);
   });
+  it('keep the journal’s accounts empty until the accountant gives them, whole or not at all (migration 0048)', () => {
+    const settings = (accounts: unknown) => ({
+      agency: invoice.agency,
+      paymentTerms: 'Aucun escompte.',
+      dueDays: 60,
+      documentReminderDays: 30,
+      fiscalYearEndMonth: 12,
+      serviceDescription: 'Animation commerciale de comptes',
+      logoSha256: null,
+      accounts,
+      updatedAt: '2026-11-01T09:00:00.000Z',
+    });
+    expect(BillingSettingsSchema.safeParse(settings(null)).success).toBe(true);
+    expect(BillingSettingsSchema.safeParse(settings({})).success).toBe(false);
+    expect(BillingSettingsSchema.safeParse(settings({ expense: '622' })).success).toBe(false);
+    expect(BillingSettingsViewSchema.safeParse({ settings: null, logo: null }).success).toBe(true);
+  });
+
+  it('are saved with the foot of the page whole: legal form, share capital, town of the trade register', () => {
+    const body = {
+      agency: {
+        ...invoice.agency,
+        legalForm: 'SAS',
+        shareCapitalMinor: 1_000_000,
+        rcsCity: 'Lyon',
+      },
+      serviceDescription: 'Animation commerciale de comptes',
+      paymentTerms: 'Aucun escompte.',
+      dueDays: 60,
+      fiscalYearEndMonth: 12,
+      logoSha256: null,
+    };
+    expect(UpdateBillingSettingsBodySchema.parse(body)).toEqual(body);
+    for (const agency of [
+      { ...body.agency, legalForm: null },
+      { ...body.agency, shareCapitalMinor: 0 },
+      { ...body.agency, rcsCity: ' ' },
+      {
+        legalName: body.agency.legalName,
+        address: body.agency.address,
+        siren: body.agency.siren,
+        vatNumber: body.agency.vatNumber,
+      },
+    ]) {
+      expect(UpdateBillingSettingsBodySchema.safeParse({ ...body, agency }).success).toBe(false);
+    }
+    expect(UpdateBillingSettingsBodySchema.safeParse({ ...body, serviceDescription: null }).success).toBe(
+      false,
+    );
+    expect(UpdateBillingSettingsBodySchema.safeParse({ ...body, dueDays: 61 }).success).toBe(false);
+  });
+
+  it('describe a kept logo by its fingerprint, its sides and its weight, and name each reason to refuse one', () => {
+    const logo = {
+      sha256: 'a'.repeat(64),
+      mediaType: 'image/png',
+      width: 1_843,
+      height: 522,
+      byteLength: 443_725,
+    };
+    expect(AgencyLogoSchema.parse(logo)).toEqual(logo);
+    expect(AgencyLogoSchema.safeParse({ ...logo, width: 63 }).success).toBe(false);
+    expect(AgencyLogoSchema.safeParse({ ...logo, byteLength: 512 * 1024 + 1 }).success).toBe(false);
+    expect(AgencyLogoSchema.safeParse({ ...logo, mediaType: 'image/svg+xml' }).success).toBe(false);
+    expect(AGENCY_LOGO_REFUSALS).toEqual(['too_heavy', 'not_png', 'damaged', 'opaque', 'dimensions']);
+  });
+
   it('print a French contractor with his SIREN or SIRET, his VAT number and « EI », and read a copy made before', () => {
     expect(BusinessIdSchema.safeParse('123456789').success).toBe(true);
     expect(BusinessIdSchema.safeParse('12345678900011').success).toBe(true);
