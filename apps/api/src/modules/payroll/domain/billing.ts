@@ -1,7 +1,9 @@
 import type {
   ContractorDocumentKind,
+  ContractorDocumentReview,
   InvoiceAgency,
   InvoiceNotIssuedReason,
+  PayPeriod,
   RegimeVat,
 } from '@nirvana/contracts';
 
@@ -66,22 +68,21 @@ export function assertRegimeChange(
   if (next.from < today || (last !== null && next.from <= last)) throw new BillingRegimeBackdated(next.from);
 }
 
-/** A document of the contractor's file, as filed. */
+/** A document of the contractor's file, as filed, with the owner's check of it. */
 export interface ContractorDocument {
   readonly kind: ContractorDocumentKind;
   readonly issuedOn: string;
   /** The end the document states, when it states one; else its kind decides. */
   readonly validUntil: string | null;
+  /** The owner's check (lot 5c): `accepted`, `refused` with its reason, `null` while it waits. */
+  readonly review: ContractorDocumentReview | null;
 }
 
-/** How long a document holds from its issue, when it states no end: a year for residence, six months for vigilance. */
-const VALIDITY_MONTHS: Readonly<Record<ContractorDocumentKind, number>> = {
-  tax_residence: 12,
-  urssaf_vigilance: 6,
-};
+/** How long a vigilance certificate holds from its issue when it states no end: six months (art. D8222-5 du Code du travail). */
+const VIGILANCE_MONTHS = 6;
 
 /** `day` plus `months`, on the same date or the month's last one (31 August plus six months is 28 or 29 February). */
-function addMonths(day: string, months: number): string {
+export function addMonths(day: string, months: number): string {
   const [year = 0, month = 1, date = 1] = day.split('-').map(Number);
   const target = new Date(Date.UTC(year, month - 1 + months, 1));
   const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
@@ -94,9 +95,18 @@ export function addDays(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** The last day a document holds: the end it states, else its issue plus its kind's months, the day before. */
-export function documentValidUntil(document: ContractorDocument): string {
-  return document.validUntil ?? addDays(addMonths(document.issuedOn, VALIDITY_MONTHS[document.kind]), -1);
+/**
+ * The last day a document holds: the end it states; else, for a tax residence certificate, the 31st of December of the
+ * year it was issued (the Beninese tax office issues it for the calendar year, and French doctrine reads it so,
+ * BOI-INT-DG-20-20-20-20 § 200; « ok année civile »); for a vigilance certificate, six months from its issue, the day
+ * before.
+ */
+export function documentValidUntil(
+  document: Pick<ContractorDocument, 'kind' | 'issuedOn' | 'validUntil'>,
+): string {
+  if (document.validUntil !== null) return document.validUntil;
+  if (document.kind === 'tax_residence') return `${document.issuedOn.slice(0, 4)}-12-31`;
+  return addDays(addMonths(document.issuedOn, VIGILANCE_MONTHS), -1);
 }
 
 export type DocumentState = 'valid' | 'expiring' | 'expired';
@@ -106,7 +116,7 @@ export type DocumentState = 'valid' | 'expiring' | 'expired';
  * the member and the owner), valid before.
  */
 export function documentState(
-  document: ContractorDocument,
+  document: Pick<ContractorDocument, 'kind' | 'issuedOn' | 'validUntil'>,
   today: string,
   reminderDays: number,
 ): DocumentState {
@@ -115,17 +125,47 @@ export function documentState(
   return today >= addDays(until, -reminderDays) ? 'expiring' : 'valid';
 }
 
-/** The newest document of a kind: a renewal never erases the one an earlier invoice relied on. */
+/**
+ * The newest document of a kind the owner has not refused: a renewal never erases the one an earlier invoice relied
+ * on, and a refused file counts as none.
+ */
 function newestOf(
   documents: readonly ContractorDocument[],
   kind: ContractorDocumentKind,
 ): ContractorDocument | null {
   let found: ContractorDocument | null = null;
   for (const one of documents) {
+    if (one.review?.decision === 'refused') continue;
     if (one.kind === kind && (found === null || one.issuedOn > found.issuedOn)) found = one;
   }
   return found;
 }
+
+/**
+ * Where a contractor stands for a period under a regime that sets the 182 B withholding aside by a tax treaty
+ * (Charles's choice (a), 01/11): `covered` by a tax residence certificate of the period's calendar year the owner
+ * accepted; `unverified` when one is filed for that year and waits for his check; `missing` otherwise, a refused or
+ * out-of-year one counting as none. Only `covered` lets an invoice go out: without the proof, the treaty does not
+ * apply and the agency would owe 25 %, which it never withholds.
+ */
+export function taxResidenceFor(
+  documents: readonly ContractorDocument[],
+  period: PayPeriod,
+): 'covered' | 'unverified' | 'missing' {
+  const year = period.slice(0, 4);
+  const filed = documents.filter(
+    (one) =>
+      one.kind === 'tax_residence' &&
+      one.review?.decision !== 'refused' &&
+      documentValidUntil(one).slice(0, 4) === year,
+  );
+  if (filed.some((one) => one.review?.decision === 'accepted')) return 'covered';
+  return filed.length > 0 ? 'unverified' : 'missing';
+}
+
+/** Whether the regime's invoices wait for a tax residence certificate (`taxResidenceFor`). */
+export const treatyNeedsResidence = (regime: Pick<BillingRegime, 'withholding'>): boolean =>
+  regime.withholding === 'treaty_exempt';
 
 /** The identity an invoice prints for the contractor: its mentions, required. */
 export interface ContractorIdentity {
@@ -177,6 +217,8 @@ export type IssueDecision =
 
 export interface IssueFacts {
   readonly day: string;
+  /** The statement's period, the service the invoice bills: the year a tax residence certificate must cover. */
+  readonly period: PayPeriod;
   readonly mandate: MandateFacts;
   readonly assignments: readonly RegimeAssignment[];
   readonly regimes: readonly BillingRegime[];
@@ -226,16 +268,20 @@ export function identityComplete(
 /**
  * Whether the validation of a statement issues its invoice. A period that brings nothing to invoice issues none, and
  * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated,
- * an identity that lacks a mention the regime prints or that the owner has not checked as it stands, no prefix or no
- * identity of the agency: no invoice, since an issued invoice never changes. Documents missing or out of date, or a mandate of an older version: the invoice goes
- * out, with a warning.
+ * an identity that lacks a mention the regime prints or that the owner has not checked as it stands, under a tax
+ * treaty no tax residence certificate of the period's year accepted by the owner, no prefix or no identity of the
+ * agency: no invoice, since an issued invoice never changes. Other documents missing or out of date, or a mandate of
+ * an older version: the invoice goes out, with a warning.
  */
 export function issueDecision(facts: IssueFacts): IssueDecision {
   const assignment = regimeOn(facts.assignments, facts.day);
   const regime =
     assignment === null ? null : (facts.regimes.find((one) => one.id === assignment.regimeId) ?? null);
   const warnings: IssueWarning[] = [];
+  const residenceBlocks = regime !== null && treatyNeedsResidence(regime);
   for (const kind of regime?.documents ?? []) {
+    // Under a treaty, the residence certificate is no warning: without it, nothing is issued (`taxResidenceFor`).
+    if (kind === 'tax_residence' && residenceBlocks) continue;
     const document = newestOf(facts.documents, kind);
     if (document === null) warnings.push({ code: 'document_missing', kind });
     else if (documentState(document, facts.day, 0) === 'expired') {
@@ -253,6 +299,11 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (regime.validatedOn === null || regime.validatedOn > facts.day) return none('regime_not_validated');
   if (!identityComplete(facts.identity, regime)) return none('identity_incomplete');
   if (!facts.identityVerified) return none('identity_unverified');
+  if (residenceBlocks) {
+    const residence = taxResidenceFor(facts.documents, facts.period);
+    if (residence === 'missing') return none('tax_residence_missing');
+    if (residence === 'unverified') return none('tax_residence_unverified');
+  }
   if (facts.prefix === null) return none('prefix_missing');
   if (facts.agency === null) return none('agency_missing');
   return { kind: 'issue', regime, warnings };

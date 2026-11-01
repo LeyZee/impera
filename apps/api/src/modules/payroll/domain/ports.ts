@@ -15,6 +15,10 @@ import type {
   CommissionStatementId,
   ContestCorrection,
   ContractAcceptance,
+  ContractorDocument,
+  ContractorDocumentId,
+  ContractorDocumentMediaType,
+  ContractorDocumentReview,
   ContractorFile,
   ContractorProfileBody,
   ContractorRegime,
@@ -56,6 +60,7 @@ import type {
   TeamScope,
   UpdateBillingSettingsBody,
   UpdatePayrollSettingsBody,
+  UploadContractorDocumentQuery,
   UserId,
   ValidateBillingRegimeBody,
   VerifyContractorProfileBody,
@@ -319,8 +324,17 @@ export interface InvoiceObjectStore {
    * store does not hold was forgotten, not damaged, and never alerts. `false` for a bucket, whose lock keeps them.
    */
   readonly volatile: boolean;
-  /** Sends `bytes` signed with their SHA-256 (hex), under a compliance lock until `retainUntil`. */
-  writeOnce(key: string, bytes: Uint8Array, sha256: string, retainUntil: Date): Promise<'written' | 'exists'>;
+  /**
+   * Sends `bytes` signed with their SHA-256 (hex), under a compliance lock until `retainUntil`, as `mediaType` (a PDF
+   * unless said: a contractor's document may be a photo, lot 5c).
+   */
+  writeOnce(
+    key: string,
+    bytes: Uint8Array,
+    sha256: string,
+    retainUntil: Date,
+    mediaType?: string,
+  ): Promise<'written' | 'exists'>;
   read(key: string): Promise<StoredObject | null>;
   /**
    * Moves the compliance lock of the object at `key` to `retainUntil`. A compliance lock only ever lengthens: an
@@ -549,6 +563,60 @@ export interface PayrollRegimeStore {
     memberId: TeamMemberId,
     body: AssignContractorRegimeBody,
   ): Promise<{ assignment: ContractorRegime; created: boolean }>;
+}
+
+/** A document's file as the store names it: its key, its fingerprint, what it is. */
+interface DocumentFile {
+  readonly key: string;
+  readonly sha256: string;
+  readonly mediaType: ContractorDocumentMediaType;
+}
+
+/**
+ * A contractor's documents (EQ-06 lot 5c): filed by the contractor himself or the owner, never a manager; read by the
+ * contractor, the owner and an active manager; checked once by the owner, never on his own file. The file goes to the
+ * bucket between `prepareUpload` and `recordUpload`, outside any transaction: a run stopped between them is sent again
+ * with the same `id` and finds its object (`exists`).
+ */
+export interface PayrollDocumentStore {
+  /**
+   * Checks an upload before its file goes up: the writer, the member, the day of issue. A document recorded under this
+   * `id` with the same file and dates comes back (`recorded`); with others, `contractor_document_id_conflict`.
+   * Otherwise the key to write and the end of the upload's lock (`new`).
+   */
+  prepareUpload(
+    actor: Actor,
+    memberId: TeamMemberId,
+    query: UploadContractorDocumentQuery,
+    file: Pick<DocumentFile, 'sha256' | 'mediaType'>,
+  ): Promise<
+    | { readonly kind: 'recorded'; readonly document: ContractorDocument }
+    | { readonly kind: 'new'; readonly key: string; readonly lockUntil: Date }
+  >;
+  /** Records the document whose file is in the bucket, checked again under the member's lock. */
+  recordUpload(
+    actor: Actor,
+    memberId: TeamMemberId,
+    query: UploadContractorDocumentQuery,
+    file: DocumentFile & { readonly lockUntil: Date },
+  ): Promise<{ document: ContractorDocument; created: boolean }>;
+  /** The document and its file under the reader's policy, `null` for none he sees. */
+  documentFor(
+    userId: UserId,
+    memberId: TeamMemberId,
+    documentId: ContractorDocumentId,
+  ): Promise<{ readonly document: ContractorDocument; readonly file: DocumentFile } | null>;
+  /**
+   * The owner's check, once. An acceptance asks the bucket, through `lengthen`, to lock the file as long as the
+   * invoices it may cover, before it is recorded: a bucket that refuses records nothing.
+   */
+  review(
+    actor: Actor,
+    memberId: TeamMemberId,
+    documentId: ContractorDocumentId,
+    body: ContractorDocumentReview,
+    lengthen: (key: string, retainUntil: Date) => Promise<void>,
+  ): Promise<{ document: ContractorDocument; created: boolean }>;
 }
 
 /** `payroll.requeue_invoice_issues`, as the jobs (`withAdmin`): enqueues the statements to try again, and counts them. */

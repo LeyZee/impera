@@ -9,6 +9,8 @@ import type {
 import {
   identityComplete,
   issueDecision,
+  taxResidenceFor,
+  treatyNeedsResidence,
   type ContractorDocument,
   type ContractorIdentity,
   type IssueWarning,
@@ -164,7 +166,8 @@ const sum = (amounts: readonly number[]): number => amounts.reduce((total, one) 
  * the period owes (`creditsDue`), on the invoice `planCreditNotes` finds for it: it keeps that invoice's period, regime
  * and the regime's mentions (ADR 0036), and prints the parties of the day and the invoice it cites. A due
  * no invoice can take whole is not issued, and neither is one without the agency's identity, the contractor's (complete
- * and checked by the owner) or a mandate: each is said to the owner. The cancel of a cancel and reissue leaves with its corrective invoice or not at
+ * and checked by the owner) or a mandate, nor a cancel whose corrective invoice waits for a tax residence certificate:
+ * each is said to the owner. The cancel of a cancel and reissue leaves with its corrective invoice or not at
  * all (ADR 0039 § 3, ADR 0040): the corrective invoice bills the same amount again under the cancelled invoice's
  * period, regime and mentions, never the regime of the day, citing it first and ending with the payment terms; it
  * prints the parties, the designation and the terms of the day, which is the error of text it corrects.
@@ -177,6 +180,7 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
   const exclVatMinor = sum(lines.map((line) => line.amountMinor));
   const decision = issueDecision({
     day: issuedOn,
+    period: source.period,
     mandate,
     assignments: facts.assignments,
     regimes: facts.regimes,
@@ -279,6 +283,15 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     if (!facts.identityVerified) {
       hold(note.request, 'identity_unverified');
       continue;
+    }
+    // A corrective invoice bills again: under a treaty, it waits for the residence certificate of the year it bills,
+    // and its cancel with it. A credit note alone pays nothing, and needs none.
+    if (reissueFor(note.request) !== null && treatyNeedsResidence(cited.regime)) {
+      const residence = taxResidenceFor(facts.documents, cited.period);
+      if (residence !== 'covered') {
+        hold(note.request, residence === 'missing' ? 'tax_residence_missing' : 'tax_residence_unverified');
+        continue;
+      }
     }
     if (until === null) {
       hold(note.request, 'no_mandate');

@@ -29,6 +29,7 @@ import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
 import type { PayrollInvoiceStore } from '../domain/ports';
 
+import { reviewOf } from './document-rows';
 import { enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
 import { CountedSchema } from './read-store';
 import { regimeVatOf } from './regime-store';
@@ -42,6 +43,7 @@ const {
   commissionStatementLines,
   commissionStatements,
   contractAcceptances,
+  contractorDocumentReviews,
   contractorDocuments,
   contractorProfiles,
   contractorRegimes,
@@ -270,8 +272,11 @@ async function factsOf(
       kind: contractorDocuments.kind,
       issuedOn: contractorDocuments.issuedOn,
       validUntil: contractorDocuments.validUntil,
+      decision: contractorDocumentReviews.decision,
+      reason: contractorDocumentReviews.reason,
     })
     .from(contractorDocuments)
+    .leftJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
     .where(eq(contractorDocuments.memberId, memberId));
   const [settings] = await tx.select().from(billingSettings).where(eq(billingSettings.id, 1));
   const keys = await tx
@@ -313,6 +318,7 @@ async function factsOf(
       kind: ContractorDocumentKindSchema.parse(one.kind),
       issuedOn: one.issuedOn,
       validUntil: one.validUntil,
+      review: reviewOf(one),
     })),
     // Without the designation of the service, the settings are not filled: nothing is issued (`agency_missing`).
     settings:

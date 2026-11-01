@@ -15,6 +15,9 @@ import {
   CommissionStatementSchema,
   ContestInvoiceBodySchema,
   ContractAcceptanceSchema,
+  ContractorDocumentParamsSchema,
+  ContractorDocumentReviewSchema,
+  ContractorDocumentSchema,
   ContractorFileSchema,
   ContractorParamsSchema,
   ContractorProfileBodySchema,
@@ -46,6 +49,7 @@ import {
   CreatePayoutMinimumBodySchema,
   UpdateBillingSettingsBodySchema,
   UpdatePayrollSettingsBodySchema,
+  UploadContractorDocumentQuerySchema,
   PenaltyIdSchema,
   PenaltySchema,
   RefuseInvoiceContestBodySchema,
@@ -63,6 +67,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { PayrollBillingSettings } from '../application/billing-settings';
+import type { ContractorDocuments } from '../application/contractor-documents';
 import type { PayrollEntries } from '../application/entries';
 import type { PayrollInvoiceAcceptance } from '../application/invoice-acceptance';
 import type { DownloadedPdf } from '../application/invoice-pdfs';
@@ -106,6 +111,12 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
 const LOGO_BODY_LIMIT_BYTES = 1_048_576;
 
 /**
+ * A contractor's document arrives as its bytes too (`content-type: application/octet-stream`), what it is read from
+ * them. Up to 12 MB, so that a file over 10 MB gets its reason (`too_heavy`) instead of a bare 413.
+ */
+const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
+
+/**
  * `/v1/payroll` (EQ-04): the owner and the team's accounts reach it, a creator never. What each one reads and writes
  * is the database's call (`withMember`): every statement for the owner and an active manager, one's own for anyone
  * else; a validation, a bonus, a penalty or an adjustment by the owner or an active manager, never for oneself; a
@@ -117,7 +128,9 @@ const LOGO_BODY_LIMIT_BYTES = 1_048_576;
  * written by himself or the owner, checked and prefixed by the owner only; the contract's and the mandate's versions
  * (`/payroll/contract-texts`) are added by the owner and accepted by the contractor himself (EQ-06 lot 5a). The
  * billing regimes (`/payroll/billing-regimes`) are read by any member; the owner alone adds one, records its validation
- * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b).
+ * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b). A
+ * contractor's documents (`…/contractors/:memberId/documents`, lot 5c) are filed by himself or the owner, read by them
+ * and an active manager, and checked once by the owner, never on his own file.
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -129,6 +142,7 @@ export function createPayrollRoutes(
   billing: PayrollBillingSettings,
   contractors: PayrollContractorStore,
   regimes: PayrollRegimeStore,
+  documents: ContractorDocuments,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -137,6 +151,13 @@ export function createPayrollRoutes(
     app.addContentTypeParser(
       'image/png',
       { parseAs: 'buffer', bodyLimit: LOGO_BODY_LIMIT_BYTES },
+      (_request, body, done) => {
+        done(null, body);
+      },
+    );
+    app.addContentTypeParser(
+      'application/octet-stream',
+      { parseAs: 'buffer', bodyLimit: DOCUMENT_BODY_LIMIT_BYTES },
       (_request, body, done) => {
         done(null, body);
       },
@@ -581,6 +602,71 @@ export function createPayrollRoutes(
           request.body,
         );
         return reply.code(created ? 201 : 200).send(assignment);
+      },
+    );
+
+    app.post(
+      '/payroll/contractors/:memberId/documents',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: ContractorParamsSchema,
+          querystring: UploadContractorDocumentQuerySchema,
+          response: { 200: ContractorDocumentSchema, 201: ContractorDocumentSchema },
+        },
+      },
+      async (request, reply) => {
+        // Anything but the bytes of a file (JSON, a form) is not a document's file.
+        const bytes = Buffer.isBuffer(request.body) ? new Uint8Array(request.body) : new Uint8Array();
+        const { document, created } = await documents.upload(
+          actorOf(request),
+          request.params.memberId,
+          request.query,
+          bytes,
+        );
+        return reply.code(created ? 201 : 200).send(document);
+      },
+    );
+
+    // A file, never JSON: kept out of every cache, its type the one read at its upload, never guessed by the browser.
+    app.get(
+      '/payroll/contractors/:memberId/documents/:documentId/file',
+      { preValidation: ownerOrMember, schema: { params: ContractorDocumentParamsSchema } },
+      async (request, reply) => {
+        const file = await documents.download(
+          userOf(request),
+          request.params.memberId,
+          request.params.documentId,
+          request.log,
+        );
+        return reply
+          .header('content-type', file.mediaType)
+          .header('content-disposition', `attachment; filename="${file.fileName}"`)
+          .header('cache-control', 'private, no-store')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-security-policy', "default-src 'none'; sandbox")
+          .send(Buffer.from(file.bytes));
+      },
+    );
+
+    app.post(
+      '/payroll/contractors/:memberId/documents/:documentId/review',
+      {
+        preValidation: owner,
+        schema: {
+          params: ContractorDocumentParamsSchema,
+          body: ContractorDocumentReviewSchema,
+          response: { 200: ContractorDocumentSchema, 201: ContractorDocumentSchema },
+        },
+      },
+      async (request, reply) => {
+        const { document, created } = await documents.review(
+          actorOf(request),
+          request.params.memberId,
+          request.params.documentId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(document);
       },
     );
     return Promise.resolve();

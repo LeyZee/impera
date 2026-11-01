@@ -599,6 +599,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
         validUntil: null,
         storageKey: `contractors/${member(kofi)}/tax-residence-2026.pdf`,
         sha256: HASH,
+        retainUntil: new Date('2037-01-01T00:00:00Z'),
         createdBy: by,
         ...values,
       });
@@ -624,6 +625,96 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
         await failure(admin((tx) => tx.update(s.contractorDocuments).set({ sha256: 'b'.repeat(64) }))),
       ).toMatch(KEPT);
       expect(await failure(admin((tx) => tx.delete(s.contractorDocuments)))).toMatch(KEPT);
+    });
+
+    it('the owner checks a document once, accepted or refused with its reason; its contractor reads it (lot 5c)', async () => {
+      const LOCKED = new Date('2038-01-01T00:00:00Z');
+      const [first, second] = await as(kofi, (tx) =>
+        tx
+          .select({ id: s.contractorDocuments.id })
+          .from(s.contractorDocuments)
+          .orderBy(s.contractorDocuments.issuedOn),
+      );
+      if (first === undefined || second === undefined) throw new Error('the documents of the test before');
+      const review = (
+        documentId: string,
+        by: string,
+        values: Partial<typeof s.contractorDocumentReviews.$inferInsert> = {},
+      ) => ({
+        documentId,
+        decision: 'accepted',
+        reason: null,
+        reviewedBy: by,
+        retainUntil: LOCKED,
+        ...values,
+      });
+      for (const by of [kofi, manager]) {
+        expect(
+          await failure(as(by, (tx) => tx.insert(s.contractorDocumentReviews).values(review(first.id, by)))),
+        ).toMatch(RLS);
+      }
+      // A refusal says why, an acceptance says nothing more.
+      expect(
+        await failure(
+          as(owner, (tx) =>
+            tx
+              .insert(s.contractorDocumentReviews)
+              .values(review(first.id, owner, { decision: 'refused', retainUntil: null })),
+          ),
+        ),
+      ).toMatch(/contractor_document_reviews_reason_check/u);
+      expect(
+        await failure(
+          as(owner, (tx) =>
+            tx.insert(s.contractorDocumentReviews).values(review(first.id, owner, { reason: 'Lisible.' })),
+          ),
+        ),
+      ).toMatch(/contractor_document_reviews_reason_check/u);
+      // An acceptance keeps the end of the file's lock, a refusal none: its file keeps the lock of its upload.
+      expect(
+        await failure(
+          as(owner, (tx) =>
+            tx.insert(s.contractorDocumentReviews).values(review(first.id, owner, { retainUntil: null })),
+          ),
+        ),
+      ).toMatch(/contractor_document_reviews_retain_check/u);
+      expect(
+        await failure(
+          as(owner, (tx) =>
+            tx
+              .insert(s.contractorDocumentReviews)
+              .values(review(first.id, owner, { decision: 'refused', reason: 'Illisible.' })),
+          ),
+        ),
+      ).toMatch(/contractor_document_reviews_retain_check/u);
+      await as(owner, (tx) =>
+        tx.insert(s.contractorDocumentReviews).values(
+          review(first.id, owner, {
+            decision: 'refused',
+            reason: 'L’année n’est pas lisible.',
+            retainUntil: null,
+          }),
+        ),
+      );
+      expect(
+        await failure(
+          as(owner, (tx) => tx.insert(s.contractorDocumentReviews).values(review(first.id, owner))),
+        ),
+      ).toMatch(/contractor_document_reviews_pkey/u);
+      await as(owner, (tx) => tx.insert(s.contractorDocumentReviews).values(review(second.id, owner)));
+      expect(await as(kofi, (tx) => tx.select().from(s.contractorDocumentReviews))).toHaveLength(2);
+      expect(await as(manager, (tx) => tx.select().from(s.contractorDocumentReviews))).toHaveLength(2);
+      expect(await as(ama, (tx) => tx.select().from(s.contractorDocumentReviews))).toHaveLength(0);
+      expect(
+        await failure(
+          admin((tx) =>
+            tx
+              .update(s.contractorDocumentReviews)
+              .set({ decision: 'accepted', reason: null, retainUntil: LOCKED }),
+          ),
+        ),
+      ).toMatch(KEPT);
+      expect(await failure(admin((tx) => tx.delete(s.contractorDocumentReviews)))).toMatch(KEPT);
     });
 
     it('a contract text is the next version and carries its SHA-256; the contractor accepts it himself, with it', async () => {

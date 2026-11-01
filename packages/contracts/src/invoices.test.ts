@@ -10,7 +10,9 @@ import {
   BillingSettingsSchema,
   BillingSettingsViewSchema,
   BusinessIdSchema,
+  CONTRACTOR_DOCUMENT_MEDIA_TYPES,
   ContestInvoiceBodySchema,
+  ContractorDocumentReviewSchema,
   ContractorProfileBodySchema,
   ContractorProfileSchema,
   CreateBillingRegimeBodySchema,
@@ -31,6 +33,7 @@ import {
   SERVICE_DESCRIPTION_MAX,
   ServiceDescriptionSchema,
   UpdateBillingSettingsBodySchema,
+  UploadContractorDocumentQuerySchema,
   ValidateBillingRegimeBodySchema,
   VatNumberSchema,
   addressLines,
@@ -536,6 +539,47 @@ describe('invoices', () => {
       expect(refused({ ...benin, mentions: Array.from({ length: 25 }, () => 'Mention') })).toEqual([
         'mentions',
       ]);
+    });
+  });
+
+  describe('Équipe › Pièces du prestataire (lot 5c)', () => {
+    const certificate = {
+      id: '0190a0b0-0000-7000-8000-000000000040',
+      kind: 'tax_residence',
+      issuedOn: '2026-03-03',
+    };
+    const refused = (query: object): string[] => {
+      const result = UploadContractorDocumentQuerySchema.safeParse(query);
+      return result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
+    };
+
+    it('takes a certificate of residence without an end: it holds for the calendar year of its issue', () => {
+      expect(UploadContractorDocumentQuerySchema.parse(certificate)).toEqual(certificate);
+      expect(refused({ ...certificate, validUntil: '2026-12-31' })).toEqual(['validUntil']);
+      const vigilance = { ...certificate, kind: 'urssaf_vigilance' };
+      expect(refused({ ...vigilance, validUntil: '2026-09-02' })).toEqual([]);
+      expect(refused({ ...vigilance, validUntil: '2026-03-03' })).toEqual(['validUntil']);
+      expect(refused({ ...vigilance, issuedOn: '2026-02-30' })).toEqual(['issuedOn']);
+    });
+
+    it('takes a check accepted, or refused with a reason of 1 to 500 characters, trimmed', () => {
+      expect(ContractorDocumentReviewSchema.parse({ decision: 'accepted' })).toEqual({
+        decision: 'accepted',
+      });
+      expect(ContractorDocumentReviewSchema.parse({ decision: 'refused', reason: '  Illisible.  ' })).toEqual(
+        {
+          decision: 'refused',
+          reason: 'Illisible.',
+        },
+      );
+      expect(ContractorDocumentReviewSchema.safeParse({ decision: 'refused' }).success).toBe(false);
+      expect(ContractorDocumentReviewSchema.safeParse({ decision: 'refused', reason: '   ' }).success).toBe(
+        false,
+      );
+      expect(
+        ContractorDocumentReviewSchema.safeParse({ decision: 'refused', reason: 'x'.repeat(501) }).success,
+      ).toBe(false);
+      expect(CONTRACTOR_DOCUMENT_MEDIA_TYPES).toEqual(['application/pdf', 'image/jpeg', 'image/png']);
     });
   });
 });

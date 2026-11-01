@@ -30,7 +30,9 @@ type AuditedAction =
   | 'contract.accept'
   | 'billing_regime.create'
   | 'billing_regime.validate'
-  | 'contractor_regime.assign';
+  | 'contractor_regime.assign'
+  | 'contractor_document.add'
+  | 'contractor_document.review';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -54,7 +56,8 @@ export async function audit(
       | 'contract_text'
       | 'contract_acceptance'
       | 'billing_regime'
-      | 'contractor_regime';
+      | 'contractor_regime'
+      | 'contractor_document';
     readonly id: string;
   },
   details: Record<string, unknown>,

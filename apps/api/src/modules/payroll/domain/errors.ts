@@ -2,6 +2,8 @@ import {
   DomainError,
   PAY_AMOUNT_MAX_MINOR,
   type AgencyLogoRefusal,
+  type ContractorDocumentDecision,
+  type ContractorDocumentRefusal,
   type PayPeriod,
 } from '@nirvana/contracts';
 
@@ -529,5 +531,61 @@ export class BillingRegimeCountryMismatch extends DomainError {
 export class ContractorRegimeIdConflict extends DomainError {
   constructor() {
     super('contractor_regime_id_conflict', 'Cet identifiant est déjà pris par une autre attribution');
+  }
+}
+
+const DOCUMENT_REFUSALS: Readonly<Record<ContractorDocumentRefusal, string>> = {
+  too_heavy: 'Le fichier pèse plus de 10 Mo',
+  not_supported: 'Le fichier doit être un PDF, ou une photo JPEG ou PNG',
+};
+
+/** A document's file the server refuses to keep (400, lot 5c), `details.reason` saying why. */
+export class ContractorDocumentInvalid extends DomainError {
+  constructor(readonly reason: ContractorDocumentRefusal) {
+    super('contractor_document_invalid', DOCUMENT_REFUSALS[reason], { details: { reason } });
+  }
+}
+
+/** The same document id sent again with another file or other dates (lot 5c). */
+export class ContractorDocumentIdConflict extends DomainError {
+  constructor() {
+    super('contractor_document_id_conflict', 'Cet identifiant est déjà pris par une autre pièce');
+  }
+}
+
+/** A document issued on a day still to come in the agency's zone (lot 5c). */
+export class ContractorDocumentIssuedAhead extends DomainError {
+  constructor(issuedOn: string) {
+    super('contractor_document_issued_future_unprocessable', 'La date de délivrance est encore à venir', {
+      details: { issuedOn },
+    });
+  }
+}
+
+/** No such document, or not one the reader sees (lot 5c). */
+export class ContractorDocumentNotFound extends DomainError {
+  constructor() {
+    super('contractor_document_not_found', 'Pièce introuvable');
+  }
+}
+
+/** The owner checked the document already, otherwise: a document is checked once (lot 5c). */
+export class ContractorDocumentReviewed extends DomainError {
+  constructor(decision: ContractorDocumentDecision) {
+    super(
+      'contractor_document_reviewed_conflict',
+      decision === 'accepted' ? 'Cette pièce est déjà acceptée' : 'Cette pièce est déjà refusée',
+      { details: { decision } },
+    );
+  }
+}
+
+/** The bucket did not give the document's file with its fingerprint: an altered file is never served (lot 5c). */
+export class ContractorDocumentUnavailable extends DomainError {
+  constructor() {
+    super(
+      'contractor_document_unavailable',
+      'La pièce est momentanément indisponible, réessaie dans un instant',
+    );
   }
 }
