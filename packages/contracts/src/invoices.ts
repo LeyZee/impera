@@ -259,6 +259,31 @@ export const VatNumberSchema = z
   .string()
   .regex(new RegExp(VAT_NUMBER_PATTERN, 'u'), 'Un numéro de TVA intracommunautaire');
 
+/**
+ * Whether a SIREN's last digit is its check key (Luhn, as INSEE computes it). Only some SIRETs of La Poste escape the
+ * rule, never a SIREN.
+ */
+export function sirenChecksOut(siren: string): boolean {
+  if (!/^[0-9]{9}$/u.test(siren)) return false;
+  let sum = 0;
+  for (let index = 0; index < siren.length; index += 1) {
+    // From the right, every second digit counts twice, its two digits added.
+    const digit = Number(siren[siren.length - 1 - index]);
+    const counted = index % 2 === 1 ? digit * 2 : digit;
+    sum += counted > 9 ? counted - 9 : counted;
+  }
+  return sum % 10 === 0;
+}
+
+/**
+ * The intra-community VAT number of a French company, from its SIREN: `FR`, a two-digit key, then the SIREN; the key is
+ * (12 + 3 × (SIREN mod 97)) mod 97.
+ */
+export function frenchVatNumberOf(siren: string): string {
+  const key = (12 + 3 * (Number(siren) % 97)) % 97;
+  return `FR${String(key).padStart(2, '0')}${siren}`;
+}
+
 export const AgencyLogoMediaTypeSchema = z.enum(AGENCY_LOGO_MEDIA_TYPES);
 export type AgencyLogoMediaType = z.infer<typeof AgencyLogoMediaTypeSchema>;
 
@@ -442,12 +467,31 @@ export type BillingSettingsView = z.infer<typeof BillingSettingsViewSchema>;
 /**
  * The agency as the owner sets it: what an invoice prints, its foot included. The legal form, the share capital and the
  * town of the trade register are optional in a copy made before lot 4, never in a setting saved from now on (art.
- * R123-237 of the Code de commerce).
+ * R123-237 of the Code de commerce). The SIREN carries its check key, and the VAT number is the one this SIREN gives
+ * (`frenchVatNumberOf`): a copy already made is read as it is, a setting saved from now on is checked.
  */
 export const BillingAgencyBodySchema = InvoiceAgencySchema.extend({
   legalForm: trimmed(AGENCY_LEGAL_FORM_MAX),
   shareCapitalMinor: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   rcsCity: trimmed(RCS_CITY_MAX),
+}).superRefine((agency, context) => {
+  // A typo in either number would be printed on every invoice from now on: both are checked before they are saved.
+  if (!sirenChecksOut(agency.siren)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['siren'],
+      message: 'Ce numéro n’est pas un SIREN : sa clé de contrôle (le dernier chiffre) ne correspond pas.',
+    });
+    return;
+  }
+  const expected = frenchVatNumberOf(agency.siren);
+  if (agency.vatNumber !== expected) {
+    context.addIssue({
+      code: 'custom',
+      path: ['vatNumber'],
+      message: `Le numéro de TVA intracommunautaire de ce SIREN est ${expected}.`,
+    });
+  }
 });
 export type BillingAgencyBody = z.infer<typeof BillingAgencyBodySchema>;
 

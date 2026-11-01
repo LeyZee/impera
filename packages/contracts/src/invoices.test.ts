@@ -4,6 +4,7 @@ import {
   AGENCY_LOGO_REFUSALS,
   AgencyLogoMediaTypeSchema,
   AgencyLogoSchema,
+  BillingAgencyBodySchema,
   BillingRegimeSchema,
   BillingSettingsSchema,
   BillingSettingsViewSchema,
@@ -26,6 +27,8 @@ import {
   ServiceDescriptionSchema,
   UpdateBillingSettingsBodySchema,
   VatNumberSchema,
+  frenchVatNumberOf,
+  sirenChecksOut,
 } from './invoices';
 
 // Invented parties (ADR 0010): no real name, address nor identifier.
@@ -175,6 +178,9 @@ describe('invoices', () => {
     const body = {
       agency: {
         ...invoice.agency,
+        // Invented, with a right check key and the VAT number it gives.
+        siren: '123456782',
+        vatNumber: 'FR11123456782',
         legalForm: 'SAS',
         shareCapitalMinor: 1_000_000,
         rcsCity: 'Lyon',
@@ -203,6 +209,43 @@ describe('invoices', () => {
       false,
     );
     expect(UpdateBillingSettingsBodySchema.safeParse({ ...body, dueDays: 61 }).success).toBe(false);
+  });
+
+  it('save a SIREN only with its check key, and the VAT number that SIREN gives', () => {
+    // Invented numbers; La Poste's SIREN is public, and passes like any other.
+    for (const siren of ['123456782', '987654324', '356000000']) expect(sirenChecksOut(siren)).toBe(true);
+    for (const siren of ['123456789', '987654321', '12345678', '12345678a']) {
+      expect(sirenChecksOut(siren)).toBe(false);
+    }
+    expect(frenchVatNumberOf('123456782')).toBe('FR11123456782');
+    expect(frenchVatNumberOf('987654324')).toBe('FR14987654324');
+    // A key below ten keeps its two digits.
+    expect(frenchVatNumberOf('987654321')).toBe('FR05987654321');
+
+    const agency = {
+      legalName: 'Agence Exemple SAS',
+      address: '1 place Fictive, 69000 Lyon',
+      siren: '123456782',
+      vatNumber: 'FR11123456782',
+      legalForm: 'SAS',
+      shareCapitalMinor: 1_000_000,
+      rcsCity: 'Lyon',
+    };
+    expect(BillingAgencyBodySchema.safeParse(agency).success).toBe(true);
+    const wrongKey = BillingAgencyBodySchema.safeParse({ ...agency, siren: '123456789' });
+    expect(wrongKey.error?.issues.map((issue) => issue.path)).toEqual([['siren']]);
+    const otherVat = BillingAgencyBodySchema.safeParse({ ...agency, vatNumber: 'FR12123456782' });
+    expect(otherVat.error?.issues).toEqual([
+      expect.objectContaining({
+        path: ['vatNumber'],
+        message: 'Le numéro de TVA intracommunautaire de ce SIREN est FR11123456782.',
+      }),
+    ]);
+    expect(BillingAgencyBodySchema.safeParse({ ...agency, vatNumber: 'BE0123456789' }).success).toBe(false);
+    // A copy made before is read as it is: the check is the setting's, at its save.
+    expect(
+      InvoiceAgencySchema.safeParse({ ...agency, siren: '123456789', vatNumber: 'FR12123456789' }).success,
+    ).toBe(true);
   });
 
   it('describe a kept logo by its fingerprint, its sides and its weight, and name each reason to refuse one', () => {
