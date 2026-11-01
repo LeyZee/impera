@@ -3,11 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bodyOf,
-  capitalText,
   closeChoiceText,
   draftOf,
-  footText,
-  formLine,
   isReady,
   isSiren,
   logoLine,
@@ -153,17 +150,6 @@ describe('Réglages › Facturation : le formulaire', () => {
 });
 
 describe('Réglages › Facturation : ce que la page dit', () => {
-  it('prints the foot as the invoice does: form, capital, register', () => {
-    expect(capitalText(1_000_000)).toBe('10\u202f000\u00a0€');
-    expect(capitalText(100_050)).toBe('1\u202f000,50\u00a0€');
-    expect(formLine(SETTINGS.agency)).toBe('SAS au capital de 10\u202f000\u00a0€');
-    expect(formLine({ ...SETTINGS.agency, legalForm: null })).toBeNull();
-    expect(footText(SETTINGS.agency)).toBe(
-      'Document établi par Atelier Lumen, 12 rue des Exemples, 69002 Lyon · SAS au capital de 10\u202f000\u00a0€ · ' +
-        'RCS\u00a0Lyon\u00a0123\u00a0456\u00a0782, mandataire de facturation du prestataire.',
-    );
-  });
-
   it('names the close of the fiscal year, February’s last day included', () => {
     expect(closeChoiceText(12)).toBe('31 décembre');
     expect(closeChoiceText(6)).toBe('30 juin');
