@@ -15,8 +15,8 @@ import { BPS, mulDivRound } from './rounding';
 /**
  * A contractor's invoice and its credit notes (EQ-06, ADR 0023 § Factures and ADR 0036), the pure rules: its number,
  * its lines from a validated statement, its totals under the regime, its due date, the credit notes a period owes and
- * the invoice each one cites, and the lines of a credit note. The invoice is frozen at its issue: every text here is
- * computed once and copied, never recomputed for an issued invoice.
+ * the invoice each one cites, the lines of a credit note, and the corrective invoices a period owes (ADR 0040). The
+ * invoice is frozen at its issue: every text here is computed once and copied, never recomputed for an issued invoice.
  */
 
 /** A line as the invoice prints it: what it is, its detail, its amount excluding VAT (negative for a deduction). */
@@ -122,6 +122,31 @@ function adjustmentDetail(reason: string, correctsPeriod: PayPeriod | null): str
 }
 
 /**
+ * The invoices a cancel and reissue names among `adjustments` (ADR 0039 § 3): a positive adjustment and a negative one
+ * that name the same document. A contest ends once, so its document has one correction: an amount (one adjustment) or
+ * this pair, never both.
+ */
+function reissuedInvoices(adjustments: InvoiceSource['adjustments']): ReadonlySet<string> {
+  const credited = new Set<string>();
+  const billed = new Set<string>();
+  for (const one of adjustments) {
+    if (one.contestedInvoiceId === null) continue;
+    if (one.amountMinor < 0) credited.add(one.contestedInvoiceId);
+    else if (one.amountMinor > 0) billed.add(one.contestedInvoiceId);
+  }
+  return new Set([...billed].filter((id) => credited.has(id)));
+}
+
+/** Whether `adjustment` is the positive half of a cancel and reissue, which a corrective invoice bills (ADR 0040). */
+const reissuing = (
+  adjustment: InvoiceSource['adjustments'][number],
+  reissued: ReadonlySet<string>,
+): boolean =>
+  adjustment.amountMinor > 0 &&
+  adjustment.contestedInvoiceId !== null &&
+  reissued.has(adjustment.contestedInvoiceId);
+
+/**
  * Each percent penalty's share of the one rounding the engine made on their sum: the rounded running total less the
  * one before, so that the lines add up to the engine's amount to the cent, each within a cent of its own share.
  */
@@ -144,9 +169,10 @@ function penaltyAmounts(penalties: readonly PenaltyForInvoice[], netMinor: numbe
  * manual bonus, each penalty as a deduction the contract provides for, the cap of penalties when it applied, and each
  * adjustment in the contractor's favour with the period it corrects (ADR 0023: an omission becomes a line of the next
  * invoice). An adjustment in the agency's favour is never a line: it is a credit note on the invoice it corrects
- * (`creditsDue`). A carry-over, positive or negative, is never invoiced again: it stays invoiced in its own period,
- * and only delays the payment. The lines add up to the statement's own amount for the period, less what it owes back,
- * or the source is a bug of the caller. When they add up to less than zero, nothing is issued and the period owes the
+ * (`creditsDue`). Neither is the positive half of a cancel and reissue: it bills again an invoice of another period,
+ * on a corrective invoice of its own under that invoice's regime (`reissuesDue`, ADR 0040). A carry-over, positive or negative, is never invoiced again: it stays invoiced in its own period,
+ * and only delays the payment. The lines add up to the statement's own amount for the period, less what it owes back
+ * and what its corrective invoices bill, or the source is a bug of the caller. When they add up to less than zero, nothing is issued and the period owes the
  * difference (`creditsDue`).
  */
 export function invoiceLines(source: InvoiceSource): InvoiceLine[] {
@@ -224,7 +250,10 @@ export function invoiceLines(source: InvoiceSource): InvoiceLine[] {
       amountMinor: capMinor,
     });
   }
-  for (const adjustment of source.adjustments.filter((one) => one.amountMinor > 0)) {
+  const reissued = reissuedInvoices(source.adjustments);
+  for (const adjustment of source.adjustments.filter(
+    (one) => one.amountMinor > 0 && !reissuing(one, reissued),
+  )) {
     lines.push({
       kind: 'adjustment',
       label: 'Régularisation',
@@ -235,9 +264,12 @@ export function invoiceLines(source: InvoiceSource): InvoiceLine[] {
   const owedBackMinor = sum(
     source.adjustments.filter((one) => one.amountMinor < 0).map((one) => one.amountMinor),
   );
+  const reissuedMinor = sum(
+    source.adjustments.filter((one) => reissuing(one, reissued)).map((one) => one.amountMinor),
+  );
   if (
     sum(lines.map((line) => line.amountMinor)) !==
-    statement.totalMinor - statement.carryOversInMinor - owedBackMinor
+    statement.totalMinor - statement.carryOversInMinor - owedBackMinor - reissuedMinor
   ) {
     throw new RangeError('The lines do not add up to the statement');
   }
@@ -253,10 +285,11 @@ export type CreditDue =
       readonly reason: string;
       readonly correctsPeriod: PayPeriod | null;
       /**
-       * The cancel of a cancel and reissue (ADR 0039 § 3): it leaves only with the invoice of this period, which bills
-       * the line again; the contractor never has an invoice cancelled with nothing in its place.
+       * The cancel of a cancel and reissue (ADR 0039 § 3, ADR 0040), the invoice it cancels, or `null`: it goes on that
+       * invoice, takes off all that is left of it, and leaves only with the corrective invoice that bills it again;
+       * the contractor never has an invoice cancelled with nothing in its place.
        */
-      readonly withInvoice: boolean;
+      readonly reissueOf: string | null;
     }
   /** What the period's own lines leave below zero, refunds above sales for instance: the period has no invoice. */
   | { readonly kind: 'negative_period'; readonly amountMinor: number; readonly period: PayPeriod };
@@ -265,14 +298,10 @@ export type CreditDue =
  * The credit notes a validated statement makes due: one per adjustment in the agency's favour, then what its invoice's
  * lines leave below zero. Every amount the statement pays less is on a document: its invoice, or one of these. The
  * negative half of a cancel and reissue (an adjustment that names a contested document beside a positive one naming
- * the same) waits for the invoice that bills it again.
+ * the same) is the cancel of that invoice, which leaves with its corrective invoice (`reissuesDue`).
  */
 export function creditsDue(source: InvoiceSource): CreditDue[] {
-  const reissued = new Set(
-    source.adjustments
-      .filter((one) => one.amountMinor > 0 && one.contestedInvoiceId !== null)
-      .map((one) => one.contestedInvoiceId),
-  );
+  const reissued = reissuedInvoices(source.adjustments);
   const dues: CreditDue[] = source.adjustments
     .filter((one) => one.amountMinor < 0)
     .map((one) => ({
@@ -280,7 +309,10 @@ export function creditsDue(source: InvoiceSource): CreditDue[] {
       amountMinor: minus(one.amountMinor),
       reason: one.reason,
       correctsPeriod: one.correctsPeriod,
-      withInvoice: one.contestedInvoiceId !== null && reissued.has(one.contestedInvoiceId),
+      reissueOf:
+        one.contestedInvoiceId !== null && reissued.has(one.contestedInvoiceId)
+          ? one.contestedInvoiceId
+          : null,
     }));
   const leftMinor = sum(invoiceLines(source).map((line) => line.amountMinor));
   if (leftMinor < 0)
@@ -288,8 +320,55 @@ export function creditsDue(source: InvoiceSource): CreditDue[] {
   return dues;
 }
 
+/**
+ * A corrective invoice a period owes (ADR 0040): the positive half of a cancel and reissue, which bills again what its
+ * cancel takes off `invoiceId`, on an invoice of its own under that invoice's period, regime and mentions.
+ */
+export interface ReissueDue {
+  readonly invoiceId: string;
+  readonly amountMinor: number;
+  readonly reason: string;
+  readonly correctsPeriod: PayPeriod | null;
+}
+
+/** The corrective invoices a validated statement makes due, one per cancel and reissue, in the order written. */
+export function reissuesDue(source: InvoiceSource): ReissueDue[] {
+  const reissued = reissuedInvoices(source.adjustments);
+  return source.adjustments.flatMap((one) =>
+    one.contestedInvoiceId !== null && reissuing(one, reissued)
+      ? [
+          {
+            invoiceId: one.contestedInvoiceId,
+            amountMinor: one.amountMinor,
+            reason: one.reason,
+            correctsPeriod: one.correctsPeriod,
+          },
+        ]
+      : [],
+  );
+}
+
+/**
+ * The line of a corrective invoice: the adjustment that bills the invoice again, with the period it corrects, as the
+ * line of its cancel says it with the opposite amount.
+ */
+export function reissueLines(due: ReissueDue): InvoiceLine[] {
+  if (!Number.isSafeInteger(due.amountMinor) || due.amountMinor <= 0) {
+    throw new RangeError('A corrective invoice bills a whole positive amount');
+  }
+  return [
+    {
+      kind: 'adjustment',
+      label: 'Régularisation',
+      detail: adjustmentDetail(due.reason, due.correctsPeriod),
+      amountMinor: due.amountMinor,
+    },
+  ];
+}
+
 /** An issued invoice of the contractor, as a credit note's target reads it. */
 export interface IssuedInvoice {
+  readonly id: string;
   readonly number: string;
   readonly period: PayPeriod;
   readonly exclVatMinor: number;
@@ -304,8 +383,8 @@ export interface PlannedCreditNote {
 
 /**
  * Where each credit note a period owes goes (ADR 0036), in order, each on one invoice that has enough left once the
- * notes before it are counted: an adjustment on the invoice of the period it corrects, a negative period on the
- * latest invoice of an earlier period. A due that no invoice can take whole is never split nor issued: it goes back to
+ * notes before it are counted: the cancel of a cancel and reissue on the invoice it cancels, another adjustment on an
+ * invoice of the period it corrects, a negative period on the latest invoice of an earlier period. A due that no invoice can take whole is never split nor issued: it goes back to
  * the owner, who settles it with the accountant.
  */
 export function planCreditNotes(
@@ -319,9 +398,11 @@ export function planCreditNotes(
   const unplaced: CreditDue[] = [];
   for (const due of dues) {
     const candidates =
-      due.kind === 'adjustment'
-        ? invoices.filter((one) => due.correctsPeriod !== null && one.period === due.correctsPeriod)
-        : latestFirst.filter((one) => one.period < due.period);
+      due.kind === 'negative_period'
+        ? latestFirst.filter((one) => one.period < due.period)
+        : due.reissueOf !== null
+          ? invoices.filter((one) => one.id === due.reissueOf)
+          : invoices.filter((one) => due.correctsPeriod !== null && one.period === due.correctsPeriod);
     const target = candidates.find((one) => left(one) >= due.amountMinor);
     if (target === undefined) {
       unplaced.push(due);
@@ -382,6 +463,14 @@ export function invoiceDueOn(issuedOn: string, delayDays: number): string {
  */
 export function paymentTermsMention(dueOn: string, terms: string): string {
   return `Échéance${COLON}${longDay(dueOn)}. ${terms}`;
+}
+
+/**
+ * What a corrective invoice cites of the invoice it replaces (ADR 0040), its first mention, before its regime's: the
+ * base checks it names that invoice.
+ */
+export function reissueMention(invoiceNumber: string, issuedOn: string): string {
+  return `Facture rectificative de la facture ${invoiceNumber} du ${longDay(issuedOn)}`;
 }
 
 /** What a credit note cites of its invoice, printed as a mention of the credit note. */

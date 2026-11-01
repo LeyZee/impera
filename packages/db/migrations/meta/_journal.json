@@ -365,6 +365,13 @@
       "when": 1793555713269,
       "tag": "0051_member_departure",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793559237637,
+      "tag": "0052_invoice_reissue",
+      "breakpoints": true
     }
   ]
 }

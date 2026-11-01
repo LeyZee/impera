@@ -69,7 +69,8 @@ export interface PdfDocumentSource {
   readonly regimeMentions: readonly string[];
   /**
    * Every mention frozen on the document: an invoice's are its regime's then its payment terms; a credit note's are
-   * the invoice it cites then that invoice's regime's (lot 3).
+   * the invoice it cites then that invoice's regime's (lot 3); a corrective invoice's are the invoice it bills again,
+   * that invoice's regime's, then its payment terms (ADR 0040).
    */
   readonly mentions: readonly string[];
   /** An invoice's designation of the service, frozen at its issue; `null` on a credit note. */
@@ -93,7 +94,9 @@ export interface PdfDocumentSource {
   };
   /** The invoice a credit note cites, `null` for an invoice. */
   readonly credited: { readonly number: string; readonly issuedOn: string } | null;
-  /** The statement an invoice bills, printed in an annex; `null` for a credit note. */
+  /** The invoice a corrective invoice bills again (ADR 0040), `null` for any other document. */
+  readonly reissued: { readonly number: string; readonly issuedOn: string } | null;
+  /** The statement an invoice bills, printed in an annex; `null` for a credit note and a corrective invoice. */
   readonly annex: StatementAnnexSource | null;
 }
 
@@ -343,21 +346,28 @@ function momentWords(at: Date, timeZone: string): string {
 
 /**
  * The document's mentions, split as lot 3 froze them: the regime's, and its own (an invoice's payment terms, the
- * invoice a credit note cites). Any other shape is a fault, never printed half: the job fails and alerts.
+ * invoice a credit note cites), with, on a corrective invoice, the invoice it bills again first (ADR 0040), printed as
+ * frozen. Any other shape is a fault, never printed half: the job fails and alerts.
  */
-function ownMention(source: PdfDocumentSource): string {
+function ownMentions(source: PdfDocumentSource): { readonly own: string; readonly reference: string | null } {
   const regime = source.regimeMentions;
   const all = source.mentions;
-  const own = source.kind === 'invoice' ? all.at(-1) : all[0];
-  const rest = source.kind === 'invoice' ? all.slice(0, -1) : all.slice(1);
+  const isInvoice = source.kind === 'invoice';
+  const reissued = isInvoice ? source.reissued : null;
+  const own = isInvoice ? all.at(-1) : all[0];
+  const reference = reissued === null ? null : (all[0] ?? '');
+  const rest = isInvoice ? all.slice(reissued === null ? 0 : 1, -1) : all.slice(1);
   if (
     own === undefined ||
+    (reissued !== null &&
+      (all.length < 2 ||
+        reference?.startsWith(`Facture rectificative de la facture ${reissued.number} du `) !== true)) ||
     rest.length !== regime.length ||
     rest.some((mention, index) => mention !== regime[index])
   ) {
     throw new Error(`The mentions of ${source.number} are not its regime’s and its own`);
   }
-  return own;
+  return { own, reference };
 }
 
 /**
@@ -421,8 +431,9 @@ function vatOf(source: PdfDocumentSource): Pick<InvoicePdfContent, 'vatNote' | '
  */
 export function invoicePdfContent(source: PdfDocumentSource): InvoicePdfContent {
   const isInvoice = source.kind === 'invoice';
-  const heading = isInvoice ? 'Facture' : 'Avoir';
-  const own = ownMention(source);
+  const { own, reference } = ownMentions(source);
+  const reissued = isInvoice ? source.reissued : null;
+  const heading = isInvoice ? (reissued === null ? 'Facture' : 'Facture rectificative') : 'Avoir';
   const contractor = contractorParty(source.contractor);
   const deadline = momentWords(source.acceptanceDeadline, source.timeZone);
 
@@ -431,6 +442,13 @@ export function invoicePdfContent(source: PdfDocumentSource): InvoicePdfContent 
     { label: 'Date d’émission', value: longDay(source.issuedOn), strong: false },
   ];
   if (isInvoice) {
+    if (reissued !== null) {
+      meta.push({
+        label: 'Facture rectifiée',
+        value: `${reissued.number} du ${longDay(reissued.issuedOn)}`,
+        strong: true,
+      });
+    }
     meta.push(
       { label: 'Période de la prestation', value: periodWords(source.period), strong: false },
       { label: 'Échéance', value: longDay(source.dueOn), strong: true },
@@ -451,6 +469,14 @@ export function invoicePdfContent(source: PdfDocumentSource): InvoicePdfContent 
   const object: PdfParagraph[] = isInvoice
     ? [
         { lead: 'Objet', text: `${COLON}${source.serviceDescription ?? 'prestation de services'}` },
+        ...(reference === null
+          ? []
+          : [
+              {
+                lead: null,
+                text: `${reference}, annulée par avoir. Elle en reprend la période, le régime de TVA et les mentions.`,
+              },
+            ]),
         {
           lead: null,
           text: source.annex === null ? category : `${category} Relevé de commissions joint en annexe.`,
@@ -500,9 +526,10 @@ export function invoicePdfContent(source: PdfDocumentSource): InvoicePdfContent 
       source.regimeMentions.length === 0
         ? null
         : {
-            heading: isInvoice
-              ? 'Mentions du régime'
-              : 'Mentions du régime (reprises de la facture d’origine)',
+            heading:
+              isInvoice && reissued === null
+                ? 'Mentions du régime'
+                : 'Mentions du régime (reprises de la facture d’origine)',
             items: source.regimeMentions,
           },
     footer: invoiceFooterOf(source.agency),

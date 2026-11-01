@@ -175,9 +175,11 @@ async function invoicesOf(tx: Transaction, memberId: string): Promise<StoredInvo
       issuedOn: invoices.issuedOn,
       exclVatMinor: invoices.exclVatMinor,
       regime: invoices.regime,
+      // The outer table named by hand: Drizzle leaves a column of a one-table select unqualified, and inside the
+      // subquery it would name the credit note itself, reading every invoice as never credited.
       creditedMinor: sql<string>`coalesce((
         select -sum(n.excl_vat_minor) from invoices n
-        where n.credited_invoice_id = ${invoices.id} and n.kind = 'credit_note'
+        where n.credited_invoice_id = invoices.id and n.kind = 'credit_note'
       ), 0)::text`,
     })
     .from(invoices)
@@ -280,7 +282,7 @@ async function factsOf(
     .select({ key: invoices.idempotencyKey })
     .from(invoices)
     .where(
-      sql`${invoices.idempotencyKey} = ${`invoice:${statement.id}`} or ${invoices.idempotencyKey} like ${`credit:${statement.id}:%`}`,
+      sql`${invoices.idempotencyKey} = ${`invoice:${statement.id}`} or ${invoices.idempotencyKey} like ${`credit:${statement.id}:%`} or ${invoices.idempotencyKey} like ${`reissue:${statement.id}:%`}`,
     );
   return {
     statementId: statement.id,
@@ -357,6 +359,7 @@ async function writeDocument(
     memberId: statement.memberId,
     statementId: statement.id,
     creditedInvoiceId: document.creditedInvoiceId,
+    reissuedInvoiceId: document.reissuedInvoiceId,
     period: document.period,
     prefix,
     year,
@@ -407,7 +410,10 @@ async function writeDocument(
       number,
       statementId: statement.id,
       key: document.key,
-      ...(document.kind === 'invoice' && warnings.length > 0 ? { warnings } : {}),
+      ...(document.reissuedInvoiceId === null ? {} : { reissuedInvoiceId: document.reissuedInvoiceId }),
+      ...(document.kind === 'invoice' && document.reissuedInvoiceId === null && warnings.length > 0
+        ? { warnings }
+        : {}),
     },
     ip: null,
   });

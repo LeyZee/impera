@@ -149,10 +149,11 @@ export const REGIME_NAME_MAX = 80;
 export const INVOICE_MENTION_MAX = 400;
 export const INVOICE_MENTIONS_MAX = 24;
 /**
- * A document prints its regime's mentions and one of its own: an invoice its payment terms after them (art. L441-9 of
- * the Code de commerce), a credit note the invoice it cites before them (ADR 0036).
+ * A document prints its regime's mentions and at most two of its own: an invoice its payment terms after them (art.
+ * L441-9 of the Code de commerce), a credit note the invoice it cites before them (ADR 0036), a corrective invoice
+ * both, the invoice it bills again before them and its payment terms after (ADR 0040).
  */
-export const INVOICE_DOCUMENT_MENTIONS_MAX = INVOICE_MENTIONS_MAX + 1;
+export const INVOICE_DOCUMENT_MENTIONS_MAX = INVOICE_MENTIONS_MAX + 2;
 /**
  * The agency's payment terms, a setting: an invoice prints them after its due date, in one mention (« Échéance : » and
  * the longest date take 30 characters of its 400).

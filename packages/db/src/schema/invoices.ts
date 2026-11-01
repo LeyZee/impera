@@ -470,8 +470,10 @@ const amountMax = num(PAY_AMOUNT_MAX_MINOR);
  * statement of its period, at most one per statement, under the contractor's regime of its day of issue and once he
  * has accepted a billing mandate; it is written with its lines and its event `issued`. A credit note cites an invoice of the same contractor, keeps
  * its period (the service it corrects) and its regime, and never takes more than what is left of it; its statement,
- * when it has one, is the later one whose validation owes it (ADR 0036). The row never changes afterwards: its
- * acceptance is its events (`invoice_events`), its PDF a row of `invoice_pdfs` (lot 4).
+ * when it has one, is the later one whose validation owes it (ADR 0036). A corrective invoice (ADR 0040) bills again
+ * an invoice its cancel took off whole, in the same transaction: like a credit note, it keeps that invoice's period
+ * and regime, and its statement is the later one. The row never changes afterwards: its acceptance is its events
+ * (`invoice_events`), its PDF a row of `invoice_pdfs` (lot 4).
  */
 export const invoices = pgTable(
   'invoices',
@@ -483,6 +485,12 @@ export const invoices = pgTable(
       .references(() => teamMembers.id),
     statementId: uuid('statement_id').references(() => commissionStatements.id),
     creditedInvoiceId: uuid('credited_invoice_id'),
+    /**
+     * The invoice a cancel and reissue cancels and bills again (ADR 0039 § 3, ADR 0040), on both of its documents: the
+     * credit note that takes off all that is left of it, and the corrective invoice that bills it again under its
+     * period, its regime and its mentions. Both are written in one transaction, or neither. `null` on any other document.
+     */
+    reissuedInvoiceId: uuid('reissued_invoice_id'),
     period: date('period')
       .notNull()
       .references(() => payPeriods.period),
@@ -517,14 +525,24 @@ export const invoices = pgTable(
     unique('invoices_number_unique').on(t.number),
     unique('invoices_sequence_unique').on(t.memberId, t.year, t.sequence),
     unique('invoices_idempotency_unique').on(t.idempotencyKey),
+    // A statement bills its own period once; a corrective invoice it issues bills the period of another invoice.
     uniqueIndex('invoices_statement_unique')
       .on(t.statementId)
-      .where(sql`${t.kind} = 'invoice'`),
+      .where(sql`${t.kind} = 'invoice' and ${t.reissuedInvoiceId} is null`),
+    // An invoice is cancelled and billed again once: one credit note and one corrective invoice name it.
+    uniqueIndex('invoices_reissue_unique')
+      .on(t.reissuedInvoiceId, t.kind)
+      .where(sql`${t.reissuedInvoiceId} is not null`),
     index('invoices_member_period_idx').on(t.memberId, t.period),
     index('invoices_credited_idx').on(t.creditedInvoiceId),
     foreignKey({
       name: 'invoices_credited_invoice_id_invoices_id_fk',
       columns: [t.creditedInvoiceId],
+      foreignColumns: [t.id],
+    }),
+    foreignKey({
+      name: 'invoices_reissued_invoice_id_invoices_id_fk',
+      columns: [t.reissuedInvoiceId],
       foreignColumns: [t.id],
     }),
     enumCheck('invoices', t.kind, INVOICE_KINDS),
@@ -535,6 +553,10 @@ export const invoices = pgTable(
     check(
       'invoices_number_check',
       sql`${t.prefix} ~ ${sql.raw(`'${INVOICE_PREFIX_PATTERN}'`)} and ${t.year} between 2000 and 9999 and ${t.sequence} >= 1 and ${t.number} = ${t.prefix} || '-' || ${t.year} || '-' || lpad(${t.sequence}::text, greatest(4, char_length(${t.sequence}::text)), '0') and ${t.year} = extract(year from ${t.issuedOn})`,
+    ),
+    check(
+      'invoices_reissue_check',
+      sql`${t.reissuedInvoiceId} is null or ${t.kind} = 'invoice' or ${t.reissuedInvoiceId} = ${t.creditedInvoiceId}`,
     ),
     check('invoices_key_check', sql`char_length(${t.idempotencyKey}) between 1 and 200`),
     check(

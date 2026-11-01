@@ -231,6 +231,14 @@ export function createDrizzlePayrollInvoicePdfStore(
                 .select({ number: invoices.number, issuedOn: invoices.issuedOn })
                 .from(invoices)
                 .where(eq(invoices.id, invoice.creditedInvoiceId));
+        // The invoice a corrective invoice bills again (ADR 0040): never the cancel's, which cites it as `credited`.
+        const [reissued] =
+          invoice.reissuedInvoiceId === null || invoice.kind !== 'invoice'
+            ? []
+            : await tx
+                .select({ number: invoices.number, issuedOn: invoices.issuedOn })
+                .from(invoices)
+                .where(eq(invoices.id, invoice.reissuedInvoiceId));
         const kind = InvoiceKindSchema.parse(invoice.kind);
         const regime = InvoiceRegimeSchema.parse(invoice.regime);
         const [settings] = await tx
@@ -270,8 +278,10 @@ export function createDrizzlePayrollInvoicePdfStore(
               inclVatMinor: invoice.inclVatMinor,
             },
             credited: credited ?? null,
+            reissued: reissued ?? null,
+            // The statement an invoice bills; a corrective invoice's statement is a later one, not its period's.
             annex:
-              kind === 'invoice' && invoice.statementId !== null
+              kind === 'invoice' && invoice.statementId !== null && invoice.reissuedInvoiceId === null
                 ? await annexOf(tx, invoice.statementId, timeZone)
                 : null,
           },
