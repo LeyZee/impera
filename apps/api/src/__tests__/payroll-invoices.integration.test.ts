@@ -495,7 +495,7 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     expect(credits.map((one) => one.exclVatMinor)).toEqual([-100, -1_500]);
   });
 
-  it('issues no invoice to a French company without its form, capital and register, then issues it once filled', async () => {
+  it('issues no invoice to a French company without its form, capital and register, then once filled and checked', async () => {
     const profile = schema.contractorProfiles;
     const company = { legalForm: 'SARL', shareCapitalMinor: 100_000, rcsCity: 'Lyon' };
     await db()
@@ -517,9 +517,22 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
       'identity_incomplete',
     ]);
 
-    // The file filled again (lot 5 will enqueue it): the next run issues the invoice, which copies the three.
+    // The file filled again: a change of identity cleared the owner's check, so nothing goes out until he checks it.
     await db().update(profile).set(company).where(eq(profile.memberId, lea.id));
+    expect(await issue(id)).toMatchObject({
+      issued: [],
+      notIssued: [{ document: 'invoice', reason: 'identity_unverified' }],
+    });
+    expect(await documentsOf(lea)).toHaveLength(before);
+    // Checked: the next run issues the invoice, which copies the three.
+    await db()
+      .update(profile)
+      .set({ verifiedAt: new Date(), verifiedBy: team.ownerId, updatedBy: team.ownerId })
+      .where(eq(profile.memberId, lea.id));
     expect(await issue(id)).toMatchObject({ issued: [{ kind: 'invoice' }], notIssued: [] });
+    expect(
+      (await notIssued(id)).map((one) => EVENT_PAYLOADS.invoice_not_issued.parse(one.payload).reason),
+    ).toEqual(['identity_incomplete', 'identity_unverified']);
     const issued = (await documentsOf(lea)).at(-1);
     expect(issued?.contractor).toMatchObject({
       legalName: 'Léa Inventée',

@@ -311,6 +311,7 @@ async function factsOf(
             shareCapitalMinor: profile.profile.shareCapitalMinor,
             rcsCity: profile.profile.rcsCity,
           },
+    identityVerified: profile !== undefined && profile.profile.verifiedAt !== null,
     prefix: profile?.profile.invoicePrefix ?? null,
     documents: documents.map((one) => ({
       kind: ContractorDocumentKindSchema.parse(one.kind),

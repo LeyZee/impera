@@ -147,6 +147,7 @@ const facts = (patch: Partial<InvoicingFacts> = {}): InvoicingFacts => ({
     shareCapitalMinor: null,
     rcsCity: null,
   },
+  identityVerified: true,
   prefix: 'NORA',
   documents: [{ kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null }],
   settings: {
@@ -316,6 +317,15 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
     expect(plan.documents.map((one) => one.kind)).toEqual(['invoice']);
     expect(plan.notIssued).toEqual([
       { document: 'credit_note', reason: 'identity_incomplete', amountMinor: 3_000 },
+    ]);
+  });
+
+  it('issues no document on a file the owner has not checked as it stands, and says each one', () => {
+    const plan = planInvoicing(facts({ identityVerified: false }));
+    expect(plan.documents).toEqual([]);
+    expect(plan.notIssued).toEqual([
+      { document: 'invoice', reason: 'identity_unverified', amountMinor: 32_321 },
+      { document: 'credit_note', reason: 'identity_unverified', amountMinor: 3_000 },
     ]);
   });
 

@@ -181,6 +181,8 @@ export interface IssueFacts {
   readonly assignments: readonly RegimeAssignment[];
   readonly regimes: readonly BillingRegime[];
   readonly identity: ContractorIdentity | null;
+  /** The owner checked the file as it stands: a change of identity clears his check (the base's trigger). */
+  readonly identityVerified: boolean;
   /** The contractor's prefix, which the owner sets: his sequence's. */
   readonly prefix: string | null;
   /** The agency's identity on each invoice, a setting of the owner's. */
@@ -224,8 +226,8 @@ export function identityComplete(
 /**
  * Whether the validation of a statement issues its invoice. A period that brings nothing to invoice issues none, and
  * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated,
- * an identity that lacks a mention the regime prints, no prefix or no identity of the agency: no invoice, since an
- * issued invoice never changes. Documents missing or out of date, or a mandate of an older version: the invoice goes
+ * an identity that lacks a mention the regime prints or that the owner has not checked as it stands, no prefix or no
+ * identity of the agency: no invoice, since an issued invoice never changes. Documents missing or out of date, or a mandate of an older version: the invoice goes
  * out, with a warning.
  */
 export function issueDecision(facts: IssueFacts): IssueDecision {
@@ -250,6 +252,7 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (regime === null) return none('no_regime');
   if (regime.validatedOn === null || regime.validatedOn > facts.day) return none('regime_not_validated');
   if (!identityComplete(facts.identity, regime)) return none('identity_incomplete');
+  if (!facts.identityVerified) return none('identity_unverified');
   if (facts.prefix === null) return none('prefix_missing');
   if (facts.agency === null) return none('agency_missing');
   return { kind: 'issue', regime, warnings };
