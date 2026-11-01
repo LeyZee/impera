@@ -356,7 +356,8 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     const conflicts = await db()
       .select()
       .from(schema.domainEvents)
-      .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'));
+      .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'))
+      .orderBy(schema.domainEvents.createdAt);
     expect(conflicts.map((one) => one.payload)).toEqual([
       expect.objectContaining({ invoiceId: id, memberId: theo.id, place: 'primary', stage: 'download' }),
     ]);
@@ -369,7 +370,8 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     const again = await db()
       .select()
       .from(schema.domainEvents)
-      .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'));
+      .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'))
+      .orderBy(schema.domainEvents.createdAt);
     expect(again.map((one) => one.payload)).toEqual([
       expect.objectContaining({ invoiceId: id, place: 'primary', stage: 'download' }),
       expect.objectContaining({ invoiceId: id, place: 'ovhcloud', stage: 'download' }),
