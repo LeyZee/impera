@@ -5,6 +5,7 @@ import {
   SYSTEM_ALERT_TOPICS,
   type AlertRef,
   type AutomaticMissing,
+  type ContractorDocumentKind,
   type HandoffCause,
   type InvoiceNotIssuedReason,
   type InvoicePdfPlace,
@@ -44,6 +45,7 @@ export const SCANNED_EVENT_TYPES = [
   'invoice_pdf_conflict',
   'invoice_pdf_missing',
   'invoice_contested',
+  'contractor_document_expiring',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -199,6 +201,28 @@ function pdfConflictText(signal: Signal & { kind: 'invoice_pdf_conflict' }): str
 }
 
 const PAY_LINK = { label: 'Ouvrir la Paie', path: '/paie' };
+
+/** « 31 décembre 2026 »: a calendar day, no time zone to apply. */
+const longDay = (day: string): string => {
+  const date = new Date(`${day}T12:00:00Z`);
+  const month = date.toLocaleDateString('fr-FR', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+  const number = date.getUTCDate();
+  return `${number === 1 ? '1er' : String(number)} ${month}`;
+};
+
+/**
+ * What a contractor's document expiring means for their invoices (EQ-06 lot 5c-2, glossary « Pièce du prestataire »):
+ * without the tax residence certificate of the year, no invoice leaves under a treaty regime; without a valid URSSAF
+ * certificate, it leaves with a warning. The contractor is never named in Telegram: the link opens their file.
+ */
+const contractorDocumentText = (document: ContractorDocumentKind, lastDay: string): string => {
+  switch (document) {
+    case 'tax_residence':
+      return `L’attestation de résidence fiscale d’un prestataire ne vaut que jusqu’au ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Sans celle de la nouvelle année, ses factures ne partiront pas.`;
+    case 'urssaf_vigilance':
+      return `L’attestation de vigilance URSSAF d’un prestataire vaut jusqu’au ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.`;
+  }
+};
 
 const conversationLink = (conversationId: string | null): { label: string; path: string } => ({
   label: 'Ouvrir la conversation',
@@ -400,6 +424,16 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         title: 'Important',
         body: `${signal.document === 'invoice' ? `La facture ${signal.number} est contestée` : `L’avoir ${signal.number} est contesté`} par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.`,
         link: PAY_LINK,
+      };
+    // Important, not urgent: the owner asks the contractor for the new document before it is needed.
+    case 'contractor_document_expiring':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: contractorDocumentText(signal.document, signal.lastDay),
+        link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${signal.memberId}` },
       };
     case 'automatic_closed': {
       // Important, not urgent: no fan is at risk, the agent just asks a human to approve again (ADR 0019).

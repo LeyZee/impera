@@ -102,6 +102,13 @@ const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
 // The document's number and kind (ADR 0039): the contractor and the reason stay in Nirvana.
 const InvoiceContestedSchema = EVENT_PAYLOADS.invoice_contested.pick({ number: true, document: true });
 
+// The document's kind and last day, and the member's id for the link (EQ-06 lot 5c-2): never a name.
+const ContractorDocumentExpiringSchema = EVENT_PAYLOADS.contractor_document_expiring.pick({
+  memberId: true,
+  kind: true,
+  lastDay: true,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -198,6 +205,12 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = InvoiceContestedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'invoice_contested', ...parsed.data };
+    }
+    case 'contractor_document_expiring': {
+      const parsed = ContractorDocumentExpiringSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { memberId, kind, lastDay } = parsed.data;
+      return { kind: 'contractor_document_expiring', memberId, document: kind, lastDay };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);

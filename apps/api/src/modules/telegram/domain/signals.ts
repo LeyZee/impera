@@ -2,6 +2,7 @@ import type {
   AlertRef,
   AutomaticMissing,
   ConversationId,
+  ContractorDocumentKind,
   CreatorId,
   HandoffCause,
   InvoiceKind,
@@ -112,6 +113,16 @@ export type Signal =
       readonly kind: 'invoice_contested';
       readonly number: string;
       readonly document: InvoiceKind;
+    }
+  | {
+      /**
+       * A document a contractor's regime asks for comes to its end with no newer one filed (EQ-06 lot 5c-2): its kind
+       * and last day, and the member's id for the link to their file; never a name.
+       */
+      readonly kind: 'contractor_document_expiring';
+      readonly memberId: string;
+      readonly document: ContractorDocumentKind;
+      readonly lastDay: string;
     }
   | {
       /** Automatique closed on its own (ADR 0019): its conversations went back to the copilot. */
