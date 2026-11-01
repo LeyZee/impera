@@ -400,10 +400,10 @@ export function RatePanel({
 
 /**
  * What « Parti » does, said before it is done: it cannot be undone from Nirvana. His closing fortnight, the one after
- * the day he leaves, gives him a final statement (EQ-14 lot 1, ADR 0039 § 6).
+ * the fortnight that holds the day he leaves, gives him a final statement (EQ-14 lot 1, ADR 0039 § 6).
  */
 const LEAVING = (name: string): string =>
-  `${name} n’aura plus accès à Nirvana : ses créatrices lui sont retirées et ses sessions fermées. Sa fiche, ses rapports et ses relevés restent. Son relevé final, celui de la quinzaine qui suit son départ, lui verse tout ce qui lui reste dû, même sous le minimum de versement. Ce changement est définitif.`;
+  `${name} n’aura plus accès à Nirvana : ses créatrices lui sont retirées et ses sessions fermées. Sa fiche, ses rapports et ses relevés restent. Son relevé final, celui de la quinzaine qui suit celle de son départ, lui verse tout ce qui lui reste dû, même sous le minimum de versement. Ce changement est définitif.`;
 
 /** What a departure leaves to do by hand until the departure itself is built (EQ-14): nothing reads as settled. */
 const LEFT_TO_DO: readonly string[] = ['Son compte membre sur Reveal est à retirer à la main.'];
