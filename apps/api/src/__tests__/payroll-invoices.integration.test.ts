@@ -7,6 +7,8 @@ import {
   ContractorRegimeIdSchema,
   ContractTextIdSchema,
   EVENT_PAYLOADS,
+  InvoiceIdSchema,
+  JOB_MAX_ATTEMPTS,
   newId,
   PayAdjustmentIdSchema,
   PayAdjustmentSchema,
@@ -15,6 +17,10 @@ import {
 } from '@nirvana/contracts';
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+
+import { createMemoryInvoiceStore } from '../modules/payroll';
+import { invoicePdfKey, invoicePdfRetainUntil } from '../modules/payroll/domain/invoice-pdf';
+import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
@@ -44,11 +50,21 @@ const LATER_TERMS =
   'Aucun escompte. Pénalités de retard au taux de la BCE majoré de 10 points, indemnité de 40 €.';
 /** The mention of the due date, then the terms, whatever the day reads. */
 const DUE_THEN = /^Échéance\u00a0: [^.]+\. /u;
+/** The designation of the service each invoice prints, a setting (EQ-06 lot 4). */
+const SERVICE = 'Animation commerciale de comptes de créatrices (texte inventé pour le test).';
+/** The agency's logo, an invented PNG. */
+const LOGO = inventedLogo();
+const LOGO_SHA256 = createHash('sha256').update(LOGO.bytes).digest('hex');
 
 describe('Équipe › Factures : l’émission à la validation d’un relevé (EQ-06 lot 3, ADR 0036)', () => {
   let team: PayrollTeam;
   let theo: TeamMember;
+  let theoCookie: string;
   let lea: TeamMember;
+  let leaCookie: string;
+  /** The two buckets of the PDFs, in memory (ADR 0037 § 8). */
+  const primary = createMemoryInvoiceStore();
+  const copy = createMemoryInvoiceStore();
   const regimeId = newId(BillingRegimeIdSchema);
   const mandate = {
     id: newId(ContractTextIdSchema),
@@ -110,15 +126,23 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
   };
 
   beforeAll(async () => {
-    team = await startPayrollTeam(inject('pgSuperuserUrl'));
-    ({ member: theo } = await team.addMember('theo@example.test', 'Théo'));
-    ({ member: lea } = await team.addMember('lea@example.test', 'Léa'));
+    team = await startPayrollTeam(inject('pgSuperuserUrl'), { invoiceBuckets: { primary, copy } });
+    ({ member: theo, cookie: theoCookie } = await team.addMember('theo@example.test', 'Théo'));
+    ({ member: lea, cookie: leaCookie } = await team.addMember('lea@example.test', 'Léa'));
     const admin = db();
+    await admin.insert(schema.agencyLogos).values({
+      sha256: LOGO_SHA256,
+      mediaType: LOGO.mediaType,
+      bytes: Buffer.from(LOGO.bytes),
+      createdBy: team.ownerId,
+    });
     await admin.insert(schema.billingSettings).values({
       id: 1,
       agency: AGENCY,
       paymentTerms: TERMS,
       dueDays: 60,
+      serviceDescription: SERVICE,
+      logoSha256: LOGO_SHA256,
       documentReminderDays: 30,
       accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
       updatedBy: team.ownerId,
@@ -157,6 +181,8 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
         legalName,
         address: '3 rue Imaginaire, 69001 Lyon',
         taxId: '12345678900011',
+        businessId: '12345678900011',
+        vatNumber: 'FR98123456789',
         email: `${prefix.toLowerCase()}@example.test`,
         invoicePrefix: prefix,
         updatedBy: member.userId,
@@ -226,7 +252,7 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
       .from(schema.invoiceLines)
       .where(eq(schema.invoiceLines.invoiceId, invoice.id));
     expect(lines.map((line) => [line.kind, line.label, line.amountMinor])).toEqual([
-      ['commission', 'Commission, compte anna-invente sur reveal', commissionMinor],
+      ['commission', 'Commission, compte @anna-invente sur Reveal', commissionMinor],
     ]);
     expect(
       await db().select().from(schema.invoiceEvents).where(eq(schema.invoiceEvents.invoiceId, invoice.id)),
@@ -246,6 +272,101 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     // A rerun (a retry, or a later enqueue) issues nothing twice.
     expect(await issue(id)).toMatchObject({ kind: 'planned', issued: [], notIssued: [] });
     expect(await documentsOf(theo)).toHaveLength(1);
+  });
+
+  it('renders the PDF of an issued invoice once, copies it, and serves it to its contractor only (lot 4)', async () => {
+    const [invoice] = await documentsOf(theo);
+    if (invoice === undefined) throw new Error('no invoice');
+    const id = InvoiceIdSchema.parse(invoice.id);
+    const pdfUrl = `/payroll/invoices/${id}/pdf`;
+    const jobOf = async (task: string) =>
+      (
+        await db().execute<{ payload: unknown; max_attempts: number }>(
+          sql`select payload, max_attempts from graphile_worker._private_jobs where key = ${`${task}:${id}`}`,
+        )
+      ).rows;
+    const pdfJobs = team.app.modules.payroll.jobs;
+    const attempt = { current: 1, max: JOB_MAX_ATTEMPTS['payroll.render_invoice_pdf'] };
+
+    // Enqueued with the issue, in its transaction; until it runs, the PDF is « being prepared ».
+    expect(await jobOf('payroll.render_invoice_pdf')).toEqual([
+      { payload: { invoiceId: id }, max_attempts: JOB_MAX_ATTEMPTS['payroll.render_invoice_pdf'] },
+    ]);
+    const early = await team.call('GET', pdfUrl, theoCookie);
+    expect(early.statusCode).toBe(404);
+    expect(team.refusal(early).code).toBe('invoice_pdf_not_found');
+
+    expect(await pdfJobs.renderInvoicePdf(id, attempt, quiet)).toBe('stored');
+    const key = invoicePdfKey(id, invoice.issuedOn);
+    const stored = primary.peek(key);
+    if (stored === undefined) throw new Error('no PDF in the bucket');
+    const retainUntil = invoicePdfRetainUntil(invoice.issuedOn, 12);
+    expect(stored.retainUntil).toEqual(retainUntil);
+    const text = Buffer.from(stored.bytes).toString('latin1');
+    expect(text.startsWith('%PDF-1.7')).toBe(true);
+    // The logo the invoice froze is drawn, with its transparency.
+    expect(text.match(/\/Subtype\s*\/Image/gu)?.length).toBe(2);
+    const fingerprint = createHash('sha256').update(stored.bytes).digest('hex');
+    const [row] = await db().select().from(schema.invoicePdfs).where(eq(schema.invoicePdfs.invoiceId, id));
+    expect(row).toMatchObject({ storageKey: key, sha256: fingerprint, retainUntil });
+    expect(await team.audited('invoice.pdf_store')).toBe(1);
+    // A rerun renders nothing again.
+    expect(await pdfJobs.renderInvoicePdf(id, attempt, quiet)).toBe('already');
+
+    // The row enqueues its copy, which carries the same bytes under the same lock.
+    expect(await jobOf('payroll.mirror_invoice_pdf')).toEqual([
+      { payload: { invoiceId: id }, max_attempts: JOB_MAX_ATTEMPTS['payroll.mirror_invoice_pdf'] },
+    ]);
+    expect(await pdfJobs.mirrorInvoicePdf(id, attempt, quiet)).toBe('copied');
+    expect(copy.peek(key)).toEqual(stored);
+    const copies = await db()
+      .select()
+      .from(schema.invoicePdfCopies)
+      .where(eq(schema.invoicePdfCopies.invoiceId, id));
+    expect(copies).toEqual([
+      expect.objectContaining({ provider: 'ovhcloud', storageKey: key, sha256: fingerprint, retainUntil }),
+    ]);
+    expect(await team.audited('invoice.pdf_copy')).toBe(1);
+    expect(await pdfJobs.mirrorInvoicePdf(id, attempt, quiet)).toBe('already');
+
+    // Served to its contractor and to the owner, named after its number, never cached; not to another member.
+    for (const cookie of [theoCookie, team.owner]) {
+      const response = await team.call('GET', pdfUrl, cookie);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers).toMatchObject({
+        'content-type': 'application/pdf',
+        'content-disposition': `attachment; filename="${invoice.prefix}-${invoice.issuedOn.slice(0, 4)}-0001.pdf"`,
+        'cache-control': 'private, no-store',
+        'x-content-type-options': 'nosniff',
+      });
+      expect(Buffer.compare(response.rawPayload, Buffer.from(stored.bytes))).toBe(0);
+    }
+    const stranger = await team.call('GET', pdfUrl, leaCookie);
+    expect(stranger.statusCode).toBe(404);
+    expect(team.refusal(stranger).code).toBe('invoice_not_found');
+    const unknown = await team.call('GET', `/payroll/invoices/${newId(InvoiceIdSchema)}/pdf`, theoCookie);
+    expect(team.refusal(unknown).code).toBe('invoice_not_found');
+    expect((await team.call('GET', '/payroll/invoices/pas-un-id/pdf', theoCookie)).statusCode).toBe(400);
+
+    // A damaged first copy is never served: the second one is, and the owner is told once.
+    primary.plant(key, { bytes: new TextEncoder().encode('damaged'), retainUntil });
+    const fallback = await team.call('GET', pdfUrl, theoCookie);
+    expect(fallback.statusCode).toBe(200);
+    expect(Buffer.compare(fallback.rawPayload, Buffer.from(stored.bytes))).toBe(0);
+    const conflicts = await db()
+      .select()
+      .from(schema.domainEvents)
+      .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'));
+    expect(conflicts.map((one) => one.payload)).toEqual([
+      expect.objectContaining({ invoiceId: id, memberId: theo.id, place: 'primary', stage: 'download' }),
+    ]);
+    // Both damaged: nothing is served.
+    copy.plant(key, { bytes: new TextEncoder().encode('damaged too'), retainUntil });
+    const none = await team.call('GET', pdfUrl, theoCookie);
+    expect(none.statusCode).toBe(503);
+    expect(team.refusal(none).code).toBe('invoice_pdf_unavailable');
+    primary.plant(key, stored);
+    copy.plant(key, stored);
   });
 
   it('issues nothing for a statement not validated', async () => {
@@ -353,6 +474,15 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     });
     expect(await documentsOf(theo)).toHaveLength(3);
     expect(await notIssued(id)).toHaveLength(2);
+
+    // Each renders from its frozen copy (lot 4): the invoice with its statement, the credit note citing its invoice.
+    for (const document of [invoice, note]) {
+      const documentId = InvoiceIdSchema.parse(document.id);
+      expect(
+        await team.app.modules.payroll.jobs.renderInvoicePdf(documentId, { current: 1, max: 5 }, quiet),
+      ).toBe('stored');
+      expect(primary.peek(invoicePdfKey(documentId, document.issuedOn))).toBeDefined();
+    }
   });
 
   it('after a partial issue, a rerun issues the very credit note that was missing, once', async () => {

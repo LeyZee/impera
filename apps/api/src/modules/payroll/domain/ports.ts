@@ -1,4 +1,5 @@
 import type {
+  AgencyLogoMediaType,
   Bonus,
   BonusId,
   BonusTierSet,
@@ -14,7 +15,10 @@ import type {
   ExchangeRate,
   ExchangeRates,
   ForeignCurrency,
+  InvoiceId,
   InvoiceKind,
+  InvoicePdfCopyProvider,
+  InvoicePdfPlace,
   PayAdjustment,
   PayAdjustmentId,
   PayCommissionStatementBody,
@@ -36,6 +40,7 @@ import type {
 } from '@nirvana/contracts';
 
 import type { IssueWarning } from './billing';
+import type { InvoicePdfContent, PdfDocumentSource } from './invoice-pdf';
 import type { DocumentNotIssued, InvoicingFacts, InvoicingPlan } from './invoicing';
 import type { PeriodBlockReason } from './period-blocks';
 import type { PeriodPlan, PeriodSnapshot, ReportForPay } from './recalculation';
@@ -271,4 +276,116 @@ export interface PayrollReadStore {
   settings(userId: UserId): Promise<PayrollSettings>;
   /** The latest rate of each currency the job read. */
   exchangeRates(userId: UserId): Promise<ExchangeRates>;
+}
+
+/** One object of a bucket as read back: its bytes, and the end of its compliance lock as the bucket gives it. */
+export interface StoredObject {
+  readonly bytes: Uint8Array;
+  /** `null` when the bucket names no lock on it: never taken for a lock that holds. */
+  readonly retainUntil: Date | null;
+}
+
+/**
+ * A bucket of invoices under compliance lock (ADR 0037 § 4 and § 6). An object is written once, with its lock, and
+ * never replaced: a key that already holds one is `exists`, whatever it holds. A provider that does not answer, or
+ * answers an error, throws `InvoiceStorageUnavailable`; a key that holds nothing reads `null`.
+ */
+export interface InvoiceObjectStore {
+  /** Sends `bytes` signed with their SHA-256 (hex), under a compliance lock until `retainUntil`. */
+  writeOnce(key: string, bytes: Uint8Array, sha256: string, retainUntil: Date): Promise<'written' | 'exists'>;
+  read(key: string): Promise<StoredObject | null>;
+}
+
+/** The agency's logo a document froze by its fingerprint (`agency_logos`), a PNG. */
+export interface InvoiceLogo {
+  readonly mediaType: AgencyLogoMediaType;
+  readonly bytes: Uint8Array;
+}
+
+/**
+ * Lays out a PDF's content as a PDF/A-3b, the same bytes for the same content, logo and instant (ADR 0037 § 2). A
+ * character its font has no glyph for throws `InvoicePdfGlyphMissing`: nothing is ever printed as a blank box.
+ */
+export interface InvoicePdfRenderer {
+  render(content: InvoicePdfContent, logo: InvoiceLogo | null, issuedAt: Date): Promise<Uint8Array>;
+}
+
+/** A PDF as its row keeps it (`invoice_pdfs`), with the copies written so far (`invoice_pdf_copies`). */
+export interface StoredInvoicePdf {
+  readonly key: string;
+  readonly sha256: string;
+  readonly retainUntil: Date;
+  readonly copies: readonly {
+    readonly provider: InvoicePdfCopyProvider;
+    readonly key: string;
+    readonly sha256: string;
+    readonly retainUntil: Date;
+  }[];
+}
+
+/** An issued document as its PDF job reads it: what it prints, where its lock ends, and its PDF once written. */
+export interface InvoiceToRender {
+  readonly id: InvoiceId;
+  readonly memberId: TeamMemberId;
+  readonly number: string;
+  readonly issuedAt: Date;
+  readonly issuedOn: string;
+  readonly document: PdfDocumentSource;
+  /** The logo the document froze, `null` for none. */
+  readonly logo: InvoiceLogo | null;
+  /** The month the agency's fiscal year closes in (`billing_settings`), read when the PDF is rendered. */
+  readonly fiscalYearEndMonth: number;
+  readonly pdf: StoredInvoicePdf | null;
+}
+
+/** What tells the owner that a PDF or a copy is wrong or missing (ADR 0037 § 5 to § 7), with its document. */
+type InvoicePdfAlert =
+  | {
+      readonly type: 'invoice_pdf_conflict';
+      readonly invoiceId: InvoiceId;
+      readonly memberId: TeamMemberId;
+      readonly number: string;
+      readonly place: InvoicePdfPlace;
+      readonly stage: 'render' | 'copy' | 'download';
+    }
+  | {
+      readonly type: 'invoice_pdf_missing';
+      readonly invoiceId: InvoiceId;
+      readonly memberId: TeamMemberId;
+      readonly number: string;
+      readonly place: InvoicePdfPlace;
+    };
+
+/** The PDFs' rows and alerts (EQ-06 lot 4): the jobs write as admin, a reader downloads under the invoice's policy. */
+export interface PayrollInvoicePdfStore {
+  /** The document, its fiscal year's close and its PDF, as the jobs (`withAdmin`); `null` for an unknown id. */
+  toRenderUnscoped(invoiceId: InvoiceId): Promise<InvoiceToRender | null>;
+  /**
+   * Writes the PDF's row once (a row already there stays as it is), and in the same transaction enqueues its copy
+   * (`payroll.mirror_invoice_pdf`) and writes its line of `audit_log`.
+   */
+  recordPdfUnscoped(
+    invoiceId: InvoiceId,
+    pdf: { readonly key: string; readonly sha256: string; readonly retainUntil: Date },
+  ): Promise<void>;
+  /** Writes a copy's row once, with its line of `audit_log`; the database refuses a copy unlike its PDF. */
+  recordCopyUnscoped(
+    invoiceId: InvoiceId,
+    provider: InvoicePdfCopyProvider,
+    copy: { readonly key: string; readonly sha256: string; readonly retainUntil: Date },
+  ): Promise<void>;
+  /** Publishes `alert` and its line of `audit_log`, once for a document, place and stage: `already` after. */
+  alertUnscoped(alert: InvoicePdfAlert): Promise<'published' | 'already'>;
+  /**
+   * The document as `userId` may read it (`withMember`, the invoice's policy): `null` when it does not exist or is
+   * not theirs to read, its PDF `null` while not rendered.
+   */
+  pdfFor(
+    userId: UserId,
+    invoiceId: InvoiceId,
+  ): Promise<{
+    readonly memberId: TeamMemberId;
+    readonly number: string;
+    readonly pdf: StoredInvoicePdf | null;
+  } | null>;
 }

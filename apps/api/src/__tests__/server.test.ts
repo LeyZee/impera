@@ -214,6 +214,7 @@ describe('error format (api.md)', () => {
     expect(statusForCode('takeover_forbidden')).toBe(403);
     expect(statusForCode('draft_conflict')).toBe(409);
     expect(statusForCode('send_limited')).toBe(429);
+    expect(statusForCode('invoice_pdf_unavailable')).toBe(503);
     expect(statusForCode('whatever')).toBe(500);
   });
 });

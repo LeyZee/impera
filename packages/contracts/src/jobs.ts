@@ -6,6 +6,7 @@ import {
   CreatorIdSchema,
   DraftIdSchema,
   FanIdSchema,
+  InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
 } from './ids';
@@ -43,6 +44,8 @@ export const JOB_NAMES = [
   'payroll.recalculate_open',
   'payroll.fetch_exchange_rates',
   'payroll.issue_invoices',
+  'payroll.render_invoice_pdf',
+  'payroll.mirror_invoice_pdf',
   'media.describe',
   'providers.check_credentials',
   'telegram.scan',
@@ -130,6 +133,17 @@ export const JOB_PAYLOADS = {
    * rerun writes only what is missing; what cannot be issued is said to the owner (`invoice_not_issued`).
    */
   'payroll.issue_invoices': z.object({ statementId: CommissionStatementIdSchema }),
+  /**
+   * The PDF of an issued invoice or credit note, rendered once from its frozen data and kept in the locked bucket
+   * (ADR 0037 § 5): enqueued in the transaction that issues it, under the key `payroll.render_invoice_pdf:<id>`. A
+   * rerun replaces nothing; the last attempt that fails tells the owner (`invoice_pdf_missing`).
+   */
+  'payroll.render_invoice_pdf': z.object({ invoiceId: InvoiceIdSchema }),
+  /**
+   * The same bytes copied to the second provider (ADR 0037 § 6), once the PDF's row is written: enqueued with it, under
+   * the key `payroll.mirror_invoice_pdf:<id>`. Same rules: nothing replaced, the last failed attempt said.
+   */
+  'payroll.mirror_invoice_pdf': z.object({ invoiceId: InvoiceIdSchema }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -169,6 +183,10 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.fetch_exchange_rates': 3,
   // Replayable: each document has its key, and a failed run wrote nothing.
   'payroll.issue_invoices': 5,
+  // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour (ADR 0037 § 5),
+  // through a short outage of a bucket, before the last one tells the owner.
+  'payroll.render_invoice_pdf': 9,
+  'payroll.mirror_invoice_pdf': 9,
   'media.describe': 3,
   'providers.check_credentials': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:

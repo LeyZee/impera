@@ -12,6 +12,7 @@ import {
   CreatePenaltyBodySchema,
   DomainError,
   ExchangeRatesSchema,
+  InvoicePdfParamsSchema,
   PageQuerySchema,
   PayAdjustmentSchema,
   PayCommissionStatementBodySchema,
@@ -27,6 +28,7 @@ import {
   PenaltySchema,
   UserIdSchema,
   ValidateCommissionStatementBodySchema,
+  type InvoiceId,
   type UserId,
   type UserRole,
 } from '@nirvana/contracts';
@@ -35,9 +37,17 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { PayrollEntries } from '../application/entries';
+import type { DownloadedPdf } from '../application/invoice-pdfs';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
-import type { Actor, PayrollRuleStore } from '../domain/ports';
+import type { Actor, JobLogger, PayrollRuleStore } from '../domain/ports';
+
+/** An invoice's PDF as its reader may download it (ADR 0037 § 7). */
+export type InvoicePdfDownload = (
+  userId: UserId,
+  invoiceId: InvoiceId,
+  logger: JobLogger,
+) => Promise<DownloadedPdf>;
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -66,10 +76,26 @@ export function createPayrollRoutes(
   validation: PayrollValidation,
   entries: PayrollEntries,
   rules: PayrollRuleStore,
+  downloadPdf: InvoicePdfDownload,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
   return (app) => {
+    // A file, never JSON: kept out of every cache, named after its number, its type never guessed by the browser.
+    app.get(
+      '/payroll/invoices/:invoiceId/pdf',
+      { preValidation: ownerOrMember, schema: { params: InvoicePdfParamsSchema } },
+      async (request, reply) => {
+        const pdf = await downloadPdf(userOf(request), request.params.invoiceId, request.log);
+        return reply
+          .header('content-type', 'application/pdf')
+          .header('content-disposition', `attachment; filename="${pdf.fileName}"`)
+          .header('cache-control', 'private, no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(Buffer.from(pdf.bytes));
+      },
+    );
+
     app.get(
       '/payroll/periods',
       {

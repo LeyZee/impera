@@ -2,6 +2,7 @@ import type {
   CommissionStatementId,
   ExchangeRate,
   ForeignCurrency,
+  InvoiceId,
   PayPeriod,
   UserId,
 } from '@nirvana/contracts';
@@ -10,13 +11,23 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
+import {
+  downloadInvoicePdf,
+  mirrorInvoicePdf,
+  renderInvoicePdf,
+  type JobAttempt,
+  type MirrorOutcome,
+  type RenderOutcome,
+} from './application/invoice-pdfs';
 import { issueInvoices } from './application/invoicing';
 import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
-import type { InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
+import type { InvoiceObjectStore, InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
+import { createPdfkitInvoiceRenderer, loadInvoiceFonts } from './infra/invoice-pdf-renderer';
+import { createDrizzlePayrollInvoicePdfStore } from './infra/invoice-pdf-store';
 import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
 import { createDrizzlePayrollJobStore } from './infra/job-store';
 import { createLatestRateRead } from './infra/latest-rate';
@@ -33,6 +44,13 @@ import { createDrizzlePayrollValidationStore } from './infra/validation-store';
  * report, through the composition root (EQ-04). One key and one number of attempts for every writer.
  */
 export { enqueuePayRecalculation } from './infra/recalculation-queue';
+
+/**
+ * The two buckets of the invoices' PDFs (ADR 0037 § 4 and § 6), which the composition root builds from the
+ * configuration: S3 in production, one store in memory shared by the API and its inline worker elsewhere.
+ */
+export { createMemoryInvoiceStore, createS3InvoiceStore } from './infra/invoice-buckets';
+export type { InvoiceObjectStore } from './domain/ports';
 
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
@@ -68,6 +86,22 @@ export interface PayrollModule {
       statementId: CommissionStatementId,
       logger: JobLogger,
     ) => Promise<InvoicingOutcome>;
+    /**
+     * `payroll.render_invoice_pdf` (EQ-06 lot 4, ADR 0037 § 5): an issued document's PDF, rendered once from its frozen
+     * data and written under lock; its row then enqueues its copy. Never replaces an object; its last failed attempt
+     * tells the owner (`invoice_pdf_missing`).
+     */
+    readonly renderInvoicePdf: (
+      invoiceId: InvoiceId,
+      attempt: JobAttempt,
+      logger: JobLogger,
+    ) => Promise<RenderOutcome>;
+    /** `payroll.mirror_invoice_pdf` (ADR 0037 § 6): the same bytes, same key and lock, at the second provider. */
+    readonly mirrorInvoicePdf: (
+      invoiceId: InvoiceId,
+      attempt: JobAttempt,
+      logger: JobLogger,
+    ) => Promise<MirrorOutcome>;
   };
 }
 
@@ -89,6 +123,15 @@ export interface PayrollDeps {
    * rate is alerted too (ADR 0033). `null` elsewhere.
    */
   readonly rateJobSince: RateJobSince | null;
+  /**
+   * The invoices' PDFs (ADR 0037): the folder of their fonts, read once here (a missing file stops the start, never
+   * the first invoice), and their two buckets.
+   */
+  readonly invoicePdfs: {
+    readonly fontsDir: string;
+    readonly primary: InvoiceObjectStore;
+    readonly copy: InvoiceObjectStore;
+  };
 }
 
 export function createPayrollModule(deps: PayrollDeps): PayrollModule {
@@ -102,6 +145,12 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   const entries = createPayrollEntries(createDrizzlePayrollEntryStore(deps.db, deps.reads, now), reads);
   const rules = createDrizzlePayrollRuleStore(deps.db, deps.reads, now);
   const invoiceStore = createDrizzlePayrollInvoiceStore(deps.adminDb, deps.reads, now);
+  const pdfs = {
+    store: createDrizzlePayrollInvoicePdfStore(deps.db, deps.adminDb, deps.reads, now),
+    renderer: createPdfkitInvoiceRenderer(loadInvoiceFonts(deps.invoicePdfs.fontsDir)),
+    primary: deps.invoicePdfs.primary,
+    copy: deps.invoicePdfs.copy,
+  };
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),
@@ -111,13 +160,23 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   };
   return {
     name: 'payroll',
-    routes: (requireRole) => createPayrollRoutes(reads, validation, entries, rules, requireRole),
+    routes: (requireRole) =>
+      createPayrollRoutes(
+        reads,
+        validation,
+        entries,
+        rules,
+        (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
+        requireRole,
+      ),
     latestRate: createLatestRateRead(deps.db),
     jobs: {
       recalculate: (period, logger) => createRecalculation(jobStore, logger, now).recalculate(period),
       recalculateOpen: (logger) => createRecalculation(jobStore, logger, now).recalculateOpen(),
       fetchExchangeRates: (logger) => fetchExchangeRates(rateJob, logger),
       issueInvoices: (statementId, logger) => issueInvoices(invoiceStore, statementId, logger),
+      renderInvoicePdf: (invoiceId, attempt, logger) => renderInvoicePdf(pdfs, invoiceId, attempt, logger),
+      mirrorInvoicePdf: (invoiceId, attempt, logger) => mirrorInvoicePdf(pdfs, invoiceId, attempt, logger),
     },
   };
 }

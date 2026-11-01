@@ -5,6 +5,14 @@ import { z } from 'zod';
 export const PlatformSchema = z.enum(['reveal', 'onlyfans', 'instagram', 'nirvana']);
 export type Platform = z.infer<typeof PlatformSchema>;
 
+/** A platform as people write it, on a screen or an invoice: never its code. */
+export const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
+  reveal: 'Reveal',
+  onlyfans: 'OnlyFans',
+  instagram: 'Instagram',
+  nirvana: 'Nirvana',
+};
+
 export const ConversationStateSchema = z.enum([
   'idle',
   'pending',

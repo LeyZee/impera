@@ -20,7 +20,7 @@ import { expect } from 'vitest';
 import { z } from 'zod';
 
 import { createOwner } from '../../auth';
-import { createApp, type App } from '../../composition-root';
+import { createApp, type App, type AppOptions } from '../../composition-root';
 import { createLogger } from '../../logger';
 import { buildServer, type Server } from '../../server';
 
@@ -101,10 +101,10 @@ const PASSWORD = 'staple battery horse';
 const quiet = { warn: () => undefined, error: () => undefined };
 const RefusalSchema = z.object({ error: z.object({ code: z.string(), details: z.unknown() }) });
 
-export async function startPayrollTeam(superuserUrl: string): Promise<PayrollTeam> {
+export async function startPayrollTeam(superuserUrl: string, options: AppOptions = {}): Promise<PayrollTeam> {
   const test = await createTestDb(superuserUrl);
   const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
-  const app = await createApp(config, createLogger(config));
+  const app = await createApp(config, createLogger(config), options);
   const server = await buildServer({
     config,
     logger: createLogger(config),
