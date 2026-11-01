@@ -112,33 +112,66 @@ export function documentValidUntil(
 export type DocumentState = 'valid' | 'expiring' | 'expired';
 
 /**
- * A document on `today`: expired the day after its last day, expiring from `reminderDays` before it (the reminder to
- * the member and the owner), valid before.
+ * The first day a document is reminded to its member and the owner (EQ-06 lot 5c-2): for a tax residence certificate,
+ * the 1st of December of its year, whatever the owner's delay (« ok année civile », Charles, 01/11: it can only be
+ * renewed in January, the reminder says so a month ahead); for another, `reminderDays` before its last day.
+ */
+export function documentReminderFrom(
+  document: Pick<ContractorDocument, 'kind' | 'issuedOn' | 'validUntil'>,
+  reminderDays: number,
+): string {
+  const until = documentValidUntil(document);
+  if (document.kind === 'tax_residence' && document.validUntil === null) return `${until.slice(0, 4)}-12-01`;
+  return addDays(until, -reminderDays);
+}
+
+/**
+ * A document on `today`: expired the day after its last day, expiring from its reminder (`documentReminderFrom`),
+ * valid before.
  */
 export function documentState(
   document: Pick<ContractorDocument, 'kind' | 'issuedOn' | 'validUntil'>,
   today: string,
   reminderDays: number,
 ): DocumentState {
-  const until = documentValidUntil(document);
-  if (today > until) return 'expired';
-  return today >= addDays(until, -reminderDays) ? 'expiring' : 'valid';
+  if (today > documentValidUntil(document)) return 'expired';
+  return today >= documentReminderFrom(document, reminderDays) ? 'expiring' : 'valid';
 }
 
 /**
  * The newest document of a kind the owner has not refused: a renewal never erases the one an earlier invoice relied
  * on, and a refused file counts as none.
  */
-function newestOf(
-  documents: readonly ContractorDocument[],
+function newestOf<T extends ContractorDocument>(
+  documents: readonly T[],
   kind: ContractorDocumentKind,
-): ContractorDocument | null {
-  let found: ContractorDocument | null = null;
+): T | null {
+  let found: T | null = null;
   for (const one of documents) {
     if (one.review?.decision === 'refused') continue;
     if (one.kind === kind && (found === null || one.issuedOn > found.issuedOn)) found = one;
   }
   return found;
+}
+
+/**
+ * The documents to remind on `today` (EQ-06 lot 5c-2): for each kind the regime in force asks for, the newest the owner
+ * has not refused, once it is expiring or expired; a newer one filed (even waiting for his check) ends the reminder of
+ * the older. A kind with nothing filed is not reminded here: an invoice that needs it says so (`tax_residence_missing`)
+ * or warns (`document_missing`).
+ */
+export function documentsToRemind<T extends ContractorDocument>(
+  regime: Pick<BillingRegime, 'documents'> | null,
+  documents: readonly T[],
+  today: string,
+  reminderDays: number,
+): T[] {
+  const due: T[] = [];
+  for (const kind of new Set(regime?.documents ?? [])) {
+    const newest = newestOf(documents, kind);
+    if (newest !== null && documentState(newest, today, reminderDays) !== 'valid') due.push(newest);
+  }
+  return due;
 }
 
 /**

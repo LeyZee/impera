@@ -771,6 +771,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         );
       },
     ),
+    'payroll.remind_documents': defineTask(
+      'payroll.remind_documents',
+      JOB_PAYLOADS['payroll.remind_documents'],
+      logger,
+      async (_payload, context) => {
+        context.logger.info(
+          { reminded: await modules.payroll.jobs.remindDocuments() },
+          'payroll: expiring documents reminded',
+        );
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

@@ -15,7 +15,13 @@ import {
   ContractorDocumentUnavailable,
   InvoiceStorageUnavailable,
 } from '../domain/errors';
-import type { Actor, InvoiceObjectStore, JobLogger, PayrollDocumentStore } from '../domain/ports';
+import type {
+  Actor,
+  InvoiceObjectStore,
+  JobLogger,
+  PayrollDocumentReminderStore,
+  PayrollDocumentStore,
+} from '../domain/ports';
 
 import { lockAtLeast, readChecked, sha256Hex } from './locked-objects';
 
@@ -220,4 +226,14 @@ export function createContractorDocuments(deps: ContractorDocumentDeps): Contrac
     review: (actor, memberId, documentId, body, logger) =>
       reviewContractorDocument(deps, actor, memberId, documentId, body, logger),
   };
+}
+
+/**
+ * `payroll.remind_documents`, each hour (EQ-06 lot 5c-2): each document a contractor's regime asks for that comes to
+ * its end, or passed it, with no newer one filed, is said once to the owner (`contractor_document_expiring`): a tax
+ * residence certificate from 1 December of its year, the others from the owner's delay before their last day. Returns
+ * how many were said this run.
+ */
+export function remindDocuments(store: PayrollDocumentReminderStore): Promise<number> {
+  return store.remindUnscoped();
 }

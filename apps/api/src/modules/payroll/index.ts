@@ -11,7 +11,7 @@ import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollBillingSettings } from './application/billing-settings';
-import { createContractorDocuments } from './application/contractor-documents';
+import { createContractorDocuments, remindDocuments } from './application/contractor-documents';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
@@ -41,6 +41,7 @@ import {
   createDrizzlePayrollContractorStore,
   createDrizzlePayrollRequeueStore,
 } from './infra/contractor-store';
+import { createDrizzleDocumentReminderStore } from './infra/document-reminder-store';
 import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
@@ -147,6 +148,12 @@ export interface PayrollModule {
      * contest without its alert said, should their own job have failed or been lost.
      */
     readonly sweepInvoiceAcceptance: (logger: JobLogger) => Promise<SweepOutcome>;
+    /**
+     * `payroll.remind_documents`, each hour (EQ-06 lot 5c-2): each document a contractor's regime asks for that comes
+     * to its end, or passed it, with no newer one filed, said once to the owner (`contractor_document_expiring`).
+     * Returns how many were said this run.
+     */
+    readonly remindDocuments: () => Promise<number>;
   };
 }
 
@@ -238,6 +245,8 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       announceInvoiceContest: (invoiceId, logger) =>
         announceInvoiceContest(acceptanceStore, invoiceId, logger),
       sweepInvoiceAcceptance: (logger) => sweepInvoiceAcceptance(acceptanceStore, logger),
+      remindDocuments: () =>
+        remindDocuments(createDrizzleDocumentReminderStore(deps.adminDb, deps.reads, now)),
     },
   };
 }

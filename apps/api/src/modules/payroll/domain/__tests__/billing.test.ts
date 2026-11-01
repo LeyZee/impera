@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertRegimeChange,
+  documentReminderFrom,
+  documentsToRemind,
   documentState,
   documentValidUntil,
   issueDecision,
@@ -131,6 +133,45 @@ describe('a contractor’s documents (EQ-06)', () => {
     expect(documentState(vigilance, '2026-10-30', 15)).toBe('expiring');
     expect(documentState(vigilance, '2026-11-14', 15)).toBe('expiring');
     expect(documentState(vigilance, '2026-11-15', 15)).toBe('expired');
+  });
+
+  it('call a residence certificate for renewal from the 1st of December of its year, whatever the delay', () => {
+    // « ok année civile »: renewed in January, said a month ahead.
+    const residence = { kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null } as const;
+    for (const delay of [1, 30, 90]) expect(documentReminderFrom(residence, delay)).toBe('2026-12-01');
+    expect(documentState(residence, '2026-11-30', 90)).toBe('valid');
+    expect(documentState(residence, '2026-12-01', 1)).toBe('expiring');
+    expect(documentState(residence, '2026-12-31', 1)).toBe('expiring');
+    expect(documentState(residence, '2027-01-01', 1)).toBe('expired');
+    const vigilance = { kind: 'urssaf_vigilance', issuedOn: '2026-05-15', validUntil: null } as const;
+    expect(documentReminderFrom(vigilance, 15)).toBe('2026-10-30');
+  });
+
+  it('remind the newest of each kind the regime asks for, once due, never a refused one nor a kind not asked', () => {
+    const of = (id: string, kind: 'tax_residence' | 'urssaf_vigilance', issuedOn: string) => ({
+      id,
+      kind,
+      issuedOn,
+      validUntil: null,
+      review: null,
+    });
+    const residence = of('residence-2026', 'tax_residence', '2026-03-10');
+    const vigilance = of('vigilance', 'urssaf_vigilance', '2026-06-20');
+    expect(documentsToRemind(ABROAD, [residence, vigilance], '2026-11-30', 30)).toEqual([]);
+    // Only the kinds of the regime: the vigilance certificate, due too, is not this regime's.
+    expect(documentsToRemind(ABROAD, [residence, vigilance], '2026-12-01', 30)).toEqual([residence]);
+    // Past its end and still the newest: reminded (once, by the job).
+    expect(documentsToRemind(ABROAD, [residence], '2027-02-01', 30)).toEqual([residence]);
+    // A newer one filed, even waiting for the owner's check, ends the reminder of the older.
+    const next = of('residence-2027', 'tax_residence', '2027-01-05');
+    expect(documentsToRemind(ABROAD, [residence, next], '2027-01-06', 30)).toEqual([]);
+    // A refused newer one counts as none.
+    const refused = { ...next, review: { decision: 'refused', reason: 'Illisible.' } } as const;
+    expect(documentsToRemind(ABROAD, [residence, refused], '2027-01-06', 30)).toEqual([residence]);
+    // Nothing filed, or no regime: nothing to remind here.
+    expect(documentsToRemind(ABROAD, [], '2026-12-01', 30)).toEqual([]);
+    expect(documentsToRemind(null, [residence], '2026-12-01', 30)).toEqual([]);
+    expect(documentsToRemind(FRANCHISE, [vigilance], '2026-11-19', 30)).toEqual([vigilance]);
   });
 });
 

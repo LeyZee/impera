@@ -15,6 +15,7 @@ import {
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
 import {
   CommissionStatementIdSchema,
+  ContractorDocumentIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
@@ -27,6 +28,7 @@ import {
   UserIdSchema,
 } from './ids';
 import {
+  ContractorDocumentKindSchema,
   InvoiceKindSchema,
   InvoiceNotIssuedReasonSchema,
   InvoiceNumberSchema,
@@ -199,6 +201,7 @@ export const EVENT_TYPES = [
   'invoice_pdf_conflict',
   'invoice_pdf_missing',
   'invoice_contested',
+  'contractor_document_expiring',
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
@@ -375,6 +378,20 @@ export const EVENT_PAYLOADS = {
     document: InvoiceKindSchema,
   }),
   /**
+   * A document a contractor's regime asks for comes to its end, or has passed it, and no newer one is filed (EQ-06 lot
+   * 5c-2): a tax residence certificate from 1 December of its year (it is renewed in January), another from the
+   * owner's delay before its last day (`documentReminderDays`). Published once per document by
+   * `payroll.remind_documents`, with no creator, for the owner; the member sees it in his file. Never a name: the
+   * member and the document by id.
+   */
+  contractor_document_expiring: z.object({
+    memberId: TeamMemberIdSchema,
+    documentId: ContractorDocumentIdSchema,
+    kind: ContractorDocumentKindSchema,
+    /** Its last valid day: past already when the reminder comes late. */
+    lastDay: z.iso.date(),
+  }),
+  /**
    * Automatique closed on its own (ADR 0019): the live rate fell under its target, or the voice version changed and
    * has not proved itself yet. Every conversation in automatic went back to the copilot. Published once, for the owner.
    */
@@ -439,6 +456,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('invoice_pdf_conflict'),
   typedEvent('invoice_pdf_missing'),
   typedEvent('invoice_contested'),
+  typedEvent('contractor_document_expiring'),
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),

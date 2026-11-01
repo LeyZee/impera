@@ -629,3 +629,12 @@ export interface PayrollDocumentStore {
 export interface PayrollRequeueStore {
   requeueUnscoped(memberId: TeamMemberId | null): Promise<number>;
 }
+
+/**
+ * `payroll.remind_documents`, as the jobs (`withAdmin`, EQ-06 lot 5c-2): on the agency's calendar day, each document
+ * to remind of each member still in the team (`documentsToRemind`, under his regime of the day and the owner's delay)
+ * is said once (`contractor_document_expiring`, with its line of `audit_log`); returns how many were said this run.
+ */
+export interface PayrollDocumentReminderStore {
+  remindUnscoped(): Promise<number>;
+}
