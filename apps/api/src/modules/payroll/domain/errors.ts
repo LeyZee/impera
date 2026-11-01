@@ -299,6 +299,13 @@ export class InvoiceNotFound extends DomainError {
   }
 }
 
+/** Only the contractor answers their invoice or credit note (ADR 0039 § 1): never the owner, a manager or another. */
+export class InvoiceAnswerForbidden extends DomainError {
+  constructor() {
+    super('invoice_answer_forbidden', 'Seul le prestataire répond à sa facture');
+  }
+}
+
 /** The document's PDF is not rendered yet (ADR 0037 § 5): the screen says « PDF en préparation ». */
 export class InvoicePdfNotFound extends DomainError {
   constructor() {

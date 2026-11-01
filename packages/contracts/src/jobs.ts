@@ -46,6 +46,9 @@ export const JOB_NAMES = [
   'payroll.issue_invoices',
   'payroll.render_invoice_pdf',
   'payroll.mirror_invoice_pdf',
+  'payroll.lapse_invoice',
+  'payroll.announce_invoice_contest',
+  'payroll.sweep_invoice_acceptance',
   'media.describe',
   'providers.check_credentials',
   'telegram.scan',
@@ -144,6 +147,23 @@ export const JOB_PAYLOADS = {
    * the key `payroll.mirror_invoice_pdf:<id>`. Same rules: nothing replaced, the last failed attempt said.
    */
   'payroll.mirror_invoice_pdf': z.object({ invoiceId: InvoiceIdSchema }),
+  /**
+   * The tacit acceptance of a document nobody answered (EQ-06 lot 6, ADR 0039 § 1): enqueued in the transaction that
+   * issues it, to run at its deadline, under the key `payroll.lapse_invoice:<id>`. A run before the deadline (another
+   * clock) waits for it again; an answered document is left as it is.
+   */
+  'payroll.lapse_invoice': z.object({ invoiceId: InvoiceIdSchema }),
+  /**
+   * The owner told of a contest (`invoice_contested`, ADR 0039 § 2): enqueued in the transaction that records it, under
+   * the key `payroll.announce_invoice_contest:<id>`. Said once per document, whatever the reruns; nothing once the
+   * contest has ended.
+   */
+  'payroll.announce_invoice_contest': z.object({ invoiceId: InvoiceIdSchema }),
+  /**
+   * Each hour (crontab), the net under the two jobs above: a document still unanswered after its deadline is accepted
+   * tacitly, an open contest without its alert is said, whatever became of their own job (failed, lost).
+   */
+  'payroll.sweep_invoice_acceptance': z.object({}),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -187,6 +207,13 @@ export const JOB_MAX_ATTEMPTS = {
   // through a short outage of a bucket, before the last one tells the owner.
   'payroll.render_invoice_pdf': 9,
   'payroll.mirror_invoice_pdf': 9,
+  // Replayable, and a few seconds each: a lapse or an alert already written is left as it is. Twenty-five attempts
+  // span about four days (exp(n) seconds, at most exp(10) between two), through any outage at the deadline; the hourly
+  // sweep catches a run that still failed, or a job lost.
+  'payroll.lapse_invoice': 25,
+  'payroll.announce_invoice_contest': 25,
+  // Each hour: the next run is the retry.
+  'payroll.sweep_invoice_acceptance': 1,
   'media.describe': 3,
   'providers.check_credentials': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:

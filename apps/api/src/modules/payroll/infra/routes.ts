@@ -5,6 +5,7 @@ import {
   CollectiveGoalSchema,
   CommissionStatementIdSchema,
   CommissionStatementSchema,
+  ContestInvoiceBodySchema,
   CreateBonusBodySchema,
   CreateBonusTierSetBodySchema,
   CreateCollectiveGoalBodySchema,
@@ -12,7 +13,8 @@ import {
   CreatePenaltyBodySchema,
   DomainError,
   ExchangeRatesSchema,
-  InvoicePdfParamsSchema,
+  InvoiceAcceptanceViewSchema,
+  InvoiceParamsSchema,
   PageQuerySchema,
   PayAdjustmentSchema,
   PayCommissionStatementBodySchema,
@@ -26,6 +28,7 @@ import {
   UpdatePayrollSettingsBodySchema,
   PenaltyIdSchema,
   PenaltySchema,
+  RefuseInvoiceContestBodySchema,
   UserIdSchema,
   ValidateCommissionStatementBodySchema,
   type InvoiceId,
@@ -37,6 +40,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { PayrollEntries } from '../application/entries';
+import type { PayrollInvoiceAcceptance } from '../application/invoice-acceptance';
 import type { DownloadedPdf } from '../application/invoice-pdfs';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
@@ -69,7 +73,8 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
  * is the database's call (`withMember`): every statement for the owner and an active manager, one's own for anyone
  * else; a validation, a bonus, a penalty or an adjustment by the owner or an active manager, never for oneself; a
  * payment and the team's rules (tiers, goals, minimum payout) by the owner only. A create sent again with the same `id`
- * and values gives back what was recorded (200).
+ * and values gives back what was recorded (200). A document is answered by its contractor only, and its contest refused
+ * by the owner only (ADR 0039); the same answer sent again gives back what was recorded (200).
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -77,6 +82,7 @@ export function createPayrollRoutes(
   entries: PayrollEntries,
   rules: PayrollRuleStore,
   downloadPdf: InvoicePdfDownload,
+  acceptance: PayrollInvoiceAcceptance,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -84,7 +90,7 @@ export function createPayrollRoutes(
     // A file, never JSON: kept out of every cache, named after its number, its type never guessed by the browser.
     app.get(
       '/payroll/invoices/:invoiceId/pdf',
-      { preValidation: ownerOrMember, schema: { params: InvoicePdfParamsSchema } },
+      { preValidation: ownerOrMember, schema: { params: InvoiceParamsSchema } },
       async (request, reply) => {
         const pdf = await downloadPdf(userOf(request), request.params.invoiceId, request.log);
         return reply
@@ -94,6 +100,50 @@ export function createPayrollRoutes(
           .header('x-content-type-options', 'nosniff')
           .send(Buffer.from(pdf.bytes));
       },
+    );
+
+    app.get(
+      '/payroll/invoices/:invoiceId/acceptance',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: InvoiceParamsSchema, response: { 200: InvoiceAcceptanceViewSchema } },
+      },
+      (request) => acceptance.read(userOf(request), request.params.invoiceId),
+    );
+
+    app.post(
+      '/payroll/invoices/:invoiceId/accept',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: InvoiceParamsSchema, response: { 200: InvoiceAcceptanceViewSchema } },
+      },
+      (request) => acceptance.accept(actorOf(request), request.params.invoiceId),
+    );
+
+    app.post(
+      '/payroll/invoices/:invoiceId/contest',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: InvoiceParamsSchema,
+          body: ContestInvoiceBodySchema,
+          response: { 200: InvoiceAcceptanceViewSchema },
+        },
+      },
+      (request) => acceptance.contest(actorOf(request), request.params.invoiceId, request.body),
+    );
+
+    app.post(
+      '/payroll/invoices/:invoiceId/contest/refuse',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: InvoiceParamsSchema,
+          body: RefuseInvoiceContestBodySchema,
+          response: { 200: InvoiceAcceptanceViewSchema },
+        },
+      },
+      (request) => acceptance.refuseContest(actorOf(request), request.params.invoiceId, request.body),
     );
 
     app.get(

@@ -6,6 +6,7 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   FanIdSchema,
+  InvoiceIdSchema,
   MessageIdSchema,
   newId,
   TeamMemberIdSchema,
@@ -129,6 +130,33 @@ describe('events', () => {
     ]) {
       expect(
         EVENT_PAYLOADS.invoice_not_issued.strict().safeParse({ ...payload, ...patch }).success,
+        JSON.stringify(patch),
+      ).toBe(false);
+    }
+  });
+
+  it('tells the owner of a contest once, without its reason nor a name (ADR 0039 § 2)', () => {
+    const payload = {
+      invoiceId: newId(InvoiceIdSchema),
+      memberId: newId(TeamMemberIdSchema),
+      number: 'KOFI-2026-0001',
+      document: 'credit_note',
+    };
+    const event = DomainEventSchema.parse({
+      ...envelope(),
+      creatorId: null,
+      type: 'invoice_contested',
+      payload,
+    });
+    expect(event.type).toBe('invoice_contested');
+    for (const patch of [
+      { reason: 'Une vente manque' },
+      { name: 'Kofi' },
+      { document: 'quote' },
+      { number: 'K-1' },
+    ]) {
+      expect(
+        EVENT_PAYLOADS.invoice_contested.strict().safeParse({ ...payload, ...patch }).success,
         JSON.stringify(patch),
       ).toBe(false);
     }

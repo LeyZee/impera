@@ -1,4 +1,4 @@
-import type { InvoiceAcceptanceState } from '@nirvana/contracts';
+import type { InvoiceAcceptanceState, InvoiceEventKind } from '@nirvana/contracts';
 
 import { InvoiceAcceptanceConflict } from './errors';
 
@@ -34,7 +34,14 @@ export function nextAcceptance(
   step: AcceptanceStep,
   at: { readonly now: Date; readonly deadline: Date },
 ): AcceptanceState {
-  const open = at.now.getTime() < at.deadline.getTime();
+  return acceptanceStep(state, step, at.now.getTime() < at.deadline.getTime());
+}
+
+/**
+ * The state after `step` while the delay to answer is `open` or not, as the database tells it in the transaction that
+ * writes (`now() < acceptance_deadline`, the clock its trigger checks too); a conflict when it no longer allows it.
+ */
+export function acceptanceStep(state: AcceptanceState, step: AcceptanceStep, open: boolean): AcceptanceState {
   if ((step.kind === 'contest' || step.kind === 'refuse') && step.reason.trim() === '') {
     throw new RangeError('A contest and its refusal give a reason');
   }
@@ -68,4 +75,65 @@ export function stateAfterCreditNote(
   at: { readonly now: Date; readonly deadline: Date },
 ): AcceptanceState {
   return note.answersContest ? nextAcceptance(state, { kind: 'credit' }, at) : state;
+}
+
+/** A step of a document as `invoice_events` keeps it, oldest first. */
+export interface RecordedStep {
+  readonly kind: InvoiceEventKind;
+  readonly reason: string | null;
+}
+
+/** The event each step writes. */
+const EVENT_OF = {
+  accept: 'accepted',
+  contest: 'contested',
+  lapse: 'lapsed',
+  credit: 'credited',
+  refuse: 'contest_refused',
+} as const satisfies Record<AcceptanceStep['kind'], InvoiceEventKind>;
+
+/** The state each event leads to; the issue and a payment leave it where it stands. */
+const STATE_AFTER: Partial<Record<InvoiceEventKind, AcceptanceState>> = {
+  accepted: 'accepted',
+  contested: 'contested',
+  lapsed: 'tacitly_accepted',
+  credited: 'credited',
+  contest_refused: 'contest_refused',
+};
+
+/**
+ * Where a document stands from its steps, oldest first: `pending` until an answer, then the last step that moves it;
+ * the reason is its contest's, kept once the contest ends (the contractor's words, never the refusal's).
+ */
+export function standingOf(steps: readonly RecordedStep[]): {
+  readonly state: AcceptanceState;
+  readonly reason: string | null;
+} {
+  let state: AcceptanceState = 'pending';
+  let reason: string | null = null;
+  for (const step of steps) {
+    state = STATE_AFTER[step.kind] ?? state;
+    if (step.kind === 'contested') reason = step.reason;
+  }
+  return { state, reason };
+}
+
+/**
+ * What a step asks to write on a document, from its recorded steps: nothing when the very same step is recorded already
+ * (an answer or a refusal sent again, its reason trimmed as the contract trims it), else the event and its reason. A
+ * different answer than the one recorded, or a step the state or the delay no longer allows, is a conflict.
+ */
+export function acceptanceWrite(
+  steps: readonly RecordedStep[],
+  step: AcceptanceStep,
+  open: boolean,
+):
+  | { readonly kind: 'replay' }
+  | { readonly kind: 'write'; readonly event: InvoiceEventKind; readonly reason: string | null } {
+  const event = EVENT_OF[step.kind];
+  const reason = step.kind === 'contest' || step.kind === 'refuse' ? step.reason.trim() : null;
+  if (steps.some((recorded) => recorded.kind === event && recorded.reason === reason))
+    return { kind: 'replay' };
+  acceptanceStep(standingOf(steps).state, step, open);
+  return { kind: 'write', event, reason };
 }

@@ -29,7 +29,7 @@ import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
 import type { PayrollInvoiceStore } from '../domain/ports';
 
-import { enqueueInvoicePdfRender } from './invoice-queue';
+import { enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
 import { CountedSchema } from './read-store';
 import type { PayInputReads } from './snapshot';
 
@@ -382,6 +382,8 @@ async function writeDocument(
     .values({ id: newId(InvoiceEventIdSchema), invoiceId: id, kind: 'issued', by: null });
   // Its PDF, once this transaction commits (ADR 0037 § 5): a document never exists without its job.
   await enqueueInvoicePdfRender(tx, id);
+  // Its tacit acceptance at its deadline, unless the contractor answers first (ADR 0039 § 1).
+  await enqueueInvoiceLapse(tx, id, document.acceptanceDeadline);
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId: null,

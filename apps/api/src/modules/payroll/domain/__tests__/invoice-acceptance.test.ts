@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   acceptanceDeadline,
+  acceptanceStep,
+  acceptanceWrite,
   nextAcceptance,
+  standingOf,
   stateAfterCreditNote,
   type AcceptanceState,
   type AcceptanceStep,
+  type RecordedStep,
 } from '../invoice-acceptance';
 
 const issuedAt = new Date('2026-11-01T08:00:00.000Z');
@@ -89,5 +93,97 @@ describe('the acceptance of an invoice by its contractor (EQ-06)', () => {
   it('refuses a contest or a refusal without a reason', () => {
     expect(() => nextAcceptance('pending', { kind: 'contest', reason: ' ' }, before)).toThrow(RangeError);
     expect(() => nextAcceptance('contested', { kind: 'refuse', reason: '' }, after)).toThrow(RangeError);
+  });
+});
+
+describe('a document answered through the API (EQ-06 lot 6, ADR 0039)', () => {
+  const issued: RecordedStep = { kind: 'issued', reason: null };
+  const contested: RecordedStep = { kind: 'contested', reason: 'Une vente du 3 manque' };
+
+  it('stands where its last answer or contest end puts it, with its contest’s reason', () => {
+    expect(standingOf([])).toEqual({ state: 'pending', reason: null });
+    expect(standingOf([issued])).toEqual({ state: 'pending', reason: null });
+    expect(standingOf([issued, { kind: 'accepted', reason: null }])).toEqual({
+      state: 'accepted',
+      reason: null,
+    });
+    expect(standingOf([issued, { kind: 'lapsed', reason: null }])).toEqual({
+      state: 'tacitly_accepted',
+      reason: null,
+    });
+    expect(standingOf([issued, contested])).toEqual({ state: 'contested', reason: 'Une vente du 3 manque' });
+    // The refusal's reason is the owner's: the document keeps the contractor's words.
+    expect(standingOf([issued, contested, { kind: 'contest_refused', reason: 'Vente du 18' }])).toEqual({
+      state: 'contest_refused',
+      reason: 'Une vente du 3 manque',
+    });
+    // A payment leaves the acceptance where it stands.
+    expect(
+      standingOf([issued, { kind: 'accepted', reason: null }, { kind: 'paid', reason: null }]).state,
+    ).toBe('accepted');
+  });
+
+  it('writes the event of an allowed step, its reason trimmed', () => {
+    expect(acceptanceWrite([issued], { kind: 'accept' }, true)).toEqual({
+      kind: 'write',
+      event: 'accepted',
+      reason: null,
+    });
+    expect(acceptanceWrite([issued], { kind: 'contest', reason: '  Une vente du 3 manque ' }, true)).toEqual({
+      kind: 'write',
+      event: 'contested',
+      reason: 'Une vente du 3 manque',
+    });
+    expect(acceptanceWrite([issued], { kind: 'lapse' }, false)).toEqual({
+      kind: 'write',
+      event: 'lapsed',
+      reason: null,
+    });
+    expect(acceptanceWrite([issued, contested], { kind: 'refuse', reason: 'Vente du 18' }, false)).toEqual({
+      kind: 'write',
+      event: 'contest_refused',
+      reason: 'Vente du 18',
+    });
+  });
+
+  it('gives back what was recorded when the same step is sent again, even after the deadline', () => {
+    const accepted: RecordedStep[] = [issued, { kind: 'accepted', reason: null }];
+    expect(acceptanceWrite(accepted, { kind: 'accept' }, true)).toEqual({ kind: 'replay' });
+    expect(acceptanceWrite(accepted, { kind: 'accept' }, false)).toEqual({ kind: 'replay' });
+    expect(
+      acceptanceWrite([issued, contested], { kind: 'contest', reason: 'Une vente du 3 manque ' }, false),
+    ).toEqual({ kind: 'replay' });
+    const refused: RecordedStep[] = [issued, contested, { kind: 'contest_refused', reason: 'Vente du 18' }];
+    expect(acceptanceWrite(refused, { kind: 'refuse', reason: 'Vente du 18' }, false)).toEqual({
+      kind: 'replay',
+    });
+  });
+
+  it('refuses another answer than the one recorded, and a step the delay no longer allows', () => {
+    const accepted: RecordedStep[] = [issued, { kind: 'accepted', reason: null }];
+    refusedIn('accepted', () =>
+      acceptanceWrite(accepted, { kind: 'contest', reason: 'Finalement non' }, true),
+    );
+    refusedIn('contested', () => acceptanceWrite([issued, contested], { kind: 'accept' }, true));
+    refusedIn('contested', () =>
+      acceptanceWrite([issued, contested], { kind: 'contest', reason: 'Un autre motif' }, true),
+    );
+    const refused: RecordedStep[] = [issued, contested, { kind: 'contest_refused', reason: 'Vente du 18' }];
+    refusedIn('contest_refused', () =>
+      acceptanceWrite(refused, { kind: 'refuse', reason: 'Autre motif' }, false),
+    );
+    refusedIn('pending', () => acceptanceWrite([issued], { kind: 'accept' }, false));
+    refusedIn('pending', () => acceptanceWrite([issued], { kind: 'lapse' }, true));
+    refusedIn('pending', () => acceptanceWrite([issued], { kind: 'refuse', reason: 'Rien à refuser' }, true));
+    refusedIn('tacitly_accepted', () =>
+      acceptanceWrite([issued, { kind: 'lapsed', reason: null }], { kind: 'accept' }, false),
+    );
+  });
+
+  it('takes the delay as the database tells it', () => {
+    expect(acceptanceStep('pending', { kind: 'accept' }, true)).toBe('accepted');
+    refusedIn('pending', () => acceptanceStep('pending', { kind: 'accept' }, false));
+    expect(acceptanceStep('pending', { kind: 'lapse' }, false)).toBe('tacitly_accepted');
+    expect(() => acceptanceWrite([issued], { kind: 'contest', reason: '   ' }, true)).toThrow(RangeError);
   });
 });
