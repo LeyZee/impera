@@ -213,14 +213,18 @@ const longDay = (day: string): string => {
 /**
  * What a contractor's document expiring means for their invoices (EQ-06 lot 5c-2, glossary « Pièce du prestataire »):
  * without the tax residence certificate of the year, no invoice leaves under a treaty regime; without a valid URSSAF
- * certificate, it leaves with a warning. The contractor is never named in Telegram: the link opens their file.
+ * certificate, it leaves with a warning. Worded to stay true after the last day: the reminder can come late. The
+ * contractor is never named in Telegram: the link opens their file.
  */
 const contractorDocumentText = (document: ContractorDocumentKind, lastDay: string): string => {
   switch (document) {
-    case 'tax_residence':
-      return `L’attestation de résidence fiscale d’un prestataire ne vaut que jusqu’au ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Sans celle de la nouvelle année, ses factures ne partiront pas.`;
+    case 'tax_residence': {
+      // Its last day is always 31 December: it covers the periods of its year, even those invoiced in January.
+      const year = Number(lastDay.slice(0, 4));
+      return `L’attestation de résidence fiscale d’un prestataire couvre l’année ${String(year)}, et aucune plus récente n’est au dossier. Sans celle de ${String(year + 1)}, les factures de ses quinzaines de ${String(year + 1)} ne partiront pas.`;
+    }
     case 'urssaf_vigilance':
-      return `L’attestation de vigilance URSSAF d’un prestataire vaut jusqu’au ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.`;
+      return `L’attestation de vigilance URSSAF d’un prestataire a pour dernier jour le ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.`;
   }
 };
 

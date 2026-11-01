@@ -266,7 +266,7 @@ describe('classification (ADR 0020 §2)', () => {
       topic: 'important',
       threadKey: null,
       title: 'Important',
-      body: 'L’attestation de résidence fiscale d’un prestataire ne vaut que jusqu’au 31 décembre 2026, et aucune plus récente n’est au dossier. Sans celle de la nouvelle année, ses factures ne partiront pas.',
+      body: 'L’attestation de résidence fiscale d’un prestataire couvre l’année 2026, et aucune plus récente n’est au dossier. Sans celle de 2027, les factures de ses quinzaines de 2027 ne partiront pas.',
       link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${memberId}` },
     });
     const urssaf = classify({
@@ -276,7 +276,7 @@ describe('classification (ADR 0020 §2)', () => {
       lastDay: '2027-03-01',
     });
     expect(urssaf?.kind === 'notice' ? urssaf.body : '').toBe(
-      'L’attestation de vigilance URSSAF d’un prestataire vaut jusqu’au 1er mars 2027, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.',
+      'L’attestation de vigilance URSSAF d’un prestataire a pour dernier jour le 1er mars 2027, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.',
     );
   });
 
