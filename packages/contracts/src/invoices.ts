@@ -104,7 +104,8 @@ export type InvoiceEventKind = z.infer<typeof InvoiceEventKindSchema>;
 
 /**
  * Why a document a validated statement makes due is not issued (EQ-06): its invoice, for want of an accepted mandate,
- * of a regime the accountant validated, of a full identity the owner checked, of a prefix or of the agency's identity;
+ * of a regime the accountant validated, of a full identity the owner checked, under a tax treaty of a tax residence
+ * certificate the owner accepted, of a prefix or of the agency's identity;
  * a credit note the period owes, when no invoice can take it whole (ADR 0036). The statement stays validated and the
  * owner is told (`invoice_not_issued`).
  */
@@ -115,6 +116,13 @@ export const INVOICE_NOT_ISSUED_REASONS = [
   'identity_incomplete',
   /** The file is complete, but the owner has not checked it, or a change of identity cleared his check (EQ-06). */
   'identity_unverified',
+  /**
+   * Under a regime whose tax treaty sets the 182 B withholding aside, no tax residence certificate of the period's
+   * calendar year, or only refused ones: the agency never withholds 25 % (Charles's choice (a), lot 5c).
+   */
+  'tax_residence_missing',
+  /** A tax residence certificate of the period's year is filed and waits for the owner's check (lot 5c). */
+  'tax_residence_unverified',
   'prefix_missing',
   'agency_missing',
   'no_invoice_to_credit',
@@ -463,15 +471,69 @@ export const ContractorProfileSchema = z.object({
 });
 export type ContractorProfile = z.infer<typeof ContractorProfileSchema>;
 
+/** The owner's check of a document (lot 5c): accepted, or refused with its reason. */
+export const CONTRACTOR_DOCUMENT_DECISIONS = ['accepted', 'refused'] as const;
+export const ContractorDocumentDecisionSchema = z.enum(CONTRACTOR_DOCUMENT_DECISIONS);
+export type ContractorDocumentDecision = z.infer<typeof ContractorDocumentDecisionSchema>;
+export const DOCUMENT_REFUSAL_REASON_MAX = 500;
+
+/**
+ * `POST /v1/payroll/contractors/:memberId/documents/:documentId/review` (lot 5c, « ok vérif pièce »), the owner only and
+ * never on his own file: the document accepted, or refused with its reason, which the contractor reads. Once: the same
+ * decision sent again gives the document back; another, `contractor_document_reviewed_conflict`. A refused document
+ * counts as none; the contractor files a new one. Accepting puts its file under the compliance lock of the invoices it
+ * covers, and a tax residence certificate accepted lets his waiting statements be invoiced.
+ */
+export const ContractorDocumentReviewSchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('accepted') }),
+  z.object({ decision: z.literal('refused'), reason: trimmed(DOCUMENT_REFUSAL_REASON_MAX) }),
+]);
+export type ContractorDocumentReview = z.infer<typeof ContractorDocumentReviewSchema>;
+
+/** The check as the file shows it: the decision, its reason for a refusal, and when the owner made it. */
+export const ContractorDocumentReviewedSchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('accepted'), reviewedAt: z.iso.datetime() }),
+  z.object({
+    decision: z.literal('refused'),
+    reason: trimmed(DOCUMENT_REFUSAL_REASON_MAX),
+    reviewedAt: z.iso.datetime(),
+  }),
+]);
+export type ContractorDocumentReviewed = z.infer<typeof ContractorDocumentReviewedSchema>;
+
+/**
+ * What a document's file may be (lot 5c): a PDF, or the photo of the paper (JPEG, PNG). The server reads it from the
+ * file's first bytes, never from what the client says.
+ */
+export const CONTRACTOR_DOCUMENT_MEDIA_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
+export const ContractorDocumentMediaTypeSchema = z.enum(CONTRACTOR_DOCUMENT_MEDIA_TYPES);
+export type ContractorDocumentMediaType = z.infer<typeof ContractorDocumentMediaTypeSchema>;
+
+/** A document's file weighs 10 MB at most: a phone's photo of a page weighs less. */
+export const CONTRACTOR_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Why a file is refused (`contractor_document_invalid`): too heavy, or neither a PDF nor a JPEG nor a PNG. */
+export const CONTRACTOR_DOCUMENT_REFUSALS = ['too_heavy', 'not_supported'] as const;
+export const ContractorDocumentRefusalSchema = z.enum(CONTRACTOR_DOCUMENT_REFUSALS);
+export type ContractorDocumentRefusal = z.infer<typeof ContractorDocumentRefusalSchema>;
+
 /** A document of the regime, dated; the old one stays kept with the invoices it covered. */
 export const ContractorDocumentSchema = z.object({
   id: ContractorDocumentIdSchema,
   memberId: TeamMemberIdSchema,
   kind: ContractorDocumentKindSchema,
   issuedOn: CalendarDaySchema,
-  /** When the document bears its own end; otherwise its regime's duration gives it. */
+  /** The end the document states, `null` when it states none. */
   validUntil: CalendarDaySchema.nullable(),
+  /**
+   * Its last day: the one it states; otherwise the 31st of December of its year for a tax residence certificate, six
+   * months from its issue, the day before, for a vigilance certificate.
+   */
+  lastDay: CalendarDaySchema,
+  mediaType: ContractorDocumentMediaTypeSchema,
   sha256: Sha256Schema,
+  /** The owner's check, `null` while it waits. */
+  review: ContractorDocumentReviewedSchema.nullable(),
   createdAt: z.iso.datetime(),
 });
 export type ContractorDocument = z.infer<typeof ContractorDocumentSchema>;
@@ -828,7 +890,8 @@ export type InvoicePrefixBody = z.infer<typeof InvoicePrefixBodySchema>;
 
 /**
  * `GET /v1/payroll/contractors/:memberId/file`: his file (`null` until it is first written), his country, whether his
- * first invoice froze his prefix, the texts he accepted, the newest version of each kind first, and his regimes.
+ * first invoice froze his prefix, the texts he accepted, the newest version of each kind first, his regimes, and his
+ * documents with the owner's check of each.
  */
 export const ContractorFileSchema = z.object({
   memberId: TeamMemberIdSchema,
@@ -838,6 +901,8 @@ export const ContractorFileSchema = z.object({
   acceptances: z.array(ContractAcceptanceSchema),
   /** His regimes, each from its day, the latest first (lot 5b): the one in force is the latest begun. */
   regimes: z.array(ContractorRegimeSchema),
+  /** His documents, the latest filed first (lot 5c): a renewal never takes the place of the old one. */
+  documents: z.array(ContractorDocumentSchema),
 });
 export type ContractorFile = z.infer<typeof ContractorFileSchema>;
 
@@ -934,6 +999,39 @@ export const AssignContractorRegimeBodySchema = z.object({
 export type AssignContractorRegimeBody = z.infer<typeof AssignContractorRegimeBodySchema>;
 
 /**
+ * `POST /v1/payroll/contractors/:memberId/documents?id=…&kind=…&issuedOn=…[&validUntil=…]` (lot 5c), by the
+ * contractor himself or the owner, never a manager: the file is the body, its bytes as they are
+ * (`content-type: application/octet-stream`), a PDF, a JPEG or a PNG of 10 MB at most (`contractor_document_invalid`
+ * otherwise, its reason in `details.reason`). Its date of issue is never ahead of today in the agency's zone
+ * (`contractor_document_issued_future_unprocessable`). A tax residence certificate states no end: it holds for the
+ * calendar year of its issue. The same `id` sent again with the same file and dates gives it back; with others,
+ * `contractor_document_id_conflict`. A tax residence certificate filed tries his waiting statements again: the owner
+ * is told it waits for his check.
+ */
+export const UploadContractorDocumentQuerySchema = z
+  .object({
+    id: ContractorDocumentIdSchema,
+    kind: ContractorDocumentKindSchema,
+    issuedOn: CalendarDaySchema,
+    validUntil: CalendarDaySchema.optional(),
+  })
+  .refine((query) => query.kind !== 'tax_residence' || query.validUntil === undefined, {
+    message:
+      'L’attestation de résidence fiscale vaut pour l’année civile de sa délivrance : pas de fin à saisir',
+    path: ['validUntil'],
+  })
+  .refine((query) => query.validUntil === undefined || query.validUntil > query.issuedOn, {
+    message: 'La fin de validité suit la date de délivrance',
+    path: ['validUntil'],
+  });
+export type UploadContractorDocumentQuery = z.infer<typeof UploadContractorDocumentQuerySchema>;
+
+export const ContractorDocumentParamsSchema = z.object({
+  memberId: TeamMemberIdSchema,
+  documentId: ContractorDocumentIdSchema,
+});
+
+/**
  * The refusals of the invoices' rules (EQ-06), each suffix setting its status (api.md). Kept apart from
  * `PAYROLL_ERROR_CODES` until the invoices' screens word them (lot 8).
  */
@@ -954,6 +1052,17 @@ export const INVOICE_ERROR_CODES = [
   'billing_regime_validation_future_unprocessable',
   /** The same id sent again with another contractor, regime or day. */
   'contractor_regime_id_conflict',
+  /** The same id sent again with another file or other dates. */
+  'contractor_document_id_conflict',
+  /** A file the server refuses to keep, with its reason in `details.reason` (`CONTRACTOR_DOCUMENT_REFUSALS`). */
+  'contractor_document_invalid',
+  /** A date of issue still to come. */
+  'contractor_document_issued_future_unprocessable',
+  'contractor_document_not_found',
+  /** The owner checked it already, otherwise: a document is checked once. */
+  'contractor_document_reviewed_conflict',
+  /** The bucket did not give the file with its fingerprint: never an altered file. */
+  'contractor_document_unavailable',
   'credit_note_amount_unprocessable',
   'invoice_acceptance_conflict',
   /** Only the contractor answers their document: never the owner, a manager or another member (ADR 0039 § 1). */

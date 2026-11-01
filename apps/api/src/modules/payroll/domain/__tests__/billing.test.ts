@@ -1,3 +1,4 @@
+import { PayPeriodSchema } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,6 +7,7 @@ import {
   documentValidUntil,
   issueDecision,
   regimeOn,
+  taxResidenceFor,
   type BillingRegime,
   type IssueFacts,
 } from '../billing';
@@ -30,8 +32,19 @@ const FRANCHISE: BillingRegime = {
   validatedOn: '2026-10-20',
 };
 
+/** The second fortnight of October 2026, which a certificate of 2026 covers. */
+const OCTOBER = PayPeriodSchema.parse('2026-10-16');
+/** A tax residence certificate of 2026, accepted by the owner. */
+const RESIDENCE_2026 = {
+  kind: 'tax_residence',
+  issuedOn: '2026-03-10',
+  validUntil: null,
+  review: { decision: 'accepted' },
+} as const;
+
 const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
   day: '2026-11-02',
+  period: OCTOBER,
   mandate: { acceptedVersion: 1, currentVersion: 1 },
   assignments: [{ regimeId: 'abroad', from: '2026-10-01' }],
   regimes: [ABROAD, FRANCHISE],
@@ -55,7 +68,7 @@ const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
     siren: '123456789',
     vatNumber: 'FR12123456789',
   },
-  documents: [{ kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null }],
+  documents: [RESIDENCE_2026],
   exclVatMinor: 32_515,
   ...patch,
 });
@@ -92,9 +105,10 @@ describe('a contractor’s billing regime (EQ-06)', () => {
 });
 
 describe('a contractor’s documents (EQ-06)', () => {
-  it('hold a year for residence and six months for vigilance, unless they state their end', () => {
+  it('hold the calendar year for residence and six months for vigilance, unless they state their end', () => {
+    // « ok année civile »: the Beninese tax office issues it for the year, French doctrine reads it so.
     expect(documentValidUntil({ kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null })).toBe(
-      '2027-03-09',
+      '2026-12-31',
     );
     expect(documentValidUntil({ kind: 'urssaf_vigilance', issuedOn: '2026-05-15', validUntil: null })).toBe(
       '2026-11-14',
@@ -185,7 +199,7 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
           rcsCity: null,
           ...patch,
         },
-        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null }],
+        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null, review: null }],
       });
     expect(issueDecision(french({}))).toMatchObject({ reason: 'identity_incomplete' });
     expect(issueDecision(french({ businessId: '  ' }))).toMatchObject({ reason: 'identity_incomplete' });
@@ -210,7 +224,7 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
           rcsCity: 'Lyon',
           ...patch,
         },
-        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null }],
+        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null, review: null }],
       });
     expect(issueDecision(company({}))).toMatchObject({ kind: 'issue' });
     expect(issueDecision(company({ legalForm: null }))).toMatchObject({ reason: 'identity_incomplete' });
@@ -292,42 +306,115 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
   });
 
   it('issues with amber warnings for documents missing or out of date, and an older mandate', () => {
+    const vigilance = (issuedOn: string) =>
+      ({ kind: 'urssaf_vigilance', issuedOn, validUntil: null, review: null }) as const;
+    const french = (patch: Partial<IssueFacts>): IssueFacts =>
+      facts({
+        assignments: [{ regimeId: 'franchise', from: '2026-10-01' }],
+        identity: {
+          legalName: 'Basile Roux',
+          address: '3 place Bellecour, Lyon',
+          country: 'FR',
+          taxId: '12345678900011',
+          businessId: '12345678900011',
+          vatNumber: null,
+          individualEntrepreneur: true,
+          legalForm: null,
+          shareCapitalMinor: null,
+          rcsCity: null,
+        },
+        ...patch,
+      });
     expect(
       issueDecision(
-        facts({
-          documents: [{ kind: 'tax_residence', issuedOn: '2025-10-15', validUntil: null }],
-          mandate: { acceptedVersion: 1, currentVersion: 2 },
-        }),
+        french({ documents: [vigilance('2026-04-15')], mandate: { acceptedVersion: 1, currentVersion: 2 } }),
       ),
     ).toEqual({
       kind: 'issue',
-      regime: ABROAD,
+      regime: FRANCHISE,
       warnings: [
-        { code: 'document_expired', kind: 'tax_residence', until: '2026-10-14' },
+        { code: 'document_expired', kind: 'urssaf_vigilance', until: '2026-10-14' },
         { code: 'mandate_outdated', accepted: 1, current: 2 },
       ],
     });
-    // The newest document counts: a renewal ends the warning.
+    // The newest document counts: a renewal ends the warning; a refused one counts as none.
+    expect(
+      issueDecision(french({ documents: [vigilance('2026-04-15'), vigilance('2026-10-20')] })).warnings,
+    ).toEqual([]);
     expect(
       issueDecision(
-        facts({
+        french({
           documents: [
-            { kind: 'tax_residence', issuedOn: '2025-10-15', validUntil: null },
-            { kind: 'tax_residence', issuedOn: '2026-10-20', validUntil: null },
+            vigilance('2026-04-15'),
+            { ...vigilance('2026-10-20'), review: { decision: 'refused', reason: 'Illisible.' } },
           ],
         }),
       ).warnings,
-    ).toEqual([]);
-    expect(issueDecision(facts({ documents: [] })).warnings).toEqual([
-      { code: 'document_missing', kind: 'tax_residence' },
+    ).toEqual([{ code: 'document_expired', kind: 'urssaf_vigilance', until: '2026-10-14' }]);
+    expect(issueDecision(french({ documents: [] })).warnings).toEqual([
+      { code: 'document_missing', kind: 'urssaf_vigilance' },
     ]);
     // A statement with no invoice still says what is missing in the file.
     expect(
-      issueDecision(facts({ documents: [], mandate: { acceptedVersion: null, currentVersion: 1 } })),
+      issueDecision(french({ documents: [], mandate: { acceptedVersion: null, currentVersion: 1 } })),
     ).toEqual({
       kind: 'none',
       reason: 'no_mandate',
+      warnings: [{ code: 'document_missing', kind: 'urssaf_vigilance' }],
+    });
+  });
+
+  it('issues nothing under a tax treaty without a residence certificate of the period’s year the owner accepted', () => {
+    // Charles's choice (a): never the 25 % withholding; the certificate is no warning, it holds the invoice back.
+    expect(issueDecision(facts({ documents: [] }))).toEqual({
+      kind: 'none',
+      reason: 'tax_residence_missing',
+      warnings: [],
+    });
+    const pending = { ...RESIDENCE_2026, review: null };
+    expect(issueDecision(facts({ documents: [pending] }))).toMatchObject({
+      reason: 'tax_residence_unverified',
+    });
+    const refused = {
+      ...RESIDENCE_2026,
+      review: { decision: 'refused', reason: 'Année illisible.' },
+    } as const;
+    expect(issueDecision(facts({ documents: [refused] }))).toMatchObject({ reason: 'tax_residence_missing' });
+    // The certificate of 2025 does not cover a fortnight of 2026, even issued in December.
+    const lastYear = { ...RESIDENCE_2026, issuedOn: '2025-12-20' };
+    expect(issueDecision(facts({ documents: [lastYear] }))).toMatchObject({
+      reason: 'tax_residence_missing',
+    });
+    // A December fortnight invoiced in January keeps the certificate of its own year.
+    expect(
+      issueDecision(facts({ day: '2027-01-05', period: PayPeriodSchema.parse('2026-12-16') })),
+    ).toMatchObject({ kind: 'issue' });
+    expect(
+      issueDecision(facts({ day: '2027-01-20', period: PayPeriodSchema.parse('2027-01-01') })),
+    ).toMatchObject({ reason: 'tax_residence_missing' });
+    // An identity to complete or to check comes first: the certificate is checked with the file.
+    expect(issueDecision(facts({ documents: [], identityVerified: false }))).toMatchObject({
+      reason: 'identity_unverified',
+    });
+    // Without a treaty (France), the regime asks for no residence certificate.
+    expect(
+      issueDecision(facts({ regimes: [{ ...ABROAD, withholding: 'none' }, FRANCHISE], documents: [] })),
+    ).toEqual({
+      kind: 'issue',
+      regime: { ...ABROAD, withholding: 'none' },
       warnings: [{ code: 'document_missing', kind: 'tax_residence' }],
     });
+  });
+
+  it('tells a certificate covering the year, one waiting for the check, and none', () => {
+    const period = PayPeriodSchema.parse('2026-05-01');
+    expect(taxResidenceFor([RESIDENCE_2026], period)).toBe('covered');
+    expect(taxResidenceFor([{ ...RESIDENCE_2026, review: null }], period)).toBe('unverified');
+    expect(taxResidenceFor([{ ...RESIDENCE_2026, review: null }, RESIDENCE_2026], period)).toBe('covered');
+    // The year it states, when it states one: a certificate issued in December for the next year.
+    const next = { ...RESIDENCE_2026, issuedOn: '2026-12-15', validUntil: '2027-12-31' };
+    expect(taxResidenceFor([next], period)).toBe('missing');
+    expect(taxResidenceFor([next], PayPeriodSchema.parse('2027-01-01'))).toBe('covered');
+    expect(taxResidenceFor([], period)).toBe('missing');
   });
 });

@@ -6,7 +6,8 @@ import { InvoiceStorageUnavailable } from '../domain/errors';
 import type { InvoiceObjectStore, StoredObject } from '../domain/ports';
 
 /**
- * The two buckets of invoices (ADR 0037 § 4 and § 6), S3-compatible: Hetzner for the PDFs, OVHcloud for their copy.
+ * The two buckets of invoices (ADR 0037 § 4 and § 6), S3-compatible: Hetzner for the PDFs, OVHcloud for their copy;
+ * the first one keeps the contractors' documents too, under their own prefix (EQ-06 lot 5c).
  * Each object goes up signed with its SHA-256, which the bucket checks (a file damaged on the way is refused), under a
  * compliance lock until its own date, and with `If-None-Match: *`: a key that holds an object is never written again.
  * Path-style URLs (`<endpoint>/<bucket>/<key>`), which both providers and MinIO serve.
@@ -59,7 +60,7 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
   };
   return {
     volatile: false,
-    async writeOnce(key, bytes, sha256, retainUntil) {
+    async writeOnce(key, bytes, sha256, retainUntil, mediaType = 'application/pdf') {
       if (createHash('sha256').update(bytes).digest('hex') !== sha256) {
         throw new Error(`The SHA-256 given for ${key} is not that of its bytes`);
       }
@@ -67,7 +68,7 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
         method: 'PUT',
         body: bytes,
         headers: {
-          'content-type': 'application/pdf',
+          'content-type': mediaType,
           // The payload is signed with its hash, and the bucket checks both sums of the bytes it receives.
           'x-amz-content-sha256': sha256,
           'x-amz-checksum-sha256': base64Of('sha256', bytes),

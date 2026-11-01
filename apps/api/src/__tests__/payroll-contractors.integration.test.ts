@@ -143,6 +143,8 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
       regimes: [
         expect.objectContaining({ memberId: theo.id, regimeId: invoicing.regimeId, from: '2025-01-01' }),
       ],
+      // No document filed yet (lot 5c).
+      documents: [],
     });
 
     const created = await write(theo.id, theoCookie, THEO_FILE);

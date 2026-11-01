@@ -44,6 +44,7 @@ import {
 } from '../domain/errors';
 import type { PayrollContractorStore, PayrollRequeueStore } from '../domain/ports';
 
+import { documentOf } from './document-rows';
 import { enqueueInvoiceIssue, enqueueInvoiceRequeue } from './invoice-queue';
 import { assignmentOf } from './regime-store';
 import { audit } from './writes';
@@ -51,6 +52,8 @@ import { audit } from './writes';
 const {
   commissionStatements,
   contractAcceptances,
+  contractorDocumentReviews,
+  contractorDocuments,
   contractorProfiles,
   contractorRegimes,
   contractTexts,
@@ -169,6 +172,12 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     .from(contractorRegimes)
     .where(eq(contractorRegimes.memberId, member.id))
     .orderBy(sql`${contractorRegimes.effectiveFrom} desc`);
+  const documents = await tx
+    .select({ row: contractorDocuments, review: contractorDocumentReviews })
+    .from(contractorDocuments)
+    .leftJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
+    .where(eq(contractorDocuments.memberId, member.id))
+    .orderBy(sql`${contractorDocuments.createdAt} desc`, sql`${contractorDocuments.id} desc`);
   return ContractorFileSchema.parse({
     memberId: member.id,
     country: member.country,
@@ -185,6 +194,7 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     prefixFrozen: await prefixFrozen(tx, member.id),
     acceptances: accepted.map((row) => acceptanceOf(row.acceptance)),
     regimes: regimes.map(assignmentOf),
+    documents: documents.map((one) => documentOf(one.row, one.review)),
   });
 }
 

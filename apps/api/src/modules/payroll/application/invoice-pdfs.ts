@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import type { InvoiceId, InvoicePdfCopyProvider, UserId } from '@nirvana/contracts';
 
 import { InvoiceNotFound, InvoicePdfNotFound, InvoicePdfUnavailable } from '../domain/errors';
@@ -12,6 +10,8 @@ import type {
   PayrollInvoicePdfStore,
   StoredInvoicePdf,
 } from '../domain/ports';
+
+import { lockAtLeast, readChecked, sha256Hex } from './locked-objects';
 
 /**
  * The PDF of each issued document (EQ-06 lot 4, ADR 0037): rendered once by `payroll.render_invoice_pdf`, copied to
@@ -44,15 +44,14 @@ const copyAt = (
 ): StoredInvoicePdf['copies'][number] | undefined =>
   new Map(pdf.copies.map((one) => [one.provider, one])).get(provider);
 
-const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
-
 export type RenderOutcome = 'not_found' | 'already' | 'stored' | 'recovered' | 'conflict';
 
 /**
- * `payroll.render_invoice_pdf`: renders the document from its frozen copy, sends it with its lock, then writes its
- * row, which enqueues the copy. Rerun, it does nothing once the row exists; an object without its row (a run that
- * stopped between the two) is read back: the same fingerprint writes the row with the lock read on the object, another
- * alerts and writes nothing.
+ * `payroll.render_invoice_pdf`: locks the tax residence certificates an invoice under a treaty relies on as long as
+ * the invoice, renders the document from its frozen copy, sends it with its lock, then writes its row, which enqueues
+ * the copy. Rerun, it does nothing once the row exists (the certificates were locked before it); an object without its
+ * row (a run that stopped between the two) is read back: the same fingerprint writes the row with the lock read on the
+ * object, another alerts and writes nothing.
  */
 export async function renderInvoicePdf(
   deps: InvoicePdfDeps,
@@ -67,10 +66,52 @@ export async function renderInvoicePdf(
   }
   if (invoice.pdf !== null) return 'already';
   try {
+    await lockCertificates(deps, invoice, logger);
     return await storePdf(deps, invoice, logger);
   } catch (error) {
     await alertIfLast(deps, invoice, 'primary', attempt, logger, error);
     throw error;
+  }
+}
+
+/**
+ * The certificates an invoice under a treaty relies on, locked in both buckets at least as long as the invoice (Bilan
+ * on #355): their acceptance locked them for the invoices of the year after their last day, an invoice of their period
+ * issued later (a late statement, a corrective invoice) is kept longer. Before the PDF's row, so that a run that stops
+ * between the two locks them again when retried; a certificate missing from a locked bucket fails the run, retried then
+ * alerted as the PDF missing (`invoice_pdf_missing`): the PDF never goes out without its proof kept as long.
+ */
+async function lockCertificates(
+  deps: InvoicePdfDeps,
+  invoice: InvoiceToRender,
+  logger: JobLogger,
+): Promise<void> {
+  if (invoice.certificateKeys.length === 0) return;
+  const due = invoicePdfRetainUntil(invoice.issuedOn, invoice.fiscalYearEndMonth);
+  for (const key of invoice.certificateKeys) {
+    for (const [place, bucket] of [
+      ['primary', deps.primary],
+      [COPY_PROVIDER, deps.copy],
+    ] as const) {
+      const found = await bucket.read(key);
+      if (found === null) {
+        // Forgotten by a store in memory (a restart in development), not lost from a locked bucket.
+        if (bucket.volatile) {
+          logger.warn(
+            { invoiceId: invoice.id, key, place },
+            'payroll.render_invoice_pdf: certificate forgotten',
+          );
+          continue;
+        }
+        throw new Error(`payroll.render_invoice_pdf: the certificate ${key} is missing at ${place}`);
+      }
+      if (found.retainUntil === null) {
+        throw new Error(
+          `payroll.render_invoice_pdf: the certificate ${key} has no lock the bucket names at ${place}`,
+        );
+      }
+      await lockAtLeast(bucket, key, found.retainUntil, due, logger);
+    }
   }
 }
 
@@ -141,32 +182,6 @@ async function recover(
   );
   await deps.store.recordPdfUnscoped(invoice.id, { key, sha256, retainUntil });
   return 'recovered';
-}
-
-/**
- * The lock of an object found under its key, made to hold at least until `due` (Bilan on #335): a shorter one, left
- * by a run under other settings or a bucket's default, is lengthened (a compliance lock lengthens, never shortens),
- * then read back. The lock the row then keeps is the one the bucket names. A bucket that refuses fails the run, which
- * is retried, then alerts (`invoice_pdf_missing`); a shorter lock is never recorded.
- */
-async function lockAtLeast(
-  bucket: InvoiceObjectStore,
-  key: string,
-  found: Date,
-  due: Date,
-  logger: JobLogger,
-): Promise<Date> {
-  if (found.getTime() >= due.getTime()) return found;
-  await bucket.lengthenLock(key, due);
-  const after = (await bucket.read(key))?.retainUntil ?? null;
-  if (after === null || after.getTime() < due.getTime()) {
-    throw new Error(`invoice PDF: the lock of ${key} still ends before ${due.toISOString()}`);
-  }
-  logger.warn(
-    { key, found: found.toISOString(), lock: after.toISOString() },
-    'invoice PDF: a lock shorter than due, lengthened',
-  );
-  return after;
 }
 
 export type MirrorOutcome = 'not_found' | 'already' | 'copied' | 'recovered' | 'conflict';
@@ -300,23 +315,6 @@ async function alertIfLast(
 export interface DownloadedPdf {
   readonly fileName: string;
   readonly bytes: Uint8Array;
-}
-
-type Checked =
-  { readonly kind: 'ok'; readonly bytes: Uint8Array } | { readonly kind: 'wrong' | 'unreachable' };
-
-async function readChecked(store: InvoiceObjectStore, key: string, sha256: string): Promise<Checked> {
-  let found: Awaited<ReturnType<InvoiceObjectStore['read']>>;
-  try {
-    found = await store.read(key);
-  } catch {
-    return { kind: 'unreachable' };
-  }
-  // A row whose object is gone is a wrong file too: the bucket's lock should have kept it. A store in memory forgets
-  // its objects with the process (development): one it no longer holds is out of reach, not damaged.
-  if (found === null) return { kind: store.volatile ? 'unreachable' : 'wrong' };
-  if (sha256Hex(found.bytes) !== sha256) return { kind: 'wrong' };
-  return { kind: 'ok', bytes: found.bytes };
 }
 
 /**

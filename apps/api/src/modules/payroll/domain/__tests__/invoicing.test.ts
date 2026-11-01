@@ -149,7 +149,9 @@ const facts = (patch: Partial<InvoicingFacts> = {}): InvoicingFacts => ({
   },
   identityVerified: true,
   prefix: 'NORA',
-  documents: [{ kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null }],
+  documents: [
+    { kind: 'tax_residence', issuedOn: '2026-03-10', validUntil: null, review: { decision: 'accepted' } },
+  ],
   settings: {
     agency: {
       legalName: 'Agence Exemple SAS',
@@ -255,7 +257,7 @@ describe('what a validated statement issues (EQ-06 lot 3)', () => {
           shareCapitalMinor: null,
           rcsCity: null,
         },
-        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-10-01', validUntil: null }],
+        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-10-01', validUntil: null, review: null }],
       }),
     );
     expect(plan.documents.map((one) => [one.kind, one.regime.id])).toEqual([

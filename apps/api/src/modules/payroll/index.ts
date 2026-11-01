@@ -11,6 +11,7 @@ import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollBillingSettings } from './application/billing-settings';
+import { createContractorDocuments } from './application/contractor-documents';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
@@ -40,6 +41,7 @@ import {
   createDrizzlePayrollContractorStore,
   createDrizzlePayrollRequeueStore,
 } from './infra/contractor-store';
+import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
 import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
@@ -215,6 +217,11 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         createPayrollBillingSettings(createDrizzlePayrollBillingSettingsStore(deps.db, now), readPng),
         createDrizzlePayrollContractorStore(deps.db, now),
         createDrizzlePayrollRegimeStore(deps.db, deps.reads, now),
+        createContractorDocuments({
+          store: createDrizzlePayrollDocumentStore(deps.db, deps.reads, now),
+          primary: deps.invoicePdfs.primary,
+          copy: deps.invoicePdfs.copy,
+        }),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),

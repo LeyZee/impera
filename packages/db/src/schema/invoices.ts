@@ -7,7 +7,9 @@ import {
   CONTRACT_TEXT_MAX,
   CONTEST_DELAY_MAX_DAYS,
   DEFAULT_FISCAL_YEAR_END_MONTH,
+  CONTRACTOR_DOCUMENT_DECISIONS,
   CONTRACTOR_DOCUMENT_KINDS,
+  DOCUMENT_REFUSAL_REASON_MAX,
   DOCUMENT_REMINDER_MAX_DAYS,
   INVOICE_DOCUMENT_MENTIONS_MAX,
   INVOICE_DUE_MAX_DAYS,
@@ -366,6 +368,11 @@ export const contractorDocuments = pgTable(
     validUntil: date('valid_until'),
     storageKey: text('storage_key').notNull(),
     sha256: text('sha256').notNull(),
+    /**
+     * The end of the compliance lock as posed at the upload (lot 5c): the file is kept as long as the invoices it
+     * covers, so that a check reads what was posed.
+     */
+    retainUntil: timestampTz('retain_until').notNull(),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -388,6 +395,57 @@ export const contractorDocuments = pgTable(
       withCheck: sql`(${isMine(t.memberId)} or ${isOwner}) and ${t.createdBy} = ${currentUser}`,
     }),
   ],
+);
+
+/**
+ * The owner's check of a document (EQ-06 lot 5c, « ok vérif pièce »): accepted, or refused with its reason, which the
+ * contractor reads. Once per document, added only: a refused file stays refused, the contractor files a new one. Only
+ * an accepted tax residence certificate lets an invoice under a tax treaty go out. Never on a document of the owner's
+ * own member record. An acceptance lengthens the file's lock to that of the invoices it may cover, and keeps its end.
+ */
+export const contractorDocumentReviews = pgTable(
+  'contractor_document_reviews',
+  {
+    documentId: uuid('document_id')
+      .primaryKey()
+      .references(() => contractorDocuments.id),
+    decision: text('decision').notNull(),
+    reason: text('reason'),
+    reviewedBy: text('reviewed_by')
+      .notNull()
+      .references(() => user.id),
+    reviewedAt: timestampTz('reviewed_at').notNull().defaultNow(),
+    /**
+     * The end of the file's lock once accepted, as both buckets were asked to hold it at the check, ten years after it
+     * at least; `null` for a refusal. A floor: an invoice issued later lengthens the lock in the buckets, which name it.
+     */
+    retainUntil: timestampTz('retain_until'),
+  },
+  (t) => {
+    const documentMember = sql`(select d.member_id from contractor_documents d where d.id = ${t.documentId})`;
+    return [
+      enumCheck('contractor_document_reviews', t.decision, CONTRACTOR_DOCUMENT_DECISIONS),
+      check(
+        'contractor_document_reviews_reason_check',
+        sql`(${t.decision} = 'refused') = (${t.reason} is not null) and (${t.reason} is null or ${textBetween(t.reason, DOCUMENT_REFUSAL_REASON_MAX)})`,
+      ),
+      check(
+        'contractor_document_reviews_retain_check',
+        sql`(${t.decision} = 'accepted') = (${t.retainUntil} is not null)`,
+      ),
+      // An accepted document justifies invoices ten years (ADR 0037 § 4, Bilan on #355): its lock never ends sooner
+      // after its check, whatever the code computed. In UTC, so that the bound never moves with the session's zone.
+      check(
+        'contractor_document_reviews_ten_years_check',
+        sql`${t.retainUntil} is null or ${t.retainUntil} >= (${t.reviewedAt} at time zone 'UTC' + interval '10 years') at time zone 'UTC'`,
+      ),
+      pgPolicy('member_read', { for: 'select', using: sql`${readsTeam} or ${isMine(documentMember)}` }),
+      pgPolicy('owner_insert', {
+        for: 'insert',
+        withCheck: sql`${ownerFor(documentMember)} and ${t.reviewedBy} = ${currentUser}`,
+      }),
+    ];
+  },
 );
 
 /**
