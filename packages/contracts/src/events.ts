@@ -337,9 +337,12 @@ export const EVENT_PAYLOADS = {
     amountMinor: z.number().int().min(1),
   }),
   /**
-   * Other bytes than the base's lie under an invoice's key (ADR 0037): at the render after a crash, at the copy, or at a
-   * download, which then served the other place. Nothing was replaced, nothing altered was served; the owner looks
-   * into it. Never a name: the member by id, the document by its number.
+   * An invoice's key does not hold its PDF as the base records it (ADR 0037 § 5 to 7). By stage: `render`, other bytes
+   * in the first bucket after a crash, nothing written; `copy`, at `primary` the PDF missing or other bytes, nothing
+   * copied, at a copy other bytes or a lock that is not the PDF's (none, or a longer one), nothing written;
+   * `download`, the file at that place missing or other bytes, not served (the other place is tried, and served only
+   * if it matches). Nothing is ever replaced; the owner looks into it. Published once per document, place and stage.
+   * Never a name: the member by id, the document by its number.
    */
   invoice_pdf_conflict: z.object({
     invoiceId: InvoiceIdSchema,
@@ -350,7 +353,8 @@ export const EVENT_PAYLOADS = {
   }),
   /**
    * The job gave up after its last attempt (ADR 0037 § 5 and 6): an invoice still has no PDF (`primary`), or its PDF
-   * no copy at the provider named. The invoice stays valid; never published while the job still retries.
+   * no copy at the provider named. The invoice stays valid; never published while the job still retries, and once
+   * per document and place.
    */
   invoice_pdf_missing: z.object({
     invoiceId: InvoiceIdSchema,
