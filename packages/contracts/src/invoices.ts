@@ -739,7 +739,8 @@ export const INVOICE_ERROR_CODES = [
   'invoice_answer_forbidden',
   /**
    * A correction the document does not allow (ADR 0039 § 3), its reason in `details.reason`: `reissue_credit_note`
-   * (only an invoice is cancelled and reissued), `nothing_left` (its credit notes took it off whole already).
+   * (only an invoice is cancelled and reissued), `nothing_left` (its credit notes took it off whole already),
+   * `above_pay_amount_max` (what it has left is more than one adjustment of pay carries, `PAY_AMOUNT_MAX_MINOR`).
    */
   'invoice_correction_unprocessable',
   /** The invoice does not exist, or is not the reader's. */

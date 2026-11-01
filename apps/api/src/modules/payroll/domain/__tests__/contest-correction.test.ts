@@ -1,3 +1,4 @@
+import { PAY_AMOUNT_MAX_MINOR } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { correctionAdjustments, correctionReplayed, type ContestedDocument } from '../contest-correction';
@@ -61,6 +62,34 @@ describe('the correction of an upheld contest (EQ-06 lot 6, ADR 0039 § 3)', () 
         'Nom faux',
       ),
     ).toThrow(expect.objectContaining({ details: { reason: 'nothing_left' } }));
+  });
+
+  it('reissues an invoice only while what it has left fits in one adjustment of pay', () => {
+    const left = (leftMinor: number): ContestedDocument => ({
+      ...invoice,
+      invoice: { ...invoice.invoice, leftMinor },
+    });
+    expect(correctionAdjustments(left(PAY_AMOUNT_MAX_MINOR), { kind: 'reissue' }, 'Nom faux')).toEqual([
+      {
+        amountMinor: -PAY_AMOUNT_MAX_MINOR,
+        reason: 'Annulation de la facture AEX-2026-0021 du 1er novembre 2026',
+      },
+      {
+        amountMinor: PAY_AMOUNT_MAX_MINOR,
+        reason: 'Refacturation de la facture AEX-2026-0021 du 1er novembre 2026',
+      },
+    ]);
+    const above = (): unknown =>
+      correctionAdjustments(left(PAY_AMOUNT_MAX_MINOR + 1), { kind: 'reissue' }, 'Nom faux');
+    expect(above).toThrow(
+      expect.objectContaining({
+        code: 'invoice_correction_unprocessable',
+        details: { reason: 'above_pay_amount_max' },
+      }),
+    );
+    // The refusal says the ceiling in euros: a new ceiling changes its words.
+    expect(PAY_AMOUNT_MAX_MINOR).toBe(5_000_000);
+    expect(above).toThrow('50\u00a0000\u00a0€ HT');
   });
 
   it('refuses a correction without a reason or without an amount', () => {

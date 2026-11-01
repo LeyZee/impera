@@ -274,19 +274,21 @@ export class CreditNoteExceedsInvoice extends DomainError {
   }
 }
 
+/** What the owner reads when a correction is refused, by its reason. */
+const CORRECTION_REFUSALS = {
+  reissue_credit_note: 'Seule une facture s’annule et se refacture, jamais un avoir',
+  nothing_left: 'Les avoirs ont déjà repris toute cette facture : il n’y a rien à refacturer',
+  above_pay_amount_max:
+    'Il reste plus de 50\u00a0000\u00a0€ HT sur cette facture : c’est plus qu’un ajustement de paie ne porte, elle ne s’annule pas et ne se refacture pas en une fois',
+} as const;
+
 /**
  * A correction of an upheld contest that the document does not allow (ADR 0039 § 3): only an invoice is cancelled and
- * reissued, and only for what its credit notes left of it.
+ * reissued, only for what its credit notes left of it, and only while that fits in one adjustment of pay.
  */
 export class InvoiceCorrectionUnprocessable extends DomainError {
-  constructor(reason: 'reissue_credit_note' | 'nothing_left') {
-    super(
-      'invoice_correction_unprocessable',
-      reason === 'reissue_credit_note'
-        ? 'Seule une facture s’annule et se refacture, jamais un avoir'
-        : 'Les avoirs ont déjà repris toute cette facture : il n’y a rien à refacturer',
-      { details: { reason } },
-    );
+  constructor(reason: keyof typeof CORRECTION_REFUSALS) {
+    super('invoice_correction_unprocessable', CORRECTION_REFUSALS[reason], { details: { reason } });
   }
 }
 

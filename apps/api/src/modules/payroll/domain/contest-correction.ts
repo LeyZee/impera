@@ -1,4 +1,4 @@
-import type { ContestCorrection, InvoiceKind } from '@nirvana/contracts';
+import { PAY_AMOUNT_MAX_MINOR, type ContestCorrection, type InvoiceKind } from '@nirvana/contracts';
 
 import { CreditNoteExceedsInvoice, InvoiceCorrectionUnprocessable } from './errors';
 import { longDay } from './invoices';
@@ -34,7 +34,8 @@ export interface CorrectionAdjustment {
  * reason; in the agency's favour, never more than its invoice has left (a credit note is never issued below zero).
  * `reissue`: the pair that cancels an invoice and bills it again, of what its credit notes left of it, each saying so;
  * the payouts do not move (the two add up to zero). A credit note is never reissued: its error of text is corrected by
- * the next document, and only an amount corrects it.
+ * the next document, and only an amount corrects it. Neither is an invoice that has more left than one adjustment of
+ * pay carries (`PAY_AMOUNT_MAX_MINOR`, which the base checks on each): its pair could not be written.
  */
 export function correctionAdjustments(
   document: ContestedDocument,
@@ -53,6 +54,8 @@ export function correctionAdjustments(
   }
   if (document.kind !== 'invoice') throw new InvoiceCorrectionUnprocessable('reissue_credit_note');
   if (invoice.leftMinor <= 0) throw new InvoiceCorrectionUnprocessable('nothing_left');
+  if (invoice.leftMinor > PAY_AMOUNT_MAX_MINOR)
+    throw new InvoiceCorrectionUnprocessable('above_pay_amount_max');
   return reissuePair(invoice.number, invoice.issuedOn, invoice.leftMinor);
 }
 

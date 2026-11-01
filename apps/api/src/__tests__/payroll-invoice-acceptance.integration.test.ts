@@ -455,10 +455,30 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     expect([reissued?.kind, reissued?.amountMinor]).toEqual(['adjustment', invoice.exclVatMinor]);
     expect(reissued?.detail).toContain(`Refacturation de ${which}`);
     const cancels = await db()
-      .select({ exclVatMinor: schema.invoices.exclVatMinor, period: schema.invoices.period })
+      .select({
+        id: schema.invoices.id,
+        exclVatMinor: schema.invoices.exclVatMinor,
+        period: schema.invoices.period,
+      })
       .from(schema.invoices)
       .where(and(eq(schema.invoices.creditedInvoiceId, id), eq(schema.invoices.kind, 'credit_note')));
-    expect(cancels).toEqual([{ exclVatMinor: -invoice.exclVatMinor, period: Q5 }]);
+    expect(cancels.map(({ exclVatMinor, period }) => ({ exclVatMinor, period }))).toEqual([
+      { exclVatMinor: -invoice.exclVatMinor, period: Q5 },
+    ]);
+
+    // A credit note is never cancelled and reissued: upholding its contest so is refused, with the reason, before
+    // anything is written.
+    const cancel = InvoiceIdSchema.parse(cancels[0]?.id);
+    expect(
+      (await send(leaCookie, cancel, 'contest', { reason: 'Cet avoir me retire tout' })).statusCode,
+    ).toBe(200);
+    const notReissued = await send(team.owner, cancel, 'contest/uphold', body);
+    expect([notReissued.statusCode, team.refusal(notReissued)]).toEqual([
+      422,
+      { code: 'invoice_correction_unprocessable', details: { reason: 'reissue_credit_note' } },
+    ]);
+    expect(await correctionOf(cancel)).toEqual([]);
+    expect((await read(leaCookie, cancel)).acceptance.state).toBe('contested');
 
     // Nothing is left of the invoice now: the same uphold sent again is still the one recorded.
     const replay = await send(team.owner, id, 'contest/uphold', body);
