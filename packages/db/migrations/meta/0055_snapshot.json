@@ -1932,6 +1932,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "domain_events_document_expiring_idx": {
+          "name": "domain_events_document_expiring_idx",
+          "columns": [
+            {
+              "expression": "(\"payload\"->>'documentId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"domain_events\".\"type\" = 'contractor_document_expiring'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {

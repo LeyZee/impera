@@ -9,7 +9,7 @@ import {
   type ContractorDocumentKind,
   type ContractorDocumentReview,
 } from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 
 import { documentsToRemind, documentValidUntil, regimeOn } from '../domain/billing';
 import type { PayrollDocumentReminderStore } from '../domain/ports';
@@ -44,10 +44,8 @@ async function said(tx: Transaction, documentId: string): Promise<boolean> {
     .select({ id: domainEvents.id })
     .from(domainEvents)
     .where(
-      and(
-        eq(domainEvents.type, 'contractor_document_expiring'),
-        sql`${domainEvents.payload}->>'documentId' = ${documentId}`,
-      ),
+      // Both written out, the type as a literal: the planner reads them through the partial index of 0055.
+      sql`${domainEvents.type} = 'contractor_document_expiring' and ${domainEvents.payload}->>'documentId' = ${documentId}`,
     )
     .limit(1);
   return row !== undefined;

@@ -7,8 +7,9 @@ import {
   newId,
   type TeamMember,
 } from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+import { eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { addDays } from '../modules/payroll/domain/billing';
 import { transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
@@ -210,5 +211,19 @@ describe('Équipe › Pièces du prestataire : le rappel avant l’échéance (E
       lastDay: addDays(day, 20),
     });
     expect(said.some((one) => one.memberId === theo.id)).toBe(false);
+  });
+
+  it('asks « already said? » through the partial index of 0055, never across the whole outbox (Bilan on #357)', async () => {
+    const plan = await db().transaction(async (tx) => {
+      // Small tables read faster whole: with sequential scans off, the plan shows whether the index can answer at all.
+      await tx.execute(sql`set local enable_seqscan = off`);
+      return tx.execute(
+        sql`explain select 1 from domain_events where domain_events.type = 'contractor_document_expiring' and domain_events.payload->>'documentId' = ${newId(ContractorDocumentIdSchema)} limit 1`,
+      );
+    });
+    const lines = z.array(z.object({ 'QUERY PLAN': z.string() })).parse(plan.rows);
+    expect(lines.map((line) => line['QUERY PLAN']).join('\n')).toContain(
+      'domain_events_document_expiring_idx',
+    );
   });
 });
