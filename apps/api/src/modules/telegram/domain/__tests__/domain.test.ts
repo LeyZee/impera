@@ -237,6 +237,21 @@ describe('classification (ADR 0020 §2)', () => {
     );
   });
 
+  it('says a document is contested, by its number and kind, without the reason nor the contractor', () => {
+    expect(classify({ kind: 'invoice_contested', number: 'DEMO-2026-0003', document: 'invoice' })).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'La facture DEMO-2026-0003 est contestée par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.',
+      link: { label: 'Ouvrir la Paie', path: '/paie' },
+    });
+    const credit = classify({ kind: 'invoice_contested', number: 'DEMO-2026-0004', document: 'credit_note' });
+    expect(credit?.kind === 'notice' ? credit.body : '').toMatch(
+      /^L’avoir DEMO-2026-0004 est contesté par son prestataire\./,
+    );
+  });
+
   it('says a message could not leave, as important, in the conversation’s thread', () => {
     expect(classify({ kind: 'send_failed', conversationId })).toEqual({
       kind: 'notice',
