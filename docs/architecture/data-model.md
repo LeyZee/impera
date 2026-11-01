@@ -315,10 +315,15 @@ Une quinzaine bloquée (migration 0038, recette du 28/10, Équipe G1) : quand le
 Mêmes portées que la paie (migration 0041, ADR 0023 § Données et RLS) : un membre lit son dossier, ses pièces, ses acceptations et ses factures ; la portée `owner` | `agency` lit tout. L'écriture revient au propriétaire ou aux jobs (`nirvana_admin`) ; le prestataire n'écrit que son dossier, ses pièces, ses acceptations et sa réponse à une facture. Les fichiers (pièces, PDF) sont une `storage_key` du stockage objet avec leur empreinte SHA-256 (ADR 0028, ADR 0030), jamais des octets en base.
 
 ```
-billing_settings           id = 1, agency (jsonb : raison sociale, adresse, SIREN, TVA), payment_terms (texte de 1 à
-                           360 caractères imprimé après l'échéance : escompte, pénalités, indemnité ; 0042),
-                           due_days (de 45 à 60, ADR 0038, 0043), document_reminder_days,
-                           accounts (jsonb : comptes du journal des achats), updated_by, updated_at (propriétaire)
+billing_settings           id = 1, agency (jsonb : raison sociale, adresse, SIREN, TVA, et depuis 0045 forme juridique,
+                           capital, ville du RCS), payment_terms (texte de 1 à 360 caractères imprimé après l'échéance :
+                           escompte, pénalités, indemnité ; 0042), due_days (de 45 à 60, ADR 0038, 0043),
+                           document_reminder_days, accounts (jsonb : comptes du journal des achats),
+                           fiscal_year_end_month (1 à 12, 12 par défaut : fin du verrou des PDF, 0045),
+                           service_description (désignation de la prestation, 1 à 400 caractères ; sans elle rien
+                           n'est émis, 0045), logo_sha256 (→ agency_logos, 0045), updated_by, updated_at (propriétaire)
+agency_logos               sha256 (clé, calculée par la base), media_type (image/png), bytes (512 Ko au plus),
+                           created_by, created_at (propriétaire, ajout seul ; lu à chaque rendu, donc en base, 0045)
 billing_regimes            id, name, countries text[], vat_treatment (reverse_charge|exempt|charged), vat_rate_bps (null
                            si franchise), withholding, mentions text[], documents text[], tax_id_required, created_by,
                            created_at (propriétaire, ajout seul)
@@ -326,9 +331,10 @@ billing_regime_validations regime_id (clé), validated_on, recorded_by, recorded
                            du comptable, une fois par régime, ajout seul)
 contractor_regimes         id, member_id, regime_id, effective_from, created_by, created_at (propriétaire, ajout seul ;
                            chacune après la dernière du membre, jamais en arrière)
-contractor_profiles        member_id (clé), legal_name, address, tax_id, email, invoice_prefix (unique), verified_at,
-                           verified_by, updated_by, created_at, updated_at (le membre ou le propriétaire ; vérifié et
-                           préfixé par le propriétaire seul ; jamais supprimé)
+contractor_profiles        member_id (clé), legal_name, address, tax_id, business_id (SIREN ou SIRET, 0045),
+                           vat_number (0045), individual_entrepreneur (« EI », 0045), email, invoice_prefix (unique),
+                           verified_at, verified_by, updated_by, created_at, updated_at (le membre ou le propriétaire ;
+                           vérifié et préfixé par le propriétaire seul ; jamais supprimé)
 contractor_documents       id, member_id, kind (tax_residence|urssaf_vigilance), issued_on, valid_until, storage_key,
                            sha256, created_by, created_at (le membre ou le propriétaire, ajout seul)
 contract_texts             id, kind (service_contract|billing_mandate), version, body, sha256, contest_delay_days (mandat
@@ -341,13 +347,18 @@ invoices                   id, kind (invoice|credit_note), member_id, statement_
                            (null pour un job), due_on, contractor, agency, regime (jsonb, copiés), regime_id, mentions
                            text[] (celles du régime, puis les conditions de paiement d'une facture, ou la facture citée
                            en tête d'un avoir : 25 au plus, migration 0042), excl_vat_minor (> 0 facture, < 0 avoir), vat_minor, incl_vat_minor,
-                           self_assessed_vat_minor, acceptance_deadline, created_at (propriétaire ou job, jamais pour soi ;
-                           une facture par relevé ; ajout seul)
+                           self_assessed_vat_minor, acceptance_deadline, service_description (facture seule, copiée
+                           des réglages, 0045), logo_sha256 (le logo du jour, 0045), created_at (propriétaire ou job,
+                           jamais pour soi ; une facture par relevé ; ajout seul)
 invoice_lines              (invoice_id, position) clé, kind, label, detail, amount_minor (écrites avec leur facture, ajout
                            seul)
 invoice_events             id, invoice_id, kind (issued|accepted|contested|lapsed|credited|contest_refused|paid), reason,
                            statement_id (paid seul), by (null pour un job), created_at (ajout seul ; l'état de la facture)
-invoice_pdfs               invoice_id (clé), storage_key, sha256, created_at (écrit une fois par le job, lot 4)
+invoice_pdfs               invoice_id (clé), storage_key, sha256, retain_until (fin du verrou posée à l'envoi, 0045),
+                           created_at (écrit une fois par le job, lot 4, ADR 0037 ; ajout seul)
+invoice_pdf_copies         (invoice_id, provider) clé, storage_key, sha256, retain_until, created_at (la copie chez le
+                           second hébergeur, ovhcloud ; écrite une fois par le job, ajout seul ; la base refuse une
+                           copie dont l'empreinte ou le verrou diffère de son PDF, 0045)
 ```
 
 Une facture émise ne change plus, pour tous les rôles, les jobs compris (déclencheurs `keep_invoice`, `refuse_billing_change`), et l'application n'a aucun `UPDATE` sur elle :
@@ -358,6 +369,8 @@ Une facture émise ne change plus, pour tous les rôles, les jobs compris (décl
 Son acceptation est la suite de ses événements, dans les étapes de `invoice-acceptance.ts` (`keep_invoice_event`) : `accepted` ou `contested` (avec un motif) avant la fin du délai du mandat, `lapsed` (acceptation tacite, par le job) après ; une contestation finit en `credited`, seulement si un avoir écrit après elle cite la facture, ou en `contest_refused` avec un motif. Un avoir suit les mêmes étapes (ADR 0036), sauf `credited` : aucun avoir ne cite un avoir, sa contestation finit en `contest_refused`. Des index uniques partiels gardent une seule émission, une seule réponse et une seule fin de contestation par facture, et un seul paiement par relevé. Un paiement est celui d'une facture, jamais d'un avoir (le rapprochement impute les avoirs, ADR 0036) ; il nomme un relevé payé du même prestataire, de la quinzaine de la facture ou d'une plus récente qui verse un report, sans recopier montant ni référence (le relevé reste la seule source de « Reste à envoyer »). L'état courant se lit par le dépôt : la réponse, puis la fin de contestation s'il y en a une.
 
 L'émission (EQ-06 lot 3) est un job, `payroll.issue_invoices`, que la validation d'un relevé met en file dans sa transaction : sous le verrou consultatif du prestataire, il écrit la facture du relevé et les avoirs que sa quinzaine doit, chacun sous sa clé d'idempotence (`invoice:<relevé>`, `credit:<relevé>:<rang>`), et dit ce qu'il ne peut pas émettre par l'événement `invoice_not_issued` de `domain_events` (sans créatrice, migration 0042), le relevé restant validé.
+
+Le PDF (EQ-06 lot 4, ADR 0037) est rendu une fois par `payroll.render_invoice_pdf`, mis en file avec l'émission, puis recopié par `payroll.mirror_invoice_pdf`, mis en file avec la ligne `invoice_pdfs` : les deux lignes sont en ajout seul, écrites par les jobs (`nirvana_admin`) et lues sous la politique de la facture. Les octets sont dans deux buckets sous verrou de conformité (Hetzner, puis OVHcloud), jamais en base ; seul le logo, petit et lu à chaque rendu, y est.
 
 Un régime ne change pas ; sa validation est une ligne à part. Un dossier garde son membre ; changer d'identité efface la vérification, et seul le propriétaire vérifie et pose le préfixe. Un texte de contrat porte l'empreinte SHA-256 de son texte exact, calculée par la base ; une acceptation la recopie. Les droits partent de `REVOKE ALL` : l'application ajoute des lignes sous les politiques, et ne change que les réglages, un dossier et un compteur.
 
