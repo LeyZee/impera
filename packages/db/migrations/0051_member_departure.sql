@@ -19,9 +19,10 @@ END;
 $$;--> statement-breakpoint
 CREATE TRIGGER "team_members_departure_kept" BEFORE UPDATE OF "left_on" ON "team_members"
   FOR EACH ROW EXECUTE FUNCTION "keep_member_departure"();--> statement-breakpoint
--- The period that holds a day: the 1st to the 15th, then the 16th to the month's end.
+-- The period that holds a day: the 1st to the 15th, then the 16th to the month's end. Date arithmetic only, never
+-- through a timestamp and the session's time zone: the function is immutable for real.
 CREATE FUNCTION "pay_period_of"(date) RETURNS date LANGUAGE sql IMMUTABLE AS $$
-  SELECT date_trunc('month', $1)::date + CASE WHEN extract(day FROM $1) >= 16 THEN 15 ELSE 0 END
+  SELECT $1 - extract(day FROM $1)::integer + CASE WHEN extract(day FROM $1) >= 16 THEN 16 ELSE 1 END
 $$;--> statement-breakpoint
 -- A document of the member still open: issued, and neither answered for good (accepted, lapsed) nor, contested, ended.
 CREATE FUNCTION "member_documents_open"(uuid) RETURNS integer LANGUAGE sql STABLE AS $$

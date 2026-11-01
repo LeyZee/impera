@@ -228,4 +228,21 @@ describe('Équipe › départ : la quinzaine de clôture d’un membre parti (EQ
     expect(await set(lea, { leftOn: LEFT_ON })).toMatch(/team_members_left_check/u);
     expect(await leftOnOf(theo)).toBe(LEFT_ON);
   });
+
+  it('reads in the base the period that holds a day, whatever the session’s time zone', async () => {
+    const periods = await db().transaction(async (tx) => {
+      await tx.execute(sql`set local time zone 'Pacific/Kiritimati'`);
+      const result = await tx.execute<{ day: string; period: string }>(sql`
+        select day::text, pay_period_of(day)::text as period
+        from unnest(array['2025-05-01', '2025-05-15', '2025-05-16', '2025-05-31', '2024-02-29']::date[]) as day`);
+      return result.rows.map((row) => [row.day, row.period]);
+    });
+    expect(periods).toEqual([
+      ['2025-05-01', '2025-05-01'],
+      ['2025-05-15', '2025-05-01'],
+      ['2025-05-16', '2025-05-16'],
+      ['2025-05-31', '2025-05-16'],
+      ['2024-02-29', '2024-02-16'],
+    ]);
+  });
 });
