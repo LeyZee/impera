@@ -1,0 +1,285 @@
+/* Réglages › Facturation (EQ-06): the cards of what each invoice prints, and the form that sets it. The paper is the
+   invoice's own, black on white in both themes: what the contractor will read, never the screen's glass. */
+.bf {
+  --bf-paper: #ffffff;
+  --bf-paper-ink: #16171a;
+  --bf-paper-muted: #5b5e66;
+}
+
+.bf .rp-account__head {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.bf .rp-account__who {
+  flex: 1;
+}
+.bf-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+
+.bf-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
+  gap: var(--nv-space-2) var(--nv-space-4);
+  margin: 0;
+}
+.bf-facts > div {
+  display: contents;
+}
+.bf-facts dt {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-body-leading);
+}
+.bf-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bf-lines {
+  white-space: pre-line;
+}
+.bf-missing {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+
+.bf-label {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: var(--nv-text-caption-tracking);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.bf-paper {
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-sm);
+  background: var(--bf-paper);
+  color: var(--bf-paper-ink);
+  box-shadow:
+    0 0 0 1px var(--nv-hairline),
+    0 1px 2px rgb(0 0 0 / 0.12);
+}
+.bf-paper--foot {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--bf-paper-muted);
+  text-wrap: pretty;
+}
+.bf-paper--logo {
+  display: flex;
+  align-items: center;
+  min-height: 88px;
+  padding: var(--nv-space-4) var(--nv-space-5);
+}
+.bf-paper--logo img {
+  display: block;
+  max-width: min(100%, 280px);
+  max-height: 56px;
+  object-fit: contain;
+}
+.bf-paper__none {
+  margin: 0;
+  color: var(--bf-paper-muted);
+  font-size: var(--nv-text-footnote);
+}
+
+.bf-quote {
+  margin: 0;
+  padding-left: var(--nv-space-3);
+  border-left: 2px solid var(--nv-hairline);
+  white-space: pre-line;
+  text-wrap: pretty;
+}
+.bf-terms {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  white-space: pre-line;
+  text-wrap: pretty;
+}
+
+/* The form: one step at a time, its place in the row of steps above it. */
+.bf-dialog.tm-dialog {
+  max-width: 600px;
+}
+.bf-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.bf-progress li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--nv-dur-slow) var(--nv-ease-out);
+}
+.bf-progress__num {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  background: var(--nv-glass-fill);
+  transition:
+    background-color var(--nv-dur-slow) var(--nv-ease-out),
+    color var(--nv-dur-slow) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.bf-progress li[data-state='now'] {
+  color: var(--nv-ink);
+}
+.bf-progress li[data-state='now'] .bf-progress__num {
+  background: var(--nv-ink);
+  color: var(--nv-void);
+  transform: scale(1.08);
+}
+.bf-progress li[data-state='done'] {
+  color: var(--nv-ink-muted);
+}
+.bf-progress li[data-state='done'] .bf-progress__num {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+}
+
+.bf-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.bf-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+}
+.bf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.bf-field .nv-field__control {
+  width: 100%;
+}
+.bf-field[data-invalid] .nv-field__control {
+  box-shadow: inset 0 0 0 1px var(--nv-warning);
+}
+.bf-field textarea.nv-field__control {
+  min-height: 0;
+  resize: vertical;
+  line-height: var(--nv-text-body-leading);
+}
+.bf-unit {
+  position: relative;
+}
+.bf-unit .nv-field__control {
+  padding-right: 3rem;
+}
+.bf-unit__sign {
+  position: absolute;
+  inset: 0 var(--nv-space-3) 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--nv-ink-muted);
+  pointer-events: none;
+}
+.bf-days {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.bf-days .nv-field__control {
+  width: 6rem;
+}
+.bf-days span {
+  color: var(--nv-ink-muted);
+}
+.bf-count {
+  margin-left: auto;
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.bf-hint-row {
+  display: flex;
+  gap: var(--nv-space-3);
+  align-items: baseline;
+}
+.bf-musts {
+  margin: 0;
+  padding-left: 1.1em;
+  list-style: disc;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.bf-suggest {
+  margin: 0;
+}
+.bf-link {
+  margin-left: var(--nv-space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nv-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.bf-link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
+.bf-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+
+@media (max-width: 560px) {
+  .bf-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .bf-facts > div + div dt {
+    margin-top: var(--nv-space-2);
+  }
+  .bf-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Five steps do not fit a phone's width: the current one says its name, the others their number. */
+  .bf-progress li:not([data-state='now']) .bf-progress__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-progress li,
+  .bf-progress__num {
+    transition: none;
+  }
+  .bf-progress li[data-state='now'] .bf-progress__num {
+    transform: none;
+  }
+}

@@ -24,6 +24,7 @@ import {
   AiModelsPage,
   AlertsPage,
   BackupsPage,
+  BillingPage,
   PayRulesPage,
   SettingsLayout,
   TelegramPage,
@@ -452,6 +453,18 @@ const payRules = createRoute({
   },
   component: PayRulesPage,
 });
+const billing = createRoute({
+  getParentRoute: () => settings,
+  path: '/facturation',
+  // The owner's alone (EQ-06), like the pay rules: anyone else is sent to Réglages.
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true });
+    }
+  },
+  component: BillingPage,
+});
 const agentMode = createRoute({ getParentRoute: () => settings, path: '/mode', component: AgentModePage });
 
 const routeTree = rootRoute.addChildren([
@@ -465,7 +478,17 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals]),
   commissions,
-  settings.addChildren([settingsIndex, aiModels, alerts, telegram, payRules, backups, devices, agentMode]),
+  settings.addChildren([
+    settingsIndex,
+    aiModels,
+    alerts,
+    telegram,
+    payRules,
+    billing,
+    backups,
+    devices,
+    agentMode,
+  ]),
 ]);
 
 const buildRouter = (context: RouterContext, history?: RouterHistory) =>
