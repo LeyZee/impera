@@ -2,6 +2,10 @@ import type {
   AcceptContractTextBody,
   AgencyLogo,
   AgencyLogoMediaType,
+  AssignContractorRegimeBody,
+  BillingRegime,
+  BillingRegimeId,
+  BillingRegimes,
   BillingSettingsView,
   Bonus,
   BonusId,
@@ -13,9 +17,11 @@ import type {
   ContractAcceptance,
   ContractorFile,
   ContractorProfileBody,
+  ContractorRegime,
   ContractText,
   ContractTextId,
   ContractTexts,
+  CreateBillingRegimeBody,
   CreateContractTextBody,
   CreateBonusBody,
   CreateBonusTierSetBody,
@@ -51,6 +57,7 @@ import type {
   UpdateBillingSettingsBody,
   UpdatePayrollSettingsBody,
   UserId,
+  ValidateBillingRegimeBody,
   VerifyContractorProfileBody,
 } from '@nirvana/contracts';
 
@@ -516,6 +523,32 @@ export interface PayrollContractorStore {
     textId: ContractTextId,
     body: AcceptContractTextBody,
   ): Promise<{ acceptance: ContractAcceptance; created: boolean }>;
+}
+
+/**
+ * The billing regimes (EQ-06 lot 5b), each write as the owner through `withMember`: the base's policies let only him
+ * write them, and its triggers keep a regime, its validation and a contractor's regimes added only.
+ */
+export interface PayrollRegimeStore {
+  /** Every regime, the newest first, with the day the accountant validated it: any member reads them. */
+  regimes(userId: UserId): Promise<BillingRegimes>;
+  /** The owner adds a regime; the same `id` and regime again give it back. */
+  addRegime(
+    actor: Actor,
+    body: CreateBillingRegimeBody,
+  ): Promise<{ regime: BillingRegime; created: boolean }>;
+  /** The owner records the accountant's validation, once, never ahead; the same day again gives the regime back. */
+  validateRegime(
+    actor: Actor,
+    regimeId: BillingRegimeId,
+    body: ValidateBillingRegimeBody,
+  ): Promise<{ regime: BillingRegime; created: boolean }>;
+  /** The owner gives a contractor a regime of his country from a day on; the same `id` and values give it back. */
+  assignRegime(
+    actor: Actor,
+    memberId: TeamMemberId,
+    body: AssignContractorRegimeBody,
+  ): Promise<{ assignment: ContractorRegime; created: boolean }>;
 }
 
 /** `payroll.requeue_invoice_issues`, as the jobs (`withAdmin`): enqueues the statements to try again, and counts them. */

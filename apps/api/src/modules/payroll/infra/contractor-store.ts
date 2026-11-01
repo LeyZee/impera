@@ -45,12 +45,14 @@ import {
 import type { PayrollContractorStore, PayrollRequeueStore } from '../domain/ports';
 
 import { enqueueInvoiceIssue, enqueueInvoiceRequeue } from './invoice-queue';
+import { assignmentOf } from './regime-store';
 import { audit } from './writes';
 
 const {
   commissionStatements,
   contractAcceptances,
   contractorProfiles,
+  contractorRegimes,
   contractTexts,
   invoices,
   teamMembers,
@@ -162,6 +164,11 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     .innerJoin(contractTexts, eq(contractTexts.id, contractAcceptances.textId))
     .where(eq(contractAcceptances.memberId, member.id))
     .orderBy(contractTexts.kind, sql`${contractTexts.version} desc`);
+  const regimes = await tx
+    .select()
+    .from(contractorRegimes)
+    .where(eq(contractorRegimes.memberId, member.id))
+    .orderBy(sql`${contractorRegimes.effectiveFrom} desc`);
   return ContractorFileSchema.parse({
     memberId: member.id,
     country: member.country,
@@ -177,6 +184,7 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
           }),
     prefixFrozen: await prefixFrozen(tx, member.id),
     acceptances: accepted.map((row) => acceptanceOf(row.acceptance)),
+    regimes: regimes.map(assignmentOf),
   });
 }
 

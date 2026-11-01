@@ -481,3 +481,53 @@ export class ContractAcceptanceForbidden extends DomainError {
     super('contract_acceptance_forbidden', 'Seul le prestataire accepte son contrat et son mandat');
   }
 }
+
+/** No regime with this id (EQ-06 lot 5b). */
+export class BillingRegimeNotFound extends DomainError {
+  constructor() {
+    super('billing_regime_not_found', 'Ce régime de facturation n’existe pas');
+  }
+}
+
+/** The same id sent again with another regime: a regime is never changed, a new text is a new regime. */
+export class BillingRegimeIdConflict extends DomainError {
+  constructor() {
+    super('billing_regime_id_conflict', 'Cet identifiant est déjà pris par un autre régime');
+  }
+}
+
+/** The accountant's validation is recorded already, on another day: it is recorded once, never moved. */
+export class BillingRegimeValidated extends DomainError {
+  constructor(validatedOn: string) {
+    super('billing_regime_validated_conflict', 'La validation du comptable est déjà notée pour ce régime', {
+      details: { validatedOn },
+    });
+  }
+}
+
+/** A validation the accountant has not given yet: recorded for a day still to come. */
+export class BillingRegimeValidationAhead extends DomainError {
+  constructor(validatedOn: string) {
+    super(
+      'billing_regime_validation_future_unprocessable',
+      'La validation du comptable se note le jour où il l’a donnée, jamais à l’avance',
+      { details: { validatedOn } },
+    );
+  }
+}
+
+/** A regime of other countries than the contractor's: its mentions and its VAT are not his. */
+export class BillingRegimeCountryMismatch extends DomainError {
+  constructor(country: string) {
+    super('billing_regime_country_unprocessable', 'Ce régime n’est pas celui du pays du prestataire', {
+      details: { country },
+    });
+  }
+}
+
+/** The same id sent again with another contractor, regime or day. */
+export class ContractorRegimeIdConflict extends DomainError {
+  constructor() {
+    super('contractor_regime_id_conflict', 'Cet identifiant est déjà pris par une autre attribution');
+  }
+}

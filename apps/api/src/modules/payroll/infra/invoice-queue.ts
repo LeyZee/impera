@@ -111,3 +111,26 @@ export async function enqueueInvoiceContestAnnounce(tx: Transaction, invoiceId: 
     )`,
   );
 }
+
+/**
+ * `payroll.requeue_invoice_issues` for a contractor at `at`, the first minute of `day`: a regime assigned from a day to
+ * come is in force only then, and his waiting statements are tried again on it (EQ-06 lot 5b). One key per contractor
+ * and day, apart from the one of a change today, so that neither replaces the other.
+ */
+export async function enqueueInvoiceRequeueOn(
+  tx: Transaction,
+  memberId: TeamMemberId,
+  day: string,
+  at: Date,
+): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'payroll.requeue_invoice_issues',
+      payload => ${JSON.stringify({ memberId })}::jsonb,
+      run_at => ${at.toISOString()}::timestamptz,
+      max_attempts => ${JOB_MAX_ATTEMPTS['payroll.requeue_invoice_issues']}::int,
+      job_key => ${`payroll.requeue_invoice_issues:${memberId}:${day}`},
+      job_key_mode => 'replace'
+    )`,
+  );
+}
