@@ -2,6 +2,8 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   CustomAlertIdSchema,
+  INVOICE_NOT_ISSUED_REASONS,
+  PayPeriodSchema,
   TelegramChatIdSchema,
   newId,
 } from '@nirvana/contracts';
@@ -164,6 +166,34 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('says a document of a validated statement was not issued, by period and reason, without the member nor the amount', () => {
+    const period = PayPeriodSchema.parse('2026-10-16');
+    expect(
+      classify({ kind: 'invoice_not_issued', period, document: 'invoice', reason: 'no_mandate' }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'La facture d’un relevé validé de la quinzaine du 16 au 31 oct. n’a pas été émise : le prestataire n’a pas accepté de mandat de facturation. Le relevé reste validé.',
+      link: { label: 'Ouvrir la quinzaine', path: '/paie/quinzaine?quinzaine=2026-10-16' },
+    });
+    const credit = classify({
+      kind: 'invoice_not_issued',
+      period: PayPeriodSchema.parse('2027-02-01'),
+      document: 'credit_note',
+      reason: 'no_invoice_to_credit',
+    });
+    expect(credit?.kind === 'notice' ? credit.body : '').toBe(
+      'Un avoir dû par la quinzaine du 1er au 15 févr. n’a pas été émis : aucune facture ne peut prendre l’avoir entier, à voir avec le comptable. Le relevé reste validé.',
+    );
+    // Every reason of the contract has its sentence.
+    for (const reason of INVOICE_NOT_ISSUED_REASONS) {
+      const notice = classify({ kind: 'invoice_not_issued', period, document: 'invoice', reason });
+      expect(notice?.kind === 'notice' ? notice.body : '').not.toContain('undefined');
+    }
+  });
+
   it('says a message could not leave, as important, in the conversation’s thread', () => {
     expect(classify({ kind: 'send_failed', conversationId })).toEqual({
       kind: 'notice',
@@ -267,9 +297,23 @@ describe('rendering (ADR 0020 §10)', () => {
   });
 
   it('keeps a grouped message under Telegram’s limit and says how many are left out', () => {
-    const joined = joinTexts(Array.from({ length: 10 }, () => 'y'.repeat(1000)));
+    const joined = joinTexts(Array.from({ length: 10 }, (_, index) => String(index).repeat(1000)));
     expect(joined.length).toBeLessThanOrEqual(MAX_TEXT);
     expect(joined).toMatch(/… et \d+ autres dans le CRM\.$/);
+  });
+
+  it('says identical messages of one send once, with their count on the first line', () => {
+    const notice =
+      '🟠 <b>Important · Nirvana</b>\nLa facture n’a pas été émise.\n<a href="https://x.test/">Ouvrir</a>';
+    expect(joinTexts(['autre', notice, notice, 'autre', notice])).toBe(
+      `autre (×2)\n\n🟠 <b>Important · Nirvana</b> (×3)\nLa facture n’a pas été émise.\n<a href="https://x.test/">Ouvrir</a>`,
+    );
+    expect(joinTexts(['a', 'b'])).toBe('a\n\nb');
+    // Cut to the limit, the count left out is of messages, not of distinct texts.
+    const long = (char: string) => char.repeat(3000);
+    expect(joinTexts([long('a'), long('b'), long('b'), long('c')])).toMatch(
+      /\n\n… et 3 autres dans le CRM\.$/,
+    );
   });
 });
 
