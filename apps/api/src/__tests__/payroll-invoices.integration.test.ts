@@ -26,6 +26,7 @@ const Q1 = PayPeriodSchema.parse('2025-05-01');
 const Q2 = PayPeriodSchema.parse('2025-05-16');
 const Q3 = PayPeriodSchema.parse('2025-06-01');
 const Q4 = PayPeriodSchema.parse('2025-06-16');
+const Q5 = PayPeriodSchema.parse('2025-07-01');
 
 const DAY = 86_400_000;
 const quiet = { warn: () => undefined, error: () => undefined };
@@ -468,5 +469,23 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
       [Q3, TERMS],
       [Q4, LATER_TERMS],
     ]);
+  });
+
+  it('credits an invoice only what its credit notes have left on it', async () => {
+    // Théo's first half billed 16 €, and its credit note took 1 € off: 15 € are left. A credit note of 15,50 € no
+    // longer fits on it, one of 15 € does, and nothing is left after it.
+    const [first] = await documentsOf(theo);
+    if (first === undefined) throw new Error('no invoice');
+    expect(await adjust(theo, -1_550, Q1, 'Pack remboursé')).toMatchObject({ period: Q5 });
+    expect(await adjust(theo, -1_500, Q1, 'Autre pack remboursé')).toMatchObject({ period: Q5 });
+    await team.report(theo, Q5, 10_000);
+    await team.recalculate(Q5);
+    expect((await team.validate(team.owner, theo, Q5)).statusCode).toBe(200);
+    expect(await issue(await statementId(theo, Q5))).toMatchObject({
+      issued: [{ kind: 'invoice' }, { kind: 'credit_note' }],
+      notIssued: [{ document: 'credit_note', reason: 'no_invoice_to_credit', amountMinor: 1_550 }],
+    });
+    const credits = (await documentsOf(theo)).filter((one) => one.creditedInvoiceId === first.id);
+    expect(credits.map((one) => one.exclVatMinor)).toEqual([-100, -1_500]);
   });
 });

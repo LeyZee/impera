@@ -175,9 +175,11 @@ async function invoicesOf(tx: Transaction, memberId: string): Promise<StoredInvo
       issuedOn: invoices.issuedOn,
       exclVatMinor: invoices.exclVatMinor,
       regime: invoices.regime,
+      // The outer table named by hand: Drizzle leaves a column of a one-table select unqualified, and inside the
+      // subquery it would name the credit note itself, reading every invoice as never credited.
       creditedMinor: sql<string>`coalesce((
         select -sum(n.excl_vat_minor) from invoices n
-        where n.credited_invoice_id = ${invoices.id} and n.kind = 'credit_note'
+        where n.credited_invoice_id = invoices.id and n.kind = 'credit_note'
       ), 0)::text`,
     })
     .from(invoices)
