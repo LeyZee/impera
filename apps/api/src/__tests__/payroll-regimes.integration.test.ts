@@ -268,4 +268,23 @@ describe('Équipe › Régimes de facturation : écrire, valider, attribuer (EQ-
       [invoicing.regimeId, today()],
     ]);
   });
+
+  it('issues nothing under a regime of another country than the one his record now gives (« ok pays »)', async () => {
+    const Q2 = PayPeriodSchema.parse('2025-05-16');
+    await team.report(theo, Q2, 8_000);
+    await team.recalculate(Q2);
+    expect((await team.validate(team.owner, theo, Q2)).statusCode).toBe(200);
+    const statementId = CommissionStatementIdSchema.parse((await team.statementOf(theo, Q2)).id);
+    // His record moved to Benin after his French regime was given.
+    await db().update(schema.teamMembers).set({ country: 'BJ' }).where(eq(schema.teamMembers.id, theo.id));
+    expect(await payroll().jobs.issueInvoices(statementId, quiet)).toMatchObject({
+      issued: [],
+      notIssued: [{ document: 'invoice', reason: 'regime_country_mismatch' }],
+    });
+    await db().update(schema.teamMembers).set({ country: 'FR' }).where(eq(schema.teamMembers.id, theo.id));
+    expect(await payroll().jobs.issueInvoices(statementId, quiet)).toMatchObject({
+      issued: [{ kind: 'invoice' }],
+      notIssued: [],
+    });
+  });
 });

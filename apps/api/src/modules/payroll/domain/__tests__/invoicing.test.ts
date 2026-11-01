@@ -135,6 +135,8 @@ const facts = (patch: Partial<InvoicingFacts> = {}): InvoicingFacts => ({
   mandate: { acceptedVersion: 1, currentVersion: 1, contestDelayDays: 15 },
   assignments: [{ regimeId: ABROAD.id, from: '2026-10-01' }],
   regimes: [ABROAD, FRANCHISE],
+  // Every regime of the test counts as one of his country, unless a test says otherwise.
+  regimesOfCountry: new Set([ABROAD.id, FRANCHISE.id, LATER.id]),
   identity: {
     legalName: 'Nora Vidal',
     address: '12 rue des Lilas, Cotonou',
@@ -445,6 +447,13 @@ describe('a cancel and reissue: the cancel, then a corrective invoice of its own
       ['credit:st-1016:0', 'credit_note', 'inv-1001', 'inv-1001', ABROAD.id],
       ['reissue:st-1016:0', 'invoice', null, 'inv-1001', ABROAD.id],
     ]);
+    // His record moved to another country since: the day's invoice waits for a regime of it, the pair goes out under
+    // the cancelled invoice's regime, which was his country's when it was issued (ADR 0040).
+    const moved = planInvoicing(facts({ source: reissued(), ...regimeChanged, regimesOfCountry: new Set() }));
+    expect(moved.notIssued).toEqual([
+      { document: 'invoice', reason: 'regime_country_mismatch', amountMinor: 32_321 },
+    ]);
+    expect(moved.documents.map((one) => one.key)).toEqual(['credit:st-1016:0', 'reissue:st-1016:0']);
     // The period's invoice bills its own period only: the reissued amount is no line of it.
     const [own, cancel, corrective] = plan.documents;
     expect(own?.totals.exclVatMinor).toBe(32_321);

@@ -75,6 +75,8 @@ export interface InvoicingFacts {
   };
   readonly assignments: readonly RegimeAssignment[];
   readonly regimes: readonly InvoiceRegime[];
+  /** The ids of the regimes written for the country of his member record, as it reads at the issue. */
+  readonly regimesOfCountry: ReadonlySet<string>;
   readonly identity: ContractorIdentity | null;
   /** The owner checked the file as it stands (`contractor_profiles.verified_at`). */
   readonly identityVerified: boolean;
@@ -184,6 +186,7 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     mandate,
     assignments: facts.assignments,
     regimes: facts.regimes,
+    regimesOfCountry: facts.regimesOfCountry,
     identity: facts.identity,
     identityVerified: facts.identityVerified,
     prefix: facts.prefix,
