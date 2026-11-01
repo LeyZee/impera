@@ -37,6 +37,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Passage à l'humain | `handoff` | La conversation est confiée à un humain ; le bot ne répond plus. |
 | Prise en main | `takeover` | Un humain prend la main volontairement (« Reprendre la main » dans Suivi) ; il répond alors dans Reveal, l'agent n'écrit plus à ce fan. |
 | Rendre la main | `release` | Fin d'une prise en main ou d'un passage à l'humain : l'agent répond de nouveau à partir du prochain message du fan. |
+| Main rendue automatiquement | `conversation.release_unavailable` | Un membre qui n'est plus « actif » (en congé, malade, en déplacement, suspendu, parti) ne lit plus aucune conversation, et ce qu'il tenait est rendu par le système dans la minute, avec son statut pour raison (EQ-13). |
 | Mode copilote | `copilot` | Le bot propose, un humain approuve. |
 | Mode auto | `auto` | Le bot envoie seul pour les catégories autorisées. |
 | Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred`. |

@@ -264,6 +264,7 @@ describe('drafts written with her active persona version, and what an activation
     const guard = startBubbleGuard({ activePersona });
     conversations = createConversationsModule({
       db: test.app.db,
+      adminDb: test.admin.db,
       fans: app.modules.fans,
       sender: new FakeSender(clock),
       requireRole: () => () => Promise.resolve(),

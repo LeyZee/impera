@@ -6,6 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { createConversationCommands, type ConversationCommands } from './application/commands';
 import { createFollowUpJob } from './application/jobs/follow-up';
 import { createRecordFactsJob } from './application/jobs/record-facts';
+import { createReleaseUnavailableJob } from './application/jobs/release-unavailable';
 import { createReopenJob } from './application/jobs/reopen';
 import { createRespondJob } from './application/jobs/respond';
 import { createSendJob } from './application/jobs/send';
@@ -23,6 +24,7 @@ import type {
   ReplyHours,
 } from './domain/ports';
 import { createDrizzleAlertHistory } from './infra/db/alert-history';
+import { createDrizzleAwayHolds } from './infra/db/away-holds';
 import { createDrizzleConversationReader } from './infra/db/reader';
 import { createDrizzleUnitOfWork } from './infra/db/unit-of-work';
 import { createAlertHistoryRoutes } from './infra/http/alert-history-routes';
@@ -51,12 +53,16 @@ export interface ConversationsModule extends ConversationCommands {
     recordFacts(payload: JobPayload<'conversation.record_facts'>, logger: JobLogger): Promise<void>;
     followUp(payload: JobPayload<'conversation.follow_up'>, logger: JobLogger): Promise<void>;
     reopen(payload: JobPayload<'conversation.reopen'>, logger: JobLogger): Promise<void>;
+    /** Each minute: what members who are no longer `active` still held is handed back (EQ-13). */
+    releaseUnavailable(logger: JobLogger): Promise<void>;
   };
 }
 
 export interface ConversationsDeps {
   /** Application role (RLS). */
   readonly db: Database;
+  /** Owner role: read across creators which conversations members who are away still hold (EQ-13). */
+  readonly adminDb: Database;
   readonly fans: FanDirectory;
   /** Implemented by the `connectors` module (P0-06). */
   readonly sender: OutboundSender;
@@ -139,6 +145,11 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         ...(deps.replyHours === undefined ? {} : { replyHours: deps.replyHours }),
       }),
       reopen: createReopenJob({ uow, clock }),
+      releaseUnavailable: createReleaseUnavailableJob({
+        uow,
+        clock,
+        holds: createDrizzleAwayHolds(deps.adminDb),
+      }),
     },
   };
 }

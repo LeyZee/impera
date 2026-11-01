@@ -185,6 +185,7 @@ function signInAccountKey(request: FastifyRequest): string {
  * The signed-in user of a request, or `null`; the role and creators come from our columns, validated. A team member
  * whose scope is `self` (a chatter, a manager who is not active) reads a creator only through the conversations
  * routed to him: his creators move to `routedCreatorIds`, so every route that checks `creatorIds` refuses him at once.
+ * A member who is not `active` keeps none (ADR 0024: a suspended member reads no fan and no conversation).
  */
 async function currentUser(
   auth: Auth,
@@ -224,7 +225,10 @@ async function userOf(
   // A session still open when the member left is refused at its next request (ADR 0023), even before it is revoked.
   if (member.team?.status === 'left') return null;
   if (member.team === null || member.teamScope !== 'self') return { user, membership: member };
-  return { user: { ...user, creatorIds: [], routedCreatorIds: user.creatorIds }, membership: member };
+  // Away (on leave, sick, travelling, suspended), he reads no conversation at all, not even one still routed to him:
+  // the job `conversation.release_unavailable` hands those back within the minute (EQ-13, Charles's « oui » of 01/11).
+  const routedCreatorIds = member.team.status === 'active' ? user.creatorIds : [];
+  return { user: { ...user, creatorIds: [], routedCreatorIds }, membership: member };
 }
 
 /**

@@ -187,6 +187,7 @@ describe('conversation.respond with a desire score', () => {
     composer = new ScriptedComposer();
     conversations = createConversationsModule({
       db: test.app.db,
+      adminDb: test.admin.db,
       fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
       sender: new FakeSender(),
       requireRole: () => () => Promise.resolve(),
