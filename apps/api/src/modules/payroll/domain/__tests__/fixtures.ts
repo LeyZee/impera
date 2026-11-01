@@ -29,6 +29,7 @@ export const member = (patch: Partial<MemberForPay> = {}): MemberForPay => ({
   teamRole: 'chatter',
   status: 'active',
   joinedOn: '2025-01-01',
+  leftOn: null,
   rate: { rateBps: 2_000, teamShareBps: null },
   ...patch,
 });
@@ -67,5 +68,6 @@ export const snapshot = (patch: Partial<PeriodSnapshot>): PeriodSnapshot => ({
   minimumPayoutMinor: 1_500,
   latestRates: [],
   statements: [],
+  lastValidated: new Map(),
   ...patch,
 });

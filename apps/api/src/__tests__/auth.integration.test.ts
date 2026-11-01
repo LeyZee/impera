@@ -163,7 +163,7 @@ describe('dashboard authentication (P0-07a)', () => {
     // Marked left without going through the route (a job, another instance): his session is not revoked yet.
     await test.admin.db
       .update(schema.teamMembers)
-      .set({ status: 'left' })
+      .set({ status: 'left', leftOn: '2025-03-10' })
       .where(eq(schema.teamMembers.userId, operatorId));
     const refused = await me(operator);
     expect(refused.statusCode).toBe(401);
@@ -174,10 +174,10 @@ describe('dashboard authentication (P0-07a)', () => {
     // The owner has no team row and is never cut off.
     expect((await me(owner)).statusCode).toBe(200);
 
-    // Back to active (as an untouched member): signing in works again.
+    // Back to active (as an untouched member), the day he left cleared with it: signing in works again.
     await test.admin.db
       .update(schema.teamMembers)
-      .set({ status: 'active' })
+      .set({ status: 'active', leftOn: null })
       .where(eq(schema.teamMembers.userId, operatorId));
     expect((await me(await signIn(server, OPERATOR.email, OPERATOR.password))).statusCode).toBe(200);
     await test.admin.db.delete(schema.teamMembers).where(eq(schema.teamMembers.userId, operatorId));

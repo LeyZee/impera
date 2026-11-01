@@ -175,7 +175,9 @@ Les approbations et prises en main ne sont pas une table : ce sont des `conversa
 ```
 team_members             id, user_id (unique → user), team_role (chatter|manager), first_name, last_name, display_name,
                          country (ISO 3166-1 alpha-2), time_zone, status (active|on_leave|sick|travelling|suspended|left),
-                         color (#rrggbb), joined_on, created_at, updated_at        (jamais supprimé : un membre parti est `left`)
+                         color (#rrggbb), joined_on, left_on (le jour de l'agence où il est passé `left`, posé par le
+                         serveur, jamais saisi ; non nul si et seulement si `left`, jamais déplacé tant qu'il est parti,
+                         migration 0051, EQ-14), created_at, updated_at        (jamais supprimé : un membre parti est `left`)
 team_member_notes        id, member_id, body (1 à 2 000 car.), author_user_id, created_at          (ajout seul)
 commission_presets       id, name, rate_bps (0 à 10 000), effective_from, created_by, created_at   (ajout seul, unique name + effective_from)
 member_commission_rates  id, member_id, rate_bps, team_share_bps (manager), preset_id, effective_from, created_by, created_at
@@ -306,6 +308,8 @@ La clôture d'une quinzaine pour toute l'équipe (migration 0029, ADR 0032) ajou
 - un rapport n'entre au registre que s'il est validé, de ce membre, d'une quinzaine d'origine qui n'est pas après sa quinzaine de comptage, et seulement dans la transaction qui a écrit la clôture, hors de tout point de sauvegarde (`xmin` de la clôture = `pg_current_xact_id()`, `keep_counted_report`). Aucune transaction plus tardive n'ajoute un rapport à une clôture passée ;
 - un relevé ne se valide que s'il porte la clôture de sa quinzaine : même net d'équipe, même objectif tel qu'atteint, mêmes taux (`rules.exchangeRates`), et exactement les rapports que le registre a comptés pour son membre dans la quinzaine, ni plus ni moins (`keep_commission_statement`) ;
 - une quinzaine d'avant la première clôture est fermée pour tous les membres (`pay_period_closed`) : elle ne sera plus jamais calculée, rien n'y arrive.
+
+Le départ d'un membre (migration 0051, EQ-14 lot 1, ADR 0039 § 6) ajoute : la quinzaine du départ est celle qui contient `left_on` (`pay_period_of`), la quinzaine de clôture est celle d'après (`next_pay_period`). À partir de la quinzaine de clôture, un relevé du membre ne se valide que s'il est final (`rules.final`, sans minimum de versement, ADR 0038) et qu'aucun de ses documents n'attend de réponse ni ne reste contesté (`member_documents_open` : une facture ou un avoir sans `accepted`, `lapsed`, `contest_upheld` ni `contest_refused`) ; avant, et pour un membre qui n'est pas parti, un relevé final ne se valide pas (`keep_final_statement`). Le recalcul lui donne un relevé dans sa quinzaine de clôture même sans activité, tant qu'aucun relevé plus récent du membre n'est validé, pour que les corrections de ses derniers documents y arrivent.
 
 Les droits par colonne tiennent en plus le rôle de l'application, qui part de `REVOKE ALL` : il ne touche à un relevé que par son statut, qui l'a validé et qui l'a payé.
 

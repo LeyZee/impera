@@ -589,7 +589,9 @@ describe('changing a member once added (EQ-10)', () => {
     const confirm = within(panel).getByRole('group', { name: 'Confirmer le départ' });
     expect(await within(confirm).findByText(/2 shifts à venir restent au planning/u)).toBeDefined();
     expect(confirm.textContent).toContain('Son compte membre sur Reveal est à retirer à la main.');
-    expect(confirm.textContent).toContain('relevé final');
+    // Pay settles his last fortnight now (EQ-14 lot 1): a carry-over is no longer left waiting.
+    expect(confirm.textContent).toContain('Son relevé final, celui de la quinzaine qui suit son départ');
+    expect(confirm.textContent).not.toContain('il n’est pas versé');
   });
 
   it('sends the owner to the planning when his shifts ahead cannot be read', async () => {

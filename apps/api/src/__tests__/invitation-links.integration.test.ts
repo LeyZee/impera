@@ -135,7 +135,7 @@ describe('invitation links (EQ-10)', () => {
 
     await test.admin.db
       .update(schema.teamMembers)
-      .set({ status: 'left' })
+      .set({ status: 'left', leftOn: '2025-03-10' })
       .where(eq(schema.teamMembers.userId, userId));
     const left = await post(
       `/v1/team/members/${memberId}/invitation-link`,
@@ -265,7 +265,7 @@ describe('invitation links (EQ-10)', () => {
     const link = await newLink(leaving.memberId);
     await test.admin.db
       .update(schema.teamMembers)
-      .set({ status: 'left' })
+      .set({ status: 'left', leftOn: '2025-03-10' })
       .where(eq(schema.teamMembers.id, leaving.memberId));
     expect((await post('/v1/invitation-links/inspect', { token: link.token })).statusCode).toBe(404);
     expect(

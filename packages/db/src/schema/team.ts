@@ -47,12 +47,19 @@ export const teamMembers = pgTable(
     /** The member's colour on the planning, `#rrggbb`. */
     color: text('color'),
     joinedOn: date('joined_on').notNull(),
+    /**
+     * The day he left, in the agency's zone: the day the owner made him `left`, never typed (EQ-14, ADR 0039 § 6). Pay
+     * reads his closing fortnight from it. Set with the status, never moved while he is gone, cleared only with the
+     * status by a return (`team_members_left_check`, `keep_member_departure`, 0051).
+     */
+    leftOn: date('left_on'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     enumCheck('team_members', t.teamRole, TEAM_ROLES),
     enumCheck('team_members', t.status, TEAM_MEMBER_STATUSES),
+    check('team_members_left_check', sql`(${t.status} = 'left') = (${t.leftOn} is not null)`),
     check('team_members_country_check', sql`${t.country} ~ '^[A-Z]{2}$'`),
     check('team_members_color_check', sql`${t.color} is null or ${t.color} ~ '^#[0-9a-f]{6}$'`),
     pgPolicy('member_read', { for: 'select', using: sql`${t.userId} = ${currentUser} or ${readsTeam}` }),

@@ -27,6 +27,7 @@ import {
 } from '@nirvana/db';
 import { z } from 'zod';
 
+import { assertDocumentsSettled } from '../domain/departure';
 import {
   CommissionStatementChanged,
   CommissionStatementNotFound,
@@ -320,6 +321,13 @@ export function createDrizzlePayrollValidationStore(
 
         const statement = statementOf(closed, head.memberId);
         if (statement.inputsHash !== head.inputsHash) throw new CommissionStatementChanged(head.period);
+        if (statement.content.rules.final) {
+          // A member who left (ADR 0039 § 6): his documents first, as the base's `keep_final_statement` counts them.
+          const [open] = await tx
+            .execute<{ count: number }>(sql`select "member_documents_open"(${head.memberId}) as count`)
+            .then((result) => z.array(z.object({ count: z.number().int() })).parse(result.rows));
+          assertDocumentsSettled(true, open?.count ?? 0);
+        }
         await assertNothingOwedBefore(tx, reads, closed, reports, head.memberId);
 
         const validated = await tx

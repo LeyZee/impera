@@ -1,6 +1,7 @@
 import {
   BonusIdSchema,
   BonusTierSetIdSchema,
+  CarryOverIdSchema,
   CommissionStatementIdSchema,
   DomainError,
   newId,
@@ -284,6 +285,68 @@ describe('a closed period (ADR 0032)', () => {
 
   it('is never computed again before the team’s first closing', () => {
     expect(planPeriod(snapshot({ period: P1, firstClosed: P2, lastClosed: P2 }))).toEqual({ kind: 'never' });
+  });
+});
+
+describe('a member who left (EQ-14, ADR 0039 § 6)', () => {
+  // He left on the 10th of March: P1 is his departure fortnight, P2 his closing fortnight.
+  const gone = () => member({ status: 'left', leftOn: '2025-03-10' });
+
+  it('has a statement in his closing fortnight even without activity, final', () => {
+    const who = gone();
+    const plan = planPeriod(snapshot({ period: P2, members: [who, member()] }));
+    expect(written(plan).inserts.map((draft) => draft.content.memberId)).toEqual([who.id]);
+    expect(draftOf(plan, who).content).toMatchObject({ lines: [], totalMinor: 0, payableMinor: 0 });
+    expect(draftOf(plan, who).content.rules.final).toBe(true);
+  });
+
+  it('keeps an ordinary statement in his departure fortnight, and none after his closing fortnight without activity', () => {
+    const who = gone();
+    const departure = planPeriod(
+      snapshot({ period: P1, members: [who], reports: [report(who, P1, 10_000)] }),
+    );
+    expect(draftOf(departure, who).content.rules.final).toBe(false);
+    expect(written(planPeriod(snapshot({ period: P3, members: [who] }))).inserts).toEqual([]);
+  });
+
+  it('gets no statement in his closing fortnight once a later one of his is validated: no draft goes behind it', () => {
+    const who = gone();
+    const plan = planPeriod(snapshot({ period: P2, members: [who], lastValidated: new Map([[who.id, P3]]) }));
+    expect(written(plan).inserts).toEqual([]);
+    const behind = planPeriod(
+      snapshot({ period: P2, members: [who], lastValidated: new Map([[who.id, P1]]) }),
+    );
+    expect(written(behind).inserts.map((draft) => draft.content.memberId)).toEqual([who.id]);
+  });
+
+  it('is paid all he is owed from his closing fortnight on, under the minimum or with a carry-over (ADR 0038)', () => {
+    const who = gone();
+    const stays = member();
+    const carried = (memberId: typeof who.id) => ({
+      id: newId(CarryOverIdSchema),
+      memberId,
+      fromPeriod: P2,
+      toPeriod: P3,
+      amountMinor: 900,
+      rank: 1,
+      statementId: newId(CommissionStatementIdSchema),
+      createdAt: '2025-04-01T00:00:00.000Z',
+    });
+    const plan = planPeriod(
+      snapshot({ period: P3, members: [who, stays], carryOvers: [carried(who.id), carried(stays.id)] }),
+    );
+    // 9 € under a 15 € minimum: carried again for whoever stays, paid to whoever left.
+    expect(draftOf(plan, who).content).toMatchObject({
+      totalMinor: 900,
+      carryOverOutMinor: 0,
+      payableMinor: 900,
+    });
+    expect(draftOf(plan, who).content.rules.final).toBe(true);
+    expect(draftOf(plan, stays).content).toMatchObject({
+      totalMinor: 900,
+      carryOverOutMinor: 900,
+      payableMinor: 0,
+    });
   });
 });
 

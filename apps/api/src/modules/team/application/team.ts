@@ -147,7 +147,8 @@ export function createTeamService(
     },
 
     changeStatus: async (actor, id, status) => {
-      await store.changeStatus(actor, id, status);
+      // The day he leaves is the day it is said, never typed: a departure is never back-dated (EQ-14).
+      await store.changeStatus(actor, id, status, today());
       return read(actor.userId, id);
     },
 

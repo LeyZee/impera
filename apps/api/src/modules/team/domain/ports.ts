@@ -82,8 +82,11 @@ export interface TeamStore {
   create(actor: Actor, member: NewMember): Promise<void>;
   /** Owner. `member_not_found`, `member_left_conflict`. The role has its own write, dated (`addRole`). */
   update(actor: Actor, id: TeamMemberId, patch: MemberPatch): Promise<void>;
-  /** Owner. Leaving empties his creators and ends his sessions in the same transaction. */
-  changeStatus(actor: Actor, id: TeamMemberId, status: TeamMemberStatus): Promise<void>;
+  /**
+   * Owner. Leaving empties his creators and ends his sessions in the same transaction, and keeps `today` (the agency's
+   * day) as the day he left, from which pay reads his closing fortnight (EQ-14, ADR 0039 § 6).
+   */
+  changeStatus(actor: Actor, id: TeamMemberId, status: TeamMemberStatus, today: string): Promise<void>;
   /**
    * Owner. `team_share_invalid` for a share when the role of the rate's first day is chatter,
    * `commission_rate_conflict` for a second rate that day. Pay

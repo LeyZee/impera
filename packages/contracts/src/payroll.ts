@@ -895,6 +895,8 @@ export function mayValidateStatement(
  * a draft ;
  * `commission_statement_open_conflict` 409, a period that has not ended ;
  * `commission_statement_order_conflict` 409, an earlier statement of the member is still a draft or not written yet ;
+ * `commission_statement_documents_open_conflict` 409, a final statement of a member who left while some of his
+ * documents still await an answer or stay contested (EQ-14, ADR 0039 § 6, `details.count`) ;
  * `pay_period_order_conflict` 409, an earlier period of the team must be validated first (`details.period`) ;
  * `pay_period_reports_pending_conflict` 409, reports of the period still wait for review (`details.count`) ;
  * `pay_period_reports_unread_conflict` 409, reports the validator may not read would be left out (`details.count`) ;
@@ -926,6 +928,7 @@ export const PAYROLL_ERROR_CODES = [
   'commission_statement_status_conflict',
   'commission_statement_open_conflict',
   'commission_statement_order_conflict',
+  'commission_statement_documents_open_conflict',
   'pay_period_order_conflict',
   'pay_period_reports_pending_conflict',
   'pay_period_reports_unread_conflict',
