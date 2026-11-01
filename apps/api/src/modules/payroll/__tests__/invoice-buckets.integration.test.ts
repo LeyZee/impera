@@ -96,6 +96,38 @@ describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage ob
     expect((await store().read('invoices/2026/c.pdf'))?.bytes).toEqual(bytes);
   });
 
+  it('refuses to shorten a compliance lock, even to its root user, and only lengthens it', async () => {
+    const bytes = bytesOf('%PDF-1.7 verrou tenu');
+    const lock = inOneDay();
+    await store().writeOnce('invoices/2026/e.pdf', bytes, sha(bytes), lock);
+    const head = await admin.fetch(`${endpoint}/${bucket}/invoices/2026/e.pdf`, { method: 'HEAD' });
+    const version = head.headers.get('x-amz-version-id') ?? '';
+    const retain = (until: Date) => {
+      const retention = `<Retention xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Mode>COMPLIANCE</Mode><RetainUntilDate>${until.toISOString()}</RetainUntilDate></Retention>`;
+      return admin.fetch(
+        `${endpoint}/${bucket}/invoices/2026/e.pdf?retention&versionId=${encodeURIComponent(version)}`,
+        {
+          method: 'PUT',
+          body: retention,
+          headers: {
+            'content-md5': createHash('md5').update(retention).digest('base64'),
+            'x-amz-bypass-governance-retention': 'true',
+          },
+        },
+      );
+    };
+    const shortened = await retain(new Date(lock.getTime() - 3_600_000));
+    // AWS answers 403 AccessDenied, MinIO 400 « Object is WORM protected »: refused either way.
+    expect(shortened.ok).toBe(false);
+    expect(await shortened.text()).toMatch(/AccessDenied|WORM protected/u);
+    expect((await store().read('invoices/2026/e.pdf'))?.retainUntil).toEqual(lock);
+    // The same request that lengthens it goes through: the refusal above is the lock's, not the request's.
+    const later = new Date(lock.getTime() + 3_600_000);
+    const lengthened = await retain(later);
+    expect(lengthened.status, await lengthened.text()).toBe(200);
+    expect(await store().read('invoices/2026/e.pdf')).toEqual({ bytes, retainUntil: later });
+  });
+
   it('refuses bytes damaged on the way: the provider checks the sums it was sent', async () => {
     const bytes = bytesOf('%PDF-1.7 abîmé en route');
     const damaging = createS3InvoiceStore(

@@ -33,7 +33,7 @@ export const CONTRACTOR: InvoiceContractor = {
   individualEntrepreneur: false,
 };
 
-export const REVERSE_CHARGE: RegimeVat = { treatment: 'reverse_charge', rateBps: 2_000 };
+const REVERSE_CHARGE: RegimeVat = { treatment: 'reverse_charge', rateBps: 2_000 };
 
 export const REGIME_MENTIONS = [
   'Prestataire établi hors de l’Union européenne (Bénin), résident fiscal de son pays\u00a0: retenue à la source de l’art. 182 B du CGI écartée par la convention fiscale France–Bénin.',

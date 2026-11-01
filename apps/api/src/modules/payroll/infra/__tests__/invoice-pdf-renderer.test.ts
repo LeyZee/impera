@@ -45,7 +45,8 @@ async function pagesOf(bytes: Uint8Array): Promise<string[]> {
 
 const ascii = (bytes: Uint8Array): string => Buffer.from(bytes).toString('latin1');
 
-describe('Équipe › Factures : le PDF rendu (EQ-06 lot 4, ADR 0037 § 2)', () => {
+// Each test lays out real pages, then reads them back with pdf.js: seconds, not milliseconds, under a loaded machine.
+describe('Équipe › Factures : le PDF rendu (EQ-06 lot 4, ADR 0037 § 2)', { timeout: 30_000 }, () => {
   let renderer: InvoicePdfRenderer;
   const render = (content: InvoicePdfContent, logo: InvoiceLogo | null = null) =>
     renderer.render(content, logo, ISSUED_AT);
