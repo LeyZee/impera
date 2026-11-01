@@ -1,6 +1,6 @@
 # 0039. Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main
 
-Statut : proposed
+Statut : accepted (Charles, 01/11/2026 15h42, « Ok 0039 », sur le texte de la tête 46dd2f4, approuvée par Bilan)
 Date : 2026-11-01
 Remplace : dans l'ADR 0036, la phrase « Seul l'avoir qui répond à une contestation fait passer la facture en « créditée » » ; précise l'ADR 0023 (§ Factures : l'acceptation, la correction d'une facture)
 
