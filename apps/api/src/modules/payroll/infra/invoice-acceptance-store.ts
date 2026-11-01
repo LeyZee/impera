@@ -8,13 +8,23 @@ import {
   InvoiceIdSchema,
   InvoiceKindSchema,
   newId,
+  PayAdjustmentIdSchema,
+  payPeriodAt,
+  TeamMemberIdSchema,
   type InvoiceAcceptanceView,
   type InvoiceEventKind,
   type UserId,
 } from '@nirvana/contracts';
 import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
+import { z } from 'zod';
 
 import {
+  correctionAdjustments,
+  correctionReplayed,
+  type ContestedDocument,
+} from '../domain/contest-correction';
+import {
+  InvoiceAcceptanceConflict,
   InvoiceAnswerForbidden,
   InvoiceNotFound,
   PayrollForbidden,
@@ -28,20 +38,32 @@ import {
 } from '../domain/invoice-acceptance';
 import type { Actor, PayrollInvoiceAcceptanceStore } from '../domain/ports';
 
+import { enqueueChanged, lockAdjustmentPeriod } from './entry-store';
 import { enqueueInvoiceContestAnnounce, enqueueInvoiceLapse } from './invoice-queue';
+import type { PayInputReads } from './snapshot';
+import { audit } from './writes';
 
-const { auditLog, domainEvents, invoiceEvents, invoices, teamMembers } = schema;
+const { auditLog, domainEvents, invoiceEvents, invoices, payAdjustments, teamMembers } = schema;
 
 /** What the acceptance writes in the audit log, entity `invoice`. */
 type AcceptanceAction =
-  'invoice.accept' | 'invoice.contest' | 'invoice.contest_refuse' | 'invoice.lapse' | 'invoice.contest_alert';
+  | 'invoice.accept'
+  | 'invoice.contest'
+  | 'invoice.contest_uphold'
+  | 'invoice.contest_refuse'
+  | 'invoice.lapse'
+  | 'invoice.contest_alert';
 
 const ACTION_OF: Partial<Record<InvoiceEventKind, AcceptanceAction>> = {
   accepted: 'invoice.accept',
   contested: 'invoice.contest',
+  contest_upheld: 'invoice.contest_uphold',
   contest_refused: 'invoice.contest_refuse',
   lapsed: 'invoice.lapse',
 };
+
+/** What credit notes took off an invoice, a sum of integers that Postgres gives as text. */
+const CreditedSchema = z.coerce.number().int().nonnegative();
 
 /** The document as the writer reads it (its policy applies under `withMember`), with the database's clock on its delay. */
 interface Document {
@@ -49,6 +71,8 @@ interface Document {
   readonly kind: string;
   readonly memberId: string;
   readonly number: string;
+  /** The invoice a credit note cites, `null` on an invoice. */
+  readonly creditedInvoiceId: string | null;
   readonly deadline: Date;
   /** `now() < acceptance_deadline`, on the clock the trigger of `invoice_events` checks. */
   readonly open: boolean;
@@ -61,6 +85,7 @@ async function documentOf(tx: Transaction, invoiceId: string): Promise<Document 
       kind: invoices.kind,
       memberId: invoices.memberId,
       number: invoices.number,
+      creditedInvoiceId: invoices.creditedInvoiceId,
       deadline: invoices.acceptanceDeadline,
       open: sql<boolean>`now() < ${invoices.acceptanceDeadline}`,
     })
@@ -118,6 +143,7 @@ async function writeStep(
   document: Document,
   step: AcceptanceStep,
   by: Actor | null,
+  details: Readonly<Record<string, unknown>> = {},
 ): Promise<'written' | 'replay'> {
   const decision = acceptanceWrite(recorded(await stepsOf(tx, document.id)), step, document.open);
   if (decision.kind === 'replay') return 'replay';
@@ -136,13 +162,66 @@ async function writeStep(
       action,
       entity: 'invoice',
       entityId: document.id,
-      details: { number: document.number, ...(decision.reason === null ? {} : { reason: decision.reason }) },
+      details: {
+        number: document.number,
+        ...(decision.reason === null ? {} : { reason: decision.reason }),
+        ...details,
+      },
       ip: by?.ip ?? null,
     });
   }
   if (decision.event === 'contested')
     await enqueueInvoiceContestAnnounce(tx, InvoiceIdSchema.parse(document.id));
   return 'written';
+}
+
+/**
+ * The contested document as its correction reads it (ADR 0039 § 3), and the statement each adjustment of it corrects:
+ * an invoice's own; for a credit note, the invoice it cites, whose period it corrected. What the invoice has left is
+ * its total excluding VAT less what its issued credit notes took off.
+ */
+async function contestedOf(
+  tx: Transaction,
+  document: Document,
+): Promise<{ readonly document: ContestedDocument; readonly correctsStatementId: string }> {
+  const kind = InvoiceKindSchema.parse(document.kind);
+  const invoiceId = kind === 'invoice' ? document.id : document.creditedInvoiceId;
+  if (invoiceId === null) throw new Error(`Credit note ${document.number} cites no invoice`);
+  const [cited] = await tx
+    .select({
+      number: invoices.number,
+      issuedOn: invoices.issuedOn,
+      statementId: invoices.statementId,
+      exclVatMinor: invoices.exclVatMinor,
+      creditedMinor: sql<string>`coalesce((
+        select -sum(n.excl_vat_minor) from invoices n
+        where n.credited_invoice_id = ${invoices.id} and n.kind = 'credit_note'
+      ), 0)::text`,
+    })
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId));
+  if (cited === undefined || cited.statementId === null)
+    throw new Error(`Invoice of ${document.number} has no statement`);
+  return {
+    document: {
+      kind,
+      invoice: {
+        number: cited.number,
+        issuedOn: cited.issuedOn,
+        leftMinor: cited.exclVatMinor - CreditedSchema.parse(cited.creditedMinor),
+      },
+    },
+    correctsStatementId: cited.statementId,
+  };
+}
+
+/** The adjustments that corrected the document's contest, negative first, as `correctionReplayed` compares them. */
+async function correctionOf(tx: Transaction, invoiceId: string) {
+  return tx
+    .select({ amountMinor: payAdjustments.amountMinor, reason: payAdjustments.reason })
+    .from(payAdjustments)
+    .where(eq(payAdjustments.contestedInvoiceId, invoiceId))
+    .orderBy(payAdjustments.amountMinor, payAdjustments.id);
 }
 
 /** Is `userId` the contractor the document is in the name of? */
@@ -158,6 +237,8 @@ async function isContractor(tx: Transaction, document: Document, userId: UserId)
 export function createDrizzlePayrollInvoiceAcceptanceStore(
   db: Database,
   adminDb: Database,
+  reads: PayInputReads,
+  now: () => Date,
 ): PayrollInvoiceAcceptanceStore {
   return {
     read: (userId, invoiceId) =>
@@ -185,6 +266,66 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
         if (await isContractor(tx, document, actor.userId)) throw new PayrollOwnForbidden();
         await lockDocument(tx, document.id);
         await writeStep(tx, document, { kind: 'refuse', reason }, actor);
+        return viewOf(tx, document);
+      }),
+
+    upholdContest: (actor, invoiceId, reason, correction) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        const document = await documentOf(tx, invoiceId);
+        if (document === null) throw new InvoiceNotFound();
+        if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
+        // The owner never decides on a document in their own name (the policy `owner_step` refuses it too).
+        if (await isContractor(tx, document, actor.userId)) throw new PayrollOwnForbidden();
+        await lockDocument(tx, document.id);
+        const step = { kind: 'uphold', reason } as const;
+        const contested = await contestedOf(tx, document);
+        // Upheld already with this reason: the same correction gives the view back, another one is a conflict. Asked
+        // before the correction is computed again, which the cancel issued since would no longer allow.
+        if (
+          acceptanceWrite(recorded(await stepsOf(tx, document.id)), step, document.open).kind === 'replay'
+        ) {
+          if (
+            !correctionReplayed(contested.document, correction, reason, await correctionOf(tx, document.id))
+          ) {
+            throw new InvoiceAcceptanceConflict('contest_upheld');
+          }
+          return viewOf(tx, document);
+        }
+        const adjustments = correctionAdjustments(contested.document, correction, reason);
+        const memberId = TeamMemberIdSchema.parse(document.memberId);
+        const current = payPeriodAt(now(), await reads.agencyTimeZone(tx));
+        const period = await lockAdjustmentPeriod(tx, reads, memberId, current);
+        const rows = await tx
+          .insert(payAdjustments)
+          .values(
+            adjustments.map((one) => ({
+              id: newId(PayAdjustmentIdSchema),
+              memberId,
+              period,
+              amountMinor: one.amountMinor,
+              reason: one.reason,
+              correctsStatementId: contested.correctsStatementId,
+              contestedInvoiceId: document.id,
+              createdBy: actor.userId,
+            })),
+          )
+          .returning({ id: payAdjustments.id });
+        for (const row of rows) {
+          await audit(
+            tx,
+            actor,
+            'pay_adjustment.create',
+            { kind: 'pay_adjustment', id: row.id },
+            { period, contestedInvoiceId: document.id },
+          );
+        }
+        // Checked again at the commit, both ways: the uphold and the adjustments that name the document.
+        await writeStep(tx, document, step, actor, {
+          correction: correction.kind,
+          adjustmentIds: rows.map((row) => row.id),
+          period,
+        });
+        await enqueueChanged(tx, period, period, current);
         return viewOf(tx, document);
       }),
 
@@ -267,7 +408,7 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
               sql`exists (select 1 from ${invoiceEvents} where ${invoiceEvents.invoiceId} = ${invoices.id}
                 and ${invoiceEvents.kind} = 'contested')`,
               sql`not exists (select 1 from ${invoiceEvents} where ${invoiceEvents.invoiceId} = ${invoices.id}
-                and ${invoiceEvents.kind} in ('credited', 'contest_refused'))`,
+                and ${invoiceEvents.kind} in ('contest_upheld', 'contest_refused'))`,
               sql`not exists (select 1 from ${domainEvents} where ${domainEvents.type} = 'invoice_contested'
                 and ${domainEvents.payload}->>'invoiceId' = ${invoices.id}::text)`,
             ),

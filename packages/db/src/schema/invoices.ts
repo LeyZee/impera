@@ -595,10 +595,11 @@ export const invoiceLines = pgTable(
 
 /**
  * A dated step of an invoice or a credit note, added only: its acceptance is its events (Bilan, lot 2). The contractor
- * accepts or contests his own; the owner credits, refuses a contest, records a payment and issues; the jobs issue and
+ * accepts or contests his own; the owner upholds or refuses a contest, records a payment and issues; the jobs issue and
  * record a tacit acceptance (`lapsed`). One answer and one end of a contest at most, one `issued`, one payment per
- * statement (the migration's trigger checks each step against the ones before it). A credit note is never credited
- * nor paid; a payment names a paid statement of the invoice's period or of a later one.
+ * statement (the migration's trigger checks each step against the ones before it). A contest upheld comes with the
+ * adjustments that correct it, in its transaction, and they with it (ADR 0039 § 3, migration 0050). A credit note is
+ * never paid; a payment names a paid statement of the invoice's period or of a later one.
  */
 export const invoiceEvents = pgTable(
   'invoice_events',
@@ -623,14 +624,14 @@ export const invoiceEvents = pgTable(
       .where(sql`${t.kind} in ('accepted', 'contested', 'lapsed')`),
     uniqueIndex('invoice_events_contest_end_unique')
       .on(t.invoiceId)
-      .where(sql`${t.kind} in ('credited', 'contest_refused')`),
+      .where(sql`${t.kind} in ('contest_upheld', 'contest_refused')`),
     uniqueIndex('invoice_events_paid_unique')
       .on(t.invoiceId, t.statementId)
       .where(sql`${t.kind} = 'paid'`),
     enumCheck('invoice_events', t.kind, INVOICE_EVENT_KINDS),
     check(
       'invoice_events_values_check',
-      sql`(${t.kind} = 'paid') = (${t.statementId} is not null) and (${t.reason} is null or ${textBetween(t.reason, INVOICE_REASON_MAX)}) and (${t.kind} not in ('contested', 'contest_refused') or ${t.reason} is not null)`,
+      sql`(${t.kind} = 'paid') = (${t.statementId} is not null) and (${t.reason} is null or ${textBetween(t.reason, INVOICE_REASON_MAX)}) and (${t.kind} not in ('contested', 'contest_upheld', 'contest_refused') or ${t.reason} is not null)`,
     ),
     pgPolicy('member_read', { for: 'select', using: ofInvoice(t.invoiceId, sql`true`) }),
     pgPolicy('member_answer', {
@@ -639,7 +640,7 @@ export const invoiceEvents = pgTable(
     }),
     pgPolicy('owner_step', {
       for: 'insert',
-      withCheck: sql`${t.kind} in ('issued', 'credited', 'contest_refused', 'paid') and ${t.by} = ${currentUser} and ${ofInvoice(t.invoiceId, ownerFor(sql`i.member_id`))}`,
+      withCheck: sql`${t.kind} in ('issued', 'contest_upheld', 'contest_refused', 'paid') and ${t.by} = ${currentUser} and ${ofInvoice(t.invoiceId, ownerFor(sql`i.member_id`))}`,
     }),
   ],
 );

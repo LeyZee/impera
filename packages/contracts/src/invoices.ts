@@ -12,6 +12,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
+import { PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema } from './pay-periods';
 import { BasisPointsSchema, CountryCodeSchema } from './team';
 import { CalendarDaySchema } from './team-members';
@@ -81,7 +82,8 @@ export const INVOICE_ACCEPTANCE_STATES = [
   'accepted',
   'tacitly_accepted',
   'contested',
-  'credited',
+  /** The owner upheld the contest, and pay corrects it (ADR 0039 § 3). */
+  'contest_upheld',
   'contest_refused',
 ] as const;
 export const InvoiceAcceptanceStateSchema = z.enum(INVOICE_ACCEPTANCE_STATES);
@@ -93,7 +95,7 @@ export const INVOICE_EVENT_KINDS = [
   'accepted',
   'contested',
   'lapsed',
-  'credited',
+  'contest_upheld',
   'contest_refused',
   'paid',
 ] as const;
@@ -231,7 +233,7 @@ export const DOCUMENT_REMINDER_MAX_DAYS = 120;
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 
-/** A contest's reason, or the reason of its refusal: the contractor's or the owner's words, 1 to 500 characters. */
+/** A contest's reason, or the reason of its end: the contractor's or the owner's words, 1 to 500 characters. */
 export const InvoiceReasonSchema = trimmed(INVOICE_REASON_MAX);
 
 /** One text a regime prints on each invoice, in its order: the regime's own words, never the code's. */
@@ -566,10 +568,16 @@ export type InvoiceEvent = z.infer<typeof InvoiceEventSchema>;
  *   the same reason sent again gives it back. The owner is told (`invoice_contested`).
  * - `POST /v1/payroll/invoices/:invoiceId/contest/refuse` (the owner alone, ADR 0039 § 3), body
  *   `RefuseInvoiceContestBodySchema` → the view; the same reason sent again gives it back.
+ * - `POST /v1/payroll/invoices/:invoiceId/contest/uphold` (the owner alone, ADR 0039 § 3 to 5), body
+ *   `UpholdInvoiceContestBodySchema` → the view; the contest ends upheld and its correction is written in the same
+ *   transaction, as adjustments of the member's first open period that correct the document's period. The same
+ *   reason and correction sent again give the view back.
  *
  * `invoice_not_found` (unknown, or not the reader's), `invoice_answer_forbidden` (another's document to answer),
- * `payroll_forbidden` (a refusal by anyone but the owner), `invoice_acceptance_conflict` (a step its state or its
- * delay no longer allows, or another answer than the one recorded).
+ * `payroll_forbidden` (an end of a contest by anyone but the owner), `invoice_acceptance_conflict` (a step its state
+ * or its delay no longer allows, or another answer than the one recorded), `credit_note_amount_unprocessable` (a
+ * correction in the agency's favour above what the invoice has left), `invoice_correction_unprocessable` (a cancel
+ * and reissue of a credit note, or of an invoice its credit notes took off whole).
  */
 export const InvoiceParamsSchema = z.object({ invoiceId: InvoiceIdSchema });
 
@@ -580,6 +588,38 @@ export type ContestInvoiceBody = z.infer<typeof ContestInvoiceBodySchema>;
 /** The owner refuses a contest, with the reason the contractor reads. */
 export const RefuseInvoiceContestBodySchema = z.object({ reason: InvoiceReasonSchema });
 export type RefuseInvoiceContestBody = z.infer<typeof RefuseInvoiceContestBodySchema>;
+
+/**
+ * What corrects a contest the owner upholds (ADR 0039 § 3), always through pay, never a credit note written by hand:
+ *
+ * - `amount`: one adjustment, excluding VAT. In the contractor's favour (a sum too low), a line of their next invoice
+ *   with the period it corrects; in the agency's (a sum too high), a credit note on the document's invoice at the next
+ *   validation (ADR 0036).
+ * - `reissue` (« Annuler et refacturer »), an error of text on an invoice (a name, an address, an identifier, a
+ *   mention): two adjustments of what is left of it, in the same period. The negative one cancels it by a credit note,
+ *   the positive one is a line of that period's invoice, which prints the corrected file; the payouts do not move, and
+ *   the credit note never leaves without that invoice.
+ */
+export const ContestCorrectionSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('amount'),
+    amountMinor: z
+      .number()
+      .int()
+      .min(-PAY_AMOUNT_MAX_MINOR)
+      .max(PAY_AMOUNT_MAX_MINOR)
+      .refine((amount) => amount !== 0, 'Un montant de 0 ne corrige rien'),
+  }),
+  z.object({ kind: z.literal('reissue') }),
+]);
+export type ContestCorrection = z.infer<typeof ContestCorrectionSchema>;
+
+/** The owner upholds a contest: the reason the contractor reads, and its correction in the same action. */
+export const UpholdInvoiceContestBodySchema = z.object({
+  reason: InvoiceReasonSchema,
+  correction: ContestCorrectionSchema,
+});
+export type UpholdInvoiceContestBody = z.infer<typeof UpholdInvoiceContestBodySchema>;
 
 /** A document's acceptance as its reader reads it: its state and each dated step, in order (`issued` first). */
 export const InvoiceAcceptanceViewSchema = z.object({
@@ -606,6 +646,11 @@ export const INVOICE_ERROR_CODES = [
   'invoice_acceptance_conflict',
   /** Only the contractor answers their document: never the owner, a manager or another member (ADR 0039 § 1). */
   'invoice_answer_forbidden',
+  /**
+   * A correction the document does not allow (ADR 0039 § 3), its reason in `details.reason`: `reissue_credit_note`
+   * (only an invoice is cancelled and reissued), `nothing_left` (its credit notes took it off whole already).
+   */
+  'invoice_correction_unprocessable',
   /** The invoice does not exist, or is not the reader's. */
   'invoice_not_found',
   /** Its PDF is not rendered yet (« PDF en préparation », ADR 0037 § 5). */

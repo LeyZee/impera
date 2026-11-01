@@ -12,6 +12,7 @@ import {
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
+import { longDay } from '../modules/payroll/domain/invoices';
 import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
@@ -22,13 +23,15 @@ const Q1 = PayPeriodSchema.parse('2025-05-01');
 const Q2 = PayPeriodSchema.parse('2025-05-16');
 const Q3 = PayPeriodSchema.parse('2025-06-01');
 const Q4 = PayPeriodSchema.parse('2025-06-16');
+const Q5 = PayPeriodSchema.parse('2025-07-01');
+const Q6 = PayPeriodSchema.parse('2025-07-16');
 
 const DAY = 86_400_000;
 const quiet = { warn: () => undefined, error: () => undefined };
 /** The contractor's words: they never leave the Paie (ADR 0039 § 2). */
 const REASON = 'Une vente du 3 manque';
 
-describe('Équipe › Factures : l’acceptation, la contestation et son refus (EQ-06 lot 6, ADR 0039)', () => {
+describe('Équipe › Factures : l’acceptation, la contestation et ses deux fins (EQ-06 lot 6, ADR 0039)', () => {
   let team: PayrollTeam;
   let theo: TeamMember;
   let theoCookie: string;
@@ -347,5 +350,163 @@ describe('Équipe › Factures : l’acceptation, la contestation et son refus (
       announced: 0,
       failed: 0,
     });
+  });
+
+  /** The adjustments that correct document `invoiceId`, negative first. */
+  const correctionOf = (invoiceId: InvoiceId) =>
+    db()
+      .select()
+      .from(schema.payAdjustments)
+      .where(eq(schema.payAdjustments.contestedInvoiceId, invoiceId))
+      .orderBy(schema.payAdjustments.amountMinor);
+
+  it('upholds a contest with the cancel and reissue of the invoice, which leave together with the next invoice', async () => {
+    // Léa's first half of July, contested for an error of text; her second half is open, a draft. (June is closed.)
+    await team.report(lea, Q5, 10_000);
+    await team.recalculate(Q5);
+    const id = await issued(lea, Q5);
+    const [invoice] = await db().select().from(schema.invoices).where(eq(schema.invoices.id, id));
+    if (invoice === undefined) throw new Error('no invoice');
+    expect((await send(leaCookie, id, 'contest', { reason: 'Mon adresse est fausse' })).statusCode).toBe(200);
+    await team.report(lea, Q6, 10_000);
+    await team.recalculate(Q6);
+
+    const body = { reason: '  Adresse corrigée dans le dossier ', correction: { kind: 'reissue' } };
+    // Only the owner ends a contest: neither its contractor nor a manager.
+    for (const cookie of [leaCookie, miaCookie]) {
+      const refused = await send(cookie, id, 'contest/uphold', body);
+      expect([refused.statusCode, team.refusal(refused).code]).toEqual([403, 'payroll_forbidden']);
+    }
+    const unknown = await send(team.owner, newId(InvoiceIdSchema), 'contest/uphold', body);
+    expect([unknown.statusCode, team.refusal(unknown).code]).toEqual([404, 'invoice_not_found']);
+    for (const wrong of [
+      { ...body, reason: ' ' },
+      { reason: 'Montant', correction: { kind: 'amount', amountMinor: 0 } },
+      { reason: 'Montant', correction: { kind: 'amount', amountMinor: 12.5 } },
+      { reason: 'Rien' },
+    ]) {
+      expect((await send(team.owner, id, 'contest/uphold', wrong)).statusCode).toBe(400);
+    }
+    const adjustmentsBefore = await team.audited('pay_adjustment.create');
+
+    const upheld = await send(team.owner, id, 'contest/uphold', body);
+    expect(upheld.statusCode, upheld.body).toBe(200);
+    expect(view(upheld)).toMatchObject({
+      // The document keeps the contractor's words; the owner's are its event's.
+      acceptance: { state: 'contest_upheld', reason: 'Mon adresse est fausse' },
+      events: [
+        { kind: 'issued' },
+        { kind: 'contested' },
+        { kind: 'contest_upheld', by: team.ownerId, reason: 'Adresse corrigée dans le dossier' },
+      ],
+    });
+    // The pair, of what the invoice bills, on Léa's first open period, correcting the period of the invoice.
+    const corrected = (await team.statementOf(lea, Q5)).id;
+    const which = `la facture ${invoice.number} du ${longDay(invoice.issuedOn)}`;
+    const pair = await correctionOf(id);
+    expect(
+      pair.map((one) => [one.memberId, one.period, one.amountMinor, one.correctsStatementId, one.createdBy]),
+    ).toEqual([
+      [lea.id, Q6, -invoice.exclVatMinor, corrected, team.ownerId],
+      [lea.id, Q6, invoice.exclVatMinor, corrected, team.ownerId],
+    ]);
+    expect(pair.map((one) => one.reason)).toEqual([`Annulation de ${which}`, `Refacturation de ${which}`]);
+    expect(await team.audited('invoice.contest_uphold')).toBe(1);
+    expect(await team.audited('pay_adjustment.create')).toBe(adjustmentsBefore + 2);
+    expect(await team.jobsFor(Q6)).not.toEqual([]);
+
+    // Sent again, the same uphold gives back what was recorded; another correction, or a refusal, is a conflict.
+    const again = await send(team.owner, id, 'contest/uphold', body);
+    expect([again.statusCode, view(again)]).toEqual([200, view(upheld)]);
+    for (const [step, payload] of [
+      ['contest/uphold', { ...body, correction: { kind: 'amount', amountMinor: 500 } }],
+      ['contest/refuse', { reason: 'Finalement non' }],
+    ] as const) {
+      const other = await send(team.owner, id, step, payload);
+      expect([other.statusCode, team.refusal(other)]).toEqual([
+        409,
+        { code: 'invoice_acceptance_conflict', details: { state: 'contest_upheld' } },
+      ]);
+    }
+    expect(await correctionOf(id)).toHaveLength(2);
+
+    // Ended before its alert went out: the job and the hourly sweep leave it, without waiting on its lock.
+    const held = await team.holding([`invoices.acceptance:${id}`]);
+    try {
+      expect(await payroll().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
+        lapsed: 0,
+        announced: 0,
+        failed: 0,
+      });
+    } finally {
+      await held.release();
+    }
+    expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
+
+    // Léa's second half of July: its invoice bills the line again, and the cancel leaves with it, citing the invoice.
+    await team.recalculate(Q6);
+    const next = await issued(lea, Q6);
+    const lines = await db()
+      .select()
+      .from(schema.invoiceLines)
+      .where(eq(schema.invoiceLines.invoiceId, next))
+      .orderBy(schema.invoiceLines.position);
+    const reissued = lines.at(-1);
+    expect([reissued?.kind, reissued?.amountMinor]).toEqual(['adjustment', invoice.exclVatMinor]);
+    expect(reissued?.detail).toContain(`Refacturation de ${which}`);
+    const cancels = await db()
+      .select({ exclVatMinor: schema.invoices.exclVatMinor, period: schema.invoices.period })
+      .from(schema.invoices)
+      .where(and(eq(schema.invoices.creditedInvoiceId, id), eq(schema.invoices.kind, 'credit_note')));
+    expect(cancels).toEqual([{ exclVatMinor: -invoice.exclVatMinor, period: Q5 }]);
+
+    // Nothing is left of the invoice now: the same uphold sent again is still the one recorded.
+    const replay = await send(team.owner, id, 'contest/uphold', body);
+    expect([replay.statusCode, view(replay)]).toEqual([200, view(upheld)]);
+  });
+
+  it('upholds a contest with an amount, in either favour, never crediting the invoice below zero', async () => {
+    // Théo's second half of June, contested and said to the owner: he has no draft, the correction goes on the team's
+    // first open period.
+    const [contested] = await db()
+      .select({ id: schema.invoices.id, exclVatMinor: schema.invoices.exclVatMinor })
+      .from(schema.invoices)
+      .where(
+        and(
+          eq(schema.invoices.memberId, theo.id),
+          eq(schema.invoices.period, Q4),
+          eq(schema.invoices.kind, 'invoice'),
+        ),
+      );
+    if (contested === undefined) throw new Error('no invoice');
+    const id = InvoiceIdSchema.parse(contested.id);
+    expect((await read(theoCookie, id)).acceptance.state).toBe('contested');
+
+    const tooMuch = await send(team.owner, id, 'contest/uphold', {
+      reason: 'Vente remboursée',
+      correction: { kind: 'amount', amountMinor: -(contested.exclVatMinor + 1) },
+    });
+    expect([tooMuch.statusCode, team.refusal(tooMuch)]).toEqual([
+      422,
+      { code: 'credit_note_amount_unprocessable', details: { leftMinor: contested.exclVatMinor } },
+    ]);
+    expect(await correctionOf(id)).toEqual([]);
+    expect((await read(theoCookie, id)).acceptance.state).toBe('contested');
+
+    const upheld = await send(team.owner, id, 'contest/uphold', {
+      reason: 'La vente du 3 manquait',
+      correction: { kind: 'amount', amountMinor: 1_500 },
+    });
+    expect(upheld.statusCode, upheld.body).toBe(200);
+    expect(view(upheld).acceptance.state).toBe('contest_upheld');
+    expect(await correctionOf(id)).toEqual([
+      expect.objectContaining({
+        memberId: theo.id,
+        amountMinor: 1_500,
+        reason: 'La vente du 3 manquait',
+        correctsStatementId: (await team.statementOf(theo, Q4)).id,
+        contestedInvoiceId: id,
+      }),
+    ]);
   });
 });

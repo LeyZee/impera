@@ -34,8 +34,8 @@ async function failure(promise: Promise<unknown>): Promise<string> {
   return 'no error';
 }
 
-/** The migration's triggers (0041): every refusal names EQ-06 or ADR 0036. */
-const KEPT = /\((EQ-06|ADR 0036)\)/u;
+/** The migrations' triggers (0041, 0050): every refusal names EQ-06 or ADR 0036, and ADR 0039 for an upheld contest. */
+const KEPT = /\((EQ-06|ADR 0036)(, ADR 0039)?\)/u;
 const RLS = /row-level security/u;
 const DENIED = /permission denied/u;
 const HASH = 'a'.repeat(64);
@@ -1009,13 +1009,67 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await failure(event(null, late.id, 'lapsed'))).toMatch(/invoice_events_answer_unique/u);
     });
 
-    it('a contest ends in a credit note that keeps the invoice’s period and regime, never above what is left', async () => {
+    /** An adjustment that corrects document `documentId` of Kofi's, on his open period, by `by`. */
+    const correction = (
+      by: string,
+      documentId: string,
+      values: Partial<typeof s.payAdjustments.$inferInsert> = {},
+    ) => ({
+      id: newId(PayAdjustmentIdSchema),
+      memberId: member(kofi),
+      period: '2026-09-16',
+      amountMinor: 2_000,
+      reason: 'Vente du 20 août oubliée',
+      correctsStatementId: statement(kofi, '2026-08-16'),
+      contestedInvoiceId: documentId,
+      createdBy: by,
+      ...values,
+    });
+    /** The owner's « fondée »: the event and its correction, in one transaction (ADR 0039 § 3). */
+    const uphold = (by: string, documentId: string, adjustments: (typeof s.payAdjustments.$inferInsert)[]) =>
+      as(by, async (tx) => {
+        await tx.insert(s.invoiceEvents).values({
+          id: newId(InvoiceEventIdSchema),
+          invoiceId: documentId,
+          kind: 'contest_upheld',
+          by,
+          reason: 'Vente oubliée, corrigée sur la prochaine quinzaine',
+        });
+        for (const one of adjustments) await tx.insert(s.payAdjustments).values(one);
+      });
+    /** An adjustment that names a document, written in a transaction of its own. */
+    const adjust = (by: string, values: typeof s.payAdjustments.$inferInsert) =>
+      as(by, (tx) => tx.insert(s.payAdjustments).values(values));
+
+    it('a credit note keeps the invoice’s period and regime, never above what is left; a contest upheld is corrected by pay', async () => {
       const id = invoice('kofi-aug16');
       expect(await failure(event(kofi, id, 'contested'))).toMatch(/invoice_events_values_check/u);
       expect(await failure(event(ama, id, 'contested', { reason: 'Pas la mienne' }))).toMatch(RLS);
       await event(kofi, id, 'contested', { reason: 'Une vente comptée deux fois' });
-      // Credited only by a credit note that cites it.
-      expect(await failure(event(owner, id, 'credited'))).toMatch(KEPT);
+      // Upheld only with its correction in the same transaction, both ways (ADR 0039 § 3).
+      expect(await failure(event(owner, id, 'contest_upheld', { reason: 'Fondée' }))).toMatch(KEPT);
+      expect(await failure(adjust(owner, correction(owner, id)))).toMatch(KEPT);
+      expect(await failure(uphold(owner, id, []))).toMatch(KEPT);
+      // The correction is of the document's member, and corrects its period.
+      expect(
+        await failure(
+          uphold(owner, id, [
+            correction(owner, id, {
+              memberId: member(ama),
+              correctsStatementId: statement(ama, '2026-08-01'),
+            }),
+          ]),
+        ),
+      ).toMatch(KEPT);
+      expect(
+        await failure(
+          uphold(owner, id, [correction(owner, id, { correctsStatementId: statement(kofi, '2026-08-01') })]),
+        ),
+      ).toMatch(KEPT);
+      // Without the period it corrects: the trigger refuses it before `pay_adjustments_contest_check` would.
+      expect(
+        await failure(uphold(owner, id, [correction(owner, id, { correctsStatementId: null })])),
+      ).toMatch(KEPT);
 
       const note = {
         by: owner,
@@ -1048,12 +1102,26 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(partial.number).toBe(`KOFI-${String(year)}-0004`);
       await issue({ ...note, amountMinor: -10_000 });
       expect(await failure(issue({ ...note, amountMinor: -1 }))).toMatch(KEPT);
-      expect(await failure(event(kofi, id, 'credited'))).toMatch(RLS);
-      expect(await failure(event(manager, id, 'credited'))).toMatch(RLS);
-      await event(owner, id, 'credited');
+      // The owner alone ends a contest: neither its contractor nor a manager.
+      expect(await failure(uphold(kofi, id, [correction(kofi, id)]))).toMatch(RLS);
+      expect(await failure(uphold(manager, id, [correction(manager, id)]))).toMatch(RLS);
+      // Its credit notes took it off whole: an amount in the contractor's favour still corrects it.
+      await uphold(owner, id, [correction(owner, id)]);
       expect(await failure(event(owner, id, 'contest_refused', { reason: 'Trop tard' }))).toMatch(
         /invoice_events_contest_end_unique/u,
       );
+      expect(await failure(uphold(owner, id, [correction(owner, id)]))).toMatch(
+        /invoice_events_contest_end_unique/u,
+      );
+      // Once upheld, no adjustment names the document again.
+      expect(await failure(adjust(owner, correction(owner, id)))).toMatch(KEPT);
+      const named = await admin((tx) =>
+        tx
+          .select({ amountMinor: s.payAdjustments.amountMinor })
+          .from(s.payAdjustments)
+          .where(eq(s.payAdjustments.contestedInvoiceId, id)),
+      );
+      expect(named).toEqual([{ amountMinor: 2_000 }]);
 
       // What a later period owes goes on an earlier invoice, accepted or not (ADR 0036): no event of it changes.
       const owed = await issue({
@@ -1074,15 +1142,22 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       ).toEqual(expect.arrayContaining([{ kind: 'issued' }, { kind: 'accepted' }]));
       invoices.set('kofi-aug1-credit', owed);
 
-      // The credit note follows its own acceptance; no credit note cites it, so its contest ends refused.
+      // The credit note follows its own acceptance and has the same two ends (ADR 0039 § 5): upheld, its correction
+      // corrects the period of the invoice it cites, never the credit note's own statement.
       await event(kofi, owed.id, 'contested', { reason: 'Ce remboursement n’est pas le mien' });
-      expect(await failure(event(owner, owed.id, 'credited'))).toMatch(KEPT);
+      expect(
+        await failure(
+          uphold(owner, owed.id, [
+            correction(owner, owed.id, { correctsStatementId: statement(kofi, '2026-09-01') }),
+          ]),
+        ),
+      ).toMatch(KEPT);
       await event(owner, owed.id, 'contest_refused', {
         reason: 'Remboursement du 2 septembre, sur ton compte',
       });
     });
 
-    it('a contest is refused with a reason; a credit note written before it does not answer it', async () => {
+    it('a contest is refused with a reason; a credit note written before it does not end it', async () => {
       const id = invoice('ama-aug1');
       await issue({
         by: owner,
@@ -1094,7 +1169,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
         invoice: { contractor: { ...CONTRACTOR, legalName: 'Ama Exemple' } },
       });
       await event(ama, id, 'contested', { reason: 'Prime oubliée' });
-      expect(await failure(event(owner, id, 'credited'))).toMatch(KEPT);
+      expect(await failure(event(owner, id, 'contest_upheld', { reason: 'Fondée' }))).toMatch(KEPT);
       expect(await failure(event(owner, id, 'contest_refused'))).toMatch(/invoice_events_values_check/u);
       await event(owner, id, 'contest_refused', { reason: 'La prime est sur la quinzaine suivante' });
     });
@@ -1138,7 +1213,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       const later16 = statement(kofi, '2026-08-16');
       await pay(later16, '2026-09-04', 'WR-0002');
       await event(owner, invoice('kofi-aug1'), 'paid', { statementId: later16 });
-      // Issued, accepted, paid twice; issued, contested, credited; issued, lapsed; the three credit notes issued, the
+      // Issued, accepted, paid twice; issued, contested, upheld; issued, lapsed; the three credit notes issued, the
       // last one contested and its contest refused.
       expect(await as(kofi, (tx) => tx.select().from(s.invoiceEvents))).toHaveLength(14);
     });

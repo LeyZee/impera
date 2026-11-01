@@ -33,6 +33,7 @@ import {
   PenaltyIdSchema,
   PenaltySchema,
   RefuseInvoiceContestBodySchema,
+  UpholdInvoiceContestBodySchema,
   UserIdSchema,
   ValidateCommissionStatementBodySchema,
   type InvoiceId,
@@ -86,7 +87,8 @@ const LOGO_BODY_LIMIT_BYTES = 1_048_576;
  * else; a validation, a bonus, a penalty or an adjustment by the owner or an active manager, never for oneself; a
  * payment and the team's rules (tiers, goals, minimum payout) by the owner only. A create sent again with the same `id`
  * and values gives back what was recorded (200). A document is answered by its contractor only, and its contest refused
- * by the owner only (ADR 0039); the same answer sent again gives back what was recorded (200). Réglages › Facturation
+ * or upheld with its correction by the owner only (ADR 0039); the same answer sent again gives back what was recorded
+ * (200). Réglages › Facturation
  * (`/payroll/billing-settings`) is the owner's alone.
  */
 export function createPayrollRoutes(
@@ -167,6 +169,19 @@ export function createPayrollRoutes(
         },
       },
       (request) => acceptance.refuseContest(actorOf(request), request.params.invoiceId, request.body),
+    );
+
+    app.post(
+      '/payroll/invoices/:invoiceId/contest/uphold',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: InvoiceParamsSchema,
+          body: UpholdInvoiceContestBodySchema,
+          response: { 200: InvoiceAcceptanceViewSchema },
+        },
+      },
+      (request) => acceptance.upholdContest(actorOf(request), request.params.invoiceId, request.body),
     );
 
     app.get(

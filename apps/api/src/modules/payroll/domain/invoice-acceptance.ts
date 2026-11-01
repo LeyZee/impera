@@ -4,10 +4,10 @@ import { InvoiceAcceptanceConflict } from './errors';
 
 /**
  * Where an invoice stands with its contractor (EQ-06, ADR 0023 § Factures; BOI-TVA-DECLA-30-20-10-30 § 150-160): each
- * invoice is accepted or contested with a reason before the mandate's deadline, and accepted tacitly after it. A
- * contest ends in a credit note or in a refusal with its reason. A credit note follows the same acceptance, from
- * `pending`. One the agency issues of its own accord (a credit a period owes, ADR 0036, or a reduction) leaves the
- * invoice it cites where it stands: only the credit note that answers a contest moves it, to `credited`. Each step is
+ * invoice is accepted or contested with a reason before the mandate's deadline, and accepted tacitly after it. The
+ * owner alone ends a contest, with a reason: refused, the document stays as it is; upheld, pay corrects it, in the same
+ * action (ADR 0039 § 3, `contest-correction.ts`). A credit note follows the same steps, from `pending`, and has the same
+ * two ends (§ 5). A credit note never moves the invoice it cites: no credit note answers a contest (§ 4). Each step is
  * dated in `audit_log` by the caller.
  */
 
@@ -18,9 +18,13 @@ export type AcceptanceStep =
   | { readonly kind: 'contest'; readonly reason: string }
   /** The dated job, once the deadline has passed without an answer. */
   | { readonly kind: 'lapse' }
-  /** A credit note answers the contest. */
-  | { readonly kind: 'credit' }
+  /** The owner upholds the contest; its correction is written with it. */
+  | { readonly kind: 'uphold'; readonly reason: string }
   | { readonly kind: 'refuse'; readonly reason: string };
+
+/** A step that gives a reason: a contest and either of its ends. */
+const reasonOf = (step: AcceptanceStep): string | null =>
+  step.kind === 'contest' || step.kind === 'uphold' || step.kind === 'refuse' ? step.reason.trim() : null;
 
 /** The end of the mandate's delay to contest: the issue plus whole days. */
 export function acceptanceDeadline(issuedAt: Date, days: number): Date {
@@ -42,9 +46,7 @@ export function nextAcceptance(
  * writes (`now() < acceptance_deadline`, the clock its trigger checks too); a conflict when it no longer allows it.
  */
 export function acceptanceStep(state: AcceptanceState, step: AcceptanceStep, open: boolean): AcceptanceState {
-  if ((step.kind === 'contest' || step.kind === 'refuse') && step.reason.trim() === '') {
-    throw new RangeError('A contest and its refusal give a reason');
-  }
+  if (reasonOf(step) === '') throw new RangeError('A contest and its end give a reason');
   switch (step.kind) {
     case 'accept':
       if (state === 'pending' && open) return 'accepted';
@@ -55,26 +57,14 @@ export function acceptanceStep(state: AcceptanceState, step: AcceptanceStep, ope
     case 'lapse':
       if (state === 'pending' && !open) return 'tacitly_accepted';
       break;
-    case 'credit':
-      if (state === 'contested') return 'credited';
+    case 'uphold':
+      if (state === 'contested') return 'contest_upheld';
       break;
     case 'refuse':
       if (state === 'contested') return 'contest_refused';
       break;
   }
   throw new InvoiceAcceptanceConflict(state);
-}
-
-/**
- * The invoice's state once a credit note cites it: `credited` when the note answers the invoice's contest, unchanged
- * when the agency issued it of its own accord, whatever the state, the note following its own acceptance.
- */
-export function stateAfterCreditNote(
-  state: AcceptanceState,
-  note: { readonly answersContest: boolean },
-  at: { readonly now: Date; readonly deadline: Date },
-): AcceptanceState {
-  return note.answersContest ? nextAcceptance(state, { kind: 'credit' }, at) : state;
 }
 
 /** A step of a document as `invoice_events` keeps it, oldest first. */
@@ -88,7 +78,7 @@ const EVENT_OF = {
   accept: 'accepted',
   contest: 'contested',
   lapse: 'lapsed',
-  credit: 'credited',
+  uphold: 'contest_upheld',
   refuse: 'contest_refused',
 } as const satisfies Record<AcceptanceStep['kind'], InvoiceEventKind>;
 
@@ -97,13 +87,13 @@ const STATE_AFTER: Partial<Record<InvoiceEventKind, AcceptanceState>> = {
   accepted: 'accepted',
   contested: 'contested',
   lapsed: 'tacitly_accepted',
-  credited: 'credited',
+  contest_upheld: 'contest_upheld',
   contest_refused: 'contest_refused',
 };
 
 /**
  * Where a document stands from its steps, oldest first: `pending` until an answer, then the last step that moves it;
- * the reason is its contest's, kept once the contest ends (the contractor's words, never the refusal's).
+ * the reason is its contest's, kept once the contest ends (the contractor's words, never the owner's).
  */
 export function standingOf(steps: readonly RecordedStep[]): {
   readonly state: AcceptanceState;
@@ -131,7 +121,7 @@ export function acceptanceWrite(
   | { readonly kind: 'replay' }
   | { readonly kind: 'write'; readonly event: InvoiceEventKind; readonly reason: string | null } {
   const event = EVENT_OF[step.kind];
-  const reason = step.kind === 'contest' || step.kind === 'refuse' ? step.reason.trim() : null;
+  const reason = reasonOf(step);
   if (steps.some((recorded) => recorded.kind === event && recorded.reason === reason))
     return { kind: 'replay' };
   acceptanceStep(standingOf(steps).state, step, open);

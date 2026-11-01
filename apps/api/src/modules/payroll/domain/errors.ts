@@ -274,6 +274,22 @@ export class CreditNoteExceedsInvoice extends DomainError {
   }
 }
 
+/**
+ * A correction of an upheld contest that the document does not allow (ADR 0039 § 3): only an invoice is cancelled and
+ * reissued, and only for what its credit notes left of it.
+ */
+export class InvoiceCorrectionUnprocessable extends DomainError {
+  constructor(reason: 'reissue_credit_note' | 'nothing_left') {
+    super(
+      'invoice_correction_unprocessable',
+      reason === 'reissue_credit_note'
+        ? 'Seule une facture s’annule et se refacture, jamais un avoir'
+        : 'Les avoirs ont déjà repris toute cette facture : il n’y a rien à refacturer',
+      { details: { reason } },
+    );
+  }
+}
+
 /** A step of an invoice's acceptance that its state or its deadline no longer allows (EQ-06). */
 export class InvoiceAcceptanceConflict extends DomainError {
   constructor(state: string) {

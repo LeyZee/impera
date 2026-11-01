@@ -15,7 +15,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
-import { CurrencySchema } from './money';
+import { CurrencySchema, PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
 import { TimezoneSchema } from './persona';
 import { BasisPointsSchema } from './team';
@@ -43,9 +43,6 @@ import { CalendarDaySchema } from './team-members';
 
 /** The engine that computes statements, copied into each one (`nirvana-1` for the first). */
 export const PayEngineVersionSchema = z.string().regex(/^nirvana-\d+$/);
-
-/** The highest amount entered by hand (a bonus, a penalty, an adjustment), in euro cents: 50 000 €, a slip guard. */
-export const PAY_AMOUNT_MAX_MINOR = 5_000_000;
 
 /** The highest threshold or target, in euro cents of net: 1 000 000 €. */
 export const PAY_TARGET_MAX_MINOR = 100_000_000;

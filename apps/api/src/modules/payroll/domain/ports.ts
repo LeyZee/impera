@@ -8,6 +8,7 @@ import type {
   CollectiveGoal,
   CommissionStatement,
   CommissionStatementId,
+  ContestCorrection,
   CreateBonusBody,
   CreateBonusTierSetBody,
   CreateCollectiveGoalBody,
@@ -409,8 +410,8 @@ export interface PayrollInvoicePdfStore {
 type InvoiceAnswer = { readonly kind: 'accept' } | { readonly kind: 'contest'; readonly reason: string };
 
 /**
- * A document's acceptance (EQ-06 lot 6, ADR 0039): the contractor answers and the owner refuses a contest as
- * themselves (`withMember`, the policies of `invoice_events` say who writes what), the dated jobs as admin. Every write
+ * A document's acceptance (EQ-06 lot 6, ADR 0039): the contractor answers and the owner ends a contest as themselves
+ * (`withMember`, the policies of `invoice_events` say who writes what), the dated jobs as admin. Every write
  * holds the document's lock (one answer, one end of a contest, even from two requests at once) and checks the delay on
  * the database's clock, the one its trigger checks.
  */
@@ -424,6 +425,18 @@ export interface PayrollInvoiceAcceptanceStore {
   answer(actor: Actor, invoiceId: InvoiceId, answer: InvoiceAnswer): Promise<InvoiceAcceptanceView>;
   /** The owner refuses a contest, with its reason and its line of `audit_log`; the same refusal sent again, nothing. */
   refuseContest(actor: Actor, invoiceId: InvoiceId, reason: string): Promise<InvoiceAcceptanceView>;
+  /**
+   * The owner upholds a contest, with its reason, and writes its correction in the same transaction (ADR 0039 § 3):
+   * the adjustments of `correctionAdjustments`, each naming the document and correcting its period, on the member's
+   * first open period, as any adjustment (its locks, its recalculation, its line of `audit_log`). The same uphold and
+   * correction sent again write nothing; another correction after it is a conflict.
+   */
+  upholdContest(
+    actor: Actor,
+    invoiceId: InvoiceId,
+    reason: string,
+    correction: ContestCorrection,
+  ): Promise<InvoiceAcceptanceView>;
   /**
    * The tacit acceptance of a document nobody answered, at its deadline (`withAdmin`): `early` when the database's
    * clock is not there yet (the job is put back at the deadline), `answered` when an answer came first.

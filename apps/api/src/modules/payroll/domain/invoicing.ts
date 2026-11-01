@@ -204,12 +204,30 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     }
   }
 
+  // The cancel of a cancel and reissue leaves with the invoice that bills it again, or not at all (ADR 0039 § 3): while
+  // that invoice is due but cannot be issued, the cancel waits, said to the owner for the same reason, and both leave
+  // at the next pass. A period with nothing to invoice has no such invoice to wait for: its credit due takes the line.
+  const invoiceOut =
+    facts.issuedKeys.has(invoiceKey(statementId)) || documents.some((one) => one.kind === 'invoice');
+  const invoiceHeld = invoiceOut || decision.kind === 'issue' ? null : decision.reason;
   const pending = creditsDue(source)
     .map((due, index) => ({ due, key: creditNoteKey(statementId, index) }))
-    .filter((one) => !facts.issuedKeys.has(one.key));
+    .filter((one) => !facts.issuedKeys.has(one.key))
+    .filter((one) => {
+      if (one.due.kind !== 'adjustment' || !one.due.withInvoice) return true;
+      if (invoiceHeld === null || invoiceHeld === 'nothing_to_invoice') return true;
+      notIssued.push({ document: 'credit_note', reason: invoiceHeld, amountMinor: one.due.amountMinor });
+      return false;
+    });
   const keyOf = new Map<CreditDue, string>(pending.map((one) => [one.due, one.key]));
+  // The cancel of a pair is placed first: its amount is what the invoice had left when the contest was upheld, and
+  // another due of the same period placed before it would leave it short while its reissued line goes out. Its key
+  // stays its place in `creditsDue`.
+  const paired = (due: CreditDue): boolean => due.kind === 'adjustment' && due.withInvoice;
   const { notes, unplaced } = planCreditNotes(
-    pending.map((one) => one.due),
+    [...pending.filter((one) => paired(one.due)), ...pending.filter((one) => !paired(one.due))].map(
+      (one) => one.due,
+    ),
     facts.invoices,
   );
   const credited = new Map(facts.invoices.map((one) => [one.id, one.creditedMinor]));

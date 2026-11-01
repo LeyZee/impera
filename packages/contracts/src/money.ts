@@ -37,3 +37,9 @@ export function format(value: Money): string {
   const cents = String(abs % 100).padStart(2, '0');
   return `${sign}${String(units)}.${cents} ${value.currency}`;
 }
+
+/**
+ * The highest amount entered by hand (a bonus, a penalty, an adjustment, the correction of an upheld contest), in euro
+ * cents: 50 000 €, a slip guard.
+ */
+export const PAY_AMOUNT_MAX_MINOR = 5_000_000;
