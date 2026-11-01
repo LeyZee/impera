@@ -1,0 +1,7 @@
+# 2026-11-01 — Le contrat de `invoice_pdf_conflict` dit ce qui s'est passé, étape par étape (EQ-06 lot 4, suite) — done
+Fait : le commentaire de `invoice_pdf_conflict` (`packages/contracts/src/events.ts`) disait qu'un conflit au téléchargement avait servi l'autre exemplaire, ce qui n'est vrai que si la copie correspond ; il parlait aussi d'« autres octets » seulement. Il dit maintenant le cas de chaque étape : `render`, d'autres octets dans le premier seau après une panne ; `copy`, au premier seau le PDF absent ou autre, à la copie d'autres octets ou un verrou qui n'est pas celui du PDF ; `download`, le fichier de cet endroit absent ou autre, jamais servi, l'autre endroit essayé et servi seulement s'il correspond. Les deux alertes y disent leur fréquence. README du module et fiche EQ-06 : une alerte par document, endroit et (pour un conflit) étape, sous verrou consultatif, et ce qu'est un fichier faux au téléchargement.
+Pas fait : rien.
+Décisions : la fréquence reste une alerte par document, endroit et étape, pour toujours (`alertUnscoped`, #335) : un objet verrouillé ne change plus, une alerte par jour n'apprendrait rien au propriétaire et ferait du bruit.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓ ; pnpm test ✓.

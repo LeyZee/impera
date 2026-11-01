@@ -127,7 +127,7 @@ ADR 0037 acceptée par Charles (« Ok0037 ») ; puis un audit du rendu (25 const
 - **L'annexe** (le relevé validé) : par compte, puis les éléments de la facture, qui font son total ; une annexe dont les commissions ne sont pas celles de la facture, ou un cours étranger sans sa date, n'est jamais rendue. Un compte dans une autre devise imprime « 1 $US = 0,923456 € (cours BCE du …) ».
 - **Identifiants** (migration 0045) : SIREN ou SIRET, numéro de TVA et « EI » au dossier du prestataire ; en France, aucune facture sans SIREN ou SIRET, et sous TVA facturée, aucune sans numéro de TVA (`identity_incomplete`).
 - **Conservation** : deux jobs (`payroll.render_invoice_pdf`, `payroll.mirror_invoice_pdf`), une clé `invoices/<année>/<id>.pdf` écrite une fois (`If-None-Match: *`), sous verrou de conformité jusqu'à dix ans après la clôture de l'exercice (`billing_settings.fiscal_year_end_month`, décembre par défaut), chez Hetzner puis OVHcloud ; le téléchargement ne sert qu'un fichier dont l'empreinte correspond. Test contre un vrai stockage objet (MinIO, verrou d'objets) : une clé ne s'écrit pas deux fois, une version verrouillée ne s'efface pas et son verrou ne se raccourcit pas, même par l'utilisateur racine.
-- **Alertes** `invoice_pdf_conflict` et `invoice_pdf_missing` : publiées, rendu Telegram à faire avec le fil Telegram.
+- **Alertes** `invoice_pdf_conflict` et `invoice_pdf_missing` : publiées une fois par document, endroit et (pour un conflit) étape ; rendu Telegram avec le fil Telegram (#336).
 
 Spécimens (données inventées, ligne « Spécimen » sur chaque page, PDF/A-3b validés par veraPDF 1.28) : facture, avoir, pire cas, France en franchise, France avec TVA.
 
