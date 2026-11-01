@@ -511,6 +511,28 @@ describe('/v1/conversations', () => {
     expect(await row(held)).toEqual({ state: 'human', routedTo: null });
     expect((await releases(held)).length).toBe(after[1]);
     await call('POST', `/v1/conversations/${held}/release?creatorId=${creatorId}`, ownerCookie, {});
+
+    // Routed to him while away but in a state no release leaves (`idle`): never read, so neither written nor warned
+    // about each minute; he reads it no more anyway.
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ routedToUserId: chatter.userId })
+      .where(eq(schema.conversations.id, routed));
+    const warned: string[] = [];
+    const counted = await releases(routed);
+    await app.modules.conversations.jobs.releaseUnavailable({
+      info: () => undefined,
+      warn: (_fields, message) => warned.push(message),
+    });
+    expect([warned, (await releases(routed)).length, await row(routed)]).toEqual([
+      [],
+      counted.length,
+      { state: 'idle', routedTo: chatter.userId },
+    ]);
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ routedToUserId: null })
+      .where(eq(schema.conversations.id, routed));
   });
 
   it('shows his desire score cooled to now with the band of that score, and none before a first score (P3-12)', async () => {

@@ -17,8 +17,10 @@ export interface ReleaseUnavailableDeps {
  * `active` (on leave, sick, travelling, suspended, gone) already reads no conversation (`auth.ts`); what he still held
  * is handed back as a « Rendre la main » without a note, by the system, with the reason that says his status, so that
  * neither the agent nor another member waits on him. Each conversation is its own transaction under its lock, checked
- * again there: one released meanwhile, by hand or by a run alongside, writes nothing. One that cannot be released
- * (not in `human` nor `error`) is left as it is and logged: he cannot read it anyway.
+ * again there: one released meanwhile, by hand or by a run alongside, writes nothing. His status is not read again
+ * under the lock, only who holds it: made `active` again in the seconds between, he still loses it and takes it back,
+ * which the creator's transaction, which never reads the team, accepts. Only conversations `release` allows are read;
+ * one whose state changed since the read is left as it is and logged.
  */
 export function createReleaseUnavailableJob({ uow, clock, holds }: ReleaseUnavailableDeps) {
   return async (logger: JobLogger): Promise<void> => {
