@@ -31,6 +31,7 @@ import type { PayrollInvoiceStore } from '../domain/ports';
 
 import { enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
 import { CountedSchema } from './read-store';
+import { regimeVatOf } from './regime-store';
 import type { PayInputReads } from './snapshot';
 
 const {
@@ -226,12 +227,7 @@ async function regimesOf(tx: Transaction): Promise<InvoiceRegime[]> {
     InvoiceRegimeSchema.parse({
       id: regime.id,
       name: regime.name,
-      vat:
-        regime.vatTreatment === 'charged'
-          ? { treatment: 'charged', rateBps: regime.vatRateBps }
-          : regime.vatTreatment === 'reverse_charge'
-            ? { treatment: 'reverse_charge', rateBps: regime.vatRateBps }
-            : { treatment: 'exempt' },
+      vat: regimeVatOf(regime),
       withholding: regime.withholding,
       mentions: regime.mentions,
       documents: regime.documents,

@@ -4,8 +4,8 @@ import { schema, type Transaction } from '@nirvana/db';
 import type { Actor } from '../domain/ports';
 
 /**
- * What pay writes in the audit log: an action on a statement, a period, a member's entry, a team rule or the billing
- * settings.
+ * What pay writes in the audit log: an action on a statement, a period, a member's entry, a team rule, the billing
+ * settings, a contractor's file, texts and regimes.
  */
 type AuditedAction =
   | 'commission_statement.validate'
@@ -27,7 +27,10 @@ type AuditedAction =
   | 'contractor_profile.verify'
   | 'contractor_profile.prefix'
   | 'contract_text.add'
-  | 'contract.accept';
+  | 'contract.accept'
+  | 'billing_regime.create'
+  | 'billing_regime.validate'
+  | 'contractor_regime.assign';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -49,7 +52,9 @@ export async function audit(
       | 'agency_logo'
       | 'contractor_profile'
       | 'contract_text'
-      | 'contract_acceptance';
+      | 'contract_acceptance'
+      | 'billing_regime'
+      | 'contractor_regime';
     readonly id: string;
   },
   details: Record<string, unknown>,

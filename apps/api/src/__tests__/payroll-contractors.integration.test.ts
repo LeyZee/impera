@@ -139,6 +139,10 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
       profile: null,
       prefixFrozen: false,
       acceptances: [],
+      // His regime, given before he writes his file (lot 5b gives it through its route).
+      regimes: [
+        expect.objectContaining({ memberId: theo.id, regimeId: invoicing.regimeId, from: '2025-01-01' }),
+      ],
     });
 
     const created = await write(theo.id, theoCookie, THEO_FILE);

@@ -828,7 +828,7 @@ export type InvoicePrefixBody = z.infer<typeof InvoicePrefixBodySchema>;
 
 /**
  * `GET /v1/payroll/contractors/:memberId/file`: his file (`null` until it is first written), his country, whether his
- * first invoice froze his prefix, and the texts he accepted, the newest version of each kind first.
+ * first invoice froze his prefix, the texts he accepted, the newest version of each kind first, and his regimes.
  */
 export const ContractorFileSchema = z.object({
   memberId: TeamMemberIdSchema,
@@ -836,6 +836,8 @@ export const ContractorFileSchema = z.object({
   profile: ContractorProfileSchema.nullable(),
   prefixFrozen: z.boolean(),
   acceptances: z.array(ContractAcceptanceSchema),
+  /** His regimes, each from its day, the latest first (lot 5b): the one in force is the latest begun. */
+  regimes: z.array(ContractorRegimeSchema),
 });
 export type ContractorFile = z.infer<typeof ContractorFileSchema>;
 
@@ -879,6 +881,59 @@ export const AcceptContractTextBodySchema = z.object({ sha256: Sha256Schema });
 export type AcceptContractTextBody = z.infer<typeof AcceptContractTextBodySchema>;
 
 /**
+ * `POST /v1/payroll/billing-regimes`, the owner only (EQ-06 lot 5b): a regime as the agency's accountant wrote it, for
+ * one or more countries. Never changed once written: a new text is a new regime, assigned from a day on. The same `id`
+ * sent again with the same regime gives it back; with another, `billing_regime_id_conflict`. Two rules of the code, not
+ * of a regime's text: a country or a document named twice says nothing more, and a regime that sets the 182 B
+ * withholding aside by a tax treaty asks for the tax residence certificate, without which the treaty does not apply
+ * (the accountant's answer of 01/11, Charles's choice (a)).
+ */
+export const CreateBillingRegimeBodySchema = BillingRegimeSchema.omit({ validatedOn: true, createdAt: true })
+  .refine((regime) => new Set(regime.countries).size === regime.countries.length, {
+    path: ['countries'],
+    message: 'Un pays n’est nommé qu’une fois.',
+  })
+  .refine((regime) => new Set(regime.documents).size === regime.documents.length, {
+    path: ['documents'],
+    message: 'Une pièce n’est demandée qu’une fois.',
+  })
+  .refine((regime) => regime.withholding !== 'treaty_exempt' || regime.documents.includes('tax_residence'), {
+    path: ['documents'],
+    message:
+      'La convention n’écarte la retenue qu’avec l’attestation de résidence fiscale : le régime la demande.',
+  });
+export type CreateBillingRegimeBody = z.infer<typeof CreateBillingRegimeBodySchema>;
+
+/** `GET /v1/payroll/billing-regimes`, any member: every regime, the newest first, with the day it was validated. */
+export const BillingRegimesSchema = z.object({ regimes: z.array(BillingRegimeSchema) });
+export type BillingRegimes = z.infer<typeof BillingRegimesSchema>;
+
+export const BillingRegimeParamsSchema = z.object({ regimeId: BillingRegimeIdSchema });
+
+/**
+ * `POST /v1/payroll/billing-regimes/:regimeId/validation`, the owner only: the day the accountant validated the regime,
+ * recorded once and never ahead of today in the agency's zone (`billing_regime_validation_future_unprocessable`). The
+ * same day sent again gives the regime back; another day, `billing_regime_validated_conflict`. Every statement whose
+ * invoice waited is tried again (`payroll.requeue_invoice_issues`).
+ */
+export const ValidateBillingRegimeBodySchema = z.object({ validatedOn: CalendarDaySchema });
+export type ValidateBillingRegimeBody = z.infer<typeof ValidateBillingRegimeBodySchema>;
+
+/**
+ * `POST /v1/payroll/contractors/:memberId/regimes`, the owner only: the contractor's regime from `from` on, today at the
+ * earliest and after his last one (`billing_regime_backdated_unprocessable`), a regime of his country
+ * (`billing_regime_country_unprocessable`). The same `id` sent again with the same values gives it back; with others,
+ * `contractor_regime_id_conflict`. His waiting statements are tried again on that day: at once from today, at the
+ * first minute of `from` in the agency's zone otherwise.
+ */
+export const AssignContractorRegimeBodySchema = z.object({
+  id: ContractorRegimeIdSchema,
+  regimeId: BillingRegimeIdSchema,
+  from: CalendarDaySchema,
+});
+export type AssignContractorRegimeBody = z.infer<typeof AssignContractorRegimeBodySchema>;
+
+/**
  * The refusals of the invoices' rules (EQ-06), each suffix setting its status (api.md). Kept apart from
  * `PAYROLL_ERROR_CODES` until the invoices' screens word them (lot 8).
  */
@@ -888,6 +943,17 @@ export const INVOICE_ERROR_CODES = [
   /** No logo was added with this fingerprint. */
   'agency_logo_not_found',
   'billing_regime_backdated_unprocessable',
+  /** The regime is not one of the contractor's country: its mentions and its VAT are another country's. */
+  'billing_regime_country_unprocessable',
+  /** The same id sent again with another regime. */
+  'billing_regime_id_conflict',
+  'billing_regime_not_found',
+  /** The accountant's validation is recorded already, on another day: it is recorded once. */
+  'billing_regime_validated_conflict',
+  /** A validation recorded for a day still to come. */
+  'billing_regime_validation_future_unprocessable',
+  /** The same id sent again with another contractor, regime or day. */
+  'contractor_regime_id_conflict',
   'credit_note_amount_unprocessable',
   'invoice_acceptance_conflict',
   /** Only the contractor answers their document: never the owner, a manager or another member (ADR 0039 § 1). */

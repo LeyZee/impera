@@ -52,6 +52,7 @@ import { readPng } from './infra/png';
 import { createPostgresRateAlerts } from './infra/rate-alerts';
 import { createDrizzlePayrollRateStore } from './infra/rate-store';
 import { createDrizzlePayrollReadStore } from './infra/read-store';
+import { createDrizzlePayrollRegimeStore } from './infra/regime-store';
 import { createPayrollRoutes, type RequireRole } from './infra/routes';
 import { createDrizzlePayrollRuleStore } from './infra/rule-store';
 import type { PayInputReads } from './infra/snapshot';
@@ -213,6 +214,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         createPayrollInvoiceAcceptance(acceptanceStore),
         createPayrollBillingSettings(createDrizzlePayrollBillingSettingsStore(deps.db, now), readPng),
         createDrizzlePayrollContractorStore(deps.db, now),
+        createDrizzlePayrollRegimeStore(deps.db, deps.reads, now),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),

@@ -2,6 +2,10 @@ import {
   AcceptContractTextBodySchema,
   AgencyLogoParamsSchema,
   AgencyLogoSchema,
+  AssignContractorRegimeBodySchema,
+  BillingRegimeParamsSchema,
+  BillingRegimeSchema,
+  BillingRegimesSchema,
   BillingSettingsViewSchema,
   BonusIdSchema,
   BonusSchema,
@@ -14,9 +18,11 @@ import {
   ContractorFileSchema,
   ContractorParamsSchema,
   ContractorProfileBodySchema,
+  ContractorRegimeSchema,
   ContractTextParamsSchema,
   ContractTextSchema,
   ContractTextsSchema,
+  CreateBillingRegimeBodySchema,
   CreateContractTextBodySchema,
   CreateBonusBodySchema,
   CreateBonusTierSetBodySchema,
@@ -45,6 +51,7 @@ import {
   RefuseInvoiceContestBodySchema,
   UpholdInvoiceContestBodySchema,
   UserIdSchema,
+  ValidateBillingRegimeBodySchema,
   ValidateCommissionStatementBodySchema,
   VerifyContractorProfileBodySchema,
   type InvoiceId,
@@ -61,7 +68,13 @@ import type { PayrollInvoiceAcceptance } from '../application/invoice-acceptance
 import type { DownloadedPdf } from '../application/invoice-pdfs';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
-import type { Actor, JobLogger, PayrollContractorStore, PayrollRuleStore } from '../domain/ports';
+import type {
+  Actor,
+  JobLogger,
+  PayrollContractorStore,
+  PayrollRegimeStore,
+  PayrollRuleStore,
+} from '../domain/ports';
 
 /** An invoice's PDF as its reader may download it (ADR 0037 § 7). */
 export type InvoicePdfDownload = (
@@ -102,7 +115,9 @@ const LOGO_BODY_LIMIT_BYTES = 1_048_576;
  * (200). Réglages › Facturation
  * (`/payroll/billing-settings`) is the owner's alone. A contractor's file (`/payroll/contractors/:memberId/…`) is
  * written by himself or the owner, checked and prefixed by the owner only; the contract's and the mandate's versions
- * (`/payroll/contract-texts`) are added by the owner and accepted by the contractor himself (EQ-06 lot 5a).
+ * (`/payroll/contract-texts`) are added by the owner and accepted by the contractor himself (EQ-06 lot 5a). The
+ * billing regimes (`/payroll/billing-regimes`) are read by any member; the owner alone adds one, records its validation
+ * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b).
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -113,6 +128,7 @@ export function createPayrollRoutes(
   acceptance: PayrollInvoiceAcceptance,
   billing: PayrollBillingSettings,
   contractors: PayrollContractorStore,
+  regimes: PayrollRegimeStore,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -504,6 +520,67 @@ export function createPayrollRoutes(
           request.body,
         );
         return reply.code(created ? 201 : 200).send(acceptance);
+      },
+    );
+
+    app.get(
+      '/payroll/billing-regimes',
+      { preValidation: ownerOrMember, schema: { response: { 200: BillingRegimesSchema } } },
+      (request) => regimes.regimes(userOf(request)),
+    );
+
+    app.post(
+      '/payroll/billing-regimes',
+      {
+        preValidation: owner,
+        schema: {
+          body: CreateBillingRegimeBodySchema,
+          response: { 200: BillingRegimeSchema, 201: BillingRegimeSchema },
+        },
+      },
+      async (request, reply) => {
+        const { regime, created } = await regimes.addRegime(actorOf(request), request.body);
+        return reply.code(created ? 201 : 200).send(regime);
+      },
+    );
+
+    app.post(
+      '/payroll/billing-regimes/:regimeId/validation',
+      {
+        preValidation: owner,
+        schema: {
+          params: BillingRegimeParamsSchema,
+          body: ValidateBillingRegimeBodySchema,
+          response: { 200: BillingRegimeSchema, 201: BillingRegimeSchema },
+        },
+      },
+      async (request, reply) => {
+        const { regime, created } = await regimes.validateRegime(
+          actorOf(request),
+          request.params.regimeId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(regime);
+      },
+    );
+
+    app.post(
+      '/payroll/contractors/:memberId/regimes',
+      {
+        preValidation: owner,
+        schema: {
+          params: ContractorParamsSchema,
+          body: AssignContractorRegimeBodySchema,
+          response: { 200: ContractorRegimeSchema, 201: ContractorRegimeSchema },
+        },
+      },
+      async (request, reply) => {
+        const { assignment, created } = await regimes.assignRegime(
+          actorOf(request),
+          request.params.memberId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(assignment);
       },
     );
     return Promise.resolve();

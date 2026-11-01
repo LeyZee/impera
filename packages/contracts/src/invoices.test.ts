@@ -4,6 +4,7 @@ import {
   AGENCY_LOGO_REFUSALS,
   AgencyLogoMediaTypeSchema,
   AgencyLogoSchema,
+  AssignContractorRegimeBodySchema,
   BillingAgencyBodySchema,
   BillingRegimeSchema,
   BillingSettingsSchema,
@@ -12,6 +13,7 @@ import {
   ContestInvoiceBodySchema,
   ContractorProfileBodySchema,
   ContractorProfileSchema,
+  CreateBillingRegimeBodySchema,
   CreateContractTextBodySchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
@@ -29,6 +31,7 @@ import {
   SERVICE_DESCRIPTION_MAX,
   ServiceDescriptionSchema,
   UpdateBillingSettingsBodySchema,
+  ValidateBillingRegimeBodySchema,
   VatNumberSchema,
   addressLines,
   frenchVatNumberOf,
@@ -481,6 +484,58 @@ describe('invoices', () => {
         CreateContractTextBodySchema.safeParse({ id, kind: 'billing_mandate', body, contestDelayDays: 7 })
           .success,
       ).toBe(true);
+    });
+  });
+
+  describe('Équipe › Régimes de facturation (lot 5b)', () => {
+    /** An invented regime (ADR 0010): its words are the test's, never an accountant's. */
+    const benin = {
+      id: '0190a0b0-0000-7000-8000-000000000030',
+      name: 'Bénin et Madagascar',
+      countries: ['BJ', 'MG'],
+      vat: { treatment: 'reverse_charge', rateBps: 2_000 },
+      withholding: 'treaty_exempt',
+      mentions: ['Autofacturation', 'Autoliquidation'],
+      documents: ['tax_residence'],
+      taxIdRequired: true,
+    };
+    const refused = (body: object): string[] => {
+      const result = CreateBillingRegimeBodySchema.safeParse(body);
+      return result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
+    };
+
+    it('takes a regime as the accountant wrote it, its validation and its assignment apart', () => {
+      expect(CreateBillingRegimeBodySchema.parse(benin)).toEqual(benin);
+      // Validated or dated by their own routes: the body says neither.
+      expect(CreateBillingRegimeBodySchema.parse({ ...benin, validatedOn: '2026-11-01' })).toEqual(benin);
+      const franchise = {
+        ...benin,
+        countries: ['FR'],
+        vat: { treatment: 'exempt' },
+        withholding: 'none',
+        documents: ['urssaf_vigilance'],
+      };
+      expect(refused(franchise)).toEqual([]);
+      expect(
+        AssignContractorRegimeBodySchema.safeParse({
+          id: '0190a0b0-0000-7000-8000-000000000031',
+          regimeId: benin.id,
+          from: '2026-11-16',
+        }).success,
+      ).toBe(true);
+      expect(ValidateBillingRegimeBodySchema.safeParse({ validatedOn: '2026-02-30' }).success).toBe(false);
+    });
+
+    it('refuses a country or a document named twice, a treaty without the residence certificate', () => {
+      expect(refused({ ...benin, countries: ['BJ', 'BJ'] })).toEqual(['countries']);
+      expect(refused({ ...benin, documents: ['tax_residence', 'tax_residence'] })).toEqual(['documents']);
+      expect(refused({ ...benin, documents: [] })).toEqual(['documents']);
+      expect(refused({ ...benin, documents: ['urssaf_vigilance'] })).toEqual(['documents']);
+      expect(refused({ ...benin, countries: [] })).toEqual(['countries']);
+      expect(refused({ ...benin, vat: { treatment: 'charged', rateBps: 10_001 } })).toEqual(['vat.rateBps']);
+      expect(refused({ ...benin, mentions: Array.from({ length: 25 }, () => 'Mention') })).toEqual([
+        'mentions',
+      ]);
     });
   });
 });
