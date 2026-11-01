@@ -1,0 +1,22 @@
+# Délai entre deux scripts : une offre il y a 3 h, rien de nouveau. Fan et messages fictifs (ADR 0010).
+description: Il resexualise trois heures après une offre ; aucun script n’est reproposé avant le délai.
+persona_version: demo
+fan_facts:
+  - 'prénom : Adrien (fictif)'
+  - a acheté un pack il y a 3 h
+situation:
+  known_hours: 100
+  age_confirmed: true
+  last_offer_hours_ago: 3
+history: []
+inbound: Mmh t’es trop chaude toi
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b
+      - \b(pack|€|euros?)\b

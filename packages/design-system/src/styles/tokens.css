@@ -190,6 +190,12 @@
   /* A shape turning into another (a button into its menu, the lens between tabs). */
   --nv-dur-morph: 560ms;
   --nv-dur-ambient: 18s;
+  /* Between two things that enter one after the other (rows, sections, the strokes of an icon). */
+  --nv-stagger: 50ms;
+  /* Data drawing itself (a line, a ring, a bar growing), on ease-out, in step with countUp's 1 000 ms. */
+  --nv-dur-data: 1000ms;
+  /* One breath of something loading (a skeleton, a placeholder that waits). */
+  --nv-dur-breathe: 1600ms;
   --nv-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --nv-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   /* Springs, one family (SwiftUI's smooth / snappy / bouncy): everything that moves or resizes uses one of

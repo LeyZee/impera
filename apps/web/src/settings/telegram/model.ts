@@ -22,14 +22,21 @@ export interface TopicMeta {
 
 export const TOPICS: Record<TelegramTopic, TopicMeta> = {
   urgent: { label: 'Urgent', sub: 'Mineur, consentement, détresse, rencontre, manipulation' },
-  important: { label: 'Important', sub: 'Plafond IA, session expirée, agent arrêté, mot-clé' },
+  important: { label: 'Important', sub: 'Plafond IA, session expirée, agent arrêté' },
   info: { label: 'Info', sub: 'Bilan du matin, retour à la normale, sans son' },
   sale: { label: 'Ventes', sub: 'Un message sans son à chaque vente' },
-  keyword: { label: 'Mots-clés', sub: 'Un fan a écrit un mot surveillé' },
+  keyword: { label: 'Mots-clés', sub: 'Un fan a écrit un mot surveillé de la Persona' },
   validation: { label: 'Validations', sub: 'Vocaux et brouillons qui attendent' },
+  custom: { label: 'Alertes personnalisées', sub: 'Les alertes que tu as écrites, quand elles sonnent' },
 };
 
-export const ALERT_TOPICS = ['urgent', 'important', 'info'] as const satisfies readonly TelegramTopic[];
+export const ALERT_TOPICS = [
+  'urgent',
+  'important',
+  'keyword',
+  'info',
+  'custom',
+] as const satisfies readonly TelegramTopic[];
 
 export interface ChatChoice {
   readonly chat: TelegramChat;
@@ -38,11 +45,13 @@ export interface ChatChoice {
   readonly isReachable: boolean;
 }
 
-/** Every group a bot sits in, the reachable ones first. */
+/** Every group a bot sits in, the reachable ones first. A group it left or was banned from is not a choice. */
 export function chatChoices(bots: readonly TelegramBot[]): ChatChoice[] {
   return bots
     .flatMap((bot) =>
-      bot.chats.map((chat) => ({ chat, bot, isReachable: chat.canPost && bot.state === 'active' })),
+      bot.chats
+        .filter((chat) => chat.membership === 'member')
+        .map((chat) => ({ chat, bot, isReachable: chat.canPost && bot.state === 'active' })),
     )
     .sort((a, b) => Number(b.isReachable) - Number(a.isReachable));
 }
@@ -107,8 +116,11 @@ function reachCount(
 }
 
 export interface Health {
+  /** Red is kept for urgent alerts that reach no one; a bot or a group in trouble is a warning (amber). */
   readonly tone: 'ok' | 'warn' | 'bad' | 'empty';
   readonly label: string;
+  /** The tab where the problem is fixed; the strip leads there. `null`: nothing to fix. */
+  readonly fix: 'bots' | 'alerts' | null;
   readonly botCount: number;
   readonly groupCount: number;
   readonly lastSentAt: string | null;
@@ -128,14 +140,27 @@ export function healthOf(overview: TelegramOverview): Health {
     groupCount: choices.filter((c) => c.isReachable).length,
     lastSentAt,
   };
-  if (overview.bots.length === 0) return { ...base, tone: 'empty', label: 'Aucun bot pour l’instant' };
-  if (overview.bots.some((bot) => bot.state !== 'active'))
-    return { ...base, tone: 'bad', label: 'Un bot demande ton attention' };
-  if (overview.coverage.some((c) => !c.urgentReachable))
-    return { ...base, tone: 'bad', label: 'Les urgences n’arrivent nulle part' };
-  if (choices.some((c) => c.chat.lastError !== null || !c.isReachable))
-    return { ...base, tone: 'warn', label: 'Un groupe demande ton attention' };
-  return { ...base, tone: 'ok', label: 'Tout fonctionne' };
+  if (overview.bots.length === 0)
+    return { ...base, tone: 'empty', label: 'Aucun bot pour l’instant', fix: null };
+  const isBotBroken = overview.bots.some((bot) => bot.state !== 'active');
+  if (overview.coverage.some((c) => !c.urgentReachable)) {
+    // No group can be written to: the fix is in Bots et groupes. Otherwise a group is to choose, in the routing.
+    const isBotsFault = !choices.some((c) => c.isReachable);
+    return {
+      ...base,
+      tone: 'bad',
+      label: 'Les urgences n’arrivent nulle part',
+      fix: isBotsFault ? 'bots' : 'alerts',
+    };
+  }
+  if (isBotBroken) return { ...base, tone: 'warn', label: 'Un bot demande ton attention', fix: 'bots' };
+  // A group the bot left or was banned from waits to be removed (REG-28): its line is amber, so is the strip.
+  if (
+    choices.some((c) => c.chat.lastError !== null || !c.isReachable) ||
+    overview.bots.some((bot) => goneChats(bot).length > 0)
+  )
+    return { ...base, tone: 'warn', label: 'Un groupe demande ton attention', fix: 'bots' };
+  return { ...base, tone: 'ok', label: 'Tout fonctionne', fix: null };
 }
 
 export interface Cover {
@@ -153,6 +178,30 @@ export function coverOf(overview: TelegramOverview): Cover {
       isOk: false,
       title: 'Personne n’est prévenu la nuit',
       sub: 'Ajoute un bot et mets-le dans un groupe : les urgences y arriveront, même à 3 h du matin.',
+    };
+  }
+  // Groups exist but none can be written to: the bot is what to fix, not the choice of a group (recette du 28/10).
+  if (missing.length > 0 && choices.length > 0 && !choices.some((c) => c.isReachable)) {
+    const isBotBroken = overview.bots.some((bot) => bot.state !== 'active');
+    return {
+      isOk: false,
+      title: 'Les alertes ne partent plus',
+      sub: isBotBroken
+        ? overview.bots.some((bot) => bot.state === 'refused')
+          ? 'Telegram refuse le jeton d’un bot : remplace-le dans Bots et groupes.'
+          : 'Un autre programme lit le bot : arrête-le, ou remplace le jeton dans Bots et groupes.'
+        : 'Le bot n’a le droit d’écrire dans aucun de ses groupes : fais-le administrateur du groupe.',
+    };
+  }
+  // No group at all to choose: the fix is to put a bot in one, not to pick one (REG-28, a bot out of its only group).
+  if (missing.length > 0 && choices.length === 0) {
+    const isOut = overview.bots.some((bot) => goneChats(bot).length > 0);
+    return {
+      isOk: false,
+      title: 'Les alertes ne partent plus',
+      sub: isOut
+        ? 'Le bot n’est plus dans aucun de ses groupes : rajoute-le à un groupe dans Bots et groupes.'
+        : 'Le bot n’est dans aucun groupe : ajoute-le à un groupe dans Bots et groupes.',
     };
   }
   if (missing.length > 0) {
@@ -177,8 +226,13 @@ export function plural(count: number, word: string): string {
 
 const graphemes = new Intl.Segmenter('fr', { granularity: 'grapheme' });
 
-/** Two letters for the round avatar of a group; an emoji counts as one. */
+/** A title that starts with an emoji (« 💰 Ventes ») is drawn by that emoji alone. */
+const LEADING_EMOJI = /^\p{Extended_Pictographic}/u;
+
+/** Two letters for the round avatar of a group, or its leading emoji alone. */
 export function initials(title: string): string {
+  const first = graphemes.segment(title.trim())[Symbol.iterator]().next().value?.segment ?? '';
+  if (LEADING_EMOJI.test(first)) return first;
   const firsts = title
     .split(/\s+/)
     .map((word) => graphemes.segment(word)[Symbol.iterator]().next().value?.segment ?? '')
@@ -228,24 +282,29 @@ export function chatLine(choice: ChatChoice, now: Date): { text: string; isWarni
   return { text: `${kind} · dernier envoi ${whenLabel(choice.chat.lastSentAt, now)}`, isWarning: false };
 }
 
-/** The line under a bot's name. */
-export function botLine(bot: TelegramBot, now: Date): { text: string; isWarning: boolean } {
+/** The groups a bot left or was banned from: listed under its groups, to remove (REG-28). */
+export function goneChats(bot: TelegramBot): TelegramChat[] {
+  return bot.chats.filter((chat) => chat.membership !== 'member');
+}
+
+/** The second line of a group the bot is out of. */
+export function goneLine(chat: TelegramChat): string {
+  const kind = KIND_LABEL[chat.kind];
+  return chat.membership === 'kicked'
+    ? `${kind} · le bot a été exclu de ce groupe`
+    : `${kind} · le bot n’est plus dans ce groupe`;
+}
+
+/** The line under a bot's name: its @identifier, or what is wrong with it. */
+export function botLine(bot: TelegramBot): { text: string; isWarning: boolean } {
   switch (bot.state) {
     case 'refused':
       return { text: 'Telegram refuse ce jeton : remplace-le', isWarning: true };
     case 'conflict':
       return { text: 'Un autre programme lit ce bot', isWarning: true };
-    case 'active': {
-      if (bot.lastPolledAt === null) return { text: `@${bot.username}`, isWarning: false };
-      const seconds = Math.max(0, Math.round((now.getTime() - new Date(bot.lastPolledAt).getTime()) / 1000));
-      const ago =
-        seconds < 60
-          ? `lu il y a ${String(seconds)} s`
-          : seconds < 3600
-            ? `lu il y a ${String(Math.floor(seconds / 60))} min`
-            : `lu il y a ${String(Math.floor(seconds / 3600))} h`;
-      return { text: `@${bot.username} · ${ago}`, isWarning: false };
-    }
+    case 'active':
+      // Its identifier alone: when Nirvana last asked Telegram for news helps no one (recette du 29/10).
+      return { text: `@${bot.username}`, isWarning: false };
   }
 }
 
@@ -265,9 +324,17 @@ export function deliveryLabel(delivery: TelegramDelivery): { text: string; isOk:
   }
 }
 
+/**
+ * The groups a bot sits in when the sheet starts waiting for a new one. A group it left or was banned from is not one
+ * of them: added back, it is found again (REG-28).
+ */
+export function knownChatIds(bot: TelegramBot): ReadonlySet<string> {
+  return new Set(bot.chats.filter((chat) => chat.membership === 'member').map((chat) => chat.id));
+}
+
 /** The groups a bot entered while the sheet was waiting for one. */
 export function newChats(bot: TelegramBot | undefined, knownIds: ReadonlySet<string>): TelegramChat[] {
-  return bot?.chats.filter((chat) => !knownIds.has(chat.id)) ?? [];
+  return bot?.chats.filter((chat) => chat.membership === 'member' && !knownIds.has(chat.id)) ?? [];
 }
 
 /** A bot token, as @BotFather gives it; the server checks it again (`token_shape`). */
@@ -275,14 +342,25 @@ export function looksLikeToken(value: string): boolean {
   return /^\d{5,15}:[A-Za-z0-9_-]{30,}$/.test(value.trim());
 }
 
-/** The identifier @BotFather will accept for a name: lowercase, underscores, ends in `bot`. */
+/** Telegram's limit on a bot's identifier. */
+const USERNAME_MAX = 32;
+
+/**
+ * The identifier @BotFather will accept for a name: starts with a letter, lowercase, underscores, ends in `bot`,
+ * 32 characters at most. A name that already ends in « bot » gets no second one.
+ */
 export function suggestedUsername(name: string): string {
-  const base = name
+  const words = name
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 28);
-  return `${base === '' ? 'nirvana' : base}_bot`;
+    .replace(/^_+|_+$/g, '');
+  const base = words === '' ? 'nirvana' : /^[a-z]/.test(words) ? words : `nirvana_${words}`;
+  if (base.endsWith('bot') && base.length >= 5 && base.length <= USERNAME_MAX) return base;
+  const stem = base
+    .replace(/_?bot$/, '')
+    .slice(0, USERNAME_MAX - '_bot'.length)
+    .replace(/_+$/, '');
+  return `${stem === '' ? 'nirvana' : stem}_bot`;
 }

@@ -1,9 +1,13 @@
 import {
+  AlertRefSchema,
   AutomaticMissingSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   HandoffCauseSchema,
+  InvoiceKindSchema,
+  InvoiceNotIssuedReasonSchema,
   KillSwitchScopeSchema,
+  PayPeriodSchema,
 } from '@nirvana/contracts';
 import { z } from 'zod';
 
@@ -12,13 +16,15 @@ import type { ScannedEvent, Signal } from '../domain/signals';
 /**
  * Reads a `domain_events` row into a signal (ADR 0020 §3). Local, tolerant schemas: the module reads the facts it
  * needs and nothing else, accepts rows written before a field existed, and skips a row it cannot read rather than
- * blocking the scan behind it. Types without a producer yet (sales, keywords, validations) give `null` here until
- * their payload enters the contract.
+ * blocking the scan behind it. Types without a producer yet (sales, validations) give `null` here until their payload
+ * enters the contract.
  */
 
 const HandoffSchema = z.object({
   conversationId: ConversationIdSchema.optional().catch(undefined),
   cause: HandoffCauseSchema.optional().catch(undefined),
+  // Which alert of hers paused the agent, to name it; a trigger it cannot read never holds the handoff back.
+  trigger: z.object({ alert: AlertRefSchema }).optional().catch(undefined),
 });
 
 // `conversationId` since #60 on `takeover_started`; a row without it (an older one) closes nothing.
@@ -46,6 +52,14 @@ const KillSwitchSchema = z.object({
   reason: z.string(),
 });
 
+// Only which alert rang: how it matched and the declared word stay out (the word is what the fan wrote too). Sent only
+// when her alert asked for it at the time (`notify`, true for the system's); a row without it is not sent.
+const AlertTriggeredSchema = z.object({
+  conversationId: ConversationIdSchema,
+  trigger: z.object({ alert: AlertRefSchema }),
+  notify: z.boolean(),
+});
+
 // Only the last failure counts: the retries before it are the platform's hiccups, not news. No fallback on the
 // attempt count for rows without `isFinal`: the outbox never held `send_failed` before the flag existed. The
 // error code stays out, as anything the platform said.
@@ -60,6 +74,22 @@ const AutomaticClosedSchema = z.object({
   conversations: z.number().int().min(1),
 });
 
+const BackupOverdueSchema = z.object({ lastSucceededAt: z.iso.datetime().nullable() });
+
+// Only the currency and the ECB's day of its last rate: no figure of the agency's pay goes to Telegram (ADR 0033).
+const ExchangeRateOverdueSchema = z.object({
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  lastRateDay: z.iso.date().nullable(),
+});
+
+// The period, the document and the reason only: the member and the amount stay in Nirvana (no figure of the pay goes to
+// Telegram, ADR 0033).
+const InvoiceNotIssuedSchema = z.object({
+  period: PayPeriodSchema,
+  document: InvoiceKindSchema,
+  reason: InvoiceNotIssuedReasonSchema,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -69,6 +99,7 @@ function signalOf(type: string, payload: unknown): Signal | null {
         kind: 'handoff',
         conversationId: parsed.data.conversationId ?? null,
         cause: parsed.data.cause ?? null,
+        ...(parsed.data.trigger !== undefined && { alert: parsed.data.trigger.alert }),
       };
     }
     case 'takeover_started': {
@@ -112,10 +143,34 @@ function signalOf(type: string, payload: unknown): Signal | null {
       if (!parsed.success) return null;
       return { kind: 'kill_switch', ...parsed.data };
     }
+    case 'alert_triggered': {
+      const parsed = AlertTriggeredSchema.safeParse(payload);
+      if (!parsed.success || !parsed.data.notify) return null;
+      return { kind: 'alert', conversationId: parsed.data.conversationId, alert: parsed.data.trigger.alert };
+    }
     case 'send_failed': {
       const parsed = SendFailedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'send_failed', conversationId: parsed.data.conversationId ?? null };
+    }
+    case 'backup_overdue': {
+      const parsed = BackupOverdueSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { lastSucceededAt } = parsed.data;
+      return {
+        kind: 'backup_overdue',
+        lastSucceededAt: lastSucceededAt === null ? null : new Date(lastSucceededAt),
+      };
+    }
+    case 'exchange_rate_overdue': {
+      const parsed = ExchangeRateOverdueSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'exchange_rate_overdue', ...parsed.data };
+    }
+    case 'invoice_not_issued': {
+      const parsed = InvoiceNotIssuedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_not_issued', ...parsed.data };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);

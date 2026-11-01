@@ -5,6 +5,8 @@ import {
   changePercent,
   eur,
   gaugeClass,
+  agentRuns,
+  foldOf,
   heroState,
   hoursMinutes,
   leverView,
@@ -13,8 +15,7 @@ import {
   signed,
   trendSeries,
 } from './logic';
-import { PERIODS, type AgentState, type Lever, type Todo } from './model';
-import { SAMPLE } from './sample';
+import type { AgentCard, AgentState, Lever, Todo } from './model';
 
 const agent: AgentState = {
   tone: 'warn',
@@ -32,7 +33,10 @@ const todo = (id: string, tone: Todo['tone']): Todo => ({
   kind: 'k',
   title: 't',
   why: 'w',
-  at: '23:00',
+  waiting: 'depuis 3 min',
+  late: false,
+  at: 'Reçu à 23 h 00',
+  conversationId: `c-${id}`,
 });
 const lever = (id: Lever['id'], current: number, previous: number): Lever => ({
   id,
@@ -44,7 +48,10 @@ const lever = (id: Lever['id'], current: number, previous: number): Lever => ({
 
 describe('formatting', () => {
   it('writes euros, durations and signs the French way', () => {
-    expect(eur(1846.4).replace(/\s/gu, ' ')).toBe('1 846 €');
+    expect(eur(1846).replace(/\s/gu, ' ')).toBe('1 846 €');
+    // The cents are never rounded away: 10,50 € is not 11 €.
+    expect(eur(10.5)).toBe('10,50 €');
+    expect(eur(1846.4).replace(/\s/gu, ' ')).toBe('1 846,40 €');
     expect(hoursMinutes(125)).toBe('2 h 05');
     expect(hoursMinutes(-3)).toBe('0 h 00');
     expect(signed(12)).toBe('+12');
@@ -114,11 +121,29 @@ describe('gaugeClass', () => {
   });
 });
 
+describe('agentRuns', () => {
+  it('says the agent acts only when nothing stalls it, whatever the mode', () => {
+    expect(agentRuns({ tone: 'ok' })).toBe(true);
+    expect(agentRuns({ tone: 'warn' })).toBe(true);
+    expect(agentRuns({ tone: 'warn', stalled: true })).toBe(false);
+    expect(agentRuns({ tone: 'idle' })).toBe(false);
+    expect(agentRuns({ tone: 'bad' })).toBe(false);
+  });
+});
+
 describe('heroState', () => {
   it('says the agent is stopped before anything else', () => {
     const hero = heroState(agent, [todo('a', 'bad')], 'stop');
     expect(hero).toMatchObject({ tone: 'bad', action: 'Repasser en copilote' });
     expect(hero.headline).toContain('**arrêté**');
+  });
+
+  it('says on Arrêt that the grave lines still wait (choix de Charles, 28/10)', () => {
+    expect(heroState(agent, [todo('a', 'bad')], 'stop').lead).toContain('Une urgence reste à traiter');
+    expect(heroState(agent, [todo('a', 'bad'), todo('b', 'bad')], 'stop').lead).toContain(
+      '2 urgences restent à traiter',
+    );
+    expect(heroState(agent, [], 'stop').lead).toContain('Les chatteurs gardent la main dans Reveal');
   });
 
   it('is calm when nothing waits', () => {
@@ -153,17 +178,77 @@ describe('heroState', () => {
   });
 });
 
-describe('sample data', () => {
-  it('stays coherent: todos open a known fan, the series end on the totals', () => {
-    const fanIds = new Set(SAMPLE.fans.map((fan) => fan.id));
-    for (const item of SAMPLE.todos) expect(fanIds.has(item.fanId)).toBe(true);
-    const day = SAMPLE.sales.day;
-    expect(Math.round(day.series.agent.at(-1) ?? 0)).toBe(day.agent);
-    expect(Math.round(day.series.chatters.at(-1) ?? 0)).toBe(day.chatters);
-    for (const period of PERIODS) {
-      const { counts, before } = SAMPLE.sales[period.id].funnel;
-      expect(counts).toHaveLength(5);
-      expect(before).toHaveLength(5);
-    }
+describe('heroState and the budget, the global stop', () => {
+  it('says the AI budget past its alert in the hero, calm or not (DASH-06)', () => {
+    const spending: AgentState = {
+      ...agent,
+      tone: 'ok',
+      budgetNote: 'À 18,62 € sur 20 €, l’agent s’arrêtera bientôt.',
+    };
+    expect(heroState(spending, [], 'copilot').lead).toContain('À 18,62 € sur 20 €');
+    expect(heroState(spending, [todo('a', 'warn')], 'copilot').lead).toContain('À 18,62 € sur 20 €');
+    expect(heroState({ ...agent, tone: 'ok' }, [], 'copilot').lead).toContain('Les alertes arrivent ici');
+  });
+
+  it('says why under a global stop, in the hero (DASH-08)', () => {
+    const hero = heroState(agent, [todo('a', 'bad')], 'stop', { globalStop: true });
+    expect(hero.lead).toContain('Un arrêt général est posé pour toutes les créatrices');
+    expect(hero.lead).toContain('Une urgence reste à traiter');
+    expect(heroState(agent, [], 'stop').lead).not.toContain('arrêt général');
+  });
+});
+
+describe('foldOf', () => {
+  const card = (id: string, tone: AgentCard['tone'], alarm?: string): AgentCard => ({
+    id,
+    tone,
+    title: id,
+    value: '',
+    sub: '',
+    rows: [],
+    ...(alarm === undefined ? {} : { alarm }),
+  });
+  const running: AgentState = { ...agent, tone: 'warn', foldTitle: 'L’agent fonctionne normalement' };
+
+  it('follows the worst card that can alarm, never « normalement » over amber (DASH-06)', () => {
+    const fold = foldOf(
+      {
+        ...running,
+        cards: [card('relays', 'warn'), card('budget', 'warn', 'Le budget IA approche du plafond')],
+      },
+      false,
+      false,
+    );
+    expect(fold).toEqual({ tone: 'warn', title: 'Le budget IA approche du plafond', live: false });
+    expect(foldOf({ ...running, cards: [card('relays', 'warn')] }, false, false)).toMatchObject({
+      tone: 'ok',
+      title: 'L’agent fonctionne normalement',
+    });
+    expect(foldOf({ ...running, cards: [] }, true, false).title).toBe('Le reste fonctionne normalement');
+  });
+
+  it('keeps the agent’s own trouble, and tells a creator the agency handles it (DASH-21)', () => {
+    const broken: AgentState = { ...agent, tone: 'bad', foldTitle: 'Quelque chose ne va pas' };
+    expect(foldOf(broken, false, false)).toEqual({
+      tone: 'bad',
+      title: 'Quelque chose ne va pas',
+      live: true,
+    });
+    expect(foldOf(broken, false, true).title).toBe('L’agence s’en occupe');
+  });
+});
+
+describe('heroState for a creator', () => {
+  it('names no conversation and offers no action, whatever waits', () => {
+    const hero = heroState(agent, [todo('a', 'bad')], 'copilot', { forCreator: true });
+    expect(hero).toMatchObject({ tone: 'ok', headline: 'Tout va bien. **Rien ne t’attend.**' });
+    expect(hero.action).toBeUndefined();
+    expect(hero.lead).toContain('L’agence suit les conversations');
+  });
+
+  it('leaves a stopped agent to the agency', () => {
+    const hero = heroState(agent, [], 'stop', { forCreator: true });
+    expect(hero.headline).toBe('L’agent est **arrêté**');
+    expect(hero.action).toBeUndefined();
   });
 });

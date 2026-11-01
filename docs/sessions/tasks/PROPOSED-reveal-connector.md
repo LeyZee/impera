@@ -25,7 +25,7 @@ Un `RevealApiConnector` qui lit la boîte de réception, les conversations, les 
 - Session du **membre d'équipe « bot »** créé dans Reveal (décision de Charles, 17/10), jamais celle de Charles ; les messages sortants doivent porter ce membre comme auteur (test contre FakeReveal).
 - Exposer le moment d'un script (`day` ☀️, `night` 🌙, ou aucun) depuis son nom ou son dossier du Vault, pour la règle « temps présent » appliquée par le moteur de vente (inventaire, Décisions de Charles).
 - Garde d'écriture : toute écriture refuse de partir si le compte n'est pas en mode autorisé (réglage `connector_config.writes`, désactivé par défaut) ; les tests écrivent seulement vers FakeReveal.
-- FakeReveal (`apps/api/test/fake-reveal/`, convention de `testing.md`) complété pour chaque endpoint utilisé, avec ses scénarios (`fake-reveal.md`).
+- FakeReveal (`apps/api/src/__tests__/fake-reveal/`, convention de `testing.md`) complété pour chaque endpoint utilisé, avec ses scénarios (`fake-reveal.md`).
 - Test de contrat commun : vert contre `FakeConnector` et contre `RevealApiConnector` + FakeReveal, y compris les scénarios `session_expired`, `rate_limited`, `shape_changed`, `challenge`.
 - Tests unitaires du mappage (chaque type de message, PPV acheté ou non, étape de script) et de la lecture de l'indicateur « script déjà envoyé » de Reveal.
 - `reveal-api-observed.md` : section « Capacités déclarées » à jour.
@@ -44,3 +44,5 @@ Un `RevealApiConnector` qui lit la boîte de réception, les conversations, les 
 Capture de session par l'extension et endpoint `/v1/connector/sessions` (fiche à part), poller et ingestion (P0-05, P0-06), moteur de vente, interface copilote, mise en production, tout appel au vrai Reveal (un test manuel en lecture seule se fait seulement à la demande de Charles).
 
 ## Notes de session
+
+- 2026-10-30 (fil Extension, accord du coordinateur) : route `/aide/reveal` (apps/web, propriétaire) réservée pour l'aide « Reconnecter Reveal ». Elle s'écrit dans la même PR que la capture de session (fiche à part), d'après `docs/runbooks/session-expired.md`, et le lead « Reveal est déconnecté » du Dashboard y mènera (DASH-18, recette design). Le runbook dit désormais la session du membre « bot », comme cette fiche.

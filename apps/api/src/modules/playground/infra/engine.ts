@@ -54,6 +54,8 @@ export interface EngineDeps {
   /** The configured voice prompt and model: the rate shown is theirs. */
   readonly version: AnswerVersion;
   readonly sessionId: string;
+  /** Dollars per euro, the daily budget's rate: costs are journaled in USD and shown in euros (ADR 0011). */
+  readonly usdPerEur: number;
   /** The creator the ratings belong to: the only one there is, until the screen lets the trainer choose. */
   readonly creatorId?: () => Promise<string | null>;
   readonly timeZone?: string;
@@ -86,7 +88,7 @@ export function ratingRecord(input: {
   };
 }
 
-function toAnswer(turn: PlaygroundTurn): PlaygroundAnswer {
+function toAnswer(turn: PlaygroundTurn, usdPerEur: number): PlaygroundAnswer {
   return {
     bubbles: [...turn.bubbles],
     isBlocked: turn.isBlocked,
@@ -118,7 +120,7 @@ function toAnswer(turn: PlaygroundTurn): PlaygroundAnswer {
     }),
     ...(turn.model !== undefined && { model: turn.model }),
     latencyMs: turn.latencyMs,
-    costUsd: turn.costUsd,
+    costEur: turn.costUsd / usdPerEur,
     isFallback: turn.isFallback,
     ...((turn.voiceFailure ?? turn.briefFailure) !== undefined && {
       failure: turn.voiceFailure ?? turn.briefFailure ?? '',
@@ -135,6 +137,9 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
     voiceExamples: voiceExamples(deps.records),
+    offerLimits: deps.persona.offerLimits,
+    sexualizationLimits: deps.persona.sexualizationLimits,
+    followUps: deps.persona.followUps,
     ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
     ...(deps.now !== undefined && { now: deps.now }),
   });
@@ -170,9 +175,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     };
   };
 
+  const isVoiceReachable = (): boolean => {
+    const voice = deps.gateway.health().roles.find((r) => r.role === 'voice');
+    return voice !== undefined && (voice.hasKey || voice.fallback?.hasKey === true);
+  };
+
   const state = (): PlaygroundState => {
     const { situation, lastExchange } = session;
     return {
+      persona: { name: deps.persona.creatorName },
       presets: FAN_PRESETS.map((p) => ({ id: p.id, label: p.label, tests: p.tests, opening: p.opening })),
       presetId,
       situation: {
@@ -194,15 +205,15 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       rate: rate(),
       version: deps.version,
       rejectReasons: REJECT_REASONS.map((id) => ({ id, label: REJECT_REASON_LABELS[id] })),
-      sessionCostUsd,
-      pending: lastExchange !== undefined && !isRated ? toAnswer(lastExchange.turn) : null,
+      sessionCostEur: sessionCostUsd / deps.usdPerEur,
+      voice: { reachable: isVoiceReachable() },
+      pending: lastExchange !== undefined && !isRated ? toAnswer(lastExchange.turn, deps.usdPerEur) : null,
     };
   };
 
   /** A voice model must be reachable, main or fallback; the key itself is never read here. */
   const assertAvailable = (): void => {
-    const voice = deps.gateway.health().roles.find((r) => r.role === 'voice');
-    if (voice === undefined || (!voice.hasKey && voice.fallback?.hasKey !== true)) throw new LlmUnavailable();
+    if (!isVoiceReachable()) throw new LlmUnavailable();
   };
 
   const sendDescribed = async (
@@ -213,7 +224,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     const turn = await session.handleFanMessage(text, media);
     isRated = false;
     sessionCostUsd += turn.costUsd;
-    return toAnswer(turn);
+    return toAnswer(turn, deps.usdPerEur);
   };
 
   const restart = (): void => {
@@ -307,7 +318,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
           })),
           isBlocked: comparison.isBlocked,
           ...(comparison.model !== undefined && { model: comparison.model }),
-          costUsd: comparison.costUsd,
+          costEur: comparison.costUsd / deps.usdPerEur,
           ...(comparison.failure !== undefined && { failure: comparison.failure }),
         };
       }),

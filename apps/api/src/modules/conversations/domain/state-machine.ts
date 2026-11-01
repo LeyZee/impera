@@ -32,7 +32,8 @@ const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
     paused: 'paused',
     error: 'error',
   },
-  create_draft: { pending: 'awaiting_approval' },
+  // From `idle` too: a follow-up to a fan who went silent after her answer (P3-10).
+  create_draft: { pending: 'awaiting_approval', idle: 'awaiting_approval' },
   approve: { awaiting_approval: 'sending' },
   reject: { awaiting_approval: 'idle' },
   // A draft that is no longer valid; a fan message that caused it already moved the conversation to pending.

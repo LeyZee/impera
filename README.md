@@ -50,7 +50,7 @@
 
 **Aucun message n'a encore été généré par Grok** : `pnpm probe` et `pnpm playground` attendent la clé `LLM_XAI_API_KEY` dans l'environnement. Le premier verdict sur le sexting en français viendra de là.
 
-**La CI verte teste le socle, pas encore le produit** : 96 tests unitaires, mais 0 test d'intégration (`test:integration` passe à vide) et 0 éval Promptfoo. Ils arrivent avec la base (P0-03) et le premier scénario de bout en bout.
+**La CI verte teste le code, pas encore la qualité des réponses** : tests unitaires et d'intégration (Postgres) tournent à chaque PR, mais les 34 scénarios d'évaluation (`pnpm evals`) n'ont jamais tourné contre un vrai modèle : ils attendent la clé `LLM_XAI_API_KEY`, et la nuit reste rouge d'ici là.
 
 ## Le projet en une minute
 
@@ -155,15 +155,15 @@ Les principes qui structurent tout ([`docs/architecture/overview.md`](docs/archi
 | IA | Vercel AI SDK derrière `LlmGateway` |
 | Interface | Vite, React 19, TanStack, Tailwind v4, shadcn/ui |
 | Extension | WXT (Chrome, Manifest V3) |
-| Qualité | Vitest, Testcontainers, Promptfoo |
+| Qualité | Vitest, Testcontainers, évals maison avec juge LLM |
 | Hébergement | Hetzner + Coolify |
 
 ## Interface et design system
 
-Les écrans de l'application n'existent pas encore ; le design system, si. **Liquid Glass sur une nuit chaude, un seul néon rouge** : surfaces translucides, bords lumineux, animations à ressort, et un test qui garantit le contraste AA dans les deux thèmes. Les images ci-dessous sont rendues depuis le CSS du package, avec des textes fictifs.
+**Liquid Glass sur une nuit chaude, un seul néon rouge** : le verre pour ce qui flotte (navigation, onglets, menus, feuilles), le contenu sur des plaques, le néon pour l'action principale et les urgences, l'ambre pour les avertissements, un seul ressort pour les animations, et un test qui garantit le contraste AA dans les deux thèmes. Ci-dessous, le CRM tel qu'il est, avec des données inventées.
 
 <p align="center">
-  <img src="docs/design/images/composants-nuit.jpg" alt="Composants du design system en thème Nuit : boutons, segment, interrupteurs, états de conversation, faits sur un fan, jauge de budget, cartes de statistiques, fil avec brouillon" width="100%">
+  <img src="docs/design/images/crm-dashboard-nuit.jpg" alt="Dashboard en thème Nuit : barre latérale en verre, titre qui dit ce qui attend, liste « À traiter » sur une plaque, santé de l'agent sur une ligne" width="100%">
 </p>
 
 <table>
@@ -174,8 +174,8 @@ Les écrans de l'application n'existent pas encore ; le design system, si. **Liq
 </table>
 
 - **Logo** : la flamme à l'auréole dessinée par Charles, nom en Playfair Display italique éclairé par la flamme. Fichiers et règles : [`brand/`](brand/README.md).
-- **Polices** : Geist pour l'interface, Geist Mono pour les chiffres, Instrument Serif italique pour les états vides. Icônes Lucide.
-- **Navigation prévue** : Dashboard, Créatrices, Entraîner (Playground, Corrections, Tests, Comparer), Suivi, Réglages. Pas d'Inbox : la validation en copilote est prévue dans Reveal, par l'extension.
+- **Polices** : Geist pour l'interface et les chiffres (tabulaires), Geist Mono pour les touches du clavier, Instrument Serif italique pour les états vides. Icônes Lucide.
+- **Navigation** : Dashboard, Créatrices, Entraîner (Playground, Corrections, Tests), Suivi, Réglages. Pas d'Inbox : en copilote, les brouillons se valident dans Suivi.
 - Guide complet, avec le thème Jour et la typographie : [`docs/design/README.md`](docs/design/README.md). Code : [`packages/design-system`](packages/design-system).
 
 ## Structure du dépôt
@@ -192,7 +192,7 @@ Les écrans de l'application n'existent pas encore ; le design system, si. **Liq
 │   ├── design-system/        tokens, pont Tailwind v4, classes nv-*, aides d'animation
 │   └── llm/                  passerelle, fournisseurs, prompts versionnés, journal des appels
 ├── personas/                 placeholders seulement (la vraie persona est hors dépôt)
-├── evals/                    test express (probe) et évaluations Promptfoo
+├── evals/                    test express (probe) et évaluations (scénarios, seuils)
 ├── brand/                    logo, lockups, favicon, bannière
 ├── brainstorm/               01 → 06 : les échanges de conception, figés
 └── docs/

@@ -1,4 +1,4 @@
-import { ConversationIdSchema, DraftIdSchema, newId } from '@nirvana/contracts';
+import { ConversationIdSchema, CustomAlertIdSchema, DraftIdSchema, newId } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { FAKE_TOKEN } from '../../__tests__/support/fake-telegram';
@@ -152,6 +152,27 @@ describe('reading the outbox', () => {
     });
   });
 
+  it('reads which alert of hers paused the agent, and lets a trigger it cannot read go', () => {
+    const alert = { kind: 'custom', id: newId(CustomAlertIdSchema) } as const;
+    const handoff = (trigger: unknown) =>
+      toScannedEvent({
+        ...base,
+        type: 'handoff_requested',
+        payload: { conversationId, cause: 'custom_alert', trigger },
+      })?.signal;
+    expect(handoff({ alert, matchedBy: 'keyword', keyword: 'appel' })).toEqual({
+      kind: 'handoff',
+      conversationId,
+      cause: 'custom_alert',
+      alert,
+    });
+    expect(handoff({ alert: { kind: 'other' } })).toEqual({
+      kind: 'handoff',
+      conversationId,
+      cause: 'custom_alert',
+    });
+  });
+
   it('reads the hand-back to the agent, with or without its conversation', () => {
     expect(
       toScannedEvent({ ...base, type: 'takeover_ended', payload: { conversationId, userId: 'u1' } }),
@@ -177,6 +198,27 @@ describe('reading the outbox', () => {
     expect(failed({ ...attempt, conversationId })).toBeNull();
   });
 
+  it('reads which alert rang when it was to go to Telegram, never how it matched nor the word', () => {
+    const alert = { kind: 'custom', id: newId(CustomAlertIdSchema) } as const;
+    const triggered = (payload: object) => toScannedEvent({ ...base, type: 'alert_triggered', payload });
+    const trigger = { alert, matchedBy: 'keyword', keyword: 'appel' };
+    expect(triggered({ conversationId, trigger, notify: true })?.signal).toEqual({
+      kind: 'alert',
+      conversationId,
+      alert,
+    });
+    expect(
+      triggered({
+        conversationId,
+        trigger: { alert: { kind: 'system', code: 'service_request' } },
+        notify: true,
+      })?.signal,
+    ).toEqual({ kind: 'alert', conversationId, alert: { kind: 'system', code: 'service_request' } });
+    // Off when it rang, or a row that does not say: nothing leaves.
+    expect(triggered({ conversationId, trigger, notify: false })).toBeNull();
+    expect(triggered({ conversationId, trigger })).toBeNull();
+  });
+
   it('keeps only the session changes that open or close a thread', () => {
     const session = (from: string, to: string) =>
       toScannedEvent({
@@ -197,6 +239,53 @@ describe('reading the outbox', () => {
         payload: { kind: 'alert', spentMinor: 1600, capMinor: 2000, currency: 'EUR', day: '2026-10-17' },
       }),
     ).toMatchObject({ signal: { kind: 'budget', threshold: 'alert' } });
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'backup_overdue',
+        payload: { lastSucceededAt: '2026-10-26T02:04:00.000Z', day: '2026-10-27' },
+      })?.signal,
+    ).toEqual({ kind: 'backup_overdue', lastSucceededAt: new Date('2026-10-26T02:04:00.000Z') });
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'backup_overdue',
+        payload: { lastSucceededAt: null, day: '2026-10-27' },
+      })?.signal,
+    ).toEqual({ kind: 'backup_overdue', lastSucceededAt: null });
+    // ADR 0033: the currency and the day of its last rate, nothing of the pay; `day` stays out.
+    const rate = (payload: object) =>
+      toScannedEvent({ ...base, type: 'exchange_rate_overdue', payload })?.signal;
+    expect(rate({ currency: 'USD', lastRateDay: '2026-10-23', day: '2026-10-28' })).toEqual({
+      kind: 'exchange_rate_overdue',
+      currency: 'USD',
+      lastRateDay: '2026-10-23',
+    });
+    expect(rate({ currency: 'USD', lastRateDay: null, day: '2026-10-28' })).toEqual({
+      kind: 'exchange_rate_overdue',
+      currency: 'USD',
+      lastRateDay: null,
+    });
+    expect(rate({ currency: 'usd<b>', lastRateDay: null, day: '2026-10-28' })).toBeUndefined();
+    // EQ-06: the period, the document and the reason; the member, the statement and the amount stay in Nirvana.
+    const notIssued = (payload: object) =>
+      toScannedEvent({ ...base, type: 'invoice_not_issued', payload })?.signal;
+    const invoice = {
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      statementId: '018f3e5c-0000-7000-8000-000000000002',
+      period: '2026-10-16',
+      document: 'invoice',
+      reason: 'identity_incomplete',
+      amountMinor: 12_345,
+    };
+    expect(notIssued(invoice)).toEqual({
+      kind: 'invoice_not_issued',
+      period: '2026-10-16',
+      document: 'invoice',
+      reason: 'identity_incomplete',
+    });
+    expect(notIssued({ ...invoice, reason: 'something_new' })).toBeUndefined();
+    expect(notIssued({ ...invoice, period: '2026-10-17' })).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

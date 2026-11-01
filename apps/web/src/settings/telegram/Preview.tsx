@@ -7,20 +7,26 @@ import { initials } from './model';
  * the first one arrives. Nothing here is real: no fan, no group of ours, no sale.
  */
 export function GroupPreview({
+  isOpen,
   group,
   heading,
   points,
   children,
 }: {
+  /** Folded once the groups have received real messages: the example then only takes room (recette du 29/10). */
+  isOpen: boolean;
   group: string;
   heading: string;
   points: readonly ReactNode[];
   children: ReactNode;
 }): JSX.Element {
   return (
-    <section>
-      <p className="tg-eyebrow">Ce que reçoit le groupe</p>
-      <div className="tg-preview">
+    <details className="nv-disclosure nv-plate" open={isOpen}>
+      <summary>
+        <span className="nv-disclosure__title">Voir un exemple de message</span>
+        <span className="nv-disclosure__sum">Ce que reçoit le groupe {group}</span>
+      </summary>
+      <div className="nv-disclosure__body tg-preview">
         <div className="tg-phone" role="img" aria-label={`Exemple de message dans ${group}`}>
           <div className="tg-phone__bar">
             <span className="tg-phone__av">{initials(group)}</span>
@@ -40,7 +46,7 @@ export function GroupPreview({
           </ul>
         </div>
       </div>
-    </section>
+    </details>
   );
 }
 

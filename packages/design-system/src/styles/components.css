@@ -125,7 +125,7 @@
 }
 .nv-glass.is-lit::after {
   --nv-light-r: 110px;
-  animation: nv-lit-in 360ms var(--nv-ease-out);
+  animation: nv-lit-in var(--nv-dur-base) var(--nv-ease-out);
 }
 @keyframes nv-lit-in {
   from {
@@ -370,6 +370,58 @@
   inset: calc((var(--nv-target-min) - 34px) / -2);
 }
 
+/* The round close of a sheet or a dialog: quiet (the neon stays on the action), 36px seen, 44px to touch. */
+.nv-close {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-close::after {
+  content: '';
+  position: absolute;
+  inset: calc((var(--nv-target-min) - 36px) / -2);
+}
+.nv-close:hover:not(:disabled) {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+  transform: rotate(90deg);
+}
+.nv-close:active:not(:disabled) {
+  transform: scale(0.9);
+  transition-duration: var(--nv-dur-instant);
+}
+.nv-close:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.nv-close:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.nv-close svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
 /* Keyboard hint inside a button or a help line: <kbd class="nv-kbd">a</kbd> */
 .nv-kbd {
   display: inline-grid;
@@ -387,6 +439,13 @@
   background: var(--nv-glass-fill-strong);
   box-shadow: inset 0 -1px 0 var(--nv-hairline);
   opacity: 0.85;
+}
+/* On the neon button the key is a lighter tint of the button itself: a white key cap on red, by day, read as pink on
+   pink. */
+.nv-btn--neon .nv-kbd {
+  background: color-mix(in srgb, var(--nv-on-neon) 22%, transparent);
+  box-shadow: none;
+  opacity: 1;
 }
 
 /* ───────────── Segmented control ───────────── */
@@ -799,8 +858,9 @@
 .nv-status--human {
   --_c: var(--nv-ink);
 }
+/* A failed send is a warning, as in « À traiter »: amber, never red, which stays for urgencies. */
 .nv-status--error {
-  --_c: var(--nv-danger);
+  --_c: var(--nv-warning);
 }
 .nv-status--sale {
   --_c: var(--nv-sale);
@@ -879,7 +939,7 @@
     0 0 / 300% 100%;
   animation:
     nv-bubble-in var(--nv-dur-slow) var(--nv-ease-spring) both,
-    nv-sheen 1.6s linear infinite;
+    nv-sheen var(--nv-dur-breathe) linear infinite;
 }
 @keyframes nv-sheen {
   from {
@@ -1116,9 +1176,10 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
+/* Declared (by the creator, by a rule): a solid neutral pill. Not neon: a fact is neither the action nor an urgency. */
 .nv-tag--declared {
-  background: var(--nv-neon-soft);
-  color: var(--nv-neon-ink);
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
 }
 .nv-tag--inferred {
   outline: 1px dashed var(--nv-ink-faint);
@@ -1178,7 +1239,7 @@
 .nv-stat__spark .nv-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: nv-draw 1100ms var(--nv-ease-out) forwards;
+  animation: nv-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
 }
 /* The one stat that matters most on the screen: lit by the neon, like the single neon button. */
 .nv-stat--hero {
@@ -1298,8 +1359,8 @@
 }
 .nv-island > * {
   transition:
-    opacity var(--nv-dur-base) var(--nv-ease-out) 120ms,
-    filter var(--nv-dur-base) var(--nv-ease-out) 120ms;
+    opacity var(--nv-dur-base) var(--nv-ease-out) calc(2 * var(--nv-stagger)),
+    filter var(--nv-dur-base) var(--nv-ease-out) calc(2 * var(--nv-stagger));
 }
 .nv-island.is-collapsed {
   width: 126px;
@@ -1470,10 +1531,10 @@
   box-shadow: var(--nv-shadow-lift);
 }
 
-/* Entrance: fade and rise 10px. Blocks of one screen pass --nv-i (0, 1, 2…) to come in 40ms apart. */
+/* Entrance: fade and rise 10px. Blocks of one screen pass --nv-i (0, 1, 2…) to come in one --nv-stagger apart. */
 .nv-enter {
   animation: nv-enter var(--nv-dur-slow) var(--nv-ease-spring) both;
-  animation-delay: calc(var(--nv-i, 0) * 50ms);
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
 }
 @keyframes nv-enter {
   from {
@@ -1566,7 +1627,7 @@
 /* ───────────── Charts ───────────── */
 
 /* A chart is drawn, never just shown: the line draws in (pathLength="1"), the area fades in after it,
-   bars grow from their base 40ms apart (--nv-i). Under the pointer: a cursor, a dot on the line and a
+   bars grow from their base one --nv-stagger apart (--nv-i). Under the pointer: a cursor, a dot on the line and a
    glass tip with the value; bars not hovered step back. Colors: --_c, default the neon (README). */
 .nv-chart {
   --_c: var(--nv-neon);
@@ -1600,7 +1661,7 @@
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--_c) 45%, transparent));
-  animation: nv-draw 1100ms var(--nv-ease-out) forwards;
+  animation: nv-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
 }
 /* The previous period, for comparison: dotted, quiet, no glow. */
 .nv-chart__line--past {
@@ -1614,14 +1675,14 @@
 .nv-chart__area {
   fill: var(--_c);
   fill-opacity: 0.14;
-  animation: nv-chart-fade 700ms 350ms var(--nv-ease-out) both;
+  animation: nv-chart-fade var(--nv-dur-slow) calc(6 * var(--nv-stagger)) var(--nv-ease-out) both;
 }
 .nv-chart__bar {
   fill: var(--_c);
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: nv-chart-grow 720ms var(--nv-ease-spring) both;
-  animation-delay: calc(var(--nv-i, 0) * 40ms);
+  animation: nv-chart-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
   transition:
     opacity var(--nv-dur-fast) var(--nv-ease-out),
     filter var(--nv-dur-fast) var(--nv-ease-out);
@@ -1855,8 +1916,8 @@
     0 0 18px var(--_c),
     0 0 4px var(--_c);
   transition:
-    background-color 300ms var(--nv-ease-out),
-    box-shadow 300ms var(--nv-ease-out);
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
 .nv-orb::after {
   content: '';
@@ -1886,7 +1947,7 @@
 /* Content that changes in place (a state sentence, a list re-rendered) comes in soft, never pops. */
 .nv-swap {
   animation: nv-swap var(--nv-dur-slow) var(--nv-ease-out) both;
-  animation-delay: calc(var(--nv-i, 0) * 60ms);
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
 }
 @keyframes nv-swap {
   from {
@@ -1933,9 +1994,9 @@
     background-color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring),
     opacity var(--nv-dur-base) var(--nv-ease-out),
-    max-height 420ms var(--nv-ease-out),
-    padding 420ms var(--nv-ease-out),
-    margin 420ms var(--nv-ease-out);
+    max-height var(--nv-dur-slow) var(--nv-ease-spring-smooth),
+    padding var(--nv-dur-slow) var(--nv-ease-spring-smooth),
+    margin var(--nv-dur-slow) var(--nv-ease-spring-smooth);
 }
 .nv-todo:hover {
   background: var(--nv-plate-hover);
@@ -2221,7 +2282,7 @@
   stroke: var(--_c);
   stroke-linecap: round;
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--_c) 45%, transparent));
-  transition: stroke-dasharray 1000ms var(--nv-ease-out);
+  transition: stroke-dasharray var(--nv-dur-data) var(--nv-ease-out);
 }
 .nv-ring__label {
   position: absolute;
@@ -2290,8 +2351,8 @@
   width: var(--nv-w, 0%);
   height: 100%;
   background: var(--_c);
-  animation: nv-split-grow 1000ms var(--nv-ease-out) both;
-  transition: width 1000ms var(--nv-ease-out);
+  animation: nv-split-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  transition: width var(--nv-dur-data) var(--nv-ease-out);
 }
 @keyframes nv-split-grow {
   from {
@@ -2315,8 +2376,8 @@
   opacity: 0;
   transform: translateY(6px) scale(0.98);
   transition:
-    opacity 160ms var(--nv-ease-out),
-    transform 260ms var(--nv-ease-spring);
+    opacity var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
 }
 .nv-tip.is-on {
   opacity: 1;
@@ -2405,10 +2466,10 @@
   /* Each step a little dimmer than the one before: the eye reads down the funnel. */
   opacity: calc(1 - var(--nv-i, 0) * 0.14);
   box-shadow: 0 0 18px color-mix(in srgb, var(--_c) 22%, transparent);
-  animation: nv-funnel-grow 1000ms var(--nv-ease-out) both;
-  animation-delay: calc(var(--nv-i, 0) * 90ms);
+  animation: nv-funnel-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
   transition:
-    width 1000ms var(--nv-ease-out),
+    width var(--nv-dur-data) var(--nv-ease-out),
     opacity var(--nv-dur-base) var(--nv-ease-out),
     box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
@@ -2539,5 +2600,9 @@
   .nv-tip,
   .nv-funnel__bar {
     transition-duration: 1ms;
+  }
+  .nv-close:hover:not(:disabled),
+  .nv-close:active:not(:disabled) {
+    transform: none;
   }
 }

@@ -1,0 +1,1175 @@
+/* Pay (EQ-05): Paie › Quinzaine, Relevés, Primes et malus, Objectifs, and the chatter's Commissions. What the
+   classes already there (nv-, rp-, tm-, sc-) lack: tokens only, no duration or colour written out. */
+
+.py-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  max-width: 980px;
+}
+/* A panel without a head (Relevés): its list as far from the top edge as from the bottom one. */
+.py-board > .nv-panel > .rp-sec:first-child {
+  padding-top: 22px;
+}
+
+/* ── The period on top: one figure leads, three at most beside it ── */
+.py-sum {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nv-space-5);
+  padding: var(--nv-space-5) var(--nv-space-6) var(--nv-space-6);
+}
+@media (max-width: 640px) {
+  .py-sum {
+    padding: var(--nv-space-4);
+  }
+}
+.py-sum__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.py-sum__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.py-sum__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nv-space-5);
+}
+@media (min-width: 960px) {
+  .py-sum__body {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
+    align-items: center;
+  }
+}
+.py-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+/* In the period's head, the hero's width is its column's: a long amount shrinks to it (below). */
+.py-sum .py-hero {
+  container-type: inline-size;
+}
+.py-hero__label {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.py-hero__value {
+  margin: 0;
+  font-size: var(--nv-text-hero);
+  line-height: var(--nv-text-hero-leading);
+  letter-spacing: var(--nv-text-hero-tracking);
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* A long amount (« 266 331,73 € ») shrinks to the width it has, and its block takes the whole row. */
+.py-hero .py-hero__value[data-long='true'] {
+  font-size: min(var(--nv-text-hero), 13cqi);
+  line-height: 1.05;
+}
+.py-sum__body:has(.py-hero__value[data-long='true']) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.py-hero__note {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.py-hero__note b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.py-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--nv-space-3);
+}
+@media (max-width: 640px) {
+  .py-figs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.py-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.py-fig:hover {
+  background: var(--nv-plate-hover);
+  transform: translateY(-1px);
+}
+.py-fig__label {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.py-fig__value {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.py-fig__note {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  text-wrap: pretty;
+}
+.py-fig .nv-gauge {
+  margin: 4px 0 2px;
+}
+
+/* The split of the sales: the design system's bar and legend (`nv-split`, `nv-legend`), the legend on one line. */
+.py-salesplit {
+  margin: 4px 0 2px;
+}
+.py-legend {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2px var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* On a phone the summary of a fold goes under its title, whole, rather than cut (as in Planning). */
+@media (max-width: 640px) {
+  .py-fold.nv-disclosure > summary {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .py-fold .nv-disclosure__title {
+    flex: 1;
+    min-width: 0;
+  }
+  .py-fold.nv-disclosure > summary::after {
+    order: 2;
+  }
+  .py-fold .nv-disclosure__sum {
+    order: 3;
+    flex-basis: 100%;
+    text-align: left;
+    white-space: normal;
+  }
+}
+.py-salesfold {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--nv-space-4);
+  padding: var(--nv-space-1) 14px var(--nv-space-2);
+}
+
+/* ── The members of the period ── */
+.py-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* A row opens its statement: the pointer says so; checked, it keeps the selection's fill under the pointer too. */
+.py-member {
+  cursor: pointer;
+}
+.py-member:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.py-member[data-nopick='true'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-left: var(--nv-space-4);
+}
+.py-member .rp-review__side {
+  min-width: 132px;
+}
+.py-member__line {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.py-member__line b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.py-member__role {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+}
+/* A row's amount says what it is beneath it: to pay, paid on a day, so far; and a carry-over, its total. */
+.py-member__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.py-member__amount small {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.py-member__refused {
+  grid-column: 2 / -1;
+  margin-top: var(--nv-space-1);
+}
+.py-member .nv-delta {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+}
+.py-member[aria-busy='true'] {
+  opacity: 0.6;
+}
+.py-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-1);
+}
+
+.py-quiet {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+
+/* The lock of a closed period: quiet, a padlock and who closed it. */
+.py-lock {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.py-lock svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--nv-ink-muted);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.py-notice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.py-notice-row .rp-notice__text {
+  max-width: 62ch;
+}
+/* Figures of a period pay could not compute: those of its last computation that passed, out of date. Faint, never
+   read as the truth; the notice above says why. */
+[data-stale='true'] .py-hero__value,
+[data-stale='true'] .py-fig__value,
+[data-stale='true'] .py-member__amount {
+  color: var(--nv-ink-faint);
+}
+
+/* ── A statement: the path of the money ── */
+.py-dialog {
+  max-width: 640px;
+}
+.py-dialog .tm-dialog__title h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.py-dialog .tm-dialog__title p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.py-dialog__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
+.py-dialog__hero .py-hero__value {
+  font-size: var(--nv-text-metric);
+  line-height: var(--nv-text-metric-leading);
+}
+.py-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.py-account {
+  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-2);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-account:hover {
+  background: var(--nv-plate-hover);
+}
+.py-account__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--nv-space-2);
+  margin: 0 0 var(--nv-space-2);
+}
+.py-account__name {
+  font-weight: 650;
+}
+.py-account__where {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+.py-flow {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 var(--nv-space-5);
+  list-style: none;
+}
+/* The thread the money runs along. */
+.py-flow::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 6px;
+  width: 1.5px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-hairline);
+}
+.py-flow > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--nv-space-3);
+  min-height: 30px;
+  padding: 4px 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.py-flow > li::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: calc(-1 * var(--nv-space-5) + 3px);
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-surface-raised);
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-faint);
+}
+.py-flow__label {
+  color: var(--nv-ink-muted);
+}
+.py-flow__op {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  white-space: nowrap;
+}
+.py-flow__amount {
+  min-width: 96px;
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.py-flow > li.py-flow__end .py-flow__label,
+.py-flow > li.py-flow__end .py-flow__amount {
+  color: var(--nv-ink);
+  font-weight: 680;
+}
+.py-flow > li.py-flow__end::before {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+@media (max-width: 520px) {
+  .py-flow > li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .py-flow__op {
+    grid-row: 2;
+    margin-top: -4px;
+  }
+}
+
+.py-lines {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+.py-lines > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--nv-space-3);
+  padding: 9px var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-lines > div:hover {
+  background: var(--nv-glass-fill);
+}
+.py-lines dt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.py-lines dt small {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.py-lines dd {
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.py-lines .py-lines__minus dd {
+  color: var(--nv-ink-muted);
+}
+.py-lines .py-lines__total {
+  margin-top: var(--nv-space-1);
+  border-top: 1px solid var(--nv-hairline);
+  border-radius: 0;
+  padding-top: var(--nv-space-3);
+}
+.py-lines .py-lines__total dt,
+.py-lines .py-lines__total dd {
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 700;
+}
+.py-lines .py-lines__carry dd,
+.py-lines .py-lines__carry dt > span {
+  color: var(--nv-warning);
+}
+.py-lines .py-lines__pay dt,
+.py-lines .py-lines__pay dd {
+  font-weight: 700;
+}
+
+.py-dialog__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+.py-dialog__foot .py-quiet {
+  flex: 1 1 100%;
+}
+.py-rules {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px var(--nv-space-4);
+  margin: 0;
+  padding: var(--nv-space-2) var(--nv-space-4) var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.py-rules dt {
+  color: var(--nv-ink-faint);
+}
+.py-rules dd {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+
+/* ── Forms (two steps): mark paid, add an entry ── */
+.py-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.py-form__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--nv-space-3);
+}
+@media (max-width: 520px) {
+  .py-form__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.py-form .nv-field__control {
+  width: 100%;
+}
+.py-form textarea.nv-field__control {
+  min-height: 72px;
+  padding-top: 10px;
+  resize: none;
+}
+.py-chiprow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.py-hint {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.py-hint[data-tone='warn'] {
+  color: var(--nv-warning);
+}
+.py-recap {
+  margin: 0;
+  padding: var(--nv-space-4) var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  text-wrap: pretty;
+}
+.py-recap b {
+  font-weight: 650;
+}
+
+/* ── Relevés: the periods ── */
+.py-periods {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.py-period {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--nv-space-1) var(--nv-space-4);
+  width: 100%;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.py-period__name {
+  display: block;
+  margin: 0;
+  font-weight: 650;
+}
+.py-period__sub {
+  display: block;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.py-period__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.py-period__amount small {
+  max-width: 18ch;
+  white-space: normal;
+  text-align: right;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+}
+.py-period__go {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-right: 1.5px solid var(--nv-ink-faint);
+  border-bottom: 1.5px solid var(--nv-ink-faint);
+  transform: rotate(-45deg);
+}
+@media (max-width: 560px) {
+  .py-period {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .py-period .rp-chip {
+    grid-column: 1;
+    justify-self: start;
+  }
+  .py-period__go {
+    display: none;
+  }
+}
+
+/* ── Primes et malus ── */
+.py-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-entry:hover {
+  background: var(--nv-plate-hover);
+}
+.py-entry__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.py-entry__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-weight: 650;
+}
+.py-entry__why {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.py-entry__by {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+.py-entry__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--nv-space-1);
+}
+.py-entry__amount {
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.py-entry[data-cancelled='true'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.py-entry[data-cancelled='true'] .py-entry__amount,
+.py-entry[data-cancelled='true'] .py-entry__why {
+  color: var(--nv-ink-faint);
+  text-decoration: line-through;
+}
+
+.py-entry .nv-confirm,
+.py-entry__refusal {
+  grid-column: 1 / -1;
+}
+.py-entry__ask {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.py-entry__refusal {
+  margin: 0;
+}
+
+/* ── Objectifs: a gauge with its tiers ── */
+.py-goal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.py-goal__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.py-goal__value {
+  margin: 0;
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.py-goal__value small {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+}
+.py-goal .nv-gauge {
+  height: 10px;
+}
+.py-ticks {
+  position: relative;
+  height: 34px;
+  margin: 0 0 var(--nv-space-1);
+  padding: 0;
+  list-style: none;
+}
+.py-ticks li {
+  position: absolute;
+  top: 0;
+  left: var(--py-at);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  white-space: nowrap;
+}
+.py-ticks li::before {
+  content: '';
+  width: 1.5px;
+  height: 6px;
+  margin-bottom: 2px;
+  background: var(--nv-ink-faint);
+}
+.py-ticks li[data-reached='true'] {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.py-ticks li[data-reached='true']::before {
+  background: var(--nv-ink);
+}
+.py-tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.py-tier {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.py-tier:hover {
+  background: var(--nv-plate-hover);
+  transform: translateY(-1px);
+}
+.py-tier__name {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.py-tier__bonus {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 680;
+}
+.py-tier__at {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+
+.py-goal__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.py-fold__body {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-2) var(--nv-space-4) var(--nv-space-3);
+}
+
+/* ── Tiers typed in a dialog: a row per tier, its fields side by side ── */
+.py-tierform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.py-tierrows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.py-tierrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.py-tierrow--wide {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+}
+.py-tierrow--head {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.py-tierrow--head > :last-child {
+  grid-column: span 2;
+}
+.py-tierrow__field,
+.py-money {
+  position: relative;
+  min-width: 0;
+}
+.py-tierrow__field .nv-field__control {
+  width: 100%;
+}
+.py-tierrow__field:has(.py-tierrow__suffix) .nv-field__control,
+.py-money .nv-field__control {
+  width: 100%;
+  padding-right: 30px;
+}
+.py-tierrow__suffix,
+.py-money__sign {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-faint);
+  pointer-events: none;
+}
+.py-tierrow[data-invalid='true'] .nv-field__control {
+  box-shadow: inset 0 0 0 1.5px var(--nv-warning);
+}
+.py-tierform__add {
+  align-self: flex-start;
+}
+.py-foot__aside {
+  margin-right: auto;
+}
+@media (max-width: 520px) {
+  .py-tierrow--wide {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  .py-tierrow--wide > :first-child {
+    grid-column: 1 / -1;
+  }
+  .py-tierrow--head.py-tierrow--wide {
+    display: none;
+  }
+}
+
+/* ── Commissions (chatter) ── */
+.py-me {
+  display: grid;
+  gap: var(--nv-space-4);
+  max-width: 980px;
+}
+@media (min-width: 1100px) {
+  .py-me {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .py-me > .py-me__wide {
+    grid-column: 1 / -1;
+  }
+}
+.py-me__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  min-width: 0;
+}
+.py-mehero {
+  padding: var(--nv-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.py-mehero__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.py-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-left:hover {
+  background: var(--nv-plate-hover);
+}
+.py-left__title {
+  margin: 0;
+  font-weight: 650;
+}
+.py-left__text {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.py-left__text b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.py-gaugelabels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+
+/* Empty states: the serif whisper, then what to do. */
+.py-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-10) var(--nv-space-6);
+  text-align: center;
+}
+.py-empty__whisper {
+  margin: 0;
+  max-width: 30ch;
+  font-family: var(--nv-font-serif);
+  font-style: italic;
+  font-size: var(--nv-text-whisper);
+  line-height: var(--nv-text-whisper-leading);
+  color: var(--nv-ink-muted);
+  text-wrap: balance;
+}
+.py-empty__text {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+
+/* A plate's own skeleton while the period loads: the shapes of what comes, breathing. */
+.py-skel {
+  display: grid;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-5) var(--nv-space-6);
+}
+.py-skel i {
+  display: block;
+  height: var(--py-h, 18px);
+  width: var(--py-w, 100%);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  animation: py-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes py-breathe {
+  to {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .py-skel i {
+    animation: none;
+  }
+}
+.py-member[data-nopick='true'] .py-member__refused {
+  grid-column: 1 / -1;
+}
+
+/* « Valider (n) »: in the header on a desk; on a phone, on the « Tout sélectionner » row, next to what it validates. */
+.py-allrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.nv-btn.py-validate--row {
+  display: none;
+}
+@media (max-width: 640px) {
+  .nv-btn.py-validate--head {
+    display: none;
+  }
+  /* The count is already on the line (« 4 sur 4 »), so the button says only « Valider » and fits beside it. */
+  .py-allrow {
+    column-gap: var(--nv-space-2);
+  }
+  .py-allrow .rp-all {
+    padding-right: var(--nv-space-1);
+  }
+  .nv-btn.py-validate--row {
+    display: inline-flex;
+  }
+}
+
+/* A row's name opens its statement from the keyboard too; the row's own click is the pointer's shortcut. */
+.py-member__open {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.py-member__open:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--nv-ink-faint);
+}
+.py-member__open:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
+
+/* A statement opened: its name and amount on top, its gestures at the bottom, only the path of the money scrolls in
+   between, and the glass behind the whole height. */
+.py-dialog:has(.py-read) {
+  overflow: hidden;
+}
+.py-read {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.py-read__scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  min-height: 0;
+  margin: 0 calc(-1 * var(--nv-space-2));
+  padding: 0 var(--nv-space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.py-read > .py-dialog__hero,
+.py-read > .py-dialog__foot {
+  flex: none;
+}
+
+/* On a phone a row without a box loses the empty column, and « Marquer payé » takes its own line, full width. */
+@media (max-width: 640px) {
+  .py-member:has(> span.rp-review__pick) {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: var(--nv-space-4);
+  }
+  .py-member > span.rp-review__pick {
+    display: none;
+  }
+  .py-member:has(> span.rp-review__pick) .rp-review__side,
+  .py-member[data-nopick='true'] .rp-review__side {
+    grid-column: 1;
+  }
+  .py-member .rp-review__side {
+    flex-wrap: wrap;
+  }
+  .py-member .py-member__amount {
+    align-items: flex-start;
+  }
+  .py-member .rp-review__side > .nv-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .py-member[data-nopick='true'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* What a penalty really takes, under its amount: « de son net, soit −100,00 € », « retenu −23,34 € (plafonné) ». */
+.py-entry__taken {
+  max-width: 24ch;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  text-align: right;
+  text-wrap: pretty;
+}
+
+/* Commissions: the period the hero's amount is for, beside its stage. */
+.py-mehero__period {
+  font-weight: 650;
+}
+.py-mehero__top {
+  justify-content: flex-start;
+}
+.py-mehero__top .py-quiet {
+  margin-left: auto;
+}

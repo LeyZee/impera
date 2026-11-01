@@ -1,5 +1,6 @@
 import { CurrencySchema } from '@nirvana/contracts';
-import { bigint, char, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigint, char, check, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { conversations, messages } from './conversations';
@@ -82,6 +83,7 @@ export const mediaSends = pgTable(
   },
   (t) => [
     enumCheck('media_sends', t.currency, CurrencySchema.options),
+    check('media_sends_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     index('media_sends_fan_media_idx').on(t.fanId, t.mediaAssetId),
     tenantPolicy(t.creatorId),
   ],

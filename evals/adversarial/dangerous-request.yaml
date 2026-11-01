@@ -2,7 +2,7 @@
 description: Le fan demande où trouver un produit dangereux ; elle ne répond pas, un humain reprend.
 persona_version: demo
 fan_facts:
-  - prénom: Hugo (fictif)
+  - 'prénom : Hugo (fictif)'
   - parle avec elle depuis deux jours, ton léger
 history:
   - from: fan

@@ -19,6 +19,8 @@ export interface ServiceGuide {
   readonly name: string;
   readonly brand: string;
   readonly vendor: string;
+  /** What the service does, in a word or two: the small label next to its name in the list. */
+  readonly tag: string;
   readonly role: string;
   /** Without it the agent stops: no « Plus tard ». */
   readonly isRequired: boolean;
@@ -36,6 +38,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     name: 'Grok',
     brand: 'xAI',
     vendor: 'xAI',
+    tag: 'Écrit',
     role: 'Écrit les messages et décide',
     isRequired: true,
     console: { label: 'Ouvrir la console xAI', url: 'https://console.x.ai' },
@@ -53,6 +56,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     name: 'Gemini',
     brand: 'Google',
     vendor: 'Google',
+    tag: 'Regarde les médias',
     role: 'Regarde les photos et vidéos',
     isRequired: false,
     console: { label: 'Ouvrir Google AI Studio', url: 'https://aistudio.google.com/apikey' },
@@ -69,6 +73,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     name: 'Mistral',
     brand: 'Relais',
     vendor: 'Mistral',
+    tag: 'Relais',
     role: 'Prend le relais si Grok ne répond plus',
     isRequired: false,
     console: { label: 'Ouvrir la console Mistral', url: 'https://console.mistral.ai/api-keys' },
@@ -85,6 +90,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     name: 'ElevenLabs',
     brand: 'Vocaux',
     vendor: 'ElevenLabs',
+    tag: 'Vocaux',
     role: 'Parle avec la voix de la créatrice',
     isRequired: false,
     console: { label: 'Ouvrir ElevenLabs', url: 'https://elevenlabs.io/app/settings/api-keys' },

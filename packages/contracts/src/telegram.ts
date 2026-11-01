@@ -15,8 +15,16 @@ export type TelegramBotId = z.infer<typeof TelegramBotIdSchema>;
 export const TelegramChatIdSchema = uuid.brand<'TelegramChatId'>();
 export type TelegramChatId = z.infer<typeof TelegramChatIdSchema>;
 
-/** One per tab topic; the three alert levels first (ADR 0020 §2). */
-export const TelegramTopicSchema = z.enum(['urgent', 'important', 'info', 'sale', 'keyword', 'validation']);
+/** One per tab topic; the three alert levels first (ADR 0020 §2). `custom`: her own alerts, one topic for all (P4-01). */
+export const TelegramTopicSchema = z.enum([
+  'urgent',
+  'important',
+  'info',
+  'sale',
+  'keyword',
+  'validation',
+  'custom',
+]);
 export type TelegramTopic = z.infer<typeof TelegramTopicSchema>;
 
 /** `refused`: Telegram turned the token down (revoked). `conflict`: another program reads the same token. */
@@ -29,6 +37,12 @@ export type TelegramChatKind = z.infer<typeof TelegramChatKindSchema>;
 export const TelegramMembershipSchema = z.enum(['member', 'left', 'kicked']);
 export type TelegramMembership = z.infer<typeof TelegramMembershipSchema>;
 
+/**
+ * `DELETE /v1/settings/telegram/chats/:id` (REG-28) while the bot still sits in the group (409): only a group it left
+ * (`left`) or was banned from (`kicked`) leaves the list.
+ */
+export const TELEGRAM_CHAT_MEMBER_CONFLICT = 'telegram_chat_member_conflict';
+
 /** Why Telegram or the shape check said no; each kind has exactly one French sentence (module `telegram`). */
 export const TelegramErrorKindSchema = z.enum([
   'token_shape',
@@ -40,6 +54,8 @@ export const TelegramErrorKindSchema = z.enum([
   'rate_limited',
   'unreachable',
   'routes_version_conflict',
+  /** A message still waiting when its group was removed from the list (REG-28): it never left. */
+  'chat_removed',
 ]);
 export type TelegramErrorKind = z.infer<typeof TelegramErrorKindSchema>;
 
@@ -126,7 +142,7 @@ export const TelegramDeliverySchema = z.object({
   status: TelegramDeliveryStatusSchema,
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
-  /** « Pris en main par Lucas », once someone took the conversation. */
+  /** « Pris en main par Théo », once someone took the conversation. */
   closedBy: z.string().min(1).nullable(),
 });
 export type TelegramDelivery = z.infer<typeof TelegramDeliverySchema>;

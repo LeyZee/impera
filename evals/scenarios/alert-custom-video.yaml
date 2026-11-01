@@ -1,0 +1,29 @@
+# Une alerte de la créatrice écrite en phrase (P4-01) : le cerveau la reconnaît sans mot-clé, et pas l'autre. Fan et messages fictifs (ADR 0010).
+description: Il demande une vidéo rien que pour lui, à son prénom ; le cerveau voit l'alerte « vidéo personnalisée » et pas celle du travail.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 72
+  age_confirmed: true
+alerts:
+  - name: video
+    phrase: Il demande une vidéo personnalisée, faite rien que pour lui
+  - name: job
+    phrase: Il dit qu'il a perdu son travail ou qu'il risque de le perdre
+history:
+  - from: fan
+    text: Je repense à ta dernière photo, t'es incroyable
+  - from: creator
+    text: Miiiii t'es mignon 😏
+inbound: Tu pourrais me tourner une petite vidéo où tu dis mon prénom ? Juste pour moi
+expect:
+  brief:
+    alerts_seen:
+      - video
+    intent_in:
+      - asks_for_service
+      - asks_for_media
+  voice:
+    bubbles_max: 4

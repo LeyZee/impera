@@ -1,0 +1,7 @@
+# 2026-10-28 — EQ-04 : les tables de la clôture d'une quinzaine (migration 0029) — in-progress
+Fait : migration 0029, la base de l'ADR 0032. `pay_period_closings` (net d'équipe, objectif tel qu'atteint, taux figés) et `pay_period_reports` (le registre, un rapport compté une fois), en ajout seul sous `FORCE ROW LEVEL SECURITY`. Déclencheurs : clôtures dans l'ordre et une fois la quinzaine finie, `closed_at` posé par la base ; rapport inscrit seulement dans la transaction de sa clôture, hors point de sauvegarde (`xmin`) ; validation d'un relevé liée à sa clôture ; quinzaines d'avant la première clôture fermées. `lockPayrollClose` (verrou `payroll.close`). Modèle de données, glossaire (Clôture de quinzaine, Rapport compté, Période ouverte, Taux de change), README du module et fiche à jour.
+Pas fait : le code de l'application (recalcul par job, lecture d'une quinzaine, validation, « payé », entrées sous verrou, taux), qui suit.
+Décisions : ADR 0032 acceptée par Charles le 28/10 à 16h27 ; la migration 0029 attendait cette acceptation pour être fusionnée. Les tests de 0028 passent en 2025, pour que leurs quinzaines soient finies, et clôturent avant de valider.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : `pnpm check` ✓, `pnpm --filter @nirvana/db drift` ✓, tests d'intégration de `packages/db` ✓ (dont `payroll-closing`, 3 tests, chaque garde prouvée par mutation : `xmin`, registre exact, ordre de la première clôture, quinzaine d'avant la première clôture, quinzaine d'origine du rapport).

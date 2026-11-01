@@ -6,7 +6,9 @@ import {
   type PlaygroundMedia as Media,
   type PlaygroundState,
   type RejectReason,
+  type Verdict,
 } from '@nirvana/contracts';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { MEDIA_KINDS } from './SetupPanel';
@@ -17,6 +19,7 @@ import {
   handoffReasons,
   isHandoff,
   MEDIA_FLAG_LABELS,
+  rejectedWords,
   type MediaKind,
   type Turn,
 } from './model';
@@ -31,6 +34,10 @@ export interface ConversationProps {
   readonly busy: boolean;
   readonly writing: boolean;
   readonly error: string | undefined;
+  /** A missing setting (no key) is a warning, amber; a failure stays red. */
+  readonly errorTone: 'warn' | 'bad';
+  /** The rating being filed as a lesson: the conversation shows what was decided while its destination is chosen. */
+  readonly lesson: Verdict | undefined;
   readonly comparison: Comparison | undefined;
   readonly onValidate: () => void;
   readonly onEdit: () => void;
@@ -56,21 +63,28 @@ export function Conversation(props: ConversationProps): JSX.Element {
   const { state, busy, writing } = props;
   const pending = state.pending;
   const draftAt = pendingIndex(state.history, pending);
-  const endRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const lastFan = state.history.findLastIndex((t) => t.from === 'fan');
   let fanCount = 0;
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
+    // The thread scrolls itself, never the page around it (on a phone the Playground's column scrolls too).
+    const thread = threadRef.current;
+    if (thread !== null) thread.scrollTop = thread.scrollHeight;
   }, [state.history.length, pending, props.mode, writing]);
 
   return (
-    <div className="pg-thread nv-scroll">
+    <div className="pg-thread nv-scroll" ref={threadRef}>
       <div className="nv-thread">
         {state.history.length === 0 && pending === null && !writing ? (
-          <Empty
-            opening={state.presets.find((p) => p.id === state.presetId)?.opening}
-            onSend={props.onSend}
-          />
+          state.voice.reachable ? (
+            <Empty
+              opening={state.presets.find((p) => p.id === state.presetId)?.opening}
+              onSend={props.onSend}
+            />
+          ) : (
+            <NoKey />
+          )
         ) : null}
         {state.history.map((turn, index) => {
           if (turn.from === 'fan') fanCount += 1;
@@ -81,6 +95,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
               key={index}
               turn={turn}
               canReplay={turn.from === 'fan' && !busy}
+              isLastFan={index === lastFan}
               onReplay={() => {
                 props.onReplay(n);
               }}
@@ -101,11 +116,10 @@ export function Conversation(props: ConversationProps): JSX.Element {
           </span>
         ) : null}
         {props.error === undefined ? null : (
-          <p role="alert" className="pg-error">
+          <p role="alert" className={`pg-error ${props.errorTone === 'warn' ? 'is-warn' : ''}`}>
             {props.error}
           </p>
         )}
-        <div ref={endRef} />
       </div>
     </div>
   );
@@ -139,13 +153,29 @@ function Empty({
   );
 }
 
+/** With no key nothing can be written: the empty state says so and leads to the setting, nothing invites a start. */
+function NoKey(): JSX.Element {
+  return (
+    <div className="pg-empty">
+      <p className="pg-empty__t">Ajoute une clé pour que l’agent réponde</p>
+      <p className="pg-empty__s">Aucune clé n’atteint le modèle de la voix : l’agent ne peut rien écrire.</p>
+      <Link to="/reglages/modeles-ia" className="nv-btn nv-btn--soft nv-btn--sm pg-empty__key">
+        Ouvrir Modèles IA
+      </Link>
+    </div>
+  );
+}
+
 function TurnView({
   turn,
   canReplay,
+  isLastFan,
   onReplay,
 }: {
   turn: Turn;
   canReplay: boolean;
+  /** On a phone only his last message offers to replay: a pill on every message is noise there. */
+  isLastFan: boolean;
   onReplay: () => void;
 }): JSX.Element {
   return (
@@ -153,7 +183,7 @@ function TurnView({
       {canReplay ? (
         <button
           type="button"
-          className="pg-m__re"
+          className={`pg-m__re ${isLastFan ? 'is-last' : ''}`}
           title="La conversation repart de ce message : une nouvelle réponse au même moment"
           onClick={onReplay}
         >
@@ -323,20 +353,25 @@ function Draft({
 
   const lines = answer.isBlocked ? answer.bubbles : bubblesOf(text);
   const blocking = answer.violations.filter((v) => v.severity === 'blocking');
+  const verdict = props.mode === 'lesson' ? props.lesson : undefined;
+  const why = blocking.length > 0 ? blocking.map((v) => v.label).join(', ') : (answer.failure ?? 'relecture');
+  const label = answer.isBlocked
+    ? `Bloquée avant envoi : ${why}`
+    : verdict === undefined
+      ? 'Proposée, à noter'
+      : 'Proposée';
+  const bubbleState = answer.isBlocked ? 'is-blocked' : verdict === undefined ? '' : 'is-set-aside';
   return (
     <div className="pg-draft">
-      <span className="nv-draft-label">{answer.isBlocked ? 'Bloquée avant envoi' : 'Proposée, à noter'}</span>
+      <span className={`nv-draft-label ${answer.isBlocked ? 'pg-blockr' : ''}`}>{label}</span>
       {lines.map((line, i) => (
-        <div key={i} className={`nv-bubble nv-bubble--draft ${answer.isBlocked ? 'is-blocked' : ''}`}>
+        <div key={i} className={`nv-bubble nv-bubble--draft ${bubbleState}`}>
           {line}
         </div>
       ))}
-      {answer.isBlocked ? (
+      {verdict === undefined ? null : <VerdictView verdict={verdict} state={props.state} />}
+      {verdict !== undefined ? null : answer.isBlocked ? (
         <>
-          <span className="pg-blockr">
-            Bloquée :{' '}
-            {blocking.length > 0 ? blocking.map((v) => v.label).join(', ') : (answer.failure ?? 'relecture')}
-          </span>
           <div className="pg-gest">
             <button
               type="button"
@@ -377,7 +412,7 @@ function Draft({
             Annuler
           </button>
         </div>
-      ) : props.mode === 'lesson' ? null : (
+      ) : (
         <div className="pg-gest">
           <button
             type="button"
@@ -407,6 +442,32 @@ function Draft({
       )}
     </div>
   );
+}
+
+/** What was decided, kept in view while its destination is chosen: her corrected version, or why it was rejected. */
+function VerdictView({ verdict, state }: { verdict: Verdict; state: PlaygroundState }): JSX.Element | null {
+  if (verdict.kind === 'corrected') {
+    return (
+      <>
+        <span className="nv-draft-label">Ta version</span>
+        {bubblesOf(verdict.text).map((line, i) => (
+          <div key={i} className="nv-bubble nv-bubble--draft">
+            {line}
+          </div>
+        ))}
+      </>
+    );
+  }
+  if (verdict.kind === 'rejected') {
+    const { reason, note } = rejectedWords(verdict, state.rejectReasons);
+    return (
+      <span className="pg-verdict">
+        Rejetée : {reason}
+        {note === null ? null : <span className="pg-verdict__note">{note}</span>}
+      </span>
+    );
+  }
+  return null;
 }
 
 /** After a correction or a rejection: where the lesson goes. One destination is proposed. */

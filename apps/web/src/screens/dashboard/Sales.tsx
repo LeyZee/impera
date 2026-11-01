@@ -7,7 +7,7 @@ import {
   placeSegmentThumb,
   ringDash,
 } from '@nirvana/design-system';
-import { useLayoutEffect, useRef, useState, type JSX } from 'react';
+import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { changePercent, chartTip, eur, leverView, sharePercent, signed, trendSeries } from './logic';
 import { PERIODS, type Lever, type Period, type Sales, type SalesSeries } from './model';
@@ -25,10 +25,16 @@ const AGAINST: Record<Period, string> = {
 };
 const RING_RADIUS = 28;
 
+/** Arrow keys of the radio group and the way they move (as Réglages › Apparence). */
+const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
 const formatEur = (value: number): string => eur(value);
 const formatPercent = (value: number): string => `${String(Math.round(value))} %`;
 
-/** The period control of the sales and of the fans' path: a segment whose thumb slides. */
+/**
+ * The period control of the sales and of the fans' path: a segment whose thumb slides. A radio group: one stop in the
+ * Tab order (the checked period), the arrows move and pick.
+ */
 export function PeriodControl({
   period,
   onChange,
@@ -54,8 +60,24 @@ export function PeriodControl({
     placed.current = true;
   }, [index]);
 
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const step = STEPS[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    const next = PERIODS[(index + step + PERIODS.length) % PERIODS.length];
+    if (next === undefined) return;
+    ref.current?.querySelector<HTMLButtonElement>(`[data-period="${next.id}"]`)?.focus();
+    onChange(next.id);
+  };
+
   return (
-    <div className="nv-seg nv-glass nv-glass--thin" role="radiogroup" aria-label="Période" ref={ref}>
+    <div
+      className="nv-seg nv-glass nv-glass--thin"
+      role="radiogroup"
+      aria-label="Période"
+      ref={ref}
+      onKeyDown={onKeyDown}
+    >
       <span className="nv-seg__thumb nv-glass nv-glass--thin" ref={thumbRef} aria-hidden="true" />
       {PERIODS.map((p) => (
         <button
@@ -63,7 +85,9 @@ export function PeriodControl({
           type="button"
           role="radio"
           className="nv-seg__opt"
+          data-period={p.id}
           aria-checked={p.id === period}
+          tabIndex={p.id === period ? 0 : -1}
           onClick={() => {
             onChange(p.id);
           }}

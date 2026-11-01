@@ -30,6 +30,15 @@ const probeRoutes: FastifyPluginAsyncZod = (app) => {
     { schema: { body: z.object({ name: z.string().min(1), count: z.number().int() }) } },
     (request) => ({ hello: request.body.name }),
   );
+  app.post(
+    '/probe-own-message',
+    {
+      schema: {
+        body: z.object({ day: z.number().refine((day) => day === 1 || day === 16, 'Un 1er ou un 16') }),
+      },
+    },
+    () => ({}),
+  );
   app.get('/missing', () => {
     throw new ConversationNotFound('conversation_not_found', 'Conversation introuvable');
   });
@@ -108,12 +117,28 @@ describe('error format (api.md)', () => {
     }>();
     expect(body.error.code).toBe('request_invalid');
     expect(body.error.requestId).toBe('req-400');
+    // Zod's own messages in French, like the rest of the body (recette 28/10).
     expect(body.error.details.fields).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ path: '/name' }),
-        expect.objectContaining({ path: '/count' }),
+        { path: '/name', message: 'Trop petit : chaîne de caractères doit avoir >=1 caractères' },
+        { path: '/count', message: 'Entrée invalide : entier attendu, nombre reçu' },
       ]),
     );
+  });
+
+  it('keeps the French message a schema writes itself', async () => {
+    const response = await (
+      await server()
+    ).inject({
+      method: 'POST',
+      url: '/v1/probe-own-message',
+      payload: { day: 31 },
+      headers: ORIGIN,
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json<{ error: { details: { fields: unknown[] } } }>().error.details.fields).toEqual([
+      { path: '/day', message: 'Un 1er ou un 16' },
+    ]);
   });
 
   it('accepts a valid body under /v1', async () => {
@@ -166,6 +191,22 @@ describe('error format (api.md)', () => {
     expect(response.json<{ error: { code: string } }>().error.code).toBe('route_not_found');
   });
 
+  it('answers a known path asked with another method with 405 and Allow', async () => {
+    const app = await server();
+    const deleted = await app.inject({ method: 'DELETE', url: '/v1/probe', headers: ORIGIN });
+    expect(deleted.statusCode).toBe(405);
+    expect(deleted.headers.allow).toBe('POST');
+    expect(deleted.json<{ error: { code: string } }>().error.code).toBe('method_not_allowed');
+    const posted = await app.inject({ method: 'POST', url: '/v1/missing?x=1', headers: ORIGIN });
+    expect([posted.statusCode, posted.headers.allow]).toEqual([405, 'GET, HEAD']);
+    // An unknown path stays a 404, whatever the method, preflight route or not.
+    const unknown = await app.inject({ method: 'PATCH', url: '/v1/nothing-here', headers: ORIGIN });
+    expect([unknown.statusCode, unknown.json<{ error: { code: string } }>().error.code]).toEqual([
+      404,
+      'route_not_found',
+    ]);
+  });
+
   it('maps the code suffixes to their status', () => {
     expect(statusForCode('fan_not_found')).toBe(404);
     expect(statusForCode('price_invalid')).toBe(400);
@@ -208,6 +249,10 @@ describe('HTTP protections (security.md §6)', () => {
       'http://localhost:5173',
     );
     expect((await preflight('https://evil.example')).headers['access-control-allow-origin']).toBeUndefined();
+    // Every method the API uses, not only CORS's default GET, HEAD and POST.
+    expect((await preflight('http://localhost:5173')).headers['access-control-allow-methods']).toBe(
+      'GET, HEAD, POST, PUT, PATCH, DELETE',
+    );
   });
 
   it('rate-limits per IP with the common error body', async () => {
@@ -292,5 +337,24 @@ describe('loadConfig', () => {
     const config = testConfig({ PLAYGROUND_PERSONA_PATH: '', NIRVANA_TRAINING_DIR: '' });
     expect(config.PLAYGROUND_PERSONA_PATH).toBeUndefined();
     expect(config.NIRVANA_TRAINING_DIR).toBeUndefined();
+  });
+});
+
+describe('route guards', () => {
+  it('refuses at startup a route that guards in preHandler, after the schema', async () => {
+    // Async so the refusal rejects the start; a plain plugin throws it out of `register` and stops the process.
+    const late: FastifyPluginAsyncZod = async (app) => {
+      await Promise.resolve();
+      app.get('/late', { preHandler: () => Promise.resolve() }, () => ({ ok: true }));
+    };
+    const config = testConfig();
+    await expect(
+      buildServer({
+        config,
+        logger: createLogger(config),
+        routes: [late],
+        readiness: () => Promise.resolve(READY),
+      }),
+    ).rejects.toThrow(/declare route guards as preValidation/);
   });
 });

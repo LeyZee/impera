@@ -10,6 +10,6 @@ describe('auth contracts', () => {
 
   it('describes the signed-in user without any token', () => {
     const user = { id: 'u1', email: 'owner@example.test', name: 'Owner', role: 'owner', creatorIds: [] };
-    expect(CurrentUserSchema.parse({ ...user, token: 'secret' })).toEqual(user);
+    expect(CurrentUserSchema.parse({ ...user, token: 'secret' })).toEqual({ ...user, routedCreatorIds: [] });
   });
 });

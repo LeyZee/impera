@@ -21,6 +21,13 @@ describe('conversation state machine', () => {
     expect(path).toEqual(['awaiting_approval', 'sending', 'idle']);
   });
 
+  it('drafts a follow-up from idle, never where a human, a pause or an error holds the conversation', () => {
+    expect(nextState('idle', 'create_draft')).toBe('awaiting_approval');
+    expect(nextState('paused', 'create_draft')).toBeNull();
+    expect(nextState('error', 'create_draft')).toBeNull();
+    expect(nextState('sending', 'create_draft')).toBeNull();
+  });
+
   it('refuses what the state does not allow', () => {
     expect(nextState('idle', 'approve')).toBeNull();
     expect(nextState('human', 'create_draft')).toBeNull();

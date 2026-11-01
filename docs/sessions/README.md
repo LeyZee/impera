@@ -6,7 +6,7 @@ Le projet avance par sessions. Une session = un agent (Claude Opus 5.5 dans Clau
 
 ### 1. Démarrage (10 min)
 
-- Lire `CLAUDE.md`, `docs/00-START-HERE.md`, ta fiche dans `docs/sessions/tasks/`, les docs qu'elle liste, et les 5 dernières entrées de journal (`docs/sessions/LOG.md` les indexe, le détail est dans `docs/sessions/log/`).
+- Lire `CLAUDE.md`, `docs/00-START-HERE.md`, ta fiche dans `docs/sessions/tasks/`, les docs qu'elle liste, et les 5 dernières entrées de journal (`pnpm sessions:log 5`, le détail est dans `docs/sessions/log/`).
 - Prérequis sur la machine : Node 22 (`.nvmrc`), pnpm 10, Docker, `gitleaks` sur le PATH.
 - Vérifier l'état : `git status` propre sur `main` à jour (`git fetch origin main`), `pnpm install` (installe les hooks), `docker compose up -d`, `pnpm check` vert. Si ce n'est pas vert avant de commencer, tu le notes dans ton entrée de journal et tu t'arrêtes : ce n'est pas à toi de réparer en passant, sauf si ta fiche le dit. Depuis le 16/10, `pnpm check`, `pnpm test` et la CI sont verts sur le squelette (seul `packages/design-system` a du code).
 - Créer la branche, en minuscules : `task/<id>-<slug>` (ex. `task/p0-03-database`, le nom exact est dans la fiche).
@@ -28,12 +28,12 @@ Le projet avance par sessions. Une session = un agent (Claude Opus 5.5 dans Clau
 2. Nettoyage selon `docs/conventions/hygiene.md`.
 3. Docs touchées par la tâche mises à jour (architecture, README de module, playbook).
 4. Fiche mise à jour : `status: done` ou `blocked` avec ce qui manque, et la section « Résultat ».
-5. Entrée de journal (format ci-dessous) dans son propre fichier, plus une ligne dans l'index.
+5. Entrée de journal (format ci-dessous) dans son propre fichier ; rien d'autre à toucher, le dossier est l'index.
 6. Branche rebasée sur `origin/main`, PR ouverte par la session (en brouillon dès que ça compile, « prête » quand tout est vert) avec le template, titre = id + titre de la fiche. La PR décrit « avant / après » en français simple. Charles fusionne.
 
 ## Format d'une entrée de journal
 
-Une entrée = un fichier `docs/sessions/log/<AAAA-MM-JJ>-<id-en-minuscules>.md` (ex. `2026-10-20-p0-03.md`), jamais modifié par une autre session, plus une ligne dans le tableau d'index de `docs/sessions/LOG.md`. Un fichier par session : deux sessions en parallèle ne se marchent pas dessus.
+Une entrée = un fichier `docs/sessions/log/<AAAA-MM-JJ>-<slug-en-minuscules>.md` (ex. `2026-10-20-p0-03.md`), jamais modifié par une autre session, dont la première ligne commence par `# <AAAA-MM-JJ>` (vérifié par `scripts/check-repo.mjs`). Le dossier est l'index : aucune session n'édite un fichier partagé, donc deux PR en parallèle n'entrent jamais en conflit sur le journal. Le tableau de `docs/sessions/LOG.md` est figé à ses 153 lignes du 27/10/2026, et `scripts/check-repo.mjs` refuse une ligne de plus. `pnpm sessions:log` liste les entrées dans l’ordre où elles sont entrées dans le dépôt (d’après git), la dernière d’abord.
 
 ```
 # 2026-10-20 — P0-03 Base de données — done

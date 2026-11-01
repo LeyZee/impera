@@ -6,6 +6,7 @@ import {
   MessageIdSchema,
   newId,
   queueNameFor,
+  resumeRunAt,
   type AgentMode,
   type AutomaticGate,
   type BlindTestResult,
@@ -19,7 +20,13 @@ import {
   type UserId,
 } from '@nirvana/contracts';
 
-import { AutomaticLocked, DraftGuarded, SendBlocked } from '../domain/errors';
+import {
+  AutomaticLocked,
+  CreatorNotFound,
+  DraftGuarded,
+  PersonaInactive,
+  SendBlocked,
+} from '../domain/errors';
 import type {
   BubbleGuard,
   Clock,
@@ -70,7 +77,8 @@ export interface ConversationCommands {
     input: Omit<ConversationCommand, 'userId'> & { draftId: DraftId; reason: string },
   ): Promise<void>;
   takeover(input: ConversationCommand & { reason?: string }): Promise<void>;
-  release(input: ConversationCommand): Promise<void>;
+  /** `note`: what the chatter wants her to remember about the fan, kept as an `operator_note` fact (P3-02). */
+  release(input: ConversationCommand & { note?: string }): Promise<void>;
   setMode(input: ConversationCommand & { mode: ConversationMode }): Promise<void>;
   /**
    * The Dashboard's control (Arrêt, Copilote, Automatique) for all her conversations. Returns the mode now in
@@ -109,6 +117,8 @@ export interface CommandDeps {
 
 const NEW_FAN_MESSAGE = 'Nouveau message du fan';
 const TAKEN_OVER = 'Conversation reprise par un humain';
+/** How far back the guards read what she already sent (P3-13): the conversation's last twenty messages. */
+const GUARD_HISTORY_MESSAGES = 20;
 
 /** Expires every draft still open: they answer a conversation that has moved on. */
 async function expireOpenDrafts(
@@ -241,6 +251,8 @@ export function createConversationCommands({
     },
 
     async approveDraft(input) {
+      // Her guards, from her active persona, read before the transaction: no second connection held inside it.
+      const herGuard = await guard.forCreator(input.creatorId);
       await uow.inTenant(input.creatorId, async (tx) => {
         const conversation = await lockConversation(tx, input.conversationId);
         const isEdited = input.bubbles !== undefined;
@@ -253,8 +265,17 @@ export function createConversationCommands({
         if (bubbles.length === 0 || bubbles.some((bubble) => bubble.trim() === '')) {
           throw new DomainError('draft_invalid', 'Le brouillon est vide');
         }
-        // Rewritten or not, what leaves passes the hard guards again: a chatter's words speak for her too.
-        const verdict = guard.check(bubbles);
+        // Rewritten or not, what leaves passes the hard guards again: a chatter's words speak for her too, read
+        // against what she already sent him (P3-13).
+        // Without her active persona, her guards cannot be read: nothing leaves (fail closed).
+        if (herGuard === null) throw new PersonaInactive();
+        const history = await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES);
+        const verdict = herGuard.check(bubbles, {
+          history: history.map((message) => ({
+            from: message.direction === 'inbound' ? 'fan' : 'creator',
+            text: message.text,
+          })),
+        });
         if (verdict.isBlocked) throw new DraftGuarded(verdict.codes);
         const meta = humanMeta(input);
         await appendEvent(
@@ -286,6 +307,20 @@ export function createConversationCommands({
           },
           { queueName: queueNameFor(conversation.id), maxAttempts: MAX_SEND_ATTEMPTS },
         );
+        // A human approved what the brief read about him: it becomes facts, on a queue of its own so the send
+        // never waits for it (P3-02).
+        if (draft.facts.length > 0) {
+          await tx.jobs.enqueue(
+            'conversation.record_facts',
+            {
+              creatorId: input.creatorId,
+              conversationId: conversation.id,
+              correlationId: input.correlationId,
+              source: { kind: 'draft', draftId: draft.id },
+            },
+            {},
+          );
+        }
       });
       await afterDecision(input.creatorId, input.correlationId);
     },
@@ -360,12 +395,25 @@ export function createConversationCommands({
     release(input) {
       return uow.inTenant(input.creatorId, async (tx) => {
         const conversation = await lockConversation(tx, input.conversationId);
+        const meta = humanMeta(input);
         await appendEvent(
           tx,
           conversation,
           { type: 'takeover_ended', payload: { conversationId: conversation.id, userId: input.userId } },
-          humanMeta(input),
+          meta,
         );
+        if (input.note !== undefined) {
+          await tx.jobs.enqueue(
+            'conversation.record_facts',
+            {
+              creatorId: input.creatorId,
+              conversationId: conversation.id,
+              correlationId: input.correlationId,
+              source: { kind: 'operator_note', note: input.note, at: meta.at.toISOString() },
+            },
+            {},
+          );
+        }
         await tx.audit.record({
           userId: input.userId,
           action: 'conversation.release',
@@ -396,7 +444,7 @@ export function createConversationCommands({
       const target = input.mode === 'auto' ? 'auto' : 'copilot';
       return uow.inTenant(input.creatorId, async (tx) => {
         // Two clicks in a row apply in the order they took the lock, and the later one stays the latest row.
-        await tx.switches.lockCreator();
+        if (!(await tx.switches.lockCreator())) throw new CreatorNotFound();
         // Automatique opens behind the server lock of ADR 0019, read under the creator's lock.
         if (input.mode === 'auto') await requireAutomaticOpen(tx, voice);
         const meta = humanMeta(input);
@@ -425,11 +473,17 @@ export function createConversationCommands({
         if (switches.creator && !stop && !switches.global) {
           // A fan who wrote during the stop was left `pending` (respond saw the switch and did nothing): each of
           // them gets an answer now, instead of waiting for the fan to write again (recette R-G2).
-          for (const id of await tx.conversations.idsInState('pending')) {
+          // One after the other, the longest wait first: a long stop does not wake them all at the same second.
+          const waiting = await tx.conversations.idsInState('pending');
+          for (const [index, id] of waiting.entries()) {
             await tx.jobs.enqueue(
               'conversation.respond',
               { creatorId: input.creatorId, conversationId: id, correlationId: input.correlationId },
-              { queueName: queueNameFor(id), jobKey: jobKeyFor('conversation.respond', id) },
+              {
+                queueName: queueNameFor(id),
+                jobKey: jobKeyFor('conversation.respond', id),
+                runAt: resumeRunAt(index, meta.at),
+              },
             );
           }
         }

@@ -4,13 +4,18 @@ import { z } from 'zod';
 export const UserRoleSchema = z.enum(['owner', 'operator', 'creator']);
 export type UserRole = z.infer<typeof UserRoleSchema>;
 
-/** `GET /v1/me`: who is signed in. Never carries the session token. */
+/**
+ * Who is signed in, as every route sees it. Never carries the session token. `creatorIds`: the creators whose every
+ * conversation, fan and figure the account reads. `routedCreatorIds`: the creators where it reads only the
+ * conversations routed to it (a team member whose scope is `self`, ADR 0024): their `creatorIds` are moved here.
+ */
 export const CurrentUserSchema = z.object({
   id: z.string().min(1),
   email: z.email(),
   name: z.string(),
   role: UserRoleSchema,
   creatorIds: z.array(z.uuid()),
+  routedCreatorIds: z.array(z.uuid()).default([]),
 });
 export type CurrentUser = z.infer<typeof CurrentUserSchema>;
 

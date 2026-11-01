@@ -6,10 +6,11 @@ import {
   ProviderStatusSchema,
   SaveProviderKeyBodySchema,
 } from '@nirvana/contracts';
-import type { FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { checkPastedKey } from '../application/connections';
 import type { ProvidersApi } from '../application/providers-api';
 import { nextAction } from '../domain/next-action';
 import type { KeyActor } from '../domain/ports';
@@ -28,11 +29,24 @@ function actorOf(request: FastifyRequest): KeyActor {
   return { userId: request.user?.id ?? null, ip: request.ip };
 }
 
+/**
+ * A key whose shape is plainly wrong (cut, or another service's) is refused before the password is asked: nothing is
+ * saved nor called either way, and the sign-in quota is not spent on it. A body the contract refuses is left to
+ * the route’s validation. Not a guard: it never lets anything through that the guards would stop.
+ */
+const refuseMalformedKey: preValidationAsyncHookHandler = async (request, reply) => {
+  const params = ProviderParamsSchema.safeParse(request.params);
+  const body = SaveProviderKeyBodySchema.safeParse(request.body);
+  if (!params.success || !body.success) return;
+  const checked = checkPastedKey(params.data.provider, body.data.key);
+  if (!checked.ok) await reply.code(422).send(checked.error);
+};
+
 export interface ProvidersRoutesOptions {
   /** `requireRole('owner')` (P0-07a): keys are an agency setting, nobody else reads or changes them. */
-  readonly guard: preHandlerAsyncHookHandler;
+  readonly guard: preValidationAsyncHookHandler;
   /** `requireRecentLogin` (ADR 0016): connecting, replacing or removing a key needs a sign-in under 10 minutes. */
-  readonly recentLogin: preHandlerAsyncHookHandler;
+  readonly recentLogin: preValidationAsyncHookHandler;
 }
 
 /**
@@ -44,7 +58,7 @@ export function createProvidersRoutes(
   options: ProvidersRoutesOptions,
 ): FastifyPluginAsyncZod {
   return (app) => {
-    app.addHook('preHandler', options.guard);
+    app.addHook('preValidation', options.guard);
 
     app.get('/settings/providers', { schema: { response: { 200: ProviderOverviewSchema } } }, async () => {
       const services = await providers.list();
@@ -54,7 +68,7 @@ export function createProvidersRoutes(
     app.put(
       '/settings/providers/:provider/key',
       {
-        preHandler: options.recentLogin,
+        preValidation: [refuseMalformedKey, options.recentLogin],
         config: providerCallLimit,
         schema: {
           params: ProviderParamsSchema,
@@ -92,7 +106,7 @@ export function createProvidersRoutes(
     app.delete(
       '/settings/providers/:provider',
       {
-        preHandler: options.recentLogin,
+        preValidation: options.recentLogin,
         schema: { params: ProviderParamsSchema, response: { 200: ProviderStatusSchema } },
       },
       (request) => providers.disconnect(request.params.provider, actorOf(request)),

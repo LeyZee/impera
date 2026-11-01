@@ -4,10 +4,17 @@ import {
   PlaygroundMessageBodySchema,
   PlaygroundRatingBodySchema,
   PlaygroundSituationBodySchema,
+  PlaygroundStateSchema,
   VerdictSchema,
 } from './playground';
 
 describe('playground contracts', () => {
+  it('names the persona it plays, never with an empty name', () => {
+    const persona = PlaygroundStateSchema.shape.persona;
+    expect(persona.parse({ name: 'Elena' })).toEqual({ name: 'Elena' });
+    expect(persona.safeParse({ name: '' }).success).toBe(false);
+  });
+
   it('takes a fan media as a kind and a few words, flags optional', () => {
     const body = PlaygroundMessageBodySchema.parse({
       text: 'Regarde',

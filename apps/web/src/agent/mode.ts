@@ -33,6 +33,8 @@ export const percent = (value: number): string =>
 export function missingRows(gate: AutomaticGate): [label: string, value: string][] {
   return gate.missing.map((condition): [string, string] => {
     switch (condition.kind) {
+      case 'active_persona':
+        return ['Persona', 'aucune version active'];
       case 'live_rate':
         return [
           'Taux en réel',
@@ -58,12 +60,13 @@ export function isSelectable(mode: AgentMode, gate: AutomaticGate): boolean {
 
 /**
  * The option the arrow keys move to from `from` (radio group pattern): the next selectable one in `step`
- * direction, wrapping around, skipping a closed Automatique.
+ * direction, skipping a closed Automatique. It stops at the edges instead of wrapping around: from Copilote, the
+ * left arrow would otherwise land on Arrêt and ask to stop the agent (recette 28/10, M6).
  */
 export function nextMode(from: AgentMode, step: 1 | -1, gate: AutomaticGate): AgentMode {
   const start = MODES.indexOf(from);
-  for (let offset = 1; offset <= MODES.length; offset++) {
-    const candidate = MODES[(start + step * offset + MODES.length * offset) % MODES.length];
+  for (let at = start + step; at >= 0 && at < MODES.length; at += step) {
+    const candidate = MODES[at];
     if (candidate !== undefined && isSelectable(candidate, gate)) return candidate;
   }
   return from;
@@ -79,12 +82,12 @@ export function pillOf(
   running = true,
 ): {
   readonly label: string;
-  readonly tone: 'ok' | 'bad' | 'unknown';
+  readonly tone: 'ok' | 'warn' | 'unknown';
   readonly live: boolean;
 } {
   switch (mode) {
     case null:
-      return { label: 'Inconnu', tone: 'unknown', live: false };
+      return { label: 'Injoignable', tone: 'unknown', live: false };
     case 'auto':
       return running
         ? { label: 'Automatique', tone: 'ok', live: true }
@@ -94,6 +97,7 @@ export function pillOf(
         ? { label: 'Copilote', tone: 'ok', live: true }
         : { label: 'Copilote', tone: 'unknown', live: false };
     case 'stop':
-      return { label: MODE_LABEL.stop, tone: 'bad', live: false };
+      // A stop is a state someone chose, not an alarm: amber, the red stays the urgencies' (NAV-06).
+      return { label: MODE_LABEL.stop, tone: 'warn', live: false };
   }
 }

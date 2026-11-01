@@ -44,3 +44,18 @@ Les écrans fonctionnels (inbox, conversation, fan, supervision) : ils arrivent 
 - Nouvelle direction publiée dans l'artefact du design system (même lien), avec le Dashboard maquetté sur bureau et téléphone, données d'exemple.
 - Fait dans `apps/web` : coquille (barre latérale flottante en verre, icônes seules entre 821 et 1 100 px, capsule d'onglets en bas sur téléphone, la page défile sous la barre), en-têtes et panneaux en plaques, Dashboard sans cartes de verre (héros posé sur le fond, sections séparées par l'espace), point d'Arrêt rouge seulement quand l'agent est arrêté (recette R-C3).
 - Reste : Créatrices, Entraîner (dont le `main` imbriqué du playground, recette R-C5), Suivi, Réglages, connexion (erreur en néon), une PR par onglet ; images du guide.
+
+2026-10-23 (suite de la refonte) :
+- Fait : Créatrices en plaques, alignée sur le titre, ambre pour ce qui reste à corriger, néon seulement sur « Enregistrer une version ».
+- Reste : Entraîner (dont le `main` imbriqué du playground, recette R-C5), Suivi, Réglages, connexion (erreur en néon), une PR par onglet ; images du guide.
+- Fait (demande de Charles du 23/10) : lueur du titre réservée à ce qui demande une action, un seul ressort (jetons `stagger` et `dur-data`, plus aucune durée en dur dans la coquille, le Dashboard et le Playground), thème Jour vérifié écran par écran.
+- Fait : Entraîner sur plaques, un seul `main` (recette R-C5), sélection neutre, ambre pour une mauvaise note. Reste : Suivi, Réglages, connexion (erreur en néon) ; images du guide.
+- Fait : Suivi, lecteur sur plaque, brouillon en teinte calme, non-lus sans néon. Reste : Réglages, connexion (erreur en néon) ; images du guide.
+- Fait : Réglages (Modèles IA, Telegram) sur plaques, alignés sur le titre, sélection neutre, ambre pour ce qui reste à régler. Reste : connexion (erreur en néon) ; images du guide.
+- Fait : connexion sur plaque, erreur en ambre, flamme du logo. Reste : images du guide.
+
+2026-10-25 (suite de la refonte) :
+- Fait : images du guide refaites depuis le CRM (Dashboard Nuit et Jour, Suivi, téléphone), palette et typographie rendues depuis `tokens.css`.
+- Reste : passe téléphone (Playground) ; choix du thème Jour, en attente de Charles.
+- Fait (choix de Charles du 25/10) : Réglages › Apparence, Nuit / Jour / Appareil, Nuit par défaut, gardé par le navigateur et posé avant le premier affichage. Reste : passe téléphone (Playground).
+- Fait : passe téléphone. Le Playground tient l'écran au-dessus de la barre d'onglets, champ en pied comme dans Messages ; le pourquoi, le fan et le taux viennent dessous, dans le défilement de la colonne. Le taux sous l'objectif n'a plus qu'un ton (ambre). Les onglets d'une section trop larges pour le téléphone défilent dans leur capsule, bord estompé. Reste : rien sur D-01.

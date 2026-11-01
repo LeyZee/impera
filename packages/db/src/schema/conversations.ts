@@ -2,6 +2,9 @@ import {
   ConversationModeSchema,
   ConversationStateSchema,
   CurrencySchema,
+  DESIRE_SCORE_MAX,
+  DESIRE_SCORE_MIN,
+  DesireBandSchema,
   DraftStatusSchema,
   EVENT_TYPES,
   MessageAuthorSchema,
@@ -24,6 +27,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
+import { user } from './auth';
 import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz, updatedAt } from './columns';
 import { fans } from './fans';
 import { personaVersions } from './persona';
@@ -55,14 +59,38 @@ export const conversations = pgTable(
     unreadCount: integer('unread_count').notNull().default(0),
     cooldowns: jsonb('cooldowns').notNull().default({}),
     activeScriptRunId: uuid('active_script_run_id'),
+    /**
+     * The team member this conversation is routed to (a `sale` handoff, EQ-08): a member whose scope is `self` reads
+     * and acts on a conversation of his creators only through this column (ADR 0024). Null: routed to nobody.
+     */
+    routedToUserId: text('routed_to_user_id').references(() => user.id),
+    /**
+     * The fan's desire score as of its last change (`desire_scored`, P3-12), its band, and when it was computed: the
+     * engine lets it cool from then on. Null until the engine first scores him.
+     */
+    desireScore: integer('desire_score'),
+    desireBand: enumText('desire_band'),
+    desireAt: timestampTz('desire_at'),
     updatedAt: updatedAt(),
   },
   (t) => [
     enumCheck('conversations', t.state, ConversationStateSchema.options),
     enumCheck('conversations', t.mode, ConversationModeSchema.options),
+    enumCheck('conversations', t.desireBand, DesireBandSchema.options),
+    check(
+      'conversations_desire_score_check',
+      sql`${t.desireScore} between ${sql.raw(String(DESIRE_SCORE_MIN))} and ${sql.raw(String(DESIRE_SCORE_MAX))}`,
+    ),
+    check(
+      'conversations_desire_together_check',
+      sql`(${t.desireScore} is null) = (${t.desireBand} is null) and (${t.desireScore} is null) = (${t.desireAt} is null)`,
+    ),
     unique('conversations_platform_conversation_unique').on(t.platformAccountId, t.platformConversationId),
     index('conversations_account_state_idx').on(t.platformAccountId, t.state),
     index('conversations_creator_last_inbound_idx').on(t.creatorId, t.lastInboundAt.desc()),
+    index('conversations_routed_to_idx')
+      .on(t.routedToUserId, t.updatedAt.desc())
+      .where(sql`${t.routedToUserId} is not null`),
     tenantPolicy(t.creatorId),
   ],
 );
@@ -141,6 +169,8 @@ export const messages = pgTable(
     enumCheck('messages', t.direction, MessageDirectionSchema.options),
     enumCheck('messages', t.author, MessageAuthorSchema.options),
     enumCheck('messages', t.currency, CurrencySchema.options),
+    // A price is what a fan pays, never a credit (the connectors' contracts already refuse one below zero).
+    check('messages_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     unique('messages_platform_message_unique').on(t.platformAccountId, t.platformMessageId),
     index('messages_conversation_created_idx').on(t.conversationId, t.platformCreatedAt.desc()),
     tenantPolicy(t.creatorId),
@@ -187,6 +217,8 @@ export const blindTests = pgTable(
       .references(() => creators.id),
     voicePrompt: text('voice_prompt').notNull(),
     voiceModel: text('voice_model').notNull(),
+    /** The persona active when the test was recorded: part of the version proved (ADR 0022); null without one. */
+    personaVersionId: uuid('persona_version_id').references(() => personaVersions.id),
     /** The rate « sans retouche » in tenths of a percent (800 = 80 %): no float on a threshold. */
     ratePerMille: integer('rate_per_mille').notNull(),
     recordedBy: text('recorded_by').notNull(),
@@ -194,7 +226,13 @@ export const blindTests = pgTable(
   },
   (t) => [
     check('blind_tests_rate_check', sql`${t.ratePerMille} between 0 and 1000`),
-    index('blind_tests_version_idx').on(t.creatorId, t.voicePrompt, t.voiceModel, t.recordedAt.desc()),
+    index('blind_tests_version_idx').on(
+      t.creatorId,
+      t.voicePrompt,
+      t.voiceModel,
+      t.personaVersionId,
+      t.recordedAt.desc(),
+    ),
     tenantPolicy(t.creatorId),
   ],
 );

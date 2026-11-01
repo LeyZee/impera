@@ -17,7 +17,7 @@ const dashboard = {
     missing: [{ kind: 'decided_drafts', value: 2, target: 100 }, { kind: 'blind_test' }],
   },
   liveRate: { rate: 84, target: 80, decided: 37, threeWeeksAgo: null },
-  reveal: { connected: true, lastReadAt: '2026-10-17T21:29:30.000Z', conversations: 42 },
+  reveal: { connected: true, lastReadAt: '2026-10-17T21:29:30.000Z', late: false, conversations: 42 },
   voice: { ok: true, keyMissing: false, medianWriteMs: 1400, outagesLast7d: 0 },
   jobs: { dead: 0 },
   replies: { medianReplyMinutes: 3.5, fansWaitingOver10Min: 1, conversationsOpen: 12 },
@@ -44,6 +44,7 @@ const dashboard = {
     {
       id: FAN,
       name: 'Julien',
+      conversationId: CONVERSATION,
       firstSeenAt: '2026-10-01T18:00:00.000Z',
       spent: 45,
       byAgent: 30,
@@ -51,6 +52,7 @@ const dashboard = {
       alert: 'minor',
     },
   ],
+  usdSales: { seen: true, rate: { day: '2026-10-27' } },
 };
 
 describe('dashboard contract', () => {
@@ -67,6 +69,17 @@ describe('dashboard contract', () => {
         ...dashboard,
         guards: { today: { minor: 1 }, telegramAlertsTonight: null },
       }).success,
+    ).toBe(false);
+  });
+
+  it('gives the ECB day of the dollar rate as a calendar day, or null when no rate is known', () => {
+    expect(DashboardSchema.parse(dashboard).usdSales.rate).toEqual({ day: '2026-10-27' });
+    expect(
+      DashboardSchema.parse({ ...dashboard, usdSales: { seen: true, rate: null } }).usdSales.rate,
+    ).toBeNull();
+    expect(
+      DashboardSchema.safeParse({ ...dashboard, usdSales: { seen: true, rate: { day: '27/10/2026' } } })
+        .success,
     ).toBe(false);
   });
 

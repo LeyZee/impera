@@ -1,0 +1,413 @@
+/*
+ * Réglages › Sauvegardes (EQ-17, ADR 0028). Built on the design-system tokens and nv-* classes; only what the package
+ * has no class for lives here, prefixed `bk-`. Content sits on plates; the dialog, which floats, is glass. A copy
+ * missing or unproven is amber, never red: the red stays the fans' urgencies (docs/design).
+ */
+
+.bk-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-5);
+}
+.bk-page > * {
+  flex-shrink: 0;
+}
+.bk-lede {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--nv-ink-muted);
+}
+.bk-eyebrow {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.bk-text {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.bk-meta {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.bk-self-start {
+  align-self: flex-start;
+}
+
+/* A state at a glance: green when proven, amber when not. */
+.bk-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-success) 18%, transparent);
+}
+.bk-dot[data-tone='warn'] {
+  background: var(--nv-warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-warning) 18%, transparent);
+}
+
+/* The nightly export: a strip, read first, quieter than the test below it. */
+.bk-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) var(--nv-space-5);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.bk-strip:hover {
+  transform: translateY(-1px);
+}
+.bk-strip > .bk-dot {
+  margin-top: 4px;
+}
+.bk-strip__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.bk-strip__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 600;
+  text-wrap: balance;
+}
+.bk-strip[data-tone='warn'] .bk-strip__title {
+  color: var(--nv-warning);
+}
+
+/* The restore test: the page's work, its title the largest line, its action the one neon. */
+.bk-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-5);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.bk-card:hover {
+  transform: translateY(-1px);
+}
+.bk-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.bk-card__title {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.bk-card[data-tone='warn'] .bk-card__title {
+  color: var(--nv-warning);
+}
+.bk-validity {
+  margin: 0;
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
+  background: var(--nv-fill-track);
+}
+.bk-how {
+  margin: var(--nv-space-1) calc(-1 * var(--nv-space-2)) 0;
+}
+.bk-steps {
+  margin: 0;
+  list-style: none;
+  counter-reset: bk-step;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.bk-steps li {
+  counter-increment: bk-step;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: var(--nv-space-2);
+  align-items: baseline;
+}
+.bk-steps li::before {
+  content: counter(bk-step);
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink);
+  background: var(--nv-fill-track);
+}
+
+/* Loading and failure. */
+.bk-skeleton {
+  height: 92px;
+  animation: nv-breathe 1.6s var(--nv-ease-out) infinite;
+}
+.bk-skeleton--tall {
+  height: 220px;
+}
+.bk-cover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-5);
+}
+.bk-cover__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+
+/* « Noter un essai »: a dialog in two steps, centred on a desk, from the bottom on a phone. */
+.bk-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--nv-space-4) max(var(--nv-space-4), env(safe-area-inset-right, 0px))
+    calc(var(--nv-space-4) + env(safe-area-inset-bottom, 0px))
+    max(var(--nv-space-4), env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: bk-fade var(--nv-dur-fast) var(--nv-ease-out) both;
+}
+@media (min-width: 700px) {
+  .bk-scrim {
+    align-items: center;
+  }
+}
+.bk-dialog {
+  --_radius: var(--nv-radius-xl);
+  width: 100%;
+  max-width: 540px;
+  max-height: calc(100% - 8px);
+  overflow: auto;
+  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  animation: bk-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.bk-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.bk-dialog__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.bk-dialog__title h2 {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.bk-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.bk-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  padding-top: var(--nv-space-2);
+}
+.bk-progress {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.bk-progress li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--nv-dur-slow) var(--nv-ease-out);
+}
+.bk-progress__num {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  background: var(--nv-glass-fill);
+  transition:
+    background-color var(--nv-dur-slow) var(--nv-ease-out),
+    color var(--nv-dur-slow) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.bk-progress li[data-state='now'] {
+  color: var(--nv-ink);
+}
+.bk-progress li[data-state='now'] .bk-progress__num {
+  background: var(--nv-ink);
+  color: var(--nv-void);
+  transform: scale(1.08);
+}
+.bk-progress li[data-state='done'] {
+  color: var(--nv-ink-muted);
+}
+.bk-progress li[data-state='done'] .bk-progress__num {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+}
+.bk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.bk-field .nv-field__control {
+  width: 100%;
+}
+.bk-field[data-invalid] .nv-field__control {
+  box-shadow: inset 0 0 0 1px var(--nv-warning);
+}
+.bk-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+}
+.bk-field .bk-when {
+  max-width: 300px;
+}
+.bk-mono,
+.bk-report {
+  font-family: var(--nv-font-mono);
+  font-size: var(--nv-text-footnote);
+}
+.bk-report {
+  resize: vertical;
+  min-height: 116px;
+}
+.bk-hint {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.bk-hint--error,
+.bk-hint--warn,
+.bk-warn {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.bk-warn {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.bk-password {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.bk-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  align-items: center;
+}
+.bk-inline .nv-field__control {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.bk-done {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+
+@media (max-width: 520px) {
+  .bk-card,
+  .bk-dialog {
+    padding: var(--nv-space-4);
+  }
+  .bk-strip {
+    padding: var(--nv-space-4);
+  }
+  .bk-dialog__foot .nv-btn {
+    min-height: 44px;
+  }
+}
+
+@keyframes bk-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes bk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-scrim,
+  .bk-dialog,
+  .bk-skeleton {
+    animation: none;
+  }
+  .bk-strip:hover,
+  .bk-card:hover {
+    transform: none;
+  }
+}
+
+/* « Relancer la sauvegarde maintenant » (REG-24): under the strip's last line, soft, never the page's neon. */
+.bk-run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-2);
+}
+
+/* Focus sent here by the page after a request: the ring for the keyboard only, as on any control. */
+.bk-strip__title:focus:not(:focus-visible),
+.bk-run-asked:focus:not(:focus-visible) {
+  outline: none;
+}

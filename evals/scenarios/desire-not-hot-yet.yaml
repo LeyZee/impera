@@ -1,0 +1,27 @@
+# Note de désir (P3-12) : un premier compliment ne fait pas un fan chaud. Fan et messages fictifs (ADR 0010).
+description:
+  Âge confirmé, bien après le KYC, aucune offre récente, mais il commence à peine à flirter (note 0) ;
+  même si le cerveau propose, la politique refuse l’offre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Gaspard (fictif)'
+  - 34 ans, confirmé
+situation:
+  known_hours: 60
+  age_confirmed: true
+  last_offer_hours_ago: null
+  desire: 0
+history:
+  - from: creator
+    text: Et toi, ta soirée ?
+inbound: Tranquille, mais t’es vraiment canon sur ta dernière photo 😏
+expect:
+  decision:
+    handoff: false
+    offer: false
+    desire_band_in:
+      - neutral
+      - playful
+  voice:
+    bubbles_max: 4

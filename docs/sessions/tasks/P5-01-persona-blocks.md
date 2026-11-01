@@ -1,0 +1,36 @@
+# P5-01 Persona par blocs, compteur de complétion et infos à collecter
+Statut : in_progress (ID validé par Charles le 27/10 à 20h37, carte « Les 5 sans capture, désir en tête »)
+Phase : 5
+Dépend de : écran Persona (`PROPOSED-persona-screen.md`), P0-08 (`PersonaSchema`), P3-02 (mémoire du fan)
+Branche : task/P5-01-persona-blocks
+
+## Objectif
+Remplacer le texte libre `additional_info` par des blocs guidés que l'agent lit mieux, montrer ce qui manque à la persona, et laisser Charles choisir ce que l'agent cherche à apprendre de chaque fan.
+
+## Contexte à lire
+`packages/contracts/src/persona.ts`, `docs/reference/persona-schema.md`, `PROPOSED-persona-screen.md`, `packages/llm/src/schemas.ts` (`FactCategory`), ADR 0010 et 0012, `docs/reference/desirely-analysis.md` (§ Persona).
+
+## Ce que fait Desirely
+Profil du modèle en sections : identité, apparence, mode de vie, goûts, personnalité, limites, style d'écriture (longueur, emojis, ponctuation, fautes voulues), exemples de réponses, avec un pourcentage de complétion. Notes du fan : une liste « Notes à collecter » réglable (prénom, âge, ville, métier, situation, goûts…), recopiées dans la note de la plateforme.
+
+## À faire
+- [x] Contrat (Bilan) : blocs `lifestyle`, `tastes`, `intimate`, `writing_style` (longueur, emojis préférés et interdits, ponctuation, majuscules), `sample_replies` (dix au plus, inventées pour les fixtures), chacun borné. C'est une nouvelle version du schéma de persona : les versions publiées existantes (`persona_versions`) continuent de se lire, par un parseur tolérant ou une migration de données qui écrit une nouvelle version, jamais par la réécriture d'une version publiée. `additional_info` reste lu le temps de cette transition puis disparaît dans une version suivante (ADR 0012).
+- [x] Compteur de complétion : une règle pure qui pèse chaque bloc ; aucun bloc n'est obligatoire et le compteur ne bloque pas l'activation, donc il ne prend aucune couleur. L'écran Persona l'affiche en jauge neutre avec le pourcentage en encre, et dessous la liste de ce qui manque, chaque ligne menant à son bloc.
+- [x] « Infos à collecter » (serveur ; reste la ligne de l'écran, Extension) : liste réglable par créatrice, rangée par `FactCategory` ; le cerveau la reçoit comme objectif de KYC (`strategies.kyc.targets`). Le Suivi montre ce qui manque pour ce fan sur une ligne neutre de la fiche du fan du lecteur, à côté de « Limites du fan » (#144) : « À apprendre : ville, métier » ; jamais dans chaque ligne de la liste.
+- [x] Écran (Extension) : les emojis préférés et interdits de `writing_style` sont des données, montrés dans leurs champs en pastilles neutres (la règle « pas d'emoji » vise les textes de l'interface) ; les réponses types sont une liste de champs avec « Ajouter », qui disparaît au dixième, et un aperçu en bulle de la créatrice (`neon-solid`) comme au playground.
+- [x] Les prompts lisent les blocs dans des sections délimitées ; aucune règle métier n'y entre (règle 3).
+
+## Critères d'acceptation
+- La persona `personas/demo` passe dans les blocs sans perte ; les évals de voix ne régressent pas.
+- Une version de persona publiée avant P5-01 se lit toujours, sans réécriture.
+- Aucune vraie donnée de créatrice dans le dépôt (ADR 0010).
+- Écran : Nuit et Jour, 1 440 et 400 px, mouvement réduit, état « Le serveur ne répond pas ».
+
+## Hors périmètre
+La persona réelle de Messa (chez Charles), les vocaux.
+
+## Notes de session
+- 28/10 (Agent, PR 1, forme validée par Bilan et Extension) : blocs `lifestyle`, `tastes`, `intimate`, `writing_style`, `sample_replies` dans `PersonaSchema`, tous facultatifs et sans défaut (le `contentHash` des versions publiées ne bouge pas, test épinglé sur `demo/v0.1.0` et `messalina/v0.0.0`) ; `meta.schema` reste 1, `additional_info` reste requis, `schema: 2` sera une ADR à part. Refus d'une persona contradictoire (emoji préféré et interdit, goût aimé et détesté, envie refusée par `limits`). `strategies.kyc.collect` (cases du canevas, ordre gardé), `kycSlotsToCollect`. `personaCompletion` (poids `PERSONA_BLOCK_WEIGHTS`, somme 100, `missing` dans l'ordre de `PERSONA_BLOCKS`), libellés `PERSONA_BLOCK_LABELS`, `PERSONA_OPTIONS.messageLength`, `.capitals`, `.kycSlots`. Côté agent : blocs en sections de la fiche, `kyc_collect` pour le cerveau (prompt 1.9.0), garde `forbidden_term` sur les emojis interdits, `sampleReplyFaults` refuse à l'enregistrement une réponse type qu'une garde dure bloquerait (422 `persona_sample_reply_unprocessable`). `personas/demo/v0.2.0.yaml` : la démo rangée en blocs, lue par défaut par le playground et les évals. Restent : l'écran des blocs et la jauge (Extension) ; « À apprendre » dans le Suivi, qui demande une donnée par fan des cases encore vides (API à poser avec Bilan, puis écran d'Extension) ; les évals de voix sur v0.2.0 avec une clé xAI.
+- 28/10 (Agent, PR 2) : « À apprendre » côté serveur. `GET /v1/fans/:id/kyc?creatorId=` rend `FanKycViewSchema` (`toLearn`, les cases de `strategies.kyc.collect` de sa persona sans fait actif de cette clé, dans son ordre ; `kycSlotsToLearn` dans `fans/domain/facts.ts`), propriétaire et chatteurs seulement, 404 pour un fan d'une autre créatrice. Le cerveau (prompt 1.10.0) donne à un fait qui remplit une case son code comme `key`. Reste : la ligne « À apprendre : … » de la fiche du fan dans le Suivi, à côté de « Limites du fan » (Extension, libellés `KYC_SLOT_LABELS`) ; l'écran des blocs et la jauge (Extension) ; les évals sur v0.2.0 avec une clé xAI.
+- 28/10 (Extension, PR écrans) : un onglet par bloc après « Détails » (Mode de vie, Goûts, Intime, Style d'écriture, Réponses types ; libellés `PERSONA_BLOCK_LABELS`), un bloc vidé de tout reste absent de la version. Style d'écriture : le premier choix crée le bloc depuis « messages courts, majuscules comme tout le monde », dit avant ; emojis dédoublonnés sans le sélecteur de variante ; « Effacer ce bloc ». Réponses types : situation et réponse, aperçu en bulle de la créatrice, « Ajouter » remplacé par une phrase au dixième. Jauge de complétude neutre dans l'en-tête, pourcentage en encre, « À compléter » mène à l'onglet du bloc ; les placeholders de l'exemple ne comptent pas. 422 `persona_sample_reply_unprocessable` : chaque réponse refusée porte « L'agent ne l'enverrait pas : … » (libellés des gardes), compté dans l'onglet, jusqu'à ce que le texte de cette réponse change ; un détail illisible reste un échec d'enregistrement. Stratégies › KYC : choix des lignes du canevas (`strategies.kyc.collect`) dans son ordre, une ligne ajoutée passant en dernier ; absent seulement pour toutes les lignes dans l'ordre du canevas. Une réponse type vide ne compte pas dans la jauge. Reste : la ligne « À apprendre » dans le Suivi (Extension), sur la route de #261.
+- 28/10 (Extension, PR « À apprendre ») : dans le lecteur du Suivi, sous « Limites du fan », une ligne neutre « À apprendre » suivie des lignes du canevas encore vides, dans l'ordre de sa persona (`GET /v1/fans/:id/kyc`, libellés `KYC_SLOT_LABELS`, relue toutes les 30 s). Rien quand tout est appris, pendant le chargement ou quand le serveur ne répond pas ; jamais demandée pour une créatrice (ADR 0023). Reste de la fiche : les évals sur v0.2.0 avec une clé xAI (Agent).

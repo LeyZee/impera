@@ -1,6 +1,7 @@
 import {
   CreatorIdSchema,
   newId,
+  PersonaVersionIdSchema,
   PlatformAccountIdSchema,
   type ConversationId,
   type CreatorId,
@@ -20,7 +21,9 @@ import {
 import { createFansModule } from '../modules/fans';
 
 /** Lets every bubble through: the guards themselves are tested in `agent` and `approval-guard`. */
-const PASS_GUARD = { check: () => ({ isBlocked: false, codes: [] }) };
+const PASS_GUARD = {
+  forCreator: () => Promise.resolve({ check: () => ({ isBlocked: false, codes: [] }) }),
+};
 const NO_LOG = { info: () => undefined, warn: () => undefined };
 
 type ComposeInput = Parameters<DraftComposer['compose']>[0];
@@ -107,13 +110,13 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     platformAccountId = newId(PlatformAccountIdSchema);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
     await test.admin.db
       .insert(schema.platformAccounts)
       .values({ id: platformAccountId, creatorId, platform: 'reveal', handle: 'composer' });
     conversations = createConversationsModule({
       db: test.app.db,
-      fans: createFansModule({ db: test.app.db }),
+      fans: createFansModule({ db: test.app.db, adminDb: test.admin.db }),
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
         sendMedia: () => Promise.reject(new Error('not used')),
@@ -155,6 +158,7 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       bubbles: ['Coucou toi', 'Je me pose'],
       guardTrace: { softViolations: ['emoji'] },
       promptHashes: { voicePrompt: '1.2.0', voiceModel: 'grok-4.7' },
+      personaVersionId: null,
     });
     expect(await state(id)).toBe('awaiting_approval');
   });
@@ -167,7 +171,7 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     expect(await state(id)).toBe('human');
     expect((await events(id)).at(-1)).toEqual({
       type: 'handoff_requested',
-      payload: { conversationId: id, cause: 'guard', reason: 'guard_blocked : meeting_promise' },
+      payload: { conversationId: id, cause: 'guard', detail: ['guard_blocked', 'meeting_promise'] },
     });
     const outbox = await test.admin.db
       .select()
@@ -204,6 +208,89 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       type: 'handoff_requested',
       payload: { conversationId: id, cause: 'distress' },
     });
+  });
+
+  it('journals her alerts: the one that paused on the handoff, each other as its own notice (P4-01)', async () => {
+    const id = await fanWrites('c-alerts', 'Tu me fais une vidéo perso ?');
+    const word = {
+      alert: { kind: 'system', code: 'keyword' },
+      matchedBy: 'keyword',
+      keyword: 'Vidéo perso',
+    } as const;
+    const service = { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'model' } as const;
+    composer.next = {
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'keyword',
+      trigger: word,
+      detail: ['alert_keyword'],
+      costUsd: 0,
+      alerts: [{ trigger: service, notify: true }],
+    };
+    await respond(id);
+    expect(await state(id)).toBe('human');
+    expect((await events(id)).slice(-2)).toEqual([
+      { type: 'alert_triggered', payload: { conversationId: id, trigger: service, notify: true } },
+      {
+        type: 'handoff_requested',
+        payload: {
+          conversationId: id,
+          cause: 'keyword',
+          detail: ['handoff', 'alert_keyword'],
+          trigger: word,
+        },
+      },
+    ]);
+  });
+
+  it('journals an alert that only lets a human know beside her draft', async () => {
+    const id = await fanWrites('c-notice', 'Tu fais des appels ?');
+    const service = { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'model' } as const;
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['On en reparle 😏'],
+      softViolations: [],
+      costUsd: 0,
+      alerts: [{ trigger: service, notify: false }],
+    };
+    await respond(id);
+    expect(await drafts(id)).toHaveLength(1);
+    expect((await events(id)).map((event) => event.type).slice(-2)).toEqual([
+      'alert_triggered',
+      'draft_created',
+    ]);
+  });
+
+  it('sounds each alert once until she answers, even when he writes again (P4-01)', async () => {
+    const id = await fanWrites('c-twice', 'Tu fais des appels ?');
+    const service = { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'model' } as const;
+    const doubt = { alert: { kind: 'system', code: 'identity_doubt' }, matchedBy: 'model' } as const;
+    composer.next = {
+      kind: 'held',
+      reason: 'no_reply',
+      detail: [],
+      costUsd: 0,
+      alerts: [{ trigger: service, notify: true }],
+    };
+    await respond(id);
+
+    await fanWrites('c-twice', 'T’es une vraie au moins ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Bien sûr 😏'],
+      softViolations: [],
+      costUsd: 0,
+      alerts: [
+        { trigger: service, notify: true },
+        { trigger: doubt, notify: true },
+      ],
+    };
+    await respond(id);
+    const sounded = (await events(id)).filter((event) => event.type === 'alert_triggered');
+    expect(sounded.map((event) => event.payload)).toEqual([
+      { conversationId: id, trigger: service, notify: true },
+      { conversationId: id, trigger: doubt, notify: true },
+    ]);
   });
 
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {
@@ -247,7 +334,7 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     expect(await state(broken)).toBe('human');
     expect((await events(broken)).at(-1)).toEqual({
       type: 'handoff_requested',
-      payload: { conversationId: broken, cause: 'llm_unavailable', reason: 'llm_unavailable' },
+      payload: { conversationId: broken, cause: 'llm_unavailable', detail: ['llm_unavailable'] },
     });
 
     const keyless = await fanWrites('c-keyless', 'Hello');
@@ -259,7 +346,8 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       payload: {
         conversationId: keyless,
         cause: 'llm_unavailable',
-        reason: 'llm_unavailable : no voice key',
+        // A chatter reads the cause in words; the codes stay in the journal, never as a reason.
+        detail: ['llm_unavailable', 'no voice key'],
       },
     });
   });
@@ -274,5 +362,30 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     composer.whileThinking = () => Promise.resolve();
     expect(await drafts(id)).toHaveLength(0);
     expect(await state(id)).toBe('pending');
+  });
+
+  it('stamps the draft with the persona active for her, the version Automatique is proved on (ADR 0022)', async () => {
+    const personaVersionId = newId(PersonaVersionIdSchema);
+    await test.admin.db.insert(schema.personaVersions).values({
+      id: personaVersionId,
+      creatorId,
+      version: 'test-1',
+      sourcePath: 'personas/example.yaml',
+      content: {},
+      contentHash: 'test',
+      isActive: true,
+      activatedAt: new Date(),
+    });
+    const id = await fanWrites('c-persona', 'Salut');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Coucou'],
+      softViolations: [],
+      costUsd: 0,
+      voice: { voicePrompt: '1.2.0', voiceModel: 'grok-4.7' },
+    };
+    await respond(id);
+    const [draft] = await drafts(id);
+    expect(draft?.personaVersionId).toBe(personaVersionId);
   });
 });

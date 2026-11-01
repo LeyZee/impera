@@ -28,7 +28,7 @@ export function apiDashboard(patch: Partial<ApiDashboard> = {}): ApiDashboard {
       ],
     },
     liveRate: { rate: 64.5, target: 80, decided: 37, threeWeeksAgo: null },
-    reveal: { connected: true, lastReadAt: '2026-10-19T11:59:46Z', conversations: 12 },
+    reveal: { connected: true, lastReadAt: '2026-10-19T11:59:46Z', late: false, conversations: 12 },
     voice: { ok: true, keyMissing: false, medianWriteMs: 3100, outagesLast7d: 0 },
     jobs: { dead: 0 },
     replies: { medianReplyMinutes: 1.7, fansWaitingOver10Min: 0, conversationsOpen: 9 },
@@ -44,6 +44,9 @@ export function apiDashboard(patch: Partial<ApiDashboard> = {}): ApiDashboard {
         keyword: 0,
         llm_unavailable: 0,
         other: 0,
+        custom_alert: 0,
+        identity_doubt: 0,
+        persona_inactive: 0,
       },
       telegramAlertsTonight: null,
     },
@@ -66,12 +69,14 @@ export function apiDashboard(patch: Partial<ApiDashboard> = {}): ApiDashboard {
       {
         id: '0192f3a0-0000-7000-8000-0000000000f2',
         name: 'Théo',
+        conversationId: CONVERSATION,
         firstSeenAt: '2026-09-14T12:00:00Z',
         spent: 120,
         byAgent: 80,
         notes: ['Infirmier de nuit'],
       },
     ],
+    usdSales: { seen: false, rate: null },
     ...patch,
   });
 }

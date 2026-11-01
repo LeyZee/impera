@@ -6,6 +6,7 @@ import { PasswordPrompt, SignInAgain } from './PasswordPrompt';
 import {
   disconnect,
   fetchOverview,
+  isForbidden,
   isSessionExpired,
   ReauthRequired,
   showError,
@@ -13,14 +14,16 @@ import {
   type ShownError,
 } from './api';
 import { GUIDES, isDashboardProvider, type DashboardProvider } from './guide';
-import { checkedAgo, dotOf, dotOfNext, segments, verifyNotice } from './view';
+import { checkedAgo, dotOf, dotOfNext, leadOf, shortStateOf, verifyNotice } from './view';
 import './services.css';
 
 /** The list refreshes on its own: a key revoked while the page is open turns red without a reload. */
 const REFRESH_MS = 30_000;
 
 type Load =
-  { kind: 'loading' } | { kind: 'failed'; error: ShownError } | { kind: 'ready'; overview: ProviderOverview };
+  | { kind: 'loading' }
+  | { kind: 'failed'; error: ShownError; isForbidden: boolean }
+  | { kind: 'ready'; overview: ProviderOverview };
 type Sheet = { provider: DashboardProvider; isReplace: boolean } | null;
 /** `warning`: nothing failed in Nirvana, the provider did not answer and the last verification stands. */
 type Notice = ShownError & { tone: 'error' | 'warning' };
@@ -61,7 +64,11 @@ export function ServicesSection(): JSX.Element {
     } catch (error) {
       if (ticket !== latest.current) return;
       const shown = showError(error);
-      setLoad((current) => (current.kind === 'ready' ? current : { kind: 'failed', error: shown }));
+      setLoad((current) =>
+        current.kind === 'ready'
+          ? current
+          : { kind: 'failed', error: shown, isForbidden: isForbidden(error) },
+      );
       // The list already on screen stays, but an expired session must not go unnoticed.
       if (isSessionExpired(error)) setNotice({ ...shown, tone: 'error' });
     }
@@ -129,10 +136,20 @@ export function ServicesSection(): JSX.Element {
     return (
       <section className="sv-page" aria-busy={load.kind === 'loading'}>
         {load.kind === 'failed' ? (
-          <div className="nv-glass sv-next">
-            <p className="sv-lead">L’état des clés n’a pas pu être lu</p>
-            <p className="sv-muted">{load.error.message}</p>
-            {load.error.isSessionExpired ? (
+          <div className="nv-plate sv-next">
+            <p className="sv-lead">
+              {load.isForbidden
+                ? 'Seul le propriétaire règle les modèles IA'
+                : load.error.isSessionExpired
+                  ? 'Ta session a expiré'
+                  : 'Le serveur ne répond pas'}
+            </p>
+            <p className="sv-muted">
+              {load.isForbidden || load.error.isSessionExpired
+                ? load.error.message
+                : 'L’état des clés n’a pas pu être lu. Réessaie dans un instant.'}
+            </p>
+            {load.isForbidden ? null : load.error.isSessionExpired ? (
               <SignInAgain />
             ) : (
               <button
@@ -155,51 +172,52 @@ export function ServicesSection(): JSX.Element {
   );
   const nextProvider = next.kind === 'all_set' ? null : next.provider;
   const nextDot = dotOfNext(next);
-  const connectedCount = segments(services).filter((s) => s === 'on').length;
 
   return (
     <section className="sv-page">
-      <div className="nv-glass sv-next" aria-live="polite">
+      <p className="sv-lede">
+        Chaque service a sa clé, vérifiée chez son fournisseur puis gardée chiffrée. Aucune ne se relit, même
+        ici.
+      </p>
+
+      <div className="nv-plate sv-next" aria-live="polite">
         <div className="sv-next__head">
           <span className="sv-dot sv-dot--big" data-dot={nextDot} />
           <div className="sv-next__text">
-            <p className="sv-lead">{next.lead}</p>
+            <p className="sv-lead">{leadOf(next, services)}</p>
             <p className="sv-muted">{next.detail}</p>
           </div>
           <NextButton next={next} onOpen={open} />
         </div>
-        <div
-          className="sv-bar"
-          role="img"
-          aria-label={`${String(connectedCount)} services sur ${String(services.length)} connectés`}
-        >
-          {segments(services).map((segment, index) => (
-            <i key={services[index]?.provider ?? index} data-segment={segment} />
-          ))}
-        </div>
       </div>
 
-      <div className="nv-glass sv-list">
+      <div className="nv-plate sv-list">
         {lines.map((status, index) => {
           const provider = status.provider;
           const guide = GUIDES[provider];
           const isVerifying = verifying === provider;
           const isNext = nextProvider === provider;
           const ago = checkedAgo(status.verifiedAt, now);
+          const isFromEnvironment = status.source === 'environment';
+          // The service the top explains says it in two words here: the full sentence is just above.
+          const short = isNext ? shortStateOf(status) : null;
           const line = isVerifying
             ? 'Vérification…'
-            : status.source === 'environment'
-              ? 'Clé lue depuis l’environnement de développement'
-              : status.state === 'connected' && ago !== null
-                ? `${status.message} · ${ago}`
-                : status.message;
+            : isFromEnvironment
+              ? 'Clé lue depuis l’environnement'
+              : (short ??
+                (status.state === 'connected' && ago !== null
+                  ? `${status.message} · ${ago}`
+                  : status.message));
           const isSaved = status.source === 'dashboard';
           return (
             <div className="sv-row" key={provider} style={{ animationDelay: `${String(index * 40)}ms` }}>
               <span className="sv-dot" data-dot={dotOf(status, isVerifying)} />
               <div className="sv-row__name">
                 {guide.name}
-                <small>{guide.brand}</small>
+                <small>{guide.tag}</small>
+                {/* Only outside production: a quiet chip, not a sentence about the server (REG-08). */}
+                {isFromEnvironment ? <span className="nv-tag sv-dev">Mode développement</span> : null}
               </div>
               <div className="sv-row__act">
                 {isSaved ? (
@@ -274,6 +292,7 @@ export function ServicesSection(): JSX.Element {
               {reauthFor === provider && sheet === null ? (
                 <div className="nv-confirm sv-confirm">
                   <PasswordPrompt
+                    lead={`Pour déconnecter ${guide.name}, confirme ton mot de passe.`}
                     onConfirmed={() => {
                       setReauthFor(null);
                       remove(provider);
@@ -290,10 +309,20 @@ export function ServicesSection(): JSX.Element {
                     <b>Déconnecter {guide.name} ?</b> {guide.offConsequence} La clé est effacée de Nirvana.
                     Chez {guide.vendor}, elle reste valide tant que tu ne la supprimes pas.
                   </p>
+                  {/* As every confirmation of Réglages: « Garder » first, the destructive action on the right. */}
                   <div className="nv-confirm__actions">
                     <button
                       type="button"
-                      className="nv-btn nv-btn--soft nv-btn--destructive"
+                      className="nv-btn nv-btn--soft nv-btn--sm"
+                      onClick={() => {
+                        setConfirming(null);
+                      }}
+                    >
+                      Garder
+                    </button>
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--soft nv-btn--destructive nv-btn--sm"
                       onClick={() => {
                         setConfirming(null);
                         setNotice(null);
@@ -301,15 +330,6 @@ export function ServicesSection(): JSX.Element {
                       }}
                     >
                       Déconnecter
-                    </button>
-                    <button
-                      type="button"
-                      className="nv-btn sv-btn--quiet"
-                      onClick={() => {
-                        setConfirming(null);
-                      }}
-                    >
-                      Annuler
                     </button>
                   </div>
                 </div>

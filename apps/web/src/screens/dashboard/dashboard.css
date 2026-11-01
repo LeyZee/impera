@@ -60,7 +60,8 @@
   z-index: -1;
   left: -80px;
   top: -150px;
-  width: 720px;
+  /* Never past the hero's right edge: on a phone the page would scroll sideways (recette 28/10, G5). */
+  width: min(720px, calc(100% + 80px));
   height: 420px;
   border-radius: 50%;
   background: radial-gradient(closest-side, color-mix(in srgb, var(--_c) 22%, transparent), transparent);
@@ -84,7 +85,22 @@
 .db-hero h1 em {
   font-style: normal;
   color: var(--_c);
+}
+/* Only what asks for a hand glows: a calm « tout va bien » stays quiet, and so does an agent at rest. */
+.db-hero[data-tone='warn'] h1 em,
+.db-hero[data-tone='bad'] h1 em {
   text-shadow: 0 0 28px color-mix(in srgb, var(--_c) 45%, transparent);
+}
+.db-hero[data-tone='ok'] .db-hero__glow,
+.db-hero[data-tone='idle'] .db-hero__glow {
+  opacity: 0.45;
+}
+/* By day a coloured halo behind dark ink reads as a stain: the glow fades and the words stay plain. */
+:root[data-theme='light'] .db-hero__glow {
+  opacity: 0.35;
+}
+:root[data-theme='light'] .db-hero h1 em {
+  text-shadow: none;
 }
 .db-hero__lead {
   margin: 8px 0 0;
@@ -209,7 +225,7 @@
   align-self: center;
 }
 .db-lever .nv-stat__spark path:first-child {
-  animation: nv-chart-fade 700ms 350ms var(--nv-ease-out) both;
+  animation: nv-chart-fade var(--nv-dur-slow) calc(6 * var(--nv-stagger)) var(--nv-ease-out) both;
 }
 
 /* ── Level 2 bis: the fans' path ── */
@@ -222,6 +238,14 @@
 .db-fans {
   --_radius: 26px;
   padding: 8px;
+}
+/* How the dollars were counted: a footnote under the list, never a warning. */
+.db-fans__note {
+  margin: var(--nv-space-2) 0 0;
+  padding: 0 4px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
 }
 .db-fan {
   appearance: none;
@@ -257,9 +281,8 @@
   font-size: 12px;
   line-height: 16px;
   color: var(--nv-ink-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Short, and allowed to wrap on a phone rather than be cut (DASH-27). */
+  text-wrap: pretty;
 }
 .db-fan__spent {
   min-width: 8.5ch;
@@ -289,7 +312,7 @@
   color: var(--nv-ink);
 }
 
-/* ── Reader (read only). Overlays are portalled to the body; `.nv-glass` would make them relative, hence the doubled selectors. ── */
+/* ── The veil of the stop dialog. Overlays are portalled to the body; `.nv-glass` would make them relative, hence the doubled selectors. ── */
 .db-scrim {
   position: fixed;
   inset: 0;
@@ -305,84 +328,10 @@
   opacity: 1;
   pointer-events: auto;
 }
-.db-reader.nv-glass {
-  --_radius: 30px;
-  position: fixed;
-  z-index: 21;
-  top: calc(var(--db-gap, 16px) + env(safe-area-inset-top, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
-  width: min(440px, calc(100vw - 32px));
-  display: flex;
-  flex-direction: column;
-  transform: translateX(calc(100% + 40px));
-  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+/* Just closed, fading: it still catches a click, so that a double click does not reach the page under it. */
+.db-scrim.is-closing {
+  pointer-events: auto;
 }
-.db-reader.nv-glass.is-on {
-  transform: none;
-}
-.db-reader__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 16px 12px;
-  border-bottom: 1px solid var(--nv-hairline);
-}
-.db-reader__head .db-fan__who {
-  flex: 1;
-}
-.db-reader__notes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--nv-hairline);
-}
-.db-reader__notes .nv-tag {
-  background: var(--nv-glass-fill);
-  color: var(--nv-ink-muted);
-  animation: nv-swap var(--nv-dur-base) var(--nv-ease-out) both;
-  animation-delay: calc(var(--nv-i, 0) * 50ms);
-}
-.db-reader__alert {
-  background: color-mix(in srgb, var(--nv-danger) 18%, transparent);
-  color: var(--nv-ink);
-}
-.db-reader__body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px;
-}
-.db-reader__body .nv-thread {
-  gap: 6px;
-}
-.db-flag {
-  align-self: stretch;
-  margin: 6px 0;
-  padding: 9px 12px;
-  border-radius: 12px;
-  font-size: 12.5px;
-  line-height: 18px;
-  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
-}
-.db-flag b {
-  color: var(--nv-warning);
-}
-.db-reader__foot {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 16px 16px;
-  border-top: 1px solid var(--nv-hairline);
-}
-.db-reader__foot p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 17px;
-  color: var(--nv-ink-faint);
-}
-
 @media (max-width: 1100px) {
   .db-sales {
     grid-template-columns: minmax(0, 1fr);
@@ -449,6 +398,20 @@
   gap: 10px;
   min-width: 0;
 }
+/* Whose agent: the chips of Créatrices, on their own line above, scrolling sideways when they are many. */
+.db-creators {
+  flex-basis: 100%;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+  margin: -2px;
+}
+.db-creators .nv-chip {
+  flex: none;
+}
 .db-mode .nv-seg__opt {
   height: 36px;
   display: inline-flex;
@@ -501,7 +464,9 @@
 }
 .db-dialog ul {
   margin: 0;
-  padding-left: 18px;
+  /* Bullets, hung in the margin so that the text lines up with the paragraph's (DASH-28). */
+  list-style: disc outside;
+  padding-left: 1.1em;
   font-size: 13px;
   line-height: 20px;
   color: var(--nv-ink-muted);
@@ -527,7 +492,7 @@
 .db-loading {
   min-height: 220px;
   border-radius: var(--nv-radius-lg);
-  animation: db-breathe 1.6s ease-in-out infinite;
+  animation: db-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
 }
 @keyframes db-breathe {
   50% {
@@ -555,4 +520,151 @@
   padding: 18px 20px;
   border-radius: var(--nv-radius-lg);
   color: var(--nv-ink-muted);
+}
+/* The owner's banner on the daily export: amber, a copy is missing, not an urgency (the red stays the urgencies'). */
+.db-backup {
+  --_c: var(--nv-warning);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--nv-space-3);
+  align-items: center;
+  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-3);
+}
+.db-backup__orb {
+  width: var(--nv-space-10);
+  height: var(--nv-space-10);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--_c);
+  background: color-mix(in srgb, var(--_c) 14%, transparent);
+}
+.db-backup__orb svg {
+  width: var(--nv-space-5);
+  height: var(--nv-space-5);
+}
+.db-backup__body {
+  min-width: 0;
+}
+.db-backup__title {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.db-backup__text {
+  margin: var(--nv-space-1) 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+
+/* A best fan the account cannot open in Suivi: the same row, without the chevron's column. */
+div.db-fan {
+  grid-template-columns: auto minmax(0, 1.1fr) minmax(0, 1fr) auto;
+}
+@media (max-width: 1100px) {
+  div.db-fan {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+/* Past 10 min of waiting, the line's time turns amber, as the fold counts him (DASH-11). */
+.nv-todo__time[data-late] {
+  color: var(--nv-warning);
+}
+/* More lines than the Dashboard shows: one way to all of them in Suivi (DASH-12). */
+.db-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-decoration: none;
+}
+.db-more:hover {
+  color: var(--nv-ink);
+}
+/* The sales, until Reveal's purchases are observed: one quiet line, no block (DASH-02). */
+.db-salesnote {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+/* A creator's mode, read only: the pill alone, nothing that looks like a control (DASH-21). */
+.db-modepill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0 var(--nv-space-3);
+  height: 36px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.db-modepill__who {
+  font-weight: 400;
+  color: var(--nv-ink-faint);
+}
+/* Another creator's urgencies, on her chip: red, they are urgencies (DASH-03). */
+.db-creators__grave {
+  margin-left: var(--nv-space-2);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--nv-radius-full);
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  font-size: 10px;
+  font-weight: 700;
+  /* The bar's counts' own colours: the neon is the red of the urgencies. */
+  color: var(--nv-on-neon);
+  background: var(--nv-neon-solid);
+}
+@media (max-width: 560px) {
+  .db-backup {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .db-backup__go {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+/*
+ * One neon on the Dashboard, the agent's sales curve (DASH-20): the fans' path fills in the data colour, fainter step
+ * after step; the agent's share ring takes the data colour too; a fall is amber, the red stays the urgencies'.
+ */
+.db-funnel .nv-funnel__step:not(.nv-funnel__step--break) .nv-funnel__bar {
+  --_c: var(--nv-data-1);
+  background: color-mix(in srgb, var(--_c) calc(100% - var(--nv-i, 0) * 14%), transparent);
+  box-shadow: none;
+}
+.db-funnel .nv-funnel__step:not(.nv-funnel__step--break):hover .nv-funnel__bar {
+  box-shadow: none;
+}
+.db .nv-ring {
+  --_c: var(--nv-data-1);
+}
+.db .nv-delta--worse {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+}
+/* The others' urgencies could not be read: said under the chips, in amber, not left silent. */
+.db-creators__unread {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-warning);
+}
+/* Empty, it stays out of the wrapped row: no gap where nothing is said. */
+.db-creators__unread:empty {
+  position: absolute;
 }

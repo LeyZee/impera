@@ -40,7 +40,8 @@ export interface PlaygroundClient {
 /** The voice the comparison asks for: the fallback of the voice role (ADR 0017), to see if it holds up. */
 export const COMPARE_MODEL = 'mistral-large-latest';
 
-export type PlaygroundErrorCode = 'llm_unavailable' | 'not_deployed' | 'still_writing' | 'failed';
+export type PlaygroundErrorCode =
+  'llm_unavailable' | 'not_deployed' | 'still_writing' | 'forbidden' | 'failed';
 
 /** What went wrong, said plainly on screen. `message` is the server's own French sentence, when it gave one. */
 export class PlaygroundError extends Error {
@@ -62,6 +63,8 @@ async function errorOf(response: Response): Promise<PlaygroundError> {
   if (response.status === 404 && (code === undefined || code === 'route_not_found')) {
     return new PlaygroundError('not_deployed');
   }
+  // The server keeps the playground to the owner: a refusal, not an outage.
+  if (response.status === 403) return new PlaygroundError('forbidden');
   if (code === 'llm_unavailable' || response.status === 503) return new PlaygroundError('llm_unavailable');
   if (code === 'answer_in_progress_conflict') return new PlaygroundError('still_writing');
   return new PlaygroundError('failed', parsed.success ? parsed.data.error.message : undefined);

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ExternalMediaSchema } from './connector';
+import { DesireBandSchema, DesireScoreSchema, DesireSignalSchema, DESIRE_SIGNALS_MAX } from './desire';
 import {
   ConversationModeSchema,
   ConversationStateSchema,
@@ -26,6 +28,13 @@ export function pageOf<T extends z.ZodType>(
   return z.object({ items: z.array(item), nextCursor: z.string().nullable() });
 }
 
+/**
+ * His desire score as the tracking screens show it (P3-12): already cooled to the time of the answer (`desireNow`) and
+ * its band taken from that cooled score, so the screen computes nothing. `null` while no `desire_scored` exists yet.
+ */
+export const ConversationDesireSchema = z.object({ score: DesireScoreSchema, band: DesireBandSchema });
+export type ConversationDesire = z.infer<typeof ConversationDesireSchema>;
+
 export const ConversationSummarySchema = z.object({
   id: ConversationIdSchema,
   fanId: FanIdSchema,
@@ -36,6 +45,7 @@ export const ConversationSummarySchema = z.object({
   lastOutboundAt: z.iso.datetime().nullable(),
   unreadCount: z.number().int().min(0),
   updatedAt: z.iso.datetime(),
+  desire: ConversationDesireSchema.nullable(),
 });
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
 
@@ -51,15 +61,32 @@ export type DraftView = z.infer<typeof DraftViewSchema>;
 export const ConversationDetailSchema = ConversationSummarySchema.extend({
   /** Drafts still waiting for a decision or being sent, oldest first. */
   openDrafts: z.array(DraftViewSchema),
+  /**
+   * While the conversation is in `error`: the draft whose send failed for good, so that a person reads what did not
+   * leave and sends it in Reveal. `null` otherwise.
+   */
+  failedDraft: DraftViewSchema.nullable(),
 });
 export type ConversationDetail = z.infer<typeof ConversationDetailSchema>;
+
+/**
+ * One media of a message, as Suivi shows it (SUIVI-26): its kind and lock as the platform listed it, and what it shows
+ * (`MediaDescription.factualDescription`) once the `media` module described and kept it, `null` before. No thumbnail:
+ * Nirvana keeps no picture of a message's media.
+ */
+export const MessageMediaViewSchema = ExternalMediaSchema.pick({ kind: true, isLocked: true }).extend({
+  description: z.string().min(1).nullable(),
+});
+export type MessageMediaView = z.infer<typeof MessageMediaViewSchema>;
 
 export const MessageViewSchema = z.object({
   id: MessageIdSchema,
   direction: MessageDirectionSchema,
   author: MessageAuthorSchema,
   text: z.string(),
-  priceMinor: z.number().int().nullable(),
+  /** Its media, in the platform's order; none for a text. */
+  media: z.array(MessageMediaViewSchema),
+  priceMinor: z.number().int().min(0).nullable(),
   currency: CurrencySchema.nullable(),
   isPaid: z.boolean(),
   draftId: DraftIdSchema.nullable(),
@@ -73,6 +100,26 @@ export const ConversationEventViewSchema = z.intersection(
 );
 export type ConversationEventView = z.infer<typeof ConversationEventViewSchema>;
 
+/** At most this many points in the reader's desire curve: the most recent ones. */
+export const DESIRE_POINTS_MAX = 200;
+
+/**
+ * One point of the reader's desire curve: one `desire_scored` event. `before` is the stored score cooled to this
+ * message (`null` on the first point); the cooling between two messages reads as the gap between a point's `score` and
+ * the next one's `before`.
+ */
+export const DesirePointSchema = z.object({
+  at: z.iso.datetime(),
+  before: DesireScoreSchema.nullable(),
+  score: DesireScoreSchema,
+  signals: z.array(DesireSignalSchema).max(DESIRE_SIGNALS_MAX),
+});
+export type DesirePoint = z.infer<typeof DesirePointSchema>;
+
+/** `GET /conversations/:id/desire`: the points, oldest first. */
+export const DesireCurveSchema = z.object({ points: z.array(DesirePointSchema).max(DESIRE_POINTS_MAX) });
+export type DesireCurve = z.infer<typeof DesireCurveSchema>;
+
 /** Bodies of the dashboard's commands. */
 export const ApproveDraftBodySchema = z.object({
   /** Present when the operator edited the bubbles before approving. */
@@ -80,4 +127,6 @@ export const ApproveDraftBodySchema = z.object({
 });
 export const RejectDraftBodySchema = z.object({ reason: z.string().trim().min(1).max(500).optional() });
 export const TakeoverBodySchema = z.object({ reason: z.string().trim().min(1).max(500).optional() });
+/** `note`: what the chatter wants her to remember about the fan, kept as an `operator_note` fact (P3-02), one line. */
+export const ReleaseBodySchema = z.object({ note: z.string().trim().min(1).max(300).optional() });
 export const SetModeBodySchema = z.object({ mode: ConversationModeSchema });

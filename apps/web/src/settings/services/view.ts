@@ -18,19 +18,40 @@ function isFromEnvironment(status: ProviderStatus): boolean {
   return status.source === 'environment';
 }
 
-export type Segment = 'on' | 'bad' | 'off';
+/** A service that can write in Grok's place: Mistral, then Venice. */
+const RELAYS = ['mistral', 'venice'] as const;
+const RELAY_NAMES: Record<(typeof RELAYS)[number], string> = { mistral: 'Mistral', venice: 'Venice' };
 
-/** One segment per service in the progress bar under the next action. */
-export function segments(services: readonly ProviderStatus[]): Segment[] {
-  return services.map((s) =>
-    isFromEnvironment(s)
-      ? 'on'
-      : s.state === 'needs_reconnect'
-        ? 'bad'
-        : s.state === 'not_connected'
-          ? 'off'
-          : 'on',
-  );
+const isWorking = (status: ProviderStatus): boolean =>
+  isFromEnvironment(status) || status.state === 'connected' || status.state === 'low_credit';
+
+/**
+ * The title at the top. Grok's key refused says what it means for the agent, from the states on the same page:
+ * without a working relay the agent writes no more; with one, the relay writes instead (recette du 29/10, REG-02).
+ * Any other action keeps the server's words.
+ */
+export function leadOf(next: ProviderNextAction, services: readonly ProviderStatus[]): string {
+  if (next.kind !== 'replace_key' || next.provider !== 'xai') return next.lead;
+  const grok = services.find((s) => s.provider === 'xai');
+  const relay = RELAYS.find((provider) => services.some((s) => s.provider === provider && isWorking(s)));
+  if (relay === undefined) {
+    const why =
+      grok?.isUnreadable === true ? 'Nirvana ne peut plus lire la clé de Grok' : 'xAI refuse la clé de Grok';
+    return `L’agent n’écrit plus : ${why} et aucun relais n’est branché.`;
+  }
+  return grok?.isUnreadable === true
+    ? next.lead
+    : `xAI refuse la clé. ${RELAY_NAMES[relay]} écrit à la place de Grok.`;
+}
+
+/**
+ * The line of the service the top already explains, in two words: the full sentence is in the title just above
+ * (REG-04). `null`: the row keeps its own line.
+ */
+export function shortStateOf(status: ProviderStatus): string | null {
+  if (status.state === 'low_credit') return 'Crédit bas';
+  if (status.state !== 'needs_reconnect') return null;
+  return status.isUnreadable ? 'Clé illisible' : 'Clé refusée';
 }
 
 /** The label of the sheet's last button: the next service still to connect, or « Terminé ». */
@@ -77,13 +98,16 @@ export function dotOfNext(next: ProviderNextAction): Dot {
 
 /**
  * « Vérifier maintenant » answers with the status as it stands. When the provider could not be reached, the
- * server keeps the last verification: same `verifiedAt`. The page says so instead of saying nothing.
+ * server keeps the last verification: same `verifiedAt`. The page says so instead of saying nothing. A key Nirvana
+ * can no longer decrypt is never sent: the provider was not called, and the notice says what to do instead.
  */
 export function verifyNotice(
   provider: DashboardProvider,
   before: ProviderStatus,
   after: ProviderStatus,
 ): string | null {
+  if (after.isUnreadable)
+    return `Nirvana ne peut plus lire la clé enregistrée : ${GUIDES[provider].vendor} n’a pas été contacté. Colle la clé à nouveau.`;
   // Every answer of the provider, a refusal included, moves `verifiedAt` (domain/credential.ts on the API).
   if (before.verifiedAt !== after.verifiedAt) return null;
   return `${GUIDES[provider].vendor} n’a pas répondu. L’état affiché est celui de la dernière vérification.`;

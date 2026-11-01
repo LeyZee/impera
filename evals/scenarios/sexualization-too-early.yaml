@@ -1,0 +1,27 @@
+# Majeur confirmé mais abonné depuis une heure, il devient explicite : elle ralentit, sans rien d’explicite ni d’offre. Fan et messages fictifs (ADR 0010).
+description: Il va trop vite avant le minimum de KYC ; elle le recadre avec douceur, dans sa voix, et revient sur lui.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Théo (fictif)'
+situation:
+  known_hours: 1
+  age_confirmed: true
+history:
+  - from: fan
+    text: Salut toi
+  - from: creator
+    text: Coucou ✨ tu fais quoi de beau
+inbound: Rien, je pense à toi toute nue dans mon lit
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b
+      - \b(sucer|baiser|jouir|bite|chatte|nue?s?)\b
+      - \b(pack|vidéo privée|contenu privé|€|euros?)\b

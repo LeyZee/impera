@@ -4,7 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-import { CreatePersonaVersionBodySchema, PersonaOverviewSchema } from './persona-api';
+import {
+  CreatePersonaVersionBodySchema,
+  PERSONA_ERROR_CODES,
+  PersonaOverviewSchema,
+  PersonaSampleReplyUnprocessableDetailsSchema,
+} from './persona-api';
 
 const demo = (): unknown =>
   parse(readFileSync(fileURLToPath(new URL('../../../personas/demo/v0.1.0.yaml', import.meta.url)), 'utf8'));
@@ -36,5 +41,20 @@ describe('persona API contract', () => {
     expect(
       PersonaOverviewSchema.safeParse({ ...overview, versions: [{ ...summary, version: 'v1' }] }).success,
     ).toBe(false);
+  });
+
+  it('gives every error code a suffix that sets its status (api.md)', () => {
+    for (const code of PERSONA_ERROR_CODES) {
+      expect(code).toMatch(/_(not_found|conflict|unprocessable)$/u);
+    }
+  });
+
+  it('reads a refused sample reply by its place and guard code, never its text', () => {
+    const details = (faults: unknown) => PersonaSampleReplyUnprocessableDetailsSchema.safeParse({ faults });
+    expect(details([{ index: 1, code: 'stage_direction' }]).success).toBe(true);
+    expect(details([]).success).toBe(false);
+    expect(details([{ index: 10, code: 'stage_direction' }]).success).toBe(false);
+    expect(details([{ index: 0, code: 'unknown_guard' }]).success).toBe(false);
+    expect(details([{ index: 0, code: 'stage_direction', reply: 'Coucou' }]).success).toBe(false);
   });
 });

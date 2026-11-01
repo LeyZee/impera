@@ -1,0 +1,916 @@
+/* Équipe › Membres (EQ-01) : la liste, la fiche, l'ajout (docs/design/README.md, « Listes », « Finition d'un écran »). */
+
+/* Two columns from tablet up: the list on the left, the member on the right. On a phone, one at a time. */
+.tm-layout {
+  display: grid;
+  gap: var(--nv-space-4);
+  width: 100%;
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .tm-layout {
+    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+  }
+}
+.tm-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+@media (max-width: 899px) {
+  .tm-is-reading .tm-side {
+    display: none;
+  }
+}
+
+/* Nothing open on a wide screen: the right column says what it is for instead of staying blank. */
+.tm-pick {
+  display: none;
+}
+@media (min-width: 900px) {
+  .tm-pick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--nv-space-1);
+    min-height: 320px;
+    padding: var(--nv-space-5);
+    border-radius: var(--nv-radius-lg);
+    box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+    text-align: center;
+  }
+}
+.tm-pick__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.tm-pick__text {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+
+/* The search and the tabs: one row on a wide side, stacked when narrow. */
+.tm-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--nv-space-2);
+  align-items: center;
+}
+@media (max-width: 420px) {
+  .tm-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.tm-search {
+  --_radius: var(--nv-radius-full);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  height: 44px;
+  padding: 0 var(--nv-space-4);
+  border-radius: var(--nv-radius-full);
+  cursor: text;
+  transition: box-shadow var(--nv-dur-fast) var(--nv-ease-out);
+}
+.tm-search:hover {
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.tm-search:focus-within {
+  box-shadow: var(--nv-shadow-focus);
+}
+.tm-search svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  transition: stroke var(--nv-dur-fast) var(--nv-ease-out);
+}
+.tm-search:focus-within svg {
+  stroke: var(--nv-ink);
+}
+.tm-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: var(--nv-ink);
+  font: inherit;
+  font-size: var(--nv-text-callout);
+  outline: none;
+}
+.tm-search input::placeholder {
+  color: var(--nv-ink-faint);
+}
+.tm-search input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+.tm-seg {
+  position: relative;
+  flex: none;
+}
+.tm-count {
+  margin-left: 6px;
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-seg__opt[aria-checked='true'] .tm-count {
+  color: var(--nv-ink-muted);
+}
+
+.tm-panel {
+  width: 100%;
+  padding: var(--nv-space-2);
+}
+.tm-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tm-list > li:nth-child(2) {
+  --nv-i: 1;
+}
+.tm-list > li:nth-child(3) {
+  --nv-i: 2;
+}
+.tm-list > li:nth-child(4) {
+  --nv-i: 3;
+}
+.tm-list > li:nth-child(5) {
+  --nv-i: 4;
+}
+.tm-list > li:nth-child(n + 6) {
+  --nv-i: 5;
+}
+/* A row is a button that opens the member: no button chrome, the row's own look. */
+.tm-row {
+  width: 100%;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.tm-row .nv-convo__preview {
+  font-variant-numeric: tabular-nums;
+}
+.tm-name {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+/* Waiting for his first sign-in: a dashed, quiet tag, never a colour that alarms. */
+.tm-invited {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--nv-radius-full);
+  outline: 1px dashed var(--nv-ink-faint);
+  outline-offset: -1px;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+/* A link gone dead before it was opened: amber, a new one is to make (EQ-06). */
+.tm-invited--expired {
+  outline-color: color-mix(in srgb, var(--nv-warning) 70%, transparent);
+  color: var(--nv-warning);
+}
+.tm-none {
+  margin: 0;
+  padding: var(--nv-space-5) var(--nv-space-4);
+  text-align: center;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+}
+.tm-gone {
+  padding: var(--nv-space-1);
+}
+.tm-gone .nv-disclosure__body {
+  padding: 0 var(--nv-space-1) var(--nv-space-1);
+}
+.tm-gone .tm-row {
+  opacity: 0.72;
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.tm-gone .tm-row:hover,
+.tm-gone .tm-row[aria-current='true'] {
+  opacity: 1;
+}
+
+/* The avatar takes the member's planning colour once he has one: a tint behind, a ring around. */
+.tm-avatar[data-color] {
+  background: color-mix(in srgb, var(--tm-color) 28%, var(--nv-glass-fill-strong));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tm-color) 70%, transparent);
+}
+
+/* Status pills: green at work, quiet while away, amber when suspended, faint once gone. Red stays for urgencies. */
+.nv-status.tm-status--ok {
+  --_c: var(--nv-success);
+}
+.nv-status.tm-status--away {
+  --_c: var(--nv-ink-muted);
+}
+.nv-status.tm-status--warn {
+  --_c: var(--nv-warning);
+}
+.nv-status.tm-status--gone {
+  --_c: var(--nv-ink-faint);
+}
+
+.tm-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-2);
+}
+.tm-skeleton i {
+  height: 56px;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  animation: tm-breathe calc(var(--nv-dur-slow) * 4) var(--nv-ease-out) infinite alternate;
+}
+.tm-skeleton i:nth-child(2) {
+  animation-delay: var(--nv-dur-fast);
+}
+.tm-skeleton i:nth-child(3) {
+  animation-delay: var(--nv-dur-slow);
+}
+.tm-notice p {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.tm-notice .nv-btn {
+  align-self: center;
+  margin-top: var(--nv-space-2);
+}
+
+/* ───────────── The member's sheet ───────────── */
+
+.tm-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  min-width: 0;
+  padding: var(--nv-space-5);
+}
+.tm-sheet .tm-back {
+  align-self: flex-start;
+}
+.tm-back::before {
+  content: '‹';
+  margin-right: 6px;
+  font-size: 1.2em;
+  line-height: 1;
+}
+@media (min-width: 900px) {
+  .tm-sheet .tm-back {
+    display: none;
+  }
+}
+.tm-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-4);
+}
+.tm-sheet__head .nv-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: var(--nv-text-title-2);
+}
+.tm-sheet__who {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.tm-sheet__who h2 {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.tm-sheet__who p {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.tm-sheet__who .nv-status {
+  align-self: flex-start;
+}
+.tm-new {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+}
+/* Closing is quiet: the page's one neon stays on « Ajouter un membre ». */
+.tm-close {
+  appearance: none;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.tm-close:hover:not(:disabled) {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+  transform: rotate(90deg);
+}
+.tm-close:active:not(:disabled) {
+  transform: scale(0.9);
+  transition-duration: var(--nv-dur-instant);
+}
+.tm-close:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.tm-close:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.tm-close svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+@media (max-width: 899px) {
+  .tm-sheet .tm-close {
+    display: none;
+  }
+}
+
+/* The figures: the rate first and largest, then his hour, then a manager's share. */
+.tm-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--nv-space-3);
+}
+.tm-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.tm-figure:hover {
+  background: var(--nv-plate-hover);
+  transform: translateY(-1px);
+}
+.tm-figure__value {
+  margin-top: 2px;
+  font-size: var(--nv-text-title-1);
+  line-height: 1.15;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tm-figure:first-child .tm-figure__value {
+  font-size: var(--nv-text-hero);
+  line-height: var(--nv-text-hero-leading);
+  letter-spacing: var(--nv-text-hero-tracking);
+}
+.tm-figure__note {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.tm-figure__ahead {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+
+.tm-facts {
+  margin: 0;
+  display: grid;
+  border-radius: var(--nv-radius-lg);
+  overflow: hidden;
+}
+.tm-facts > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--nv-space-3);
+  align-items: baseline;
+  padding: var(--nv-space-3) var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.tm-facts > div:first-child {
+  border-top: 0;
+}
+.tm-facts > div:hover {
+  background: var(--nv-plate-hover);
+}
+.tm-facts dt {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.tm-facts dd {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.tm-mail {
+  overflow-wrap: anywhere;
+}
+.tm-muted {
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 520px) {
+  .tm-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
+.tm-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding-top: var(--nv-space-4);
+  border-top: 1px solid var(--nv-hairline);
+}
+.tm-block h3 {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.tm-hint {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.tm-hint--error,
+.tm-warn {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.tm-warn {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.tm-recap {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-track);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.tm-todo {
+  margin: 4px 0 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 2px;
+}
+.tm-self-start {
+  align-self: flex-start;
+}
+.tm-self-end {
+  align-self: flex-end;
+}
+
+/* The link: read only, selected on focus, with Copier and Partager next to it. */
+.tm-share {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tm-share__actions,
+.tm-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  align-items: center;
+}
+.tm-inline .nv-field__control {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.tm-link {
+  width: 100%;
+  font-family: var(--nv-font-mono);
+  font-size: var(--nv-text-footnote);
+  text-overflow: ellipsis;
+}
+
+.tm-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tm-notes li {
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.tm-notes li:hover {
+  background: var(--nv-plate-hover);
+}
+.tm-notes p {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tm-note__by {
+  display: block;
+  margin-top: 4px;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+.tm-note-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tm-note-input {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+}
+
+/* ───────────── The add panel: the one thing that floats here, so the one glass ───────────── */
+
+.tm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--nv-space-4) max(var(--nv-space-4), env(safe-area-inset-right, 0px))
+    calc(var(--nv-space-4) + env(safe-area-inset-bottom, 0px))
+    max(var(--nv-space-4), env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: tm-fade var(--nv-dur-fast) var(--nv-ease-out) both;
+}
+@media (min-width: 700px) {
+  .tm-scrim {
+    align-items: center;
+  }
+}
+.tm-dialog {
+  --_radius: var(--nv-radius-xl);
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100% - 8px);
+  overflow: auto;
+  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  animation: tm-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.tm-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.tm-dialog__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tm-dialog__title h2 {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.tm-dialog__title p {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tm-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.tm-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--nv-dur-slow) var(--nv-ease-out);
+}
+.tm-steps__num {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  background: var(--nv-glass-fill);
+  transition:
+    background-color var(--nv-dur-slow) var(--nv-ease-out),
+    color var(--nv-dur-slow) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.tm-steps li[data-state='now'] {
+  color: var(--nv-ink);
+}
+.tm-steps li[data-state='now'] .tm-steps__num {
+  background: var(--nv-ink);
+  color: var(--nv-void);
+  transform: scale(1.08);
+}
+.tm-steps li[data-state='done'] {
+  color: var(--nv-ink-muted);
+}
+.tm-steps li[data-state='done'] .tm-steps__num {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+}
+.tm-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.tm-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+  padding-top: var(--nv-space-2);
+}
+.tm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.tm-field .nv-field__control {
+  width: 100%;
+}
+.tm-field[data-invalid] .nv-field__control {
+  box-shadow: inset 0 0 0 1px var(--nv-warning);
+}
+.tm-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--nv-space-3);
+}
+.tm-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.tm-select {
+  cursor: pointer;
+}
+.tm-date {
+  max-width: 220px;
+}
+.tm-zone {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
+.tm-zone__time {
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.tm-zone__name {
+  min-width: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+
+/* A preset is a card: its name, its rate, picked in one gesture. */
+.tm-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--nv-space-2);
+}
+.tm-preset {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: var(--nv-space-3);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.tm-preset:hover {
+  background: var(--nv-plate-hover);
+  transform: translateY(-1px);
+}
+.tm-preset:active {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+.tm-preset:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.tm-preset[aria-checked='true'] {
+  background: var(--nv-select-strong);
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-muted);
+}
+.tm-preset__name {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.tm-preset[aria-checked='true'] .tm-preset__name {
+  color: var(--nv-ink);
+}
+.tm-preset__rate {
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  .tm-zone {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .tm-zone__name {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+}
+.tm-preset__rate--word {
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink-muted);
+}
+.tm-preset[aria-checked='true'] .tm-preset__rate--word {
+  color: var(--nv-ink);
+}
+.tm-percent {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  max-width: 160px;
+  color: var(--nv-ink-muted);
+  font-weight: 600;
+}
+
+@keyframes tm-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+}
+@keyframes tm-breathe {
+  to {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-scrim,
+  .tm-dialog,
+  .tm-skeleton i {
+    animation: none;
+  }
+  .tm-figure:hover,
+  .tm-preset:hover,
+  .tm-close:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* What could not be read: one amber line and « Réessayer », on Planning, Membres and Rapports alike (EQ-22). */
+.tm-unread {
+  align-self: start;
+  padding: var(--nv-space-4) var(--nv-space-5);
+}
+
+/* Where the member is and what hour it is there, under the name (EQ-08). */
+.tm-sheet__where {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+/* The owner's gestures on a member once added (EQ-10): one row under the head. */
+.tm-sheet__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.tm-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.tm-color {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.tm-color__well {
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.tm-sure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-weight: 600;
+  cursor: pointer;
+}

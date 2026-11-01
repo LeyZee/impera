@@ -20,6 +20,8 @@ export interface TelegramApi {
   replaceToken(id: TelegramBotId, token: string): Promise<Result<TelegramBot, TelegramRefusal> | null>;
   removeBot(id: TelegramBotId): Promise<boolean>;
   listen(id: TelegramBotId): Promise<boolean>;
+  /** REG-28: `refused` while the bot still sits in the group. */
+  removeChat(id: TelegramChatId, userId: string): Promise<'removed' | 'missing' | 'refused'>;
   saveRoutes(
     version: number,
     routes: readonly TelegramRoute[],

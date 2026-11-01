@@ -1,5 +1,6 @@
 import type { ProviderStatus, ProviderVoice } from '@nirvana/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 import { PasswordPrompt, SignInAgain } from './PasswordPrompt';
 import { connectKey, ReauthRequired, saveSettings, showError, type ShownError } from './api';
@@ -186,12 +187,14 @@ export function ConnectSheet({
     <button
       ref={closeButton}
       type="button"
-      className="sv-close"
+      className="nv-close"
       aria-label="Fermer"
       disabled={isBusy}
       onClick={close}
     >
-      ×
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="m4 4 8 8M12 4l-8 8" />
+      </svg>
     </button>
   );
 
@@ -330,10 +333,14 @@ export function ConnectSheet({
         </li>
         <li className="sv-step" data-state={hasOpenedConsole ? 'now' : 'later'}>
           <span className="sv-num">2</span>
-          <div className="sv-step__head">Colle-la ici</div>
+          <div className="sv-step__head">
+            {phase.kind === 'reauth' ? 'Confirme ton mot de passe Nirvana' : 'Colle-la ici'}
+          </div>
           {phase.kind === 'reauth' ? (
             <div className="sv-step__body">
               <PasswordPrompt
+                lead="Ta connexion date de plus de 10 minutes : pour toucher à une clé, Nirvana redemande ton mot de passe."
+                note="Ta clé est gardée, elle sera vérifiée juste après."
                 onBusyChange={setIsReauthBusy}
                 onConfirmed={() => {
                   void submit(phase.key, true);
@@ -444,7 +451,8 @@ function Scrim({ children, onClose }: { children: ReactNode; onClose: () => void
     },
     [opener],
   );
-  return (
+  // Portalled to <body>: an ancestor's transform or filter (the page's entrance) would otherwise trap the fixed scrim.
+  return createPortal(
     <div
       className="sv-scrim"
       onMouseDown={(event) => {
@@ -474,6 +482,7 @@ function Scrim({ children, onClose }: { children: ReactNode; onClose: () => void
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

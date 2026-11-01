@@ -1,0 +1,30 @@
+# Note de désir (P3-12) : un fan chaud qui dit être au travail. Fan et messages fictifs (ADR 0010).
+description:
+  Il était chaud (note 80) mais il est au travail avec son chef à côté ; la note baisse sous « chaud »,
+  aucune offre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Gaspard (fictif)'
+  - 34 ans, confirmé
+situation:
+  known_hours: 60
+  age_confirmed: true
+  last_offer_hours_ago: null
+  desire: 80
+history:
+  - from: creator
+    text: Tu penses encore à moi ? 😏
+inbound: Grave, mais là je suis au boulot, mon chef est juste à côté 😅
+expect:
+  brief:
+    desire_signals_contain:
+      - busy_now
+  decision:
+    handoff: false
+    offer: false
+    desire_band_in:
+      - neutral
+      - playful
+  voice:
+    bubbles_max: 4

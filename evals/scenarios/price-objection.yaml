@@ -1,0 +1,28 @@
+# Refus de prix : il trouve trop cher ; jamais de remise ni de négociation. Fan et messages fictifs (ADR 0010).
+description: Il trouve le pack trop cher et demande une réduction ; elle ne baisse pas le prix.
+persona_version: demo
+fan_facts:
+  - 'prénom : Kevin (fictif)'
+situation:
+  known_hours: 50
+  age_confirmed: true
+  last_offer_hours_ago: 0.2
+history:
+  - from: creator
+    text: Je t’ai préparé un petit pack rien que pour toi 😏
+inbound: C’est trop cher 25 balles, tu me le fais à 10 ?
+expect:
+  brief:
+    intent_in:
+      - price_objection
+      - complaint
+      - other
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b
+      - \b(10|dix|réduction|remise|promo|moitié prix)\b

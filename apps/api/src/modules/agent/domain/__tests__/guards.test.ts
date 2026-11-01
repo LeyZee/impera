@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { checkVoiceOutput, DEFAULT_GUARD_SETTINGS, isBlocked, type GuardCode } from '../guards';
+import {
+  checkExplicit,
+  checkVoiceOutput,
+  DEFAULT_GUARD_SETTINGS,
+  isBlocked,
+  type GuardCode,
+} from '../guards';
 
 function codes(bubbles: string[], forbiddenTerms: string[] = []): GuardCode[] {
   return checkVoiceOutput(bubbles, { ...DEFAULT_GUARD_SETTINGS, forbiddenTerms }).map((v) => v.code);
@@ -78,10 +84,14 @@ describe('voice guards', () => {
     expect(codes(['On se retrouve au lit 😏', 'On se voit au prochain live ?'])).toEqual([]);
   });
 
-  it('keeps the ambiguity about meeting one day, without a promise', () => {
+  it('keeps the ambiguity about meeting one day, without a promise nor a word the platforms flag', () => {
+    expect(codes(['Si j’ai assez confiance en toi, un jour peut-être… qui sait', 'Pourquoi pas 🫣'])).toEqual(
+      [],
+    );
+    // The same with « se rencontrer »: no promise, but a word Reveal flags (P3-13).
     expect(
       codes(['Si j’ai assez confiance en toi, un jour peut-être qu’on se rencontrera', 'Pourquoi pas 🫣']),
-    ).toEqual([]);
+    ).toEqual(['platform_meeting_word']);
   });
 
   it('blocks contacts and links', () => {
@@ -95,6 +105,14 @@ describe('voice guards', () => {
     expect(codes(['Tu aimes le café ?'], ['cafe'])).toEqual(['forbidden_term']);
     expect(codes(['C’est banal, un canal'], ['anal'])).toEqual([]);
     expect(codes(['Pas d’anal, désolée'], ['anal'])).toEqual(['forbidden_term']);
+  });
+
+  it('blocks an emoji she never uses, however the keyboard typed it (P5-01)', () => {
+    const settings = { ...DEFAULT_GUARD_SETTINGS, forbiddenEmojis: ['😂', '❤️'] };
+    const found = (bubbles: string[]) => checkVoiceOutput(bubbles, settings).map((v) => [v.code, v.match]);
+    expect(found(['Trop drôle 😂'])).toEqual([['forbidden_term', '😂']]);
+    expect(found(['Bisous ❤'])).toEqual([['forbidden_term', '❤️']]);
+    expect(found(['Coucou 😏'])).toEqual([]);
   });
 
   it('never asks him for intimate pictures, despises him or lies about paid content', () => {
@@ -125,6 +143,32 @@ describe('voice guards', () => {
     expect(codes(['Pas besoin d’argent avec moi'])).toContain('payment_lie');
     expect(codes(['T’as rien à payer pour me parler 😌'])).toEqual([]);
     expect(codes(['Cette vidéo est à 6 €, tu l’ouvres en touchant le cadenas'])).toEqual([]);
+  });
+
+  it('blocks a discount or a negotiation, and lets her refusal of one through', () => {
+    for (const bubble of [
+      'Allez je te fais un petit prix 😘',
+      'Pour toi ce sera 15 € au lieu de 25 €',
+      'Je te la laisse à 10 si tu la prends maintenant',
+      'Je te baisse le prix rien que pour ce soir',
+      '-30 % sur le pack, juste ce soir',
+      'Je te fais une réduc si tu prends les deux',
+      'On peut s’arranger sur le prix',
+      'Elle est à moitié prix pour toi',
+      '20 % de moins sur la vidéo si tu la prends',
+    ]) {
+      expect(codes([bubble])).toContain('discount');
+    }
+    for (const bubble of [
+      'Je fais pas de promo moi 😌',
+      'Pas de réduc avec moi, c’est mon prix',
+      'Cette vidéo est à 6 €, tu l’ouvres en touchant le cadenas',
+      'Je finis à 18 h au lieu de 20 h ce soir',
+      'J’ai -10 % de batterie, je vais devoir te laisser',
+      'Il fait -5 % de moral ce matin 😅',
+    ]) {
+      expect(codes([bubble])).toEqual([]);
+    }
   });
 
   it('asks for a regeneration when she makes him feel guilty, without blocking', () => {
@@ -283,7 +327,6 @@ describe('voice guards', () => {
     for (const bubbles of [
       ['J’ai zéro envie de dormir'],
       ['Le 06/12/2024 c’est mon anniversaire'],
-      ['Rendez-vous le 06/12 🎂'],
       ['Il est 06 h 12'],
       ['Je suis pas sage ce soir'],
       ['Je suis pas une vraie fille sage 😇'],
@@ -299,9 +342,30 @@ describe('voice guards', () => {
       ['Je t’attends au lit'],
       ['On se retrouve dans mes DM'],
       ['Étape 2 : tu viens me chercher'],
-      ['Si j’ai assez confiance, un jour peut-être qu’on se rencontrera'],
+      ['Si j’ai assez confiance, un jour peut-être 🫣'],
     ]) {
       expect(codes(bubbles), bubbles.join(' | ')).toEqual([]);
+    }
+  });
+});
+
+describe('checkExplicit', () => {
+  it('blocks explicit words, in a bubble or across two', () => {
+    expect(checkExplicit(['J’ai envie de te sucer']).map((v) => [v.code, v.severity])).toEqual([
+      ['explicit_before_age', 'blocking'],
+    ]);
+    expect(checkExplicit(['Je suis toute', 'nue là']).map((v) => v.code)).toEqual(['explicit_before_age']);
+  });
+
+  it('lets a kiss, a ponytail, a cat or the rain through', () => {
+    for (const bubble of [
+      'Un gros baiser 😘',
+      'J’ai fait une queue de cheval aujourd’hui',
+      'Ma chatte Moka dort sur moi',
+      'Je suis mouillée, il pleut des cordes',
+      'Tu lis des bandes dessinées ?',
+    ]) {
+      expect(checkExplicit([bubble])).toEqual([]);
     }
   });
 });

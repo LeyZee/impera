@@ -9,6 +9,7 @@ import {
   KillSwitchScopeSchema,
   newId,
   queueNameFor,
+  resumeRunAt,
   type KillSwitchScope,
 } from '@nirvana/contracts';
 import {
@@ -123,12 +124,16 @@ async function answerWhoWaited(
         : input.scope === 'creator' && creatorId !== null
           ? and(pending, eq(schema.conversations.creatorId, creatorId))
           : and(pending, eq(schema.conversations.id, ConversationIdSchema.parse(input.scopeId))),
-    );
-  for (const conversation of waiting) {
+    )
+    .orderBy(sql`${schema.conversations.lastInboundAt} asc nulls last`, schema.conversations.id);
+  // One after the other, the longest wait first, as from the Dashboard (`setAgentMode`).
+  const now = new Date();
+  for (const [index, conversation] of waiting.entries()) {
     await tx.execute(sql`select public.enqueue_job(
       task => 'conversation.respond',
       payload => ${JSON.stringify({ creatorId: conversation.creatorId, conversationId: conversation.id, correlationId })}::jsonb,
       queue_name => ${queueNameFor(conversation.id)},
+      run_at => ${resumeRunAt(index, now).toISOString()}::timestamptz,
       max_attempts => ${JOB_MAX_ATTEMPTS['conversation.respond']}::int,
       job_key => ${jobKeyFor('conversation.respond', conversation.id)}
     )`);

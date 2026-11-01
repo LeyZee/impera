@@ -59,7 +59,7 @@ export function renderPrompt(template: PromptTemplate, values: Readonly<Record<s
   return template.body.replace(VARIABLE, (_, key: string) => values[key] ?? '');
 }
 
-export function loadPrompt(role: 'voice' | 'brain' | 'sense', name = 'default'): PromptTemplate {
+export function loadPrompt(role: 'voice' | 'brain' | 'sense' | 'judge', name = 'default'): PromptTemplate {
   const url = new URL(`../prompts/${role}/${name}.md`, import.meta.url);
   return parsePrompt(`${role}/${name}`, readFileSync(url, 'utf8'));
 }

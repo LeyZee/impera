@@ -1,4 +1,4 @@
-/* The Dashboard's Telegram coverage banner (NightBanner.tsx): one glass row, a moon, the action on the right. */
+/* The Dashboard's Telegram coverage banner (NightBanner.tsx): one plate row (content, not glass), a moon, the action on the right. */
 .tg-night {
   /* Amber: a setting to make, not an urgency (the red stays the urgencies'). */
   --_c: var(--nv-warning);

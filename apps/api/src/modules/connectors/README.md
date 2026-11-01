@@ -11,6 +11,7 @@
 - `domain/platform-connector.ts` : le port et `ConnectorError` ; `domain/rhythm.ts` : rythme des relèves et coupe-circuit.
 - `application/` : jobs `dispatch`, `poll`, `reconcile` ; `sessions` ; `outbound-sender` (port `OutboundSender` de `conversations`).
 - `infra/fake/FakeConnector.ts` : plateforme en mémoire à scénarios. `infra/__tests__/contract.test.ts` : la suite que tout adaptateur doit passer.
+- `infra/http/routes.ts` : `POST /v1/connector/sessions`, la « Sync » de l'extension, authentifiée par le jeton d'appareil (`x-extension-token`) vérifié dès l'arrivée de la requête : sans jeton valide, 401 `device_unauthenticated` avant toute lecture du corps (jamais un 400 qui listerait les champs attendus).
 - Un adaptateur se branche par le registre (`ConnectorRegistry`, une fabrique par plateforme) passé à `createApp` ; registre vide = aucun compte relevé.
 
 ## Structure

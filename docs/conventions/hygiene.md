@@ -37,7 +37,7 @@ En cas de doute : on ne supprime pas, on écrit une ligne dans `docs/sessions/LO
 - `docs/sessions/LOG.md`, `docs/sessions/tasks/**` (les fiches terminées restent, statut `done`)
 - `packages/db/migrations/**` appliquées
 - `personas/**` (toute version, même inactive)
-- `evals/**` datasets et enregistrements `FakeReveal` (`apps/api/test/fake-reveal/recordings/**`, versionnés et anonymisés)
+- `evals/**` datasets et enregistrements `FakeReveal` (`apps/api/src/__tests__/fake-reveal/recordings/**`, versionnés et anonymisés)
 - `docs/reference/reveal-api-observed.md`
 - `.github/**` ; `brainstorm/` et `Contexte et cahier des charges — Agent IA Reveal.md` (historique du raisonnement, à la racine).
 

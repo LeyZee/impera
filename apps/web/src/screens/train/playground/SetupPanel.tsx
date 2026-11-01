@@ -1,7 +1,7 @@
 import type { PlaygroundState } from '@nirvana/contracts';
 import { useEffect, useState, type JSX } from 'react';
 
-import { clockAt, duration, money } from './logic';
+import { clockAt, duration, money, scriptsHint } from './logic';
 import type { CreatorMedia as CreatorMediaInput, MediaKind } from './model';
 import type { Playground } from './usePlayground';
 
@@ -15,7 +15,18 @@ export const MEDIA_KINDS: readonly { kind: MediaKind; label: string }[] = [
  * Who the fan is, what we know of him, what time it is for her, and what she can send. Only the fan stays
  * open: the rest folds to one line that says what it holds (docs/design/README.md, « Hiérarchie »).
  */
-export function SetupPanel({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element {
+export function SetupPanel({
+  state,
+  pg,
+  sheetOpen,
+  onCloseSheet,
+}: {
+  state: PlaygroundState;
+  pg: Playground;
+  /** On a phone the panel is a sheet, opened from the conversation's « Fan » button. */
+  sheetOpen: boolean;
+  onCloseSheet: () => void;
+}): JSX.Element {
   const { situation } = state;
   const age = new Date(situation.now).getTime() - new Date(situation.relationshipStartedAt).getTime();
   const known = [
@@ -24,9 +35,19 @@ export function SetupPanel({ state, pg }: { state: PlaygroundState; pg: Playgrou
   ].join(' · ');
 
   return (
-    <aside className="pg-setup nv-glass" aria-label="Mise en situation">
+    <aside
+      id="pg-setup"
+      className={`pg-setup nv-plate ${sheetOpen ? 'is-sheet nv-glass nv-glass--thick' : ''}`}
+      aria-label="Mise en situation"
+    >
+      <div className="pg-setup__h">
+        <b>Mise en situation</b>
+        <button type="button" className="nv-close" aria-label="Fermer" onClick={onCloseSheet}>
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
       <div className="nv-scroll">
-        <FanPicker state={state} pg={pg} />
+        <FanPicker state={state} pg={pg} onPicked={onCloseSheet} />
 
         <details className="nv-disclosure pg-fold">
           <summary>
@@ -51,8 +72,9 @@ export function SetupPanel({ state, pg }: { state: PlaygroundState; pg: Playgrou
           <summary>
             <span className="nv-disclosure__title">Le moment</span>
             <span className="nv-disclosure__sum">
-              {clockAt(situation.now, situation.timeZone)} {situation.isNight ? 'Nuit' : 'Jour'} ·{' '}
-              {duration(age)}
+              {clockAt(situation.now, situation.timeZone)}, {situation.isNight ? 'Nuit' : 'Jour'} ·{' '}
+              {/* Kept on one line when the summary wraps. */}
+              {`relation de ${duration(age)}`.replaceAll(' ', '\u00a0')}
             </span>
           </summary>
           <div className="nv-disclosure__body">
@@ -69,9 +91,7 @@ export function SetupPanel({ state, pg }: { state: PlaygroundState; pg: Playgrou
                 <b>{duration(age)}</b>
               </span>
             </div>
-            <p className="pg-hint">
-              Nuit de 22 h à 7 h chez elle : scripts <b>{situation.isNight ? 'Nuit' : 'Jour'}</b> seulement.
-            </p>
+            <p className="pg-hint">{scriptsHint(situation.isNight)}</p>
             <div className="pg-row2">
               <button
                 type="button"
@@ -111,7 +131,15 @@ export function SetupPanel({ state, pg }: { state: PlaygroundState; pg: Playgrou
 }
 
 /** The fan being played, always visible; the other types unfold only to change. */
-function FanPicker({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element {
+function FanPicker({
+  state,
+  pg,
+  onPicked,
+}: {
+  state: PlaygroundState;
+  pg: Playground;
+  onPicked: () => void;
+}): JSX.Element {
   const [open, setOpen] = useState(false);
   const preset = state.presets.find((p) => p.id === state.presetId);
   return (
@@ -144,14 +172,16 @@ function FanPicker({ state, pg }: { state: PlaygroundState; pg: Playground }): J
                 aria-checked={false}
                 className="pg-fan__opt nv-tap"
                 style={{ animationDelay: `${String(i * 25)}ms` }}
-                title={`Teste ${p.tests}`}
                 disabled={pg.busy}
                 onClick={() => {
                   setOpen(false);
+                  onPicked();
                   void pg.run((c) => c.choosePreset(p.id));
                 }}
               >
                 {p.label}
+                {/* What it tests is what one picks a scenario by: said in full, not on hover (no hover on a phone). */}
+                <span className="pg-fan__optt">Teste {p.tests}</span>
               </button>
             ))}
         </div>

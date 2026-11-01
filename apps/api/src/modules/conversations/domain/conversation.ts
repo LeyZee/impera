@@ -9,5 +9,9 @@ export function projectionOf(conversation: Conversation): ConversationProjection
     lastInboundAt: conversation.lastInboundAt,
     lastOutboundAt: conversation.lastOutboundAt,
     unreadCount: conversation.unreadCount,
+    routedToUserId: conversation.routedToUserId,
+    desireScore: conversation.desireScore,
+    desireBand: conversation.desireBand,
+    desireAt: conversation.desireAt,
   };
 }

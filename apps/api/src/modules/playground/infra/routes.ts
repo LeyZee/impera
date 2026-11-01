@@ -1,4 +1,6 @@
 import {
+  AlertTestBodySchema,
+  AlertTestResultSchema,
   ApiErrorSchema,
   PlaygroundAdvanceBodySchema,
   PlaygroundAnswerSchema,
@@ -14,15 +16,16 @@ import {
   PlaygroundSituationBodySchema,
   PlaygroundStateSchema,
 } from '@nirvana/contracts';
-import type { FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import type { AlertTester } from '../../agent/index';
 import { LlmUnavailable, type PlaygroundEngine } from '../application/engine';
 import type { PlaygroundService } from '../application/playground-service';
 
 export interface PlaygroundRoutesOptions {
   /** `requireRole('owner')` for now (coordinator, 17/10); Messa (`creator`) later. */
-  readonly guard: preHandlerAsyncHookHandler;
+  readonly guard: preValidationAsyncHookHandler;
 }
 
 const state = { 200: PlaygroundStateSchema };
@@ -33,10 +36,11 @@ const state = { 200: PlaygroundStateSchema };
  */
 export function createPlaygroundRoutes(
   service: PlaygroundService,
+  alertTester: AlertTester,
   options: PlaygroundRoutesOptions,
 ): FastifyPluginAsyncZod {
   return (app) => {
-    app.addHook('preHandler', options.guard);
+    app.addHook('preValidation', options.guard);
 
     const engineOf = (request: FastifyRequest): PlaygroundEngine => {
       // The guard has set the user; a route reached without one is a wiring error, not a user error.
@@ -125,6 +129,13 @@ export function createPlaygroundRoutes(
         const { isLocked, ...media } = request.body;
         return engineOf(request).sendCreatorMedia(media, isLocked);
       },
+    );
+
+    // Réglages › Alertes (P4-01): served here, beside the persona the brain reads; `/v1/alerts` stays the module's.
+    app.post(
+      '/alerts/test',
+      { schema: { body: AlertTestBodySchema, response: { 200: AlertTestResultSchema } } },
+      (request) => alertTester.test(request.body),
     );
 
     return Promise.resolve();

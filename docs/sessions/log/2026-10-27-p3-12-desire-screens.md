@@ -1,0 +1,7 @@
+# 2026-10-27 — Note de désir dans le Suivi, le lecteur et la Persona (P3-12, écrans) — done
+Fait : la bande en mot à la fin de la sous-ligne du Suivi ; l'ordre « Récents · Chauds d'abord » au-dessus de la liste, retenu sur l'appareil, « À traiter » restant au-dessus ; la fiche « Désir » du lecteur (bande, `nv-gauge` neutre) et sa courbe `nv-chart` en `data-1` avec les seuils 40 et 70, info-bulle au survol, au toucher et au clavier (heure, mouvement, signaux en mots) ; les deux seuils de la persona dans Stratégies, avec la bande où tombe la valeur.
+Pas fait : rien.
+Décisions : après un silence, la courbe finit par un point « Maintenant » en pointillés, au score de la jauge (retombée), pour ne jamais contredire la jauge (remarque d'Agent) ; les seuils tracés viennent de `DESIRE_BAND_FLOORS` (Bilan et Agent). La courbe n'est lue qu'à l'ouverture de la fiche (rien n'est demandé au serveur pour un fan qu'on ne regarde pas). « Chauds d'abord » ne range que la page chargée, et l'écran le dit quand il en reste.
+Découvertes : `.nv-chart` fixe `--_c` au néon et peut gagner par ordre de chargement sur une feuille d'écran : la surcharge prend deux classes (`.nv-chart.tr-desire__chart`).
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓ (web : 382 tests, dont desire.test.ts, view.test.ts, TrackingPage.test.tsx, persona/tabs.test.tsx) ; à l'œil en Nuit et Jour, 1 440 et 400 px, mouvement réduit.

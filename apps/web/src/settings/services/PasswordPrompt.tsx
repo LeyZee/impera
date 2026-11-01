@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { confirmPassword, type ConfirmResult } from './api';
+import './services.css';
 
 const MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
   wrong_credentials: 'Ce n’est pas le bon mot de passe.',
   too_many_attempts: 'Trop d’essais. Attends une minute avant de réessayer.',
-  unavailable: 'Nirvana ne répond pas. Réessaie dans un instant.',
+  unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
 };
 
@@ -34,13 +35,21 @@ export function PasswordPrompt({
   onConfirmed,
   onCancel,
   onBusyChange,
+  lead = 'Pour toucher à une clé, confirme ton mot de passe.',
+  note,
 }: {
   onConfirmed: () => void;
   onCancel: () => void;
   /** Told while the password is being checked, so a sheet around the prompt does not close meanwhile. */
   onBusyChange?: (isBusy: boolean) => void;
+  /** What the password unlocks, said before the field; a key by default. */
+  lead?: string;
+  /** One more line under the lead (« Ta clé est gardée… »). */
+  note?: string;
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
+  // A visible label, so the field cannot be taken for the key field it replaces (recette du 29/10).
+  const fieldId = useId();
   const [isBusy, setIsBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<ConfirmResult, 'ok'> | null>(null);
 
@@ -74,7 +83,11 @@ export function PasswordPrompt({
         if (!isBusy) onCancel();
       }}
     >
-      <p className="sv-muted">Pour toucher à une clé, confirme ton mot de passe.</p>
+      <p className="sv-muted">{lead}</p>
+      {note === undefined ? null : <p className="sv-muted">{note}</p>}
+      <label className="sv-reauth__label" htmlFor={fieldId}>
+        Mot de passe
+      </label>
       <form
         className="sv-key"
         data-error={failure !== null}
@@ -85,9 +98,9 @@ export function PasswordPrompt({
       >
         <input
           ref={input}
+          id={fieldId}
           type="password"
           autoComplete="current-password"
-          aria-label="Mot de passe"
           aria-invalid={failure !== null}
           aria-describedby="sv-reauth-msg"
           // Read-only rather than disabled while checking: the field keeps the focus, so Escape stays here.

@@ -4,7 +4,7 @@
 
 **Peut dépendre de.** packages/llm (rôle sense)
 
-**Règles propres.** Propriétaire de `media_assets`, `media_descriptions`, `media_sends`.
+**Règles propres.** Propriétaire de `media_assets`, `media_descriptions`, `media_sends`. Lecture exposée : `createDrizzleDescriptionReader` (`of(creatorId, ids)`), la dernière description gardée de chaque média (sa `factualDescription`), sous RLS ; le composition root la branche sur le port `MediaDescriptions` de `conversations` pour le fil de Suivi (SUIVI-26).
 
 ## Structure
 

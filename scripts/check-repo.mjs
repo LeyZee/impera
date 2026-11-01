@@ -11,6 +11,9 @@
 //  7. The nightly CI job still runs `pnpm probe` and `pnpm evals`: removing the quality gate is an error.
 //  8. Every root script that delegates with `pnpm --filter <package> [run] <script>` reaches a package of the
 //     workspace that has that script, and every `tsx <file>` of a package script names a file that exists.
+//  9. The session journal is one file per session: docs/sessions/log/<date>-<slug>.md whose first line starts
+//     with `# <date>`, and no row beyond the frozen count of the index of docs/sessions/LOG.md (the shared table made every
+//     merge conflict; `pnpm sessions:log` reads the folder instead).
 // No dependency: Node 22 only.
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -32,6 +35,8 @@ const SKIP_DIRS = new Set([
 ]);
 const PLANNED_PREFIXES = ['apps/', 'packages/'];
 const MAX_BYTES = 500 * 1024;
+/** Rows of the frozen index of docs/sessions/LOG.md (check 9): one more is refused, whatever its date. */
+const LOG_INDEX_ROWS = 153;
 const FORBIDDEN_NAMES = [
   /\.(bak|orig|copy|tmp)$/i,
   /-v\d+\.[a-z]+$/i,
@@ -213,6 +218,27 @@ if (!stagedOnly) {
   if (/^\s*continue-on-error:\s*true/m.test(nightly))
     errors.push(
       '.github/workflows/ci.yml: the nightly job must fail when the evals fail (no continue-on-error)',
+    );
+}
+
+// 9. The session journal: one file per session, and the index of LOG.md stays frozen
+if (!stagedOnly) {
+  const logDir = join(root, 'docs/sessions/log');
+  for (const name of readdirSync(logDir)) {
+    const match = /^(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/.exec(name);
+    if (match === null) {
+      errors.push(`docs/sessions/log/${name}: name it <AAAA-MM-JJ>-<slug>.md (docs/sessions/README.md)`);
+      continue;
+    }
+    const first = readFileSync(join(logDir, name), 'utf8').split('\n', 1)[0];
+    if (!first.startsWith(`# ${match[1]}`))
+      errors.push(`docs/sessions/log/${name}: the first line must start with \`# ${match[1]}\``);
+  }
+  const index = readFileSync(join(root, 'docs/sessions/LOG.md'), 'utf8');
+  const rows = [...index.matchAll(/^\|.*`log\/\d{4}-\d{2}-\d{2}-[^`]*`/gm)].length;
+  if (rows > LOG_INDEX_ROWS)
+    errors.push(
+      `docs/sessions/LOG.md: the index is frozen at ${String(LOG_INDEX_ROWS)} rows (${String(rows)} now); a session writes its own file in docs/sessions/log/ and adds no row`,
     );
 }
 

@@ -16,7 +16,10 @@ export function nextAction(statuses: readonly ProviderStatus[]): NextAction {
       kind: 'replace_key',
       provider: refused.provider,
       lead: refused.message,
-      detail: `Remplace la clé, ou règle le souci chez ${profileOf(refused.provider).vendor} puis « Vérifier maintenant ».`,
+      // An unreadable key is Nirvana's own problem: nothing to fix at the provider, and a check would call no one.
+      detail: refused.isUnreadable
+        ? `Remplace la clé : rien n’est à régler chez ${profileOf(refused.provider).vendor}.`
+        : `Remplace la clé, ou règle le souci chez ${profileOf(refused.provider).vendor} puis « Vérifier maintenant ».`,
     };
   }
   const low = statuses.find((s) => s.state === 'low_credit');

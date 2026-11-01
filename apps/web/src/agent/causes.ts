@@ -12,4 +12,7 @@ export const CAUSE_LABELS: Readonly<Record<HandoffCause, string>> = {
   keyword: 'Mot d’alerte',
   llm_unavailable: 'IA indisponible',
   other: 'À reprendre',
+  custom_alert: 'Alerte personnalisée',
+  identity_doubt: 'Doute sur la personne',
+  persona_inactive: 'Pas de persona active pour cette créatrice',
 };

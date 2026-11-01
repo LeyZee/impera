@@ -92,6 +92,230 @@
       "when": 1792682011645,
       "tag": "0012_telegram_send_failed",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792707502728,
+      "tag": "0013_automatic_persona_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792756004721,
+      "tag": "0014_fan_facts_and_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793113816692,
+      "tag": "0015_team_members",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793114909234,
+      "tag": "0016_conversation_routing",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793118865083,
+      "tag": "0017_rate_limit_counters",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793121152610,
+      "tag": "0018_invitation_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793122669283,
+      "tag": "0019_backup_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793123741555,
+      "tag": "0020_backup_overdue",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793127280618,
+      "tag": "0021_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793134716078,
+      "tag": "0022_desire_score",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793135886202,
+      "tag": "0023_leaves_and_swaps",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793139620797,
+      "tag": "0024_agent_hours",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793145311146,
+      "tag": "0025_custom_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793146397883,
+      "tag": "0026_shift_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793153916802,
+      "tag": "0027_telegram_alert_triggered",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793159225158,
+      "tag": "0028_payroll",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793161001073,
+      "tag": "0029_payroll_closing",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793166847794,
+      "tag": "0030_exchange_rate_overdue",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793172694515,
+      "tag": "0031_payment_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793214544292,
+      "tag": "0032_telegram_exchange_rate_overdue",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793217338151,
+      "tag": "0033_worldremit_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793226782637,
+      "tag": "0034_member_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793231815277,
+      "tag": "0035_creator_name_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793239666360,
+      "tag": "0036_non_negative_prices",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793291281391,
+      "tag": "0037_telegram_deliveries_keep",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793293271775,
+      "tag": "0038_pay_period_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1793296979350,
+      "tag": "0039_backup_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793297812988,
+      "tag": "0040_payout_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793446381813,
+      "tag": "0041_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793452953248,
+      "tag": "0042_invoice_not_issued",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793454555366,
+      "tag": "0043_carry_over_rank",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1793454615366,
+      "tag": "0044_telegram_invoice_not_issued",
+      "breakpoints": true
     }
   ]
 }

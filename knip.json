@@ -7,7 +7,7 @@
       "project": ["*.{js,ts}", "scripts/**/*.mjs"]
     },
     "apps/api": {
-      "entry": ["src/worker.ts", "src/__tests__/**/*.ts"],
+      "entry": ["src/__tests__/**/*.ts"],
       "project": ["src/**/*.ts"]
     },
     "apps/web": {

@@ -33,3 +33,62 @@ export function canSend(check: SendCheck): boolean {
 export function bubbleIdempotencyKey(draftId: string, index: number): string {
   return `${draftId}:${String(index)}`;
 }
+
+const HOUR_MS = 3_600_000;
+
+/** A follow-up due: which delay of the persona, and when. */
+export interface FollowUpSlot {
+  readonly step: number;
+  readonly runAt: Date;
+}
+
+/**
+ * The next follow-up after her message reached him (P3-10): the first delay of `persona.follow_ups`, counted from his
+ * last message (`anchor`), that is still ahead. None past the last delay, nor without any message of his: she never
+ * writes first.
+ */
+export function nextFollowUp(
+  anchor: Date | null,
+  delaysHours: readonly number[],
+  now: Date,
+): FollowUpSlot | null {
+  if (anchor === null) return null;
+  const step = delaysHours.findIndex((hours) => anchor.getTime() + hours * HOUR_MS > now.getTime());
+  const hours = delaysHours[step];
+  return hours === undefined ? null : { step, runAt: new Date(anchor.getTime() + hours * HOUR_MS) };
+}
+
+/** One follow-up draft per silence and per step: a replayed job cannot write a second one. */
+export function followUpIdempotencyKey(conversationId: string, anchor: Date, step: number): string {
+  return `follow_up:${conversationId}:${String(anchor.getTime())}:${String(step)}`;
+}
+
+const MINUTE_MS = 60_000;
+const DEFERRED_RESPOND_MIN_MINUTES = 5;
+const DEFERRED_RESPOND_MAX_MINUTES = 25;
+
+/**
+ * When her deferred answer is tried again (P3-11), or `null` when the engine asked for none or out of bounds: not
+ * before 5 minutes, and never after 25, so the « À traiter » net of 30 minutes always comes after it.
+ */
+export function deferredRespondAt(retryAt: Date | undefined, now: Date): Date | null {
+  if (retryAt === undefined) return null;
+  const ahead = retryAt.getTime() - now.getTime();
+  return ahead >= DEFERRED_RESPOND_MIN_MINUTES * MINUTE_MS &&
+    ahead <= DEFERRED_RESPOND_MAX_MINUTES * MINUTE_MS
+    ? retryAt
+    : null;
+}
+
+/**
+ * How far ahead the engine may put a follow-up off (her night, or her next reply slot, P3-14): a week of slots and a
+ * day of margin. Beyond, it is cancelled.
+ */
+const FOLLOW_UP_RETRY_MAX_HOURS = 8 * 24;
+
+/** The time a follow-up put off goes out again, or `null` when the engine asked for none or for too far ahead. */
+export function followUpRetry(retryAt: Date | undefined, now: Date): Date | null {
+  if (retryAt === undefined) return null;
+  const ahead = retryAt.getTime() - now.getTime();
+  return ahead > 0 && ahead <= FOLLOW_UP_RETRY_MAX_HOURS * HOUR_MS ? retryAt : null;
+}

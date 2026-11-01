@@ -1,0 +1,7 @@
+# 2026-10-30 — Recette design, « Reste à envoyer » d'Historique et de Commissions — done
+
+Fait : suite de #295. Dans Historique, une quinzaine en partie validée dit « reste à envoyer, validation en cours » avec `validatedPayableMinor − paidMinor`, le montant que Quinzaine affiche (« Reste à envoyer », somme des relevés validés), au lieu d'un total qui comptait aussi les relevés à valider ; une quinzaine à verser compte de même. Quand tout ce qui est validé est déjà versé et qu'un relevé attend encore, la ligne dit ce qu'il verserait, « à verser une fois validé », jamais « 0,00 € reste à envoyer » ; les deux montants restent séparés, jamais additionnés. Dans Commissions, un relevé validé non versé dit « à toucher » avec ce qui est dû ; un relevé à valider dit « à toucher une fois validé », puisque seule une validation rend un montant dû. Une quinzaine reportée dit ce qui part sur la suivante à partir de `carriedMinor`, sans relire la quinzaine : plus de « 0,00 € touché » pendant cette lecture ou si elle échoue.
+Décisions : une quinzaine dont aucun relevé n'est validé garde « à verser une fois validé » avec le total de tous les relevés ; une quinzaine au calcul bloqué garde son montant au dernier calcul.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, tests web ✓ (quinzaine en partie validée, quinzaine à verser, quinzaine payée avec un relevé qui attend, relevé à valider et relevé validé du chatteur, quinzaine reportée dont la lecture échoue).

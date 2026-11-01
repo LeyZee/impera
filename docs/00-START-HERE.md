@@ -14,7 +14,7 @@ Ce dépôt est conçu pour être travaillé par des sessions d'agents codeurs (C
 | Si ta tâche touche… | Lis aussi |
 |---|---|
 | N'importe quel code | `docs/architecture/overview.md`, `docs/architecture/modules.md`, `docs/conventions/coding.md`, `docs/conventions/security.md` (checklist PR), `docs/glossary.md` |
-| La base, les entités, les migrations | `docs/architecture/data-model.md`, ADR 0005, 0007, 0011, `docker-compose.yml` |
+| La base, les entités, les migrations | `docs/architecture/data-model.md`, `docs/architecture/jsonb.md`, ADR 0005, 0007, 0011, `docker-compose.yml` |
 | L'ingestion, les drafts, l'envoi | `docs/architecture/message-flow.md`, ADR 0006, 0007 |
 | Une route HTTP, l'API du dashboard | `docs/conventions/api.md`, `docs/conventions/security.md` §6 |
 | Un connecteur (Reveal, Fake, plateforme propre) | `docs/architecture/connectors.md`, ADR 0008, `docs/reference/reveal-api-observed.md`, `docs/playbooks/add-a-connector.md` |
@@ -40,5 +40,5 @@ Ce dépôt est conçu pour être travaillé par des sessions d'agents codeurs (C
 
 ## Ce que ce dépôt n'est pas
 
-- Pas une réécriture d'Imperium ni d'OnlyScript. On a repris des concepts et des contrats (voir `docs/reference/legacy-projects.md`), aucun code.
+- Pas une copie d'Imperium ni d'OnlyScript. Leurs concepts sont reconstruits de zéro dans Nirvana (l'équipe et la paie d'Imperium par l'ADR 0023, les scripts d'OnlyScript en second temps), aucun code repris (voir `docs/reference/legacy-projects.md`).
 - Pas un SaaS multi-agences pour l'instant. Une créatrice (Messalina), une plateforme (Reveal), un objectif : fiabilité du connecteur, qualité du chatting, propreté de l'architecture.

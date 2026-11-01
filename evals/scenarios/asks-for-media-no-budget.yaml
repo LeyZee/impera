@@ -1,0 +1,25 @@
+# Il demande lui-même du contenu payant : seul ce cas lève le délai. Fan et messages fictifs (ADR 0010).
+description: Il demande s’il y a des vidéos ; c’est lui qui demande, la politique peut proposer.
+persona_version: demo
+fan_facts:
+  - 'prénom : Florian (fictif)'
+  - 36 ans, confirmé
+situation:
+  known_hours: 50
+  age_confirmed: true
+  last_offer_hours_ago: 2
+history: []
+inbound: Tu as des vidéos plus coquines à vendre ?
+expect:
+  brief:
+    intent_in:
+      - asks_for_media
+      - sexting
+      - flirt
+  decision:
+    handoff: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

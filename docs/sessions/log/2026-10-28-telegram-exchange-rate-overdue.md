@@ -1,0 +1,6 @@
+# 2026-10-28 — Telegram dit qu'un taux de la BCE manque (ADR 0033, second lot) — done
+Fait : `exchange_rate_overdue` entre dans `SCANNED_EVENT_TYPES` et dans le déclencheur `domain_events_telegram_scan` (migration 0032, attribuée par Bilan, même gabarit que 0020 et 0027 ; les CHECK de 0030 ne bougent pas). Le signal ne lit que la devise et le jour du dernier taux (`infra/events.ts`, devise en trois majuscules), jamais un chiffre de la paie. Rendu important, sans créatrice : « Pas de nouveau taux USD de la BCE depuis le 23 oct. : une quinzaine qui finit sans taux récent ne pourra pas être clôturée. », ou, `lastRateDay` nul, « Aucun taux USD de la BCE n’est encore arrivé : une quinzaine payée en USD ne peut pas être clôturée. ». Le jour de la BCE est un jour civil, formaté sans fuseau. ADR 0020 §3 et README du module complétés. Vérifié : tests domaine et infra, test d'intégration du module (la liste du déclencheur égale `SCANNED_EVENT_TYPES`) sur Postgres 16 local.
+Pas fait : rien. L’entrée 0032 du journal Drizzle et son instantané (identique à 0031, le déclencheur n’y figure pas) sont venus après la fusion de 0031 (API EQ-05, #279).
+Décisions : lien « Ouvrir le Dashboard » comme `backup_overdue`, l'écran Paie n'existant pas encore.
+Découvertes : aucune.
+Candidats à suppression : aucun.

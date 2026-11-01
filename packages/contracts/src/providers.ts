@@ -55,6 +55,11 @@ export const ProviderStatusSchema = z.object({
   source: ProviderKeySourceSchema.nullable(),
   keyLabel: z.string().nullable(),
   verifiedAt: z.iso.datetime().nullable(),
+  /**
+   * The saved key no longer decrypts (its encryption key was dropped too early): Nirvana cannot check it, the
+   * provider is never called, and only pasting it again fixes it.
+   */
+  isUnreadable: z.boolean(),
   /** The one sentence the line shows: what is lost without the service, or what works. */
   message: z.string().min(1),
   facts: z.array(ProviderFactSchema),

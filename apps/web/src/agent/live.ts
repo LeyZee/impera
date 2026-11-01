@@ -1,7 +1,9 @@
 import { DashboardSchema, type Dashboard as ApiDashboard, type DashboardPeriod } from '@nirvana/contracts';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
-import { fetchCreators } from '@/creators/api';
+import { followedOf, useFollowedCreatorId } from './followed';
+
+import { creatorsQuery } from '@/creators/api';
 
 /** How often the Dashboard and the bar read the agent again, as Suivi does. */
 const REFRESH_MS = 30_000;
@@ -25,25 +27,27 @@ export type LiveDashboard =
   | { readonly kind: 'empty' };
 
 /**
- * The Dashboard of the first creator (the screen has no creator picker yet), shared by the
- * Dashboard and the bar's pill through the query cache. A failed read is never covered by an older answer: the
- * screen says the server does not answer until it does again.
+ * The Dashboard of the followed creator (`agent/followed.ts`: chosen on the Dashboard, the first one otherwise),
+ * shared by the Dashboard and the bar's pill through the query cache. A failed read is never covered by an older
+ * answer: the screen says the server does not answer until it does again. Suivi's « À traiter » does not read it: it
+ * reads every creator followed (`GET /v1/dashboard/todos`, SUIVI-09).
  */
 export function useLiveDashboard(period: DashboardPeriod = 'day'): LiveDashboard {
   const creators = useQuery({
-    queryKey: ['creators'],
-    queryFn: fetchCreators,
+    ...creatorsQuery,
     // Read again while it fails, so the page comes back on its own once the server does.
     refetchInterval: (query) => (query.state.status === 'error' ? REFRESH_MS : false),
   });
-  const creator = creators.data?.[0];
+  const { chosen } = useFollowedCreatorId();
+  const creator = followedOf(creators.data ?? [], chosen);
   const dashboard = useQuery({
     queryKey: ['dashboard', creator?.id, period],
     queryFn: () => fetchDashboard(creator?.id ?? '', period),
     enabled: creator !== undefined,
     refetchInterval: REFRESH_MS,
-    // A new period keeps the page on the last answer while it is read: no flash back to loading.
-    placeholderData: keepPreviousData,
+    // A new period keeps the page on the last answer while it is read: no flash back to loading. Another creator
+    // does not: her page never shows under the name of the one before.
+    placeholderData: (previous) => (previous?.creator.id === creator?.id ? previous : undefined),
     // One retry, then the page says the server does not answer: a server down must not leave it loading.
     retry: 1,
   });

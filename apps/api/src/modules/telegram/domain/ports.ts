@@ -57,6 +57,12 @@ export interface NewDelivery {
   readonly closedBy: string | null;
 }
 
+/** A delivery as the « Dernières alertes » log reads it: its group may be gone (REG-28), its title stays. */
+export interface LoggedDelivery extends Omit<DeliveryRecord, 'chatId'> {
+  readonly chatId: TelegramChatId | null;
+  readonly chatTitle: string;
+}
+
 export interface DeliveryRecord extends NewDelivery {
   readonly id: string;
   readonly status: TelegramDeliveryStatus;
@@ -114,6 +120,18 @@ export interface BotsStore {
     },
   ): Promise<void>;
 
+  /**
+   * REG-28, in one transaction: deletes the group and its routes (cascade) if `mayRemove` says so of its membership
+   * read under a row lock. Its deliveries stay, without a group and with its title (the night counts read them): those
+   * still pending fail, those being sent turn `unknown`, both `chat_removed`. Moves the routing version so open
+   * screens reload; writes `audit_log`.
+   */
+  removeChat(
+    id: TelegramChatId,
+    mayRemove: (membership: TelegramMembership) => boolean,
+    userId: string,
+  ): Promise<'removed' | 'missing' | 'refused'>;
+
   listRoutes(): Promise<{ readonly routes: readonly TelegramRoute[]; readonly version: number }>;
   /** Replaces the whole table if it is still at `version`; false otherwise. */
   replaceRoutes(version: number, routes: readonly TelegramRoute[]): Promise<boolean>;
@@ -170,10 +188,7 @@ export interface DeliveriesStore {
   enqueueFlush(chatId: TelegramChatId, runAt: Date): Promise<void>;
   enqueuePoll(botId: TelegramBotId, waitSeconds: number): Promise<void>;
 
-  listDeliveries(
-    limit: number,
-    topic: TelegramTopic | null,
-  ): Promise<readonly (DeliveryRecord & { readonly chatTitle: string })[]>;
+  listDeliveries(limit: number, topic: TelegramTopic | null): Promise<readonly LoggedDelivery[]>;
   countTopics(creatorId: CreatorId, from: Date, to: Date): Promise<Partial<Record<TelegramTopic, number>>>;
   purgeBefore(at: Date): Promise<number>;
 }
@@ -259,4 +274,9 @@ export interface NotificationChannel {
 
 export interface Clock {
   now(): Date;
+}
+
+/** Her alerts' names by the id of their row, archived ones too (the `alerts` module, wired by the composition root). */
+export interface AlertNames {
+  ofCreator(creatorId: CreatorId): Promise<ReadonlyMap<string, string>>;
 }

@@ -1,4 +1,5 @@
 import type {
+  BriefIntent,
   Destination,
   PlaygroundAnswer,
   PlaygroundMedia,
@@ -24,9 +25,40 @@ export const DESTINATION_LABELS: Readonly<Record<Destination, string>> = {
 };
 export const DESTINATION_HINTS: Readonly<Record<Destination, string>> = {
   voice_example: 'Rejoint les exemples donnés à la voix.',
-  rule: 'Part à Charles pour validation, puis devient du code.',
+  rule: 'Part au propriétaire pour validation, puis devient du code.',
   test: 'Rejoué à chaque changement de prompt ou de modèle.',
 };
+/** Said once the lesson is filed: where it went and what it changes. */
+const DESTINATION_ACKS: Readonly<Record<Destination, string>> = {
+  voice_example: 'Rangée en Exemple de voix : elle rejoint les exemples donnés à la voix.',
+  rule: 'Rangée en Règle : elle part au propriétaire pour validation.',
+  test: 'Rangée en Test : rejouée à chaque changement de prompt ou de modèle.',
+};
+
+/** The line under the conversation once a lesson is filed; the demo saves nothing, and says so as its bar does. */
+export const filedAck = (destination: Destination, isDemo: boolean): string =>
+  isDemo ? 'Démo : rien n’est rangé pour de vrai.' : DESTINATION_ACKS[destination];
+
+/**
+ * Why an answer was rejected, kept in view while its destination is chosen: the reason first, since it decides where
+ * the lesson goes (a rule for some reasons), then the trainer's note when there is one.
+ */
+export function rejectedWords(
+  verdict: Extract<Verdict, { kind: 'rejected' }>,
+  reasons: PlaygroundState['rejectReasons'],
+): { reason: string; note: string | null } {
+  const reason = reasons.find((r) => r.id === verdict.reason)?.label ?? verdict.reason;
+  const note = verdict.note?.trim() ?? '';
+  return { reason, note: note === '' ? null : note };
+}
+
+/** A risk the trap already explains in words: listed once, under « Piège ». */
+const TRAP_RISKS: readonly string[] = ['manipulation_attempt'];
+
+/** The brain's risks worth a line of their own next to the trap's signals. */
+export function risksBesideTrap(risks: readonly string[], hasTrap: boolean): string[] {
+  return hasTrap ? risks.filter((r) => !TRAP_RISKS.includes(r)) : [...risks];
+}
 
 const RULE_REASONS: readonly RejectReason[] = ['too_early_sexual', 'missed_sale', 'forgot_fact'];
 
@@ -40,7 +72,8 @@ export function suggestedDestination(verdict: Verdict): Destination | undefined 
   return RULE_REASONS.includes(verdict.reason) ? 'rule' : 'test';
 }
 
-const INTENTS: Readonly<Record<string, string>> = {
+/** Every intent of the contract has its words: an intent added to `BRIEF_INTENTS` breaks the typecheck here. */
+const INTENTS: Readonly<Record<BriefIntent, string>> = {
   small_talk: 'Il discute',
   kyc_answer: 'Il parle de lui',
   flirt: 'Il flirte',
@@ -51,6 +84,7 @@ const INTENTS: Readonly<Record<string, string>> = {
   asks_if_bot: 'Il demande si elle est un bot',
   asks_to_meet: 'Il veut la rencontrer',
   asks_personal_contact: 'Il veut ses coordonnées',
+  asks_for_service: 'Il demande un service (sur mesure, appel, cam, vocal)',
   distress: 'Il va mal',
   complaint: 'Il se plaint',
   off_topic_request: 'Il demande autre chose (recette, code…)',
@@ -94,7 +128,7 @@ export const MEDIA_FLAG_LABELS: Readonly<Record<string, string>> = {
 };
 
 /** The brain's codes in the team's words; an unknown code shows as is, never as an empty line. */
-export const intentLabel = (code: string): string => INTENTS[code] ?? code;
+export const intentLabel = (intent: BriefIntent): string => INTENTS[intent];
 export const sentimentLabel = (code: string): string => SENTIMENTS[code] ?? code;
 export const actionLabel = (code: string): string => ACTIONS[code] ?? code;
 export const riskLabel = (code: string): string => RISKS[code] ?? code;

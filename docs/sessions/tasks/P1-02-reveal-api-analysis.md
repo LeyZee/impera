@@ -15,7 +15,7 @@ Répondre aux 14 questions de `connectors.md` dans `docs/reference/reveal-api-ob
 - Charles enregistre 2 ou 3 sessions, avec l'enregistreur (P1-01) ou en HAR (`docs/runbooks/reveal-recording.md`, anonymisé par `scripts/anonymize-har.mjs`), et dépose les exports **anonymisés** dans `.scratch/inbox/` (pas dans le dépôt).
 - Analyser : endpoints, auth, identifiants, temps réel, écritures (CSRF/signature), anti-bot, ventes, médias, rate limits. Documenter chaque endpoint utile avec un exemple anonymisé.
 - Vérifier la stabilité sur deux enregistrements à des jours différents.
-- `apps/api/test/fake-reveal/` : serveur Fastify reproduisant ces endpoints (formes de réponses, codes d'erreur, pagination), scénarios pilotables (`POST /__scenario`), fixtures fictives.
+- `apps/api/src/__tests__/fake-reveal/` : serveur Fastify reproduisant ces endpoints (formes de réponses, codes d'erreur, pagination), scénarios pilotables (`POST /__scenario`), fixtures fictives.
 - Mettre à jour `ConnectorCapabilities` attendues pour Reveal.
 - Si l'enregistreur n'a pas suffi (WebSocket binaire, chiffrement applicatif), le dire et proposer la suite (C ou analyse plus poussée).
 

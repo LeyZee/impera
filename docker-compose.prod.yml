@@ -1,0 +1,104 @@
+# Production deployment (ADR 0027, docs/runbooks/deploy.md): what Coolify deploys from `main`, and a local rehearsal.
+# The database is Neon (ADR 0005): DATABASE_URL and DATABASE_ADMIN_URL point to its direct endpoint, never the pooler
+# (Graphile Worker needs LISTEN/NOTIFY). Every variable is set in Coolify, never in a file of the repository.
+#
+# Local rehearsal against the development Postgres, with a .env.prod (ignored by git) copied from .env.example and the
+# database host set to `postgres`; the database first, the migrations need it up:
+#   docker compose up -d --wait postgres
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
+x-api-env: &api-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  RELEASE: ${SOURCE_COMMIT:-unknown}
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-300}
+  # Coolify's proxy, then the web container's nginx.
+  TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+  DATABASE_URL: ${DATABASE_URL:?}
+  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
+  SESSION_ENCRYPTION_KEYS: ${SESSION_ENCRYPTION_KEYS:?}
+  CREDENTIALS_ENCRYPTION_KEYS: ${CREDENTIALS_ENCRYPTION_KEYS:?}
+  AUTH_SECRET: ${AUTH_SECRET:?}
+  AUTH_BASE_URL: ${AUTH_BASE_URL:?}
+  WEB_ORIGIN: ${WEB_ORIGIN:?}
+  EXTENSION_DEVICE_TOKEN: ${EXTENSION_DEVICE_TOKEN:?}
+  PLAYGROUND_PERSONA_PATH: ${PLAYGROUND_PERSONA_PATH:-}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+  LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+  LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+  LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_BUCKET: ${S3_BUCKET:-nirvana-media}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+  VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+  NIRVANA_INLINE_WORKER: '0'
+
+# The same image for the three Node services; Docker's cache builds it once.
+x-api-image: &api-image
+  build: { context: ., dockerfile: apps/api/Dockerfile }
+  image: nirvana-api:${SOURCE_COMMIT:-local}
+
+services:
+  # Applies the pending migrations, then exits; the API and the worker start only once it succeeded.
+  migrate:
+    <<: *api-image
+    command: ['node', 'dist/scripts/migrate.js']
+    environment: *api-env
+    restart: 'no'
+    healthcheck: { disable: true }
+
+  api:
+    <<: *api-image
+    environment: *api-env
+    volumes:
+      - training:/data/training
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  worker:
+    <<: *api-image
+    command: ['node', 'dist/worker.js']
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    # A job in progress gets 25 s to finish after SIGTERM (operations.md).
+    stop_grace_period: 30s
+    healthcheck: { disable: true }
+
+  # The only public service: Coolify gives it the domain; /v1 reaches the API through it.
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    environment:
+      API_UPSTREAM: api:3000
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+    ports:
+      # Loopback only: in production every request comes through Coolify's proxy, never straight to this port.
+      - '127.0.0.1:${WEB_PORT:-8080}:8080'
+
+  # The daily encrypted export outside Neon (ADR 0028, ops/db-export). Without its settings it still starts, and the
+  # night's export fails into backup_runs, where the 26-hour alert sees it: a missing backup is never silent.
+  backup:
+    build: { context: ops/db-export }
+    environment:
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:-${DATABASE_ADMIN_URL:?}}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_TARGET: s3
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    healthcheck: { disable: true }
+
+volumes:
+  training:

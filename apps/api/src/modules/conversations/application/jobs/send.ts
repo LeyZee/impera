@@ -14,6 +14,7 @@ import type {
   Conversation,
   Draft,
   EventMeta,
+  FollowUpPlan,
   JobLogger,
   OutboundSender,
   Transaction,
@@ -21,12 +22,15 @@ import type {
 } from '../../domain/ports';
 import { bubbleIdempotencyKey, canSend } from '../../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../../domain/state-machine';
+import { scheduleFollowUp } from '../follow-ups';
 import { appendEvent, lockConversation, setDraftStatus } from '../journal';
 
 export interface SendDeps {
   readonly uow: UnitOfWork;
   readonly clock: Clock;
   readonly sender: OutboundSender;
+  /** Her follow-up delays (P3-10); without it, no follow-up is scheduled. */
+  readonly followUps?: FollowUpPlan;
 }
 
 interface Sendable {
@@ -42,7 +46,7 @@ const SENDABLE: readonly DraftStatus[] = ['approved', 'edited'];
  * fan message or a takeover since the approval expires the draft and stops the send. A retry resumes after the
  * bubbles already recorded; an unknown outcome is checked with `verifySent` before trying again.
  */
-export function createSendJob({ uow, clock, sender }: SendDeps) {
+export function createSendJob({ uow, clock, sender, followUps }: SendDeps) {
   const meta = (payload: JobPayload<'conversation.send'>): EventMeta => ({
     actor: 'system',
     correlationId: payload.correlationId,
@@ -80,6 +84,23 @@ export function createSendJob({ uow, clock, sender }: SendDeps) {
     );
     await setDraftStatus(tx, draft, 'expired', { decidedBy: null, at: at.at });
     return null;
+  }
+
+  /** The persona's delays, or none: a follow-up missed is better than a send that fails after it went out. */
+  async function followUpDelays(
+    payload: JobPayload<'conversation.send'>,
+    logger: JobLogger,
+  ): Promise<readonly number[]> {
+    if (followUps === undefined) return [];
+    try {
+      return await followUps.delaysHours(payload.creatorId);
+    } catch (error) {
+      logger.warn(
+        { err: error instanceof Error ? error.name : 'unknown' },
+        'send: follow-up delays unreadable',
+      );
+      return [];
+    }
   }
 
   return async (
@@ -212,10 +233,13 @@ export function createSendJob({ uow, clock, sender }: SendDeps) {
       });
     }
 
+    // Read before the lock, like the engine: the persona lives in another module.
+    const delaysHours = await followUpDelays(payload, logger);
     await uow.inTenant(payload.creatorId, async (tx) => {
       const sendable = await lockSendable(tx, payload);
       if (sendable === null) return;
-      await appendEvent(
+      const at = meta(payload);
+      const sent = await appendEvent(
         tx,
         sendable.conversation,
         {
@@ -227,9 +251,11 @@ export function createSendJob({ uow, clock, sender }: SendDeps) {
             attempt,
           },
         },
-        meta(payload),
+        at,
       );
       await setDraftStatus(tx, sendable.draft, 'sent', { decidedBy: null, at: clock.now() });
+      // He has her answer: if he goes silent, she follows up (P3-10).
+      await scheduleFollowUp(tx, sent, delaysHours, at);
     });
     logger.info({ draftId: payload.draftId, bubbles: bubbles.length }, 'send: verified');
   };

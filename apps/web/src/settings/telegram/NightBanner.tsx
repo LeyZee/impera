@@ -57,7 +57,7 @@ export function NightBanner({
   const banner = nightBannerOf(night, creatorName);
   if (banner === null) return null;
   return (
-    <aside className="nv-glass tg-night nv-enter" data-state={banner.state} aria-labelledby="tg-night-title">
+    <aside className="nv-plate tg-night nv-enter" data-state={banner.state} aria-labelledby="tg-night-title">
       <span className="tg-night__orb" aria-hidden="true">
         <svg
           viewBox="0 0 24 24"

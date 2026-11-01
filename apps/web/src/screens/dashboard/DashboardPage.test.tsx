@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { AgentModeResultSchema, type AgentMode, type Dashboard as ApiDashboard } from '@nirvana/contracts';
+import {
+  AgentModeResultSchema,
+  CreatorIdSchema,
+  type AgentMode,
+  type Dashboard as ApiDashboard,
+} from '@nirvana/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -12,6 +17,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DashboardPage } from './DashboardPage';
+import { dashboardSearch, parseDashboardSearch, periodOf } from './logic';
 
 import { apiDashboard, CREATOR, serveDashboard } from '@/test/fakes';
 
@@ -51,19 +57,46 @@ afterEach(() => {
 /** Where the page's router is, once a test has rendered it. */
 let location = (): string => '';
 
-function renderDashboard(): QueryClient {
+function renderDashboard(
+  forCreator = false,
+  forOwner = false,
+  opensTracking = true,
+  at = '/',
+  canAddCreator = false,
+): QueryClient {
   // No delay before the one retry: a failing server shows at once.
   const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
   // The night banner links to Réglages: the page needs a router around it.
   const root = createRootRoute();
+  const home = createRoute({
+    getParentRoute: () => root,
+    path: '/',
+    validateSearch: parseDashboardSearch,
+    component: function Home() {
+      const search = home.useSearch();
+      const navigate = home.useNavigate();
+      return (
+        <DashboardPage
+          period={periodOf(search)}
+          onPeriod={(next) => void navigate({ search: dashboardSearch(next), replace: true })}
+          forCreator={forCreator}
+          forOwner={forOwner}
+          opensTracking={opensTracking}
+          canAddCreator={canAddCreator}
+        />
+      );
+    },
+  });
   const router = createRouter({
     routeTree: root.addChildren([
-      createRoute({ getParentRoute: () => root, path: '/', component: DashboardPage }),
+      home,
       createRoute({ getParentRoute: () => root, path: '/reglages/telegram' }),
       createRoute({ getParentRoute: () => root, path: '/reglages/modeles-ia' }),
       createRoute({ getParentRoute: () => root, path: '/suivi' }),
+      createRoute({ getParentRoute: () => root, path: '/creatrices' }),
+      createRoute({ getParentRoute: () => root, path: '/reglages/sauvegardes' }),
     ]),
-    history: createMemoryHistory({ initialEntries: ['/'] }),
+    history: createMemoryHistory({ initialEntries: [at] }),
   });
   location = () => router.state.location.href;
   render(
@@ -75,8 +108,6 @@ function renderDashboard(): QueryClient {
 }
 
 const headline = (): string => document.querySelector('h1')?.textContent ?? '';
-const dialog = (): HTMLElement => screen.getByRole('dialog', { hidden: true });
-
 describe('DashboardPage on the server’s data', () => {
   it('waits for the server without showing any figure', async () => {
     serveDashboard({ status: 200, body: apiDashboard() });
@@ -91,12 +122,36 @@ describe('DashboardPage on the server’s data', () => {
     expect(await screen.findByText('Kévin')).toBeDefined();
     expect(screen.queryByText('Exemple')).toBeNull();
     expect(headline()).toBe('Une urgence t’attend');
-    expect(screen.getByText(/dès que la connexion à Reveal les observera/u)).toBeDefined();
+    // No sales block until they are observed: one quiet line (DASH-02).
+    expect(screen.getByText(/Ventes : bientôt lues depuis Reveal/u)).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /^Ventes/u })).toBeNull();
     expect(screen.getByText('Théo')).toBeDefined();
     // The best fans' bar names no colour: the agent's part is the data colour, not the urgencies' red.
     expect(screen.getByText(/d’abord la part de l’agent, puis celle des chatteurs/u)).toBeDefined();
     // A todo of the server leaves the list when its conversation is handled, not on a tick here.
     expect(screen.queryByRole('button', { name: 'Marquer comme traité' })).toBeNull();
+  });
+
+  it('says under the best fans that the dollars are not counted for want of a rate, or at which one', async () => {
+    serveDashboard({ status: 200, body: apiDashboard({ usdSales: { seen: true, rate: null } }) });
+    renderDashboard();
+    expect(
+      await screen.findByText(
+        'Les ventes en dollars ne sont pas comptées : aucun taux BCE n’est encore connu.',
+      ),
+    ).toBeDefined();
+    cleanup();
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({ usdSales: { seen: true, rate: { day: '2026-10-27' } } }),
+    });
+    renderDashboard();
+    expect(await screen.findByText('Dollars convertis en euros au taux BCE du 27 octobre.')).toBeDefined();
+    cleanup();
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard();
+    await screen.findByText('Théo');
+    expect(screen.queryByText(/taux BCE/u)).toBeNull();
   });
 
   it('opens a draft to validate in Suivi, on its conversation', async () => {
@@ -124,12 +179,25 @@ describe('DashboardPage on the server’s data', () => {
     });
   });
 
-  it('says the voice waits for its key and leads to where it goes', async () => {
+  it('tells a manager who puts the key, and offers no way to Réglages, which he does not have', async () => {
     serveDashboard({
       status: 200,
       body: apiDashboard({ voice: { ok: false, keyMissing: true, medianWriteMs: null, outagesLast7d: 0 } }),
     });
     renderDashboard();
+    await waitFor(() => {
+      expect(headline()).toBe('L’IA qui écrit attend sa clé');
+    });
+    expect(screen.getByText(/^Le propriétaire la pose dans Réglages › Modèles IA\./u)).toBeDefined();
+    expect(screen.queryByRole('link', { name: 'Poser la clé' })).toBeNull();
+  });
+
+  it('says the voice waits for its key and leads the owner to where it goes', async () => {
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({ voice: { ok: false, keyMissing: true, medianWriteMs: null, outagesLast7d: 0 } }),
+    });
+    renderDashboard(false, true);
     await waitFor(() => {
       expect(headline()).toBe('L’IA qui écrit attend sa clé');
     });
@@ -172,6 +240,53 @@ function serveModes(
 
 const checked = (name: string): string | null =>
   screen.getByRole('radio', { name }).getAttribute('aria-checked');
+
+describe('DashboardPage, its period (recette 28/10, M11 and M12)', () => {
+  it('reads the period from the address, so that a reload keeps it, and writes it back there', async () => {
+    const fetch = serveDashboard((url) => ({
+      status: 200,
+      body: apiDashboard({ period: url.searchParams.get('period') === 'week' ? 'week' : 'day' }),
+    }));
+    renderDashboard(false, false, true, '/?periode=7j');
+    const week = await screen.findByRole('radio', { name: '7 jours' });
+    expect(week.getAttribute('aria-checked')).toBe('true');
+    const asked = fetch.mock.calls.map(([input]) => String(input)).filter((u) => u.includes('/v1/dashboard'));
+    expect(asked.every((u) => u.includes('period=week'))).toBe(true);
+
+    fireEvent.click(screen.getByRole('radio', { name: '30 jours' }));
+    await waitFor(() => {
+      expect(location()).toBe('/?periode=30j');
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'Aujourd’hui' }));
+    await waitFor(() => {
+      expect(location()).toBe('/');
+    });
+  });
+
+  it('moves between the periods with the arrow keys, one stop of the Tab key for the group', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard();
+    const today = await screen.findByRole('radio', { name: 'Aujourd’hui' });
+    const week = screen.getByRole('radio', { name: '7 jours' });
+    expect(today.tabIndex).toBe(0);
+    expect(week.tabIndex).toBe(-1);
+    today.focus();
+    fireEvent.keyDown(today, { key: 'ArrowRight' });
+    await waitFor(() => {
+      expect(location()).toBe('/?periode=7j');
+    });
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: '7 jours' }));
+    fireEvent.keyDown(document.activeElement ?? week, { key: 'ArrowLeft' });
+    await waitFor(() => {
+      expect(location()).toBe('/');
+    });
+    // As Réglages › Apparence: past the first, the last.
+    fireEvent.keyDown(document.activeElement ?? today, { key: 'ArrowLeft' });
+    await waitFor(() => {
+      expect(location()).toBe('/?periode=30j');
+    });
+  });
+});
 
 describe('DashboardPage changing the mode', () => {
   it('stops the agent after the confirmation, on the server, and resumes it in one click', async () => {
@@ -242,6 +357,28 @@ describe('DashboardPage changing the mode', () => {
     expect(checked('Arrêt')).toBe('true');
   });
 
+  it('keeps the grave lines on Arrêt and only them (choix de Charles, 28/10)', async () => {
+    const [grave] = apiDashboard().todos;
+    if (grave === undefined) throw new Error('the fixture has a todo');
+    // A line the server no longer sends on Arrêt, still held from the read before the stop.
+    serveModes('stop', undefined, {
+      todos: [grave, { ...grave, id: 'todo-2', tone: 'warn', kind: 'awaiting_approval', title: 'Marc' }],
+    });
+    renderDashboard();
+    expect(await screen.findByRole('button', { name: 'Mineur possible : Kévin' })).toBeDefined();
+    expect(screen.queryByText('Marc')).toBeNull();
+    expect(headline()).toContain('arrêté');
+    expect(screen.getByText(/Une urgence reste à traiter quand même/u)).toBeDefined();
+  });
+
+  it('says nothing waits on Arrêt when no grave line does', async () => {
+    serveModes('stop', undefined, { todos: [] });
+    renderDashboard();
+    await screen.findByRole('radio', { name: 'Arrêt' });
+    expect(screen.queryByText('Rien à traiter pour l’instant.')).toBeNull();
+    expect(screen.getByText(/Les chatteurs gardent la main dans Reveal/u)).toBeDefined();
+  });
+
   it('says so when the global switch keeps the agent stopped', async () => {
     serveModes('stop', () => ({ status: 200, body: { mode: 'stop', globalStop: true } }));
     renderDashboard();
@@ -253,7 +390,9 @@ describe('DashboardPage changing the mode', () => {
   it('says from the start when a global switch holds the agent, and offers no way back it cannot give', async () => {
     serveModes('stop', undefined, { globalStop: true });
     renderDashboard();
-    expect((await screen.findByRole('alert')).textContent).toContain('seul un opérateur peut le lever');
+    // In the hero, next to the sentence it explains, not in a corner (DASH-08).
+    expect(await screen.findByText(/Un arrêt général est posé pour toutes les créatrices/u)).toBeDefined();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('radio', { name: 'Copilote' }).getAttribute('aria-disabled')).toBe('true');
     expect(screen.queryByRole('button', { name: 'Repasser en copilote' })).toBeNull();
   });
@@ -339,16 +478,132 @@ describe('DashboardPage changing the mode', () => {
   });
 });
 
+describe('DashboardPage of the owner', () => {
+  const backups = (state: 'ok' | 'overdue' | 'never') => (url: URL) =>
+    url.pathname === '/v1/backups/status'
+      ? {
+          status: 200,
+          body: {
+            state,
+            lastSucceededAt: state === 'never' ? null : '2026-10-26T02:12:00.000Z',
+            overdueAfterHours: 26,
+            lastRun: null,
+            lastRestoreTest: {
+              testedAt: '2026-10-01T10:00:00.000Z',
+              backupFinishedAt: '2026-09-30T01:05:00.000Z',
+              durationSeconds: 420,
+              rowCountMismatches: 0,
+            },
+            restoreTestFresh: true,
+          },
+        }
+      : { status: 200, body: apiDashboard() };
+
+  it('says in amber when no export succeeded for too long', async () => {
+    serveDashboard(backups('overdue'));
+    renderDashboard(false, true);
+    expect(await screen.findByText(/^Aucune sauvegarde réussie depuis le 26 octobre/u)).toBeDefined();
+    // Where the export is read and a restore test noted, one click away (DASH-19).
+    expect(screen.getByRole('link', { name: 'Voir les sauvegardes' }).getAttribute('href')).toBe(
+      '/reglages/sauvegardes',
+    );
+  });
+
+  it('says when none was ever made, and nothing while they are on time', async () => {
+    serveDashboard(backups('never'));
+    renderDashboard(false, true);
+    expect(await screen.findByText('Aucune sauvegarde encore')).toBeDefined();
+    cleanup();
+    serveDashboard(backups('ok'));
+    renderDashboard(false, true);
+    await screen.findByRole('radio', { name: 'Arrêt' });
+    expect(screen.queryByText(/Aucune sauvegarde/u)).toBeNull();
+  });
+
+  it('says when no restore test is recent, with the exports on time', async () => {
+    serveDashboard((url: URL) =>
+      url.pathname === '/v1/backups/status'
+        ? {
+            status: 200,
+            body: {
+              state: 'ok',
+              lastSucceededAt: '2026-10-26T02:12:00.000Z',
+              overdueAfterHours: 26,
+              lastRun: null,
+              lastRestoreTest: null,
+              restoreTestFresh: false,
+            },
+          }
+        : { status: 200, body: apiDashboard() },
+    );
+    renderDashboard(false, true);
+    expect(await screen.findByText('Aucun essai de restauration récent')).toBeDefined();
+  });
+
+  it('is the owner’s alone: nobody else reads the exports', async () => {
+    const fetched = serveDashboard(backups('never'));
+    renderDashboard();
+    await screen.findByRole('radio', { name: 'Arrêt' });
+    expect(screen.queryByText('Aucune sauvegarde encore')).toBeNull();
+    expect(fetched.mock.calls.map(([input]) => String(input))).not.toContain('/v1/backups/status');
+  });
+});
+
+describe('DashboardPage of a creator', () => {
+  it('shows the agent’s state, never a conversation nor a fan, even if the server sent one', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(true);
+    await waitFor(() => {
+      expect(headline()).toBe('Tout va bien. Rien ne t’attend.');
+    });
+    expect(screen.queryByText('Kévin')).toBeNull();
+    expect(screen.queryByText('Théo')).toBeNull();
+    expect(screen.queryByText('Meilleurs fans')).toBeNull();
+    expect(screen.queryByText('Rien à traiter pour l’instant.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Voir l’urgence' })).toBeNull();
+    expect(screen.getByText(/L’agence suit les conversations/u)).toBeDefined();
+  });
+
+  it('leaves the mode and the key to the agency', async () => {
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({ voice: { ok: false, keyMissing: true, medianWriteMs: null, outagesLast7d: 0 } }),
+    });
+    renderDashboard(true);
+    await waitFor(() => {
+      expect(headline()).toBe('L’IA qui écrit attend sa clé');
+    });
+    expect(screen.queryByRole('link', { name: 'Poser la clé' })).toBeNull();
+    expect(screen.getByText(/L’agence s’en occupe\. D’ici là/u)).toBeDefined();
+    // Her fold says it is the agency's to do, never « une étape reste à faire » (DASH-21).
+    expect(document.querySelector('.nv-disclosure__title')?.textContent).toBe('L’agence s’en occupe');
+    // Her mode, read only: the pill alone, no control that looks like one.
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(document.querySelector('.db-modepill')?.textContent).toContain('réglé par l’agence');
+  });
+
+  it('says nothing of the night’s alerts, the team’s', async () => {
+    serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
+    renderDashboard(true);
+    await screen.findByText(/réglé par l’agence/u);
+    expect(screen.queryByText('Personne n’est prévenu la nuit')).toBeNull();
+  });
+});
+
 describe('DashboardPage when the server does not answer', () => {
-  it('says so in one sentence, with no figure and nothing to act on', async () => {
-    serveDashboard({ status: 500 });
+  it('says so in one sentence, with no figure and only « Réessayer » (DASH-22)', async () => {
+    let up = false;
+    serveDashboard(() => (up ? { status: 200, body: apiDashboard() } : { status: 500 }));
     renderDashboard();
     expect(await screen.findByText('ne répond pas')).toBeDefined();
     expect(headline()).toBe('Le serveur ne répond pas');
     expect(screen.getByText('Léa')).toBeDefined();
     expect(screen.queryByText('Exemple')).toBeNull();
     expect(screen.queryByRole('radio')).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Réessayer']);
+    up = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(await screen.findByText('Kévin')).toBeDefined();
   });
 
   it('never keeps an older answer on screen once a read fails', async () => {
@@ -367,14 +622,188 @@ describe('DashboardPage when the server does not answer', () => {
 });
 
 describe('DashboardPage before any creator exists', () => {
-  it('shows the sample, marked « Exemple », where nothing can be acted on', async () => {
+  it('asks for a first creator, with no made-up figure (DASH-13)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() }, []);
+    renderDashboard(false, true, true, '/', true);
+    await waitFor(() => {
+      expect(headline()).toBe('Ajoute ta première créatrice');
+    });
+    expect(screen.getByRole('link', { name: 'Aller à Créatrices' }).getAttribute('href')).toBe('/creatrices');
+    expect(screen.queryByText('Kévin')).toBeNull();
+    expect(screen.queryByText('Exemple')).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull();
+  });
+
+  it('tells an account that cannot add one who does', async () => {
     serveDashboard({ status: 200, body: apiDashboard() }, []);
     renderDashboard();
-    expect(await screen.findByText('Exemple')).toBeDefined();
-    expect(headline()).toContain('3 choses');
-    expect(screen.getByRole('radio', { name: 'Arrêt' }).getAttribute('aria-disabled')).toBe('true');
+    await waitFor(() => {
+      expect(headline()).toBe('Aucune créatrice pour l’instant');
+    });
+    expect(screen.getByText(/Le propriétaire de l’agence les ajoute/u)).toBeDefined();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+});
+
+describe('DashboardPage with several creators (recette 28/10, G1)', () => {
+  // Before Léa in the alphabet: the server lists her first.
+  const ANA = { id: '0192f3a0-0000-7000-8000-0000000000c2', displayName: 'Ana', timezone: 'Europe/Paris' };
+  const writes: { creatorId: string; mode: AgentMode }[] = [];
+
+  /** Whose Dashboard was read last. */
+  let lastRead = (): string | null => null;
+
+  /** Each creator's own Dashboard, by the id asked for. */
+  function serveBoth(): void {
+    writes.length = 0;
+    const server = serveDashboard(
+      (url) => {
+        const ana = url.searchParams.get('creatorId') === ANA.id;
+        return {
+          status: 200,
+          body: apiDashboard({
+            creator: {
+              id: CreatorIdSchema.parse(ana ? ANA.id : CREATOR.id),
+              name: ana ? 'Ana' : 'Léa',
+              timezone: 'Europe/Paris',
+              now: '2026-10-19T12:00:00Z',
+            },
+          }),
+        };
+      },
+      [ANA, CREATOR],
+      (body) => {
+        writes.push(body);
+        return { status: 200, body: { mode: body.mode, globalStop: false } };
+      },
+    );
+    lastRead = () => {
+      const reads = server.mock.calls
+        .map(([input]) => new URL(String(input), 'http://localhost'))
+        .filter((url) => url.pathname === '/v1/dashboard');
+      return reads.at(-1)?.searchParams.get('creatorId') ?? null;
+    };
+  }
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('shows the first creator until another is chosen, then hers, and stops the one on screen', async () => {
+    serveBoth();
+    renderDashboard();
+    expect((await screen.findByRole('radio', { name: 'Ana' })).getAttribute('aria-checked')).toBe('true');
+    // The chips name her: the header does not say it a second time (DASH-03).
+    await waitFor(() => {
+      expect(lastRead()).toBe(ANA.id);
+    });
+    expect(document.querySelector('.db-top__name')).toBeNull();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Léa' }));
+    await waitFor(() => {
+      expect(lastRead()).toBe(CREATOR.id);
+    });
+    expect((await screen.findByRole('radio', { name: 'Léa' })).getAttribute('aria-checked')).toBe('true');
+
     fireEvent.click(screen.getByRole('radio', { name: 'Arrêt' }));
-    expect(dialog().getAttribute('aria-hidden')).toBe('true');
-    expect(screen.queryByRole('button', { name: 'Marquer comme traité' })).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Arrêter l’agent' }));
+      await tick();
+    });
+    expect(writes).toEqual([{ creatorId: CREATOR.id, mode: 'stop' }]);
+  });
+
+  it('keeps the choice over a reload, and moves it with the arrow keys', async () => {
+    serveBoth();
+    localStorage.setItem('nirvana.followed-creator', CREATOR.id);
+    renderDashboard();
+    const lea = await screen.findByRole('radio', { name: 'Léa' });
+    expect(lea.getAttribute('aria-checked')).toBe('true');
+    expect(lea.tabIndex).toBe(0);
+    fireEvent.keyDown(lea, { key: 'ArrowLeft' });
+    await waitFor(() => {
+      expect(lastRead()).toBe(ANA.id);
+    });
+    expect(localStorage.getItem('nirvana.followed-creator')).toBe(ANA.id);
+  });
+
+  it('shows the urgencies of the others on their chip, and says when they cannot be read (DASH-03)', async () => {
+    let queue = true;
+    serveDashboard(
+      (url) =>
+        url.pathname === '/v1/dashboard/todos'
+          ? queue
+            ? {
+                status: 200,
+                body: {
+                  items: [],
+                  creators: [
+                    { creatorId: ANA.id, name: 'Ana', todos: 1, grave: 1 },
+                    { creatorId: CREATOR.id, name: 'Léa', todos: 3, grave: 2 },
+                  ],
+                },
+              }
+            : { status: 500 }
+          : { status: 200, body: apiDashboard() },
+      [ANA, CREATOR],
+    );
+    renderDashboard();
+    // Ana is followed: her own urgencies are on the page; Léa's are on her chip.
+    expect(await screen.findByRole('radio', { name: 'Léa, 2 urgences' })).toBeDefined();
+    expect(screen.getByRole('radio', { name: 'Ana' })).toBeDefined();
+    // The live region is there before it has anything to say, so that its text is announced when it comes.
+    const quiet = document.querySelector('.db-creators__unread');
+    expect(quiet?.getAttribute('role')).toBe('status');
+    expect(quiet?.textContent).toBe('');
+    cleanup();
+    queue = false;
+    renderDashboard();
+    expect(
+      await screen.findByText(/Les urgences des autres créatrices n’ont pas pu être lues/u, undefined, {
+        timeout: 4000,
+      }),
+    ).toBeDefined();
+  });
+
+  it('offers no choice with a single creator', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard();
+    expect(await screen.findByText('Kévin')).toBeDefined();
+    expect(screen.queryByRole('radiogroup', { name: 'Créatrice suivie' })).toBeNull();
+  });
+});
+
+describe('DashboardPage, the fold of the agent', () => {
+  it('says each card’s detail to a screen reader, not only in the tip (DASH-17)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(false, true);
+    await screen.findByText('Kévin');
+    const budget = [...document.querySelectorAll('.nv-tile')].find((tile) =>
+      tile.textContent.includes('Budget IA du jour'),
+    );
+    expect(budget?.querySelector('.sr-only')?.textContent).toContain('Compté : pour toutes les créatrices.');
+  });
+});
+
+describe('DashboardPage, its best fans', () => {
+  it('opens his conversation in Suivi, with no reader in between (DASH-14)', async () => {
+    const [theo] = apiDashboard().fans;
+    if (theo === undefined) throw new Error('the fixture has a fan');
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard();
+    fireEvent.click(await screen.findByText('Théo'));
+    expect(screen.queryByRole('dialog', { name: 'Conversation' })).toBeNull();
+    await waitFor(() => {
+      expect(location()).toBe(`/suivi?conversation=${theo.conversationId}&creatrice=${CREATOR.id}`);
+    });
+  });
+
+  it('is read only for an account whose rail has no Suivi', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(false, false, false);
+    const theo = await screen.findByText('Théo');
+    expect(theo.closest('button')).toBeNull();
+    fireEvent.click(theo);
+    expect(location()).toBe('/');
   });
 });

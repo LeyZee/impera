@@ -6,6 +6,7 @@ import { run, type Runner } from 'graphile-worker';
 import type { App } from './composition-root';
 import { parsedCronJobs, type CronJob } from './crontab';
 import { workerLoggerFrom, type Logger } from './logger';
+import { useFrenchValidationMessages } from './validation-messages';
 
 export interface WorkerOptions {
   readonly logger: Logger;
@@ -30,6 +31,7 @@ export interface WorkerHandle {
  * tasks. Jobs reach tenant data only through `withTenant` on the application pool, inside each task.
  */
 export async function startWorker(app: App, options: WorkerOptions): Promise<WorkerHandle> {
+  useFrenchValidationMessages();
   const workerId = `${hostname()}:${String(process.pid)}`;
   const logger = options.logger.child({ workerId });
 

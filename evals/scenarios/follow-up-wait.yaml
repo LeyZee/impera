@@ -1,0 +1,22 @@
+# Relance : il dit qu’il revient ; elle ne répond pas (attendre). Fan et messages fictifs (ADR 0010).
+description: Il écrit « attends 5 min je reviens » ; elle attend, aucune bulle n’est obligatoire.
+persona_version: demo
+fan_facts:
+  - 'prénom : Hugo (fictif)'
+history:
+  - from: creator
+    text: Et toi tu fais quoi ce soir
+inbound: Attends 5 min je reviens, je suis au téléphone
+expect:
+  brief:
+    action_in:
+      - wait
+      - reply
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 2
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

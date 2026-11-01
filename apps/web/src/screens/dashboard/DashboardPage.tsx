@@ -1,23 +1,28 @@
-import { useNavigate } from '@tanstack/react-router';
-import { useCallback, useState, type JSX } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { AgentHero } from './AgentHero';
+import { BackupBanner } from './BackupBanner';
+import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
-import { Reader } from './Reader';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TopFans } from './TopFans';
-import { litParts } from './logic';
-import type { Fan, Period, Todo } from './model';
+import { agentRuns, litParts } from './logic';
+import type { Fan, Period, Todo, Tone } from './model';
 import { Section, TONE_COLOR, useFloatingTip } from './parts';
 import { useDashboard, type DashboardView } from './useDashboard';
 import './dashboard.css';
 
+import { pillOf } from '@/agent/mode';
 import { useAgentModeWriter } from '@/agent/write';
+import { useCreators } from '@/creators/api';
+import { initialOf } from '@/lib/utils';
 import { NightBanner } from '@/settings/telegram/NightBanner';
+import { ServerSilent } from '@/shell/ServerSilent';
 
-/** Why the control cannot change the mode: on the sample, under an operator's global switch. */
-const SAMPLE_NOTE = 'Exemple : ce contrôle ne pilote aucun agent.';
+/** Why the control cannot change the mode under an operator's global switch: the hero says it too (DASH-08). */
 const GLOBAL_NOTE =
   'Un arrêt général retient l’agent pour toutes les créatrices : seul un opérateur peut le lever.';
 
@@ -27,41 +32,37 @@ const FUNNEL_SUB: Record<Period, string> = {
   month: 'les fans arrivés ces 30 jours, et combien passent chaque étape',
 };
 
-/**
- * The server does not answer: one sentence, no figure and nothing to act on, until it answers again. Amber, not red:
- * a warning, the red stays the urgencies'.
- */
-function Offline({ creatorName }: { creatorName: string | null }): JSX.Element {
+/** A sentence alone where the page would be: there is no creator yet. */
+function Alone({
+  tone,
+  headline,
+  lead,
+  children,
+}: {
+  tone: Tone;
+  headline: string;
+  lead: string;
+  children?: ReactNode;
+}): JSX.Element {
   return (
     <div className="db">
-      {creatorName === null ? null : (
-        <header className="db-top nv-enter">
-          <div className="db-top__who">
-            <span className="db-top__av" aria-hidden="true">
-              {creatorName.slice(0, 1)}
-            </span>
-            <span className="db-top__name">{creatorName}</span>
-          </div>
-        </header>
-      )}
       <section
         className="db-hero nv-enter"
-        style={{ '--_c': TONE_COLOR.warn, '--nv-i': 1 }}
+        style={{ '--_c': TONE_COLOR[tone], '--nv-i': 1 }}
         role="status"
         aria-live="polite"
       >
         <div className="db-hero__top">
-          <span className="nv-orb nv-tone--warn" aria-hidden="true" />
+          <span className={`nv-orb nv-tone--${tone}`} aria-hidden="true" />
           <div>
             <h1>
-              {litParts('Le serveur **ne répond pas**').map((part) =>
+              {litParts(headline).map((part) =>
                 part.lit ? <em key={part.text}>{part.text}</em> : part.text,
               )}
             </h1>
-            <p className="db-hero__lead">
-              Les chiffres reviennent dès qu’il répond. Rien ici n’est à jour en attendant.
-            </p>
+            <p className="db-hero__lead">{lead}</p>
           </div>
+          {children}
         </div>
       </section>
     </div>
@@ -69,12 +70,90 @@ function Offline({ creatorName }: { creatorName: string | null }): JSX.Element {
 }
 
 /**
- * The Dashboard, read top to bottom (maquette v6, validée le 17/10) : the agent's state and what waits for a
- * human, then the sales, the fans' path, the best fans. Every detail lives in a tip or the read-only reader.
+ * The server does not answer: one sentence, no figure, only « Réessayer », until it answers again. Amber, not red: a
+ * warning, the red stays the urgencies'.
  */
-export function DashboardPage(): JSX.Element {
-  const [period, setPeriod] = useState<Period>('day');
-  const view = useDashboard(period);
+function Offline({ creatorName }: { creatorName: string | null }): JSX.Element {
+  const client = useQueryClient();
+  return (
+    <div className="db">
+      {creatorName === null ? null : (
+        <header className="db-top nv-enter">
+          {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
+          <CreatorPicker />
+          <div className="db-top__who">
+            <span className="db-top__av" aria-hidden="true">
+              {initialOf(creatorName)}
+            </span>
+            <span className="db-top__name">{creatorName}</span>
+          </div>
+        </header>
+      )}
+      {/* The same face as on Aujourd'hui (DASH-22): the sentence, what it holds back, « Réessayer ». */}
+      <ServerSilent
+        headline
+        text="Les chiffres reviennent dès qu’il répond. Rien ici n’est à jour en attendant."
+        onRetry={() => {
+          // The list of creators may be what failed: both are read again.
+          void client.refetchQueries({ queryKey: ['creators'] });
+          void client.refetchQueries({ queryKey: ['dashboard'] });
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). Whoever can add one is led to
+ * Créatrices; anyone else reads who does.
+ */
+function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
+  return canAddCreator ? (
+    <Alone
+      tone="idle"
+      headline="Ajoute ta **première créatrice**"
+      lead="Son agent, ce qui attend un humain et ses meilleurs fans arriveront ici dès que sa session Reveal sera reliée."
+    >
+      <Link to="/creatrices" className="nv-btn nv-btn--soft">
+        Aller à Créatrices
+      </Link>
+    </Alone>
+  ) : (
+    <Alone
+      tone="idle"
+      headline="Aucune créatrice **pour l’instant**"
+      lead="Le propriétaire de l’agence les ajoute. Leur agent et ce qui attend un humain arriveront ici."
+    />
+  );
+}
+
+/**
+ * The Dashboard, read top to bottom (maquette v6, validée le 17/10) : the agent's state and what waits for a
+ * human, then the sales, the fans' path, the best fans. Every detail lives in a tip, every line opens in Suivi.
+ *
+ * A creator's keeps her aggregates only (ADR 0023: never a conversation nor a fan): the agent's state and mode,
+ * read only, its health, the sales; no « À traiter », no best fans, no way into Suivi. The server sends her neither.
+ */
+export function DashboardPage({
+  period,
+  onPeriod,
+  forCreator = false,
+  forOwner = false,
+  opensTracking = false,
+  canAddCreator = false,
+}: {
+  /** The period of the sales, the fans' path, the best fans and the reply delay: from the address (`?periode=`). */
+  period: Period;
+  onPeriod: (period: Period) => void;
+  forCreator?: boolean;
+  /** The owner also reads the state of the daily export (OPS-02), the one figure that is the owner's alone. */
+  forOwner?: boolean;
+  /** The account's rail holds Suivi: a best fan opens his conversation there (DASH-14). */
+  opensTracking?: boolean;
+  /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
+  canAddCreator?: boolean;
+}): JSX.Element {
+  const view = useDashboard(period, forCreator ? 'creator' : forOwner ? 'owner' : 'team');
   if (view.status === 'loading') {
     return (
       <div className="db" aria-busy="true">
@@ -83,78 +162,102 @@ export function DashboardPage(): JSX.Element {
     );
   }
   if (view.status === 'offline') return <Offline creatorName={view.creatorName} />;
-  return <Loaded view={view} period={period} onPeriod={setPeriod} />;
+  if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
+  return (
+    <Loaded
+      view={view}
+      period={period}
+      onPeriod={onPeriod}
+      forCreator={forCreator}
+      forOwner={forOwner}
+      opensTracking={opensTracking}
+    />
+  );
 }
 
 function Loaded({
-  view: { status, creatorId, globalStop, readAt, data, mode, automatic },
+  view: { creatorId, globalStop, readAt, data, mode, automatic },
   period,
   onPeriod,
+  forCreator,
+  forOwner,
+  opensTracking,
 }: {
-  view: Extract<DashboardView, { status: 'live' | 'sample' }>;
+  view: Extract<DashboardView, { status: 'live' }>;
   period: Period;
   onPeriod: (period: Period) => void;
+  forCreator: boolean;
+  forOwner: boolean;
+  opensTracking: boolean;
 }): JSX.Element {
-  const [fanId, setFanId] = useState<string | null>(null);
   const tip = useFloatingTip();
   const sales = data.sales?.[period] ?? null;
-  const fan = data.fans.find((f) => f.id === fanId) ?? null;
+  // With several creators the chips above name her: the header does not say her name a second time (DASH-03).
+  const several = (useCreators().data?.length ?? 0) >= 2;
 
   const navigate = useNavigate();
+  // Every line opens in Suivi, where a draft is decided and a handoff given back; a best fan too, on his conversation.
   const openTodo = useCallback(
-    (todo: Todo) => {
-      // The server's lines open in Suivi, where a draft is decided and a handoff given back; the sample's in the reader.
-      if (todo.conversationId !== undefined)
-        void navigate({ to: '/suivi', search: { conversation: todo.conversationId } });
-      else if (todo.fanId !== undefined) setFanId(todo.fanId);
-    },
+    (todo: Todo) => void navigate({ to: '/suivi', search: { conversation: todo.conversationId } }),
     [navigate],
   );
-  const openFan = useCallback((f: Fan) => {
-    setFanId(f.id);
-  }, []);
-  const close = useCallback(() => {
-    setFanId(null);
-  }, []);
+  // His conversation may be older than her latest ones: Suivi is told whose it is.
+  const openFan = useCallback(
+    (fan: Fan) =>
+      void navigate({ to: '/suivi', search: { conversation: fan.conversationId, creatrice: creatorId } }),
+    [navigate, creatorId],
+  );
   const writer = useAgentModeWriter(creatorId, readAt);
   const { setMode } = writer;
   const resume = useCallback(() => {
     setMode('copilot');
   }, [setMode]);
-  const notice = writer.notice ?? (globalStop ? GLOBAL_NOTE : null);
+  const running = agentRuns(data.agent);
+  // The global stop is said in the hero, next to the sentence it explains, not in this corner (DASH-08).
+  const notice = writer.notice;
+  const pill = pillOf(mode, running);
 
   const periodControl = <PeriodControl period={period} onChange={onPeriod} />;
   return (
     <div className="db">
       <header className="db-top nv-enter">
+        {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
+        <CreatorPicker />
         <div className="db-top__who">
-          <span className="db-top__av" aria-hidden="true">
-            {data.creator.name.slice(0, 1)}
-          </span>
+          {several ? null : (
+            <span className="db-top__av" aria-hidden="true">
+              {initialOf(data.creator.name)}
+            </span>
+          )}
           <span>
-            <span className="db-top__name">{data.creator.name}</span>
+            {several ? null : <span className="db-top__name">{data.creator.name}</span>}
             <span className="db-top__when">
               {data.creator.platform} · {data.creator.now}
             </span>
           </span>
-          {status === 'sample' ? (
-            <span
-              className="nv-sample"
-              title="Aucune créatrice encore : ces chiffres sont inventés pour montrer la page, rien n’est réel."
-            >
-              Exemple
-            </span>
-          ) : null}
         </div>
-        {/* The mode changes once the server has made the change (PUT /v1/agent/mode); the sample pilots nothing. */}
-        <ModeControl
-          mode={mode}
-          automatic={automatic}
-          creatorName={data.creator.name}
-          tip={tip}
-          readOnly={status === 'sample' ? SAMPLE_NOTE : globalStop ? GLOBAL_NOTE : null}
-          onChange={setMode}
-        />
+        {forCreator ? (
+          // Hers to read, not to change: the mode alone, never a control that looks like one (DASH-21).
+          <p className="db-modepill nv-glass nv-glass--thin">
+            <span
+              className={`nv-dot${pill.tone === 'unknown' ? '' : ` nv-tone--${pill.tone}`}${pill.live ? ' nv-dot--live' : ''}`}
+              aria-hidden="true"
+            />
+            {pill.label}
+            <span className="db-modepill__who">réglé par l’agence</span>
+          </p>
+        ) : (
+          // The mode changes once the server has made the change (PUT /v1/agent/mode).
+          <ModeControl
+            mode={mode}
+            automatic={automatic}
+            creatorName={data.creator.name}
+            tip={tip}
+            readOnly={globalStop ? GLOBAL_NOTE : null}
+            running={running}
+            onChange={setMode}
+          />
+        )}
         {writer.pending ? (
           <p className="db-notice db-notice--quiet" role="status">
             Envoi au serveur…
@@ -171,20 +274,19 @@ function Loaded({
         mode={mode}
         todos={data.todos}
         onOpen={openTodo}
-        onDone={undefined}
-        onResume={status === 'live' && !globalStop ? resume : undefined}
+        onResume={!globalStop && !forCreator ? resume : undefined}
+        tip={tip}
+        forCreator={forCreator}
+        globalStop={globalStop}
+        opensSettings={forOwner}
       />
 
-      <NightBanner night={data.telegram} creatorName={data.creator.name} />
+      <BackupBanner enabled={forOwner} />
 
-      {sales === null ? (
-        <Section title="Ventes" sub="ce que l’agent et les chatteurs vendent" index={2}>
-          <p className="db-pending nv-plate">
-            Les ventes s’afficheront ici dès que la connexion à Reveal les observera. En attendant, elles se
-            lisent dans Reveal.
-          </p>
-        </Section>
-      ) : (
+      {/* The night's alerts and where they go are the team's (Réglages › Telegram). */}
+      {forCreator ? null : <NightBanner night={data.telegram} creatorName={data.creator.name} />}
+
+      {sales === null ? null : (
         <>
           <Section title="Ventes" sub={salesSub(period)} index={2} control={periodControl}>
             <SalesPanel period={period} sales={sales} tip={tip} />
@@ -196,17 +298,30 @@ function Loaded({
         </>
       )}
 
-      <Section
-        title="Meilleurs fans"
-        sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
-        index={4}
-        control={sales === null ? periodControl : undefined}
-      >
-        <TopFans fans={data.fans} tip={tip} onOpen={openFan} />
-      </Section>
+      {forCreator ? null : (
+        <Section
+          title="Meilleurs fans"
+          sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
+          index={2}
+          control={sales === null ? periodControl : undefined}
+        >
+          <TopFans
+            fans={data.fans}
+            tip={tip}
+            onOpen={opensTracking ? openFan : undefined}
+            usdNote={data.usdNote}
+          />
+        </Section>
+      )}
+
+      {/* Until Reveal's purchases are observed, one quiet line says where the sales are read, no block (DASH-02). */}
+      {sales === null ? (
+        <p className="db-salesnote nv-enter" style={{ '--nv-i': 3 }}>
+          Ventes : bientôt lues depuis Reveal.
+        </p>
+      ) : null}
 
       {tip.element}
-      <Reader fan={fan} onClose={close} />
     </div>
   );
 }

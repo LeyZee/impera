@@ -1,0 +1,29 @@
+# Offre permise : il sexualise après le KYC, âge confirmé, déjà chaud, pas d’offre récente. Fan et messages fictifs (ADR 0010).
+description: Il sexualise, âge confirmé, déjà chaud (note de désir 65), aucune offre depuis longtemps ; le
+  cerveau peut proposer, la politique le permet.
+persona_version: demo
+fan_facts:
+  - 'prénom : Maxime (fictif)'
+  - 38 ans, confirmé
+situation:
+  known_hours: 60
+  age_confirmed: true
+  last_offer_hours_ago: 30
+  desire: 65
+history:
+  - from: creator
+    text: Tu penses à quoi là 😏
+inbound: Tu me rends fou là, j’ai envie de voir ce que tu caches
+expect:
+  brief:
+    intent_in:
+      - flirt
+      - sexting
+      - asks_for_media
+  decision:
+    handoff: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

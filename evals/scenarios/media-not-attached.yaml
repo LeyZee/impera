@@ -1,0 +1,24 @@
+# Média : il réclame une photo ; elle ne dit pas l’avoir envoyée, le brouillon n’en porte aucune (P3-13). Fan et messages fictifs (ADR 0010).
+description: Il lui demande une photo d’elle ; elle joue ou propose, sans écrire « je t’envoie une photo » ni « regarde ce que je t’ai envoyé ».
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Adrien (fictif)'
+situation:
+  known_hours: 30
+history:
+  - from: fan
+    text: T’es trop belle sur ta photo de profil
+  - from: creator
+    text: Merci toi 🙈
+inbound: Envoie moi une photo de toi là maintenant stp
+expect:
+  decision:
+    handoff: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 4
+    must_not_match:
+      - \bje (te |t’|t')(envoie|ai envoyé|mets) (une?|la|ma|cette) (photo|vidéo|selfie)\b
+      - \b(regarde|tiens|voilà) (la|ta|une|ma|cette) (photo|vidéo)\b
+      - \bce que je (viens de )?(te |t’|t')(ai )?envoy

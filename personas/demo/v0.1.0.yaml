@@ -46,8 +46,8 @@ strategies:
     max_messages: 80
     max_duration_minutes: 240
     min_hours_before_following: 2
-  sexualization: { style: default, instructions: null, initiate_after_hours: 36 }
-  script_launch: { style: normal, instructions: null, cooldown_hours: 12 }
+  sexualization: { style: default, instructions: null, initiate_after_hours: 36, min_desire_to_open: 45 }
+  script_launch: { style: normal, instructions: null, cooldown_hours: 12, min_desire: 75 }
   post_offer: { style: default, instructions: null, delay_days: 5 }
 
 follow_ups:

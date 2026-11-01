@@ -5,6 +5,7 @@ import {
   newId,
   PersonaSchema,
   PersonaVersionIdSchema,
+  type Persona,
   type PersonaVersionSummary,
 } from '@nirvana/contracts';
 import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@nirvana/db';
@@ -108,8 +109,39 @@ async function activateRow(
   return { row: active, activated: true };
 }
 
-export function createDrizzlePersonaVersionStore(db: Database): PersonaVersionStore {
+/**
+ * `checkBeforeActivate` reads a stored version again before the screen activates it, and throws to refuse it: the
+ * guards may have changed since it was saved (the sample replies, P5-01).
+ */
+export function createDrizzlePersonaVersionStore(
+  db: Database,
+  checkBeforeActivate?: (persona: Persona) => void,
+): PersonaVersionStore {
   return {
+    active(creatorId) {
+      return withTenant(db, creatorId, async (tx) => {
+        const [row] = await tx
+          .select({
+            id: schema.personaVersions.id,
+            version: schema.personaVersions.version,
+            content: schema.personaVersions.content,
+            creatorName: schema.creators.displayName,
+          })
+          .from(schema.personaVersions)
+          .innerJoin(schema.creators, eq(schema.creators.id, schema.personaVersions.creatorId))
+          .where(
+            and(eq(schema.personaVersions.creatorId, creatorId), eq(schema.personaVersions.isActive, true)),
+          );
+        if (row === undefined) return null;
+        return {
+          id: PersonaVersionIdSchema.parse(row.id),
+          version: row.version,
+          creatorName: row.creatorName,
+          persona: PersonaSchema.parse(row.content),
+        };
+      });
+    },
+
     overview(creatorId) {
       return withTenant(db, creatorId, async (tx) => {
         const rows = await summaries(tx);
@@ -209,14 +241,21 @@ export function createDrizzlePersonaVersionStore(db: Database): PersonaVersionSt
       });
     },
 
-    activate(creatorId, versionId, userId) {
+    activate(creatorId, versionId, expectedActive, userId) {
       return withTenant(db, creatorId, async (tx) => {
         await lockCreator(tx, creatorId);
-        const [row] = await tx
-          .select(columns)
-          .from(schema.personaVersions)
-          .where(eq(schema.personaVersions.id, versionId));
+        const rows = await summaries(tx);
+        const row = rows.find((r) => r.id === versionId);
         if (row === undefined) throw new PersonaVersionNotFound();
+        // A screen left open activates only over the active version it read: never undo an activation made since.
+        if ((rows.find((r) => r.isActive)?.id ?? null) !== expectedActive) throw new PersonaVersionConflict();
+        if (!row.isActive && checkBeforeActivate !== undefined) {
+          const [stored] = await tx
+            .select({ content: schema.personaVersions.content })
+            .from(schema.personaVersions)
+            .where(eq(schema.personaVersions.id, row.id));
+          checkBeforeActivate(PersonaSchema.parse(stored?.content));
+        }
         return toSummary((await activateRow(tx, creatorId, row, userId)).row);
       });
     },

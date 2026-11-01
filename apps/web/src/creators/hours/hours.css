@@ -1,0 +1,283 @@
+/*
+ * Créatrices › Heures (P3-14). The head, panel, blocks, hints and errors are the persona's (`ps-*`); only the week and
+ * the lines of slots live here, prefixed `hr-`. A slot is data, not an alarm: a warm neutral, never the neon. A slot
+ * switched off stays in place in pale ink, never red; what needs fixing is amber, like every warning.
+ */
+
+/* ── The week: a line a day, 0 h to 24 h on her clock ── */
+.hr-week {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.hr-week__row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.hr-week__day {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.hr-week__track {
+  position: relative;
+  height: 14px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+/* Her quiet hours, every day: no follow-up there, even in a slot. */
+.hr-week__quiet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, var(--nv-select) 0 3px, transparent 3px 7px);
+}
+.hr-week__bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-data-1);
+  opacity: 0.85;
+  transition:
+    left var(--nv-dur-base) var(--nv-ease-out),
+    width var(--nv-dur-base) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+/* The part after midnight of an overnight slot: square where it comes from the day before. */
+.hr-week__bar[data-continued='true'] {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.hr-week__bar[data-off='true'] {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--nv-ink-faint);
+  opacity: 0.5;
+}
+.hr-week__axis {
+  margin-top: -2px;
+}
+.hr-week__ticks {
+  position: relative;
+  height: 16px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--nv-ink-faint);
+}
+.hr-week__ticks > span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.hr-week__ticks > span:first-child {
+  transform: none;
+}
+.hr-week__ticks > span:last-child {
+  transform: translateX(-100%);
+}
+.hr-week__legend {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding-left: 46px;
+}
+.hr-week__key {
+  width: 14px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-data-1);
+  opacity: 0.85;
+}
+.hr-week__key[data-off='true'] {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--nv-ink-faint);
+  opacity: 0.5;
+}
+.hr-week__key--quiet {
+  background: repeating-linear-gradient(135deg, var(--nv-ink-faint) 0 2px, transparent 2px 4px);
+  opacity: 0.6;
+}
+
+/* ── The planner: a line a day, its slots side by side (CREA-21) ── */
+.hr-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hr-day {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.hr-day:first-child {
+  border-top: 0;
+}
+.hr-day__name {
+  padding-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-transform: capitalize;
+}
+.hr-day__slots {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.hr-day[data-empty='true'] .hr-day__slots {
+  padding-top: 13px;
+}
+.hr-day__add {
+  margin-top: 6px;
+}
+.hr-day__full {
+  flex-basis: 100%;
+  margin: 0;
+}
+.hr-slot,
+.hr-range {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.hr-slot__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+/* A slot of the planner: its hours, then what they do not say, then its switch and ×, aligned from line to line. */
+.hr-slot {
+  flex: 1 1 100%;
+}
+.hr-slot > .hr-slot__fields {
+  display: grid;
+  grid-template-columns: auto minmax(max-content, 1fr) auto;
+}
+.hr-slot > .hr-slot__fields > .hr-slot__end {
+  grid-column: 3;
+}
+/* A slot on is data, like its bar on the week: the warm neutral of the chart, never the neon of the action. */
+.hr-slot .nv-switch:checked {
+  background: var(--nv-data-1);
+  box-shadow: none;
+}
+.hr-slot__hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+/* Wide enough for « 23:00 » and, with its clock, for « 11:00 PM » of a browser in English. */
+.hr-slot__hours .hr-time {
+  width: 144px;
+}
+.hr-slot__words {
+  flex: none;
+  white-space: nowrap;
+}
+.hr-slot__end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.hr-slot__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+/* Switched off: kept in place, in pale ink; the switch itself stays readable to turn it back on. */
+.hr-slot[data-off='true'] .hr-time,
+.hr-slot[data-off='true'] .hr-slot__words {
+  color: var(--nv-ink-faint);
+  opacity: 0.7;
+}
+.hr-slot[data-invalid='true'] .nv-field__control,
+.hr-range[data-invalid='true'] .nv-field__control {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
+}
+.hr-range__label {
+  width: 128px;
+  flex: none;
+  font-size: 14px;
+  color: var(--nv-ink-muted);
+}
+
+.hr-warning {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+
+/* A phone: the day and « Ajouter » on one line, its slots under them, full width. */
+@media (max-width: 520px) {
+  .hr-day {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name add'
+      'slots slots';
+  }
+  .hr-day__name {
+    grid-area: name;
+    padding-top: 6px;
+  }
+  .hr-day__add {
+    grid-area: add;
+    margin-top: 0;
+  }
+  .hr-day__slots {
+    grid-area: slots;
+  }
+  .hr-day[data-empty='true'] .hr-day__slots {
+    padding-top: 0;
+  }
+  .hr-slot > .hr-slot__fields {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .hr-slot > .hr-slot__fields > .hr-slot__hours {
+    grid-column: 1 / -1;
+  }
+  .hr-slot > .hr-slot__fields > .hr-slot__end {
+    grid-column: 2;
+  }
+  .hr-range__label {
+    width: 100%;
+  }
+  .hr-slot__hours {
+    flex: 1 1 auto;
+  }
+  .hr-slot__hours .hr-time {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+  .hr-week__legend {
+    padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hr-week__bar,
+  .hr-slot,
+  .hr-range {
+    transition: none;
+    animation: none;
+  }
+}

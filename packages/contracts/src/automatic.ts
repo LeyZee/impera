@@ -15,10 +15,12 @@ const percent = z.number().min(0).max(100);
 const count = z.number().int().nonnegative();
 
 /**
- * What keeps Automatique locked (ADR 0019): the live rate, the number of decided drafts, the blind test. Each
- * missing condition carries where it stands; the thresholds live on the server only.
+ * What keeps Automatique locked (ADR 0019): her active persona, the live rate, the number of decided drafts, the
+ * blind test. Each missing condition carries where it stands; the thresholds live on the server only.
  */
 export const AutomaticMissingSchema = z.discriminatedUnion('kind', [
+  /** She has no active persona version: the agent writes nothing, nothing is proved (recette 28/10, G4). */
+  z.object({ kind: z.literal('active_persona') }),
   z.object({ kind: z.literal('live_rate'), value: percent.nullable(), target: percent }),
   z.object({ kind: z.literal('decided_drafts'), value: count, target: count }),
   z.object({ kind: z.literal('blind_test') }),
@@ -67,13 +69,18 @@ export function asPercent(rate: number | undefined): number | null {
   return rate === undefined ? null : Math.round(rate * 1000) / 10;
 }
 
-/** Automatique opens when the live rate reaches 80 % on at least 100 decided drafts and the blind test passed. */
+/**
+ * Automatique opens when she has an active persona version, the live rate reaches 80 % on at least 100 decided
+ * drafts of it and the blind test passed.
+ */
 export function automaticGate(input: {
+  readonly personaActive: boolean;
   readonly reading: LiveRateReading;
   readonly blindTestPassed: boolean;
 }): AutomaticGate {
   const { rate, decided } = input.reading;
   const missing: AutomaticMissing[] = [];
+  if (!input.personaActive) missing.push({ kind: 'active_persona' });
   if (rate === undefined || rate < LIVE_TARGET) {
     missing.push({ kind: 'live_rate', value: asPercent(rate), target: LIVE_TARGET * 100 });
   }

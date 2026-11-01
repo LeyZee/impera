@@ -47,7 +47,7 @@ export const PROVIDER_PROFILES: readonly ProviderProfile[] = [
     provider: 'elevenlabs',
     service: 'ElevenLabs',
     vendor: 'ElevenLabs',
-    role: 'Parle avec la voix de Messa',
+    role: 'Parle avec la voix de la créatrice',
     withoutIt: 'Optionnel. Sans lui, pas de vocaux',
     revoked: 'ElevenLabs refuse la clé. Pas de vocaux pour l’instant.',
     whileRefused: 'Pas de vocaux pour l’instant.',

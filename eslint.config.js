@@ -9,7 +9,8 @@ import prettier from 'eslint-config-prettier';
 
 /**
  * Business modules of apps/api and the modules each one may import (through their index.ts only).
- * Single source of truth, mirrored in docs/architecture/modules.md. No cycles allowed.
+ * Single source of truth, mirrored in docs/architecture/modules.md. No cycles allowed. A planned module (sales,
+ * scripts: phase 6) enters here with its first code.
  */
 const MODULE_DEPENDENCIES = {
   connectors: ['conversations'],
@@ -19,11 +20,14 @@ const MODULE_DEPENDENCIES = {
   agent: ['fans', 'persona', 'media'],
   media: [],
   supervision: ['conversations', 'fans'],
-  sales: ['conversations', 'media'],
-  scripts: ['sales', 'media', 'conversations'],
   playground: ['agent'],
   providers: [],
   telegram: [],
+  team: [],
+  backups: [],
+  scheduling: [],
+  alerts: [],
+  payroll: [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);

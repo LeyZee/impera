@@ -37,6 +37,7 @@ import type {
   ChatRecord,
   DeliveriesStore,
   DeliveryRecord,
+  LoggedDelivery,
   NewDelivery,
   ThreadRoot,
 } from '../domain/ports';
@@ -79,11 +80,18 @@ function toChat(row: typeof chats.$inferSelect): ChatRecord {
 
 const ActionSchema = z.enum(['send', 'edit', 'reply']);
 
+/** A delivery of a group still in the list: the queue and the threads only ever read those. */
 function toDelivery(row: typeof deliveries.$inferSelect): DeliveryRecord {
+  return { ...toLogged(row), chatId: TelegramChatIdSchema.parse(row.chatId) };
+}
+
+/** A delivery as the log reads it: its group may have been removed since (REG-28), its title stays. */
+function toLogged(row: typeof deliveries.$inferSelect): LoggedDelivery {
   return {
     id: row.id,
     sourceKey: row.sourceKey,
-    chatId: TelegramChatIdSchema.parse(row.chatId),
+    chatId: row.chatId === null ? null : TelegramChatIdSchema.parse(row.chatId),
+    chatTitle: row.chatTitle,
     creatorId: row.creatorId === null ? null : CreatorIdSchema.parse(row.creatorId),
     topic: TelegramTopicSchema.parse(row.topic),
     action: ActionSchema.parse(row.action),
@@ -107,20 +115,44 @@ async function insertDeliveries(
   now: Date,
 ): Promise<readonly TelegramChatId[]> {
   if (rows.length === 0) return [];
+  // Each delivery keeps its group's title: the log still names it once the group is removed (REG-28).
+  // KEY SHARE orders this against removeChat's FOR UPDATE: either these rows exist before the removal
+  // (which then closes them as chat_removed) or the group is already gone and its rows are skipped.
+  const titles = new Map(
+    (
+      await tx
+        .select({ id: chats.id, title: chats.title })
+        .from(chats)
+        .where(inArray(chats.id, [...new Set(rows.map((row) => row.chatId))]))
+        .for('key share')
+    ).map((chat) => [chat.id, chat.title]),
+  );
+  const values = rows.flatMap((row) => {
+    const chatTitle = titles.get(row.chatId);
+    return chatTitle === undefined
+      ? []
+      : [
+          {
+            id: newId(z.uuid()),
+            ...row,
+            chatTitle,
+            status: 'pending' as const,
+            runAfter: now,
+            createdAt: now,
+          },
+        ];
+  });
+  if (values.length === 0) return [];
   const inserted = await tx
     .insert(deliveries)
-    .values(
-      rows.map((row) => ({
-        id: newId(z.uuid()),
-        ...row,
-        status: 'pending',
-        runAfter: now,
-        createdAt: now,
-      })),
-    )
+    .values(values)
     .onConflictDoNothing({ target: [deliveries.sourceKey, deliveries.chatId] })
     .returning({ chatId: deliveries.chatId });
-  return [...new Set(inserted.map((row) => TelegramChatIdSchema.parse(row.chatId)))];
+  return [
+    ...new Set(
+      inserted.flatMap((row) => (row.chatId === null ? [] : [TelegramChatIdSchema.parse(row.chatId)])),
+    ),
+  ];
 }
 
 async function enqueueFlushIn(
@@ -293,6 +325,42 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
           .where(eq(state.id, 1));
       });
     },
+    async removeChat(id, mayRemove, userId) {
+      return admin(async (tx) => {
+        const [row] = await tx
+          .select({ membership: chats.membership, title: chats.title })
+          .from(chats)
+          .where(eq(chats.id, id))
+          .for('update');
+        if (row === undefined) return 'missing';
+        if (!mayRemove(TelegramMembershipSchema.parse(row.membership))) return 'refused';
+        // What still waited for the group never leaves: said so in the log. A send under way may have gone out.
+        await tx
+          .update(deliveries)
+          .set({ status: 'failed', errorKind: 'chat_removed' })
+          .where(and(eq(deliveries.chatId, id), eq(deliveries.status, 'pending')));
+        await tx
+          .update(deliveries)
+          .set({ status: 'unknown', errorKind: 'chat_removed' })
+          .where(and(eq(deliveries.chatId, id), eq(deliveries.status, 'sending')));
+        // Cascades to its routes; its deliveries stay, `chat_id` null, for the night counts and the log until the
+        // purge. The routing version moves so open screens reload.
+        await tx.delete(chats).where(eq(chats.id, id));
+        await tx
+          .update(state)
+          .set({ routesVersion: sql`${state.routesVersion} + 1` })
+          .where(eq(state.id, 1));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'telegram_chat.remove',
+          entity: 'telegram_chat',
+          entityId: id,
+          details: { membership: row.membership },
+        });
+        return 'removed';
+      });
+    },
     async listChats() {
       const rows = await admin((tx) => tx.select().from(chats).orderBy(chats.discoveredAt));
       return rows.map(toChat);
@@ -403,6 +471,8 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
           .where(
             and(
               eq(deliveries.threadKey, threadKey),
+              // A removed group gets no edit nor reply.
+              sql`${deliveries.chatId} is not null`,
               eq(deliveries.action, 'send'),
               inArray(deliveries.status, ['pending', 'sending', 'sent']),
             ),
@@ -530,7 +600,7 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
         if (row === undefined) return null;
         const status = TelegramDeliveryStatusSchema.parse(row.status);
         let isShared = false;
-        if (row.telegramMessageId !== null) {
+        if (row.telegramMessageId !== null && row.chatId !== null) {
           const [shared] = await tx
             .select({ count: sql<number>`count(*)::int` })
             .from(deliveries)
@@ -576,14 +646,13 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
     async listDeliveries(limit, topic) {
       const rows = await admin((tx) =>
         tx
-          .select({ delivery: deliveries, chatTitle: chats.title })
+          .select()
           .from(deliveries)
-          .innerJoin(chats, eq(chats.id, deliveries.chatId))
           .where(topic === null ? undefined : eq(deliveries.topic, topic))
           .orderBy(sql`${deliveries.createdAt} desc`)
           .limit(limit),
       );
-      return rows.map((row) => ({ ...toDelivery(row.delivery), chatTitle: row.chatTitle }));
+      return rows.map(toLogged);
     },
     async countTopics(creatorId, from, to) {
       // One alert sent to two groups counts once: distinct source.

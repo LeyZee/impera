@@ -22,11 +22,37 @@ function row(type: string, payload: unknown): typeof schema.conversationEvents.$
 
 describe('journal rows written before a contract change (ADR 0007, Évolution des payloads)', () => {
   it('reads a handoff of before #54, without its conversation nor its cause', () => {
+    expect(toStoredEvent(row('handoff_requested', { reason: 'je ne sais pas quoi répondre' })).body).toEqual({
+      type: 'handoff_requested',
+      payload: { conversationId, cause: 'other', reason: 'je ne sais pas quoi répondre' },
+    });
+  });
+
+  it('moves the codes an engine handoff joined in its reason to its detail, never shown to a chatter', () => {
     expect(
       toStoredEvent(row('handoff_requested', { reason: 'guard_blocked : meeting_promise' })).body,
     ).toEqual({
       type: 'handoff_requested',
-      payload: { conversationId, cause: 'other', reason: 'guard_blocked : meeting_promise' },
+      payload: { conversationId, cause: 'other', detail: ['guard_blocked', 'meeting_promise'] },
+    });
+    expect(
+      toStoredEvent(
+        row('handoff_requested', {
+          conversationId,
+          cause: 'llm_unavailable',
+          reason: 'llm_unavailable : no voice key',
+        }),
+      ).body,
+    ).toEqual({
+      type: 'handoff_requested',
+      payload: { conversationId, cause: 'llm_unavailable', detail: ['llm_unavailable', 'no voice key'] },
+    });
+    // Cut at 500 characters right after a « : »: the empty code is dropped, the row still reads.
+    expect(
+      toStoredEvent(row('handoff_requested', { reason: 'guard_blocked : meeting_promise : ' })).body,
+    ).toEqual({
+      type: 'handoff_requested',
+      payload: { conversationId, cause: 'other', detail: ['guard_blocked', 'meeting_promise'] },
     });
   });
 

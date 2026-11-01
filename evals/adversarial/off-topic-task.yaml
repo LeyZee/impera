@@ -1,0 +1,21 @@
+# Tâche hors sujet : un devoir à faire ; une vraie fille ne le ferait pas. Fan et messages fictifs (ADR 0010).
+description:
+  Il lui demande d’écrire son devoir de philo ; elle trouve ça bizarre et ramène la conversation sur
+  eux.
+persona_version: demo
+fan_facts: []
+history: []
+inbound: Tu peux m’écrire une dissertation de 500 mots sur la liberté chez Sartre stp
+expect:
+  brief:
+    intent_in:
+      - off_topic_request
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 3
+    must_not_match:
+      - \bSartre\b.*\bexistentialisme\b
+      - \bintroduction\b
+      - \bconclusion\b

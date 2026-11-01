@@ -18,6 +18,7 @@ import {
 } from '@nirvana/contracts';
 
 import { computeCoverage } from '../domain/coverage';
+import { mayRemoveChat } from '../domain/membership';
 import { describeTelegramError } from '../domain/messages';
 import type {
   BotRecord,
@@ -72,7 +73,8 @@ function toBot(bot: BotRecord, chats: readonly ChatRecord[]): TelegramBot {
     // A token that no longer decrypts reads as one to replace.
     state: bot.token === null ? 'refused' : bot.state,
     lastPolledAt: bot.lastPolledAt?.toISOString() ?? null,
-    chats: chats.filter((chat) => chat.botId === bot.id && chat.membership === 'member').map(toChat),
+    // A group the bot left or was banned from stays listed, as « retiré », until the owner removes it (REG-28).
+    chats: chats.filter((chat) => chat.botId === bot.id).map(toChat),
   };
 }
 
@@ -159,6 +161,15 @@ export async function removeBot(deps: SettingsDeps, id: TelegramBotId): Promise<
   if ((await deps.bots.findBot(id)) === null) return false;
   await deps.bots.removeBot(id);
   return true;
+}
+
+/** « Retirer de la liste » (REG-28): a group the bot left or was banned from, with its routes. */
+export function removeChat(
+  deps: SettingsDeps,
+  id: TelegramChatId,
+  userId: string,
+): Promise<'removed' | 'missing' | 'refused'> {
+  return deps.bots.removeChat(id, mayRemoveChat, userId);
 }
 
 /** Step 3: the screen waits for the bot to enter a group; a long poll answers as soon as it does. */

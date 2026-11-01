@@ -1,0 +1,352 @@
+/*
+ * Réglages › Alertes (P4-01). The head, fields, switches and errors are the persona's (`ps-*`); only the lines of
+ * alerts live here, prefixed `al-`. An alert is a setting, not an alarm: no red here. A creator without a Telegram
+ * group for its topic is amber, like every warning; an alert switched off stays in place, in pale ink.
+ */
+
+.al-page {
+  gap: var(--nv-space-5);
+}
+.al-page > * {
+  flex-shrink: 0;
+}
+
+.al-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+.al-head__text {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.al-head__action {
+  flex: none;
+}
+
+.al-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.al-group__lede {
+  margin-top: -4px;
+}
+.al-eyebrow {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+
+.al-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.al-empty {
+  --_radius: var(--nv-radius-xl);
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.al-empty__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── A line: one alert, its creators, what it does, where it goes ── */
+.al-line {
+  --_radius: var(--nv-radius-xl);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.al-line__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.al-line__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.al-line__name {
+  margin: 0;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.al-line__meta {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* One line by alert (REG-16): the name opens the rest. */
+.al-line__open {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.al-line__open:focus-visible {
+  outline: none;
+  border-radius: var(--nv-radius-sm);
+  box-shadow: var(--nv-shadow-focus);
+}
+.al-line__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.al-line__title::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-right: 1.5px solid var(--nv-ink-faint);
+  border-bottom: 1.5px solid var(--nv-ink-faint);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.al-line__open[aria-expanded='true'] .al-line__title::after {
+  transform: rotate(225deg) translateY(-1px);
+}
+.al-line__more {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.al-line__more[hidden] {
+  display: none;
+}
+.al-line__links {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.al-line__switch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.al-line__phrase {
+  margin: 0;
+  max-width: 62ch;
+  font-family: var(--nv-font-serif);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--nv-ink-muted);
+  overflow-wrap: anywhere;
+}
+.al-line__does {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--nv-ink-muted);
+}
+.al-line__does[data-pauses='true'] {
+  color: var(--nv-ink);
+}
+.al-line__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+/* Switched off: kept in place, in pale ink; its switch stays readable to turn it back on. */
+.al-line[data-off='true'] .al-line__name,
+.al-line[data-off='true'] .al-line__meta,
+.al-line[data-off='true'] .al-line__phrase,
+.al-line[data-off='true'] .al-words,
+.al-line[data-off='true'] .al-line__does {
+  opacity: 0.55;
+}
+
+.al-words {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.al-word {
+  padding: 2px 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+}
+
+.al-lock {
+  flex: none;
+}
+.al-creators {
+  margin-top: 2px;
+}
+
+/* ── Where it goes on Telegram: read from Réglages › Telegram ── */
+/* The dot stays on the first line when the sentence wraps. */
+.al-telegram {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.al-telegram__dot {
+  width: 6px;
+  height: 6px;
+  align-self: start;
+  margin-top: calc((var(--nv-text-footnote-leading) - 6px) / 2);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink-faint);
+}
+.al-telegram[data-kind='sent'] .al-telegram__dot {
+  background: var(--nv-data-1);
+}
+.al-telegram[data-kind='missing'] {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.al-telegram[data-kind='missing'] .al-telegram__dot {
+  background: var(--nv-warning);
+}
+.al-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.al-confirm__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* ── The editor, in place of the line ── */
+.al-editor {
+  --_radius: var(--nv-radius-xl);
+  padding: 18px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.al-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .al-line,
+  .al-editor {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .al-head__action {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al-line {
+    transition: none;
+  }
+}
+
+/*
+ * « Tester » (P4-01): a message tried on the alert as written, inside its editor. The verdict is ink, its headline
+ * stronger when it would ring; a phrase that could not be read is amber. Nothing here is red.
+ */
+.al-try {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+}
+.al-try__title {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.al-try__run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.al-try__why {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.al-try__verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.al-try__verdict p {
+  margin: 0;
+}
+.al-try__headline {
+  font-weight: 500;
+  color: var(--nv-ink);
+}
+.al-try__verdict[data-rings='true'] .al-try__headline {
+  font-weight: 650;
+}
+.al-try__warning {
+  color: var(--nv-warning);
+}

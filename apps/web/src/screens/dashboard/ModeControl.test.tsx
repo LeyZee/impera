@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +18,7 @@ function Harness(props: {
   mode: AgentMode;
   automatic: AutomaticGate;
   readOnly?: string | null;
+  running?: boolean;
   onChange: (mode: AgentMode) => void;
 }): JSX.Element {
   const tip = useFloatingTip();
@@ -67,6 +68,17 @@ describe('ModeControl', () => {
     expect(dot('Copilote')?.classList.contains('db-mode__dot--rest')).toBe(true);
   });
 
+  it('lets the dot of Copilote breathe only while the agent acts', () => {
+    const dot = (): Element | null =>
+      screen.getByRole('radio', { name: 'Copilote' }).querySelector('.db-mode__dot');
+    render(<Harness mode="copilot" automatic={OPEN} onChange={vi.fn()} />);
+    expect(dot()?.classList.contains('nv-tone--ok')).toBe(true);
+    expect(dot()?.classList.contains('nv-dot--live')).toBe(false);
+    cleanup();
+    render(<Harness mode="copilot" automatic={OPEN} running onChange={vi.fn()} />);
+    expect(dot()?.classList.contains('nv-dot--live')).toBe(true);
+  });
+
   it('opens Automatique when the server says so', () => {
     const { onChange, option } = setup('copilot', OPEN);
     expect(option('Automatique').getAttribute('aria-disabled')).toBe('false');
@@ -95,6 +107,40 @@ describe('ModeControl', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith('stop');
   });
 
+  it('keeps its veil catching clicks while it fades, so that a double click stays on the Dashboard (recette 28/10, G2)', () => {
+    vi.useFakeTimers();
+    try {
+      const { onChange, option } = setup('copilot', CLOSED);
+      fireEvent.click(option('Arrêt'));
+      const confirm = screen.getByRole('button', { name: 'Arrêter l’agent' });
+      fireEvent.click(confirm);
+      const scrim = document.querySelector('.db-scrim');
+      // Closed, but the veil is still there to take the second click of a double click.
+      expect(dialog().getAttribute('aria-hidden')).toBe('true');
+      expect(scrim?.classList.contains('is-closing')).toBe(true);
+      if (scrim !== null) fireEvent.click(scrim);
+      expect(onChange).toHaveBeenCalledExactlyOnceWith('stop');
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(scrim?.classList.contains('is-closing')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps Tab inside the dialog while it is open (recette 28/10, M5)', () => {
+    const { option } = setup('copilot', CLOSED);
+    fireEvent.click(option('Arrêt'));
+    const cancel = screen.getByRole('button', { name: 'Annuler' });
+    const confirm = screen.getByRole('button', { name: 'Arrêter l’agent' });
+    confirm.focus();
+    fireEvent.keyDown(confirm, { key: 'Tab' });
+    expect(document.activeElement).toBe(cancel);
+    fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(confirm);
+  });
+
   it('gives the focus back to the option checked once the dialog closes', () => {
     const { option } = setup('copilot', CLOSED);
     fireEvent.click(option('Arrêt'));
@@ -112,9 +158,13 @@ describe('ModeControl', () => {
     expect(option('Copilote').tabIndex).toBe(0);
     expect(option('Arrêt').tabIndex).toBe(-1);
 
-    // Left from Copilote wraps past the locked Automatique to Arrêt, which still asks first: the dialog takes
-    // the focus, on Annuler.
+    // Left from Copilote stops there: the locked Automatique is skipped, and nothing wraps onto Arrêt (recette
+    // 28/10, M6).
     fireEvent.keyDown(option('Copilote'), { key: 'ArrowLeft' });
+    expect(dialog().getAttribute('aria-hidden')).toBe('true');
+    expect(document.activeElement).toBe(option('Copilote'));
+    // Right moves onto Arrêt, which still asks first: the dialog takes the focus, on Annuler.
+    fireEvent.keyDown(option('Copilote'), { key: 'ArrowRight' });
     expect(dialog().getAttribute('aria-hidden')).toBe('false');
     expect(document.activeElement?.textContent).toBe('Annuler');
     expect(onChange).not.toHaveBeenCalled();

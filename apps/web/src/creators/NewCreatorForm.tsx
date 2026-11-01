@@ -1,14 +1,22 @@
-import type { CreatorSummary } from '@nirvana/contracts';
+import { CreatorDisplayNameSchema, CreatorIdSchema, newId, type CreatorSummary } from '@nirvana/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useId, useState, type SyntheticEvent, type JSX } from 'react';
+import { useId, useRef, useState, type SyntheticEvent, type JSX } from 'react';
 
-import { createCreator } from './api';
+import { DEFAULT_ZONE, UNKNOWN_ZONE, ZoneInput } from './ZoneInput';
+import { createCreator, type CreateResult } from './api';
 import { Field } from './persona/fields';
 
-const DEFAULT_ZONE = 'Europe/Paris';
+import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
-/** Every zone the browser knows, for the suggestions under the field; the server checks the one typed. */
-const ZONES: readonly string[] = Intl.supportedValuesOf('timeZone');
+/** What each refusal of `POST /v1/creators` says; nothing was created on any of them. */
+const PROBLEMS: Record<Exclude<CreateResult['kind'], 'created'>, string> = {
+  unknown_zone: UNKNOWN_ZONE,
+  invalid: 'Ce nom n’est pas accepté : il lui faut au moins une lettre.',
+  name_taken: 'Une créatrice porte déjà ce nom. Ajoute une initiale ou choisis un autre pseudo.',
+  conflict: 'Cette créatrice vient d’être créée sous un autre nom. Recharge la page pour la voir.',
+  expired: 'Ta session a expiré : reconnecte-toi, puis recommence. Rien n’a été créé.',
+  failed: 'Rien n’a été créé : Nirvana ne répond pas. Réessaie dans un instant.',
+};
 
 /**
  * Adds a creator (owner only): her name as fans see it and the zone her day and night follow. Her persona is
@@ -27,30 +35,39 @@ export function NewCreatorForm({
   const [name, setName] = useState('');
   const [zone, setZone] = useState(DEFAULT_ZONE);
   const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
+  // A second click lands before the re-render that disables the button: the ref stops it, the id makes it harmless.
+  const sending = useRef(false);
+  const [creatorId, setCreatorId] = useState(() => newId(CreatorIdSchema));
+  const [problem, setProblem] = useState<keyof typeof PROBLEMS | null>(null);
+
+  // The server refuses a name without a letter (an invisible character or punctuation alone): said before sending.
+  const noLetter = name.trim() !== '' && !CreatorDisplayNameSchema.safeParse(name).success;
+  const nameRefused = problem === 'name_taken' || problem === 'invalid';
 
   const submit = async (event: SyntheticEvent): Promise<void> => {
     event.preventDefault();
-    if (name.trim() === '' || busy) return;
+    if (name.trim() === '' || noLetter || sending.current) return;
+    sending.current = true;
     setBusy(true);
     setProblem(null);
-    const result = await createCreator(name.trim(), zone.trim()).catch(() => ({ kind: 'failed' as const }));
+    const result = await createCreator(creatorId, name.trim(), zone.trim()).catch(() => ({
+      kind: 'failed' as const,
+    }));
+    sending.current = false;
     setBusy(false);
     if (result.kind === 'created') {
+      // The next creator typed in this form is another one: a new id.
+      setCreatorId(newId(CreatorIdSchema));
       await client.invalidateQueries({ queryKey: ['creators'] });
       onCreated(result.creator);
     } else {
-      setProblem(
-        result.kind === 'invalid'
-          ? 'Ce fuseau n’existe pas. Choisis-en un dans la liste, par exemple Europe/Paris.'
-          : 'Rien n’a été créé : Nirvana ne répond pas. Réessaie dans un instant.',
-      );
+      setProblem(result.kind);
     }
   };
 
   return (
     <form
-      className="nv-glass ps-head"
+      className="nv-plate ps-head"
       onSubmit={(event) => {
         void submit(event);
       }}
@@ -63,32 +80,29 @@ export function NewCreatorForm({
           value={name}
           maxLength={80}
           autoFocus
+          aria-invalid={noLetter || nameRefused}
+          aria-describedby={noLetter ? `${id}-name-error` : nameRefused ? `${id}-problem` : undefined}
           onChange={(event) => {
             setName(event.target.value);
+            // The refusal was about the name: typing another one answers it.
+            if (problem === 'name_taken' || problem === 'invalid') setProblem(null);
           }}
         />
+        {noLetter ? (
+          <p className="ps-error" id={`${id}-name-error`}>
+            Le nom doit contenir au moins une lettre.
+          </p>
+        ) : null}
       </Field>
       <Field label="Fuseau horaire" id={`${id}-zone`} hint="Sa journée et sa nuit suivent ce fuseau.">
-        <input
-          id={`${id}-zone`}
-          className="nv-glass nv-field__control ps-input"
-          value={zone}
-          list={`${id}-zones`}
-          onChange={(event) => {
-            setZone(event.target.value);
-          }}
-        />
-        <datalist id={`${id}-zones`}>
-          {ZONES.map((z) => (
-            <option key={z} value={z} />
-          ))}
-        </datalist>
+        <ZoneInput id={`${id}-zone`} value={zone} onChange={setZone} invalid={problem === 'unknown_zone'} />
       </Field>
       {problem === null ? null : (
-        <p className="ps-error" role="alert">
-          {problem}
+        <p className="ps-error" role="alert" id={`${id}-problem`}>
+          {PROBLEMS[problem]}
         </p>
       )}
+      {problem === 'expired' ? <SignInAgain /> : null}
       <div className="ps-head__actions">
         {onCancel === null ? null : (
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onCancel}>
@@ -98,7 +112,7 @@ export function NewCreatorForm({
         <button
           type="submit"
           className="nv-btn nv-btn--neon"
-          disabled={name.trim() === '' || busy}
+          disabled={name.trim() === '' || noLetter || busy}
           aria-busy={busy}
         >
           {busy ? 'Création…' : 'Créer'}

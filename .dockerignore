@@ -1,0 +1,20 @@
+# Build context of apps/api/Dockerfile and apps/web/Dockerfile (the repository root): sources and lockfile only.
+**/node_modules
+**/dist
+**/.output
+**/.wxt
+**/.turbo
+**/coverage
+.git
+.scratch
+.env
+.env.*
+!.env.example
+*.har
+*.sql.gz
+*.age
+personas/**/v[1-9]*.yaml
+brainstorm
+docs
+evals
+brand

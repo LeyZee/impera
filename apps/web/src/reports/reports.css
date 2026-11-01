@@ -1,0 +1,1193 @@
+/* End-of-shift reports (EQ-03): the report panel, the hold island, Aujourd'hui's « Mes rapports », Équipe › Rapports
+   and Réglages › Paie. Tokens only; one neon per screen (the panel's send, the page's validate). */
+
+/* ── Statuses: quiet while waiting, green once validated, amber when sent back. Red stays for urgencies. ── */
+.rp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 650;
+  white-space: nowrap;
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+}
+.rp-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: currentColor;
+  opacity: 0.85;
+}
+.rp-chip--ok {
+  color: var(--nv-success);
+  background: color-mix(in srgb, var(--nv-success) 12%, transparent);
+}
+.rp-chip--warn {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+}
+.rp-chip--neutral::before {
+  display: none;
+}
+.rp-status {
+  align-self: flex-start;
+  font-weight: 650;
+}
+
+/* ── The panel ── */
+.rp-lead__who {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.rp-lead__when {
+  display: block;
+  margin-top: 2px;
+}
+/* A notice's mark is a straight bar beside its text, from its first line to its last: an inset shadow on a rounded box
+   follows the corner and reads as a bracket. No overflow: hidden, so the glow of a button inside is never cut. */
+.rp-notice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.rp-notice::before {
+  content: '';
+  position: absolute;
+  inset: var(--nv-space-4) auto var(--nv-space-4) 0;
+  width: 3px;
+  border-radius: 0 var(--nv-radius-full) var(--nv-radius-full) 0;
+  background: var(--nv-ink-faint);
+}
+.rp-notice[data-tone='warn'] {
+  background: color-mix(in srgb, var(--nv-warning) 9%, var(--nv-glass-fill));
+}
+.rp-notice[data-tone='warn']::before {
+  background: var(--nv-warning);
+}
+.rp-notice__title {
+  margin: 0;
+  font-weight: 650;
+}
+.rp-notice[data-tone='warn'] .rp-notice__title {
+  color: var(--nv-warning);
+}
+.rp-notice__text {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+
+/* The amount dominates the form: large, its currency beside it. */
+.rp-amount__box {
+  position: relative;
+}
+.rp-amount__input.nv-field__control {
+  height: 72px;
+  padding-right: 56px;
+  font-size: var(--nv-text-large-title);
+  line-height: 1;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+.rp-amount__input::placeholder {
+  color: var(--nv-ink-faint);
+  font-weight: 600;
+}
+.rp-amount__sign {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-title-2);
+  font-weight: 600;
+  pointer-events: none;
+  transition: color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-amount__box:focus-within .rp-amount__sign {
+  color: var(--nv-ink);
+}
+.rp-amount[data-invalid='true'] .rp-amount__input {
+  box-shadow: inset 0 0 0 1.5px var(--nv-warning);
+}
+
+.rp-incident {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.rp-incident:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-incident[data-on='true'] {
+  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-glass-fill));
+}
+.rp-incident__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  min-height: var(--nv-target-min);
+  cursor: pointer;
+}
+.rp-incident__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rp-incident__title {
+  font-weight: 650;
+}
+.rp-incident__sub {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+
+/* A validated report: its amount, then its corrections. */
+.rp-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
+.rp-figure__value {
+  margin: 0;
+  font-size: var(--nv-text-hero);
+  line-height: var(--nv-text-hero-leading);
+  letter-spacing: var(--nv-text-hero-tracking);
+  font-weight: 680;
+}
+.rp-figure__note {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-corrections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rp-corrections__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-correction {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: var(--nv-target-min);
+  padding: 0 var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+  border-radius: var(--nv-radius-sm);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-correction:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-correction:first-child {
+  border-top: 0;
+}
+.rp-correction__amount {
+  font-weight: 680;
+}
+.rp-correction__why {
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-corrections__total {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: var(--nv-space-2) var(--nv-space-2) 0;
+  border-top: 1px solid var(--nv-hairline);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.rp-corrections__total .nv-num {
+  color: var(--nv-ink);
+}
+
+/* ── The hold islands: at the foot of the screen, above the phone's tab bar; a refusal sent meanwhile above ── */
+.rp-islands {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: calc(var(--nv-space-6) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  width: min(440px, calc(100vw - 28px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.rp-island {
+  --_radius: var(--nv-radius-xl);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  box-sizing: border-box;
+  padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-3) var(--nv-space-4);
+  pointer-events: auto;
+  animation: rp-island-in var(--nv-dur-slow) var(--nv-ease-spring-bouncy) both;
+}
+@keyframes rp-island-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+    filter: blur(4px);
+  }
+}
+.rp-island__mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--nv-ink);
+}
+.rp-island__ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.rp-island__ring circle {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.rp-island__track {
+  stroke: var(--nv-fill-track);
+}
+.rp-island__left {
+  stroke: var(--nv-neon);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: rp-countdown linear both;
+}
+@keyframes rp-countdown {
+  to {
+    stroke-dashoffset: 1;
+  }
+}
+.rp-island__count {
+  position: relative;
+  font-size: var(--nv-text-footnote);
+  font-weight: 700;
+}
+.rp-island__spin {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid var(--nv-fill-track);
+  border-top-color: var(--nv-ink);
+  border-radius: var(--nv-radius-full);
+  animation: rp-spin 0.8s linear infinite;
+}
+@keyframes rp-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.rp-island__glyph {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rp-island[data-phase='done'] .rp-island__mark {
+  border-radius: var(--nv-radius-full);
+  color: var(--nv-success);
+  background: color-mix(in srgb, var(--nv-success) 14%, transparent);
+}
+.rp-island[data-phase='failed'] .rp-island__mark {
+  border-radius: var(--nv-radius-full);
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+}
+.rp-island__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.rp-island__title {
+  font-weight: 650;
+}
+.rp-island__text {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.rp-island__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-1);
+}
+.rp-island__close svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+/* ── Aujourd'hui ── */
+.rp-hero__made {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: var(--nv-target-min);
+  margin: 0;
+  padding: 0 var(--nv-space-3) 0 var(--nv-space-2);
+  border: 0;
+  border-radius: var(--nv-radius-full);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.rp-hero__see {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.rp-hero__later {
+  align-self: center;
+  padding: 0 var(--nv-space-2);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+
+/* The body of a panel under its eyebrow, at the head's own inset. */
+.rp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: 4px 24px 22px;
+}
+.rp-mine__empty {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-todo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-todo__one {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  width: 100%;
+  min-height: 60px;
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rp-todo__one[data-tone='warn'] {
+  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-glass-fill));
+}
+.rp-todo__mark {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-neon);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-neon) 18%, transparent);
+}
+.rp-todo__one[data-tone='warn'] .rp-todo__mark {
+  background: var(--nv-warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-warning) 18%, transparent);
+}
+.rp-todo__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.rp-todo__title {
+  font-weight: 650;
+}
+.rp-todo__sub,
+.rp-todo__note {
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-todo__note {
+  color: var(--nv-warning);
+  white-space: normal;
+}
+.rp-todo__go {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill-strong);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-todo__one:hover .rp-todo__go {
+  background: var(--nv-select-strong);
+}
+
+.rp-figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rp-figures__row {
+  display: flex;
+  flex-wrap: wrap;
+  /* The labels on one line, whatever the size of the figure under each (DASH-24). */
+  align-items: flex-start;
+  gap: var(--nv-space-3) var(--nv-space-8);
+}
+.rp-figures__one {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-figures__label {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.rp-figures__value {
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  letter-spacing: var(--nv-text-title-1-tracking);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.rp-figures__value--quiet,
+.rp-figures__value--warn {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  color: var(--nv-ink-muted);
+}
+/* Came back: it waits for its member, amber like the line that says it. */
+.rp-figures__value--warn {
+  color: var(--nv-warning);
+}
+.rp-mine__all {
+  margin: 0 calc(-1 * var(--nv-space-2));
+}
+.rp-lines {
+  margin: 0;
+  list-style: none;
+}
+.rp-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  width: 100%;
+  min-height: var(--nv-target-min);
+  margin: 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.rp-line__when {
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-line__amount {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* ── Équipe › Rapports ── */
+.rp-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  max-width: 980px;
+}
+.rp-validate__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-4);
+}
+.rp-validate__count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-3);
+  margin: 0;
+}
+.rp-validate__num {
+  font-size: var(--nv-text-hero);
+  line-height: var(--nv-text-hero-leading);
+  letter-spacing: var(--nv-text-hero-tracking);
+  font-weight: 680;
+}
+.rp-validate__what {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+}
+.rp-validate__sum {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+  color: var(--nv-ink-muted);
+}
+
+/* « N shifts sans rapport » under the count (EQ-14): who, on what, since when, and « Relancer » (EQ-15). */
+.rp-late .rp-late__title {
+  color: var(--nv-warning);
+}
+.rp-late__one {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  min-height: var(--nv-target-min);
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-late__one:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-late__who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  overflow: hidden;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rp-late__when,
+.rp-late__since {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.rp-late__since {
+  color: var(--nv-warning);
+  white-space: nowrap;
+}
+.rp-nudge__text {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0 0 var(--nv-space-2);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-track);
+  color: var(--nv-ink);
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  resize: none;
+}
+/* « Valider (N) » at the foot of its list, kept in sight while the list scrolls (EQ-26). */
+.rp-validate__bar {
+  position: sticky;
+  bottom: calc(var(--nv-space-3) + env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  margin-top: var(--nv-space-3);
+  padding: var(--nv-space-2) var(--nv-space-2) var(--nv-space-2) var(--nv-space-4);
+  border-radius: var(--nv-radius-full);
+  box-shadow: var(--nv-shadow-lift);
+}
+.rp-validate__chosen {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .rp-late__one {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-block: var(--nv-space-2);
+  }
+  .rp-late__when {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .rp-late .rp-nudge {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  /* The count is enough on a phone; the oldest one is the first line. */
+  .rp-late summary .nv-disclosure__sum {
+    display: none;
+  }
+}
+
+/* A checkbox of the design: a soft square that fills with ink, its tick drawn. */
+.rp-check {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border-radius: 7px;
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1.5px var(--nv-hairline);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rp-check::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  margin-top: -3px;
+  border-left: 2px solid var(--nv-void);
+  border-bottom: 2px solid var(--nv-void);
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.rp-check:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-faint);
+}
+.rp-check:active:not(:disabled) {
+  transform: scale(0.9);
+}
+.rp-check:checked {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+.rp-check:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+.rp-check:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.rp-check:disabled {
+  opacity: 0.5;
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.rp-all {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  align-self: flex-start;
+  min-height: var(--nv-target-min);
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-all:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-all__count {
+  color: var(--nv-ink-faint);
+}
+.rp-reviews {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-review {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-2);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.rp-review:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-review[data-checked='true'] {
+  background: var(--nv-select);
+  box-shadow: inset 0 0 0 1px var(--nv-select-strong);
+}
+.rp-review[data-locked='true'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+/* Held: still the selection, on its way; the locked row stays the quiet one. */
+.rp-review[data-held='true'] {
+  opacity: 0.6;
+  background: var(--nv-select);
+  box-shadow: inset 0 0 0 1px var(--nv-select-strong);
+}
+.rp-review__held {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.rp-review__pick {
+  display: grid;
+  place-items: center;
+  width: var(--nv-target-min);
+  height: var(--nv-target-min);
+  margin: -6px 0;
+  cursor: pointer;
+}
+.rp-review__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.rp-review__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-weight: 650;
+}
+.rp-review__where,
+.rp-review__locked {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-review__locked {
+  color: var(--nv-ink-faint);
+}
+.rp-review__quote {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.rp-review__incident {
+  margin: 2px 0 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-warning) 10%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-review__flag {
+  margin-right: 4px;
+  color: var(--nv-warning);
+  font-weight: 700;
+}
+.rp-review__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--nv-space-1);
+  padding-top: 2px;
+}
+.rp-review__amount {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.rp-review__refuse {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-2);
+}
+.rp-review__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+.rp-sent {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px var(--nv-space-3);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-sent:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-sent__who {
+  font-weight: 650;
+}
+.rp-sent__when {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.rp-sent__note {
+  grid-column: 1 / -1;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+
+.rp-members {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 calc(-1 * var(--nv-space-2));
+}
+/* Only « N sans rapport » is amber in a member's line, not the money validated beside it (EQ-14). */
+.rp-member__late {
+  color: var(--nv-warning);
+}
+.rp-pline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: var(--nv-target-min);
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-pline:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-pline[data-missing='true'] {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.rp-pline__when {
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-pline__amount {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.rp-pline__fix {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  font-weight: 500;
+}
+
+/* ── Réglages › Règles de paie ── */
+.rp-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  max-width: 820px;
+}
+.rp-rules__lede {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+.rp-rules__cover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+}
+.rp-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-account:hover {
+  background: var(--nv-plate-hover);
+}
+.rp-account__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-4);
+}
+.rp-account__who {
+  min-width: 0;
+}
+.rp-account__name {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.rp-account__handle,
+.rp-account__since {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+/* An account without rules: the notice above the list says it once, the card stays neutral and its button acts. */
+.rp-account__none {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.rp-account__now,
+.rp-account__next {
+  display: grid;
+  /* The chips share one column, so that the rules line up whatever the chip says. */
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--nv-space-3);
+}
+.rp-account__now .rp-account__since,
+.rp-account__next .rp-account__since {
+  grid-column: 2;
+}
+.rp-account__rules {
+  margin: 0;
+  font-weight: 600;
+}
+.rp-account__now .rp-chip,
+.rp-account__next .rp-chip {
+  justify-self: start;
+}
+.rp-account__next .rp-account__rules {
+  color: var(--nv-ink-muted);
+}
+.rp-account__past {
+  margin: 0 calc(-1 * var(--nv-space-3));
+}
+.rp-account__old {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--nv-space-1) 0;
+  font-size: var(--nv-text-footnote);
+}
+.rp-recap {
+  padding: var(--nv-space-4) var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
+.rp-recap__list {
+  display: flex;
+  flex-direction: column;
+  margin: var(--nv-space-2) 0 0;
+}
+.rp-recap__list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-4);
+  padding: var(--nv-space-2) 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.rp-recap__list > div:first-child {
+  border-top: 0;
+}
+.rp-recap__list dt {
+  color: var(--nv-ink-muted);
+}
+.rp-recap__list dd {
+  margin: 0;
+  font-weight: 650;
+  text-align: right;
+}
+
+/* ── Planning : le rapport d'un shift ── */
+.sc-chip__incident {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: var(--nv-warning);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* A past shift fades, its incident stays readable. */
+.sc-chip[data-incident='true'][data-phase='past'] {
+  opacity: 0.82;
+}
+.sc-sheet__report {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.sc-sheet__report[data-warn='true'] {
+  color: var(--nv-warning);
+}
+/* The report row and the member's name of a shift are links: Rapports, Membres (EQ-11, EQ-13). */
+a.sc-sheet__report,
+.sc-sheet__who {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+a.sc-sheet__report[data-warn='true'] {
+  color: var(--nv-warning);
+}
+a.sc-sheet__report:hover,
+.sc-sheet__who:hover {
+  text-decoration-color: currentColor;
+}
+a.sc-sheet__report:focus-visible,
+.sc-sheet__who:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.sc-sheet__incident {
+  margin: 0;
+}
+
+@media (max-width: 820px) {
+  .rp-islands {
+    /* Above the floating tab bar (shell.css, « Phone »). */
+    bottom: calc(14px + 64px + 12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (max-width: 520px) {
+  .rp-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .rp-line .rp-chip {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .rp-amount__input.nv-field__control {
+    height: 64px;
+    font-size: var(--nv-text-title-1);
+  }
+  .rp-review {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .rp-review__side {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .rp-pline {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--nv-space-2) var(--nv-space-3);
+  }
+  .rp-pline .rp-chip {
+    justify-self: start;
+  }
+  .rp-account__now,
+  .rp-account__next {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--nv-space-1);
+  }
+  .rp-account__now .rp-chip,
+  .rp-account__next .rp-chip {
+    justify-self: start;
+  }
+  .rp-account__now .rp-account__since,
+  .rp-account__next .rp-account__since {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-island {
+    animation: none;
+  }
+  /* The ring stays full and the number counts down: the time left is still said. */
+  .rp-island__left {
+    animation: none;
+  }
+  .rp-island__spin {
+    animation-duration: 2.4s;
+  }
+  .rp-incident,
+  .rp-correction,
+  .rp-todo__go,
+  .rp-review,
+  .rp-account,
+  .rp-check,
+  .rp-check::after {
+    transition: none;
+  }
+  .rp-check:active:not(:disabled) {
+    transform: none;
+  }
+}

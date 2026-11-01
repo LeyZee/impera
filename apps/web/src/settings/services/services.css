@@ -1,14 +1,21 @@
 /*
  * Réglages › Modèles IA › Services (fiche P3-03). Built on the design-system tokens and nv-* classes; only what the
- * package has no class for lives here, prefixed `sv-`. The container is glass, the rows are not (docs/design).
+ * package has no class for lives here, prefixed `sv-`. Content sits on plates; only the menu and the sheet, which
+ * float, are glass (docs/design). Amber for a setting to make or a key refused; red only for a service broken in use.
  */
 
 .sv-page {
   max-width: 680px;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-5);
+}
+/* The one line under the tab, in the style of every Réglages sub-page (tg-lede, bk-lede). */
+.sv-lede {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--nv-ink-muted);
 }
 .sv-muted {
   margin: 0;
@@ -54,35 +61,6 @@
   flex-direction: column;
   gap: 2px;
 }
-.sv-bar {
-  display: flex;
-  gap: 6px;
-}
-.sv-bar i {
-  flex: 1;
-  height: 4px;
-  border-radius: 4px;
-  background: var(--nv-glass-fill-strong);
-  overflow: hidden;
-  position: relative;
-}
-.sv-bar i::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--nv-success);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.sv-bar i[data-segment='on']::after {
-  transform: scaleX(1);
-}
-.sv-bar i[data-segment='bad']::after {
-  background: var(--nv-danger);
-  transform: scaleX(1);
-}
-
 /* State dots: calm is still, waiting breathes, an error pulses; colour changes fade in 300 ms. */
 .sv-dot {
   width: 12px;
@@ -91,8 +69,8 @@
   flex: none;
   background: var(--nv-ink-faint);
   transition:
-    background-color 300ms var(--nv-ease-out),
-    box-shadow 300ms var(--nv-ease-out);
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
 .sv-dot--big {
   width: 16px;
@@ -107,18 +85,18 @@
 }
 .sv-dot[data-dot='must'] {
   background: transparent;
-  box-shadow: inset 0 0 0 2px var(--nv-neon-ink);
+  box-shadow: inset 0 0 0 2px var(--nv-warning);
 }
 .sv-dot[data-dot='low'] {
   background: var(--nv-warning);
 }
 .sv-dot[data-dot='bad'] {
   background: var(--nv-danger);
-  animation: sv-pulse 1.4s ease-in-out infinite;
+  animation: sv-pulse var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
 }
 .sv-dot[data-dot='busy'] {
   background: var(--nv-warning);
-  animation: sv-breathe 1.6s ease-in-out infinite;
+  animation: sv-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
 }
 
 /* Services */
@@ -154,6 +132,13 @@
   font-weight: 400;
   font-size: 12px;
   color: var(--nv-ink-faint);
+}
+/* Development only: says so quietly, never a sentence about the server. */
+.sv-dev {
+  align-self: center;
+  outline: 1px dashed var(--nv-ink-faint);
+  outline-offset: -1px;
+  color: var(--nv-ink-muted);
 }
 .sv-row__act {
   grid-row: 1 / 3;
@@ -251,7 +236,7 @@
 .sv-scrim {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 40;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -298,23 +283,6 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
-.sv-close {
-  appearance: none;
-  width: 44px;
-  height: 44px;
-  flex: none;
-  border: 0;
-  border-radius: var(--nv-radius-full);
-  background: transparent;
-  color: var(--nv-ink-muted);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-}
-.sv-close:hover {
-  background: var(--nv-glass-fill);
-  color: var(--nv-ink);
-}
 .sv-steps {
   list-style: none;
   margin: 4px 0 0;
@@ -344,16 +312,16 @@
   background: var(--nv-glass-fill-strong);
   color: var(--nv-ink-muted);
   transition:
-    background-color 300ms var(--nv-ease-out),
-    color 300ms var(--nv-ease-out);
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    color var(--nv-dur-base) var(--nv-ease-out);
 }
 .sv-num svg {
   width: 14px;
   height: 14px;
 }
 .sv-step[data-state='now'] .sv-num {
-  background: var(--nv-neon-soft);
-  color: var(--nv-neon-ink);
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
 }
 .sv-step[data-state='done'] .sv-num {
   background: color-mix(in srgb, var(--nv-success) 16%, transparent);
@@ -448,7 +416,7 @@
   color: var(--nv-success);
 }
 .sv-copy[data-copy='failed'] span {
-  color: var(--nv-danger);
+  color: var(--nv-warning);
 }
 .sv-note {
   margin: 0;
@@ -469,8 +437,8 @@
   box-shadow: var(--nv-shadow-focus);
 }
 .sv-key[data-error='true'] {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 60%, transparent);
-  animation: sv-nudge 300ms var(--nv-ease-out);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 60%, transparent);
+  animation: sv-nudge var(--nv-dur-base) var(--nv-ease-out);
 }
 .sv-key input {
   flex: 1;
@@ -505,7 +473,7 @@
   align-items: center;
 }
 .sv-msg[data-kind='error'] {
-  color: var(--nv-danger);
+  color: var(--nv-warning);
 }
 .sv-msg[data-kind='busy'] {
   color: var(--nv-ink-muted);
@@ -533,7 +501,7 @@
   fill: color-mix(in srgb, var(--nv-success) 10%, transparent);
   stroke-dasharray: 151;
   stroke-dashoffset: 151;
-  animation: sv-draw 500ms var(--nv-ease-out) forwards;
+  animation: sv-draw var(--nv-dur-slow) var(--nv-ease-out) forwards;
 }
 .sv-done path {
   stroke: var(--nv-success);
@@ -543,7 +511,7 @@
   stroke-linejoin: round;
   stroke-dasharray: 30;
   stroke-dashoffset: 30;
-  animation: sv-draw 300ms 350ms var(--nv-ease-out) forwards;
+  animation: sv-draw var(--nv-dur-base) calc(var(--nv-stagger) * 7) var(--nv-ease-out) forwards;
 }
 .sv-done h3 {
   font-size: 17px;
@@ -600,7 +568,7 @@
 }
 .sv-hint[data-error='true'],
 .sv-notice {
-  color: var(--nv-danger);
+  color: var(--nv-warning);
 }
 .sv-notice {
   margin: 0;
@@ -683,4 +651,9 @@
 .sv-reauth {
   display: grid;
   gap: 8px;
+}
+.sv-reauth__label {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
 }

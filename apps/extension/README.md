@@ -10,6 +10,6 @@ Interface : le popup utilise `@nirvana/design-system/styles.css` (`docs/design/R
 
 Contraintes : `host_permissions` limitées à `*://*.reveal.me/*` ; service worker éphémère (`chrome.alarms`, pas de `setInterval`) ; aucun secret stocké dans l'extension (`chrome.storage.session` au plus) ; aucun appel LLM depuis l'extension.
 
-Chargement en dev : `pnpm --filter @nirvana/extension dev`, puis `chrome://extensions` → mode développeur → charger `.output/chrome-mv3`.
+Chargement en dev : `pnpm --filter @nirvana/extension dev` (serveur de dev WXT sur le port 3100, le 3000 étant celui de l'API), puis `chrome://extensions` → mode développeur → charger `.output/chrome-mv3-dev`.
 
 Icônes : `public/icon/<taille>.png` (16, 32, 48, 128), tirées de `brand/favicon.svg` sans retouche ; WXT les met dans le manifeste. Paquet à installer ou à publier : `pnpm --filter @nirvana/extension zip` (dans `.output/`).

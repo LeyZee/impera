@@ -1,7 +1,8 @@
 import type { DraftView } from '@nirvana/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 
+import { FanSheet } from './FanSheet';
 import {
   approveDraft,
   ConversationGone,
@@ -12,11 +13,17 @@ import {
   type ConversationRead,
   type Decision,
 } from './api';
-import { lastHandoff, threadOf } from './reader-model';
-import { bubblesFromText, STATE_LABELS, statusClass } from './view';
+import { draftsOf, threadOf, whyHuman } from './reader-model';
+import { bringIntoView, useEndInView } from './scroll';
+import { bubblesFromText, bubblesProblem, MODE_LABELS, STATE_LABELS, statusClass } from './view';
+
+import { initialOf } from '@/lib/utils';
 
 /** The reader follows the conversation more closely than the list: a draft or a fan's message shows up quickly. */
 const REFRESH_MS = 10_000;
+
+/** What `ReleaseBodySchema` accepts for the note left when giving the hand back. */
+const NOTE_MAX = 300;
 
 /**
  * One conversation, read in Nirvana (decided by Charles on 19/10, « Valider dans Suivi »): the thread, the drafts
@@ -28,12 +35,15 @@ export function Reader({
   conversationId,
   canDecide,
   onClose,
+  backLabel = 'Toutes les conversations',
 }: {
   creatorId: string;
   conversationId: string;
   /** Owners and chatters decide; a creator reads. */
   canDecide: boolean;
   onClose: () => void;
+  /** Where the phone's back button leads: the list the reader was opened from. */
+  backLabel?: string;
 }): JSX.Element {
   const key = ['conversation', creatorId, conversationId];
   const query = useQuery({
@@ -52,11 +62,15 @@ export function Reader({
     ]);
   };
 
+  const back = (
+    <button type="button" className="nv-btn nv-btn--plain nv-btn--sm tr-back" onClick={onClose}>
+      ← {backLabel}
+    </button>
+  );
+
   return (
-    <section className="nv-glass tr-reader" aria-label="Conversation">
-      <button type="button" className="nv-btn nv-btn--plain nv-btn--sm tr-back" onClick={onClose}>
-        ← Toutes les conversations
-      </button>
+    <section className="nv-plate tr-reader" aria-label="Conversation">
+      {query.data === undefined ? back : null}
       {query.error instanceof ConversationGone ? (
         <p className="tr-reader__empty">Cette conversation n’existe plus.</p>
       ) : query.isError && query.data === undefined ? (
@@ -72,6 +86,7 @@ export function Reader({
         </div>
       ) : (
         <Loaded
+          back={back}
           read={query.data}
           stale={query.isError}
           creatorId={creatorId}
@@ -84,12 +99,15 @@ export function Reader({
 }
 
 function Loaded({
+  back,
   read,
   stale,
   creatorId,
   canDecide,
   settle,
 }: {
+  /** The way back to the list, kept with the fan's name at the top of the screen on a phone. */
+  back: JSX.Element;
   read: ConversationRead;
   /** The last read failed: what shows is the previous answer, and the screen says so. */
   stale: boolean;
@@ -99,44 +117,97 @@ function Loaded({
 }): JSX.Element {
   const { detail } = read;
   const name = detail.fanDisplayName.trim() === '' ? 'Fan sans nom' : detail.fanDisplayName;
-  const isHuman = detail.state === 'human';
-  const handoff = isHuman ? lastHandoff(read) : null;
+  const drafts = draftsOf(read);
+  const isHuman = drafts.state === 'human';
+  const why = isHuman ? whyHuman(read) : null;
   const [hand, setHand] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
   });
+  /** A decision that came too late: said here, since the draft it was about leaves the screen. */
+  const [outdated, setOutdated] = useState<string | null>(null);
+
+  const [note, setNote] = useState('');
 
   const toggleHand = async (): Promise<void> => {
     setHand({ pending: true, error: null });
-    const result = await (isHuman ? giveBack(creatorId, detail.id) : takeOver(creatorId, detail.id));
-    if (result.ok) await settle();
+    setOutdated(null);
+    const kept = note.trim();
+    const result = await (isHuman
+      ? giveBack(creatorId, detail.id, kept === '' ? undefined : kept)
+      : takeOver(creatorId, detail.id));
+    if (result.ok) setNote('');
+    // A takeover or a release that came too late: what shows is read again at once, as after a success.
+    if (result.ok || result.outdated) await settle();
     setHand({ pending: false, error: result.ok ? null : result.message });
   };
 
+  const decided = async (decision: Decision): Promise<string | null> => {
+    if (decision.ok) {
+      setOutdated(null);
+      await settle();
+      return null;
+    }
+    if (!decision.outdated) return decision.message;
+    setOutdated(decision.message);
+    await settle();
+    return null;
+  };
+
+  // Like any messenger, the reader opens on the end of the thread: the draft waiting for a decision, else the last
+  // message. A new draft brings it into view again only if the end of the thread was in view: a person reading higher
+  // up is not pulled down. From 900 px the thread scrolls on its own, so the list beside it never moves.
+  const pending = detail.openDrafts.find((draft) => draft.status === 'pending') ?? null;
+  const pendingId = pending?.id ?? null;
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const draftRef = useRef<HTMLDivElement>(null);
+  const endInView = useEndInView(endRef);
+  const openedId = useRef<string | null>(null);
+  useEffect(() => {
+    const opening = openedId.current !== detail.id;
+    openedId.current = detail.id;
+    if (opening || endInView.current) bringIntoView(bodyRef.current, draftRef.current, endRef.current);
+  }, [detail.id, pendingId, endInView]);
+
+  const handButton = (
+    <button
+      type="button"
+      className="nv-btn nv-btn--soft nv-btn--sm"
+      disabled={hand.pending}
+      onClick={() => void toggleHand()}
+    >
+      {hand.pending
+        ? 'Envoi au serveur…'
+        : !isHuman
+          ? 'Reprendre la main'
+          : note.trim() === ''
+            ? 'Rendre la main à l’agent'
+            : 'Rendre la main (avec la note)'}
+    </button>
+  );
+
   return (
     <>
-      <header className="tr-reader__head">
-        <span className="nv-avatar" aria-hidden="true">
-          {name.slice(0, 1).toUpperCase()}
-        </span>
-        <span className="tr-reader__who">
-          <h2>{name}</h2>
-          <span className={`nv-status ${statusClass(detail.state)}`}>
-            <span className="nv-status__dot" />
-            {STATE_LABELS[detail.state]}
+      <div className="tr-reader__top">
+        {back}
+        <header className="tr-reader__head">
+          <span className="nv-avatar" aria-hidden="true">
+            {initialOf(name)}
           </span>
-        </span>
-        {canDecide ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            disabled={hand.pending}
-            onClick={() => void toggleHand()}
-          >
-            {hand.pending ? 'Envoi au serveur…' : isHuman ? 'Rendre la main à l’agent' : 'Reprendre la main'}
-          </button>
-        ) : null}
-      </header>
+          <span className="tr-reader__who">
+            <h2>{name}</h2>
+            <span className="tr-reader__state">
+              <span className={`nv-status ${statusClass(drafts.state)}`}>
+                <span className="nv-status__dot" />
+                {STATE_LABELS[drafts.state]}
+              </span>
+              <span className="nv-meta">{MODE_LABELS[detail.mode]}</span>
+            </span>
+          </span>
+          {canDecide && !isHuman ? handButton : null}
+        </header>
+      </div>
       {stale ? (
         <p className="tr-warn tr-line">Le serveur ne répond pas : ce fil peut avoir changé depuis.</p>
       ) : null}
@@ -145,13 +216,45 @@ function Loaded({
           {hand.error}
         </p>
       )}
-      {isHuman ? (
-        <p className="tr-hand">
-          {handoff === null ? 'Un humain a la main.' : `${handoff}.`} Il répond dans Reveal ; l’agent n’écrit
-          plus à ce fan jusqu’à ce qu’on lui rende la main.
+      {outdated === null ? null : (
+        <p className="tr-warn tr-line" role="status">
+          {outdated}
         </p>
+      )}
+      {isHuman ? (
+        <div className="tr-hand">
+          <p>
+            {why === null ? 'Un humain a la main.' : `${why}.`} Il répond dans Reveal ; l’agent n’écrit plus à
+            ce fan jusqu’à ce qu’on lui rende la main.
+          </p>
+          {canDecide ? (
+            <div className="tr-hand__give">
+              <label className="nv-field">
+                <span className="nv-field__label">Note pour l’agent (facultatif)</span>
+                <input
+                  className="nv-field__control"
+                  maxLength={NOTE_MAX}
+                  value={note}
+                  disabled={hand.pending}
+                  placeholder="Ex. : anniversaire le 12 mars"
+                  onChange={(event) => {
+                    setNote(event.target.value);
+                  }}
+                />
+              </label>
+              {handButton}
+            </div>
+          ) : null}
+        </div>
       ) : null}
-      <div className="tr-reader__body">
+      <FanSheet
+        creatorId={creatorId}
+        fanId={detail.fanId}
+        conversationId={detail.id}
+        desire={detail.desire}
+        canDecide={canDecide}
+      />
+      <div className="tr-reader__body" ref={bodyRef}>
         {read.isPartial ? (
           <p className="tr-more">Seuls les derniers messages sont affichés ; le reste se lit dans Reveal.</p>
         ) : null}
@@ -163,7 +266,19 @@ function Loaded({
               </p>
             ) : (
               <div key={item.id} className={`nv-bubble nv-bubble--${item.from}`}>
-                {item.text === '' ? <em>Média</em> : item.text}
+                {item.text === '' ? (
+                  item.media.length === 0 ? (
+                    <em>Média</em>
+                  ) : null
+                ) : (
+                  <span className="tr-text">{item.text}</span>
+                )}
+                {item.media.map((media, index) => (
+                  <span key={index} className="tr-media">
+                    <em>{media.label}</em>
+                    {media.description === null ? null : ` · ${media.description}`}
+                  </span>
+                ))}
                 {item.ppv === null ? null : (
                   <span className="tr-ppv">
                     Média payant · {item.ppv.price} · {item.ppv.isPaid ? 'acheté' : 'pas encore acheté'}
@@ -173,30 +288,83 @@ function Loaded({
               </div>
             ),
           )}
-          {detail.openDrafts.map((draft) =>
-            draft.status === 'pending' ? (
-              <DraftPanel
-                key={draft.id}
-                draft={draft}
-                creatorId={creatorId}
-                conversationId={detail.id}
-                canDecide={canDecide && !isHuman}
-                settle={settle}
-              />
-            ) : (
-              <div key={draft.id} className="tr-draft-sending">
-                {(draft.finalBubbles ?? draft.bubbles).map((bubble, i) => (
-                  <div key={i} className="nv-bubble nv-bubble--draft">
-                    {bubble}
-                  </div>
-                ))}
-                <span className="nv-meta nv-meta--end">Envoi en cours</span>
-              </div>
-            ),
+          {drafts.sending.map((draft) => (
+            <div key={draft.id} className="tr-draft-sending">
+              {(draft.finalBubbles ?? draft.bubbles).map((bubble, i) => (
+                <div key={i} className="nv-bubble nv-bubble--draft">
+                  {bubble}
+                </div>
+              ))}
+              <span className="nv-meta nv-meta--end">Envoi en cours</span>
+            </div>
+          ))}
+          {drafts.failed === null ? null : (
+            <div className="tr-draft-sending tr-draft-failed">
+              {(drafts.failed.finalBubbles ?? drafts.failed.bubbles).map((bubble, i) => (
+                <div key={i} className="nv-bubble nv-bubble--draft">
+                  {bubble}
+                </div>
+              ))}
+              <span className="nv-meta nv-meta--end">N’est pas parti : à envoyer dans Reveal</span>
+              <CopyText bubbles={drafts.failed.finalBubbles ?? drafts.failed.bubbles} />
+            </div>
           )}
+          <div ref={endRef} />
         </div>
       </div>
+      {/* The draft waiting for a person, pinned under the thread with its buttons: never scrolled away with it. */}
+      {pending === null ? null : (
+        <div className="tr-reader__foot" ref={draftRef}>
+          <DraftPanel
+            key={pending.id}
+            draft={pending}
+            creatorId={creatorId}
+            conversationId={detail.id}
+            blocked={!canDecide ? 'reader' : isHuman ? 'human' : null}
+            decided={decided}
+          />
+        </div>
+      )}
     </>
+  );
+}
+
+/** How long « Copié » stays on the button. */
+const COPIED_MS = 2_000;
+
+/** What did not leave, copied to paste in Reveal: one bubble per line, as the chatter sends them. */
+function CopyText({ bubbles }: { bubbles: readonly string[] }): JSX.Element {
+  const [said, setSaid] = useState<'idle' | 'copied' | 'failed'>('idle');
+  useEffect(() => {
+    if (said === 'idle') return;
+    const timer = window.setTimeout(() => {
+      setSaid('idle');
+    }, COPIED_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [said]);
+  const copy = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(bubbles.join('\n'));
+      setSaid('copied');
+    } catch {
+      setSaid('failed');
+    }
+  };
+  return (
+    <button
+      type="button"
+      className="nv-btn nv-btn--soft nv-btn--sm tr-copy"
+      aria-live="polite"
+      onClick={() => void copy()}
+    >
+      {said === 'copied'
+        ? 'Copié'
+        : said === 'failed'
+          ? 'Copie impossible : sélectionne le texte'
+          : 'Copier le texte'}
+    </button>
   );
 }
 
@@ -207,14 +375,16 @@ function DraftPanel({
   draft,
   creatorId,
   conversationId,
-  canDecide,
-  settle,
+  blocked,
+  decided,
 }: {
   draft: DraftView;
   creatorId: string;
   conversationId: string;
-  canDecide: boolean;
-  settle: () => Promise<void>;
+  /** Why this person cannot decide now: a human has the hand, or she only reads (a creator); null when she can. */
+  blocked: 'human' | 'reader' | null;
+  /** What follows a decision: the sentence to show here when it was refused, null when it went through or came late. */
+  decided: (decision: Decision) => Promise<string | null>;
 }): JSX.Element {
   const [step, setStep] = useState<Step>('idle');
   const [text, setText] = useState(() => draft.bubbles.join('\n'));
@@ -222,20 +392,20 @@ function DraftPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const edited = bubblesFromText(text);
-  const isChanged = edited !== null && edited.join('\n') !== draft.bubbles.join('\n');
+  const problem = step === 'editing' ? bubblesProblem(text) : null;
+  // An invalid text is a retouch too: the button keeps its name while it is off.
+  const isChanged = edited?.join('\n') !== draft.bubbles.join('\n');
 
   const run = async (decide: () => Promise<Decision>): Promise<void> => {
     setPending(true);
     setError(null);
-    const result = await decide();
     // A refused decision leaves the draft as it was, waiting: the sentence says why, the panel stays.
-    if (result.ok) await settle();
-    else setError(result.message);
+    setError(await decided(await decide()));
     setPending(false);
   };
 
   return (
-    <section className="nv-glass nv-draft-panel tr-draft" aria-label="Brouillon à valider">
+    <section className="nv-draft-panel tr-draft" aria-label="Brouillon à valider">
       <span className="nv-draft-label">Brouillon de l’agent</span>
       {step === 'editing' ? (
         <label className="nv-field">
@@ -250,7 +420,7 @@ function DraftPanel({
           />
         </label>
       ) : (
-        <div className="nv-thread">
+        <div className="nv-thread tr-draft__bubbles">
           {draft.bubbles.map((bubble, i) => (
             <div key={i} className="nv-bubble nv-bubble--draft">
               {bubble}
@@ -271,16 +441,22 @@ function DraftPanel({
           />
         </label>
       ) : null}
+      {problem === null ? null : (
+        <p className="tr-warn tr-line" role="status">
+          {problem}
+        </p>
+      )}
       {error === null ? null : (
         <p className="tr-warn" role="alert">
           {error}
         </p>
       )}
-      {!canDecide ? (
+      {blocked === 'human' ? (
         <p className="nv-draft-panel__brief">
-          Seuls le propriétaire et les chatteurs décident des brouillons, et pas pendant qu’un humain a la
-          main.
+          Un humain a la main : rends-la à l’agent pour décider de ce brouillon.
         </p>
+      ) : blocked === 'reader' ? (
+        <p className="nv-draft-panel__brief">Tu lis seulement : l’équipe décide.</p>
       ) : step === 'rejecting' ? (
         <div className="nv-draft-panel__actions">
           <button
@@ -319,7 +495,12 @@ function DraftPanel({
             disabled={pending || edited === null}
             onClick={() =>
               void run(() =>
-                approveDraft(creatorId, conversationId, draft.id, isChanged ? edited : undefined),
+                approveDraft(
+                  creatorId,
+                  conversationId,
+                  draft.id,
+                  isChanged && edited !== null ? edited : undefined,
+                ),
               )
             }
           >

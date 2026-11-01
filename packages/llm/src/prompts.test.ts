@@ -38,7 +38,7 @@ describe('prompts', () => {
   });
 
   it('loads the shipped prompts', () => {
-    for (const role of ['voice', 'brain'] as const) {
+    for (const role of ['voice', 'brain', 'judge'] as const) {
       const prompt = loadPrompt(role);
       expect(prompt.header.role).toBe(role);
       expect(prompt.variables).toContain('persona_sheet');

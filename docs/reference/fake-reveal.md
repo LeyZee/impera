@@ -1,10 +1,10 @@
 # FakeReveal : spécification
 
-Dernière revue : 2026-10-17. Statut : **proposé**. Rien n'est codé tant qu'aucune capture n'existe : les chemins, les formes de réponse et les codes d'erreur viennent de `docs/reference/reveal-api-observed.md`, rempli d'après les captures anonymisées (`docs/runbooks/reveal-recording.md`). Ce document fixe ce que FakeReveal doit savoir simuler, aligné sur `docs/reference/reveal-connector-inventory.md` (L1 à L10, E1 à E6).
+Dernière revue : 2026-10-27. Statut : **codé, routes provisoires**. Le serveur, l'état, les scénarios et le test de fidélité existent (`apps/api/src/__tests__/fake-reveal/`). Les chemins et les formes de réponse sous `/api` sont **inventés** tant qu'aucune capture n'existe (`model.ts`, `OBSERVED_ON` vide) ; ils seront réécrits d'après `docs/reference/reveal-api-observed.md`, rempli à partir des captures anonymisées (`docs/runbooks/reveal-recording.md`). Ce document fixe ce que FakeReveal doit savoir simuler, aligné sur `docs/reference/reveal-connector-inventory.md`.
 
 ## Rôle
 
-Un serveur Fastify dans `apps/api/test/fake-reveal/` qui imite l'API privée de Reveal. Il sert :
+Un serveur Fastify dans `apps/api/src/__tests__/fake-reveal/` qui imite l'API privée de Reveal. Il sert :
 
 - au **test de contrat** du connecteur : la même suite tourne contre `FakeConnector` et contre `RevealApiConnector` pointé sur FakeReveal (`docs/conventions/testing.md`) ;
 - aux tests du **moteur de vente** : scripts natifs, étapes déjà envoyées, achats ;
@@ -29,7 +29,7 @@ Tout est inventé et évidemment faux (pseudos `fan_test_01`, textes « Message 
 | Envoi de script | `fanRef`, `scriptRef`, `stepIndex`, `messageRef`, `sentAt` |
 | Transaction | `ref`, `fanRef`, type (PPV, tip, abonnement), `amountCents`, `messageRef`, `createdAt` |
 
-Fixtures de départ (`fixtures/default.json`) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de plus de 300 messages (pagination), 15 médias en 3 dossiers, 4 scripts de 3 étapes aux prix 5, 15 et 30 $, dont 1 déjà envoyé en entier à un fan et 1 envoyé jusqu'à l'étape 2 à un autre.
+Fixtures de départ (`fixtures.ts`, `default` et `empty`) : 1 créatrice, 12 fans dont 3 payeurs et 1 sans aucun message, 1 conversation de plus de 300 messages (pagination), 15 médias en 3 dossiers, 4 scripts de 3 étapes aux prix 5, 15 et 30 $, dont 1 déjà envoyé en entier à un fan et 1 envoyé jusqu'à l'étape 2 à un autre.
 
 ## Comportements
 
@@ -56,7 +56,8 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 
 - `POST /__reset` : recharge les fixtures (`?fixture=<nom>`).
 - `GET /__state` : état complet, pour les assertions.
-- `POST /__scenario` : programme des événements, par fichier (`scenarios/*.json`) ou en ligne.
+- `POST /__scenario` : programme des événements (`{ events: [...] }`), à `atMs` après l'horloge de FakeReveal.
+- `POST /__clock` : avance l'horloge (`{ advanceMs }`) ; les événements échus se produisent. Seule cette route fait passer le temps, un test reste déterministe.
 
 | Événement | Effet |
 |---|---|
@@ -70,12 +71,12 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `script_changed` | Un script change d'étapes ou de prix entre deux lectures |
 | `shape_changed` | Un champ renommé ou ajouté dans une réponse : le connecteur doit lever une erreur typée, pas avaler la donnée (schémas Zod stricts aux frontières) |
 | `challenge` | Page anti-bot (403 avec HTML) à la place du JSON |
-| `ws_drop` | Coupure du temps réel ; le connecteur reprend par polling |
+| `ws_drop` | Coupure du temps réel ; le connecteur reprend par polling (pas encore codé : la capture dira si Reveal a du temps réel) |
 
 ## Fidélité
 
 - Chaque endpoint de FakeReveal cite sa section de `reveal-api-observed.md` et la date de la capture qui le fonde.
-- Les captures anonymisées retenues comme référence sont copiées dans `apps/api/test/fake-reveal/recordings/` (sans secret ni donnée réelle, relues avant commit, gitleaks), et un test vérifie que les réponses de FakeReveal passent les mêmes schémas Zod que ces enregistrements.
+- Les captures anonymisées retenues comme référence sont copiées dans `apps/api/src/__tests__/fake-reveal/recordings/` (sans secret ni donnée réelle, relues avant commit, gitleaks), et un test vérifie que les réponses de FakeReveal passent les mêmes schémas Zod que ces enregistrements.
 - Quand une nouvelle capture montre un changement, FakeReveal et le journal des changements de `reveal-api-observed.md` sont mis à jour dans la même PR.
 
 ## Hors périmètre

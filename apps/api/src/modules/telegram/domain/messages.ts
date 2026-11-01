@@ -24,5 +24,7 @@ export function describeTelegramError(kind: TelegramErrorKind): string {
       return 'Telegram ne répond pas. Rien n’est perdu : Nirvana réessaie tout seul.';
     case 'routes_version_conflict':
       return 'Quelqu’un a changé ces réglages en même temps que toi. Recharge la page pour voir les siens.';
+    case 'chat_removed':
+      return 'Le groupe a été retiré de la liste avant l’envoi : ce message n’est pas parti.';
   }
 }

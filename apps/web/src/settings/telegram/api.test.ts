@@ -1,9 +1,22 @@
-import { CreatorIdSchema, REAUTHENTICATION_ERROR_CODE, TelegramBotIdSchema, newId } from '@nirvana/contracts';
+import {
+  REAUTHENTICATION_ERROR_CODE,
+  TelegramBotIdSchema,
+  TelegramChatIdSchema,
+  newId,
+} from '@nirvana/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReauthRequired } from '../services/api';
 
-import { TelegramOff, addBot, fetchAlertKeywords, fetchOverview, removeBot, saveRoutes } from './api';
+import {
+  TelegramForbidden,
+  TelegramOff,
+  addBot,
+  fetchOverview,
+  removeBot,
+  removeChat,
+  saveRoutes,
+} from './api';
 
 const bot = {
   id: newId(TelegramBotIdSchema),
@@ -59,6 +72,11 @@ describe('Telegram API client', () => {
     await expect(fetchOverview()).rejects.not.toBeInstanceOf(TelegramOff);
   });
 
+  it('tells a member who is not the owner from a server that fails', async () => {
+    answer(403, { error: { code: 'role_forbidden', message: 'x', details: {}, requestId: 'r' } });
+    await expect(fetchOverview()).rejects.toBeInstanceOf(TelegramForbidden);
+  });
+
   it('never takes a refused removal for a success', async () => {
     answer(409, { kind: 'routes_version_conflict', message: 'x' });
     await expect(removeBot(bot.id)).rejects.toThrow('DELETE /bots: 409');
@@ -78,8 +96,18 @@ describe('Telegram API client', () => {
     await expect(fetchOverview()).rejects.toThrow('GET : 500');
   });
 
-  it('reads the alert words of a creator, none before her first version', async () => {
-    answer(200, { creatorId: newId(CreatorIdSchema), latest: null, versions: [] });
-    expect(await fetchAlertKeywords(newId(CreatorIdSchema))).toEqual({ words: [], isActive: true });
+  it('removes a group the bot is out of, already gone counts, the bot back in keeps it (REG-28)', async () => {
+    const id = newId(TelegramChatIdSchema);
+    answer(204, null);
+    expect(await removeChat(id)).toBe('removed');
+    expect(calls[0]).toMatchObject({ url: `/v1/settings/telegram/chats/${id}`, init: { method: 'DELETE' } });
+    answer(404, { error: { code: 'telegram_chat_not_found', message: 'x', details: {}, requestId: 'r' } });
+    expect(await removeChat(id)).toBe('removed');
+    answer(409, {
+      error: { code: 'telegram_chat_member_conflict', message: 'x', details: {}, requestId: 'r' },
+    });
+    expect(await removeChat(id)).toBe('still_member');
+    answer(500, null);
+    await expect(removeChat(id)).rejects.toThrow();
   });
 });

@@ -1,0 +1,52 @@
+/*
+ * The save of a long sheet, pinned to the bottom of the screen while its head has scrolled away (CREA-20). It floats
+ * over the content, so it is glass; it holds the one neon of the screen while the head's is out of sight.
+ */
+.cr-savebar {
+  --_radius: var(--nv-radius-full);
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 18px;
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.cr-savebar__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cr-savebar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* A phone: above the floating capsule of tabs. */
+@media (max-width: 820px) {
+  .cr-savebar {
+    bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
+    padding-left: 14px;
+  }
+}
+/* A narrow phone: what waits is read whole; « Tout annuler » stays in the head of the sheet. */
+@media (max-width: 480px) {
+  .cr-savebar .cr-savebar__reset {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-savebar {
+    animation: none;
+  }
+}

@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bubblesFromText,
+  bubblesProblem,
+  duration,
   lastMessageAgo,
   mergeConversations,
+  orderLines,
   parseTrackingSearch,
   sharedMode,
   statusClass,
@@ -24,6 +27,7 @@ function conversation(id: string, patch: Partial<ConversationSummary> = {}): Con
     lastOutboundAt: null,
     unreadCount: 0,
     updatedAt: '2026-10-17T20:00:00Z',
+    desire: null,
     ...patch,
   });
 }
@@ -53,14 +57,23 @@ describe('lastMessageAgo', () => {
     expect(lastMessageAgo('2026-10-17T18:00:00Z', NOW)).toBe('il y a 3 h');
     expect(lastMessageAgo('2026-10-15T20:00:00Z', NOW)).toBe('il y a 2 j');
   });
+
+  it('says a wait in days past a day, as the list does: never « 49 h »', () => {
+    expect(duration(0)).toBe('0 min');
+    expect(duration(59)).toBe('59 min');
+    expect(duration(23 * 60 + 59)).toBe('23 h');
+    expect(duration(49 * 60)).toBe('2 j');
+  });
 });
 
 describe('subline, sharedMode and statusClass', () => {
-  it('says when he last wrote, with the mode only when the lines do not share one', () => {
-    expect(subline(conversation('1'), NOW, false)).toBe('N’a pas encore écrit');
+  it('says when he last wrote in a few words, never the mode', () => {
+    expect(subline(conversation('1'), NOW)).toEqual({ text: 'Pas encore écrit', band: null });
     const auto = conversation('2', { mode: 'auto', lastInboundAt: '2026-10-17T20:55:00Z' });
-    expect(subline(auto, NOW, false)).toBe('A écrit il y a 5 min');
-    expect(subline(auto, NOW, true)).toBe('Automatique · a écrit il y a 5 min');
+    expect(subline(auto, NOW)).toEqual({ text: 'Il y a 5 min', band: null });
+    expect(subline(conversation('3', { lastInboundAt: '2026-10-17T20:59:40Z' }), NOW).text).toBe(
+      'À l’instant',
+    );
   });
 
   it('finds the mode all lines share, or none', () => {
@@ -87,6 +100,17 @@ describe('parseTrackingSearch', () => {
     expect(parseTrackingSearch({ conversation: 42 })).toEqual({});
     expect(parseTrackingSearch({})).toEqual({});
   });
+
+  it('keeps the creator the link names, only with a conversation and only as an id', () => {
+    const id = '0192f3a0-0000-7000-8000-000000000001';
+    const creator = '0192f3a0-0000-7000-8000-0000000000a1';
+    expect(parseTrackingSearch({ conversation: id, creatrice: creator })).toEqual({
+      conversation: id,
+      creatrice: creator,
+    });
+    expect(parseTrackingSearch({ conversation: id, creatrice: 'Anna' })).toEqual({ conversation: id });
+    expect(parseTrackingSearch({ creatrice: creator })).toEqual({});
+  });
 });
 
 describe('bubblesFromText', () => {
@@ -95,5 +119,37 @@ describe('bubblesFromText', () => {
     expect(bubblesFromText('  \n ')).toBeNull();
     expect(bubblesFromText(Array.from({ length: 11 }, (_, i) => `b${String(i)}`).join('\n'))).toBeNull();
     expect(bubblesFromText('x'.repeat(2_001))).toBeNull();
+  });
+
+  it('says why a retouched text cannot be sent', () => {
+    expect(bubblesProblem('Coucou\nÇa va ?')).toBeNull();
+    expect(bubblesProblem(' \n')).toBe('Écris au moins une bulle.');
+    expect(bubblesProblem(Array.from({ length: 11 }, (_, i) => `b${String(i)}`).join('\n'))).toBe(
+      '10 bulles au plus, une par ligne : il y en a 11.',
+    );
+    expect(bubblesProblem('x'.repeat(2_001))).toBe('2\u202f000 caractères au plus par bulle.');
+  });
+});
+
+describe('the desire score in the list (P3-12)', () => {
+  it('ends the subline with the band in a word when it says something, never « neutre »', () => {
+    expect(subline(conversation('1', { desire: { score: 45, band: 'playful' } }), NOW)).toEqual({
+      text: 'Pas encore écrit',
+      band: 'joueur',
+    });
+    expect(subline(conversation('1', { desire: { score: 82, band: 'hot' } }), NOW).band).toBe('chaud');
+    expect(subline(conversation('1', { desire: { score: 12, band: 'neutral' } }), NOW).band).toBeNull();
+  });
+
+  it('orders the hottest first, keeps the order of equal scores, and puts the unscored last', () => {
+    const line = (id: string, score: number | null) => ({
+      conversation: conversation(id, {
+        desire: score === null ? null : { score, band: score >= 70 ? 'hot' : 'neutral' },
+      }),
+    });
+    const lines = [line('1', null), line('2', 30), line('3', 80), line('4', 30)];
+    const ids = (ordered: typeof lines) => ordered.map((l) => l.conversation.id.slice(-1));
+    expect(ids(orderLines(lines, 'hot'))).toEqual(['3', '2', '4', '1']);
+    expect(ids(orderLines(lines, 'recent'))).toEqual(['1', '2', '3', '4']);
   });
 });

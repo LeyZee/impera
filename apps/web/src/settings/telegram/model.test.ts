@@ -15,6 +15,9 @@ import {
   chatLine,
   coverOf,
   deliveryLabel,
+  goneChats,
+  knownChatIds,
+  goneLine,
   healthOf,
   initials,
   looksLikeToken,
@@ -100,9 +103,11 @@ describe('health and coverage', () => {
   it('says all is well, then names what breaks first', () => {
     expect(healthOf(overview())).toMatchObject({ tone: 'ok', botCount: 1, groupCount: 2 });
     expect(healthOf(overview({ bots: [] }))).toMatchObject({ tone: 'empty' });
+    // A refused bot is a warning, not an urgency: red is kept for urgent alerts that reach no one.
     expect(healthOf(overview({ bots: [bot([], { state: 'refused' })] }))).toMatchObject({
-      tone: 'bad',
+      tone: 'warn',
       label: 'Un bot demande ton attention',
+      fix: 'bots',
     });
     expect(
       healthOf(
@@ -112,7 +117,17 @@ describe('health and coverage', () => {
           ],
         }),
       ),
-    ).toMatchObject({ tone: 'bad', label: 'Les urgences n’arrivent nulle part' });
+    ).toMatchObject({ tone: 'bad', label: 'Les urgences n’arrivent nulle part', fix: 'alerts' });
+    expect(
+      healthOf(
+        overview({
+          bots: [bot([chat(groupA, 'Astreinte')], { state: 'refused' })],
+          coverage: [
+            { creatorId: creator, displayName: 'Démo', urgentReachable: false, topicsWithoutGroup: [] },
+          ],
+        }),
+      ),
+    ).toMatchObject({ tone: 'bad', fix: 'bots' });
     expect(
       healthOf(
         overview({ bots: [bot([chat(groupA, 'Astreinte', { lastError: 'Le bot ne peut plus écrire.' })])] }),
@@ -145,12 +160,76 @@ describe('health and coverage', () => {
     expect(coverOf(overview({ bots: [] })).sub).toContain('Ajoute un bot');
   });
 
+  it('sends to the broken bot, not to a group to choose, when no group can be written to', () => {
+    const coverage = [
+      { creatorId: creator, displayName: 'Démo', urgentReachable: false, topicsWithoutGroup: [] },
+    ];
+    const refused = coverOf(
+      overview({ bots: [bot([chat(groupA, 'Astreinte')], { state: 'refused' })], coverage }),
+    );
+    expect(refused).toEqual({
+      isOk: false,
+      title: 'Les alertes ne partent plus',
+      sub: 'Telegram refuse le jeton d’un bot : remplace-le dans Bots et groupes.',
+    });
+    expect(refused.sub).not.toContain('Choisis');
+    const muted = coverOf(
+      overview({ bots: [bot([chat(groupA, 'Astreinte', { canPost: false })])], coverage }),
+    );
+    expect(muted.sub).toContain('administrateur');
+  });
+
   it('never offers a group the bot cannot post in', () => {
     const choices = chatChoices([
       bot([chat(groupA, 'Muet', { canPost: false })]),
       bot([chat(groupB, 'Ouvert')], { state: 'conflict' }),
     ]);
     expect(choices.map((c) => c.isReachable)).toEqual([false, false]);
+  });
+});
+
+describe('a group the bot is out of (REG-28)', () => {
+  it('is no routing choice nor a new group, but listed to remove, with why', () => {
+    const left = chat(groupA, 'Ancien', { membership: 'left', canPost: false });
+    const kicked = chat(groupB, 'Banni', { membership: 'kicked', canPost: false, kind: 'supergroup' });
+    const owner = bot([left, kicked, chat(newId(TelegramChatIdSchema), 'Vivant')]);
+    expect(chatChoices([owner]).map((c) => c.chat.title)).toEqual(['Vivant']);
+    expect(newChats(owner, new Set()).map((c) => c.title)).toEqual(['Vivant']);
+    // Added back while the sheet waits, a group it was out of counts as found.
+    expect([...knownChatIds(owner)]).toEqual([owner.chats[2]?.id]);
+    const back = bot([{ ...left, membership: 'member', canPost: true }], { id: owner.id });
+    expect(newChats(back, knownChatIds(owner)).map((c) => c.title)).toEqual(['Ancien']);
+    expect(goneChats(owner)).toEqual([left, kicked]);
+    expect(goneLine(left)).toBe('Groupe · le bot n’est plus dans ce groupe');
+    expect(goneLine(kicked)).toBe('Supergroupe · le bot a été exclu de ce groupe');
+  });
+
+  it('keeps the strip amber while one waits to be removed', () => {
+    const kicked = chat(groupB, 'Banni', { membership: 'kicked', canPost: false });
+    expect(healthOf(overview({ bots: [bot([chat(groupA, 'Astreinte'), kicked])] }))).toMatchObject({
+      tone: 'warn',
+      label: 'Un groupe demande ton attention',
+      fix: 'bots',
+    });
+  });
+
+  it('sends to Bots et groupes, not to a choice of group, when the bot is out of its only group', () => {
+    const missing = [
+      { creatorId: creator, displayName: 'Démo', urgentReachable: false, topicsWithoutGroup: [] },
+    ];
+    const out = coverOf(
+      overview({
+        bots: [bot([chat(groupA, 'Astreinte', { membership: 'kicked', canPost: false })])],
+        coverage: missing,
+      }),
+    );
+    expect(out).toMatchObject({ isOk: false, title: 'Les alertes ne partent plus' });
+    expect(out.sub).toBe(
+      'Le bot n’est plus dans aucun de ses groupes : rajoute-le à un groupe dans Bots et groupes.',
+    );
+    expect(out.sub).not.toContain('Choisis');
+    const none = coverOf(overview({ bots: [bot([])], coverage: missing }));
+    expect(none.sub).toBe('Le bot n’est dans aucun groupe : ajoute-le à un groupe dans Bots et groupes.');
   });
 });
 
@@ -172,10 +251,10 @@ describe('lines', () => {
   });
 
   it('reads a bot’s state in words', () => {
-    expect(botLine(bot([], { lastPolledAt: new Date(now.getTime() - 12_000).toISOString() }), now).text).toBe(
-      '@demo_alertes_bot · lu il y a 12 s',
+    expect(botLine(bot([], { lastPolledAt: new Date(now.getTime() - 12_000).toISOString() })).text).toBe(
+      '@demo_alertes_bot',
     );
-    expect(botLine(bot([], { state: 'refused' }), now)).toEqual({
+    expect(botLine(bot([], { state: 'refused' }))).toEqual({
       text: 'Telegram refuse ce jeton : remplace-le',
       isWarning: true,
     });
@@ -191,7 +270,7 @@ describe('lines', () => {
       createdAt: '2026-10-17T22:00:00.000Z',
       sentAt: null,
     };
-    expect(deliveryLabel({ ...base, status: 'sent', closedBy: 'Lucas' }).text).toBe('Pris en main par Lucas');
+    expect(deliveryLabel({ ...base, status: 'sent', closedBy: 'Théo' }).text).toBe('Pris en main par Théo');
     expect(deliveryLabel({ ...base, status: 'failed', closedBy: null })).toEqual({
       text: 'Non livrée',
       isOk: false,
@@ -215,12 +294,19 @@ describe('the sheet', () => {
     expect(suggestedUsername('Nirvana Alertes')).toBe('nirvana_alertes_bot');
     expect(suggestedUsername('Équipe nuit !')).toBe('equipe_nuit_bot');
     expect(suggestedUsername('   ')).toBe('nirvana_bot');
+    // @BotFather wants a letter first, and one « bot » at the end.
+    expect(suggestedUsername('3h Alertes')).toBe('nirvana_3h_alertes_bot');
+    expect(suggestedUsername('Nirvana Bot')).toBe('nirvana_bot');
+    expect(suggestedUsername('Robot')).toBe('robot');
+    expect(suggestedUsername('A'.repeat(40))).toBe(`${'a'.repeat(28)}_bot`);
+    expect(suggestedUsername('Bot')).toBe('nirvana_bot');
   });
 
   it('draws two letters for a group, an emoji as one', () => {
     expect(initials('Astreinte nuit')).toBe('AN');
     expect(initials('équipe')).toBe('É');
-    expect(initials('🔥 Ventes')).toBe('🔥V');
+    expect(initials('🔥 Ventes')).toBe('🔥');
+    expect(initials('💰 Ventes')).toBe('💰');
     expect(initials('')).toBe('?');
   });
 });

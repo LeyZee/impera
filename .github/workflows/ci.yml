@@ -43,28 +43,58 @@ jobs:
   test:
     name: Tests (unit + integration)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version-file: .nvmrc, cache: pnpm }
-      # The media module cuts videos with ffmpeg; its tests run the real binary on synthetic clips. apt-get has hung
-      # for the whole job twice (before any test): each try is bounded, three tries, and man-db's trigger is skipped.
+      # The media module cuts videos with ffmpeg; its tests run the real binary on synthetic clips. The apt mirror has
+      # hung the job and timed out three tries in a row: the .deb files apt downloads are cached per runner image, so
+      # once one run got them, later runs install them with dpkg alone, without the network.
+      # The runner image's machine variables are not in the `env` context: read them in a shell for the cache key.
+      - name: Name the runner image
+        id: image
+        run: echo "key=ffmpeg-debs-$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - name: Restore ffmpeg packages
+        id: ffmpeg-debs
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/ffmpeg-debs
+          key: ${{ steps.image.outputs.key }}
       - name: Install ffmpeg
-        timeout-minutes: 10
+        id: ffmpeg
+        timeout-minutes: 15
         run: |
           if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then exit 0; fi
+          debs="$HOME/ffmpeg-debs"
           sudo rm -f /var/lib/man-db/auto-update
+          if compgen -G "$debs/*.deb" >/dev/null && sudo dpkg -i "$debs"/*.deb >/dev/null; then
+            ffmpeg -version | head -1
+            exit 0
+          fi
+          # `-f` below also repairs a dpkg -i of the cache that stopped halfway.
+          mkdir -p "$debs/partial"
           for attempt in 1 2 3; do
-            if timeout 60 sudo apt-get update -qq &&
-              timeout 120 sudo apt-get install -y -qq --no-install-recommends ffmpeg; then
+            if timeout 90 sudo apt-get update -qq &&
+              timeout 180 sudo apt-get install -y -qq -f --no-install-recommends \
+                -o Dir::Cache::Archives="$debs" -o APT::Keep-Downloaded-Packages=true ffmpeg; then
+              sudo chown -R "$USER" "$debs"
+              rm -rf "$debs/partial" "$debs/lock"
+              if compgen -G "$debs/*.deb" >/dev/null; then echo "fresh=true" >> "$GITHUB_OUTPUT"; fi
               exit 0
             fi
             echo "ffmpeg install failed (attempt $attempt), retrying"
             sleep 5
           done
           exit 1
+      # Saved right away, not at the end of the job: a red test must not lose the packages.
+      - name: Save ffmpeg packages
+        if: steps.ffmpeg.outputs.fresh == 'true' && steps.ffmpeg-debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/ffmpeg-debs
+          key: ${{ steps.image.outputs.key }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm test:integration
@@ -99,6 +129,71 @@ jobs:
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+
+  images:
+    name: Docker images (build and boot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [check]
+    env:
+      COMPOSE: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod
+    steps:
+      - uses: actions/checkout@v7
+      # The production stack of docker-compose.prod.yml (ADR 0027) against the development Postgres, with throwaway
+      # secrets generated for this run only.
+      - name: Throwaway settings
+        run: |
+          {
+            echo "DATABASE_URL=postgres://nirvana_app:change-me@postgres:5432/nirvana"
+            echo "DATABASE_ADMIN_URL=postgres://nirvana_admin:change-me@postgres:5432/nirvana"
+            echo "SESSION_ENCRYPTION_KEYS=v1:$(openssl rand -base64 32)"
+            echo "CREDENTIALS_ENCRYPTION_KEYS=v1:$(openssl rand -base64 32)"
+            echo "AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "AUTH_BASE_URL=http://127.0.0.1:8080"
+            echo "WEB_ORIGIN=http://127.0.0.1:8080"
+            echo "EXTENSION_DEVICE_TOKEN=$(openssl rand -hex 24)"
+          } > .env.prod
+      - run: docker compose up -d --wait postgres
+      - run: $COMPOSE up -d --build
+      # Migrations applied, worker seen, dashboard served, /v1 forwarded to the API.
+      - name: The stack answers
+        run: |
+          for attempt in $(seq 1 30); do
+            if $COMPOSE exec -T api wget -q -O - http://127.0.0.1:3000/ready | grep '"status":"ready"' >/dev/null; then break; fi
+            if [ "$attempt" = 30 ]; then exit 1; fi
+            sleep 2
+          done
+          # nginx starts last: give it the same patience.
+          for attempt in $(seq 1 15); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/v1/me)" = 401 ]; then break; fi
+            if [ "$attempt" = 15 ]; then exit 1; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep '<div id="root">' >/dev/null
+          curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy: default-src 'none'" >/dev/null
+      # The daily export (ADR 0028) end to end, but to a folder instead of the bucket: dump, check, encrypt, then a
+      # restore into an empty database with the queue emptied, and the same row counts.
+      - name: Backup export and restore
+        timeout-minutes: 10
+        run: |
+          mkdir -m 777 backup-out
+          # The S3 checksum headers, in the image's own shell (busybox): SHA-256 of nothing, as base64.
+          $COMPOSE run --rm --no-deps --entrypoint sh backup -c \
+            'eval "$(sed -n "/^hex_to_base64()/,/^}/p" /app/export.sh)"; hex_to_base64 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' |
+            grep -Fx '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='
+          $COMPOSE run --rm --no-deps --entrypoint age-keygen backup > backup-out/identity.txt
+          recipient=$(grep -o 'age1[0-9a-z]*' backup-out/identity.txt)
+          $COMPOSE run --rm --no-deps -v "$PWD/backup-out:/out" -e BACKUP_TARGET=local -e BACKUP_LOCAL_DIR=/out \
+            -e BACKUP_AGE_RECIPIENT="$recipient" backup /app/export.sh
+          docker compose exec -T postgres psql -U nirvana_admin -d nirvana -c 'create database nirvana_restore'
+          export_file=$(cd backup-out && ls nirvana-*.tar.age)
+          $COMPOSE run --rm --no-deps -v "$PWD/backup-out:/out" backup /app/restore-check.sh "/out/$export_file" \
+            /out/identity.txt postgres://nirvana_admin:change-me@postgres:5432/nirvana_restore
+          docker compose exec -T postgres psql -U nirvana_admin -d nirvana -Atc \
+            "select count(*) from backup_runs where status = 'succeeded'" | grep -x 1
+      - name: Logs
+        if: failure()
+        run: $COMPOSE logs --no-color
 
   nightly:
     name: Nightly e2e and evals smoke

@@ -5,6 +5,7 @@ import {
   DashboardSchema,
   newId,
   PlatformAccountIdSchema,
+  RESUME_SPACING_SECONDS,
   type ConversationId,
   type CreatorId,
 } from '@nirvana/contracts';
@@ -64,7 +65,7 @@ describe('PUT /v1/agent/mode', () => {
     const platformAccountId = newId(PlatformAccountIdSchema);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Lina', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Lina', timezone: 'Europe/Paris' });
     await test.admin.db.insert(schema.platformAccounts).values({
       id: platformAccountId,
       creatorId,
@@ -122,6 +123,12 @@ describe('PUT /v1/agent/mode', () => {
   it('refuses a creator outside the operator’s list', async () => {
     expect((await setMode('stop', operatorCookie)).statusCode).toBe(403);
     expect(await creatorSwitches()).toEqual([]);
+  });
+
+  it('answers 404 for a creator that does not exist, not a 500 from the foreign key', async () => {
+    const response = await send('PUT', '/v1/agent/mode', { creatorId: newId(CreatorIdSchema), mode: 'stop' });
+    expect(response.statusCode).toBe(404);
+    expect(ApiErrorSchema.parse(response.json()).error.code).toBe('creator_not_found');
   });
 
   it('Arrêt sets her kill switch at once, with its event and its audit line', async () => {
@@ -196,6 +203,64 @@ describe('PUT /v1/agent/mode', () => {
     );
     expect((await setMode('copilot')).statusCode).toBe(200);
     expect(await respondJobs()).toEqual([]);
+  });
+
+  it('answers the fans who waited one after the other, the longest wait first', async () => {
+    const platformAccountId = PlatformAccountIdSchema.parse(
+      (
+        await test.admin.db
+          .select({ id: schema.platformAccounts.id })
+          .from(schema.platformAccounts)
+          .where(eq(schema.platformAccounts.creatorId, creatorId))
+      )[0]?.id,
+    );
+    const { conversationId: later } = await app.modules.conversations.ingestMessage({
+      creatorId,
+      platformAccountId,
+      platformConversationId: 'c-basile',
+      platformFanId: 'f-basile',
+      fanDisplayName: 'Basile',
+      message: {
+        ref: { platform: 'reveal', id: 'm-basile' },
+        conversationRef: { platform: 'reveal', id: 'c-basile' },
+        direction: 'inbound',
+        text: 'Coucou',
+        media: [],
+        priceMinor: null,
+        currency: null,
+        isPaid: false,
+        createdAt: new Date().toISOString(),
+      },
+      correlationId: 'seed-basile',
+    });
+    const first = `conversation.respond:${conversationId}`;
+    const second = `conversation.respond:${later}`;
+    const delays = async () =>
+      (
+        await test.admin.db.execute<{ key: string; delay: number }>(sql`
+          select key, extract(epoch from run_at - now())::float as delay from graphile_worker._private_jobs
+          where key in (${first}, ${second})`)
+      ).rows;
+    const clear = () =>
+      test.admin.db.execute(
+        sql`delete from graphile_worker._private_jobs where key in (${first}, ${second})`,
+      );
+
+    expect((await setMode('stop')).statusCode).toBe(200);
+    await clear();
+    expect((await setMode('copilot')).statusCode).toBe(200);
+    const byKey = new Map((await delays()).map((row) => [row.key, row.delay]));
+    // Julien wrote first: answered now; Basile one spacing later, not at the same second.
+    expect(byKey.get(first)).toBeLessThanOrEqual(1);
+    expect(byKey.get(second)).toBeGreaterThan(RESUME_SPACING_SECONDS - 2);
+    expect(byKey.get(second)).toBeLessThanOrEqual(RESUME_SPACING_SECONDS + 1);
+
+    // Basile leaves the waiting list: the tests below count on Julien alone.
+    await clear();
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ state: 'idle' })
+      .where(eq(schema.conversations.id, later));
   });
 
   it('answers Arrêt to Copilote while the global switch stays on', async () => {

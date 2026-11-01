@@ -1,0 +1,32 @@
+# Note de désir (P3-12) : il a flirté un peu, puis parle de son travail. Fan et messages fictifs (ADR 0010).
+description:
+  Il a flirté au message précédent (note 45), puis passe à sa journée de travail ; le cerveau relève
+  qu’il change de sujet, aucune offre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Gaspard (fictif)'
+  - 34 ans, confirmé
+situation:
+  known_hours: 60
+  age_confirmed: true
+  last_offer_hours_ago: null
+  desire: 45
+history:
+  - from: fan
+    text: T’es trop mignonne quand tu boudes
+  - from: creator
+    text: Je boude pas d’abord 😌
+inbound: Bon sinon journée de fou au bureau, trois réunions d’affilée, je suis rincé
+expect:
+  brief:
+    desire_signals_contain:
+      - changes_subject
+  decision:
+    handoff: false
+    offer: false
+    desire_band_in:
+      - neutral
+      - playful
+  voice:
+    bubbles_max: 4

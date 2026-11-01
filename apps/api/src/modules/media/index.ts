@@ -1,7 +1,10 @@
 /** Public entry point of the `media` module (ADR 0002). Other modules import this file only. */
 export { createMediaDescriber, type MediaDescriber } from './application/describe-media';
 export { mediaKindOf, sniffMediaType } from './domain/media';
+export { createDrizzleDescriptionReader } from './infra/description-reader';
 export { createFfmpegMediaTools } from './infra/ffmpeg-media-tools';
+/** @public Read once by the composition root at start-up: a missing ffmpeg is said in the log. */
+export { missingMediaBinaries } from './infra/ffmpeg-media-tools';
 export {
   createGatewaySenser,
   createGatewayTranscriber,

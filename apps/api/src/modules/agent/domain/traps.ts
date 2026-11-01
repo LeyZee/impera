@@ -1,9 +1,11 @@
 import type { HandoffCause, MediaDescription, MediaFlag } from '@nirvana/contracts';
 
-import { detectInjection, type InjectionSignal } from './injection';
+import { detectInjection, detectInjectionAcross, type InjectionSignal } from './injection';
 
 export interface TrapInput {
   readonly fanText: string;
+  /** His messages before this one, oldest first: a trap cut across messages counts once he completes it. */
+  readonly earlierFanTexts?: readonly string[];
   /** Descriptions of the media he sent with this message: their written text and speech count as his words. */
   readonly media: readonly MediaDescription[];
   /** What the brain read in the message; it catches the traps the patterns do not know. */
@@ -12,7 +14,9 @@ export interface TrapInput {
 
 export interface TrapAssessment {
   readonly isTrap: boolean;
-  readonly signals: readonly (InjectionSignal & { readonly source: 'fan_message' | 'media' | 'brain' })[];
+  readonly signals: readonly (InjectionSignal & {
+    readonly source: 'fan_message' | 'split' | 'media' | 'brain';
+  })[];
   /**
    * Replaces the brain's reply brief when the message is a trap: she does not play along. Absent when the
    * message also carries a safety risk: a trap never hides distress, a possible minor or a handoff.
@@ -43,8 +47,12 @@ const TRAP_REPLY_BRIEF =
 export function assessTrap(input: TrapInput): TrapAssessment {
   const signals: TrapAssessment['signals'][number][] = [
     ...detectInjection(input.fanText).map((s) => ({ ...s, source: 'fan_message' as const })),
+    ...detectInjectionAcross(input.earlierFanTexts ?? [], input.fanText).map((s) => ({
+      ...s,
+      source: 'split' as const,
+    })),
     ...input.media
-      .flatMap((d) => [d.textVisible, d.audio?.transcript].filter((t): t is string => t != null))
+      .flatMap(mediaTexts)
       .flatMap((text) => detectInjection(text).map((s) => ({ ...s, source: 'media' as const }))),
   ];
   if (input.brain?.intent === 'off_topic_request') {
@@ -58,6 +66,17 @@ export function assessTrap(input: TrapInput): TrapAssessment {
     input.brain?.action === 'handoff' || (input.brain?.risks.some((r) => SAFETY_RISKS.includes(r)) ?? false);
   if (isSafetyCase) return { isTrap: true, signals };
   return { isTrap: true, signals, replyBrief: TRAP_REPLY_BRIEF, toneHints: ['amusée', 'taquine'] };
+}
+
+/** Everything the vision wrote about a media: text it read, speech, and its own words, which may quote both. */
+function mediaTexts(d: MediaDescription): string[] {
+  return [
+    d.textVisible,
+    d.audio?.transcript,
+    d.factualDescription,
+    d.setting,
+    ...d.segments.map((s) => s.description),
+  ].filter((t): t is string => t != null);
 }
 
 export interface MediaScreening {

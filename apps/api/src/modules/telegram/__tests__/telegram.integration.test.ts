@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import {
   ConversationIdSchema,
   CreatorIdSchema,
+  CustomAlertIdSchema,
   DraftIdSchema,
   EventIdSchema,
   newId,
@@ -12,7 +13,7 @@ import {
 } from '@nirvana/contracts';
 import { eq, parseEncryptionKeys, schema, sql, withTenant } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import type { preHandlerAsyncHookHandler } from 'fastify';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -21,6 +22,7 @@ import { testConfig } from '../../../__tests__/support/config';
 import { createJobQueue, type JobQueue } from '../../../jobs';
 import { createLogger } from '../../../logger';
 import { buildServer } from '../../../server';
+import { nightOf } from '../domain/schedule';
 import { createPostgresTelegramStore, type ResealReport } from '../infra/postgres.store';
 
 import { FAKE_TOKEN, FakeTelegram, OTHER_TOKEN, SAME_BOT_NEW_TOKEN, joined } from './support/fake-telegram';
@@ -41,6 +43,8 @@ describe('telegram module on Postgres', () => {
   let telegram: FakeTelegram;
   let module: TelegramModule;
   let uncovered: string[];
+  /** Her alerts' names, as the `alerts` module gives them. */
+  const names = new Map<string, ReadonlyMap<string, string>>();
 
   function build(encryptionKeys = keys): {
     module: TelegramModule;
@@ -59,6 +63,7 @@ describe('telegram module on Postgres', () => {
         webOrigin: WEB_ORIGIN,
         onUncovered: (event) => uncovered.push(event.id),
         resealTokens: store.resealTokens,
+        alertNames: { ofCreator: (creatorId) => Promise.resolve(names.get(creatorId) ?? new Map()) },
       }),
       resealTokens: store.resealTokens,
     };
@@ -138,7 +143,7 @@ describe('telegram module on Postgres', () => {
     creatorId = newId(CreatorIdSchema);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Démo', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Démo', timezone: 'Europe/Paris' });
   });
 
   afterAll(async () => {
@@ -152,6 +157,8 @@ describe('telegram module on Postgres', () => {
     telegram = new FakeTelegram();
     module = build().module;
     await test.admin.db.delete(schema.telegramBots);
+    // A removed group leaves its deliveries behind (REG-28): each test starts from an empty log.
+    await test.admin.db.delete(schema.telegramDeliveries);
     await test.admin.db.execute(sql`delete from graphile_worker._private_jobs`);
     // The outbox is append-only: each test writes its events in a time slice of its own, past the previous one's
     // scan window.
@@ -353,6 +360,63 @@ describe('telegram module on Postgres', () => {
     expect(telegram.edits[0]?.text).toMatch(/✓ Pris en main$/);
   });
 
+  it('sends her alerts to their topic, a paused fan to the important groups when none has it (P4-01)', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    // A second creator whose own alerts have a group; « Démo »'s have none.
+    const other = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: other, nameKey: other, displayName: 'Autre', timezone: 'Europe/Paris' });
+    const { routes, version } = await module.overview();
+    const saved = await module.saveRoutes(version, [
+      ...routes,
+      { creatorId: other, topic: 'custom', chatId },
+    ]);
+    if (!saved.ok) throw new Error('routes not saved');
+
+    const custom = { kind: 'custom', id: newId(CustomAlertIdSchema) } as const;
+    names.set(other, new Map([[custom.id, 'Appel vidéo']]));
+    const trigger = { alert: custom, matchedBy: 'keyword', keyword: 'mot-déclaré' } as const;
+    const paused = newId(ConversationIdSchema);
+    const told = newId(ConversationIdSchema);
+    const pausedOther = newId(ConversationIdSchema);
+    await publish('handoff_requested', { conversationId: paused, cause: 'custom_alert', trigger });
+    await publish('alert_triggered', { conversationId: newId(ConversationIdSchema), trigger, notify: true });
+    await publish('alert_triggered', { conversationId: told, trigger, notify: true }, other);
+    await publish('alert_triggered', { conversationId: told, trigger, notify: false }, other);
+    await publish(
+      'handoff_requested',
+      { conversationId: pausedOther, cause: 'custom_alert', trigger },
+      other,
+    );
+    // The trigger knows the new type (0027).
+    expect(await jobs('telegram.scan')).toMatchObject([{ key: 'telegram.scan' }]);
+    await module.jobs.scan();
+
+    const rows = await deliveryRows(chatId);
+    expect(rows).toHaveLength(3);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        // « Démo »: no group for her alerts, the paused fan goes to important; the alert that only tells, nowhere.
+        expect.objectContaining({ creatorId, topic: 'important', threadKey: `conversation:${paused}` }),
+        // « Autre »: in her alerts' group, the paused fan in its thread; once, `notify: false` is not sent.
+        expect.objectContaining({ creatorId: other, topic: 'custom', threadKey: null }),
+        expect.objectContaining({
+          creatorId: other,
+          topic: 'custom',
+          threadKey: `conversation:${pausedOther}`,
+        }),
+      ]),
+    );
+    expect(rows.map((row) => row.text).join()).not.toContain('mot-déclaré');
+    await module.jobs.flushChat(chatId);
+    const sent = telegram.sent.map((m) => m.text).join();
+    // Named as the history names it: her alert's name, written by the agency, never the word.
+    expect(sent).toContain('🔔 <b>Appel vidéo · Autre</b>');
+    expect(sent).toContain('Le message du fan correspond à l’alerte « Appel vidéo ». Il n’écrit plus');
+    expect(sent).not.toContain('mot-déclaré');
+  });
+
   it('logs an urgent alert that no group can receive', async () => {
     const id = await publish('handoff_requested', {
       conversationId: newId(ConversationIdSchema),
@@ -396,6 +460,73 @@ describe('telegram module on Postgres', () => {
     expect((await module.overview()).coverage[0]).toMatchObject({ urgentReachable: false });
   });
 
+  it('keeps a group the bot was banned from in the list, and removes it with its routes on request (REG-28)', async () => {
+    const { bot, chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    expect(await module.removeChat(chatId, 'owner-telegram')).toBe('refused');
+    // Last night, one alert went out to the group, one was cut off mid-call and one still waits when it is
+    // removed in the morning.
+    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'minor' });
+    await module.jobs.scan();
+    await module.jobs.flushChat(chatId);
+    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'distress' });
+    await module.jobs.scan();
+    await test.admin.db
+      .update(schema.telegramDeliveries)
+      .set({ status: 'sending' })
+      .where(eq(schema.telegramDeliveries.status, 'pending'));
+    await publish('handoff_requested', { conversationId: newId(ConversationIdSchema), cause: 'non_consent' });
+    await module.jobs.scan();
+    const { from, to } = nightOf('Europe/Paris', new Date());
+    await test.admin.db
+      .update(schema.telegramDeliveries)
+      .set({ createdAt: new Date((from.getTime() + to.getTime()) / 2) })
+      .where(eq(schema.telegramDeliveries.chatId, chatId));
+    const night = await module.nightCounts(creatorId);
+    expect(night.urgent).toBe(3);
+
+    telegram.updates.push({
+      kind: 'membership',
+      updateId: telegram.updates.length + 1,
+      telegramChatId: '-100',
+      title: 'Groupe demo_bot',
+      chatKind: 'group',
+      membership: 'kicked',
+      canPost: false,
+    });
+    await module.jobs.pollUpdates(bot.id, 0);
+    const before = await module.overview();
+    expect(before.bots[0]?.chats).toMatchObject([{ id: chatId, membership: 'kicked', canPost: false }]);
+    expect(before.routes.filter((route) => route.chatId === chatId)).toHaveLength(3);
+
+    expect(await module.removeChat(chatId, 'owner-telegram')).toBe('removed');
+    const after = await module.overview();
+    expect(after.bots[0]?.chats).toEqual([]);
+    expect(after.routes).toEqual([]);
+    expect(after.version).toBeGreaterThan(before.version);
+    // Its alerts stay, without a group and with its name: the night still counts them, the log still names it.
+    expect(await module.nightCounts(creatorId)).toEqual(night);
+    // All were moved to the same instant of the night: read by status, not by date.
+    const kept = (await deliveryRows())
+      .map(({ chatId: chat, chatTitle, status, errorKind }) => ({ chat, chatTitle, status, errorKind }))
+      .sort((a, b) => a.status.localeCompare(b.status));
+    expect(kept).toEqual([
+      { chat: null, chatTitle: 'Groupe demo_bot', status: 'failed', errorKind: 'chat_removed' },
+      { chat: null, chatTitle: 'Groupe demo_bot', status: 'sent', errorKind: null },
+      { chat: null, chatTitle: 'Groupe demo_bot', status: 'unknown', errorKind: 'chat_removed' },
+    ]);
+    expect((await module.listDeliveries('urgent', 10)).map((row) => row.chatTitle)).toEqual([
+      'Groupe demo_bot',
+      'Groupe demo_bot',
+      'Groupe demo_bot',
+    ]);
+    const audit = await test.admin.db
+      .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'telegram_chat.remove'));
+    expect(audit).toEqual([{ userId: 'owner-telegram', details: { membership: 'kicked' } }]);
+    expect(await module.removeChat(chatId, 'owner-telegram')).toBe('missing');
+  });
+
   it('marks the bot to reconnect on a 401 and keeps its messages for the retry window', async () => {
     const { bot, chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
     await publish(
@@ -425,6 +556,7 @@ describe('telegram module on Postgres', () => {
       id: newId(z.uuid()),
       sourceKey: 'digest:test',
       chatId,
+      chatTitle: 'Groupe demo_bot',
       creatorId,
       topic: 'info',
       action: 'send',
@@ -447,7 +579,7 @@ describe('telegram module on Postgres', () => {
     const userId = 'user-takeover-test';
     await test.admin.db
       .insert(schema.user)
-      .values({ id: userId, name: 'Lucas Martin', email: 'lucas@example.test' })
+      .values({ id: userId, name: 'Théo Brun', email: 'theo@example.test' })
       .onConflictDoNothing();
     const conversationId = newId(ConversationIdSchema);
     await publish('handoff_requested', { conversationId, cause: 'distress' });
@@ -458,8 +590,8 @@ describe('telegram module on Postgres', () => {
     offsetMs = 4000;
     await module.jobs.flushChat(chatId);
     expect(telegram.edits).toMatchObject([{ chatId: '-100', messageId: telegram.sent[0]?.messageId }]);
-    expect(telegram.edits[0]?.text).toMatch(/✓ Pris en main par Lucas$/);
-    expect(await module.listDeliveries('urgent', 10)).toMatchObject([{ closedBy: 'Lucas', status: 'sent' }]);
+    expect(telegram.edits[0]?.text).toMatch(/✓ Pris en main par Théo$/);
+    expect(await module.listDeliveries('urgent', 10)).toMatchObject([{ closedBy: 'Théo', status: 'sent' }]);
   });
 
   it('closes a handoff alert when the conversation goes back to the agent, and only once', async () => {
@@ -467,7 +599,7 @@ describe('telegram module on Postgres', () => {
     const userId = 'user-release-test';
     await test.admin.db
       .insert(schema.user)
-      .values({ id: userId, name: 'Marie Ange', email: 'marie@example.test' })
+      .values({ id: userId, name: 'Nora Vidal', email: 'nora@example.test' })
       .onConflictDoNothing();
     const conversationId = newId(ConversationIdSchema);
     await publish('handoff_requested', { conversationId, cause: 'llm_unavailable' });
@@ -478,7 +610,7 @@ describe('telegram module on Postgres', () => {
     offsetMs = 4000;
     await module.jobs.flushChat(chatId);
     expect(telegram.edits).toMatchObject([{ chatId: '-100', messageId: telegram.sent[0]?.messageId }]);
-    expect(telegram.edits[0]?.text).toMatch(/✓ Rendu à l’agent par Marie$/);
+    expect(telegram.edits[0]?.text).toMatch(/✓ Rendu à l’agent par Nora$/);
     // A second hand-back (taken, given back again) leaves the closed alert as it is.
     await publish('takeover_ended', { conversationId, userId });
     await module.jobs.scan();
@@ -486,7 +618,7 @@ describe('telegram module on Postgres', () => {
     await module.jobs.flushChat(chatId);
     expect(telegram.edits).toHaveLength(1);
     expect(await module.listDeliveries('important', 10)).toMatchObject([
-      { closedBy: 'Marie', status: 'sent' },
+      { closedBy: 'Nora', status: 'sent' },
     ]);
   });
 
@@ -522,10 +654,21 @@ describe('telegram module on Postgres', () => {
   });
 
   it('serves the settings to the owner only, a bot change after a fresh sign-in only', async () => {
-    const ownerOnly: preHandlerAsyncHookHandler = async (request, reply) => {
-      if (request.headers['x-test-role'] !== 'owner') await reply.code(403).send({ error: 'forbidden' });
+    const ownerOnly: preValidationAsyncHookHandler = async (request, reply) => {
+      if (request.headers['x-test-role'] !== 'owner') {
+        await reply.code(403).send({ error: 'forbidden' });
+        return;
+      }
+      request.user = {
+        id: 'owner-telegram',
+        email: 'owner@example.test',
+        name: 'Owner',
+        role: 'owner',
+        creatorIds: [],
+        routedCreatorIds: [],
+      };
     };
-    const freshOnly: preHandlerAsyncHookHandler = async (request, reply) => {
+    const freshOnly: preValidationAsyncHookHandler = async (request, reply) => {
       if (request.headers['x-test-stale'] === '1')
         await reply.code(403).send({ error: { code: 'reauthentication_forbidden' } });
     };
@@ -573,6 +716,81 @@ describe('telegram module on Postgres', () => {
         payload: { version: 999, routes: [] },
       });
       expect(conflict.statusCode).toBe(409);
+      // Refusals in the common error body (recette 28/10): an invalid body was a 500 against the route's own schema.
+      const invalid = await server.inject({
+        method: 'PUT',
+        url: '/v1/settings/telegram/routes',
+        headers,
+        payload: { version: 1, routes: [{ creatorId: null, topic: 'x', chatId: 'y' }] },
+      });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json()).toMatchObject({ error: { code: 'request_invalid' } });
+      const missing = await server.inject({
+        method: 'POST',
+        url: `/v1/settings/telegram/bots/${newId(z.uuid().brand<'TelegramBotId'>())}/listen`,
+        headers,
+      });
+      expect(missing.statusCode).toBe(404);
+      expect(missing.json()).toMatchObject({ error: { code: 'telegram_bot_not_found' } });
+      const gone = await server.inject({
+        method: 'DELETE',
+        url: `/v1/settings/telegram/bots/${newId(z.uuid().brand<'TelegramBotId'>())}`,
+        headers,
+      });
+      expect(gone.statusCode).toBe(404);
+      expect(gone.json()).toMatchObject({ error: { code: 'telegram_bot_not_found' } });
+      const noChat = await server.inject({
+        method: 'POST',
+        url: `/v1/settings/telegram/chats/${newId(z.uuid().brand<'TelegramChatId'>())}/test`,
+        headers,
+      });
+      expect(noChat.statusCode).toBe(404);
+      expect(noChat.json()).toMatchObject({ error: { code: 'telegram_chat_not_found' } });
+      const noGroup = await server.inject({
+        method: 'DELETE',
+        url: `/v1/settings/telegram/chats/${newId(z.uuid().brand<'TelegramChatId'>())}`,
+        headers,
+      });
+      expect([noGroup.statusCode, noGroup.json()]).toMatchObject([
+        404,
+        { error: { code: 'telegram_chat_not_found' } },
+      ]);
+      const { id: botId } = created.json<{ id: string }>();
+      telegram.updates.push(joined(telegram.updates.length + 1, '-300', 'Groupe vivant'));
+      await module.jobs.pollUpdates(z.uuid().brand<'TelegramBotId'>().parse(botId), 0);
+      const living = (await module.overview()).bots[0]?.chats[0];
+      if (living === undefined) throw new Error('group not found');
+      const stillIn = await server.inject({
+        method: 'DELETE',
+        url: `/v1/settings/telegram/chats/${living.id}`,
+        headers,
+      });
+      expect([stillIn.statusCode, stillIn.json()]).toMatchObject([
+        409,
+        { error: { code: 'telegram_chat_member_conflict' } },
+      ]);
+      const { version } = (
+        await server.inject({ method: 'GET', url: '/v1/settings/telegram', headers })
+      ).json<{
+        version: number;
+      }>();
+      const unknownChat = await server.inject({
+        method: 'PUT',
+        url: '/v1/settings/telegram/routes',
+        headers,
+        payload: {
+          version,
+          routes: [
+            {
+              creatorId: newId(CreatorIdSchema),
+              topic: 'urgent',
+              chatId: newId(z.uuid().brand<'TelegramChatId'>()),
+            },
+          ],
+        },
+      });
+      expect(unknownChat.statusCode).toBe(400);
+      expect(unknownChat.json()).toMatchObject({ error: { code: 'telegram_chat_invalid' } });
       const journal = await server.inject({
         method: 'GET',
         url: '/v1/settings/telegram/deliveries?topic=urgent',

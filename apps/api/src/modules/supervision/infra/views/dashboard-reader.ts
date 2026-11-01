@@ -1,8 +1,18 @@
-import { HandoffCauseSchema, LIVE_WINDOW, type DecidedDraft } from '@nirvana/contracts';
+import {
+  AgentHoursSchema,
+  ConnectorConfigSchema,
+  DEFAULT_AGENT_HOURS,
+  HandoffCauseSchema,
+  LIVE_WINDOW,
+  type AgentHours,
+  type DecidedDraft,
+} from '@nirvana/contracts';
 import { sql, withTenant, type Database, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
+import { unansweredSince } from '../../domain/dashboard';
 import type { DashboardFacts, DashboardReader, DashboardWindow } from '../../domain/dashboard-ports';
+import { rankFans, type UsdRate } from '../../domain/fan-ranking';
 
 /**
  * The Dashboard's SQL views (docs/architecture/modules.md: read only, aggregates, the documented exception to
@@ -29,10 +39,15 @@ async function first<T extends z.ZodType>(tx: Transaction, schema: T, query: Ret
 }
 
 /**
- * Decided drafts of one voice version before a date, newest first: approved as is, edited or rejected (ADR 0019).
- * The same selection and order as the lock's reading in `conversations`, for the trend.
+ * Decided drafts of one voice version and her active persona (ADR 0022) before a date, newest first: approved as
+ * is, edited or rejected (ADR 0019). The same selection and order as the lock's reading in `conversations`, for the trend.
  */
-async function decided(tx: Transaction, window: DashboardWindow, before: Date): Promise<DecidedDraft[]> {
+async function decided(
+  tx: Transaction,
+  creatorId: string,
+  window: DashboardWindow,
+  before: Date,
+): Promise<DecidedDraft[]> {
   const list = await rows(
     tx,
     z.object({ as_is: z.boolean() }),
@@ -42,12 +57,20 @@ async function decided(tx: Transaction, window: DashboardWindow, before: Date): 
           and status in ('approved', 'edited', 'rejected', 'sent', 'failed')
           and prompt_hashes->>'voicePrompt' = ${window.voice.voicePrompt}
           and prompt_hashes->>'voiceModel' = ${window.voice.voiceModel}
+          and persona_version_id is not distinct from
+            (select id from persona_versions where creator_id = ${creatorId}::uuid and is_active)
         order by decided_at desc, id desc limit ${LIVE_WINDOW}`,
   );
   return list.map((row) => ({ asIs: row.as_is }));
 }
 
-async function facts(tx: Transaction, creatorId: string, window: DashboardWindow) {
+async function facts(
+  tx: Transaction,
+  creatorId: string,
+  window: DashboardWindow,
+  her: { readonly hours: AgentHours; readonly timeZone: string },
+  usdRate: UsdRate | null,
+) {
   const now = window.now.toISOString();
   const dayStart = window.dayStart.toISOString();
   const periodStart = window.periodStart.toISOString();
@@ -74,9 +97,11 @@ async function facts(tx: Transaction, creatorId: string, window: DashboardWindow
     z.object({
       session_state: z.string(),
       last_poll_at: timestamp.nullable(),
+      session_updated_at: timestamp.nullable(),
       paused_until: timestamp.nullable(),
+      connector_config: z.unknown(),
     }),
-    sql`select session_state, last_poll_at, paused_until from platform_accounts
+    sql`select session_state, last_poll_at, session_updated_at, paused_until, connector_config from platform_accounts
         where platform = 'reveal' order by created_at limit 1`,
   );
   const voice = await first(
@@ -109,23 +134,25 @@ async function facts(tx: Transaction, creatorId: string, window: DashboardWindow
         where type = 'handoff_requested' and created_at >= ${dayStart}::timestamptz
         group by payload->>'cause'`,
   );
-  // His conversation with a human: the cause of its last handoff, or `other` when the event is missing.
+  // His conversation handed to a human by the agent, with the cause of that handoff. A handoff leaves once the hand
+  // was given back (`takeover_ended`); a person who takes the hand of their own accord is on it, so it never enters.
   const handedOver = await rows(
     tx,
     z.object({
       conversation_id: z.string(),
       fan_id: z.string(),
       fan_name: z.string(),
-      cause: HandoffCauseSchema.nullable(),
+      cause: HandoffCauseSchema,
       since: timestamp,
     }),
-    sql`select c.id as conversation_id, c.fan_id, f.display_name as fan_name, h.cause,
-               coalesce(h.created_at, c.updated_at) as since
+    sql`select c.id as conversation_id, c.fan_id, f.display_name as fan_name, h.cause, h.created_at as since
         from conversations c
         join fans f on f.id = c.fan_id
-        left join lateral (
+        join lateral (
           select payload->>'cause' as cause, created_at from conversation_events e
           where e.conversation_id = c.id and e.type = 'handoff_requested'
+            and e.seq > coalesce((select max(t.seq) from conversation_events t
+                                  where t.conversation_id = c.id and t.type = 'takeover_ended'), -1)
           order by e.seq desc limit 1) h on true
         where c.state = 'human'`,
   );
@@ -140,53 +167,126 @@ async function facts(tx: Transaction, creatorId: string, window: DashboardWindow
           and c.state = 'awaiting_approval'
         group by c.id, c.fan_id, f.display_name`,
   );
-  // What she sold him over the period: her paid messages he unlocked, in euros (sales observed in EUR only).
-  const fans = await rows(
+  // A send that failed for good leaves the conversation in `error`: nothing retries it, a human must look.
+  const failed = await rows(
+    tx,
+    z.object({ conversation_id: z.string(), fan_id: z.string(), fan_name: z.string(), since: timestamp }),
+    sql`select c.id as conversation_id, c.fan_id, f.display_name as fan_name,
+               coalesce(s.created_at, c.updated_at) as since
+        from conversations c
+        join fans f on f.id = c.fan_id
+        left join lateral (
+          select created_at from conversation_events e
+          where e.conversation_id = c.id and e.type = 'send_failed'
+          order by e.seq desc limit 1) s on true
+        where c.state = 'error'`,
+  );
+  // The net under every other line (P3-11): his last message unanswered for 30 minutes, with no draft waiting, while
+  // the conversation rests or a respond job that should have ended long ago has not. A respond put off after
+  // « attends, je reviens » runs within 25 minutes, so it never shows here; nothing does while a kill switch stops
+  // her or Reveal is not read, the Dashboard already says so.
+  const unanswered = await rows(
+    tx,
+    z.object({ conversation_id: z.string(), fan_id: z.string(), fan_name: z.string(), since: timestamp }),
+    sql`select c.id as conversation_id, c.fan_id, f.display_name as fan_name, c.last_inbound_at as since
+        from conversations c
+        join fans f on f.id = c.fan_id
+        where c.state in ('idle', 'pending', 'drafting')
+          and c.last_inbound_at < ${now}::timestamptz - interval '30 minutes'
+          and (c.last_outbound_at is null or c.last_outbound_at < c.last_inbound_at)
+          and not exists (select 1 from drafts d where d.conversation_id = c.id and d.status = 'pending')`,
+  );
+  // What she sold him over the period: her paid messages he unlocked, by currency (EUR and USD, the ones Reveal pays
+  // in). The domain converts his dollars and ranks (`rankFans`); then the details of the best ones only. No `limit`
+  // here: the ranking needs his dollars converted, so the query returns one row per fan who paid over the period.
+  const sales = await rows(
     tx,
     z.object({
-      id: z.string(),
-      name: z.string(),
-      first_seen_at: timestamp,
-      spent_minor: int,
-      by_agent_minor: int,
-      notes: z.array(z.string()).nullable(),
-      alert: HandoffCauseSchema.nullable(),
+      fan_id: z.string(),
+      conversation_id: z.string(),
+      eur_minor: int,
+      usd_minor: int,
+      by_agent_eur_minor: int,
+      by_agent_usd_minor: int,
     }),
-    sql`select f.id, f.display_name as name, f.first_seen_at,
-               sum(m.price_minor) as spent_minor,
-               coalesce(sum(m.price_minor) filter (where m.author = 'ai'), 0) as by_agent_minor,
-               (select array_agg(n.value order by n.observed_at desc) from (
-                  select value, observed_at from fan_facts ff
-                  where ff.fan_id = f.id and ff.superseded_by is null
-                    and (ff.expires_at is null or ff.expires_at > ${now}::timestamptz)
-                  order by observed_at desc limit ${NOTES_PER_FAN}) n) as notes,
-               (select h.payload->>'cause' from conversations c
-                join conversation_events h on h.conversation_id = c.id and h.type = 'handoff_requested'
-                where c.fan_id = f.id and c.state = 'human'
-                order by h.created_at desc limit 1) as alert
+    sql`select c.fan_id,
+               (array_agg(c.id order by m.platform_created_at desc))[1] as conversation_id,
+               coalesce(sum(m.price_minor) filter (where m.currency = 'EUR'), 0) as eur_minor,
+               coalesce(sum(m.price_minor) filter (where m.currency = 'USD'), 0) as usd_minor,
+               coalesce(sum(m.price_minor) filter (where m.currency = 'EUR' and m.author = 'ai'), 0)
+                 as by_agent_eur_minor,
+               coalesce(sum(m.price_minor) filter (where m.currency = 'USD' and m.author = 'ai'), 0)
+                 as by_agent_usd_minor
         from messages m
         join conversations c on c.id = m.conversation_id
-        join fans f on f.id = c.fan_id
-        where m.direction = 'outbound' and m.is_paid and m.price_minor is not null and m.currency = 'EUR'
+        where m.direction = 'outbound' and m.is_paid and m.price_minor > 0
+          and m.currency in ('EUR', 'USD')
           and m.platform_created_at >= ${periodStart}::timestamptz
-        group by f.id, f.display_name, f.first_seen_at
-        order by spent_minor desc limit ${TOP_FANS}`,
+        group by c.fan_id`,
   );
+  const ranked = rankFans(
+    sales.map((s) => ({
+      fanId: s.fan_id,
+      conversationId: s.conversation_id,
+      eurMinor: s.eur_minor,
+      usdMinor: s.usd_minor,
+      byAgentEurMinor: s.by_agent_eur_minor,
+      byAgentUsdMinor: s.by_agent_usd_minor,
+    })),
+    usdRate,
+    TOP_FANS,
+  );
+  const details =
+    ranked.length === 0
+      ? []
+      : await rows(
+          tx,
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            first_seen_at: timestamp,
+            notes: z.array(z.string()).nullable(),
+            alert: HandoffCauseSchema.nullable(),
+          }),
+          sql`select f.id, f.display_name as name, f.first_seen_at,
+                     (select array_agg(n.value order by n.observed_at desc) from (
+                        select value, observed_at from fan_facts ff
+                        where ff.fan_id = f.id and ff.superseded_by is null
+                          and (ff.expires_at is null or ff.expires_at > ${now}::timestamptz)
+                        order by observed_at desc limit ${NOTES_PER_FAN}) n) as notes,
+                     (select h.payload->>'cause' from conversations c
+                      join conversation_events h on h.conversation_id = c.id and h.type = 'handoff_requested'
+                      where c.fan_id = f.id and c.state = 'human'
+                      order by h.created_at desc limit 1) as alert
+              from fans f
+              where f.id = any(${sql.param(ranked.map((fan) => fan.fanId))}::uuid[])`,
+        );
+  const detailOf = new Map(details.map((d) => [d.id, d]));
 
   const isPaused =
     account?.paused_until !== null &&
     account?.paused_until !== undefined &&
     account.paused_until > window.now;
+  const connected =
+    account !== undefined && ['valid', 'warning'].includes(account.session_state) && !isPaused;
+  // Its rhythm as the connectors read it (`account-store.ts`): unreadable is the defaults, as there.
+  const rhythm = ConnectorConfigSchema.catch(ConnectorConfigSchema.parse({})).parse(
+    account?.connector_config ?? {},
+  );
+  // Stopped, or Reveal unread (session expired, paused): every conversation would fall in the net, the banner says it.
+  const quiet = stopped.some((s) => s.active) || !connected;
   return {
     switches: {
       global: stopped.some((s) => s.scope === 'global' && s.active),
       creator: stopped.some((s) => s.scope === 'creator' && s.active),
     },
     autoConversations: counts.auto,
-    decidedThreeWeeksAgo: await decided(tx, window, new Date(window.now.getTime() - 21 * DAY_MS)),
+    decidedThreeWeeksAgo: await decided(tx, creatorId, window, new Date(window.now.getTime() - 21 * DAY_MS)),
     reveal: {
-      connected: account !== undefined && ['valid', 'warning'].includes(account.session_state) && !isPaused,
+      connected,
       lastReadAt: account?.last_poll_at ?? null,
+      sessionSince: account?.session_updated_at ?? null,
+      pollEverySeconds: rhythm.pollIntervalSeconds + rhythm.jitterSeconds,
       conversations: counts.total,
     },
     voice: { medianWriteMs: voice.median_ms, outageHoursLast7d: voice.outage_hours },
@@ -201,7 +301,7 @@ async function facts(tx: Transaction, creatorId: string, window: DashboardWindow
         conversationId: h.conversation_id,
         fanId: h.fan_id,
         fanName: h.fan_name,
-        kind: h.cause ?? 'other',
+        kind: h.cause,
         since: h.since,
       })),
       ...unread.map((u) => ({
@@ -211,34 +311,71 @@ async function facts(tx: Transaction, creatorId: string, window: DashboardWindow
         kind: 'awaiting_approval' as const,
         since: u.since,
       })),
+      ...failed.map((f) => ({
+        conversationId: f.conversation_id,
+        fanId: f.fan_id,
+        fanName: f.fan_name,
+        kind: 'send_failed' as const,
+        since: f.since,
+      })),
+      // Out of her reply slots the net is silent; from her opening it counts again (P3-14).
+      ...(quiet ? [] : unanswered).flatMap((u) => {
+        const since = unansweredSince(u.since, window.now, her);
+        return since === null
+          ? []
+          : [
+              {
+                conversationId: u.conversation_id,
+                fanId: u.fan_id,
+                fanName: u.fan_name,
+                kind: 'unanswered' as const,
+                since,
+              },
+            ];
+      }),
     ],
-    fans: fans.map((f) => ({
-      id: f.id,
-      name: f.name,
-      firstSeenAt: f.first_seen_at,
-      spentMinor: f.spent_minor,
-      byAgentMinor: f.by_agent_minor,
-      notes: f.notes ?? [],
-      alert: f.alert ?? undefined,
-    })),
+    fans: ranked.flatMap((fan) => {
+      const detail = detailOf.get(fan.fanId);
+      return detail === undefined
+        ? []
+        : [
+            {
+              id: fan.fanId,
+              name: detail.name,
+              conversationId: fan.conversationId,
+              firstSeenAt: detail.first_seen_at,
+              spentMinor: fan.spentMinor,
+              byAgentMinor: fan.byAgentMinor,
+              notes: detail.notes ?? [],
+              alert: detail.alert ?? undefined,
+            },
+          ];
+    }),
+    usdSales: {
+      seen: sales.some((s) => s.usd_minor > 0),
+      rateDay: usdRate?.day ?? null,
+    },
   } satisfies Omit<DashboardFacts, 'creator'>;
 }
 
 export function createDashboardReader(db: Database): DashboardReader {
   return {
-    read: (creatorId, windowFor) =>
+    read: (creatorId, windowFor, usdRate) =>
       withTenant(db, creatorId, async (tx) => {
         const [creator] = await rows(
           tx,
-          z.object({ display_name: z.string(), timezone: z.string() }),
-          sql`select display_name, timezone from creators where id = ${creatorId}::uuid`,
+          z.object({ display_name: z.string(), timezone: z.string(), agent_hours: z.unknown() }),
+          sql`select display_name, timezone, agent_hours from creators where id = ${creatorId}::uuid`,
         );
         if (creator === undefined) return undefined;
         const window = windowFor(creator.timezone);
+        // Her hours as the worker reads them: none stored, or unreadable, are the defaults (always open).
+        const stored = AgentHoursSchema.safeParse(creator.agent_hours);
+        const her = { hours: stored.success ? stored.data : DEFAULT_AGENT_HOURS, timeZone: creator.timezone };
         return {
           facts: {
             creator: { name: creator.display_name, timezone: creator.timezone },
-            ...(await facts(tx, creatorId, window)),
+            ...(await facts(tx, creatorId, window, her, usdRate)),
           },
           window,
         };

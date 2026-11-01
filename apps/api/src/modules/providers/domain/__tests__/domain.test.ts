@@ -75,6 +75,11 @@ describe('the single translation table', () => {
     expect(describeRefusal('xai', 'wrong_provider', { belongsTo: 'google' })).toBe(
       'Cette clé vient de Google : elle va dans Gemini.',
     );
+    // « de » elides before a vowel.
+    expect(describeRefusal('mistral', 'wrong_provider', { belongsTo: 'elevenlabs' })).toBe(
+      'Cette clé vient d’ElevenLabs : elle va dans ElevenLabs.',
+    );
+    expect(describeRefusal('elevenlabs', 'wrong_provider')).toBe('Cette clé ne vient pas d’ElevenLabs.');
     expect(describeRefusal('xai', 'unauthorized')).toBe(
       'xAI ne reconnaît pas cette clé. Vérifie qu’elle est copiée en entier.',
     );
@@ -154,6 +159,8 @@ describe('credential states', () => {
     expect(toStatus('xai', unreadable, 'dashboard').message).toBe(
       'La clé Grok enregistrée ne peut plus être déchiffrée. Colle-la à nouveau. Seul Mistral, s’il est branché, écrit en attendant.',
     );
+    expect(toStatus('xai', unreadable, 'dashboard').isUnreadable).toBe(true);
+    expect(toStatus('xai', { ...unreadable, key: FAKE_XAI }, 'dashboard').isUnreadable).toBe(false);
   });
 
   it('never puts the key in the status', () => {
@@ -188,6 +195,27 @@ describe('next action', () => {
       lead: 'Le compte Google n’a plus de crédit.',
       detail: 'Remplace la clé, ou règle le souci chez Google puis « Vérifier maintenant ».',
     });
+  });
+
+  it('sends no one to the provider for a key Nirvana can no longer decrypt', () => {
+    const unreadable = { ...status('elevenlabs', 'needs_reconnect'), isUnreadable: true };
+    expect(nextAction([status('xai', 'connected'), unreadable])).toMatchObject({
+      kind: 'replace_key',
+      detail: 'Remplace la clé : rien n’est à régler chez ElevenLabs.',
+    });
+  });
+
+  it('names no persona in the ElevenLabs texts', () => {
+    expect(
+      nextAction([
+        status('xai', 'connected'),
+        status('elevenlabs', 'not_connected'),
+        status('mistral', 'not_connected'),
+      ]),
+    ).toMatchObject({ detail: 'Parle avec la voix de la créatrice.' });
+    expect(describeVoiceAccount(undefined, 0).facts[1]?.value).toBe(
+      'Aucune voix clonée trouvée. Crée la voix de la créatrice dans ElevenLabs, puis reviens.',
+    );
   });
 
   it('asks for Grok first, as it stops the agent', () => {

@@ -14,6 +14,7 @@ import { startWorker, type WorkerHandle } from '../worker-runner';
 import { fixedComposer } from './support/composer';
 import { testConfig } from './support/config';
 import { LogSink } from './support/log-sink';
+import { activateDemoPersona } from './support/persona';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 import { createSlowTask, enqueueSlow, SLOW_TASK } from './support/slow-task';
 
@@ -87,7 +88,8 @@ describe('worker (Graphile, ADR 0006)', () => {
     const platformAccountId = newId(PlatformAccountIdSchema);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+    await activateDemoPersona(app, creatorId);
     await test.admin.db
       .insert(schema.platformAccounts)
       .values({ id: platformAccountId, creatorId, platform: 'reveal', handle: 'test-corr' });

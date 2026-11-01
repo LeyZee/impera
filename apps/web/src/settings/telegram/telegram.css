@@ -1,13 +1,14 @@
 /*
  * Réglages › Telegram (fiche P3-07), drawn after the validated mockup. Built on the design-system tokens and nv-*
- * classes; only what the package has no class for lives here, prefixed `tg-`. Containers are glass, rows are not.
+ * classes; only what the package has no class for lives here, prefixed `tg-`. Content sits on plates; the tab bar and
+ * the sheets, which float, are glass. Selection is neutral, a refused input or a failed save is amber (docs/design).
  */
 
 .tg-page {
   width: 100%;
   min-width: 0;
   max-width: 760px;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -32,7 +33,7 @@
 }
 .tg-lede {
   margin: 0;
-  max-width: 56ch;
+  max-width: 60ch;
   color: var(--nv-ink-muted);
 }
 .tg-eyebrow {
@@ -59,7 +60,7 @@
   color: var(--nv-ink-faint);
 }
 .tg-hint[data-error='true'] {
-  color: var(--nv-danger);
+  color: var(--nv-warning);
 }
 .tg-pad {
   padding: 10px 4px 0;
@@ -87,7 +88,7 @@
   padding: 12px 16px;
   border-radius: var(--nv-radius-md);
   font-size: var(--nv-text-callout);
-  background: color-mix(in srgb, var(--nv-danger) 10%, var(--nv-glass-fill));
+  background: color-mix(in srgb, var(--nv-warning) 12%, var(--nv-glass-fill));
 }
 .tg-sent {
   color: var(--nv-success);
@@ -130,6 +131,38 @@
   width: 1px;
   height: 18px;
   background: var(--nv-hairline);
+}
+/* Something to fix: the whole strip leads to the tab where it is fixed. */
+.tg-health--link {
+  appearance: none;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-base) var(--nv-ease-out);
+}
+.tg-health--link:hover {
+  background: var(--nv-select-strong);
+}
+.tg-health--link:active {
+  transform: scale(0.99);
+  transition-duration: var(--nv-dur-instant);
+}
+.tg-health--link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.tg-health__go {
+  margin-left: auto;
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.tg-health--link:hover .tg-health__go {
+  color: var(--nv-ink);
 }
 .tg-state-dot {
   --_c: var(--nv-success);
@@ -198,8 +231,8 @@
   outline-offset: -2px;
 }
 .tg-tab[aria-selected='true'] {
-  color: var(--nv-neon-ink);
-  background: var(--nv-neon-soft);
+  color: var(--nv-ink);
+  background: var(--nv-select-strong);
 }
 .tg-tab svg {
   width: 16px;
@@ -275,6 +308,23 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-faint);
 }
+.tg-lvl small.tg-route__warn {
+  color: var(--nv-warning);
+}
+.tg-route__link {
+  color: var(--nv-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--nv-ink-faint);
+}
+.tg-route__link:hover {
+  text-decoration-color: currentColor;
+}
+.tg-route__link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .tg-dot {
   --_c: var(--nv-ink-faint);
   width: 8px;
@@ -349,12 +399,12 @@
   white-space: nowrap;
 }
 .tg-gchip[aria-checked='true'] {
-  color: var(--nv-neon-ink);
-  background: var(--nv-neon-soft);
+  color: var(--nv-ink);
+  background: var(--nv-select-strong);
 }
 .tg-gchip[aria-checked='true'] .tg-av {
-  background: var(--nv-neon-solid);
-  color: var(--nv-on-neon);
+  background: var(--nv-ink);
+  color: var(--nv-void);
 }
 /* Already sent for every creator: shown on, but quiet and not clickable here. */
 .tg-gchip[data-inherited='true'] {
@@ -592,6 +642,10 @@
   align-items: center;
   padding: 11px 18px 11px 76px;
 }
+/* « Retirer de la liste » (REG-28): the confirmation spans the whole line of the group. */
+.tg-chat > .nv-confirm {
+  grid-column: 1 / -1;
+}
 .tg-chat__t {
   min-width: 0;
   display: flex;
@@ -688,25 +742,50 @@
   justify-content: space-between;
   gap: 12px;
 }
+/* The sheets of Réglages share one skeleton (recette du 29/10): numbered steps, a round ×, Retour on the left and the
+   neon action on the right, the error as amber text under the field. Same look as Sauvegardes (bk-progress). */
 .tg-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.tg-steps li {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  transition: color var(--nv-dur-slow) var(--nv-ease-out);
 }
-.tg-steps i {
-  width: 22px;
-  height: 4px;
-  border-radius: 4px;
-  background: var(--nv-fill-track);
+.tg-steps__num {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  background: var(--nv-glass-fill);
   transition:
-    background-color var(--nv-dur-base) var(--nv-ease-out),
-    width var(--nv-dur-slow) var(--nv-ease-spring);
+    background-color var(--nv-dur-slow) var(--nv-ease-out),
+    color var(--nv-dur-slow) var(--nv-ease-out);
 }
-.tg-steps i[data-state='on'] {
-  width: 34px;
-  background: var(--nv-neon);
+.tg-steps li[data-state='now'] {
+  color: var(--nv-ink);
 }
-.tg-steps i[data-state='done'] {
-  background: var(--nv-ink-faint);
+.tg-steps li[data-state='now'] .tg-steps__num {
+  background: var(--nv-ink);
+  color: var(--nv-void);
+}
+.tg-steps li[data-state='done'] {
+  color: var(--nv-ink-muted);
+}
+.tg-steps li[data-state='done'] .tg-steps__num {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
 }
 .tg-sheet__actions {
   display: flex;
@@ -820,8 +899,13 @@
   font-size: var(--nv-text-callout);
   background: var(--nv-glass-fill);
 }
+/* An error is amber text under the field, as in the other sheets: no box. */
 .tg-verify[data-state='error'] {
-  background: color-mix(in srgb, var(--nv-danger) 10%, var(--nv-glass-fill));
+  padding: 0 2px;
+  background: none;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
 }
 .tg-verify[data-state='ok'] {
   background: color-mix(in srgb, var(--nv-success) 10%, var(--nv-glass-fill));
@@ -836,8 +920,8 @@
   flex: none;
   border-radius: 50%;
   border: 2px solid var(--nv-fill-track);
-  border-top-color: var(--nv-neon);
-  animation: tg-spin 800ms linear infinite;
+  border-top-color: var(--nv-ink);
+  animation: tg-spin var(--nv-dur-data) linear infinite;
 }
 @keyframes tg-spin {
   to {
@@ -860,7 +944,7 @@
   height: 56px;
   display: grid;
   place-items: center;
-  color: var(--nv-neon-ink);
+  color: var(--nv-ink);
 }
 .tg-radar::before,
 .tg-radar::after {
@@ -868,12 +952,12 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1.5px solid var(--nv-neon);
+  border: 1.5px solid var(--nv-ink-muted);
   opacity: 0;
-  animation: tg-ping 2.2s var(--nv-ease-out) infinite;
+  animation: tg-ping var(--nv-dur-breathe) var(--nv-ease-out) infinite;
 }
 .tg-radar::after {
-  animation-delay: 1.1s;
+  animation-delay: calc(var(--nv-dur-breathe) / 2);
 }
 @keyframes tg-ping {
   0% {
@@ -958,8 +1042,14 @@
   .tg-log em {
     grid-column: 3;
   }
-  .tg-health__sep {
+  .tg-health__sep,
+  .tg-health__count {
     display: none;
+  }
+  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs wrap instead. */
+  .tg-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -971,5 +1061,11 @@
   .tg-radar::after,
   .tg-spin {
     animation: none;
+  }
+  .tg-health--link {
+    transition: none;
+  }
+  .tg-health--link:active {
+    transform: none;
   }
 }

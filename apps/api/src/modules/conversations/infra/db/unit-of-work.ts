@@ -10,6 +10,7 @@ import {
   LIVE_WINDOW,
   MessageAuthorSchema,
   MessageDirectionSchema,
+  MessageIdSchema,
   newId,
 } from '@nirvana/contracts';
 import {
@@ -25,7 +26,7 @@ import { z } from 'zod';
 
 import type { Transaction, UnitOfWork } from '../../domain/ports';
 
-import { toConversation, toDraft, toStoredEvent } from './rows';
+import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 
@@ -33,6 +34,8 @@ const PlatformMediaSchema = z.array(ExternalMediaSchema);
 
 /** The repositories of one tenant transaction (`withTenant`: RLS scopes every statement to the creator). */
 function bind(tx: DbTransaction, creatorId: string): Transaction {
+  // Her active persona, read inside the statement that needs it: part of the version Automatique is proved on (ADR 0022).
+  const activePersona = sql`(select id from persona_versions where creator_id = ${creatorId} and is_active)`;
   return {
     conversations: {
       async lockOrCreate(key) {
@@ -82,7 +85,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .select({ id: schema.conversations.id })
           .from(schema.conversations)
           .where(eq(schema.conversations.state, state))
-          .orderBy(schema.conversations.id);
+          .orderBy(sql`${schema.conversations.lastInboundAt} asc nulls last`, schema.conversations.id);
         return rows.map((row) => ConversationIdSchema.parse(row.id));
       },
     },
@@ -113,6 +116,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .orderBy(sql`${schema.messages.platformCreatedAt} desc, ${schema.messages.id} desc`)
           .limit(limit);
         return rows.reverse().map((row) => ({
+          id: MessageIdSchema.parse(row.id),
           direction: MessageDirectionSchema.parse(row.direction),
           author: MessageAuthorSchema.parse(row.author),
           text: row.text,
@@ -128,18 +132,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           })),
         }));
       },
-      async fanContext(fanId) {
-        const facts = await tx
-          .select({ key: schema.fanFacts.key, value: schema.fanFacts.value })
-          .from(schema.fanFacts)
-          .where(
-            and(
-              eq(schema.fanFacts.fanId, fanId),
-              sql`${schema.fanFacts.supersededBy} is null`,
-              sql`(${schema.fanFacts.expiresAt} is null or ${schema.fanFacts.expiresAt} > now())`,
-            ),
-          )
-          .orderBy(schema.fanFacts.observedAt);
+      async fanStats(fanId) {
         const [totals] = await tx
           .select({
             spentMinor: sql<number>`coalesce(sum(${schema.messages.priceMinor}) filter (where ${schema.messages.isPaid}), 0)::int`,
@@ -150,7 +143,6 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .where(eq(schema.conversations.fanId, fanId));
         const firstMessageAt = totals?.firstMessageAt ?? null;
         return {
-          notes: facts.map((fact) => `${fact.key} : ${fact.value}`),
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
         };
@@ -176,13 +168,17 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .for('update');
         return rows.map(toDraft);
       },
-      async insert({ bubbles, softViolations, voice, ...draft }) {
+      async insert({ bubbles, softViolations, voice, personaVersionId, facts, ...draft }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
+          ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
           guardTrace: { softViolations: [...(softViolations ?? [])] },
-          ...(voice !== undefined && { promptHashes: { ...voice } }),
+          ...(voice !== undefined && {
+            promptHashes: { ...voice },
+            personaVersionId: personaVersionId ?? activePersona,
+          }),
         });
       },
       async setStatus(id, status, decision) {
@@ -236,6 +232,24 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           createdAt: meta.at,
         });
       },
+      async alertsSince(conversationId, since) {
+        const rows = await tx
+          .select()
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              eq(schema.conversationEvents.type, 'alert_triggered'),
+              since === null
+                ? undefined
+                : sql`${schema.conversationEvents.createdAt} > ${since.toISOString()}`,
+            ),
+          )
+          .orderBy(schema.conversationEvents.seq);
+        return rows
+          .map(toStoredEvent)
+          .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
+      },
       async list(conversationId) {
         const rows = await tx
           .select()
@@ -257,7 +271,8 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             queue_name => ${options.queueName ?? null},
             run_at => ${options.runAt?.toISOString() ?? null}::timestamptz,
             max_attempts => ${options.maxAttempts ?? JOB_MAX_ATTEMPTS[job]}::int,
-            job_key => ${options.jobKey ?? null}
+            job_key => ${options.jobKey ?? null},
+            job_key_mode => ${options.jobKeyMode ?? 'replace'}
           )`,
         );
       },
@@ -268,6 +283,10 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`agent_mode:${creatorId}`}, 0))`,
         );
+        const rows = await tx.execute<{ found: boolean }>(
+          sql`select exists (select 1 from creators where id = ${creatorId}) as found`,
+        );
+        return rows.rows[0]?.found === true;
       },
       async isOn() {
         const rows = await tx.execute<{ scope: string; active: boolean }>(sql`
@@ -293,6 +312,15 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
     },
 
     automatic: {
+      async personaActive() {
+        const [row] = await tx
+          .select({ id: schema.personaVersions.id })
+          .from(schema.personaVersions)
+          .where(
+            and(eq(schema.personaVersions.creatorId, creatorId), eq(schema.personaVersions.isActive, true)),
+          );
+        return row !== undefined;
+      },
       async decided(voice) {
         // Approved as is: neither edited nor rejected, and sent with the bubbles it was written with (ADR 0019).
         const rows = await tx.execute<{ as_is: boolean }>(sql`
@@ -302,6 +330,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             and status in ('approved', 'edited', 'rejected', 'sent', 'failed')
             and prompt_hashes->>'voicePrompt' = ${voice.voicePrompt}
             and prompt_hashes->>'voiceModel' = ${voice.voiceModel}
+            and persona_version_id is not distinct from ${activePersona}
           order by decided_at desc, id desc limit ${LIVE_WINDOW}`);
         return rows.rows.map((row) => ({ asIs: row.as_is }));
       },
@@ -313,6 +342,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             and(
               eq(schema.blindTests.voicePrompt, voice.voicePrompt),
               eq(schema.blindTests.voiceModel, voice.voiceModel),
+              sql`${schema.blindTests.personaVersionId} is not distinct from ${activePersona}`,
             ),
           )
           .orderBy(sql`${schema.blindTests.recordedAt} desc`)
@@ -327,6 +357,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             creatorId,
             voicePrompt: entry.voice.voicePrompt,
             voiceModel: entry.voice.voiceModel,
+            personaVersionId: activePersona,
             ratePerMille: entry.ratePerMille,
             recordedBy: entry.recordedBy,
             recordedAt: sql`clock_timestamp()`,

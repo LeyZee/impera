@@ -9,7 +9,7 @@ Six couches, chacune avec un outil et un but. Une PR touche la couche qui corres
 | Intégration | Vitest + Testcontainers (Postgres) | Repositories, RLS, jobs Graphile, cas d'usage de bout en bout sur une base réelle | s | `pnpm test:integration` (Docker requis), CI |
 | Contrat connecteur | Vitest | La **même suite** tourne contre `FakeConnector`, `FakeReveal` (serveur mock) et, à la main, contre Reveal réel en lecture | s | CI (Fake) ; manuel (réel) |
 | E2E | Playwright | Dashboard (inbox copilote), extension contre `FakeReveal` | min | `pnpm test:e2e`, CI nightly + avant release |
-| Qualité IA | Promptfoo | Scénarios, rubriques, adversarial, régression de prompts et de modèles | min, coûte des tokens | `pnpm evals` : sous-ensemble en CI nightly ; complet avant changement de persona/modèle |
+| Qualité IA | Exécuteur maison (`apps/api/src/scripts/evals.ts`) et juge LLM | Scénarios, rubriques, adversarial, régression de prompts et de modèles, sur le vrai chemin de l’agent | min, coûte des tokens | `pnpm evals` : sous-ensemble en CI nightly ; complet avant changement de persona/modèle |
 
 `pnpm check` est statique (typecheck, lint, format, knip, `check-repo`) et ne lance aucun test ; `pnpm test:all` enchaîne unitaire et intégration.
 
@@ -25,7 +25,7 @@ Six couches, chacune avec un outil et un but. Une PR touche la couche qui corres
 
 ## FakeReveal
 
-Un serveur HTTP (Fastify, dans `apps/api/test/fake-reveal/`) qui imite l'API de Reveal telle qu'observée (phase 1), piloté par des scénarios (`scenarios/*.json` : messages qui arrivent à t+X, session qui expire, erreur 500, rate limit). C'est contre lui que tourne le connecteur en CI et en dev. Il est mis à jour à chaque changement observé de Reveal (voir `docs/reference/reveal-api-observed.md`), et ses enregistrements anonymisés sont versionnés dans le dépôt (`apps/api/test/fake-reveal/recordings/`, sans secret ni donnée réelle) et protégés (hygiene.md).
+Un serveur HTTP (Fastify, dans `apps/api/src/__tests__/fake-reveal/`) qui imite l'API de Reveal telle qu'observée (phase 1), piloté par des scénarios (`scenarios/*.json` : messages qui arrivent à t+X, session qui expire, erreur 500, rate limit). C'est contre lui que tourne le connecteur en CI et en dev. Il est mis à jour à chaque changement observé de Reveal (voir `docs/reference/reveal-api-observed.md`), et ses enregistrements anonymisés sont versionnés dans le dépôt (`apps/api/src/__tests__/fake-reveal/recordings/`, sans secret ni donnée réelle) et protégés (hygiene.md).
 
 ## Évals (résumé, détail dans `docs/playbooks/write-an-eval.md`)
 
@@ -33,3 +33,4 @@ Un serveur HTTP (Fastify, dans `apps/api/test/fake-reveal/`) qui imite l'API de 
 - `evals/adversarial/` : injections et pièges.
 - `evals/regression/` : cas réels anonymisés et validés par Messa (plus tard), figés.
 - Seuils dans `evals/thresholds.json` ; la CI échoue si le sous-ensemble `smoke` passe sous le seuil.
+- Pourquoi pas Promptfoo : un scénario doit passer par le même chemin qu’un vrai message (cerveau, politique `holdDecision` / `offerDecision`, voix, gardes dures, `composeTurn`). Promptfoo n’appellerait que des prompts isolés ; l’exécuteur maison appelle le code de l’agent, puis le rôle `judge` de `LlmGateway` note la réponse comme une donnée (`<candidate_reply>`).

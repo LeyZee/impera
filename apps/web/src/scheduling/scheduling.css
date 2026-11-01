@@ -1,0 +1,1216 @@
+/*
+ * The planning (EQ-02, EQ-13): Équipe › Planning, the chatter's Planning and Aujourd'hui, the off-shift notice of
+ * Suivi. Design-system tokens only; a member's own colour reaches a shift through `--sc-color`.
+ */
+
+/* ── Shared ── */
+.sc-swatch {
+  --sc-color: var(--nv-ink-faint);
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sc-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-color) 18%, transparent);
+}
+.sc-notice h2 {
+  text-wrap: balance;
+}
+.sc-notice .nv-btn {
+  align-self: center;
+  margin-top: var(--nv-space-2);
+}
+.sc-phase {
+  flex: none;
+}
+.sc-phase--past {
+  opacity: 0.7;
+}
+.sc-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4);
+}
+.sc-skeleton i {
+  height: 56px;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  animation: sc-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+.sc-skeleton--grid i {
+  height: 72px;
+}
+.sc-skeleton i:nth-child(2) {
+  animation-delay: calc(var(--nv-stagger) * 2);
+}
+.sc-skeleton i:nth-child(3) {
+  animation-delay: calc(var(--nv-stagger) * 4);
+}
+.sc-skeleton i:nth-child(4) {
+  animation-delay: calc(var(--nv-stagger) * 6);
+}
+@keyframes sc-breathe {
+  to {
+    opacity: 0.4;
+  }
+}
+
+/* ── The week: ‹ 26 oct. – 1 nov. › ── */
+.sc-week {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.sc-week__label {
+  margin: 0;
+  min-width: 13ch;
+  text-align: center;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.sc-week__back {
+  margin-left: var(--nv-space-1);
+}
+.sc-arrow {
+  appearance: none;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.sc-arrow svg,
+.sc-add svg,
+.sc-more svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sc-arrow:hover {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+}
+.sc-arrow:active {
+  transform: scale(0.9);
+  transition-duration: var(--nv-dur-instant);
+}
+.sc-arrow:focus-visible,
+.sc-add:focus-visible,
+.sc-chip:focus-visible,
+.sc-days__one:focus-visible,
+.sc-duty__one:focus-visible,
+.sc-more:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+
+/* ── Équipe › Planning ── */
+.sc-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  min-width: 0;
+}
+.sc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3) var(--nv-space-4);
+}
+/* « Ses shifts » (EQ-11): whose shifts stand out, and the way back to the whole team. */
+.sc-focus {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-focus b {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.sc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  min-width: 0;
+}
+
+/* Who is on shift right now: one quiet line of people. */
+.sc-duty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-4);
+}
+.sc-duty__title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.sc-duty__none {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-duty__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+.sc-duty__one {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  max-width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 var(--nv-space-3) 0 var(--nv-space-3);
+  border: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink);
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  white-space: nowrap;
+}
+button.sc-duty__one {
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+button.sc-duty__one:hover {
+  background: var(--nv-plate-hover);
+}
+button.sc-duty__one:active {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+.sc-duty__who {
+  font-weight: 650;
+}
+.sc-duty__where {
+  color: var(--nv-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-duty__until {
+  color: var(--nv-ink-faint);
+}
+
+/* Who is on shift and who is on leave, on one row of names above the grid (EQ-02). */
+.sc-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-6);
+  min-width: 0;
+}
+
+/* The weekly shifts that could not be placed: amber, never red (ADR 0011: red is for the urgent). */
+.sc-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3) var(--nv-space-5);
+  border-radius: var(--nv-radius-xl);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 38%, transparent);
+  background: color-mix(in srgb, var(--nv-warning) 7%, var(--nv-plate));
+}
+.sc-conflicts__title {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 650;
+}
+.sc-conflicts__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-conflicts__one {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-1) 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.sc-conflicts__one:first-child {
+  border-top: 0;
+}
+.sc-conflicts__text {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-conflicts__when {
+  font-weight: 600;
+}
+.sc-conflicts__what {
+  color: var(--nv-ink-muted);
+}
+
+/* The grid: accounts down, days across, each row a subgrid so the columns line up. */
+.sc-grid-panel {
+  overflow: visible;
+}
+.sc-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.15fr) repeat(7, minmax(0, 1fr));
+  min-width: 0;
+  transition: opacity var(--nv-dur-base) var(--nv-ease-out);
+}
+.sc-grid[data-loading='true'] {
+  opacity: 0.55;
+}
+.sc-grid__row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--nv-hairline);
+}
+.sc-grid__row--head {
+  border-top: 0;
+}
+.sc-grid__corner {
+  display: flex;
+  align-items: flex-end;
+  padding: var(--nv-space-4) var(--nv-space-4) var(--nv-space-3) var(--nv-space-5);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.sc-grid__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--nv-space-4) var(--nv-space-1) var(--nv-space-3);
+  color: var(--nv-ink-muted);
+}
+.sc-grid__dayname {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.sc-grid__daynum {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.sc-grid__day[data-past='true'] .sc-grid__daynum {
+  color: var(--nv-ink-faint);
+}
+.sc-grid__day[data-today='true'] {
+  color: var(--nv-ink);
+}
+.sc-grid__day[data-today='true'] .sc-grid__daynum {
+  color: var(--nv-void);
+  background: var(--nv-ink);
+}
+.sc-grid__account {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-5);
+}
+.sc-grid__creator {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-grid__handle {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-grid__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 76px;
+  padding: var(--nv-space-2) 4px;
+  border-left: 1px solid var(--nv-hairline);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-grid__cell[data-today='true'] {
+  background: var(--nv-select);
+}
+.sc-grid__cell:hover {
+  background: var(--nv-plate-hover);
+}
+.sc-grid__cell[data-today='true']:hover {
+  background: var(--nv-select-strong);
+}
+.sc-grid__row:last-child .sc-grid__cell:last-child {
+  border-bottom-right-radius: var(--nv-radius-xl);
+}
+
+/* A shift: its member's colour on the left edge, the name, the hours. */
+.sc-chip {
+  --sc-color: var(--nv-ink-faint);
+  appearance: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px 6px 10px;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--sc-color) 16%, var(--nv-surface-raised));
+  box-shadow:
+    inset 3px 0 0 var(--sc-color),
+    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
+  color: var(--nv-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.sc-chip:hover {
+  background: color-mix(in srgb, var(--sc-color) 26%, var(--nv-surface-raised));
+  transform: translateY(-1px);
+  box-shadow:
+    inset 3px 0 0 var(--sc-color),
+    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 44%, transparent),
+    var(--nv-shadow-lift);
+}
+.sc-chip:active {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+.sc-chip[data-phase='past'] {
+  opacity: 0.58;
+}
+/* Another member's shift while one member's stand out (« Ses shifts », EQ-11). */
+.sc-chip[data-muted='true'] {
+  opacity: 0.35;
+}
+.sc-chip[data-phase='live'] {
+  box-shadow:
+    inset 3px 0 0 var(--sc-color),
+    inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 55%, transparent);
+}
+.sc-chip__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-chip__who > svg,
+.sc-chip__who > .nv-dot {
+  flex: none;
+}
+/* Room on the right for the weekly mark, so a long name never runs under it (EQ-24). */
+.sc-chip[data-repeat='true'] .sc-chip__who {
+  padding-right: 12px;
+}
+.sc-chip__hours {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+.sc-chip__night {
+  color: var(--nv-ink-faint);
+}
+.sc-chip__repeat {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The day cut into the agency's créneaux (EQ-01): one créneau at the same height all week, the + under them. */
+.sc-grid__row--slots {
+  grid-template-rows: repeat(var(--sc-slots), auto) auto;
+}
+.sc-grid__row--slots > .sc-grid__account {
+  grid-row: 1 / -1;
+}
+.sc-grid__row--slots > .sc-grid__cell {
+  grid-row: 1 / -1;
+  display: grid;
+  grid-template-rows: subgrid;
+  row-gap: 4px;
+}
+.sc-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 40px;
+}
+/* An empty créneau ahead: dashed amber, a thing to do and no damage done yet. */
+.sc-slot__fill {
+  appearance: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px dashed color-mix(in srgb, var(--nv-warning) 60%, transparent);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-warning) 6%, transparent);
+  color: var(--nv-warning);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-slot__fill:hover {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+}
+.sc-slot__fill:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.sc-slot__label {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 650;
+}
+.sc-slot__hours {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+/* An empty créneau gone by: grey, nothing to do about it now. */
+.sc-slot__gone {
+  flex: 1;
+  min-height: 40px;
+  border: 1px dashed var(--nv-hairline);
+  border-radius: var(--nv-radius-sm);
+}
+.sc-grid__tofill {
+  color: var(--nv-warning);
+}
+/* The marks of a shift, said once under the grid (EQ-24). */
+.sc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-5);
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-5);
+  border-top: 1px solid var(--nv-hairline);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.sc-legend__one {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sc-legend__icon {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The + of a day: there when the cell is pointed at, or always on a touch screen. */
+.sc-add {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--nv-hairline);
+  border-radius: var(--nv-radius-sm);
+  background: transparent;
+  color: var(--nv-ink-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    border-color var(--nv-dur-fast) var(--nv-ease-out),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-grid__cell:hover .sc-add,
+.sc-add:focus-visible {
+  opacity: 1;
+}
+.sc-add:hover {
+  color: var(--nv-ink);
+  border-color: var(--nv-ink-faint);
+  background: var(--nv-plate);
+}
+@media (hover: none) {
+  .sc-add {
+    opacity: 0.7;
+  }
+}
+
+/* Day pills: the phone shows one day at a time. */
+.sc-days {
+  display: none;
+}
+.sc-days__one {
+  appearance: none;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--nv-target-min);
+  margin: 0;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  color: var(--nv-ink-muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.sc-days__one:hover {
+  background: var(--nv-plate-hover);
+  color: var(--nv-ink);
+}
+.sc-days__one:active {
+  transform: scale(0.94);
+  transition-duration: var(--nv-dur-instant);
+}
+.sc-days__one[aria-checked='true'] {
+  background: var(--nv-ink);
+  color: var(--nv-void);
+}
+.sc-days__one[data-today='true']:not([aria-checked='true']) {
+  color: var(--nv-ink);
+  box-shadow: inset 0 0 0 1px var(--nv-ink-faint);
+}
+.sc-days__name {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.sc-days__num {
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 650;
+}
+
+@media (max-width: 820px) {
+  .sc-days {
+    display: flex;
+    gap: 2px;
+    padding: var(--nv-space-2);
+    border-bottom: 1px solid var(--nv-hairline);
+  }
+  .sc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sc-grid__row {
+    display: flex;
+    flex-direction: column;
+  }
+  .sc-grid__row--head {
+    display: none;
+  }
+  .sc-grid__row:nth-child(2) {
+    border-top: 0;
+  }
+  .sc-grid__cell:not([data-picked='true']) {
+    display: none;
+  }
+  .sc-grid__account {
+    padding: var(--nv-space-3) var(--nv-space-4) 0;
+  }
+  .sc-grid__cell {
+    min-height: 0;
+    padding: var(--nv-space-2) var(--nv-space-4) var(--nv-space-3);
+    border-left: 0;
+  }
+  .sc-grid__cell[data-today='true'],
+  .sc-grid__cell:hover,
+  .sc-grid__cell[data-today='true']:hover {
+    background: transparent;
+  }
+  .sc-chip {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nv-space-3);
+    padding: 10px 28px 10px 12px;
+  }
+  .sc-chip__repeat {
+    top: 50%;
+    right: 10px;
+    margin-top: -5.5px;
+  }
+  .sc-add {
+    min-height: 36px;
+    opacity: 0.7;
+  }
+  .sc-week__label {
+    min-width: 0;
+  }
+}
+
+/* ── Dialogs (a new shift, one shift) ── */
+.sc-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sc-fieldset legend {
+  padding: 0;
+  margin-bottom: var(--nv-space-2);
+}
+.sc-hours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-3);
+}
+.sc-hours__one {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.sc-hours__one input {
+  width: 128px;
+}
+.sc-refusal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.sc-refusal p {
+  margin: 0;
+}
+.sc-sheet__when {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.sc-sheet__when .sc-swatch {
+  width: 14px;
+  height: 14px;
+}
+.sc-sheet__time {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sc-sheet__range {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 700;
+}
+.sc-sheet__day {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-sheet__facts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-sheet__facts:empty {
+  display: none;
+}
+.sc-sheet__facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-2) 0;
+  border-top: 1px solid var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-sheet__facts li > span:first-child {
+  color: var(--nv-ink-muted);
+}
+.sc-sheet__facts li > span:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+.sc-sheet__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.sc-sheet__foot {
+  justify-content: space-between;
+}
+.sc-sheet__repeat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.sc-link {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition:
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    text-decoration-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-link:hover:not(:disabled) {
+  color: var(--nv-ink);
+  text-decoration-color: currentColor;
+}
+.sc-link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
+.sc-confirm__text {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+
+/* ── Aujourd'hui ── */
+.sc-today {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  max-width: 720px;
+}
+.sc-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: var(--nv-space-6);
+}
+.sc-hero--on {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 34%, transparent);
+  background: color-mix(in srgb, var(--nv-success) 5%, var(--nv-plate));
+}
+.sc-hero--ended,
+.sc-hero--soon {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 30%, transparent);
+}
+.sc-hero__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.sc-state {
+  font-weight: 650;
+}
+.sc-hero__when {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-hero__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sc-hero__kicker {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.sc-hero__title {
+  margin: 0;
+  /* Her name in Geist, bold: the serif is the whisper of an empty state, never a name (DASH-23). */
+  font-weight: 700;
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  letter-spacing: var(--nv-text-title-1-tracking);
+  text-wrap: balance;
+}
+.sc-hero--none .sc-hero__title {
+  font-family: var(--nv-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+.sc-hero__where {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.sc-hero__hours {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-3);
+  margin: 0;
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  font-weight: 700;
+}
+.sc-hero__day {
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+  color: var(--nv-ink-muted);
+}
+.sc-hero__gauge {
+  max-width: 420px;
+}
+.sc-hero__note {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.sc-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.sc-next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4) var(--nv-space-5);
+}
+.sc-next__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-4);
+}
+.sc-next__main,
+.sc-next__side {
+  min-width: 0;
+}
+.sc-next__side {
+  text-align: right;
+}
+.sc-next__who,
+.sc-next__hours {
+  margin: 0;
+  font-weight: 650;
+}
+.sc-next__where,
+.sc-next__in {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  min-height: var(--nv-target-min);
+  padding: 0 var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-more:hover {
+  color: var(--nv-ink);
+  background: var(--nv-plate-hover);
+}
+.sc-more svg {
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.sc-more:hover svg {
+  transform: translateX(3px);
+}
+@media (max-width: 520px) {
+  .sc-hero {
+    padding: var(--nv-space-5);
+  }
+  .sc-next__side {
+    text-align: left;
+  }
+}
+
+/* ── The chatter's Planning ── */
+.sc-mine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-5);
+  max-width: 820px;
+}
+.sc-mine__sum {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-mine__day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sc-mine__date {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 650;
+  color: var(--nv-ink-muted);
+}
+.sc-mine__day[data-today='true'] .sc-mine__date {
+  color: var(--nv-ink);
+}
+.sc-mine__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-mine__shift {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-4);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.sc-mine__shift:hover {
+  background: var(--nv-plate-hover);
+}
+/* A finished shift is quiet; its report, still to make or to read, keeps full ink (EQ-19). */
+.sc-mine__shift[data-phase='past'] > :not(.sc-mine__report) {
+  opacity: 0.62;
+}
+.sc-mine__report {
+  justify-self: end;
+}
+.sc-mine__earlier .nv-disclosure__body {
+  padding-top: var(--nv-space-2);
+}
+.sc-mine__shift[data-phase='live'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 40%, transparent);
+}
+.sc-mine__range,
+.sc-mine__who {
+  margin: 0;
+  font-weight: 650;
+}
+.sc-mine__range {
+  font-size: var(--nv-text-callout);
+}
+.sc-mine__length,
+.sc-mine__where {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sc-mine__main {
+  min-width: 0;
+}
+.sc-mine__agency {
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 520px) {
+  .sc-mine__shift {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--nv-space-1) var(--nv-space-3);
+  }
+  .sc-mine__hours {
+    display: flex;
+    align-items: baseline;
+    gap: var(--nv-space-2);
+  }
+  .sc-mine__main {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* ── Suivi, off shift (EQ-13): said plainly, never an error ── */
+.sc-off {
+  align-self: start;
+}
+.sc-off__in {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
+  padding: var(--nv-space-4) var(--nv-space-5);
+}
+.sc-off__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+}
+.sc-off__icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sc-off__text {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sc-off__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.sc-off__lead {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.sc-off__go {
+  flex: none;
+}
+@media (max-width: 520px) {
+  .sc-off__in {
+    flex-wrap: wrap;
+  }
+  .sc-off__go {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-skeleton i {
+    animation: none;
+  }
+  .sc-chip,
+  .sc-chip:hover,
+  .sc-chip:active,
+  .sc-arrow:active,
+  .sc-days__one:active,
+  button.sc-duty__one:active,
+  .sc-more:hover svg {
+    transform: none;
+  }
+  .sc-grid,
+  .sc-chip,
+  .sc-arrow,
+  .sc-add,
+  .sc-days__one,
+  .sc-more svg,
+  .sc-mine__shift {
+    transition: none;
+  }
+}

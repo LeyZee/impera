@@ -40,7 +40,7 @@ describe('llm_calls as the gateway journal (LlmCallStore)', () => {
     const creatorId = newId(CreatorIdSchema);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
     const start = new Date(Date.now() - 1_000);
     // A draft id no draft has yet: the calls come before the draft.
     await store.insert({ ...call({ draftId: '0199f2a0-0000-7000-8000-0000000000aa' }), creatorId });

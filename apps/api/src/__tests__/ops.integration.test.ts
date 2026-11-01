@@ -39,7 +39,7 @@ describe('ops commands (P0-07b)', () => {
     const creatorId = newId(CreatorIdSchema);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
     await setKillSwitch(test.admin.db, {
       active: true,
       scope: 'creator',
@@ -99,7 +99,7 @@ describe('ops commands (P0-07b)', () => {
     const rotated = parseEncryptionKeys(`v2:${key()},v1:${oldKeys[0]?.key.toString('base64') ?? ''}`);
     await test.admin.db
       .insert(schema.creators)
-      .values({ id: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
+      .values({ id: creatorId, nameKey: creatorId, displayName: 'Test', timezone: 'Europe/Paris' });
     await test.admin.db.insert(schema.platformAccounts).values({
       id: accountId,
       creatorId,

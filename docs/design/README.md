@@ -1,14 +1,18 @@
 # Guide design : Nirvana « Liquid Glass »
 
-Dernière revue : 2026-10-19 (refonte). Fiche : D-01. Code : `packages/design-system` (ADR 0015).
+Dernière revue : 2026-10-25 (images refaites depuis le CRM). Fiche : D-01. Code : `packages/design-system` (ADR 0015).
 
 ## En images
 
-Rendus du package lui-même (`tokens.css`, `components.css`, polices du design system) dans Chromium, à 2×, mouvement réduit ; textes fictifs. Ils datent d'avant la refonte du 19/10 et seront remplacés par des captures du CRM refait. Si une image et le CSS divergent, le CSS a raison et l'image est à refaire.
+Captures du CRM refait (23/10), prises dans Chromium à 2×, mouvement réduit, avec des données inventées (prénoms fictifs, aucune vraie conversation). La palette et la typographie sont rendues depuis le package lui-même : les valeurs affichées sont lues dans `tokens.css` au moment de la capture. Si une image et le CSS divergent, le CSS a raison et l'image est à refaire.
 
-![Composants, thème Nuit](images/composants-nuit.jpg)
+![Dashboard, thème Nuit](images/crm-dashboard-nuit.jpg)
 
-![Composants, thème Jour](images/composants-jour.jpg)
+![Dashboard, thème Jour](images/crm-dashboard-jour.jpg)
+
+![Suivi : le lecteur, les limites du fan et le brouillon de l'agent, thème Nuit](images/crm-suivi-nuit.jpg)
+
+![Sur téléphone : Dashboard, Suivi, Entraîner](images/crm-telephone.jpg)
 
 ![Palette des thèmes Nuit et Jour](images/palette.jpg)
 
@@ -23,7 +27,8 @@ Demandée par Charles le 19/10 : le CRM faisait « cheap » et « daté ». La r
 - **Deux couches.** Le verre (`nv-glass`) est réservé à la couche qui flotte : navigation, barres d'outils, contrôles (segments, sous-onglets), menus, info-bulles, feuilles, dialogues. Le contenu (listes, chiffres, formulaires, graphiques) n'est pas en verre : il se pose sur le fond, groupé par l'espace, ou sur une plaque (`nv-plate`), un souffle de lumière et un filet, sans flou ni ombre.
 - **Un verre clair, pas laiteux.** Voile léger, saturation forte (les couleurs derrière restent vivantes), reflet spéculaire sur le bord haut et, plus doux, sur le bord bas, et un fin anneau sombre qui le détache du fond (iOS 27). Plus il est grand, plus il est profond (`nv-glass--thick`, `nv-glass--float`).
 - **Une seule lumière.** Le fond est une nuit presque noire avec une seule source néon au-dessus de la page et son ombre lie-de-vin très loin dessous, plus un grain fin qui empêche les dégradés de faire des bandes.
-- **Le néon est une lumière, pas une couleur d'interface.** Il sert à l'action principale de l'écran (une seule), à l'état « allumé » (interrupteur), au chiffre dont parle l'écran, à l'icône de l'onglet actif et aux urgences. Il ne sert plus à sélectionner : une sélection est une lumière neutre (`select`, `select-strong`), une puce cochée est remplie d'encre. L'anneau de focus est blanc chaud : un anneau rouge sur chaque champ actif se lisait comme une erreur.
+- **Le néon est une lumière, pas une couleur d'interface.** Il sert à l'action principale de l'écran (une seule), à l'état « allumé » (interrupteur), au chiffre dont parle l'écran, à l'icône de l'onglet actif et aux urgences. Il ne sert plus à sélectionner : une sélection est une lumière neutre (`select`, `select-strong`), une puce cochée est remplie d'encre, une étiquette « déclarée » (`nv-tag--declared`) est une pastille neutre. L'anneau de focus est blanc chaud : un anneau rouge sur chaque champ actif se lisait comme une erreur. Ce qui reste à corriger dans un formulaire est ambre, comme tout avertissement.
+- **Seul ce qui demande une main luit.** Le titre du Dashboard ne brille (halo du texte) qu'en ambre ou en rouge ; un état calme garde une lueur de fond atténuée et des mots sans halo. En Jour, un halo coloré derrière une encre sombre fait une tache : la lueur s'efface et le texte reste net.
 - **De grands titres.** Titre de page en `large-title` gras, aligné à gauche ; titres de section en `title-2`, phrase en minuscules avec sa ligne de lecture dessous. Plus de sourcils en capitales espacées. Les chiffres et les heures sont en Geist à chiffres tabulaires, plus en police de code.
 - **Un seul ressort.** Trois courbes d'une même famille (`ease-spring-smooth`, `ease-spring`, `ease-spring-bouncy`, comme les ressorts de SwiftUI) ; ce qui se déplace ou change de taille prend l'une d'elles. Un bouton pressé cède comme un gel (plus large que haut) et revient. Le verre se matérialise (`nv-materialize` : flou qui se lève et petite échelle) au lieu d'apparaître en fondu ; un menu naît du bouton qui l'ouvre.
 - **La coquille.** Barre latérale flottante en verre (icône et libellé côte à côte, comme macOS 26), réduite aux icônes sous 1 100 px, capsule d'onglets flottante en bas sur téléphone. La page défile sous elle, contenu limité à 1 240 px.
@@ -41,7 +46,7 @@ Réponses aux questions ouvertes de `brief.md` :
 
 Prototype cliquable : https://claude.ai/artifact/TZjCUAPFhxN4pJn978A9zz (brainstorm/06). Ce qu'il a fixé :
 
-- **Le dashboard n'a ni Inbox ni page Fans.** Navigation : Dashboard (statistiques), Créatrices, Entraîner, Suivi, Réglages. La validation en copilote passe par l'extension, dans Reveal (décision de Charles, 17/10).
+- **Le dashboard n'a ni Inbox ni page Fans.** Navigation : Dashboard (statistiques), Créatrices, Entraîner, Suivi, Réglages. Les brouillons du copilote se valident dans Suivi (décision de Charles du 19/10, qui remplace la validation par l'extension dans Reveal fixée le 17/10).
 - **Un dashboard de statistiques à la manière de celui de Reveal**, animé (voir « Dashboard » plus bas).
 - **Pas de double bouton sur le verre** : un bouton secondaire posé sur une surface vitrée est une teinte (`nv-btn--soft`), pas un second verre.
 - **Chaque icône de navigation a son geste** quand on l'active, et les changements d'onglet s'animent.
@@ -63,6 +68,19 @@ Donnés sur la maquette du Dashboard (fil de revue 08), valables pour tout le CR
 - **Créatrices et Réglages ne se mélangent pas** : sous Créatrices, tout ce qui est propre à une créatrice (persona, plus tard catalogue et chiffres par créatrice) ; sous Réglages, le CRM lui-même (clés, appareils, mode, notifications).
 - **Tout doit être intuitif** : se mettre à la place de quelqu'un qui découvre l'écran, repérer ce qui est flou ou ambigu, simplifier les mots et les chiffres, sans le prendre pour un idiot (section « Clarté »).
 
+## Finition d'un écran (Charles, 2026-10-27)
+
+« Il faut que tout soit très joli… cohérent avec le design système de Nirvana… que ça respire, qu'il y ait des hovers partout, que ça interagisse avec l'utilisateur, que la navigation soit fluide, agréable, intuitive, avec une belle hiérarchie des informations partout. C'est très, très important. » Valable pour chaque écran nouveau, à commencer par ceux de l'équipe (fiches EQ). Un écran est prêt quand :
+
+- **Hiérarchie** : il se lit en deux secondes ; un seul chiffre ou une seule action domine, le secondaire est replié ou au survol (section « Hiérarchie »).
+- **Ça respire** : espacements des jetons, contenu sur plaques, au plus trois chiffres secondaires côte à côte, jamais un mur de champs ; un formulaire long se fait par étapes.
+- **Tout réagit** : survol, pression, focus et sélection sur chaque élément cliquable, par les classes communes (section « États ») ; rien n'apparaît sans animation (`nv-enter` avec `--nv-i`) ; les chiffres comptent (`countUp`) ; un graphique passe par `nv-chart`.
+- **Navigation fluide** : la lentille glisse entre les onglets, la page entre en fondu, un retour garde la position et les filtres, le focus clavier suit, aucune animation ne bloque une saisie.
+- **Le design system, rien d'autre** : jetons de couleur, de durée et de courbe (aucune valeur en dur), un seul néon par écran, verre seulement sur ce qui flotte, textes en français avec apostrophes typographiques, montants en euros (ADR 0011).
+- **États honnêtes** : chargement, vide qui propose l'action, erreur « Le serveur ne répond pas », jamais un faux contenu.
+- **Accessible** : contraste vérifié dans les deux thèmes, `prefers-reduced-motion` respecté (tout reste lisible au repos), cibles d'au moins 44px sur téléphone.
+- **Prouvé** : captures Nuit et Jour, bureau (1 440 px) et téléphone (390 px), mouvement réduit compris, avec des données inventées, jointes à la PR et relues par le fil propriétaire d'`apps/web`.
+
 ## Où vivent les choses
 
 | Fichier                                                 | Rôle                                                                                                                                                |
@@ -78,7 +96,7 @@ Les consommateurs et l'ordre d'import sont dans `packages/design-system/README.m
 
 ## Principes
 
-1. **La nuit d'abord.** Nuit est le thème par défaut (usage le soir) ; Jour existe pour le bureau en plein jour.
+1. **La nuit d'abord.** Nuit est le thème par défaut (usage le soir) ; Jour existe pour le bureau en plein jour. Le choix se fait dans Réglages › Apparence (Nuit, Jour, Appareil), par navigateur, et s'applique avant le premier affichage (décision de Charles du 25/10).
 2. **Un seul néon.** `neon` est une lumière, pas un remplissage ni une couleur de sélection. Une action néon par écran (`nv-btn--neon`), une surface teintée par écran (`nv-glass--neon`).
 3. **Le verre flotte, le contenu se pose.** Le verre est pour les contrôles et la navigation, posé sur `nv-aura` ou sur du contenu, jamais sur un aplat ; le contenu va sur le fond ou sur une plaque (`nv-plate`).
 4. **La matière bouge, l'interface reste calme.** Ce qui se déplace (pouce, lentille, Island) se déforme sur un ressort ; le reste ne fait que des fondus.
@@ -165,18 +183,18 @@ Tout élément cliquable a les quatre états ; un écran prend la classe qui con
 
 Classes communes : `nv-btn` (actions), `nv-chip` (un choix parmi quelques-uns), `nv-tap` (ligne, carte, élément de liste), `nv-lift` (carte flottante, pas un grand panneau), `nv-disclosure` (pli `<details>` avec titre `__title`, résumé `__sum` et contenu `__body`), `nv-enter` (entrée en fondu montant, décalée par `--nv-i`).
 
-Pastilles d'état (`nv-status--<état>`) : une par valeur de `conversations.state` (`data-model.md`) : `idle`, `pending`, `drafting` (respire), `awaiting-approval`, `sending` (respire), `human`, `paused`, `error`, plus `sale`. Libellés, qui disent qui a la main (section « Clarté ») : Rien à faire, Message reçu, L'agent écrit, À valider, Envoi en cours, Un humain répond, En pause, Erreur, Vente.
+Pastilles d'état (`nv-status--<état>`) : une par valeur de `conversations.state` (`data-model.md`) : `idle`, `pending`, `drafting` (respire), `awaiting-approval`, `sending` (respire), `human`, `paused`, `error`, plus `sale`. Libellés, qui disent qui a la main (section « Clarté ») : Rien à faire, Message reçu, L'agent écrit, À valider, Envoi en cours, Un humain répond, En pause, Erreur, Vente. « Erreur » (un envoi qui n'est pas parti) est en ambre, un avertissement : le rouge reste aux urgences.
 
 ## Mouvement
 
-- Durées : `dur-instant` (pression), `dur-fast` (couleurs), `dur-base` (états), `dur-slow` (déplacement de matière), `dur-ambient` (aura).
+- Durées : `dur-instant` (pression), `dur-fast` (couleurs), `dur-base` (états), `dur-slow` (déplacement de matière, entrée d'un bloc), `dur-morph` (forme qui en devient une autre, geste d'une icône), `dur-data` (une donnée qui se dessine, au rythme de `countUp`), `dur-breathe` (un chargement qui respire), `dur-ambient` (aura). Entre deux choses qui entrent l'une après l'autre : `stagger` (50 ms), ou un multiple. Aucune durée ni aucun décalage écrit en dur dans un écran : un `ms` dans une feuille de style d'`apps/web` est un écart (sauf les boucles qui respirent).
 - Courbes : une famille de ressorts. `ease-spring-smooth` (sans rebond) pour ce qui grandit ou se replie, `ease-spring` (léger dépassement) pour ce qui se déplace, `ease-spring-bouncy` pour les pouces d'interrupteur et l'Island, `ease-out` pour les fondus de couleur. `dur-morph` pour une forme qui en devient une autre (la lentille entre deux onglets).
 - Signature : pression à ressort ; pouces et lentilles qui s'écrasent pendant leur trajet (`playLiquid`) ; bulles qui montent de 8px en entrant ; Island qui naît d'une capsule ; aura qui dérive.
 - **Le verre ne ralentit jamais le clavier** : approuver, éditer, rejeter, suivant, précédent ne déclenchent aucune animation bloquante ; le focus passe au brouillon suivant immédiatement.
-- **Changement de page** : la lentille de la barre de navigation glisse et s'étire sur son trajet (`playLiquid`), la page entre en fondu en montant de 10px, ses blocs décalés de 40ms.
-- **Icônes de navigation** : chacune a un geste propre, joué une fois à l'activation par la classe `is-playing` (`playOnce`) ; l'icône active prend `neon-ink` et un halo. Geste lié au sens : Dashboard, les barres repoussent ; Entraîner, l'étoile pivote et les petites scintillent ; Suivi, l'aiguille balaie le cadran et se pose ; Réglages, l'engrenage tourne d'un cran. Une nouvelle icône de navigation arrive avec son geste.
-- **Chiffres** : une statistique compte jusqu'à sa valeur (`countUp`, `easeOutQuart`) et, au changement de période, part de l'ancienne valeur, pas de zéro. Les courbes se dessinent (`nv-draw`), les aires apparaissent en fondu, les barres poussent depuis leur base, décalées.
-- **Pastilles d'état global** : fixes en vert (le calme ne bouge pas), elles respirent en ambre et pulsent en rouge ; un changement d'état est une transition de couleur de 300 ms, sans secousse.
+- **Changement de page** : la lentille de la barre de navigation glisse et s'étire sur son trajet (`playLiquid`), la page entre en fondu en montant de 10px, ses blocs décalés d'un `stagger`.
+- **Icônes de navigation** : chacune a un geste propre, joué une fois à l'activation par la classe `is-playing` (`playOnce`) ; l'icône active prend `neon-ink` et un halo. Geste lié au sens : Dashboard, les barres repoussent ; Entraîner, l'étoile pivote et les petites scintillent ; Suivi, l'aiguille balaie le cadran et se pose ; Réglages, l'engrenage tourne d'un cran ; Aujourd'hui, les rayons tournent d'un huitième et sortent ; Planning, le jour tombe dans sa case ; Équipe, les trois sautent l'un après l'autre ; Paie et Commissions, la pièce se retourne ; Moi, un hochement de tête ; Plus, les trois points rebondissent. Une nouvelle icône de navigation arrive avec son geste.
+- **Chiffres** : une statistique compte jusqu'à sa valeur (`countUp`, `easeOutQuart`) et, au changement de période, part de l'ancienne valeur, pas de zéro. Les courbes se dessinent (`nv-draw`), les aires apparaissent en fondu, les barres poussent depuis leur base, décalées : tout cela en `dur-data` sur `ease-out`, la même courbe que le compteur, pour que le chiffre et sa barre arrivent ensemble.
+- **Pastilles d'état global** : fixes en vert (le calme ne bouge pas), elles respirent en ambre et pulsent en rouge ; un changement d'état est une transition de couleur en `dur-base`, sans secousse.
 - `prefers-reduced-motion` : ressorts instantanés, boucles arrêtées ; tout reste lisible au repos.
 
 ## Dashboard (statistiques)
@@ -224,7 +242,7 @@ Un seul composant, `nv-chart` : un SVG dessiné avec les aides de `@nirvana/desi
 
 - Raccourcis communs au playground et au copilote : `a` valider, `e` corriger, `r` rejeter. Chaque bouton affiche sa touche (`nv-kbd`).
 - La proposition montre le brief en une ligne, le fil, le brouillon étiqueté, puis les faits utilisés et la latence en `nv-meta`.
-- Cibles ≥ 44px : les contrôles compacts (`nv-btn--sm`, `nv-iconbtn`, `nv-switch`) gardent une zone de clic de 44px autour d'un visuel plus petit.
+- Cibles ≥ 44px : les contrôles compacts (`nv-btn--sm`, `nv-iconbtn`, `nv-close`, `nv-switch`) gardent une zone de clic de 44px autour d'un visuel plus petit.
 
 ## Correspondance avec shadcn/ui
 

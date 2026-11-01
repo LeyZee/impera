@@ -19,6 +19,8 @@ export interface Playground {
   run(call: (client: PlaygroundClient) => Promise<PlaygroundState>): Promise<boolean>;
   /** Shows an error from a call that returns no state (the comparison). */
   fail(code: PlaygroundErrorCode): void;
+  /** Asks the server for the state again, after it failed to answer. */
+  readonly retry: () => void;
   /** Switches to answers written in advance, when the server cannot be reached. */
   readonly switchToDemo: () => void;
 }
@@ -76,11 +78,16 @@ export function usePlayground(): Playground {
   return {
     client,
     state: query.data,
-    isLoading: query.isPending,
+    // A retry after an error loads again: the error gives way to the wait.
+    isLoading: query.isPending || query.isFetching,
     busy,
     error,
     run,
     fail: setError,
+    retry: () => {
+      setError(undefined);
+      void query.refetch();
+    },
     switchToDemo: () => {
       setError(undefined);
       setClient(demoClient());

@@ -3,13 +3,23 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createFfmpegMediaTools } from '../ffmpeg-media-tools';
+import { createFfmpegMediaTools, missingMediaBinaries } from '../ffmpeg-media-tools';
 
 const dir = mkdtempSync(join(tmpdir(), 'nirvana-ffmpeg-test-'));
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
+});
+
+// These tests run the real ffmpeg (a prerequisite, CLAUDE.md): say so plainly when it is not installed.
+beforeAll(async () => {
+  const missing = await missingMediaBinaries();
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.join(' et ')} ${missing.length > 1 ? 'absents' : 'absent'} du PATH : installe ffmpeg (il fournit aussi ffprobe), puis relance.`,
+    );
+  }
 });
 
 /** Synthetic media made on the fly: no real data. */

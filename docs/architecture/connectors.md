@@ -91,4 +91,4 @@ Contraintes MV3 à connaître : le service worker meurt après ~30 s d'inactivit
 
 ## FakeReveal
 
-Spécification : `docs/reference/fake-reveal.md`. `apps/api/test/fake-reveal/` : un serveur Fastify qui implémente les endpoints observés, avec des scénarios pilotables (`POST /__scenario`) : arrivée de messages à t+X, expiration de session, 429, 500, latence, conversation qui disparaît. Il sert aux tests de contrat (`connectors/__tests__/contract.test.ts` tourne contre `FakeConnector` et contre `RevealApiConnector`+FakeReveal), aux e2e Playwright, et au dev local sans compte Reveal.
+Spécification : `docs/reference/fake-reveal.md`. `apps/api/src/__tests__/fake-reveal/` : un serveur Fastify qui implémente les endpoints observés, avec des scénarios pilotables (`POST /__scenario`) : arrivée de messages à t+X, expiration de session, 429, 500, latence, conversation qui disparaît. Il sert aux tests de contrat (`connectors/__tests__/contract.test.ts` tourne contre `FakeConnector` et contre `RevealApiConnector`+FakeReveal), aux e2e Playwright, et au dev local sans compte Reveal.

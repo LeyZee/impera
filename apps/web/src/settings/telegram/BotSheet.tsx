@@ -1,5 +1,6 @@
 import type { TelegramBot, TelegramChat, TelegramTopic } from '@nirvana/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 import { ReauthRequired } from '../services/api';
 
@@ -7,6 +8,7 @@ import { Reauth } from './Reauth';
 import { addBot, fetchOverview, listen, replaceToken, saveRoutes, sendTest } from './api';
 import {
   initials,
+  knownChatIds,
   looksLikeToken,
   newChats,
   setTopicsOfChat,
@@ -20,6 +22,9 @@ export type SheetMode =
   { kind: 'add' } | { kind: 'listen'; bot: TelegramBot } | { kind: 'replace'; bot: TelegramBot };
 
 type Step = 1 | 2 | 3 | 4;
+
+/** The steps as the sheet's progress names them, as Sauvegardes names its own. */
+const STEP_TITLES: Record<Step, string> = { 1: 'Créer', 2: 'Jeton', 3: 'Groupe', 4: 'Messages' };
 
 const SHEET_TOPICS: readonly TelegramTopic[] = [
   'urgent',
@@ -52,8 +57,8 @@ export function BotSheet({
   const [bot, setBot] = useState<TelegramBot | null>(mode.kind === 'add' ? null : mode.bot);
   const [found, setFound] = useState<TelegramChat[]>([]);
   /** The groups the bot sat in before step 3: only a new one counts as found. */
-  const [known] = useState<ReadonlySet<string>>(
-    () => new Set(mode.kind === 'add' ? [] : mode.bot.chats.map((chat) => chat.id)),
+  const [known] = useState<ReadonlySet<string>>(() =>
+    mode.kind === 'add' ? new Set() : knownChatIds(mode.bot),
   );
   const lastStep: Step = mode.kind === 'replace' ? 2 : 4;
   const firstStep: Step = mode.kind === 'add' ? 1 : mode.kind === 'listen' ? 3 : 2;
@@ -64,19 +69,25 @@ export function BotSheet({
         {mode.kind === 'replace' ? (
           <span />
         ) : (
-          <div
-            className="tg-steps"
-            aria-label={`Étape ${String(step - firstStep + 1)} sur ${String(lastStep - firstStep + 1)}`}
-          >
+          <ol className="tg-steps" aria-label="Étapes">
             {([1, 2, 3, 4] as const)
-              .filter((n) => n >= firstStep)
+              .filter((n) => n >= firstStep && n <= lastStep)
               .map((n) => (
-                <i key={n} data-state={n === step ? 'on' : n < step ? 'done' : 'later'} />
+                <li
+                  key={n}
+                  data-state={n === step ? 'now' : n < step ? 'done' : 'later'}
+                  aria-current={n === step ? 'step' : undefined}
+                >
+                  <span className="tg-steps__num">{String(n - firstStep + 1)}</span>
+                  {STEP_TITLES[n]}
+                </li>
               ))}
-          </div>
+          </ol>
         )}
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onClose}>
-          Fermer
+        <button type="button" className="nv-close" aria-label="Fermer" onClick={onClose}>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="m4 4 8 8M12 4l-8 8" />
+          </svg>
         </button>
       </div>
       {step === 1 ? (
@@ -127,7 +138,9 @@ export function BotSheet({
 
 function CreateStep({ onNext }: { onNext: () => void }): JSX.Element {
   const [name, setName] = useState('Nirvana Alertes');
-  const username = suggestedUsername(name);
+  // The identifier follows the name the chip offers, the default one when the field is emptied.
+  const shownName = name.trim() === '' ? 'Nirvana Alertes' : name.trim();
+  const username = suggestedUsername(shownName);
   return (
     <>
       <h2 id="tg-sheet-title">Crée ton bot</h2>
@@ -151,7 +164,7 @@ function CreateStep({ onNext }: { onNext: () => void }): JSX.Element {
                 setName(event.target.value);
               }}
             />
-            <CopyChip value={name.trim() === '' ? 'Nirvana Alertes' : name.trim()} />
+            <CopyChip value={shownName} />
           </div>
         </li>
         <li>
@@ -675,7 +688,8 @@ function Scrim({ children, onClose }: { children: ReactNode; onClose: () => void
       window.removeEventListener('keydown', onKey);
     };
   }, []);
-  return (
+  // Portalled to <body>: an ancestor's transform or filter (the page's entrance) would otherwise trap the fixed scrim.
+  return createPortal(
     <div
       className="tg-scrim"
       onMouseDown={(event) => {
@@ -705,6 +719,7 @@ function Scrim({ children, onClose }: { children: ReactNode; onClose: () => void
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

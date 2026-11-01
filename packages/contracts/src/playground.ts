@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { BriefIntentSchema } from './brief';
 import { MediaDescriptionSchema } from './media';
 
 /**
@@ -98,7 +99,7 @@ export const PlaygroundAnswerSchema = z.object({
     .exactOptional(),
   brief: z
     .object({
-      intent: z.string(),
+      intent: BriefIntentSchema,
       sentiment: z.string(),
       risks: z.array(z.string()),
       action: z.string(),
@@ -108,7 +109,8 @@ export const PlaygroundAnswerSchema = z.object({
     .exactOptional(),
   model: z.string().exactOptional(),
   latencyMs: z.number().nonnegative(),
-  costUsd: z.number().nonnegative(),
+  /** The cost in euros, at the daily budget's rate (ADR 0011); the journal keeps dollars. */
+  costEur: z.number().nonnegative(),
   isFallback: z.boolean(),
   /** Why nothing was written: the models that failed, or the daily cap reached. */
   failure: z.string().exactOptional(),
@@ -132,6 +134,11 @@ export const PlaygroundRateSchema = z.object({
 export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
 
 export const PlaygroundStateSchema = z.object({
+  /**
+   * The persona the playground plays (`PLAYGROUND_PERSONA_PATH`, the demo's by default): its first name, so that a
+   * trainer never takes it for one of the agency's creators (recette 28/10, M13).
+   */
+  persona: z.object({ name: z.string().min(1) }),
   presets: z.array(PlaygroundPresetSchema),
   presetId: z.string().nullable(),
   situation: PlaygroundSituationSchema,
@@ -140,7 +147,10 @@ export const PlaygroundStateSchema = z.object({
   rate: PlaygroundRateSchema,
   version: AnswerVersionSchema,
   rejectReasons: z.array(z.object({ id: RejectReasonSchema, label: z.string() })),
-  sessionCostUsd: z.number().nonnegative(),
+  /** The session's cost in euros, at the daily budget's rate (ADR 0011). */
+  sessionCostEur: z.number().nonnegative(),
+  /** Whether a key reaches the voice model, main or fallback: without one, sending a message answers 503. */
+  voice: z.object({ reachable: z.boolean() }),
   /** The last answer, until it is rated. */
   pending: PlaygroundAnswerSchema.nullable(),
 });
@@ -151,7 +161,7 @@ export const PlaygroundComparisonSchema = z.object({
   violations: z.array(GuardViolationSchema),
   isBlocked: z.boolean(),
   model: z.string().exactOptional(),
-  costUsd: z.number().nonnegative(),
+  costEur: z.number().nonnegative(),
   failure: z.string().exactOptional(),
 });
 export type PlaygroundComparison = z.infer<typeof PlaygroundComparisonSchema>;

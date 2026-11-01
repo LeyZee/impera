@@ -1,8 +1,8 @@
 import type { TelegramNight } from '@/settings/telegram/NightBanner';
 
 /**
- * What the Dashboard shows, in the shape the screen needs: `GET /v1/dashboard` written in French (`live.ts`), or
- * the sample of this shape when the server does not answer, and the screen says « Exemple ».
+ * What the Dashboard shows, in the shape the screen needs: `GET /v1/dashboard` written in French (`live.ts`). Nothing
+ * stands in for it: before any creator, the screen asks for one (DASH-13).
  * Money is in euros, durations in minutes, rates in % (0 to 100).
  */
 
@@ -16,10 +16,7 @@ export const PERIODS: readonly { readonly id: Period; readonly label: string }[]
   { id: 'month', label: '30 jours' },
 ];
 
-/**
- * One line of « À traiter ». `conversationId` opens it in Suivi (the server's lines), else `fanId` opens the
- * reader (the sample's); without either, `where` says what to open instead.
- */
+/** One line of « À traiter »: it opens its conversation in Suivi. */
 export interface Todo {
   readonly id: string;
   readonly tone: Tone;
@@ -28,22 +25,32 @@ export interface Todo {
   readonly title: string;
   /** One sentence: why it waits for a human, and what the agent does meanwhile. */
   readonly why: string;
-  /** « 23:41 », creator's time. */
+  /** How long it has waited, « depuis 19 min » (DASH-11), amber past 10 min (`late`). */
+  readonly waiting: string;
+  readonly late: boolean;
+  /** « Reçu à 23 h 41 », her time: the exact hour, in the line's tip. */
   readonly at: string;
-  readonly fanId?: string;
-  readonly conversationId?: string;
-  readonly where?: string;
+  readonly conversationId: string;
 }
 
-/** One card of the « L'agent » fold. `rows` feed the tip; `gauge` is a spend or a rate against a mark. */
-interface AgentCard {
+/**
+ * One card of the « L'agent » fold: its value, one useful sentence under it (`sub`), the rest in its tip (`rows`,
+ * DASH-17). `gauge` is a spend or a rate against a mark.
+ */
+export interface AgentCard {
   readonly id: string;
   readonly tone: Tone;
   readonly title: string;
   readonly value: string;
+  readonly sub: string;
   readonly rows: readonly (readonly [label: string, value: string])[];
   /** A spend against its budget (neutral, amber from 70 %, neon from 90 %) or a rate against its target (tone). */
   readonly gauge?: { readonly kind: 'spend' | 'rate'; readonly value: number; readonly mark: number };
+  /**
+   * What the fold's title says when this card is the worst of the agent's health (DASH-06), or nothing when the card
+   * never darkens the fold: the handoffs to a human are the job, and the live rate is a goal, not a fault.
+   */
+  readonly alarm?: string;
 }
 
 export interface AgentState {
@@ -59,6 +66,13 @@ export interface AgentState {
   readonly stalled?: true;
   /** Where the action leads, when it is a page and not the first todo (« Poser la clé » › Réglages). */
   readonly actionTo?: '/reglages/modeles-ia';
+  /** The lead read by whoever cannot open `actionTo` (Réglages is the owner's alone): who does it, and where. */
+  readonly leadWithoutAction?: string;
+  /**
+   * The AI budget past its alert, in one sentence for the hero (« À 18,62 € sur 20 €, l’agent s’arrêtera bientôt. »,
+   * DASH-06); absent below it and for a creator, whose agency's spend is not hers.
+   */
+  readonly budgetNote?: string;
   /** The fold's title (« L'agent fonctionne normalement ») and its one-line summary. */
   readonly foldTitle: string;
   readonly foldSummary: string;
@@ -94,22 +108,15 @@ export interface Sales {
   readonly funnel: { readonly counts: readonly number[]; readonly before: readonly number[] };
 }
 
-interface Bubble {
-  readonly from: 'fan' | 'creator' | 'flag';
-  readonly text: string;
-}
-
 export interface Fan {
   readonly id: string;
   readonly name: string;
-  /** « abonné depuis 3 semaines · Nantes » */
+  /** The conversation of his latest purchase over the period: a click opens it in Suivi (DASH-14). */
+  readonly conversationId: string;
+  /** « depuis 3 semaines »: how long ago he first wrote. */
   readonly line: string;
   readonly spent: number;
   readonly byAgent: number;
-  /** What she knows about him (notes), and the alert that froze him, if any. */
-  readonly notes: readonly string[];
-  readonly alert?: string;
-  readonly thread: readonly Bubble[];
 }
 
 export interface Dashboard {
@@ -120,6 +127,11 @@ export interface Dashboard {
   readonly sales: Readonly<Record<Period, Sales>> | null;
   /** Best fans first. */
   readonly fans: readonly Fan[];
+  /**
+   * One discreet sentence under the best fans on how their dollars were counted: converted at an ECB day's rate, or
+   * left out for want of one (`usdNote`). Absent when no dollar sale falls in the period, and on sample data.
+   */
+  readonly usdNote?: string;
   /** Telegram's coverage of her night (`telegramNightOf`); absent on sample data. */
   readonly telegram?: TelegramNight;
 }

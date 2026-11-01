@@ -1,15 +1,24 @@
-import type { MediaDescription } from '@nirvana/contracts';
+import { desireBandOf, type DesireBand, type DesireSignal, type MediaDescription } from '@nirvana/contracts';
 import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from '@nirvana/llm';
 
 import {
   asSent,
   checkVoiceOutput,
   composeTurn,
+  followUpDecision,
+  guardContextOf,
   withExamples,
+  withoutOrders,
   isBlocked,
   type GuardSettings,
   type GuardViolation,
+  type FollowUpDecision,
+  measureDesire,
+  type DesireState,
+  type OfferInput,
+  type OfferLimits,
   type RatedMoment,
+  type SexualizationLimits,
   type Situation,
   type TrapAssessment,
 } from '../../agent/index';
@@ -28,6 +37,12 @@ export interface PlaygroundTurn {
   readonly latencyMs: number;
   readonly model?: string;
   readonly isFallback: boolean;
+  /** His desire score after this message, when it moved (P3-12): what the policy read. */
+  readonly desire?: {
+    readonly score: number;
+    readonly band: DesireBand;
+    readonly signals: readonly DesireSignal[];
+  };
 }
 
 /** The last answer and what it was written from: what a rating records, and what a comparison replays. */
@@ -37,6 +52,13 @@ interface PlaygroundExchange {
   readonly moment: RatedMoment;
   readonly voiceInput?: VoiceInput;
 }
+
+/** A follow-up asked with /relance: written, or why not (not due yet, her quiet hours, none left). */
+export type PlaygroundFollowUp =
+  | { readonly kind: 'written'; readonly step: number; readonly turn: PlaygroundTurn }
+  | { readonly kind: 'not_due'; readonly step: number; readonly dueAt: Date }
+  | { readonly kind: 'nothing_to_follow_up' }
+  | Exclude<FollowUpDecision, { readonly kind: 'write' }>;
 
 interface VoiceComparison {
   readonly bubbles: readonly string[];
@@ -61,6 +83,8 @@ export interface PlaygroundSession {
   setSituation(patch: Partial<Situation>): void;
   /** The simulated clock: tests follow-ups, day and night, the sexualisation delay. */
   advance(ms: number): void;
+  /** Her next follow-up on his silence, as `conversation.follow_up` would ask for it at the simulated time (P3-10). */
+  followUp(): Promise<PlaygroundFollowUp>;
   setFanNotes(notes: readonly string[]): void;
   reset(): void;
   readonly history: readonly ConversationTurn[];
@@ -80,6 +104,15 @@ export interface PlaygroundDeps {
   readonly voiceExamples?: readonly string[];
   readonly timeZone?: string;
   readonly now?: () => Date;
+  /**
+   * Her pace of scripts: with it, the simulated fan is an invented adult and the policy decides on each offer as
+   * for a real fan. Without it, she offers nothing.
+   */
+  readonly offerLimits?: OfferLimits;
+  /** When she goes sexual: the simulated fan starts with his age unknown and confirms it by stating it. */
+  readonly sexualizationLimits?: SexualizationLimits;
+  /** Her follow-ups (`PersonaForModels.followUps`): without them, she never follows up. */
+  readonly followUps?: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
 }
 
 /** Why nothing was written, for the trace: the daily cap, or each model that failed. */
@@ -105,6 +138,27 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     spentCents: 0,
   };
   let lastExchange: PlaygroundExchange | undefined;
+  // When the policy last let her offer, on the simulated clock: the cooldown is tested with `advance`.
+  let lastOfferAt: Date | null = null;
+  // His age, unknown until he states an adult one, as for a real fan (P3-09).
+  let ageConfirmedAt: Date | null = null;
+  // His last message on the simulated clock, and the follow-ups she wrote since: the next step is their count.
+  let lastFanAt: Date | null = null;
+  let followUpsSince = 0;
+  // His desire score as `conversations` would store it (P3-12), on the simulated clock.
+  let desire: DesireState | undefined;
+  // His score before each of his messages: a branch goes back to it.
+  const desireBefore: (DesireState | undefined)[] = [];
+  const offerAt = (now: Date): OfferInput | undefined =>
+    deps.offerLimits === undefined
+      ? undefined
+      : {
+          now,
+          lastOfferAt,
+          hasNoBudget: false,
+          flags: ageConfirmedAt === null ? {} : { ageConfirmedAt: ageConfirmedAt.toISOString() },
+          limits: deps.offerLimits,
+        };
 
   return {
     history,
@@ -120,6 +174,12 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       history.length = 0;
       fanNotes.length = 0;
       lastExchange = undefined;
+      lastOfferAt = null;
+      ageConfirmedAt = null;
+      lastFanAt = null;
+      followUpsSince = 0;
+      desire = undefined;
+      desireBefore.length = 0;
       situation = { ...situation, relationshipStartedAt: situation.now, spentCents: 0 };
     },
 
@@ -155,6 +215,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       const turn = history[index];
       if (turn === undefined) return undefined;
       history.splice(index);
+      desire = desireBefore[fanMessageNumber - 1];
+      desireBefore.length = fanMessageNumber - 1;
       lastExchange = undefined;
       return { text: turn.text, media: (turn.media ?? []).map((m) => m.description) };
     },
@@ -164,7 +226,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       if (input === undefined) return undefined;
       const voice = await gateway.voice(input);
       const written = voice.ok ? voice.value.output.bubbles : [];
-      const violations = checkVoiceOutput(written, deps.guardSettings);
+      const violations = checkVoiceOutput(written, deps.guardSettings, guardContextOf(input.history));
       const bubbles = asSent(written, deps.splitMessages);
       return {
         bubbles,
@@ -176,13 +238,24 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       };
     },
 
-    async handleFanMessage(text, media = []) {
-      history.push({ from: 'fan', text, media: media.map((description) => ({ description })) });
-      const moment: RatedMoment = {
-        history: [...history],
-        fanNotes: fanNotes.join('\n'),
-        situation,
-      };
+    async followUp() {
+      if (lastFanAt === null || history.at(-1)?.from !== 'creator') return { kind: 'nothing_to_follow_up' };
+      const delays = deps.followUps?.delaysHours ?? [];
+      const step = followUpsSince;
+      const hours = delays[step];
+      const silentMs = situation.now.getTime() - lastFanAt.getTime();
+      if (hours !== undefined && silentMs < hours * 3_600_000) {
+        return { kind: 'not_due', step, dueAt: new Date(lastFanAt.getTime() + hours * 3_600_000) };
+      }
+      // The simulated fan is an invented adult with no limit set: only the plan and her clock decide.
+      const decision = followUpDecision({
+        step,
+        steps: delays.length,
+        flags: {},
+        now: situation.now,
+        timeZone: situation.timeZone,
+      });
+      if (decision.kind !== 'write') return decision;
       const composed = await composeTurn(
         deps.gateway,
         {
@@ -191,10 +264,91 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
         },
-        { history: [...history], fanText: text, media, fanNotes: moment.fanNotes, situation },
+        {
+          history: [...history],
+          fanText: '',
+          media: [],
+          fanNotes: fanNotes.join('\n'),
+          situation,
+          followUp: { silentHours: silentMs / 3_600_000, spirit: deps.followUps?.spirit ?? null },
+        },
       );
+      if (!composed.isBlocked) {
+        history.push({ from: 'creator', text: composed.bubbles.join('\n') });
+        followUpsSince += 1;
+      }
+      lastExchange = undefined;
+      return {
+        kind: 'written',
+        step,
+        turn: {
+          ...(composed.brief !== undefined && { brief: composed.brief }),
+          bubbles: composed.bubbles,
+          ...(composed.voiceFailure !== undefined && { voiceFailure: failure(composed.voiceFailure) }),
+          violations: composed.violations,
+          isBlocked: composed.isBlocked,
+          costUsd: composed.costUsd,
+          latencyMs: composed.latencyMs,
+          ...(composed.model !== undefined && { model: composed.model }),
+          isFallback: composed.isFallback,
+        },
+      };
+    },
+
+    async handleFanMessage(text, media = []) {
+      lastFanAt = situation.now;
+      followUpsSince = 0;
+      desireBefore.push(desire);
+      history.push({ from: 'fan', text, media: media.map((description) => ({ description })) });
+      const moment: RatedMoment = {
+        history: [...history],
+        fanNotes: fanNotes.join('\n'),
+        situation,
+      };
+      const offer = offerAt(situation.now);
+      const composed = await composeTurn(
+        deps.gateway,
+        {
+          creatorName: deps.creatorName,
+          personaSheet,
+          guardSettings: deps.guardSettings,
+          ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
+        },
+        {
+          history: [...history],
+          fanText: text,
+          media,
+          fanNotes: moment.fanNotes,
+          situation,
+          ...(offer !== undefined && { offer }),
+          ...(deps.sexualizationLimits !== undefined && {
+            sexualization: {
+              limits: deps.sexualizationLimits,
+              ageConfirmed: ageConfirmedAt !== null,
+              noExplicit: false,
+            },
+          }),
+          desire: {
+            ...(desire !== undefined && { previous: desire }),
+            // No clock per message here: his reply speed is not measured.
+            measured: {
+              ...measureDesire(
+                history.map((t) => ({ fromFan: t.from === 'fan', text: t.text, at: situation.now })),
+              ),
+              replySeconds: null,
+            },
+            ageDisputed: false,
+            counted: false,
+          },
+        },
+      );
+      if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
+      if (composed.ageDeclared !== undefined && ageConfirmedAt === null) ageConfirmedAt = situation.now;
+      if (composed.voiceBrief?.action === 'offer' && !composed.isBlocked) {
+        lastOfferAt = situation.now;
+      }
       // In-memory fan notes until the fans module stores facts (P3-02).
-      for (const fact of composed.brief?.factsProposed ?? [])
+      for (const fact of withoutOrders(composed.brief?.factsProposed ?? []))
         fanNotes.push(`${fact.category} / ${fact.key} : ${fact.value} (${fact.kind})`);
       if (!composed.isBlocked) history.push({ from: 'creator', text: composed.bubbles.join('\n') });
 
@@ -211,6 +365,13 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         latencyMs: composed.latencyMs,
         ...(composed.model !== undefined && { model: composed.model }),
         isFallback: composed.isFallback,
+        ...(composed.desire !== undefined && {
+          desire: {
+            score: composed.desire.score,
+            band: desireBandOf(composed.desire.score),
+            signals: composed.desire.signals,
+          },
+        }),
       };
       lastExchange = {
         fanMessage: text,

@@ -11,10 +11,22 @@ import {
   type ReactNode,
 } from 'react';
 
-import { hasChange, isPlaceholder, issuesOf, matchOptions, togglePick, type FieldIssue } from './model';
+import {
+  appendPick,
+  hasChange,
+  isPlaceholder,
+  issuesOf,
+  matchOptions,
+  togglePick,
+  type FieldIssue,
+} from './model';
 
 /** What an empty text field says, and what a placeholder of the example (`<à remplir>`) shows as. */
 const TO_FILL = 'À remplir';
+
+/** An example in an empty field reads as one, « Ex. : … », never as a value already typed (REG-17). */
+const placeholderOf = (placeholder: string | undefined, example: string | undefined): string =>
+  example === undefined ? (placeholder ?? TO_FILL) : `Ex. : ${example}`;
 
 /**
  * The controls of the persona form, all on the design-system classes: a field with its label and its errors,
@@ -50,10 +62,13 @@ export function Field({
   path,
   children,
   id,
+  labelHidden = false,
 }: {
   label: string;
   hint?: ReactNode;
   code?: boolean;
+  /** The block's title already says it (« Infos en plus », « Mots-clés »): read aloud, not shown twice (CREA-17). */
+  labelHidden?: boolean;
   /** Where the field sits in the persona (`strategies.kyc.max_messages`): its errors and changes come from there. */
   path?: string;
   children: ReactNode;
@@ -70,7 +85,7 @@ export function Field({
       data-invalid={first === undefined ? undefined : 'true'}
       data-changed={changed ? 'true' : undefined}
     >
-      <div className="ps-field__head">
+      <div className={labelHidden ? 'sr-only' : 'ps-field__head'}>
         <span className="ps-changed" aria-hidden="true" />
         {id === undefined ? (
           <span className="nv-field__label">{label}</span>
@@ -101,25 +116,32 @@ export function TextInput({
   onChange,
   maxLength,
   placeholder,
+  example,
   type = 'text',
   list,
+  invalid = false,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   maxLength?: number;
   placeholder?: string;
+  /** What one could write, shown « Ex. : … » in the empty field. */
+  example?: string;
   type?: 'text' | 'date';
   list?: string;
+  /** Refused as it stands, so that a screen reader says so on the control itself. */
+  invalid?: boolean;
 }): JSX.Element {
   return (
     <input
       id={id}
       type={type}
+      aria-invalid={invalid ? true : undefined}
       className="nv-glass nv-field__control ps-input"
       value={isPlaceholder(value) ? '' : value}
       maxLength={maxLength}
-      placeholder={placeholder ?? TO_FILL}
+      placeholder={placeholderOf(placeholder, example)}
       list={list}
       onChange={(event) => {
         onChange(event.target.value);
@@ -135,6 +157,8 @@ export function TextArea({
   maxLength,
   rows = 3,
   placeholder,
+  example,
+  invalid = false,
 }: {
   id: string;
   value: string;
@@ -142,6 +166,10 @@ export function TextArea({
   maxLength: number;
   rows?: number;
   placeholder?: string;
+  /** What one could write, shown « Ex. : … » in the empty field. */
+  example?: string;
+  /** Refused as it stands, even when the message is said under another field. */
+  invalid?: boolean;
 }): JSX.Element {
   const shown = isPlaceholder(value) ? '' : value;
   return (
@@ -152,7 +180,8 @@ export function TextArea({
         value={shown}
         rows={rows}
         maxLength={maxLength}
-        placeholder={placeholder ?? TO_FILL}
+        aria-invalid={invalid ? true : undefined}
+        placeholder={placeholderOf(placeholder, example)}
         onChange={(event) => {
           onChange(event.target.value);
         }}
@@ -380,7 +409,8 @@ export function SwitchRow({
 
 /**
  * A list of short entries (hobbies, pet names, keywords): Entrée or a comma adds, × removes, a double is refused
- * here already (the schema refuses it too). Placeholders of the example are not shown; the first real entry replaces them.
+ * here already (the schema refuses it too), and so is an entry with nothing `keyOf` keeps (« !!! » as a keyword);
+ * the refusal is said in words, not only in colour. Placeholders of the example are not shown; the first real entry replaces them.
  */
 export function Entries({
   id,
@@ -388,23 +418,30 @@ export function Entries({
   onChange,
   placeholder,
   maxLength,
+  keyOf = (value) => value.toLocaleLowerCase('fr'),
 }: {
   id: string;
   values: readonly string[];
   onChange: (values: string[]) => void;
   placeholder: string;
   maxLength: number;
+  /** What two entries share when they count as the same one: their case by default. */
+  keyOf?: (value: string) => string;
 }): JSX.Element {
   const [text, setText] = useState('');
-  const [refused, setRefused] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   const shown = values.filter((v) => !isPlaceholder(v));
 
   const add = (): void => {
     const entry = text.trim();
     if (entry === '') return;
-    if (values.some((v) => v.toLocaleLowerCase('fr') === entry.toLocaleLowerCase('fr'))) {
-      setRefused(true);
+    if (keyOf(entry) === '') {
+      setRefusal('Il faut au moins une lettre ou un chiffre.');
+      return;
+    }
+    if (values.some((v) => keyOf(v) === keyOf(entry))) {
+      setRefusal('Déjà dans la liste.');
       return;
     }
     onChange([...shown, entry]);
@@ -421,36 +458,46 @@ export function Entries({
   };
 
   return (
-    <div className="nv-glass nv-field__control ps-entries" data-refused={refused ? 'true' : undefined}>
-      {shown.map((value, index) => (
-        <span key={`${value}-${String(index)}`} className="ps-entry">
-          <span className="ps-entry__text">{value}</span>
-          <button
-            type="button"
-            className="ps-entry__remove"
-            aria-label={`Retirer ${value}`}
-            onClick={() => {
-              onChange(shown.filter((_, i) => i !== index));
-            }}
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      <input
-        id={id}
-        className="ps-entries__input"
-        value={text}
-        maxLength={maxLength}
-        placeholder={placeholder}
-        onChange={(event) => {
-          setText(event.target.value);
-          setRefused(false);
-        }}
-        onKeyDown={onKey}
-        onBlur={add}
-      />
-    </div>
+    <>
+      <div
+        className="nv-glass nv-field__control ps-entries"
+        data-refused={refusal === null ? undefined : 'true'}
+      >
+        {shown.map((value, index) => (
+          <span key={`${value}-${String(index)}`} className="ps-entry">
+            <span className="ps-entry__text">{value}</span>
+            <button
+              type="button"
+              className="ps-entry__remove"
+              aria-label={`Retirer ${value}`}
+              onClick={() => {
+                onChange(shown.filter((_, i) => i !== index));
+              }}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          id={id}
+          className="ps-entries__input"
+          value={text}
+          maxLength={maxLength}
+          placeholder={placeholder}
+          aria-invalid={refusal === null ? undefined : true}
+          aria-describedby={refusal === null ? undefined : `${id}-refusal`}
+          onChange={(event) => {
+            setText(event.target.value);
+            setRefusal(null);
+          }}
+          onKeyDown={onKey}
+          onBlur={add}
+        />
+      </div>
+      <p id={`${id}-refusal`} className="ps-hint" role="status" hidden={refusal === null}>
+        {refusal}
+      </p>
+    </>
   );
 }
 
@@ -466,6 +513,7 @@ export function Picker<V extends string>({
   label,
   placeholder,
   empty,
+  keepOrder = false,
 }: {
   id: string;
   options: Options<V>;
@@ -475,6 +523,8 @@ export function Picker<V extends string>({
   placeholder: string;
   /** Said when typing matches nothing. */
   empty: string;
+  /** Her order means something: a new pick goes last instead of taking its place in the options. */
+  keepOrder?: boolean;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -486,7 +536,7 @@ export function Picker<V extends string>({
   const shown = matchOptions(options, text);
   const labelOf = (v: V): string => options.find((o) => o.value === v)?.label ?? v;
   const toggle = (v: V): void => {
-    onChange(togglePick(options, values, v));
+    onChange(keepOrder ? appendPick(values, v) : togglePick(options, values, v));
     setText('');
     setActive(0);
   };
@@ -611,12 +661,18 @@ export function Fold({
   title: string;
   summary: string;
   children: ReactNode;
-  /** Forced open while it holds an error; otherwise the reader opens it. */
+  /** Opened when it comes to hold an error; never closed by it: only the reader folds it again. */
   open?: boolean | undefined;
   code?: boolean;
 }): JSX.Element {
+  // Not a controlled `open`: React would remove the attribute, and fold the block under the typing, the moment the
+  // error clears (recette 28/10, a « 40 » saved as 4).
+  const ref = useRef<HTMLDetailsElement>(null);
+  useLayoutEffect(() => {
+    if (open === true && ref.current !== null) ref.current.open = true;
+  }, [open]);
   return (
-    <details className="nv-disclosure ps-fold" open={open}>
+    <details className="nv-disclosure ps-fold" ref={ref}>
       <summary>
         <span className="nv-disclosure__title">{title}</span>
         {code ? <CodeTag /> : null}

@@ -2,7 +2,7 @@
 
 Pour : Charles, sur son PC. Durée : **45 min la première fois** (5 de préparation, 30 de navigation, 10 d'export et d'anonymisation), **10 min** pour la deuxième capture, un autre jour. Pourquoi : Reveal n'a pas d'API publique ; le connecteur s'écrit d'après ce que le site web de Reveal échange avec ses serveurs. Ce qu'on cherche : `docs/reference/reveal-connector-inventory.md`.
 
-Cette méthode utilise les outils de développement de Chrome (fichier HAR). L'enregistreur de l'extension (fiche P1-01) la remplacera pour les captures suivantes et la détection des changements d'API.
+Version courte, une page : `reveal-capture-express.md`. Cette méthode utilise les outils de développement de Chrome (fichier HAR). L'enregistreur de l'extension (fiche P1-01) la remplacera pour les captures suivantes et la détection des changements d'API.
 
 ## Les règles
 

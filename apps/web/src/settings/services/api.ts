@@ -43,7 +43,7 @@ const ERROR_MESSAGES: Record<ServicesErrorKind, string> = {
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
   forbidden: 'Seul le compte propriétaire peut gérer les clés.',
   rate_limited: 'Trop d’essais. Attends une minute avant de réessayer.',
-  unavailable: 'Nirvana ne répond pas. Réessaie dans un instant.',
+  unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
 };
 
 export class ServicesError extends Error {
@@ -59,6 +59,11 @@ export class ServicesError extends Error {
 /** The one French sentence the page shows for a failed call. */
 export function describeError(error: unknown): string {
   return ERROR_MESSAGES[error instanceof ServicesError ? error.kind : 'unavailable'];
+}
+
+/** A member who is not the owner (403 `role_forbidden`): retrying changes nothing. */
+export function isForbidden(error: unknown): boolean {
+  return error instanceof ServicesError && error.kind === 'forbidden';
 }
 
 /** A 401 somewhere on the page: the only way out is to sign in again (`window.location.reload()`). */
@@ -106,7 +111,7 @@ async function call(path: string, init: RequestInit = {}): Promise<Response> {
   throw new ServicesError('unavailable', detail);
 }
 
-/** An answer the contract refuses reads as « Nirvana ne répond pas », like any answer the page cannot use. */
+/** An answer the contract refuses reads as « Le serveur ne répond pas », like any answer the page cannot use. */
 async function parsed<T>(response: Response, parse: (body: unknown) => T): Promise<T> {
   try {
     return parse(await response.json());

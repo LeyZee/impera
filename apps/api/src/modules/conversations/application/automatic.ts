@@ -27,6 +27,7 @@ export async function readAutomaticLock(
   const reading = liveRate(await tx.automatic.decided(voice));
   const blindTest = await tx.automatic.latestBlindTest(voice);
   const gate = automaticGate({
+    personaActive: await tx.automatic.personaActive(),
     reading,
     blindTestPassed: blindTest !== null && blindTest >= BLIND_TEST_TARGET * 10,
   });

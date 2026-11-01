@@ -21,6 +21,11 @@ const PERMISSION_LABELS: Readonly<Record<string, string>> = {
   text_to_speech: 'Text to Speech',
 };
 
+/** « de » before a company name, elided before a vowel: « d’ElevenLabs », « de Google ». */
+function fromVendor(vendor: string): string {
+  return /^[aeiouyàâéèêëîïôöùûü]/i.test(vendor) ? `d’${vendor}` : `de ${vendor}`;
+}
+
 export function describeRefusal(
   provider: AiProvider,
   kind: ProviderErrorKind,
@@ -33,8 +38,8 @@ export function describeRefusal(
     case 'wrong_provider': {
       const owner = details.belongsTo === undefined ? undefined : profileOf(details.belongsTo);
       return owner === undefined
-        ? `Cette clé ne vient pas de ${vendor}.`
-        : `Cette clé vient de ${owner.vendor} : elle va dans ${owner.service}.`;
+        ? `Cette clé ne vient pas ${fromVendor(vendor)}.`
+        : `Cette clé vient ${fromVendor(owner.vendor)} : elle va dans ${owner.service}.`;
     }
     case 'unauthorized':
       return `${vendor} ne reconnaît pas cette clé. Vérifie qu’elle est copiée en entier.`;
@@ -113,7 +118,8 @@ export function describeVoiceAccount(
       {
         label: 'Voix',
         value:
-          voice?.name ?? 'Aucune voix clonée trouvée. Crée la voix de Messa dans ElevenLabs, puis reviens.',
+          voice?.name ??
+          'Aucune voix clonée trouvée. Crée la voix de la créatrice dans ElevenLabs, puis reviens.',
       },
     ],
   };

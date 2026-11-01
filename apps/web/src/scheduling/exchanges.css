@@ -1,0 +1,458 @@
+/*
+ * Leaves and swaps (ADR 0031): the chatter's answers, leaves and swaps around their Planning, the requests to decide
+ * and the swaps around Équipe › Planning. Design-system tokens only; amber says what waits on someone, never red.
+ */
+
+/* ── Shared ── */
+/* The body of « Mon planning »: its sections one under the other, from the top. */
+.sc-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sc-section__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 650;
+}
+.sc-optional {
+  margin-left: var(--nv-space-1);
+  font-weight: 500;
+  color: var(--nv-ink-faint);
+}
+.sc-note {
+  resize: vertical;
+  min-height: 64px;
+}
+.sc-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  margin: 0;
+}
+.sc-skeleton--short {
+  padding: 0;
+}
+.sc-skeleton--short i {
+  height: 52px;
+}
+.sc-leave__sum {
+  margin-top: calc(var(--nv-space-2) * -1);
+}
+
+/* The colleague to ask, then what comes back: cards that light when picked. */
+.sc-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.sc-option {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  width: 100%;
+  min-height: var(--nv-target-min);
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.sc-option:hover:not(:disabled) {
+  background: var(--nv-plate-hover);
+}
+.sc-option:active:not(:disabled) {
+  transform: scale(0.985);
+  transition-duration: var(--nv-dur-instant);
+}
+.sc-option:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.sc-option[aria-checked='true'] {
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-muted);
+}
+.sc-option:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.sc-option__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sc-option__title {
+  font-weight: 650;
+}
+.sc-option__sub {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+/* A swap: who, which shift or two, the word that came with it. */
+.sc-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-card:hover {
+  background: var(--nv-plate-hover);
+}
+.sc-card[data-over='true'] {
+  opacity: 0.72;
+}
+.sc-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.sc-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.sc-card__title {
+  margin: 0;
+  font-weight: 650;
+}
+.sc-card__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.sc-card__line {
+  display: grid;
+  grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-card__line dt {
+  color: var(--nv-ink-faint);
+}
+.sc-card__line dd {
+  margin: 0;
+  color: var(--nv-ink);
+}
+.sc-card__quote {
+  margin: 0;
+  padding-left: var(--nv-space-3);
+  border-left: 2px solid var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  font-style: italic;
+}
+.sc-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+/* ── The chatter's Planning ── */
+.sc-answers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  max-width: 820px;
+  margin-bottom: var(--nv-space-5);
+}
+.sc-said {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.sc-said--info {
+  color: var(--nv-ink-muted);
+}
+.sc-said--warn {
+  color: var(--nv-warning);
+}
+.sc-away {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-away__one {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: 36px;
+  padding: 0 var(--nv-space-3);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  font-size: var(--nv-text-footnote);
+}
+.sc-away__one[data-status='pending'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 34%, transparent);
+}
+.sc-away__one svg,
+.sc-onleave__icon,
+.sc-mine__swap svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sc-away__what {
+  font-weight: 650;
+}
+.sc-away__when {
+  color: var(--nv-ink-muted);
+}
+/* A proposal waiting for its answer is a normal state, not a warning (EQ-20). */
+.sc-mine__offer {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.sc-mine__swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--nv-target-min);
+  padding: 0 var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  text-decoration: none;
+  opacity: 0.6;
+  transition:
+    opacity var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-mine__shift:hover .sc-mine__swap,
+.sc-mine__swap:focus-visible {
+  opacity: 1;
+}
+.sc-mine__swap:hover:not(:disabled) {
+  background: var(--nv-plate-hover);
+  text-decoration: none;
+}
+@media (hover: none) {
+  .sc-mine__swap {
+    opacity: 1;
+  }
+}
+.sc-folds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  max-width: 820px;
+  margin-top: var(--nv-space-6);
+}
+.sc-fold {
+  overflow: hidden;
+}
+.sc-fold.nv-disclosure > summary {
+  min-height: 52px;
+  padding: 0 var(--nv-space-5);
+}
+.sc-fold > .nv-disclosure__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-2) var(--nv-space-4) var(--nv-space-4);
+}
+
+/* A list of rows: a leave, a request to decide. */
+.sc-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  padding: var(--nv-space-3) var(--nv-space-1);
+  border-top: 1px solid var(--nv-hairline);
+}
+.sc-row:first-child {
+  border-top: 0;
+}
+.sc-row[data-over='true'] {
+  opacity: 0.62;
+}
+.sc-row__main {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.sc-row__title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--nv-space-2);
+  margin: 0;
+  font-weight: 650;
+}
+.sc-row__aside {
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+}
+.sc-row__sub,
+.sc-row__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.sc-row__note {
+  align-self: center;
+}
+.sc-row__side {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.sc-row__side .sc-link {
+  font-size: var(--nv-text-footnote);
+}
+.sc-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+/* ── Équipe › Planning ── */
+/* The requests to decide, folded to one line until opened (EQ-02): the name of each requester in the summary. */
+.sc-decide > summary .nv-disclosure__title {
+  color: var(--nv-warning);
+}
+.sc-row--leave {
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+  border-radius: var(--nv-radius-sm);
+}
+.sc-row--leave:hover {
+  background: var(--nv-plate-hover);
+}
+.sc-inline-warn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+/* What could not be read above the page's body. */
+.sc-unread {
+  margin-bottom: var(--nv-space-4);
+}
+.sc-refuse {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-2);
+}
+.sc-refuse .sc-row__actions {
+  justify-content: flex-start;
+}
+.sc-onleave {
+  flex-direction: row;
+}
+.sc-onleave__confirm {
+  flex-basis: 100%;
+  max-width: 560px;
+}
+/* A shift a leave's approval found in its way: an amber ring on the grid, steady, never blinking. */
+.sc-chip[data-flagged='true'],
+.sc-chip[data-flagged='true']:hover {
+  box-shadow:
+    inset 3px 0 0 var(--sc-color),
+    0 0 0 2px var(--nv-warning);
+}
+
+@media (max-width: 520px) {
+  .sc-card {
+    padding: var(--nv-space-4);
+  }
+  .sc-card__line {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .sc-mine__shift[data-actions='true'] .sc-mine__swap {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+    margin-left: calc(var(--nv-space-2) * -1);
+  }
+  /* On a phone the summary goes under the title, whole, rather than cut. */
+  .sc-fold.nv-disclosure > summary {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding: var(--nv-space-3) var(--nv-space-4);
+  }
+  .sc-fold .nv-disclosure__title {
+    flex: 1;
+    min-width: 0;
+  }
+  .sc-fold.nv-disclosure > summary::after {
+    order: 2;
+  }
+  .sc-fold .nv-disclosure__sum {
+    order: 3;
+    flex-basis: 100%;
+    text-align: left;
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-option,
+  .sc-card,
+  .sc-row--leave,
+  .sc-mine__swap {
+    transition: none;
+  }
+  .sc-option:active:not(:disabled) {
+    transform: none;
+  }
+}

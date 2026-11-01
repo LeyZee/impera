@@ -49,6 +49,8 @@ export const FactCategorySchema = z.enum([
   'commercial',
   'intimate',
   'events',
+  /** A chatter's note, written when they give the conversation back (`release`); never proposed by a model. */
+  'operator_note',
 ]);
 export type FactCategory = z.infer<typeof FactCategorySchema>;
 

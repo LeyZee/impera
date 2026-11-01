@@ -9,6 +9,7 @@ src/
 ├── worker-runner.ts      Graphile Worker : tâches, heartbeat, arrêt borné
 ├── server.ts             Fastify : plugins, erreurs, /health, /ready, /v1
 ├── config.ts             process.env validé par Zod
+├── validation-messages.ts  messages de Zod en français (API et worker)
 ├── logger.ts             pino partagé (redaction), pont vers les logs Graphile
 ├── jobs.ts               file de jobs typée et defineTask (payload validé)
 ├── crontab.ts            jobs périodiques Graphile (poll, reconcile, purge)

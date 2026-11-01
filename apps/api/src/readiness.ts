@@ -34,17 +34,46 @@ async function within<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 /**
- * Jobs Graphile gave up on that concern one creator: hers (payload `creatorId`) and the ones of no creator
- * (cron, dispatch), which stop her too. `null` when the count could not be read in time.
+ * A given-up job of no creator (cron tick, scan) counts this long, then no more: the next tick has redone its work, and
+ * nothing ever deletes the row (recette 28/10). A creator's own given-up job counts until it is dealt with.
  */
-export function countDeadJobs(adminDb: Database, creatorId: string): Promise<number | null> {
+const SYSTEM_DEAD_JOB_HOURS = 24;
+
+/** A job no worker task takes is stuck once it has waited this long: it never spends an attempt. */
+const ORPHAN_AFTER_MINUTES = 15;
+
+/**
+ * Stuck jobs that concern one creator: hers (payload `creatorId`) and the ones of no creator (cron, dispatch),
+ * which stop her too. Stuck is given up on (attempts spent), or due for `ORPHAN_AFTER_MINUTES` under a name
+ * the worker has no task for (`handledTasks`): Graphile leaves those in the queue forever. `null` when the
+ * count could not be read in time.
+ */
+export function countDeadJobs(
+  adminDb: Database,
+  creatorId: string,
+  handledTasks: readonly string[],
+): Promise<number | null> {
+  // `not in (null)` is never true: without a task list, no job counts as orphaned.
+  const handled =
+    handledTasks.length === 0
+      ? sql`null`
+      : sql.join(
+          handledTasks.map((task) => sql`${task}`),
+          sql`, `,
+        );
   return within(
     adminDb
       .execute<{ dead: number }>(
-        // The public `jobs` view has no payload: the table behind it does.
-        sql`select count(*)::int as dead from graphile_worker._private_jobs
-            where attempts >= max_attempts
-              and (payload->>'creatorId' is null or payload->>'creatorId' = ${creatorId})`,
+        // The public `jobs` view has no payload: the tables behind it do.
+        sql`select count(*)::int as dead
+            from graphile_worker._private_jobs job
+            join graphile_worker._private_tasks task on task.id = job.task_id
+            where ((job.attempts >= job.max_attempts
+                    and (job.payload->>'creatorId' is not null
+                         or job.updated_at > now() - make_interval(hours => ${SYSTEM_DEAD_JOB_HOURS})))
+                or (task.identifier not in (${handled}) and job.locked_at is null
+                    and job.run_at < now() - make_interval(mins => ${ORPHAN_AFTER_MINUTES})))
+              and (job.payload->>'creatorId' is null or job.payload->>'creatorId' = ${creatorId})`,
       )
       .then((result) => result.rows[0]?.dead ?? null),
     null,
@@ -77,7 +106,10 @@ export async function checkReadiness(db: Database, adminDb: Database): Promise<R
     within(
       adminDb
         .execute<{ dead: number }>(
-          sql`select count(*)::int as dead from graphile_worker.jobs where attempts >= max_attempts`,
+          sql`select count(*)::int as dead from graphile_worker._private_jobs
+              where attempts >= max_attempts
+                and (payload->>'creatorId' is not null
+                     or updated_at > now() - make_interval(hours => ${SYSTEM_DEAD_JOB_HOURS}))`,
         )
         .then((result) => result.rows[0]?.dead ?? null),
       null,

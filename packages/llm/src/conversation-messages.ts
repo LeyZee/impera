@@ -1,6 +1,6 @@
 import type { ModelMessage } from 'ai';
 
-import type { ConversationTurn, TurnMedia } from './gateway-types';
+import type { BrainAlert, ConversationTurn, TurnMedia } from './gateway-types';
 import type { Brief } from './schemas';
 import { wrapUntrusted } from './untrusted';
 
@@ -71,4 +71,13 @@ export function notesBlock(fanNotes: string): string {
   return fanNotes.trim() === ''
     ? 'Rien pour l’instant : c’est le début de votre relation.'
     : wrapUntrusted('fan_notes', fanNotes);
+}
+
+/**
+ * Her alerts for the brain (P4-01): each id beside its phrase, the phrase in a typed block like any text the code
+ * did not write itself; none, the brain is told so and answers none.
+ */
+export function alertsBlock(alerts: readonly BrainAlert[]): string {
+  if (alerts.length === 0) return 'Aucune : ne rends pas `alertsSeen`.';
+  return alerts.map((alert) => `${alert.id} :\n${wrapUntrusted('creator_alert', alert.phrase)}`).join('\n');
 }

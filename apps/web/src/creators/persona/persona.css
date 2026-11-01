@@ -1,21 +1,57 @@
 /*
  * Créatrices › Persona. Built on the design-system tokens and nv-* classes; only what the package has no class for
- * lives here, prefixed `ps-`. Head and panel are glass; the controls on them are tints, never a second glass.
+ * lives here, prefixed `ps-`. Head and panel are content, so plates (`nv-plate`), never glass: glass is kept for
+ * what floats (the tabs, the list a picker unfolds). Neon only on the one action, « Enregistrer une version »;
+ * what needs fixing is amber, like every warning.
  */
 
 .ps-page {
-  max-width: 760px;
+  /* Aligned on the large title, like every page: the eye goes down one edge. The stage scrolls, not the page. */
+  max-width: 820px;
   width: 100%;
   min-width: 0;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--nv-hairline) transparent;
   padding-bottom: var(--nv-space-6);
+}
+/* Créatrices: the switch, the confirmation to leave and the sheet, one child of the page, in reading order. */
+.ps-sheet {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-4);
+}
+.ps-sheet > .ps-page {
+  align-self: stretch;
+}
+/* Bounded by the sheet and set right above its head, not across the page (CREA-07). */
+.ps-leave {
+  align-self: stretch;
+  max-width: 820px;
+  margin: 0;
+}
+/* A phone: the creators on one line that scrolls, its far edge fading, instead of rows of chips (CREA-19). */
+@media (max-width: 640px) {
+  .cr-creators {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    padding-right: 32px;
+  }
+  .cr-creators::-webkit-scrollbar {
+    display: none;
+  }
+  .cr-creators > .nv-chip {
+    flex: none;
+  }
+}
+.ps-head__state:empty {
+  display: none;
 }
 .ps-muted {
   margin: 0;
@@ -39,7 +75,7 @@
 /* While loading: the shapes of the page, breathing, so nothing jumps when it arrives. */
 .ps-skeleton {
   min-height: 150px;
-  animation: ps-skeleton 1.6s var(--nv-ease-out) infinite;
+  animation: ps-skeleton var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
 }
 .ps-skeleton--tall {
   min-height: 420px;
@@ -60,13 +96,14 @@
   min-width: 0;
   flex: 1 1 260px;
 }
+/* Under her name, in retreat: the number and the date are Geist with tabular figures, never the code face. */
 .ps-head__meta {
-  margin: 0 0 4px;
+  margin: 4px 0 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  font-family: var(--nv-font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-faint);
@@ -114,15 +151,15 @@
   }
 }
 
-/* A field changed since the saved version: a small neon dot before its label (and on its tab). */
+/* A field changed since the saved version: a small ink dot before its label (and on its tab). Neutral: a change
+   is neither the action nor an urgency. */
 .ps-changed {
   flex: none;
   width: 0;
   height: 6px;
   margin-right: -8px;
   border-radius: 99px;
-  background: var(--nv-neon);
-  box-shadow: 0 0 8px var(--nv-neon);
+  background: var(--nv-ink-muted);
   opacity: 0;
   transform: scale(0);
   transition:
@@ -172,19 +209,79 @@
 
 /* ── Tabs ── */
 .ps-tabs {
+  position: relative;
   flex: none;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  min-width: 0;
 }
+/* Bounded by the sheet: past its width, the bar scrolls inside itself, never past the panel. */
 .ps-tabs__bar {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
 .ps-tabs__bar::-webkit-scrollbar {
   display: none;
 }
-.ps-tabs__item {
+/* More tabs past an edge: that edge fades instead of cutting a tab in two, and a chevron sits on it (CREA-01). */
+.ps-tabs[data-more='end'] .ps-tabs__bar {
+  mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
+}
+.ps-tabs[data-more='start'] .ps-tabs__bar {
+  mask-image: linear-gradient(to left, #000 calc(100% - 64px), transparent);
+}
+.ps-tabs[data-more='both'] .ps-tabs__bar {
+  mask-image: linear-gradient(to right, transparent, #000 64px, #000 calc(100% - 64px), transparent);
+}
+.ps-tabs__more {
+  --_radius: var(--nv-radius-full);
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  margin-top: -17px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: var(--nv-ink);
+  cursor: pointer;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-spring);
+}
+.ps-tabs__more[data-side='start'] {
+  left: 0;
+}
+.ps-tabs__more[data-side='end'] {
+  right: 0;
+}
+.ps-tabs__more:hover {
+  transform: scale(1.06);
+}
+.ps-tabs__more:active {
+  transform: scale(0.94);
+}
+.ps-tabs__chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: translateX(-2px) rotate(-45deg);
+}
+.ps-tabs__more[data-side='start'] .ps-tabs__chevron {
+  transform: translateX(2px) rotate(135deg);
+}
+/* A hidden tab holds fields to fix: its amber count rides on the chevron that leads to it. */
+.ps-tabs__more .ps-tabs__alert {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--nv-warning);
+  color: var(--nv-void);
+}
+.ps-tabs__bar .ps-tabs__item {
   appearance: none;
   border: 0;
   margin: 0;
@@ -195,6 +292,13 @@
   cursor: pointer;
   white-space: nowrap;
   flex: none;
+  /* Tighter than the shell's sub-nav: the eight tabs hold on one line in the sheet's 820 px (CREA-01). */
+  padding: 0 11px;
+}
+/* What is left to fix counts in amber: the shell's neon count is for what waits on someone. */
+.ps-tabs__item .nv-subnav__count {
+  background: var(--nv-warning);
+  color: var(--nv-void);
 }
 .ps-tabs__item[aria-selected='true'] {
   color: var(--nv-ink);
@@ -238,8 +342,18 @@
 .ps-block:first-child {
   border-top: 0;
 }
-.ps-block > .nv-eyebrow {
-  margin-bottom: -4px;
+/* A block's title: a heading in ink, above the labels of its fields, never weaker than them (CREA-17). */
+.ps-block__title {
+  margin: 0 0 -4px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+  color: var(--nv-ink);
 }
 .ps-lead {
   margin: 0;
@@ -276,6 +390,16 @@
 .ps-coded > .ps-grid {
   align-self: stretch;
 }
+/* « Limites de temps · Règle stricte »: the mark joined to a title, never alone above a grid (CREA-08). */
+.ps-coded__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
 
 /* ── Fields ── */
 .ps-field {
@@ -304,19 +428,18 @@
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
-  color: var(--nv-danger);
+  color: var(--nv-warning);
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
 .ps-error::before {
-  content: '! ';
+  content: '!\202F';
 }
-.ps-field[data-invalid='true'] .nv-field__control {
-  box-shadow:
-    var(--nv-shadow-glass),
-    inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 70%, transparent);
+.ps-field[data-invalid='true'] .nv-field__control,
+.ps-input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
 }
 .ps-input:hover:not(:focus) {
-  background-color: var(--nv-glass-fill-strong);
+  background-color: var(--nv-select);
 }
 .ps-input[type='date'] {
   color-scheme: dark;
@@ -338,7 +461,7 @@
   position: absolute;
   right: 12px;
   bottom: 7px;
-  font-family: var(--nv-font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--nv-text-caption);
   color: var(--nv-ink-faint);
   pointer-events: none;
@@ -373,7 +496,7 @@
   margin: 0;
   background: none;
   outline: none;
-  font-family: var(--nv-font-mono);
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
   font-size: var(--nv-text-body);
   color: var(--nv-ink);
@@ -423,7 +546,7 @@
 }
 .ps-step:hover:not(:disabled) {
   color: var(--nv-ink);
-  background: var(--nv-glass-fill-strong);
+  background: var(--nv-select);
 }
 .ps-step:active:not(:disabled) {
   transform: scale(0.88);
@@ -500,15 +623,29 @@
   font-weight: 600;
 }
 
-/* A value set elsewhere, shown as a field that does not take input. */
-.ps-static.nv-field__control {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 44px;
-  padding: 0 14px;
+/* A value set elsewhere: a line of text, never a field that looks typeable but is not (CREA-27). */
+.ps-static-line {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  color: var(--nv-ink);
   font-variant-numeric: tabular-nums;
+}
+.ps-link {
+  color: var(--nv-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--nv-ink-faint);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.ps-link:hover {
+  text-decoration-color: currentColor;
+}
+.ps-link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* A list of entries: removable tints in a field. */
@@ -521,7 +658,10 @@
   cursor: text;
 }
 .ps-entries:focus-within {
-  box-shadow: var(--nv-shadow-glass), var(--nv-shadow-focus);
+  background: var(--nv-select);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-plate-edge),
+    var(--nv-shadow-focus);
 }
 .ps-entries[data-refused='true'] {
   animation: ps-shake var(--nv-dur-slow) var(--nv-ease-spring);
@@ -562,14 +702,14 @@
   height: 28px;
   padding: 0 4px 0 11px;
   border-radius: var(--nv-radius-full);
-  background: var(--nv-glass-fill-strong);
+  background: var(--nv-select-strong);
   font-size: var(--nv-text-footnote);
   font-weight: 600;
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-spring) both;
   transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
 }
 .ps-entry:hover {
-  background: var(--nv-neon-soft);
+  background: color-mix(in srgb, var(--nv-ink) 22%, transparent);
 }
 .ps-entry__text {
   min-width: 0;
@@ -645,7 +785,11 @@
 .ps-fold__body {
   gap: 16px;
 }
-.ps-panel > .ps-fold {
+/* The panel's fields sit in a fieldset that only disables them (read-only): it draws no box of its own. */
+.ps-fieldset {
+  display: contents;
+}
+.ps-fieldset > .ps-fold {
   margin-top: 6px;
   padding-top: 10px;
   border-top: 1px solid var(--nv-hairline);
@@ -659,9 +803,6 @@
   .ps-panel {
     padding-left: 16px;
     padding-right: 16px;
-  }
-  .ps-tabs {
-    justify-content: flex-start;
   }
   .ps-fold > summary .ps-code {
     display: none;
@@ -743,7 +884,7 @@
     outline-color var(--nv-dur-fast) var(--nv-ease-out);
 }
 .ps-picker__option[aria-selected='true'] .ps-picker__check {
-  background: var(--nv-neon-solid);
+  background: var(--nv-ink);
   outline-color: transparent;
 }
 .ps-picker__option[aria-selected='true'] .ps-picker__check::after {
@@ -753,8 +894,8 @@
   top: 2px;
   width: 4px;
   height: 9px;
-  border-right: 2px solid var(--nv-on-neon);
-  border-bottom: 2px solid var(--nv-on-neon);
+  border-right: 2px solid var(--nv-void);
+  border-bottom: 2px solid var(--nv-void);
   transform: rotate(45deg);
   animation: nv-enter var(--nv-dur-fast) var(--nv-ease-spring) both;
 }
@@ -764,9 +905,149 @@
   font-size: var(--nv-text-footnote);
 }
 
+/* ── Elle en détail (CREA-02): the five P5-01 blocks, each folded; the block's own lead opens its body. ── */
+.ps-in-depth__lead {
+  padding: 14px 0 6px;
+}
+.ps-in-depth__body > .ps-block:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+/* ── Completion (P5-01): how much of her the agent can read. Neutral: a share, not a warning nor an action. ── */
+.ps-completion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--nv-hairline);
+}
+.ps-completion__line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.ps-completion__percent {
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.ps-completion__gauge {
+  display: block;
+  flex: 1 1 auto;
+  max-width: 240px;
+  margin-left: 6px;
+}
+.ps-completion__missing {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+.ps-completion__missing > .ps-muted {
+  display: inline;
+  margin-right: 4px;
+}
+/* A block still to write, as a word of the sentence: it opens its tab. */
+.ps-completion__block {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--nv-hairline);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: text-decoration-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.ps-completion__block:hover {
+  text-decoration-color: currentColor;
+}
+.ps-completion__block:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Sample replies: the fields, then the bubble as a fan would read it. ── */
+.ps-replies {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ps-reply {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  grid-template-areas:
+    'fields preview'
+    'remove preview';
+  gap: 10px 18px;
+  padding: 16px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.ps-reply__fields {
+  grid-area: fields;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.ps-reply__preview {
+  grid-area: preview;
+  align-self: center;
+  min-width: 0;
+}
+.ps-reply > .nv-btn {
+  grid-area: remove;
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .ps-reply {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'fields'
+      'preview'
+      'remove';
+  }
+  /* A phone: the summary of a fold goes under its title, on two lines at most, instead of cut short (CREA-26). */
+  .ps-fold > summary {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .ps-fold > summary > .nv-disclosure__title {
+    margin-right: auto;
+  }
+  .ps-fold > summary > .nv-disclosure__sum {
+    order: 1;
+    flex: 1 1 100%;
+    text-align: left;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ps-panel,
   .ps-reveal,
+  .ps-reply,
   .ps-error,
   .ps-entry,
   .ps-picker__list,
@@ -780,4 +1061,9 @@
   .ps-changed {
     transition: none;
   }
+}
+
+/* A zone chosen by city (CREA-27). */
+.ps-select {
+  cursor: pointer;
 }

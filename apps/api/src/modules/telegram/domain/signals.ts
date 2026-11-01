@@ -1,9 +1,13 @@
 import type {
+  AlertRef,
   AutomaticMissing,
   ConversationId,
   CreatorId,
   HandoffCause,
+  InvoiceKind,
+  InvoiceNotIssuedReason,
   KillSwitchScope,
+  PayPeriod,
   TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -18,6 +22,8 @@ export type Signal =
       readonly conversationId: ConversationId | null;
       /** `null` for an event written before the cause existed (#54): it ranks as important. */
       readonly cause: HandoffCause | null;
+      /** The alert of hers that paused the agent (P4-01), named in the message; absent for any other cause. */
+      readonly alert?: AlertRef;
     }
   | {
       readonly kind: 'takeover';
@@ -47,9 +53,42 @@ export type Signal =
       readonly reason: string;
     }
   | {
+      /**
+       * One of her alerts lets a human know while the agent goes on (`alert_triggered`, P4-01): which alert, never
+       * what the fan wrote. An alert that pauses the agent is a `handoff` instead.
+       */
+      readonly kind: 'alert';
+      readonly conversationId: ConversationId;
+      readonly alert: AlertRef;
+    }
+  | {
       /** A message of the agent will never leave (last attempt, or refused): the conversation is in `error`. */
       readonly kind: 'send_failed';
       readonly conversationId: ConversationId | null;
+    }
+  | {
+      /** No export of the database succeeded for 26 hours (ADR 0028 § 5); null when none ever did. */
+      readonly kind: 'backup_overdue';
+      readonly lastSucceededAt: Date | null;
+    }
+  | {
+      /**
+       * No ECB rate of a currency pay converts for more than two weekdays (ADR 0033); `lastRateDay` is the ECB's day
+       * of the last one, null when none ever came.
+       */
+      readonly kind: 'exchange_rate_overdue';
+      readonly currency: string;
+      readonly lastRateDay: string | null;
+    }
+  | {
+      /**
+       * A document a validated statement made due was not issued (EQ-06, ADR 0036): only its period, its kind and the
+       * closed reason; never the member nor the amount.
+       */
+      readonly kind: 'invoice_not_issued';
+      readonly period: PayPeriod;
+      readonly document: InvoiceKind;
+      readonly reason: InvoiceNotIssuedReason;
     }
   | {
       /** Automatique closed on its own (ADR 0019): its conversations went back to the copilot. */
@@ -73,6 +112,11 @@ export interface Notice {
   readonly topic: TelegramTopic;
   /** Lets a later event close the message (a takeover, a recovery); null when nothing ever will. */
   readonly threadKey: string | null;
+  /**
+   * Where the message goes when no group can get `topic`: a fan paused by one of her alerts is told to the
+   * important groups rather than to nobody (P4-01).
+   */
+  readonly fallbackTopic?: TelegramTopic;
   readonly title: string;
   readonly body: string;
   readonly link: { readonly label: string; readonly path: string } | null;

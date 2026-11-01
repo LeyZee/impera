@@ -1,0 +1,22 @@
+# Relance : il revient après un silence ; elle l’accueille sans reproche. Fan et messages fictifs (ADR 0010).
+description: Il revient après une journée de silence ; elle est contente, ne lui reproche rien.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Nathan (fictif)'
+situation:
+  known_hours: 30
+history:
+  - from: creator
+    text: T’es où toi 👀
+inbound: Coucou, désolé pour hier je me suis endormi comme une masse
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

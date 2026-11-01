@@ -1,0 +1,50 @@
+# Rendered by the nginx image at start (envsubst on ${API_UPSTREAM}). The only public entry of a deployment:
+# Coolify's proxy → this server → the API, which therefore runs with TRUST_PROXY_HOPS=2.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    # Docker's embedded DNS, read at each request: nginx starts even while the API is still booting.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $api http://${API_UPSTREAM};
+
+    # Security headers on the app's files only: under /v1 the API sets its own (helmet), never twice.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /v1/ {
+        proxy_pass $api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        # Same ceiling as the API's body limit (1 MiB): a larger body never leaves the proxy.
+        client_max_body_size 1m;
+        proxy_read_timeout 90s;
+    }
+
+    # Hashed by Vite: cached for a year.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options nosniff always;
+        try_files $uri =404;
+    }
+
+    # The router lives in the browser: any other path gets the app, never cached so a deployment shows at once.
+    location / {
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy no-referrer always;
+        add_header X-Frame-Options DENY always;
+        # Scripts, fonts, images and API calls from this origin only; no inline script, no frame, no plugin.
+        # Inline styles stay allowed: React sets `style` attributes, which only 'unsafe-inline' lets through
+        # everywhere (style-src-attr is not in every Safari the team uses).
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'" always;
+        try_files $uri $uri/ /index.html;
+    }
+}

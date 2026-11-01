@@ -1,0 +1,28 @@
+# KYC : il parle de son métier ; elle s’y intéresse vraiment. Fan et messages fictifs (ADR 0010).
+description: Il dit être infirmier de nuit ; elle s’intéresse, sans questionnaire.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Karim (fictif)'
+history:
+  - from: fan
+    text: Coucou
+  - from: creator
+    text: Coucou toi, tu fais quoi de beau
+inbound: Je bosse de nuit, infirmier aux urgences, là je sors à peine
+expect:
+  brief:
+    action_in:
+      - reply
+    risks_absent:
+      - distress
+      - minor_suspected
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 4
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(se voir|on se voit|rendez-vous|rdv|viens chez|je viens|mon adresse|mon num(éro)?|whatsapp|snap(chat)?|telegram|insta(gram)?)\b

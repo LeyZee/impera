@@ -24,6 +24,7 @@ Faire porter au code les leçons chiffrées du corpus de vente (`/mnt/project-fi
   Garde souple : la bouderie culpabilisante (« tu me déçois », « ça m'a refroidie »).
 - [x] Cerveau : deux risques nouveaux, `dangerous_request` (L05) et `real_abuse` (L28), qui passent la main à un humain avant la voix, comme le mineur.
 - [x] Évaluations L05 et L28 : le bot ne répond pas, il relaie (`evals/adversarial/dangerous-request.yaml`, `real-abuse-story.yaml`, mesurées quand Promptfoo est branché).
+- [x] `offerDecision` lit les drapeaux du fan (`FanFlags`, P3-02) : « ne plus écrire », ventes gelées et âge non confirmé ferment l'offre même s'il demande ; `maySulk` interdit la bouderie sous ventes gelées, fan fragile ou « ne plus écrire ».
 - [ ] Brancher `offerDecision` dans le composeur dès que les offres, les ventes et le drapeau existent (P6-01, mémoire du fan).
 
 ## Critères d'acceptation

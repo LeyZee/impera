@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dayPart, describeSituation, localTime, nextLocalTime } from '../situation';
+import { dayPart, describeSituation, isNight, localTime, nextLocalTime } from '../situation';
 
 describe('situation', () => {
   it('reads her time in her own time zone', () => {
@@ -25,10 +25,25 @@ describe('situation', () => {
   });
 
   it('calls night from 22:00 to 06:59', () => {
-    expect(dayPart(22)).toBe('night');
-    expect(dayPart(3)).toBe('night');
-    expect(dayPart(7)).toBe('day');
-    expect(dayPart(21)).toBe('day');
+    expect(dayPart(22 * 60)).toBe('night');
+    expect(dayPart(3 * 60)).toBe('night');
+    expect(dayPart(6 * 60 + 59)).toBe('night');
+    expect(dayPart(7 * 60)).toBe('day');
+    expect(dayPart(21 * 60 + 59)).toBe('day');
+  });
+
+  it('reads her night from her hours (P3-14)', () => {
+    // 21:30 in Paris: day by default, night when hers starts at 21:00.
+    const moment = {
+      now: new Date('2026-10-27T20:30:00Z'),
+      timeZone: 'Europe/Paris',
+      relationshipStartedAt: new Date('2026-10-20T20:30:00Z'),
+      spentCents: 0,
+    };
+    expect(isNight(moment)).toBe(false);
+    const night = { startMinute: 21 * 60, endMinute: 6 * 60 };
+    expect(isNight({ ...moment, night })).toBe(true);
+    expect(describeSituation({ ...moment, night })).toContain('(nuit)');
   });
 
   it('writes the moment as facts: time, day or night, how long, what he spent', () => {

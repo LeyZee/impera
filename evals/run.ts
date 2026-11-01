@@ -1,8 +1,10 @@
 /**
  * `pnpm evals`: the nightly quality gate (docs/playbooks/write-an-eval.md). It is red until it really
  * measures something: an empty suite, a suite below `min_scenarios` or a missing key never passes, so a
- * nightly run cannot look green while testing nothing. Promptfoo will run the scenarios once they land.
+ * nightly run cannot look green while testing nothing. Then the scenarios run through the real agent path
+ * (`apps/api/src/scripts/evals.ts`), where the agent's code lives.
  */
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -31,5 +33,12 @@ if (process.env['LLM_XAI_API_KEY'] === undefined || process.env['LLM_XAI_API_KEY
   console.error('evals: no LLM_XAI_API_KEY in the environment, nothing can be measured.');
   process.exit(1);
 }
-console.error(`evals ${tier}: ${String(found)} scenarios found, but the Promptfoo runner is not wired yet.`);
-process.exit(1);
+const args = [
+  '--filter',
+  '@nirvana/api',
+  'run',
+  'evals',
+  ...process.argv.slice(2).filter((arg) => arg !== '--'),
+];
+const run = spawnSync('pnpm', args, { stdio: 'inherit' });
+process.exit(run.status ?? 1);

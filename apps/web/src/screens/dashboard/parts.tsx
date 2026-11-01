@@ -169,22 +169,6 @@ export function Chevron({ className }: { className: string }): JSX.Element {
   );
 }
 
-export function CheckIcon(): JSX.Element {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M5 12.5l4.5 4.5L19 7.5" />
-    </svg>
-  );
-}
-
 /** A section of the screen: an eyebrow title, its one-line reading guide, and an optional control. */
 export function Section({
   title,

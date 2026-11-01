@@ -95,6 +95,7 @@ export function toStatus(
       source,
       keyLabel: null,
       verifiedAt: null,
+      isUnreadable: false,
       message:
         source === 'environment' ? 'Clé lue depuis l’environnement de développement' : profile.withoutIt,
       facts: [],
@@ -114,6 +115,7 @@ export function toStatus(
     source,
     keyLabel: stored.keyLabel,
     verifiedAt: stored.verifiedAt.toISOString(),
+    isUnreadable: stored.key === null,
     message,
     facts: [...stored.facts],
     settings: stored.settings,

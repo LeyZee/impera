@@ -14,13 +14,13 @@
   animation: nv-enter var(--nv-dur-slow) var(--nv-ease-spring) both;
 }
 .pg > :nth-child(2) {
-  animation-delay: 40ms;
+  animation-delay: var(--nv-stagger);
 }
 .pg > :nth-child(3) {
-  animation-delay: 80ms;
+  animation-delay: calc(2 * var(--nv-stagger));
 }
 .pg > :nth-child(4) {
-  animation-delay: 120ms;
+  animation-delay: calc(3 * var(--nv-stagger));
 }
 .pg-loading {
   --_radius: var(--nv-radius-xl);
@@ -66,9 +66,6 @@
 .pg-rate--warn {
   --_c: var(--nv-warning);
 }
-.pg-rate--bad {
-  --_c: var(--nv-neon-ink);
-}
 .pg-rate__v {
   min-width: 2.9em;
   font:
@@ -93,12 +90,17 @@
   line-height: 14px;
   color: var(--nv-ink-muted);
 }
+/* A rise is said in bold ink, a fall in amber: red is for urgencies, success for a verified send. */
 .pg-rate__d b {
-  color: var(--nv-success);
+  color: var(--nv-ink);
   font-weight: 600;
 }
 .pg-rate__d b.is-down {
-  color: var(--nv-danger);
+  color: var(--nv-warning);
+}
+/* Before the first rating the dash stays quiet: the line under it says how the rate starts. */
+.pg-rate__v.is-empty {
+  color: var(--nv-ink-faint);
 }
 .pg-meter {
   position: relative;
@@ -112,7 +114,7 @@
   inset: 0 auto 0 0;
   border-radius: 99px;
   background: var(--_c);
-  transition: width 520ms var(--nv-ease-spring);
+  transition: width var(--nv-dur-morph) var(--nv-ease-spring);
 }
 .pg-meter b {
   position: absolute;
@@ -140,7 +142,8 @@
   font-size: 11px;
   color: var(--nv-ink-muted);
 }
-.pg-demo {
+.pg-demo,
+.pg-key {
   padding: 3px 9px;
   border-radius: 99px;
   font-size: 11px;
@@ -149,8 +152,18 @@
   background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
   cursor: help;
 }
+.pg-key {
+  text-decoration: none;
+  cursor: pointer;
+}
+.pg-key:hover {
+  background: color-mix(in srgb, var(--nv-warning) 22%, transparent);
+}
 
 /* ── Situation: the fan stays in view, the rest folds to one line each ── */
+.pg-setup__h {
+  display: none;
+}
 .pg-setup {
   --_radius: var(--nv-radius-xl);
   min-height: 0;
@@ -179,11 +192,12 @@
   gap: 10px;
   padding: 12px 12px 12px 14px;
   border-radius: 18px;
-  background: var(--nv-neon-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-neon) 40%, transparent);
+  /* The fan being played is a selection: neutral light, not neon. */
+  background: var(--nv-select);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
 }
 .pg-fan__now:hover {
-  background: color-mix(in srgb, var(--nv-neon) 18%, transparent);
+  background: var(--nv-select-strong);
 }
 .pg-fan__t {
   flex: 1;
@@ -206,7 +220,7 @@
   flex: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--nv-neon-ink);
+  color: var(--nv-ink-muted);
 }
 .pg-fan__list {
   display: flex;
@@ -227,6 +241,20 @@
   font-weight: 600;
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
+.pg-fan__opt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pg-fan__opt:hover:not(:disabled) {
+  background: var(--nv-select);
+}
+.pg-fan__optt {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 400;
+  color: var(--nv-ink-muted);
+}
 .pg-fan__opt:disabled {
   cursor: default;
   opacity: 0.5;
@@ -238,6 +266,14 @@
 .pg-fold > summary {
   margin: 4px 0;
   padding: 0 8px 0 10px;
+}
+/* The column is narrow: a summary takes two lines rather than cutting « relation de 3 j » in half. */
+.pg-fold .nv-disclosure__sum {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .pg-fold .nv-disclosure__body {
   padding: 4px 10px 16px;
@@ -269,8 +305,9 @@
 .pg-input:focus,
 .pg-edit textarea:focus {
   outline: none;
+  background: var(--nv-select);
   box-shadow:
-    inset 0 0 0 1px var(--nv-neon),
+    inset 0 0 0 1px var(--nv-plate-edge),
     var(--nv-shadow-focus);
 }
 .pg-spent {
@@ -401,6 +438,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.pg-top__rate,
+.pg-top__fan,
+.pg-top__persona,
+.pg-top__btn svg {
+  display: none;
+}
+.pg-top__btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .pg-thread {
   padding: 18px;
 }
@@ -449,11 +501,14 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--nv-neon-ink);
+  color: var(--nv-ink-muted);
+}
+.pg-empty__key {
+  margin-top: 14px;
 }
 .pg-empty__go:hover {
-  background: var(--nv-glass-fill-strong);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-neon) 45%, transparent);
+  background: var(--nv-select-strong);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
 }
 .pg-m {
   position: relative;
@@ -537,16 +592,33 @@
   text-decoration-color: color-mix(in srgb, var(--nv-danger) 70%, transparent);
 }
 .pg-blockr {
+  max-width: 88%;
+  text-align: right;
+  color: var(--nv-danger);
+}
+.nv-bubble--draft.is-set-aside {
+  color: var(--nv-ink-faint);
+  background: transparent;
+  outline-color: var(--nv-hairline);
+  text-decoration: line-through;
+  text-decoration-color: var(--nv-ink-faint);
+}
+.pg-verdict {
   font-size: 12px;
   font-weight: 600;
-  color: var(--nv-danger);
+  color: var(--nv-ink-muted);
+}
+/* The trainer's note under the reason, which decides the destination. */
+.pg-verdict__note {
+  display: block;
+  font-weight: 400;
 }
 .pg-gest {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  animation: nv-shell-rise 360ms var(--nv-ease-spring) both;
+  animation: nv-shell-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
 }
 .pg-gest .nv-kbd {
   margin-left: 4px;
@@ -629,6 +701,18 @@
   color: var(--nv-ink);
   background: color-mix(in srgb, var(--nv-danger) 14%, transparent);
 }
+.pg-error.is-warn {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+}
+/* TRAIN-07: where the lesson went, until the next message. */
+.pg-ack {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--nv-ink-muted);
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
 .pg-dock {
   display: flex;
   flex-direction: column;
@@ -643,7 +727,7 @@
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 12px 10px 14px;
-  animation: nv-shell-rise 380ms var(--nv-ease-spring) both;
+  animation: nv-shell-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
 }
 .pg-lesson__q {
   flex: 1;
@@ -687,7 +771,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width 420ms var(--nv-ease-spring);
+  transition: width var(--nv-dur-morph) var(--nv-ease-spring);
 }
 .pg-why[data-open='true'] {
   width: 340px;
@@ -812,13 +896,13 @@
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
 .pg-why[data-open='true'] .pg-why__sec:nth-child(2) {
-  animation-delay: 30ms;
+  animation-delay: var(--nv-stagger);
 }
 .pg-why[data-open='true'] .pg-why__sec:nth-child(3) {
-  animation-delay: 60ms;
+  animation-delay: calc(2 * var(--nv-stagger));
 }
 .pg-why[data-open='true'] .pg-why__sec:nth-child(n + 4) {
-  animation-delay: 90ms;
+  animation-delay: calc(3 * var(--nv-stagger));
 }
 .pg-why__b {
   font-size: 14px;
@@ -898,22 +982,84 @@
     bottom: 0;
   }
 }
-/* Phone: one column, the conversation first. */
+/*
+ * Phone: one column. The conversation fills the screen above the tab bar, composer at its foot, as in Messages;
+ * the explanation, the fan and the rate come under it, in the column's own scroll.
+ */
 @media (max-width: 820px) {
   .pg {
+    container-type: size;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
     grid-template-columns: minmax(0, 1fr);
+    /* max-content: the column's height is fixed, so auto rows would never grow past their minimum. */
+    grid-template-rows: none;
+    grid-auto-rows: max-content;
+    align-content: start;
   }
   .pg-main {
     order: 1;
-    min-height: 72vh;
+    height: 100cqh;
+  }
+  .pg-top {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 10px 10px 10px 14px;
+  }
+  .pg-top__t {
+    flex-basis: 0;
+  }
+  .pg-top .nv-btn {
+    padding-inline: 10px;
+  }
+  .pg-top__t b {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The rate in short and the situation behind « Fan »; Comparer and Recommencer as icons. */
+  .pg-top__rate {
+    display: inline-flex;
+    flex: none;
+    padding: 3px 9px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--nv-ink-muted);
+    background: var(--nv-glass-fill-strong);
+  }
+  .pg-top__fan {
+    display: inline-flex;
+  }
+  /* The bar is hidden on a phone: the header names the persona the answers speak as. */
+  .pg-top__t .pg-top__persona {
+    display: block;
+  }
+  .pg-top .pg-top__btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+  .pg-top__btn svg {
+    display: block;
+  }
+  .pg-top__btn span {
+    display: none;
   }
   .pg-why {
     order: 2;
     width: auto;
   }
+  /* The medium rule lays the open panel over columns 2 to 4: on one column that would make new columns. */
   .pg-why[data-open='true'] {
     position: static;
     width: auto;
+    grid-column: auto;
+    grid-row: auto;
   }
   .pg-why__rail {
     flex-direction: row;
@@ -929,11 +1075,33 @@
   .pg-why__empty {
     width: auto;
   }
-  .pg-setup {
-    order: 3;
-  }
-  .pg-bar__sp {
+  /* The situation is a sheet over the conversation, opened from « Fan »; the rate sits in the header. */
+  .pg-setup,
+  .pg-bar {
     display: none;
+  }
+  .pg-setup.is-sheet {
+    position: absolute;
+    z-index: 8;
+    top: 18cqh;
+    left: 0;
+    right: 0;
+    max-height: 82cqh;
+    display: flex;
+    animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+  }
+  .pg-setup.is-sheet .pg-setup__h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 0 20px;
+    font-size: 15px;
+  }
+  .pg-setup.is-sheet .nv-scroll {
+    min-height: 0;
+  }
+  .pg-setup.is-sheet .pg-fan__opt {
+    min-height: 44px;
   }
   .pg-duo {
     grid-template-columns: minmax(0, 1fr);
@@ -947,6 +1115,17 @@
     position: static;
     align-self: flex-end;
   }
+  /* One « Rejouer d'ici », on his last message: a pill on each of them is noise on a small screen. */
+  .pg-m__re:not(.is-last) {
+    display: none;
+  }
+}
+
+/* No keyboard under a finger: the gestures' key hints go. */
+@media (hover: none), (max-width: 820px) {
+  .pg-gest .nv-kbd {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -955,7 +1134,9 @@
   .pg > *,
   .pg-empty,
   .pg-fan__opt,
-  .pg-why__sec {
+  .pg-why__sec,
+  .pg-ack,
+  .pg-setup.is-sheet {
     animation: none;
   }
   .pg-why,
@@ -972,4 +1153,10 @@
 }
 .pg-loading__in p {
   margin: 0;
+}
+.pg-loading__in .pg-loading__t {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+  color: var(--nv-ink);
 }

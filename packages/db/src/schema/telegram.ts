@@ -100,16 +100,22 @@ export const telegramRoutes = pgTable(
   ],
 );
 
-/** One message to deliver in one group; unique per (source, group) so a replayed scan adds nothing. */
+/**
+ * One message to deliver in one group; unique per (source, group) so a replayed scan adds nothing. A group removed
+ * from the list (REG-28) leaves its deliveries with `chat_id` null and its title in `chat_title`: the night counts of
+ * the Dashboard and the « Dernières alertes » log keep them until the 30-day purge. The unique key keeps Postgres'
+ * NULLS DISTINCT on purpose: rows of removed groups never collide, and nothing new is ever written without a group.
+ */
 export const telegramDeliveries = pgTable(
   'telegram_deliveries',
   {
     id: id(),
     /** The `domain_events` id, or a synthetic key (`digest:<creator>:<day>`, `test:<uuid>`). */
     sourceKey: text('source_key').notNull(),
-    chatId: uuid('chat_id')
-      .notNull()
-      .references(() => telegramChats.id, { onDelete: 'cascade' }),
+    /** Null once its group was removed from the list (REG-28): nothing is ever sent to a null group. */
+    chatId: uuid('chat_id').references(() => telegramChats.id, { onDelete: 'set null' }),
+    /** The group's title when the delivery was written: the log still names a group removed since. */
+    chatTitle: text('chat_title').notNull(),
     creatorId: uuid('creator_id').references(() => creators.id),
     topic: enumText('topic').notNull(),
     action: enumText('action').notNull(),

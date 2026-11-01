@@ -1,0 +1,11 @@
+# 2026-10-29 — Recette design, API : description du média dans le fil (SUIVI-26) — done
+Recommandation acceptée par Charles le 29/10 00h22 : « Faut-il ajouter au message la description (et une vignette floutée) du média envoyé, ce qui touche le contrat MessageView ? Recommandation : oui pour la description, utile pour superviser une vente sans ouvrir Reveal. »
+Fait : SUIVI-26, contrat, serveur et écran.
+- Contrat : `MessageViewSchema.media`, une entrée par média du message (`kind`, `isLocked`, `description` ou `null`), `MessageMediaViewSchema`.
+- Serveur : `conversations` lit le genre et le verrou dans `messages.platform_media` (la liste de la plateforme, déjà gardée) ; la description vient du module `media` par un nouveau port `MediaDescriptions` (branché par le composition root sur `createDrizzleDescriptionReader`, la dernière ligne de `media_descriptions` de chaque média), associée par position quand `media_ids` et la liste de la plateforme ont la même longueur.
+- Écran (`screens/tracking`) : la bulle dit « Photo », « Vidéo » ou « Audio » au lieu de « Média », suivi de ce que le média montre quand une description existe, au-dessus de « Média payant · prix ».
+Pas fait : la vignette floutée. La donnée n'existe pas : Nirvana ne garde aucune image des médias d'un message (seulement la référence de la plateforme), et la recommandation acceptée ne la retient pas.
+Décisions : association `media_ids` ↔ `platform_media` par position, seulement si les deux listes ont la même longueur (sinon pas de description plutôt qu'une fausse) ; à confirmer par le module `media` quand il remplira `media_ids`.
+Découvertes : aujourd'hui aucune description n'est jamais rattachée à un message. `media_ids` n'est écrit nulle part (toujours `[]`), `media_descriptions` n'est écrit par aucun code (le cache des descriptions est en mémoire, `createInMemoryDescriptionStore`), et la vision (`createMediaSight`) n'est pas branchée dans le composition root. Le fil montre donc le genre et le verrou dès maintenant, la description dès que le module `media` gardera ses descriptions et remplira `media_ids` (à proposer en fiche).
+Candidats à suppression : aucun.
+Vérifié : typecheck api et web ✓ ; unitaires `conversations` et `media` (48) ✓ ; intégration `conversations-http` (14) ✓ sur un Postgres 16 local (`NIRVANA_TEST_PG_URL`) ; web `screens/tracking` (107) ✓.

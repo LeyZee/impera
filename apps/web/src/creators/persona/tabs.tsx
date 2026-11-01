@@ -1,11 +1,14 @@
 import {
   ADDITIONAL_INFO_MAX,
   ageOn,
+  DESIRE_BAND_FLOORS,
+  KycSlotSchema,
   PERSONA_BOUNDS,
   PERSONA_OPTIONS,
   type Persona,
   type PersonaStrategies,
 } from '@nirvana/contracts';
+import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import {
@@ -22,65 +25,85 @@ import {
   TextInput,
 } from './fields';
 import {
+  collectOrAll,
+  desireHint,
   followUpsSummary,
   hoursLabel,
   issuesOf,
+  localDay,
   localTime,
   minutesLabel,
   nudgesSummary,
   physiqueSummary,
   strategySummaries,
+  type BlockId,
   type FieldIssue,
-  type TabId,
 } from './model';
+
+import { cityOf } from '@/scheduling/time';
 
 /**
  * One component per tab, in OnlyChat's order. Each edits its own section of the draft; the numbers the policy
- * enforces carry « Règle stricte », the rest feeds the prompt. Nothing here decides: the schema does.
+ * enforces carry « Règle stricte », the rest feeds the prompt. Nothing here decides: the schema does. The mark is
+ * said once per group (CREA-08): on the title of the block or of the fold that holds the rules, never on each field.
  */
 
-export interface TabProps<K extends TabId> {
+export interface TabProps<K extends BlockId> {
   readonly value: Persona[K];
   readonly onChange: (value: Persona[K]) => void;
   readonly issues: readonly FieldIssue[];
 }
 
-/** Empty text is « not given » (null) for the optional fields of the schema. */
-const orNull = (text: string): string | null => (text === '' ? null : text);
+/** Empty text, or only spaces, is « not given » (null) for the optional fields of the schema. */
+export const orNull = (text: string): string | null => (text.trim() === '' ? null : text);
 
-/** Numbers the policy enforces, side by side: one mark for the group instead of one per field. */
-function Coded({ children }: { children: ReactNode }): JSX.Element {
+/** Numbers the policy enforces, side by side, under one title that carries the mark for the group. */
+function Coded({ title, children }: { title: string; children: ReactNode }): JSX.Element {
   return (
     <div className="ps-coded">
-      <CodeTag />
+      <p className="ps-coded__title">
+        {title}
+        <CodeTag />
+      </p>
       {children}
     </div>
   );
 }
 
-function Block({
+/**
+ * A block of a tab. Its title is a heading in ink above the labels it covers (CREA-17); `code` puts « Règle stricte »
+ * on it once, for every field of the block.
+ */
+export function Block({
   title,
   lead,
+  code = false,
   children,
 }: {
   title?: string;
-  lead?: string;
+  lead?: ReactNode;
+  code?: boolean;
   children: ReactNode;
 }): JSX.Element {
   return (
     <section className="ps-block">
-      {title === undefined ? null : <p className="nv-eyebrow">{title}</p>}
+      {title === undefined ? null : (
+        <h3 className="ps-block__title">
+          {title}
+          {code ? <CodeTag /> : null}
+        </h3>
+      )}
       {lead === undefined ? null : <p className="ps-lead">{lead}</p>}
       {children}
     </section>
   );
 }
 
-const TODAY = new Date().toISOString().slice(0, 10);
-
-function ageLine(dateOfBirth: string): string | undefined {
+/** « 26 ans aujourd’hui », on the local calendar of today; nothing for a date not yet whole or still to come. */
+export function ageLine(dateOfBirth: string, today: string = localDay()): string | undefined {
   try {
-    return `${String(ageOn(dateOfBirth, TODAY))} ans aujourd’hui`;
+    const age = ageOn(dateOfBirth, today);
+    return age >= 0 ? `${String(age)} ans aujourd’hui` : undefined;
   } catch {
     return undefined;
   }
@@ -91,9 +114,12 @@ export function DetailsTab({
   onChange,
   issues,
   timezone,
+  isOwner = false,
 }: TabProps<'details'> & {
   /** The creator's own zone (`creators.timezone`), the one the code goes by; the persona's is a copy for the model. */
   timezone: string | null;
+  /** Only the owner changes it, in Heures d'activité: the others are not sent where they cannot go. */
+  isOwner?: boolean;
 }): JSX.Element {
   const id = useId();
   const zone = timezone ?? d.timezone;
@@ -161,20 +187,23 @@ export function DetailsTab({
             }}
           />
         </Field>
+        {/* Not a field: it does not change here. A line of text, her city and her hour (CREA-27). */}
         <Field
           label="Fuseau horaire"
-          id={`${id}-tz`}
-          hint="Celui de la créatrice, choisi à sa création. Il dit au bot s’il fait jour ou nuit chez elle."
+          hint={
+            isOwner
+              ? 'Celui de la créatrice, à changer dans Heures d’activité. Il dit à l’agent s’il fait jour ou nuit chez elle.'
+              : 'Celui de la créatrice. Il dit à l’agent s’il fait jour ou nuit chez elle.'
+          }
           path="details.timezone"
         >
-          <output id={`${id}-tz`} className="nv-glass nv-field__control ps-static">
-            <span>{zone}</span>
-            <span className="ps-muted">{localTime(zone)} chez elle</span>
-          </output>
+          <p className="ps-static-line" title={zone}>
+            {cityOf(zone)} · {localTime(zone)} chez elle
+          </p>
         </Field>
       </Block>
 
-      <Block title="Goûts et caractère">
+      <Block title="Passions et caractère">
         <Field label="Passions" id={`${id}-hob`} path="details.hobbies">
           <Entries
             id={`${id}-hob`}
@@ -291,8 +320,9 @@ export function DetailsTab({
 export function AdditionalInfoTab({ value, onChange }: TabProps<'additional_info'>): JSX.Element {
   const id = useId();
   return (
-    <Block lead="Le texte libre que l’agent lit avant chaque réponse : identité, ce qui l’a construite, personnalité, voix et style, séduction, passions, objectifs.">
-      <Field label="Infos en plus" id={id} path="additional_info">
+    // CREA-12, accepted by Charles on 29/10: what the other tabs do not say yet, never the same thing twice.
+    <Block lead="Ce que les autres onglets ne disent pas encore. L’agent le lit avant chaque réponse.">
+      <Field label="Infos en plus" labelHidden id={id} path="additional_info">
         <TextArea id={id} rows={16} value={value} maxLength={ADDITIONAL_INFO_MAX} onChange={onChange} />
       </Field>
     </Block>
@@ -345,7 +375,6 @@ export function BehaviorTab({ value: b, onChange }: TabProps<'behavior'>): JSX.E
       <Block title="Règles strictes">
         <Field
           label="Surnoms"
-          code
           id={`${id}-pet`}
           hint="Les seuls surnoms qu’elle donne aux fans : elle n’en utilise aucun autre."
           path="behavior.pet_names"
@@ -362,7 +391,6 @@ export function BehaviorTab({ value: b, onChange }: TabProps<'behavior'>): JSX.E
         </Field>
         <Field
           label="Délai avant de répondre"
-          code
           id={`${id}-delay`}
           hint="Attendu avant chaque envoi, pour répondre comme une personne."
           path="behavior.response_delay_minutes"
@@ -399,11 +427,8 @@ function StyleFields<S extends Strategy>({
   const id = useId();
   return (
     <>
-      <Field
-        label="Style"
-        hint={`${options[0]?.label ?? 'Par défaut'} : la méthode de l’agence. Personnalisé : tu écris comment elle doit faire.`}
-        path={`${path}.style`}
-      >
+      {/* What the two styles mean is said once, in the lead of the tab (CREA-09). */}
+      <Field label="Style" path={`${path}.style`}>
         <Segment
           label="Style"
           options={options}
@@ -449,8 +474,16 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
   const at = (field: string): FieldIssue[] => issuesOf(issues, `strategies.${field}`);
   const openIf = (field: string): boolean | undefined => (at(field).length > 0 ? true : undefined);
   return (
-    <Block lead="Comment elle mène la conversation jusqu’à la vente, étape par étape. Les prix ne se négocient jamais : ce n’est pas un réglage.">
-      <Fold title="Faire connaissance (KYC)" summary={summaries.kyc} open={openIf('kyc')}>
+    <Block
+      lead={
+        <>
+          Comment elle mène la conversation jusqu’à la vente, étape par étape. Les prix ne se négocient jamais
+          : ce n’est pas un réglage. Pour chaque étape, le style par défaut suit la méthode de l’agence ;
+          Personnalisé : tu écris comment elle doit faire.
+        </>
+      }
+    >
+      <Fold title="Faire connaissance" summary={summaries.kyc} open={openIf('kyc')}>
         <StyleFields
           path="strategies.kyc"
           value={s.kyc}
@@ -459,10 +492,30 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
             set('kyc', v);
           }}
         />
+        {/* CREA-11, accepted by Charles on 29/10: the list the code applies first, OnlyChat's free text after. */}
         <Field
-          label="Ce qu’elle cherche à savoir"
+          label="Infos à collecter"
+          id={`${id}-c`}
+          hint="Toutes par défaut, dans cet ordre. Une info ajoutée passe en dernier ; celles retirées ne sont jamais demandées au fan."
+          path="strategies.kyc.collect"
+        >
+          <Picker
+            id={`${id}-c`}
+            label="Infos à collecter"
+            options={PERSONA_OPTIONS.kycSlots}
+            values={s.kyc.collect ?? KycSlotSchema.options}
+            placeholder="Ajouter une info"
+            empty="Aucune info de ce nom"
+            keepOrder
+            onChange={(v) => {
+              set('kyc', { ...s.kyc, collect: collectOrAll(v) });
+            }}
+          />
+        </Field>
+        <Field
+          label="Autre chose à savoir (facultatif)"
           id={`${id}-t`}
-          hint="Facultatif : prénom, âge, métier, ville…"
+          hint="Ce que la liste ne dit pas, en quelques mots."
           path="strategies.kyc.targets"
         >
           <TextArea
@@ -475,7 +528,7 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
             }}
           />
         </Field>
-        <Coded>
+        <Coded title="Limites de temps">
           <div className="ps-grid ps-grid--3">
             <Field label="Au plus, en messages" id={`${id}-m`} path="strategies.kyc.max_messages">
               <NumberInput
@@ -491,7 +544,11 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
             <Field
               label="Au plus, en temps"
               id={`${id}-d`}
-              hint={minutesLabel(s.kyc.max_duration_minutes)}
+              hint={
+                Number.isFinite(s.kyc.max_duration_minutes)
+                  ? minutesLabel(s.kyc.max_duration_minutes)
+                  : undefined
+              }
               path="strategies.kyc.max_duration_minutes"
             >
               <NumberInput
@@ -524,7 +581,7 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
         </Coded>
       </Fold>
 
-      <Fold title="Sexualisation" summary={summaries.sexualization} open={openIf('sexualization')}>
+      <Fold title="Sexualisation" code summary={summaries.sexualization} open={openIf('sexualization')}>
         <StyleFields
           path="strategies.sexualization"
           value={s.sexualization}
@@ -535,7 +592,6 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
         />
         <Field
           label="Elle lance le sujet après"
-          code
           id={`${id}-sx`}
           hint="Temps de relation avec le fan. S’il le lance avant, c’est la règle de « Faire connaissance » qui joue."
           path="strategies.sexualization.initiate_after_hours"
@@ -550,9 +606,32 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
             }}
           />
         </Field>
+        <Field
+          label="Elle ne l’ouvre qu’à partir d’une note de désir de"
+          id={`${id}-sd`}
+          hint={desireHint(s.sexualization.min_desire_to_open, DESIRE_BAND_FLOORS.playful)}
+          path="strategies.sexualization.min_desire_to_open"
+        >
+          <NumberInput
+            id={`${id}-sd`}
+            unit="sur 100"
+            nullable
+            bounds={PERSONA_BOUNDS.sexualizationMinDesireToOpen}
+            value={s.sexualization.min_desire_to_open ?? null}
+            onChange={(v) => {
+              // Emptied, the default applies: an absent key, which the saved version leaves out.
+              set('sexualization', { ...s.sexualization, min_desire_to_open: v ?? undefined });
+            }}
+          />
+        </Field>
       </Fold>
 
-      <Fold title="Lancement des scripts" summary={summaries.script_launch} open={openIf('script_launch')}>
+      <Fold
+        title="Lancement des scripts"
+        code
+        summary={summaries.script_launch}
+        open={openIf('script_launch')}
+      >
         <StyleFields
           path="strategies.script_launch"
           value={s.script_launch}
@@ -564,7 +643,6 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
         <Field
           label="Attendre au moins, avant un nouveau script"
           hint="Pour un même fan."
-          code
           id={`${id}-sc`}
           path="strategies.script_launch.cooldown_hours"
         >
@@ -578,9 +656,26 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
             }}
           />
         </Field>
+        <Field
+          label="Un script ne part qu’à partir d’une note de désir de"
+          id={`${id}-sm`}
+          hint={desireHint(s.script_launch.min_desire, DESIRE_BAND_FLOORS.hot)}
+          path="strategies.script_launch.min_desire"
+        >
+          <NumberInput
+            id={`${id}-sm`}
+            unit="sur 100"
+            nullable
+            bounds={PERSONA_BOUNDS.scriptMinDesire}
+            value={s.script_launch.min_desire ?? null}
+            onChange={(v) => {
+              set('script_launch', { ...s.script_launch, min_desire: v ?? undefined });
+            }}
+          />
+        </Field>
       </Fold>
 
-      <Fold title="Suivi d’offre" summary={summaries.post_offer} open={openIf('post_offer')}>
+      <Fold title="Suivi d’offre" code summary={summaries.post_offer} open={openIf('post_offer')}>
         <StyleFields
           path="strategies.post_offer"
           value={s.post_offer}
@@ -589,7 +684,7 @@ export function StrategiesTab({ value: s, onChange, issues }: TabProps<'strategi
             set('post_offer', v);
           }}
         />
-        <Field label="Reproposer après un refus" code id={`${id}-po`} path="strategies.post_offer.delay_days">
+        <Field label="Reproposer après un refus" id={`${id}-po`} path="strategies.post_offer.delay_days">
           <NumberInput
             id={`${id}-po`}
             unit="jours"
@@ -616,7 +711,13 @@ function Delays({
   const id = useId();
   const [next, setNext] = useState<number | null>(null);
   const [min, max] = PERSONA_BOUNDS.followUpDelayHours;
-  const canAdd = next !== null && next >= min && next <= max && !values.includes(next) && values.length < 5;
+  const canAdd =
+    next !== null &&
+    Number.isInteger(next) &&
+    next >= min &&
+    next <= max &&
+    !values.includes(next) &&
+    values.length < 5;
   return (
     <div className="ps-delays">
       {values.map((h) => (
@@ -676,22 +777,22 @@ export function FollowUpsTab({ value: f, onChange, issues }: TabProps<'follow_up
   const at = (field: string): FieldIssue[] => issuesOf(issues, `follow_ups.${field}`);
   return (
     <>
-      <Block title="Relances">
+      <Block title="Relances" code>
         <SwitchRow
           label="Relancer un fan qui ne répond plus"
           path="follow_ups.enabled"
           detail={followUpsSummary(f)}
-          code
           checked={f.enabled}
           onChange={(v) => {
-            set('enabled', v);
+            // Switched off, the type and its text are hidden: a custom text left empty would block the save unseen.
+            const unwritten = f.type === 'custom' && (f.text ?? '').trim() === '';
+            onChange(!v && unwritten ? { ...f, enabled: v, type: 'soft', text: null } : { ...f, enabled: v });
           }}
         />
         {f.enabled ? (
           <div className="ps-reveal ps-stack">
             <Field
               label="Quand relancer"
-              code
               hint="Heures après son dernier message, cinq relances au plus."
               path="follow_ups.delays_hours"
             >
@@ -822,11 +923,34 @@ const NOTIFICATIONS: readonly {
   { field: 'rate_limited', label: 'Envois freinés', detail: 'La plateforme ralentit les envois du compte.' },
 ];
 
-export function NotificationsTab({ value: v, onChange }: TabProps<'notifications'>): JSX.Element {
+export function NotificationsTab({
+  value: v,
+  onChange,
+  isOwner = false,
+}: TabProps<'notifications'> & {
+  /** Réglages › Alertes is the owner's: a link for the owner, its name alone for the others. */
+  isOwner?: boolean;
+}): JSX.Element {
   const id = useId();
   return (
     <>
-      <Block title="Te prévenir quand">
+      <Block
+        title="Te prévenir quand"
+        lead={
+          <>
+            Sur les canaux d’alerte, réglés dans{' '}
+            {isOwner ? (
+              // A route link: it keeps the app, and the « leave without saving? » question, instead of reloading.
+              <Link className="ps-link" to="/reglages/alertes">
+                Réglages › Alertes
+              </Link>
+            ) : (
+              'Réglages › Alertes par le propriétaire'
+            )}
+            .
+          </>
+        }
+      >
         <div className="ps-switches">
           {NOTIFICATIONS.map((item) => (
             <SwitchRow
@@ -842,10 +966,10 @@ export function NotificationsTab({ value: v, onChange }: TabProps<'notifications
           ))}
         </div>
       </Block>
-      <Block title="Mots-clés d’alerte">
+      <Block title="Mots-clés d’alerte" code>
         <Field
-          label="Mots-clés"
-          code
+          label="Mots-clés d’alerte"
+          labelHidden
           id={`${id}-kw`}
           hint="Toujours actifs : un fan qui en écrit un met l’agent en pause pour lui et prévient un humain."
           path="notifications.alert_keywords"
@@ -869,6 +993,7 @@ const LIMITS: readonly {
   readonly field: keyof Persona['limits'];
   readonly label: string;
   readonly placeholder: string;
+  readonly hint?: string;
   readonly max: number;
 }[] = [
   { field: 'never_do', label: 'Ce qu’elle ne fait jamais', placeholder: 'Ajouter une pratique', max: 120 },
@@ -887,7 +1012,9 @@ const LIMITS: readonly {
   {
     field: 'disgusts',
     label: 'Ses dégoûts',
-    placeholder: 'Ajouter un dégoût, variantes comprises',
+    // Short enough to stay whole in the field (CREA-29); the rest goes under it.
+    placeholder: 'Ajouter un dégoût',
+    hint: 'Variantes comprises.',
     max: 120,
   },
 ];
@@ -900,7 +1027,13 @@ export function LimitsTab({ value: l, onChange }: TabProps<'limits'>): JSX.Eleme
       lead="L’agent n’envoie jamais un message qui en franchit une, quoi qu’on lui demande."
     >
       {LIMITS.map((item) => (
-        <Field key={item.field} label={item.label} id={`${id}-${item.field}`} path={`limits.${item.field}`}>
+        <Field
+          key={item.field}
+          label={item.label}
+          hint={item.hint}
+          id={`${id}-${item.field}`}
+          path={`limits.${item.field}`}
+        >
           <Entries
             id={`${id}-${item.field}`}
             values={l[item.field]}

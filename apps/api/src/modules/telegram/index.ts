@@ -16,11 +16,12 @@ import {
   overview,
   purge,
   removeBot,
+  removeChat,
   replaceToken,
   saveRoutes,
   sendTest,
 } from './application/settings';
-import type { BotsStore, Clock, DeliveriesStore, NotificationChannel } from './domain/ports';
+import type { AlertNames, BotsStore, Clock, DeliveriesStore, NotificationChannel } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
 import { createTelegramRoutes, type TelegramRoutesOptions } from './infra/routes';
@@ -39,6 +40,8 @@ export interface TelegramDeps {
   readonly onUncovered?: (event: ScannedEvent) => void;
   /** Re-seals the tokens with the newest key at start (rotation); absent in tests. */
   readonly resealTokens?: () => Promise<ResealReport>;
+  /** Her alerts' names, to name the alert in its message (P4-01). */
+  readonly alertNames?: AlertNames;
 }
 
 /** The job handlers, one per `telegram.*` job (TELEGRAM_JOB_PAYLOADS); the worker wires them. */
@@ -69,6 +72,7 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     replaceToken: (id, token) => replaceToken(base, id, token),
     removeBot: (id) => removeBot(base, id),
     listen: (id) => listen(base, id),
+    removeChat: (id, userId) => removeChat(base, id, userId),
     saveRoutes: (version, routes) => saveRoutes(base, version, routes),
     sendTest: (chatId) => sendTest(base, chatId),
     listDeliveries: (topic, limit) => listDeliveries(base, topic, limit),
@@ -83,6 +87,7 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
           ...base,
           webOrigin: deps.webOrigin,
           onUncovered: deps.onUncovered ?? (() => undefined),
+          ...(deps.alertNames !== undefined && { alertNames: deps.alertNames }),
         }),
       flushChat: (chatId) => flushChat(base, chatId),
       dispatchPolls: () => dispatchPolls(base),
@@ -103,6 +108,7 @@ export interface TelegramStartOptions {
   readonly onUncovered: (event: ScannedEvent) => void;
   /** Tokens no listed key opens, found at start: the caller logs them (the old key was dropped too early). */
   readonly onUnreadableTokens: (bots: readonly string[]) => void;
+  readonly alertNames: AlertNames;
 }
 
 /** Builds the module on Postgres and the Telegram Bot API, and re-seals the tokens of a past rotation. */
@@ -118,6 +124,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     webOrigin: options.webOrigin,
     onUncovered: options.onUncovered,
     resealTokens: store.resealTokens,
+    alertNames: options.alertNames,
   });
   const report = await module.start();
   if (report.unreadable.length > 0) options.onUnreadableTokens(report.unreadable);
@@ -130,4 +137,19 @@ export function resealTelegramTokens(
   keys: readonly EncryptionKey[],
 ): Promise<ResealReport> {
   return createPostgresTelegramStore({ adminDb, keys }).resealTokens();
+}
+
+/**
+ * `pnpm ops:check-keys` (ADR 0028 § 7): how many bot tokens the given keys open, read only, nothing sent to Telegram.
+ * The unreadable ones are named by the bot's username, never by a token.
+ */
+export async function checkTelegramTokens(
+  adminDb: Database,
+  keys: readonly EncryptionKey[],
+): Promise<{ readonly total: number; readonly unreadable: readonly string[] }> {
+  const bots = await createPostgresTelegramStore({ adminDb, keys }).bots.listBots();
+  return {
+    total: bots.length,
+    unreadable: bots.filter((bot) => bot.token === null).map((bot) => bot.username),
+  };
 }

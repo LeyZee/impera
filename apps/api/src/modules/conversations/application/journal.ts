@@ -7,13 +7,15 @@ import { applyEvent, commandFor } from '../domain/projection';
 import { canDraftBecome, nextState } from '../domain/state-machine';
 
 /**
- * Events other modules react to (`supervision` notifies on a new draft, `telegram` opens and closes alerts): also
- * written to the outbox. Only the last failure of a send is news; the retries before it stay in the journal.
+ * Events other modules react to (`supervision` notifies on a new draft, `telegram` opens and closes alerts and
+ * tells the alerts that only let a human know): also written to the outbox. Only the last failure of a send is
+ * news; the retries before it stay in the journal.
  */
 const PUBLISHED: ReadonlySet<EventType> = new Set([
   'draft_created',
   'message_sent',
   'handoff_requested',
+  'alert_triggered',
   'takeover_started',
   'takeover_ended',
   'send_failed',

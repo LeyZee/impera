@@ -8,7 +8,47 @@ import { z } from 'zod';
 
 import type { ExtractedFrame, MediaTools } from '../application/describe-media';
 
-const run = promisify(execFile);
+const execFileAsync = promisify(execFile);
+
+type MediaBinary = 'ffmpeg' | 'ffprobe';
+const BINARIES: Record<MediaBinary, string> = { ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' };
+
+/** Said instead of `spawn ENOENT`, which tells nobody what to install. */
+const missingMessage = (binary: string): string =>
+  `${binary} absent : introuvable sur le PATH. Installe ffmpeg (il fournit aussi ffprobe), puis relance.`;
+
+const isNotFound = (error: unknown): boolean =>
+  error instanceof Error && 'code' in error && error.code === 'ENOENT';
+
+async function run(
+  binary: string,
+  args: readonly string[],
+  options: { readonly maxBuffer?: number; readonly timeout?: number } = {},
+): Promise<{ readonly stdout: string; readonly stderr: string }> {
+  try {
+    return await execFileAsync(binary, args, options);
+  } catch (error) {
+    if (isNotFound(error)) throw new Error(missingMessage(binary), { cause: error });
+    throw error;
+  }
+}
+
+/**
+ * The media binaries that cannot be run here, empty when both answer: read once at start-up, so that a missing
+ * ffmpeg is said in the log rather than found on the first video of a fan.
+ */
+export async function missingMediaBinaries(binaries = BINARIES): Promise<readonly MediaBinary[]> {
+  const names: readonly MediaBinary[] = ['ffmpeg', 'ffprobe'];
+  const answers = await Promise.all(
+    names.map((name) =>
+      execFileAsync(binaries[name], ['-version'], { timeout: 5_000 }).then(
+        () => true,
+        () => false,
+      ),
+    ),
+  );
+  return names.filter((_, i) => answers[i] !== true);
+}
 
 /** Enough for a vision model, far cheaper in tokens than a full-size image. */
 const MAX_SIDE = 1_024;
@@ -32,7 +72,7 @@ async function inTempDir<T>(input: Uint8Array, use: (dir: string, path: string) 
 }
 
 /** ffmpeg and ffprobe come with the Docker image (operations.md); files never leave a private temp folder. */
-export function createFfmpegMediaTools(binaries = { ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }): MediaTools {
+export function createFfmpegMediaTools(binaries = BINARIES): MediaTools {
   const ffmpeg = (args: readonly string[]) =>
     run(binaries.ffmpeg, ['-v', 'error', '-y', ...args], { maxBuffer: FFMPEG_BUFFER });
 

@@ -1,11 +1,18 @@
 import {
+  AlertTestResultSchema,
   ApiErrorSchema,
   PlaygroundAnswerSchema,
   PlaygroundRatingResultSchema,
   PlaygroundStateSchema,
 } from '@nirvana/contracts';
-import type { Brief, HealthReport, LlmGateway, VoiceOutput } from '@nirvana/llm';
-import type { LightMyRequestResponse, preHandlerAsyncHookHandler } from 'fastify';
+import {
+  DEFAULT_LLM_CONFIG,
+  type Brief,
+  type HealthReport,
+  type LlmGateway,
+  type VoiceOutput,
+} from '@nirvana/llm';
+import type { LightMyRequestResponse, preValidationAsyncHookHandler } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { testConfig } from '../../../../__tests__/support/config';
@@ -72,6 +79,7 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
       return { ok: true, value: { output: voice, meta: META } };
     },
     health: () => health(control.hasKey),
+    judge: () => Promise.reject(new Error('not used')),
     testConnection: () => Promise.reject(new Error('not used')),
   };
 }
@@ -80,13 +88,20 @@ const stateOf = (response: LightMyRequestResponse) => PlaygroundStateSchema.pars
 const codeOf = (response: LightMyRequestResponse) => ApiErrorSchema.parse(response.json()).error.code;
 
 /** Stands in for `requireRole('owner')`: the header says who asks, and the user is set as auth.ts does. */
-const ownerOnly: preHandlerAsyncHookHandler = async (request, reply) => {
+const ownerOnly: preValidationAsyncHookHandler = async (request, reply) => {
   const id = request.headers['x-test-user'];
   if (typeof id !== 'string') {
     await reply.code(403).send({ error: 'forbidden' });
     return;
   }
-  request.user = { id, email: `${id}@example.test`, name: id, role: 'owner', creatorIds: [] };
+  request.user = {
+    id,
+    email: `${id}@example.test`,
+    name: id,
+    role: 'owner',
+    creatorIds: [],
+    routedCreatorIds: [],
+  };
 };
 
 async function server(
@@ -108,10 +123,17 @@ async function server(
       creatorName: 'Lina',
       personaSheet: 'fiche',
       forbiddenTerms: [],
-      offerLimits: { cooldownHours: 10 },
+      offerLimits: { cooldownHours: 10, minDesire: 70 },
+      sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
+      followUps: { delaysHours: [12, 24], spirit: null },
       splitMessages: true,
       petNames: [],
+      alertKeywords: [],
+      forbiddenEmojis: [],
+      kycSlots: [],
     },
+    // « Tester » reads her active persona; none here: the words are read, the phrase needs no persona to be refused.
+    activePersona: () => Promise.resolve(null),
     store,
     records,
     gateway: gateway(options.voice ?? { bubbles: ['Coucou toi ✨'] }, options.control),
@@ -146,13 +168,22 @@ describe('/v1/playground', () => {
     expect(state.presets).toHaveLength(9);
     expect(state.rejectReasons).toContainEqual({ id: 'too_long', label: 'trop long' });
     expect(state).toMatchObject({ pending: null, rate: { rate: null, target: 0.8 }, presetId: null });
+    expect(state).toMatchObject({ sessionCostEur: 0, voice: { reachable: true } });
+    // The persona it plays, by her first name: never taken for one of the agency's creators.
+    expect(state.persona).toEqual({ name: 'Lina' });
     expect(state.situation).toMatchObject({ timeZone: 'Europe/Paris', isNight: false });
   });
 
   it('answers, rates once, and counts the rate', async () => {
-    const { post, stored } = await server();
+    const { app, headers, post, stored } = await server();
     const answer = await post('/messages', { text: 'Salut' });
     expect(answer.json()).toMatchObject({ bubbles: ['Coucou toi ✨'], isBlocked: false, model: 'grok-4.7' });
+    // Costs are journaled in USD and shown in euros, at the daily budget's rate (ADR 0011).
+    const usdPerEur = DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur;
+    const { costEur } = PlaygroundAnswerSchema.parse(answer.json());
+    expect(costEur).toBeCloseTo(0.002 / usdPerEur);
+    const after = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(after.sessionCostEur).toBeCloseTo(costEur);
 
     const rating = await post('/rating', { verdict: { kind: 'validated' } });
     expect(rating.json()).toMatchObject({ rate: { rate: 1, rated: 1 }, destination: null });
@@ -203,7 +234,9 @@ describe('/v1/playground', () => {
   });
 
   it('asks for the Grok key when no voice model is reachable', async () => {
-    const { post } = await server({ control: { hasKey: false } });
+    const { app, headers, post } = await server({ control: { hasKey: false } });
+    const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(state.voice).toEqual({ reachable: false });
     const response = await post('/messages', { text: 'Salut' });
     expect(response.statusCode).toBe(503);
     expect(codeOf(response)).toBe('llm_unavailable');
@@ -293,5 +326,56 @@ describe('/v1/playground', () => {
     });
     const comparison = await post('/compare', { voiceModel: 'mistral-large-latest' });
     expect(codeOf(comparison)).toBe('nothing_to_compare_conflict');
+  });
+});
+
+describe('POST /v1/alerts/test (P4-01)', () => {
+  const alert = { phrase: 'Il demande une vidéo rien que pour lui', keywords: ['vidéo perso'] };
+  const creatorId = '7f0c8a52-3a35-4c5e-9a1e-2d8f6f0e1a01';
+
+  it('is closed to anyone without the owner session', async () => {
+    const { app } = await server();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/alerts/test',
+      payload: { creatorId, alert, message: 'une vidéo perso ?' },
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('reads her words in code, and says why the phrase was not read when no brain is reachable', async () => {
+    const { app, headers } = await server();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/alerts/test',
+      headers,
+      payload: { creatorId, alert, message: 'Tu me fais une Video-Perso ?' },
+    });
+    expect(response.statusCode).toBe(200);
+    const result = AlertTestResultSchema.parse(response.json());
+    expect(result).toMatchObject({ keywords: ['vidéo perso'], phraseMatched: null });
+    expect(result.reason).toContain('Modèles IA');
+  });
+
+  it('refuses an alert with neither phrase nor word', async () => {
+    const { app, headers } = await server();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/alerts/test',
+      headers,
+      payload: { creatorId, alert: { phrase: null, keywords: [] }, message: 'coucou' },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a test that names no creator: the phrase is read with her persona (recette M13)', async () => {
+    const { app, headers } = await server();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/alerts/test',
+      headers,
+      payload: { alert, message: 'coucou' },
+    });
+    expect(response.statusCode).toBe(400);
   });
 });
