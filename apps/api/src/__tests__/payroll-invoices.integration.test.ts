@@ -365,6 +365,15 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     const none = await team.call('GET', pdfUrl, theoCookie);
     expect(none.statusCode).toBe(503);
     expect(team.refusal(none).code).toBe('invoice_pdf_unavailable');
+    // The first copy, read damaged a second time, is not said again: one alert per document, place and stage.
+    const again = await db()
+      .select()
+      .from(schema.domainEvents)
+      .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'));
+    expect(again.map((one) => one.payload)).toEqual([
+      expect.objectContaining({ invoiceId: id, place: 'primary', stage: 'download' }),
+      expect.objectContaining({ invoiceId: id, place: 'ovhcloud', stage: 'download' }),
+    ]);
     primary.plant(key, stored);
     copy.plant(key, stored);
   });
