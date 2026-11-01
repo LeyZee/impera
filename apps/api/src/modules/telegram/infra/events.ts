@@ -99,6 +99,9 @@ const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
   stage: true,
 });
 
+// The document's number and kind (ADR 0039): the contractor and the reason stay in Nirvana.
+const InvoiceContestedSchema = EVENT_PAYLOADS.invoice_contested.pick({ number: true, document: true });
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -190,6 +193,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = InvoicePdfMissingSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'invoice_pdf_missing', ...parsed.data };
+    }
+    case 'invoice_contested': {
+      const parsed = InvoiceContestedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_contested', ...parsed.data };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);
