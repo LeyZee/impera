@@ -480,7 +480,7 @@ export const BillingAgencyBodySchema = InvoiceAgencySchema.extend({
     context.addIssue({
       code: 'custom',
       path: ['siren'],
-      message: 'Ce SIREN n’existe pas : sa clé de contrôle (le dernier chiffre) ne correspond pas.',
+      message: 'Ce numéro n’est pas un SIREN : sa clé de contrôle (le dernier chiffre) ne correspond pas.',
     });
     return;
   }
