@@ -185,8 +185,8 @@ function pdfConflictText(signal: Signal & { kind: 'invoice_pdf_conflict' }): str
       return `Le PDF du document ${number} n’a pas été enregistré : ${pdfPlaceText(place)}, sa place est déjà prise par un autre fichier. Rien n’a été remplacé ; le document reste émis, mais ne se télécharge pas encore. À vérifier.`;
     case 'copy':
       return place === 'primary'
-        ? `Le PDF du document ${number} manque chez ${PDF_PLACE_NAMES.primary} ou ne correspond plus à son empreinte : il n’a pas été copié. À vérifier.`
-        : `La copie du PDF du document ${number} chez ${PDF_PLACE_NAMES[place]} n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF reste téléchargeable chez ${PDF_PLACE_NAMES.primary}. À vérifier.`;
+        ? `Le PDF du document ${number} manque chez ${PDF_PLACE_NAMES.primary} ou ne correspond plus à son empreinte : il n’a pas été copié, et aucune copie n’existe encore ; il ne se télécharge plus. À vérifier.`
+        : `La copie du PDF du document ${number} chez ${PDF_PLACE_NAMES[place]} n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`;
     case 'download':
       return `Au téléchargement, le PDF du document ${number} ${pdfPlaceText(place)} manquait ou ne correspondait pas à son empreinte : ce fichier n’a pas été servi, rien n’a été remplacé. À vérifier.`;
   }
@@ -382,7 +382,7 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         body:
           signal.place === 'primary'
             ? `Le document ${signal.number} n’a toujours pas de PDF après plusieurs essais : il reste émis, mais ne se télécharge pas encore. À vérifier.`
-            : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Il reste téléchargeable chez ${PDF_PLACE_NAMES.primary}. À vérifier.`,
+            : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`,
         link: PAY_LINK,
       };
     case 'automatic_closed': {

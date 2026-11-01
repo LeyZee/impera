@@ -210,10 +210,10 @@ describe('classification (ADR 0020 §2)', () => {
       return notice?.kind === 'notice' ? notice.body : '';
     };
     expect(body('copy', 'ovhcloud')).toBe(
-      'La copie du PDF du document DEMO-2026-0001 chez OVHcloud n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF reste téléchargeable chez Hetzner. À vérifier.',
+      'La copie du PDF du document DEMO-2026-0001 chez OVHcloud n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF chez Hetzner n’a pas été touché. À vérifier.',
     );
     expect(body('copy', 'primary')).toBe(
-      'Le PDF du document DEMO-2026-0001 manque chez Hetzner ou ne correspond plus à son empreinte : il n’a pas été copié. À vérifier.',
+      'Le PDF du document DEMO-2026-0001 manque chez Hetzner ou ne correspond plus à son empreinte : il n’a pas été copié, et aucune copie n’existe encore ; il ne se télécharge plus. À vérifier.',
     );
     // A download never claims the other place was served: it may not have been.
     expect(body('download', 'primary')).toBe(
@@ -233,7 +233,7 @@ describe('classification (ADR 0020 §2)', () => {
     });
     const copy = classify({ kind: 'invoice_pdf_missing', number: 'DEMO-2026-0002', place: 'ovhcloud' });
     expect(copy?.kind === 'notice' ? copy.body : '').toBe(
-      'Le PDF du document DEMO-2026-0002 n’a pas pu être copié chez OVHcloud après plusieurs essais. Il reste téléchargeable chez Hetzner. À vérifier.',
+      'Le PDF du document DEMO-2026-0002 n’a pas pu être copié chez OVHcloud après plusieurs essais. Le PDF chez Hetzner n’a pas été touché. À vérifier.',
     );
   });
 
