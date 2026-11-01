@@ -3,11 +3,10 @@ import {
   AutomaticMissingSchema,
   ConversationIdSchema,
   CreatorIdSchema,
+  EVENT_PAYLOADS,
   HandoffCauseSchema,
   InvoiceKindSchema,
   InvoiceNotIssuedReasonSchema,
-  InvoiceNumberSchema,
-  InvoicePdfPlaceSchema,
   KillSwitchScopeSchema,
   PayPeriodSchema,
 } from '@nirvana/contracts';
@@ -92,10 +91,12 @@ const InvoiceNotIssuedSchema = z.object({
   reason: InvoiceNotIssuedReasonSchema,
 });
 
-// The document's number and where (ADR 0037): the member stays in Nirvana.
-const InvoicePdfMissingSchema = z.object({ number: InvoiceNumberSchema, place: InvoicePdfPlaceSchema });
-const InvoicePdfConflictSchema = InvoicePdfMissingSchema.extend({
-  stage: z.enum(['render', 'copy', 'download']),
+// The document's number, where and, for a conflict, at which stage (ADR 0037): the member stays in Nirvana.
+const InvoicePdfMissingSchema = EVENT_PAYLOADS.invoice_pdf_missing.pick({ number: true, place: true });
+const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
+  number: true,
+  place: true,
+  stage: true,
 });
 
 function signalOf(type: string, payload: unknown): Signal | null {

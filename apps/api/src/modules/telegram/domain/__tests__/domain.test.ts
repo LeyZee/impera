@@ -194,35 +194,32 @@ describe('classification (ADR 0020 §2)', () => {
     }
   });
 
-  it('says a PDF of a document met another file, by its number and place, without the member', () => {
-    expect(
-      classify({ kind: 'invoice_pdf_conflict', number: 'DEMO-2026-0001', place: 'primary', stage: 'render' }),
-    ).toEqual({
+  it('says what an invoice PDF conflict means at each stage and place, by its number, without the member', () => {
+    const conflict = (stage: 'render' | 'copy' | 'download', place: 'primary' | 'ovhcloud') =>
+      classify({ kind: 'invoice_pdf_conflict', number: 'DEMO-2026-0001', place, stage });
+    expect(conflict('render', 'primary')).toEqual({
       kind: 'notice',
       topic: 'important',
       threadKey: null,
       title: 'Important',
-      body: 'Un autre fichier occupe déjà la place du PDF du document DEMO-2026-0001 chez l’hébergeur principal : rien n’a été remplacé. À vérifier.',
+      body: 'Le PDF du document DEMO-2026-0001 n’a pas été enregistré : chez Hetzner, sa place est déjà prise par un autre fichier. Rien n’a été remplacé ; le document reste émis, mais ne se télécharge pas encore. À vérifier.',
       link: { label: 'Ouvrir la Paie', path: '/paie' },
     });
-    const copy = classify({
-      kind: 'invoice_pdf_conflict',
-      number: 'DEMO-2026-0001',
-      place: 'ovhcloud',
-      stage: 'copy',
-    });
-    expect(copy?.kind === 'notice' ? copy.body : '').toBe(
-      'Un autre fichier occupe déjà la place du PDF du document DEMO-2026-0001 chez OVHcloud (la copie) : rien n’a été remplacé. À vérifier.',
+    const body = (stage: 'render' | 'copy' | 'download', place: 'primary' | 'ovhcloud') => {
+      const notice = conflict(stage, place);
+      return notice?.kind === 'notice' ? notice.body : '';
+    };
+    expect(body('copy', 'ovhcloud')).toBe(
+      'La copie du PDF du document DEMO-2026-0001 chez OVHcloud n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF reste téléchargeable chez Hetzner. À vérifier.',
     );
-    const download = classify({
-      kind: 'invoice_pdf_conflict',
-      number: 'DEMO-2026-0001',
-      place: 'primary',
-      stage: 'download',
-    });
-    expect(download?.kind === 'notice' ? download.body : '').toBe(
-      'Le PDF du document DEMO-2026-0001 chez l’hébergeur principal ne correspond pas à celui de la base : l’autre exemplaire a été servi, rien n’a été remplacé. À vérifier.',
+    expect(body('copy', 'primary')).toBe(
+      'Le PDF du document DEMO-2026-0001 manque chez Hetzner ou ne correspond plus à son empreinte : il n’a pas été copié. À vérifier.',
     );
+    // A download never claims the other place was served: it may not have been.
+    expect(body('download', 'primary')).toBe(
+      'Au téléchargement, le PDF du document DEMO-2026-0001 chez Hetzner manquait ou ne correspondait pas à son empreinte : ce fichier n’a pas été servi, rien n’a été remplacé. À vérifier.',
+    );
+    expect(body('download', 'ovhcloud')).toContain('chez OVHcloud (la copie) manquait');
   });
 
   it('says a document still has no PDF, or no copy, after the last attempt', () => {
@@ -231,12 +228,12 @@ describe('classification (ADR 0020 §2)', () => {
       topic: 'important',
       threadKey: null,
       title: 'Important',
-      body: 'Le document DEMO-2026-0002 n’a toujours pas de PDF après plusieurs essais. Il reste valable. À vérifier.',
+      body: 'Le document DEMO-2026-0002 n’a toujours pas de PDF après plusieurs essais : il reste émis, mais ne se télécharge pas encore. À vérifier.',
       link: { label: 'Ouvrir la Paie', path: '/paie' },
     });
     const copy = classify({ kind: 'invoice_pdf_missing', number: 'DEMO-2026-0002', place: 'ovhcloud' });
     expect(copy?.kind === 'notice' ? copy.body : '').toBe(
-      'Le PDF du document DEMO-2026-0002 n’a pas pu être copié chez OVHcloud après plusieurs essais. Il reste valable. À vérifier.',
+      'Le PDF du document DEMO-2026-0002 n’a pas pu être copié chez OVHcloud après plusieurs essais. Il reste téléchargeable chez Hetzner. À vérifier.',
     );
   });
 
