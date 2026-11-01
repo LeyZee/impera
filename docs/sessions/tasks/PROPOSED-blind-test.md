@@ -132,7 +132,7 @@ Elle peut revenir sur la carte précédente, jamais plus loin. Une séance peut 
 ## Questions pour Charles (défauts pris en attendant)
 1. Exception à l'ADR 0023 : Messa voit des extraits de vraies conversations, noms masqués, sur ta session et à ton écran, sans aucun droit nouveau pour son compte. Défaut : oui. Si c'est non, le test se fait sur des conversations inventées.
 2. Le taux de « jamais » et l'indiscernabilité restent des informations, sans devenir des conditions. Réglé : ADR 0034 acceptée le 01/11 (« Ok » de Charles).
-3. 50 situations (100 cartes) et un minimum de 40. Réglé : ADR 0034 acceptée le 01/11.
+3. 50 situations (100 cartes) et un minimum de 40. Minimum de 40 réglé par l'ADR 0034 (acceptée le 01/11) ; 50 situations reste le défaut de la fiche.
 
 ## Hors périmètre
 L'ouverture de l'Automatique elle-même (déjà dans le verrou), la transformation d'une carte en cas d'éval (vrai texte de fan), les vocaux, les médias et les étapes de script dans le test, une autre créatrice que Messa.
