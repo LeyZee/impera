@@ -45,7 +45,7 @@ Un prestataire conteste pour trois raisons en pratique :
 
 **5. Un avoir contesté a les mêmes deux fins.** Par exemple, un avoir trop fort se corrige par un ajustement en faveur du prestataire, qui corrige la période de la facture citée. La question laissée ouverte par le lot 2 est ainsi fermée.
 
-**6. Un membre parti.** Sa correction va, comme tout ajustement, sur sa première quinzaine encore ouverte, et cette quinzaine est validée, facturée et versée comme les autres. Le départ (EQ-14) garde donc ouverte la dernière quinzaine d'un membre parti tant qu'une contestation de ses documents n'est pas tranchée.
+**6. Un membre parti.** Sa correction va, comme tout ajustement, sur sa première quinzaine encore ouverte, et cette quinzaine est validée, facturée et versée comme les autres. Or la facture de sa dernière quinzaine travaillée, et les avoirs émis avec elle, naissent à la validation de cette quinzaine : leur contestation arrive après. Le départ (EQ-14) garde donc ouverte, après la dernière quinzaine travaillée, une quinzaine de clôture sans activité, tant que le délai d'acceptation des derniers documents n'est pas passé ou qu'une de leurs contestations reste ouverte. Elle porte les corrections, et elle est validée et versée même sous le minimum de versement (ADR 0038).
 
 ## Conséquences
 
