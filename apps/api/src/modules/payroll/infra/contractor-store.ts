@@ -85,6 +85,25 @@ async function profileOf(tx: Transaction, memberId: TeamMemberId): Promise<Profi
   return row ?? null;
 }
 
+/**
+ * Changes a file's row and proves it changed: a policy that filters the row (`member_update`, whose `USING` hides it
+ * before any trigger runs) updates nothing without an error. A row that does not come back is refused (`refused`),
+ * never answered 200 over a write that did not happen, whatever the role checks above it become.
+ */
+async function updateProfile(
+  tx: Transaction,
+  memberId: TeamMemberId,
+  values: Partial<typeof contractorProfiles.$inferInsert>,
+  refused: () => Error,
+): Promise<void> {
+  const written = await tx
+    .update(contractorProfiles)
+    .set(values)
+    .where(eq(contractorProfiles.memberId, memberId))
+    .returning({ memberId: contractorProfiles.memberId });
+  if (written.length === 0) throw refused();
+}
+
 /** What a write compares: the file as its body would hold it. */
 const bodyOf = (row: ProfileRow): ContractorProfileBody => ({
   legalName: row.legalName,
@@ -199,10 +218,12 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
         if (before === null) {
           await tx.insert(contractorProfiles).values({ memberId, ...body, updatedBy: actor.userId });
         } else {
-          await tx
-            .update(contractorProfiles)
-            .set({ ...body, updatedBy: actor.userId })
-            .where(eq(contractorProfiles.memberId, memberId));
+          await updateProfile(
+            tx,
+            memberId,
+            { ...body, updatedBy: actor.userId },
+            () => new ContractorProfileForbidden(),
+          );
         }
         await audit(
           tx,
@@ -223,10 +244,12 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
         // Checked already: nothing of the identity changed since, or the trigger would have cleared it.
         if (profile.verifiedAt !== null) return fileOf(tx, member);
         if (profile.updatedAt.toISOString() !== body.updatedAt) throw new ContractorProfileChanged();
-        await tx
-          .update(contractorProfiles)
-          .set({ verifiedAt: now(), verifiedBy: actor.userId, updatedBy: actor.userId })
-          .where(eq(contractorProfiles.memberId, memberId));
+        await updateProfile(
+          tx,
+          memberId,
+          { verifiedAt: now(), verifiedBy: actor.userId, updatedBy: actor.userId },
+          () => new PayrollForbidden({ ownerOnly: true }),
+        );
         await audit(tx, actor, 'contractor_profile.verify', { kind: 'contractor_profile', id: memberId }, {});
         await enqueueInvoiceRequeue(tx, memberId);
         return fileOf(tx, member);
@@ -245,10 +268,12 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
           .from(contractorProfiles)
           .where(eq(contractorProfiles.invoicePrefix, body.invoicePrefix));
         if (holder !== undefined) throw new InvoicePrefixTaken();
-        await tx
-          .update(contractorProfiles)
-          .set({ invoicePrefix: body.invoicePrefix, updatedBy: actor.userId })
-          .where(eq(contractorProfiles.memberId, memberId));
+        await updateProfile(
+          tx,
+          memberId,
+          { invoicePrefix: body.invoicePrefix, updatedBy: actor.userId },
+          () => new PayrollForbidden({ ownerOnly: true }),
+        );
         await audit(
           tx,
           actor,
