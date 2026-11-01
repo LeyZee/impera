@@ -2,7 +2,7 @@
 
 Statut : proposed
 Date : 2026-11-01
-Précise : l'ADR 0023 (§ Factures : l'acceptation, la correction d'une facture) et l'ADR 0036
+Remplace : dans l'ADR 0036, la phrase « Seul l'avoir qui répond à une contestation fait passer la facture en « créditée » » ; précise l'ADR 0023 (§ Factures : l'acceptation, la correction d'une facture)
 
 ## Contexte
 
@@ -35,23 +35,31 @@ Un prestataire conteste pour trois raisons en pratique :
 - **Fondée**, avec un motif, et dans la même action la correction (`contest_upheld`). La correction est un ajustement de paie ou plus. Chacun nomme le document contesté et corrige sa quinzaine (`corrects_statement_id`). Selon l'erreur :
   - **montant trop bas** : un ajustement en faveur du prestataire. Il devient une ligne de régularisation sur sa facture suivante, avec la période d'origine (ADR 0023) ;
   - **montant trop haut** : un ajustement en faveur de l'agence. Il devient un avoir sur la facture contestée à la validation suivante (ADR 0036) ;
-  - **erreur de texte sur une facture** (nom, adresse, identifiant, mention) : « annuler et refacturer ». C'est une paire d'ajustements du montant qui reste de la facture. Le premier, négatif, donne l'avoir qui annule la facture. Le second, positif, donne une ligne de la facture suivante, qui imprime le dossier corrigé. Les virements ne bougent pas.
+  - **erreur de texte sur une facture** (nom, adresse, identifiant, mention) : « annuler et refacturer ». C'est une paire d'ajustements du montant qui reste de la facture, dans la même quinzaine. Le premier, négatif, donne l'avoir qui annule la facture. Le second, positif, donne une ligne de la facture de cette quinzaine, qui imprime le dossier corrigé. Les virements ne bougent pas. **La paire part ensemble ou pas du tout** : l'avoir de la paire n'est émis qu'avec la facture qui reprend la ligne. Un dossier corrigé attend sa nouvelle vérification ; si la quinzaine est validée avant elle, sa facture n'est pas émissible (`invoice_not_issued`), et l'avoir de la paire ne part pas non plus. Les deux partent au passage suivant, une fois le dossier vérifié (le lot 5 remet l'émission en file). Le prestataire n'a jamais une facture annulée sans rien à la place.
 
-  Une contestation n'est fondée qu'avec au moins un ajustement. L'étape et ses ajustements s'écrivent dans une seule transaction.
+  Chaque ajustement de la correction corrige la quinzaine du document contesté : pour une facture, son relevé ; pour un avoir, le relevé de la facture qu'il cite, c'est-à-dire sa période (`corrects_statement_id`).
 
-**4. Aucun avoir écrit à la main ne répond à une contestation.** Chaque document vient de la paie, si bien que les factures moins les avoirs font toujours les virements (ADR 0036). L'état `credited` du lot 2 disparaît. Rien n'est déployé et aucune donnée ne le porte : la migration du lot 6 le remplace par `contest_upheld` dans la contrainte, le déclencheur, la politique et l'index unique.
+  **« Fondée » et ses ajustements vont ensemble, vérifié par la base dans les deux sens.** Un déclencheur de contrainte différé, comme `check_invoice_at_commit`, refuse au commit un `contest_upheld` sans ajustement qui nomme le document. Il refuse aussi un ajustement qui nomme un document contesté sans `contest_upheld` de ce document dans la même transaction.
 
-**5. Un avoir contesté a les mêmes deux fins.** Par exemple, un avoir trop fort se corrige par un ajustement en faveur du prestataire. La question laissée ouverte par le lot 2 est ainsi fermée.
+**4. Aucun avoir écrit à la main ne répond à une contestation.** Chaque document vient de la paie, si bien que les factures moins les avoirs font toujours les virements (ADR 0036). L'état `credited` du lot 2 disparaît. Rien n'est déployé et aucune donnée ne le porte : une migration du lot 6 le remplace par `contest_upheld` dans la contrainte, le déclencheur, la politique et l'index unique.
+
+**5. Un avoir contesté a les mêmes deux fins.** Par exemple, un avoir trop fort se corrige par un ajustement en faveur du prestataire, qui corrige la période de la facture citée. La question laissée ouverte par le lot 2 est ainsi fermée.
+
+**6. Un membre parti.** Sa correction va, comme tout ajustement, sur sa première quinzaine encore ouverte, et cette quinzaine est validée, facturée et versée comme les autres. Le départ (EQ-14) garde donc ouverte la dernière quinzaine d'un membre parti tant qu'une contestation de ses documents n'est pas tranchée.
 
 ## Conséquences
 
 - L'argent ne bouge que par la paie. La piste d'audit va de la contestation à l'ajustement, puis au document, puis au virement, et un contrôle la suit sans trou.
-- La correction n'est pas immédiate : elle arrive avec la prochaine quinzaine validée, quinze jours au plus. La facture corrigée est un document de la période suivante, pas un remplacement dans la même période. L'avoir qui cite la facture d'origine, puis la nouvelle facture, sont la forme d'une facture rectificative. Le comptable la confirme avec les autres textes avant la mise en service (EQ-17).
+- La correction n'est pas immédiate : elle arrive avec la prochaine quinzaine validée, quinze jours au plus. La facture corrigée est un document de la période suivante, pas un remplacement dans la même période. L'avoir qui cite la facture d'origine, puis la nouvelle facture, sont la forme d'une facture rectificative.
+- La ligne refacturée prend le régime du jour, alors que l'avoir garde celui de la facture d'origine (ADR 0036). Si le régime a changé entre les deux, par exemple une sortie de franchise, la même prestation est refacturée sous une autre TVA.
+- Deux questions s'ajoutent à celles du comptable, à trancher avant la mise en service (EQ-17) : cette forme de facture rectificative, et la TVA de la ligne refacturée quand le régime a changé.
 - Le prestataire voit sa correction là où il lit déjà ses commissions : son relevé et sa facture suivante.
-- Migration du lot 6, numéro attribué par Bilan :
-  - `contest_upheld` remplace `credited` ;
-  - `pay_adjustments.contested_invoice_id` (nullable), avec un contrôle : l'ajustement est du membre du document et corrige la quinzaine de ce document ;
-  - `invoice_contested` entre dans les types d'événements.
+- Migrations du lot 6, numéros attribués par Bilan :
+  - 0047 (lot 6a) : `invoice_contested` entre dans les types d'événements ;
+  - une suivante, pour la fin « fondée » :
+    - `contest_upheld` remplace `credited` (contrainte, déclencheur `keep_invoice_event`, politique `owner_step`, index unique des fins de contestation) ;
+    - `pay_adjustments.contested_invoice_id` (nullable), avec un contrôle : l'ajustement est du membre du document et corrige la quinzaine de ce document (point 3) ;
+    - le déclencheur de contrainte différé qui lie « fondée » et ses ajustements dans les deux sens (point 3).
 - Ordre du code : l'acceptation, la contestation, le refus, l'acceptation tacite et l'alerte ne dépendent pas de cette ADR et passent d'abord. La fin « fondée » vient après son acceptation.
 - Écrans (lot 8) : « Annuler et refacturer » crée la paire d'ajustements. « Contestation fondée » demande le motif et la correction ensemble.
 
