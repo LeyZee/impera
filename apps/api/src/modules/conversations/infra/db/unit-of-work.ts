@@ -26,6 +26,7 @@ import { z } from 'zod';
 
 import type { Transaction, UnitOfWork } from '../../domain/ports';
 
+import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
@@ -87,6 +88,13 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .where(eq(schema.conversations.state, state))
           .orderBy(sql`${schema.conversations.lastInboundAt} asc nulls last`, schema.conversations.id);
         return rows.map((row) => ConversationIdSchema.parse(row.id));
+      },
+      async isHeldBy(id, userId) {
+        const [row] = await tx
+          .select({ id: schema.conversations.id })
+          .from(schema.conversations)
+          .where(and(eq(schema.conversations.id, id), heldBy(sql`${userId}`)));
+        return row !== undefined;
       },
     },
 

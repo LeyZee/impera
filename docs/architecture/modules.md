@@ -44,7 +44,7 @@ Un cycle est une erreur de conception, pas un cas à autoriser. Si `fans` a beso
 
 1. **Appel direct** via l'`index.ts` du module cible, pour les lectures et les commandes synchrones simples.
 2. **Événements de domaine** pour tout ce qui doit être découplé ou différé : un module écrit un événement dans `conversation_events` (ou `domain_events` pour le hors-conversation) **dans la même transaction** que son changement d'état (outbox). Un job Graphile les distribue aux abonnés. C'est ainsi que `supervision` apprend qu'un draft existe, que `fans` apprend qu'un fait est confirmé, que `sales` apprend qu'un envoi payant a eu lieu.
-3. **Jobs** pour le travail asynchrone (`conversation.respond`, `conversation.record_facts`, `media.describe`, `fans.refresh_summary`, `conversation.follow_up`, `conversation.reopen`, `connector.poll`, `connector.reconcile`). Nom = `<module>.<verbe>`.
+3. **Jobs** pour le travail asynchrone (`conversation.respond`, `conversation.record_facts`, `media.describe`, `fans.refresh_summary`, `conversation.follow_up`, `conversation.reopen`, `conversation.release_unavailable`, `connector.poll`, `connector.reconcile`). Nom = `<module>.<verbe>`.
 
 ## Propriété des tables
 

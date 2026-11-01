@@ -30,6 +30,7 @@ export const JOB_NAMES = [
   'conversation.follow_up',
   'conversation.record_facts',
   'conversation.reopen',
+  'conversation.release_unavailable',
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
@@ -97,6 +98,8 @@ export const JOB_PAYLOADS = {
    * wait first. One per creator (`reopenJobKey`): every deferral out of her hours points at it.
    */
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
+  /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
+  'conversation.release_unavailable': z.object({}),
   'connector.dispatch': z.object({}),
   'connector.poll': z.object({
     creatorId: CreatorIdSchema,
@@ -186,6 +189,8 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.follow_up': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
+  // Each minute: the next run is the retry.
+  'conversation.release_unavailable': 1,
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,

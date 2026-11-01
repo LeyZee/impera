@@ -377,24 +377,140 @@ describe('/v1/conversations', () => {
     );
     expect(all.items).toHaveLength(2);
 
-    // A suspended manager keeps his sign-in but drops to `self` (ADR 0024): no conversation is routed to him.
+    // A suspended manager keeps his sign-in but drops to `self` (ADR 0024), and away, he reads no conversation at all
+    // (EQ-13): not even the list of his creators'.
     await test.admin.db
       .update(schema.teamMembers)
       .set({ status: 'suspended' })
       .where(eq(schema.teamMembers.displayName, 'manager'));
     expect(MeSchema.parse((await call('GET', '/v1/me', manager)).json())).toMatchObject({
       creatorIds: [],
-      routedCreatorIds: [creatorId],
+      routedCreatorIds: [],
       teamScope: 'self',
     });
-    const suspended = pageOf(ConversationSummarySchema).parse(
-      (await call('GET', `/v1/conversations?creatorId=${creatorId}`, manager)).json(),
-    );
-    expect(suspended.items).toEqual([]);
+    const suspended = await call('GET', `/v1/conversations?creatorId=${creatorId}`, manager);
+    expect([suspended.statusCode, suspended.json()]).toMatchObject([
+      403,
+      { error: { code: 'creator_forbidden' } },
+    ]);
     for (const id of [routed, other]) {
       const refused = await call('GET', `/v1/conversations/${id}/messages?creatorId=${creatorId}`, manager);
       expect(refused.statusCode).toBe(403);
     }
+  });
+
+  it('hands back what a member who is away still held, by the system and with his status, once (EQ-13)', async () => {
+    const [routed, held] = conversationIds;
+    if (routed === undefined || held === undefined) throw new Error('Two conversations are seeded');
+    const members: Record<'chatter' | 'manager', { userId: string; cookie: string }> = {
+      chatter: { userId: '', cookie: '' },
+      manager: { userId: '', cookie: '' },
+    };
+    for (const teamRole of ['chatter', 'manager'] as const) {
+      const email = `away-${teamRole}@example.test`;
+      const { userId } = await createOwner(app.auth, app.db.db, {
+        email,
+        name: teamRole,
+        password: 'correct horse battery',
+      });
+      await test.admin.db
+        .update(schema.user)
+        .set({ role: 'operator', creatorIds: [creatorId] })
+        .where(eq(schema.user.id, userId));
+      // Invented members (ADR 0010).
+      await test.admin.db.insert(schema.teamMembers).values({
+        id: newId(TeamMemberIdSchema),
+        userId,
+        teamRole,
+        firstName: 'Prénom',
+        lastName: 'Inventé',
+        displayName: `away-${teamRole}`,
+        country: 'BJ',
+        timeZone: 'Africa/Porto-Novo',
+        joinedOn: '2026-10-01',
+      });
+      members[teamRole] = { userId, cookie: await signIn(server, email, 'correct horse battery') };
+    }
+    const { chatter, manager } = members;
+    const setStatus = (userId: string, status: 'active' | 'on_leave' | 'sick') =>
+      test.admin.db.update(schema.teamMembers).set({ status }).where(eq(schema.teamMembers.userId, userId));
+    const row = async (id: ConversationId) => {
+      const [found] = await test.admin.db
+        .select({ state: schema.conversations.state, routedTo: schema.conversations.routedToUserId })
+        .from(schema.conversations)
+        .where(eq(schema.conversations.id, id));
+      return found;
+    };
+    const releases = (id: ConversationId) =>
+      test.admin.db
+        .select({ actor: schema.conversationEvents.actor, payload: schema.conversationEvents.payload })
+        .from(schema.conversationEvents)
+        .where(
+          sql`${schema.conversationEvents.conversationId} = ${id} and ${schema.conversationEvents.type} = 'takeover_ended'`,
+        )
+        .orderBy(schema.conversationEvents.seq);
+    const run = () => app.modules.conversations.jobs.releaseUnavailable(NO_LOG);
+
+    // The chatter takes the conversation routed to him; the active manager takes another one.
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ routedToUserId: chatter.userId })
+      .where(eq(schema.conversations.id, routed));
+    const take = (id: ConversationId, cookie: string) =>
+      call('POST', `/v1/conversations/${id}/takeover?creatorId=${creatorId}`, cookie, {});
+    expect((await take(routed, chatter.cookie)).statusCode).toBe(204);
+    expect((await take(held, manager.cookie)).statusCode).toBe(204);
+    const before = [(await releases(routed)).length, (await releases(held)).length];
+
+    // Active, they keep what they hold: the run writes nothing.
+    await run();
+    expect([(await releases(routed)).length, (await releases(held)).length]).toEqual(before);
+    expect(await row(routed)).toEqual({ state: 'human', routedTo: chatter.userId });
+
+    // On leave, the chatter reads nothing from his next request, and the run hands his conversation back.
+    await setStatus(chatter.userId, 'on_leave');
+    expect(MeSchema.parse((await call('GET', '/v1/me', chatter.cookie)).json())).toMatchObject({
+      routedCreatorIds: [],
+    });
+    expect(
+      (await call('GET', `/v1/conversations/${routed}?creatorId=${creatorId}`, chatter.cookie)).statusCode,
+    ).toBe(403);
+    await run();
+    expect(await row(routed)).toEqual({ state: 'idle', routedTo: null });
+    expect((await releases(routed)).at(-1)).toEqual({
+      actor: 'system',
+      payload: {
+        conversationId: routed,
+        userId: chatter.userId,
+        reason: 'Rendue automatiquement : le membre qui la tenait est en congé.',
+      },
+    });
+    // The manager, still active, keeps his.
+    expect(await row(held)).toEqual({ state: 'human', routedTo: null });
+
+    // Sick, the manager's takeover is handed back too, though nothing was routed to him.
+    await setStatus(manager.userId, 'sick');
+    await run();
+    expect(await row(held)).toEqual({ state: 'idle', routedTo: null });
+    expect((await releases(held)).at(-1)?.payload).toMatchObject({
+      reason: 'Rendue automatiquement : le membre qui la tenait est malade.',
+    });
+
+    // Run again, nothing more is written; back to active, nothing is given back to him either.
+    const after = [(await releases(routed)).length, (await releases(held)).length];
+    await run();
+    await setStatus(manager.userId, 'active');
+    await run();
+    expect([(await releases(routed)).length, (await releases(held)).length]).toEqual(after);
+
+    // A takeover handed to someone else since is no longer his: away again, the manager loses nothing he no longer holds.
+    expect((await take(held, manager.cookie)).statusCode).toBe(204);
+    expect((await take(held, ownerCookie)).statusCode).toBe(204);
+    await setStatus(manager.userId, 'sick');
+    await run();
+    expect(await row(held)).toEqual({ state: 'human', routedTo: null });
+    expect((await releases(held)).length).toBe(after[1]);
+    await call('POST', `/v1/conversations/${held}/release?creatorId=${creatorId}`, ownerCookie, {});
   });
 
   it('shows his desire score cooled to now with the band of that score, and none before a first score (P3-12)', async () => {

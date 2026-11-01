@@ -146,6 +146,7 @@ describe('fan facts from the conversations', () => {
     fans = createFansModule({ db: test.app.db, adminDb: test.admin.db });
     conversations = createConversationsModule({
       db: test.app.db,
+      adminDb: test.admin.db,
       fans,
       sender: {
         sendText: () => Promise.reject(new Error('not used')),

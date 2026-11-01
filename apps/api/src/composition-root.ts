@@ -404,6 +404,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   };
   const conversations = createConversationsModule({
     db: db.db,
+    adminDb: adminDb.db,
     fans,
     sender: connectors.outboundSender,
     requireRole,
@@ -521,6 +522,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       JOB_PAYLOADS['conversation.reopen'],
       logger,
       (payload, context) => modules.conversations.jobs.reopen(payload, context.logger),
+    ),
+    'conversation.release_unavailable': defineTask(
+      'conversation.release_unavailable',
+      JOB_PAYLOADS['conversation.release_unavailable'],
+      logger,
+      (_payload, context) => modules.conversations.jobs.releaseUnavailable(context.logger),
     ),
     'connector.dispatch': defineTask(
       'connector.dispatch',
