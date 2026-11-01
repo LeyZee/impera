@@ -105,6 +105,30 @@ describe('Équipe › Factures : le dépôt dans un seau S3 verrouillé (ADR 003
     ).toBeNull();
   });
 
+  it('lengthens a lock with the object’s retention, signed, and fails with the code when the bucket refuses', async () => {
+    const bucket = provider(() => new Response(null, { status: 200 }));
+    const store = createS3InvoiceStore(CONFIG, bucket.fetch);
+    expect(store.volatile).toBe(false);
+    await store.lengthenLock(KEY, LOCK);
+    const [request] = bucket.requests;
+    if (request === undefined) throw new Error('no request');
+    expect(request.method).toBe('PUT');
+    expect(request.url).toBe(
+      'https://objects.example.test/factures-exemple/invoices/2026/0190f1a2-0000-7000-8000-000000000001.pdf?retention',
+    );
+    const body = new Uint8Array(await request.arrayBuffer());
+    expect(new TextDecoder().decode(body)).toBe(
+      '<Retention xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Mode>COMPLIANCE</Mode><RetainUntilDate>2037-01-01T00:00:00.000Z</RetainUntilDate></Retention>',
+    );
+    expect(request.headers.get('content-md5')).toBe(createHash('md5').update(body).digest('base64'));
+    expect(request.headers.get('x-amz-content-sha256')).toBe(createHash('sha256').update(body).digest('hex'));
+    expect(request.headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=EXAMPLEKEYID\//u);
+    const refused = () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 });
+    await expect(
+      createS3InvoiceStore(CONFIG, provider(refused).fetch).lengthenLock(KEY, LOCK),
+    ).rejects.toThrow(/PUT .*\?retention answered 403 \(AccessDenied\)$/u);
+  });
+
   it('never takes a governance lock, or a date it cannot read, for a compliance lock', async () => {
     const answer = (headers: Record<string, string>) => () => new Response(BYTES, { status: 200, headers });
     const governance = answer({
@@ -142,5 +166,20 @@ describe('Équipe › Factures : le seau en mémoire du développement (ADR 0037
     await expect(store.writeOnce('other', BYTES, '0'.repeat(64), LOCK)).rejects.toThrow(
       /not that of its bytes/u,
     );
+  });
+
+  it('only lengthens a lock, as a compliance lock, and says whether it forgets with the process', async () => {
+    const store = createMemoryInvoiceStore();
+    expect(store.volatile).toBe(false);
+    expect(createMemoryInvoiceStore({ volatile: true }).volatile).toBe(true);
+    await expect(store.lengthenLock(KEY, LOCK)).rejects.toBeInstanceOf(InvoiceStorageUnavailable);
+    await store.writeOnce(KEY, BYTES, SHA, LOCK);
+    const later = new Date('2038-01-01T00:00:00.000Z');
+    await store.lengthenLock(KEY, later);
+    expect(store.peek(KEY)?.retainUntil).toEqual(later);
+    await expect(store.lengthenLock(KEY, LOCK)).rejects.toThrow(/only lengthens/u);
+    expect(store.peek(KEY)?.retainUntil).toEqual(later);
+    store.plant('unlocked', { bytes: BYTES, retainUntil: null });
+    await expect(store.lengthenLock('unlocked', later)).rejects.toThrow(/only lengthens/u);
   });
 });

@@ -291,9 +291,19 @@ export interface StoredObject {
  * answers an error, throws `InvoiceStorageUnavailable`; a key that holds nothing reads `null`.
  */
 export interface InvoiceObjectStore {
+  /**
+   * `true` for a store that loses its objects with the process (memory, development): an object a row names and the
+   * store does not hold was forgotten, not damaged, and never alerts. `false` for a bucket, whose lock keeps them.
+   */
+  readonly volatile: boolean;
   /** Sends `bytes` signed with their SHA-256 (hex), under a compliance lock until `retainUntil`. */
   writeOnce(key: string, bytes: Uint8Array, sha256: string, retainUntil: Date): Promise<'written' | 'exists'>;
   read(key: string): Promise<StoredObject | null>;
+  /**
+   * Moves the compliance lock of the object at `key` to `retainUntil`. A compliance lock only ever lengthens: an
+   * earlier date is refused by the bucket, and throws.
+   */
+  lengthenLock(key: string, retainUntil: Date): Promise<void>;
 }
 
 /** The agency's logo a document froze by its fingerprint (`agency_logos`), a PNG. */

@@ -242,6 +242,8 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
         inclVatMinor: o.amountMinor,
         selfAssessedVatMinor: Math.trunc(o.amountMinor / 5),
         acceptanceDeadline: new Date(Date.now() + 7 * DAY),
+        // What an invoice bills, required at its commit from 0045 on; a credit note cites its invoice instead.
+        serviceDescription: o.creditedInvoiceId === undefined ? 'Animation commerciale de comptes' : null,
         ...o.invoice,
       });
       const amounts = o.lines ?? [o.amountMinor];
@@ -796,7 +798,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       ).toEqual([{ last: 2 }]);
     });
 
-    it('at its commit, an invoice has lines that add up to its total and its event issued; no line comes after', async () => {
+    it('at its commit, an invoice has lines that add up to its total, its event issued and its service; no line comes after', async () => {
       const sep1 = {
         by: owner,
         userId: kofi,
@@ -808,6 +810,9 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await failure(issue({ ...sep1, amountMinor: 12_000, withoutIssued: true }))).toMatch(
         /with its event issued/u,
       );
+      expect(
+        await failure(issue({ ...sep1, amountMinor: 12_000, invoice: { serviceDescription: null } })),
+      ).toMatch(/names the service it bills/u);
       expect(
         await failure(
           as(owner, (tx) =>
@@ -867,13 +872,25 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
           ),
         ),
       ).toMatch(KEPT);
-      const retainUntil = new Date('2037-01-01T00:00:00.000Z');
-      const pdf = { invoiceId: id, storageKey: `invoices/2026/${id}.pdf`, sha256: HASH, retainUntil };
+      // Issued today under a calendar year: locked through the end of the year ten years on.
+      const retainUntil = new Date(Date.UTC(year + 11, 0, 1));
+      const pdf = {
+        invoiceId: id,
+        storageKey: `invoices/${String(year)}/${id}.pdf`,
+        sha256: HASH,
+        retainUntil,
+      };
       expect(
         await failure(
           admin((tx) => tx.insert(s.invoicePdfs).values({ ...pdf, retainUntil: new Date('2020-01-01') })),
         ),
-      ).toMatch(/invoice_pdfs_retention_check/u);
+      ).toMatch(/locked ten years after its issue at least/u);
+      // Never shorter than ten years after the issue, whatever a bucket gave back (ADR 0037 § 4): the trigger answers
+      // before the CHECK on `created_at`.
+      const nineYears = new Date(`${String(year + 9)}${today.slice(4)}T00:00:00.000Z`);
+      expect(
+        await failure(admin((tx) => tx.insert(s.invoicePdfs).values({ ...pdf, retainUntil: nineYears }))),
+      ).toMatch(/locked ten years after its issue at least/u);
       expect(await failure(as(owner, (tx) => tx.insert(s.invoicePdfs).values(pdf)))).toMatch(DENIED);
       await admin((tx) => tx.insert(s.invoicePdfs).values(pdf));
       expect(
@@ -900,7 +917,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
           admin((tx) =>
             tx
               .insert(s.invoicePdfCopies)
-              .values({ ...copy, retainUntil: new Date('2038-01-01T00:00:00.000Z') }),
+              .values({ ...copy, retainUntil: new Date(Date.UTC(year + 12, 0, 1)) }),
           ),
         ),
       ).toMatch(/ADR 0037/u);

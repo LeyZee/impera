@@ -132,8 +132,41 @@ async function recover(
   if (found.retainUntil === null) {
     throw new Error(`payroll.render_invoice_pdf: ${key} holds the PDF without a lock the bucket names`);
   }
-  await deps.store.recordPdfUnscoped(invoice.id, { key, sha256, retainUntil: found.retainUntil });
+  const retainUntil = await lockAtLeast(
+    deps.primary,
+    key,
+    found.retainUntil,
+    invoicePdfRetainUntil(invoice.issuedOn, invoice.fiscalYearEndMonth),
+    logger,
+  );
+  await deps.store.recordPdfUnscoped(invoice.id, { key, sha256, retainUntil });
   return 'recovered';
+}
+
+/**
+ * The lock of an object found under its key, made to hold at least until `due` (Bilan on #335): a shorter one, left
+ * by a run under other settings or a bucket's default, is lengthened (a compliance lock lengthens, never shortens),
+ * then read back. The lock the row then keeps is the one the bucket names. A bucket that refuses fails the run, which
+ * is retried, then alerts (`invoice_pdf_missing`); a shorter lock is never recorded.
+ */
+async function lockAtLeast(
+  bucket: InvoiceObjectStore,
+  key: string,
+  found: Date,
+  due: Date,
+  logger: JobLogger,
+): Promise<Date> {
+  if (found.getTime() >= due.getTime()) return found;
+  await bucket.lengthenLock(key, due);
+  const after = (await bucket.read(key))?.retainUntil ?? null;
+  if (after === null || after.getTime() < due.getTime()) {
+    throw new Error(`invoice PDF: the lock of ${key} still ends before ${due.toISOString()}`);
+  }
+  logger.warn(
+    { key, found: found.toISOString(), lock: after.toISOString() },
+    'invoice PDF: a lock shorter than due, lengthened',
+  );
+  return after;
 }
 
 export type MirrorOutcome = 'not_found' | 'already' | 'copied' | 'recovered' | 'conflict';
@@ -193,8 +226,16 @@ async function copyPdf(
         'the copy holds other bytes under this key, nothing written, owner alerted',
       );
     }
-    if (found.retainUntil?.getTime() !== pdf.retainUntil.getTime()) {
+    // A shorter lock is lengthened to its PDF's; a longer one, or none named, is not the PDF's lock and never
+    // will be (a compliance lock never shortens): the owner is told.
+    if (found.retainUntil === null || found.retainUntil.getTime() > pdf.retainUntil.getTime()) {
       return conflict(COPY_PROVIDER, 'the copy is not under its PDF’s lock, nothing written, owner alerted');
+    }
+    if (found.retainUntil.getTime() < pdf.retainUntil.getTime()) {
+      const lock = await lockAtLeast(deps.copy, pdf.key, found.retainUntil, pdf.retainUntil, logger);
+      if (lock.getTime() !== pdf.retainUntil.getTime()) {
+        return conflict(COPY_PROVIDER, 'the copy’s lock passed its PDF’s, nothing written, owner alerted');
+      }
     }
     await deps.store.recordCopyUnscoped(invoice.id, COPY_PROVIDER, {
       key: pdf.key,
@@ -208,6 +249,8 @@ async function copyPdf(
   if (already !== null) return recoverCopy(already);
   const source = await deps.primary.read(pdf.key);
   if (source === null) {
+    // Forgotten by a store in memory (a restart in development), not lost from a locked bucket: no conflict.
+    if (deps.primary.volatile) throw new Error(`payroll.mirror_invoice_pdf: ${pdf.key} was forgotten`);
     return conflict('primary', 'the PDF is missing from its bucket, nothing copied, owner alerted');
   }
   if (sha256Hex(source.bytes) !== pdf.sha256) {
@@ -269,8 +312,10 @@ async function readChecked(store: InvoiceObjectStore, key: string, sha256: strin
   } catch {
     return { kind: 'unreachable' };
   }
-  // A row whose object is gone is a wrong file too: the bucket's lock should have kept it.
-  if (found === null || sha256Hex(found.bytes) !== sha256) return { kind: 'wrong' };
+  // A row whose object is gone is a wrong file too: the bucket's lock should have kept it. A store in memory forgets
+  // its objects with the process (development): one it no longer holds is out of reach, not damaged.
+  if (found === null) return { kind: store.volatile ? 'unreachable' : 'wrong' };
+  if (sha256Hex(found.bytes) !== sha256) return { kind: 'wrong' };
   return { kind: 'ok', bytes: found.bytes };
 }
 

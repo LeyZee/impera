@@ -13,6 +13,7 @@ import { sampleInvoice } from '../../domain/__tests__/invoice-pdf-fixtures';
 import { InvoiceNotFound, InvoicePdfNotFound, InvoicePdfUnavailable } from '../../domain/errors';
 import { invoicePdfKey } from '../../domain/invoice-pdf';
 import type {
+  InvoiceObjectStore,
   InvoicePdfRenderer,
   InvoiceToRender,
   PayrollInvoicePdfStore,
@@ -117,9 +118,11 @@ function fakeRenderer(output = 'pdf AEX-2026-0021'): FakeRenderer {
 }
 
 /** A bucket that throws on every call: a provider that does not answer. */
-const silent = {
+const silent: InvoiceObjectStore = {
+  volatile: false,
   writeOnce: () => Promise.reject(new Error('no answer')),
   read: () => Promise.reject(new Error('no answer')),
+  lengthenLock: () => Promise.reject(new Error('no answer')),
 };
 
 describe('Équipe › Factures : le rendu du PDF, une fois, verrouillé (ADR 0037 § 5)', () => {
@@ -157,6 +160,44 @@ describe('Équipe › Factures : le rendu du PDF, une fois, verrouillé (ADR 003
     primary.plant(KEY, { bytes, retainUntil: posed });
     expect(await renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('recovered');
     expect(store.invoice?.pdf).toMatchObject({ key: KEY, sha256: sha(bytes), retainUntil: posed });
+  });
+
+  it('lengthens a shorter lock found on the PDF to the one due, then writes the row with it', async () => {
+    const bytes = bytesOf('pdf AEX-2026-0021');
+    primary.plant(KEY, { bytes, retainUntil: new Date('2030-01-01T00:00:00.000Z') });
+    expect(await renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('recovered');
+    expect(primary.peek(KEY)?.retainUntil).toEqual(LOCK);
+    expect(store.invoice?.pdf).toMatchObject({ key: KEY, sha256: sha(bytes), retainUntil: LOCK });
+    expect(store.alerts).toEqual([]);
+  });
+
+  it('keeps a longer lock found on the PDF as the bucket names it', async () => {
+    const longer = new Date('2040-01-01T00:00:00.000Z');
+    primary.plant(KEY, { bytes: bytesOf('pdf AEX-2026-0021'), retainUntil: longer });
+    expect(await renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('recovered');
+    expect(store.invoice?.pdf?.retainUntil).toEqual(longer);
+  });
+
+  it('never records a shorter lock: a bucket that does not lengthen it fails the run, then alerts', async () => {
+    const short = new Date('2030-01-01T00:00:00.000Z');
+    primary.plant(KEY, { bytes: bytesOf('pdf AEX-2026-0021'), retainUntil: short });
+    const refusing: MemoryInvoiceStore = {
+      ...primary,
+      lengthenLock: () => Promise.reject(new Error('AccessDenied')),
+    };
+    const stuck: MemoryInvoiceStore = { ...primary, lengthenLock: () => Promise.resolve() };
+    for (const bucket of [refusing, stuck]) {
+      await expect(renderInvoicePdf({ ...deps(), primary: bucket }, invoiceId, FIRST, quiet)).rejects.toThrow(
+        /AccessDenied|still ends before/u,
+      );
+    }
+    expect(store.invoice?.pdf).toBeNull();
+    expect(store.alerts).toEqual([]);
+    await expect(
+      renderInvoicePdf({ ...deps(), primary: refusing }, invoiceId, LAST, quiet),
+    ).rejects.toThrow();
+    expect(store.alerts.map((alert) => alert.type)).toEqual(['invoice_pdf_missing']);
+    expect(primary.peek(KEY)?.retainUntil).toEqual(short);
   });
 
   it('never takes an object without a lock for one under lock: the run fails and is retried', async () => {
@@ -241,9 +282,26 @@ describe('Équipe › Factures : la copie chez le second hébergeur (ADR 0037 §
     expect(store.copies).toHaveLength(1);
   });
 
+  it('lengthens a copy found under a shorter lock to its PDF’s, then writes its row', async () => {
+    copy.plant(KEY, { bytes, retainUntil: new Date('2036-01-01T00:00:00.000Z') });
+    expect(await mirrorInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('recovered');
+    expect(copy.peek(KEY)?.retainUntil).toEqual(LOCK);
+    expect(store.copies).toEqual([{ provider: 'ovhcloud', sha256: sha(bytes), retainUntil: LOCK }]);
+    expect(store.alerts).toEqual([]);
+  });
+
+  it('retries, without a conflict, a PDF a store in memory forgot with a restart (development)', async () => {
+    const forgetful = createMemoryInvoiceStore({ volatile: true });
+    await expect(
+      mirrorInvoicePdf({ ...deps(), primary: forgetful }, invoiceId, FIRST, quiet),
+    ).rejects.toThrow(/forgotten/u);
+    expect(store.alerts).toEqual([]);
+    expect(store.copies).toEqual([]);
+  });
+
   const wrongCopies: [string, StoredObject][] = [
     ['other bytes', { bytes: bytesOf('another PDF'), retainUntil: LOCK }],
-    ['another lock', { bytes, retainUntil: new Date('2036-01-01T00:00:00.000Z') }],
+    ['a longer lock', { bytes, retainUntil: new Date('2038-01-01T00:00:00.000Z') }],
     ['no lock', { bytes, retainUntil: null }],
   ];
   it.each(wrongCopies)('alerts and writes nothing when the copy holds %s', async (_, planted) => {
@@ -336,6 +394,23 @@ describe('Équipe › Factures : le téléchargement, vérifié par l’empreint
     damaged.plant(KEY, { bytes: bytesOf('damaged'), retainUntil: LOCK });
     await expect(download({ primary: damaged, copy: damaged })).rejects.toBeInstanceOf(InvoicePdfUnavailable);
     expect(store.alerts.map((alert) => alert.place)).toEqual(['primary', 'ovhcloud']);
+  });
+
+  it('takes a PDF a store in memory forgot with a restart for one out of reach, never a damaged one', async () => {
+    const forgetful = createMemoryInvoiceStore({ volatile: true });
+    expect(await download({ primary: forgetful })).toEqual({ fileName: 'AEX-2026-0021.pdf', bytes });
+    await expect(download({ primary: forgetful, copy: forgetful })).rejects.toBeInstanceOf(
+      InvoicePdfUnavailable,
+    );
+    expect(store.alerts).toEqual([]);
+    // A bucket keeps what its lock holds: an object gone from it is a wrong file, and alerts.
+    expect(await download({ primary: createMemoryInvoiceStore() })).toEqual({
+      fileName: 'AEX-2026-0021.pdf',
+      bytes,
+    });
+    expect(store.alerts.map((alert) => [alert.type, alert.place])).toEqual([
+      ['invoice_pdf_conflict', 'primary'],
+    ]);
   });
 
   it('serves nothing while the first bucket fails and no copy is written yet', async () => {

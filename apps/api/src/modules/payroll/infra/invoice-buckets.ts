@@ -48,15 +48,17 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
       .split('/')
       .map(encodeURIComponent)
       .join('/')}`;
-  const call = async (key: string, init: RequestInit): Promise<Response> => {
+  /** `query`: a subresource of the object (`retention`), signed with it. */
+  const call = async (key: string, init: RequestInit, query = ''): Promise<Response> => {
     try {
-      const signed = await client.sign(urlOf(key), init);
+      const signed = await client.sign(query === '' ? urlOf(key) : `${urlOf(key)}?${query}`, init);
       return await send(new Request(signed, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }));
     } catch (error) {
       throw new InvoiceStorageUnavailable(`${config.bucket}: no answer for ${key}`, { cause: error });
     }
   };
   return {
+    volatile: false,
     async writeOnce(key, bytes, sha256, retainUntil) {
       if (createHash('sha256').update(bytes).digest('hex') !== sha256) {
         throw new Error(`The SHA-256 given for ${key} is not that of its bytes`);
@@ -112,12 +114,37 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
         retainUntil: retainUntil === null || Number.isNaN(retainUntil.getTime()) ? null : retainUntil,
       };
     },
+    async lengthenLock(key, retainUntil) {
+      // PutObjectRetention on the object's current version: the bucket refuses a date earlier than its lock.
+      const retention = `<Retention xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Mode>COMPLIANCE</Mode><RetainUntilDate>${retainUntil.toISOString()}</RetainUntilDate></Retention>`;
+      const body = new TextEncoder().encode(retention);
+      const response = await call(
+        key,
+        {
+          method: 'PUT',
+          body,
+          headers: {
+            'content-type': 'application/xml',
+            'content-md5': base64Of('md5', body),
+            'x-amz-content-sha256': createHash('sha256').update(body).digest('hex'),
+          },
+        },
+        'retention',
+      );
+      if (!response.ok) {
+        throw new InvoiceStorageUnavailable(
+          `${config.bucket}: PUT ${key}?retention answered ${String(response.status)} (${await errorCodeOf(response)})`,
+        );
+      }
+      await response.body?.cancel();
+    },
   };
 }
 
 /**
  * A bucket in memory, for development and the tests (ADR 0037 § 8): written once per key, never replaced, its lock
- * kept as given. Lost with the process, so the inline worker of `pnpm dev` and the API share one.
+ * kept as given and only ever lengthened. Lost with the process, so the inline worker of `pnpm dev` and the API share
+ * one, which says it is `volatile`: after a restart, a PDF it forgot is not taken for a damaged one.
  */
 export interface MemoryInvoiceStore extends InvoiceObjectStore {
   /** Tests only: what a key holds, `undefined` for nothing. */
@@ -126,9 +153,11 @@ export interface MemoryInvoiceStore extends InvoiceObjectStore {
   plant(key: string, object: StoredObject): void;
 }
 
-export function createMemoryInvoiceStore(): MemoryInvoiceStore {
+export function createMemoryInvoiceStore(options: { readonly volatile?: boolean } = {}): MemoryInvoiceStore {
   const objects = new Map<string, StoredObject>();
   return {
+    // A bucket by default, as the tests want one; `pnpm dev` says it forgets (`composition-root.ts`).
+    volatile: options.volatile ?? false,
     writeOnce(key, bytes, sha256, retainUntil) {
       if (createHash('sha256').update(bytes).digest('hex') !== sha256) {
         return Promise.reject(new Error(`The SHA-256 given for ${key} is not that of its bytes`));
@@ -142,6 +171,18 @@ export function createMemoryInvoiceStore(): MemoryInvoiceStore {
       return Promise.resolve(
         found === undefined ? null : { bytes: Uint8Array.from(found.bytes), retainUntil: found.retainUntil },
       );
+    },
+    lengthenLock(key, retainUntil) {
+      const found = objects.get(key);
+      if (found === undefined) {
+        return Promise.reject(new InvoiceStorageUnavailable(`memory: no object at ${key}`));
+      }
+      // As a compliance lock: never shorter, and a lock the store does not name is never moved.
+      if (found.retainUntil === null || retainUntil.getTime() < found.retainUntil.getTime()) {
+        return Promise.reject(new InvoiceStorageUnavailable(`memory: the lock of ${key} only lengthens`));
+      }
+      objects.set(key, { ...found, retainUntil });
+      return Promise.resolve();
     },
     peek: (key) => objects.get(key),
     plant: (key, object) => {

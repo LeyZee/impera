@@ -26,7 +26,7 @@ const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).di
 /** A lock of one day, to the second: what the provider gives back. */
 const inOneDay = (): Date => new Date(Math.floor(Date.now() / 1000) * 1000 + 86_400_000);
 
-describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage objet (ADR 0037 § 4 à § 6)', () => {
+describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage objet (ADR 0037 § 4 à § 8)', () => {
   let container: StartedTestContainer | undefined;
   let endpoint = process.env['NIRVANA_TEST_S3_URL'] ?? '';
   const bucket = `factures-${String(Date.now())}`;
@@ -126,6 +126,19 @@ describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage ob
     const lengthened = await retain(later);
     expect(lengthened.status, await lengthened.text()).toBe(200);
     expect(await store().read('invoices/2026/e.pdf')).toEqual({ bytes, retainUntil: later });
+  });
+
+  it('lengthens a lock through the store, and the bucket refuses to shorten it', async () => {
+    const bytes = bytesOf('%PDF-1.7 verrou prolongé');
+    const lock = inOneDay();
+    await store().writeOnce('invoices/2026/f.pdf', bytes, sha(bytes), lock);
+    const later = new Date(lock.getTime() + 7_200_000);
+    await store().lengthenLock('invoices/2026/f.pdf', later);
+    expect(await store().read('invoices/2026/f.pdf')).toEqual({ bytes, retainUntil: later });
+    await expect(store().lengthenLock('invoices/2026/f.pdf', lock)).rejects.toThrow(
+      /\?retention answered 4\d\d/u,
+    );
+    expect((await store().read('invoices/2026/f.pdf'))?.retainUntil).toEqual(later);
   });
 
   it('refuses bytes damaged on the way: the provider checks the sums it was sent', async () => {

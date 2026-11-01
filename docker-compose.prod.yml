@@ -3,7 +3,8 @@
 # (Graphile Worker needs LISTEN/NOTIFY). Every variable is set in Coolify, never in a file of the repository.
 #
 # Local rehearsal against the development Postgres, with a .env.prod (ignored by git) copied from .env.example and the
-# database host set to `postgres`; the database first, the migrations need it up:
+# database host set to `postgres`, and the invoices' buckets as the CI job `images` writes them (two https hosts under
+# `.invalid`: nothing is issued, none is reached); the database first, the migrations need it up:
 #   docker compose up -d --wait postgres
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
 x-api-env: &api-env

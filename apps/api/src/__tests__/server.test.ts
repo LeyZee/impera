@@ -334,6 +334,83 @@ describe('loadConfig', () => {
     expect(() => testConfig({ NIRVANA_INLINE_WORKER: 'yes' })).toThrow(/NIRVANA_INLINE_WORKER/);
   });
 
+  describe('the invoices’ buckets (ADR 0037)', () => {
+    /** A whole bucket, invented (ADR 0010): nothing here reaches a provider. */
+    const bucket = (prefix: string, endpoint: string, name: string): NodeJS.ProcessEnv => ({
+      [`${prefix}ENDPOINT`]: endpoint,
+      [`${prefix}REGION`]: 'eu-central',
+      [`${prefix}BUCKET`]: name,
+      [`${prefix}ACCESS_KEY_ID`]: 'EXAMPLEKEYID',
+      [`${prefix}SECRET_ACCESS_KEY`]: 'example-secret-for-tests-only',
+    });
+    const PRIMARY = bucket('INVOICES_S3_', 'https://fsn1.objects.example.test', 'factures');
+    const COPY = bucket('INVOICES_COPY_S3_', 'https://s3.gra.copies.example.test', 'factures-copie');
+    /** What production needs beside the buckets. */
+    const PRODUCTION: NodeJS.ProcessEnv = {
+      NODE_ENV: 'production',
+      CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
+      SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
+      EXTENSION_DEVICE_TOKEN: 'c'.repeat(48),
+    };
+
+    it('takes both buckets whole, or none outside production, never half of one', () => {
+      expect(() => testConfig({ ...PRIMARY, ...COPY })).not.toThrow();
+      expect(() => testConfig()).not.toThrow();
+      expect(() => testConfig({ INVOICES_S3_BUCKET: 'factures' })).toThrow(
+        /INVOICES_S3_\* must all be set, or none/u,
+      );
+    });
+
+    it('requires both in production, at an https endpoint each, at two providers', () => {
+      expect(() => testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY })).not.toThrow();
+      expect(() => testConfig({ ...PRODUCTION, ...PRIMARY })).toThrow(
+        /INVOICES_COPY_S3_\* must all be set in production/u,
+      );
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          INVOICES_S3_ENDPOINT: 'http://fsn1.objects.example.test',
+        }),
+      ).toThrow(/INVOICES_S3_ENDPOINT must be an https URL/u);
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          INVOICES_COPY_S3_ENDPOINT: 'https://FSN1.objects.example.test/',
+        }),
+      ).toThrow(/the copy lives at another provider in production/u);
+    });
+
+    it('refuses an endpoint that is not a plain URL, and a copy in the first bucket', () => {
+      for (const endpoint of [
+        'fsn1.objects.example.test',
+        'ftp://objects.example.test',
+        'https://a:b@objects.example.test',
+        'https://objects.example.test/?x=1',
+      ]) {
+        expect(() => testConfig({ ...PRIMARY, INVOICES_S3_ENDPOINT: endpoint }), endpoint).toThrow(
+          /INVOICES_S3_ENDPOINT must be an http\(s\) URL/u,
+        );
+      }
+      // A local MinIO in development: http, and two buckets on one host.
+      expect(() =>
+        testConfig({
+          ...bucket('INVOICES_S3_', 'http://127.0.0.1:9000', 'factures'),
+          ...bucket('INVOICES_COPY_S3_', 'http://127.0.0.1:9000/', 'factures-copie'),
+        }),
+      ).not.toThrow();
+      expect(() =>
+        testConfig({
+          ...bucket('INVOICES_S3_', 'http://127.0.0.1:9000', 'factures'),
+          ...bucket('INVOICES_COPY_S3_', 'http://127.0.0.1:9000/', 'Factures'),
+        }),
+      ).toThrow(/names the bucket of INVOICES_S3_\*/u);
+    });
+  });
+
   it('treats an empty playground path as unset, as copied from .env.example', () => {
     const config = testConfig({ PLAYGROUND_PERSONA_PATH: '', NIRVANA_TRAINING_DIR: '' });
     expect(config.PLAYGROUND_PERSONA_PATH).toBeUndefined();

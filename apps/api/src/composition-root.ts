@@ -141,7 +141,8 @@ const INVOICE_FONTS_DIR = fileURLToPath(new URL('../src/modules/payroll/infra/fo
 
 /**
  * The invoices' two buckets (ADR 0037 § 4 and § 6): the configured ones (always in production, `loadConfig` refuses
- * to start without), or one store in memory each, shared by the API and its inline worker, lost with the process.
+ * to start without), or one store in memory each, shared by the API and its inline worker, lost with the process:
+ * `volatile`, so that a PDF forgotten by a restart is never alerted as a damaged one.
  */
 function invoiceBuckets(config: Config): {
   readonly primary: InvoiceObjectStore;
@@ -150,8 +151,8 @@ function invoiceBuckets(config: Config): {
   const primary = invoiceBucket(config, 'primary');
   const copy = invoiceBucket(config, 'copy');
   return {
-    primary: primary === null ? createMemoryInvoiceStore() : createS3InvoiceStore(primary),
-    copy: copy === null ? createMemoryInvoiceStore() : createS3InvoiceStore(copy),
+    primary: primary === null ? createMemoryInvoiceStore({ volatile: true }) : createS3InvoiceStore(primary),
+    copy: copy === null ? createMemoryInvoiceStore({ volatile: true }) : createS3InvoiceStore(copy),
   };
 }
 

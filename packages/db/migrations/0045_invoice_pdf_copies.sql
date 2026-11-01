@@ -14,6 +14,13 @@
 -- `contractor_profiles`: the SIREN or SIRET of a contractor established in France, their VAT number when they charge
 -- VAT, and whether they are an individual entrepreneur (« EI » after their name). A change of these asks for a new
 -- check of the file, like the other parts of the identity: `keep_contractor_profile` is replaced to count them.
+-- `keep_invoice_pdf_lock`: a PDF's row never names a lock shorter than ten years after its issue, whatever the job read
+-- on a bucket (ADR 0037 § 4; Bilan on #335). Not a CHECK on `created_at`: an invoice issued on 31 December and
+-- rendered on 2 January has a lock legitimately less than ten years after its row. The lock the job computes (ten
+-- years after the close of the fiscal year) is always later than this floor.
+-- `check_invoice_at_commit` (0041) is replaced to require an invoice's designation of the service: every invoice
+-- written from this migration on names what it bills. Rows written before keep theirs null (lot 3, development
+-- bases): a constraint trigger only checks the rows of its own transaction, never the old ones.
 -- Two new event types in both CHECKs (`invoice_pdf_conflict`, `invoice_pdf_missing`): additive, every row still
 -- passes. The Telegram trigger's list is not touched: no rendering of these alerts yet (their own PR, with the module).
 CREATE TABLE "agency_logos" (
@@ -86,6 +93,41 @@ END;
 $$;--> statement-breakpoint
 CREATE TRIGGER "invoice_pdf_copies_same_pdf" BEFORE INSERT ON "invoice_pdf_copies"
   FOR EACH ROW EXECUTE FUNCTION "keep_invoice_pdf_copy"();--> statement-breakpoint
+-- A PDF's lock is never shorter than ten years after its issue (UTC: the job's lock ends at 00:00 UTC the day after
+-- the close, so always later).
+CREATE FUNCTION "keep_invoice_pdf_lock"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM "invoices" i
+    WHERE i."id" = NEW."invoice_id" AND NEW."retain_until" < (i."issued_on" + interval '10 years') AT TIME ZONE 'UTC'
+  ) THEN
+    RAISE EXCEPTION 'the PDF of % is locked ten years after its issue at least (ADR 0037)', NEW."invoice_id"
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER "invoice_pdfs_ten_years" BEFORE INSERT ON "invoice_pdfs"
+  FOR EACH ROW EXECUTE FUNCTION "keep_invoice_pdf_lock"();--> statement-breakpoint
+-- 0041's function, with an invoice's designation of the service required from this migration on.
+CREATE OR REPLACE FUNCTION "check_invoice_at_commit"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM "invoice_lines" l WHERE l."invoice_id" = NEW."id")
+     OR (SELECT sum(l."amount_minor") FROM "invoice_lines" l WHERE l."invoice_id" = NEW."id") <> NEW."excl_vat_minor" THEN
+    RAISE EXCEPTION 'the lines of invoice % add up to its total (EQ-06)', NEW."number"
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM "invoice_events" e WHERE e."invoice_id" = NEW."id" AND e."kind" = 'issued') THEN
+    RAISE EXCEPTION 'invoice % is written with its event issued (EQ-06)', NEW."number"
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+  IF NEW."kind" = 'invoice' AND NEW."service_description" IS NULL THEN
+    RAISE EXCEPTION 'invoice % names the service it bills (EQ-06)', NEW."number"
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$;--> statement-breakpoint
 -- 0041's function, with the three new parts of a contractor's identity in the change that withdraws the check.
 CREATE OR REPLACE FUNCTION "keep_contractor_profile"() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
@@ -109,7 +151,7 @@ BEGIN
       RAISE EXCEPTION 'only the owner sets a contractor''s prefix (EQ-06)' USING ERRCODE = 'restrict_violation';
     END IF;
     IF EXISTS (SELECT 1 FROM "invoices" i WHERE i."member_id" = OLD."member_id") THEN
-      RAISE EXCEPTION 'the prefix of % is frozen by his first invoice (EQ-06)', OLD."member_id"
+      RAISE EXCEPTION 'the prefix of % is frozen by their first invoice (EQ-06)', OLD."member_id"
         USING ERRCODE = 'restrict_violation';
     END IF;
   END IF;
@@ -122,11 +164,11 @@ BEGIN
   ELSIF NEW."verified_at" IS NOT NULL
         AND (NEW."verified_at", NEW."verified_by") IS DISTINCT FROM (OLD."verified_at", OLD."verified_by") THEN
     IF scope IS NOT NULL AND (scope <> 'owner' OR NEW."verified_by" IS DISTINCT FROM actor) THEN
-      RAISE EXCEPTION 'only the owner checks a contractor''s file, in his own name (EQ-06)'
+      RAISE EXCEPTION 'only the owner checks a contractor''s file, in their own name (EQ-06)'
         USING ERRCODE = 'restrict_violation';
     END IF;
   ELSIF NEW."verified_at" IS NULL AND OLD."verified_at" IS NOT NULL AND scope IS NOT NULL AND scope <> 'owner' THEN
-    RAISE EXCEPTION 'only the owner withdraws his check (EQ-06)' USING ERRCODE = 'restrict_violation';
+    RAISE EXCEPTION 'only the owner withdraws their check (EQ-06)' USING ERRCODE = 'restrict_violation';
   END IF;
   NEW."updated_at" := now();
   RETURN NEW;
