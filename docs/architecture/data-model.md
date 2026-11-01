@@ -338,9 +338,11 @@ billing_regime_validations regime_id (clé), validated_on, recorded_by, recorded
 contractor_regimes         id, member_id, regime_id, effective_from, created_by, created_at (propriétaire, ajout seul ;
                            chacune après la dernière du membre, jamais en arrière)
 contractor_profiles        member_id (clé), legal_name, address, tax_id, business_id (SIREN ou SIRET, 0045),
-                           vat_number (0045), individual_entrepreneur (« EI », 0045), email, invoice_prefix (unique),
-                           verified_at, verified_by, updated_by, created_at, updated_at (le membre ou le propriétaire ;
-                           vérifié et préfixé par le propriétaire seul ; jamais supprimé)
+                           vat_number (0045), individual_entrepreneur (« EI », 0045), legal_form, share_capital_minor,
+                           rcs_city (société : les trois ou aucun, jamais avec « EI », 0053), email, invoice_prefix
+                           (unique), verified_at, verified_by, updated_by, created_at, updated_at (le membre ou le
+                           propriétaire ; vérifié et préfixé par le propriétaire seul ; un changement d'identité retire
+                           la vérification ; jamais supprimé)
 contractor_documents       id, member_id, kind (tax_residence|urssaf_vigilance), issued_on, valid_until, storage_key,
                            sha256, created_by, created_at (le membre ou le propriétaire, ajout seul)
 contract_texts             id, kind (service_contract|billing_mandate), version, body, sha256, contest_delay_days (mandat

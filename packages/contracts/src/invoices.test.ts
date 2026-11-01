@@ -10,6 +10,7 @@ import {
   BillingSettingsViewSchema,
   BusinessIdSchema,
   ContestInvoiceBodySchema,
+  ContractorProfileSchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
   INVOICE_ERROR_CODES,
@@ -323,6 +324,19 @@ describe('invoices', () => {
     // A frozen copy of lot 3 has none of the three: it still reads, and prints as it was written.
     expect(InvoiceContractorSchema.safeParse(invoice.contractor).success).toBe(true);
     expect(InvoiceContractorSchema.safeParse({ ...french, businessId: '123' }).success).toBe(false);
+    // A company's copy carries its form, a capital of at least 1 cent and its register town, as its file does.
+    const company = {
+      ...french,
+      legalName: 'Chloé Exemple SARL',
+      businessId: '987654321',
+      individualEntrepreneur: false,
+      legalForm: 'SARL',
+      shareCapitalMinor: 750_000,
+      rcsCity: 'Marseille',
+    };
+    expect(InvoiceContractorSchema.safeParse(company).success).toBe(true);
+    expect(InvoiceContractorSchema.safeParse({ ...company, shareCapitalMinor: 0 }).success).toBe(false);
+    expect(ContractorProfileSchema.shape.shareCapitalMinor.safeParse(0).success).toBe(false);
   });
 
   it('keep the agency’s legal form, capital and register town optional, and its logo a PNG', () => {

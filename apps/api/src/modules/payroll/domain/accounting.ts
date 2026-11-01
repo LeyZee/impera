@@ -74,8 +74,11 @@ export function purchaseJournal(
     .toSorted((a, b) => a.issuedOn.localeCompare(b.issuedOn) || a.number.localeCompare(b.number));
 }
 
-/** A DAS2 declares fees of more than 1 200 € paid to one beneficiary in the year, non-residents included. */
-const DAS2_THRESHOLD_MINOR = 120_000;
+/**
+ * A DAS2 declares fees of more than 2 400 € paid to one beneficiary in the calendar year, what was paid with any VAT,
+ * non-residents included (art. 240 of the CGI; doubled for sums paid from 2024, BOI-BIC-DECLA-30-70-20 § 140).
+ */
+const DAS2_THRESHOLD_MINOR = 240_000;
 
 export interface PaymentForDas2 {
   readonly contractorId: string;

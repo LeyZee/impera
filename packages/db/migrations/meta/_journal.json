@@ -372,6 +372,13 @@
       "when": 1793559237637,
       "tag": "0052_invoice_reissue",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1793563127655,
+      "tag": "0053_contractor_company",
+      "breakpoints": true
     }
   ]
 }

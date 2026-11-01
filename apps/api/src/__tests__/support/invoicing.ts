@@ -120,6 +120,10 @@ export async function setUpInvoicing(
       taxId: '12345678900011',
       businessId: '12345678900011',
       vatNumber: 'FR98123456789',
+      // A company established in France (not an individual entrepreneur): its form, capital and register.
+      legalForm: 'SARL',
+      shareCapitalMinor: 100_000,
+      rcsCity: 'Lyon',
       email: `${prefix.toLowerCase()}@example.test`,
       invoicePrefix: prefix,
       updatedBy: member.userId,

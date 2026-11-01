@@ -2,7 +2,9 @@ import {
   addressLines,
   INVOICE_RETENTION_YEARS,
   invoiceFooterOf,
+  legalFormWords,
   PLATFORM_NAMES,
+  rcsWords,
   type Currency,
   type InvoiceAgency,
   type InvoiceContractor,
@@ -290,6 +292,21 @@ function ofName(name: string): string {
   return /^([aeiouàâäéèêëîïôöùûüæœ]|y[^aeiouàâäéèêëîïôöùûü])/iu.test(name) ? `d’${name}` : `de ${name}`;
 }
 
+/**
+ * A company contractor's form and capital, then its register and SIREN (art. R123-237 C. com.), each on its own line
+ * under its address: « SARL au capital de 7 500 € », « RCS Marseille 987 654 321 ». None for a person, nor for a copy
+ * made before these mentions existed.
+ */
+function companyLines(contractor: InvoiceContractor): string[] {
+  const lines: string[] = [];
+  const form = legalFormWords(contractor);
+  if (form !== null) lines.push(form);
+  const city = contractor.rcsCity ?? null;
+  const businessId = contractor.businessId ?? null;
+  if (city !== null && businessId !== null) lines.push(rcsWords(city, businessId));
+  return lines;
+}
+
 function contractorParty(contractor: InvoiceContractor): PdfParty {
   const ids: { label: string; value: string }[] = [];
   const businessId = contractor.businessId ?? null;
@@ -309,7 +326,7 @@ function contractorParty(contractor: InvoiceContractor): PdfParty {
   return {
     label: 'Prestataire (fournisseur)',
     name: contractorName(contractor),
-    lines: placeLines(contractor.address, contractor.country),
+    lines: [...placeLines(contractor.address, contractor.country), ...companyLines(contractor)],
     ids,
   };
 }

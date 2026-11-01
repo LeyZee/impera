@@ -543,6 +543,37 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await failure(update(kofi, { vatNumber: 'fr00912345678' }))).toMatch(
         /contractor_profiles_ids_check/u,
       );
+      // A company's form, capital and register (0053): all three or none, never an individual entrepreneur's, and
+      // each is its identity too.
+      const company = { legalForm: 'SARL', shareCapitalMinor: 100_000, rcsCity: 'Lyon' };
+      const COMPANY = /contractor_profiles_company_check/u;
+      expect(await failure(update(kofi, company))).toMatch(COMPANY);
+      await update(kofi, { individualEntrepreneur: false });
+      for (const partial of [
+        { legalForm: 'SARL' },
+        { shareCapitalMinor: 100_000 },
+        { rcsCity: 'Lyon' },
+        { ...company, rcsCity: null },
+        { ...company, shareCapitalMinor: 0 },
+        { ...company, legalForm: '' },
+        { ...company, rcsCity: 'L'.repeat(61) },
+      ]) {
+        expect(await failure(update(kofi, partial))).toMatch(COMPANY);
+      }
+      await update(owner, { verifiedAt: new Date(), verifiedBy: owner });
+      const [incorporated] = await update(kofi, company);
+      expect(incorporated?.verifiedAt).toBeNull();
+      expect(await failure(update(kofi, { individualEntrepreneur: true }))).toMatch(COMPANY);
+      for (const change of [
+        { legalForm: 'SAS' },
+        { shareCapitalMinor: 250_000 },
+        { rcsCity: 'Villeurbanne' },
+      ]) {
+        await update(owner, { verifiedAt: new Date(), verifiedBy: owner });
+        const [changed] = await update(kofi, change);
+        expect(changed?.verifiedAt).toBeNull();
+      }
+      await update(kofi, { legalForm: null, shareCapitalMinor: null, rcsCity: null });
       // The owner opens Ama's file with her prefix.
       await as(owner, (tx) =>
         tx.insert(s.contractorProfiles).values({

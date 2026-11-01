@@ -43,6 +43,9 @@ const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
     businessId: null,
     vatNumber: null,
     individualEntrepreneur: false,
+    legalForm: null,
+    shareCapitalMinor: null,
+    rcsCity: null,
   },
   prefix: 'THEO',
   agency: {
@@ -148,6 +151,9 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
             businessId: null,
             vatNumber: null,
             individualEntrepreneur: false,
+            legalForm: null,
+            shareCapitalMinor: null,
+            rcsCity: null,
           },
         }),
       ),
@@ -164,6 +170,9 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
           businessId: null,
           vatNumber: null,
           individualEntrepreneur: true,
+          legalForm: null,
+          shareCapitalMinor: null,
+          rcsCity: null,
           ...patch,
         },
         documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null }],
@@ -171,6 +180,60 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     expect(issueDecision(french({}))).toMatchObject({ reason: 'identity_incomplete' });
     expect(issueDecision(french({ businessId: '  ' }))).toMatchObject({ reason: 'identity_incomplete' });
     expect(issueDecision(french({ businessId: '12345678900011' }))).toMatchObject({ kind: 'issue' });
+  });
+
+  it('asks a French company its legal form, share capital and register, never a person or one abroad', () => {
+    // Art. R123-237 of the Code de commerce, the accountant's answers of 01/11: a company prints all three.
+    const company = (patch: Partial<NonNullable<IssueFacts['identity']>>): IssueFacts =>
+      facts({
+        assignments: [{ regimeId: 'franchise', from: '2026-10-01' }],
+        identity: {
+          legalName: 'Atelier Roux',
+          address: '3 place Bellecour, Lyon',
+          country: 'FR',
+          taxId: '123456789',
+          businessId: '123456789',
+          vatNumber: null,
+          individualEntrepreneur: false,
+          legalForm: 'SARL',
+          shareCapitalMinor: 1_000_000,
+          rcsCity: 'Lyon',
+          ...patch,
+        },
+        documents: [{ kind: 'urssaf_vigilance', issuedOn: '2026-09-01', validUntil: null }],
+      });
+    expect(issueDecision(company({}))).toMatchObject({ kind: 'issue' });
+    expect(issueDecision(company({ legalForm: null }))).toMatchObject({ reason: 'identity_incomplete' });
+    expect(issueDecision(company({ legalForm: ' ' }))).toMatchObject({ reason: 'identity_incomplete' });
+    expect(issueDecision(company({ shareCapitalMinor: null }))).toMatchObject({
+      reason: 'identity_incomplete',
+    });
+    expect(issueDecision(company({ rcsCity: null }))).toMatchObject({ reason: 'identity_incomplete' });
+    // An individual entrepreneur is a person: « EI » after the name, no form, capital or register.
+    expect(
+      issueDecision(
+        company({ individualEntrepreneur: true, legalForm: null, shareCapitalMinor: null, rcsCity: null }),
+      ),
+    ).toMatchObject({ kind: 'issue' });
+    // Abroad, the French register does not apply.
+    expect(
+      issueDecision(
+        facts({
+          identity: {
+            legalName: 'Atelier Houénou',
+            address: '12 rue des Lilas, Cotonou',
+            country: 'BJ',
+            taxId: null,
+            businessId: null,
+            vatNumber: null,
+            individualEntrepreneur: false,
+            legalForm: null,
+            shareCapitalMinor: null,
+            rcsCity: null,
+          },
+        }),
+      ),
+    ).toMatchObject({ kind: 'issue' });
   });
 
   it('asks the VAT number of a contractor who charges VAT, and no SIREN of one established abroad', () => {
@@ -191,6 +254,9 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
           businessId: '12345678900011',
           vatNumber,
           individualEntrepreneur: false,
+          legalForm: 'SAS',
+          shareCapitalMinor: 100_000,
+          rcsCity: 'Lyon',
         },
       });
     expect(issueDecision(french(null))).toMatchObject({ reason: 'identity_incomplete' });

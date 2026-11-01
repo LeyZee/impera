@@ -1,3 +1,4 @@
+import type { InvoiceContractor } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -429,10 +430,13 @@ describe('Équipe › Factures : un prestataire français qui facture la TVA', (
 describe('Équipe › Factures : les deux spécimens France (constats A4 et A8 de l’audit)', () => {
   it('prints the franchise: « EI », the SIRET, no VAT number, « TVA non applicable, art. 293 B du CGI »', () => {
     const content = invoicePdfContent(frenchFranchise());
+    // A person: no form, capital or register; no mention of an exemption from registration (struck on 01/11).
     expect(content.parties[0]).toMatchObject({
       name: 'Basile Exemple EI',
+      lines: ['2 rue Inventée', '69001 Lyon', 'France'],
       ids: [{ label: 'SIRET', value: '123\u00a0456\u00a0789\u00a000011' }],
     });
+    expect(content.mentions).toBeNull();
     expect(content.vatNote.lead).toBe('TVA non applicable, art. 293 B du CGI');
     expect(content.totals.map((one) => [one.label, plain(one.value)])).toEqual([
       ['Total HT', '400,00 €'],
@@ -441,12 +445,19 @@ describe('Équipe › Factures : les deux spécimens France (constats A4 et A8 d
     ]);
   });
 
-  it('prints the VAT a company charges: its SIREN and VAT number, the rate, the VAT and the total with it', () => {
+  it('prints the VAT a company charges: its form, capital, register, SIREN and VAT number, the VAT and the total', () => {
     const content = invoicePdfContent(frenchCharged());
     expect(content.parties[0]).toEqual({
       label: 'Prestataire (fournisseur)',
       name: 'Chloé Exemple SARL',
-      lines: ['5 avenue Inventée', '13001 Marseille', 'France'],
+      lines: [
+        '5 avenue Inventée',
+        '13001 Marseille',
+        'France',
+        // Art. R123-237 of the Code de commerce: the register and its number never break apart.
+        'SARL au capital de 7\u202f500\u00a0€',
+        'RCS\u00a0Marseille\u00a0987\u00a0654\u00a0321',
+      ],
       ids: [
         { label: 'SIREN', value: '987\u00a0654\u00a0321' },
         { label: 'TVA intracommunautaire', value: 'FR45987654321' },
@@ -458,6 +469,37 @@ describe('Équipe › Factures : les deux spécimens France (constats A4 et A8 d
       ['Net à payer TTC', '540,00 €'],
     ]);
     expect(content.mentions).toBeNull();
+  });
+});
+
+describe('Équipe › Factures : la société prestataire (réponses du comptable, 01/11)', () => {
+  // What follows the address (three lines) of the French company, its copy changed by `patch`.
+  const companyLines = (patch: Partial<InvoiceContractor>): readonly string[] =>
+    invoicePdfContent({
+      ...frenchCharged(),
+      contractor: { ...frenchCharged().contractor, ...patch },
+    }).parties[0].lines.slice(3);
+
+  it('prints the form alone without a capital, and the register only with a SIREN', () => {
+    expect(companyLines({ shareCapitalMinor: null })).toEqual([
+      'SARL',
+      'RCS\u00a0Marseille\u00a0987\u00a0654\u00a0321',
+    ]);
+    expect(companyLines({ businessId: null })).toEqual(['SARL au capital de 7\u202f500\u00a0€']);
+    expect(companyLines({ legalForm: null, shareCapitalMinor: null })).toEqual([
+      'RCS\u00a0Marseille\u00a0987\u00a0654\u00a0321',
+    ]);
+  });
+
+  it('prints a frozen copy as it was written: no line from a copy made before these mentions', () => {
+    const { legalName, address, country, taxId, businessId, vatNumber, individualEntrepreneur } =
+      frenchCharged().contractor;
+    const before = { legalName, address, country, taxId, businessId, vatNumber, individualEntrepreneur };
+    expect(invoicePdfContent({ ...frenchCharged(), contractor: before }).parties[0].lines).toEqual([
+      '5 avenue Inventée',
+      '13001 Marseille',
+      'France',
+    ]);
   });
 });
 

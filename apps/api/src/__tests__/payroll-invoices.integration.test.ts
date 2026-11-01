@@ -27,6 +27,7 @@ const Q2 = PayPeriodSchema.parse('2025-05-16');
 const Q3 = PayPeriodSchema.parse('2025-06-01');
 const Q4 = PayPeriodSchema.parse('2025-06-16');
 const Q5 = PayPeriodSchema.parse('2025-07-01');
+const Q6 = PayPeriodSchema.parse('2025-07-16');
 
 const DAY = 86_400_000;
 const quiet = { warn: () => undefined, error: () => undefined };
@@ -143,6 +144,11 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
         address: '3 rue Imaginaire, 69001 Lyon',
         country: 'FR',
         taxId: '12345678900011',
+        // A company: its form, capital and register (art. R123-237 of the Code de commerce).
+        individualEntrepreneur: false,
+        legalForm: 'SARL',
+        shareCapitalMinor: 100_000,
+        rcsCity: 'Lyon',
       },
       agency: AGENCY,
       regimeId: invoicing.regimeId,
@@ -487,5 +493,38 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     });
     const credits = (await documentsOf(theo)).filter((one) => one.creditedInvoiceId === first.id);
     expect(credits.map((one) => one.exclVatMinor)).toEqual([-100, -1_500]);
+  });
+
+  it('issues no invoice to a French company without its form, capital and register, then issues it once filled', async () => {
+    const profile = schema.contractorProfiles;
+    const company = { legalForm: 'SARL', shareCapitalMinor: 100_000, rcsCity: 'Lyon' };
+    await db()
+      .update(profile)
+      .set({ legalForm: null, shareCapitalMinor: null, rcsCity: null })
+      .where(eq(profile.memberId, lea.id));
+    await team.report(lea, Q6, 10_000);
+    await team.recalculate(Q6);
+    expect((await team.validate(team.owner, lea, Q6)).statusCode).toBe(200);
+    const id = await statementId(lea, Q6);
+    const before = (await documentsOf(lea)).length;
+    expect(await issue(id)).toMatchObject({
+      issued: [],
+      notIssued: [{ document: 'invoice', reason: 'identity_incomplete' }],
+    });
+    expect(await documentsOf(lea)).toHaveLength(before);
+    const said = await notIssued(id);
+    expect(said.map((one) => EVENT_PAYLOADS.invoice_not_issued.parse(one.payload).reason)).toEqual([
+      'identity_incomplete',
+    ]);
+
+    // The file filled again (lot 5 will enqueue it): the next run issues the invoice, which copies the three.
+    await db().update(profile).set(company).where(eq(profile.memberId, lea.id));
+    expect(await issue(id)).toMatchObject({ issued: [{ kind: 'invoice' }], notIssued: [] });
+    const issued = (await documentsOf(lea)).at(-1);
+    expect(issued?.contractor).toMatchObject({
+      legalName: 'Léa Inventée',
+      individualEntrepreneur: false,
+      ...company,
+    });
   });
 });
