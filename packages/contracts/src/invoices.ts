@@ -351,7 +351,7 @@ export const InvoiceContractorSchema = z.object({
   vatNumber: VatNumberSchema.nullable().optional(),
   individualEntrepreneur: z.boolean().optional(),
   legalForm: trimmed(AGENCY_LEGAL_FORM_MAX).nullable().optional(),
-  shareCapitalMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+  shareCapitalMinor: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   rcsCity: trimmed(RCS_CITY_MAX).nullable().optional(),
 });
 export type InvoiceContractor = z.infer<typeof InvoiceContractorSchema>;
