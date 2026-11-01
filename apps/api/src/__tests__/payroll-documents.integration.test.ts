@@ -10,6 +10,7 @@ import {
   ContractorRegimeIdSchema,
   CONTRACTOR_DOCUMENT_MAX_BYTES,
   EVENT_PAYLOADS,
+  InvoiceIdSchema,
   newId,
   PayPeriodSchema,
   type ContractorProfileBody,
@@ -21,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createMemoryInvoiceStore } from '../modules/payroll';
 import { addDays } from '../modules/payroll/domain/billing';
 import { documentRetainUntil, documentStorageKey } from '../modules/payroll/domain/documents';
+import { invoicePdfRetainUntil } from '../modules/payroll/domain/invoice-pdf';
 import { transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
 
 import { setUpInvoicing } from './support/invoicing';
@@ -288,8 +290,9 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
       code: 'contractor_document_reviewed_conflict',
       details: { decision: 'refused' },
     });
-    // Refused, its file keeps the lock of its upload.
+    // Refused, its file keeps the lock of its upload, and is never copied.
     expect(primary.peek(key)?.retainUntil?.getTime()).toBe(lock);
+    expect(copy.peek(key)).toBeUndefined();
     expect(await issue()).toMatchObject({ notIssued: [{ reason: 'tax_residence_missing' }] });
     expect(await toldWhy()).toEqual(['tax_residence_missing', 'tax_residence_unverified']);
 
@@ -301,7 +304,10 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     expect(accepted.statusCode, accepted.body).toBe(201);
     expect(ContractorDocumentSchema.parse(accepted.json()).review).toMatchObject({ decision: 'accepted' });
     const due = documentRetainUntil('2025-12-31', today(), 12);
-    expect(primary.peek(documentStorageKey(kofi.id, rescan.id, 'image/png'))?.retainUntil).toEqual(due);
+    const rescanKey = documentStorageKey(kofi.id, rescan.id, 'image/png');
+    expect(primary.peek(rescanKey)?.retainUntil).toEqual(due);
+    // Accepted, it is copied to the second bucket under the same key and lock, as a PDF is (ADR 0037 § 6).
+    expect(copy.peek(rescanKey)).toEqual({ bytes: PNG, retainUntil: due });
     const [check] = await db()
       .select()
       .from(schema.contractorDocumentReviews)
@@ -314,6 +320,27 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     });
     expect(await requeued()).toBe(1);
     expect(await issue()).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
+
+    // The invoice keeps its proof as long as itself (Bilan on #355): a shorter lock on the accepted certificate of its
+    // year is lengthened to the invoice's, in both buckets, before its PDF is stored. The refused scan and this year's
+    // certificate are not its proof: their locks do not move.
+    const [invoice] = await db()
+      .select({ id: schema.invoices.id, issuedOn: schema.invoices.issuedOn })
+      .from(schema.invoices)
+      .where(eq(schema.invoices.memberId, kofi.id));
+    if (invoice === undefined) throw new Error('the invoice just issued');
+    const invoiceLock = invoicePdfRetainUntil(invoice.issuedOn, 12);
+    const shorter = new Date(invoiceLock.getTime() - DAY);
+    for (const bucket of [primary, copy]) bucket.plant(rescanKey, { bytes: PNG, retainUntil: shorter });
+    const thisYearKey = documentStorageKey(kofi.id, thisYear.id, 'image/jpeg');
+    const thisYearLock = primary.peek(thisYearKey)?.retainUntil;
+    expect(
+      await payroll().jobs.renderInvoicePdf(InvoiceIdSchema.parse(invoice.id), { current: 1, max: 5 }, quiet),
+    ).toBe('stored');
+    expect(primary.peek(rescanKey)?.retainUntil).toEqual(invoiceLock);
+    expect(copy.peek(rescanKey)?.retainUntil).toEqual(invoiceLock);
+    expect(primary.peek(key)?.retainUntil?.getTime()).toBe(lock);
+    expect(primary.peek(thisYearKey)?.retainUntil).toEqual(thisYearLock);
 
     // His file lists them, the latest filed first, each with its check.
     const file = ContractorFileSchema.parse(
@@ -328,7 +355,7 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     expect(await team.audited('contractor_document.review')).toBe(2);
   });
 
-  it('never serves a file whose bytes are not the ones filed, and records no acceptance the bucket refuses', async () => {
+  it('never serves a file whose bytes are not the ones filed, records no acceptance a bucket refuses, reads the copy', async () => {
     const vigilance = { id: newId(ContractorDocumentIdSchema), kind: 'urssaf_vigilance', issuedOn: today() };
     const bytes = pdf('a vigilance certificate');
     expect((await upload(team.owner, vigilance, bytes)).statusCode).toBe(201);
@@ -350,7 +377,27 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
 
     primary.plant(key, { bytes, retainUntil: new Date(Date.now() + DAY) });
     expect((await download(kofiCookie, vigilance.id)).statusCode).toBe(200);
+    // The copy holds another file under its key: the acceptance is refused, nothing recorded.
+    copy.plant(key, { bytes: pdf('another file'), retainUntil: new Date(Date.now() + DAY) });
+    expect((await review(team.owner, vigilance.id, { decision: 'accepted' })).statusCode).toBe(503);
+    const checks = () =>
+      db()
+        .select()
+        .from(schema.contractorDocumentReviews)
+        .where(eq(schema.contractorDocumentReviews.documentId, vigilance.id));
+    expect(await checks()).toEqual([]);
+    // The same file, left by an attempt that did not commit: its lock is lengthened like the first's, and recorded.
+    copy.plant(key, { bytes, retainUntil: new Date(Date.now() + DAY) });
     expect((await review(team.owner, vigilance.id, { decision: 'accepted' })).statusCode).toBe(201);
-    expect(copy.peek(key)).toBeUndefined();
+    const [check] = await checks();
+    expect(check?.retainUntil).toBeInstanceOf(Date);
+    expect(primary.peek(key)?.retainUntil).toEqual(check?.retainUntil);
+    expect(copy.peek(key)).toEqual({ bytes, retainUntil: check?.retainUntil });
+
+    // Accepted, it is served from the copy when the first bucket gives another file.
+    primary.plant(key, { bytes: pdf('altered'), retainUntil: null });
+    const fromCopy = await download(kofiCookie, vigilance.id);
+    expect(fromCopy.statusCode).toBe(200);
+    expect(new Uint8Array(fromCopy.rawPayload)).toEqual(bytes);
   });
 });

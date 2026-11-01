@@ -177,7 +177,7 @@ export function createDrizzlePayrollDocumentStore(
         };
       }),
 
-    review: (actor, memberId, documentId, body, lengthen) =>
+    review: (actor, memberId, documentId, body, secure) =>
       withMember(db, actor.userId, async (tx, scope) => {
         if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
         const member = await memberOf(tx, memberId);
@@ -224,8 +224,6 @@ export function createDrizzlePayrollDocumentStore(
           })
           .returning();
         if (review === undefined) throw new Error('contractor_document_reviews: insert returned no row');
-        // Inside the transaction: a bucket that refuses rolls the check back, and the owner tries again.
-        if (retainUntil !== null) await lengthen(row.storageKey, retainUntil);
         await audit(
           tx,
           actor,
@@ -234,6 +232,14 @@ export function createDrizzlePayrollDocumentStore(
           { memberId, decision: body.decision, retainUntil: retainUntil?.toISOString() ?? null },
         );
         if (row.kind === 'tax_residence') await enqueueInvoiceRequeue(tx, memberId);
+        // Last, once every write of the base has passed (Bilan on #355): a bucket that refuses rolls the check back,
+        // and the owner tries again; a write of the base that fails never leaves a file locked ten years for nothing.
+        if (retainUntil !== null) {
+          await secure(
+            { key: row.storageKey, sha256: row.sha256, mediaType: mediaTypeOfRow(row) },
+            retainUntil,
+          );
+        }
         return { document: documentOf(row, review), created: true };
       }),
   };

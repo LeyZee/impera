@@ -219,7 +219,8 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         createDrizzlePayrollRegimeStore(deps.db, deps.reads, now),
         createContractorDocuments({
           store: createDrizzlePayrollDocumentStore(deps.db, deps.reads, now),
-          bucket: deps.invoicePdfs.primary,
+          primary: deps.invoicePdfs.primary,
+          copy: deps.invoicePdfs.copy,
         }),
         requireRole,
       ),

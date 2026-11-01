@@ -4,8 +4,13 @@
 -- document and added only, like the documents themselves (0041): a refused file stays refused, the contractor files a
 -- new one. The owner checks for a contractor, never a document of his own member record (`owner_insert`, the same
 -- clause as the other writes « for » a contractor). The contractor reads the checks of his own documents, the owner
--- and an active manager every one. An acceptance keeps the end of the lock the bucket was asked to hold on the file
+-- and an active manager every one. An acceptance keeps the end of the lock both buckets were asked to hold on the file
 -- (`retain_until`, that of the invoices it may cover); a refusal has none: its file keeps its upload lock only.
+-- `contractor_document_reviews_ten_years_check`: an accepted document's lock never ends sooner than ten years after
+-- its check, whatever the code computed (Bilan on #355), as `keep_invoice_pdf_lock` for the PDFs (0045). A CHECK on
+-- its own row, in UTC: the bound never moves with the session's zone. The lock the code asks for (ten years after the
+-- close of the fiscal year that holds the day one year after the document's last day or the check) is always later.
+-- The column is a floor: an invoice under a treaty issued later lengthens the certificate's lock in the buckets.
 -- `contractor_documents.retain_until`: the end of the lock posed on the file at its upload (thirty days, until the
 -- owner's check), as `invoice_pdfs.retain_until` (0045). NOT NULL with no default: no route nor job wrote this table
 -- before this lot, so no row exists anywhere.
@@ -18,7 +23,8 @@ CREATE TABLE "contractor_document_reviews" (
 	"retain_until" timestamp with time zone,
 	CONSTRAINT "contractor_document_reviews_decision_check" CHECK ("contractor_document_reviews"."decision" in ('accepted', 'refused')),
 	CONSTRAINT "contractor_document_reviews_reason_check" CHECK (("contractor_document_reviews"."decision" = 'refused') = ("contractor_document_reviews"."reason" is not null) and ("contractor_document_reviews"."reason" is null or char_length("contractor_document_reviews"."reason") between 1 and 500)),
-	CONSTRAINT "contractor_document_reviews_retain_check" CHECK (("contractor_document_reviews"."decision" = 'accepted') = ("contractor_document_reviews"."retain_until" is not null))
+	CONSTRAINT "contractor_document_reviews_retain_check" CHECK (("contractor_document_reviews"."decision" = 'accepted') = ("contractor_document_reviews"."retain_until" is not null)),
+	CONSTRAINT "contractor_document_reviews_ten_years_check" CHECK ("contractor_document_reviews"."retain_until" is null or "contractor_document_reviews"."retain_until" >= ("contractor_document_reviews"."reviewed_at" at time zone 'UTC' + interval '10 years') at time zone 'UTC')
 );
 --> statement-breakpoint
 ALTER TABLE "contractor_document_reviews" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint

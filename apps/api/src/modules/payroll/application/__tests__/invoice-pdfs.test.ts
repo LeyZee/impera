@@ -65,6 +65,7 @@ function fakeStore(): FakeStore {
       document: sampleInvoice(),
       logo: null,
       fiscalYearEndMonth: 12,
+      certificateKeys: [],
       pdf: null,
     },
     alerts,
@@ -251,6 +252,83 @@ describe('Équipe › Factures : le rendu du PDF, une fois, verrouillé (ADR 003
       'no answer',
     );
     expect(store.invoice?.pdf).toBeNull();
+  });
+});
+
+describe('Équipe › Factures : l’attestation de résidence gardée aussi longtemps que la facture sous convention (EQ-06 lot 5c)', () => {
+  const CERTIFICATE = 'contractor-documents/kofi/certificate-2026.pdf';
+  const RESCAN = 'contractor-documents/kofi/certificate-2026-rescan.png';
+  /** Locked at its acceptance for the invoices of the year after its last day: shorter than an invoice issued later. */
+  const ACCEPTED_LOCK = new Date('2036-01-01T00:00:00.000Z');
+  let store: FakeStore;
+  let primary: MemoryInvoiceStore;
+  let copy: MemoryInvoiceStore;
+  const deps = () => ({ store, renderer: fakeRenderer(), primary, copy });
+  const plantBoth = (key: string, retainUntil: Date | null) => {
+    for (const bucket of [primary, copy]) bucket.plant(key, { bytes: bytesOf(key), retainUntil });
+  };
+
+  beforeEach(() => {
+    store = fakeStore();
+    primary = createMemoryInvoiceStore();
+    copy = createMemoryInvoiceStore();
+    if (store.invoice === null) throw new Error('the invoice of the fake store');
+    store.invoice = { ...store.invoice, certificateKeys: [CERTIFICATE, RESCAN] };
+  });
+
+  it('lengthens each certificate’s lock to the invoice’s, in both buckets, before the PDF is stored', async () => {
+    plantBoth(CERTIFICATE, ACCEPTED_LOCK);
+    plantBoth(RESCAN, ACCEPTED_LOCK);
+    expect(await renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('stored');
+    for (const bucket of [primary, copy]) {
+      expect(bucket.peek(CERTIFICATE)?.retainUntil).toEqual(LOCK);
+      expect(bucket.peek(RESCAN)?.retainUntil).toEqual(LOCK);
+    }
+  });
+
+  it('keeps a certificate’s longer lock as it is', async () => {
+    const longer = new Date('2040-01-01T00:00:00.000Z');
+    plantBoth(CERTIFICATE, longer);
+    plantBoth(RESCAN, ACCEPTED_LOCK);
+    expect(await renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('stored');
+    expect(primary.peek(CERTIFICATE)?.retainUntil).toEqual(longer);
+    expect(copy.peek(CERTIFICATE)?.retainUntil).toEqual(longer);
+  });
+
+  it('stores no PDF while a certificate is not locked as long: retried, then alerted on the last attempt', async () => {
+    plantBoth(CERTIFICATE, ACCEPTED_LOCK);
+    // Missing from the copy, which a locked bucket never loses: a fault, not a passing failure.
+    primary.plant(RESCAN, { bytes: bytesOf(RESCAN), retainUntil: ACCEPTED_LOCK });
+    await expect(renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).rejects.toThrow(/missing at ovhcloud/u);
+    expect(store.invoice?.pdf).toBeNull();
+    expect(primary.peek(KEY)).toBeUndefined();
+    expect(store.alerts).toEqual([]);
+    // No lock the bucket names: never taken for one that holds.
+    copy.plant(RESCAN, { bytes: bytesOf(RESCAN), retainUntil: null });
+    await expect(renderInvoicePdf(deps(), invoiceId, LAST, quiet)).rejects.toThrow(/no lock/u);
+    expect(store.alerts.map((alert) => alert.type)).toEqual(['invoice_pdf_missing']);
+    expect(store.invoice?.pdf).toBeNull();
+  });
+
+  it('skips a certificate a store in memory forgot with the process (development)', async () => {
+    const volatilePrimary = createMemoryInvoiceStore({ volatile: true });
+    const volatileCopy = createMemoryInvoiceStore({ volatile: true });
+    expect(
+      await renderInvoicePdf(
+        { ...deps(), primary: volatilePrimary, copy: volatileCopy },
+        invoiceId,
+        FIRST,
+        quiet,
+      ),
+    ).toBe('stored');
+  });
+
+  it('locks nothing for a document that relies on no certificate', async () => {
+    if (store.invoice === null) throw new Error('the invoice of the fake store');
+    store.invoice = { ...store.invoice, certificateKeys: [] };
+    plantBoth(CERTIFICATE, ACCEPTED_LOCK);
+    expect(await renderInvoicePdf(deps(), invoiceId, FIRST, quiet)).toBe('stored');
+    expect(primary.peek(CERTIFICATE)?.retainUntil).toEqual(ACCEPTED_LOCK);
   });
 });
 

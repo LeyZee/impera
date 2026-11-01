@@ -382,6 +382,11 @@ export interface InvoiceToRender {
   readonly logo: InvoiceLogo | null;
   /** The month the agency's fiscal year closes in (`billing_settings`), read when the PDF is rendered. */
   readonly fiscalYearEndMonth: number;
+  /**
+   * The storage keys of the tax residence certificates an invoice under a tax treaty relies on: those of its member,
+   * accepted by the owner, of its period's civil year (`taxResidenceFor`). Empty for any other document.
+   */
+  readonly certificateKeys: readonly string[];
   readonly pdf: StoredInvoicePdf | null;
 }
 
@@ -607,15 +612,16 @@ export interface PayrollDocumentStore {
     documentId: ContractorDocumentId,
   ): Promise<{ readonly document: ContractorDocument; readonly file: DocumentFile } | null>;
   /**
-   * The owner's check, once. An acceptance asks the bucket, through `lengthen`, to lock the file as long as the
-   * invoices it may cover, before it is recorded: a bucket that refuses records nothing.
+   * The owner's check, once. An acceptance hands its file and the lock it records to `secure`, last in the check's
+   * transaction (after its row, its line of `audit_log` and the requeue): the buckets lock the file as long as the
+   * invoices it may cover, in both providers; one that refuses rolls the check back and records nothing.
    */
   review(
     actor: Actor,
     memberId: TeamMemberId,
     documentId: ContractorDocumentId,
     body: ContractorDocumentReview,
-    lengthen: (key: string, retainUntil: Date) => Promise<void>,
+    secure: (file: DocumentFile, retainUntil: Date) => Promise<void>,
   ): Promise<{ document: ContractorDocument; created: boolean }>;
 }
 

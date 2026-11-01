@@ -345,10 +345,13 @@ contractor_profiles        member_id (clé), legal_name, address, tax_id, busine
                            la vérification ; jamais supprimé)
 contractor_documents       id, member_id, kind (tax_residence|urssaf_vigilance), issued_on, valid_until, storage_key,
                            sha256, retain_until (verrou posé au dépôt, 0054), created_by, created_at (le membre ou le
-                           propriétaire, ajout seul ; le fichier dans le premier bucket des factures)
+                           propriétaire, ajout seul ; le fichier dans le premier bucket des factures, copié chez
+                           le second une fois accepté)
 contractor_document_reviews document_id (clé), decision (accepted|refused), reason (refus seul), reviewed_by,
-                           reviewed_at, retain_until (acceptation seule : verrou rallongé à celui des factures)
-                           (propriétaire seul, jamais sur sa propre fiche ; une fois, ajout seul ; 0054)
+                           reviewed_at, retain_until (acceptation seule : verrou rallongé à celui des factures, dix
+                           ans après la vérification au moins ; un minimum, les factures émises plus tard le
+                           rallongent dans les buckets) (propriétaire seul, jamais sur sa propre fiche ; une fois,
+                           ajout seul ; 0054)
 contract_texts             id, kind (service_contract|billing_mandate), version, body, sha256, contest_delay_days (mandat
                            seul), created_by, created_at (propriétaire, ajout seul ; version suivante de sa sorte)
 contract_acceptances       id, member_id, text_id, text_sha256, accepted_by, accepted_at (le membre lui-même, ajout seul ;

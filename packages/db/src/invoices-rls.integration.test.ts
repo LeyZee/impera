@@ -18,7 +18,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from '@nirvana/contracts';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { withAdmin, withMember } from './client';
@@ -701,7 +701,21 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
           as(owner, (tx) => tx.insert(s.contractorDocumentReviews).values(review(first.id, owner))),
         ),
       ).toMatch(/contractor_document_reviews_pkey/u);
-      await as(owner, (tx) => tx.insert(s.contractorDocumentReviews).values(review(second.id, owner)));
+      // Locked ten years after its check at least, whatever the code computed (Bilan on #355), in UTC whatever the
+      // session's zone: a millisecond short is refused, the bound itself passes.
+      const CHECKED = new Date('2026-11-01T23:30:00Z');
+      const TEN_YEARS = new Date('2036-11-01T23:30:00Z');
+      const accepted = (retainUntil: Date) =>
+        as(owner, async (tx) => {
+          await tx.execute(sql`set local time zone 'Pacific/Kiritimati'`);
+          await tx
+            .insert(s.contractorDocumentReviews)
+            .values(review(second.id, owner, { reviewedAt: CHECKED, retainUntil }));
+        });
+      expect(await failure(accepted(new Date(TEN_YEARS.getTime() - 1)))).toMatch(
+        /contractor_document_reviews_ten_years_check/u,
+      );
+      await accepted(TEN_YEARS);
       expect(await as(kofi, (tx) => tx.select().from(s.contractorDocumentReviews))).toHaveLength(2);
       expect(await as(manager, (tx) => tx.select().from(s.contractorDocumentReviews))).toHaveLength(2);
       expect(await as(ama, (tx) => tx.select().from(s.contractorDocumentReviews))).toHaveLength(0);

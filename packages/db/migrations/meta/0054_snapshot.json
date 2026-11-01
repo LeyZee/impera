@@ -2841,6 +2841,10 @@
         "contractor_document_reviews_retain_check": {
           "name": "contractor_document_reviews_retain_check",
           "value": "(\"contractor_document_reviews\".\"decision\" = 'accepted') = (\"contractor_document_reviews\".\"retain_until\" is not null)"
+        },
+        "contractor_document_reviews_ten_years_check": {
+          "name": "contractor_document_reviews_ten_years_check",
+          "value": "\"contractor_document_reviews\".\"retain_until\" is null or \"contractor_document_reviews\".\"retain_until\" >= (\"contractor_document_reviews\".\"reviewed_at\" at time zone 'UTC' + interval '10 years') at time zone 'UTC'"
         }
       },
       "isRLSEnabled": false

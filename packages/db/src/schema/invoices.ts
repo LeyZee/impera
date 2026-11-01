@@ -415,7 +415,10 @@ export const contractorDocumentReviews = pgTable(
       .notNull()
       .references(() => user.id),
     reviewedAt: timestampTz('reviewed_at').notNull().defaultNow(),
-    /** The end of the file's lock once accepted, as the bucket was asked to hold it; `null` for a refusal. */
+    /**
+     * The end of the file's lock once accepted, as both buckets were asked to hold it at the check, ten years after it
+     * at least; `null` for a refusal. A floor: an invoice issued later lengthens the lock in the buckets, which name it.
+     */
     retainUntil: timestampTz('retain_until'),
   },
   (t) => {
@@ -429,6 +432,12 @@ export const contractorDocumentReviews = pgTable(
       check(
         'contractor_document_reviews_retain_check',
         sql`(${t.decision} = 'accepted') = (${t.retainUntil} is not null)`,
+      ),
+      // An accepted document justifies invoices ten years (ADR 0037 § 4, Bilan on #355): its lock never ends sooner
+      // after its check, whatever the code computed. In UTC, so that the bound never moves with the session's zone.
+      check(
+        'contractor_document_reviews_ten_years_check',
+        sql`${t.retainUntil} is null or ${t.retainUntil} >= (${t.reviewedAt} at time zone 'UTC' + interval '10 years') at time zone 'UTC'`,
       ),
       pgPolicy('member_read', { for: 'select', using: sql`${readsTeam} or ${isMine(documentMember)}` }),
       pgPolicy('owner_insert', {

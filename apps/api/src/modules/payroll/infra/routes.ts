@@ -665,6 +665,7 @@ export function createPayrollRoutes(
           request.params.memberId,
           request.params.documentId,
           request.body,
+          request.log,
         );
         return reply.code(created ? 201 : 200).send(document);
       },

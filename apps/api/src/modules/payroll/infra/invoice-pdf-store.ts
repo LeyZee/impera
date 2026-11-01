@@ -22,6 +22,7 @@ import {
 } from '@nirvana/contracts';
 import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
 
+import { documentValidUntil, treatyNeedsResidence } from '../domain/billing';
 import type { StatementAnnexSource } from '../domain/invoice-pdf';
 import type { InvoiceLogo, InvoiceToRender, PayrollInvoicePdfStore, StoredInvoicePdf } from '../domain/ports';
 
@@ -35,6 +36,8 @@ const {
   commissionStatementLines,
   commissionStatements,
   contractAcceptances,
+  contractorDocumentReviews,
+  contractorDocuments,
   contractTexts,
   domainEvents,
   invoiceLines,
@@ -64,6 +67,33 @@ async function pdfOf(tx: Transaction, invoiceId: string): Promise<StoredInvoiceP
       retainUntil: copy.retainUntil,
     })),
   };
+}
+
+/**
+ * The storage keys of the tax residence certificates of `memberId` accepted by the owner and of `period`'s civil year:
+ * those an invoice of that period relies on under a treaty (`taxResidenceFor`). Every one: a rescan accepted besides
+ * the first is proof as well.
+ */
+async function certificateKeysOf(tx: Transaction, memberId: string, period: string): Promise<string[]> {
+  const rows = await tx
+    .select({
+      key: contractorDocuments.storageKey,
+      issuedOn: contractorDocuments.issuedOn,
+      validUntil: contractorDocuments.validUntil,
+    })
+    .from(contractorDocuments)
+    .innerJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
+    .where(
+      and(
+        eq(contractorDocuments.memberId, memberId),
+        eq(contractorDocuments.kind, 'tax_residence'),
+        eq(contractorDocumentReviews.decision, 'accepted'),
+      ),
+    )
+    .orderBy(contractorDocuments.storageKey);
+  return rows
+    .filter((row) => documentValidUntil({ kind: 'tax_residence', ...row }).slice(0, 4) === period.slice(0, 4))
+    .map((row) => row.key);
 }
 
 /**
@@ -287,6 +317,11 @@ export function createDrizzlePayrollInvoicePdfStore(
           },
           logo: await logoOf(tx, invoice.logoSha256),
           fiscalYearEndMonth: settings?.fiscalYearEndMonth ?? DEFAULT_FISCAL_YEAR_END_MONTH,
+          // An invoice issued under a treaty waited for them (`issueDecision`); a credit note never did.
+          certificateKeys:
+            kind === 'invoice' && treatyNeedsResidence(regime)
+              ? await certificateKeysOf(tx, invoice.memberId, invoice.period)
+              : [],
           pdf: await pdfOf(tx, invoiceId),
         };
       }),
