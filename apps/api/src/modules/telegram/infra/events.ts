@@ -3,6 +3,7 @@ import {
   AutomaticMissingSchema,
   ConversationIdSchema,
   CreatorIdSchema,
+  EVENT_PAYLOADS,
   HandoffCauseSchema,
   InvoiceKindSchema,
   InvoiceNotIssuedReasonSchema,
@@ -90,6 +91,14 @@ const InvoiceNotIssuedSchema = z.object({
   reason: InvoiceNotIssuedReasonSchema,
 });
 
+// The document's number, where and, for a conflict, at which stage (ADR 0037): the member stays in Nirvana.
+const InvoicePdfMissingSchema = EVENT_PAYLOADS.invoice_pdf_missing.pick({ number: true, place: true });
+const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
+  number: true,
+  place: true,
+  stage: true,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -171,6 +180,16 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = InvoiceNotIssuedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'invoice_not_issued', ...parsed.data };
+    }
+    case 'invoice_pdf_conflict': {
+      const parsed = InvoicePdfConflictSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_pdf_conflict', ...parsed.data };
+    }
+    case 'invoice_pdf_missing': {
+      const parsed = InvoicePdfMissingSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_pdf_missing', ...parsed.data };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);
