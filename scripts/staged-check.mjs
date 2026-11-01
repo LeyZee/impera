@@ -9,6 +9,9 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** From this many staged files, the check says it may take a while before it starts. */
+const LONG_RUN_FILES = 200;
+
 /** The files each check reads, by extension: the globs the hooks had in lefthook.yml. */
 export const CHECKS = {
   format: ['ts', 'tsx', 'js', 'mjs', 'json', 'yaml', 'yml', 'css'],
@@ -74,6 +77,12 @@ if (process.argv[1]?.endsWith('staged-check.mjs') === true) {
     maxBuffer: 64 * 1024 * 1024,
   });
   const files = stagedFor(check, staged);
+  // A merge can stage thousands of files: say so, rather than stay silent for minutes.
+  if (files.length >= LONG_RUN_FILES) {
+    console.error(
+      `staged-check ${check}: ${String(files.length)} staged files, this can take a few minutes…`,
+    );
+  }
   if (files.length > 0) {
     const ok = check === 'format' ? await format(root, files) : await lint(root, files);
     if (!ok) process.exit(1);
