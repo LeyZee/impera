@@ -34,6 +34,8 @@ type Answer = { status: number; body: unknown } | 'down';
 let view: { settings: unknown; logo: unknown } | 'down';
 let onPut: Answer;
 let onLogo: Answer;
+/** While set, the server is still reading the logo sent: its answer waits for this. */
+let hold: Promise<void> | null;
 const writes: { method: string; path: string; body: unknown }[] = [];
 
 function serve(): void {
@@ -51,7 +53,8 @@ function serve(): void {
           path: url.pathname,
           body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body,
         });
-        return json(init.method === 'PUT' ? onPut : onLogo);
+        if (init.method === 'PUT') return json(onPut);
+        return hold === null ? json(onLogo) : hold.then(() => json(onLogo));
       }
       if (url.pathname === '/v1/payroll/billing-settings') {
         return json(view === 'down' ? { status: 500, body: null } : { status: 200, body: view });
@@ -90,6 +93,7 @@ beforeEach(() => {
   view = { settings: SETTINGS, logo: LOGO };
   onPut = { status: 200, body: { settings: SETTINGS, logo: LOGO } };
   onLogo = { status: 201, body: LOGO };
+  hold = null;
   serve();
 });
 
@@ -262,6 +266,40 @@ describe('Réglages › Facturation', () => {
       expect(writes).toHaveLength(2);
     });
     expect(writes[1]).toMatchObject({ method: 'PUT', body: { logoSha256: null } });
+  });
+
+  it('saves nothing while the server reads a logo, then keeps it and gives the focus back to the picker', async () => {
+    let release = (): void => undefined;
+    hold = new Promise((resolve) => {
+      release = resolve;
+    });
+    const fresh = { ...LOGO, sha256: 'c'.repeat(64) };
+    onLogo = { status: 201, body: fresh };
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Changer : Logo' }));
+
+    pick(4_000);
+    expect(await screen.findByRole('button', { name: 'Lecture du fichier…' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    const save = screen.getByRole('button', { name: 'Enregistrer' });
+    expect(save).toHaveProperty('disabled', true);
+    // Not by the keyboard either: Entrée submits the form.
+    const form = save.closest('form');
+    expect(form).not.toBeNull();
+    if (form !== null) fireEvent.submit(form);
+    expect(writes.map((write) => write.method)).toEqual(['POST']);
+
+    release();
+    const picker = await screen.findByRole('button', { name: 'Choisir un autre PNG' });
+    expect(picker).toHaveProperty('disabled', false);
+    expect(document.activeElement).toBe(picker);
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(2);
+    });
+    expect(writes[1]).toMatchObject({ method: 'PUT', body: { logoSha256: fresh.sha256 } });
   });
 
   it('warns that a short logo may print blurry, without refusing it', async () => {

@@ -76,13 +76,14 @@ describe('Réglages › Facturation : le formulaire', () => {
     expect(isSiren('123 456 782')).toBe(true);
     expect(isSiren('123456789')).toBe(false);
     expect(isSiren('12345678')).toBe(false);
+    // La Poste's SIREN carries its key like any other.
     expect(isSiren('356000000')).toBe(true);
     expect(vatOfSiren('123 456 782')).toBe('FR11123456782');
-    // Offered while the field is empty or holds a French number that does not match, never over a foreign one.
+    // Offered while the field holds another number or none, a foreign one included: a SIREN has its French number.
     expect(suggestedVat(filled({ vatNumber: '' }))).toBe('FR11123456782');
     expect(suggestedVat(filled({ vatNumber: 'FR12123456782' }))).toBe('FR11123456782');
+    expect(suggestedVat(filled({ vatNumber: 'BE0123456789' }))).toBe('FR11123456782');
     expect(suggestedVat(filled({ vatNumber: 'fr 11 123 456 782' }))).toBeNull();
-    expect(suggestedVat(filled({ vatNumber: 'BE0123456789' }))).toBeNull();
     expect(suggestedVat(filled({ siren: '123456789', vatNumber: '' }))).toBeNull();
   });
 
@@ -95,11 +96,16 @@ describe('Réglages › Facturation : le formulaire', () => {
       'address',
     ]);
     expect(problemsOf(filled({ siren: '123456789' }), ['siren']).siren).toMatch(/SIREN/u);
-    expect(problemsOf(filled({ vatNumber: 'FR12123456782' }), ['vatNumber']).vatNumber).toMatch(
-      /ne correspond pas au SIREN/u,
+    expect(problemsOf(filled({ vatNumber: 'FR12123456782' }), ['vatNumber']).vatNumber).toBe(
+      'Le numéro de TVA de ce SIREN est FR11123456782 : vérifie l’un ou l’autre.',
     );
-    // A VAT number of another country is not checked against the SIREN.
-    expect(problemsOf(filled({ vatNumber: 'BE0123456789' }), ['vatNumber'])).toEqual({});
+    // A company with a SIREN has its French number and no other, as the server checks (#344).
+    expect(problemsOf(filled({ vatNumber: 'BE0123456789' }), ['vatNumber']).vatNumber).toMatch(
+      /FR11123456782/u,
+    );
+    expect(problemsOf(filled({ vatNumber: '11123456782' }), ['vatNumber']).vatNumber).toMatch(
+      /^FR, deux chiffres/u,
+    );
     expect(problemsOf(filled({ dueDays: '30' }), ['dueDays']).dueDays).toBe(
       'Un nombre entier de jours, de 45 à 60.',
     );
@@ -173,11 +179,11 @@ describe('Réglages › Facturation : ce que la page dit', () => {
       height: 522,
       byteLength: 443_392,
     };
-    expect(logoLine(logo)).toBe('1\u202f843 × 522 px · 433 Ko');
+    expect(logoLine(logo)).toBe('1\u202f843 × 522 px · 433\u00a0Ko');
     expect(logoWarning(logo)).toBeNull();
     expect(logoWarning({ ...logo, height: 120 })).toMatch(/flou/u);
-    expect(weightText(512 * 1024)).toBe('512 Ko');
-    expect(weightText(1_258_291)).toBe('1,2 Mo');
+    expect(weightText(512 * 1024)).toBe('512\u00a0Ko');
+    expect(weightText(1_258_291)).toBe('1,2\u00a0Mo');
   });
 
   it('lets no invoice leave without the designation of the service', () => {

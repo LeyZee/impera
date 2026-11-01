@@ -10,12 +10,13 @@ import {
   type AgencyLogo,
   type BillingSettingsView,
 } from '@nirvana/contracts';
-import { useEffect, useId, useRef, useState, type JSX, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { addLogo, logoUrl, saveBillingSettings, useKeepBillingSettings, type BillingRefusal } from './api';
 import {
   ALL_STEPS,
   FIELDS_OF,
+  LOGO_HINT,
   LOGO_REFUSALS,
   MONTHS,
   STEP_TITLES,
@@ -84,14 +85,17 @@ export function BillingDialog({
     () => new Set(setup ? [] : wrongSteps(draftOf(view.settings))),
   );
   const [busy, setBusy] = useState(false);
+  // A logo being read by the server: nothing is saved nor left meanwhile, or the save would keep the logo before it.
+  const [reading, setReading] = useState(false);
   const [refusal, setRefusal] = useState<BillingRefusal | null>(null);
 
   const step = steps[index] ?? 'agency';
   const last = index === steps.length - 1;
   const problems = shown.has(step) ? problemsOf(draft, FIELDS_OF[step]) : {};
 
-  // Each step opens on its first field; a step that cannot go on, on its first problem.
-  useEffect(() => {
+  // Each step opens on its first field; a step that cannot go on, on its first problem. In the commit that shows the
+  // step, before it is painted (#342).
+  useLayoutEffect(() => {
     const form = body.current;
     if (form === null) return;
     (
@@ -126,7 +130,7 @@ export function BillingDialog({
   };
 
   const next = (): void => {
-    if (busy) return;
+    if (busy || reading) return;
     if (Object.keys(problemsOf(draft, FIELDS_OF[step])).length > 0) {
       setShown((before) => new Set([...before, step]));
       return;
@@ -181,6 +185,8 @@ export function BillingDialog({
           <LogoStep
             logo={draft.logoSha256 === null ? null : logo}
             busy={busy}
+            reading={reading}
+            onReading={setReading}
             onLogo={(kept) => {
               setLogo(kept);
               setDraft((before) => ({ ...before, logoSha256: kept?.sha256 ?? null }));
@@ -201,7 +207,7 @@ export function BillingDialog({
             <button
               type="button"
               className="nv-btn nv-btn--plain"
-              disabled={busy}
+              disabled={busy || reading}
               onClick={() => {
                 setIndex(index - 1);
               }}
@@ -209,7 +215,7 @@ export function BillingDialog({
               Retour
             </button>
           )}
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy || reading} aria-busy={busy}>
             {busy ? 'Enregistrement…' : last ? 'Enregistrer' : 'Continuer'}
           </button>
         </div>
@@ -367,7 +373,7 @@ function RegistrationStep(props: StepProps): JSX.Element {
         id={id}
         field="vatNumber"
         label="TVA intracommunautaire"
-        hint="Celui de l’agence, sur ses avis de TVA."
+        hint="Le numéro de l’agence, sur ses avis de TVA."
         problems={problems}
         after={
           suggested === null ? null : (
@@ -491,41 +497,57 @@ function PaymentStep(props: StepProps): JSX.Element {
   );
 }
 
-type LogoState =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'sending' }
-  | { readonly kind: 'refused'; readonly name: string; readonly refusal: BillingRefusal };
-
 /**
  * The logo, sent as soon as it is picked: the server reads it whole and says why it refuses one. Kept by the next save
- * only; « Ne pas imprimer de logo » prints the legal name alone.
+ * only; « Ne pas imprimer de logo » prints the legal name alone. While the server reads it, the dialog saves nothing
+ * (`reading`); once read, the focus goes back to the button that picks one, disabled meanwhile.
  */
 function LogoStep({
   logo,
   busy,
+  reading,
+  onReading,
   onLogo,
 }: {
   logo: AgencyLogo | null;
   busy: boolean;
+  reading: boolean;
+  onReading: (reading: boolean) => void;
   onLogo: (logo: AgencyLogo | null) => void;
 }): JSX.Element {
   const file = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<LogoState>({ kind: 'idle' });
+  const pick = useRef<HTMLButtonElement>(null);
+  const read = useRef(false);
+  const [refused, setRefused] = useState<{ readonly name: string; readonly refusal: BillingRefusal } | null>(
+    null,
+  );
   const warning = logo === null ? null : logoWarning(logo);
 
+  // A disabled button loses the focus: it gets it back in the commit that enables it again.
+  useLayoutEffect(() => {
+    if (reading) {
+      read.current = true;
+      return;
+    }
+    if (!read.current) return;
+    read.current = false;
+    pick.current?.focus();
+  }, [reading]);
+
   const send = async (picked: File): Promise<void> => {
-    setState({ kind: 'sending' });
+    setRefused(null);
+    onReading(true);
     const outcome = await addLogo(picked);
+    onReading(false);
     if (outcome.kind === 'ok') {
-      setState({ kind: 'idle' });
       onLogo(outcome.value);
       return;
     }
-    setState({ kind: 'refused', name: picked.name, refusal: outcome });
+    setRefused({ name: picked.name, refusal: outcome });
   };
 
   return (
-    <div className="bf-step" aria-busy={state.kind === 'sending'}>
+    <div className="bf-step" aria-busy={reading}>
       <div className="bf-paper bf-paper--logo">
         {logo === null ? (
           <p className="bf-paper__none">Aucun logo : la facture imprime la raison sociale seule.</p>
@@ -536,11 +558,7 @@ function LogoStep({
       {logo === null ? null : <p className="tm-hint nv-num">{logoLine(logo)}</p>}
       {warning === null ? null : <p className="tm-warn">{warning}</p>}
 
-      <p className="tm-hint">
-        {
-          'Un PNG à fond transparent, 512\u00a0Ko au plus : 1\u00a0000 à 2\u00a0000 pixels de large suffisent. Ni SVG ni JPEG, qui ne passent pas dans une facture PDF/A.'
-        }
-      </p>
+      <p className="tm-hint">{LOGO_HINT}</p>
       <input
         ref={file}
         type="file"
@@ -554,35 +572,32 @@ function LogoStep({
           if (picked !== undefined) void send(picked);
         }}
       />
-      {state.kind === 'refused' ? (
+      {refused === null ? null : (
         <p className="tm-warn nv-swap" role="alert">
-          « {state.name} » n’est pas gardé. {refusalText(state.refusal)}
+          « {refused.name} » n’est pas gardé. {refusalText(refused.refusal)}
         </p>
-      ) : null}
+      )}
       <div className="bf-logo-actions">
         <button
+          ref={pick}
           type="button"
           className="nv-btn nv-btn--soft"
           data-autofocus
-          disabled={busy || state.kind === 'sending'}
-          aria-busy={state.kind === 'sending'}
+          disabled={busy || reading}
+          aria-busy={reading}
           onClick={() => {
             file.current?.click();
           }}
         >
-          {state.kind === 'sending'
-            ? 'Lecture du fichier…'
-            : logo === null
-              ? 'Choisir un PNG'
-              : 'Choisir un autre PNG'}
+          {reading ? 'Lecture du fichier…' : logo === null ? 'Choisir un PNG' : 'Choisir un autre PNG'}
         </button>
         {logo === null ? null : (
           <button
             type="button"
             className="nv-btn nv-btn--plain"
-            disabled={busy || state.kind === 'sending'}
+            disabled={busy || reading}
             onClick={() => {
-              setState({ kind: 'idle' });
+              setRefused(null);
               onLogo(null);
             }}
           >

@@ -108,13 +108,12 @@ export function parseEuros(text: string): number | null {
 const digitsOf = (text: string): string => text.replace(/[\s.]/gu, '');
 
 /**
- * Whether a text is a SIREN: nine digits carrying the Luhn key every SIREN carries, La Poste's excepted (356 000 000,
- * kept by INSEE without it). A typo is said here, before an accountant finds it on an invoice.
+ * Whether a text is a SIREN: nine digits carrying the Luhn key every SIREN carries (La Poste's included). A typo is
+ * said here, before an accountant finds it on an invoice; the server refuses it too.
  */
 export function isSiren(text: string): boolean {
   const digits = digitsOf(text);
   if (!/^\d{9}$/u.test(digits)) return false;
-  if (digits === '356000000') return true;
   let sum = 0;
   for (let index = 0; index < digits.length; index += 1) {
     const value = Number(digits.charAt(index)) * (index % 2 === 1 ? 2 : 1);
@@ -135,14 +134,13 @@ const vatOf = (text: string): string => text.replace(/[\s.-]/gu, '').toUpperCase
 const VAT_NUMBER = new RegExp(VAT_NUMBER_PATTERN, 'u');
 
 /**
- * The French VAT number the SIREN gives, offered while the field is empty or holds a French number that does not match;
- * `null` otherwise (a foreign number is the owner's to know).
+ * The VAT number the SIREN gives, offered while the field holds another one or none: a company with a SIREN has
+ * that French number and no other, which the server checks too; `null` once it is there, or without a SIREN.
  */
 export function suggestedVat(draft: BillingDraft): string | null {
   if (!isSiren(draft.siren)) return null;
-  const vat = vatOf(draft.vatNumber);
   const computed = vatOfSiren(draft.siren);
-  return (vat === '' || vat.startsWith('FR')) && vat !== computed ? computed : null;
+  return vatOf(draft.vatNumber) === computed ? null : computed;
 }
 
 /** Whole days within the bounds of the due date, or `null`. */
@@ -186,11 +184,11 @@ export function problemsOf(
   check('siren', isSiren(draft.siren), 'Neuf chiffres, ceux du Kbis : ceux-ci ne forment pas un SIREN.');
   check('rcsCity', filled(draft.rcsCity, RCS_CITY_MAX), 'La ville du greffe, comme sur le Kbis.');
   const vat = vatOf(draft.vatNumber);
-  check('vatNumber', VAT_NUMBER.test(vat), 'Deux lettres puis le numéro, par exemple FR12…');
+  check('vatNumber', VAT_NUMBER.test(vat), 'FR, deux chiffres puis le SIREN, comme sur les avis de TVA.');
   check(
     'vatNumber',
-    !vat.startsWith('FR') || !isSiren(draft.siren) || vat === vatOfSiren(draft.siren),
-    'Ce numéro ne correspond pas au SIREN : vérifie l’un ou l’autre.',
+    !isSiren(draft.siren) || vat === vatOfSiren(draft.siren),
+    `Le numéro de TVA de ce SIREN est ${vatOfSiren(draft.siren)} : vérifie l’un ou l’autre.`,
   );
   check(
     'serviceDescription',
@@ -301,13 +299,16 @@ export function footText(agency: InvoiceAgency): string {
   return `${parts.join(' · ')}, mandataire de facturation du prestataire.`;
 }
 
-/** « 433 Ko », « 1,2 Mo »: a file's weight. */
+/** « 433 Ko », « 1,2 Mo »: a file's weight, the number and its unit never broken apart. */
 export function weightText(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${String(Math.max(1, Math.round(bytes / 1024)))} Ko`;
-  return `${(bytes / 1024 / 1024).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo`;
+  if (bytes < 1024 * 1024) return `${String(Math.max(1, Math.round(bytes / 1024)))}\u00a0Ko`;
+  return `${(bytes / 1024 / 1024).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u00a0Mo`;
 }
 
 const SIDE = new Intl.NumberFormat('fr-FR');
+
+/** What the logo step asks for, its weight from the limit the server keeps (`AGENCY_LOGO_MAX_BYTES`). */
+export const LOGO_HINT = `Un PNG à fond transparent, ${weightText(AGENCY_LOGO_MAX_BYTES)} au plus : 1\u00a0000 à 2\u00a0000 pixels de large suffisent. Ni SVG ni JPEG, qui ne passent pas dans une facture PDF/A.`;
 
 /** « 1 843 × 522 px · 433 Ko »: a kept logo in one line. */
 export const logoLine = (logo: AgencyLogo): string =>

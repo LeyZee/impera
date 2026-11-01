@@ -36,7 +36,8 @@ const CARDS = {
 } as const satisfies Readonly<Record<string, Opened>>;
 
 /**
- * Réglages › Facturation (EQ-06), the owner's alone: what each invoice and credit note prints in the agency's name. Until
+ * Réglages › Facturation (EQ-06), the owner's alone: what each invoice and credit note says of the agency, which issues
+ * them in the name and on behalf of each contractor (self-billing). Until
  * it is saved, no invoice is issued (`agency_missing`): the page then asks for it before anything else. An invoice
  * issued keeps its own copy; a change only reaches the next ones.
  */
@@ -82,8 +83,8 @@ export function BillingSection(): JSX.Element {
   return (
     <section className="rp-rules bf">
       <p className="rp-rules__lede nv-enter">
-        Ce que chaque facture et chaque avoir impriment au nom de l’agence. Une facture émise garde sa copie :
-        un changement ne vaut que pour les suivantes.
+        Ce que chaque facture et chaque avoir disent de l’agence, qui les établit au nom de chaque
+        prestataire. Une facture émise garde sa copie : un changement ne vaut que pour les suivantes.
       </p>
       {settings === null ? (
         <Setup
@@ -224,7 +225,7 @@ function Cards({
             <img src={logoUrl(logo.sha256)} alt={`Logo de ${agency.legalName}`} />
           )}
         </div>
-        {logo === null ? null : <p className="rp-account__since nv-num">{logoLine(logo)}</p>}
+        {logo === null ? null : <p className="tm-hint nv-num">{logoLine(logo)}</p>}
         {warning === null ? null : <p className="tm-warn">{warning}</p>}
       </Card>
     </>
