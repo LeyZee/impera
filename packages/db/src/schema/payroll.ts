@@ -1,4 +1,5 @@
 import {
+  CARRY_OVER_RANK_MAX,
   COMMISSION_STATEMENT_STATUSES,
   CurrencySchema,
   EARNINGS_SOURCES,
@@ -61,6 +62,7 @@ const amountMax = sql.raw(String(PAY_AMOUNT_MAX_MINOR));
 const referenceMax = sql.raw(String(PAYMENT_REFERENCE_MAX));
 const targetMax = sql.raw(String(PAY_TARGET_MAX_MINOR));
 const payoutDelayMax = sql.raw(String(PAYOUT_DELAY_MAX_BUSINESS_DAYS));
+const carryOverRankMax = sql.raw(String(CARRY_OVER_RANK_MAX));
 
 /**
  * An account's pay rules from `from_period` on (contracts `pay-rules.ts`, EQ-03): one per account and period at most,
@@ -524,7 +526,11 @@ export const payAdjustments = pgTable(
   ],
 );
 
-/** What a validated statement carried to the next period: one per member and period it comes from, added only. */
+/**
+ * What a validated statement carried to the next period: one per member and period it comes from, added only. `rank`:
+ * how many times in a row a positive amount has been carried, this one included, 2 at most (ADR 0038); always 1 for a
+ * negative one. `keep_carry_over` checks it against the member's carry-over before (migration 0043).
+ */
 export const carryOvers = pgTable(
   'carry_overs',
   {
@@ -535,6 +541,7 @@ export const carryOvers = pgTable(
     fromPeriod: date('from_period').notNull(),
     toPeriod: date('to_period').notNull(),
     amountMinor: integer('amount_minor').notNull(),
+    rank: smallint('rank').notNull().default(1),
     statementId: uuid('statement_id')
       .notNull()
       .unique()
@@ -543,6 +550,10 @@ export const carryOvers = pgTable(
   },
   (t) => [
     unique('carry_overs_member_period_unique').on(t.memberId, t.fromPeriod),
+    check(
+      'carry_overs_rank_check',
+      sql`${t.rank} between 1 and ${carryOverRankMax} and (${t.rank} = 1 or ${t.amountMinor} > 0)`,
+    ),
     periodCheck('carry_overs_from_period_check', t.fromPeriod),
     periodCheck('carry_overs_to_period_check', t.toPeriod),
     check('carry_overs_periods_check', sql`${t.toPeriod} > ${t.fromPeriod}`),

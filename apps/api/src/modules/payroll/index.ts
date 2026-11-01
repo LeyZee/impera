@@ -1,15 +1,23 @@
-import type { ExchangeRate, ForeignCurrency, PayPeriod, UserId } from '@nirvana/contracts';
+import type {
+  CommissionStatementId,
+  ExchangeRate,
+  ForeignCurrency,
+  PayPeriod,
+  UserId,
+} from '@nirvana/contracts';
 import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
+import { issueInvoices } from './application/invoicing';
 import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
-import type { JobLogger, RateJobSince } from './domain/ports';
+import type { InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
+import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
 import { createDrizzlePayrollJobStore } from './infra/job-store';
 import { createLatestRateRead } from './infra/latest-rate';
 import { createPostgresRateAlerts } from './infra/rate-alerts';
@@ -51,6 +59,15 @@ export interface PayrollModule {
      * also one that never got a rate).
      */
     readonly fetchExchangeRates: (logger: JobLogger) => Promise<RateFetchOutcome>;
+    /**
+     * `payroll.issue_invoices` (EQ-06 lot 3, ADR 0036): a validated statement's invoice and the credit notes its period
+     * owes, numbered on the contractor's counter; what cannot be issued is said to the owner (`invoice_not_issued`).
+     * Replayable: a run issues only what is missing.
+     */
+    readonly issueInvoices: (
+      statementId: CommissionStatementId,
+      logger: JobLogger,
+    ) => Promise<InvoicingOutcome>;
   };
 }
 
@@ -84,6 +101,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   );
   const entries = createPayrollEntries(createDrizzlePayrollEntryStore(deps.db, deps.reads, now), reads);
   const rules = createDrizzlePayrollRuleStore(deps.db, deps.reads, now);
+  const invoiceStore = createDrizzlePayrollInvoiceStore(deps.adminDb, deps.reads, now);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),
@@ -99,6 +117,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       recalculate: (period, logger) => createRecalculation(jobStore, logger, now).recalculate(period),
       recalculateOpen: (logger) => createRecalculation(jobStore, logger, now).recalculateOpen(),
       fetchExchangeRates: (logger) => fetchExchangeRates(rateJob, logger),
+      issueInvoices: (statementId, logger) => issueInvoices(invoiceStore, statementId, logger),
     },
   };
 }

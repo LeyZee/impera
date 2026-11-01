@@ -44,8 +44,6 @@ export interface ProvidersDeps {
    */
   readonly reloadEveryMs?: number;
   readonly onReloadError?: (error: unknown) => void;
-  /** Development without CREDENTIALS_ENCRYPTION_KEYS: the lines say a pasted key is lost at restart. */
-  readonly keepsKeysInMemory?: boolean;
 }
 
 export interface ProvidersModule extends ProvidersApi {
@@ -76,7 +74,6 @@ export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
       deps.onChange?.(provider);
     },
     hasEnvironmentKey: (provider) => deps.environmentKeys?.(provider) !== undefined,
-    keepsKeysInMemory: deps.keepsKeysInMemory === true,
   };
   const reportRefusedKey = createRefusalReporter(connections, cache);
   const api: ProvidersApi = {
@@ -153,8 +150,7 @@ class ProviderKeysInMemory extends Error {
 /** The module as the composition root builds it: Postgres store when there is an encryption key, keys loaded. */
 export async function startProvidersModule(options: ProvidersStartOptions): Promise<ProvidersModule> {
   const environment = options.environmentKeys;
-  const inMemory = options.encryptionKeys === undefined;
-  if (inMemory) options.onLoadError(new ProviderKeysInMemory());
+  if (options.encryptionKeys === undefined) options.onLoadError(new ProviderKeysInMemory());
   const module = createProvidersModule({
     store:
       options.encryptionKeys === undefined
@@ -170,7 +166,6 @@ export async function startProvidersModule(options: ProvidersStartOptions): Prom
     environmentKeys: environment === null ? null : (provider) => environment[provider],
     reloadEveryMs: KEY_RELOAD_MS,
     onReloadError: options.onLoadError,
-    keepsKeysInMemory: inMemory,
   });
   await module.start().catch(options.onLoadError);
   return module;

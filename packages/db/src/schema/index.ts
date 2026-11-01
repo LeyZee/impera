@@ -5,6 +5,7 @@ export * from './conversations';
 export * from './credentials';
 export * from './events';
 export * from './fans';
+export * from './invoices';
 export * from './llm';
 export * from './media';
 export * from './memory';

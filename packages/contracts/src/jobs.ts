@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  CommissionStatementIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
@@ -41,6 +42,7 @@ export const JOB_NAMES = [
   'payroll.recalculate',
   'payroll.recalculate_open',
   'payroll.fetch_exchange_rates',
+  'payroll.issue_invoices',
   'media.describe',
   'providers.check_credentials',
   'telegram.scan',
@@ -122,6 +124,12 @@ export const JOB_PAYLOADS = {
    * strict: the cron adds `_cron` to the payload of every run it enqueues.
    */
   'payroll.fetch_exchange_rates': z.object({}),
+  /**
+   * The invoice of a validated statement and the credit notes its period owes (EQ-06, ADR 0036), in one transaction:
+   * enqueued by the validation, under the key `payroll.issue_invoices:<statementId>`. Each document has its key, so a
+   * rerun writes only what is missing; what cannot be issued is said to the owner (`invoice_not_issued`).
+   */
+  'payroll.issue_invoices': z.object({ statementId: CommissionStatementIdSchema }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -159,6 +167,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.recalculate_open': 1,
   // The ECB may be down for a minute; the next hour reads the 90 days again anyway.
   'payroll.fetch_exchange_rates': 3,
+  // Replayable: each document has its key, and a failed run wrote nothing.
+  'payroll.issue_invoices': 5,
   'media.describe': 3,
   'providers.check_credentials': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:

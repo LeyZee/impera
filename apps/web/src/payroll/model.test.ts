@@ -1,5 +1,6 @@
 import {
   BonusIdSchema,
+  CarryOverIdSchema,
   CommissionStatementIdSchema,
   newId,
   PayAdjustmentIdSchema,
@@ -10,6 +11,7 @@ import {
   ShiftReportIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
+  type CarryOver,
   type CommissionStatement,
   type CommissionStatementLine,
   type PayPeriod,
@@ -277,17 +279,31 @@ describe('a period in the list', () => {
     ]);
     const ended = summary({ statements: { draft: 4, validated: 0, paid: 0, carried: 1 } });
     expect(phaseChip(ended)).toEqual({ label: 'Finie : à valider', tone: 'wait' });
+    // Half validated: what is left to send counts the validated statements only, as Quinzaine does (#295).
     const closed = summary({
       closedAt: '2026-11-02T09:41:00.000Z',
       statements: { draft: 1, validated: 2, paid: 1, carried: 1 },
+      validatedPayableMinor: 25_000,
       paidMinor: 10_000,
     });
     expect([phaseChip(closed).label, periodAmount(closed)]).toEqual([
       'Close : à valider',
-      { minor: 20_000, what: 'à verser, validation en cours' },
+      { minor: 15_000, what: 'reste à envoyer, validation en cours' },
     ]);
     expect(periodAmount(ended).what).toBe('à verser une fois validé');
-    const toPay = summary({ statements: { draft: 0, validated: 2, paid: 1, carried: 0 }, paidMinor: 10_000 });
+    // Everything validated is paid, one statement still waits: what it would pay, never « 0,00 € reste à envoyer ».
+    const waiting = summary({
+      statements: { draft: 1, validated: 0, paid: 2, carried: 0 },
+      payableMinor: 30_000,
+      validatedPayableMinor: 20_000,
+      paidMinor: 20_000,
+    });
+    expect(periodAmount(waiting)).toEqual({ minor: 10_000, what: 'à verser une fois validé' });
+    const toPay = summary({
+      statements: { draft: 0, validated: 2, paid: 1, carried: 0 },
+      validatedPayableMinor: 30_000,
+      paidMinor: 10_000,
+    });
     expect(periodAmount(toPay)).toEqual({ minor: 20_000, what: 'reste à envoyer' });
     const paid = summary({ statements: { draft: 0, validated: 1, paid: 3, carried: 1 }, paidMinor: 30_000 });
     expect([phaseChip(paid), periodAmount(paid)]).toEqual([
@@ -732,6 +748,50 @@ describe('a member’s row', () => {
       'Total sous zéro à ce jour : −8,00 € iraient sur la quinzaine suivante, si la quinzaine finit ainsi.',
     );
   });
+
+  it('says a second carry-over in a row, then why the next period pays under the minimum (ADR 0038)', () => {
+    const carriedIn = (amountMinor: number, rank: number): CarryOver => ({
+      id: newId(CarryOverIdSchema),
+      memberId: newId(TeamMemberIdSchema),
+      fromPeriod: PayPeriodSchema.parse('2026-10-16'),
+      toPeriod: PERIOD,
+      amountMinor,
+      rank,
+      statementId: newId(CommissionStatementIdSchema),
+      createdAt: '2026-11-02T09:00:00.000Z',
+    });
+    const once = [carriedIn(900, 1)];
+    const second = { carryOversIn: once, totalMinor: 1_300, carryOverOutMinor: 1_300, payableMinor: 0 };
+    expect(plain(carryLine(statement({ ...second, status: 'validated' }), true) ?? '')).toBe(
+      'Sous le minimum de 15,00 € : 13,00 € reportés sur la quinzaine suivante. Deuxième report de suite : la quinzaine suivante versera ce montant, même sous le minimum.',
+    );
+    // In the mood of the sentence before: certain once the period has ended, conditional while it runs.
+    expect(plain(carryLine(statement(second), true) ?? '')).toBe(
+      'Sous le minimum de 15,00 € : 13,00 € iront sur la quinzaine suivante une fois le relevé validé. Ce sera le deuxième report de suite : la quinzaine suivante versera ce montant, même sous le minimum.',
+    );
+    expect(plain(carryLine(statement(second), false) ?? '')).toBe(
+      'Sous le minimum de 15,00 € à ce jour : 13,00 € iraient sur la quinzaine suivante, si la quinzaine finit ainsi. Ce serait le deuxième report de suite : la quinzaine suivante verserait ce montant, même sous le minimum.',
+    );
+    // After a negative carry-over, the count starts again: a first carry-over, said plainly.
+    const afterNegative = { ...second, carryOversIn: [carriedIn(-500, 1)] };
+    expect(plain(carryLine(statement({ ...afterNegative, status: 'validated' }), true) ?? '')).toBe(
+      'Sous le minimum de 15,00 € : 13,00 € reportés sur la quinzaine suivante.',
+    );
+    // Carried twice: paid under the minimum, and said why; only the amount coming in was carried.
+    const twice = [carriedIn(1_300, 2)];
+    const paid = { carryOversIn: twice, totalMinor: 1_400, carryOverOutMinor: 0, payableMinor: 1_400 };
+    expect(plain(carryLine(statement({ ...paid, status: 'validated' }), true) ?? '')).toBe(
+      'Sous le minimum de 15,00 €, mais le montant qui entre a déjà été reporté deux fois : la quinzaine verse tout quand même, pour que la facture qui attend soit payée avant son échéance.',
+    );
+    expect(plain(carryLine(statement(paid), false) ?? '')).toBe(
+      'Sous le minimum de 15,00 € à ce jour, mais le montant qui entre a déjà été reporté deux fois : la quinzaine versera tout quand même, pour que la facture qui attend soit payée avant son échéance.',
+    );
+    // A final statement pays everything because the member leaves (EQ-14): not for this reason, so no word of it.
+    const leaving = statement({ ...paid, status: 'validated' });
+    expect(carryLine({ ...leaving, rules: { ...leaving.rules, final: true } }, true)).toBeNull();
+    // Over the minimum, the payment needs no word.
+    expect(carryLine(statement({ ...paid, totalMinor: 2_000, payableMinor: 2_000 }), true)).toBeNull();
+  });
 });
 
 describe('the figures of a period', () => {
@@ -970,13 +1030,20 @@ describe('Commissions, as the member reads them', () => {
       minor: 2_125,
       what: 'à ce jour',
     });
+    // Not validated, so not owed yet (#295).
     expect(memberPeriodAmount(summary({ statements: counts(1, 0, 0), payableMinor: 2_125 }))).toEqual({
       minor: 2_125,
-      what: 'à toucher',
+      what: 'à toucher une fois validé',
     });
     expect(
       memberPeriodAmount(summary({ statements: counts(0, 0, 1), payableMinor: 2_125, paidMinor: 2_125 })),
     ).toEqual({ minor: 2_125, what: 'touché' });
+    // Validated, not sent yet: what is owed (#295).
+    expect(
+      memberPeriodAmount(
+        summary({ statements: counts(0, 1, 0), payableMinor: 2_125, validatedPayableMinor: 2_125 }),
+      ),
+    ).toEqual({ minor: 2_125, what: 'à toucher' });
   });
 
   it('opens on the money on its way, then on the period under way, else on what the last one brought', () => {

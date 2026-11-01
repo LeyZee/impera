@@ -1,3 +1,4 @@
+import { CARRY_OVER_RANK_MAX, carryOverRank } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -66,10 +67,11 @@ function memberOf(draw: Draw, index: number): MemberPayInput {
         ? { id: `p${String(penalty)}`, kind: 'fixed', amountMinor: between(draw, 1, 200_000) }
         : { id: `p${String(penalty)}`, kind: 'percent', bps: between(draw, 1, 3_000) },
     ),
-    carryOversIn: some(draw, 1, (carry) => ({
-      id: `c${String(carry)}`,
-      amountMinor: between(draw, -5_000, 1_499),
-    })),
+    carryOversIn: some(draw, 1, (carry) => {
+      const amountMinor = between(draw, -5_000, 1_499);
+      // A positive carry-over is at rank 1 or 2, a negative one at rank 1 (ADR 0038).
+      return { id: `c${String(carry)}`, amountMinor, rank: amountMinor > 0 ? between(draw, 1, 2) : 1 };
+    }),
     adjustments: some(draw, 1, (adjustment) => ({
       id: `a${String(adjustment)}`,
       amountMinor: between(draw, -100_000, 100_000),
@@ -112,15 +114,28 @@ const byMember = (statements: readonly CommissionStatement[]): Map<string, Commi
   new Map(statements.map((one) => [one.memberId, one]));
 
 describe('every period the engine computes', () => {
-  it('never pays below zero, nor under the minimum outside a final statement', () => {
+  it('never pays below zero, nor under the minimum outside a final statement or an amount carried twice', () => {
     for (const input of periods(1)) {
       for (const one of computeCommissionStatements(input).statements) {
         const member = input.members.find((candidate) => candidate.memberId === one.memberId);
+        const carriedTwice = member?.carryOversIn.some((carry) => carry.amountMinor > 0 && carry.rank === 2);
         expect(one.payableMinor).toBeGreaterThanOrEqual(0);
-        if (one.payableMinor > 0 && member?.final !== true) {
+        if (one.payableMinor > 0 && member?.final !== true && carriedTwice !== true) {
           expect(one.payableMinor).toBeGreaterThanOrEqual(input.minimumPayoutMinor);
         }
         expect(one.payableMinor + one.carryOverOutMinor).toBe(one.totalMinor);
+      }
+    }
+  });
+
+  it('carries a positive amount twice at most: the third period pays it (ADR 0038)', () => {
+    for (const input of periods(7)) {
+      for (const one of computeCommissionStatements(input).statements) {
+        const member = input.members.find((candidate) => candidate.memberId === one.memberId);
+        if (member === undefined) throw new Error('no member');
+        expect(carryOverRank(member.carryOversIn, one.carryOverOutMinor)).toBeLessThanOrEqual(
+          CARRY_OVER_RANK_MAX,
+        );
       }
     }
   });

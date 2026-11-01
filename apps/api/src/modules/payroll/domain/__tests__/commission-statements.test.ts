@@ -1,4 +1,4 @@
-import { DomainError } from '@nirvana/contracts';
+import { carryOverRank, DomainError } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -354,7 +354,7 @@ describe('what goes from a period to the next', () => {
         [
           chatter('lou', {
             accounts: [account({ grossMinor: 5_000 })],
-            carryOversIn: [{ id: 'c1', amountMinor: first.carryOverOutMinor }],
+            carryOversIn: [{ id: 'c1', amountMinor: first.carryOverOutMinor, rank: 1 }],
           }),
         ],
         { minimumPayoutMinor: 1_500 },
@@ -371,12 +371,80 @@ describe('what goes from a period to the next', () => {
 
   it('carries a lone carry-over that is still under the minimum', () => {
     const one = statementOf(
-      period([chatter('lou', { carryOversIn: [{ id: 'c1', amountMinor: 1_000 }] })], {
+      period([chatter('lou', { carryOversIn: [{ id: 'c1', amountMinor: 1_000, rank: 1 }] })], {
         minimumPayoutMinor: 1_500,
       }),
       'lou',
     );
     expect([one.totalMinor, one.carryOverOutMinor, one.payableMinor]).toEqual([1_000, 1_000, 0]);
+  });
+
+  it('carries a positive amount twice at most: the third period pays it, under the minimum too (ADR 0038)', () => {
+    // Minimum 15,00 €. 9,00 €, then 4,00 € (13,00 €), then 1,00 € (14,00 €): carried at rank 1, then 2, then paid.
+    const earning = (grossMinor: number) => [account({ grossMinor })];
+    const first = statementOf(
+      period([chatter('lou', { accounts: earning(4_500) })], { minimumPayoutMinor: 1_500 }),
+      'lou',
+    );
+    expect([first.totalMinor, first.carryOverOutMinor]).toEqual([900, 900]);
+    expect(carryOverRank([], first.carryOverOutMinor)).toBe(1);
+
+    const secondIn = [{ id: 'c1', amountMinor: 900, rank: 1 }];
+    const second = statementOf(
+      period([chatter('lou', { accounts: earning(2_000), carryOversIn: secondIn })], {
+        minimumPayoutMinor: 1_500,
+      }),
+      'lou',
+    );
+    expect([second.totalMinor, second.carryOverOutMinor, second.payableMinor]).toEqual([1_300, 1_300, 0]);
+    expect(carryOverRank(secondIn, second.carryOverOutMinor)).toBe(2);
+
+    const third = statementOf(
+      period(
+        [
+          chatter('lou', {
+            accounts: earning(500),
+            carryOversIn: [{ id: 'c2', amountMinor: 1_300, rank: 2 }],
+          }),
+        ],
+        { minimumPayoutMinor: 1_500 },
+      ),
+      'lou',
+    );
+    expect([third.totalMinor, third.carryOverOutMinor, third.payableMinor]).toEqual([1_400, 0, 1_400]);
+  });
+
+  it('keeps counting through a negative period while the total stays positive, and starts again under zero', () => {
+    // 9,00 € carried (rank 1), then a period at −5,00 €: 4,00 € left, carried a second time.
+    const keptIn = [{ id: 'c1', amountMinor: 900, rank: 1 }];
+    const kept = statementOf(
+      period([chatter('lou', { adjustments: [{ id: 'a1', amountMinor: -500 }], carryOversIn: keptIn })], {
+        minimumPayoutMinor: 1_500,
+      }),
+      'lou',
+    );
+    expect([kept.totalMinor, kept.carryOverOutMinor]).toEqual([400, 400]);
+    expect(carryOverRank(keptIn, kept.carryOverOutMinor)).toBe(2);
+
+    // Under zero: nothing is paid, the negative total is carried at rank 1, and the next positive one starts at 1.
+    const underIn = [{ id: 'c1', amountMinor: 900, rank: 2 }];
+    const under = statementOf(
+      period([chatter('lou', { adjustments: [{ id: 'a1', amountMinor: -2_000 }], carryOversIn: underIn })], {
+        minimumPayoutMinor: 1_500,
+      }),
+      'lou',
+    );
+    expect([under.totalMinor, under.carryOverOutMinor, under.payableMinor]).toEqual([-1_100, -1_100, 0]);
+    expect(carryOverRank(underIn, under.carryOverOutMinor)).toBe(1);
+    const againIn = [{ id: 'c2', amountMinor: -1_100, rank: 1 }];
+    const again = statementOf(
+      period([chatter('lou', { accounts: [account({ grossMinor: 10_000 })], carryOversIn: againIn })], {
+        minimumPayoutMinor: 1_500,
+      }),
+      'lou',
+    );
+    expect([again.totalMinor, again.carryOverOutMinor]).toEqual([900, 900]);
+    expect(carryOverRank(againIn, again.carryOverOutMinor)).toBe(1);
   });
 
   it('pays everything on a final statement, under the minimum too', () => {
@@ -386,7 +454,7 @@ describe('what goes from a period to the next', () => {
           chatter('lou', {
             final: true,
             accounts: [account({ grossMinor: 5_000 })],
-            carryOversIn: [{ id: 'c1', amountMinor: 300 }],
+            carryOversIn: [{ id: 'c1', amountMinor: 300, rank: 1 }],
           }),
         ],
         { minimumPayoutMinor: 1_500 },

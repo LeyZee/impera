@@ -267,6 +267,25 @@ describe('reading the outbox', () => {
       lastRateDay: null,
     });
     expect(rate({ currency: 'usd<b>', lastRateDay: null, day: '2026-10-28' })).toBeUndefined();
+    // EQ-06: the period, the document and the reason; the member, the statement and the amount stay in Nirvana.
+    const notIssued = (payload: object) =>
+      toScannedEvent({ ...base, type: 'invoice_not_issued', payload })?.signal;
+    const invoice = {
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      statementId: '018f3e5c-0000-7000-8000-000000000002',
+      period: '2026-10-16',
+      document: 'invoice',
+      reason: 'identity_incomplete',
+      amountMinor: 12_345,
+    };
+    expect(notIssued(invoice)).toEqual({
+      kind: 'invoice_not_issued',
+      period: '2026-10-16',
+      document: 'invoice',
+      reason: 'identity_incomplete',
+    });
+    expect(notIssued({ ...invoice, reason: 'something_new' })).toBeUndefined();
+    expect(notIssued({ ...invoice, period: '2026-10-17' })).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

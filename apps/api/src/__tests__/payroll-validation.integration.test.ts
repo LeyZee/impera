@@ -171,6 +171,28 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
     expect(await closingOf(Q2)).toMatchObject({ closedBy: mona.userId, teamNetMinor: 8_000 });
     // Léa's carry-over came in: her draft of the period exists, and validates on the same closing.
     expect((await validate(monaCookie, lea, Q2)).statusCode).toBe(200);
+    // Her 8 € are still under the minimum: carried a second time, and her next period pays them (ADR 0038).
+    const carried = await test.admin.db
+      .select({
+        fromPeriod: schema.carryOvers.fromPeriod,
+        amountMinor: schema.carryOvers.amountMinor,
+        rank: schema.carryOvers.rank,
+      })
+      .from(schema.carryOvers)
+      .where(eq(schema.carryOvers.memberId, lea.id))
+      .orderBy(schema.carryOvers.fromPeriod);
+    expect(carried).toEqual([
+      { fromPeriod: Q1, amountMinor: 800, rank: 1 },
+      { fromPeriod: Q2, amountMinor: 800, rank: 2 },
+    ]);
+    await recalculate(Q3);
+    expect(await statementOf(lea, Q3)).toMatchObject({
+      carryOversInMinor: 800,
+      totalMinor: 800,
+      carryOverOutMinor: 0,
+      payableMinor: 800,
+      engineVersion: 'nirvana-2',
+    });
   });
 
   it('counts a report of a closed period, validated late, at the next closing, from where it came', async () => {

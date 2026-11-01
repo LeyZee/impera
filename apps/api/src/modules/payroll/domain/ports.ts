@@ -14,6 +14,7 @@ import type {
   ExchangeRate,
   ExchangeRates,
   ForeignCurrency,
+  InvoiceKind,
   PayAdjustment,
   PayAdjustmentId,
   PayCommissionStatementBody,
@@ -34,6 +35,8 @@ import type {
   UserId,
 } from '@nirvana/contracts';
 
+import type { IssueWarning } from './billing';
+import type { DocumentNotIssued, InvoicingFacts, InvoicingPlan } from './invoicing';
 import type { PeriodBlockReason } from './period-blocks';
 import type { PeriodPlan, PeriodSnapshot, ReportForPay } from './recalculation';
 
@@ -89,6 +92,30 @@ export interface PayrollJobStore {
     decide: (snapshot: PeriodSnapshot) => PeriodDecision,
   ): Promise<RecomputedPeriod>;
   openPeriodFactsUnscoped(now: Date): Promise<OpenPeriodFacts>;
+}
+
+/** What the invoicing job did for a statement, for its log line. */
+export type InvoicingOutcome =
+  | { readonly kind: 'not_validated' }
+  | {
+      readonly kind: 'planned';
+      readonly issued: readonly { readonly kind: InvoiceKind; readonly number: string }[];
+      readonly notIssued: readonly DocumentNotIssued[];
+      readonly warnings: readonly IssueWarning[];
+    };
+
+/** `payroll.issue_invoices` (EQ-06 lot 3): the documents of a validated statement, as the jobs write them. */
+export interface PayrollInvoiceStore {
+  /**
+   * One transaction as the jobs (`withAdmin`), under the contractor's lock: reads what the statement's documents are
+   * made of, hands it to `plan`, numbers each document the plan gives on the contractor's counter (`FOR UPDATE`) and
+   * writes it with its lines and its event `issued`, then publishes `invoice_not_issued` for each one it does not
+   * issue. A statement still a draft gets nothing.
+   */
+  issueUnscoped(
+    statementId: CommissionStatementId,
+    plan: (facts: InvoicingFacts) => InvoicingPlan,
+  ): Promise<InvoicingOutcome>;
 }
 
 /** The validation of a statement (ADR 0032): one transaction as the member who validates, under both locks. */

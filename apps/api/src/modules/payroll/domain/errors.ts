@@ -244,6 +244,15 @@ export class PayPeriodTooFar extends DomainError {
   }
 }
 
+/** A contractor's new billing regime dated before today or before the last one (EQ-06): a regime never goes back. */
+export class BillingRegimeBackdated extends DomainError {
+  constructor(from: string) {
+    super('billing_regime_backdated_unprocessable', 'Un régime de facturation ne s’applique pas en arrière', {
+      details: { from },
+    });
+  }
+}
+
 /**
  * PAIE-22: tiers or a payout minimum from a period that has begun (400). A pay rule starts with a fortnight not worked
  * yet, as a commission rate does: it never changes under a chatter's feet.
@@ -252,6 +261,24 @@ export class PayRuleStarted extends DomainError {
   constructor(period: PayPeriod) {
     super('pay_rule_started_invalid', 'Une règle de paie part d’une quinzaine qui n’a pas commencé', {
       details: { period },
+    });
+  }
+}
+
+/** A credit note for more than what is left of its invoice (EQ-06): an invoice is never credited below zero. */
+export class CreditNoteExceedsInvoice extends DomainError {
+  constructor(leftMinor: number) {
+    super('credit_note_amount_unprocessable', 'L’avoir dépasse ce qui reste de la facture', {
+      details: { leftMinor },
+    });
+  }
+}
+
+/** A step of an invoice's acceptance that its state or its deadline no longer allows (EQ-06). */
+export class InvoiceAcceptanceConflict extends DomainError {
+  constructor(state: string) {
+    super('invoice_acceptance_conflict', 'Cette étape n’est plus possible pour cette facture', {
+      details: { state },
     });
   }
 }

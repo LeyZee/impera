@@ -4,7 +4,10 @@ import type {
   ConversationId,
   CreatorId,
   HandoffCause,
+  InvoiceKind,
+  InvoiceNotIssuedReason,
   KillSwitchScope,
+  PayPeriod,
   TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -76,6 +79,16 @@ export type Signal =
       readonly kind: 'exchange_rate_overdue';
       readonly currency: string;
       readonly lastRateDay: string | null;
+    }
+  | {
+      /**
+       * A document a validated statement made due was not issued (EQ-06, ADR 0036): only its period, its kind and the
+       * closed reason; never the member nor the amount.
+       */
+      readonly kind: 'invoice_not_issued';
+      readonly period: PayPeriod;
+      readonly document: InvoiceKind;
+      readonly reason: InvoiceNotIssuedReason;
     }
   | {
       /** Automatique closed on its own (ADR 0019): its conversations went back to the copilot. */

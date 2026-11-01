@@ -524,14 +524,11 @@ function MyBlockNotice({
 function MyPeriodRow({ summary, onOpen }: { summary: PayPeriodSummary; onOpen: () => void }): JSX.Element {
   const { window } = summary;
   const chip = memberPhaseChip(summary);
-  // A period carried over pays nothing: its row says what went on the next one, read in its statement.
-  const carried = chip.label === 'Reporté';
-  const read = usePayPeriod(carried ? window.period : null);
-  const statement = read.data?.period === window.period ? read.data.statements[0] : undefined;
+  // A period carried over pays nothing: its row says what went on the next one, the member's `carriedMinor` (#295).
   const amount =
-    carried && statement !== undefined
+    chip.label === 'Reporté'
       ? {
-          minor: statement.carryOverOutMinor,
+          minor: summary.carriedMinor,
           what: `reporté sur le ${periodTitle(followingPeriod(window.period), false)}`,
         }
       : memberPeriodAmount(summary);

@@ -1,5 +1,5 @@
 # EQ-17 Mise en service de la paie : rien de réel avant que tout soit prouvé
-Statut : in-progress (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous »)
+Statut : in_progress (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous »)
 Phase : équipe (ADR 0023), dernière étape de la chaîne de paie, au déploiement
 Dépend de : EQ-04, EQ-05, EQ-06, EQ-15, le déploiement (Hetzner, Coolify), `docs/runbooks/restore.md`
 Branche : task/eq-17-payroll-go-live

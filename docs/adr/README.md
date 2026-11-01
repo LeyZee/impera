@@ -60,3 +60,5 @@ Date : AAAA-MM-JJ
 | 0033 | Paie : le taux dollar → euro vient de la BCE, lu chaque heure par un job | accepted (complète 0023 § Paie et 0032) |
 | 0034 | Le test à l'aveugle est une séance : le serveur calcule le taux, à partir de 40 situations | proposed (complète 0019 ; exception à 0023 à valider) |
 | 0035 | Paie : une saisie verrouille sa quinzaine et chacune des suivantes | accepted (complète 0032 § Verrous) |
+| 0036 | Factures : ce qu'une quinzaine doit rendre devient un avoir sur une facture déjà émise | accepted (précise 0023 § Factures) |
+| 0038 | Paie : un petit montant est reporté deux fois au plus, pour que chaque facture soit payée avant son échéance | accepted (remplace dans 0023 le report sans limite d'un montant positif ; 0037 réservée au PDF des factures) |

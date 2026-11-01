@@ -124,21 +124,11 @@ describe('after the connection', () => {
   });
 });
 
-describe('keys kept in memory (development without CREDENTIALS_ENCRYPTION_KEYS)', () => {
-  it('says on the line that a pasted key is lost at restart', async () => {
-    const answer: { current: VerificationOutcome } = { current: works };
-    const { deps } = setup(answer);
-    const inMemory = { ...deps, keepsKeysInMemory: true };
-    const result = await connectProvider(inMemory, 'xai', OLD_KEY);
-    expect(result).toMatchObject({
-      ok: true,
-      value: { message: 'Grok 4.7 écrit et décide · gardée en mémoire jusqu’au redémarrage' },
-    });
-    // Not on a red line: it already says what to do.
-    answer.current = { ok: false, kind: 'unauthorized' };
-    expect((await reverifyProvider(inMemory, 'xai')).message).toBe(
-      'xAI refuse la clé. Seul Mistral, s’il est branché, écrit en attendant.',
-    );
+describe('the line of a saved key (REG-08)', () => {
+  it('shows the line of a working key as it is, never a sentence about the server (REG-08)', async () => {
+    const { deps } = setup({ current: works });
+    const result = await connectProvider(deps, 'xai', OLD_KEY);
+    expect(result).toMatchObject({ ok: true, value: { message: 'Grok 4.7 écrit et décide' } });
   });
 });
 

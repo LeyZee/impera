@@ -61,8 +61,6 @@ export interface ConnectionsDeps {
   readonly onChange?: (provider: AiProvider) => void | Promise<void>;
   /** Outside production only: whether the environment holds a key for this provider. */
   readonly hasEnvironmentKey?: (provider: AiProvider) => boolean;
-  /** Development without CREDENTIALS_ENCRYPTION_KEYS: a pasted key lives until the server restarts, and says so. */
-  readonly keepsKeysInMemory?: boolean;
 }
 
 /** A refusal as the sheet shows it, under the key field. */
@@ -117,7 +115,7 @@ export async function connectProvider(
   const credential = credentialFromVerification(provider, shape.value, outcome, deps.clock.now());
   await deps.store.save(credential, by);
   await changed(deps, provider);
-  return ok(savedStatus(deps, provider, credential));
+  return ok(savedStatus(provider, credential));
 }
 
 /**
@@ -127,16 +125,16 @@ export async function connectProvider(
 export async function reverifyProvider(deps: ConnectionsDeps, provider: AiProvider): Promise<ProviderStatus> {
   const stored = await deps.store.find(provider);
   if (stored === null) return statusOf(deps, provider, null);
-  if (stored.key === null) return savedStatus(deps, provider, stored);
+  if (stored.key === null) return savedStatus(provider, stored);
   const outcome = await verifierFor(deps, provider).verify(stored.key, stored.settings);
   const next = applyReverification(stored, outcome, deps.clock.now());
-  if (next === stored) return savedStatus(deps, provider, stored);
+  if (next === stored) return savedStatus(provider, stored);
   if (await deps.store.update(next)) {
     await changed(deps, provider);
-    return savedStatus(deps, provider, next);
+    return savedStatus(provider, next);
   }
   const current = await deps.store.find(provider);
-  return current === null ? statusOf(deps, provider, null) : savedStatus(deps, provider, current);
+  return current === null ? statusOf(deps, provider, null) : savedStatus(provider, current);
 }
 
 export async function reverifyAll(deps: ConnectionsDeps): Promise<readonly ProviderStatus[]> {
@@ -255,18 +253,18 @@ export async function updateProviderSettings(
     const next = { ...stored, ...voiceLine, settings: merged };
     if (await deps.store.update(next)) {
       await changed(deps, provider);
-      return savedStatus(deps, provider, next);
+      return savedStatus(provider, next);
     }
   }
   throw new ProviderBusy(provider);
 }
 
-/** The line of a saved key. */
-function savedStatus(deps: ConnectionsDeps, provider: AiProvider, stored: StoredCredential): ProviderStatus {
-  const status = toStatus(provider, stored, 'dashboard');
-  // Only on a working line: a red or amber one already says what to do, and leads the next action.
-  if (deps.keepsKeysInMemory !== true || stored.state !== 'connected') return status;
-  return { ...status, message: `${status.message} · gardée en mémoire jusqu’au redémarrage` };
+/**
+ * The line of a saved key. Without CREDENTIALS_ENCRYPTION_KEYS (development only, production refuses to start) a pasted
+ * key is lost at restart: the start-up log says so to whoever runs the server, never the line (REG-08).
+ */
+function savedStatus(provider: AiProvider, stored: StoredCredential): ProviderStatus {
+  return toStatus(provider, stored, 'dashboard');
 }
 
 function statusOf(deps: ConnectionsDeps, provider: AiProvider, stored: null): ProviderStatus {
@@ -279,6 +277,6 @@ export async function listProviderStatuses(deps: ConnectionsDeps): Promise<reado
   const saved = await deps.store.list();
   return DASHBOARD_PROVIDERS.map((provider) => {
     const stored = saved.find((c) => c.provider === provider) ?? null;
-    return stored === null ? statusOf(deps, provider, null) : savedStatus(deps, provider, stored);
+    return stored === null ? statusOf(deps, provider, null) : savedStatus(provider, stored);
   });
 }

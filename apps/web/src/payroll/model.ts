@@ -1,4 +1,6 @@
 import {
+  CARRY_OVER_RANK_MAX,
+  carryOverRank,
   collectiveGoalLastDay,
   nextPayPeriod,
   PAY_TARGET_MAX_MINOR,
@@ -7,6 +9,7 @@ import {
   payPeriodOfDay,
   PayPeriodSchema,
   penaltyApplies,
+  positiveCarryRankIn,
   type BonusTier,
   type CollectiveGoal,
   type CollectiveTier,
@@ -187,23 +190,26 @@ export function phaseChip(summary: Omit<PayPeriodSummary, 'window'>): PayChip {
   }
 }
 
-/** The one amount a period shows in the list: what is paid, or what is left to pay. */
+/**
+ * The one amount a period shows in the list: what is paid, or what is left to pay. Only a validation makes an amount
+ * owed: once one is, « reste à envoyer » is `validatedPayableMinor − paidMinor`, the figure Quinzaine shows (#295).
+ */
 export function periodAmount(summary: Omit<PayPeriodSummary, 'window'>): { minor: number; what: string } {
   if (summary.blocked !== null)
     return { minor: summary.payableMinor - summary.paidMinor, what: 'au dernier calcul, plus à jour' };
   switch (phaseOf(summary)) {
     case 'running':
       return { minor: summary.payableMinor, what: 'à verser à ce jour' };
-    case 'to_validate':
-      return {
-        minor: summary.payableMinor - summary.paidMinor,
-        what:
-          summary.statements.validated + summary.statements.paid === 0
-            ? 'à verser une fois validé'
-            : 'à verser, validation en cours',
-      };
+    case 'to_validate': {
+      // What is owed and what waits for a validation stay apart, never added: when nothing owed is left to send, the
+      // row says what the statements still to validate would pay rather than « 0,00 € ».
+      const owed = summary.validatedPayableMinor - summary.paidMinor;
+      return summary.statements.validated + summary.statements.paid === 0 || owed === 0
+        ? { minor: summary.payableMinor - summary.validatedPayableMinor, what: 'à verser une fois validé' }
+        : { minor: owed, what: 'reste à envoyer, validation en cours' };
+    }
     case 'to_pay':
-      return { minor: summary.payableMinor - summary.paidMinor, what: 'reste à envoyer' };
+      return { minor: summary.validatedPayableMinor - summary.paidMinor, what: 'reste à envoyer' };
     case 'paid':
       return { minor: summary.paidMinor, what: 'versé' };
   }
@@ -829,11 +835,43 @@ export function memberFacts(statement: CommissionStatement): string[] {
 }
 
 /**
- * The sentence of a statement that carries its total over, or `null`: said as done once validated, as what would
- * happen before — so far while the period runs, at its validation once it has ended.
+ * Said after a positive carry-over that is the second in a row, or nothing: the next period pays that amount, under
+ * the minimum too, so that the invoice it waits for is paid before its due date (ADR 0038). In the mood of the
+ * sentence before: done once validated, certain once the period has ended, conditional while it runs.
+ */
+function secondCarry(statement: CommissionStatement, ended: boolean): string {
+  if (statement.carryOverOutMinor <= 0) return '';
+  if (carryOverRank(statement.carryOversIn, statement.carryOverOutMinor) !== CARRY_OVER_RANK_MAX) return '';
+  if (statement.status !== 'draft')
+    return ' Deuxième report de suite : la quinzaine suivante versera ce montant, même sous le minimum.';
+  return ended
+    ? ' Ce sera le deuxième report de suite : la quinzaine suivante versera ce montant, même sous le minimum.'
+    : ' Ce serait le deuxième report de suite : la quinzaine suivante verserait ce montant, même sous le minimum.';
+}
+
+/**
+ * Why a total under the minimum is paid, or `null`: the amount coming in was carried twice in a row already (ADR
+ * 0038). Without this sentence, a payment under the minimum would read as a mistake. A member's final statement pays
+ * everything because they leave (EQ-14), not for this reason: it gets none. Before its validation the payment is
+ * certain all the same (over the minimum, it is paid anyway), hence the future.
+ */
+function paidAfterTwoCarries(statement: CommissionStatement, ended: boolean): string | null {
+  const { totalMinor, rules } = statement;
+  if (rules.final || totalMinor <= 0 || totalMinor >= rules.minimumPayoutMinor) return null;
+  if (positiveCarryRankIn(statement.carryOversIn) < CARRY_OVER_RANK_MAX) return null;
+  const draft = statement.status === 'draft';
+  const soFar = draft && !ended ? ' à ce jour' : '';
+  return `Sous le minimum de ${amountText(rules.minimumPayoutMinor, 'EUR')}${soFar}, mais le montant qui entre a déjà été reporté deux fois : la quinzaine ${draft ? 'versera' : 'verse'} tout quand même, pour que la facture qui attend soit payée avant son échéance.`;
+}
+
+/**
+ * The sentence of a statement that carries its total over, or pays it under the minimum after two carry-overs, or
+ * `null`: said as done once validated, as what would happen before — so far while the period runs, at its validation
+ * once it has ended.
  */
 export function carryLine(statement: CommissionStatement, ended: boolean): string | null {
-  if (statement.carryOverOutMinor === 0) return null;
+  if (statement.carryOverOutMinor === 0) return paidAfterTwoCarries(statement, ended);
+  const second = secondCarry(statement, ended);
   if (statement.status === 'draft') {
     const soFar = ended ? '' : ' à ce jour';
     const when = ended
@@ -841,11 +879,11 @@ export function carryLine(statement: CommissionStatement, ended: boolean): strin
       : 'iraient sur la quinzaine suivante, si la quinzaine finit ainsi';
     return statement.totalMinor < 0
       ? `Total sous zéro${soFar} : ${signedAmountText(statement.carryOverOutMinor, 'EUR')} ${when}.`
-      : `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')}${soFar} : ${amountText(statement.carryOverOutMinor, 'EUR')} ${when}.`;
+      : `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')}${soFar} : ${amountText(statement.carryOverOutMinor, 'EUR')} ${when}.${second}`;
   }
   if (statement.totalMinor < 0)
     return `Total sous zéro : ${signedAmountText(statement.carryOverOutMinor, 'EUR')} reportés sur la quinzaine suivante.`;
-  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} : ${amountText(statement.carryOverOutMinor, 'EUR')} reportés sur la quinzaine suivante.`;
+  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} : ${amountText(statement.carryOverOutMinor, 'EUR')} reportés sur la quinzaine suivante.${second}`;
 }
 
 /** One part of a split: a name, its net, and its share of the whole in basis points. */
@@ -1188,8 +1226,13 @@ export function memberPeriodAmount(summary: Omit<PayPeriodSummary, 'window'>): {
     case 'running':
       return { minor: summary.payableMinor, what: 'à ce jour' };
     case 'to_validate':
+      // Not validated yet, so not owed: what the period would pay, as Quinzaine says it (« à verser une fois validé »).
+      return {
+        minor: summary.payableMinor - summary.validatedPayableMinor,
+        what: 'à toucher une fois validé',
+      };
     case 'to_pay':
-      return { minor: summary.payableMinor - summary.paidMinor, what: 'à toucher' };
+      return { minor: summary.validatedPayableMinor - summary.paidMinor, what: 'à toucher' };
     case 'paid':
       return { minor: summary.paidMinor, what: 'touché' };
   }
@@ -1288,7 +1331,7 @@ function myCarryLine(statement: CommissionStatement, ended: boolean): string | n
   if (ended || statement.carryOverOutMinor === 0) return carryLine(statement, ended);
   if (statement.totalMinor < 0)
     return `Ton total est sous zéro à ce jour : si la quinzaine finit ainsi, ${signedAmountText(statement.carryOverOutMinor, 'EUR')} iront sur la suivante.`;
-  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} à ce jour : si la quinzaine finit ainsi, ${amountText(statement.carryOverOutMinor, 'EUR')} iront sur la suivante.`;
+  return `Sous le minimum de ${amountText(statement.rules.minimumPayoutMinor, 'EUR')} à ce jour : si la quinzaine finit ainsi, ${amountText(statement.carryOverOutMinor, 'EUR')} iront sur la suivante.${secondCarry(statement, ended)}`;
 }
 
 /** Where a net stands among the tiers: the highest reached, its threshold included, and the next one. */

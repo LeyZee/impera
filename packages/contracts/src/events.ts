@@ -14,6 +14,7 @@ import {
 } from './enums';
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
 import {
+  CommissionStatementIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
@@ -21,9 +22,12 @@ import {
   MediaAssetIdSchema,
   MessageIdSchema,
   PlatformAccountIdSchema,
+  TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
+import { InvoiceKindSchema, InvoiceNotIssuedReasonSchema } from './invoices';
 import { CurrencySchema } from './money';
+import { PayPeriodSchema } from './pay-periods';
 
 /**
  * The closed list of event types (data-model.md) and their payloads (camelCase, never media content, never a
@@ -185,6 +189,7 @@ export const EVENT_TYPES = [
   'budget_threshold_crossed',
   'backup_overdue',
   'exchange_rate_overdue',
+  'invoice_not_issued',
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
@@ -310,6 +315,20 @@ export const EVENT_PAYLOADS = {
     day: z.iso.date(),
   }),
   /**
+   * A document a validated statement made due was not issued (EQ-06, ADR 0036): its invoice, or a credit note the
+   * period owes. Pay's invoicing job publishes it with no creator; the statement stays validated, and the owner settles
+   * the reason (with the accountant for a credit note no invoice can take). Never a name: the member by id.
+   */
+  invoice_not_issued: z.object({
+    memberId: TeamMemberIdSchema,
+    statementId: CommissionStatementIdSchema,
+    period: PayPeriodSchema,
+    document: InvoiceKindSchema,
+    reason: InvoiceNotIssuedReasonSchema,
+    /** What stays without a document, excluding VAT, in cents: the invoice's total, or the credit owed. */
+    amountMinor: z.number().int().min(1),
+  }),
+  /**
    * Automatique closed on its own (ADR 0019): the live rate fell under its target, or the voice version changed and
    * has not proved itself yet. Every conversation in automatic went back to the copilot. Published once, for the owner.
    */
@@ -370,6 +389,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('budget_threshold_crossed'),
   typedEvent('backup_overdue'),
   typedEvent('exchange_rate_overdue'),
+  typedEvent('invoice_not_issued'),
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),

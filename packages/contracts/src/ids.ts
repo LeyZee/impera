@@ -133,3 +133,31 @@ export type PayoutMinimumId = z.infer<typeof PayoutMinimumIdSchema>;
 /** The team's collective goal for a pay period, with its tiers (EQ-04). */
 export const CollectiveGoalIdSchema = uuid.brand<'CollectiveGoalId'>();
 export type CollectiveGoalId = z.infer<typeof CollectiveGoalIdSchema>;
+
+/** A billing regime the owner sets and the accountant validates: VAT, withholding, mentions, documents (EQ-06). */
+export const BillingRegimeIdSchema = uuid.brand<'BillingRegimeId'>();
+export type BillingRegimeId = z.infer<typeof BillingRegimeIdSchema>;
+
+/** A contractor's billing regime from a day on, never backwards (EQ-06). */
+export const ContractorRegimeIdSchema = uuid.brand<'ContractorRegimeId'>();
+export type ContractorRegimeId = z.infer<typeof ContractorRegimeIdSchema>;
+
+/** A dated document a regime asks of a contractor: tax residence, URSSAF vigilance (EQ-06). */
+export const ContractorDocumentIdSchema = uuid.brand<'ContractorDocumentId'>();
+export type ContractorDocumentId = z.infer<typeof ContractorDocumentIdSchema>;
+
+/** A version of the service contract or of the billing mandate, as the agency's accountant gave it (EQ-06). */
+export const ContractTextIdSchema = uuid.brand<'ContractTextId'>();
+export type ContractTextId = z.infer<typeof ContractTextIdSchema>;
+
+/** A contractor's acceptance of one version of a contract text (EQ-06). */
+export const ContractAcceptanceIdSchema = uuid.brand<'ContractAcceptanceId'>();
+export type ContractAcceptanceId = z.infer<typeof ContractAcceptanceIdSchema>;
+
+/** A self-billed invoice or a credit note, in its contractor's sequence (EQ-06). */
+export const InvoiceIdSchema = uuid.brand<'InvoiceId'>();
+export type InvoiceId = z.infer<typeof InvoiceIdSchema>;
+
+/** A step in an invoice's life: issue, acceptance, contest, credit, payment (EQ-06). */
+export const InvoiceEventIdSchema = uuid.brand<'InvoiceEventId'>();
+export type InvoiceEventId = z.infer<typeof InvoiceEventIdSchema>;

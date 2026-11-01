@@ -1,4 +1,4 @@
-import type { Currency } from '@nirvana/contracts';
+import { CARRY_OVER_RANK_MAX, positiveCarryRankIn, type Currency } from '@nirvana/contracts';
 
 import { MissingExchangeRate } from './errors';
 import { BPS, mulDivRound, RATE_SCALE } from './rounding';
@@ -15,13 +15,15 @@ import { BPS, mulDivRound, RATE_SCALE } from './rounding';
  * - fixed and percent penalties, the percent on the member's net, capped at the member's share plus bonuses;
  * - a manager's share of the team's net;
  * - what comes in from earlier periods (carry-overs, adjustments), and a total under the payout minimum carried over.
- * Two points differ from Imperium's code, as the ADR and the task sheet decide: a penalty is capped at the member's
- * share plus bonuses, never at the net plus bonuses (a statement is never negative), and a manager's share of the
- * team's net leaves out the manager's own net, already paid by the manager's commission.
+ * Three points differ from Imperium's code, as the ADRs and the task sheet decide: a penalty is capped at the member's
+ * share plus bonuses, never at the net plus bonuses (a statement is never negative); a manager's share of the team's
+ * net leaves out the manager's own net, already paid by the manager's commission; and a positive total is carried twice
+ * at most, the third period paying it even under the minimum, so that its invoice is paid before its due date
+ * (ADR 0038).
  */
 
 /** Bumped with any change that could move a cent; a validated statement keeps the version that made it. */
-export const ENGINE_VERSION = 'nirvana-1';
+export const ENGINE_VERSION = 'nirvana-2';
 
 /** Euros for one unit of `currency`, in millionths, with where and when it was read. */
 interface ExchangeRate {
@@ -51,6 +53,11 @@ interface AmountInput {
   readonly amountMinor: number;
 }
 
+/** A carry-over into the period, with how many times in a row its amount has been carried (ADR 0038). */
+interface CarryOverInput extends AmountInput {
+  readonly rank: number;
+}
+
 export interface MemberPayInput {
   readonly memberId: string;
   readonly teamRole: 'chatter' | 'manager';
@@ -64,7 +71,7 @@ export interface MemberPayInput {
   readonly accounts: readonly AccountEarnings[];
   readonly manualBonuses: readonly AmountInput[];
   readonly penalties: readonly PenaltyInput[];
-  readonly carryOversIn: readonly AmountInput[];
+  readonly carryOversIn: readonly CarryOverInput[];
   readonly adjustments: readonly AmountInput[];
 }
 
@@ -125,7 +132,10 @@ export interface CommissionStatement {
   readonly carryOversInMinor: number;
   readonly adjustmentsMinor: number;
   readonly totalMinor: number;
-  /** Carried to the next period: a total under the payout minimum, or below zero. */
+  /**
+   * Carried to the next period: a total under the payout minimum, unless already carried twice (ADR 0038), or below
+   * zero.
+   */
   readonly carryOverOutMinor: number;
   readonly payableMinor: number;
 }
@@ -297,7 +307,10 @@ export function computeCommissionStatements(input: PeriodPayInput): PeriodStatem
     const carryOverOutMinor =
       totalMinor < 0
         ? totalMinor
-        : !member.final && totalMinor > 0 && totalMinor < input.minimumPayoutMinor
+        : !member.final &&
+            totalMinor > 0 &&
+            totalMinor < input.minimumPayoutMinor &&
+            positiveCarryRankIn(member.carryOversIn) < CARRY_OVER_RANK_MAX
           ? totalMinor
           : 0;
 

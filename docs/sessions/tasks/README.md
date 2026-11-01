@@ -63,12 +63,12 @@ Branche : task/<id>-<slug>
 | H-01 | Première session d'hygiène | 0 | todo | P0-07b |
 | D-01 | Design system « Liquid Glass » | 4 | in_progress | P0-01 |
 | D-02 | Recette design et navigation de l'interface web | 4 | in_progress | D-01 |
-| EQ-01 | Équipe : membres, pays, commission, paramètres de paie des plateformes | équipe | todo | ADR 0023, ADR 0024 ; écrans : EQ-11 |
-| EQ-02 | Planning des shifts et « qui est en poste » | équipe | todo | EQ-01 |
-| EQ-03 | Rapport de fin de shift dans Nirvana | équipe | todo | EQ-02 |
-| EQ-04 | Moteur de paie : calcul pur, périodes, verrou | équipe | todo | EQ-01, EQ-03 |
-| EQ-05 | Paie : écrans de validation, de paiement et commissions du chatteur | équipe | in_progress | EQ-04, EQ-11 |
-| EQ-06 | Factures des prestataires : autofacturation, avoirs, export comptable | équipe | todo | EQ-04, EQ-05 |
+| EQ-01 | Équipe : membres, pays, commission, paramètres de paie des plateformes | équipe | in_progress | ADR 0023, ADR 0024 ; écrans : EQ-11 |
+| EQ-02 | Planning des shifts et « qui est en poste » | équipe | in_progress | EQ-01 |
+| EQ-03 | Rapport de fin de shift dans Nirvana | équipe | in_progress | EQ-02 |
+| EQ-04 | Moteur de paie : calcul pur, périodes, verrou | équipe | in_progress | EQ-01, EQ-03 |
+| EQ-05 | Paie : écrans de validation, de paiement et commissions du chatteur | équipe | done | EQ-04, EQ-11 |
+| EQ-06 | Factures des prestataires : autofacturation, avoirs, export comptable | équipe | in_progress | EQ-04, EQ-05 |
 | EQ-07 | Import de l'historique d'Imperium (optionnel) | équipe | blocked (pas de base d'Imperium) | EQ-01 à EQ-06 |
 | EQ-08 | Mode hybride : passage à l'humain pour vendre, routage et attribution | 3-4 | blocked (capture Reveal, clés) | EQ-02, P6-01 |
 | EQ-09 | PWA de la créatrice : routine, revenus, qui est en poste | 5 | todo (second temps) | EQ-01, EQ-02, EQ-04 |
@@ -76,10 +76,10 @@ Branche : task/<id>-<slug>
 | EQ-11 | Shell par rôle : rail, barre du téléphone et gardes de route | équipe | todo | ADR 0024, EQ-01 (`/v1/me`) |
 | EQ-12 | Annonces, prise de poste et notifications de l'équipe, sans Telegram | équipe | todo | EQ-02, EQ-10, EQ-11 |
 | EQ-13 | Accès d'un chatteur borné à son shift | équipe | todo | ADR 0025, EQ-01, EQ-02, filtre des conversations routées |
-| EQ-14 | Départ d'un membre : accès, conversations, dernier versement | équipe | todo | EQ-01, EQ-02, EQ-04 à EQ-06 |
+| EQ-14 | Gestes de la fiche d'un membre et départ | équipe | in_progress | EQ-01 (gestes) ; EQ-02, EQ-04 à EQ-06 (départ) |
 | EQ-15 | Double authentification pour le propriétaire et les managers | équipe | todo | EQ-01, EQ-10, EQ-11 |
 | EQ-16 | S'entraîner : les recrues s'exercent contre des fans simulés | équipe | blocked (clés, comme le playground) | EQ-10, EQ-11, P3-01, P3-05 |
-| EQ-17 | Mise en service de la paie : sauvegardes, comptable, paie à blanc | équipe | todo | EQ-04 à EQ-06, EQ-15, déploiement |
+| EQ-17 | Mise en service de la paie : sauvegardes, comptable, paie à blanc | équipe | in_progress | EQ-04 à EQ-06, EQ-15, déploiement |
 | EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | todo | EQ-11 |
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |

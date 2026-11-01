@@ -1,4 +1,4 @@
-/** Shared Zod schemas and types: the agent's hours, alerts, auth, the Automatique rule, backups, the brain's intents, conversations, creators, dashboard, the desire score, fans (KYC slots, flags), the agent's guard codes, ids, invitation links, money, text normalisation, enums, errors, events, jobs, connector port data, media, pay periods and an account's pay rules, payroll (commission statements, bonuses, penalties, adjustments, carry-overs, tiers, goals, exchange rates), settings, persona and its API, scheduling and the end-of-shift reports, team and its members, telegram. */
+/** Shared Zod schemas and types: the agent's hours, alerts, auth, the Automatique rule, backups, the brain's intents, conversations, creators, dashboard, the desire score, fans (KYC slots, flags), the agent's guard codes, ids, invitation links, money, text normalisation, enums, errors, events, jobs, connector port data, media, pay periods and an account's pay rules, payroll (commission statements, bonuses, penalties, adjustments, carry-overs, tiers, goals, exchange rates), contractors' invoices (regimes, contractor files, contract texts, invoices and credit notes), settings, persona and its API, scheduling and the end-of-shift reports, team and its members, telegram. */
 export const CONTRACTS_PACKAGE = '@nirvana/contracts';
 
 export * from './agent-hours';
@@ -20,6 +20,7 @@ export * from './fans';
 export * from './guards';
 export * from './ids';
 export * from './invitation-links';
+export * from './invoices';
 export * from './jobs';
 export * from './media';
 export * from './money';

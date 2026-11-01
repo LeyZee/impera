@@ -53,6 +53,12 @@ export const PAY_TARGET_MAX_MINOR = 100_000_000;
 /** The payout minimum until the owner sets one: 15 €, Imperium's `paie_report_seuil`. */
 export const DEFAULT_MINIMUM_PAYOUT_MINOR = 1_500;
 
+/**
+ * How many times in a row a positive amount may be carried over (ADR 0038): the third fortnight pays it, even under the
+ * payout minimum, so that its invoice is paid before its due date.
+ */
+export const CARRY_OVER_RANK_MAX = 2;
+
 /** The longest payout delay the owner may announce to the team (PAIE-32), in business days. */
 export const PAYOUT_DELAY_MAX_BUSINESS_DAYS = 30;
 
@@ -479,16 +485,43 @@ export type PayAdjustmentView = z.infer<typeof PayAdjustmentViewSchema>;
  * zero. Written by the validation, one per member and period it comes from, never changed; the next period's
  * statement counts it.
  */
-export const CarryOverSchema = z.object({
-  id: CarryOverIdSchema,
-  memberId: TeamMemberIdSchema,
-  fromPeriod: PayPeriodSchema,
-  toPeriod: PayPeriodSchema,
-  amountMinor: MinorSchema.refine((amount) => amount !== 0, 'Un report de 0'),
-  statementId: CommissionStatementIdSchema,
-  createdAt: z.iso.datetime(),
-});
+export const CarryOverSchema = z
+  .object({
+    id: CarryOverIdSchema,
+    memberId: TeamMemberIdSchema,
+    fromPeriod: PayPeriodSchema,
+    toPeriod: PayPeriodSchema,
+    amountMinor: MinorSchema.refine((amount) => amount !== 0, 'Un report de 0'),
+    /**
+     * How many times in a row a positive amount has been carried, this carry-over included: 1, then 2 (ADR 0038); always 1
+     * for a negative one. A statement counted before the rank existed read 1: a first carry-over.
+     */
+    rank: z.number().int().min(1).max(CARRY_OVER_RANK_MAX).default(1),
+    statementId: CommissionStatementIdSchema,
+    createdAt: z.iso.datetime(),
+  })
+  .refine((carry) => carry.rank === 1 || carry.amountMinor > 0, 'Un report négatif est toujours au rang 1');
 export type CarryOver = z.infer<typeof CarryOverSchema>;
+
+/** What the rank rule reads of a carry-over. */
+interface RankedCarryOver {
+  readonly amountMinor: number;
+  readonly rank: number;
+}
+
+/** How many times in a row the positive amount coming into a period has been carried (ADR 0038); 0 when none comes in. */
+export function positiveCarryRankIn(carryOversIn: readonly RankedCarryOver[]): number {
+  return Math.max(0, ...carryOversIn.filter((one) => one.amountMinor > 0).map((one) => one.rank));
+}
+
+/**
+ * The rank of what a statement carries over (ADR 0038): a positive amount following a positive carry-over takes its
+ * rank plus one, any other carry-over rank 1, a negative one included, which starts the count again. The base checks
+ * the same rule (`keep_carry_over`, migration 0043) and refuses a third time.
+ */
+export function carryOverRank(carryOversIn: readonly RankedCarryOver[], carryOverOutMinor: number): number {
+  return carryOverOutMinor > 0 ? positiveCarryRankIn(carryOversIn) + 1 : 1;
+}
 
 /** A report a statement counts although it was made for an earlier period, closed for the team when it came. */
 export const LateReportSchema = z.object({

@@ -40,6 +40,8 @@ const text = (element: Element | null | undefined): string => (element?.textCont
 
 let periods: Record<string, PayrollPeriod>;
 let down: boolean;
+/** A period whose own read fails, the list still answering. */
+let periodDown: string | null;
 let delay: number | null;
 /** The member's own line of the team, all `/v1/team/members` gives a chatter (scope `self`). */
 let mine: TeamMember;
@@ -73,6 +75,8 @@ function serve(): void {
       if (down && url.pathname.startsWith('/v1/payroll'))
         return json({ error: { code: 'internal', message: 'down', details: {}, requestId: 'req-1' } }, 500);
       const period = /^\/v1\/payroll\/periods\/(.+)$/u.exec(url.pathname)?.[1];
+      if (period !== undefined && period === periodDown)
+        return json({ error: { code: 'internal', message: 'down', details: {}, requestId: 'req-1' } }, 500);
       if (period !== undefined) return json(periods[period] ?? periodOf(period, [], { window: null }));
       switch (url.pathname) {
         case '/v1/payroll/periods':
@@ -144,6 +148,7 @@ beforeEach(() => {
   // Friday 6 November at midnight in Paris: five days of fifteen gone.
   vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
   down = false;
+  periodDown = null;
   delay = null;
   mine = THEO;
   asked.length = 0;
@@ -350,12 +355,12 @@ describe('CommissionsPage', () => {
       ],
       { closing: CLOSED(OCT1, '2026-10-16T08:41:00.000Z') },
     );
+    // Its own read fails: the row says it from the list's sum (`carriedMinor`, #295), never « 0,00 € touché ».
+    periodDown = OCT1;
     renderPage();
     const panelOf = await waitFor(() => panel('Mes relevés'));
     const carried = await within(panelOf).findByRole('button', { name: /^1er – 15 octobre/u });
-    await waitFor(() => {
-      expect(text(carried)).toContain('Reporté6,67 €reporté sur le 16 – 31 octobre');
-    });
+    expect(text(carried)).toContain('Reporté6,67 €reporté sur le 16 – 31 octobre');
     expect(text(carried)).not.toContain('touché');
   });
 

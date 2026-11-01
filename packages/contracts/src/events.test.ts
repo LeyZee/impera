@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { ConversationEventSchema, DomainEventSchema, EVENT_PAYLOADS, EVENT_TYPES } from './events';
-import { ConversationIdSchema, CreatorIdSchema, FanIdSchema, MessageIdSchema, newId } from './ids';
+import {
+  CommissionStatementIdSchema,
+  ConversationIdSchema,
+  CreatorIdSchema,
+  FanIdSchema,
+  MessageIdSchema,
+  newId,
+  TeamMemberIdSchema,
+} from './ids';
 
 const envelope = () => ({
   id: newId(MessageIdSchema),
@@ -86,6 +94,43 @@ describe('events', () => {
       expect(EVENT_PAYLOADS.exchange_rate_overdue.safeParse(payload).success, JSON.stringify(payload)).toBe(
         false,
       );
+    }
+  });
+
+  it('tells the owner of an invoice or a credit note not issued, with no creator and never a name', () => {
+    const payload = {
+      memberId: newId(TeamMemberIdSchema),
+      statementId: newId(CommissionStatementIdSchema),
+      period: '2026-10-01',
+      document: 'invoice',
+      reason: 'no_mandate',
+      amountMinor: 12_000,
+    };
+    const event = DomainEventSchema.parse({
+      ...envelope(),
+      creatorId: null,
+      type: 'invoice_not_issued',
+      payload,
+    });
+    expect(event.type).toBe('invoice_not_issued');
+    expect(
+      EVENT_PAYLOADS.invoice_not_issued.safeParse({
+        ...payload,
+        document: 'credit_note',
+        reason: 'no_invoice_to_credit',
+      }).success,
+    ).toBe(true);
+    // A closed reason, a pay period, and an amount that something stays without.
+    for (const patch of [
+      { reason: 'tired' },
+      { period: '2026-10-02' },
+      { amountMinor: 0 },
+      { name: 'Kofi' },
+    ]) {
+      expect(
+        EVENT_PAYLOADS.invoice_not_issued.strict().safeParse({ ...payload, ...patch }).success,
+        JSON.stringify(patch),
+      ).toBe(false);
     }
   });
 

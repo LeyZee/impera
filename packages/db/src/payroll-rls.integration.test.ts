@@ -591,6 +591,53 @@ describe('commission statements (EQ-04): who reads and writes, and a past that n
       await insert(owner, mine);
     });
 
+    it('a positive amount is carried twice in a row at most; a negative one starts the count again (ADR 0038)', async () => {
+      const RANK = /carry_overs_rank_check/u;
+      /** Validates the draft of `userId` for `period`, then tries to write its carry-over at each rank given. */
+      const carried = async (userId: string, period: string, totalMinor: number) => {
+        const statementId = await draft(userId, period, {
+          totalMinor,
+          carryOverOutMinor: totalMinor,
+          payableMinor: 0,
+        });
+        await validate(manager, statementId);
+        return (rank: number) =>
+          as(owner, (tx) =>
+            tx.insert(s.carryOvers).values({
+              id: newId(CarryOverIdSchema),
+              memberId: member(userId),
+              fromPeriod: period,
+              toPeriod: nextPayPeriod(PayPeriodSchema.parse(period)),
+              amountMinor: totalMinor,
+              rank,
+              statementId,
+            }),
+          );
+      };
+
+      // Iris: 9 €, then 4 € (13 €), then 1 € (14 €). Her 9 € of October 1st went at rank 1 (test above).
+      const second = await carried(iris, '2025-10-16', 1_300);
+      expect(await failure(second(1))).toMatch(KEPT);
+      await second(2);
+      // A third carry-over is written at no rank: the engine pays it (the 14 € here).
+      const third = await carried(iris, '2025-11-01', 1_400);
+      expect(await failure(third(3))).toMatch(RANK);
+      expect(await failure(third(2))).toMatch(KEPT);
+      expect(await failure(third(1))).toMatch(KEPT);
+
+      // Basile: −5 €, always at rank 1 (the trigger answers before the CHECK, which refuses it too); then 9 €, a
+      // first carry-over; then −5 € in the period, 4 € still owed.
+      const negative = await carried(basile, '2025-09-16', -500);
+      expect(await failure(negative(2))).toMatch(KEPT);
+      await negative(1);
+      const first = await carried(basile, '2025-10-01', 900);
+      expect(await failure(first(2))).toMatch(KEPT);
+      await first(1);
+      const owed = await carried(basile, '2025-10-16', 400);
+      expect(await failure(owed(1))).toMatch(KEPT);
+      await owed(2);
+    });
+
     it('the owner alone sets tiers and goals, never for a period already validated', async () => {
       const tiers = (fromPeriod: string) => ({
         id: newId(BonusTierSetIdSchema),

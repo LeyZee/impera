@@ -4,6 +4,8 @@ import { PayPeriodSchema } from './pay-periods';
 import {
   BonusTierSetSchema,
   canonicalExchangeRates,
+  carryOverRank,
+  CarryOverSchema,
   CollectiveGoalSchema,
   containsIban,
   CreateBonusBodySchema,
@@ -31,6 +33,7 @@ import {
   UpdatePayrollSettingsBodySchema,
   penaltyApplies,
   penaltyCovers,
+  positiveCarryRankIn,
 } from './payroll';
 
 const MEMBER = '0199f2a0-0000-7000-8000-0000000000b1';
@@ -347,6 +350,43 @@ describe('a blocked period', () => {
     };
     expect(PayrollPeriodSchema.safeParse(periodRead).success).toBe(false);
     expect(PayrollPeriodSchema.parse({ ...periodRead, blocked: null }).blocked).toBeNull();
+  });
+});
+
+describe('carry-overs (ADR 0038)', () => {
+  const carry = (amountMinor: number, rank?: number) => ({
+    id: '0199f2a0-0000-7000-8000-0000000000c1',
+    memberId: '0199f2a0-0000-7000-8000-0000000000c2',
+    fromPeriod: '2026-11-01',
+    toPeriod: '2026-11-16',
+    amountMinor,
+    ...(rank === undefined ? {} : { rank }),
+    statementId: '0199f2a0-0000-7000-8000-0000000000c3',
+    createdAt: '2026-11-17T09:00:00.000Z',
+  });
+
+  it('carry a positive amount twice at most, a negative one always at rank 1', () => {
+    expect(CarryOverSchema.parse(carry(900, 1)).rank).toBe(1);
+    expect(CarryOverSchema.parse(carry(1_300, 2)).rank).toBe(2);
+    expect(CarryOverSchema.safeParse(carry(1_400, 3)).success).toBe(false);
+    expect(CarryOverSchema.safeParse(carry(-500, 2)).success).toBe(false);
+    expect(CarryOverSchema.parse(carry(-500, 1)).rank).toBe(1);
+  });
+
+  it('read a carry-over counted before the rank existed as a first one', () => {
+    expect(CarryOverSchema.parse(carry(900)).rank).toBe(1);
+  });
+
+  it('give what a statement carries the rank after the positive one that came in, 1 otherwise', () => {
+    const ranked = (amountMinor: number, rank: number) => ({ amountMinor, rank });
+    expect(positiveCarryRankIn([])).toBe(0);
+    expect(positiveCarryRankIn([ranked(-500, 1)])).toBe(0);
+    expect(positiveCarryRankIn([ranked(1_300, 2)])).toBe(2);
+    expect(carryOverRank([], 900)).toBe(1);
+    expect(carryOverRank([ranked(900, 1)], 1_300)).toBe(2);
+    // A negative amount carried, in or out, starts the count again.
+    expect(carryOverRank([ranked(-500, 1)], 400)).toBe(1);
+    expect(carryOverRank([ranked(900, 1)], -300)).toBe(1);
   });
 });
 

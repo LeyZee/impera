@@ -64,7 +64,7 @@ const {
 
 const iso = (at: Date | null): string | null => (at === null ? null : at.toISOString());
 
-const CountedSchema = z.object({
+export const CountedSchema = z.object({
   bonuses: z.array(BonusSchema),
   penalties: z.array(PenaltySchema),
   carryOversIn: z.array(CarryOverSchema),

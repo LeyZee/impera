@@ -634,6 +634,24 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         );
       },
     ),
+    'payroll.issue_invoices': defineTask(
+      'payroll.issue_invoices',
+      JOB_PAYLOADS['payroll.issue_invoices'],
+      logger,
+      async (payload, context) => {
+        const outcome = await modules.payroll.jobs.issueInvoices(payload.statementId, context.logger);
+        context.logger.info(
+          outcome.kind === 'planned'
+            ? {
+                statementId: payload.statementId,
+                issued: outcome.issued,
+                notIssued: outcome.notIssued.length,
+              }
+            : { statementId: payload.statementId, outcome: outcome.kind },
+          'payroll: invoices issued',
+        );
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],
