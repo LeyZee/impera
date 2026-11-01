@@ -307,6 +307,9 @@ async function factsOf(
             businessId: profile.profile.businessId,
             vatNumber: profile.profile.vatNumber,
             individualEntrepreneur: profile.profile.individualEntrepreneur,
+            legalForm: profile.profile.legalForm,
+            shareCapitalMinor: profile.profile.shareCapitalMinor,
+            rcsCity: profile.profile.rcsCity,
           },
     prefix: profile?.profile.invoicePrefix ?? null,
     documents: documents.map((one) => ({

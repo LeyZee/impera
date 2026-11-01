@@ -338,8 +338,9 @@ export type ContractorRegime = z.infer<typeof ContractorRegimeSchema>;
 /**
  * The contractor as his invoice prints him, copied at the issue. A contractor established in France adds his SIREN or
  * SIRET, his VAT number when he charges VAT, and « EI » after his name when he is an individual entrepreneur (art.
- * L526-22 and R526-27 of the Code de commerce). Those three are absent from a copy made before they existed (lot 4):
- * a frozen copy is printed as it was written.
+ * L526-22 and R526-27 of the Code de commerce); a company adds its legal form, its share capital and the town of its
+ * trade register (art. R123-237). Those are absent from a copy made before they existed (lot 4, then the accountant's
+ * answers of 01/11): a frozen copy is printed as it was written.
  */
 export const InvoiceContractorSchema = z.object({
   legalName: trimmed(LEGAL_NAME_MAX),
@@ -349,6 +350,9 @@ export const InvoiceContractorSchema = z.object({
   businessId: BusinessIdSchema.nullable().optional(),
   vatNumber: VatNumberSchema.nullable().optional(),
   individualEntrepreneur: z.boolean().optional(),
+  legalForm: trimmed(AGENCY_LEGAL_FORM_MAX).nullable().optional(),
+  shareCapitalMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+  rcsCity: trimmed(RCS_CITY_MAX).nullable().optional(),
 });
 export type InvoiceContractor = z.infer<typeof InvoiceContractorSchema>;
 
@@ -387,10 +391,16 @@ export const addressLines = (address: string): string[] =>
 export const shareCapitalWords = (minor: number): string =>
   minor % 100 === 0 ? WHOLE_EUROS.format(minor / 100) : EUROS.format(minor / 100);
 
-/** « SAS au capital de 10 000 € », the form alone without a capital, `null` without a form (a copy made before lot 4). */
-export function legalFormWords(agency: InvoiceAgency): string | null {
-  const form = agency.legalForm ?? null;
-  const capital = agency.shareCapitalMinor ?? null;
+/**
+ * « SAS au capital de 10 000 € », the form alone without a capital, `null` without a form (a copy made before lot 4, an
+ * individual contractor): the agency's or a company contractor's.
+ */
+export function legalFormWords(company: {
+  readonly legalForm?: string | null | undefined;
+  readonly shareCapitalMinor?: number | null | undefined;
+}): string | null {
+  const form = company.legalForm ?? null;
+  const capital = company.shareCapitalMinor ?? null;
   if (form === null) return null;
   return capital === null ? form : `${form} au capital de ${shareCapitalWords(capital)}`;
 }
@@ -398,6 +408,13 @@ export function legalFormWords(agency: InvoiceAgency): string | null {
 /** « 123 456 789 »: a SIREN in its three groups, which never break apart. */
 export const sirenWords = (siren: string): string =>
   [siren.slice(0, 3), siren.slice(3, 6), siren.slice(6)].join('\u00a0');
+
+/**
+ * « RCS Lyon 123 456 789 » (art. R123-237 of the Code de commerce): the register's town and the SIREN, the first nine
+ * digits of a SIRET, which never break apart.
+ */
+export const rcsWords = (city: string, businessId: string): string =>
+  `RCS\u00a0${city}\u00a0${sirenWords(businessId.slice(0, 9))}`;
 
 /**
  * The foot of each page of an invoice or a credit note (art. R123-237 of the Code de commerce): the agency and its
@@ -410,7 +427,7 @@ export function invoiceFooterOf(agency: InvoiceAgency): string {
   if (form !== null) parts.push(form);
   if (agency.rcsCity !== undefined && agency.rcsCity !== null) {
     // The register and its number never break apart either.
-    parts.push(`RCS\u00a0${agency.rcsCity}\u00a0${sirenWords(agency.siren)}`);
+    parts.push(rcsWords(agency.rcsCity, agency.siren));
   }
   return `${parts.join(' · ')}, mandataire de facturation du prestataire.`;
 }
@@ -430,6 +447,13 @@ export const ContractorProfileSchema = z.object({
   vatNumber: VatNumberSchema.nullable(),
   /** An individual entrepreneur: his invoices print « EI » after his name. */
   individualEntrepreneur: z.boolean(),
+  /**
+   * A company established in France: its legal form, share capital and trade-register town, which its invoices print
+   * and require (art. R123-237 of the Code de commerce, the accountant's answers of 01/11); `null` for a person.
+   */
+  legalForm: trimmed(AGENCY_LEGAL_FORM_MAX).nullable(),
+  shareCapitalMinor: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).nullable(),
+  rcsCity: trimmed(RCS_CITY_MAX).nullable(),
   email: z.email().max(BILLING_EMAIL_MAX),
   invoicePrefix: InvoicePrefixSchema.nullable(),
   verifiedAt: z.iso.datetime().nullable(),

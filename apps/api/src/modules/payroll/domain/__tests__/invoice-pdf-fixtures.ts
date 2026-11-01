@@ -40,10 +40,10 @@ export const REGIME_MENTIONS = [
 ];
 
 export const TERMS =
-  'Règlement par virement. Aucun escompte pour paiement anticipé. En cas de retard, pénalités au taux de trois fois le taux d’intérêt légal et indemnité forfaitaire de 40\u00a0€ pour frais de recouvrement (art. L441-10 et D441-5 du Code de commerce).';
+  'Règlement par virement. Aucun escompte pour paiement anticipé. Tout retard de paiement entraîne de plein droit des pénalités au taux de trois fois le taux d’intérêt légal en vigueur et une indemnité forfaitaire de 40\u00a0€ pour frais de recouvrement (art. L441-10 et D441-5 du Code de commerce).';
 
 export const SERVICE =
-  'Animation commerciale de comptes de créatrices (messagerie), rémunérée à la commission.';
+  'Animation commerciale de messageries de comptes de créatrices de contenu, rémunérée à la commission.';
 
 /** The invoice of the mockup: two accounts, a tier bonus, a deduction, under reverse charge (Benin). */
 export function sampleInvoice(patch: Partial<PdfDocumentSource> = {}): PdfDocumentSource {
@@ -260,12 +260,10 @@ const frenchAnnex = (handle: string): NonNullable<PdfDocumentSource['annex']> =>
 
 /**
  * A French contractor under the VAT franchise (art. 293 B of the CGI): an individual entrepreneur with a SIRET and no
- * VAT number; the invoice prints no VAT.
+ * VAT number; the invoice prints no VAT. No mention of an exemption from registration (the answers of 01/11): that
+ * exemption is gone, every business is in the national register since 2023, and « EI » with the SIREN suffice.
  */
 export function frenchFranchise(): PdfDocumentSource {
-  const mentions = [
-    'Entrepreneur individuel dispensé d’immatriculation au registre du commerce et des sociétés.',
-  ];
   return sampleInvoice({
     contractor: {
       legalName: 'Basile Exemple',
@@ -277,8 +275,8 @@ export function frenchFranchise(): PdfDocumentSource {
       individualEntrepreneur: true,
     },
     vat: { treatment: 'exempt' },
-    regimeMentions: mentions,
-    mentions: [...mentions, paymentTermsMention('2027-01-16', TERMS)],
+    regimeMentions: [],
+    mentions: [paymentTermsMention('2027-01-16', TERMS)],
     lines: [
       {
         kind: 'commission',
@@ -292,7 +290,10 @@ export function frenchFranchise(): PdfDocumentSource {
   });
 }
 
-/** A French company that charges VAT at 20 %: its SIREN, its VAT number, the VAT and the total including it. */
+/**
+ * A French company that charges VAT at 20 %: its form, capital and register (art. R123-237 C. com.), its SIREN, its
+ * VAT number, the VAT and the total including it.
+ */
 export function frenchCharged(): PdfDocumentSource {
   return sampleInvoice({
     contractor: {
@@ -303,6 +304,9 @@ export function frenchCharged(): PdfDocumentSource {
       businessId: '987654321',
       vatNumber: 'FR45987654321',
       individualEntrepreneur: false,
+      legalForm: 'SARL',
+      shareCapitalMinor: 750_000,
+      rcsCity: 'Marseille',
     },
     vat: { treatment: 'charged', rateBps: 2_000 },
     regimeMentions: [],

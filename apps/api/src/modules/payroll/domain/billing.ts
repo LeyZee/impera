@@ -139,6 +139,10 @@ export interface ContractorIdentity {
   readonly vatNumber: string | null;
   /** An individual entrepreneur: their invoices print « EI » after their name. */
   readonly individualEntrepreneur: boolean;
+  /** A company established in France: its legal form, share capital and trade-register town (art. R123-237 C. com.). */
+  readonly legalForm: string | null;
+  readonly shareCapitalMinor: number | null;
+  readonly rcsCity: string | null;
 }
 
 /** The mandate the contractor accepted, and the agency's version in force. */
@@ -189,11 +193,17 @@ export interface IssueFacts {
 const filled = (text: string | null | undefined): boolean =>
   text !== null && text !== undefined && text.trim() !== '';
 
+/** A French company's three mentions, all filled: its legal form, a share capital, the town of its trade register. */
+const companyComplete = (identity: ContractorIdentity): boolean =>
+  filled(identity.legalForm) && identity.shareCapitalMinor !== null && filled(identity.rcsCity);
+
 /**
  * Whether the contractor's file holds everything their invoice must print under `regime`, never an invoice without
  * it: their name, address and country; the tax id the regime asks for (the IFU of Benin, the NIF of Madagascar); their
- * SIREN or SIRET when they are established in France, whatever their regime; their VAT number when the regime charges
- * VAT (art. 242 nonies A of annex II to the CGI). Rules of the code, never of a regime's text.
+ * SIREN or SIRET when they are established in France, whatever their regime; established in France and not an
+ * individual entrepreneur, a company's legal form, share capital and trade-register town (art. R123-237 of the Code de
+ * commerce); their VAT number when the regime charges VAT (art. 242 nonies A of annex II to the CGI). Rules of the
+ * code, never of a regime's text.
  */
 export function identityComplete(
   identity: ContractorIdentity | null,
@@ -206,6 +216,7 @@ export function identityComplete(
     filled(identity.country) &&
     (!regime.taxIdRequired || filled(identity.taxId)) &&
     (identity.country !== 'FR' || filled(identity.businessId)) &&
+    (identity.country !== 'FR' || identity.individualEntrepreneur || companyComplete(identity)) &&
     (regime.vat.treatment !== 'charged' || filled(identity.vatNumber))
   );
 }

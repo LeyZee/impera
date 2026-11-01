@@ -1,4 +1,5 @@
 import {
+  AGENCY_LEGAL_FORM_MAX,
   AGENCY_LOGO_MAX_BYTES,
   AGENCY_LOGO_MEDIA_TYPES,
   BUSINESS_ID_PATTERN,
@@ -24,6 +25,7 @@ import {
   PAY_AMOUNT_MAX_MINOR,
   PAYMENT_TERMS_MAX,
   POSTAL_ADDRESS_MAX,
+  RCS_CITY_MAX,
   REGIME_NAME_MAX,
   SERVICE_DESCRIPTION_MAX,
   STORAGE_KEY_MAX,
@@ -35,6 +37,7 @@ import {
 } from '@nirvana/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   customType,
@@ -300,6 +303,14 @@ export const contractorProfiles = pgTable(
     vatNumber: text('vat_number'),
     /** An individual entrepreneur, whose invoices print « EI » after his name (lot 4). */
     individualEntrepreneur: boolean('individual_entrepreneur').notNull().default(false),
+    /**
+     * A company established in France: its legal form, share capital and trade-register town, which its invoices
+     * print (art. R123-237 of the Code de commerce, the accountant's answers of 01/11/2026); all three or none, never
+     * for an individual entrepreneur.
+     */
+    legalForm: text('legal_form'),
+    shareCapitalMinor: bigint('share_capital_minor', { mode: 'number' }),
+    rcsCity: text('rcs_city'),
     email: text('email').notNull(),
     invoicePrefix: text('invoice_prefix').unique('contractor_profiles_prefix_unique'),
     verifiedAt: timestampTz('verified_at'),
@@ -322,6 +333,11 @@ export const contractorProfiles = pgTable(
     check(
       'contractor_profiles_prefix_check',
       sql`${t.invoicePrefix} is null or ${t.invoicePrefix} ~ ${sql.raw(`'${INVOICE_PREFIX_PATTERN}'`)}`,
+    ),
+    check(
+      'contractor_profiles_company_check',
+      // All three or none: each `is null` is compared first, since a CHECK lets a NULL through.
+      sql`(${t.legalForm} is null) = (${t.shareCapitalMinor} is null) and (${t.legalForm} is null) = (${t.rcsCity} is null) and (${t.legalForm} is null or (not ${t.individualEntrepreneur} and ${textBetween(t.legalForm, AGENCY_LEGAL_FORM_MAX)} and ${t.shareCapitalMinor} >= 1 and ${textBetween(t.rcsCity, RCS_CITY_MAX)}))`,
     ),
     check('contractor_profiles_verified_check', sql`(${t.verifiedAt} is null) = (${t.verifiedBy} is null)`),
     memberRead(t.memberId),
