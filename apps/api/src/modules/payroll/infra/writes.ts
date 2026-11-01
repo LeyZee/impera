@@ -21,7 +21,13 @@ type AuditedAction =
   | 'payout_minimum.create'
   | 'payroll_settings.update'
   | 'billing_settings.update'
-  | 'agency_logo.add';
+  | 'agency_logo.add'
+  | 'contractor_profile.create'
+  | 'contractor_profile.update'
+  | 'contractor_profile.verify'
+  | 'contractor_profile.prefix'
+  | 'contract_text.add'
+  | 'contract.accept';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -40,7 +46,10 @@ export async function audit(
       | 'payout_minimum'
       | 'payroll_settings'
       | 'billing_settings'
-      | 'agency_logo';
+      | 'agency_logo'
+      | 'contractor_profile'
+      | 'contract_text'
+      | 'contract_acceptance';
     readonly id: string;
   },
   details: Record<string, unknown>,

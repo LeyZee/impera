@@ -406,3 +406,78 @@ export class AgencyLogoNotFound extends DomainError {
     super('agency_logo_not_found', 'Logo introuvable : dépose-le d’abord');
   }
 }
+
+/** The contractor has not written his file yet: nothing to check nor to prefix (EQ-06 lot 5a). */
+export class ContractorProfileNotFound extends DomainError {
+  constructor() {
+    super('contractor_profile_not_found', 'Le prestataire n’a pas encore rempli son dossier');
+  }
+}
+
+/** A manager, or another member, writing a contractor's file: only the contractor and the owner write it. */
+export class ContractorProfileForbidden extends DomainError {
+  constructor() {
+    super('contractor_profile_forbidden', 'Seuls le prestataire et le propriétaire écrivent ce dossier');
+  }
+}
+
+/** The file changed since the owner read it: he checks what he sees, never a file he did not see. */
+export class ContractorProfileChanged extends DomainError {
+  constructor() {
+    super('contractor_profile_changed_conflict', 'Le dossier a changé depuis son affichage');
+  }
+}
+
+/** The contractor's first invoice froze his prefix: his numbers never change. */
+export class InvoicePrefixFrozen extends DomainError {
+  constructor() {
+    super('invoice_prefix_frozen_conflict', 'La première facture du prestataire a figé son préfixe');
+  }
+}
+
+/** Another contractor holds this prefix: each one numbers his own sequence. */
+export class InvoicePrefixTaken extends DomainError {
+  constructor() {
+    super('invoice_prefix_taken_conflict', 'Un autre prestataire a déjà ce préfixe');
+  }
+}
+
+export class ContractTextNotFound extends DomainError {
+  constructor() {
+    super('contract_text_not_found', 'Texte introuvable');
+  }
+}
+
+/** The same id sent again with another text, another kind or another delay. */
+export class ContractTextIdConflict extends DomainError {
+  constructor() {
+    super('contract_text_id_conflict', 'Cet identifiant est déjà pris par un autre texte');
+  }
+}
+
+/** The fingerprint the screen sent is not this version's: the contractor accepts only the text he read. */
+export class ContractTextChanged extends DomainError {
+  constructor() {
+    super(
+      'contract_text_changed_conflict',
+      'Ce texte n’est pas celui que tu as lu : relis-le avant de l’accepter',
+    );
+  }
+}
+
+/** A newer version of the same kind replaced it: the contractor reads and accepts that one. */
+export class ContractTextSuperseded extends DomainError {
+  constructor() {
+    super(
+      'contract_text_superseded_conflict',
+      'Une version plus récente remplace ce texte : lis-la avant de l’accepter',
+    );
+  }
+}
+
+/** Only the contractor accepts his contract and his mandate, never the owner nor a manager for him. */
+export class ContractAcceptanceForbidden extends DomainError {
+  constructor() {
+    super('contract_acceptance_forbidden', 'Seul le prestataire accepte son contrat et son mandat');
+  }
+}

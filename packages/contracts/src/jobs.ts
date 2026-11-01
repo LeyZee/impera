@@ -9,6 +9,7 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  TeamMemberIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
@@ -45,6 +46,7 @@ export const JOB_NAMES = [
   'payroll.recalculate_open',
   'payroll.fetch_exchange_rates',
   'payroll.issue_invoices',
+  'payroll.requeue_invoice_issues',
   'payroll.render_invoice_pdf',
   'payroll.mirror_invoice_pdf',
   'payroll.lapse_invoice',
@@ -140,6 +142,14 @@ export const JOB_PAYLOADS = {
    */
   'payroll.issue_invoices': z.object({ statementId: CommissionStatementIdSchema }),
   /**
+   * Tries again the statements whose invoice waits (EQ-06 lot 5a): those of the member (all of them when `memberId` is
+   * `null`) for which `invoice_not_issued` was said, once his file, his prefix, the check of his file or his mandate
+   * changes, or the agency's settings (`null`). Enqueued in the transaction that changes them, under the key
+   * `payroll.requeue_invoice_issues:<memberId | all>`; it enqueues `payroll.issue_invoices` for each, which issues only
+   * what is missing and says only a new reason.
+   */
+  'payroll.requeue_invoice_issues': z.object({ memberId: TeamMemberIdSchema.nullable() }),
+  /**
    * The PDF of an issued invoice or credit note, rendered once from its frozen data and kept in the locked bucket
    * (ADR 0037 § 5): enqueued in the transaction that issues it, under the key `payroll.render_invoice_pdf:<id>`. A
    * rerun replaces nothing; the last attempt that fails tells the owner (`invoice_pdf_missing`).
@@ -208,6 +218,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.fetch_exchange_rates': 3,
   // Replayable: each document has its key, and a failed run wrote nothing.
   'payroll.issue_invoices': 5,
+  // Replayable: it only enqueues, and each enqueue replaces the waiting run of its statement.
+  'payroll.requeue_invoice_issues': 5,
   // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour (ADR 0037 § 5),
   // through a short outage of a bucket, before the last one tells the owner.
   'payroll.render_invoice_pdf': 9,

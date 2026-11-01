@@ -1,0 +1,389 @@
+import { createHash } from 'node:crypto';
+
+import {
+  CommissionStatementIdSchema,
+  ContractAcceptanceIdSchema,
+  ContractAcceptanceSchema,
+  ContractorFileSchema,
+  ContractorProfileSchema,
+  ContractTextSchema,
+  newId,
+  TeamMemberIdSchema,
+  type ContractAcceptance,
+  type ContractorFile,
+  type ContractorProfileBody,
+  type ContractText,
+  type TeamMemberId,
+} from '@nirvana/contracts';
+import {
+  and,
+  eq,
+  inArray,
+  schema,
+  sql,
+  withAdmin,
+  withMember,
+  type Database,
+  type Transaction,
+} from '@nirvana/db';
+
+import { profileChanges } from '../domain/contractors';
+import {
+  ContractAcceptanceForbidden,
+  ContractorProfileChanged,
+  ContractorProfileForbidden,
+  ContractorProfileNotFound,
+  ContractTextChanged,
+  ContractTextIdConflict,
+  ContractTextNotFound,
+  ContractTextSuperseded,
+  InvoicePrefixFrozen,
+  InvoicePrefixTaken,
+  PayrollForbidden,
+  TeamMemberNotFound,
+} from '../domain/errors';
+import type { PayrollContractorStore, PayrollRequeueStore } from '../domain/ports';
+
+import { enqueueInvoiceIssue, enqueueInvoiceRequeue } from './invoice-queue';
+import { audit } from './writes';
+
+const {
+  commissionStatements,
+  contractAcceptances,
+  contractorProfiles,
+  contractTexts,
+  invoices,
+  teamMembers,
+} = schema;
+
+type ProfileRow = typeof contractorProfiles.$inferSelect;
+type TextRow = typeof contractTexts.$inferSelect;
+
+/** The member as the reader's policy lets him see it: the owner and an active manager every one, a member his own. */
+interface Member {
+  readonly id: TeamMemberId;
+  readonly userId: string | null;
+  readonly country: string;
+}
+
+async function memberOf(tx: Transaction, memberId: TeamMemberId): Promise<Member> {
+  const [row] = await tx
+    .select({ userId: teamMembers.userId, country: teamMembers.country })
+    .from(teamMembers)
+    .where(eq(teamMembers.id, memberId));
+  if (row === undefined) throw new TeamMemberNotFound();
+  return { id: memberId, userId: row.userId, country: row.country };
+}
+
+/** One write at a time on a file, a prefix, the texts or a contractor's acceptances: each one reads what it changes. */
+async function lock(tx: Transaction, key: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+}
+
+async function profileOf(tx: Transaction, memberId: TeamMemberId): Promise<ProfileRow | null> {
+  const [row] = await tx.select().from(contractorProfiles).where(eq(contractorProfiles.memberId, memberId));
+  return row ?? null;
+}
+
+/** What a write compares: the file as its body would hold it. */
+const bodyOf = (row: ProfileRow): ContractorProfileBody => ({
+  legalName: row.legalName,
+  address: row.address,
+  taxId: row.taxId,
+  businessId: row.businessId,
+  vatNumber: row.vatNumber,
+  individualEntrepreneur: row.individualEntrepreneur,
+  legalForm: row.legalForm,
+  shareCapitalMinor: row.shareCapitalMinor,
+  rcsCity: row.rcsCity,
+  email: row.email,
+});
+
+const textOf = (row: TextRow): ContractText =>
+  ContractTextSchema.parse({
+    id: row.id,
+    kind: row.kind,
+    version: row.version,
+    body: row.body,
+    sha256: row.sha256,
+    contestDelayDays: row.contestDelayDays,
+    createdAt: row.createdAt.toISOString(),
+  });
+
+const acceptanceOf = (row: {
+  id: string;
+  memberId: string;
+  textId: string;
+  textSha256: string;
+  acceptedAt: Date;
+}): ContractAcceptance =>
+  ContractAcceptanceSchema.parse({
+    id: row.id,
+    memberId: row.memberId,
+    textId: row.textId,
+    sha256: row.textSha256,
+    acceptedAt: row.acceptedAt.toISOString(),
+  });
+
+/** Whether the contractor has a document: his first invoice froze his prefix (the base's trigger says it again). */
+async function prefixFrozen(tx: Transaction, memberId: TeamMemberId): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(eq(invoices.memberId, memberId))
+    .limit(1);
+  return row !== undefined;
+}
+
+async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> {
+  const profile = await profileOf(tx, member.id);
+  const accepted = await tx
+    .select({ acceptance: contractAcceptances })
+    .from(contractAcceptances)
+    .innerJoin(contractTexts, eq(contractTexts.id, contractAcceptances.textId))
+    .where(eq(contractAcceptances.memberId, member.id))
+    .orderBy(contractTexts.kind, sql`${contractTexts.version} desc`);
+  return ContractorFileSchema.parse({
+    memberId: member.id,
+    country: member.country,
+    profile:
+      profile === null
+        ? null
+        : ContractorProfileSchema.parse({
+            memberId: profile.memberId,
+            ...bodyOf(profile),
+            invoicePrefix: profile.invoicePrefix,
+            verifiedAt: profile.verifiedAt?.toISOString() ?? null,
+            updatedAt: profile.updatedAt.toISOString(),
+          }),
+    prefixFrozen: await prefixFrozen(tx, member.id),
+    acceptances: accepted.map((row) => acceptanceOf(row.acceptance)),
+  });
+}
+
+/** The prefix and the check are the owner's; the policies `member_update` and the trigger say it again. */
+function assertOwner(scope: string): void {
+  if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
+}
+
+/** The owner's file to change: the member he sees, and his file, which exists. Locked for the rest of the transaction. */
+async function ownedProfile(
+  tx: Transaction,
+  memberId: TeamMemberId,
+): Promise<{ member: Member; profile: ProfileRow }> {
+  const member = await memberOf(tx, memberId);
+  await lock(tx, `contractor_profile:${memberId}`);
+  const profile = await profileOf(tx, memberId);
+  if (profile === null) throw new ContractorProfileNotFound();
+  return { member, profile };
+}
+
+/**
+ * The contractor's file and texts (EQ-06 lot 5a): see `PayrollContractorStore`. A file's `updated_at` is the base's
+ * (its trigger sets it at each change), the instant of a check the module's clock.
+ */
+export function createDrizzlePayrollContractorStore(db: Database, now: () => Date): PayrollContractorStore {
+  return {
+    file: (userId, memberId) =>
+      withMember(db, userId, async (tx) => fileOf(tx, await memberOf(tx, memberId))),
+
+    writeProfile: (actor, memberId, body) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        const member = await memberOf(tx, memberId);
+        if (scope !== 'owner' && member.userId !== actor.userId) throw new ContractorProfileForbidden();
+        await lock(tx, `contractor_profile:${memberId}`);
+        const before = await profileOf(tx, memberId);
+        const changed = profileChanges(before === null ? null : bodyOf(before), body);
+        if (before !== null && changed.length === 0)
+          return { file: await fileOf(tx, member), created: false };
+        if (before === null) {
+          await tx.insert(contractorProfiles).values({ memberId, ...body, updatedBy: actor.userId });
+        } else {
+          await tx
+            .update(contractorProfiles)
+            .set({ ...body, updatedBy: actor.userId })
+            .where(eq(contractorProfiles.memberId, memberId));
+        }
+        await audit(
+          tx,
+          actor,
+          before === null ? 'contractor_profile.create' : 'contractor_profile.update',
+          { kind: 'contractor_profile', id: memberId },
+          // Every field is identity: a change clears the owner's check (the trigger), said here with the fields' names.
+          { changed, checkCleared: before?.verifiedAt !== null && before?.verifiedAt !== undefined },
+        );
+        await enqueueInvoiceRequeue(tx, memberId);
+        return { file: await fileOf(tx, member), created: before === null };
+      }),
+
+    verifyProfile: (actor, memberId, body) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        assertOwner(scope);
+        const { member, profile } = await ownedProfile(tx, memberId);
+        // Checked already: nothing of the identity changed since, or the trigger would have cleared it.
+        if (profile.verifiedAt !== null) return fileOf(tx, member);
+        if (profile.updatedAt.toISOString() !== body.updatedAt) throw new ContractorProfileChanged();
+        await tx
+          .update(contractorProfiles)
+          .set({ verifiedAt: now(), verifiedBy: actor.userId, updatedBy: actor.userId })
+          .where(eq(contractorProfiles.memberId, memberId));
+        await audit(tx, actor, 'contractor_profile.verify', { kind: 'contractor_profile', id: memberId }, {});
+        await enqueueInvoiceRequeue(tx, memberId);
+        return fileOf(tx, member);
+      }),
+
+    setPrefix: (actor, memberId, body) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        assertOwner(scope);
+        const { member, profile } = await ownedProfile(tx, memberId);
+        if (profile.invoicePrefix === body.invoicePrefix) return fileOf(tx, member);
+        if (await prefixFrozen(tx, memberId)) throw new InvoicePrefixFrozen();
+        // Two owners' tabs giving one prefix to two contractors: the second waits, then finds it taken.
+        await lock(tx, `invoice_prefix:${body.invoicePrefix}`);
+        const [holder] = await tx
+          .select({ memberId: contractorProfiles.memberId })
+          .from(contractorProfiles)
+          .where(eq(contractorProfiles.invoicePrefix, body.invoicePrefix));
+        if (holder !== undefined) throw new InvoicePrefixTaken();
+        await tx
+          .update(contractorProfiles)
+          .set({ invoicePrefix: body.invoicePrefix, updatedBy: actor.userId })
+          .where(eq(contractorProfiles.memberId, memberId));
+        await audit(
+          tx,
+          actor,
+          'contractor_profile.prefix',
+          { kind: 'contractor_profile', id: memberId },
+          { from: profile.invoicePrefix, to: body.invoicePrefix },
+        );
+        await enqueueInvoiceRequeue(tx, memberId);
+        return fileOf(tx, member);
+      }),
+
+    texts: (userId) =>
+      withMember(db, userId, async (tx) => {
+        const rows = await tx
+          .select()
+          .from(contractTexts)
+          .orderBy(contractTexts.kind, sql`${contractTexts.version} desc`);
+        return { texts: rows.map(textOf) };
+      }),
+
+    addText: (actor, body) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        assertOwner(scope);
+        // One version at a time, of every kind: each takes the next number of its own (the trigger checks it).
+        await lock(tx, 'contract_texts');
+        const contestDelayDays = body.kind === 'billing_mandate' ? body.contestDelayDays : null;
+        const [existing] = await tx.select().from(contractTexts).where(eq(contractTexts.id, body.id));
+        if (existing !== undefined) {
+          const same =
+            existing.kind === body.kind &&
+            existing.body === body.body &&
+            existing.contestDelayDays === contestDelayDays;
+          if (!same) throw new ContractTextIdConflict();
+          return { text: textOf(existing), created: false };
+        }
+        const [last] = await tx
+          .select({ version: sql<number | null>`max(${contractTexts.version})` })
+          .from(contractTexts)
+          .where(eq(contractTexts.kind, body.kind));
+        const version = (last?.version ?? 0) + 1;
+        const sha256 = createHash('sha256').update(body.body, 'utf8').digest('hex');
+        const [row] = await tx
+          .insert(contractTexts)
+          .values({
+            id: body.id,
+            kind: body.kind,
+            version,
+            body: body.body,
+            sha256,
+            contestDelayDays,
+            createdBy: actor.userId,
+          })
+          .returning();
+        if (row === undefined) throw new Error('contract_texts: insert returned no row');
+        await audit(
+          tx,
+          actor,
+          'contract_text.add',
+          { kind: 'contract_text', id: body.id },
+          { kind: body.kind, version, sha256, contestDelayDays },
+        );
+        return { text: textOf(row), created: true };
+      }),
+
+    accept: (actor, textId, body) =>
+      withMember(db, actor.userId, async (tx) => {
+        // His own member record only: no one accepts for him, the owner neither (policy `member_accept`).
+        const [member] = await tx
+          .select({ id: teamMembers.id })
+          .from(teamMembers)
+          .where(eq(teamMembers.userId, actor.userId));
+        if (member === undefined) throw new ContractAcceptanceForbidden();
+        const memberId = TeamMemberIdSchema.parse(member.id);
+        const [text] = await tx.select().from(contractTexts).where(eq(contractTexts.id, textId));
+        if (text === undefined) throw new ContractTextNotFound();
+        await lock(tx, `contract_acceptance:${memberId}`);
+        const [existing] = await tx
+          .select()
+          .from(contractAcceptances)
+          .where(and(eq(contractAcceptances.memberId, memberId), eq(contractAcceptances.textId, textId)));
+        if (existing !== undefined) return { acceptance: acceptanceOf(existing), created: false };
+        if (text.sha256 !== body.sha256) throw new ContractTextChanged();
+        const [newest] = await tx
+          .select({ version: sql<number | null>`max(${contractTexts.version})` })
+          .from(contractTexts)
+          .where(eq(contractTexts.kind, text.kind));
+        if ((newest?.version ?? text.version) > text.version) throw new ContractTextSuperseded();
+        const [row] = await tx
+          .insert(contractAcceptances)
+          .values({
+            id: newId(ContractAcceptanceIdSchema),
+            memberId,
+            textId,
+            textSha256: text.sha256,
+            acceptedBy: actor.userId,
+          })
+          .returning();
+        if (row === undefined) throw new Error('contract_acceptances: insert returned no row');
+        await audit(
+          tx,
+          actor,
+          'contract.accept',
+          { kind: 'contract_acceptance', id: row.id },
+          { kind: text.kind, version: text.version, sha256: text.sha256 },
+        );
+        // The mandate is what an invoice waits for; the service contract does not hold one back.
+        if (text.kind === 'billing_mandate') await enqueueInvoiceRequeue(tx, memberId);
+        return { acceptance: acceptanceOf(row), created: true };
+      }),
+  };
+}
+
+/**
+ * `payroll.requeue_invoice_issues` as the jobs (`withAdmin`, which reads every member's statements and events): each
+ * validated or paid statement of the contractor (of every one for `null`) for which `invoice_not_issued` was said gets
+ * its `payroll.issue_invoices` again. That run issues only what is missing, and says only a new reason.
+ */
+export function createDrizzlePayrollRequeueStore(adminDb: Database): PayrollRequeueStore {
+  return {
+    requeueUnscoped: (memberId) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select({ id: commissionStatements.id })
+          .from(commissionStatements)
+          .where(
+            and(
+              inArray(commissionStatements.status, ['validated', 'paid']),
+              memberId === null ? undefined : eq(commissionStatements.memberId, memberId),
+              // Written out by hand: Drizzle prints a column of a single-table select without its table.
+              sql`exists (select 1 from domain_events e where e.type = 'invoice_not_issued' and e.payload->>'statementId' = "commission_statements"."id"::text)`,
+            ),
+          )
+          .orderBy(commissionStatements.period, commissionStatements.id);
+        for (const row of rows) await enqueueInvoiceIssue(tx, CommissionStatementIdSchema.parse(row.id));
+        return rows.length;
+      }),
+  };
+}

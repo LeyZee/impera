@@ -14,6 +14,7 @@ import { eq, schema, withMember, type Transaction, type Database } from '@nirvan
 import { AgencyLogoNotFound, PayrollForbidden } from '../domain/errors';
 import type { PayrollBillingSettingsStore } from '../domain/ports';
 
+import { enqueueInvoiceRequeue } from './invoice-queue';
 import { pngSize } from './png';
 import { audit } from './writes';
 
@@ -152,6 +153,8 @@ export function createDrizzlePayrollBillingSettingsStore(
             changed,
           },
         );
+        // Saved settings may be what every waiting invoice lacked (`agency_missing`): each one is tried again.
+        await enqueueInvoiceRequeue(tx, null);
         return viewOf(tx);
       }),
 
