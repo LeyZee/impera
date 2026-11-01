@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AgencyLogoMediaTypeSchema,
   BillingRegimeSchema,
   BillingSettingsSchema,
+  BusinessIdSchema,
+  DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
   INVOICE_ERROR_CODES,
+  InvoiceAgencySchema,
+  InvoiceContractorSchema,
   InvoiceNumberSchema,
+  InvoicePdfParamsSchema,
   InvoicePrefixSchema,
   InvoiceSchema,
   RegimeVatSchema,
+  SERVICE_DESCRIPTION_MAX,
+  ServiceDescriptionSchema,
+  VatNumberSchema,
 } from './invoices';
 
 // Invented parties (ADR 0010): no real name, address nor identifier.
@@ -41,6 +50,8 @@ const invoice = {
     validatedOn: '2026-10-30',
   },
   mentions: ['Autofacturation', 'Autoliquidation'],
+  serviceDescription: 'Animation commerciale de comptes, rémunérée à la commission',
+  logoSha256: null,
   lines: [{ kind: 'commission', label: 'Commission', detail: null, amountMinor: 12_000 }],
   totals: { exclVatMinor: 12_000, vatMinor: 0, inclVatMinor: 12_000, selfAssessedVatMinor: 2_400 },
   acceptance: { state: 'pending', deadline: '2026-11-24T09:00:00.000Z', reason: null },
@@ -50,7 +61,7 @@ const invoice = {
 describe('invoices', () => {
   it('give every error code a suffix that sets its status (api.md)', () => {
     for (const code of INVOICE_ERROR_CODES) {
-      expect(code).toMatch(/_(not_found|invalid|conflict|unprocessable|forbidden)$/u);
+      expect(code).toMatch(/_(not_found|invalid|conflict|unprocessable|forbidden|unavailable)$/u);
     }
   });
 
@@ -105,6 +116,9 @@ describe('invoices', () => {
         'Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 €.',
       dueDays,
       documentReminderDays: 30,
+      fiscalYearEndMonth: 12,
+      serviceDescription: null,
+      logoSha256: null,
       accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
       updatedAt: '2026-10-31T09:00:00.000Z',
     });
@@ -112,5 +126,64 @@ describe('invoices', () => {
     for (const ok of [45, 60]) expect(BillingSettingsSchema.safeParse(settings(ok)).success).toBe(true);
     for (const wrong of [15, 44, 61, 90])
       expect(BillingSettingsSchema.safeParse(settings(wrong)).success).toBe(false);
+  });
+
+  it('closes the fiscal year at the end of one month of the year, the calendar year by default', () => {
+    const settings = (fiscalYearEndMonth: number) => ({
+      agency: invoice.agency,
+      paymentTerms: 'Aucun escompte.',
+      dueDays: 60,
+      documentReminderDays: 30,
+      fiscalYearEndMonth,
+      serviceDescription: 'Animation commerciale de comptes',
+      logoSha256: 'a'.repeat(64),
+      accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
+      updatedAt: '2026-10-31T09:00:00.000Z',
+    });
+    expect(DEFAULT_FISCAL_YEAR_END_MONTH).toBe(12);
+    for (const ok of [1, 6, 12]) expect(BillingSettingsSchema.safeParse(settings(ok)).success).toBe(true);
+    for (const wrong of [0, 13, 6.5])
+      expect(BillingSettingsSchema.safeParse(settings(wrong)).success).toBe(false);
+  });
+  it('print a French contractor with his SIREN or SIRET, his VAT number and « EI », and read a copy made before', () => {
+    expect(BusinessIdSchema.safeParse('123456789').success).toBe(true);
+    expect(BusinessIdSchema.safeParse('12345678900011').success).toBe(true);
+    for (const wrong of ['12345678', '1234567890', '123 456 789', 'FR123456789']) {
+      expect(BusinessIdSchema.safeParse(wrong).success).toBe(false);
+    }
+    expect(VatNumberSchema.safeParse('FR12123456789').success).toBe(true);
+    expect(VatNumberSchema.safeParse('fr12123456789').success).toBe(false);
+    const french = {
+      legalName: 'Basile Exemple',
+      address: '3 place Inventée, Lyon',
+      country: 'FR',
+      taxId: null,
+      businessId: '12345678900011',
+      vatNumber: 'FR12123456789',
+      individualEntrepreneur: true,
+    };
+    expect(InvoiceContractorSchema.safeParse(french).success).toBe(true);
+    // A frozen copy of lot 3 has none of the three: it still reads, and prints as it was written.
+    expect(InvoiceContractorSchema.safeParse(invoice.contractor).success).toBe(true);
+    expect(InvoiceContractorSchema.safeParse({ ...french, businessId: '123' }).success).toBe(false);
+  });
+
+  it('keep the agency’s legal form, capital and register town optional, and its logo a PNG', () => {
+    const full = { ...invoice.agency, legalForm: 'SAS', shareCapitalMinor: 100_000, rcsCity: 'Lyon' };
+    expect(InvoiceAgencySchema.safeParse(full).success).toBe(true);
+    expect(InvoiceAgencySchema.safeParse(invoice.agency).success).toBe(true);
+    expect(InvoiceAgencySchema.safeParse({ ...full, shareCapitalMinor: -1 }).success).toBe(false);
+    expect(AgencyLogoMediaTypeSchema.safeParse('image/png').success).toBe(true);
+    for (const wrong of ['image/jpeg', 'image/svg+xml', 'image/gif']) {
+      expect(AgencyLogoMediaTypeSchema.safeParse(wrong).success).toBe(false);
+    }
+    expect(ServiceDescriptionSchema.safeParse('x'.repeat(SERVICE_DESCRIPTION_MAX)).success).toBe(true);
+    expect(ServiceDescriptionSchema.safeParse('x'.repeat(SERVICE_DESCRIPTION_MAX + 1)).success).toBe(false);
+    expect(ServiceDescriptionSchema.safeParse('  ').success).toBe(false);
+  });
+
+  it('name a PDF to download by its invoice’s id', () => {
+    expect(InvoicePdfParamsSchema.safeParse({ invoiceId: invoice.id }).success).toBe(true);
+    expect(InvoicePdfParamsSchema.safeParse({ invoiceId: 'KOFI-2026-0001' }).success).toBe(false);
   });
 });

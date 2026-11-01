@@ -16,6 +16,8 @@ import {
   newId,
   PaymentTermsSchema,
   PayPeriodSchema,
+  PlatformSchema,
+  ServiceDescriptionSchema,
   type CommissionStatementId,
   type InvoiceRegime,
 } from '@nirvana/contracts';
@@ -27,6 +29,7 @@ import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
 import type { PayrollInvoiceStore } from '../domain/ports';
 
+import { enqueueInvoicePdfRender } from './invoice-queue';
 import { CountedSchema } from './read-store';
 import type { PayInputReads } from './snapshot';
 
@@ -135,7 +138,9 @@ async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceS
       adjustmentsMinor: statement.adjustmentsMinor,
       totalMinor: statement.totalMinor,
     },
-    accounts: new Map(accounts.map((row) => [row.id, { handle: row.handle, platform: row.platform }])),
+    accounts: new Map(
+      accounts.map((row) => [row.id, { handle: row.handle, platform: PlatformSchema.parse(row.platform) }]),
+    ),
     bonuses: counted.bonuses.map((one) => ({ amountMinor: one.amountMinor, reason: one.reason })),
     penalties: counted.penalties.map((one) => ({ reason: one.reason, ...one.amount })),
     adjustments: counted.adjustments.map((one) => ({
@@ -284,6 +289,9 @@ async function factsOf(
             address: profile.profile.address,
             country: profile.country,
             taxId: profile.profile.taxId,
+            businessId: profile.profile.businessId,
+            vatNumber: profile.profile.vatNumber,
+            individualEntrepreneur: profile.profile.individualEntrepreneur,
           },
     prefix: profile?.profile.invoicePrefix ?? null,
     documents: documents.map((one) => ({
@@ -291,13 +299,16 @@ async function factsOf(
       issuedOn: one.issuedOn,
       validUntil: one.validUntil,
     })),
+    // Without the designation of the service, the settings are not filled: nothing is issued (`agency_missing`).
     settings:
-      settings === undefined
+      settings === undefined || settings.serviceDescription === null
         ? null
         : {
             agency: InvoiceAgencySchema.parse(settings.agency),
             paymentTerms: PaymentTermsSchema.parse(settings.paymentTerms),
             dueDays: settings.dueDays,
+            serviceDescription: ServiceDescriptionSchema.parse(settings.serviceDescription),
+            logoSha256: settings.logoSha256,
           },
     invoices: await invoicesOf(tx, memberId),
     issuedKeys: new Set(keys.map((row) => row.key)),
@@ -353,6 +364,8 @@ async function writeDocument(
     inclVatMinor: document.totals.inclVatMinor,
     selfAssessedVatMinor: document.totals.selfAssessedVatMinor,
     acceptanceDeadline: document.acceptanceDeadline,
+    serviceDescription: document.serviceDescription,
+    logoSha256: document.logoSha256,
   });
   await tx.insert(invoiceLines).values(
     document.lines.map((line, index) => ({
@@ -367,6 +380,8 @@ async function writeDocument(
   await tx
     .insert(invoiceEvents)
     .values({ id: newId(InvoiceEventIdSchema), invoiceId: id, kind: 'issued', by: null });
+  // Its PDF, once this transaction commits (ADR 0037 § 5): a document never exists without its job.
+  await enqueueInvoicePdfRender(tx, id);
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId: null,

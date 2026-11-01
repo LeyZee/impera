@@ -26,7 +26,10 @@ export interface BillingRegime {
   /** Printed as written on each invoice, in this order. */
   readonly mentions: readonly string[];
   readonly documents: readonly ContractorDocumentKind[];
-  /** The contractor's tax identifier is a mention of the regime (a SIREN or SIRET in France). */
+  /**
+   * The contractor's tax identifier is a mention of the regime (the IFU in Benin, the NIF in Madagascar). In France, the
+   * SIREN or SIRET is asked by the code whatever the regime (`identityComplete`).
+   */
   readonly taxIdRequired: boolean;
   /** The day the accountant validated it; a regime not validated issues no invoice. */
   readonly validatedOn: string | null;
@@ -130,6 +133,12 @@ export interface ContractorIdentity {
   readonly address: string;
   readonly country: string;
   readonly taxId: string | null;
+  /** The SIREN or SIRET, which a contractor established in France must have (EQ-06 lot 4). */
+  readonly businessId: string | null;
+  /** The VAT number, which a contractor who charges VAT must have. */
+  readonly vatNumber: string | null;
+  /** An individual entrepreneur: their invoices print « EI » after their name. */
+  readonly individualEntrepreneur: boolean;
 }
 
 /** The mandate the contractor accepted, and the agency's version in force. */
@@ -180,17 +189,24 @@ export interface IssueFacts {
 const filled = (text: string | null | undefined): boolean =>
   text !== null && text !== undefined && text.trim() !== '';
 
-/** Whether `identity` prints every mention of the contractor `regime` asks for: never an invoice without one. */
+/**
+ * Whether the contractor's file holds everything their invoice must print under `regime`, never an invoice without
+ * it: their name, address and country; the tax id the regime asks for (the IFU of Benin, the NIF of Madagascar); their
+ * SIREN or SIRET when they are established in France, whatever their regime; their VAT number when the regime charges
+ * VAT (art. 242 nonies A of annex II to the CGI). Rules of the code, never of a regime's text.
+ */
 export function identityComplete(
   identity: ContractorIdentity | null,
-  regime: Pick<BillingRegime, 'taxIdRequired'>,
+  regime: Pick<BillingRegime, 'taxIdRequired' | 'vat'>,
 ): identity is ContractorIdentity {
   return (
     identity !== null &&
     filled(identity.legalName) &&
     filled(identity.address) &&
     filled(identity.country) &&
-    (!regime.taxIdRequired || filled(identity.taxId))
+    (!regime.taxIdRequired || filled(identity.taxId)) &&
+    (identity.country !== 'FR' || filled(identity.businessId)) &&
+    (regime.vat.treatment !== 'charged' || filled(identity.vatNumber))
   );
 }
 

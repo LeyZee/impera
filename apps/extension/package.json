@@ -11,7 +11,7 @@
     "postinstall": "wxt prepare",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "devDependencies": {
     "typescript": "6.0.3",

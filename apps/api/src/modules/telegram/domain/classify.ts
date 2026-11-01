@@ -7,6 +7,7 @@ import {
   type AutomaticMissing,
   type HandoffCause,
   type InvoiceNotIssuedReason,
+  type InvoicePdfPlace,
   type PayPeriod,
   type SystemAlertCode,
   type TelegramTopic,
@@ -40,6 +41,8 @@ export const SCANNED_EVENT_TYPES = [
   'backup_overdue',
   'exchange_rate_overdue',
   'invoice_not_issued',
+  'invoice_pdf_conflict',
+  'invoice_pdf_missing',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -163,6 +166,33 @@ const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
   agency_missing: 'les réglages de facturation de l’agence ne sont pas remplis',
   no_invoice_to_credit: 'aucune facture ne peut prendre l’avoir entier, à voir avec le comptable',
 };
+
+/** Where a document's PDF lies (ADR 0037): Hetzner first, the copy at a second provider; named as the owner knows them. */
+const PDF_PLACE_NAMES: Record<InvoicePdfPlace, string> = { primary: 'Hetzner', ovhcloud: 'OVHcloud' };
+
+const pdfPlaceText = (place: InvoicePdfPlace): string =>
+  place === 'primary' ? `chez ${PDF_PLACE_NAMES.primary}` : `chez ${PDF_PLACE_NAMES[place]} (la copie)`;
+
+/**
+ * What a conflict means by stage and place, as #335 raises it: the render found another file at Hetzner; the copy found
+ * the first file missing or altered (`primary`) or a copy not the expected one, other bytes or another lock (a copy
+ * provider); a download found the file of that place missing or altered and did not serve it.
+ */
+function pdfConflictText(signal: Signal & { kind: 'invoice_pdf_conflict' }): string {
+  const { number, place } = signal;
+  switch (signal.stage) {
+    case 'render':
+      return `Le PDF du document ${number} n’a pas été enregistré : ${pdfPlaceText(place)}, sa place est déjà prise par un autre fichier. Rien n’a été remplacé ; le document reste émis, mais ne se télécharge pas encore. À vérifier.`;
+    case 'copy':
+      return place === 'primary'
+        ? `Le PDF du document ${number} manque chez ${PDF_PLACE_NAMES.primary} ou ne correspond plus à son empreinte : il n’a pas été copié, et aucune copie n’existe encore ; il ne se télécharge plus. À vérifier.`
+        : `La copie du PDF du document ${number} chez ${PDF_PLACE_NAMES[place]} n’est pas celle attendue (autre fichier ou autre verrou) : rien n’a été remplacé, la copie n’est pas enregistrée. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`;
+    case 'download':
+      return `Au téléchargement, le PDF du document ${number} ${pdfPlaceText(place)} manquait ou ne correspondait pas à son empreinte : ce fichier n’a pas été servi, rien n’a été remplacé. À vérifier.`;
+  }
+}
+
+const PAY_LINK = { label: 'Ouvrir la Paie', path: '/paie' };
 
 const conversationLink = (conversationId: string | null): { label: string; path: string } => ({
   label: 'Ouvrir la conversation',
@@ -331,6 +361,29 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         title: 'Important',
         body: `${signal.document === 'invoice' ? 'La facture d’un relevé validé de' : 'Un avoir dû par'} ${periodText(signal.period)} n’a pas été ${signal.document === 'invoice' ? 'émise' : 'émis'} : ${INVOICE_NOT_ISSUED_TEXT[signal.reason]}. Le relevé reste validé.`,
         link: { label: 'Ouvrir la quinzaine', path: `/paie/quinzaine?quinzaine=${signal.period}` },
+      };
+    // Important, not urgent: nothing was replaced and nothing altered was served; the owner looks into it.
+    case 'invoice_pdf_conflict':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: pdfConflictText(signal),
+        link: PAY_LINK,
+      };
+    // Important, not urgent: the document stays issued, only its file (or its copy) is missing.
+    case 'invoice_pdf_missing':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body:
+          signal.place === 'primary'
+            ? `Le document ${signal.number} n’a toujours pas de PDF après plusieurs essais : il reste émis, mais ne se télécharge pas encore. À vérifier.`
+            : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`,
+        link: PAY_LINK,
       };
     case 'automatic_closed': {
       // Important, not urgent: no fan is at risk, the agent just asks a human to approve again (ADR 0019).

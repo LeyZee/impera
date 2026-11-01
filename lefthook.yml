@@ -5,12 +5,12 @@ pre-commit:
   commands:
     gitleaks:
       run: gitleaks git --pre-commit --staged --redact --verbose
+    # The staged files are read by the scripts, never passed as arguments: a merge that stages thousands of them would
+    # go over the command-line limit of Windows.
     format:
-      glob: '*.{ts,tsx,js,mjs,json,yaml,yml,css}'
-      run: pnpm prettier --check {staged_files}
+      run: node scripts/staged-check.mjs format
     lint:
-      glob: '*.{ts,tsx}'
-      run: pnpm eslint {staged_files}
+      run: node scripts/staged-check.mjs lint
     repo:
       run: node scripts/check-repo.mjs --staged
 
@@ -31,6 +31,4 @@ pre-push:
 commit-msg:
   commands:
     conventional:
-      run: |
-        head -1 "{1}" | grep -Eq '^(Merge |(feat|fix|docs|style|chore|refactor|test|perf|build|ci|revert)(\([a-z0-9-]+\))?!?: .{1,72}$)' \
-          || { echo "Commit message does not follow Conventional Commits (see docs/conventions/git-and-pr.md)"; exit 1; }
+      run: node scripts/commit-msg.mjs {1}

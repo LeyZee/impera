@@ -286,6 +286,34 @@ describe('reading the outbox', () => {
     });
     expect(notIssued({ ...invoice, reason: 'something_new' })).toBeUndefined();
     expect(notIssued({ ...invoice, period: '2026-10-17' })).toBeUndefined();
+    // ADR 0037: the document's number, the place and the stage; the member and the invoice id stay in Nirvana.
+    const pdf = {
+      invoiceId: '018f3e5c-0000-7000-8000-000000000003',
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      number: 'DEMO-2026-0001',
+      place: 'ovhcloud',
+    };
+    expect(toScannedEvent({ ...base, type: 'invoice_pdf_missing', payload: pdf })?.signal).toEqual({
+      kind: 'invoice_pdf_missing',
+      number: 'DEMO-2026-0001',
+      place: 'ovhcloud',
+    });
+    expect(
+      toScannedEvent({ ...base, type: 'invoice_pdf_conflict', payload: { ...pdf, stage: 'download' } })
+        ?.signal,
+    ).toEqual({
+      kind: 'invoice_pdf_conflict',
+      number: 'DEMO-2026-0001',
+      place: 'ovhcloud',
+      stage: 'download',
+    });
+    expect(
+      toScannedEvent({ ...base, type: 'invoice_pdf_conflict', payload: { ...pdf, stage: 'erase' } })?.signal,
+    ).toBeUndefined();
+    expect(
+      toScannedEvent({ ...base, type: 'invoice_pdf_missing', payload: { ...pdf, number: '<b>x</b>' } })
+        ?.signal,
+    ).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,
