@@ -373,6 +373,13 @@ const WHOLE_EUROS = new Intl.NumberFormat('fr-FR', {
 });
 const EUROS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 
+/** A postal address as written, one printed line per line of it: blank lines and the spaces around each dropped. */
+export const addressLines = (address: string): string[] =>
+  address
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+
 /** « 10 000 € », « 1 000,50 € »: a share capital as an invoice prints it, the cents only when there are some. */
 export const shareCapitalWords = (minor: number): string =>
   minor % 100 === 0 ? WHOLE_EUROS.format(minor / 100) : EUROS.format(minor / 100);
@@ -395,11 +402,7 @@ export const sirenWords = (siren: string): string =>
  * prints and Réglages › Facturation shows: the owner reads there what the contractor will.
  */
 export function invoiceFooterOf(agency: InvoiceAgency): string {
-  const address = agency.address
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-  const parts = [`Document établi par ${agency.legalName}, ${address.join(', ')}`];
+  const parts = [`Document établi par ${agency.legalName}, ${addressLines(agency.address).join(', ')}`];
   const form = legalFormWords(agency);
   if (form !== null) parts.push(form);
   if (agency.rcsCity !== undefined && agency.rcsCity !== null) {

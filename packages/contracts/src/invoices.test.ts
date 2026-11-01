@@ -27,6 +27,7 @@ import {
   ServiceDescriptionSchema,
   UpdateBillingSettingsBodySchema,
   VatNumberSchema,
+  addressLines,
   frenchVatNumberOf,
   invoiceFooterOf,
   legalFormWords,
@@ -262,6 +263,7 @@ describe('invoices', () => {
       shareCapitalMinor: 1_000_000,
       rcsCity: 'Lyon',
     };
+    expect(addressLines(agency.address)).toEqual(['1 place Fictive', '69000 Lyon']);
     expect(shareCapitalWords(1_000_000)).toBe('10\u202f000\u00a0€');
     expect(shareCapitalWords(100_050)).toBe('1\u202f000,50\u00a0€');
     expect(sirenWords('123456782')).toBe('123\u00a0456\u00a0782');

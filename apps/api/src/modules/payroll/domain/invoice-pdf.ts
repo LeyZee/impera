@@ -1,4 +1,5 @@
 import {
+  addressLines,
   INVOICE_RETENTION_YEARS,
   invoiceFooterOf,
   PLATFORM_NAMES,
@@ -251,13 +252,6 @@ function rateWords(currency: Currency, rateMicros: number, rateOn: string | null
   }).format(1);
   return `${one} = ${RATE.format(rateMicros / 1_000_000)}\u00a0€ (cours BCE du ${longDay(rateOn)})`;
 }
-
-/** A postal address as written, one printed line per line of it. */
-const addressLines = (address: string): string[] =>
-  address
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
 
 const countryName = (code: string): string => COUNTRIES.of(code) ?? code;
 
