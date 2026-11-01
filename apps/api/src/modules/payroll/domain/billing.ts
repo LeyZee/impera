@@ -270,11 +270,11 @@ export function identityComplete(
 /**
  * Whether the validation of a statement issues its invoice. A period that brings nothing to invoice issues none, and
  * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated or
- * not written for the contractor's country as his member record now says it,
- * an identity that lacks a mention the regime prints or that the owner has not checked as it stands, under a tax
- * treaty no tax residence certificate of the period's year accepted by the owner, no prefix or no identity of the
- * agency: no invoice, since an issued invoice never changes. Other documents missing or out of date, or a mandate of
- * an older version: the invoice goes out, with a warning.
+ * not written for the contractor's country as his member record now says it, an identity that lacks a mention the
+ * regime prints or that the owner has not checked as it stands, under a tax treaty no tax residence certificate of the
+ * period's year accepted by the owner, no prefix or no identity of the agency: no invoice, since an issued invoice
+ * never changes. Other documents missing or out of date, or a mandate of an older version: the invoice goes out, with
+ * a warning.
  */
 export function issueDecision(facts: IssueFacts): IssueDecision {
   const assignment = regimeOn(facts.assignments, facts.day);

@@ -104,8 +104,8 @@ export type InvoiceEventKind = z.infer<typeof InvoiceEventKindSchema>;
 
 /**
  * Why a document a validated statement makes due is not issued (EQ-06): its invoice, for want of an accepted mandate,
- * of a regime the accountant validated and written for the contractor's country, of a full identity the owner checked, under a tax treaty of a tax residence
- * certificate the owner accepted, of a prefix or of the agency's identity;
+ * of a regime the accountant validated and written for the contractor's country, of a full identity the owner checked,
+ * under a tax treaty of a tax residence certificate the owner accepted, of a prefix or of the agency's identity;
  * a credit note the period owes, when no invoice can take it whole (ADR 0036). The statement stays validated and the
  * owner is told (`invoice_not_issued`).
  */
