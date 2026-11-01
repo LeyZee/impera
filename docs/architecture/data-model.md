@@ -354,7 +354,7 @@ invoices                   id, kind (invoice|credit_note), member_id, statement_
                            year, sequence, number (unique), idempotency_key (unique), issued_at, issued_on, issued_by
                            (null pour un job), due_on, contractor, agency, regime (jsonb, copiés), regime_id, mentions
                            text[] (celles du régime, puis les conditions de paiement d'une facture, ou la facture citée
-                           en tête d'un avoir : 25 au plus, migration 0042), excl_vat_minor (> 0 facture, < 0 avoir), vat_minor, incl_vat_minor,
+                           en tête d'un avoir, les deux autour d'elles pour une facture rectificative : 26 au plus, migration 0052), excl_vat_minor (> 0 facture, < 0 avoir), vat_minor, incl_vat_minor,
                            self_assessed_vat_minor, acceptance_deadline, service_description (facture seule, copiée
                            des réglages, exigée au commit de toute facture écrite depuis 0045), logo_sha256 (le logo du jour, 0045), created_at (propriétaire ou job,
                            jamais pour soi ; une facture de sa quinzaine par relevé ; ajout seul)

@@ -7,6 +7,8 @@ import {
   ContractorDocumentIdSchema,
   ContractorRegimeIdSchema,
   ContractTextIdSchema,
+  INVOICE_DOCUMENT_MENTIONS_MAX,
+  INVOICE_MENTIONS_MAX,
   InvoiceEventIdSchema,
   InvoiceIdSchema,
   newId,
@@ -1371,6 +1373,116 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(chained.map((one) => one.number)).toEqual([
         `AMA-${String(year)}-0006`,
         `AMA-${String(year)}-0007`,
+      ]);
+    });
+
+    it('a corrective invoice prints all of its regime’s mentions, the most a regime has, between its two own, and never fewer than those two (ADR 0040)', async () => {
+      const amas = { ...CONTRACTOR, legalName: 'Ama Exemple' };
+      const terms = `Échéance : ${today}. Aucun escompte.`;
+      const reference = (number: string) => `Facture rectificative de la facture ${number} du ${today}`;
+      const copy = (mentions: string[]) => ({ ...regimeCopy(benin, '2026-10-30'), mentions });
+      const widest = copy(Array.from({ length: INVOICE_MENTIONS_MAX }, (_, i) => `Mention ${String(i + 1)}`));
+      const bare = copy([]);
+      // Two invoices of Ama's, one under a copy of a regime with the most mentions, one under a copy of none. Her first
+      // half of September issued only a cancel and reissue so far: never its own invoice.
+      const [september] = await admin((tx) =>
+        tx
+          .select({ id: s.commissionStatements.id })
+          .from(s.commissionStatements)
+          .where(
+            and(
+              eq(s.commissionStatements.memberId, member(ama)),
+              eq(s.commissionStatements.period, '2026-09-01'),
+            ),
+          ),
+      );
+      if (september === undefined) throw new Error('no statement');
+      const wide = await issue({
+        by: null,
+        userId: ama,
+        statementId: september.id,
+        period: '2026-09-01',
+        amountMinor: 5_000,
+        invoice: { contractor: amas, regime: widest, mentions: [...widest.mentions, terms] },
+      });
+      const plain = await issue({
+        by: null,
+        userId: ama,
+        statementId: await validated(ama, '2026-09-16'),
+        period: '2026-09-16',
+        amountMinor: 3_000,
+        invoice: { contractor: amas, regime: bare, mentions: [terms] },
+      });
+      const last = await validated(ama, '2026-10-01');
+      const reissue = (
+        cited: { id: string; number: string },
+        period: string,
+        amountMinor: number,
+        regime: ReturnType<typeof copy>,
+        mentions: string[],
+      ) =>
+        issueTogether([
+          {
+            by: null,
+            userId: ama,
+            statementId: last,
+            period,
+            creditedInvoiceId: cited.id,
+            amountMinor: -amountMinor,
+            invoice: {
+              contractor: amas,
+              regime,
+              reissuedInvoiceId: cited.id,
+              mentions: [`Avoir sur la facture ${cited.number} du ${today}`, ...regime.mentions],
+            },
+          },
+          {
+            by: null,
+            userId: ama,
+            statementId: last,
+            period,
+            amountMinor,
+            invoice: { contractor: amas, regime, reissuedInvoiceId: cited.id, mentions },
+          },
+        ]);
+
+      // The widest regime's 24 mentions, its citation before them, its terms after: 26, the most a document prints.
+      const mentions = [reference(wide.number), ...widest.mentions, terms];
+      expect(mentions).toHaveLength(INVOICE_DOCUMENT_MENTIONS_MAX);
+      const [, widely] = await reissue(wide, '2026-09-01', 5_000, widest, mentions);
+      const [kept] = await admin((tx) =>
+        tx
+          .select({ mentions: s.invoices.mentions })
+          .from(s.invoices)
+          .where(eq(s.invoices.id, widely?.id ?? '')),
+      );
+      expect(kept?.mentions).toEqual(mentions);
+      // One more is never a document's.
+      expect(
+        await failure(
+          issue({
+            by: null,
+            userId: ama,
+            statementId: last,
+            period: '2026-10-01',
+            amountMinor: 1_000,
+            invoice: { contractor: amas, mentions: [...mentions, 'Une de trop'] },
+          }),
+        ),
+      ).toMatch(/invoices_copies_check/u);
+
+      // A regime without mentions: the corrective invoice still cites the invoice and prints its terms.
+      for (const none of [[], [terms]])
+        expect(await failure(reissue(plain, '2026-09-16', 3_000, bare, none))).toMatch(
+          /citing it, with its period, its regime and the regime's mentions \(ADR 0040\)/u,
+        );
+      const [cancelled, cited] = await reissue(plain, '2026-09-16', 3_000, bare, [
+        reference(plain.number),
+        terms,
+      ]);
+      expect([cancelled?.number, cited?.number]).toEqual([
+        `AMA-${String(year)}-0012`,
+        `AMA-${String(year)}-0013`,
       ]);
     });
   });

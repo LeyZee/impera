@@ -12,6 +12,9 @@ ALTER TABLE "invoices" ADD COLUMN "reissued_invoice_id" uuid;--> statement-break
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_reissued_invoice_id_invoices_id_fk" FOREIGN KEY ("reissued_invoice_id") REFERENCES "public"."invoices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "invoices_reissue_unique" ON "invoices" USING btree ("reissued_invoice_id","kind") WHERE "invoices"."reissued_invoice_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "invoices_statement_unique" ON "invoices" USING btree ("statement_id") WHERE "invoices"."kind" = 'invoice' and "invoices"."reissued_invoice_id" is null;--> statement-breakpoint
+-- A corrective invoice prints two mentions of its own around its regime's (`INVOICE_DOCUMENT_MENTIONS_MAX`).
+ALTER TABLE "invoices" DROP CONSTRAINT "invoices_copies_check";--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_copies_check" CHECK (jsonb_typeof("invoices"."contractor") = 'object' and jsonb_typeof("invoices"."agency") = 'object' and jsonb_typeof("invoices"."regime") = 'object' and cardinality("invoices"."mentions") <= 26 and array_position("invoices"."mentions", null) is null);--> statement-breakpoint
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_reissue_check" CHECK ("invoices"."reissued_invoice_id" is null or "invoices"."kind" = 'invoice' or "invoices"."reissued_invoice_id" = "invoices"."credited_invoice_id");--> statement-breakpoint
 -- 0041's function, with the corrective invoice: owed by a later statement, under the regime of the invoice it bills
 -- again (never the regime of the day), after the cancel of that invoice in its transaction and of that cancel's amount;
@@ -66,7 +69,9 @@ BEGIN
       SELECT * INTO cited FROM "invoices" i WHERE i."id" = NEW."reissued_invoice_id";
       IF NOT FOUND OR cited."kind" <> 'invoice' OR cited."member_id" <> NEW."member_id"
          OR cited."period" <> NEW."period" OR cited."regime_id" <> NEW."regime_id" OR cited."regime" <> NEW."regime"
-         -- Its own mentions frame the regime's: first the invoice it corrects, last its payment terms.
+         -- Its own mentions frame the regime's: first the invoice it corrects, last its payment terms. At least those
+         -- two, so that the first is there (`invoices_copies_check` keeps nulls out) and its test is never null.
+         OR cardinality(NEW."mentions") < 2
          OR NEW."mentions"[1] NOT LIKE 'Facture rectificative de la facture ' || cited."number" || ' du %'
          OR NEW."mentions"[2:cardinality(NEW."mentions") - 1]
             IS DISTINCT FROM ARRAY(SELECT jsonb_array_elements_text(cited."regime" -> 'mentions')) THEN

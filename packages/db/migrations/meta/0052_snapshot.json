@@ -4070,7 +4070,7 @@
         },
         "invoices_copies_check": {
           "name": "invoices_copies_check",
-          "value": "jsonb_typeof(\"invoices\".\"contractor\") = 'object' and jsonb_typeof(\"invoices\".\"agency\") = 'object' and jsonb_typeof(\"invoices\".\"regime\") = 'object' and cardinality(\"invoices\".\"mentions\") <= 25 and array_position(\"invoices\".\"mentions\", null) is null"
+          "value": "jsonb_typeof(\"invoices\".\"contractor\") = 'object' and jsonb_typeof(\"invoices\".\"agency\") = 'object' and jsonb_typeof(\"invoices\".\"regime\") = 'object' and cardinality(\"invoices\".\"mentions\") <= 26 and array_position(\"invoices\".\"mentions\", null) is null"
         },
         "invoices_dates_check": {
           "name": "invoices_dates_check",
