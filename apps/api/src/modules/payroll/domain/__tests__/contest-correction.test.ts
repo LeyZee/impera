@@ -87,9 +87,10 @@ describe('the correction of an upheld contest (EQ-06 lot 6, ADR 0039 § 3)', () 
         details: { reason: 'above_pay_amount_max' },
       }),
     );
-    // The refusal says the ceiling in euros: a new ceiling changes its words.
+    // The refusal says the ceiling in euros, written from `PAY_AMOUNT_MAX_MINOR` (50 000 € today), with the narrow
+    // no-break space between thousands and the no-break space before the sign.
     expect(PAY_AMOUNT_MAX_MINOR).toBe(5_000_000);
-    expect(above).toThrow('50\u00a0000\u00a0€ HT');
+    expect(above).toThrow('Il reste plus de 50\u202f000\u00a0€ HT sur cette facture');
   });
 
   it('refuses a correction without a reason or without an amount', () => {
