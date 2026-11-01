@@ -1,5 +1,5 @@
 # Écran Persona du CRM, dans Créatrices (ID à donner)
-Statut : in_progress (écran, API, création et activation ; reste l'historique des versions ; ID à valider par Charles)
+Statut : in_progress (écran, API, création, activation et import d'un fichier ; reste l'historique des versions ; ID à valider par Charles)
 Phase : 5 (éditeur de persona, ADR 0010), avancé par la revue 08, action 5
 Dépend de : P0-08 (`PersonaSchema`), coquille `apps/web` (#34) ; pour l'API, la PR créatrices du fil Bilan (`GET /v1/creators`)
 Branche : claude/persona-screen-jbetuh
@@ -22,6 +22,7 @@ Créatrices › Persona montre et édite la persona de la créatrice onglet par 
 - [x] `pnpm persona:load <fichier> [--creator <id>] [--activate]` et `pnpm persona:validate <fichier>` (demande du coordinateur, relecture Bilan) : chargement idempotent, une seule version active, audit.
 - [x] Recette du 19/10 (A-13, A-14) : les `<à remplir>` de l'exemple ne s'affichent plus comme des valeurs (champ vide « À remplir », étiquettes masquées) et ne sont jamais enregistrés ; « Écris comme le fan… » dans le Playground.
 - [x] Créer une créatrice et activer une version depuis l'écran Créatrices (demande de Charles relayée le 19/10, la CLI ne suffit pas) : `POST /v1/creators` (propriétaire) et `POST …/persona/versions/:versionId/activate` (propriétaire et créatrice), ajout seul, Bilan en relecture. Le retour du verrou d'Automatique au changement de version active est porté par Bilan (R-G3, ADR 0019).
+- [x] « Importer un fichier » (« oui » de Charles du 01/11 au brouillon de la persona) : le propriétaire ou la créatrice choisit un fichier YAML de persona écrit hors de Nirvana, jamais dans le dépôt (ADR 0010). Le fichier est lu dans le navigateur par `PersonaSchema` et remplace ce qui est à l'écran, champ par champ, comme une saisie : rien n'est envoyé avant « Enregistrer une version », la version enregistrée reste inactive jusqu'à son activation, et la version active ne bouge pas. Le fichier devient celui de la créatrice de l'écran (`meta.creator`) et garde son numéro s'il vient après toutes ses versions (sinon le suivant). Bouton seulement quand rien n'attend à l'écran ; un fichier refusé dit combien de problèmes, le premier sous son onglet et sa clé YAML, et rien ne change. Le mot « brouillon » est celui de la réponse de l'agent (glossaire) : l'écran dit « fichier ».
 - [ ] Historique des versions et comparaison (ADR 0010), plus tard.
 
 ## Critères d'acceptation

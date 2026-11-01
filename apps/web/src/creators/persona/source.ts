@@ -10,7 +10,7 @@ import {
 } from '@nirvana/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
-import { firstDraft } from './model';
+import { firstDraft, schemaIssues, type FieldIssue } from './model';
 
 /**
  * Where the persona screen reads from: her stored versions (`GET /v1/creators/:id/persona`), or, while she has none
@@ -35,6 +35,33 @@ export type PersonaLoad = { readonly kind: 'loading' } | { readonly kind: 'faile
 export async function parsePersonaYaml(text: string): Promise<Persona> {
   const { parse } = await import('yaml');
   return PersonaSchema.parse(parse(text));
+}
+
+/** A persona file is a few kilobytes of text: anything past this is not one, and is not read. */
+export const PERSONA_FILE_MAX_BYTES = 256 * 1024;
+
+export type PersonaFileRead =
+  | { readonly kind: 'persona'; readonly persona: Persona }
+  /** Read as YAML, but `PersonaSchema` refuses it: what it refuses, in French. */
+  | { readonly kind: 'invalid'; readonly issues: readonly FieldIssue[] }
+  /** Not YAML, not text, or too big to be a persona. */
+  | { readonly kind: 'unreadable' };
+
+/** Reads a persona file the owner or the creator picked (« Importer un fichier »); nothing is sent anywhere. */
+export async function readPersonaFile(file: File): Promise<PersonaFileRead> {
+  if (file.size > PERSONA_FILE_MAX_BYTES) return { kind: 'unreadable' };
+  let value: unknown;
+  try {
+    const { parse } = await import('yaml');
+    value = parse(await file.text());
+  } catch {
+    return { kind: 'unreadable' };
+  }
+  if (typeof value !== 'object' || value === null) return { kind: 'unreadable' };
+  const persona = PersonaSchema.safeParse(value);
+  return persona.success
+    ? { kind: 'persona', persona: persona.data }
+    : { kind: 'invalid', issues: schemaIssues(value) };
 }
 
 /** Loaded on demand: the YAML parser and the file only reach the browser on this page. */

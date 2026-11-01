@@ -91,7 +91,11 @@ const FIELD_MESSAGES: Readonly<Record<string, Partial<Record<z.core.$ZodIssue['c
 
 /** Validates a draft; an empty list means it can be saved as a new version. */
 export function validate(draft: Persona): FieldIssue[] {
-  const stored = withoutPlaceholders(draft);
+  return schemaIssues(withoutPlaceholders(draft));
+}
+
+/** What `PersonaSchema` refuses in a value, in French: a draft as stored, or a file being imported. */
+export function schemaIssues(stored: unknown): FieldIssue[] {
   const result = PersonaSchema.safeParse(stored);
   if (result.success) return [];
   return result.error.issues.map((issue) => {
@@ -385,15 +389,52 @@ const semver = (version: string): [number, number, number] => {
   return [major, minor, patch];
 };
 
+/** Compares two version numbers: below zero when `a` comes first. */
+const compareVersions = (a: [number, number, number], b: [number, number, number]): number =>
+  a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
 /** The number of the next version: one patch above the highest taken (« 0.1.3 » after 0.1.2 and 0.0.9). */
 export function nextVersion(taken: readonly string[]): string {
   const [major, minor, patch] = taken
     .map(semver)
-    .reduce<[number, number, number]>(
-      (top, v) => ((v[0] - top[0] || v[1] - top[1] || v[2] - top[2]) > 0 ? v : top),
-      [0, 0, 0],
-    );
+    .reduce<[number, number, number]>((top, v) => (compareVersions(v, top) > 0 ? v : top), [0, 0, 0]);
   return `${String(major)}.${String(minor)}.${String(patch + 1)}`;
+}
+
+/**
+ * The number a save gives the draft. An imported draft keeps the number its file carries (« 1.0.0 », the one its
+ * authors know it by) when it comes after every stored version; otherwise, as for any edit, one patch above the
+ * highest, the draft's own included.
+ */
+export function versionOnSave(draft: Persona, stored: readonly string[], imported: boolean): string {
+  const own = semver(draft.meta.version);
+  if (imported && stored.every((version) => compareVersions(own, semver(version)) > 0))
+    return draft.meta.version;
+  return nextVersion([...stored, draft.meta.version]);
+}
+
+/**
+ * Why a file is not imported, said in the head: how many problems, then the first, under its tab and at its place in
+ * the file (the YAML keys are the schema's path, `details.date_of_birth`), so that it can be fixed there.
+ */
+export function fileRefusal(issues: readonly FieldIssue[]): string {
+  const first = issues[0];
+  if (first === undefined) return UNREADABLE_FILE;
+  const block = blockOf(first.field);
+  const where = block === undefined ? 'l’en-tête du fichier' : `« ${tabLabel(tabOf(block))} »`;
+  const count = issues.length > 1 ? `${String(issues.length)} problèmes ; le premier` : 'un problème';
+  return `Ce fichier ne passe pas la vérification de la persona : ${count}, dans ${where} (${first.field}) : ${first.message}. Rien n’a changé.`;
+}
+
+/** Said when a file is not a persona at all: not YAML, not text, or far too big. */
+export const UNREADABLE_FILE =
+  'Ce fichier ne se lit pas comme une persona : il faut le fichier YAML de sa fiche. Rien n’a changé.';
+
+const tabLabel = (tab: TabId): string => TABS.find((t) => t.id === tab)?.label ?? tab;
+
+/** A persona read from a file, made hers: the creator it names is the one whose screen imports it. */
+export function importedDraft(persona: Persona, creatorId: string): Persona {
+  return { ...persona, meta: { ...persona.meta, creator: creatorId } };
 }
 
 const real = (list: readonly string[]): string[] => list.filter((entry) => !isPlaceholder(entry));
