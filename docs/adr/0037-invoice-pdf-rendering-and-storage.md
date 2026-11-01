@@ -1,6 +1,6 @@
 # 0037. Factures : un PDF/A rendu une fois par PDFKit, gardé dix ans sous verrou de conformité, en deux copies
 
-Statut : proposed
+Statut : accepted (Charles, 01/11/2026 11h34, « Ok0037 », sur le texte repris après les deux relectures de Bilan, dont la phrase amendée sur les deux copies et le mode conformité, lue par Charles)
 Date : 2026-10-31
 Précise : l'ADR 0023 (§ Factures, « son PDF est rendu une fois depuis ces données, gardé avec son empreinte, et plus jamais régénéré » ; « deux dépendances nouvelles se décident dans leurs fiches : la génération de PDF… ») et l'ADR 0028 (§ 4, le bucket des factures gardé dix ans, avec son propre verrou et ses propres identifiants, dont elle ne fixe ni le mode ni le lieu des clés)
 

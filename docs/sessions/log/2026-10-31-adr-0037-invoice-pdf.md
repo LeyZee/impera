@@ -1,9 +1,10 @@
-# 2026-10-31 — ADR 0037 : le PDF des factures et sa conservation (fil Équipe) — in_progress
+# 2026-10-31 — ADR 0037 : le PDF des factures et sa conservation (fil Équipe) — done
 Fait :
 - `docs/adr/0037-invoice-pdf-rendering-and-storage.md` (proposée) et sa ligne dans l'index : un PDF/A-3b rendu une fois par PDFKit dans le worker, reproductible (date de création = émission, police Geist embarquée), prêt à porter le XML de Factur-X le jour de la facturation électronique ; les octets dans le bucket des factures de l'ADR 0028, sous un verrou par objet jusqu'à dix ans après la clôture de l'exercice, jamais remplacés ; un job qui reprend après une panne sans rien écraser ; un téléchargement par l'API qui vérifie l'empreinte avant de servir.
 - Fiche EQ-06 : statut (#330) et lot 4 (ADR 0037 proposée, aucun code avant son acceptation).
 - Relecture de Bilan (quatre remarques, deux facultatives), toutes reprises : verrou en mode conformité (en gouvernance, le propriétaire du projet peut effacer) ; bucket des factures dans un projet Hetzner à lui, une seule clé, celle de l'application, qui écrit aussi les exports annuels (pas de politique par préfixe) ; seconde copie de chaque PDF chez OVHcloud par `payroll.mirror_invoice_pdf`, lue par l'API si Hetzner ne répond pas ; `retain_until` dans `invoice_pdfs` et, pour la copie, une table en ajout seul `invoice_pdf_copies` (seconde relecture de Bilan : `invoice_pdfs` est en ajout seul depuis 0041, rien ne s'y écrit après coup), par une migration du lot 4 ; version de PDFKit retirée de l'ADR ; l'alerte d'un PDF manquant ne part que du dernier essai du job.
-Pas fait : le code du lot 4, après l'acceptation par Charles.
+- Acceptée par Charles le 01/11 à 11h34 (« Ok0037 »), statut et index mis à jour avant fusion.
+Pas fait : le code du lot 4, dans sa propre PR.
 Décisions : essai de rendu hors dépôt avant d'écrire l'ADR (PDFKit 0.20.2, police libre embarquée, pièce jointe XML : PDF/A-3b, mêmes octets sur deux processus avec une date de création fixée) ; dossier d'essai supprimé.
 Découvertes : un verrou fixe de dix ans à partir de l'envoi ne couvre pas la fin de l'obligation (dix ans après la clôture de l'exercice) : le verrou se pose par objet ; question au comptable sur la date de clôture et sur le calendrier de la facturation électronique pour les prestataires établis en France.
 Candidats à suppression : aucun.
