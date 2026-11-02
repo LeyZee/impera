@@ -30,10 +30,10 @@ Premier des quatre modules de la paie (ADR 0047 § 1) : `contractors` (réglages
 
 ## Hors périmètre
 
-- Les lectures croisées des tables (la paie lit encore celles du dossier, le dossier lit encore `invoices` et `audit_log`) : ports de lecture et test d'architecture, fiche ARC-04 à écrire.
+- Les lectures croisées des tables (la paie lit encore celles du dossier, le dossier lit encore `invoices` et `audit_log`) : ports de lecture et test d'architecture, fiche ARC-05 à écrire.
 - `invoicing` et `accounting` (PR suivantes d'ADR 0047 § 1), les ports `PayoutGate` et `AfterValidation`.
 
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 
 - 02/11 : `inputs_hash` couvre des identifiants tirés au hasard ; la référence garde donc les montants, statuts et numéros normalisés, pas les empreintes.
-- 02/11 : `reviewOf` et `regimeVatOf` (lecteurs de lignes) passent par `contractors/index.ts` en attendant ARC-04.
+- 02/11 : `reviewOf` et `regimeVatOf` (lecteurs de lignes) passent par `contractors/index.ts` en attendant ARC-05.
