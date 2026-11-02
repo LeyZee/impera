@@ -84,13 +84,13 @@ Branche : task/<id>-<slug>
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
-| CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | todo | EQ-03, EQ-04, CR-01 (téléphone) |
-| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | todo | CR-02, CR-03, EQ-01 (paramètres de plateforme) |
+| CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
+| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | todo | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
 | CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
 | CR-08 | Plan de publication du feed : la semaine préparée, acceptée d'un geste, programmée dans Reveal | espaces | blocked (capture Reveal) | CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la garde d'écriture (ADR 0018) |
-| CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (signaux) ; blocked (rapprochement) | CR-03 ; pour le rapprochement, le connecteur Reveal (`listTransactions`) et l'attribution des ventes (EQ-08) |
+| CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (total inhabituel) ; blocked (signaux par vente, rapprochement) | EQ-03 ; CR-03 pour les signaux par vente ; CRM-01 et CRM-03 pour le rapprochement |
 | CR-10 | Retours de l'IA aux chatteurs, chaque semaine, sans effet sur la paie | espaces | blocked (lecture des messages de Reveal avec leur auteur, clé du fournisseur) | le connecteur Reveal (messages et auteur), la passerelle LLM, la rubrique des évaluations |
 | CR-11 | Mass DM : les médias déposés, envoyés aux listes de fans, jamais deux fois | espaces | blocked (capture Reveal) | CR-06, CR-08, la capture Reveal |
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |

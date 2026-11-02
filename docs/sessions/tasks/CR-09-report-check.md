@@ -1,7 +1,7 @@
 # CR-09 Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal
-Statut : todo pour les signaux ; blocked pour le rapprochement (lecture des ventes de Reveal) (ADR 0043 § 4 et § 5, acceptée par Charles le 02/11/2026)
+Statut : todo pour le total inhabituel ; blocked pour les signaux par vente (CR-03) et pour le rapprochement (CRM-01) (ADR 0043 § 4, ADR 0050 §§ 6 et 10)
 Phase : espaces (ADR 0043)
-Dépend de : CR-03 ; pour le rapprochement, le connecteur Reveal (`listTransactions`) et l'attribution des ventes (EQ-08)
+Dépend de : EQ-03 ; CR-03 pour les signaux par vente ; CRM-01 et CRM-03 pour le rapprochement
 Branche : task/cr-09-report-check
 
 ## Objectif
@@ -30,3 +30,4 @@ Les retours de l'IA (CR-10).
 ## Notes de session
 
 - 2026-11-02 (fil API CRM) : l'ADR 0050 change cette fiche. La source du rapprochement est `PlatformSalesFeed` (lecture par curseur), pas `listTransactions`. Seuls `ppv`, `tip` et `paid_message` sans chatteur comptent comme vente sans attribution (§ 6). Un compte Reveal en source « détectée » n'a plus de rapport à rapprocher : mini feedback et deux signaux seulement (§ 10).
+- 2026-11-02 (fil API CRM) : sans saisie sur Reveal, seul le signal « total inhabituel » s'applique au total déclaré avant la bascule.
