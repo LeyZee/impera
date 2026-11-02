@@ -82,6 +82,31 @@ export function createSalesFeedRoutes(
     );
 
     app.put(
+      '/settings/sales-feeds/:platform/webhook',
+      {
+        preValidation: options.recentLogin,
+        config: { rateLimit: { max: KEY_CALLS_PER_MINUTE, timeWindow: '1 minute' } },
+        schema: {
+          params: PlatformParamsSchema,
+          response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalSchema },
+        },
+      },
+      async (request, reply) => {
+        const result = await feeds.connectWebhook(request.params.platform, actorOf(request));
+        return result.ok ? reply.send(result.value) : reply.code(422).send(result.error);
+      },
+    );
+
+    app.delete(
+      '/settings/sales-feeds/:platform/webhook',
+      {
+        preValidation: options.recentLogin,
+        schema: { params: PlatformParamsSchema, response: { 200: SalesFeedStatusSchema } },
+      },
+      (request) => feeds.disconnectWebhook(request.params.platform, actorOf(request)),
+    );
+
+    app.put(
       '/settings/sales-feeds/:platform/models/:platformModelId',
       {
         schema: {

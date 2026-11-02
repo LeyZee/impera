@@ -27,6 +27,8 @@ const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: '
 const NO_LOG = { info: () => undefined, warn: () => undefined };
 
 const CountSchema = z.array(z.object({ n: z.number() }));
+const PUBLIC_BASE_URL = 'https://nirvana.example.test';
+const DELIVERY_URL = '/v1/webhooks/sales-feeds/reveal';
 
 /** The sales feed of ADR 0050 through the real app: the key in Réglages, the register read by its job (CRM-01). */
 describe('sales feed (CRM-01)', () => {
@@ -42,7 +44,9 @@ describe('sales feed (CRM-01)', () => {
   const sink = new LogSink();
   let jobLogger: ReturnType<typeof createLogger>;
 
-  const read = () => app.modules.connectors.jobs.readSales(jobLogger, 'test');
+  /** A reading that goes ahead whatever the webhook (a delivery's); `minuteRead` is the crontab's. */
+  const read = () => app.modules.connectors.jobs.readSales(jobLogger, 'test', true);
+  const minuteRead = () => app.modules.connectors.jobs.readSales(jobLogger, 'test');
 
   async function count(query: ReturnType<typeof sql>): Promise<number> {
     const result = await test.admin.db.execute(query);
@@ -93,6 +97,8 @@ describe('sales feed (CRM-01)', () => {
       DATABASE_URL: test.appUrl,
       DATABASE_ADMIN_URL: test.adminUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
+      // Deliveries are posted to this address: a platform only posts over HTTPS.
+      AUTH_BASE_URL: PUBLIC_BASE_URL,
     });
     const logger = createLogger(config, sink);
     jobLogger = logger;
@@ -175,7 +181,8 @@ describe('sales feed (CRM-01)', () => {
   it('records each line once, under its creator, and keeps an unlinked model aside, counted nowhere', async () => {
     crm.sell({ id: 'sale_a', createdAt: '2026-10-20T18:00:00.000Z' });
     crm.sell({ id: 'sale_q', modelId: 'model_test_02', createdAt: '2026-10-20T18:01:00.000Z' });
-    await read();
+    // No webhook yet: the minute's crontab reads.
+    await minuteRead();
     const [line] = await test.admin.db
       .select()
       .from(schema.platformSales)
@@ -349,6 +356,98 @@ describe('sales feed (CRM-01)', () => {
     expect(unknownMember.statusCode).toBe(422);
   });
 
+  const readJobs = () =>
+    count(
+      sql`select count(*)::int as n from graphile_worker.jobs where task_identifier = 'connector.read_sales'`,
+    );
+  const inbox = () => count(sql`select count(*)::int as n from sales_feed_deliveries`);
+  const deliver = (delivery: { body: string; headers: Record<string, string> }) =>
+    // From Reveal's servers: no dashboard cookie, no Origin.
+    server.inject({ method: 'POST', url: DELIVERY_URL, headers: delivery.headers, payload: delivery.body });
+
+  it('registers the webhook at Reveal with Nirvana’s HTTPS address, its secret sealed and never shown', async () => {
+    const position = crm.sell({ id: 'sale_before_hook' });
+    expect((await deliver(crm.delivery(position, { secret: 'whsec_unknown' }))).statusCode).toBe(404);
+
+    const registered = await api('PUT', '/v1/settings/sales-feeds/reveal/webhook');
+    expect(registered.statusCode).toBe(200);
+    expect(registered.json()).toMatchObject({ webhook: { lastDeliveryAt: null } });
+    const [hook] = [...crm.webhooks.values()];
+    expect(hook?.url).toBe(`${PUBLIC_BASE_URL}${DELIVERY_URL}`);
+    expect(registered.body).not.toContain(hook?.secret);
+    const [row] = await test.admin.db.select().from(schema.salesFeedWebhooks);
+    expect(row?.secretCiphertext.toString('utf8')).not.toContain(hook?.secret);
+
+    // Registered again: the new one replaces the old one, at Reveal too.
+    expect((await api('PUT', '/v1/settings/sales-feeds/reveal/webhook')).statusCode).toBe(200);
+    expect(crm.webhooks.size).toBe(1);
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entity, 'sales_feed_webhook'));
+    expect(audit.map((line) => line.action)).toEqual([
+      'sales_feed_webhook.registered',
+      'sales_feed_webhook.registered',
+    ]);
+    expect(JSON.stringify(audit)).not.toContain('whsec_');
+  });
+
+  it('a signed delivery wakes the reading once; forged, stale or unsigned ones are refused and kept nowhere', async () => {
+    await test.admin.db.execute(sql`delete from graphile_worker._private_jobs`);
+    const position = crm.sell({ id: 'sale_hook' });
+
+    const forged = await deliver(crm.delivery(position, { secret: 'whsec_forged' }));
+    expect(forged.statusCode).toBe(401);
+    expect(forged.json()).toMatchObject({ error: { code: 'sales_feed_delivery_unauthenticated' } });
+    const stale = await deliver(crm.delivery(position, { t: Math.floor(Date.now() / 1000) - 600 }));
+    expect(stale.statusCode).toBe(401);
+    const signed = crm.delivery(position);
+    const unsigned = await deliver({ body: signed.body, headers: { 'content-type': 'application/json' } });
+    expect(unsigned.statusCode).toBe(401);
+    // One byte changed after signing: the signature is over the raw bytes.
+    const tampered = await deliver({
+      body: signed.body.replace('sale_hook', 'sale_hool'),
+      headers: signed.headers,
+    });
+    expect(tampered.statusCode).toBe(401);
+    expect(await inbox()).toBe(0);
+    expect(await readJobs()).toBe(0);
+
+    expect((await deliver(signed)).statusCode).toBe(204);
+    // Reveal sends it again (no answer in time): taken, nothing more.
+    expect((await deliver(signed)).statusCode).toBe(204);
+    expect(await inbox()).toBe(1);
+    expect(await readJobs()).toBe(1);
+    // The delivery only woke the reading: the line comes from the register, by cursor. With a working webhook, the
+    // minute's crontab leaves it to the delivery (an hourly catch-up only).
+    expect(await ledgerLines('sale_hook')).toBe(0);
+    await minuteRead();
+    expect(await ledgerLines('sale_hook')).toBe(0);
+    await read();
+    expect(await ledgerLines('sale_hook')).toBe(1);
+    expect(await ledgerLines('sale_before_hook')).toBe(1);
+
+    const [kept] = await test.admin.db.select().from(schema.salesFeedDeliveries);
+    expect(kept).toMatchObject({ deliveryId: `delivery_${position}`, event: 'sale_created', position });
+    expect(JSON.stringify(kept)).not.toContain('fan_test_01');
+    const status = await api('GET', '/v1/settings/sales-feeds');
+    expect(JSON.stringify(status.json())).toContain('lastDeliveryAt');
+    expect(sink.lines.some((line) => JSON.stringify(line).includes('bad_signature'))).toBe(true);
+  });
+
+  it('removes the webhook here and at Reveal; deliveries are refused after', async () => {
+    const position = crm.positionOf('sale_hook');
+    if (position === null) throw new Error('no sale_hook');
+    const late = crm.delivery(position, { id: 'delivery_after_removal' });
+    const removed = await api('DELETE', '/v1/settings/sales-feeds/reveal/webhook');
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json()).toMatchObject({ webhook: null });
+    expect(crm.webhooks.size).toBe(0);
+    expect((await deliver(late)).statusCode).toBe(404);
+    // Registered again for the rest of the file.
+    expect((await api('PUT', '/v1/settings/sales-feeds/reveal/webhook')).statusCode).toBe(200);
+  });
+
   it('waits out a 429 and stops on a revoked key until it is connected again', async () => {
     const callsBefore = crm.calls.length;
     crm.rateLimit(1, 120);
@@ -379,11 +478,16 @@ describe('sales feed (CRM-01)', () => {
     expect(logged).not.toContain(FAKE_CRM_KEY);
   });
 
-  it('disconnects the key: removed, said in the audit log', async () => {
+  it('disconnects the key: removed with its webhook, said in the audit log', async () => {
     const removed = await api('DELETE', '/v1/settings/sales-feeds/reveal');
     expect(removed.statusCode).toBe(200);
-    expect(removed.json()).toMatchObject({ state: 'not_connected' });
+    expect(removed.json()).toMatchObject({ state: 'not_connected', webhook: null });
     expect(await count(sql`select count(*)::int as n from sales_feed_credentials`)).toBe(0);
+    expect(await count(sql`select count(*)::int as n from sales_feed_webhooks`)).toBe(0);
+    // Without a key, no webhook can be registered.
+    const refused = await api('PUT', '/v1/settings/sales-feeds/reveal/webhook');
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ error: { code: 'sales_feed_not_connected_conflict' } });
     await app.modules.connectors.jobs.readSales(NO_LOG, 'test');
   });
 

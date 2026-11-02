@@ -64,6 +64,49 @@ export const salesFeedCredentials = pgTable(
 );
 
 /**
+ * The platform's webhook for Nirvana (ADR 0050 § 3), registered from Réglages once the key is connected: its id at the
+ * platform and the secret it signs deliveries with, sealed like the key (context `sales_feed_webhook:<platform>`), out
+ * of RLS and revoked from `nirvana_app`.
+ */
+export const salesFeedWebhooks = pgTable(
+  'sales_feed_webhooks',
+  {
+    platform: enumText('platform').primaryKey(),
+    platformWebhookId: text('platform_webhook_id').notNull(),
+    secretCiphertext: bytea('secret_ciphertext').notNull(),
+    keyVersion: text('key_version').notNull(),
+    /** The address given to the platform, as it was given. */
+    url: text('url').notNull(),
+    lastDeliveryAt: timestampTz('last_delivery_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [enumCheck('sales_feed_webhooks', t.platform, PlatformSchema.options)],
+);
+
+/**
+ * The inbox of the webhook: one row per checked delivery, its id telling a second sending of it. It holds no line of
+ * the register: a delivery only wakes the reading by cursor, which records the lines in the register's order. Pruned
+ * after a week; out of RLS, revoked from `nirvana_app` (the webhook route writes it through the admin role).
+ */
+export const salesFeedDeliveries = pgTable(
+  'sales_feed_deliveries',
+  {
+    platform: enumText('platform').notNull(),
+    deliveryId: text('delivery_id').notNull(),
+    /** The platform's event, as it named it (`sale_created`, `sale_refunded`, or one Nirvana does not know yet). */
+    event: text('event').notNull(),
+    /** The register's position the delivery announced. */
+    position: text('position').notNull(),
+    receivedAt: timestampTz('received_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.platform, t.deliveryId] }),
+    index('sales_feed_deliveries_received_idx').on(t.receivedAt),
+    enumCheck('sales_feed_deliveries', t.platform, PlatformSchema.options),
+  ],
+);
+
+/**
  * Where the reading of a platform's register stands: moved only in the transaction that records the lines it read
  * (ADR 0050 § 3), so a crash between the two loses and doubles nothing. Agency-level, out of RLS, nothing secret.
  */

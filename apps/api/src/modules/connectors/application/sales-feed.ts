@@ -13,10 +13,14 @@ import {
 
 import {
   SalesFeedAccountUnprocessable,
+  SalesFeedDeliveryRefused,
   SalesFeedMemberUnprocessable,
   SalesFeedModelConflict,
+  SalesFeedNotConnected,
   SalesFeedNotFound,
   SalesFeedVaultMissing,
+  SalesFeedWebhookNotFound,
+  SalesFeedWebhookUrlUnprocessable,
 } from '../domain/errors';
 import type { Clock, JobLogger } from '../domain/ports';
 import {
@@ -26,7 +30,9 @@ import {
   type PlatformSalesFeed,
   type SalesFeedFactory,
   type SalesFeedFailure,
+  type SalesFeedJobs,
   type SalesFeedKeyStore,
+  type SalesFeedWebhookStore,
   type SalesFeedRegistry,
   type SalesLedger,
   type StoredSalesFeedKey,
@@ -35,6 +41,10 @@ import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-fee
 
 /** At most this many pages per platform and run (500 lines each): the next minute goes on from the cursor. */
 const MAX_PAGES_PER_RUN = 20;
+/** The inbox only tells a second sending of a delivery, which the platform makes within hours: a week is plenty. */
+const DELIVERY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** With a working webhook, the minute's reading becomes an hourly catch-up; a delivery wakes it in between. */
+const CATCH_UP_MS = 60 * 60 * 1000;
 
 export interface SalesFeedDeps {
   /** `null` without CREDENTIALS_ENCRYPTION_KEYS: no key can be kept, nothing is read. */
@@ -42,6 +52,11 @@ export interface SalesFeedDeps {
   readonly ledger: SalesLedger;
   readonly registry: SalesFeedRegistry;
   readonly clock: Clock;
+  /** `null` without CREDENTIALS_ENCRYPTION_KEYS, like `keys`. */
+  readonly webhooks: SalesFeedWebhookStore | null;
+  readonly jobs: SalesFeedJobs;
+  /** Nirvana's public address for a platform's deliveries; `null` when it is not HTTPS (development). */
+  readonly webhookUrl: (platform: Platform) => string | null;
 }
 
 export interface SalesFeeds {
@@ -61,8 +76,24 @@ export interface SalesFeeds {
     link: LinkSalesFeedChatterBody,
     by: string | null,
   ): Promise<SalesFeedOverview>;
-  /** The `connector.read_sales` job: every connected feed, from its cursor. */
-  read(logger: JobLogger, correlationId: string): Promise<void>;
+  /** Registers Nirvana's webhook at the platform (replacing one already there) and keeps its secret sealed. */
+  connectWebhook(platform: Platform, by: KeyActor): Promise<Result<SalesFeedStatus, SalesFeedRefusal>>;
+  disconnectWebhook(platform: Platform, by: KeyActor): Promise<SalesFeedStatus>;
+  /**
+   * A delivery of the platform's webhook: checked against the secret, put in the inbox once, and the reading of the
+   * register woken. Throws `SalesFeedDeliveryRefused` (401) when it does not pass; nothing of it is kept then.
+   */
+  receive(
+    platform: Platform,
+    rawBody: Buffer,
+    headers: Readonly<Record<string, string | undefined>>,
+    logger: JobLogger,
+  ): Promise<void>;
+  /**
+   * The `connector.read_sales` job: every connected feed, from its cursor. `woken` by a delivery, it reads now;
+   * otherwise a feed whose webhook works is read once an hour, the others every minute (ADR 0050 § 3).
+   */
+  read(logger: JobLogger, correlationId: string, woken: boolean): Promise<void>;
 }
 
 function refusal(kind: SalesFeedRefusal['kind']): SalesFeedRefusal {
@@ -85,10 +116,11 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
 
   async function statusOf(platform: Platform): Promise<SalesFeedStatus> {
     factoryOf(platform);
-    const [stored, cursor, quarantined] = await Promise.all([
+    const [stored, cursor, quarantined, webhook] = await Promise.all([
       deps.keys?.find(platform) ?? Promise.resolve(null),
       ledger.cursorOf(platform),
       ledger.quarantined(platform),
+      deps.webhooks?.find(platform) ?? Promise.resolve(null),
     ]);
     const state = stored?.state ?? 'not_connected';
     const lastErrorKind = stored?.lastErrorKind ?? null;
@@ -101,7 +133,30 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       lastErrorKind,
       message: salesFeedMessage(state, lastErrorKind),
       quarantined: [...quarantined.values()].reduce((sum, count) => sum + count, 0),
+      webhook:
+        webhook === null
+          ? null
+          : {
+              createdAt: webhook.createdAt.toISOString(),
+              lastDeliveryAt: webhook.lastDeliveryAt?.toISOString() ?? null,
+            },
     };
+  }
+
+  function webhooksOrThrow(): SalesFeedWebhookStore {
+    if (deps.webhooks === null) throw new SalesFeedVaultMissing();
+    return deps.webhooks;
+  }
+
+  /** Removes the webhook at the platform (when the key still works) and here; a platform that refuses is not waited for. */
+  async function dropWebhook(platform: Platform, by: KeyActor): Promise<void> {
+    const store = webhooksOrThrow();
+    const stored = await store.find(platform);
+    if (stored === null) return;
+    const feed = await liveFeed(platform);
+    // Best effort at the platform: its webhook then posts to an address that refuses it (404), until it gives up.
+    if (feed !== null) await feed.deleteWebhook(stored.platformWebhookId);
+    await store.remove(platform, by);
   }
 
   /** The feed of the saved key, or `null` when there is none that works. */
@@ -232,6 +287,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     stored: StoredSalesFeedKey,
     logger: JobLogger,
     correlationId: string,
+    woken: boolean,
   ): Promise<void> {
     const { platform } = stored;
     const factory = registry[platform];
@@ -239,6 +295,11 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     const cursor = await ledger.cursorOf(platform);
     const now = clock.now();
     if (cursor.pausedUntil !== null && cursor.pausedUntil > now) return;
+    if (!woken && cursor.readAt !== null && now.getTime() - cursor.readAt.getTime() < CATCH_UP_MS) {
+      const webhook = await deps.webhooks?.find(platform);
+      // A webhook whose secret still opens: its deliveries wake the reading, the minute has nothing to add.
+      if (webhook?.secret != null) return;
+    }
     const feed = factory.create(stored.key);
     let position = cursor.position;
     const totals = { pages: 0, recorded: 0, quarantined: 0, duplicates: 0 };
@@ -270,6 +331,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       if (!read.value.hasMore) break;
     }
     if (stored.lastErrorKind !== null) await keysOrThrow().markState(platform, 'connected', null);
+    await deps.webhooks?.prune(new Date(now.getTime() - DELIVERY_RETENTION_MS));
     // Counts only: never a sale's id, a fan's id or pseudo.
     logger.info({ platform, ...totals }, 'sales feed read');
   }
@@ -297,8 +359,55 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
 
     async disconnect(platform, by) {
       factoryOf(platform);
+      // The webhook goes first, while the key can still remove it at the platform.
+      if (deps.webhooks !== null) await dropWebhook(platform, by);
       await keysOrThrow().remove(platform, by);
       return statusOf(platform);
+    },
+
+    async connectWebhook(platform, by) {
+      factoryOf(platform);
+      const store = webhooksOrThrow();
+      const feed = await liveFeed(platform);
+      if (feed === null) throw new SalesFeedNotConnected();
+      const url = deps.webhookUrl(platform);
+      if (url === null) throw new SalesFeedWebhookUrlUnprocessable();
+      const existing = await store.find(platform);
+      const created = await feed.createWebhook(url);
+      // Webhooks not opened by the support (403), key refused, platform away: nothing changes here.
+      if (!created.ok) return err(refusal(errorKindOf(created.failure)));
+      if (existing !== null) await feed.deleteWebhook(existing.platformWebhookId);
+      await store.save(platform, created.value, url, clock.now(), by);
+      return ok(await statusOf(platform));
+    },
+
+    async disconnectWebhook(platform, by) {
+      factoryOf(platform);
+      await dropWebhook(platform, by);
+      return statusOf(platform);
+    },
+
+    async receive(platform, rawBody, headers, logger) {
+      const factory = factoryOf(platform);
+      const stored = await deps.webhooks?.find(platform);
+      if (stored == null) throw new SalesFeedWebhookNotFound();
+      if (stored.secret === null) {
+        logger.warn(
+          { platform },
+          'sales feed delivery refused: no listed encryption key opens the webhook secret',
+        );
+        throw new SalesFeedDeliveryRefused();
+      }
+      const now = clock.now();
+      const delivery = factory.readDelivery({ rawBody, headers, secret: stored.secret, now });
+      if (!delivery.ok) {
+        // The reason only: never the body, which carries a fan's pseudo.
+        logger.warn({ platform, reason: delivery.reason }, 'sales feed delivery refused');
+        throw new SalesFeedDeliveryRefused();
+      }
+      const received = await webhooksOrThrow().receive(platform, delivery, now);
+      if (received === 'new') await deps.jobs.readNow(`delivery:${platform}`);
+      logger.info({ platform, event: delivery.event, received }, 'sales feed delivery');
     },
 
     async linkModel(platform, platformModelId, platformAccountId, by) {
@@ -330,10 +439,10 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       return overview(platform);
     },
 
-    async read(logger, correlationId) {
+    async read(logger, correlationId, woken) {
       if (deps.keys === null) return;
       for (const stored of await deps.keys.list()) {
-        await readOne(stored, logger, correlationId);
+        await readOne(stored, logger, correlationId, woken);
       }
     },
   };
