@@ -15,7 +15,7 @@ import {
 import { PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema } from './pay-periods';
 import { BasisPointsSchema, CountryCodeSchema } from './team';
-import { CalendarDaySchema } from './team-members';
+import { CalendarDaySchema, TeamMemberSchema } from './team-members';
 
 /**
  * Contractors' invoices (EQ-06, ADR 0023 § Factures, ADR 0036): what the base keeps of a self-billed invoice, its
@@ -1347,6 +1347,33 @@ export const ContractorDocumentParamsSchema = z.object({
   memberId: TeamMemberIdSchema,
   documentId: ContractorDocumentIdSchema,
 });
+
+/** The documents waiting for the owner's check that `GET /v1/payroll/contractors/documents` gives at most. */
+export const CONTRACTOR_DOCUMENTS_PENDING_MAX = 200;
+
+/**
+ * `GET /v1/payroll/contractors/documents?review=pending` (EQ-06 lot 8), the owner only, who alone checks a document:
+ * every member's documents without a check yet, the oldest filed first, so that Aujourd'hui never reads each file one
+ * by one; never his own, which he may not check. `review` names what the list holds; only the documents waiting exist today.
+ */
+export const ContractorDocumentsQuerySchema = z.object({ review: z.literal('pending') });
+export type ContractorDocumentsQuery = z.infer<typeof ContractorDocumentsQuerySchema>;
+
+/** A document waiting for the check, with its member's name as the team shows it; never its file. */
+export const PendingContractorDocumentSchema = ContractorDocumentSchema.extend({
+  displayName: TeamMemberSchema.shape.displayName,
+});
+export type PendingContractorDocument = z.infer<typeof PendingContractorDocumentSchema>;
+
+/**
+ * The documents waiting, `CONTRACTOR_DOCUMENTS_PENDING_MAX` at most, the oldest first; `more` says others wait after
+ * them, which a check of the first ones brings into the list.
+ */
+export const PendingContractorDocumentsSchema = z.object({
+  documents: z.array(PendingContractorDocumentSchema).max(CONTRACTOR_DOCUMENTS_PENDING_MAX),
+  more: z.boolean(),
+});
+export type PendingContractorDocuments = z.infer<typeof PendingContractorDocumentsSchema>;
 
 /**
  * The refusals of the invoices' rules (EQ-06), each suffix setting its status (api.md). Kept apart from

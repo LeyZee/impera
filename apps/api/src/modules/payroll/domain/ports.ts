@@ -19,6 +19,7 @@ import type {
   ContractorDocumentId,
   ContractorDocumentMediaType,
   ContractorDocumentReview,
+  PendingContractorDocuments,
   ContractorFile,
   ContractorProfileBody,
   ContractorRegime,
@@ -699,6 +700,11 @@ export interface PayrollDocumentStore {
     body: ContractorDocumentReview,
     secure: (file: DocumentFile, retainUntil: Date) => Promise<void>,
   ): Promise<{ document: ContractorDocument; created: boolean }>;
+  /**
+   * Every member's documents without a check, the oldest filed first, with the member's name: the owner only
+   * (`payroll_forbidden` otherwise), who alone checks one, never his own ones, which he may not check (lot 8).
+   */
+  pending(userId: UserId): Promise<PendingContractorDocuments>;
 }
 
 /** `payroll.requeue_invoice_issues`, as the jobs (`withAdmin`): enqueues the statements to try again, and counts them. */
