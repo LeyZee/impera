@@ -73,6 +73,12 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `challenge` | Page anti-bot (403 avec HTML) à la place du JSON |
 | `ws_drop` | Coupure du temps réel ; le connecteur reprend par polling (pas encore codé : la capture dira si Reveal a du temps réel) |
 
+## API CRM (ADR 0050 § 9)
+
+`apps/api/src/__tests__/fake-reveal/crm.ts` sert les routes documentées de `api.reveal.me` (`/v1/sales`, `/v1/models`, `/v1/chatters`, `/v1/stats/daily`, `/v1/stats/chatters/daily`) derrière `x-api-key`, sur un registre en mémoire, par `app.inject` (aucun port ouvert). Tout est inventé (`model_test_01`, `chatter_test_01`, `fan_test_01`) ; les formes suivent la documentation lue le 02/11/2026 tant qu'aucune réponse réelle n'a été vue.
+
+Commandes : `sell` (vente ajoutée au registre dans son ordre, quelle que soit sa date : une vente 3-D Secure confirmée tard vient en dernier), `refund`, `appendRaw` (événement inconnu), `rateLimit` (429 et `Retry-After`), `revoke` (401), `withhold` (403 sur les ventes ou les statistiques), `breakShape` (réponse sans `pageInfo`), `positionOf`, `calls`.
+
 ## Fidélité
 
 - Chaque endpoint de FakeReveal cite sa section de `reveal-api-observed.md` et la date de la capture qui le fonde.

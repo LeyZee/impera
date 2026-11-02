@@ -34,13 +34,23 @@ export function readAppearance(): Appearance {
   return parseAppearance(readStored());
 }
 
+/**
+ * The colour of the browser's bar (and of the installed app's status bar) in each theme: `--nv-void`, as in
+ * `public/appearance.js` and the manifest.
+ */
+export const THEME_COLORS = { night: '#060508', day: '#f6f1f3' } as const;
+
 function apply(appearance: Appearance): void {
   const root = document.documentElement;
-  if (isDay(appearance, window.matchMedia(LIGHT_QUERY).matches)) {
+  const day = isDay(appearance, window.matchMedia(LIGHT_QUERY).matches);
+  if (day) {
     root.dataset['theme'] = 'light';
   } else {
     delete root.dataset['theme'];
   }
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', day ? THEME_COLORS.day : THEME_COLORS.night);
 }
 
 let current: Appearance = 'night';

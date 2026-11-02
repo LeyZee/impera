@@ -10,6 +10,7 @@ import { Unreachable } from './auth/Unreachable';
 import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
 import { readSession, signOut } from './auth/session';
+import { forgetDevice } from './pwa/device';
 import { createAppRouter, type RouterContext } from './router';
 import { railOf } from './shell/nav';
 
@@ -43,6 +44,8 @@ export function App(): JSX.Element {
   const refresh = useCallback(() => {
     readSession().then(
       (current) => {
+        // No session any more (signed out here, revoked or expired elsewhere): the device forgets what it kept.
+        if (current.kind === 'signed_out') void forgetDevice();
         setSession(
           current.kind === 'signed_in'
             ? { status: 'signed_in', user: current.user }

@@ -10,6 +10,7 @@ import {
 import { CreatorsPage } from './creators/CreatorsPage';
 import { creatorsSearch, parseCreatorsSearch } from './creators/search';
 import { parsePaySearch } from './payroll/model';
+import { InstallPage } from './pwa/InstallPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyFilePage } from './screens/me/MyFilePage';
@@ -608,7 +609,15 @@ const settingsSecurity = createRoute({
 });
 const agentMode = createRoute({ getParentRoute: () => settings, path: '/mode', component: AgentModePage });
 
+/** /aide/installer (CR-01): open to every role, outside the rail (no section, so the guard lets it through). */
+const installHelp = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/aide/installer',
+  component: InstallPage,
+});
+
 const routeTree = rootRoute.addChildren([
+  installHelp,
   dashboard,
   creators,
   train.addChildren([trainIndex, playground, corrections, tests]),

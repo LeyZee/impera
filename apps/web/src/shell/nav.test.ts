@@ -1,7 +1,7 @@
 import type { Me } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { canOpen, layoutRail, railKindOf, railOf, sectionOf, type Section } from './nav';
+import { canOpen, documentTitle, layoutRail, railKindOf, railOf, sectionOf, type Section } from './nav';
 
 const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds: [], routedCreatorIds: [] };
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
@@ -137,5 +137,13 @@ describe('sectionOf and canOpen', () => {
     }
     expect(canOpen(railOf(owner), '/reglages')).toBe(true);
     expect(canOpen(railOf(creator), '/suivi')).toBe(false);
+  });
+});
+
+describe('documentTitle', () => {
+  it('titles the install guide, which belongs to no section, for everyone', () => {
+    expect(documentTitle('/aide/installer', null, 'chatter')).toBe('Installer Nirvana · Nirvana');
+    expect(documentTitle('/aide/installer/', null, 'owner')).toBe('Installer Nirvana · Nirvana');
+    expect(documentTitle('/nulle-part', null, 'owner')).toBe('Page introuvable · Nirvana');
   });
 });

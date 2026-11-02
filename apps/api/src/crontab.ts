@@ -19,6 +19,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.dispatch'] },
   },
+  // Reveal's register of sales and refunds, read from its stored cursor (ADR 0050 § 3): Reveal's own advice is one
+  // call a minute. No backfill: the cursor keeps the place, the next run reads what was missed.
+  {
+    task: 'connector.read_sales',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_sales'] },
+  },
   // What a member no longer `active` still held (a takeover, a routed conversation) is handed back within the minute
   // (EQ-13): he already reads none of it. No backfill: the next run finds them all anyway.
   {

@@ -14,6 +14,7 @@ import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { checkEncryptionKeys, READ_ONLY_POOL_OPTIONS } from '../key-check';
+import { createSalesFeedKeyStore } from '../modules/connectors/infra/db/sales-feed-keys';
 import { createPostgresCredentialStore } from '../modules/providers/infra/postgres.store';
 import { createPostgresTelegramStore } from '../modules/telegram/infra/postgres.store';
 
@@ -65,6 +66,13 @@ describe('ops:check-keys', () => {
       token: '100000001:FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAK',
       state: 'active',
     });
+    await createSalesFeedKeyStore(test.admin.db, credentials).save(
+      'reveal',
+      'rvl_FAKEFAKEFAKEFAKEFAKE',
+      ['sales'],
+      new Date('2026-11-02T10:00:00Z'),
+      { userId: null, ip: null },
+    );
   });
 
   afterAll(async () => {
@@ -77,12 +85,18 @@ describe('ops:check-keys', () => {
       expect.objectContaining({ keys: 'SESSION_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
       expect.objectContaining({ keys: 'CREDENTIALS_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
       expect.objectContaining({ keys: 'CREDENTIALS_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
+      expect.objectContaining({ keys: 'CREDENTIALS_ENCRYPTION_KEYS', total: 1, unreadable: [] }),
     ]);
   });
 
   it('names what a stale copy does not open, never a secret', async () => {
     const families = await checkEncryptionKeys(readOnly.db, { session: newKeys(), credentials: newKeys() });
-    expect(families.map((family) => family.unreadable)).toEqual([[accountId], ['xai'], ['nirvana_demo_bot']]);
+    expect(families.map((family) => family.unreadable)).toEqual([
+      [accountId],
+      ['xai'],
+      ['nirvana_demo_bot'],
+      ['reveal'],
+    ]);
     expect(JSON.stringify(families)).not.toContain('FAKE');
     expect(JSON.stringify(families)).not.toContain('invented');
   });

@@ -28,6 +28,7 @@ import {
 } from './nav';
 
 import { initialOf } from '@/lib/utils';
+import { InstallNudge } from '@/pwa/InstallNudge';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
 
@@ -128,6 +129,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
           <Stage key={current ?? 'none'} pathname={pathname} stage={main} />
+          <InstallNudge />
           {/* Always there, empty when silent: a screen reader announces what comes into a region it already knows. */}
           <p className="nv-notice-region" role="status">
             {said === null ? null : (
