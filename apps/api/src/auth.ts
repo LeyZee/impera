@@ -344,10 +344,10 @@ function cookieOf(request: FastifyRequest, name: string): string | undefined {
  * The session of a request, as Better Auth reads it (12 hours without activity), refused past 7 days from its creation
  * whatever its use (ADR 0046 § 6): the row goes, and the request is answered as without a session.
  */
-async function sessionOf(auth: Auth, db: Database, request: FastifyRequest) {
+async function sessionOf(auth: Auth, db: Database, request: FastifyRequest, now: Date = new Date()) {
   const result = await auth.api.getSession({ headers: authHeaders(request) });
   if (result === null) return null;
-  if (Date.now() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
+  if (now.getTime() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
   await db.delete(schema.session).where(eq(schema.session.id, result.session.id));
   return null;
 }
@@ -445,7 +445,7 @@ export function createRequireRecentLogin(
   now: () => Date = () => new Date(),
 ): preValidationAsyncHookHandler {
   return async (request) => {
-    const result = await sessionOf(auth, db, request);
+    const result = await sessionOf(auth, db, request, now());
     if (result === null) throw new SessionUnauthenticated();
     const confirmedAt = result.session.reauthenticatedAt;
     if (confirmedAt === null || confirmedAt === undefined) throw new ReauthenticationRequired();
