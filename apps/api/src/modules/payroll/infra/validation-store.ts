@@ -54,7 +54,7 @@ import {
   type StatementHead,
 } from '../domain/validation';
 
-import { enqueueInvoiceIssue } from './invoice-queue';
+import { enqueueDocumentSettle, enqueueInvoiceIssue } from './invoice-queue';
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { closingsSpan, readSnapshot, registeredAmong, type PayInputReads } from './snapshot';
 import { audit } from './writes';
@@ -367,6 +367,8 @@ export function createDrizzlePayrollValidationStore(
         await enqueuePayRecalculation(tx, head.period);
         // Its invoice and the credit notes its period owes (EQ-06 lot 3), once this validation commits.
         await enqueueInvoiceIssue(tx, statementId);
+        // A cumulated total of zero or below ends the debt of documents already issued (ADR 0038, EQ-06 lot 7a).
+        await enqueueDocumentSettle(tx, head.memberId);
         return { period: head.period };
       }),
 

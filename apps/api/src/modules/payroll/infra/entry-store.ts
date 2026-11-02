@@ -49,6 +49,7 @@ import {
 import type { PayReader, PayrollEntryStore } from '../domain/ports';
 import type { MemberForPay } from '../domain/recalculation';
 
+import { enqueueDocumentSettle } from './invoice-queue';
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { adjustmentOfRow, bonusOfRow, closingsSpan, penaltyOfRow, type PayInputReads } from './snapshot';
 import { audit } from './writes';
@@ -405,6 +406,7 @@ export function createDrizzlePayrollEntryStore(
         const { revision } = payment;
         const [row] = await tx
           .select({
+            memberId: commissionStatements.memberId,
             period: commissionStatements.period,
             status: commissionStatements.status,
             revision: commissionStatements.revision,
@@ -450,6 +452,8 @@ export function createDrizzlePayrollEntryStore(
           { kind: 'commission_statement', id: statementId },
           { period, revision, paidOn: payment.paidOn, method: payment.method, sentMinor: payment.sentMinor },
         );
+        // The documents this transfer settles, once it commits (EQ-06 lot 7a).
+        await enqueueDocumentSettle(tx, row.memberId);
         return { period };
       }),
   };

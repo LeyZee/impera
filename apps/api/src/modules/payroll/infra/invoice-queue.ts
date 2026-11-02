@@ -47,6 +47,23 @@ export async function enqueueInvoiceRequeue(tx: Transaction, memberId: TeamMembe
 }
 
 /**
+ * `payroll.settle_documents` for a contractor (EQ-06 lot 7a), in the transaction that validates or pays one of his
+ * statements or issues one of his documents: once it commits, each document whose debt a statement ended is marked.
+ * One key per contractor: a second enqueue replaces the waiting run, and a run writes only what is missing.
+ */
+export async function enqueueDocumentSettle(tx: Transaction, memberId: string): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'payroll.settle_documents',
+      payload => ${JSON.stringify({ memberId })}::jsonb,
+      max_attempts => ${JOB_MAX_ATTEMPTS['payroll.settle_documents']}::int,
+      job_key => ${`payroll.settle_documents:${memberId}`},
+      job_key_mode => 'replace'
+    )`,
+  );
+}
+
+/**
  * `payroll.render_invoice_pdf` for a document, in the transaction that issues it (ADR 0037 § 5): an issued document
  * always has its job. One key per document; the run renders only when its PDF has no row yet.
  */
