@@ -12,7 +12,7 @@ Un compte Reveal basculé est payé sur ses ventes lues : le chatteur ne saisit 
 
 ## Contexte à lire
 
-ADR 0050 (§§ 5 à 8, § 10), ADR 0043 (§§ 2, 3, 5, 7), ADR 0023, 0032, 0035, 0039 § 6, fiches CR-03 et CR-09.
+Prototype de l'espace chatteur pour l'option 3 : https://claude.ai/artifact/Lc2yn1cyu8RuJqA5WGt4ph (copie hors dépôt : `espaces/prototype-chatteur/`). ADR 0050 (§§ 5 à 8, § 10), ADR 0043 (§§ 2, 3, 5, 7), ADR 0023, 0032, 0035, 0039 § 6, fiches CR-03 et CR-09.
 
 ## À faire
 
@@ -20,7 +20,8 @@ ADR 0050 (§§ 5 à 8, § 10), ADR 0043 (§§ 2, 3, 5, 7), ADR 0023, 0032, 0035,
 - [ ] Attribution et vente en attente du valideur (§ 5) ; remboursement après validation en vente tardive négative (§ 7).
 - [ ] `shift_feedback` : ventes en lecture seule, commentaire, incident, remontée, ou « rien à signaler » ; rappel, sans effet sur la paie.
 - [ ] Téléphone : ventes lues, commission estimée, palier, objectif collectif, sans « + Vente ».
-- [ ] Décider avec Charles de l'ordre avec CR-03 : si cette fiche arrive avant, la saisie n'est pas construite pour Reveal.
+- [ ] Une vente lue attribuée à tort au chatteur : il la signale au valideur, sans effet sur la paie tant que le valideur n'a pas tranché.
+- [ ] Avant la bascule, le téléphone garde le total déclaré (EQ-03) ; CR-03 n'est pas construite pour Reveal.
 
 ## Critères d'acceptation
 
