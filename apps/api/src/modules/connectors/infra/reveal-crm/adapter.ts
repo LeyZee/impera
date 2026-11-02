@@ -21,6 +21,7 @@ import type {
 
 import {
   RevealChatterDailyStatsSchema,
+  RevealCreatedWebhookSchema,
   RevealChattersSchema,
   RevealDailyStatsSchema,
   RevealModelsSchema,
@@ -39,7 +40,12 @@ const DEFAULT_RETRY_AFTER_MS = 60_000;
 /** `fetch`, narrowed to what the adapter uses, so a test can hand FakeReveal over. */
 export type SalesFeedFetch = (
   url: string,
-  init: { readonly headers: Record<string, string>; readonly signal: AbortSignal },
+  init: {
+    readonly method?: 'GET' | 'POST' | 'DELETE';
+    readonly headers: Record<string, string>;
+    readonly body?: string;
+    readonly signal: AbortSignal;
+  },
 ) => Promise<{
   readonly status: number;
   readonly headers: { get(name: string): string | null };
@@ -89,27 +95,45 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
   const base = (options.baseUrl ?? REVEAL_CRM_BASE_URL).replace(/\/$/, '');
   const now = options.now ?? (() => new Date());
 
+  async function call(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    query: Record<string, string | undefined>,
+    payload?: object,
+  ): Promise<SalesFeedResult<{ readonly status: number; readonly body: string }>> {
+    const search = new URLSearchParams();
+    for (const [name, value] of Object.entries(query)) if (value !== undefined) search.set(name, value);
+    const url = `${base}${path}${search.size === 0 ? '' : `?${search.toString()}`}`;
+    try {
+      const response = await options.fetch(url, {
+        method,
+        headers: {
+          'x-api-key': options.key,
+          accept: 'application/json',
+          ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      });
+      const body = await response.text();
+      const failure = failureOf(response.status, response.headers.get('retry-after'));
+      if (failure !== null) return { ok: false, failure };
+      return { ok: true, value: { status: response.status, body } };
+    } catch {
+      return { ok: false, failure: { kind: 'unreachable' } };
+    }
+  }
+
   async function get<S extends z.ZodType>(
     path: string,
     query: Record<string, string | undefined>,
     schema: S,
+    method: 'GET' | 'POST' = 'GET',
+    payload?: object,
   ): Promise<SalesFeedResult<z.output<S>>> {
-    const search = new URLSearchParams();
-    for (const [name, value] of Object.entries(query)) if (value !== undefined) search.set(name, value);
-    const url = `${base}${path}${search.size === 0 ? '' : `?${search.toString()}`}`;
-    let response: Awaited<ReturnType<SalesFeedFetch>>;
-    let body: string;
-    try {
-      response = await options.fetch(url, {
-        headers: { 'x-api-key': options.key, accept: 'application/json' },
-        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-      });
-      body = await response.text();
-    } catch {
-      return { ok: false, failure: { kind: 'unreachable' } };
-    }
-    const failure = failureOf(response.status, response.headers.get('retry-after'));
-    if (failure !== null) return { ok: false, failure };
+    const answer = await call(method, path, query, payload);
+    if (!answer.ok) return answer;
+    const body = answer.value.body;
     let json: unknown;
     try {
       json = JSON.parse(body);
@@ -300,6 +324,29 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
           messagesSent: row.messagesSent,
         })),
       };
+    },
+
+    async createWebhook(url) {
+      const created = await get('/v1/webhooks', {}, RevealCreatedWebhookSchema, 'POST', {
+        url,
+        events: ['sale_created', 'sale_refunded'],
+      });
+      if (!created.ok) return created;
+      const webhook = 'data' in created.value ? created.value.data : created.value;
+      return { ok: true, value: { platformWebhookId: webhook.id, secret: webhook.secret } };
+    },
+
+    async deleteWebhook(platformWebhookId) {
+      const removed = await call('DELETE', `/v1/webhooks/${encodeURIComponent(platformWebhookId)}`, {});
+      // Already gone at Reveal (404, the documentation's « webhook inconnu »): what was asked is true.
+      if (
+        !removed.ok &&
+        removed.failure.kind === 'unexpected_answer' &&
+        removed.failure.detail === 'HTTP 404'
+      ) {
+        return { ok: true, value: null };
+      }
+      return removed.ok ? { ok: true, value: null } : removed;
     },
   };
 }

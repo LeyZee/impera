@@ -202,6 +202,19 @@ export const SalesFeedStatusSchema = z.object({
   message: z.string().min(1),
   /** Lines waiting for a model the owner has not linked yet. */
   quarantined: z.number().int().min(0),
+  /**
+   * The platform's webhook for Nirvana, `null` when none is registered: a sale then shows within a minute (the
+   * cursor), within seconds with it. `lastDeliveryAt` is the last delivery that passed its signature check;
+   * `lastRejectedAt` the last one refused since the webhook was registered (an old secret, a forged one): the one case
+   * where the owner has something to do, register it again. No delivery for hours only means no sale.
+   */
+  webhook: z
+    .object({
+      createdAt: z.iso.datetime(),
+      lastDeliveryAt: z.iso.datetime().nullable(),
+      lastRejectedAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
 });
 export type SalesFeedStatus = z.infer<typeof SalesFeedStatusSchema>;
 
@@ -298,6 +311,10 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_account_unprocessable',
   'sales_feed_model_conflict',
   'sales_feed_member_unprocessable',
+  'sales_feed_not_connected_conflict',
+  'sales_feed_webhook_url_unprocessable',
+  'sales_feed_delivery_unauthenticated',
+  'sales_feed_webhook_not_found',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;

@@ -110,3 +110,4 @@ Branche : task/<id>-<slug>
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
 | ARC-03 | Le dossier du prestataire sorti de la paie | exploitation | in_progress | ADR 0047, ADR 0051, ARC-02 |
+| ARC-04 | Les frontières vérifiées aussi à l'intérieur d'un module | exploitation | todo | ARC-03 |
