@@ -66,3 +66,6 @@ Date : AAAA-MM-JJ
 | 0039 | Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main | accepted (remplace dans 0036 la phrase sur l'état « créditée » ; précise 0023 § Factures ; au § 3, la ligne refacturée sur la facture du jour et sa conséquence sur le régime remplacées par 0040) |
 | 0040 | Factures : « annuler et refacturer » émet une facture rectificative, sous le régime de la facture annulée | accepted (remplace dans 0039 § 3 la ligne refacturée sur la facture du jour) |
 | 0041 | Factures : l'attestation de résidence fiscale conditionne le versement, pas la facture | accepted (remplace dans 0023 § Factures la phrase sur l'attestation, et les choix (a) et « ok année civile » du lot 5c) |
+| 0042 | Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche | proposed (remplacerait dans 0023 la phrase de § Rôles sur la créatrice, dans 0024 sa ligne du rail, dans 0030 § 3 la référence de `validated_by`) |
+| 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | proposed (précise 0023 et EQ-03) |
+| 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | proposed (remplacerait 0030 § 2 et § 4 pour le seul contenu déposé) |
