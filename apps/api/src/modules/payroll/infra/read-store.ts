@@ -31,8 +31,9 @@ import {
 import { and, eq, inArray, schema, sql, withAdmin, withMember, type Database } from '@nirvana/db';
 import { z } from 'zod';
 
+import { PayrollForbidden } from '../../contractors/pure';
 import { redactAuthors } from '../domain/authors';
-import { PayPeriodCursorInvalid, PayrollEntriesTooMany, PayrollForbidden } from '../domain/errors';
+import { PayPeriodCursorInvalid, PayrollEntriesTooMany } from '../domain/errors';
 import { payoutDecision } from '../domain/payouts';
 import { blockFor } from '../domain/period-blocks';
 import { lateNetOf } from '../domain/period-figures';

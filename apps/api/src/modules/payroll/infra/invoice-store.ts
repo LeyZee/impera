@@ -24,15 +24,14 @@ import {
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
+import { regimeVatOf, reviewOf } from '../../contractors';
 import type { IssueWarning } from '../domain/billing';
 import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
 import type { PayrollInvoiceStore } from '../domain/ports';
 
-import { reviewOf } from './document-rows';
 import { enqueueDocumentSettle, enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
 import { CountedSchema } from './read-store';
-import { regimeVatOf } from './regime-store';
 import type { PayInputReads } from './snapshot';
 
 const {

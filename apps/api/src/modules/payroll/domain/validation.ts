@@ -6,11 +6,12 @@ import {
   type TeamMemberId,
 } from '@nirvana/contracts';
 
+import { PayrollForbidden } from '../../contractors/pure';
+
 import {
   CommissionStatementChanged,
   CommissionStatementOpen,
   CommissionStatementStatusConflict,
-  PayrollForbidden,
   PayrollOwnForbidden,
 } from './errors';
 import type { PayReader } from './ports';

@@ -11,8 +11,8 @@ import {
 } from '@nirvana/contracts';
 import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
 
+import { PayrollForbidden } from '../../contractors/pure';
 import type { Das2Contractor } from '../domain/accounting';
-import { PayrollForbidden } from '../domain/errors';
 import type { JournalContractor, JournalDocument, JournalStatement } from '../domain/journal';
 import type { ArchiveDocument, Das2Facts, JournalFacts, PayrollAccountingStore } from '../domain/ports';
 

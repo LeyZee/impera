@@ -18,7 +18,8 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import type { App } from '../composition-root';
 import { createLogger } from '../logger';
-import { createMemoryInvoiceStore, createPayrollModule } from '../modules/payroll';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
+import { createPayrollModule } from '../modules/payroll';
 import { buildServer } from '../server';
 
 import { testConfig } from './support/config';

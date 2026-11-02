@@ -4,8 +4,9 @@ import type {
   ValidateCommissionStatementBody,
 } from '@nirvana/contracts';
 
+import type { Actor } from '../../contractors/pure';
 import { CommissionStatementChanged } from '../domain/errors';
-import type { Actor, PayrollValidationStore } from '../domain/ports';
+import type { PayrollValidationStore } from '../domain/ports';
 
 import type { PayrollReads } from './periods';
 

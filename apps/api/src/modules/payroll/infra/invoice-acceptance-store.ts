@@ -35,6 +35,8 @@ import {
 } from '@nirvana/db';
 import { z } from 'zod';
 
+import { PayrollForbidden } from '../../contractors/pure';
+import type { Actor } from '../../contractors/pure';
 import {
   correctionAdjustments,
   correctionReplayed,
@@ -44,7 +46,6 @@ import {
   InvoiceAcceptanceConflict,
   InvoiceAnswerForbidden,
   InvoiceNotFound,
-  PayrollForbidden,
   PayrollOwnForbidden,
 } from '../domain/errors';
 import {
@@ -54,7 +55,7 @@ import {
   type RecordedStep,
 } from '../domain/invoice-acceptance';
 import { invoiceDueState } from '../domain/invoices';
-import type { Actor, PayrollInvoiceAcceptanceStore } from '../domain/ports';
+import type { PayrollInvoiceAcceptanceStore } from '../domain/ports';
 
 import { enqueueChanged, lockAdjustmentPeriod } from './entry-store';
 import { enqueueInvoiceContestAnnounce, enqueueInvoiceLapse } from './invoice-queue';

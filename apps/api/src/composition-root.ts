@@ -30,10 +30,11 @@ import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
 import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './modules/connectors';
+import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { FansModule } from './modules/fans';
 import type { MediaModule } from './modules/media';
-import type { PayrollModule } from './modules/payroll';
+import { invoiceRequeue, type PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
 import type { ProvidersModule } from './modules/providers';
@@ -49,10 +50,11 @@ import { wireAgent } from './wiring/agent';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
+import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireFans } from './wiring/fans';
 import { wireMedia } from './wiring/media';
-import { wirePayroll, type InvoiceBuckets } from './wiring/payroll';
+import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
@@ -76,6 +78,7 @@ interface Modules {
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
   readonly scheduling: SchedulingModule;
+  readonly contractors: ContractorsModule;
   readonly payroll: PayrollModule;
   /** Null in the worker, or when its persona cannot be read: the API starts without the playground and says why. */
   readonly playground: PlaygroundModule | null;
@@ -233,13 +236,19 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
+  const contractors = wireContractors(shared, {
+    scheduling: scheduling.module,
+    requeue: invoiceRequeue,
+    ...(options.invoiceBuckets !== undefined && { invoiceBuckets: options.invoiceBuckets }),
+    ...(options.payrollClock !== undefined && { now: options.payrollClock }),
+  });
   const payroll = wirePayroll(shared, {
     persona: persona.module,
     scheduling: scheduling.module,
     team: team.module,
     rateJobSince: rateJobSince(config, adminDb.db),
     invoiceFontsDir: INVOICE_FONTS_DIR,
-    ...(options.invoiceBuckets !== undefined && { invoiceBuckets: options.invoiceBuckets }),
+    invoiceBuckets: contractors.buckets,
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
   const playground = await wirePlayground(shared, {
@@ -287,6 +296,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
     team: team.module,
     scheduling: scheduling.module,
+    contractors: contractors.module,
     payroll: payroll.module,
     agent: agent.module,
     media: media.module,
@@ -306,6 +316,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...backups.tasks,
     ...scheduling.tasks,
     ...team.tasks,
+    ...contractors.tasks,
     ...payroll.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
@@ -353,6 +364,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       fans.routes(agent.kycSlotsOf),
       ...team.routes,
       ...scheduling.routes,
+      ...contractors.routes,
       ...payroll.routes,
       ...backups.routes,
       ...providers.routes,

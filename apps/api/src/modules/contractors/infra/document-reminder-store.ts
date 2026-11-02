@@ -15,7 +15,7 @@ import { documentsToRemind, documentValidUntil, regimeOn } from '../domain/billi
 import type { PayrollDocumentReminderStore } from '../domain/ports';
 
 import { reviewOf } from './document-rows';
-import type { PayInputReads } from './snapshot';
+import type { ContractorReads } from './ports';
 
 const {
   auditLog,
@@ -71,7 +71,7 @@ async function said(tx: Transaction, documentId: string): Promise<boolean> {
  */
 export function createDrizzleDocumentReminderStore(
   adminDb: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: ContractorReads,
   now: () => Date,
 ): PayrollDocumentReminderStore {
   return {

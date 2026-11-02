@@ -1,0 +1,340 @@
+{
+  "statements": [
+    {
+      "statement": "lea@2025-05-01",
+      "status": "validated",
+      "revision": 1,
+      "engineVersion": "nirvana-2",
+      "netMinor": 6232,
+      "commissionMinor": 1246,
+      "teamShareBaseMinor": null,
+      "teamShareBps": null,
+      "teamShareMinor": null,
+      "tierBonus": {
+        "label": "Bronze",
+        "bonusMinor": 3000,
+        "thresholdMinor": 5000
+      },
+      "collectiveBonusMinor": 1000,
+      "bonusesMinor": 4000,
+      "penaltiesRequestedMinor": 0,
+      "penaltiesMinor": 0,
+      "carryOversInMinor": 0,
+      "adjustmentsMinor": 0,
+      "totalMinor": 5246,
+      "carryOverOutMinor": 0,
+      "payableMinor": 5246,
+      "teamNetMinor": 16108,
+      "collective": {
+        "tier": {
+          "bonusMinor": 1000,
+          "reachedBps": 5000
+        },
+        "reachedBps": 16108
+      },
+      "lines": [
+        {
+          "currency": "EUR",
+          "vatBps": 0,
+          "platformFeeBps": 2000,
+          "rateMicros": 1000000,
+          "grossMinor": 1001,
+          "grossEurMinor": 1001,
+          "exclVatMinor": 1001,
+          "netMinor": 801,
+          "commissionMinor": 160,
+          "reports": 1,
+          "lateReports": 0
+        },
+        {
+          "currency": "EUR",
+          "vatBps": 0,
+          "platformFeeBps": 2000,
+          "rateMicros": 1000000,
+          "grossMinor": 6789,
+          "grossEurMinor": 6789,
+          "exclVatMinor": 6789,
+          "netMinor": 5431,
+          "commissionMinor": 1086,
+          "reports": 1,
+          "lateReports": 0
+        }
+      ]
+    },
+    {
+      "statement": "theo@2025-05-01",
+      "status": "validated",
+      "revision": 1,
+      "engineVersion": "nirvana-2",
+      "netMinor": 9876,
+      "commissionMinor": 1975,
+      "teamShareBaseMinor": null,
+      "teamShareBps": null,
+      "teamShareMinor": null,
+      "tierBonus": {
+        "label": "Bronze",
+        "bonusMinor": 3000,
+        "thresholdMinor": 5000
+      },
+      "collectiveBonusMinor": 1000,
+      "bonusesMinor": 4000,
+      "penaltiesRequestedMinor": 0,
+      "penaltiesMinor": 0,
+      "carryOversInMinor": 0,
+      "adjustmentsMinor": 0,
+      "totalMinor": 5975,
+      "carryOverOutMinor": 0,
+      "payableMinor": 5975,
+      "teamNetMinor": 16108,
+      "collective": {
+        "tier": {
+          "bonusMinor": 1000,
+          "reachedBps": 5000
+        },
+        "reachedBps": 16108
+      },
+      "lines": [
+        {
+          "currency": "EUR",
+          "vatBps": 0,
+          "platformFeeBps": 2000,
+          "rateMicros": 1000000,
+          "grossMinor": 12345,
+          "grossEurMinor": 12345,
+          "exclVatMinor": 12345,
+          "netMinor": 9876,
+          "commissionMinor": 1975,
+          "reports": 1,
+          "lateReports": 0
+        }
+      ]
+    },
+    {
+      "statement": "lea@2025-05-16",
+      "status": "validated",
+      "revision": 1,
+      "engineVersion": "nirvana-2",
+      "netMinor": 3457,
+      "commissionMinor": 691,
+      "teamShareBaseMinor": null,
+      "teamShareBps": null,
+      "teamShareMinor": null,
+      "tierBonus": null,
+      "collectiveBonusMinor": 0,
+      "bonusesMinor": 0,
+      "penaltiesRequestedMinor": 0,
+      "penaltiesMinor": 0,
+      "carryOversInMinor": 0,
+      "adjustmentsMinor": 0,
+      "totalMinor": 691,
+      "carryOverOutMinor": 691,
+      "payableMinor": 0,
+      "teamNetMinor": 11457,
+      "collective": null,
+      "lines": [
+        {
+          "currency": "EUR",
+          "vatBps": 0,
+          "platformFeeBps": 2000,
+          "rateMicros": 1000000,
+          "grossMinor": 4321,
+          "grossEurMinor": 4321,
+          "exclVatMinor": 4321,
+          "netMinor": 3457,
+          "commissionMinor": 691,
+          "reports": 1,
+          "lateReports": 0
+        }
+      ]
+    },
+    {
+      "statement": "theo@2025-05-16",
+      "status": "validated",
+      "revision": 1,
+      "engineVersion": "nirvana-2",
+      "netMinor": 8000,
+      "commissionMinor": 1600,
+      "teamShareBaseMinor": null,
+      "teamShareBps": null,
+      "teamShareMinor": null,
+      "tierBonus": {
+        "label": "Bronze",
+        "bonusMinor": 3000,
+        "thresholdMinor": 5000
+      },
+      "collectiveBonusMinor": 0,
+      "bonusesMinor": 3000,
+      "penaltiesRequestedMinor": 0,
+      "penaltiesMinor": 0,
+      "carryOversInMinor": 0,
+      "adjustmentsMinor": -250,
+      "totalMinor": 4350,
+      "carryOverOutMinor": 0,
+      "payableMinor": 4350,
+      "teamNetMinor": 11457,
+      "collective": null,
+      "lines": [
+        {
+          "currency": "EUR",
+          "vatBps": 0,
+          "platformFeeBps": 2000,
+          "rateMicros": 1000000,
+          "grossMinor": 10000,
+          "grossEurMinor": 10000,
+          "exclVatMinor": 10000,
+          "netMinor": 8000,
+          "commissionMinor": 1600,
+          "reports": 1,
+          "lateReports": 0
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "number": "LEA-YYYY-0001",
+      "kind": "invoice",
+      "statement": "lea@2025-05-01",
+      "credits": null,
+      "period": "2025-05-01",
+      "idempotencyKey": "invoice:lea@2025-05-01",
+      "exclVatMinor": 5246,
+      "vatMinor": 1049,
+      "inclVatMinor": 6295,
+      "selfAssessedVatMinor": 0,
+      "mentions": [
+        "Autofacturation",
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+      ],
+      "lines": [
+        {
+          "kind": "commission",
+          "label": "Commission, compte @anna-invente sur Reveal",
+          "amountMinor": 1086
+        },
+        {
+          "kind": "commission",
+          "label": "Commission, compte @bea-inventee sur Reveal",
+          "amountMinor": 160
+        },
+        {
+          "kind": "tier_bonus",
+          "label": "Prime de palier",
+          "amountMinor": 3000
+        },
+        {
+          "kind": "collective_bonus",
+          "label": "Prime d’objectif collectif",
+          "amountMinor": 1000
+        }
+      ]
+    },
+    {
+      "number": "LEA-YYYY-0002",
+      "kind": "invoice",
+      "statement": "lea@2025-05-16",
+      "credits": null,
+      "period": "2025-05-16",
+      "idempotencyKey": "invoice:lea@2025-05-16",
+      "exclVatMinor": 691,
+      "vatMinor": 138,
+      "inclVatMinor": 829,
+      "selfAssessedVatMinor": 0,
+      "mentions": [
+        "Autofacturation",
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+      ],
+      "lines": [
+        {
+          "kind": "commission",
+          "label": "Commission, compte @anna-invente sur Reveal",
+          "amountMinor": 691
+        }
+      ]
+    },
+    {
+      "number": "THEO-YYYY-0001",
+      "kind": "invoice",
+      "statement": "theo@2025-05-01",
+      "credits": null,
+      "period": "2025-05-01",
+      "idempotencyKey": "invoice:theo@2025-05-01",
+      "exclVatMinor": 5975,
+      "vatMinor": 1195,
+      "inclVatMinor": 7170,
+      "selfAssessedVatMinor": 0,
+      "mentions": [
+        "Autofacturation",
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+      ],
+      "lines": [
+        {
+          "kind": "commission",
+          "label": "Commission, compte @anna-invente sur Reveal",
+          "amountMinor": 1975
+        },
+        {
+          "kind": "tier_bonus",
+          "label": "Prime de palier",
+          "amountMinor": 3000
+        },
+        {
+          "kind": "collective_bonus",
+          "label": "Prime d’objectif collectif",
+          "amountMinor": 1000
+        }
+      ]
+    },
+    {
+      "number": "THEO-YYYY-0002",
+      "kind": "invoice",
+      "statement": "theo@2025-05-16",
+      "credits": null,
+      "period": "2025-05-16",
+      "idempotencyKey": "invoice:theo@2025-05-16",
+      "exclVatMinor": 4600,
+      "vatMinor": 920,
+      "inclVatMinor": 5520,
+      "selfAssessedVatMinor": 0,
+      "mentions": [
+        "Autofacturation",
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+      ],
+      "lines": [
+        {
+          "kind": "commission",
+          "label": "Commission, compte @anna-invente sur Reveal",
+          "amountMinor": 1600
+        },
+        {
+          "kind": "tier_bonus",
+          "label": "Prime de palier",
+          "amountMinor": 3000
+        }
+      ]
+    },
+    {
+      "number": "THEO-YYYY-0003",
+      "kind": "credit_note",
+      "statement": "theo@2025-05-16",
+      "credits": "THEO-YYYY-0001",
+      "period": "2025-05-01",
+      "idempotencyKey": "credit:theo@2025-05-16:0",
+      "exclVatMinor": -250,
+      "vatMinor": -50,
+      "inclVatMinor": -300,
+      "selfAssessedVatMinor": 0,
+      "mentions": [
+        "Avoir sur la facture THEO-YYYY-NNNN du …",
+        "Autofacturation"
+      ],
+      "lines": [
+        {
+          "kind": "adjustment",
+          "label": "Régularisation",
+          "amountMinor": -250
+        }
+      ]
+    }
+  ]
+}

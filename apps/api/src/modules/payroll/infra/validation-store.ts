@@ -27,6 +27,7 @@ import {
 } from '@nirvana/db';
 import { z } from 'zod';
 
+import type { Actor } from '../../contractors/pure';
 import { assertDocumentsSettled } from '../domain/departure';
 import {
   CommissionStatementChanged,
@@ -37,7 +38,7 @@ import {
   PayPeriodReportsPending,
   PayPeriodReportsUnread,
 } from '../domain/errors';
-import type { Actor, PayrollValidationStore } from '../domain/ports';
+import type { PayrollValidationStore } from '../domain/ports';
 import {
   closePeriod,
   paysMember,

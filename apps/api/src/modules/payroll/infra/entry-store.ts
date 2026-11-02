@@ -21,6 +21,8 @@ import {
   type Transaction,
 } from '@nirvana/db';
 
+import { enqueuePayoutCertificateLock } from '../../contractors';
+import { PayrollForbidden, TeamMemberNotFound } from '../../contractors/pure';
 import {
   adjustmentPeriod,
   assertJoinedBy,
@@ -43,15 +45,13 @@ import {
   PayEntryConflict,
   PayPeriodClosed,
   PayoutBlocked,
-  PayrollForbidden,
   PenaltyNotFound,
-  TeamMemberNotFound,
 } from '../domain/errors';
 import { payoutDecision } from '../domain/payouts';
 import type { PayReader, PayrollEntryStore } from '../domain/ports';
 import type { MemberForPay } from '../domain/recalculation';
 
-import { enqueueDocumentSettle, enqueuePayoutCertificateLock } from './invoice-queue';
+import { enqueueDocumentSettle } from './invoice-queue';
 import { payoutFactsOf } from './payout-facts';
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { adjustmentOfRow, bonusOfRow, closingsSpan, penaltyOfRow, type PayInputReads } from './snapshot';

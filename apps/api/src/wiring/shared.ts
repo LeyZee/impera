@@ -19,6 +19,9 @@ export type JobWithTask = Exclude<JobName, JobWithoutTask>;
 /** The tasks a wiring file registers: the jobs named after its module, each exactly once (ADR 0047 § 3). */
 export type TasksOf<Prefix extends string> = Record<Extract<JobWithTask, `${Prefix}.${string}`>, Task>;
 
+/** The tasks of a module whose jobs keep another module's prefix (ADR 0047 § 1: `payroll.*` split in four), by name. */
+export type TasksNamed<Name extends JobWithTask> = Record<Name, Task>;
+
 /** What every wiring file is built from: the shared dependencies `composition-root.ts` makes once. */
 export interface Shared {
   readonly config: Config;
