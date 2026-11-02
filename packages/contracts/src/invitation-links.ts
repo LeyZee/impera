@@ -61,8 +61,11 @@ export const RedeemInvitationLinkBodySchema = z.object({
 });
 export type RedeemInvitationLinkBody = z.infer<typeof RedeemInvitationLinkBodySchema>;
 
-/** `details.reason` of `password_invalid`: too short, too long, or refused by Better Auth. */
-export const PasswordInvalidReasonSchema = z.enum(['too_short', 'too_long', 'refused']);
+/**
+ * `details.reason` of `password_invalid`: too short, too long, found in a known data breach (ADR 0046 § 4), or refused
+ * by Better Auth.
+ */
+export const PasswordInvalidReasonSchema = z.enum(['too_short', 'too_long', 'breached', 'refused']);
 export type PasswordInvalidReason = z.infer<typeof PasswordInvalidReasonSchema>;
 
 /** The error codes of these routes, besides `rate_limited` from the limiter of the redeem and inspect routes. */

@@ -16,6 +16,7 @@ import {
 
 import { redactAuthors } from '../domain/authors';
 import { blockFor } from '../domain/period-blocks';
+import { lateNetOf, periodFigures, periodPace } from '../domain/period-figures';
 import type { PayReader, PayrollReadStore, StoredStatement } from '../domain/ports';
 
 /**
@@ -58,6 +59,16 @@ export function createPayrollReads(store: PayrollReadStore, now: () => Date): Pa
   return {
     async period(userId: UserId, period: PayPeriod): Promise<PayrollPeriod> {
       const view = await store.period(userId, period);
+      const statements = view.statements.map((statement) => toStatement(statement, view.reader));
+      const collectiveGoal = collectiveGoalFor(view.collectiveGoals, period);
+      const summary = periodFigures(statements);
+      const self = view.reader.scope === 'self';
+      // The agency reads every statement: its own sums are the team's. A member's are theirs, so the goal's one
+      // forecast reads the team's two sums apart, and gives them only the share of the target (« ok A »).
+      const team =
+        self && collectiveGoal !== null
+          ? await store.teamTotalsUnscoped(period)
+          : { netMinor: summary.netMinor, lateNetMinor: self ? 0 : lateNetOf(statements) };
       return {
         period,
         window: view.window,
@@ -65,10 +76,20 @@ export function createPayrollReads(store: PayrollReadStore, now: () => Date): Pa
         closing: closingFor(view.closing, view.reader),
         beforeFirstClosing: view.firstClosed !== null && period < view.firstClosed,
         blocked: blockFor(view.blocked, view.reader),
-        statements: view.statements.map((statement) => toStatement(statement, view.reader)),
+        statements,
         bonusTiers: bonusTiersFor(view.bonusTierSets, period),
-        collectiveGoal: collectiveGoalFor(view.collectiveGoals, period),
+        collectiveGoal,
         settings: view.settings,
+        summary,
+        pace: periodPace({
+          statements,
+          figures: summary,
+          window: view.window,
+          goal: collectiveGoal,
+          self,
+          team,
+          now: now(),
+        }),
       };
     },
     async periods(userId, page) {

@@ -300,6 +300,14 @@ type StoredPeriodSummary = Omit<PayPeriodSummary, 'ended'>;
 
 export interface PayrollReadStore {
   period(userId: UserId, period: PayPeriod): Promise<PeriodView>;
+  /**
+   * The team's net over the period and the share of it that late reports brought, over every statement whoever reads
+   * (ADR 0047 § 2, « ok A »): the one forecast of a collective goal. Only these two sums leave the store, never a
+   * statement, so that a member reads how far the team will get, never its net.
+   */
+  teamTotalsUnscoped(
+    period: PayPeriod,
+  ): Promise<{ readonly netMinor: number; readonly lateNetMinor: number }>;
   /** The periods where the reader reads a statement, the most recent first: a page after `page.cursor`. */
   periods(
     userId: UserId,

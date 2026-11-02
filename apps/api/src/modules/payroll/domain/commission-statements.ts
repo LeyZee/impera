@@ -200,10 +200,16 @@ function collectiveReached(goal: CollectiveGoal, teamNetMinor: number): PeriodSt
     const best = tier === null ? null : { step: tier.reachedBps, bonus: tier.bonusMinor };
     if (reached && higher(one.reachedBps, one.bonusMinor, best)) tier = one;
   }
-  // Said in basis points for the screen, rounded down: the comparison above is the exact one.
-  const reachedBps =
-    teamNetMinor <= 0 ? 0 : Number((BigInt(teamNetMinor) * BigInt(BPS)) / BigInt(goal.targetMinor));
-  return { reachedBps, tier };
+  return { reachedBps: reachedBpsOf(teamNetMinor, goal.targetMinor), tier };
+}
+
+/**
+ * A team's net as a share of a goal's target, in basis points, said for the screen and rounded down in integers: the
+ * tiers compare exactly (`collectiveReached`). Nothing reached below zero, nor on a target that is not positive.
+ */
+export function reachedBpsOf(teamNetMinor: number, targetMinor: number): number {
+  if (teamNetMinor <= 0 || targetMinor <= 0) return 0;
+  return Number((BigInt(teamNetMinor) * BigInt(BPS)) / BigInt(targetMinor));
 }
 
 /** Has the member anything to say this period: a statement is made only then. */

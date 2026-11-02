@@ -89,7 +89,7 @@ describe('/v1/backups/restore-tests', () => {
   it('is closed to an operator, and asks the owner for a recent sign-in', async () => {
     const operator = await signIn(server, OPERATOR.email, OPERATOR.password);
     expect((await post(body(), operator)).statusCode).toBe(403);
-    await test.admin.db.update(schema.session).set({ createdAt: sql`now() - interval '1 hour'` });
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now() - interval '1 hour'` });
     const stale = await post(body());
     expect(stale.statusCode).toBe(403);
     expect(codeOf(stale)).toBe('reauthentication_forbidden');

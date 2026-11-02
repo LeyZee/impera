@@ -5,10 +5,11 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { createInvitationLink, MEMBERS_KEY } from './api';
 import { deadline, ERROR_MESSAGES } from './model';
 
-import { confirmPassword, type ConfirmResult } from '@/settings/services/api';
+import { CodeInput } from '@/auth/CodeInput';
+import { confirmIdentity, type ConfirmResult } from '@/settings/services/api';
 
 const PASSWORD_MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
-  wrong_credentials: 'Ce n’est pas le bon mot de passe.',
+  wrong_credentials: 'Mot de passe ou code incorrect.',
   too_many_attempts: 'Trop d’essais. Réessaie dans quelques minutes.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
@@ -188,6 +189,7 @@ function PasswordStep({
   onCancel: () => void;
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
+  const codeInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<ConfirmResult, 'ok'> | null>(null);
 
@@ -195,16 +197,21 @@ function PasswordStep({
     input.current?.focus();
   }, []);
 
-  const confirm = async (password: string): Promise<void> => {
+  const confirm = async (password: string, code: string): Promise<void> => {
     if (password === '') return;
+    if (code.trim() === '') {
+      codeInput.current?.focus();
+      return;
+    }
     setBusy(true);
-    const result = await confirmPassword(password).catch(() => 'unavailable' as const);
+    const result = await confirmIdentity(password, code).catch(() => 'unavailable' as const);
     setBusy(false);
     if (result === 'ok') {
       onConfirmed();
       return;
     }
     if (input.current !== null) input.current.value = '';
+    if (codeInput.current !== null) codeInput.current.value = '';
     setFailure(result);
   };
 
@@ -218,12 +225,12 @@ function PasswordStep({
         if (!busy) onCancel();
       }}
     >
-      <p className="tm-hint">Pour créer un lien d’accès, confirme ton mot de passe.</p>
+      <p className="tm-hint">Pour créer un lien d’accès, confirme ton mot de passe et ton code.</p>
       <form
         className="tm-inline"
         onSubmit={(event) => {
           event.preventDefault();
-          void confirm(input.current?.value ?? '');
+          void confirm(input.current?.value ?? '', codeInput.current?.value ?? '');
         }}
       >
         <input
@@ -235,6 +242,7 @@ function PasswordStep({
           aria-invalid={failure !== null}
           disabled={busy}
         />
+        <CodeInput ref={codeInput} disabled={busy} invalid={failure !== null} label="Ton code à 6 chiffres" />
         <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={busy} aria-busy={busy}>
           Confirmer
         </button>

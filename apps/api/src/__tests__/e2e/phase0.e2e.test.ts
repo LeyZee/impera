@@ -22,7 +22,7 @@ import { startWorker, type WorkerHandle } from '../../worker-runner';
 import { FIXED_BUBBLES, fixedComposer } from '../support/composer';
 import { testConfig } from '../support/config';
 import { activateDemoPersona } from '../support/persona';
-import { DASHBOARD_ORIGIN } from '../support/sign-in';
+import { DASHBOARD_ORIGIN, signIn } from '../support/sign-in';
 
 /** Polls `check` until it returns a value, or fails after `timeoutMs`. */
 async function eventually<T>(check: () => Promise<T | null>, what: string, timeoutMs = 30_000): Promise<T> {
@@ -88,16 +88,8 @@ describe('phase 0 end to end', () => {
 
     const owner = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
     await createOwner(app.auth, app.db.db, owner);
-    const signIn = await fetch(`${baseUrl}/v1/auth/sign-in/email`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', origin: DASHBOARD_ORIGIN },
-      body: JSON.stringify({ email: owner.email, password: owner.password }),
-    });
-    expect(signIn.status).toBe(200);
-    cookie = signIn.headers
-      .getSetCookie()
-      .map((line) => line.split(';')[0])
-      .join('; ');
+    // Password then code, as every account signs in (ADR 0046).
+    cookie = await signIn(server, owner.email, owner.password);
   });
 
   afterAll(async () => {

@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
-import { confirmPassword, type ConfirmResult } from './api';
+import { confirmIdentity, type ConfirmResult } from './api';
+
+import { CodeInput } from '@/auth/CodeInput';
 import './services.css';
 
 const MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
-  wrong_credentials: 'Ce n’est pas le bon mot de passe.',
+  wrong_credentials: 'Mot de passe ou code incorrect.',
   too_many_attempts: 'Trop d’essais. Attends une minute avant de réessayer.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
@@ -26,16 +28,16 @@ export function SignInAgain(): JSX.Element {
 }
 
 /**
- * Asks for the password again before a key is connected, replaced or removed (ADR 0016: the sign-in is more than
- * 10 minutes old). Confirmed, it signs in afresh and lets the caller run its action again; « Annuler » or Escape
- * gives up the action, except while the password is being checked. The page shows one prompt at a time: the
- * Services section closes a row's prompt before it opens a sheet.
+ * Asks for the password and a code again before a key is connected, replaced or removed (ADR 0016, ADR 0046 § 3: they
+ * were not given in the last 10 minutes on this session). Confirmed, the caller runs its action again; « Annuler » or
+ * Escape gives up the action, except while they are being checked. The page shows one prompt at a time: the Services
+ * section closes a row's prompt before it opens a sheet.
  */
 export function PasswordPrompt({
   onConfirmed,
   onCancel,
   onBusyChange,
-  lead = 'Pour toucher à une clé, confirme ton mot de passe.',
+  lead = 'Pour toucher à une clé, confirme ton mot de passe et ton code.',
   note,
 }: {
   onConfirmed: () => void;
@@ -48,6 +50,7 @@ export function PasswordPrompt({
   note?: string;
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
+  const codeInput = useRef<HTMLInputElement>(null);
   // A visible label, so the field cannot be taken for the key field it replaces (recette du 29/10).
   const fieldId = useId();
   const [isBusy, setIsBusy] = useState(false);
@@ -57,11 +60,15 @@ export function PasswordPrompt({
     input.current?.focus();
   }, []);
 
-  async function confirm(password: string): Promise<void> {
+  async function confirm(password: string, code: string): Promise<void> {
     if (password === '') return;
+    if (code.trim() === '') {
+      codeInput.current?.focus();
+      return;
+    }
     setIsBusy(true);
     onBusyChange?.(true);
-    const result = await confirmPassword(password).catch(() => 'unavailable' as const);
+    const result = await confirmIdentity(password, code).catch(() => 'unavailable' as const);
     setIsBusy(false);
     onBusyChange?.(false);
     if (result === 'ok') {
@@ -69,6 +76,7 @@ export function PasswordPrompt({
       return;
     }
     if (input.current !== null) input.current.value = '';
+    if (codeInput.current !== null) codeInput.current.value = '';
     setFailure(result);
   }
 
@@ -93,7 +101,7 @@ export function PasswordPrompt({
         data-error={failure !== null}
         onSubmit={(event) => {
           event.preventDefault();
-          void confirm(input.current?.value ?? '');
+          void confirm(input.current?.value ?? '', codeInput.current?.value ?? '');
         }}
       >
         <input
@@ -107,6 +115,7 @@ export function PasswordPrompt({
           readOnly={isBusy}
           disabled={isExpired}
         />
+        <CodeInput ref={codeInput} disabled={isBusy || isExpired} invalid={failure !== null} />
         <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={isBusy || isExpired}>
           Confirmer
         </button>

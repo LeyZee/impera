@@ -357,9 +357,22 @@ describe('a blocked period', () => {
       bonusTiers: null,
       collectiveGoal: null,
       settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null },
+      summary: {
+        statements: { draft: 0, validated: 0, paid: 0, carried: 0 },
+        netMinor: 0,
+        payableMinor: 0,
+        validatedPayableMinor: 0,
+        carriedMinor: 0,
+        paidMinor: 0,
+      },
+      pace: { lateNetMinor: 0, forecastNetMinor: 0, goal: null },
     };
     expect(PayrollPeriodSchema.safeParse(periodRead).success).toBe(false);
     expect(PayrollPeriodSchema.parse({ ...periodRead, blocked: null }).blocked).toBeNull();
+    // Its sums and pace come from the server (ADR 0047 § 2): a read without them is refused too.
+    expect(PayrollPeriodSchema.safeParse({ ...periodRead, blocked: null, summary: undefined }).success).toBe(
+      false,
+    );
   });
 });
 

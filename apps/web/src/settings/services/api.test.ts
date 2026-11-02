@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  confirmPassword,
+  confirmIdentity,
   connectKey,
   describeError,
   disconnect,
@@ -121,38 +121,27 @@ describe('Services API client', () => {
     });
   });
 
-  it('confirms the password by signing in again as the current user', async () => {
+  it('confirms the password and a code on the current session (ADR 0046 § 3)', async () => {
     const calls: string[] = [];
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
-        calls.push(
-          `${init?.method ?? 'GET'} ${url} ${typeof init?.body === 'string' ? init.body : ''}`.trim(),
-        );
-        const body =
-          url === '/v1/me'
-            ? {
-                id: 'u1',
-                email: 'owner@example.test',
-                name: 'Owner',
-                role: 'owner',
-                creatorIds: [],
-                team: null,
-                teamScope: 'owner',
-              }
-            : { user: {} };
-        return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+        calls.push(`${init?.method ?? 'GET'} ${url} ${typeof init?.body === 'string' ? init.body : ''}`);
+        return Promise.resolve(new Response(null, { status: 204 }));
       }),
     );
-    expect(await confirmPassword('correct horse battery')).toBe('ok');
+    expect(await confirmIdentity('correct horse battery', '123456')).toBe('ok');
     expect(calls).toEqual([
-      'GET /v1/me',
-      'POST /v1/auth/sign-in/email {"email":"owner@example.test","password":"correct horse battery"}',
+      'POST /v1/auth/reauthenticate {"password":"correct horse battery","code":"123456"}',
     ]);
   });
 
-  it('says the session expired, not that the password is wrong, when there is no session', async () => {
+  it('tells a wrong password or code from an expired session', async () => {
+    answer(401, apiError('reauthentication_unauthenticated'));
+    expect(await confirmIdentity('correct horse battery', '123456')).toBe('wrong_credentials');
     answer(401, apiError('session_unauthenticated'));
-    expect(await confirmPassword('correct horse battery')).toBe('session_expired');
+    expect(await confirmIdentity('correct horse battery', '123456')).toBe('session_expired');
+    answer(429, apiError('reauthentication_limited'));
+    expect(await confirmIdentity('correct horse battery', '123456')).toBe('too_many_attempts');
   });
 });

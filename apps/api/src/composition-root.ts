@@ -67,6 +67,7 @@ import { createSchedulingModule, type SchedulingModule } from './modules/schedul
 import { createSupervisionModule, type SupervisionModule } from './modules/supervision';
 import { createTeamModule, type TeamModule } from './modules/team';
 import { startTelegramModule, type TelegramModule } from './modules/telegram';
+import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, countDeadJobs, type Readiness } from './readiness';
 
@@ -109,6 +110,8 @@ export interface App {
   readonly jobs: JobQueue;
   /** `llm_calls` for the LLM gateway's journal: one daily cap for the API and the worker, across restarts. */
   readonly llmCalls: LlmCallStore;
+  /** Whether a password is known from a data breach (ADR 0046 § 4): checked wherever a password is chosen. */
+  readonly passwordBreaches: PasswordBreachCheck;
   /** Dashboard authentication (Better Auth); routes guard themselves with `requireRole`. */
   readonly auth: Auth;
   readonly requireRole: RequireRole;
@@ -188,6 +191,8 @@ export interface AppOptions {
    * (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
+  /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
+  readonly passwordBreaches?: PasswordBreachCheck;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -217,6 +222,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const jobs = await createJobQueue(adminDb.pool);
   const auth = createAuth(config, db.db, logger);
   const requireRole = createRequireRole(auth, db.db);
+  const passwordBreaches = options.passwordBreaches ?? createPwnedPasswordsCheck();
 
   const fans = createFansModule({ db: db.db, adminDb: adminDb.db });
   const sessionKeys = secretOrNull(config.SESSION_ENCRYPTION_KEYS);
@@ -851,9 +857,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     jobs,
     llmCalls,
     auth,
+    passwordBreaches,
     requireRole,
     routes: [
-      createAuthRoutes(auth, db.db, config, requireRole),
+      createAuthRoutes(auth, db.db, config, requireRole, logger),
       createInvitationLinkRoutes({
         auth,
         db: db.db,
@@ -861,6 +868,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         config,
         requireRole,
         recentLogin: createRequireRecentLogin(auth),
+        passwordBreaches,
       }),
       modules.conversations.routes,
       modules.persona.routes,

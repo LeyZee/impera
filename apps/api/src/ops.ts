@@ -18,6 +18,8 @@ import {
   encryptSecret,
   eq,
   keyVersionOf,
+  resetSecondFactor,
+  revokeSignIns,
   schema,
   sql,
   withAdmin,
@@ -140,25 +142,65 @@ async function answerWhoWaited(
   }
 }
 
-/** Signs out every dashboard session, or one user's (by e-mail). Returns how many were revoked. */
+/** The account of an e-mail, as typed on the command line; refuses one that does not exist. */
+async function accountOf(tx: Transaction, email: string): Promise<string> {
+  const [row] = await tx
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.email, email.trim().toLowerCase()));
+  if (row === undefined) throw new Error('Aucun compte avec cet e-mail');
+  return row.id;
+}
+
+/**
+ * Signs out every dashboard session, or one user's (by e-mail), with their trusted devices (ADR 0046 § 3). Returns how
+ * many sessions were revoked.
+ */
 export function revokeDashboardSessions(adminDb: Database, email: string | null): Promise<number> {
   return withAdmin(adminDb, async (tx) => {
-    const result =
-      email === null
-        ? await tx.delete(schema.session).returning({ id: schema.session.id })
-        : await tx
-            .delete(schema.session)
-            .where(sql`${schema.session.userId} in (select id from "user" where email = ${email})`)
-            .returning({ id: schema.session.id });
+    const revoked = await revokeSignIns(tx, email === null ? null : await accountOf(tx, email));
     await tx.insert(schema.auditLog).values({
       id: newId(AuditEntryIdSchema),
       userId: null,
       action: 'auth.sessions_revoked',
       entity: 'session',
       entityId: null,
-      details: { scope: email === null ? 'all' : 'user', revoked: result.length },
+      details: {
+        scope: email === null ? 'all' : 'user',
+        revoked: revoked.sessions,
+        trustedDevices: revoked.trustedDevices,
+      },
     });
-    return result.length;
+    return revoked.sessions;
+  });
+}
+
+/**
+ * Puts one account's second factor back to zero from the server (ADR 0046 § 2): the owner who lost his phone and his
+ * backup codes, who has nobody to send him a reset link. His sessions and trusted devices end; at his next sign-in,
+ * with his password, he activates a new code. Never reachable from the dashboard.
+ */
+export function resetAccountSecondFactor(
+  adminDb: Database,
+  email: string,
+): Promise<{ hadSecondFactor: boolean }> {
+  return withAdmin(adminDb, async (tx) => {
+    const userId = await accountOf(tx, email);
+    const reset = await resetSecondFactor(tx, userId);
+    await tx.insert(schema.auditLog).values({
+      id: newId(AuditEntryIdSchema),
+      userId: null,
+      action: 'auth.second_factor_reset',
+      entity: 'user',
+      entityId: userId,
+      details: {
+        via: 'ops',
+        hadSecondFactor: reset.hadSecondFactor,
+        sessionsEnded: reset.sessions,
+        trustedDevicesEnded: reset.trustedDevices,
+      },
+    });
+    return { hadSecondFactor: reset.hadSecondFactor };
   });
 }
 

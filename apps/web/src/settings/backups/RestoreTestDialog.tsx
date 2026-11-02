@@ -289,7 +289,7 @@ export function RestoreTestDialog({ onClose }: { onClose: () => void }): JSX.Ele
             {failure?.signIn === true ? <SignInAgain /> : null}
             {phase.kind === 'password' ? (
               <PasswordStep
-                hint="Pour noter un essai, confirme ton mot de passe."
+                hint="Pour noter un essai, confirme ton mot de passe et ton code."
                 onConfirmed={() => {
                   void send();
                 }}
