@@ -202,10 +202,9 @@
       "vatMinor": 1049,
       "inclVatMinor": 6295,
       "selfAssessedVatMinor": 0,
-      "dueInDays": 60,
       "mentions": [
         "Autofacturation",
-        "Échéance : JJ mois AAAA. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
       ],
       "lines": [
         {
@@ -241,10 +240,9 @@
       "vatMinor": 138,
       "inclVatMinor": 829,
       "selfAssessedVatMinor": 0,
-      "dueInDays": 60,
       "mentions": [
         "Autofacturation",
-        "Échéance : JJ mois AAAA. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
       ],
       "lines": [
         {
@@ -265,10 +263,9 @@
       "vatMinor": 1195,
       "inclVatMinor": 7170,
       "selfAssessedVatMinor": 0,
-      "dueInDays": 60,
       "mentions": [
         "Autofacturation",
-        "Échéance : JJ mois AAAA. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
       ],
       "lines": [
         {
@@ -299,10 +296,9 @@
       "vatMinor": 920,
       "inclVatMinor": 5520,
       "selfAssessedVatMinor": 0,
-      "dueInDays": 60,
       "mentions": [
         "Autofacturation",
-        "Échéance : JJ mois AAAA. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
+        "Échéance : 1er janvier 2027. Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 € pour frais de recouvrement."
       ],
       "lines": [
         {
@@ -328,7 +324,6 @@
       "vatMinor": -50,
       "inclVatMinor": -300,
       "selfAssessedVatMinor": 0,
-      "dueInDays": 60,
       "mentions": [
         "Avoir sur la facture THEO-YYYY-NNNN du …",
         "Autofacturation"
