@@ -38,7 +38,7 @@ describe('invitation links', () => {
   });
 
   it('names why a password is refused and what the owner meets when making a link', () => {
-    expect(PasswordInvalidReasonSchema.options).toEqual(['too_short', 'too_long', 'refused']);
+    expect(PasswordInvalidReasonSchema.options).toEqual(['too_short', 'too_long', 'breached', 'refused']);
     expect(INVITATION_LINK_ERROR_CODES).toContain(REAUTHENTICATION_ERROR_CODE);
     expect(INVITATION_LINK_ERROR_CODES).toContain('member_left_conflict');
   });

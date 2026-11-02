@@ -278,7 +278,7 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
 
     // A change asks for the password again after 10 minutes; reading does not.
     await test.admin.db.execute(
-      sql`update "session" set created_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
+      sql`update "session" set reauthenticated_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
     );
     const stale = await put(owner, slots);
     expect([stale.statusCode, stale.json<{ error: { code: string } }>().error.code]).toEqual([
@@ -366,7 +366,7 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
 
     // A change asks for the password again after 10 minutes.
     await test.admin.db.execute(
-      sql`update "session" set created_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
+      sql`update "session" set reauthenticated_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
     );
     expect(status(await patch(owner, { timezone: 'Asia/Tokyo' }))).toEqual([
       403,

@@ -218,6 +218,10 @@ export function periodOf(
   statements: readonly CommissionStatement[],
   patch: Partial<Record<keyof PayrollPeriod, unknown>> = {},
 ): PayrollPeriod {
+  // The server's sums of these statements (ADR 0047 § 2). Its pace is neutral here: a test that reads it sets `pace`.
+  const sum = (pick: (one: CommissionStatement) => number): number =>
+    statements.reduce((total, one) => total + pick(one), 0);
+  const count = (keep: (one: CommissionStatement) => boolean): number => statements.filter(keep).length;
   return PayrollPeriodSchema.parse({
     period,
     window: windowOf(period),
@@ -229,6 +233,20 @@ export function periodOf(
     bonusTiers: null,
     collectiveGoal: null,
     settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null },
+    summary: {
+      statements: {
+        draft: count((one) => one.status === 'draft'),
+        validated: count((one) => one.status === 'validated'),
+        paid: count((one) => one.status === 'paid'),
+        carried: count((one) => one.carryOverOutMinor !== 0 && one.status !== 'draft'),
+      },
+      netMinor: sum((one) => one.netMinor),
+      payableMinor: sum((one) => one.payableMinor),
+      validatedPayableMinor: sum((one) => (one.status === 'draft' ? 0 : one.payableMinor)),
+      carriedMinor: sum((one) => (one.status === 'draft' ? 0 : one.carryOverOutMinor)),
+      paidMinor: sum((one) => one.payment?.sentMinor ?? 0),
+    },
+    pace: { lateNetMinor: null, forecastNetMinor: null, goal: null },
     ...patch,
   });
 }

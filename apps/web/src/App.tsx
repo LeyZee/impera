@@ -4,11 +4,12 @@ import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 
 import { NewPasswordPage } from './auth/NewPasswordPage';
+import { SecondFactorPage } from './auth/SecondFactorPage';
 import { SignInPage } from './auth/SignInPage';
 import { Unreachable } from './auth/Unreachable';
 import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
-import { fetchCurrentUser, signOut } from './auth/session';
+import { readSession, signOut } from './auth/session';
 import { createAppRouter, type RouterContext } from './router';
 import { railOf } from './shell/nav';
 
@@ -17,6 +18,8 @@ type Session =
   /** `attempt` counts the failed reads in a row, so the next one waits a little longer. */
   | { status: 'unreachable'; attempt: number }
   | { status: 'signed_out' }
+  /** Signed in with the password, the code not active yet: the activation is the only screen (ADR 0046). */
+  | { status: 'second_factor_required' }
   | { status: 'signed_in'; user: Me };
 
 /**
@@ -38,9 +41,13 @@ export function App(): JSX.Element {
   const [signOutFailed, setSignOutFailed] = useState(false);
 
   const refresh = useCallback(() => {
-    fetchCurrentUser().then(
-      (user) => {
-        setSession(user === null ? { status: 'signed_out' } : { status: 'signed_in', user });
+    readSession().then(
+      (current) => {
+        setSession(
+          current.kind === 'signed_in'
+            ? { status: 'signed_in', user: current.user }
+            : { status: current.kind },
+        );
       },
       () => {
         setSession((before) => ({
@@ -96,6 +103,9 @@ export function App(): JSX.Element {
   if (session.status === 'unreachable') return <Unreachable />;
   if (session.status === 'signed_out') {
     return <SignInPage onSignedIn={refresh} />;
+  }
+  if (session.status === 'second_factor_required') {
+    return <SecondFactorPage onActivated={refresh} onSignOut={leave} />;
   }
   return (
     <>

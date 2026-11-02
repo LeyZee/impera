@@ -292,7 +292,7 @@ export function ServicesSection(): JSX.Element {
               {reauthFor === provider && sheet === null ? (
                 <div className="nv-confirm sv-confirm">
                   <PasswordPrompt
-                    lead={`Pour déconnecter ${guide.name}, confirme ton mot de passe.`}
+                    lead={`Pour déconnecter ${guide.name}, confirme ton mot de passe et ton code.`}
                     onConfirmed={() => {
                       setReauthFor(null);
                       remove(provider);

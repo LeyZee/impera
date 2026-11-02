@@ -2,26 +2,36 @@ import {
   AuditEntryIdSchema,
   CurrentUserSchema,
   DomainError,
+  isBackupCode,
   MeSchema,
   newId,
   REAUTHENTICATION_ERROR_CODE,
+  ReauthenticateBodySchema,
+  SECOND_FACTOR_ERROR_CODE,
+  SecondFactorEnableBodySchema,
+  SecondFactorVerifyBodySchema,
+  SignInAnswerSchema,
   TeamMembershipSchema,
   UserIdSchema,
   UserRoleSchema,
   type CurrentUser,
   type Me,
+  type SecondFactorCode,
   type UserRole,
 } from '@nirvana/contracts';
-import { eq, schema, withMember, type Database } from '@nirvana/db';
+import { and, eq, schema, sql, withMember, type Database } from '@nirvana/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { isAPIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
+import { twoFactor } from 'better-auth/plugins/two-factor';
 import type { FastifyReply, FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { Config } from './config';
 import type { Logger } from './logger';
+import type { PasswordBreachCheck } from './password-breaches';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -37,17 +47,39 @@ const SESSION_SECONDS = 12 * 60 * 60;
 const SESSION_REFRESH_SECONDS = 60 * 60;
 /** Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit. */
 const AUTH_RATE_LIMIT_PER_MINUTE = 20;
-/** Sign-in attempts per account, whatever the IP: guessing one password from many addresses stays slow. */
-const SIGN_IN_PER_ACCOUNT = 10;
+/**
+ * Sign-in limits (ADR 0046 § 5), password and code each with its own counters: 10 tries per quarter of an hour for an
+ * account from one address, so that someone else's tries never lock its holder out; 100 for an account from all
+ * addresses, against a guess spread over many. A sign-in from a trusted device does not count in the second.
+ */
+const SIGN_IN_PER_ACCOUNT_ADDRESS = 10;
+const SIGN_IN_PER_ACCOUNT = 100;
 const SIGN_IN_ACCOUNT_WINDOW = '15 minutes';
+/** The cookies of Better Auth's `two-factor` plugin: the code step of a sign-in, and a trusted device. */
+const TWO_FACTOR_COOKIE = 'two_factor';
+const TRUST_DEVICE_COOKIE = 'trust_device';
+/** However much it is used, a session opened more than 7 days ago is refused at its next request (ADR 0046 § 6). */
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * The client IP as Fastify resolved it (`trustProxy`, TRUST_PROXY_HOPS), handed to Better Auth under a header of
  * our own: it never reads `x-forwarded-for`, which any client can write.
  */
 const CLIENT_IP_HEADER = 'x-nirvana-client-ip';
 const MIN_PASSWORD_LENGTH = 12;
-/** A sensitive action needs a sign-in younger than this (ADR 0016). */
+/** A sensitive action needs the password and the code given on the session less than this ago (ADR 0046 § 3). */
 const RECENT_LOGIN_MS = 10 * 60 * 1000;
+/**
+ * Confirmations per account, whatever the address: a code guessed from a stolen session stays slow. Bounds of its own:
+ * two limiters with the same bounds would share their counters (`rate-limit-store.ts` refuses to start).
+ */
+const REAUTHENTICATE_PER_ACCOUNT = 10;
+const REAUTHENTICATE_ACCOUNT_WINDOW = '10 minutes';
+/** A device trusted after a right code skips the code at sign-in for 30 days (ADR 0046 § 3). */
+const TRUSTED_DEVICE_SECONDS = 30 * 24 * 60 * 60;
+/** The code step of a sign-in: 10 minutes, then the sign-in starts over. */
+const SIGN_IN_CODE_SECONDS = 10 * 60;
+/** Ten wrong codes in a row lock the account's code for 15 minutes (the plugin's own count, across sign-ins). */
+const CODE_LOCK = { enabled: true, maxFailedAttempts: 10, durationSeconds: 15 * 60 };
 
 class SessionUnauthenticated extends DomainError {
   constructor() {
@@ -91,14 +123,87 @@ function refusalOf(status: number, onUnauthorized: () => DomainError): Error {
   return new Error(`Better Auth answered ${String(status)}`);
 }
 
-/** What a sign-in answers about its account, read to close the session it replaces. */
-const SignedInSchema = z.object({ user: z.object({ id: z.string() }) });
-
 class ReauthenticationRequired extends DomainError {
   constructor() {
-    super(REAUTHENTICATION_ERROR_CODE, 'Mot de passe à confirmer pour cette action');
+    super(REAUTHENTICATION_ERROR_CODE, 'Mot de passe et code à confirmer pour cette action');
   }
 }
+
+/** Every route but the activation's, for an account whose second factor is not active yet (ADR 0046 § 1). */
+class SecondFactorRequired extends DomainError {
+  constructor() {
+    super(SECOND_FACTOR_ERROR_CODE, 'Active d’abord la validation en deux étapes');
+  }
+}
+
+class SecondFactorAlreadyActive extends DomainError {
+  constructor() {
+    super('second_factor_conflict', 'La validation en deux étapes est déjà active sur ce compte');
+  }
+}
+
+class WrongCode extends DomainError {
+  constructor() {
+    super('second_factor_unauthenticated', 'Code incorrect');
+  }
+}
+
+class CodeStepExpired extends DomainError {
+  constructor() {
+    super('second_factor_challenge_unauthenticated', 'La vérification a expiré : reconnecte-toi');
+  }
+}
+
+class CodeLocked extends DomainError {
+  constructor() {
+    super('second_factor_limited', 'Trop de codes faux : réessaie dans un quart d’heure');
+  }
+}
+
+class WrongPassword extends DomainError {
+  constructor() {
+    super('password_unauthenticated', 'Ce n’est pas le bon mot de passe');
+  }
+}
+
+/** A wrong password or a wrong code on the confirmation: one answer, it does not tell which. */
+class ReauthenticationRefused extends DomainError {
+  constructor() {
+    super('reauthentication_unauthenticated', 'Mot de passe ou code incorrect');
+  }
+}
+
+class ReauthenticationLimited extends DomainError {
+  constructor() {
+    super('reauthentication_limited', 'Trop d’essais : réessaie dans quelques minutes');
+  }
+}
+
+/**
+ * Better Auth's refusals on the routes of the second factor, by its own error code: its body is English and of another
+ * shape. A code it has no reason to send falls to `refusalOf`.
+ */
+function secondFactorRefusal(code: string | undefined): DomainError | undefined {
+  switch (code) {
+    case 'INVALID_CODE':
+    case 'INVALID_BACKUP_CODE':
+      return new WrongCode();
+    case 'INVALID_TWO_FACTOR_COOKIE':
+    case 'TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE':
+      return new CodeStepExpired();
+    case 'ACCOUNT_TEMPORARILY_LOCKED':
+      return new CodeLocked();
+    case 'INVALID_PASSWORD':
+      return new WrongPassword();
+    case 'TOTP_ALREADY_ENABLED':
+      return new SecondFactorAlreadyActive();
+    case undefined:
+    default:
+      return undefined;
+  }
+}
+
+const BetterAuthErrorSchema = z.object({ code: z.string() });
 
 /**
  * Better Auth on the Drizzle tables of `schema/auth.ts` (data-model.md): email and password, no public sign-up
@@ -121,6 +226,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        twoFactor: schema.twoFactor,
       },
     }),
     emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: MIN_PASSWORD_LENGTH },
@@ -130,7 +236,22 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
         creatorIds: { type: 'string[]', input: false, required: false },
       },
     },
-    session: { expiresIn: SESSION_SECONDS, updateAge: SESSION_REFRESH_SECONDS },
+    session: {
+      expiresIn: SESSION_SECONDS,
+      updateAge: SESSION_REFRESH_SECONDS,
+      additionalFields: { reauthenticatedAt: { type: 'date', input: false, required: false } },
+    },
+    // ADR 0046: an authenticator code for every account. The secret and the backup codes are encrypted with the
+    // Better Auth secret; a trusted device is a signed cookie and a `verification` row, revoked with the sessions.
+    plugins: [
+      twoFactor({
+        issuer: 'Nirvana',
+        trustDeviceMaxAge: TRUSTED_DEVICE_SECONDS,
+        twoFactorCookieMaxAge: SIGN_IN_CODE_SECONDS,
+        backupCodeOptions: { amount: 10, storeBackupCodes: 'encrypted' },
+        accountLockout: CODE_LOCK,
+      }),
+    ],
     advanced: {
       useSecureCookies: config.NODE_ENV === 'production',
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' },
@@ -148,15 +269,10 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
           // into the same refusal as a wrong password.
           before: async (session) => ((await hasLeftTeam(db, session.userId)) ? false : undefined),
           after: async (session, context) => {
-            await db.insert(schema.auditLog).values({
-              id: newId(AuditEntryIdSchema),
-              userId: session.userId,
-              action: 'auth.login',
-              entity: 'session',
-              entityId: session.id,
-              ip: session.ipAddress ?? null,
-            });
-            logger.info({ userId: session.userId, path: context?.path }, 'user signed in');
+            // The password step of an account with an active second factor: this session is dropped at once unless
+            // the device is trusted, which the sign-in route alone knows; it writes that login itself.
+            if (context?.path === '/sign-in/email' && (await secondFactorActive(db, session.userId))) return;
+            await recordLogin(db, logger, session, context?.path);
           },
         },
       },
@@ -166,6 +282,38 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
 
 export type Auth = ReturnType<typeof createAuth>;
 
+interface OpenedSession {
+  readonly id: string;
+  readonly userId: string;
+  readonly ipAddress?: string | null | undefined;
+}
+
+/** The `auth.login` line of a session that opened (security.md § 6), whatever the way in. */
+async function recordLogin(
+  db: Database,
+  logger: Logger,
+  session: OpenedSession,
+  path?: string,
+): Promise<void> {
+  await db.insert(schema.auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId: session.userId,
+    action: 'auth.login',
+    entity: 'session',
+    entityId: session.id,
+    ip: session.ipAddress ?? null,
+  });
+  logger.info({ userId: session.userId, path }, 'user signed in');
+}
+
+async function secondFactorActive(db: Database, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ enabled: schema.user.twoFactorEnabled })
+    .from(schema.user)
+    .where(eq(schema.user.id, userId));
+  return row?.enabled === true;
+}
+
 /** The request's headers for Better Auth, with the client IP we resolved in place of any the client sent. */
 export function authHeaders(request: FastifyRequest): Headers {
   const headers = fromNodeHeaders(request.headers);
@@ -174,11 +322,34 @@ export function authHeaders(request: FastifyRequest): Headers {
 }
 
 const SignInBodySchema = z.looseObject({ email: z.string().min(1) });
+/** The session token in Better Auth's answer to a code, read to stamp that session and never sent on. */
+const SessionTokenSchema = z.object({ token: z.string().min(1) });
 
-/** The account a sign-in targets, for its own limit; a body without an email counts against the IP. */
+/** The account a sign-in targets, for its own limits; a body without an email counts against the IP. */
 function signInAccountKey(request: FastifyRequest): string {
   const parsed = SignInBodySchema.safeParse(request.body);
-  return parsed.success ? `account:${parsed.data.email.trim().toLowerCase()}` : `ip:${request.ip}`;
+  return parsed.success ? `sign-in:${parsed.data.email.trim().toLowerCase()}` : `ip:${request.ip}`;
+}
+
+/** The value of a cookie of the request, or `undefined`. */
+function cookieOf(request: FastifyRequest, name: string): string | undefined {
+  for (const pair of (request.headers.cookie ?? '').split(';')) {
+    const at = pair.indexOf('=');
+    if (at > 0 && pair.slice(0, at).trim() === name) return decodeURIComponent(pair.slice(at + 1).trim());
+  }
+  return undefined;
+}
+
+/**
+ * The session of a request, as Better Auth reads it (12 hours without activity), refused past 7 days from its creation
+ * whatever its use (ADR 0046 § 6): the row goes, and the request is answered as without a session.
+ */
+async function sessionOf(auth: Auth, db: Database, request: FastifyRequest, now: Date = new Date()) {
+  const result = await auth.api.getSession({ headers: authHeaders(request) });
+  if (result === null) return null;
+  if (now.getTime() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
+  await db.delete(schema.session).where(eq(schema.session.id, result.session.id));
+  return null;
 }
 
 /**
@@ -191,10 +362,12 @@ async function currentUser(
   auth: Auth,
   db: Database,
   request: FastifyRequest,
-): Promise<{ user: CurrentUser; membership: Membership | null } | null> {
-  const result = await auth.api.getSession({ headers: authHeaders(request) });
+): Promise<{ user: CurrentUser; membership: Membership | null; secondFactorEnabled: boolean } | null> {
+  const result = await sessionOf(auth, db, request);
   if (result === null) return null;
-  return userOf(db, result.user);
+  const signedIn = await userOf(db, result.user);
+  if (signedIn === null) return null;
+  return { ...signedIn, secondFactorEnabled: result.user.twoFactorEnabled === true };
 }
 
 /** The columns of `user` that `/v1/me` starts from. */
@@ -243,12 +416,17 @@ function withoutToken(json: string): string {
 
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
-/** Route guard: no session → 401, a session with another role → 403 (security.md §6). */
+/**
+ * Route guard: no session → 401; an account whose second factor is not active yet → 403 `second_factor_forbidden`,
+ * whatever its role (ADR 0046 § 1: the activation is the only way in); a session with another role → 403
+ * (security.md §6).
+ */
 export function createRequireRole(auth: Auth, db: Database): RequireRole {
   return (...roles) =>
     async (request) => {
       const session = await currentUser(auth, db, request);
       if (session === null) throw new SessionUnauthenticated();
+      if (!session.secondFactorEnabled) throw new SecondFactorRequired();
       if (!roles.includes(session.user.role)) throw new RoleForbidden();
       request.user = session.user;
       request.membership = session.membership;
@@ -256,20 +434,49 @@ export function createRequireRole(auth: Auth, db: Database): RequireRole {
 }
 
 /**
- * Route guard for sensitive actions, after `requireRole` (ADR 0016: connecting, replacing or removing an AI key): the
- * session must have been opened less than 10 minutes ago, otherwise 403 `reauthentication_forbidden` and the page
- * asks for the password again. Signing in again opens a fresh session.
+ * Route guard for sensitive actions, after `requireRole` (ADR 0016, ADR 0046 § 3): the password and the code must have
+ * been given on this session less than 10 minutes ago (a sign-in through the code, or `POST /v1/auth/reauthenticate`),
+ * otherwise 403 `reauthentication_forbidden` and the page asks for both. A session's age says nothing: a sign-in from a
+ * trusted device asked for no code.
  */
 export function createRequireRecentLogin(
   auth: Auth,
+  db: Database,
   now: () => Date = () => new Date(),
 ): preValidationAsyncHookHandler {
   return async (request) => {
-    const result = await auth.api.getSession({ headers: authHeaders(request) });
+    const result = await sessionOf(auth, db, request, now());
     if (result === null) throw new SessionUnauthenticated();
-    if (now().getTime() - result.session.createdAt.getTime() > RECENT_LOGIN_MS)
-      throw new ReauthenticationRequired();
+    const confirmedAt = result.session.reauthenticatedAt;
+    if (confirmedAt === null || confirmedAt === undefined) throw new ReauthenticationRequired();
+    if (now().getTime() - confirmedAt.getTime() > RECENT_LOGIN_MS) throw new ReauthenticationRequired();
   };
+}
+
+/** Whether the password is the account's, checked against its credential the way Better Auth's sign-in does. */
+async function passwordMatches(auth: Auth, userId: string, password: string): Promise<boolean> {
+  const context = await auth.$context;
+  const accounts = await context.internalAdapter.findAccounts(userId);
+  const hash = accounts.find((account) => account.providerId === 'credential')?.password;
+  if (hash === null || hash === undefined) return false;
+  return context.password.verify({ hash, password });
+}
+
+/**
+ * Whether the code is the account's, on the signed-in session: the authenticator's, or a backup code, which is then
+ * used up. Better Auth's refusals are a wrong code; anything else (the database, the secret) is an error.
+ */
+async function codeMatches(auth: Auth, request: FastifyRequest, code: SecondFactorCode): Promise<boolean> {
+  const headers = authHeaders(request);
+  try {
+    if (isBackupCode(code))
+      await auth.api.verifyBackupCode({ headers, body: { code, disableSession: true } });
+    else await auth.api.verifyTOTP({ headers, body: { code } });
+    return true;
+  } catch (error) {
+    if (isAPIError(error)) return false;
+    throw error;
+  }
 }
 
 type Membership = Pick<Me, 'team' | 'teamScope'>;
@@ -311,6 +518,7 @@ export function createAuthRoutes(
   db: Database,
   config: Config,
   requireRole: RequireRole,
+  logger: Logger,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.decorateRequest('user', null);
@@ -320,18 +528,84 @@ export function createAuthRoutes(
     const perIp = {
       rateLimit: { max: AUTH_RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute', skipOnError: false },
     };
-    // Its own counter: the per-IP limiter has already run on this request, `rateLimit()` would stand down.
+    // Their own counters: the per-IP limiter has already run on this request, `rateLimit()` would stand down. Each
+    // request names the account it counts against (`limitKeys`): the e-mail of a sign-in, the account of a code step.
+    const limitKeys = new WeakMap<FastifyRequest, string>();
+    const accountKeyOf = (request: FastifyRequest) => limitKeys.get(request) ?? `ip:${request.ip}`;
+    const perAccountAddress = app.createRateLimit({
+      max: SIGN_IN_PER_ACCOUNT_ADDRESS,
+      timeWindow: SIGN_IN_ACCOUNT_WINDOW,
+      keyGenerator: (request) => `${accountKeyOf(request)}@${request.ip}`,
+      skipOnError: false,
+    });
     const perAccount = app.createRateLimit({
       max: SIGN_IN_PER_ACCOUNT,
       timeWindow: SIGN_IN_ACCOUNT_WINDOW,
-      keyGenerator: signInAccountKey,
+      keyGenerator: accountKeyOf,
       skipOnError: false,
     });
+    /** Counts one try against both limits, the account's own unless `trusted`; whether one is spent. */
+    const exceeded = async (request: FastifyRequest, reply: FastifyReply, key: string, trusted: boolean) => {
+      limitKeys.set(request, key);
+      for (const limit of trusted ? [perAccountAddress] : [perAccountAddress, perAccount]) {
+        const attempt = await limit(request);
+        if (!attempt.isAllowed && attempt.isExceeded) {
+          void reply.header('retry-after', attempt.ttlInSeconds);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    /**
+     * Whether the browser holds a trusted device of the account this e-mail names (ADR 0046 § 5): its cookie names a
+     * `trust-device-…` row of that account, unexpired. Only spares the limit for all addresses; Better Auth still
+     * checks the cookie's signature before it skips the code.
+     */
+    const trustedDeviceOf = async (request: FastifyRequest): Promise<boolean> => {
+      const asked = SignInBodySchema.safeParse(request.body);
+      if (!asked.success) return false;
+      const context = await auth.$context;
+      const cookie = cookieOf(request, context.createAuthCookie(TRUST_DEVICE_COOKIE).name);
+      // `<token>!<identifier>.<signature>`: the identifier is the row's, random, never shown but in this cookie.
+      const identifier = cookie?.split('!')[1]?.split('.')[0];
+      if (identifier?.startsWith('trust-device-') !== true) return false;
+      const [row] = await db
+        .select({ id: schema.verification.id })
+        .from(schema.verification)
+        .innerJoin(schema.user, eq(schema.user.id, schema.verification.value))
+        .where(
+          and(
+            eq(schema.verification.identifier, identifier),
+            sql`lower(${schema.user.email}) = ${asked.data.email.trim().toLowerCase()}`,
+            sql`${schema.verification.expiresAt} > now()`,
+          ),
+        )
+        .limit(1);
+      return row !== undefined;
+    };
+
+    /** The account of a code step: the signed-in one (activation), or the one the sign-in's `two_factor` cookie names. */
+    const codeAccountKey = async (request: FastifyRequest, signedIn: string | null): Promise<string> => {
+      if (signedIn !== null) return `code:${signedIn}`;
+      const context = await auth.$context;
+      // `<identifier>.<signature>`: the row the plugin wrote for this sign-in, worth nothing once used or expired.
+      const identifier = cookieOf(request, context.createAuthCookie(TWO_FACTOR_COOKIE).name)?.split('.')[0];
+      if (identifier === undefined || identifier === '') return `ip:${request.ip}`;
+      const [row] = await db
+        .select({ userId: schema.verification.value })
+        .from(schema.verification)
+        .where(eq(schema.verification.identifier, identifier))
+        .limit(1);
+      return row === undefined ? `ip:${request.ip}` : `code:${row.userId}`;
+    };
     const forward = async (
       request: FastifyRequest,
       reply: FastifyReply,
       options: {
         readonly onUnauthorized: () => DomainError;
+        /** Names a refusal by Better Auth's own error code first (the routes of the second factor). */
+        readonly refusal?: (code: string | undefined) => DomainError | undefined;
         /** Run on success with Better Auth's JSON body, before the reply leaves. */
         readonly onSuccess?: (json: unknown) => Promise<void>;
       },
@@ -345,7 +619,13 @@ export function createAuthRoutes(
           ...(body === undefined ? {} : { body }),
         }),
       );
-      if (response.status >= 400) throw refusalOf(response.status, options.onUnauthorized);
+      if (response.status >= 400) {
+        const refused = BetterAuthErrorSchema.safeParse(await response.json().catch(() => null));
+        throw (
+          options.refusal?.(refused.success ? refused.data.code : undefined) ??
+          refusalOf(response.status, options.onUnauthorized)
+        );
+      }
       reply.code(response.status);
       response.headers.forEach((value, key) => {
         if (!['set-cookie', 'content-length', 'content-encoding', 'transfer-encoding'].includes(key)) {
@@ -375,9 +655,17 @@ export function createAuthRoutes(
           request.log.warn({ err: error }, 'sign-in: the session being replaced could not be read');
           return null;
         });
+      const asked = SignInBodySchema.safeParse(request.body);
       return async (json: unknown) => {
-        const signedIn = SignedInSchema.safeParse(json);
-        if (previous === null || !signedIn.success || signedIn.data.user.id !== previous.user.id) return;
+        if (previous === null) return;
+        const signedIn = SignInAnswerSchema.safeParse(json);
+        if (!signedIn.success) return;
+        // A sign-in waiting for its code has already dropped the old cookie; the same account's session goes too.
+        const sameAccount =
+          'user' in signedIn.data
+            ? signedIn.data.user.id === previous.user.id
+            : asked.success && asked.data.email.trim().toLowerCase() === previous.user.email.toLowerCase();
+        if (!sameAccount) return;
         try {
           const context = await auth.$context;
           await context.internalAdapter.deleteSession(previous.session.token);
@@ -387,29 +675,192 @@ export function createAuthRoutes(
       };
     };
 
-    // Sign-in has both limits: per IP like the rest of `/auth`, and per account (after the body is read).
+    // Sign-in has three limits: per IP like the rest of `/auth`, then per account from this address and per account
+    // from all addresses (after the body is read).
     app.route({
       method: 'POST',
       url: '/auth/sign-in/email',
       config: perIp,
       preValidation: async (request, reply) => {
-        const attempt = await perAccount(request);
-        if (attempt.isAllowed || !attempt.isExceeded) return;
-        void reply.header('retry-after', attempt.ttlInSeconds);
-        throw new SignInLimited();
+        if (await exceeded(request, reply, signInAccountKey(request), await trustedDeviceOf(request))) {
+          throw new SignInLimited();
+        }
       },
       // Better Auth's 401s (unknown e-mail, wrong password, a member who left) all become one French refusal.
-      handler: async (request, reply) =>
-        forward(request, reply, {
+      handler: async (request, reply) => {
+        const closeReplaced = await closeReplacedSession(request);
+        return forward(request, reply, {
           onUnauthorized: () => new SignInRefused(),
-          onSuccess: await closeReplacedSession(request),
-        }),
+          onSuccess: async (json) => {
+            await closeReplaced(json);
+            await recordTrustedDeviceLogin(json);
+          },
+        });
+      },
     });
     // Only what the dashboard calls: the rest of Better Auth (get-session and list-sessions with their tokens,
     // update-user renaming an account) stays unreachable and answers 404 like any unknown route. Signing out without
     // a session succeeds: there is nothing to close.
     app.post('/auth/sign-out', { config: perIp }, (request, reply) =>
       forward(request, reply, { onUnauthorized: () => new SessionUnauthenticated() }),
+    );
+
+    /**
+     * Stamps the session a code has just opened (ADR 0046 § 3): the password and the code were both given, so a
+     * sensitive action needs no confirmation for 10 minutes. Better Auth's answer carries the new session's token,
+     * which never reaches the page (`withoutToken`).
+     */
+    const stampSignIn = async (json: unknown) => {
+      const opened = SessionTokenSchema.safeParse(json);
+      if (!opened.success) return;
+      await db
+        .update(schema.session)
+        .set({ reauthenticatedAt: sql`now()` })
+        .where(eq(schema.session.token, opened.data.token));
+    };
+
+    /**
+     * A session the password opened for an account with an active second factor: its device was trusted, so no code
+     * was asked (ADR 0046 § 3). The database hook leaves this login to here, the only place that sees it kept.
+     */
+    const recordTrustedDeviceLogin = async (json: unknown) => {
+      const opened = SessionTokenSchema.safeParse(json);
+      if (!opened.success) return;
+      const [session] = await db
+        .select({
+          id: schema.session.id,
+          userId: schema.session.userId,
+          ipAddress: schema.session.ipAddress,
+          secondFactor: schema.user.twoFactorEnabled,
+        })
+        .from(schema.session)
+        .innerJoin(schema.user, eq(schema.user.id, schema.session.userId))
+        .where(eq(schema.session.token, opened.data.token));
+      if (session?.secondFactor === true) await recordLogin(db, logger, session, '/sign-in/email');
+    };
+
+    const audit = (request: FastifyRequest, userId: string, action: string) =>
+      db.insert(schema.auditLog).values({
+        id: newId(AuditEntryIdSchema),
+        userId,
+        action,
+        entity: 'user',
+        entityId: userId,
+        ip: request.ip,
+      });
+
+    // The activation (ADR 0046 § 1), for a signed-in account whose second factor is not active yet: the password once
+    // more, then a secret and ten backup codes, shown once. Asking again before the first code restarts it.
+    app.post(
+      '/auth/two-factor/enable',
+      { config: perIp, schema: { body: SecondFactorEnableBodySchema } },
+      async (request, reply) => {
+        const session = await currentUser(auth, db, request);
+        if (session === null) throw new SessionUnauthenticated();
+        if (session.secondFactorEnabled) throw new SecondFactorAlreadyActive();
+        return forward(request, reply, {
+          onUnauthorized: () => new SessionUnauthenticated(),
+          refusal: secondFactorRefusal,
+        });
+      },
+    );
+
+    // The code: at sign-in (no session yet, the `two_factor` cookie of the sign-in), or to finish the activation (the
+    // session of an account not yet active). Never on an active account's session: that would answer whether a code is
+    // right without the password and without Better Auth's lock, which only counts at sign-in.
+    app.post(
+      '/auth/two-factor/verify-totp',
+      { config: perIp, schema: { body: SecondFactorVerifyBodySchema } },
+      async (request, reply) => {
+        const session = await currentUser(auth, db, request);
+        if (session?.secondFactorEnabled === true) throw new SecondFactorAlreadyActive();
+        if (await exceeded(request, reply, await codeAccountKey(request, session?.user.id ?? null), false)) {
+          throw new CodeLocked();
+        }
+        const startedAt = new Date();
+        return forward(request, reply, {
+          onUnauthorized: () => new CodeStepExpired(),
+          refusal: secondFactorRefusal,
+          onSuccess:
+            session === null
+              ? stampSignIn
+              : async () => {
+                  // The password and a first code were both just given: the session the plugin opens in place of
+                  // this one counts as confirmed, so a sensitive action right after does not ask again. Its answer
+                  // names the session it replaced, so the new one is found as the account's session opened since.
+                  await db
+                    .update(schema.session)
+                    .set({ reauthenticatedAt: sql`now()` })
+                    .where(
+                      and(
+                        eq(schema.session.userId, session.user.id),
+                        sql`${schema.session.createdAt} >= ${startedAt}`,
+                      ),
+                    );
+                  await audit(request, session.user.id, 'auth.second_factor_enabled');
+                },
+        });
+      },
+    );
+
+    // A backup code, at sign-in only: it is used up.
+    app.post(
+      '/auth/two-factor/verify-backup-code',
+      { config: perIp, schema: { body: SecondFactorVerifyBodySchema } },
+      async (request, reply) => {
+        if ((await currentUser(auth, db, request)) !== null) throw new SecondFactorAlreadyActive();
+        if (await exceeded(request, reply, await codeAccountKey(request, null), false))
+          throw new CodeLocked();
+        return forward(request, reply, {
+          onUnauthorized: () => new CodeStepExpired(),
+          refusal: secondFactorRefusal,
+          onSuccess: stampSignIn,
+        });
+      },
+    );
+
+    // The confirmation before a sensitive action (ADR 0046 § 3): the password, then a code, on this session. The
+    // password is checked first, so a wrong one never uses up a backup code. Its own limit per account.
+    const perAccountConfirmation = app.createRateLimit({
+      max: REAUTHENTICATE_PER_ACCOUNT,
+      timeWindow: REAUTHENTICATE_ACCOUNT_WINDOW,
+      keyGenerator: (request) => `reauthenticate:${request.user?.id ?? request.ip}`,
+      skipOnError: false,
+    });
+    app.post(
+      '/auth/reauthenticate',
+      {
+        config: perIp,
+        preValidation: [
+          requireRole(...UserRoleSchema.options),
+          async (request, reply) => {
+            const attempt = await perAccountConfirmation(request);
+            if (attempt.isAllowed || !attempt.isExceeded) return;
+            void reply.header('retry-after', attempt.ttlInSeconds);
+            throw new ReauthenticationLimited();
+          },
+        ],
+        schema: { body: ReauthenticateBodySchema },
+      },
+      async (request, reply) => {
+        if (request.user === null) throw new SessionUnauthenticated();
+        const { password, code } = request.body;
+        const confirmed =
+          (await passwordMatches(auth, request.user.id, password)) &&
+          (await codeMatches(auth, request, code));
+        if (!confirmed) {
+          await audit(request, request.user.id, 'auth.reauthentication_refused');
+          throw new ReauthenticationRefused();
+        }
+        const result = await sessionOf(auth, db, request);
+        if (result === null) throw new SessionUnauthenticated();
+        await db
+          .update(schema.session)
+          .set({ reauthenticatedAt: sql`now()` })
+          .where(eq(schema.session.id, result.session.id));
+        await audit(request, request.user.id, 'auth.reauthenticated');
+        return reply.code(204).send();
+      },
     );
 
     app.get(
@@ -435,13 +886,26 @@ export interface NewOwner {
 
 /**
  * Creates an `owner` account (there is no public sign-up): the user, its password account, the role, and the
- * audit line, in that order. Refuses an email that already exists.
+ * audit line, in that order. Refuses an email that already exists, and a password known from a data breach when a
+ * check is given (`pnpm owner:create` always gives the app's). The account activates its second factor at its first
+ * sign-in (ADR 0046).
  */
-export async function createOwner(auth: Auth, db: Database, owner: NewOwner): Promise<{ userId: string }> {
+export async function createOwner(
+  auth: Auth,
+  db: Database,
+  owner: NewOwner,
+  passwordBreaches?: PasswordBreachCheck,
+): Promise<{ userId: string }> {
   if (owner.password.length < MIN_PASSWORD_LENGTH) {
     throw new DomainError(
       'password_invalid',
       `Mot de passe trop court (${String(MIN_PASSWORD_LENGTH)} minimum)`,
+    );
+  }
+  if (passwordBreaches !== undefined && (await passwordBreaches(owner.password))) {
+    throw new DomainError(
+      'password_invalid',
+      'Ce mot de passe circule dans des fuites de données connues, choisis-en un autre',
     );
   }
   const context = await auth.$context;

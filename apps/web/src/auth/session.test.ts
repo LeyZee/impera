@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchCurrentUser, signIn, signOut } from './session';
+import { fetchCurrentUser, readSession, signIn, signOut, verifySignInCode } from './session';
 
 function answer(status: number, body: unknown = {}): void {
   vi.stubGlobal(
@@ -45,6 +45,46 @@ describe('dashboard session', () => {
     expect(await signIn('a@example.test', 'x')).toBe('too_many_attempts');
     answer(502);
     expect(await signIn('a@example.test', 'x')).toBe('unavailable');
+  });
+
+  it('asks for the code when the password was right on an account whose code is active (ADR 0046)', async () => {
+    answer(200, { twoFactorRedirect: true });
+    expect(await signIn('a@example.test', 'x')).toBe('code_required');
+    answer(200, { user: { id: 'u1' } });
+    expect(await signIn('a@example.test', 'x')).toBe('ok');
+  });
+
+  it('opens the activation, and only it, for an account whose code is not active yet', async () => {
+    answer(403, { error: { code: 'second_factor_forbidden', message: 'x', details: {}, requestId: 'r' } });
+    expect(await readSession()).toEqual({ kind: 'second_factor_required' });
+    expect(await fetchCurrentUser()).toBeNull();
+    answer(403, { error: { code: 'role_forbidden', message: 'x', details: {}, requestId: 'r' } });
+    await expect(readSession()).rejects.toThrow('GET /v1/me: 403');
+  });
+
+  it('sends the code of a sign-in to the right check, and tells its refusals apart', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        calls.push(`${url} ${typeof init?.body === 'string' ? init.body : ''}`);
+        return Promise.resolve(new Response('{}', { status: 200 }));
+      }),
+    );
+    expect(await verifySignInCode('123456', { backup: false, trustDevice: true })).toBe('ok');
+    expect(await verifySignInCode('abcde-fghij', { backup: true, trustDevice: false })).toBe('ok');
+    expect(calls).toEqual([
+      '/v1/auth/two-factor/verify-totp {"code":"123456","trustDevice":true}',
+      '/v1/auth/two-factor/verify-backup-code {"code":"abcde-fghij","trustDevice":false}',
+    ]);
+    const refused = (code: string, status: number) => {
+      answer(status, { error: { code, message: 'x', details: {}, requestId: 'r' } });
+      return verifySignInCode('123456', { backup: false, trustDevice: false });
+    };
+    expect(await refused('second_factor_unauthenticated', 401)).toBe('wrong_code');
+    expect(await refused('second_factor_challenge_unauthenticated', 401)).toBe('expired');
+    expect(await refused('second_factor_limited', 429)).toBe('locked');
+    expect(await refused('rate_limited', 429)).toBe('too_many_attempts');
   });
 
   it('throws when the server did not close the session, so that the page can say so (recette 28/10, G9)', async () => {

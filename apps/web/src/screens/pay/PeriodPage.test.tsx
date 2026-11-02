@@ -20,6 +20,7 @@ import {
   adjustmentOf,
   BASILE,
   euroLine,
+  goalOf,
   IRIS,
   IRIS_ME,
   LEA_ONLYFANS,
@@ -905,7 +906,10 @@ describe('Paie › Quinzaine', () => {
   it('shows a running period’s net and where its pace leads, with nothing to validate', async () => {
     // Thursday 5 November at midnight in Paris: five days of fifteen gone.
     vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
-    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 50_000 })]);
+    // The server's forecast: 500 € in five days, three times as much at the end.
+    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 50_000 })], {
+      pace: { lateNetMinor: 0, forecastNetMinor: 150_000, goal: null },
+    });
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
     expect(await screen.findByText('Net de l’équipe à ce jour')).toBeTruthy();
     // The forecast is a figure of its own, in whole euros, said once.
@@ -913,6 +917,25 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryByText(/À ce rythme/u)).toBeNull();
     expect(screen.queryAllByRole('checkbox')).toEqual([]);
     expect(screen.queryByRole('button', { name: /^Valider/u })).toBeNull();
+  });
+
+  it('reads the share of the goal and where it heads from the server, never from the net', async () => {
+    vi.setSystemTime(new Date('2026-11-05T23:00:00Z'));
+    // The server's shares on a 1 500 € goal: 33 % reached, 100 % forecast; the screen recomputes neither.
+    periods[NOV1] = periodOf(NOV1, [statementOf(THEO, NOV1, { netMinor: 50_000 })], {
+      collectiveGoal: goalOf(NOV1),
+      pace: {
+        lateNetMinor: 0,
+        forecastNetMinor: 150_000,
+        goal: { reachedBps: 3_333, forecastReachedBps: 10_000 },
+      },
+    });
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${NOV1}`);
+    const goal = (await screen.findByText('Objectif collectif')).closest('.py-fig');
+    expect(text(goal?.querySelector('.py-fig__value'))).toBe('33 %');
+    expect(text(goal?.querySelector('.py-fig__note'))).toBe(
+      'prévu 100 % : palier 100 %, +25,00 € par chatteur',
+    );
   });
 });
 

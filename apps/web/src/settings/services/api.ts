@@ -11,7 +11,7 @@ import {
   type ProviderStatus,
 } from '@nirvana/contracts';
 
-import { fetchCurrentUser, signIn, type SignInResult } from '../../auth/session';
+import { reauthenticate, type ReauthenticateResult } from '../../auth/session';
 
 /**
  * `/v1/settings/providers` (fiche P3-03). The key goes up once, in the body of `PUT …/key`; no answer ever brings
@@ -22,12 +22,12 @@ const BASE = '/v1/settings/providers';
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 /**
- * Connecting, replacing or removing a key asks for a sign-in under 10 minutes (ADR 0016): the page asks for the
- * password (`confirmPassword`), then runs the action again.
+ * Connecting, replacing or removing a key asks for the password and the code given under 10 minutes ago (ADR 0016,
+ * ADR 0046 § 3): the page asks for both (`confirmIdentity`), then runs the action again.
  */
 export class ReauthRequired extends Error {
   constructor() {
-    super('Mot de passe à confirmer');
+    super('Mot de passe et code à confirmer');
     this.name = 'ReauthRequired';
   }
 }
@@ -120,16 +120,14 @@ async function parsed<T>(response: Response, parse: (body: unknown) => T): Promi
   }
 }
 
-export type ConfirmResult = SignInResult | 'session_expired';
+export type ConfirmResult = ReauthenticateResult;
 
 /**
- * Signs in again as the current user: a fresh session, so the key action can be retried. No session at all is
+ * The password and a code, on the current session, so the sensitive action can be retried. No session at all is
  * `session_expired`, not a wrong password: only the sign-in page can help then.
  */
-export async function confirmPassword(password: string): Promise<ConfirmResult> {
-  const user = await fetchCurrentUser();
-  if (user === null) return 'session_expired';
-  return signIn(user.email, password);
+export function confirmIdentity(password: string, code: string): Promise<ConfirmResult> {
+  return reauthenticate(password, code);
 }
 
 export async function fetchOverview(): Promise<ProviderOverview> {

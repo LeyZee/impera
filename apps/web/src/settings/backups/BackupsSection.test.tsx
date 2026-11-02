@@ -6,9 +6,9 @@ import { z } from 'zod';
 
 import { BackupsSection } from './BackupsSection';
 
-const confirmPassword = vi.fn<(password: string) => Promise<string>>();
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', () => ({
-  confirmPassword: (password: string) => confirmPassword(password),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
 }));
 
 const SHA = '3f1c'.repeat(16);
@@ -82,7 +82,7 @@ const recorded = (body: unknown): Reply => ({
 });
 
 beforeEach(() => {
-  confirmPassword.mockReset();
+  confirmIdentity.mockReset();
 });
 afterEach(() => {
   cleanup();
@@ -127,7 +127,7 @@ describe('Réglages › Sauvegardes', () => {
       post: (body) =>
         attempts++ === 0 ? { status: 403, body: apiError('reauthentication_forbidden') } : recorded(body),
     });
-    confirmPassword.mockResolvedValue('ok');
+    confirmIdentity.mockResolvedValue('ok');
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Noter un essai' }));
     const dialog = screen.getByRole('dialog', { name: 'Noter un essai de restauration' });
@@ -141,11 +141,12 @@ describe('Réglages › Sauvegardes', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Noter l’essai' }));
     fireEvent.change(await within(dialog).findByLabelText('Mot de passe'), { target: { value: 'secret' } });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
 
     expect(await screen.findByRole('heading', { name: 'Essai noté' })).toBeTruthy();
     expect(screen.getByText(/restauré en 4 min 12 s, toutes les lignes retrouvées/u)).toBeTruthy();
-    expect(confirmPassword).toHaveBeenCalledWith('secret');
+    expect(confirmIdentity).toHaveBeenCalledWith('secret', '123456');
     expect(posted).toHaveLength(2);
     const [first, second] = posted;
     expect(second).toEqual(first);
@@ -263,12 +264,13 @@ describe('Réglages › Sauvegardes', () => {
         return { status: 202, body: { id, requestedAt: asked, pickedAt: null } };
       },
     });
-    confirmPassword.mockResolvedValue('ok');
+    confirmIdentity.mockResolvedValue('ok');
     renderPage();
     const button = await screen.findByRole('button', { name: 'Relancer la sauvegarde maintenant' });
     expect(button.className).toContain('nv-btn--soft');
     fireEvent.click(button);
     fireEvent.change(await screen.findByLabelText('Mot de passe'), { target: { value: 'secret' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
     // « Noter un essai » stays the page's one neon while the password is asked here.
     expect(screen.getByRole('button', { name: 'Confirmer' }).className).toContain('nv-btn--soft');
     expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);

@@ -28,12 +28,15 @@ if ((await readSecret('Confirme le mot de passe : ')) !== password) {
 const config = loadConfig();
 const app = await createApp(config, createLogger(config));
 try {
-  const { userId } = await createOwner(app.auth, app.db.db, {
-    email: values.email,
-    name: values.name,
-    password,
-  });
-  console.log(`Compte owner créé (${userId}).`);
+  const { userId } = await createOwner(
+    app.auth,
+    app.db.db,
+    { email: values.email, name: values.name, password },
+    app.passwordBreaches,
+  );
+  console.log(
+    `Compte owner créé (${userId}). À la première connexion, il active sa validation en deux étapes.`,
+  );
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;

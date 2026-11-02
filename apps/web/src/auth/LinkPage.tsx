@@ -182,6 +182,7 @@ function Refused({
 const REFUSED_PASSWORD: Readonly<Record<PasswordInvalidReason, string>> = {
   too_short: `Ce mot de passe est trop court : il faut ${String(PASSWORD_MIN_LENGTH)} caractères au moins.`,
   too_long: `Ce mot de passe est trop long : ${String(PASSWORD_MAX_LENGTH)} caractères au plus.`,
+  breached: 'Ce mot de passe circule déjà dans des fuites de données connues. Choisis-en un autre.',
   refused: 'Ce mot de passe est refusé. Choisis-en un autre.',
 };
 

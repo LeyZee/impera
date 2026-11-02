@@ -107,7 +107,7 @@ export function RunNow({
     <div className="bk-run">
       {needsPassword && requestId !== null ? (
         <PasswordStep
-          hint="Pour relancer la sauvegarde, confirme ton mot de passe."
+          hint="Pour relancer la sauvegarde, confirme ton mot de passe et ton code."
           tone="soft"
           onConfirmed={() => {
             void send(requestId);

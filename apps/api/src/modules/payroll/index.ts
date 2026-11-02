@@ -227,7 +227,10 @@ export interface PayrollDeps {
 export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   const now = deps.now ?? (() => new Date());
   const jobStore = createDrizzlePayrollJobStore(deps.adminDb, deps.reads, now);
-  const reads = createPayrollReads(createDrizzlePayrollReadStore(deps.db, deps.reads, now), now);
+  const reads = createPayrollReads(
+    createDrizzlePayrollReadStore(deps.db, deps.adminDb, deps.reads, now),
+    now,
+  );
   const validation = createPayrollValidation(
     createDrizzlePayrollValidationStore(deps.db, deps.adminDb, deps.reads, now),
     reads,

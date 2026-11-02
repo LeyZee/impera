@@ -109,11 +109,11 @@ describe('rate limits shared by every API instance (ADR 0027)', () => {
         remoteAddress,
         headers: { origin: DASHBOARD_ORIGIN },
       });
-    // Ten tries per account, from addresses that each stay under the API-wide limit, split across both instances.
+    // Ten tries per account from one address (ADR 0046 § 5), under the API-wide limit, split across both instances.
     for (let i = 0; i < 10; i += 1) {
-      expect((await signIn(i % 2 === 0 ? first : second, `198.51.100.${String(i)}`)).statusCode).toBe(401);
+      expect((await signIn(i % 2 === 0 ? first : second, '198.51.100.7')).statusCode).toBe(401);
     }
-    const blocked = await signIn(second, '198.51.100.50');
+    const blocked = await signIn(second, '198.51.100.7');
     expect(blocked.statusCode).toBe(429);
     expect(blocked.json<{ error: { code: string } }>().error.code).toBe('sign_in_limited');
   });

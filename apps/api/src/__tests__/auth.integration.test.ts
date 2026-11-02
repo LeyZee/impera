@@ -10,7 +10,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
-import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
+import { codeFor, cookiesOf, DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: 'staple battery horse' };
@@ -204,18 +204,27 @@ describe('dashboard authentication (P0-07a)', () => {
   });
 
   it('sets the session cookie HttpOnly and SameSite=Lax, and keeps the token out of the body', async () => {
+    // The owner activated his code in the tests above.
     const response = await server.inject({
       method: 'POST',
       url: '/v1/auth/sign-in/email',
       payload: { email: OWNER.email, password: OWNER.password },
       headers: { origin: DASHBOARD_ORIGIN },
     });
-    const setCookie = String(response.headers['set-cookie']);
-    expect(setCookie).toMatch(/HttpOnly/i);
+    // The password alone opens nothing (ADR 0046): the code step's cookie, no session.
+    expect(response.json()).toEqual({ twoFactorRedirect: true, twoFactorMethods: ['totp'] });
+    const verified = await server.inject({
+      method: 'POST',
+      url: '/v1/auth/two-factor/verify-totp',
+      payload: { code: codeFor(OWNER.email) },
+      headers: { origin: DASHBOARD_ORIGIN, cookie: cookiesOf(response.headers) },
+    });
+    const setCookie = String(verified.headers['set-cookie']);
+    expect(setCookie).toMatch(/session_token=[^;]+;.*HttpOnly/i);
     expect(setCookie).toMatch(/SameSite=Lax/i);
     // The token lives in the cookie only, never in a body the page's JavaScript can read.
-    expect(response.json()).not.toHaveProperty('token');
-    expect(response.json()).toMatchObject({ user: { email: OWNER.email } });
+    expect(verified.json()).not.toHaveProperty('token');
+    expect(verified.json()).toMatchObject({ user: { email: OWNER.email } });
   });
 
   it('refuses a wrong password', async () => {
@@ -249,6 +258,28 @@ describe('dashboard authentication (P0-07a)', () => {
       .from(schema.user)
       .where(eq(schema.user.email, 'intruder@example.test'));
     expect(users).toEqual([]);
+  });
+
+  it('refuses a session opened more than 7 days ago, however much it is used (ADR 0046 § 6)', async () => {
+    const cookie = await signIn(server, OPERATOR.email, OPERATOR.password);
+    const me = () => server.inject({ method: 'GET', url: '/v1/me', headers: { cookie } });
+    const age = (interval: string) =>
+      test.admin.db.execute(
+        sql`update "session" set created_at = now() - ${interval}::interval where user_id = (select id from "user" where email = ${OPERATOR.email})`,
+      );
+    await age('6 days 23 hours');
+    expect((await me()).statusCode).toBe(200);
+    const count = async () =>
+      (
+        await test.admin.db.execute(
+          sql`select 1 from "session" where user_id = (select id from "user" where email = ${OPERATOR.email})`,
+        )
+      ).rows.length;
+    const before = await count();
+    await age('7 days 1 minute');
+    expect((await me()).statusCode).toBe(401);
+    // The refused session is gone, not only turned away.
+    expect(await count()).toBe(before - 1);
   });
 
   it('signs out and the session stops working', async () => {
@@ -311,26 +342,29 @@ describe('dashboard authentication (P0-07a)', () => {
       return String(response.headers['set-cookie']).split(';')[0] ?? '';
     };
 
+    // An account whose second factor is not active yet: its password opens a session that serves the activation only.
     const first = await signInFrom('', SECOND);
     expect(await sessions()).toBe(1);
-    // The password confirmed again before a sensitive action (ADR 0016): one session still, the new one.
+    // Signing in again from the same browser: one session still, the new one.
     const confirmed = await signInFrom(first, SECOND);
     expect(await sessions()).toBe(1);
     expect((await me(first)).statusCode).toBe(401);
-    expect((await me(confirmed)).statusCode).toBe(200);
+    expect((await me(confirmed)).json<{ error: { code: string } }>().error.code).toBe(
+      'second_factor_forbidden',
+    );
     // Another account signing in from that browser leaves this one's session to its own sign-out.
     await signInFrom(confirmed, OPERATOR);
     expect(await sessions()).toBe(1);
   });
 
-  it('asks for the password again before touching an AI key with a session older than 10 minutes', async () => {
+  it('asks for the password and the code again before touching an AI key, 10 minutes after they were given', async () => {
     const cookie = await signIn(server, OWNER.email, OWNER.password);
     const headers = { cookie, origin: DASHBOARD_ORIGIN };
     const remove = () => server.inject({ method: 'DELETE', url: '/v1/settings/providers/xai', headers });
     expect((await remove()).statusCode).toBe(200);
 
     await test.admin.db.execute(
-      sql`update "session" set created_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
+      sql`update "session" set reauthenticated_at = now() - interval '11 minutes' where user_id = (select id from "user" where email = ${OWNER.email})`,
     );
     const stale = await remove();
     expect(stale.statusCode).toBe(403);
@@ -340,13 +374,15 @@ describe('dashboard authentication (P0-07a)', () => {
       200,
     );
 
-    const fresh = await signIn(server, OWNER.email, OWNER.password);
-    const again = await server.inject({
-      method: 'DELETE',
-      url: '/v1/settings/providers/xai',
-      headers: { cookie: fresh, origin: DASHBOARD_ORIGIN },
+    // The password and the code given again, on the same session (ADR 0046 § 3).
+    const confirmed = await server.inject({
+      method: 'POST',
+      url: '/v1/auth/reauthenticate',
+      payload: { password: OWNER.password, code: codeFor(OWNER.email) },
+      headers,
     });
-    expect(again.statusCode).toBe(200);
+    expect(confirmed.statusCode).toBe(204);
+    expect((await remove()).statusCode).toBe(200);
   });
 
   it('refuses a second account with the same email and a short password', async () => {
