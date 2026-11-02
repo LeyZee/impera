@@ -183,6 +183,13 @@ jobs:
           curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy: default-src 'none'" >/dev/null
           curl -fsSI http://127.0.0.1:8080/ | grep -i "strict-transport-security: max-age=31536000; includesubdomains" >/dev/null
           curl -fsSI http://127.0.0.1:8080/ | grep -i "permissions-policy: camera=()" >/dev/null
+          # The installable app (CR-01): the service worker and the manifest are never cached by the browser, so a new
+          # version always shows; the worker must be served as JavaScript or the browser refuses to register it.
+          curl -fsSI http://127.0.0.1:8080/sw.js | grep -i "cache-control: no-cache" >/dev/null
+          curl -fsSI http://127.0.0.1:8080/sw.js | grep -iE "content-type: (application|text)/javascript" >/dev/null
+          curl -fsSI http://127.0.0.1:8080/manifest.webmanifest | grep -i "cache-control: no-cache" >/dev/null
+          curl -fsS http://127.0.0.1:8080/manifest.webmanifest | grep '"display": "standalone"' >/dev/null
+          curl -fsSI http://127.0.0.1:8080/icons/icon-512.png | grep -i "content-type: image/png" >/dev/null
       # The daily export (ADR 0028) end to end, but to a folder instead of the bucket: dump, check, encrypt, then a
       # restore into an empty database with the queue emptied, and the same row counts.
       - name: Backup export and restore
