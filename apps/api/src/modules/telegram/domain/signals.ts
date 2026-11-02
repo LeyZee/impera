@@ -9,6 +9,7 @@ import type {
   InvoiceNotIssuedReason,
   InvoicePdfPlace,
   KillSwitchScope,
+  PayoutBlock,
   PayPeriod,
   TelegramTopic,
 } from '@nirvana/contracts';
@@ -113,6 +114,19 @@ export type Signal =
       readonly kind: 'invoice_contested';
       readonly number: string;
       readonly document: InvoiceKind;
+    }
+  | {
+      /**
+       * An invoice not settled comes to its due date (`overdue` false, from seven days before) or passed it (EQ-06 lot
+       * 8): its number, its due date and what blocks the transfer that will pay it (ADR 0041); never the amount nor a
+       * name, the member's id for the link to their file.
+       */
+      readonly kind: 'invoice_due';
+      readonly overdue: boolean;
+      readonly memberId: string;
+      readonly number: string;
+      readonly dueOn: string;
+      readonly payoutBlock: PayoutBlock | null;
     }
   | {
       /**

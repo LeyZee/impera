@@ -109,6 +109,15 @@ const ContractorDocumentExpiringSchema = EVENT_PAYLOADS.contractor_document_expi
   lastDay: true,
 });
 
+// The invoice's number, due date and what blocks its transfer (EQ-06 lot 8), the member's id for the link: never its
+// total nor a name.
+const InvoiceDueSchema = EVENT_PAYLOADS.invoice_due_soon.pick({
+  memberId: true,
+  number: true,
+  dueOn: true,
+  payoutBlock: true,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -205,6 +214,12 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = InvoiceContestedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'invoice_contested', ...parsed.data };
+    }
+    case 'invoice_due_soon':
+    case 'invoice_overdue': {
+      const parsed = InvoiceDueSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'invoice_due', overdue: type === 'invoice_overdue', ...parsed.data };
     }
     case 'contractor_document_expiring': {
       const parsed = ContractorDocumentExpiringSchema.safeParse(payload);
