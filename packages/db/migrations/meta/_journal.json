@@ -435,6 +435,20 @@
       "when": 1793641201872,
       "tag": "0061_second_factor",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793649231114,
+      "tag": "0064_security_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1793652282986,
+      "tag": "0065_sales_feed",
+      "breakpoints": true
     }
   ]
 }

@@ -5,9 +5,11 @@ import { secretOrNull } from '../config';
 import { defineTask } from '../jobs';
 import {
   createConnectorsModule,
+  revealSalesFeed,
   type ConnectorRegistry,
   type ConnectorsDeps,
   type ConnectorsModule,
+  type SalesFeedRegistry,
 } from '../modules/connectors';
 
 import type { Routes, Shared, TasksOf } from './shared';
@@ -25,10 +27,13 @@ export function wireConnectors(
     readonly ingest: ConnectorsDeps['ingest'];
     /** Reveal's adapter arrives with phase 1 (ADR 0008); until then no account is polled. */
     readonly registry: ConnectorRegistry;
+    /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
+    readonly salesFeeds?: SalesFeedRegistry;
   },
 ): WiredConnectors {
-  const { config, db, adminDb, logger } = shared;
+  const { config, db, adminDb, logger, requireRole, recentLogin } = shared;
   const sessionKeys = secretOrNull(config.SESSION_ENCRYPTION_KEYS);
+  const credentialKeys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
   const module = createConnectorsModule({
     db,
     adminDb,
@@ -36,6 +41,11 @@ export function wireConnectors(
     registry: deps.registry,
     sessionKeys: sessionKeys === null ? null : parseEncryptionKeys(sessionKeys, 'SESSION_ENCRYPTION_KEYS'),
     deviceToken: secretOrNull(config.EXTENSION_DEVICE_TOKEN),
+    // The AI keys' encryption (ADR 0050 § 4): without it no sales feed key is kept, nothing is read.
+    credentialKeys:
+      credentialKeys === null ? null : parseEncryptionKeys(credentialKeys, 'CREDENTIALS_ENCRYPTION_KEYS'),
+    // Nothing is called at Reveal until the owner pastes a key in Réglages.
+    salesFeeds: deps.salesFeeds ?? { reveal: revealSalesFeed(fetch) },
   });
   return {
     module,
@@ -58,7 +68,13 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.reconcile(payload, context.logger),
       ),
+      'connector.read_sales': defineTask(
+        'connector.read_sales',
+        JOB_PAYLOADS['connector.read_sales'],
+        logger,
+        (_payload, context) => module.jobs.readSales(context.logger, `job:${context.jobId}`),
+      ),
     },
-    routes: [module.routes],
+    routes: [module.routes, module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin })],
   };
 }

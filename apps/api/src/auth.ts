@@ -32,6 +32,7 @@ import { z } from 'zod';
 import type { Config } from './config';
 import type { Logger } from './logger';
 import type { PasswordBreachCheck } from './password-breaches';
+import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -516,6 +517,7 @@ export async function meOf(db: Database, row: AccountRow): Promise<Me | null> {
 export function createAuthRoutes(
   auth: Auth,
   db: Database,
+  adminDb: Database,
   config: Config,
   requireRole: RequireRole,
   logger: Logger,
@@ -585,19 +587,48 @@ export function createAuthRoutes(
       return row !== undefined;
     };
 
-    /** The account of a code step: the signed-in one (activation), or the one the sign-in's `two_factor` cookie names. */
-    const codeAccountKey = async (request: FastifyRequest, signedIn: string | null): Promise<string> => {
-      if (signedIn !== null) return `code:${signedIn}`;
+    /**
+     * The account of a code step: the signed-in one (activation), or the one the sign-in's `two_factor` cookie names;
+     * null when neither is known.
+     */
+    const codeAccountOf = async (
+      request: FastifyRequest,
+      signedIn: string | null,
+    ): Promise<string | null> => {
+      if (signedIn !== null) return signedIn;
       const context = await auth.$context;
       // `<identifier>.<signature>`: the row the plugin wrote for this sign-in, worth nothing once used or expired.
       const identifier = cookieOf(request, context.createAuthCookie(TWO_FACTOR_COOKIE).name)?.split('.')[0];
-      if (identifier === undefined || identifier === '') return `ip:${request.ip}`;
+      if (identifier === undefined || identifier === '') return null;
       const [row] = await db
         .select({ userId: schema.verification.value })
         .from(schema.verification)
         .where(eq(schema.verification.identifier, identifier))
         .limit(1);
-      return row === undefined ? `ip:${request.ip}` : `code:${row.userId}`;
+      return row?.userId ?? null;
+    };
+    const codeAccountKey = (request: FastifyRequest, account: string | null): string =>
+      account === null ? `ip:${request.ip}` : `code:${account}`;
+
+    /**
+     * A refusal counted for the security alerts (ADR 0046 § 8): never a condition of the answer, which stays the
+     * refusal it was if the line cannot be written.
+     */
+    const refused = async (request: FastifyRequest, userId: string | null, action: RefusalAction) => {
+      if (userId === null) return;
+      try {
+        await recordRefusal(adminDb, { userId, action, ip: request.ip });
+      } catch (error) {
+        request.log.warn({ err: error }, 'auth: a refusal could not be recorded');
+      }
+    };
+    /** The same for a sign-in the owner just made: a lost alert never fails the sign-in. */
+    const told = async (request: FastifyRequest, userId: string) => {
+      try {
+        await alertOwnerSignIn(adminDb, userId, request.ip);
+      } catch (error) {
+        request.log.warn({ err: error }, 'auth: a sign-in alert could not be written');
+      }
     };
     const forward = async (
       request: FastifyRequest,
@@ -608,6 +639,8 @@ export function createAuthRoutes(
         readonly refusal?: (code: string | undefined) => DomainError | undefined;
         /** Run on success with Better Auth's JSON body, before the reply leaves. */
         readonly onSuccess?: (json: unknown) => Promise<void>;
+        /** Run on a refusal with its status and Better Auth's error code, before it is thrown. */
+        readonly onRefused?: (status: number, code: string | undefined) => Promise<void>;
       },
     ) => {
       const body =
@@ -620,11 +653,10 @@ export function createAuthRoutes(
         }),
       );
       if (response.status >= 400) {
-        const refused = BetterAuthErrorSchema.safeParse(await response.json().catch(() => null));
-        throw (
-          options.refusal?.(refused.success ? refused.data.code : undefined) ??
-          refusalOf(response.status, options.onUnauthorized)
-        );
+        const answer = BetterAuthErrorSchema.safeParse(await response.json().catch(() => null));
+        const code = answer.success ? answer.data.code : undefined;
+        await options.onRefused?.(response.status, code);
+        throw options.refusal?.(code) ?? refusalOf(response.status, options.onUnauthorized);
       }
       reply.code(response.status);
       response.headers.forEach((value, key) => {
@@ -693,7 +725,11 @@ export function createAuthRoutes(
           onUnauthorized: () => new SignInRefused(),
           onSuccess: async (json) => {
             await closeReplaced(json);
-            await recordTrustedDeviceLogin(json);
+            await recordPasswordLogin(request, json);
+          },
+          // A wrong password for an account that exists; an unknown e-mail is nobody's to warn.
+          onRefused: async (status) => {
+            if (status === 401) await refused(request, await accountOfEmail(request), 'auth.sign_in_refused');
           },
         });
       },
@@ -710,20 +746,36 @@ export function createAuthRoutes(
      * sensitive action needs no confirmation for 10 minutes. Better Auth's answer carries the new session's token,
      * which never reaches the page (`withoutToken`).
      */
-    const stampSignIn = async (json: unknown) => {
+    const stampSignIn = (request: FastifyRequest) => async (json: unknown) => {
       const opened = SessionTokenSchema.safeParse(json);
       if (!opened.success) return;
-      await db
+      const [session] = await db
         .update(schema.session)
         .set({ reauthenticatedAt: sql`now()` })
-        .where(eq(schema.session.token, opened.data.token));
+        .where(eq(schema.session.token, opened.data.token))
+        .returning({ userId: schema.session.userId });
+      // A code was asked: no trusted device spared it, which the owner hears of (ADR 0046 § 8).
+      if (session !== undefined) await told(request, session.userId);
+    };
+
+    /** The account a sign-in's e-mail names, null if none. */
+    const accountOfEmail = async (request: FastifyRequest): Promise<string | null> => {
+      const asked = SignInBodySchema.safeParse(request.body);
+      if (!asked.success) return null;
+      const [row] = await db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(sql`lower(${schema.user.email}) = ${asked.data.email.trim().toLowerCase()}`)
+        .limit(1);
+      return row?.id ?? null;
     };
 
     /**
-     * A session the password opened for an account with an active second factor: its device was trusted, so no code
-     * was asked (ADR 0046 § 3). The database hook leaves this login to here, the only place that sees it kept.
+     * A session the password opened. With an active second factor, its device was trusted, so no code was asked (ADR
+     * 0046 § 3): the database hook leaves this login to here, the only place that sees it kept. Without one (not set
+     * up yet), nothing spared the device: the owner hears of it (§ 8).
      */
-    const recordTrustedDeviceLogin = async (json: unknown) => {
+    const recordPasswordLogin = async (request: FastifyRequest, json: unknown) => {
       const opened = SessionTokenSchema.safeParse(json);
       if (!opened.success) return;
       const [session] = await db
@@ -736,7 +788,9 @@ export function createAuthRoutes(
         .from(schema.session)
         .innerJoin(schema.user, eq(schema.user.id, schema.session.userId))
         .where(eq(schema.session.token, opened.data.token));
-      if (session?.secondFactor === true) await recordLogin(db, logger, session, '/sign-in/email');
+      if (session === undefined) return;
+      if (session.secondFactor) await recordLogin(db, logger, session, '/sign-in/email');
+      else await told(request, session.userId);
     };
 
     const audit = (request: FastifyRequest, userId: string, action: string) =>
@@ -774,16 +828,20 @@ export function createAuthRoutes(
       async (request, reply) => {
         const session = await currentUser(auth, db, request);
         if (session?.secondFactorEnabled === true) throw new SecondFactorAlreadyActive();
-        if (await exceeded(request, reply, await codeAccountKey(request, session?.user.id ?? null), false)) {
+        const account = await codeAccountOf(request, session?.user.id ?? null);
+        if (await exceeded(request, reply, codeAccountKey(request, account), false)) {
           throw new CodeLocked();
         }
         const startedAt = new Date();
         return forward(request, reply, {
           onUnauthorized: () => new CodeStepExpired(),
           refusal: secondFactorRefusal,
+          onRefused: async (_status, code) => {
+            if (code === 'INVALID_CODE') await refused(request, account, 'auth.code_refused');
+          },
           onSuccess:
             session === null
-              ? stampSignIn
+              ? stampSignIn(request)
               : async () => {
                   // The password and a first code were both just given: the session the plugin opens in place of
                   // this one counts as confirmed, so a sensitive action right after does not ask again. Its answer
@@ -809,12 +867,15 @@ export function createAuthRoutes(
       { config: perIp, schema: { body: SecondFactorVerifyBodySchema } },
       async (request, reply) => {
         if ((await currentUser(auth, db, request)) !== null) throw new SecondFactorAlreadyActive();
-        if (await exceeded(request, reply, await codeAccountKey(request, null), false))
-          throw new CodeLocked();
+        const account = await codeAccountOf(request, null);
+        if (await exceeded(request, reply, codeAccountKey(request, account), false)) throw new CodeLocked();
         return forward(request, reply, {
           onUnauthorized: () => new CodeStepExpired(),
           refusal: secondFactorRefusal,
-          onSuccess: stampSignIn,
+          onRefused: async (_status, code) => {
+            if (code === 'INVALID_BACKUP_CODE') await refused(request, account, 'auth.code_refused');
+          },
+          onSuccess: stampSignIn(request),
         });
       },
     );
@@ -849,7 +910,7 @@ export function createAuthRoutes(
           (await passwordMatches(auth, request.user.id, password)) &&
           (await codeMatches(auth, request, code));
         if (!confirmed) {
-          await audit(request, request.user.id, 'auth.reauthentication_refused');
+          await refused(request, request.user.id, 'auth.reauthentication_refused');
           throw new ReauthenticationRefused();
         }
         const result = await sessionOf(auth, db, request);

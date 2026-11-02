@@ -40,6 +40,7 @@ describe('the server lock of Automatique (ADR 0019)', () => {
   /** Her first active persona version: what the drafts below prove by default. */
   let firstPersona: string;
   let ownerCookie: string;
+  let ownerId: string;
   let operatorCookie: string;
   let decidedAt = Date.parse('2026-10-19T08:00:00.000Z');
 
@@ -71,6 +72,21 @@ describe('the server lock of Automatique (ADR 0019)', () => {
       .where(
         and(eq(schema.domainEvents.creatorId, creatorId), eq(schema.domainEvents.type, 'automatic_closed')),
       );
+  /** The `automatic_enabled` security alerts of her, oldest first. */
+  const automaticAlerts = async () =>
+    (
+      await test.admin.db
+        .select({ payload: schema.domainEvents.payload })
+        .from(schema.domainEvents)
+        .where(
+          and(
+            eq(schema.domainEvents.creatorId, creatorId),
+            eq(schema.domainEvents.type, 'security_alert'),
+            sql`${schema.domainEvents.payload}->>'reason' = 'automatic_enabled'`,
+          ),
+        )
+        .orderBy(schema.domainEvents.createdAt)
+    ).map((row) => row.payload);
 
   /** Drafts a chatter decided, each newer than the last; by default the active voice and her first persona. */
   const decide = async (
@@ -153,7 +169,7 @@ describe('the server lock of Automatique (ADR 0019)', () => {
     }));
 
     const owner = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
-    await createOwner(app.auth, app.db.db, owner);
+    ({ userId: ownerId } = await createOwner(app.auth, app.db.db, owner));
     ownerCookie = await signIn(server, owner.email, owner.password);
     const operator = { email: 'operator@example.test', name: 'Operator', password: 'correct horse battery' };
     const { userId } = await createOwner(app.auth, app.db.db, operator);
@@ -220,6 +236,16 @@ describe('the server lock of Automatique (ADR 0019)', () => {
     expect(response.json()).toEqual({ mode: 'auto', globalStop: false });
     expect(await conversationMode()).toBe('auto');
     expect(await dashboard()).toMatchObject({ mode: 'auto', automatic: { open: true, missing: [] } });
+    // Told to the urgent groups after its audit line (ADR 0046 § 8); asked again, nothing changes and nothing is told.
+    expect((await setAgentMode('auto')).statusCode).toBe(200);
+    expect(await automaticAlerts()).toEqual([
+      { reason: 'automatic_enabled', userId: ownerId, scope: 'creator' },
+    ]);
+    const [audit] = await test.admin.db
+      .select({ entity: schema.auditLog.entity, entityId: schema.auditLog.entityId })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'automatic.on'));
+    expect(audit).toEqual({ entity: 'creator', entityId: creatorId });
   });
 
   it('closes on its own when the live rate falls, at the next answer, and tells the owner once', async () => {
@@ -250,6 +276,11 @@ describe('the server lock of Automatique (ADR 0019)', () => {
   it('closes at once when a later blind test of the version fails', async () => {
     await decide(300, 'sent');
     expect((await setConversationMode('auto')).statusCode).toBe(204);
+    expect((await automaticAlerts()).at(-1)).toEqual({
+      reason: 'automatic_enabled',
+      userId: ownerId,
+      scope: 'conversation',
+    });
     expect(BlindTestResultSchema.parse((await recordBlindTest(60)).json()).automatic.open).toBe(false);
     expect(await conversationMode()).toBe('copilot');
     expect(await closedEvents()).toHaveLength(2);

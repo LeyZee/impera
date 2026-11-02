@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import {
   AuditEntryIdSchema,
+  EVENT_PAYLOADS,
+  EventIdSchema,
   newId,
   PersonaSchema,
   PersonaVersionIdSchema,
@@ -106,6 +108,21 @@ async function activateRow(
     { creatorId, version: active.version, contentHash: active.contentHash },
     userId,
   );
+  // Told to the urgent groups after its audit line (ADR 0046 § 8): the version, never the content.
+  const at = new Date();
+  await tx.insert(schema.domainEvents).values({
+    id: newId(EventIdSchema),
+    creatorId,
+    type: 'security_alert',
+    payload: EVENT_PAYLOADS.security_alert.parse({
+      reason: 'persona_activated',
+      userId,
+      version: active.version,
+    }),
+    actor: 'system',
+    correlationId: `security:persona_activated:${active.id}`,
+    createdAt: at,
+  });
   return { row: active, activated: true };
 }
 

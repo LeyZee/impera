@@ -161,3 +161,7 @@ export type InvoiceId = z.infer<typeof InvoiceIdSchema>;
 /** A step in an invoice's life: issue, acceptance, contest, credit, payment (EQ-06). */
 export const InvoiceEventIdSchema = uuid.brand<'InvoiceEventId'>();
 export type InvoiceEventId = z.infer<typeof InvoiceEventIdSchema>;
+
+/** A line of a platform's register as Nirvana keeps it (`platform_sales`, its quarantine; ADR 0050). */
+export const SalesLineIdSchema = uuid.brand<'SalesLineId'>();
+export type SalesLineId = z.infer<typeof SalesLineIdSchema>;
