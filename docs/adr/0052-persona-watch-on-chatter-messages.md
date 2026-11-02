@@ -23,7 +23,7 @@ Ce qu'on sait déjà :
 ### 1. Ce qui est relu
 
 - Chaque message **sortant écrit par un membre humain** dans Reveal, lu par le connecteur sur la session capturée, sur un compte dont une créatrice a une persona active. Pas les messages de l'agent, déjà gardés avant l'envoi, ni ceux que la créatrice écrit elle-même : elle est la persona.
-- Le message est rattaché à son auteur Reveal (ADR 0025, 0049). Tant que la capture ne dit pas quel membre a écrit, il est rattaché au membre en poste ; à plusieurs en poste sur des fans partagés, à aucun, et l'écart va au manager seulement.
+- Le message est rattaché à son auteur Reveal (ADR 0025, 0049). Tant que la capture ne dit pas quel membre a écrit, il est rattaché au membre connecté à l'extension du navigateur d'où l'envoi est parti, puis, à défaut, au membre en poste ; à plusieurs en poste sur des fans partagés sans extension pour trancher, à aucun, et l'écart va au manager seulement.
 - Il est relu **contre la version de la persona active au moment du message**, et l'écart garde l'identifiant de cette version.
 
 ### 2. Trois contrôles, du moins cher au plus cher
@@ -45,10 +45,11 @@ Le message du fan et celui du chatteur entrent dans le prompt comme données, da
 
 ### 4. Le chatteur le voit tout de suite, discrètement
 
-- **Dans l'extension**, sur la conversation ouverte, une ligne par écart dès qu'il est relevé, sans recouvrir Reveal (rien de stylé injecté dans la page, `docs/design/README.md`) : la couleur, l'extrait (200 caractères au plus), la règle ou la ligne de la persona, et ce qu'il aurait fallu écrire. Une touche « Faux signal » le renvoie au calibrage, sans discussion.
+- **Dans l'extension**, sur la conversation ouverte, une ligne par écart dès qu'il est relevé, sans recouvrir Reveal (rien de stylé injecté dans la page, `docs/design/README.md`) : la couleur, l'extrait (200 caractères au plus), la règle ou la ligne de la persona, et ce qu'il aurait fallu écrire. Une touche « Faux signal » le renvoie au calibrage, sans discussion ; elle porte une clé d'idempotence, et deux touches font un seul renvoi.
+- **Où** : dans le panneau latéral de Chrome, ouvert à côté de l'onglet Reveal pendant le shift. Il montre les écarts de la conversation ouverte, et le résumé du shift quand aucune ne l'est. C'est le panneau qui tient la connexion au serveur, pas le service worker de l'extension, qui s'endort. Panneau fermé, l'icône de l'extension porte en rouge le nombre d'écarts rouges non lus ; rien pour l'ambre, et aucune notification système.
 - **Ses écarts de voix** (contrôle 2) se regroupent : une ligne par conversation et par shift, pas une par message, pour ne pas noyer les interdits.
 - **Dans son espace**, la liste des écarts de son shift, la sienne seulement.
-- **Avant l'envoi, ensuite** : quand la capture montre que l'extension peut lire le champ de saisie de Reveal, les contrôles 1 et 2 passent aussi sur le texte qu'il tape, en ambre ou en rouge, sans rien bloquer. Ils tournent sur le serveur, jamais dans la page, et le texte n'est pas gardé tant qu'il n'est pas envoyé.
+- **Avant l'envoi, ensuite** : quand la capture montre que l'extension peut lire le champ de saisie de Reveal, les contrôles 1 et 2 passent aussi sur le texte qu'il tape, en ambre ou en rouge, sans rien bloquer. Un script de contenu lit le champ sans rien afficher dans la page ; le texte part au serveur après une pause de frappe, pas à chaque touche ; les contrôles tournent sur le serveur, les couleurs s'affichent dans le panneau, jamais dans le champ, et le texte n'est pas gardé tant qu'il n'est pas envoyé.
 
 ### 5. Qui d'autre le voit
 
@@ -89,7 +90,7 @@ Négatives, à surveiller :
 - Le relevé arrive après l'envoi, le temps que la capture lise le message : il corrige la suite, pas ce qui est parti.
 - Des faux signaux en ambre au début, surtout sur les faits : le contrôle 3 reste ambre et passe ses évals avant d'être affiché.
 - Tout dépend de la capture : sans elle, rien n'est relu.
-- Si la capture ne dit pas quel membre a écrit, un écart sur des fans partagés n'est attribué à personne.
+- Si la capture ne dit pas quel membre a écrit et qu'aucune extension ne l'a vu partir, un écart sur des fans partagés n'est attribué à personne.
 
 ## Alternatives rejetées
 
