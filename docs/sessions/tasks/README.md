@@ -71,10 +71,10 @@ Branche : task/<id>-<slug>
 | EQ-06 | Factures des prestataires : autofacturation, avoirs, export comptable | équipe | done | EQ-04, EQ-05 |
 | EQ-07 | Import de l'historique d'Imperium (optionnel) | équipe | blocked (pas de base d'Imperium) | EQ-01 à EQ-06 |
 | EQ-08 | Mode hybride : passage à l'humain pour vendre, routage et attribution | 3-4 | blocked (capture Reveal, clés) | EQ-02, P6-01 |
-| EQ-09 | PWA de la créatrice : routine, revenus, qui est en poste | 5 | todo (second temps) | EQ-01, EQ-02, EQ-04 |
+| EQ-09 | PWA de la créatrice : routine, revenus, qui est en poste | 5 | done (remplacée par CR-01 à CR-07, ADR 0042) | EQ-01, EQ-02, EQ-04 |
 | EQ-10 | Connexion et premier accès du chatteur | équipe | todo | EQ-01, EQ-11 |
 | EQ-11 | Shell par rôle : rail, barre du téléphone et gardes de route | équipe | todo | ADR 0024, EQ-01 (`/v1/me`) |
-| EQ-12 | Annonces, prise de poste et notifications de l'équipe, sans Telegram | équipe | todo | EQ-02, EQ-10, EQ-11 |
+| EQ-12 | Annonces, prise de poste et notifications de l'équipe, sans Telegram | équipe | todo | CR-01, EQ-02, CR-13, EQ-10, EQ-11 |
 | EQ-13 | Accès d'un chatteur borné à son shift | équipe | todo | ADR 0025, EQ-01, EQ-02, filtre des conversations routées |
 | EQ-14 | Gestes de la fiche d'un membre et départ | équipe | in_progress | EQ-01 (gestes) ; EQ-02, EQ-04 à EQ-06 (départ) |
 | EQ-15 | Double authentification pour le propriétaire et les managers | équipe | todo | EQ-01, EQ-10, EQ-11 |
@@ -82,6 +82,19 @@ Branche : task/<id>-<slug>
 | EQ-17 | Mise en service de la paie : sauvegardes, comptable, paie à blanc | équipe | in_progress | EQ-04 à EQ-06, EQ-15, déploiement |
 | EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | todo | EQ-11 |
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
+| CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
+| CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
+| CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | todo | EQ-03, EQ-04, CR-01 (téléphone) |
+| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | todo | CR-02, CR-03, EQ-01 (paramètres de plateforme) |
+| CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
+| CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
+| CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
+| CR-08 | Plan de publication du feed : la semaine préparée, acceptée d'un geste, programmée dans Reveal | espaces | blocked (capture Reveal) | CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la garde d'écriture (ADR 0018) |
+| CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (signaux) ; blocked (rapprochement) | CR-03 ; pour le rapprochement, le connecteur Reveal (`listTransactions`) et l'attribution des ventes (EQ-08) |
+| CR-10 | Retours de l'IA aux chatteurs, chaque semaine, sans effet sur la paie | espaces | blocked (lecture des messages de Reveal avec leur auteur, clé du fournisseur) | le connecteur Reveal (messages et auteur), la passerelle LLM, la rubrique des évaluations |
+| CR-11 | Mass DM : les médias déposés, envoyés aux listes de fans, jamais deux fois | espaces | blocked (capture Reveal) | CR-06, CR-08, la capture Reveal |
+| CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
+| CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |

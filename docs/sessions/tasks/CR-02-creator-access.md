@@ -1,0 +1,33 @@
+# CR-02 Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe
+Statut : todo (ADR 0042 § 1 et § 2, acceptée par Charles le 02/11/2026)
+Phase : espaces (ADR 0042)
+Dépend de : CR-01, ADR 0042, EQ-11
+Branche : task/cr-02-creator-access
+
+## Objectif
+La créatrice se connecte par une invitation et voit tout son compte (ventes, fans, conversations en lecture), jamais rien de l'équipe, et la base le garantit.
+
+## Contexte à lire
+`docs/adr/0042-creator-space.md` (§ 1, § 2, § 8), ADR 0023 (§ Données et RLS), ADR 0024, ADR 0025, `docs/architecture/threat-model.md`, le module `team` (vue « qui est en poste »), les liens d'invitation existants (`packages/contracts/src/invitation-links.ts`).
+
+## À faire
+- [ ] Invitation de la créatrice par le propriétaire depuis Créatrices : lien à usage unique, 72 h, rôle `creator` lié à sa fiche ; réutiliser le mécanisme d'invitation existant.
+- [ ] Rail de la créatrice (ADR 0042 § 8) : Aujourd'hui · Agenda · Ventes · Contenu · Moi, chaque onglet n'apparaissant qu'avec son écran (ADR 0024).
+- [ ] Lectures ouvertes au rôle `creator`, bornées à sa créatrice : fans (pseudo, dépenses, notes), conversations en lecture seule, qui est en poste (nom affiché et créneau). Aucune route d'écriture vers un fan.
+- [ ] Fermetures prouvées : `team_members`, relevés, factures, avoirs, versements, dossiers, retours de chatting (CR-10) restent illisibles pour elle.
+- [ ] Journal : chaque ouverture de conversation par la créatrice, comme pour un chatteur.
+- [ ] Moi : profil, préférences de notifications (CR-01), déconnexion de ses appareils.
+- [ ] Base (propriétaire de `packages/db`) : le chemin de lecture de la créatrice pose deux réglages de transaction, `app.account_role`, déduit de `user.role` lu en base comme `withMember` déduit le scope et jamais d'après l'appelant, et `app.creator_id`, lu dans `user.creator_ids`, jamais dans la requête. Une contrainte en base veut qu'un compte `creator` porte exactement un `creator_id` (`role <> 'creator' or cardinality(creator_ids) = 1`), par une migration dont Bilan donne le numéro. Une politique RLS **restrictive** `FOR INSERT, UPDATE, DELETE`, écrite contre `current_setting('app.account_role', true) is distinct from 'creator'`, refuse ces écritures sur `conversations`, `messages`, `fans` et `media_descriptions` ; ses trois écritures permises (description d'un de ses médias, légende d'une de ses publications, retrait d'une publication prévue) ont chacune leur politique (ADR 0042 § 2).
+- [ ] Restent fermés : brouillons non envoyés, verdicts des gardes, `llm_calls` et prompts, notes de supervision (des lignes : une politique `SELECT` restrictive les ferme) ; et l'auteur d'un message envoyé (ADR 0021), qui est une colonne et que la RLS ne cache pas : il se ferme par une lecture qui ne le sélectionne pas et par un contrat Zod `strict` de la réponse de la créatrice, sans champ auteur. Elle voit le message, jamais qui l'a écrit.
+- [ ] L'onglet Persona qu'elle a aujourd'hui passe dans Moi (ADR 0042 § 8).
+
+## Critères d'acceptation
+- Tests d'intégration RLS (Postgres) : une créatrice lit ses fans et ses conversations, jamais ceux d'une autre ; elle ne lit aucune ligne d'équipe ni de paie, ni brouillon, verdict ou appel au modèle ; un compte `creator` sans `creator_id` ou avec deux est refusé par la base ; toute écriture sur `conversations`, `messages`, `fans` et `media_descriptions` est refusée hors de ses trois écritures permises.
+- Auteur d'un envoi : test d'intégration par la route et par le contrat (la réponse ne porte aucun champ auteur, un champ de trop fait échouer le contrat `strict`).
+- Le lien d'invitation expiré ou déjà servi est refusé.
+- Finition : captures Nuit et Jour, téléphone et bureau, mouvement réduit.
+
+## Hors périmètre
+Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
+
+## Notes de session

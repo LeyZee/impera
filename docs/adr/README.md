@@ -71,3 +71,4 @@ Date : AAAA-MM-JJ
 | 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | accepted (remplace 0030 § 2 et § 4 pour le seul contenu déposé) |
 | 0045 | Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt | accepted (remplace dans 0031 la phrase « la seule porte ») |
 | 0046 | Accès au dashboard : deuxième facteur, connexions bornées, alertes de sécurité | accepted (remplace security.md § 1 sur l'exposition du dashboard) |
+| 0048 | L'IA dans le calendrier des shifts : ses heures se lisent à côté de celles des chatteurs | accepted (précise 0045) |
