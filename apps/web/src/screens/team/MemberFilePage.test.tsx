@@ -181,6 +181,38 @@ describe('Équipe › Membres › Dossier', () => {
     expect(server.writes[0]?.body).toMatchObject({ regimeId: BENIN_REGIME.id, from: '2026-11-16' });
   });
 
+  it('starts a new regime after the one set ahead, and sends the same key again after a lost answer', async () => {
+    server.file = fileOf({
+      regimes: [
+        contractorRegimeOf(2, BENIN_DRAFT, '2026-12-01'),
+        contractorRegimeOf(1, BENIN_REGIME, '2026-11-01'),
+      ],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Attribuer un régime' }));
+    const from = within(dialog()).getByLabelText('À partir du');
+    expect(from.getAttribute('min')).toBe('2026-12-02');
+    expect(within(dialog()).getByDisplayValue('2026-12-02')).toBe(from);
+    fireEvent.change(from, { target: { value: '2026-12-01' } });
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
+    expect(
+      within(dialog()).getByText('Après le régime déjà prévu, le 2 décembre 2026 au plus tôt.'),
+    ).toBeTruthy();
+    expect(server.writes).toEqual([]);
+
+    fireEvent.change(from, { target: { value: '2027-01-01' } });
+    server.refusal = { status: 503, code: 'unavailable' };
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
+    await within(dialog()).findByRole('alert');
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    const [lost, again] = server.writes.map((one) => one.body);
+    expect(again).toEqual(lost);
+    expect(again).toMatchObject({ from: '2027-01-01' });
+  });
+
   it('says a regime set ahead, and a member without any', async () => {
     server.file = fileOf({
       regimes: [

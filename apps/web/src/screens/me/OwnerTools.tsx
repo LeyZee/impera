@@ -5,13 +5,14 @@ import {
   type ContractorFile,
 } from '@nirvana/contracts';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useId, useMemo, useState, type JSX, type SyntheticEvent } from 'react';
+import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { Refusal, useFileSend } from './FileParts';
 
 import { assignRegime, setPrefix, verifyProfile } from '@/contractors/api';
 import {
   askedText,
+  earliestRegimeDay,
   prefixOf,
   regimeAhead,
   regimeInForce,
@@ -307,13 +308,15 @@ function AssignDialog({
 }): JSX.Element {
   const id = useId();
   const { busy, refusal, send } = useFileSend(onClose);
+  const earliest = earliestRegimeDay(file);
   const [regimeId, setRegimeId] = useState(available[0]?.id ?? '');
-  const [from, setFrom] = useState(file.today);
+  const [from, setFrom] = useState(earliest);
   const [tried, setTried] = useState(false);
-  // One key per choice: the same choice sent again is the same assignment, another one is a new one.
-  const key = useMemo(() => crypto.randomUUID(), [regimeId, from]);
+  // One key per choice, kept in state (a memo is a cache React may drop): the same choice sent again after a lost
+  // answer is the same assignment; a choice changed draws a new key.
+  const [key, setKey] = useState(() => crypto.randomUUID());
   const chosen = available.find((regime) => regime.id === regimeId) ?? null;
-  const fromOk = /^\d{4}-\d{2}-\d{2}$/u.test(from) && from >= file.today;
+  const fromOk = /^\d{4}-\d{2}-\d{2}$/u.test(from) && from >= earliest;
 
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
@@ -331,7 +334,7 @@ function AssignDialog({
   return (
     <Dialog
       title={`Attribuer un régime à ${name}`}
-      lead={`Un régime de ${countryName(file.country)}, à partir d’aujourd’hui au plus tôt : jamais en arrière.`}
+      lead={`Un régime de ${countryName(file.country)}, à partir d’aujourd’hui au plus tôt et après le dernier déjà attribué : jamais en arrière.`}
       busy={busy}
       onClose={onClose}
     >
@@ -353,6 +356,7 @@ function AssignDialog({
                 value={regimeId}
                 onChange={(event) => {
                   setRegimeId(event.target.value);
+                  setKey(crypto.randomUUID());
                 }}
               >
                 {available.map((regime) => (
@@ -375,17 +379,20 @@ function AssignDialog({
                 id={`${id}-from`}
                 type="date"
                 className="nv-field__control nv-glass nv-num"
-                min={file.today}
+                min={earliest}
                 value={from}
                 aria-invalid={tried && !fromOk}
                 aria-describedby={`${id}-from-hint`}
                 onChange={(event) => {
                   setFrom(event.target.value);
+                  setKey(crypto.randomUUID());
                 }}
               />
               <p id={`${id}-from-hint`} className={tried && !fromOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
                 {tried && !fromOk
-                  ? `Aujourd’hui au plus tôt, le ${fullDay(file.today)}.`
+                  ? earliest === file.today
+                    ? `Aujourd’hui au plus tôt, le ${fullDay(earliest)}.`
+                    : `Après le régime déjà prévu, le ${fullDay(earliest)} au plus tôt.`
                   : 'Ses relevés en attente sont repris ce jour-là.'}
               </p>
             </div>

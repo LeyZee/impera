@@ -5,6 +5,7 @@ import {
   documentDatesText,
   documentStanding,
   documentStateText,
+  earliestRegimeDay,
   identityLines,
   olderDocuments,
   prefixOf,
@@ -47,6 +48,16 @@ describe('the regime of a file', () => {
     expect(regimeAhead(file)?.from).toBe('2026-11-20');
     expect(regimeInForce({ today: '2026-10-31', regimes })).toBeNull();
     expect(regimeAhead({ today: '2026-12-01', regimes })).toBeNull();
+  });
+
+  it('starts a new regime today at the earliest, and after the last one given', () => {
+    expect(earliestRegimeDay({ today: '2026-11-05', regimes: [] })).toBe('2026-11-05');
+    const inForce = contractorRegimeOf(1, BENIN_REGIME, '2026-11-01');
+    expect(earliestRegimeDay({ today: '2026-11-05', regimes: [inForce] })).toBe('2026-11-05');
+    // Given today: the next starts tomorrow, as the server's `assertRegimeChange` wants.
+    expect(earliestRegimeDay({ today: '2026-11-01', regimes: [inForce] })).toBe('2026-11-02');
+    const ahead = contractorRegimeOf(2, BENIN_DRAFT, '2026-12-01');
+    expect(earliestRegimeDay({ today: '2026-11-05', regimes: [ahead, inForce] })).toBe('2026-12-02');
   });
 
   it('offers only the regimes of the member’s country, and says what each asks for', () => {
@@ -101,16 +112,48 @@ describe('the documents', () => {
     const pending = documentOf(2, { issuedOn: '2026-10-20', review: null });
     const accepted = documentOf(1, { remindFrom: null });
     const documents = [refused, pending, accepted];
-    const standing = documentStanding('tax_residence', documents);
+    const standing = documentStanding('tax_residence', documents, '2026-11-05');
     expect(standing).toEqual({ kind: 'pending', document: pending });
     expect(olderDocuments('tax_residence', documents, standing)).toEqual([refused, accepted]);
-    expect(documentStanding('tax_residence', [refused])).toEqual({ kind: 'refused', document: refused });
-    expect(documentStanding('urssaf_vigilance', documents)).toEqual({ kind: 'missing' });
+    expect(documentStanding('tax_residence', [refused], '2026-11-05')).toEqual({
+      kind: 'refused',
+      document: refused,
+    });
+    expect(documentStanding('urssaf_vigilance', documents, '2026-11-05')).toEqual({ kind: 'missing' });
+  });
+
+  it('follows the newest issued, as the server does, though an older year was filed after it', () => {
+    const year2027 = documentOf(1, {
+      issuedOn: '2027-01-08',
+      lastDay: '2027-12-31',
+      remindFrom: '2027-12-01',
+    });
+    // The certificate of 2026 filed again, late: it does not take the place of the one of 2027.
+    const lateFiled = documentOf(2, { remindFrom: null });
+    expect(documentStanding('tax_residence', [lateFiled, year2027], '2027-01-10')).toEqual({
+      kind: 'accepted',
+      document: year2027,
+    });
+    // The same day of issue: the latest filed stays.
+    const again = documentOf(3, { review: null, remindFrom: '2026-12-01' });
+    expect(documentStanding('tax_residence', [again, lateFiled], '2026-11-05').kind).toBe('pending');
+  });
+
+  it('says an accepted document past its last day expired, on the file’s day', () => {
+    const certificate = documentOf(1);
+    expect(documentStanding('tax_residence', [certificate], '2026-12-31').kind).toBe('accepted');
+    expect(documentStanding('tax_residence', [certificate], '2027-01-01')).toEqual({
+      kind: 'expired',
+      document: certificate,
+    });
+    expect(documentStateText(certificate, '2027-01-01')).toBe('Acceptée, échue le 31 décembre 2026');
   });
 
   it('says a document’s check and its dates', () => {
-    expect(documentStateText(documentOf(1))).toBe('Acceptée jusqu’au 31 décembre 2026');
-    expect(documentStateText(documentOf(2, { review: null }))).toBe('En attente de vérification');
+    expect(documentStateText(documentOf(1), '2026-11-05')).toBe('Acceptée jusqu’au 31 décembre 2026');
+    expect(documentStateText(documentOf(2, { review: null }), '2027-01-05')).toBe(
+      'En attente de vérification',
+    );
     const vigilance = documentOf(3, {
       kind: 'urssaf_vigilance',
       issuedOn: '2026-10-01',
@@ -138,6 +181,38 @@ describe('the documents', () => {
     });
     expect(reminderText(vigilance, '2027-03-02', true)).toBe(
       'Ton attestation de vigilance se termine le 31 mars 2027 : dépose la nouvelle avant.',
+    );
+  });
+
+  it('says what holds once the last day passed: the payouts blocked, the invoices with a warning', () => {
+    const certificate = documentOf(1);
+    expect(reminderText(certificate, '2027-01-02', true)).toBe(
+      'Ton attestation de 2026 s’est terminée le 31 décembre 2026. Tes versements sont bloqués jusqu’à ce que celle de 2027 soit acceptée : demande-la à la DGI et dépose-la ici.',
+    );
+    expect(reminderText(certificate, '2027-01-02', false)).toBe(
+      'Son attestation de 2026 s’est terminée le 31 décembre 2026 : ses versements sont bloqués jusqu’à ce que celle de 2027 soit acceptée.',
+    );
+    const vigilance = documentOf(3, {
+      kind: 'urssaf_vigilance',
+      lastDay: '2027-03-31',
+      remindFrom: '2027-03-01',
+    });
+    expect(reminderText(vigilance, '2027-04-01', true)).toBe(
+      'Ton attestation de vigilance s’est terminée le 31 mars 2027 : dépose la nouvelle. Tes factures partent avec un avertissement en attendant.',
+    );
+    expect(reminderText(vigilance, '2027-04-01', false)).toBe(
+      'Son attestation de vigilance s’est terminée le 31 mars 2027 : ses factures partent avec un avertissement.',
+    );
+  });
+
+  it('says the last day the API set when a certificate states another than the 31st of December', () => {
+    const certificate = documentOf(1, {
+      validUntil: '2026-11-30',
+      lastDay: '2026-11-30',
+      remindFrom: '2026-11-01',
+    });
+    expect(reminderText(certificate, '2026-11-02', true)).toMatch(
+      /^Ton attestation se termine le 30 novembre 2026\. Sans celle de 2027/u,
     );
   });
 });

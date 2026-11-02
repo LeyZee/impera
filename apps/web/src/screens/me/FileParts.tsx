@@ -291,6 +291,9 @@ function standingChip(standing: DocumentStanding, reader: FileReader): JSX.Eleme
       );
     case 'accepted':
       return <Chip tone="ok">Acceptée</Chip>;
+    case 'expired':
+      // Amber, never red: a document to renew is a warning (the guide).
+      return <Chip tone="warn">Échue</Chip>;
     case 'refused':
       return <Chip tone="warn">Refusée</Chip>;
   }
@@ -300,18 +303,21 @@ function standingChip(standing: DocumentStanding, reader: FileReader): JSX.Eleme
 function DocumentLine({
   memberId,
   document,
+  today,
   reader,
   onReview,
 }: {
   memberId: string;
   document: ContractorFileDocument;
+  /** The file's day: an accepted document past it reads « échue ». */
+  today: string;
   reader: FileReader;
   onReview: (document: ContractorFileDocument) => void;
 }): JSX.Element {
   return (
     <>
       <p className="cf-item__sub">
-        {documentDatesText(document)} · {documentStateText(document)}
+        {documentDatesText(document)} · {documentStateText(document, today)}
       </p>
       {document.review?.decision === 'refused' ? (
         <p className="cf-item__reason">Motif : « {document.review.reason} »</p>
@@ -381,7 +387,7 @@ export function DocumentsPanel({
       ) : (
         <ul className="cf-list">
           {regime.documents.map((kind) => {
-            const standing = documentStanding(kind, file.documents);
+            const standing = documentStanding(kind, file.documents, file.today);
             const older = olderDocuments(kind, file.documents, standing);
             const shown = standing.kind === 'missing' ? null : standing.document;
             const reminder = shown === null ? null : reminderText(shown, file.today, reader.self);
@@ -401,6 +407,7 @@ export function DocumentsPanel({
                     <DocumentLine
                       memberId={file.memberId}
                       document={shown}
+                      today={file.today}
                       reader={reader}
                       onReview={onReview}
                     />
@@ -443,6 +450,7 @@ export function DocumentsPanel({
                             <DocumentLine
                               memberId={file.memberId}
                               document={document}
+                              today={file.today}
                               reader={reader}
                               onReview={onReview}
                             />

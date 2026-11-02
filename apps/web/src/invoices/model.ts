@@ -243,7 +243,7 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
     case 'billing_settings_missing_conflict':
       return 'Enregistre d’abord l’identité de l’agence dans Réglages › Facturation.';
     case 'billing_regime_backdated_unprocessable':
-      return 'Un régime s’attribue à partir d’aujourd’hui au plus tôt.';
+      return 'Un régime s’attribue à partir d’aujourd’hui au plus tôt, et après le dernier déjà attribué.';
     case 'billing_regime_country_unprocessable':
       return 'Ce régime n’est pas celui du pays du prestataire.';
     case 'billing_regime_id_conflict':

@@ -25,7 +25,7 @@ import {
 } from '@nirvana/contracts';
 import { z } from 'zod';
 
-import { dayOf, fullDay } from '@/scheduling/time';
+import { addDays, dayOf, fullDay } from '@/scheduling/time';
 import { eurosInput, isSiren, parseEuros, vatOfSiren } from '@/settings/billing/model';
 
 /**
@@ -87,20 +87,37 @@ export function textStanding(
   return { kind: 'to_accept', text: newest, before: null };
 }
 
-/** Where a document of a kind stands: never filed, or its newest one not refused, else its newest refused. */
+/**
+ * Where a document of a kind stands on the file's day: never filed; the one the server follows, the newest issued the
+ * owner has not refused (`newestOf` of the API: a renewal filed even before its check takes the place of the older, an
+ * older year filed late does not), waiting, accepted, or accepted but past its last day; else the latest filed refused.
+ */
 export type DocumentStanding =
   | { readonly kind: 'missing' }
-  | { readonly kind: 'pending' | 'accepted' | 'refused'; readonly document: ContractorFileDocument };
+  | {
+      readonly kind: 'pending' | 'accepted' | 'expired' | 'refused';
+      readonly document: ContractorFileDocument;
+    };
+
+/** An accepted document past its last day, on the file's day (never the device's): it no longer covers a payout. */
+export const isExpired = (document: ContractorFileDocument, today: string): boolean =>
+  document.review?.decision === 'accepted' && document.lastDay < today;
 
 export function documentStanding(
   kind: ContractorDocumentKind,
   documents: readonly ContractorFileDocument[],
+  today: string,
 ): DocumentStanding {
   const ofKind = documents.filter((document) => document.kind === kind);
-  const kept = ofKind.find((document) => document.review?.decision !== 'refused');
+  // The list comes the latest filed first: on the same day of issue, the latest filed stays, as the server's.
+  let kept: ContractorFileDocument | undefined;
+  for (const document of ofKind)
+    if (document.review?.decision !== 'refused' && (kept === undefined || document.issuedOn > kept.issuedOn))
+      kept = document;
   const shown = kept ?? ofKind[0];
   if (shown === undefined) return { kind: 'missing' };
   if (shown.review === null) return { kind: 'pending', document: shown };
+  if (isExpired(shown, today)) return { kind: 'expired', document: shown };
   return { kind: shown.review.decision, document: shown };
 }
 
@@ -115,11 +132,13 @@ export const olderDocuments = (
       document.kind === kind && (standing.kind === 'missing' || document.id !== standing.document.id),
   );
 
-/** A document's check in words (glossary « Vérification d'une pièce »). */
-export function documentStateText(document: ContractorFileDocument): string {
+/** A document's check in words (glossary « Vérification d'une pièce »), on the file's day. */
+export function documentStateText(document: ContractorFileDocument, today: string): string {
   if (document.review === null) return 'En attente de vérification';
   if (document.review.decision === 'refused') return 'Refusée';
-  return `Acceptée jusqu’au ${fullDay(document.lastDay)}`;
+  return isExpired(document, today)
+    ? `Acceptée, échue le ${fullDay(document.lastDay)}`
+    : `Acceptée jusqu’au ${fullDay(document.lastDay)}`;
 }
 
 /**
@@ -129,15 +148,29 @@ export function documentStateText(document: ContractorFileDocument): string {
  */
 export function reminderText(document: ContractorFileDocument, today: string, self: boolean): string | null {
   if (document.remindFrom === null || document.remindFrom > today) return null;
+  const end = fullDay(document.lastDay);
+  // Past its last day, the reminder says what holds now (ADR 0041 § 5): the payouts are blocked, no longer will be.
+  const ended = today > document.lastDay;
   if (document.kind === 'tax_residence') {
-    const next = String(Number(document.lastDay.slice(0, 4)) + 1);
+    const year = document.lastDay.slice(0, 4);
+    const next = String(Number(year) + 1);
+    if (ended)
+      return self
+        ? `Ton attestation de ${year} s’est terminée le ${end}. Tes versements sont bloqués jusqu’à ce que celle de ${next} soit acceptée : demande-la à la DGI et dépose-la ici.`
+        : `Son attestation de ${year} s’est terminée le ${end} : ses versements sont bloqués jusqu’à ce que celle de ${next} soit acceptée.`;
+    // The guide's sentence (« 31 décembre »), the day the API set when the certificate states another.
+    const until = document.lastDay.endsWith('-12-31') ? '31 décembre' : end;
     return self
-      ? `Ton attestation se termine le 31 décembre. Sans celle de ${next}, tes versements à partir du 1er janvier ${next} seront bloqués : demande-la dès janvier.`
-      : `Son attestation se termine le 31 décembre. Sans celle de ${next}, ses versements à partir du 1er janvier ${next} seront bloqués.`;
+      ? `Ton attestation se termine le ${until}. Sans celle de ${next}, tes versements à partir du 1er janvier ${next} seront bloqués : demande-la dès janvier.`
+      : `Son attestation se termine le ${until}. Sans celle de ${next}, ses versements à partir du 1er janvier ${next} seront bloqués.`;
   }
+  if (ended)
+    return self
+      ? `Ton attestation de vigilance s’est terminée le ${end} : dépose la nouvelle. Tes factures partent avec un avertissement en attendant.`
+      : `Son attestation de vigilance s’est terminée le ${end} : ses factures partent avec un avertissement.`;
   return self
-    ? `Ton attestation de vigilance se termine le ${fullDay(document.lastDay)} : dépose la nouvelle avant.`
-    : `Son attestation de vigilance se termine le ${fullDay(document.lastDay)}.`;
+    ? `Ton attestation de vigilance se termine le ${end} : dépose la nouvelle avant.`
+    : `Son attestation de vigilance se termine le ${end}.`;
 }
 
 /** A document's dates, as the file shows them: its issue, and the end it states. */
@@ -335,6 +368,18 @@ const PREFIX = new RegExp(INVOICE_PREFIX_PATTERN, 'u');
 export function prefixOf(text: string): string | null {
   const prefix = text.trim().toUpperCase();
   return PREFIX.test(prefix) ? prefix : null;
+}
+
+/**
+ * The first day a new regime may start (`assertRegimeChange` of the API): today at the earliest, and after the last
+ * one given, in force or set ahead.
+ */
+export function earliestRegimeDay(file: Pick<ContractorFile, 'regimes' | 'today'>): string {
+  const last = file.regimes.reduce<string | null>(
+    (max, regime) => (max === null || regime.from > max ? regime.from : max),
+    null,
+  );
+  return last === null || last < file.today ? file.today : addDays(last, 1);
 }
 
 /** The regimes the owner may give a member: those written for his country, the newest first. */

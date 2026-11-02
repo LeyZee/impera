@@ -247,6 +247,21 @@ describe('Moi › Dossier', () => {
     expect(within(older).getByText('Fichier effacé')).toBeTruthy();
   });
 
+  it('says a certificate past its year expired in amber, and what it blocks now', async () => {
+    server.file = fileOf({ today: '2027-01-04', documents: [documentOf(1)] });
+    renderPage();
+    const documents = await waitFor(() => panelOf('Tes pièces'));
+    const certificate = await waitFor(() => itemOf(documents, 'Attestation de résidence fiscale'));
+    expect(within(certificate).getByText('Échue').className).toBe('rp-chip rp-chip--warn');
+    expect(within(certificate).queryByText('Acceptée')).toBeNull();
+    expect(certificate.textContent).toContain('Acceptée, échue le 31 décembre 2026');
+    expect(certificate.dataset['remind']).toBe('true');
+    expect(
+      within(certificate).getByText(/^Ton attestation de 2026 s’est terminée le 31 décembre 2026\./u)
+        .textContent,
+    ).toContain('Tes versements sont bloqués jusqu’à ce que celle de 2027 soit acceptée');
+  });
+
   it('gives a manager his two screens of Moi', async () => {
     server.members = [IRIS];
     server.file = fileOf({
