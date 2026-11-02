@@ -34,7 +34,7 @@ Ordre : les compléments 1, 2, 4 et 5 dans une PR d'API, puis le 3 (le job et so
 
 ## Où vivent les écrans
 ADR 0024 fixe les sections ; les routes :
-- **Moi** (`/moi`) devient une section prête, ouverte au chatteur et au manager comme leurs rails le prévoient déjà ; sur le téléphone elle reste sous « Plus » (la colonne « Téléphone » de l'ADR 0024 ne change pas) ; l'apparence reste dans le menu du compte (NAV-03). `/moi` mène à `/moi/dossier` (dossier, contrat et mandat). Le manager y a aussi `/moi/factures` : ses propres documents, le même écran que celui du chatteur (ADR 0024 : pour le manager, ses commissions sont dans Moi) ; son planning et ses commissions dans Moi sont hors de cette fiche.
+- **Moi** (`/moi`) devient une section prête, ouverte au chatteur et au manager comme leurs rails le prévoient déjà ; sur le téléphone, elle devient le cinquième onglet de la barre pour ces deux rôles, qui n'ont alors plus de « Plus » (ADR 0024, colonne « Téléphone » : « les mêmes cinq » ; `layoutRail` le fait dès que la section est prête) ; l'apparence reste dans le menu du compte (NAV-03). `/moi` mène à `/moi/dossier` (dossier, contrat et mandat). Le manager y a aussi `/moi/factures` : ses propres documents, le même écran que celui du chatteur (ADR 0024 : pour le manager, ses commissions sont dans Moi) ; son planning et ses commissions dans Moi sont hors de cette fiche.
 - **Commissions** (`/commissions`, chatteur) devient un layout à deux onglets : « Relevés » (l'index, la page d'aujourd'hui, ses liens inchangés) et « Factures » (`/commissions/factures`).
 - **Le dossier d'un membre** : une route `/equipe/membres/:memberId/dossier`, ouverte depuis le panneau du membre (`EditMember`) ; le propriétaire seul, tout autre rôle est renvoyé vers `/equipe/membres`.
 - **Paie** : six onglets dans l'ordre de l'ADR 0024, « Quinzaine », « Historique », « Primes et malus », « Objectifs », « Factures » (`/paie/factures`, propriétaire et manager), « Exports » (`/paie/exports`, le propriétaire seul : l'onglet n'apparaît pas pour un manager, et l'adresse le renvoie vers `/paie`, comme Facturation renvoie vers `/reglages`). Le repli du `SubNav` entre 821 et 1 100 px est celui que l'ADR 0024 prévoit (défilement horizontal).
@@ -57,7 +57,7 @@ Quatre PR d'écrans, chacune relue par Équipe, chacune partie seulement quand l
 - **8a** : Commissions › Factures, `/moi/factures` et Paie › Factures (compléments 1) ;
 - **8b** : Moi › Dossier et le dossier d'un membre (complément 2 ; le guide du Bénin une fois validé par Charles) ;
 - **8c** : Réglages › Facturation et Paie › Exports (complément 4) ;
-- **8d** : Aujourd'hui et la finition de l'ensemble (compléments 1 et 5).
+- **8d** : Aujourd'hui et la finition de l'ensemble (compléments 1, 2 et 5 : `remindFrom` pour l'Aujourd'hui du chatteur).
 
 ## Critères d'acceptation
 - Aucun écran ne recalcule une échéance, un état d'acceptation, un règlement, un blocage ni un montant : il lit ce que l'API rend.
