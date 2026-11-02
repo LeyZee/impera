@@ -4,10 +4,13 @@ import {
   BackupCodesSchema,
   ClosedSessionsSchema,
   OpenSessionsSchema,
+  PasskeysSchema,
   REAUTHENTICATION_ERROR_CODE,
+  RemovedPasskeysSchema,
   type AccountSecurity,
   type ClosedSessions,
   type OpenSession,
+  type Passkey,
 } from '@nirvana/contracts';
 
 /**
@@ -109,4 +112,24 @@ export async function closeAccountSessions(userId: string): Promise<ClosedSessio
     method: 'POST',
   });
   return read(response, (body) => ClosedSessionsSchema.parse(body));
+}
+
+/** One's passkeys (ADR 0053 § 5): the device each was added from, its keychain, when added and last used. */
+export async function fetchOwnPasskeys(): Promise<readonly Passkey[]> {
+  return read(await call('/auth/passkeys'), (body) => PasskeysSchema.parse(body).passkeys);
+}
+
+/** Removes one of one's keys (a sensitive action); one already removed counts as removed. */
+export async function removePasskey(id: string): Promise<void> {
+  const response = await call(`/auth/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (response.ok || response.status === 404) return;
+  throw await refusalOf(response);
+}
+
+/** For the owner: removes every key of an account (a sensitive action); answers how many went. */
+export async function removeAccountPasskeys(userId: string): Promise<number> {
+  const response = await call(`/settings/security/accounts/${encodeURIComponent(userId)}/remove-passkeys`, {
+    method: 'POST',
+  });
+  return read(response, (body) => RemovedPasskeysSchema.parse(body).passkeys);
 }

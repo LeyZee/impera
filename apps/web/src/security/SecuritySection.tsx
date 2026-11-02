@@ -1,4 +1,4 @@
-import type { AccountSecurity, OpenSession } from '@nirvana/contracts';
+import type { AccountSecurity, OpenSession, Passkey } from '@nirvana/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import {
@@ -6,15 +6,19 @@ import {
   closeOtherSessions,
   closeSession,
   fetchAccounts,
+  fetchOwnPasskeys,
   fetchSessions,
   generateBackupCodes,
+  removeAccountPasskeys,
+  removePasskey,
   SECURITY_ERROR_MESSAGES,
   SecurityError,
 } from './api';
-import { ago, closedText, ROLE_LABELS, sessionsText } from './view';
+import { ago, closedText, dayText, passkeysText, ROLE_LABELS, sessionsText } from './view';
 
 import { BackupCodesList } from '@/auth/BackupCodesList';
 import { CodeInput } from '@/auth/CodeInput';
+import { addPasskey, canUsePasskeys, gestureName } from '@/auth/passkeys';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Panel, PanelSection } from '@/shell/layout';
 
@@ -26,13 +30,14 @@ const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
- * factor (`ownerId` given). A session shows its device, its network and when it was last used: never a full address, never a country
+ * factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
  * (no geographic base: Charles's choice of 02/11).
  */
 export function SecuritySection({ ownerId }: { ownerId?: string }): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <SessionsPanel />
+      <PasskeysPanel />
       <BackupCodesPanel />
       {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
     </div>
@@ -191,6 +196,168 @@ function SessionsPanel(): JSX.Element {
   );
 }
 
+const ADD_REFUSALS: Readonly<Record<'refused' | 'session_expired' | 'unavailable', string>> = {
+  refused: 'Cet appareil n’a pas demandé ton visage, ton doigt ou son code : la clé n’a pas été ajoutée.',
+  session_expired: SECURITY_ERROR_MESSAGES.session_expired,
+  unavailable: SECURITY_ERROR_MESSAGES.unavailable,
+};
+
+/**
+ * Clés d'accès (ADR 0053 § 5): one's keys, each by the device it was added from, its keychain, the day it was added
+ * and its last use; a key is added on this device after the password and the code (never a gesture), and removed
+ * after a confirmation. Closing sessions leaves the keys: two separate acts, side by side.
+ */
+function PasskeysPanel(): JSX.Element {
+  const [keys, setKeys] = useState<readonly Passkey[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ readonly removing: string } | 'adding' | null>(null);
+  const [canAdd] = useState(canUsePasskeys);
+  const gesture = gestureName();
+
+  const load = useCallback(async () => {
+    try {
+      setKeys(await fetchOwnPasskeys());
+      setError(null);
+    } catch (failure) {
+      setError(messageOf(failure));
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function add(): Promise<void> {
+    setBusy('add');
+    setNotice(null);
+    setError(null);
+    const result = await addPasskey().catch(() => ({ kind: 'unavailable' as const }));
+    setBusy(null);
+    switch (result.kind) {
+      case 'ok':
+        setNotice(`Clé ajoutée : ${result.passkey.device}. Tu te connecteras d’un geste sur cet appareil.`);
+        await load();
+        return;
+      case 'reauth_required':
+        setConfirming('adding');
+        return;
+      case 'already':
+        setNotice('Cet appareil a déjà une clé de ton compte.');
+        return;
+      case 'cancelled':
+        return;
+      case 'refused':
+      case 'session_expired':
+      case 'unavailable':
+        setError(ADD_REFUSALS[result.kind]);
+    }
+  }
+
+  async function remove(key: Passkey): Promise<void> {
+    setBusy(key.id);
+    setNotice(null);
+    setError(null);
+    try {
+      await removePasskey(key.id);
+      setConfirming(null);
+      setNotice(`Clé retirée : ${key.device} redemandera ton mot de passe et ton code.`);
+      await load();
+    } catch (failure) {
+      if (failure instanceof SecurityError && failure.kind === 'reauth_required') {
+        setConfirming({ removing: key.id });
+      } else setError(messageOf(failure));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const now = new Date();
+  return (
+    <Panel title="Clés d’accès" eyebrow="Face ID, empreinte">
+      <PanelSection>
+        {keys === null && error === null ? <p className={MUTED}>Chargement…</p> : null}
+        {keys === null ? null : keys.length === 0 ? (
+          <p className={MUTED}>
+            Aucune clé. Ajoute {gesture} pour te connecter d’un geste, sans mot de passe ni code&nbsp;; ton
+            code reste la porte de secours.
+          </p>
+        ) : (
+          <ul className={ROWS} aria-label="Clés d’accès">
+            {keys.map((key, index) => (
+              <li
+                key={key.id}
+                className="nv-enter flex flex-col gap-3 py-3 first:pt-0"
+                style={{ '--nv-i': index + 1 }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="font-semibold">{key.device}</span>
+                    <span className={MUTED}>
+                      {key.keychain === null ? '' : `${key.keychain} · `}ajoutée le {dayText(key.createdAt)} ·{' '}
+                      {key.lastUsedAt === null ? 'jamais utilisée' : `utilisée ${ago(key.lastUsedAt, now)}`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--sm shrink-0"
+                    disabled={busy !== null}
+                    aria-label={`Retirer la clé ${key.device}`}
+                    onClick={() => void remove(key)}
+                  >
+                    {busy === key.id ? 'Retrait…' : 'Retirer'}
+                  </button>
+                </div>
+                {confirming !== null && confirming !== 'adding' && confirming.removing === key.id ? (
+                  <PasswordPrompt
+                    passkey={{ excluding: key.id }}
+                    lead="Pour retirer cette clé, confirme ton mot de passe et ton code, ou un geste sur une autre clé."
+                    onConfirmed={() => void remove(key)}
+                    onCancel={() => {
+                      setConfirming(null);
+                    }}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {confirming === 'adding' ? (
+          <PasswordPrompt
+            passkey={false}
+            lead={`Pour ajouter ${gesture}, confirme d’abord ton mot de passe et ton code.`}
+            onConfirmed={() => {
+              setConfirming(null);
+              // A fresh tap: Safari opens Face ID only right after a gesture of the person.
+              setNotice(`C’est confirmé. Touche « Ajouter ${gesture} » pour créer la clé.`);
+            }}
+            onCancel={() => {
+              setConfirming(null);
+            }}
+          />
+        ) : canAdd ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm self-start"
+            disabled={busy !== null}
+            onClick={() => void add()}
+          >
+            {busy === 'add' ? 'Ajout…' : `Ajouter ${gesture}`}
+          </button>
+        ) : (
+          <p className={MUTED}>
+            Ce navigateur ne sait pas créer de clé d’accès&nbsp;: ajoute-la depuis ton téléphone.
+          </p>
+        )}
+        <p className="text-sm text-[var(--nv-ink-faint)]">
+          Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
+        </p>
+        <Outcome error={error} notice={notice} />
+      </PanelSection>
+    </Panel>
+  );
+}
+
 function BackupCodesPanel(): JSX.Element {
   const [step, setStep] = useState<'idle' | 'confirm' | 'shown'>('idle');
   const [codes, setCodes] = useState<readonly string[]>([]);
@@ -314,11 +481,14 @@ function BackupCodesPanel(): JSX.Element {
   );
 }
 
+/** The owner's two acts on an account: close its sessions, or remove its keys. */
+type Act = 'close' | 'keys';
+
 function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
   const [accounts, setAccounts] = useState<readonly AccountSecurity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ readonly userId: string; readonly act: Act } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -333,19 +503,27 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
     void load();
   }, [load]);
 
-  async function closeAll(account: AccountSecurity): Promise<void> {
-    setBusy(account.userId);
+  /** Closes every session of an account, or removes every key of it; both are sensitive actions. */
+  async function run(account: AccountSecurity, act: Act): Promise<void> {
+    setBusy(`${act}:${account.userId}`);
     setNotice(null);
     setError(null);
     try {
-      const closed = await closeAccountSessions(account.userId);
+      if (act === 'close') {
+        const closed = await closeAccountSessions(account.userId);
+        setNotice(`${account.name} : ${closedText(closed.sessions, closed.trustedDevices)}`);
+      } else {
+        const removed = await removeAccountPasskeys(account.userId);
+        setNotice(
+          `${account.name} : ${passkeysText(removed).replace('Aucune', 'aucune')} retirée${removed > 1 ? 's' : ''}. Ses sessions restent ouvertes.`,
+        );
+      }
       setConfirming(null);
-      setNotice(`${account.name} : ${closedText(closed.sessions, closed.trustedDevices)}`);
       await load();
     } catch (failure) {
-      if (failure instanceof SecurityError && failure.kind === 'reauth_required')
-        setConfirming(account.userId);
-      else setError(messageOf(failure));
+      if (failure instanceof SecurityError && failure.kind === 'reauth_required') {
+        setConfirming({ userId: account.userId, act });
+      } else setError(messageOf(failure));
     } finally {
       setBusy(null);
     }
@@ -388,23 +566,39 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
                         ? 'Code à 6 chiffres actif'
                         : 'Code à 6 chiffres pas encore activé'}
                     </span>
+                    <span className={MUTED}>{passkeysText(account.passkeys)}</span>
                     {account.userId === ownerId || account.sessions === 0 ? null : (
                       <button
                         type="button"
                         className="nv-btn nv-btn--plain nv-btn--sm"
                         disabled={busy !== null}
                         aria-label={`Fermer toutes les sessions de ${account.name}`}
-                        onClick={() => void closeAll(account)}
+                        onClick={() => void run(account, 'close')}
                       >
-                        {busy === account.userId ? 'Fermeture…' : 'Fermer ses sessions'}
+                        {busy === `close:${account.userId}` ? 'Fermeture…' : 'Fermer ses sessions'}
+                      </button>
+                    )}
+                    {account.userId === ownerId || account.passkeys === 0 ? null : (
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--plain nv-btn--sm"
+                        disabled={busy !== null}
+                        aria-label={`Retirer toutes les clés d’accès de ${account.name}`}
+                        onClick={() => void run(account, 'keys')}
+                      >
+                        {busy === `keys:${account.userId}` ? 'Retrait…' : 'Retirer ses clés'}
                       </button>
                     )}
                   </div>
                 </div>
-                {confirming === account.userId ? (
+                {confirming?.userId === account.userId ? (
                   <PasswordPrompt
-                    lead={`Pour fermer toutes les sessions de ${account.name}, confirme ton mot de passe et ton code.`}
-                    onConfirmed={() => void closeAll(account)}
+                    lead={
+                      confirming.act === 'close'
+                        ? `Pour fermer toutes les sessions de ${account.name}, confirme ton mot de passe et ton code.`
+                        : `Pour retirer toutes les clés d’accès de ${account.name}, confirme ton mot de passe et ton code.`
+                    }
+                    onConfirmed={() => void run(account, confirming.act)}
                     onCancel={() => {
                       setConfirming(null);
                     }}

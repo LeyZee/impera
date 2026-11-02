@@ -183,6 +183,9 @@ importers:
       '@nirvana/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@simplewebauthn/browser':
+        specifier: 13.3.0
+        version: 13.3.0
       '@tanstack/react-query':
         specifier: 5.104.4
         version: 5.104.4(@types/react@19.3.0)(react@19.3.1)
