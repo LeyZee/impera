@@ -1,6 +1,6 @@
 import { Writable } from 'node:stream';
 
-import { newId, TeamMemberIdSchema, UserIdSchema } from '@nirvana/contracts';
+import { newId, SecurityAlertPayloadSchema, TeamMemberIdSchema, UserIdSchema } from '@nirvana/contracts';
 import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -316,6 +316,24 @@ describe('invitation links (EQ-10)', () => {
     expect(resets).toContainEqual({
       details: { purpose: 'reset', sessionsEnded: 4, trustedDevicesEnded: 0, secondFactorReset: true },
     });
+    // His code put back to zero is told to the urgent groups (ADR 0046 § 8); his first link reset nothing.
+    const alerts = await test.admin.db
+      .select({ payload: schema.domainEvents.payload })
+      .from(schema.domainEvents)
+      .where(
+        sql`${schema.domainEvents.type} = 'security_alert' and ${schema.domainEvents.payload}->>'userId' = ${userId}
+          and ${schema.domainEvents.payload}->>'reason' = 'second_factor_reset'`,
+      );
+    const [alert, ...others] = alerts.map((row) => SecurityAlertPayloadSchema.parse(row.payload));
+    expect(others).toEqual([]);
+    expect(alert).toMatchObject({
+      reason: 'second_factor_reset',
+      userId,
+      role: 'operator',
+      via: 'invitation_link',
+    });
+    // Its network, never its address.
+    expect(alert && 'network' in alert ? alert.network : null).toMatch(/^10\.0\.\d+\.x$/u);
   });
 
   it('stops a burst on the redeem route', async () => {

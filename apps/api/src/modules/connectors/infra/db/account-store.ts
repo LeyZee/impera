@@ -2,6 +2,7 @@ import {
   AuditEntryIdSchema,
   ConnectorConfigSchema,
   CreatorIdSchema,
+  EVENT_PAYLOADS,
   EventIdSchema,
   JOB_MAX_ATTEMPTS,
   JOB_PAYLOADS,
@@ -135,6 +136,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
       withTenant(db, creatorId, async (tx) => {
         const [row] = await tx
           .select({
+            platform: schema.platformAccounts.platform,
             sessionState: schema.platformAccounts.sessionState,
             sessionCiphertext: schema.platformAccounts.sessionCiphertext,
           })
@@ -182,6 +184,28 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           details: { correlationId: meta.correlationId },
           createdAt: meta.at,
         });
+        // A valid session replaced by a different one (ADR 0046 § 8): the agent may now speak through another
+        // account. Renewing an expired session, or storing the same one again, is ordinary and says nothing.
+        if (
+          row.sessionState === 'valid' &&
+          row.sessionCiphertext !== null &&
+          !session.isSame(row.sessionCiphertext)
+        ) {
+          await insertEvent(
+            tx,
+            creatorId,
+            {
+              type: 'security_alert',
+              payload: EVENT_PAYLOADS.security_alert.parse({
+                reason: 'platform_session_replaced',
+                userId: meta.userId,
+                platformAccountId: id,
+                platform: PlatformSchema.parse(row.platform),
+              }),
+            },
+            meta,
+          );
+        }
       }),
 
     publish: (creatorId, body, meta) =>

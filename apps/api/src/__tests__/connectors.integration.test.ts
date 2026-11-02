@@ -11,7 +11,7 @@ import {
   type PlatformAccountId,
   type SessionState,
 } from '@nirvana/contracts';
-import { decryptSecret, eq, parseEncryptionKeys, schema, sql } from '@nirvana/db';
+import { and, decryptSecret, eq, parseEncryptionKeys, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -366,5 +366,31 @@ describe('connectors module (P0-06)', () => {
     await send('reveal-session-b');
     expect(await datedAt()).not.toBe(longAgo.getTime());
     expect((await accountRow(id)).sessionState).toBe('valid');
+    // Over an expired one, another session renews it: ordinary, nothing told.
+    await app.modules.connectors.sessions.markExpired(creatorId, id, 'test');
+    await send('reveal-session-c');
+
+    // Only `b` replacing `a` while it was valid is told to the urgent groups (ADR 0046 § 8), never the session.
+    const alerts = await test.admin.db
+      .select({ creatorId: schema.domainEvents.creatorId, payload: schema.domainEvents.payload })
+      .from(schema.domainEvents)
+      .where(
+        and(
+          eq(schema.domainEvents.type, 'security_alert'),
+          sql`${schema.domainEvents.payload}->>'platformAccountId' = ${id}`,
+        ),
+      );
+    expect(alerts).toEqual([
+      {
+        creatorId,
+        payload: {
+          reason: 'platform_session_replaced',
+          userId: null,
+          platformAccountId: id,
+          platform: 'reveal',
+        },
+      },
+    ]);
+    expect(JSON.stringify(alerts)).not.toContain('reveal-session');
   });
 });
