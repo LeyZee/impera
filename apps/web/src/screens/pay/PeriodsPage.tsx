@@ -56,7 +56,7 @@ export function PeriodsPage({
         eyebrow="Paie"
         title="Historique"
         lead="Chaque quinzaine, ce qui a été validé et versé."
-        actions={<PayNav />}
+        actions={<PayNav user={user} />}
       />
       <div className="py-board">
         <Panel className="nv-enter">

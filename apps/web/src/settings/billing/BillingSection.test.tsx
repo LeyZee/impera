@@ -103,7 +103,7 @@ afterEach(() => {
 });
 
 describe('Réglages › Facturation', () => {
-  it('asks for the settings first while none is saved, then walks the five steps and saves them whole', async () => {
+  it('asks for the settings first while none is saved, then walks the six steps and saves them whole', async () => {
     view = { settings: null, logo: null };
     renderSection();
     expect(await screen.findByText('Aucune facture ne part')).toBeDefined();
@@ -114,7 +114,7 @@ describe('Réglages › Facturation', () => {
       within(dialog)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['1L’agence', '2Immatriculation', '3Prestation', '4Paiement', '5Logo']);
+    ).toEqual(['1L’agence', '2Immatriculation', '3Prestation', '4Paiement', '5Rappel des pièces', '6Logo']);
     // Nothing goes on with an empty step: each field says what it wants, the focus on the first.
     next();
     expect(screen.getByText('La raison sociale, telle que sur le Kbis.')).toBeDefined();
@@ -151,6 +151,14 @@ describe('Réglages › Facturation', () => {
     type('Conditions de paiement', SETTINGS.paymentTerms);
     next();
 
+    // The reminder of the documents: 30 days ahead unless changed, 1 to 120.
+    expect(screen.getByLabelText<HTMLInputElement>('Rappel des pièces').value).toBe('30');
+    type('Rappel des pièces', '0');
+    next();
+    expect(screen.getByText('Un nombre entier de jours, de 1 à 120.')).toBeDefined();
+    type('Rappel des pièces', '45');
+    next();
+
     expect(screen.getByText('Aucun logo : la facture imprime la raison sociale seule.')).toBeDefined();
     pick(120_000);
     expect(await screen.findByText('1 200 × 340 px · 117 Ko')).toBeDefined();
@@ -168,6 +176,7 @@ describe('Réglages › Facturation', () => {
         serviceDescription: SETTINGS.serviceDescription,
         paymentTerms: SETTINGS.paymentTerms,
         dueDays: 60,
+        documentReminderDays: 45,
         fiscalYearEndMonth: 6,
         logoSha256: SHA,
       },
@@ -183,7 +192,8 @@ describe('Réglages › Facturation', () => {
     expect(screen.getByText('SAS au capital de 10 000 €')).toBeDefined();
     expect(screen.getByText('123 456 782')).toBeDefined();
     expect(screen.getByText('31 décembre')).toBeDefined();
-    expect(screen.getByText('60 jours après l’émission')).toBeDefined();
+    // Under the total in Paiement, and among the delays.
+    expect(screen.getAllByText('60 jours après l’émission')).toHaveLength(2);
     expect(
       screen.getByText(
         'Document établi par Atelier Lumen, 12 rue des Exemples, 69002 Lyon · SAS au capital de 10 000 € · ' +
@@ -222,6 +232,7 @@ describe('Réglages › Facturation', () => {
           serviceDescription: SETTINGS.serviceDescription,
           paymentTerms: SETTINGS.paymentTerms,
           dueDays: 45,
+          documentReminderDays: 30,
           fiscalYearEndMonth: 12,
           logoSha256: SHA,
         },

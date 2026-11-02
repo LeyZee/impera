@@ -1,0 +1,130 @@
+/* ── Paie › Exports (EQ-06 lot 8c): the accountant's three files. Tokens only, as pay.css. ── */
+.ex-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: 4px 24px 22px;
+}
+.ex-lead {
+  max-width: 68ch;
+}
+.ex-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.ex-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-1);
+}
+.ex-presets [aria-pressed='true'] {
+  color: var(--nv-ink);
+  box-shadow: inset 0 0 0 1px var(--nv-neon);
+}
+.ex-days {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.ex-days .nv-field {
+  flex: 1 1 160px;
+  max-width: 220px;
+}
+.ex-form > .nv-field {
+  max-width: 220px;
+}
+.ex-ask {
+  align-self: flex-start;
+}
+.ex-days .ex-ask {
+  align-self: flex-end;
+}
+
+/* A file ready: its name and weight, then the button that saves its bytes. */
+.ex-ready {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.ex-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.ex-file__what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ex-file__name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ex-sub {
+  display: block;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  font-weight: 400;
+}
+.ex-notice__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--nv-space-1) 0 0;
+  padding-left: var(--nv-space-4);
+  font-size: var(--nv-text-footnote);
+}
+.ex-link {
+  color: var(--nv-neon);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The DAS2's beneficiaries: wider than a phone, it scrolls in its own box. */
+.ex-table-wrap {
+  overflow-x: auto;
+}
+.ex-table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+}
+.ex-table th,
+.ex-table td {
+  padding: var(--nv-space-2) var(--nv-space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--nv-hairline);
+}
+.ex-table thead th {
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+}
+.ex-table tbody th {
+  font-weight: 400;
+}
+.ex-table .ex-num {
+  text-align: right;
+  white-space: nowrap;
+}
+.ex-who {
+  display: block;
+  font-weight: 600;
+}
+.ex-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-1);
+  margin-top: var(--nv-space-1);
+}

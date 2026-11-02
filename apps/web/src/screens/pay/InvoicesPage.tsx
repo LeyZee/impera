@@ -107,7 +107,7 @@ export function InvoicesPage({
         eyebrow="Paie"
         title="Factures"
         lead="Les factures et avoirs émis au nom de chaque membre : les contestations à trancher, les échéances, puis chaque quinzaine."
-        actions={<PayNav />}
+        actions={<PayNav user={user} />}
       />
       <div className="py-board">
         {timeZone === null ? null : (

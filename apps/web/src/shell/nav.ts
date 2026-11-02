@@ -256,6 +256,7 @@ const SCREENS = {
   '/paie/primes-malus': 'Primes et malus',
   '/paie/objectifs': 'Objectifs',
   '/paie/factures': 'Factures',
+  '/paie/exports': 'Exports',
   '/commissions/factures': 'Factures',
   '/moi/dossier': 'Dossier',
   '/moi/factures': 'Factures',

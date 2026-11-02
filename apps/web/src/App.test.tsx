@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { App } from './App';
 import { forgetTakenToken } from './auth/api';
 import { railOf } from './shell/nav';
+import { OWNER } from './test/pay';
 
 /** A fake `/v1/me` that answers each status in turn, the last one for good. */
 function serveMe(...statuses: number[]): ReturnType<typeof vi.fn> {
@@ -275,5 +276,23 @@ describe('App on the screens of a contractor’s file', () => {
     await vi.waitFor(() => {
       expect(window.location.pathname).toBe('/equipe/membres');
     });
+  });
+
+  it('keeps Paie › Exports to the owner: a manager has no tab, and its address leads him to Paie', async () => {
+    serveAs(member('manager'));
+    window.history.replaceState(null, '', '/paie/exports');
+    render(<App />);
+    await vi.waitFor(() => {
+      expect(window.location.pathname).toBe('/paie/quinzaine');
+    });
+    expect(await screen.findByRole('link', { name: 'Factures' })).toBeDefined();
+    expect(screen.queryByRole('link', { name: 'Exports' })).toBeNull();
+    cleanup();
+    serveAs(OWNER);
+    window.history.replaceState(null, '', '/paie/exports');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Exports' })).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Exports' }).getAttribute('href')).toBe('/paie/exports');
+    expect(window.location.pathname).toBe('/paie/exports');
   });
 });

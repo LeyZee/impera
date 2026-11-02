@@ -263,7 +263,7 @@
   .bf-pair {
     grid-template-columns: minmax(0, 1fr);
   }
-  /* Five steps do not fit a phone's width: the current one says its name, the others their number. */
+  /* Six steps do not fit a phone's width: the current one says its name, the others their number. */
   .bf-progress li:not([data-state='now']) .bf-progress__title {
     position: absolute;
     width: 1px;
@@ -281,5 +281,152 @@
   }
   .bf-progress li[data-state='now'] .bf-progress__num {
     transform: none;
+  }
+}
+
+/* ── EQ-06 lot 8c: the journal's accounts, the delays, the texts and the regimes ── */
+.bf-fact-note {
+  display: block;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+.bf-versions,
+.bf-regimes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bf-version,
+.bf-regime {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+/* A regime the accountant has not validated yet: an amber edge, no invoice leaves under it. */
+.bf-regime[data-pending='true'] {
+  box-shadow: inset 3px 0 0 var(--nv-warning);
+}
+.bf-version__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.bf-version__name {
+  font-weight: 600;
+}
+.bf-version__facts {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.bf-version__text summary {
+  cursor: pointer;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.bf-version__text[open] summary {
+  margin-bottom: var(--nv-space-2);
+}
+.bf-facts--tight {
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: var(--nv-space-1) var(--nv-space-4);
+}
+.bf-mention-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding-left: var(--nv-space-5);
+  font-size: var(--nv-text-footnote);
+  overflow-wrap: anywhere;
+}
+
+/* The forms: a regime's choices, its countries and mentions, a text pasted whole. */
+.bf-accounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3) var(--nv-space-4);
+}
+.bf-accounts > .sc-refusal,
+.bf-accounts > .tm-dialog__foot {
+  grid-column: 1 / -1;
+}
+.bf-text-body {
+  min-height: 14rem;
+  font-size: var(--nv-text-callout);
+}
+.bf-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.bf-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.bf-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--nv-space-2);
+  cursor: pointer;
+}
+.bf-choice input {
+  margin-top: 3px;
+}
+.bf-choice__label {
+  display: block;
+}
+.bf-choice__hint {
+  display: block;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.bf-countries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-1);
+  margin: 0 0 var(--nv-space-2);
+  padding: 0;
+  list-style: none;
+}
+.bf-country {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-1);
+  padding: 2px 2px 2px var(--nv-space-3);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+}
+.bf-mentions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0 0 var(--nv-space-2);
+  padding: 0;
+  list-style: none;
+}
+.bf-mention {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nv-space-2);
+}
+
+@media (max-width: 560px) {
+  .bf-accounts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-facts--tight {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

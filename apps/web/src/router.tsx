@@ -16,6 +16,7 @@ import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
+import { ExportsPage } from './screens/pay/ExportsPage';
 import { GoalsPage } from './screens/pay/GoalsPage';
 import { InvoicesPage } from './screens/pay/InvoicesPage';
 import { MyInvoicesPage } from './screens/pay/MyInvoicesPage';
@@ -379,6 +380,22 @@ const payInvoices = createRoute({
   },
 });
 
+const payExports = createRoute({
+  getParentRoute: () => pay,
+  path: '/exports',
+  // The owner's alone (EQ-06 lot 8c), as the server serves the exports: a manager is sent to Paie, without a tab.
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/paie', replace: true });
+    }
+  },
+  component: function PayExports() {
+    const { user } = rootRoute.useRouteContext();
+    return <ExportsPage user={user} />;
+  },
+});
+
 // Commissions (EQ-06 lot 8): « Relevés », the page of the period, and « Factures », one's own documents.
 const commissions = createRoute({ getParentRoute: () => rootRoute, path: '/commissions' });
 const commissionsIndex = createRoute({
@@ -559,7 +576,7 @@ const routeTree = rootRoute.addChildren([
   today,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
-  pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices]),
+  pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
   me.addChildren([meIndex, meFile, meInvoices]),
   settings.addChildren([

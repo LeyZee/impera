@@ -65,7 +65,8 @@
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
 }
-.cf-amber {
+.cf-amber,
+.tm-hint.cf-amber {
   color: var(--nv-warning);
 }
 .cf-state {

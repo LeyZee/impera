@@ -4,8 +4,10 @@ import {
   AGENCY_LOGO_MAX_SIDE,
   AGENCY_LOGO_MIN_SIDE,
   AGENCY_LOGO_SHARP_HEIGHT,
+  DEFAULT_DOCUMENT_REMINDER_DAYS,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
+  DOCUMENT_REMINDER_MAX_DAYS,
   INVOICE_DUE_MAX_DAYS,
   INVOICE_DUE_MIN_DAYS,
   LEGAL_NAME_MAX,
@@ -30,17 +32,25 @@ import {
  */
 
 /** The steps of the form, in order: the first filling walks them all, a card's « Changer » only its own. */
-export type StepKey = 'agency' | 'registration' | 'service' | 'payment' | 'logo';
+export type StepKey = 'agency' | 'registration' | 'service' | 'payment' | 'reminder' | 'logo';
 
 export const STEP_TITLES: Readonly<Record<StepKey, string>> = {
   agency: 'L’agence',
   registration: 'Immatriculation',
   service: 'Prestation',
   payment: 'Paiement',
+  reminder: 'Rappel des pièces',
   logo: 'Logo',
 };
 
-export const ALL_STEPS: readonly StepKey[] = ['agency', 'registration', 'service', 'payment', 'logo'];
+export const ALL_STEPS: readonly StepKey[] = [
+  'agency',
+  'registration',
+  'service',
+  'payment',
+  'reminder',
+  'logo',
+];
 
 /** The form as typed: text everywhere, read into numbers only when sent. */
 export interface BillingDraft {
@@ -55,6 +65,7 @@ export interface BillingDraft {
   readonly serviceDescription: string;
   readonly paymentTerms: string;
   readonly dueDays: string;
+  readonly documentReminderDays: string;
   readonly logoSha256: string | null;
 }
 
@@ -66,6 +77,7 @@ export const FIELDS_OF: Readonly<Record<StepKey, readonly DraftField[]>> = {
   registration: ['siren', 'rcsCity', 'vatNumber', 'fiscalYearEndMonth'],
   service: ['serviceDescription'],
   payment: ['dueDays', 'paymentTerms'],
+  reminder: ['documentReminderDays'],
   logo: [],
 };
 
@@ -76,7 +88,10 @@ export function eurosInput(minor: number): string {
   return cents === 0 ? euros : `${euros},${String(cents).padStart(2, '0')}`;
 }
 
-/** The form from the settings saved, or empty with the defaults (60 days, a fiscal year closed in December). */
+/**
+ * The form from the settings saved, or empty with the defaults (60 days, a reminder 30 days ahead, a fiscal year closed
+ * in December).
+ */
 export function draftOf(settings: BillingSettings | null): BillingDraft {
   const agency = settings?.agency;
   const capital = agency?.shareCapitalMinor ?? null;
@@ -92,6 +107,7 @@ export function draftOf(settings: BillingSettings | null): BillingDraft {
     serviceDescription: settings?.serviceDescription ?? '',
     paymentTerms: settings?.paymentTerms ?? '',
     dueDays: String(settings?.dueDays ?? DEFAULT_INVOICE_DUE_DAYS),
+    documentReminderDays: String(settings?.documentReminderDays ?? DEFAULT_DOCUMENT_REMINDER_DAYS),
     logoSha256: settings?.logoSha256 ?? null,
   };
 }
@@ -131,16 +147,17 @@ export function suggestedVat(draft: BillingDraft): string | null {
   return vatOf(draft.vatNumber) === computed ? null : computed;
 }
 
-/** Whole days within the bounds of the due date, or `null`. */
-function dueDaysOf(text: string): number | null {
+/** Whole days from `min` to `max`, or `null`. */
+function daysOf(text: string, min: number, max: number): number | null {
   const value = Number(text.trim());
-  return text.trim() !== '' &&
-    Number.isInteger(value) &&
-    value >= INVOICE_DUE_MIN_DAYS &&
-    value <= INVOICE_DUE_MAX_DAYS
-    ? value
-    : null;
+  return text.trim() !== '' && Number.isInteger(value) && value >= min && value <= max ? value : null;
 }
+
+/** Whole days within the bounds of the due date, or `null`. */
+const dueDaysOf = (text: string): number | null => daysOf(text, INVOICE_DUE_MIN_DAYS, INVOICE_DUE_MAX_DAYS);
+
+/** Whole days within the bounds of a document's reminder (1 to 120), or `null`. */
+const reminderDaysOf = (text: string): number | null => daysOf(text, 1, DOCUMENT_REMINDER_MAX_DAYS);
 
 const filled = (text: string, max: number): boolean => text.trim() !== '' && text.trim().length <= max;
 
@@ -193,6 +210,11 @@ export function problemsOf(
     dueDaysOf(draft.dueDays) !== null,
     `Un nombre entier de jours, de ${String(INVOICE_DUE_MIN_DAYS)} à ${String(INVOICE_DUE_MAX_DAYS)}.`,
   );
+  check(
+    'documentReminderDays',
+    reminderDaysOf(draft.documentReminderDays) !== null,
+    `Un nombre entier de jours, de 1 à ${String(DOCUMENT_REMINDER_MAX_DAYS)}.`,
+  );
   return problems;
 }
 
@@ -216,6 +238,7 @@ export function bodyOf(draft: BillingDraft): UpdateBillingSettingsBody | null {
     serviceDescription: draft.serviceDescription,
     paymentTerms: draft.paymentTerms,
     dueDays: dueDaysOf(draft.dueDays),
+    documentReminderDays: reminderDaysOf(draft.documentReminderDays),
     fiscalYearEndMonth: Number(draft.fiscalYearEndMonth),
     logoSha256: draft.logoSha256,
   });
@@ -280,6 +303,10 @@ export const LOGO_REFUSALS: Readonly<Record<AgencyLogoRefusal, string>> = {
 /** Whether invoices can leave: the settings saved, with the designation of the service (`agency_missing`). */
 export const isReady = (settings: BillingSettings | null): settings is BillingSettings =>
   settings !== null && settings.serviceDescription !== null;
+
+/** « 30 jours avant sa fin »: when a document's reminder starts, the tax residence certificate keeping its 1st of December. */
+export const reminderDaysText = (days: number): string =>
+  days === 1 ? 'La veille de sa fin' : `${String(days)} jours avant sa fin`;
 
 /** « 60 jours après l’émission »: the due date each invoice prints. */
 export const dueText = (days: number): string => `${String(days)} jours après l’émission`;
