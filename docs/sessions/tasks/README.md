@@ -107,4 +107,5 @@ Branche : task/<id>-<slug>
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | todo | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | todo | ADR 0046, SEC-02 |
 | SEC-04 | Réglages › Sécurité et alertes de sécurité | exploitation | todo | ADR 0046, ADR 0020, SEC-02 |
-| ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | in_progress | ADR 0047 |
+| ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
+| ARC-02 | L'assemblage module par module | exploitation | in_progress | ADR 0047 |

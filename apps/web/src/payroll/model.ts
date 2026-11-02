@@ -160,30 +160,14 @@ export function carryWhat(statement: CommissionStatement): string | null {
   return statement.status === 'draft' ? `${total} → irait en report` : `${total} → reporté`;
 }
 
-/** A period as the list of periods sums it, read from the period itself. */
-export function summaryOf(period: PayrollPeriod): Omit<PayPeriodSummary, 'window'> {
-  const count = (keep: (statement: CommissionStatement) => boolean): number =>
-    period.statements.filter(keep).length;
-  const sum = (pick: (statement: CommissionStatement) => number): number =>
-    period.statements.reduce((total, statement) => total + pick(statement), 0);
-  return {
-    ended: period.ended,
-    closedAt: period.closing?.closedAt ?? null,
-    closedBy: period.closing?.closedBy ?? null,
-    blocked: period.blocked,
-    statements: {
-      draft: count((one) => one.status === 'draft'),
-      validated: count((one) => one.status === 'validated'),
-      paid: count((one) => one.status === 'paid'),
-      carried: count((one) => one.carryOverOutMinor !== 0 && one.status !== 'draft'),
-    },
-    netMinor: sum((one) => one.netMinor),
-    payableMinor: sum((one) => one.payableMinor),
-    validatedPayableMinor: sum((one) => (one.status === 'draft' ? 0 : one.payableMinor)),
-    carriedMinor: sum((one) => (one.status === 'draft' ? 0 : one.carryOverOutMinor)),
-    paidMinor: sum((one) => one.payment?.sentMinor ?? 0),
-  };
-}
+/** A period's head as the list of periods reads it: its state, and the figures the server summed (ADR 0047 § 2). */
+export const periodHeadOf = (period: PayrollPeriod): Omit<PayPeriodSummary, 'window'> => ({
+  ...period.summary,
+  ended: period.ended,
+  closedAt: period.closing?.closedAt ?? null,
+  closedBy: period.closing?.closedBy ?? null,
+  blocked: period.blocked,
+});
 
 /** Where a period is: running, to validate, validated with money still to send, or paid. */
 export type PeriodPhase = 'running' | 'to_validate' | 'to_pay' | 'paid';
@@ -300,39 +284,6 @@ export function whoName(
 ): string {
   if (userId === me.id) return me.name;
   return members.find((member) => member.userId === userId)?.displayName ?? 'le propriétaire';
-}
-
-/**
- * The net a statement counts from reports of an earlier period, closed when they came (EQ-04): each line's share of
- * its gross that is late, of its net. They are not the period's own pace.
- */
-export function lateNetOf(statements: readonly CommissionStatement[]): number {
-  let late = 0;
-  for (const line of statements.flatMap((statement) => statement.lines)) {
-    const lateGross = line.lateReports.reduce((total, report) => total + report.grossMinor, 0);
-    if (lateGross !== 0 && line.grossMinor !== 0)
-      late += Math.round((line.netMinor * lateGross) / line.grossMinor);
-  }
-  return late;
-}
-
-/**
- * The team's net at the end of the period, at the pace of the time gone by in the agency's zone: what late reports
- * brought is counted once, not as pace. The net itself once the period has ended; `null` before a first full day,
- * when there is no pace to speak of.
- */
-export function forecastNet(
-  netMinor: number,
-  lateNetMinor: number,
-  window: Pick<PayPeriodWindow, 'startsAt' | 'endsAt'>,
-  now: Date,
-): number | null {
-  const starts = new Date(window.startsAt).getTime();
-  const ends = new Date(window.endsAt).getTime();
-  const gone = now.getTime() - starts;
-  if (now.getTime() >= ends) return netMinor;
-  if (gone < DAY_MS) return null;
-  return Math.round(((netMinor - lateNetMinor) * (ends - starts)) / gone) + lateNetMinor;
 }
 
 /** Days left in a period, today included: « encore 3 jours ». */
@@ -952,10 +903,6 @@ export function salesSplit(
   ];
 }
 
-/** How far the team's net is towards its target, in basis points, floored as the engine floors it. */
-export const reachedBpsOf = (netMinor: number, targetMinor: number): number =>
-  Math.max(0, Math.floor((netMinor * 10_000) / targetMinor));
-
 /** The highest tier a reached share gives, or `null`. */
 export function tierAt(tiers: readonly CollectiveTier[], reachedBps: number): CollectiveTier | null {
   return tiers.reduce<CollectiveTier | null>(
@@ -1198,22 +1145,6 @@ export const goalTiersInOrder = (tiers: readonly CollectiveTier[]): CollectiveTi
 /** Individual tiers in their order, the lowest threshold first. */
 export const bonusTiersInOrder = (tiers: readonly BonusTier[]): BonusTier[] =>
   tiers.toSorted((a, b) => a.thresholdMinor - b.thresholdMinor);
-
-/** The team's net in a period: the sum of its members' nets, managers' sales included. */
-export const teamNetOf = (statements: readonly Pick<CommissionStatement, 'netMinor'>[]): number =>
-  statements.reduce((sum, one) => sum + one.netMinor, 0);
-
-/**
- * How far the team is towards the period's goal, in basis points: as the engine saw it in the statements (frozen once
- * the period is closed), else from the team's net.
- */
-export function goalReachedBps(
-  period: Pick<PayrollPeriod, 'statements'>,
-  goal: Pick<CollectiveGoal, 'targetMinor'>,
-): number {
-  const seen = period.statements.map((one) => one.team?.collective ?? null).find((one) => one !== null);
-  return seen?.reachedBps ?? reachedBpsOf(teamNetOf(period.statements), goal.targetMinor);
-}
 
 const WHOLE_EUROS = new Intl.NumberFormat('fr-FR', {
   style: 'currency',

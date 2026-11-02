@@ -262,10 +262,9 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
   it('locks the code after ten wrong ones in a row, whatever the sign-in', async () => {
     const fred = account('fred');
     await createOwner(app.auth, app.db.db, fred);
-    const post = from();
     await signIn(server, fred.email, fred.password);
 
-    const wrongCodes = async (count: number) => {
+    const wrongCodes = async (post: ReturnType<typeof from>, count: number) => {
       const pending = cookiesOf(
         (await post('/v1/auth/sign-in/email', { email: fred.email, password: fred.password })).headers,
       );
@@ -275,19 +274,56 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
       }
       return { pending, answers };
     };
-    // Five tries per sign-in, then that sign-in starts over.
-    const firstRound = await wrongCodes(6);
+    // Five tries per sign-in, then that sign-in starts over. Each round from its own address: the plugin's lock counts
+    // for the account wherever the codes come from, under the limit per account and address (SEC-03).
+    const firstRound = await wrongCodes(from(), 6);
     expect(firstRound.answers.slice(0, 5)).toEqual(Array(5).fill('second_factor_unauthenticated'));
     expect(firstRound.answers[5]).toBe('second_factor_challenge_unauthenticated');
-    const secondRound = await wrongCodes(5);
+    const secondRound = await wrongCodes(from(), 5);
     expect(secondRound.answers).toEqual(Array(5).fill('second_factor_unauthenticated'));
     // Ten in a row: even the right code waits 15 minutes.
+    const post = from();
     const third = cookiesOf(
       (await post('/v1/auth/sign-in/email', { email: fred.email, password: fred.password })).headers,
     );
     const locked = await post('/v1/auth/two-factor/verify-totp', { code: codeFor(fred.email) }, third);
     expect(locked.statusCode).toBe(429);
     expect(codeOf(locked)).toBe('second_factor_limited');
+  });
+
+  it('limits the codes of an account from one address, not from another (ADR 0046 § 5)', async () => {
+    const iris = account('iris');
+    await createOwner(app.auth, app.db.db, iris);
+    await signIn(server, iris.email, iris.password);
+    const here = from();
+    // Ten codes from one address, each sign-in ended by the right one so that the plugin's lock never counts.
+    for (let round = 0; round < 2; round += 1) {
+      const pending = cookiesOf(
+        (await here('/v1/auth/sign-in/email', { email: iris.email, password: iris.password })).headers,
+      );
+      for (let i = 0; i < 4; i += 1) {
+        expect(codeOf(await here('/v1/auth/two-factor/verify-totp', { code: '000000' }, pending))).toBe(
+          'second_factor_unauthenticated',
+        );
+      }
+      expect(
+        (await here('/v1/auth/two-factor/verify-totp', { code: codeFor(iris.email) }, pending)).statusCode,
+      ).toBe(200);
+    }
+    const pending = cookiesOf(
+      (await here('/v1/auth/sign-in/email', { email: iris.email, password: iris.password })).headers,
+    );
+    const limited = await here('/v1/auth/two-factor/verify-totp', { code: codeFor(iris.email) }, pending);
+    expect(limited.statusCode).toBe(429);
+    expect(codeOf(limited)).toBe('second_factor_limited');
+
+    const elsewhere = from();
+    const fresh = cookiesOf(
+      (await elsewhere('/v1/auth/sign-in/email', { email: iris.email, password: iris.password })).headers,
+    );
+    expect(
+      (await elsewhere('/v1/auth/two-factor/verify-totp', { code: codeFor(iris.email) }, fresh)).statusCode,
+    ).toBe(200);
   });
 
   it('writes a login only for a session that opened', async () => {

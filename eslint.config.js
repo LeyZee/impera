@@ -117,6 +117,8 @@ export default tseslint.config(
         { type: 'module', pattern: 'apps/api/src/modules/*', capture: ['module'], partialMatch: false },
         { type: 'api-tests', pattern: 'apps/api/src/__tests__', partialMatch: false },
         { type: 'api-scripts', pattern: 'apps/api/src/scripts', partialMatch: false },
+        // ADR 0047 § 3: each module's wiring, imported by `composition-root.ts` alone.
+        { type: 'api-wiring', pattern: 'apps/api/src/wiring', partialMatch: false },
         { type: 'api-root', pattern: 'apps/api/src', partialMatch: false },
         { type: 'api-test', pattern: 'apps/api/test', partialMatch: false },
         { type: 'package', pattern: 'packages/*/src', capture: ['package'], partialMatch: false },
@@ -140,7 +142,20 @@ export default tseslint.config(
             // npm packages and node: builtins are allowed by default; the policies at the end restrict them.
             { allow: { to: { module: { origin: ['external', 'core'] } } } },
             ...moduleRules,
-            { from: el('api-root'), allow: { to: anyOf(layer('index'), el('package'), el('api-root')) } },
+            {
+              from: el('api-root'),
+              allow: { to: anyOf(layer('index'), el('package'), el('api-root')) },
+            },
+            // The one place where the wiring files are imported, and the order they are built in.
+            {
+              from: { element: { type: 'api-root', fileInternalPath: 'composition-root.ts' } },
+              allow: { to: anyOf(layer('index'), el('package'), el('api-root'), el('api-wiring')) },
+            },
+            // A wiring file builds its module from the shared dependencies: modules by their index.ts only.
+            {
+              from: el('api-wiring'),
+              allow: { to: anyOf(layer('index'), el('package'), el('api-root'), el('api-wiring')) },
+            },
             {
               from: el('api-scripts'),
               allow: { to: anyOf(layer('index'), el('package'), el('api-root')) },
@@ -153,7 +168,9 @@ export default tseslint.config(
             },
             {
               from: el('api-test'),
-              allow: { to: anyOf(layer('index'), el('package'), el('api-root'), el('api-test')) },
+              allow: {
+                to: anyOf(layer('index'), el('package'), el('api-root'), el('api-test')),
+              },
             },
             { from: el('package'), allow: { to: el('package') } },
             // design-system: ADR 0015. Apps may import it next to contracts.
@@ -186,6 +203,7 @@ export default tseslint.config(
                 el('web'),
                 el('extension'),
                 el('api-root'),
+                el('api-wiring'),
                 el('api-scripts'),
                 el('evals'),
               ),

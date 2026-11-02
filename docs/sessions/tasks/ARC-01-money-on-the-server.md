@@ -1,5 +1,5 @@
 # ARC-01 Les sommes et la prévision de quinzaine rendues par le serveur
-Statut : in_progress (partie serveur dans cette PR ; retrait côté web par le fil Extension)
+Statut : done (serveur #389 ; retrait côté web par le fil Extension)
 Phase : exploitation
 Dépend de : ADR 0047 § 2
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
@@ -19,7 +19,7 @@ Le détail d'une quinzaine porte ses totaux (`summary`) et sa prévision (`pace`
 - [x] `domain/period-figures.ts` : totaux, net tardif, prévision linéaire, part d'objectif atteinte, horloge injectée.
 - [x] Prévision d'objectif identique pour chaque lecteur : le membre lit les deux sommes d'équipe par une lecture système qui ne rend que deux entiers.
 - [x] Tests : unitaires du domaine ; intégration « summary == ligne de liste » pour owner, manager et deux membres ; même prévision d'objectif pour owner, manager et membre.
-- [ ] Web (fil Extension) : `summaryOf`, `lateNetOf`, `forecastNet`, `teamNetOf`, `goalReachedBps`, `reachedBpsOf` quittent `apps/web/src/payroll/model.ts` au profit de `summary` et `pace`.
+- [x] Web (fil Extension) : `summaryOf`, `lateNetOf`, `forecastNet`, `teamNetOf`, `goalReachedBps`, `reachedBpsOf` quittent `apps/web/src/payroll/model.ts` au profit de `summary` et `pace`.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
@@ -33,3 +33,4 @@ Le détail d'une quinzaine porte ses totaux (`summary`) et sa prévision (`pace`
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 
 - 02/11 : le net d'équipe d'un membre est lu par `teamTotalsUnscoped` (`withAdmin`, deux sommes seulement, jamais une ligne) : la RLS lui cache les relevés des autres.
+- 02/11 (web) : `summaryOf` devient `periodHeadOf`, qui pose l'état de la quinzaine à côté de `summary` sans rien additionner ; Commissions, Quinzaine et Objectifs lisent `pace`. Le chatteur voit la marque de prévision du serveur (avant : son pourcentage extrapolé dans le navigateur, sans les rapports tardifs).
