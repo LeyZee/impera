@@ -34,6 +34,7 @@ import {
   BackupsPage,
   BillingPage,
   PayRulesPage,
+  SalesFeedPage,
   SecurityPage,
   SettingsLayout,
   TelegramPage,
@@ -522,6 +523,18 @@ const aiModels = createRoute({
   },
   component: AiModelsPage,
 });
+const salesFeeds = createRoute({
+  getParentRoute: () => settings,
+  path: '/ventes',
+  // The owner's alone, as the server serves the key and the links (ADR 0050 § 4): anyone else is sent to Réglages.
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true });
+    }
+  },
+  component: SalesFeedPage,
+});
 const telegram = createRoute({
   getParentRoute: () => settings,
   path: '/telegram',
@@ -641,6 +654,7 @@ const routeTree = rootRoute.addChildren([
   settings.addChildren([
     settingsIndex,
     aiModels,
+    salesFeeds,
     alerts,
     telegram,
     payRules,
