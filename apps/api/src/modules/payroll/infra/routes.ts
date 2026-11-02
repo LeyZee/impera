@@ -1,6 +1,7 @@
 import {
+  ACCOUNTING_ARCHIVE_MEDIA_TYPE,
   AcceptContractTextBodySchema,
-  AccountingJournalQuerySchema,
+  AccountingPeriodQuerySchema,
   AccountingJournalSchema,
   AgencyLogoParamsSchema,
   AgencyLogoSchema,
@@ -137,8 +138,9 @@ const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
  * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b). A
  * contractor's documents (`…/contractors/:memberId/documents`, lot 5c) are filed by himself or the owner, read by them
  * and an active manager, and checked once by the owner, never on his own file. The accountant's export
- * (`/payroll/accounting/journal`, lot 7b), its accounts (`/payroll/billing-settings/accounts`) and the DAS2 recap
- * (`/payroll/accounting/das2`, lot 7c) are the owner's alone.
+ * (`/payroll/accounting/journal`, lot 7b), its accounts (`/payroll/billing-settings/accounts`), the DAS2 recap
+ * (`/payroll/accounting/das2`, lot 7c) and the archive of the PDFs (`/payroll/accounting/archive`, lot 7d) are the
+ * owner's alone.
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -445,7 +447,7 @@ export function createPayrollRoutes(
       '/payroll/accounting/journal',
       {
         preValidation: owner,
-        schema: { querystring: AccountingJournalQuerySchema, response: { 200: AccountingJournalSchema } },
+        schema: { querystring: AccountingPeriodQuerySchema, response: { 200: AccountingJournalSchema } },
       },
       async (request, reply) => {
         const journal = await accounting.journal(actorOf(request), request.query);
@@ -464,6 +466,21 @@ export function createPayrollRoutes(
         const recap = await accounting.das2(actorOf(request), request.query);
         // The contractors' names and addresses are in it: never kept by a cache.
         return reply.header('cache-control', 'no-store').send(recap);
+      },
+    );
+
+    app.get(
+      '/payroll/accounting/archive',
+      { preValidation: owner, schema: { querystring: AccountingPeriodQuerySchema } },
+      async (request, reply) => {
+        const archive = await accounting.archive(actorOf(request), request.query, request.log);
+        // Streamed as it is zipped; the PDFs name the contractors: never kept by a cache.
+        return reply
+          .header('content-type', ACCOUNTING_ARCHIVE_MEDIA_TYPE)
+          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(archive.stream);
       },
     );
 

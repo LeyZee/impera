@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  ACCOUNTING_JOURNAL_MAX_DAYS,
+  ACCOUNTING_PERIOD_MAX_DAYS,
   ACCOUNTING_JOURNAL_MEDIA_TYPE,
-  AccountingJournalQuerySchema,
+  AccountingPeriodQuerySchema,
   AccountingJournalSchema,
   AGENCY_LOGO_REFUSALS,
   AgencyLogoMediaTypeSchema,
@@ -231,21 +231,21 @@ describe('invoices', () => {
   });
 
   it('export from one day to another, both included, two years at most', () => {
-    expect(AccountingJournalQuerySchema.safeParse({ from: '2026-11-01', to: '2026-11-01' }).success).toBe(
+    expect(AccountingPeriodQuerySchema.safeParse({ from: '2026-11-01', to: '2026-11-01' }).success).toBe(
       true,
     );
-    expect(AccountingJournalQuerySchema.safeParse({ from: '2026-11-02', to: '2026-11-01' }).success).toBe(
+    expect(AccountingPeriodQuerySchema.safeParse({ from: '2026-11-02', to: '2026-11-01' }).success).toBe(
       false,
     );
     // A first fiscal year of 24 months across a 29 February: 731 days.
-    expect(ACCOUNTING_JOURNAL_MAX_DAYS).toBe(731);
-    expect(AccountingJournalQuerySchema.safeParse({ from: '2024-01-01', to: '2025-12-31' }).success).toBe(
+    expect(ACCOUNTING_PERIOD_MAX_DAYS).toBe(731);
+    expect(AccountingPeriodQuerySchema.safeParse({ from: '2024-01-01', to: '2025-12-31' }).success).toBe(
       true,
     );
-    expect(AccountingJournalQuerySchema.safeParse({ from: '2023-12-31', to: '2025-12-31' }).success).toBe(
+    expect(AccountingPeriodQuerySchema.safeParse({ from: '2023-12-31', to: '2025-12-31' }).success).toBe(
       false,
     );
-    expect(AccountingJournalQuerySchema.safeParse({ from: '2026-11-01', to: '2026-11-31' }).success).toBe(
+    expect(AccountingPeriodQuerySchema.safeParse({ from: '2026-11-01', to: '2026-11-31' }).success).toBe(
       false,
     );
     const journal = {

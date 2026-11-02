@@ -22,6 +22,7 @@ import type {
 } from '../../domain/ports';
 import { createMemoryInvoiceStore, type MemoryInvoiceStore } from '../../infra/invoice-buckets';
 import {
+  checkedInvoicePdf,
   downloadInvoicePdf,
   mirrorInvoicePdf,
   renderInvoicePdf,
@@ -474,6 +475,23 @@ describe('Équipe › Factures : le téléchargement, vérifié par l’empreint
     damaged.plant(KEY, { bytes: bytesOf('damaged'), retainUntil: LOCK });
     await expect(download({ primary: damaged, copy: damaged })).rejects.toBeInstanceOf(InvoicePdfUnavailable);
     expect(store.alerts.map((alert) => alert.place)).toEqual(['primary', 'ovhcloud']);
+  });
+
+  it('says why it gives nothing: wrong once a bucket gave a wrong file, out of reach when none answered', async () => {
+    const pdf = store.invoice?.pdf ?? null;
+    if (pdf === null) throw new Error('no PDF');
+    const damaged = createMemoryInvoiceStore();
+    damaged.plant(KEY, { bytes: bytesOf('damaged'), retainUntil: LOCK });
+    const check = (buckets: Pick<InvoicePdfDeps, 'primary' | 'copy'>) =>
+      checkedInvoicePdf({ store, ...buckets }, { invoiceId, memberId, number: 'AEX-2026-0021', pdf }, quiet);
+    expect(await check({ primary, copy })).toEqual({ kind: 'ok', bytes });
+    expect(await check({ primary: silent, copy: silent })).toEqual({ kind: 'unreachable' });
+    expect(store.alerts).toEqual([]);
+    // One wrong file is enough: the owner is told, and a new read would not mend it.
+    expect(await check({ primary: damaged, copy: silent })).toEqual({ kind: 'wrong' });
+    expect(await check({ primary: silent, copy: damaged })).toEqual({ kind: 'wrong' });
+    expect(await check({ primary: damaged, copy: damaged })).toEqual({ kind: 'wrong' });
+    expect(store.alerts.map((alert) => alert.place)).toEqual(['primary', 'ovhcloud', 'primary', 'ovhcloud']);
   });
 
   it('takes a PDF a store in memory forgot with a restart for one out of reach, never a damaged one', async () => {
