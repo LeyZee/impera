@@ -13,7 +13,7 @@ import {
   type PersonaOverview,
   type PersonaVersionSummary,
 } from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
+import { and, eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { parse } from 'yaml';
@@ -268,6 +268,15 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     const activations = audit.filter((row) => row.action === 'persona_version.activate');
     expect(activations).toHaveLength(1);
     expect(activations[0]?.userId).not.toBeNull();
+    // Each activation is told to the urgent groups (ADR 0046 § 8), by its version and for her, never its content.
+    const alerts = await test.admin.db
+      .select({ creatorId: schema.domainEvents.creatorId, payload: schema.domainEvents.payload })
+      .from(schema.domainEvents)
+      .where(and(eq(schema.domainEvents.type, 'security_alert'), eq(schema.domainEvents.creatorId, anna)));
+    expect(alerts.map((row) => row.payload)).toEqual([
+      { reason: 'persona_activated', userId: activations[0]?.userId, version: older.version },
+      { reason: 'persona_activated', userId: activations[0]?.userId, version: newest.version },
+    ]);
   });
 
   it('checks a stored version again before activating it: one saved before a guard changed stays inactive (P5-01)', async () => {

@@ -11,11 +11,14 @@ import {
   type InvoicePdfPlace,
   type PayoutBlock,
   type PayPeriod,
+  type Platform,
+  type SecurityAlertPayload,
   type SystemAlertCode,
+  type UserRole,
   type TelegramTopic,
 } from '@nirvana/contracts';
 
-import type { Outcome, Signal } from './signals';
+import type { Notice, Outcome, Signal } from './signals';
 
 /**
  * The classification table (ADR 0020 §2, CLAUDE.md rule 3): which event becomes which message, in code. An event
@@ -49,6 +52,7 @@ export const SCANNED_EVENT_TYPES = [
   'contractor_document_expiring',
   'invoice_due_soon',
   'invoice_overdue',
+  'security_alert',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -279,6 +283,66 @@ function scopeLabel(scope: Signal & { kind: 'kill_switch' }): string {
 }
 
 /** `nameOf` names her alerts (P4-01); without it, a message says « une alerte personnalisée ». */
+const ROLE_TEXT: Readonly<Record<UserRole, string>> = {
+  owner: 'le compte propriétaire',
+  operator: 'un compte de l’équipe',
+  creator: 'le compte d’une créatrice',
+};
+
+const accountText = (role: UserRole | null): string => (role === null ? 'un compte' : ROLE_TEXT[role]);
+
+const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
+  reveal: 'Reveal',
+  onlyfans: 'OnlyFans',
+  instagram: 'Instagram',
+  nirvana: 'Nirvana',
+};
+
+// Réglages › Sécurité (its sessions, by member for the owner) comes with the screen of SEC-04; until then, Réglages.
+const SECURITY_LINK = { label: 'Ouvrir les Réglages', path: '/reglages' };
+
+/**
+ * A security alert (ADR 0046 § 8): the act, the account's role and its network, written by the code; never a name,
+ * never a full address (the payload holds none), never the ids it carries.
+ */
+function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'link'> {
+  switch (alert.reason) {
+    case 'new_device_sign_in':
+      return {
+        body: `Connexion ${alert.role === 'owner' ? 'au compte propriétaire' : `à ${accountText(alert.role)}`} depuis un appareil qui n’était pas de confiance${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si ce n’est pas le propriétaire, ferme ses sessions et change son mot de passe.`,
+        link: SECURITY_LINK,
+      };
+    case 'sign_in_refusals':
+      return {
+        body: `${String(alert.refusals)} refus de mot de passe ou de code en ${String(alert.windowMinutes)} minutes sur ${accountText(alert.role)}${alert.network === null ? '' : ` (dernier réseau ${alert.network})`} : quelqu’un essaie peut-être d’y entrer.`,
+        link: SECURITY_LINK,
+      };
+    case 'second_factor_reset':
+      return {
+        body: `Deuxième facteur remis à zéro sur ${accountText(alert.role)}, ${alert.via === 'ops' ? 'depuis le serveur' : 'par un lien de réinitialisation'} : ses sessions et ses appareils de confiance sont fermés.`,
+        link: SECURITY_LINK,
+      };
+    case 'persona_activated':
+      return {
+        body: `Une autre version de la persona est maintenant active (${alert.version}).`,
+        link: { label: 'Ouvrir les créatrices', path: '/creatrices' },
+      };
+    case 'automatic_enabled':
+      return {
+        body:
+          alert.scope === 'creator'
+            ? 'Mode Automatique allumé : l’agent envoie seul sur toutes ses conversations.'
+            : 'Mode Automatique allumé sur une conversation : l’agent y envoie seul.',
+        link: { label: 'Ouvrir le mode de l’agent', path: '/reglages/mode' },
+      };
+    case 'platform_session_replaced':
+      return {
+        body: `La session ${PLATFORM_NAMES[alert.platform]} de l’agent a été remplacée par une autre. Si personne de l’agence ne l’a fait, vérifie le compte branché.`,
+        link: { label: 'Ouvrir les Réglages', path: '/reglages' },
+      };
+  }
+}
+
 export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome | null {
   switch (signal.kind) {
     case 'handoff': {
@@ -498,5 +562,15 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         link: { label: 'Ouvrir le Dashboard', path: '/' },
       };
     }
+    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
+    case 'security_alert':
+      return {
+        kind: 'notice',
+        topic: 'urgent',
+        fallbackTopic: 'important',
+        threadKey: null,
+        title: 'URGENT',
+        ...securityNotice(signal.alert),
+      };
   }
 }
