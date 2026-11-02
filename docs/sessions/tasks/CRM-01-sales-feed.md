@@ -1,6 +1,6 @@
 # CRM-01 Connecter la clé Reveal et lire les ventes
 
-Statut : in-progress (lecture par curseur, PR 1 ; webhooks, PR 2 ; l'écran Réglages reste)
+Statut : done (lecture par curseur, PR 1 ; webhooks, PR 2 ; écran Réglages › Ventes, PR 3)
 Phase : API CRM (ADR 0050)
 Dépend de : ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement
 Branche : task/crm-01-sales-feed
@@ -18,12 +18,12 @@ La clé Reveal se connecte depuis les Réglages comme une clé d'IA, et Nirvana 
 
 - [x] `PlatformSalesFeed` : types dans `packages/contracts`, sans aucune forme Reveal ; adaptateur dans le module `connectors`, avec capacités déclarées.
 - [x] Adaptateur API CRM : `/v1/sales` par curseur stocké, `/v1/models`, `/v1/chatters`, `/v1/stats/daily`, `/v1/stats/chatters/daily`, schémas Zod stricts, valeur inconnue passée en `other` et signalée.
-- [x] (API ; l'écran reste) Coffre et Réglages selon l'ADR 0050 § 4 : vérifiée avant d'être gardée, écriture seule, état « à reconnecter ».
+- [x] Coffre et Réglages selon l'ADR 0050 § 4 : vérifiée avant d'être gardée, écriture seule, état « à reconnecter ».
 - [x] Job rejouable : lecture du registre une fois par minute ; le curseur avance dans la même transaction que les ventes ; une vente unique sur `sale.id` et `event`.
 - [x] Registre en ajout seul, avec `inputs_hash`. Migration 0065 (0062 annoncée, renumérotée parce que 0064 est entrée avant : drizzle-kit lit le dernier snapshot par son nom).
 - [x] Montants en centimes entiers, par conversion décimale exacte si une conversion est nécessaire ; test `netAmount` = `agencyRevenue` + `modelRevenue`.
 - [x] `modelId` vers créatrice sous `withTenant`, quarantaine si inconnu ; correspondance `chatterId` vers membre posée par le propriétaire.
-- [x] (API ; l'écran reste) Webhooks ensuite, dès que le support les a ouverts : signature sur le corps brut, comparaison en temps constant, horodatage refusé à ± 5 minutes, boîte de réception puis job, secret au coffre, rattrapage par curseur une fois par heure.
+- [x] Webhooks ensuite, dès que le support les a ouverts : signature sur le corps brut, comparaison en temps constant, horodatage refusé à ± 5 minutes, boîte de réception puis job, secret au coffre, rattrapage par curseur une fois par heure.
 - [x] FakeReveal : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`, `403`.
 
 ## Critères d'acceptation
@@ -55,3 +55,9 @@ La paie, les écrans de vente, tout appel réel sans la demande de Charles.
 - Avec un webhook dont le secret s'ouvre, le passage de la minute ne lit qu'une fois par heure (rattrapage, ADR 0050 § 3) ; une livraison met en file `connector.read_sales` avec `woken` (une seule en attente, `job_key`).
 - Rien n'est appelé chez Reveal tant que le propriétaire n'a pas inscrit le webhook, ce qui attend que le support l'ouvre.
 - Reste : écran Réglages (clé, liens, bouton du webhook).
+
+02/11/2026, Extension, PR 3 (écran) :
+- Réglages › Ventes (`/reglages/ventes`, propriétaire seul) : clé, réception instantanée, liens des modèles et de l'équipe, dans `apps/web/src/settings/sales-feed/`.
+- Un webhook silencieux n'alerte jamais ; `lastRejectedAt` seul propose « Réinscrire ». L'inscription part en `PUT` sans corps.
+- « Confirmer » repose un lien `auto` vers le même compte : il devient celui du propriétaire avec la #413 (Bilan).
+- Reste : rien pour CRM-01.

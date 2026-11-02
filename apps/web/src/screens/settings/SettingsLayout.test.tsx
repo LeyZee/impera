@@ -57,6 +57,11 @@ describe('Réglages tabs', () => {
     expect(await settingsTabs(owner)).toContain('Telegram');
   });
 
+  it('gives the sales feeds (CRM-01) a tab right after the AI keys', async () => {
+    const tabs = await settingsTabs(owner);
+    expect(tabs.slice(0, 2)).toEqual(['Modèles IA', 'Ventes']);
+  });
+
   it('keeps Apparence and « Se déconnecter » out of the tabs: both live in the account menu (NAV-03)', async () => {
     const tabs = await settingsTabs(owner);
     expect(tabs).not.toContain('Apparence');

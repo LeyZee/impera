@@ -6,6 +6,7 @@ import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
 import { BillingSection } from '@/settings/billing/BillingSection';
 import { PayRulesSection } from '@/settings/pay/PayRulesSection';
+import { SalesFeedSection } from '@/settings/sales-feed/SalesFeedSection';
 import { ServicesSection } from '@/settings/services/ServicesSection';
 import { TelegramSection } from '@/settings/telegram/TelegramSection';
 import type { TelegramTab } from '@/settings/telegram/search';
@@ -14,13 +15,14 @@ import { screenLabel, type ScreenPath } from '@/shell/nav';
 
 /**
  * Réglages is the owner's alone (NAV-18): every page of it is served to the owner only, and the appearance, which is
- * everyone's, lives in the account's menu (NAV-03). The AI keys and the bots and groups (P3-03, P3-07), the alerts
- * (P4-01), the accounts' pay rules (EQ-03), what each invoice prints (EQ-06), the backups (ADR 0028) and the security
- * of every account (SEC-04).
+ * everyone's, lives in the account's menu (NAV-03). The AI keys, the platforms' sales feeds (CRM-01), the bots and
+ * groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what each invoice prints (EQ-06), the
+ * backups (ADR 0028) and the security of every account (SEC-04).
  */
 const TABS: readonly SubNavItem[] = (
   [
     '/reglages/modeles-ia',
+    '/reglages/ventes',
     '/reglages/alertes',
     '/reglages/telegram',
     '/reglages/regles-de-paie',
@@ -47,6 +49,11 @@ export function SettingsLayout(): JSX.Element {
 /** Réglages › Modèles IA: the Services page of P3-03, as the Connecteurs thread built it. */
 export function AiModelsPage(): JSX.Element {
   return <ServicesSection />;
+}
+
+/** Réglages › Ventes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01). */
+export function SalesFeedPage(): JSX.Element {
+  return <SalesFeedSection />;
 }
 
 /** Réglages › Alertes: her own alerts and the system's, on each creator (P4-01). */

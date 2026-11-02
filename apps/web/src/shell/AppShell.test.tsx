@@ -175,6 +175,7 @@ describe('Réglages › Sauvegardes', () => {
     const router = renderApp(owner, '/reglages/sauvegardes');
     expect(await subTabs()).toEqual([
       'Modèles IA',
+      'Ventes',
       'Alertes',
       'Telegram',
       'Règles de paie',
@@ -188,6 +189,7 @@ describe('Réglages › Sauvegardes', () => {
   // Réglages is the owner's alone (NAV-18): any of its addresses sends anyone else to the Dashboard, and says why.
   it('sends an operator or a creator from any page of Réglages to the Dashboard, and says why (NAV-21)', async () => {
     for (const path of [
+      '/reglages/ventes',
       '/reglages/sauvegardes',
       '/reglages/alertes',
       '/reglages/regles-de-paie',
