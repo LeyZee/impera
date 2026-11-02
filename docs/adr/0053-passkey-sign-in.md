@@ -1,6 +1,6 @@
 # 0053. Clé d'accès (Face ID, empreinte) : un geste vaut mot de passe et code
 
-Statut : proposed
+Statut : accepted (Charles, 2026-11-02 21h28, « ok 0053 »)
 Date : 2026-11-02
 
 ## Contexte
