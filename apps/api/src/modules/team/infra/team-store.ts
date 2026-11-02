@@ -22,6 +22,7 @@ import {
   and,
   eq,
   inArray,
+  removePasskeys,
   revokeSignIns,
   schema,
   sql,
@@ -332,17 +333,24 @@ export function createDrizzleTeamStore(
           .set({ status, ...(leaving && { leftOn: today }), updatedAt: now() })
           .where(eq(teamMembers.id, id));
         let sessionsEnded = 0;
+        let passkeysRemoved = 0;
         if (leaving) {
           await tx.update(user).set({ creatorIds: [], updatedAt: now() }).where(eq(user.id, current.userId));
-          // Its trusted devices too (ADR 0046 § 3): nothing of the account stays signed in.
+          // Its trusted devices too (ADR 0046 § 3), and its passkeys (ADR 0053 § 5): nothing of the account stays signed
+          // in, nothing lets it sign in again.
           sessionsEnded = (await revokeSignIns(tx, current.userId)).sessions;
+          passkeysRemoved = await removePasskeys(tx, current.userId);
         }
         await audit(
           tx,
           actor,
           'team_member.status_change',
           { entity: 'team_member', id },
-          { from: current.status, to: status, ...(leaving && { sessionsEnded, leftOn: today }) },
+          {
+            from: current.status,
+            to: status,
+            ...(leaving && { sessionsEnded, passkeysRemoved, leftOn: today }),
+          },
         );
       }),
 

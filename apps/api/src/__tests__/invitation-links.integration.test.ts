@@ -220,7 +220,13 @@ describe('invitation links (EQ-10)', () => {
       .where(eq(schema.auditLog.userId, userId));
     expect(audit).toContainEqual({
       action: 'invitation_link.redeem',
-      details: { purpose: 'invitation', sessionsEnded: 0, trustedDevicesEnded: 0, secondFactorReset: false },
+      details: {
+        purpose: 'invitation',
+        sessionsEnded: 0,
+        trustedDevicesEnded: 0,
+        passkeysRemoved: 0,
+        secondFactorReset: false,
+      },
     });
   });
 
@@ -314,7 +320,13 @@ describe('invitation links (EQ-10)', () => {
         sql`${schema.auditLog.userId} = ${userId} and ${schema.auditLog.action} = 'invitation_link.redeem'`,
       );
     expect(resets).toContainEqual({
-      details: { purpose: 'reset', sessionsEnded: 4, trustedDevicesEnded: 0, secondFactorReset: true },
+      details: {
+        purpose: 'reset',
+        sessionsEnded: 4,
+        trustedDevicesEnded: 0,
+        passkeysRemoved: 0,
+        secondFactorReset: true,
+      },
     });
     // His code put back to zero is told to the urgent groups (ADR 0046 § 8); his first link reset nothing.
     const alerts = await test.admin.db

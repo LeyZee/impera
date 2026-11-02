@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Dashboard users (Better Auth core schema, Drizzle adapter), plus `role` and `creator_ids` on `user`. Out of RLS:
@@ -48,6 +48,11 @@ export const session = pgTable('session', {
    * confirmation before a sensitive action. `null` after a sign-in from a trusted device, which asked for no code.
    */
   reauthenticatedAt: tz('reauthenticated_at'),
+  /**
+   * When the password and the code themselves were last given on this session, never stamped by a passkey gesture:
+   * adding a passkey reads it, so a key never adds another key (ADR 0053 § 2).
+   */
+  codeConfirmedAt: tz('code_confirmed_at'),
 });
 
 export const account = pgTable('account', {
@@ -94,3 +99,30 @@ export const twoFactor = pgTable('two_factor', {
   failedVerificationCount: integer('failed_verification_count').notNull().default(0),
   lockedUntil: tz('locked_until'),
 });
+
+/**
+ * The passkeys of an account (Better Auth `passkey` plugin, ADR 0053): the public part of a key that never leaves the
+ * device, its credential id, and the signature counter checked at each gesture. Nothing biometric exists here. `name`
+ * is the device it was added from, read from the browser by the server; `last_used_at` is written by the server at
+ * each sign-in or confirmation with it, so the owner hears of a sign-in with a key never used before (§ 7).
+ */
+export const passkey = pgTable(
+  'passkey',
+  {
+    id: text('id').primaryKey(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull().unique(),
+    counter: integer('counter').notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    transports: text('transports'),
+    aaguid: text('aaguid'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    lastUsedAt: tz('last_used_at'),
+  },
+  (t) => [index('passkey_user_id_idx').on(t.userId)],
+);

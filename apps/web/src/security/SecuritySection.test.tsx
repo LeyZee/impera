@@ -45,6 +45,7 @@ const ACCOUNTS = [
     role: 'owner',
     secondFactor: true,
     sessions: 1,
+    passkeys: 0,
     lastActiveAt: minutesAgo(0),
   },
   {
@@ -53,6 +54,7 @@ const ACCOUNTS = [
     role: 'operator',
     secondFactor: false,
     sessions: 2,
+    passkeys: 0,
     lastActiveAt: minutesAgo(30),
   },
 ];

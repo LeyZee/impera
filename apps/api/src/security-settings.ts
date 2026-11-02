@@ -8,14 +8,29 @@ import {
   networkOf,
   newId,
   OpenSessionsSchema,
+  PasskeysSchema,
   ReauthenticateBodySchema,
+  RemovedPasskeysSchema,
   UserRoleSchema,
   type AccountsSecurity,
   type ClosedSessions,
   type OpenSessions,
+  type PasskeyErrorCode,
+  type Passkeys,
+  type RemovedPasskeys,
   type SecuritySettingsErrorCode,
 } from '@nirvana/contracts';
-import { and, eq, revokeSignIns, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+import {
+  and,
+  eq,
+  removePasskeys,
+  revokeSignIns,
+  schema,
+  sql,
+  withAdmin,
+  type Database,
+  type Transaction,
+} from '@nirvana/db';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -31,6 +46,7 @@ import {
   type Auth,
   type RequireRole,
 } from './auth';
+import { passkeysOf } from './passkeys';
 import { recordRefusal } from './security-alerts';
 
 /**
@@ -75,7 +91,14 @@ class AccountNotFound extends DomainError {
   }
 }
 
+class PasskeyNotFound extends DomainError {
+  constructor() {
+    super('passkey_not_found' satisfies PasskeyErrorCode, 'Cette clé d’accès est déjà retirée');
+  }
+}
+
 const SessionParamsSchema = z.object({ sessionId: z.string().min(1).max(128) });
+const PasskeyParamsSchema = z.object({ passkeyId: z.string().min(1).max(128) });
 const AccountParamsSchema = z.object({ userId: z.string().min(1).max(128) });
 
 /** Better Auth's answer to new backup codes, read for the codes only. */
@@ -243,7 +266,42 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
       },
     );
 
-    // For the owner: each account's second factor and how many sessions it has open; no device, no network.
+    // One's own passkeys (ADR 0053 § 5): the device each was added from, the keychain, when added and last used.
+    app.get(
+      '/auth/passkeys',
+      { preValidation: anyone, schema: { response: { 200: PasskeysSchema } } },
+      async (request): Promise<Passkeys> => {
+        const { userId } = await signedIn(request);
+        return { passkeys: await passkeysOf(db, userId) };
+      },
+    );
+
+    // Removing one of one's own keys: a sensitive action (the password and the code, or a gesture on another key).
+    app.delete(
+      '/auth/passkeys/:passkeyId',
+      { preValidation: [anyone, requireRecentLogin], schema: { params: PasskeyParamsSchema } },
+      async (request, reply) => {
+        const { userId } = await signedIn(request);
+        await withAdmin(adminDb, async (tx) => {
+          const removed = await tx
+            .delete(schema.passkey)
+            .where(and(eq(schema.passkey.id, request.params.passkeyId), eq(schema.passkey.userId, userId)))
+            .returning({ id: schema.passkey.id });
+          if (removed.length === 0) throw new PasskeyNotFound();
+          await audit(tx, {
+            userId,
+            action: 'auth.passkey_removed',
+            entityId: userId,
+            ip: request.ip,
+            details: { passkeyId: request.params.passkeyId },
+          });
+        });
+        return reply.code(204).send();
+      },
+    );
+
+    // For the owner: each account's second factor, how many sessions it has open and how many passkeys it holds; no
+    // device, no network.
     app.get(
       '/settings/security/accounts',
       { preValidation: requireRole('owner'), schema: { response: { 200: AccountsSecuritySchema } } },
@@ -255,10 +313,12 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             role: string;
             second_factor: boolean;
             sessions: number;
+            passkeys: number;
             last_active_at: Date | string | null;
           }>(sql`
             select u.id, u.name, u.role, u.two_factor_enabled as second_factor,
-              count(s.id)::int as sessions, max(s.updated_at) as last_active_at
+              count(s.id)::int as sessions, max(s.updated_at) as last_active_at,
+              (select count(*)::int from passkey p where p.user_id = u.id) as passkeys
             from "user" u
             left join session s on s.user_id = u.id and s.expires_at > now()
               and s.created_at > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})
@@ -273,6 +333,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             role: row.role,
             secondFactor: row.second_factor,
             sessions: row.sessions,
+            passkeys: row.passkeys,
             lastActiveAt: row.last_active_at === null ? null : new Date(row.last_active_at).toISOString(),
           })),
         });
@@ -305,6 +366,35 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             details: { scope: 'account', revoked: closed.sessions, trustedDevices: closed.trustedDevices },
           });
           return { sessions: closed.sessions, trustedDevices: closed.trustedDevices };
+        });
+      },
+    );
+    // The owner removes every passkey of an account (ADR 0053 § 5), his own included: a sensitive action. Its sessions
+    // stay open: closing them is the gesture beside it.
+    app.post(
+      '/settings/security/accounts/:userId/remove-passkeys',
+      {
+        preValidation: [requireRole('owner'), requireRecentLogin],
+        schema: { params: AccountParamsSchema, response: { 200: RemovedPasskeysSchema } },
+      },
+      async (request): Promise<RemovedPasskeys> => {
+        const { userId: ownerId } = await signedIn(request);
+        const target = request.params.userId;
+        return withAdmin(adminDb, async (tx) => {
+          const [account] = await tx
+            .select({ id: schema.user.id })
+            .from(schema.user)
+            .where(eq(schema.user.id, target));
+          if (account === undefined) throw new AccountNotFound();
+          const removed = await removePasskeys(tx, target);
+          await audit(tx, {
+            userId: ownerId,
+            action: 'auth.passkeys_removed',
+            entityId: target,
+            ip: request.ip,
+            details: { removed },
+          });
+          return { passkeys: removed };
         });
       },
     );

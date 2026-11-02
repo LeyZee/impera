@@ -314,12 +314,22 @@ function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'lin
       };
     case 'sign_in_refusals':
       return {
-        body: `${String(alert.refusals)} refus de mot de passe ou de code en ${String(alert.windowMinutes)} minutes sur ${accountText(alert.role)}${alert.network === null ? '' : ` (dernier réseau ${alert.network})`} : quelqu’un essaie peut-être d’y entrer.`,
+        body: `${String(alert.refusals)} refus de mot de passe, de code ou de clé d’accès en ${String(alert.windowMinutes)} minutes sur ${accountText(alert.role)}${alert.network === null ? '' : ` (dernier réseau ${alert.network})`} : quelqu’un essaie peut-être d’y entrer.`,
         link: SECURITY_LINK,
       };
     case 'second_factor_reset':
       return {
         body: `Deuxième facteur remis à zéro sur ${accountText(alert.role)}, ${alert.via === 'ops' ? 'depuis le serveur' : 'par un lien de réinitialisation'} : ses sessions et ses appareils de confiance sont fermés.`,
+        link: SECURITY_LINK,
+      };
+    case 'passkey_added':
+      return {
+        body: `Clé d’accès (Face ID, empreinte) ajoutée sur ${accountText(alert.role)}${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si personne ne l’a fait, retire ses clés et ferme ses sessions.`,
+        link: SECURITY_LINK,
+      };
+    case 'passkey_new_sign_in':
+      return {
+        body: `Connexion au compte propriétaire avec une clé d’accès jamais utilisée${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si ce n’est pas le propriétaire, retire ses clés et ferme ses sessions.`,
         link: SECURITY_LINK,
       };
     case 'persona_activated':

@@ -23,6 +23,6 @@ export {
 } from './crypto';
 export { MIGRATIONS_FOLDER, migrationStatus, runMigrations, type MigrationStatus } from './migrate';
 export * as schema from './schema';
-export { resetSecondFactor, revokeSignIns } from './sign-ins';
+export { removePasskeys, resetSecondFactor, revokeSignIns } from './sign-ins';
 /** Query operators, re-exported so that every package uses this package's single copy of Drizzle. */
 export { and, eq, inArray, sql } from 'drizzle-orm';

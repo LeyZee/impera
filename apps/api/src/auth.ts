@@ -1,3 +1,4 @@
+import { passkey } from '@better-auth/passkey';
 import {
   AuditEntryIdSchema,
   CurrentUserSchema,
@@ -5,6 +6,9 @@ import {
   isBackupCode,
   MeSchema,
   newId,
+  PASSKEY_ADD_WINDOW_MINUTES,
+  PasskeyGestureBodySchema,
+  PasskeySchema,
   REAUTHENTICATION_ERROR_CODE,
   ReauthenticateBodySchema,
   SECOND_FACTOR_ERROR_CODE,
@@ -16,13 +20,14 @@ import {
   UserRoleSchema,
   type CurrentUser,
   type Me,
+  type PasskeyErrorCode,
   type SecondFactorCode,
   type UserRole,
 } from '@nirvana/contracts';
 import { and, eq, schema, sql, withMember, type Database } from '@nirvana/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { isAPIError } from 'better-auth/api';
+import { APIError, isAPIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import { twoFactor } from 'better-auth/plugins/two-factor';
 import type { FastifyReply, FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
@@ -31,6 +36,18 @@ import { z } from 'zod';
 
 import type { Config } from './config';
 import type { Logger } from './logger';
+import {
+  alertOwnerPasskeySignIn,
+  confirmationOptions,
+  confirmGesture,
+  credentialIdOf,
+  deviceName,
+  markPasskeyUsed,
+  passkeyOf,
+  passkeyOwnerOf,
+  recordPasskeyAdded,
+  requireUserVerification,
+} from './passkeys';
 import type { PasswordBreachCheck } from './password-breaches';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
 
@@ -79,6 +96,8 @@ const REAUTHENTICATE_ACCOUNT_WINDOW = '10 minutes';
 const TRUSTED_DEVICE_SECONDS = 30 * 24 * 60 * 60;
 /** The code step of a sign-in: 10 minutes, then the sign-in starts over. */
 const SIGN_IN_CODE_SECONDS = 10 * 60;
+/** The code of our own refusal of a gesture made without user verification (ADR 0053 § 1). */
+const USER_NOT_VERIFIED = 'USER_NOT_VERIFIED';
 /** Ten wrong codes in a row lock the account's code for 15 minutes (the plugin's own count, across sign-ins). */
 const CODE_LOCK = { enabled: true, maxFailedAttempts: 10, durationSeconds: 15 * 60 };
 
@@ -174,6 +193,51 @@ export class ReauthenticationRefused extends DomainError {
   }
 }
 
+/** A gesture the server refused (ADR 0053 § 6): unknown key, wrong signature, counter, origin, no user verification. */
+class PasskeyRefused extends DomainError {
+  constructor() {
+    super('passkey_unauthenticated' satisfies PasskeyErrorCode, 'Cette clé d’accès n’a pas été reconnue');
+  }
+}
+
+class PasskeyChallengeExpired extends DomainError {
+  constructor() {
+    super('passkey_challenge_unauthenticated' satisfies PasskeyErrorCode, 'Le geste a expiré : recommence');
+  }
+}
+
+class NoPasskey extends DomainError {
+  constructor() {
+    super('passkey_not_found' satisfies PasskeyErrorCode, 'Aucune clé d’accès sur ce compte');
+  }
+}
+
+class PasskeyConflict extends DomainError {
+  constructor() {
+    super('passkey_conflict' satisfies PasskeyErrorCode, 'Cette clé d’accès est déjà sur un compte');
+  }
+}
+
+/**
+ * The plugin's refusals of a gesture, by its error code (ours for a gesture without user verification). A member who
+ * left is refused by the session hook (`UNABLE_TO_CREATE_SESSION`): the same refusal as an unknown key.
+ */
+const PASSKEY_REFUSED_CODES: ReadonlySet<string> = new Set([
+  'PASSKEY_NOT_FOUND',
+  'AUTHENTICATION_FAILED',
+  'FAILED_TO_VERIFY_REGISTRATION',
+  'YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY',
+  'UNABLE_TO_CREATE_SESSION',
+  USER_NOT_VERIFIED,
+]);
+
+function passkeyRefusal(code: string | undefined): DomainError | undefined {
+  if (code === undefined) return undefined;
+  if (code === 'CHALLENGE_NOT_FOUND') return new PasskeyChallengeExpired();
+  if (code === 'PREVIOUSLY_REGISTERED') return new PasskeyConflict();
+  return PASSKEY_REFUSED_CODES.has(code) ? new PasskeyRefused() : undefined;
+}
+
 export class ReauthenticationLimited extends DomainError {
   constructor() {
     super('reauthentication_limited', 'Trop d’essais : réessaie dans quelques minutes');
@@ -228,6 +292,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
         account: schema.account,
         verification: schema.verification,
         twoFactor: schema.twoFactor,
+        passkey: schema.passkey,
       },
     }),
     emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: MIN_PASSWORD_LENGTH },
@@ -240,7 +305,10 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
     session: {
       expiresIn: SESSION_SECONDS,
       updateAge: SESSION_REFRESH_SECONDS,
-      additionalFields: { reauthenticatedAt: { type: 'date', input: false, required: false } },
+      additionalFields: {
+        reauthenticatedAt: { type: 'date', input: false, required: false },
+        codeConfirmedAt: { type: 'date', input: false, required: false },
+      },
     },
     // ADR 0046: an authenticator code for every account. The secret and the backup codes are encrypted with the
     // Better Auth secret; a trusted device is a signed cookie and a `verification` row, revoked with the sessions.
@@ -251,6 +319,44 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
         twoFactorCookieMaxAge: SIGN_IN_CODE_SECONDS,
         backupCodeOptions: { amount: 10, storeBackupCodes: 'encrypted' },
         accountLockout: CODE_LOCK,
+      }),
+      // ADR 0053: a passkey is worth the password and the code. The plugin asks the browser for user verification
+      // only as « preferred » at sign-in and never checks it: both hooks refuse a gesture made without Face ID, a
+      // fingerprint or the phone's code. Keys are bound to the dashboard's host; the origin is checked at each gesture.
+      // Its routes are reached only through ours (`createAuthRoutes`), which require the session, the recent
+      // confirmation and the limits; `requireSession: false` only spares the plugin's own « fresh session » rule
+      // (a session opened less than a day ago), which ours replaces.
+      passkey({
+        rpID: new URL(config.WEB_ORIGIN).hostname,
+        rpName: 'Nirvana',
+        origin: config.WEB_ORIGIN,
+        authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+        registration: {
+          requireSession: false,
+          resolveUser: () => {
+            throw new APIError('UNAUTHORIZED', { message: 'session required' });
+          },
+          afterVerification: ({ verification }) => {
+            if (verification.registrationInfo?.userVerified !== true) {
+              throw new APIError('BAD_REQUEST', {
+                code: USER_NOT_VERIFIED,
+                message: 'user verification required',
+              });
+            }
+            return Promise.resolve(undefined);
+          },
+        },
+        authentication: {
+          afterVerification: ({ verification }) => {
+            if (!verification.authenticationInfo.userVerified) {
+              throw new APIError('UNAUTHORIZED', {
+                code: USER_NOT_VERIFIED,
+                message: 'user verification required',
+              });
+            }
+            return Promise.resolve();
+          },
+        },
       }),
     ],
     advanced: {
@@ -323,6 +429,8 @@ export function authHeaders(request: FastifyRequest): Headers {
 }
 
 const SignInBodySchema = z.looseObject({ email: z.string().min(1) });
+/** The passkey the plugin has just stored, read for its id only (the rest never reaches the page). */
+const AddedPasskeySchema = z.object({ id: z.string().min(1) });
 /** The session token in Better Auth's answer to a code, read to stamp that session and never sent on. */
 const SessionTokenSchema = z.object({ token: z.string().min(1) });
 
@@ -441,21 +549,35 @@ export function createRequireRole(auth: Auth, db: Database): RequireRole {
 
 /**
  * Route guard for sensitive actions, after `requireRole` (ADR 0016, ADR 0046 § 3): the password and the code must have
- * been given on this session less than 10 minutes ago (a sign-in through the code, or `POST /v1/auth/reauthenticate`),
- * otherwise 403 `reauthentication_forbidden` and the page asks for both. A session's age says nothing: a sign-in from a
- * trusted device asked for no code.
+ * been given on this session less than 10 minutes ago (a sign-in through the code, `POST /v1/auth/reauthenticate`, or a
+ * passkey gesture on `POST /v1/auth/passkey/confirm`, ADR 0053 § 4), otherwise 403 `reauthentication_forbidden` and the
+ * page asks again. A session's age says nothing: a sign-in from a trusted device or by a passkey asked for none.
  */
 export function createRequireRecentLogin(
   auth: Auth,
   db: Database,
   now: () => Date = () => new Date(),
 ): preValidationAsyncHookHandler {
+  return createRequireConfirmedWithin(auth, db, RECENT_LOGIN_MS, 'reauthenticatedAt', now);
+}
+
+/**
+ * The same guard with its own window and stamp: adding a passkey asks for the password and the code themselves within
+ * the last 5 minutes, a gesture on another key never counts (ADR 0053 § 2).
+ */
+function createRequireConfirmedWithin(
+  auth: Auth,
+  db: Database,
+  withinMs: number,
+  stamp: 'reauthenticatedAt' | 'codeConfirmedAt',
+  now: () => Date = () => new Date(),
+): preValidationAsyncHookHandler {
   return async (request) => {
     const result = await sessionOf(auth, db, request, now());
     if (result === null) throw new SessionUnauthenticated();
-    const confirmedAt = result.session.reauthenticatedAt;
+    const confirmedAt = result.session[stamp];
     if (confirmedAt === null || confirmedAt === undefined) throw new ReauthenticationRequired();
-    if (now().getTime() - confirmedAt.getTime() > RECENT_LOGIN_MS) throw new ReauthenticationRequired();
+    if (now().getTime() - confirmedAt.getTime() > withinMs) throw new ReauthenticationRequired();
   };
 }
 
@@ -649,6 +771,18 @@ export function createAuthRoutes(
         request.log.warn({ err: error }, 'auth: a sign-in alert could not be written');
       }
     };
+    /**
+     * A sign-in by a passkey: its last use is written, and the owner hears of a key never used before (ADR 0053 § 7).
+     * Never a condition of the sign-in, which has already opened.
+     */
+    const usedForSignIn = async (request: FastifyRequest, credentialId: string) => {
+      try {
+        const first = await markPasskeyUsed(adminDb, credentialId);
+        if (first !== null) await alertOwnerPasskeySignIn(adminDb, first, request.ip);
+      } catch (error) {
+        request.log.warn({ err: error }, 'auth: a passkey sign-in could not be recorded');
+      }
+    };
     const forward = async (
       request: FastifyRequest,
       reply: FastifyReply,
@@ -660,10 +794,14 @@ export function createAuthRoutes(
         readonly onSuccess?: (json: unknown) => Promise<void>;
         /** Run on a refusal with its status and Better Auth's error code, before it is thrown. */
         readonly onRefused?: (status: number, code: string | undefined) => Promise<void>;
+        /** The body Better Auth receives in place of the request's (ours, completed by the server). */
+        readonly body?: unknown;
+        /** What the page receives in place of Better Auth's JSON body, after `onSuccess`. */
+        readonly answer?: (json: unknown) => Promise<unknown>;
       },
     ) => {
-      const body =
-        request.body === undefined || request.body === null ? undefined : JSON.stringify(request.body);
+      const sent = options.body ?? request.body;
+      const body = sent === undefined || sent === null ? undefined : JSON.stringify(sent);
       const response = await auth.handler(
         new Request(new URL(request.url, config.AUTH_BASE_URL), {
           method: request.method,
@@ -689,6 +827,7 @@ export function createAuthRoutes(
       const text = await response.text();
       const isJson = response.headers.get('content-type')?.includes('json') === true;
       if (isJson && options.onSuccess !== undefined) await options.onSuccess(JSON.parse(text));
+      if (isJson && options.answer !== undefined) return reply.send(await options.answer(JSON.parse(text)));
       return reply.send(isJson ? withoutToken(text) : text);
     };
 
@@ -753,6 +892,48 @@ export function createAuthRoutes(
         });
       },
     });
+    // Sign-in with a passkey (ADR 0053 § 1): one gesture opens the session, no password, no code. The options carry
+    // no account (the key says whose it is), and ask for user verification, which the plugin's hook then requires.
+    app.get('/auth/passkey/generate-authenticate-options', { config: perIp }, (request, reply) =>
+      forward(request, reply, {
+        onUnauthorized: () => new SessionUnauthenticated(),
+        answer: (json) => Promise.resolve(requireUserVerification(json)),
+      }),
+    );
+    // Same limits as a password (ADR 0053 § 6): per address, then per account once the key names one; only refusals
+    // the server checked count toward the alert, a cancelled Face ID never reaches it.
+    app.route({
+      method: 'POST',
+      url: '/auth/passkey/verify-authentication',
+      config: perIp,
+      schema: { body: PasskeyGestureBodySchema },
+      preValidation: async (request, reply) => {
+        const account = await passkeyOwnerOf(db, credentialIdOf(request.body));
+        if (
+          await exceeded(request, reply, account === null ? `ip:${request.ip}` : `passkey:${account}`, false)
+        ) {
+          throw new SignInLimited();
+        }
+      },
+      handler: async (request, reply) => {
+        const credentialId = request.body.response.id;
+        const closeReplaced = await closeReplacedSession(request);
+        return forward(request, reply, {
+          onUnauthorized: () => new PasskeyRefused(),
+          refusal: passkeyRefusal,
+          onRefused: async (_status, code) => {
+            if (code === 'AUTHENTICATION_FAILED' || code === USER_NOT_VERIFIED) {
+              await refused(request, await passkeyOwnerOf(db, credentialId), 'auth.passkey_refused');
+            }
+          },
+          onSuccess: async (json) => {
+            await closeReplaced(json);
+            await usedForSignIn(request, credentialId);
+          },
+        });
+      },
+    });
+
     // Only what the dashboard calls: the rest of Better Auth (get-session and list-sessions with their tokens,
     // update-user renaming an account) stays unreachable and answers 404 like any unknown route. Signing out without
     // a session succeeds: there is nothing to close.
@@ -770,7 +951,7 @@ export function createAuthRoutes(
       if (!opened.success) return;
       const [session] = await db
         .update(schema.session)
-        .set({ reauthenticatedAt: sql`now()` })
+        .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()` })
         .where(eq(schema.session.token, opened.data.token))
         .returning({ userId: schema.session.userId });
       // A code was asked: no trusted device spared it, which the owner hears of (ADR 0046 § 8).
@@ -867,7 +1048,7 @@ export function createAuthRoutes(
                   // names the session it replaced, so the new one is found as the account's session opened since.
                   await db
                     .update(schema.session)
-                    .set({ reauthenticatedAt: sql`now()` })
+                    .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()` })
                     .where(
                       and(
                         eq(schema.session.userId, session.user.id),
@@ -933,10 +1114,101 @@ export function createAuthRoutes(
         if (result === null) throw new SessionUnauthenticated();
         await db
           .update(schema.session)
-          .set({ reauthenticatedAt: sql`now()` })
+          .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()` })
           .where(eq(schema.session.id, result.session.id));
         await audit(request, request.user.id, 'auth.reauthenticated');
         return reply.code(204).send();
+      },
+    );
+
+    // A sensitive action confirmed by a gesture (ADR 0053 § 4): a fresh challenge for this session, a key of this
+    // account, user verification; it stamps the session like the password and the code. The same limit per account.
+    const relying = { rpID: new URL(config.WEB_ORIGIN).hostname, origin: config.WEB_ORIGIN };
+    const anyRole = requireRole(...UserRoleSchema.options);
+    const signedInSession = async (request: FastifyRequest) => {
+      if (request.user === null) throw new SessionUnauthenticated();
+      const current = await sessionOf(auth, db, request);
+      if (current === null) throw new SessionUnauthenticated();
+      return { userId: request.user.id, sessionId: current.session.id };
+    };
+    app.post('/auth/passkey/confirm-options', { config: perIp, preValidation: anyRole }, async (request) => {
+      const options = await confirmationOptions(db, relying, await signedInSession(request));
+      if (options === null) throw new NoPasskey();
+      return options;
+    });
+    app.post(
+      '/auth/passkey/confirm',
+      {
+        config: perIp,
+        preValidation: [
+          anyRole,
+          async (request, reply) => {
+            const attempt = await perAccountConfirmation(request);
+            if (attempt.isAllowed || !attempt.isExceeded) return;
+            void reply.header('retry-after', attempt.ttlInSeconds);
+            throw new ReauthenticationLimited();
+          },
+        ],
+        schema: { body: PasskeyGestureBodySchema },
+      },
+      async (request, reply) => {
+        const target = await signedInSession(request);
+        const outcome = await confirmGesture(db, relying, { ...target, response: request.body.response });
+        if (outcome === 'expired') throw new PasskeyChallengeExpired();
+        if (outcome === 'refused') {
+          await refused(request, target.userId, 'auth.reauthentication_refused');
+          throw new PasskeyRefused();
+        }
+        await db
+          .update(schema.session)
+          .set({ reauthenticatedAt: sql`now()` })
+          .where(eq(schema.session.id, target.sessionId));
+        await db.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: target.userId,
+          action: 'auth.reauthenticated',
+          entity: 'user',
+          entityId: target.userId,
+          details: { via: 'passkey' },
+          ip: request.ip,
+        });
+        return reply.code(204).send();
+      },
+    );
+
+    // Adding a passkey (ADR 0053 § 2): only on a session whose password and code were confirmed within 5 minutes,
+    // never by a trusted device, and always to the session's own account (the plugin reads it from the session). The
+    // key is named by the device it was added from, read here, never by the page.
+    const addingWindow = createRequireConfirmedWithin(
+      auth,
+      db,
+      PASSKEY_ADD_WINDOW_MINUTES * 60_000,
+      'codeConfirmedAt',
+    );
+    app.get(
+      '/auth/passkey/generate-register-options',
+      { config: perIp, preValidation: [anyRole, addingWindow] },
+      (request, reply) => forward(request, reply, { onUnauthorized: () => new SessionUnauthenticated() }),
+    );
+    app.post(
+      '/auth/passkey/verify-registration',
+      { config: perIp, preValidation: [anyRole, addingWindow], schema: { body: PasskeyGestureBodySchema } },
+      async (request, reply) => {
+        const { userId } = await signedInSession(request);
+        let added: string | null = null;
+        return forward(request, reply, {
+          body: { response: request.body.response, name: deviceName(request.headers['user-agent']) },
+          onUnauthorized: () => new SessionUnauthenticated(),
+          refusal: passkeyRefusal,
+          onSuccess: async (json) => {
+            added = AddedPasskeySchema.parse(json).id;
+            await recordPasskeyAdded(adminDb, { userId, passkeyId: added, ip: request.ip });
+          },
+          answer: async () => {
+            const view = added === null ? null : await passkeyOf(db, userId, added);
+            return PasskeySchema.parse(view);
+          },
+        });
       },
     );
 

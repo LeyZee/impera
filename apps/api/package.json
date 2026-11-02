@@ -28,9 +28,12 @@
     "ops:check-keys": "tsx --env-file-if-exists=../../.env src/scripts/ops-check-keys.ts"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.7",
+    "@better-auth/utils": "0.4.2",
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
     "@fastify/rate-limit": "11.2.0",
+    "@simplewebauthn/server": "13.3.3",
     "aws4fetch": "1.0.20",
     "fastify": "5.12.7",
     "fastify-type-provider-zod": "7.0.0",

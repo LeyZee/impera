@@ -401,7 +401,23 @@ describe('classification (ADR 0020 §2)', () => {
         },
       })?.body,
     ).toBe(
-      '5 refus de mot de passe ou de code en 15 minutes sur un compte de l’équipe : quelqu’un essaie peut-être d’y entrer.',
+      '5 refus de mot de passe, de code ou de clé d’accès en 15 minutes sur un compte de l’équipe : quelqu’un essaie peut-être d’y entrer.',
+    );
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: { reason: 'passkey_added', userId: 'op-1', role: 'operator', network: '198.51.100.x' },
+      })?.body,
+    ).toBe(
+      'Clé d’accès (Face ID, empreinte) ajoutée sur un compte de l’équipe (réseau 198.51.100.x). Si personne ne l’a fait, retire ses clés et ferme ses sessions.',
+    );
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: { reason: 'passkey_new_sign_in', userId: 'owner-1', role: 'owner', network: null },
+      })?.body,
+    ).toBe(
+      'Connexion au compte propriétaire avec une clé d’accès jamais utilisée. Si ce n’est pas le propriétaire, retire ses clés et ferme ses sessions.',
     );
     expect(
       bodyOf({

@@ -36,6 +36,7 @@ export * from './providers';
 export * from './result';
 export * from './sales-feed';
 export * from './scheduling';
+export * from './passkeys';
 export * from './security';
 export * from './settings';
 export * from './shift-reports';

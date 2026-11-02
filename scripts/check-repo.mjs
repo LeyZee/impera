@@ -98,7 +98,9 @@ const rel = (f) => relative(root, f).split(sep).join('/');
 // 3. Size, 4. Forbidden names, 5. TODO without id
 for (const f of files) {
   const r = rel(f);
-  if (statSync(f).size > MAX_BYTES) errors.push(`${r}: larger than 500 KB`);
+  // The compiler's incremental state (`incremental` in tsconfig.base.json) is ignored by git and rewritten by every
+  // typecheck, which runs before this script: its size says nothing about the repository.
+  if (statSync(f).size > MAX_BYTES && !r.endsWith('.tsbuildinfo')) errors.push(`${r}: larger than 500 KB`);
   if (FORBIDDEN_NAMES.some((re) => re.test(r))) errors.push(`${r}: forbidden file name (hygiene.md)`);
   if (/\.(ts|tsx|mjs|js)$/.test(r) && !r.startsWith('scripts/check-repo')) {
     const lines = readFileSync(f, 'utf8').split('\n');
