@@ -1,0 +1,7 @@
+# 2026-11-02 — CRM-01 Écran Réglages › Ventes — done
+Fait : onglet « Ventes » des Réglages (propriétaire seul, `/reglages/ventes`) dans `apps/web/src/settings/sales-feed/` : clé de l'API CRM collée et vérifiée chez Reveal (refus dit sous le champ, jamais gardée), remplacer, retirer (la confirmation dit que la réception instantanée s'arrête aussi), mot de passe et code redemandés par `PasswordPrompt` ; réception instantanée (webhook) : activer, réinscrire, couper, par un `PUT` sans corps ni en-tête JSON ; liens des modèles (compte pris par un autre modèle visible mais non choisissable, lien « relié par pseudo identique » à vérifier, ventes en quarantaine comptées) et de l'équipe Reveal (membre, l'agent ou personne, depuis la liste de l'équipe). 29 tests (vue, appels, écran).
+Pas fait : rien.
+Décisions : un webhook silencieux n'alerte jamais ; seul `lastRejectedAt` met l'ambre et propose « Réinscrire ». Rouge seulement quand la lecture est arrêtée (`needs_reconnect`), ambre pour un problème passager. Les refus `sales_feed_*` affichent la phrase du serveur.
+Découvertes : relier un modèle au compte qu'il a déjà ne change rien côté serveur, donc un lien automatique ne peut pas être « confirmé » en lien du propriétaire (Bilan, si l'écran doit le permettre).
+Candidats à suppression : aucun.
+Vérifié : `pnpm check` ; tests web ; captures Nuit et Jour, 1440 et 400 px, sans défilement horizontal.
