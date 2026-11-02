@@ -374,7 +374,7 @@ export const entriesOf = (
   PayrollEntriesSchema.parse({ period, bonuses: [], penalties: [], adjustments: [], ...entries });
 
 /**
- * A document of `/v1/payroll/invoices` for `whose`, an invoice of `period` by default: issued on the 2nd of November,
+ * A document of `/v1/payroll/invoices` for `whose`, an invoice of `period` by default (its statement's too): issued on the 2nd of November,
  * due 60 days later, 100 € excluding VAT and no VAT (reverse charge), accepted, not settled. `n` tells it apart, and
  * makes its number (`TEST-2026-000n`).
  */
@@ -392,6 +392,7 @@ export function invoiceOf(
     number: `TEST-2026-${String(n).padStart(4, '0')}`,
     period,
     statementId: payId(950 + n),
+    statementPeriod: period,
     creditedInvoiceId: null,
     issuedOn: '2026-11-02',
     dueOn: '2027-01-01',

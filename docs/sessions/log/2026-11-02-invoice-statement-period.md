@@ -1,0 +1,7 @@
+# 2026-11-02 — lot 8 : la quinzaine du relevé de chaque document de la liste (fil Équipe) — done
+Fait : `statementPeriod` dans chaque élément de `GET /v1/payroll/invoices` (`InvoiceListItemSchema`) : la quinzaine du relevé qui a émis le document, lue par une sous-requête sur `commission_statements` (`null` sans relevé). Pour une facture, c'est sa propre `period` ; pour un avoir ou une facture rectificative, la quinzaine plus tardive qui l'a dû, alors que `period` reste celle qu'il corrige et imprime. README de la paie et fiche `EQ-06-invoice-screens.md` (complément 1) complétés.
+Pas fait : la lecture du champ par l'écran (`statementPeriodOf` d'Extension, en 8b ou dans une petite PR).
+Décisions : un champ de la liste plutôt qu'une lecture du relevé par l'écran : la facture rectificative a une échéance, elle peut être en ambre ou en rouge dans « Échéances proches ou passées », hors de toute liste par quinzaine, et le propriétaire doit rejoindre le relevé qui la paie. Découverte d'Extension sur #374.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : intégration `payroll-invoice-list` contre Postgres 16 (la facture mène à sa quinzaine ; l'avoir émis sous Q2 imprime Q1 et mène à Q2, sous la quinzaine comme dans une liste par jours d'émission ; la chatteuse lit la quinzaine de son propre relevé, jamais `null` sous la politique des relevés ; un avoir sans relevé, écrit comme le ferait un import, rend `statementId` et `statementPeriod` à `null` et reste sous la quinzaine qu'il corrige ; demandes de Bilan sur #375) ✓.
