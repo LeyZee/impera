@@ -243,6 +243,24 @@ describe('Équipe › Paie : paliers, objectif collectif, minimum et délai de v
     ).toMatchObject({ code: 'collective_goal_conflict' });
   });
 
+  it('gives every reader the same share of the goal and the same forecast of it, never a member the net (ADR 0047 § 2)', async () => {
+    const pace = async (cookie: string) => {
+      const response = await team.call('GET', `/payroll/periods/${R2}`, cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return PayrollPeriodSchema.parse(response.json()).pace;
+    };
+    const owners = await pace(team.owner);
+    // The team made 8 000 of 10 000, and the period has ended: the forecast is what was made.
+    expect(owners).toEqual({
+      lateNetMinor: 0,
+      forecastNetMinor: 8_000,
+      goal: { reachedBps: 8_000, forecastReachedBps: 8_000 },
+    });
+    expect(await pace(monaCookie)).toEqual(owners);
+    // Théo reads only his own statements, yet the same goal (« ok A »); never the team's net nor its late reports.
+    expect(await pace(theoCookie)).toEqual({ lateNetMinor: null, forecastNetMinor: null, goal: owners.goal });
+  });
+
   it('sets a minimum from a period not begun: the drafts already worked keep theirs (PAIE-22)', async () => {
     for (const period of [R1, R2]) await team.forgetJobs(period);
     const ahead = nextPayPeriod(current());

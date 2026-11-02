@@ -28,13 +28,14 @@ import {
   type PayoutBlock,
   type PayPeriod,
 } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withMember, type Database } from '@nirvana/db';
+import { and, eq, inArray, schema, sql, withAdmin, withMember, type Database } from '@nirvana/db';
 import { z } from 'zod';
 
 import { redactAuthors } from '../domain/authors';
 import { PayPeriodCursorInvalid, PayrollEntriesTooMany, PayrollForbidden } from '../domain/errors';
 import { payoutDecision } from '../domain/payouts';
 import { blockFor } from '../domain/period-blocks';
+import { lateNetOf } from '../domain/period-figures';
 import type { PayrollReadStore, StoredStatement } from '../domain/ports';
 
 import { payoutFactsOf } from './payout-facts';
@@ -112,10 +113,52 @@ function decodePeriodCursor(cursor: string | undefined): PayPeriod | null {
  */
 export function createDrizzlePayrollReadStore(
   db: Database,
+  adminDb: Database,
   reads: Pick<PayInputReads, 'agencyTimeZone'>,
   now: () => Date,
 ): PayrollReadStore {
   return {
+    // Every statement of the period at its current revision, read as the admin role: only two sums come out.
+    teamTotalsUnscoped: (period: PayPeriod) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select({
+            statementId: commissionStatements.id,
+            netMinor: commissionStatements.netMinor,
+          })
+          .from(commissionStatements)
+          .where(eq(commissionStatements.period, period));
+        const lines =
+          rows.length === 0
+            ? []
+            : await tx
+                .select({
+                  grossMinor: commissionStatementLines.grossMinor,
+                  netMinor: commissionStatementLines.netMinor,
+                  lateReports: commissionStatementLines.lateReports,
+                })
+                .from(commissionStatementLines)
+                .innerJoin(
+                  commissionStatements,
+                  and(
+                    eq(commissionStatements.id, commissionStatementLines.statementId),
+                    eq(commissionStatements.revision, commissionStatementLines.revision),
+                  ),
+                )
+                .where(eq(commissionStatements.period, period));
+        return {
+          netMinor: rows.reduce((total, row) => total + row.netMinor, 0),
+          lateNetMinor: lateNetOf([
+            {
+              lines: lines.map((line) => ({
+                grossMinor: line.grossMinor,
+                netMinor: line.netMinor,
+                lateReports: z.array(LateReportSchema).parse(line.lateReports),
+              })),
+            },
+          ]),
+        };
+      }),
     period: (userId, period: PayPeriod) =>
       withMember(db, userId, async (tx, scope) => {
         const [own] = await tx

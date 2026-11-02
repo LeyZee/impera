@@ -774,6 +774,50 @@ export type PayPeriodBlock = z.infer<typeof PayPeriodBlockSchema>;
  * first open period (ADR 0032). `blocked` says pay could not compute the period at its last try
  * (`PayPeriodBlockSchema`): its statements are out of date until it can. Absent (an older server) reads as `null`.
  */
+/** A sum of a period's statements in euro cents: a `bigint` in SQL, read only within JavaScript's exact integers. */
+const PeriodSumSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
+const StatementCountSchema = z.number().int().min(0);
+
+/**
+ * The statements of a period counted by status and summed, as its reader reads them (`withMember`): the fields of a
+ * line of `GET /v1/payroll/periods` (`PayPeriodSummarySchema`), and the `summary` of `GET /v1/payroll/periods/:period`,
+ * computed by the server so that every screen shows the same figure (ADR 0047 § 2).
+ */
+export const PeriodFiguresSchema = z.object({
+  statements: z.object({
+    draft: StatementCountSchema,
+    validated: StatementCountSchema,
+    paid: StatementCountSchema,
+    carried: StatementCountSchema,
+  }),
+  netMinor: PeriodSumSchema,
+  payableMinor: PeriodSumSchema,
+  validatedPayableMinor: PeriodSumSchema,
+  carriedMinor: PeriodSumSchema,
+  paidMinor: PeriodSumSchema,
+});
+export type PeriodFigures = z.infer<typeof PeriodFiguresSchema>;
+
+/**
+ * Where a period is heading, at the time of the request (ADR 0047 § 2). `lateNetMinor` is the net its statements count
+ * from reports of an earlier, closed period, and `forecastNetMinor` the team's net at the end of the period at the pace
+ * of the time gone by in the agency's zone, the late net counted once; the net itself once the period has ended, `null`
+ * before a first full day or without a window. Both are the agency's: `null` for a member, who never reads the team's
+ * net. `goal`, with a collective goal: how far the team got in basis points (as the engine froze it in the statements,
+ * else from the net) and the one forecast of it, late reports set apart, the same for every reader (« ok A », 02/11).
+ */
+export const PeriodPaceSchema = z.object({
+  lateNetMinor: MinorSchema.nullable(),
+  forecastNetMinor: MinorSchema.nullable(),
+  goal: z
+    .object({
+      reachedBps: z.number().int().min(0).nullable(),
+      forecastReachedBps: z.number().int().min(0).nullable(),
+    })
+    .nullable(),
+});
+export type PeriodPace = z.infer<typeof PeriodPaceSchema>;
+
 export const PayrollPeriodSchema = z.object({
   period: PayPeriodSchema,
   window: PayPeriodWindowSchema.nullable(),
@@ -785,12 +829,10 @@ export const PayrollPeriodSchema = z.object({
   bonusTiers: BonusTierSetSchema.nullable(),
   collectiveGoal: CollectiveGoalSchema.nullable(),
   settings: PayrollSettingsSchema,
+  summary: PeriodFiguresSchema,
+  pace: PeriodPaceSchema,
 });
 export type PayrollPeriod = z.infer<typeof PayrollPeriodSchema>;
-
-/** A sum of a period's statements in euro cents: a `bigint` in SQL, read only within JavaScript's exact integers. */
-const PeriodSumSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
-const StatementCountSchema = z.number().int().min(0);
 
 /**
  * A period of `GET /v1/payroll/periods` (EQ-05): its window, whether it has ended, when the team closed it, and the
@@ -807,24 +849,15 @@ const StatementCountSchema = z.number().int().min(0);
  * amount to show as owed or taken back. `paidMinor` is what was sent. `blocked` says pay could not compute the period at
  * its last try, as in `PayrollPeriodSchema`: its sums are out of date.
  */
-export const PayPeriodSummarySchema = z.object({
-  window: PayPeriodWindowSchema,
-  ended: z.boolean(),
-  closedAt: z.iso.datetime().nullable(),
-  closedBy: UserIdSchema.nullable(),
-  blocked: PayPeriodBlockSchema.nullable(),
-  statements: z.object({
-    draft: StatementCountSchema,
-    validated: StatementCountSchema,
-    paid: StatementCountSchema,
-    carried: StatementCountSchema,
-  }),
-  netMinor: PeriodSumSchema,
-  payableMinor: PeriodSumSchema,
-  validatedPayableMinor: PeriodSumSchema,
-  carriedMinor: PeriodSumSchema,
-  paidMinor: PeriodSumSchema,
-});
+export const PayPeriodSummarySchema = z
+  .object({
+    window: PayPeriodWindowSchema,
+    ended: z.boolean(),
+    closedAt: z.iso.datetime().nullable(),
+    closedBy: UserIdSchema.nullable(),
+    blocked: PayPeriodBlockSchema.nullable(),
+  })
+  .extend(PeriodFiguresSchema.shape);
 export type PayPeriodSummary = z.infer<typeof PayPeriodSummarySchema>;
 
 /**

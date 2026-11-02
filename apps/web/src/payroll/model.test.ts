@@ -93,6 +93,18 @@ const WINDOW = {
   endsAt: '2026-11-15T23:00:00.000Z',
   timeZone: 'Europe/Paris',
 };
+/** The server's sums and pace of a period (ADR 0047 § 2), which these tests do not read. */
+const UNREAD = {
+  summary: {
+    statements: { draft: 0, validated: 0, paid: 0, carried: 0 },
+    netMinor: 0,
+    payableMinor: 0,
+    validatedPayableMinor: 0,
+    carriedMinor: 0,
+    paidMinor: 0,
+  },
+  pace: { lateNetMinor: null, forecastNetMinor: null, goal: null },
+} as const satisfies Pick<PayrollPeriod, 'summary' | 'pace'>;
 const ACCOUNT = newId(PlatformAccountIdSchema);
 
 const line = (patch: Partial<CommissionStatementLine> = {}): CommissionStatementLine => ({
@@ -351,6 +363,7 @@ describe('a period in the list', () => {
       window: WINDOW,
       ended: true,
       beforeFirstClosing: false,
+      ...UNREAD,
       blocked: null,
       closing: null,
       statements: [
@@ -590,6 +603,7 @@ describe('the export of a period', () => {
       window: WINDOW,
       ended: true,
       beforeFirstClosing: false,
+      ...UNREAD,
       blocked: null,
       closing: null,
       statements: [statement()],
@@ -616,6 +630,7 @@ describe('the export of a period', () => {
       window: WINDOW,
       ended: true,
       beforeFirstClosing: false,
+      ...UNREAD,
       blocked: null,
       closing: null,
       statements: [statement({ penaltiesMinor: 500 })],
@@ -715,6 +730,7 @@ describe('the dollar’s rate before a closing', () => {
     window: { ...WINDOW, period: OCT2 },
     ended: true,
     beforeFirstClosing: false,
+    ...UNREAD,
     blocked: null,
     closing: null,
     statements: [

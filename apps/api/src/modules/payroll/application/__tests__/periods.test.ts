@@ -110,6 +110,7 @@ const read = (
       entries: () => Promise.reject(new Error('not read here')),
       settings: () => Promise.reject(new Error('not read here')),
       exchangeRates: () => Promise.reject(new Error('not read here')),
+      teamTotalsUnscoped: () => Promise.reject(new Error('not read here')),
     },
     () => new Date(at),
   ).period(newId(UserIdSchema), P1);
@@ -196,6 +197,7 @@ describe('the periods’ list (EQ-05)', () => {
           entries: () => Promise.reject(new Error('not read here')),
           settings: () => Promise.reject(new Error('not read here')),
           exchangeRates: () => Promise.reject(new Error('not read here')),
+          teamTotalsUnscoped: () => Promise.reject(new Error('not read here')),
         },
         () => new Date(at),
       ).periods(newId(UserIdSchema), { limit: 1 });
