@@ -45,6 +45,7 @@ import type { TelegramModule } from './modules/telegram';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
+import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAgent } from './wiring/agent';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
@@ -344,6 +345,13 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         requireRole,
         recentLogin: shared.recentLogin,
         passwordBreaches,
+      }),
+      createSecuritySettingsRoutes({
+        auth,
+        db: db.db,
+        adminDb: adminDb.db,
+        requireRole,
+        requireRecentLogin: shared.recentLogin,
       }),
       ...conversations.routes,
       ...persona.routes,

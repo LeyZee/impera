@@ -298,8 +298,8 @@ const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
   nirvana: 'Nirvana',
 };
 
-// Réglages › Sécurité (its sessions, by member for the owner) comes with the screen of SEC-04; until then, Réglages.
-const SECURITY_LINK = { label: 'Ouvrir les Réglages', path: '/reglages' };
+// Réglages › Sécurité (SEC-04): the owner's sessions, and each account's, where he closes them.
+const SECURITY_LINK = { label: 'Ouvrir la sécurité', path: '/reglages/securite' };
 
 /**
  * A security alert (ADR 0046 § 8): the act, the account's role and its network, written by the code; never a name,

@@ -387,7 +387,7 @@ describe('classification (ADR 0020 §2)', () => {
     expect(signIn?.body).toBe(
       'Connexion au compte propriétaire depuis un appareil qui n’était pas de confiance (réseau 203.0.113.x). Si ce n’est pas le propriétaire, ferme ses sessions et change son mot de passe.',
     );
-    expect(signIn?.link).toEqual({ label: 'Ouvrir les Réglages', path: '/reglages' });
+    expect(signIn?.link).toEqual({ label: 'Ouvrir la sécurité', path: '/reglages/securite' });
     expect(
       bodyOf({
         kind: 'security_alert',

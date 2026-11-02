@@ -16,6 +16,7 @@ import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
+import { MySecurityPage } from './screens/me/MySecurityPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
 import { ExportsPage } from './screens/pay/ExportsPage';
@@ -33,6 +34,7 @@ import {
   BackupsPage,
   BillingPage,
   PayRulesPage,
+  SecurityPage,
   SettingsLayout,
   TelegramPage,
 } from './screens/settings/SettingsLayout';
@@ -51,10 +53,11 @@ import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TestsPage } from './screens/train/TestsPage';
 import { TrainLayout } from './screens/train/TrainLayout';
+import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
 import { NotFoundPage } from './shell/NotFoundPage';
-import { canOpen, railOf, sectionOf } from './shell/nav';
+import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -456,6 +459,22 @@ const meInvoices = createRoute({
   },
 });
 
+const meSecurity = createRoute({
+  getParentRoute: () => me,
+  path: '/securite',
+  component: function MySecurity() {
+    const { user } = rootRoute.useRouteContext();
+    return <MySecurityPage user={user} />;
+  },
+});
+
+// Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
+const accountSecurity = createRoute({
+  getParentRoute: () => rootRoute,
+  path: ACCOUNT_SECURITY,
+  component: AccountSecurityPage,
+});
+
 const train = createRoute({ getParentRoute: () => rootRoute, path: '/entrainer', component: TrainLayout });
 const trainIndex = createRoute({
   getParentRoute: () => train,
@@ -574,6 +593,21 @@ const billing = createRoute({
   },
   component: BillingPage,
 });
+const settingsSecurity = createRoute({
+  getParentRoute: () => settings,
+  path: '/securite',
+  // The owner's own and the agency's accounts (SEC-04); a chatter or a manager finds his own in Moi › Sécurité.
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true });
+    }
+  },
+  component: function Security() {
+    const { user } = rootRoute.useRouteContext();
+    return <SecurityPage userId={user.id} />;
+  },
+});
 const agentMode = createRoute({ getParentRoute: () => settings, path: '/mode', component: AgentModePage });
 
 /** /aide/installer (CR-01): open to every role, outside the rail (no section, so the guard lets it through). */
@@ -602,7 +636,8 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, meFile, meInvoices]),
+  me.addChildren([meIndex, meFile, meInvoices, meSecurity]),
+  accountSecurity,
   settings.addChildren([
     settingsIndex,
     aiModels,
@@ -611,6 +646,7 @@ const routeTree = rootRoute.addChildren([
     payRules,
     billing,
     backups,
+    settingsSecurity,
     devices,
     agentMode,
   ]),

@@ -260,30 +260,43 @@ const SCREENS = {
   '/commissions/factures': 'Factures',
   '/moi/dossier': 'Dossier',
   '/moi/factures': 'Factures',
+  '/moi/securite': 'Sécurité',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
   '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
+  '/reglages/securite': 'Sécurité',
 } as const;
 export type ScreenPath = keyof typeof SCREENS;
+
+/**
+ * Where an account finds its own sessions and backup codes (SEC-04), from its menu: the owner in Réglages, a manager or
+ * a chatter in Moi, anyone else (an operator, a creator) on a page outside the rail.
+ */
+export const ACCOUNT_SECURITY = '/compte/securite';
+export function securityPathOf(me: Me): '/reglages/securite' | '/moi/securite' | typeof ACCOUNT_SECURITY {
+  if (me.role === 'owner') return '/reglages/securite';
+  return canOpen(railOf(me), '/moi') ? '/moi/securite' : ACCOUNT_SECURITY;
+}
 
 /** The name of a screen inside its section, for its sub-tab. */
 export const screenLabel = (to: ScreenPath): string => SCREENS[to];
 
 const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREENS));
 
-/** Pages open to every role outside the rail (CR-01): the install guide, the account's notifications. */
-const FREE_TITLES: ReadonlyMap<string, string> = new Map([
+/** Pages open to every role outside the rail: help and the account's notifications (CR-01), its security (SEC-04). */
+const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
   ['/aide/installer', 'Installer Nirvana'],
   ['/notifications', 'Notifications'],
+  [ACCOUNT_SECURITY, 'Sécurité'],
 ]);
 
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
 export function documentTitle(pathname: string, section: Section | null, kind: RailKind): string {
-  const free = FREE_TITLES.get(pathname.replace(/\/+$/u, ''));
-  if (free !== undefined) return `${free} · Nirvana`;
+  const offRail = OFF_RAIL_TITLES.get(pathname.replace(/\/+$/u, ''));
+  if (offRail !== undefined) return `${offRail} · Nirvana`;
   if (section === null) return 'Page introuvable · Nirvana';
   const path = pathname.replace(/\/+$/u, '');
   // A section's own page is no screen of its own: « Suivi · Nirvana », not « Conversations · Suivi ».

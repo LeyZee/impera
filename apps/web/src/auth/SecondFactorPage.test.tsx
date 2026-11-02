@@ -113,6 +113,13 @@ describe('SecondFactorPage', () => {
     }
   });
 
+  it('moves the focus to the title of each new step', async () => {
+    serve({ '/v1/auth/two-factor/enable': () => json({ totpURI: URI, backupCodes: BACKUP_CODES }) });
+    render(<SecondFactorPage onActivated={() => undefined} onSignOut={() => undefined} />);
+    await givePassword();
+    expect(document.activeElement?.textContent).toBe('Ajoute Nirvana dans ton application');
+  });
+
   it('lets the person sign out before the codes are shown', async () => {
     serve({});
     const onSignOut = vi.fn();

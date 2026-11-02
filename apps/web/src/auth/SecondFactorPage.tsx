@@ -1,6 +1,7 @@
 import type { SecondFactorSetup } from '@nirvana/contracts';
-import { useEffect, useRef, useState, type JSX, type RefObject, type SyntheticEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
+import { BackupCodesList, CopyButton } from './BackupCodesList';
 import { PublicBrand } from './PublicBrand';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
 
@@ -51,6 +52,14 @@ export function SecondFactorPage({
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const keyRef = useRef<HTMLElement>(null);
+  const stepRef = useRef<HTMLDivElement>(null);
+
+  // Each new step is announced where the eye and a screen reader go: its title takes the focus (the first step's
+  // field has it already). In the commit itself, so that nothing the person does next comes before it.
+  useLayoutEffect(() => {
+    if (step.kind === 'password') return;
+    stepRef.current?.querySelector<HTMLElement>('h1')?.focus();
+  }, [step.kind]);
 
   async function sendPassword(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -87,7 +96,7 @@ export function SecondFactorPage({
     <main className="nv-aura grid min-h-dvh place-items-center px-4 py-10">
       <div className="nv-plate nv-plate--pad flex w-full max-w-md flex-col gap-6">
         <PublicBrand page="Validation en deux étapes" />
-        <div key={step.kind} className="flex flex-col gap-5">
+        <div key={step.kind} ref={stepRef} className="flex flex-col gap-5">
           {renderStep()}
         </div>
         {error === null ? null : (
@@ -141,7 +150,9 @@ export function SecondFactorPage({
         return (
           <form className="flex flex-col gap-5" onSubmit={(event) => void sendCode(event, setup)}>
             <div className="nv-enter flex flex-col gap-2">
-              <h1 className="text-xl font-semibold">Ajoute Nirvana dans ton application</h1>
+              <h1 tabIndex={-1} className="text-xl font-semibold outline-none">
+                Ajoute Nirvana dans ton application
+              </h1>
               <p className="text-sm text-[var(--nv-ink-muted)]">
                 Sur ton téléphone, touche le bouton. Sur un ordinateur, choisis « Saisir une clé » dans
                 l’application et recopie celle-ci.
@@ -190,51 +201,21 @@ export function SecondFactorPage({
   }
 }
 
-/** Ten backup codes, shown once: copied, saved as a file, and the person says they are kept before going on. */
+/** Ten backup codes, shown once (the shared list), and the person says they are kept before going on. */
 function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () => void }): JSX.Element {
   const [kept, setKept] = useState(false);
-  const listRef = useRef<HTMLUListElement>(null);
-  const text = `Nirvana : codes de secours (chacun ne sert qu’une fois)\n\n${codes.join('\n')}\n`;
   return (
     <>
       <div className="nv-enter flex flex-col gap-2">
-        <h1 className="text-xl font-semibold">C’est actif. Note tes codes de secours</h1>
+        <h1 tabIndex={-1} className="text-xl font-semibold outline-none">
+          C’est actif. Note tes codes de secours
+        </h1>
         <p className="text-sm text-[var(--nv-ink-muted)]">
           Sans ton téléphone, chacun de ces codes remplace une fois le code de l’application. Ils ne seront
           plus affichés : garde-les dans ton gestionnaire de mots de passe ou sur papier, jamais en photo.
         </p>
       </div>
-      <ul
-        ref={listRef}
-        className="nv-glass grid grid-cols-2 gap-x-6 gap-y-2 rounded-[var(--nv-radius-md)] px-4 py-3 font-mono text-sm"
-        aria-label="Codes de secours"
-      >
-        {codes.map((code) => (
-          <li key={code}>{code}</li>
-        ))}
-      </ul>
-      <div className="flex flex-wrap gap-2">
-        <CopyButton text={text} label="Copier les codes" shown={listRef} />
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm"
-          onClick={() => {
-            const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'nirvana-codes-de-secours.txt';
-            // In the document for Firefox, and the URL kept a moment: revoked at once, Safari cancels the download.
-            document.body.append(link);
-            link.click();
-            link.remove();
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-            }, 1_000);
-          }}
-        >
-          Enregistrer en fichier
-        </button>
-      </div>
+      <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
         <input
           className="mt-1"
@@ -250,55 +231,5 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
         Ouvrir Nirvana
       </button>
     </>
-  );
-}
-
-/** How long « Copié » or the fallback stays on the button before its label comes back. */
-const COPY_FEEDBACK_MS = 3_000;
-
-/**
- * Copies `text`. Where the browser refuses (some in-app browsers, a page without focus), the text on screen (`shown`)
- * is selected instead and the button says to copy it by hand: the person never believes a copy that did not happen.
- */
-function CopyButton({
-  text,
-  label,
-  shown,
-}: {
-  text: string;
-  label: string;
-  shown: RefObject<HTMLElement | null>;
-}): JSX.Element {
-  const [state, setState] = useState<'idle' | 'copied' | 'selected'>('idle');
-  useEffect(() => {
-    if (state === 'idle') return undefined;
-    const timer = setTimeout(() => {
-      setState('idle');
-    }, COPY_FEEDBACK_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [state]);
-  return (
-    <button
-      type="button"
-      className="nv-btn nv-btn--soft nv-btn--sm self-start"
-      aria-live="polite"
-      onClick={() => {
-        const refused = () => {
-          if (shown.current !== null) window.getSelection()?.selectAllChildren(shown.current);
-          setState('selected');
-        };
-        try {
-          navigator.clipboard.writeText(text).then(() => {
-            setState('copied');
-          }, refused);
-        } catch {
-          refused();
-        }
-      }}
-    >
-      {state === 'copied' ? 'Copié' : state === 'selected' ? 'Sélectionné : copie-le à la main' : label}
-    </button>
   );
 }
