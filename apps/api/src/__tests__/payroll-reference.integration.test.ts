@@ -12,7 +12,7 @@ import { eq, schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -44,7 +44,7 @@ describe('Équipe › Paie : la référence des chiffres avant et après le déc
   const statementId = async (member: TeamMember, period: PayPeriod) =>
     CommissionStatementIdSchema.parse((await team.statementOf(member, period)).id);
   const issue = async (member: TeamMember, period: PayPeriod) =>
-    team.app.modules.payroll.jobs.issueInvoices(await statementId(member, period), quiet);
+    team.app.modules.invoicing.jobs.issueInvoices(await statementId(member, period), quiet);
   const validate = async (member: TeamMember, period: PayPeriod) => {
     const response = await team.validate(team.owner, member, period);
     expect(response.statusCode, response.body).toBe(200);

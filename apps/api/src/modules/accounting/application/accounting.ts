@@ -11,7 +11,7 @@ import {
 import { Zip, ZipPassThrough } from 'fflate';
 
 import type { Actor, JobLogger } from '../../contractors/pure';
-import type { CheckedPdf, PdfToServe } from '../../payroll';
+import type { CheckedPdf, PdfToServe } from '../../invoicing';
 import { das2Csv, das2Declaration, das2FileName } from '../domain/accounting';
 import {
   ARCHIVE_MANIFEST_NAME,

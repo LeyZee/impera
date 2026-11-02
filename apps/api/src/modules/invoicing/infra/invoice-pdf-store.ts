@@ -27,7 +27,7 @@ import type { StatementAnnexSource } from '../domain/invoice-pdf';
 import type { InvoiceLogo, InvoiceToRender, PayrollInvoicePdfStore, StoredInvoicePdf } from '../domain/ports';
 
 import { enqueueInvoicePdfMirror } from './invoice-queue';
-import type { PayInputReads } from './snapshot';
+import type { InvoicingReads } from './ports';
 
 const {
   agencyLogos,
@@ -241,7 +241,7 @@ function alertOf(alert: Parameters<PayrollInvoicePdfStore['alertUnscoped']>[0]):
 export function createDrizzlePayrollInvoicePdfStore(
   db: Database,
   adminDb: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: InvoicingReads,
   now: () => Date,
 ): PayrollInvoicePdfStore {
   return {

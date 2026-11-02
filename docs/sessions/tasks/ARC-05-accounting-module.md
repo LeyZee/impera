@@ -1,5 +1,5 @@
 # ARC-05 Les exports du comptable sortis de la paie
-Statut : in_progress
+Statut : done
 Phase : exploitation
 Dépend de : ADR 0047 § 1, ADR 0051, ARC-03
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
@@ -35,3 +35,4 @@ Deuxième des quatre modules de la paie (ADR 0047 § 1) : `accounting` (journal 
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 
 - 02/11 : `accounting` passe avant `invoicing` : tant que les exports sont dans la paie, sortir `invoicing` ferait un cycle `payroll` → `invoicing` → `payroll`. ADR 0047 donne les dépendances de chaque module, pas l'ordre des PR.
+- 02/11 : fusionnée (#410), avec l'horloge de la paie fixée dans le test de référence (l'échéance imprimée suivait le jour d'exécution). Depuis ARC-06, `periodWords`, `settlementsDue`, `StoredInvoicePdf` et `checkedPdf` viennent d'`invoicing`.

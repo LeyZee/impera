@@ -30,7 +30,8 @@ const MODULE_DEPENDENCIES = {
   // ADR 0047 § 1: pay is four modules; contractors imports none of the others.
   contractors: [],
   payroll: ['contractors'],
-  accounting: ['payroll', 'contractors'],
+  invoicing: ['payroll', 'contractors'],
+  accounting: ['payroll', 'invoicing', 'contractors'],
   notifications: [],
 };
 

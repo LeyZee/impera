@@ -68,7 +68,7 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
   let miaCookie: string;
 
   const db = () => team.test.admin.db;
-  const payroll = () => team.app.modules.payroll;
+  const invoicingModule = () => team.app.modules.invoicing;
 
   const fileOf = (memberId: string, cookie: string) =>
     team.call('GET', `/payroll/contractors/${memberId}/file`, cookie);
@@ -330,7 +330,10 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
     // Validated before his mandate: no invoice, said to the owner once.
     expect((await team.validate(team.owner, theo, Q1)).statusCode).toBe(200);
     const { id: statementId } = await team.statementOf(theo, Q1);
-    const blocked = await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
+    const blocked = await invoicingModule().jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statementId),
+      quiet,
+    );
     expect(blocked).toMatchObject({ kind: 'planned', issued: [], notIssued: [{ reason: 'no_mandate' }] });
 
     const texts = ContractTextsSchema.parse(
@@ -368,11 +371,11 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
     // His mandate accepted: the statement that waited for it is tried again.
     expect(await jobsAt(`payroll.requeue_invoice_issues:${theo.id}`)).toEqual([{ memberId: theo.id }]);
     await forgetJobs('payroll.issue_invoices:%');
-    expect(await payroll().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
+    expect(await invoicingModule().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
     expect(await jobsAt(`payroll.issue_invoices:${statementId}`)).toEqual([{ statementId }]);
     // Nobody else's statement waits.
-    expect(await payroll().jobs.requeueInvoiceIssues(lou.id)).toBe(0);
-    const unchecked = await payroll().jobs.issueInvoices(
+    expect(await invoicingModule().jobs.requeueInvoiceIssues(lou.id)).toBe(0);
+    const unchecked = await invoicingModule().jobs.issueInvoices(
       CommissionStatementIdSchema.parse(statementId),
       quiet,
     );
@@ -385,8 +388,11 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
     const file = ContractorFileSchema.parse((await fileOf(theo.id, team.owner)).json());
     expect((await verify(theo.id, team.owner, file.profile?.updatedAt ?? '')).statusCode).toBe(200);
     expect(await jobsAt(`payroll.requeue_invoice_issues:${theo.id}`)).toEqual([{ memberId: theo.id }]);
-    expect(await payroll().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
-    const issued = await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
+    expect(await invoicingModule().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
+    const issued = await invoicingModule().jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statementId),
+      quiet,
+    );
     expect(issued).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
     const invoice = await invoiceOf(theo, Q1);
     expect(invoice?.prefix).toBe('THEO');
@@ -424,9 +430,12 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
     expect(saved.statusCode, saved.body).toBe(200);
     expect(await jobsAt('payroll.requeue_invoice_issues:all')).toEqual([{ memberId: null }]);
     // Théo's statement was said not issued once: it is tried again, and its run issues nothing twice.
-    expect(await payroll().jobs.requeueInvoiceIssues(null)).toBe(1);
+    expect(await invoicingModule().jobs.requeueInvoiceIssues(null)).toBe(1);
     const { id: statementId } = await team.statementOf(theo, Q1);
-    const rerun = await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
+    const rerun = await invoicingModule().jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statementId),
+      quiet,
+    );
     expect(rerun).toMatchObject({ kind: 'planned', issued: [], notIssued: [] });
   });
 });

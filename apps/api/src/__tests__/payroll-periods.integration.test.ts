@@ -14,7 +14,7 @@ import {
 import { schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -105,7 +105,7 @@ describe('Paie › Relevés : la liste des quinzaines (EQ-05)', () => {
       { member: theo, prefix: 'THEO', legalName: 'Théo Inventé' },
     ]);
     await invoicing.acceptMandate(theo);
-    await team.app.modules.payroll.jobs.issueInvoices(
+    await team.app.modules.invoicing.jobs.issueInvoices(
       CommissionStatementIdSchema.parse((await team.statementOf(theo, Q1)).id),
       { warn: () => undefined, error: () => undefined },
     );

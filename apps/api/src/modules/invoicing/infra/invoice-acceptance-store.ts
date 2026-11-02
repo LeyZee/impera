@@ -12,8 +12,6 @@ import {
   InvoiceListSchema,
   InvoiceSettlementKindSchema,
   newId,
-  PayAdjustmentIdSchema,
-  payPeriodAt,
   TeamMemberIdSchema,
   type InvoiceAcceptanceView,
   type InvoiceEventKind,
@@ -37,17 +35,13 @@ import { z } from 'zod';
 
 import { PayrollForbidden } from '../../contractors/pure';
 import type { Actor } from '../../contractors/pure';
+import { PayrollOwnForbidden, type ContestCorrectionWrite } from '../../payroll';
 import {
   correctionAdjustments,
   correctionReplayed,
   type ContestedDocument,
 } from '../domain/contest-correction';
-import {
-  InvoiceAcceptanceConflict,
-  InvoiceAnswerForbidden,
-  InvoiceNotFound,
-  PayrollOwnForbidden,
-} from '../domain/errors';
+import { InvoiceAcceptanceConflict, InvoiceAnswerForbidden, InvoiceNotFound } from '../domain/errors';
 import {
   acceptanceWrite,
   standingOf,
@@ -57,10 +51,8 @@ import {
 import { invoiceDueState } from '../domain/invoices';
 import type { PayrollInvoiceAcceptanceStore } from '../domain/ports';
 
-import { enqueueChanged, lockAdjustmentPeriod } from './entry-store';
 import { enqueueInvoiceContestAnnounce, enqueueInvoiceLapse } from './invoice-queue';
-import type { PayInputReads } from './snapshot';
-import { audit } from './writes';
+import type { InvoicingReads } from './ports';
 
 const {
   auditLog,
@@ -424,7 +416,8 @@ async function isContractor(tx: Transaction, document: Document, userId: UserId)
 export function createDrizzlePayrollInvoiceAcceptanceStore(
   db: Database,
   adminDb: Database,
-  reads: PayInputReads,
+  reads: InvoicingReads,
+  correctContest: ContestCorrectionWrite,
   now: () => Date,
 ): PayrollInvoiceAcceptanceStore {
   return {
@@ -485,40 +478,18 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
           return viewOf(tx, document);
         }
         const adjustments = correctionAdjustments(contested.document, correction, reason);
-        const memberId = TeamMemberIdSchema.parse(document.memberId);
-        const current = payPeriodAt(now(), await reads.agencyTimeZone(tx));
-        const period = await lockAdjustmentPeriod(tx, reads, memberId, current);
-        const rows = await tx
-          .insert(payAdjustments)
-          .values(
-            adjustments.map((one) => ({
-              id: newId(PayAdjustmentIdSchema),
-              memberId,
-              period,
-              amountMinor: one.amountMinor,
-              reason: one.reason,
-              correctsStatementId: contested.correctsStatementId,
-              contestedInvoiceId: document.id,
-              createdBy: actor.userId,
-            })),
-          )
-          .returning({ id: payAdjustments.id });
-        for (const row of rows) {
-          await audit(
-            tx,
-            actor,
-            'pay_adjustment.create',
-            { kind: 'pay_adjustment', id: row.id },
-            { period, contestedInvoiceId: document.id },
-          );
-        }
+        const { period, adjustmentIds } = await correctContest(tx, actor, {
+          memberId: TeamMemberIdSchema.parse(document.memberId),
+          contestedInvoiceId: document.id,
+          correctsStatementId: contested.correctsStatementId,
+          adjustments,
+        });
         // Checked again at the commit, both ways: the uphold and the adjustments that name the document.
         await writeStep(tx, document, step, actor, {
           correction: correction.kind,
-          adjustmentIds: rows.map((row) => row.id),
+          adjustmentIds,
           period,
         });
-        await enqueueChanged(tx, period, period, current);
         return viewOf(tx, document);
       }),
 

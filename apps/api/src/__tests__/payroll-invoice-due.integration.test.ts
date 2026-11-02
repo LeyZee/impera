@@ -15,7 +15,7 @@ import { and, eq, inArray, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { addDays } from '../modules/contractors/domain/billing';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { lockWaits } from './support/lock-waits';
@@ -65,7 +65,7 @@ describe('Équipe › Factures : l’alerte avant et après l’échéance (EQ-0
   let today: string;
 
   const db = () => team.test.admin.db;
-  const remind = () => team.app.modules.payroll.jobs.remindDueInvoices();
+  const remind = () => team.app.modules.invoicing.jobs.remindDueInvoices();
   const shiftedDay = () => calendarDayAt(shifted(), ZONE);
   const invoiceOf = async (member: TeamMember) => {
     const [found] = await db()
@@ -166,7 +166,7 @@ describe('Équipe › Factures : l’alerte avant et après l’échéance (EQ-0
     for (const member of [theo, lea, kofi]) {
       expect((await team.validate(team.owner, member, Q1)).statusCode).toBe(200);
       const statement = await team.statementOf(member, Q1);
-      await team.app.modules.payroll.jobs.issueInvoices(
+      await team.app.modules.invoicing.jobs.issueInvoices(
         CommissionStatementIdSchema.parse(statement.id),
         quiet,
       );
@@ -216,7 +216,7 @@ describe('Équipe › Factures : l’alerte avant et après l’échéance (EQ-0
 
   it('says it once more the day after the due date', async () => {
     // The reconciliation runs: Théo's invoice is settled in the base now, still never said.
-    expect(await team.app.modules.payroll.jobs.settleDocuments(null)).toBe(1);
+    expect(await team.app.modules.invoicing.jobs.settleDocuments(null)).toBe(1);
     clock.days = 60;
     expect(await remind()).toBe(0);
     clock.days = 61;
@@ -238,7 +238,7 @@ describe('Équipe › Factures : l’alerte avant et après l’échéance (EQ-0
     await team.report(lea, Q2, 10_000);
     await team.recalculate(Q2);
     expect((await team.validate(team.owner, lea, Q2)).statusCode).toBe(200);
-    await team.app.modules.payroll.jobs.issueInvoices(
+    await team.app.modules.invoicing.jobs.issueInvoices(
       CommissionStatementIdSchema.parse((await team.statementOf(lea, Q2)).id),
       quiet,
     );

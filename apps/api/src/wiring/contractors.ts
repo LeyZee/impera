@@ -51,7 +51,7 @@ export interface WiredContractors {
 
 /**
  * The contractors' file reads the agency's time zone from the planning (`index.ts`), and asks pay to try its waiting
- * invoices again through `InvoiceRequeue`, which pay implements: the module never imports pay (ADR 0047 § 1).
+ * invoices again through `InvoiceRequeue`, which the invoices implement: the module never imports them (ADR 0047 § 1).
  */
 export function wireContractors(
   shared: Shared,

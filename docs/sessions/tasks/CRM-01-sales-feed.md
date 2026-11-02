@@ -61,3 +61,5 @@ La paie, les écrans de vente, tout appel réel sans la demande de Charles.
 - Un webhook silencieux n'alerte jamais ; `lastRejectedAt` seul propose « Réinscrire ». L'inscription part en `PUT` sans corps.
 - « Confirmer » repose un lien `auto` vers le même compte : il devient celui du propriétaire avec la #413 (Bilan).
 - Reste : rien pour CRM-01.
+
+02/11/2026, Bilan, après la relecture de l'écran (#412) : reposer un lien `auto` vers le même compte le confirme (`linkedBy` passe au propriétaire, ligne `sales_feed.model_linked` avec `confirmed`), sans quarantaine ni vente déplacée.
