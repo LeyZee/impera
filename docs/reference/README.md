@@ -13,3 +13,4 @@ Documents de fond, lus au besoin. Ils ne décident rien (les ADR décident) ; il
 | `fake-reveal.md` | Spécification de FakeReveal, le double de Reveal pour les tests |
 | `reveal-api-observed.md` | Journal d'observation de l'API privée de Reveal (rempli en phase 1) |
 | `llm-providers.md` | État des fournisseurs : capacités, politiques, prix, dates de vérification |
+| `residence-certificate-benin.md` | Le guide d'écran de l'attestation de domiciliation fiscale du chatteur béninois (EQ-06 lot 8b), brouillon jusqu'à la validation de Charles |
