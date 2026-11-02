@@ -544,6 +544,13 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
   });
 
   it('marks a member who left: no creator, no session, and his record no longer changes', async () => {
+    // A browser he trusted for 30 days (ADR 0046): leaving ends it with his sessions.
+    await test.admin.db.insert(schema.verification).values({
+      id: 'trust-device-row-theo',
+      identifier: 'trust-device-invente-theo',
+      value: theo.userId,
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
     const before = parisDay();
     const response = await call('PUT', `/team/members/${theo.id}/status`, owner, { status: 'left' });
     const after = parisDay();
@@ -558,6 +565,13 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
       .from(schema.session)
       .where(eq(schema.session.userId, theo.userId));
     expect(sessions).toEqual([]);
+    const trusted = await test.admin.db
+      .select()
+      .from(schema.verification)
+      .where(
+        sql`${schema.verification.identifier} like 'trust-device-%' and ${schema.verification.value} = ${theo.userId}`,
+      );
+    expect(trusted).toEqual([]);
 
     const again = await call('PUT', `/team/members/${theo.id}/status`, owner, { status: 'left' });
     expect(again.statusCode).toBe(200);
