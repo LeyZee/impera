@@ -65,6 +65,7 @@ import {
 } from './tabs';
 
 import { fullDay } from '@/scheduling/time';
+import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import './persona.css';
 
 /**
@@ -190,6 +191,8 @@ function Editor({
   const saved = ready.persona;
   const [draft, setDraft] = useState(saved);
   const [saving, setSaving] = useState(false);
+  /** Activating asked for the password again (a sign-in over 10 minutes old): the prompt shows under the head. */
+  const [reauth, setReauth] = useState(false);
   /** Why the last save did not go through, and whether reloading is the way out. */
   const [problem, setProblem] = useState<{ text: string; reload: boolean } | null>(null);
   /** Which way the panel slides in: towards the tab picked, like a page turning. */
@@ -336,6 +339,7 @@ function Editor({
     );
     setSaving(false);
     if (result === 'activated') onActivated(version.version);
+    else if (result === 'reauth') setReauth(true);
     else if (result === 'conflict') setProblem({ text: ACTIVATION_CONFLICT, reload: true });
     else {
       setProblem({
@@ -416,6 +420,18 @@ function Editor({
             show(issue.field);
           }}
         />
+        {reauth ? (
+          <PasswordPrompt
+            lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe."
+            onConfirmed={() => {
+              setReauth(false);
+              void activate();
+            }}
+            onCancel={() => {
+              setReauth(false);
+            }}
+          />
+        ) : null}
 
         <Tabs
           active={tab}

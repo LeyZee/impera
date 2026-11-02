@@ -179,6 +179,22 @@ describe('Créatrices › Persona, recette 28/10', () => {
     expect(init?.body).toBe(JSON.stringify({ expectedActive: OLDER.id }));
   });
 
+  // Audit de sécurité du 02/11 (M1): her persona speaks to every fan, an old sign-in confirms the password first.
+  it('asks for the password again when the sign-in is too old to activate, and lets it go on cancel', async () => {
+    await serveVersions([NEWEST, OLDER], () => [
+      403,
+      { error: { code: 'reauthentication_forbidden', message: 'x', details: {}, requestId: 'r' } },
+    ]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Activer la version 0.2.0' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer l’activation' }));
+
+    expect(await screen.findByText(/pour l’activer, confirme ton mot de passe/u)).toBeDefined();
+    expect(screen.queryByText(/Seuls le propriétaire et la créatrice/u)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByText(/pour l’activer, confirme ton mot de passe/u)).toBeNull();
+  });
+
   it('says nothing of the state while nothing waits, and says the changes once there are some (CREA-05)', async () => {
     await serveVersions([SUMMARY], () => [500, {}]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);

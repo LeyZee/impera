@@ -13,7 +13,7 @@ import {
   type PersonaOverview,
   type PersonaVersionSummary,
 } from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { parse } from 'yaml';
@@ -227,6 +227,16 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
 
     expect((await activate(anna, older.id, operator, null)).statusCode).toBe(403);
     expect((await activate(bea, older.id, owner, null)).statusCode).toBe(404);
+
+    // It changes what the agent says to every fan: a sign-in older than 10 minutes is asked again (audit du 02/11, M1).
+    await test.admin.db.update(schema.session).set({ createdAt: sql`now() - interval '1 hour'` });
+    const stale = await activate(anna, older.id, owner, null);
+    expect([stale.statusCode, ApiErrorSchema.parse(stale.json()).error.code]).toEqual([
+      403,
+      'reauthentication_forbidden',
+    ]);
+    expect((await get(anna, owner)).json<PersonaOverview>().versions.some((v) => v.isActive)).toBe(false);
+    owner = await signIn(server, OWNER.email, OWNER.password);
 
     const first = await activate(anna, older.id, owner, null);
     expect(first.statusCode).toBe(200);

@@ -87,7 +87,7 @@ Trois fonctions, dans cet ordre de livraison :
 2. **Capture de session** (phase 2) : bouton « Sync » qui lit les cookies/jetons de la session courante et les envoie, chiffrés, à l'endpoint `/v1/connector/sessions` du backend (jeton d'appareil). Jamais stockés dans l'extension.
 3. **Relais d'actions** (optionnel, si B ne peut pas tout faire) : le backend met une action en file, l'extension la joue depuis l'onglet ouvert.
 
-Contraintes MV3 à connaître : le service worker meurt après ~30 s d'inactivité (utiliser `chrome.alarms`, pas de `setInterval`) ; `webRequest` ne lit pas les corps de réponse (d'où le script main world) ; `host_permissions` limitées à `*://*.reveal.me/*`.
+Contraintes MV3 à connaître : le service worker meurt après ~30 s d'inactivité (utiliser `chrome.alarms`, pas de `setInterval`) ; `webRequest` ne lit pas les corps de réponse (d'où le script main world) ; `host_permissions` limitées à `https://*.reveal.me/*`.
 
 ## FakeReveal
 

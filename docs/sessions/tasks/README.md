@@ -97,3 +97,4 @@ Branche : task/<id>-<slug>
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | blocked (prototype à valider) | CR-12 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
+| SEC-01 | Audit de sécurité : premiers correctifs | exploitation | in_progress | — |

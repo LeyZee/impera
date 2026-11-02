@@ -71,7 +71,7 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
   // Checked again on activation: a version saved before a guard changed is not activated as it is (P5-01).
   const stored = createDrizzlePersonaVersionStore(deps.db, check);
   const versions = check === undefined ? stored : withSampleReplyCheck(stored, check);
-  const personaRoutes = createPersonaRoutes(versions, deps.requireRole);
+  const personaRoutes = createPersonaRoutes(versions, deps.requireRole, deps.recentLogin);
   return {
     name: 'persona',
     creators,
