@@ -31,6 +31,7 @@ server {
     # Hashed by Vite: cached for a year.
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options nosniff always;
         try_files $uri =404;
     }
@@ -38,6 +39,12 @@ server {
     # The router lives in the browser: any other path gets the app, never cached so a deployment shows at once.
     location / {
         add_header Cache-Control "no-cache" always;
+        # HTTPS only from the first visit on (the API under /v1 sends its own through helmet). Without
+        # includeSubDomains: the agency's other subdomains are not ours to bind.
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        # Nothing of the device the dashboard does not use; WebAuthn (passkeys, Face ID) and the microphone stay
+        # open to this origin alone.
+        add_header Permissions-Policy "camera=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), microphone=(self), publickey-credentials-get=(self), publickey-credentials-create=(self)" always;
         add_header X-Content-Type-Options nosniff always;
         add_header Referrer-Policy no-referrer always;
         add_header X-Frame-Options DENY always;

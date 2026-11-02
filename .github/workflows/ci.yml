@@ -181,6 +181,8 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8080/ | grep '<div id="root">' >/dev/null
           curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy: default-src 'none'" >/dev/null
+          curl -fsSI http://127.0.0.1:8080/ | grep -i "strict-transport-security: max-age=31536000" >/dev/null
+          curl -fsSI http://127.0.0.1:8080/ | grep -i "permissions-policy: camera=()" >/dev/null
       # The daily export (ADR 0028) end to end, but to a folder instead of the bucket: dump, check, encrypt, then a
       # restore into an empty database with the queue emptied, and the same row counts.
       - name: Backup export and restore
