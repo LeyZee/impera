@@ -13,7 +13,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { InvoiceObjectStore } from '../contractors';
 import type { JobLogger } from '../contractors/pure';
 
-import { createPayrollAccounting } from './application/accounting';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
@@ -26,10 +25,13 @@ import {
   type SweepOutcome,
 } from './application/invoice-acceptance';
 import {
+  checkedInvoicePdf,
   downloadInvoicePdf,
   mirrorInvoicePdf,
   renderInvoicePdf,
+  type CheckedPdf,
   type JobAttempt,
+  type PdfToServe,
   type MirrorOutcome,
   type RenderOutcome,
 } from './application/invoice-pdfs';
@@ -38,7 +40,6 @@ import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
 import type { InvoicingOutcome, RateJobSince } from './domain/ports';
-import { createDrizzlePayrollAccountingStore } from './infra/accounting-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
 import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
@@ -69,6 +70,8 @@ export { enqueuePayRecalculation } from './infra/recalculation-queue';
  * it into `contractors`, which never imports this module.
  */
 export { invoiceRequeue } from './infra/invoice-queue';
+/** A rendered PDF read back against its fingerprint (ADR 0037 § 7), what the accountant's archive reads. */
+export type { CheckedPdf, PdfToServe } from './application/invoice-pdfs';
 
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
@@ -81,6 +84,11 @@ export interface PayrollModule {
    * the Dashboard, which ranks its best fans with it and shows only its day.
    */
   readonly latestRate: (userId: UserId, currency: ForeignCurrency) => Promise<ExchangeRate | null>;
+  /**
+   * A rendered PDF read back from the first bucket, or from the copy when the first one does not give it whole
+   * (`checkedInvoicePdf`): the accountant's archive reads each document through it (`accounting`, ADR 0047 § 1).
+   */
+  readonly checkedPdf: (pdf: PdfToServe, logger: JobLogger) => Promise<CheckedPdf>;
   readonly jobs: {
     /**
      * `payroll.recalculate` (ADR 0032): the drafts of a period, and those of the team's first open period when it is
@@ -226,10 +234,10 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         rules,
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
         createPayrollInvoiceAcceptance(acceptanceStore),
-        createPayrollAccounting(createDrizzlePayrollAccountingStore(deps.db, deps.reads), pdfs),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),
+    checkedPdf: (pdf, logger) => checkedInvoicePdf(pdfs, pdf, logger),
     jobs: {
       recalculate: (period, logger) => createRecalculation(jobStore, logger, now).recalculate(period),
       recalculateOpen: (logger) => createRecalculation(jobStore, logger, now).recalculateOpen(),
