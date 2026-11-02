@@ -16,8 +16,8 @@ import type { Das2Contractor } from '../domain/accounting';
 import type { JournalContractor, JournalDocument, JournalStatement } from '../domain/journal';
 import type { ArchiveDocument, Das2Facts, JournalFacts, PayrollAccountingStore } from '../domain/ports';
 
-import type { PayInputReads } from './snapshot';
-import { audit } from './writes';
+import { audit } from './audit';
+import type { AccountingReads } from './ports';
 
 const {
   billingSettings,
@@ -323,7 +323,7 @@ async function documentsInRange(tx: Transaction, from: string, to: string): Prom
 /** The journal export (EQ-06 lot 7b), the DAS2 recap (lot 7c) and the archive (lot 7d): see `PayrollAccountingStore`. */
 export function createDrizzlePayrollAccountingStore(
   db: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: AccountingReads,
 ): PayrollAccountingStore {
   return {
     exportJournal: (actor, from, to, render) =>

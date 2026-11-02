@@ -21,9 +21,13 @@ import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
  * The reference of ADR 0047 § 1: what pay computes and issues on a fixed scenario, written to
  * `__snapshots__/payroll-reference.json` before the payroll module is split, and found again, identical, after each
  * step of the split. Ids and the year of issue change from run to run: they are named by who they are (`theo`, `Q1`)
- * and the year is written `YYYY`. Every amount a statement's `inputs_hash` covers is kept, line by line.
+ * and the year is written `YYYY`. Every amount a statement's `inputs_hash` covers is kept, line by line. Pay's clock is
+ * fixed on the day the reference was written: a document's due date is printed in its mentions, and it follows the day
+ * of issue.
  */
 
+/** Noon in Paris on the day the reference was written (2 November 2026), whatever day the suite runs. */
+const WRITTEN_AT = new Date('2026-11-02T11:00:00Z');
 const Q1 = PayPeriodSchema.parse('2025-05-01');
 const Q2 = PayPeriodSchema.parse('2025-05-16');
 const quiet = { warn: () => undefined, error: () => undefined };
@@ -49,6 +53,7 @@ describe('Équipe › Paie : la référence des chiffres avant et après le déc
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'), {
       invoiceBuckets: { primary: createMemoryInvoiceStore(), copy: createMemoryInvoiceStore() },
+      payrollClock: () => WRITTEN_AT,
     });
     ({ member: theo } = await team.addMember('theo@example.test', 'Théo'));
     ({ member: lea } = await team.addMember('lea@example.test', 'Léa'));
