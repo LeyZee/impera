@@ -85,3 +85,17 @@ export function settlementsDue(
       return [];
     });
 }
+
+/**
+ * The documents a transfer for `statementId` settles once it is recorded: what `settlementsDue` writes when that
+ * statement is paid, the documents of its own period and those of the statements carried into it (ADR 0041 § 2).
+ */
+export function settledByTransfer(
+  statementId: string,
+  statements: readonly SettlementStatement[],
+  carryOvers: readonly SettlementCarryOver[],
+  documents: readonly SettlementDocument[],
+): Settlement[] {
+  const paid = statements.map((one) => (one.id === statementId ? { ...one, status: 'paid' as const } : one));
+  return settlementsDue(paid, carryOvers, documents).filter((one) => one.statementId === statementId);
+}

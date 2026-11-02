@@ -71,8 +71,9 @@ async function pdfOf(tx: Transaction, invoiceId: string): Promise<StoredInvoiceP
 
 /**
  * The storage keys of the tax residence certificates of `memberId` accepted by the owner and of `period`'s civil year:
- * those an invoice of that period relies on under a treaty (`taxResidenceFor`). Every one: a rescan accepted besides
- * the first is proof as well.
+ * the proof of the treaty for the service an invoice of that period bills. Every one: a rescan accepted besides the
+ * first is proof as well. Since ADR 0041 the invoice no longer waits for them, and the transfer locks its own
+ * (`payroll.lock_payout_certificate`); one already accepted is kept as long as the invoice too.
  */
 async function certificateKeysOf(tx: Transaction, memberId: string, period: string): Promise<string[]> {
   const rows = await tx
@@ -317,7 +318,7 @@ export function createDrizzlePayrollInvoicePdfStore(
           },
           logo: await logoOf(tx, invoice.logoSha256),
           fiscalYearEndMonth: settings?.fiscalYearEndMonth ?? DEFAULT_FISCAL_YEAR_END_MONTH,
-          // An invoice issued under a treaty waited for them (`issueDecision`); a credit note never did.
+          // Those of an invoice under a treaty, when accepted already (ADR 0041: the invoice no longer waits for them).
           certificateKeys:
             kind === 'invoice' && treatyNeedsResidence(regime)
               ? await certificateKeysOf(tx, invoice.memberId, invoice.period)

@@ -657,6 +657,23 @@ export const StatementPaymentSchema = z.object({
 export type StatementPayment = z.infer<typeof StatementPaymentSchema>;
 
 /**
+ * Why the transfer of a validated statement cannot be recorded (ADR 0041): under a tax treaty that sets the 182 B
+ * withholding aside, the contractor's tax residence certificate of the transfer's calendar year is missing or refused
+ * (`tax_residence_missing`), or filed and not checked by the owner yet (`tax_residence_unverified`). The agency never
+ * withholds 25 %: it does not pay.
+ */
+export const PAYOUT_BLOCK_REASONS = ['tax_residence_missing', 'tax_residence_unverified'] as const;
+export const PayoutBlockReasonSchema = z.enum(PAYOUT_BLOCK_REASONS);
+export type PayoutBlockReason = z.infer<typeof PayoutBlockReasonSchema>;
+
+/** A transfer that waits (ADR 0041 § 4): why, and the calendar year the certificate must cover. */
+export const PayoutBlockSchema = z.object({
+  reason: PayoutBlockReasonSchema,
+  year: z.string().regex(/^\d{4}$/u),
+});
+export type PayoutBlock = z.infer<typeof PayoutBlockSchema>;
+
+/**
  * A member's statement for a period. `revision` grows by one each time a recalculation changes it; a validation names
  * the revision it shows, and the server computes it again under its locks, on the period's closing: another revision,
  * or other inputs (`inputsHash`, which covers the reports counted, the rates, the period's team net, collective tier
@@ -714,6 +731,11 @@ export const CommissionStatementSchema = z.object({
   paidBy: UserIdSchema.nullable(),
   /** How the owner paid it, `null` until it is paid. */
   payment: StatementPaymentSchema.nullable(),
+  /**
+   * Why its transfer could not be recorded today, as pay would refuse it (`payout_blocked_conflict`, ADR 0041): read for
+   * a validated statement with something to pay, `null` otherwise and when nothing stops it.
+   */
+  payoutBlock: PayoutBlockSchema.nullable(),
 });
 export type CommissionStatement = z.infer<typeof CommissionStatementSchema>;
 
@@ -913,6 +935,8 @@ export function mayValidateStatement(
  * `payment_in_future_unprocessable` 422, a payment dated after today in the agency's zone ;
  * `payment_before_period_unprocessable` 422, a payment dated before the first day of the statement's period ;
  * `payment_amount_unprocessable` 422, an amount sent that is not what the statement pays ;
+ * `payout_blocked_conflict` 409, a transfer under a tax treaty without the contractor's tax residence certificate of
+ * its calendar year accepted by the owner (ADR 0041, `details.reason` and `details.year`) ;
  * `cursor_invalid` 400, a page cursor the periods' list did not give ;
  * `payroll_entries_too_many_unprocessable` 422, more than `PAYROLL_ENTRIES_MAX` entries of a kind in one period ;
  * `payroll_own_forbidden` 403, one's own statement, bonus, penalty or adjustment ;
@@ -948,6 +972,7 @@ export const PAYROLL_ERROR_CODES = [
   'payment_in_future_unprocessable',
   'payment_before_period_unprocessable',
   'payment_amount_unprocessable',
+  'payout_blocked_conflict',
   'cursor_invalid',
   'payroll_entries_too_many_unprocessable',
   'payroll_own_forbidden',

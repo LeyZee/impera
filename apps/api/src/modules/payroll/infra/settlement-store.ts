@@ -1,18 +1,12 @@
-import {
-  AuditEntryIdSchema,
-  CommissionStatementStatusSchema,
-  InvoiceEventIdSchema,
-  newId,
-} from '@nirvana/contracts';
-import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+import { AuditEntryIdSchema, InvoiceEventIdSchema, newId } from '@nirvana/contracts';
+import { schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 
 import type { PayrollSettlementStore } from '../domain/ports';
-import { settlementsDue, type SettlementDocument, type SettlementKind } from '../domain/settlements';
+import { settlementsDue, type SettlementKind } from '../domain/settlements';
 
-const { auditLog, carryOvers, commissionStatements, invoiceEvents, invoices } = schema;
+import { SETTLED, settlementFactsOf } from './settlement-rows';
 
-/** The kinds that settle a document, once (migration 0058's unique index). */
-const SETTLED = sql.raw(`('paid', 'imputed', 'compensated')`);
+const { auditLog, invoiceEvents, invoices } = schema;
 
 /** The audit action of a settlement, by the document's kind. */
 function actionOf(kind: SettlementKind, document: 'invoice' | 'credit_note'): string {
@@ -24,48 +18,10 @@ function actionOf(kind: SettlementKind, document: 'invoice' | 'credit_note'): st
 /** One contractor's settlements, under his lock: two runs at once write each settlement once. */
 async function settleMember(tx: Transaction, memberId: string): Promise<number> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`payroll.settle:${memberId}`}, 0))`);
-  const statements = await tx
-    .select({
-      id: commissionStatements.id,
-      period: commissionStatements.period,
-      status: commissionStatements.status,
-      totalMinor: commissionStatements.totalMinor,
-    })
-    .from(commissionStatements)
-    .where(eq(commissionStatements.memberId, memberId));
-  const carried = await tx
-    .select({ statementId: carryOvers.statementId, toPeriod: carryOvers.toPeriod })
-    .from(carryOvers)
-    .where(eq(carryOvers.memberId, memberId));
-  const documents = await tx
-    .select({
-      id: invoices.id,
-      kind: invoices.kind,
-      number: invoices.number,
-      statementId: invoices.statementId,
-      // The outer table by hand: Drizzle writes a column of a one-table select without its table.
-      settled: sql<boolean>`exists (select 1 from ${invoiceEvents} e where e.invoice_id = "invoices"."id" and e.kind in ${SETTLED})`,
-    })
-    .from(invoices)
-    .where(eq(invoices.memberId, memberId));
-  const kindOf = (one: { readonly kind: string }): SettlementDocument['kind'] =>
-    one.kind === 'invoice' ? 'invoice' : 'credit_note';
-  const byId = new Map(documents.map((one) => [one.id, { number: one.number, kind: kindOf(one) }]));
-  const due = settlementsDue(
-    statements.map((one) => ({
-      id: one.id,
-      period: one.period,
-      status: CommissionStatementStatusSchema.parse(one.status),
-      totalMinor: one.totalMinor,
-    })),
-    carried,
-    documents.map((one): SettlementDocument => ({
-      id: one.id,
-      kind: kindOf(one),
-      statementId: one.statementId,
-      settled: one.settled,
-    })),
-  );
+  const facts = (await settlementFactsOf(tx, [memberId])).get(memberId);
+  if (facts === undefined) throw new Error('The contractor off the facts read');
+  const byId = new Map(facts.documents.map((one) => [one.id, one]));
+  const due = settlementsDue(facts.statements, facts.carryOvers, facts.documents);
   for (const settlement of due) {
     const document = byId.get(settlement.documentId);
     if (document === undefined) throw new Error('A settlement off the documents read');

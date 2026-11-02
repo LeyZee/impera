@@ -5,6 +5,7 @@ import {
   type ContractorDocumentDecision,
   type ContractorDocumentRefusal,
   type PayPeriod,
+  type PayoutBlockReason,
 } from '@nirvana/contracts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
@@ -108,6 +109,22 @@ export class CommissionStatementDocumentsOpen extends DomainError {
       'commission_statement_documents_open_conflict',
       'Ce relevé final attend que ses factures et avoirs soient acceptés ou que leurs contestations soient tranchées',
       { details: { count } },
+    );
+  }
+}
+
+/**
+ * A transfer under a tax treaty without the contractor's tax residence certificate of its calendar year accepted by
+ * the owner (ADR 0041 § 2 and § 4): the agency never withholds 25 %, it does not pay.
+ */
+export class PayoutBlocked extends DomainError {
+  constructor(reason: PayoutBlockReason, year: string) {
+    super(
+      'payout_blocked_conflict',
+      reason === 'tax_residence_missing'
+        ? `Versement bloqué : l’attestation de résidence fiscale ${year} de ce prestataire manque`
+        : `Versement bloqué : l’attestation de résidence fiscale ${year} de ce prestataire attend ta vérification`,
+      { details: { reason, year } },
     );
   }
 }

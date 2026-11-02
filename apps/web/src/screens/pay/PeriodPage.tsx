@@ -60,6 +60,7 @@ import {
   memberFacts,
   momentAt,
   opensOn,
+  payoutBlockText,
   payRefusalText,
   phaseChip,
   phaseOf,
@@ -479,7 +480,12 @@ function PeriodView({
                           ? null
                           : { refusal, text: payRefusalText(refusal, refusalNames(statement)) }
                       }
-                      canPay={owner && statement.status === 'validated' && statement.payableMinor > 0}
+                      canPay={
+                        owner &&
+                        statement.status === 'validated' &&
+                        statement.payableMinor > 0 &&
+                        statement.payoutBlock === null
+                      }
                       onCheck={(on) => {
                         setUnchecked((was) => {
                           const next = new Set(was);
@@ -792,10 +798,15 @@ function EndedHero({
     : validated.length + payments.length === 0
       ? ['À verser une fois validé', sumOf(drafts)]
       : ['Reste à envoyer', sumOf(validated)];
+  // What waits for a tax residence certificate is said apart (ADR 0041 § 4): it cannot be sent yet.
+  const blocked = validated.filter((one) => one.payoutBlock !== null);
   const notes = stale
     ? ['Plus à jour : le calcul est bloqué.']
     : [
         !paid && sent > 0 ? `déjà versé ${amountText(sent, 'EUR')}` : null,
+        blocked.length === 0
+          ? null
+          : `dont ${amountText(sumOf(blocked), 'EUR')} au versement bloqué (${statementsWord(blocked.length)})`,
         drafts.length === 0
           ? null
           : validated.length + payments.length === 0
@@ -1033,6 +1044,9 @@ function MemberRow({
           {memberFacts(statement).map((fact) => ` · ${fact}`)}
         </p>
         {carry === null ? null : <p className="py-member__line">{carry}</p>}
+        {statement.payoutBlock === null ? null : (
+          <p className="py-member__line">{payoutBlockText(statement.payoutBlock)}</p>
+        )}
         {locked ? (
           <p className="rp-review__locked">Ton relevé : un autre membre de l’agence le valide.</p>
         ) : null}

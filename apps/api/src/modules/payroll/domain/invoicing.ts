@@ -9,8 +9,6 @@ import type {
 import {
   identityComplete,
   issueDecision,
-  taxResidenceFor,
-  treatyNeedsResidence,
   type ContractorDocument,
   type ContractorIdentity,
   type IssueWarning,
@@ -182,7 +180,6 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
   const exclVatMinor = sum(lines.map((line) => line.amountMinor));
   const decision = issueDecision({
     day: issuedOn,
-    period: source.period,
     mandate,
     assignments: facts.assignments,
     regimes: facts.regimes,
@@ -286,15 +283,6 @@ export function planInvoicing(facts: InvoicingFacts): InvoicingPlan {
     if (!facts.identityVerified) {
       hold(note.request, 'identity_unverified');
       continue;
-    }
-    // A corrective invoice bills again: under a treaty, it waits for the residence certificate of the year it bills,
-    // and its cancel with it. A credit note alone pays nothing, and needs none.
-    if (reissueFor(note.request) !== null && treatyNeedsResidence(cited.regime)) {
-      const residence = taxResidenceFor(facts.documents, cited.period);
-      if (residence !== 'covered') {
-        hold(note.request, residence === 'missing' ? 'tax_residence_missing' : 'tax_residence_unverified');
-        continue;
-      }
     }
     if (until === null) {
       hold(note.request, 'no_mandate');

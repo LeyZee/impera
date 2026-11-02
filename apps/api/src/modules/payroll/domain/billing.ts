@@ -3,7 +3,6 @@ import type {
   ContractorDocumentReview,
   InvoiceAgency,
   InvoiceNotIssuedReason,
-  PayPeriod,
   RegimeVat,
 } from '@nirvana/contracts';
 
@@ -157,8 +156,8 @@ function newestOf<T extends ContractorDocument>(
 /**
  * The documents to remind on `today` (EQ-06 lot 5c-2): for each kind the regime in force asks for, the newest the owner
  * has not refused, once it is expiring or expired; a newer one filed (even waiting for his check) ends the reminder of
- * the older. A kind with nothing filed is not reminded here: an invoice that needs it says so (`tax_residence_missing`)
- * or warns (`document_missing`).
+ * the older. A kind with nothing filed is not reminded here: a transfer that needs it says so (`payout_blocked_conflict`,
+ * ADR 0041) or an invoice warns (`document_missing`).
  */
 export function documentsToRemind<T extends ContractorDocument>(
   regime: Pick<BillingRegime, 'documents'> | null,
@@ -175,28 +174,32 @@ export function documentsToRemind<T extends ContractorDocument>(
 }
 
 /**
- * Where a contractor stands for a period under a regime that sets the 182 B withholding aside by a tax treaty
- * (Charles's choice (a), 01/11): `covered` by a tax residence certificate of the period's calendar year the owner
- * accepted; `unverified` when one is filed for that year and waits for his check; `missing` otherwise, a refused or
- * out-of-year one counting as none. Only `covered` lets an invoice go out: without the proof, the treaty does not
- * apply and the agency would owe 25 %, which it never withholds.
+ * Where a contractor stands for a calendar year under a regime that sets the 182 B withholding aside by a tax treaty:
+ * `covered` by a tax residence certificate of that year the owner accepted (the newest of them, `document`);
+ * `unverified` when one is filed for that year and waits for his check; `missing` otherwise, a refused or out-of-year
+ * one counting as none. Since ADR 0041 the year is that of a transfer, and only `covered` lets it be recorded: without
+ * the proof before the payment, the treaty does not apply and the agency would owe 25 %, which it never withholds.
  */
-export function taxResidenceFor(
-  documents: readonly ContractorDocument[],
-  period: PayPeriod,
-): 'covered' | 'unverified' | 'missing' {
-  const year = period.slice(0, 4);
+export function taxResidenceOf<T extends ContractorDocument>(
+  documents: readonly T[],
+  year: string,
+): { readonly state: 'covered'; readonly document: T } | { readonly state: 'unverified' | 'missing' } {
   const filed = documents.filter(
     (one) =>
       one.kind === 'tax_residence' &&
       one.review?.decision !== 'refused' &&
       documentValidUntil(one).slice(0, 4) === year,
   );
-  if (filed.some((one) => one.review?.decision === 'accepted')) return 'covered';
-  return filed.length > 0 ? 'unverified' : 'missing';
+  let accepted: T | null = null;
+  for (const one of filed) {
+    if (one.review?.decision === 'accepted' && (accepted === null || one.issuedOn > accepted.issuedOn))
+      accepted = one;
+  }
+  if (accepted !== null) return { state: 'covered', document: accepted };
+  return { state: filed.length > 0 ? 'unverified' : 'missing' };
 }
 
-/** Whether the regime's invoices wait for a tax residence certificate (`taxResidenceFor`). */
+/** Whether a transfer under the regime waits for a tax residence certificate of its year (`taxResidenceOf`, ADR 0041). */
 export const treatyNeedsResidence = (regime: Pick<BillingRegime, 'withholding'>): boolean =>
   regime.withholding === 'treaty_exempt';
 
@@ -250,8 +253,6 @@ export type IssueDecision =
 
 export interface IssueFacts {
   readonly day: string;
-  /** The statement's period, the service the invoice bills: the year a tax residence certificate must cover. */
-  readonly period: PayPeriod;
   readonly mandate: MandateFacts;
   readonly assignments: readonly RegimeAssignment[];
   readonly regimes: readonly BillingRegime[];
@@ -304,20 +305,20 @@ export function identityComplete(
  * Whether the validation of a statement issues its invoice. A period that brings nothing to invoice issues none, and
  * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated or
  * not written for the contractor's country as his member record now says it, an identity that lacks a mention the
- * regime prints or that the owner has not checked as it stands, under a tax treaty no tax residence certificate of the
- * period's year accepted by the owner, no prefix or no identity of the agency: no invoice, since an issued invoice
- * never changes. Other documents missing or out of date, or a mandate of an older version: the invoice goes out, with
- * a warning.
+ * regime prints or that the owner has not checked as it stands, no prefix or no identity of the agency: no invoice, since
+ * an issued invoice never changes. Other documents missing or out of date, or a mandate of an older version: the
+ * invoice goes out, with a warning. Under a tax treaty, the tax residence certificate is neither: it gates the
+ * transfer, not the invoice (ADR 0041).
  */
 export function issueDecision(facts: IssueFacts): IssueDecision {
   const assignment = regimeOn(facts.assignments, facts.day);
   const regime =
     assignment === null ? null : (facts.regimes.find((one) => one.id === assignment.regimeId) ?? null);
   const warnings: IssueWarning[] = [];
-  const residenceBlocks = regime !== null && treatyNeedsResidence(regime);
+  const residenceGatesTransfer = regime !== null && treatyNeedsResidence(regime);
   for (const kind of regime?.documents ?? []) {
-    // Under a treaty, the residence certificate is no warning: without it, nothing is issued (`taxResidenceFor`).
-    if (kind === 'tax_residence' && residenceBlocks) continue;
+    // Under a treaty, the residence certificate is no warning: the transfer waits for it (ADR 0041, `payoutDecision`).
+    if (kind === 'tax_residence' && residenceGatesTransfer) continue;
     const document = newestOf(facts.documents, kind);
     if (document === null) warnings.push({ code: 'document_missing', kind });
     else if (documentState(document, facts.day, 0) === 'expired') {
@@ -338,11 +339,6 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (!facts.regimesOfCountry.has(regime.id)) return none('regime_country_mismatch');
   if (!identityComplete(facts.identity, regime)) return none('identity_incomplete');
   if (!facts.identityVerified) return none('identity_unverified');
-  if (residenceBlocks) {
-    const residence = taxResidenceFor(facts.documents, facts.period);
-    if (residence === 'missing') return none('tax_residence_missing');
-    if (residence === 'unverified') return none('tax_residence_unverified');
-  }
   if (facts.prefix === null) return none('prefix_missing');
   if (facts.agency === null) return none('agency_missing');
   return { kind: 'issue', regime, warnings };

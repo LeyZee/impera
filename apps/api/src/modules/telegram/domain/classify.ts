@@ -211,17 +211,18 @@ const longDay = (day: string): string => {
 };
 
 /**
- * What a contractor's document expiring means for their invoices (EQ-06 lot 5c-2, glossary « Pièce du prestataire »):
- * without the tax residence certificate of the year, no invoice leaves under a treaty regime; without a valid URSSAF
- * certificate, it leaves with a warning. Worded to stay true after the last day: the reminder can come late. The
- * contractor is never named in Telegram: the link opens their file.
+ * What a contractor's document expiring means (EQ-06 lot 5c-2, glossary « Pièce du prestataire »): without the tax
+ * residence certificate of the next year, no transfer of that year is recorded under a treaty regime (ADR 0041 § 5),
+ * the invoices leaving all the same; without a valid URSSAF certificate, an invoice leaves with a warning. Worded to
+ * stay true after the last day: the reminder can come late. The contractor is never named in Telegram: the link opens
+ * their file.
  */
 const contractorDocumentText = (document: ContractorDocumentKind, lastDay: string): string => {
   switch (document) {
     case 'tax_residence': {
-      // Its last day is always 31 December: it covers the periods of its year, even those invoiced in January.
-      const year = Number(lastDay.slice(0, 4));
-      return `L’attestation de résidence fiscale d’un prestataire couvre l’année ${String(year)}, et aucune plus récente n’est au dossier. Sans celle de ${String(year + 1)}, les factures de ses quinzaines de ${String(year + 1)} ne partiront pas.`;
+      // Its last day is always 31 December: it covers the transfers of its year, and those of January wait for the next.
+      const next = String(Number(lastDay.slice(0, 4)) + 1);
+      return `L’attestation de résidence fiscale d’un prestataire couvre l’année ${lastDay.slice(0, 4)}, et aucune plus récente n’est au dossier. Sans celle de ${next}, ses versements à partir du 1er janvier ${next} seront bloqués.`;
     }
     case 'urssaf_vigilance':
       return `L’attestation de vigilance URSSAF d’un prestataire a pour dernier jour le ${longDay(lastDay)}, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.`;

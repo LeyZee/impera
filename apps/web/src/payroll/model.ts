@@ -19,6 +19,7 @@ import {
   type ExchangeRate,
   type ForeignCurrency,
   type PaymentMethod,
+  type PayoutBlock,
   type PayPeriodBlock,
   type PayPeriod,
   type PayPeriodSummary,
@@ -104,9 +105,24 @@ function carryChip(statement: CommissionStatement): PayChip | null {
   return { label: statement.totalMinor < 0 ? 'Sous zéro' : 'Sous le minimum', tone: 'warn' };
 }
 
+/**
+ * Why a transfer cannot be recorded (ADR 0041 § 4), in the words of the screens: under a tax treaty, the contractor's
+ * tax residence certificate of the transfer's year is missing or waits for the owner's check.
+ */
+export function payoutBlockText(block: PayoutBlock): string {
+  return `Versement bloqué : attestation de résidence ${block.year} ${block.reason === 'tax_residence_missing' ? 'absente' : 'à vérifier'}.`;
+}
+
+/** A transfer that waits for a certificate, amber: shown before the owner makes it in WorldRemit (ADR 0041 § 4). */
+const PAYOUT_BLOCKED: PayChip = { label: 'Versement bloqué', tone: 'warn' };
+
 export function statementChips(statement: CommissionStatement, ended: boolean): PayChip[] {
   const carry = carryChip(statement);
-  return [statementStage(statement, ended), ...(carry === null ? [] : [carry])];
+  return [
+    statementStage(statement, ended),
+    ...(carry === null ? [] : [carry]),
+    ...(statement.payoutBlock === null ? [] : [PAYOUT_BLOCKED]),
+  ];
 }
 
 /**
@@ -552,6 +568,11 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return named.success
         ? `Le paiement ne peut pas être daté avant le début de la quinzaine (${longDay(named.data)}).`
         : 'Le paiement ne peut pas être daté avant le début de la quinzaine.';
+    case 'payout_blocked_conflict':
+      // Recorded only once the certificate of the transfer's year is accepted (ADR 0041 § 4): nothing is written.
+      return details.reason === undefined || details.year === undefined
+        ? 'Versement bloqué : l’attestation de résidence de l’année du virement manque ou attend ta vérification.'
+        : `${payoutBlockText({ reason: details.reason, year: details.year })} Rien n’a été enregistré.`;
     case 'payment_amount_unprocessable':
       return details.payableMinor === undefined
         ? 'Le montant envoyé doit être celui à verser.'

@@ -1,4 +1,3 @@
-import { PayPeriodSchema } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,7 +8,7 @@ import {
   documentValidUntil,
   issueDecision,
   regimeOn,
-  taxResidenceFor,
+  taxResidenceOf,
   type BillingRegime,
   type IssueFacts,
 } from '../billing';
@@ -34,8 +33,6 @@ const FRANCHISE: BillingRegime = {
   validatedOn: '2026-10-20',
 };
 
-/** The second fortnight of October 2026, which a certificate of 2026 covers. */
-const OCTOBER = PayPeriodSchema.parse('2026-10-16');
 /** A tax residence certificate of 2026, accepted by the owner. */
 const RESIDENCE_2026 = {
   kind: 'tax_residence',
@@ -46,7 +43,6 @@ const RESIDENCE_2026 = {
 
 const facts = (patch: Partial<IssueFacts> = {}): IssueFacts => ({
   day: '2026-11-02',
-  period: OCTOBER,
   mandate: { acceptedVersion: 1, currentVersion: 1 },
   assignments: [{ regimeId: 'abroad', from: '2026-10-01' }],
   regimes: [ABROAD, FRANCHISE],
@@ -422,39 +418,16 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
     });
   });
 
-  it('issues nothing under a tax treaty without a residence certificate of the period’s year the owner accepted', () => {
-    // Charles's choice (a): never the 25 % withholding; the certificate is no warning, it holds the invoice back.
-    expect(issueDecision(facts({ documents: [] }))).toEqual({
-      kind: 'none',
-      reason: 'tax_residence_missing',
-      warnings: [],
-    });
-    const pending = { ...RESIDENCE_2026, review: null };
-    expect(issueDecision(facts({ documents: [pending] }))).toMatchObject({
-      reason: 'tax_residence_unverified',
-    });
-    const refused = {
-      ...RESIDENCE_2026,
-      review: { decision: 'refused', reason: 'Année illisible.' },
-    } as const;
-    expect(issueDecision(facts({ documents: [refused] }))).toMatchObject({ reason: 'tax_residence_missing' });
-    // The certificate of 2025 does not cover a fortnight of 2026, even issued in December.
-    const lastYear = { ...RESIDENCE_2026, issuedOn: '2025-12-20' };
-    expect(issueDecision(facts({ documents: [lastYear] }))).toMatchObject({
-      reason: 'tax_residence_missing',
-    });
-    // A December fortnight invoiced in January keeps the certificate of its own year.
-    expect(
-      issueDecision(facts({ day: '2027-01-05', period: PayPeriodSchema.parse('2026-12-16') })),
-    ).toMatchObject({ kind: 'issue' });
-    expect(
-      issueDecision(facts({ day: '2027-01-20', period: PayPeriodSchema.parse('2027-01-01') })),
-    ).toMatchObject({ reason: 'tax_residence_missing' });
-    // An identity to complete or to check comes first: the certificate is checked with the file.
+  it('issues under a tax treaty without the residence certificate: it gates the transfer, not the invoice (ADR 0041)', () => {
+    // Neither a reason to hold the invoice nor a warning: the transfer waits for it (`payoutDecision`).
+    for (const documents of [[], [{ ...RESIDENCE_2026, review: null }]]) {
+      expect(issueDecision(facts({ documents }))).toEqual({ kind: 'issue', regime: ABROAD, warnings: [] });
+    }
+    // An identity to complete or to check still comes first.
     expect(issueDecision(facts({ documents: [], identityVerified: false }))).toMatchObject({
       reason: 'identity_unverified',
     });
-    // Without a treaty (France), the regime asks for no residence certificate.
+    // Without a treaty (France), a residence certificate the regime asks for is a warning, as any document.
     expect(
       issueDecision(facts({ regimes: [{ ...ABROAD, withholding: 'none' }, FRANCHISE], documents: [] })),
     ).toEqual({
@@ -465,14 +438,26 @@ describe('whether a validated statement issues its invoice (EQ-06)', () => {
   });
 
   it('tells a certificate covering the year, one waiting for the check, and none', () => {
-    const period = PayPeriodSchema.parse('2026-05-01');
-    expect(taxResidenceFor([RESIDENCE_2026], period)).toBe('covered');
-    expect(taxResidenceFor([{ ...RESIDENCE_2026, review: null }], period)).toBe('unverified');
-    expect(taxResidenceFor([{ ...RESIDENCE_2026, review: null }, RESIDENCE_2026], period)).toBe('covered');
+    expect(taxResidenceOf([RESIDENCE_2026], '2026')).toEqual({ state: 'covered', document: RESIDENCE_2026 });
+    expect(taxResidenceOf([{ ...RESIDENCE_2026, review: null }], '2026')).toEqual({ state: 'unverified' });
+    const pending = { ...RESIDENCE_2026, review: null };
+    expect(taxResidenceOf([pending, RESIDENCE_2026], '2026')).toMatchObject({ state: 'covered' });
+    // The newest accepted of the year, when there are two.
+    const renewed = { ...RESIDENCE_2026, issuedOn: '2026-06-02' };
+    expect(taxResidenceOf([RESIDENCE_2026, renewed], '2026')).toEqual({
+      state: 'covered',
+      document: renewed,
+    });
+    // A refused one counts as none.
+    const refused = {
+      ...RESIDENCE_2026,
+      review: { decision: 'refused', reason: 'Année illisible.' },
+    } as const;
+    expect(taxResidenceOf([refused], '2026')).toEqual({ state: 'missing' });
     // The year it states, when it states one: a certificate issued in December for the next year.
     const next = { ...RESIDENCE_2026, issuedOn: '2026-12-15', validUntil: '2027-12-31' };
-    expect(taxResidenceFor([next], period)).toBe('missing');
-    expect(taxResidenceFor([next], PayPeriodSchema.parse('2027-01-01'))).toBe('covered');
-    expect(taxResidenceFor([], period)).toBe('missing');
+    expect(taxResidenceOf([next], '2026')).toEqual({ state: 'missing' });
+    expect(taxResidenceOf([next], '2027')).toEqual({ state: 'covered', document: next });
+    expect(taxResidenceOf([], '2026')).toEqual({ state: 'missing' });
   });
 });

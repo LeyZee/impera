@@ -112,9 +112,8 @@ export type InvoiceEventKind = z.infer<typeof InvoiceEventKindSchema>;
 /**
  * Why a document a validated statement makes due is not issued (EQ-06): its invoice, for want of an accepted mandate,
  * of a regime the accountant validated and written for the contractor's country, of a full identity the owner checked,
- * under a tax treaty of a tax residence certificate the owner accepted, of a prefix or of the agency's identity;
- * a credit note the period owes, when no invoice can take it whole (ADR 0036). The statement stays validated and the
- * owner is told (`invoice_not_issued`).
+ * of a prefix or of the agency's identity; a credit note the period owes, when no invoice can take it whole (ADR 0036).
+ * The statement stays validated and the owner is told (`invoice_not_issued`).
  */
 export const INVOICE_NOT_ISSUED_REASONS = [
   'no_mandate',
@@ -129,11 +128,12 @@ export const INVOICE_NOT_ISSUED_REASONS = [
   /** The file is complete, but the owner has not checked it, or a change of identity cleared his check (EQ-06). */
   'identity_unverified',
   /**
-   * Under a regime whose tax treaty sets the 182 B withholding aside, no tax residence certificate of the period's
-   * calendar year, or only refused ones: the agency never withholds 25 % (Charles's choice (a), lot 5c).
+   * No tax residence certificate of the period's year under a tax treaty (lot 5c). Since ADR 0041 the certificate gates
+   * the transfer (`payout_blocked_conflict`), not the invoice: no issue gives this reason any more, kept to read what
+   * was written before.
    */
   'tax_residence_missing',
-  /** A tax residence certificate of the period's year is filed and waits for the owner's check (lot 5c). */
+  /** A certificate of the period's year waiting for the owner's check (lot 5c); kept as `tax_residence_missing` is. */
   'tax_residence_unverified',
   'prefix_missing',
   'agency_missing',

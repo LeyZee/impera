@@ -266,7 +266,7 @@ describe('classification (ADR 0020 §2)', () => {
       topic: 'important',
       threadKey: null,
       title: 'Important',
-      body: 'L’attestation de résidence fiscale d’un prestataire couvre l’année 2026, et aucune plus récente n’est au dossier. Sans celle de 2027, les factures de ses quinzaines de 2027 ne partiront pas.',
+      body: 'L’attestation de résidence fiscale d’un prestataire couvre l’année 2026, et aucune plus récente n’est au dossier. Sans celle de 2027, ses versements à partir du 1er janvier 2027 seront bloqués.',
       link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${memberId}` },
     });
     const urssaf = classify({

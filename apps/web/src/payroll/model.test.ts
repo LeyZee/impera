@@ -52,6 +52,7 @@ import {
   myStatementWords,
   parsePaySearch,
   parseTarget,
+  payoutBlockText,
   payRefusalText,
   payoutDelayText,
   penaltyTaken,
@@ -153,6 +154,7 @@ const statement = (patch: Partial<CommissionStatement> = {}): CommissionStatemen
   paidAt: null,
   paidBy: null,
   payment: null,
+  payoutBlock: null,
   ...patch,
 });
 
@@ -238,6 +240,21 @@ describe('a statement’s marks', () => {
       { label: 'Validé', tone: 'wait' },
     ]);
     expect(statementChips(statement({ status: 'paid' }), true)).toEqual([{ label: 'Payé', tone: 'ok' }]);
+    // A transfer that waits for a tax residence certificate (ADR 0041 § 4): amber, said before the owner makes it.
+    const blocked = statement({
+      status: 'validated',
+      payoutBlock: { reason: 'tax_residence_unverified', year: '2027' },
+    });
+    expect(statementChips(blocked, true)).toEqual([
+      { label: 'Validé', tone: 'wait' },
+      { label: 'Versement bloqué', tone: 'warn' },
+    ]);
+    expect(payoutBlockText({ reason: 'tax_residence_missing', year: '2027' })).toBe(
+      'Versement bloqué : attestation de résidence 2027 absente.',
+    );
+    expect(payoutBlockText({ reason: 'tax_residence_unverified', year: '2027' })).toBe(
+      'Versement bloqué : attestation de résidence 2027 à vérifier.',
+    );
   });
 
   it('leaves out of a row the stage every row shares, and says what its amount is', () => {
@@ -532,6 +549,16 @@ describe('words', () => {
     expect(
       payRefusalText({ kind: 'refused', code: 'pay_period_not_computed_conflict', details: {} }, names),
     ).toBe('La paie n’a pas encore calculé cette quinzaine : réessaie dans quelques minutes.');
+    expect(
+      payRefusalText(
+        {
+          kind: 'refused',
+          code: 'payout_blocked_conflict',
+          details: { reason: 'tax_residence_missing', year: '2027' },
+        },
+        names,
+      ),
+    ).toBe('Versement bloqué : attestation de résidence 2027 absente. Rien n’a été enregistré.');
     // Every form says it, the payment, the goals and the settings included, none of which has a reason.
     expect(payRefusalText({ kind: 'refused', code: 'request_invalid', details: {} }, names)).toBe(
       'Ces valeurs ne conviennent pas : vérifie le formulaire.',

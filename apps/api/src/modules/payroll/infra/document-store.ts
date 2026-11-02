@@ -21,7 +21,6 @@ import {
 import type { Actor, PayrollDocumentStore } from '../domain/ports';
 
 import { documentOf, mediaTypeOfRow } from './document-rows';
-import { enqueueInvoiceRequeue } from './invoice-queue';
 import type { PayInputReads } from './snapshot';
 import { audit } from './writes';
 
@@ -183,8 +182,6 @@ export function createDrizzlePayrollDocumentStore(
             sha256: file.sha256,
           },
         );
-        // Under a treaty his statements wait for this certificate: tried again, the owner is told it waits for him.
-        if (query.kind === 'tax_residence') await enqueueInvoiceRequeue(tx, memberId);
         return { document: documentOf(row, null, null), created: true };
       }),
 
@@ -252,7 +249,6 @@ export function createDrizzlePayrollDocumentStore(
           { kind: 'contractor_document', id: documentId },
           { memberId, decision: body.decision, retainUntil: retainUntil?.toISOString() ?? null },
         );
-        if (row.kind === 'tax_residence') await enqueueInvoiceRequeue(tx, memberId);
         // Last, once every write of the base has passed (Bilan on #355): a bucket that refuses rolls the check back,
         // and the owner tries again; a write of the base that fails never leaves a file locked ten years for nothing.
         if (retainUntil !== null) {

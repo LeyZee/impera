@@ -1,4 +1,5 @@
 import {
+  PayoutBlockReasonSchema,
   ApiErrorSchema,
   BonusSchema,
   BonusTierSetSchema,
@@ -172,7 +173,10 @@ export function useExchangeRates(enabled: boolean): UseQueryResult<ExchangeRates
 /** Besides pay's own: a role guard, and a body the server refuses that the screen let through. */
 export type PayRefusalCode = PayrollErrorCode | 'role_forbidden' | 'request_invalid';
 
-/** What some refusals say more: a count of reports, a period, a member, an amount, a day. */
+/**
+ * What some refusals say more: a count of reports, a period, a member, an amount, a day; for a transfer that waits for
+ * a tax residence certificate, why and the year it must cover (ADR 0041).
+ */
 const DetailsSchema = z
   .object({
     count: z.number().int(),
@@ -182,6 +186,8 @@ const DetailsSchema = z
     payableMinor: z.number().int(),
     today: z.string(),
     currency: z.string(),
+    reason: PayoutBlockReasonSchema,
+    year: z.string(),
   })
   .partial();
 export type PayRefusalDetails = z.infer<typeof DetailsSchema>;

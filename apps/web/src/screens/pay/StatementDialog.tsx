@@ -20,6 +20,7 @@ import {
   fcfaText,
   momentAt,
   PAID_BY,
+  payoutBlockText,
   payRefusalText,
   rateText,
   shortHash,
@@ -279,7 +280,9 @@ function Foot({
 }): JSX.Element {
   const zone = statement.window.timeZone;
   const validate = statement.status === 'draft' && statement.canValidate && canValidateNow;
-  const pay = statement.status === 'validated' && owner && statement.payableMinor > 0;
+  // A transfer that waits for a tax residence certificate is not offered: the server would refuse it (ADR 0041 § 4).
+  const blocked = statement.status === 'validated' ? statement.payoutBlock : null;
+  const pay = statement.status === 'validated' && owner && statement.payableMinor > 0 && blocked === null;
   const said =
     statement.status === 'paid' && statement.payment !== null
       ? `Payé le ${longDay(statement.payment.paidOn)}${PAID_BY[statement.payment.method]}${
@@ -288,7 +291,7 @@ function Foot({
       : statement.status === 'validated' && statement.validatedAt !== null
         ? `Validé le ${momentAt(statement.validatedAt, zone)}${
             statement.validatedBy === null ? '' : ` par ${who(statement.validatedBy)}`
-          }.${statement.payableMinor === 0 ? ' Rien à verser : le total part en report.' : owner ? '' : ' Le propriétaire le marque payé une fois le transfert fait.'}`
+          }.${statement.payableMinor === 0 ? ' Rien à verser : le total part en report.' : blocked !== null ? ` ${payoutBlockText(blocked)}` : owner ? '' : ' Le propriétaire le marque payé une fois le transfert fait.'}`
         : own
           ? 'Ton relevé : un autre membre de l’agence le valide.'
           : statement.status === 'draft'
