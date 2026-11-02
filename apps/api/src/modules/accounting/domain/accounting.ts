@@ -8,8 +8,7 @@ import type {
 } from '@nirvana/contracts';
 
 import type { ContractorIdentity } from '../../contractors/pure';
-
-import { settlementsDue, type SettlementCarryOver, type SettlementStatement } from './settlements';
+import { settlementsDue, type SettlementCarryOver, type SettlementStatement } from '../../payroll/pure';
 
 /**
  * The yearly recap a DAS2 declares (EQ-06 lot 7c), the pure rules. The journal of the contractors' invoices and

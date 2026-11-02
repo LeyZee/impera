@@ -11,6 +11,7 @@ import {
 import { Zip, ZipPassThrough } from 'fflate';
 
 import type { Actor, JobLogger } from '../../contractors/pure';
+import type { CheckedPdf, PdfToServe } from '../../payroll';
 import { das2Csv, das2Declaration, das2FileName } from '../domain/accounting';
 import {
   ARCHIVE_MANIFEST_NAME,
@@ -24,8 +25,6 @@ import { JournalAccountsMissing } from '../domain/errors';
 import { fecText, journalFileName, latin9 } from '../domain/fec';
 import { journalEntries, ledgerAccountsOf } from '../domain/journal';
 import type { ArchiveDocument, PayrollAccountingStore } from '../domain/ports';
-
-import { checkedInvoicePdf, type CheckedPdf, type InvoicePdfDeps } from './invoice-pdfs';
 
 /**
  * The accountant's exports, the owner's alone (EQ-06 lot 7; ADR 0023 « export comptable par période »):
@@ -51,7 +50,8 @@ interface AccountingArchive {
   readonly stream: Readable;
 }
 
-type ArchivePdfs = Pick<InvoicePdfDeps, 'store' | 'primary' | 'copy'>;
+/** A rendered PDF read back against its fingerprint, from either bucket: pay's `checkedInvoicePdf` (ADR 0037 § 7). */
+export type ArchivePdfs = (pdf: PdfToServe, logger: JobLogger) => Promise<CheckedPdf>;
 
 /**
  * The archive's bytes, pulled by the response: each PDF read back and stored as it is (`ZipPassThrough`, a PDF is
@@ -87,7 +87,7 @@ async function* archiveChunks(
   const entries: ArchiveEntry[] = [];
   for (const document of documents) {
     const { pdf } = document;
-    const checked = pdf === null ? null : await checkedInvoicePdf(pdfs, { ...document, pdf }, logger);
+    const checked = pdf === null ? null : await pdfs({ ...document, pdf }, logger);
     // Dated of its issue, at noon so that no time zone moves it to another day.
     if (checked?.kind === 'ok')
       add(archiveEntryName(document.number), checked.bytes, new Date(`${document.issuedOn}T12:00:00Z`));

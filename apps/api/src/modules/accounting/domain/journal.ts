@@ -5,9 +5,12 @@ import {
   type PayPeriod,
 } from '@nirvana/contracts';
 
-import type { InvoiceTotals } from './invoices';
-import { periodWords } from './invoices';
-import type { SettlementCarryOver, SettlementStatement } from './settlements';
+import {
+  periodWords,
+  type InvoiceTotals,
+  type SettlementCarryOver,
+  type SettlementStatement,
+} from '../../payroll/pure';
 
 /**
  * The accounting journal of the contractors (EQ-06 lot 7b; ADR 0023 « journal des achats, comptes paramétrables,

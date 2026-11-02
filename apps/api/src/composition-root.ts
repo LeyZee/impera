@@ -26,6 +26,7 @@ import { createJobQueue, defineTask, type JobQueue } from './jobs';
 import { createAppLlm } from './llm';
 import { createDrizzleLlmCallStore } from './llm-call-store';
 import type { Logger } from './logger';
+import type { AccountingModule } from './modules/accounting';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
@@ -46,6 +47,7 @@ import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
 import { createSecuritySettingsRoutes } from './security-settings';
+import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
@@ -80,6 +82,7 @@ interface Modules {
   readonly scheduling: SchedulingModule;
   readonly contractors: ContractorsModule;
   readonly payroll: PayrollModule;
+  readonly accounting: AccountingModule;
   /** Null in the worker, or when its persona cannot be read: the API starts without the playground and says why. */
   readonly playground: PlaygroundModule | null;
   /** Null without CREDENTIALS_ENCRYPTION_KEYS: a bot token is never kept unsealed (ADR 0020 §5). */
@@ -251,6 +254,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     invoiceBuckets: contractors.buckets,
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
+  const accounting = wireAccounting(shared, { scheduling: scheduling.module, payroll: payroll.module });
   const playground = await wirePlayground(shared, {
     llm,
     persona: persona.module,
@@ -298,6 +302,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     contractors: contractors.module,
     payroll: payroll.module,
+    accounting: accounting.module,
     agent: agent.module,
     media: media.module,
     supervision: supervision.module,
@@ -366,6 +371,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scheduling.routes,
       ...contractors.routes,
       ...payroll.routes,
+      ...accounting.routes,
       ...backups.routes,
       ...providers.routes,
       ...connectors.routes,

@@ -4,8 +4,7 @@ import { schema, type Transaction } from '@nirvana/db';
 import type { Actor } from '../../contractors/pure';
 
 /**
- * What pay writes in the audit log: an action on a statement, a period, a member's entry, a team rule, the accountant's
- * exports.
+ * What pay writes in the audit log: an action on a statement, a period, a member's entry, a team rule.
  */
 type AuditedAction =
   | 'commission_statement.validate'
@@ -19,10 +18,7 @@ type AuditedAction =
   | 'bonus_tier_set.create'
   | 'collective_goal.create'
   | 'payout_minimum.create'
-  | 'payroll_settings.update'
-  | 'accounting_journal.export'
-  | 'accounting_das2.export'
-  | 'accounting_archive.export';
+  | 'payroll_settings.update';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -39,10 +35,7 @@ export async function audit(
       | 'bonus_tier_set'
       | 'collective_goal'
       | 'payout_minimum'
-      | 'payroll_settings'
-      | 'accounting_journal'
-      | 'accounting_das2'
-      | 'accounting_archive';
+      | 'payroll_settings';
     readonly id: string;
   },
   details: Record<string, unknown>,
