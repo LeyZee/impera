@@ -1,6 +1,6 @@
 # 0048. L'IA dans le calendrier des shifts : ses heures se lisent à côté de celles des chatteurs
 
-Statut : proposed (demande de Charles, 02/11/2026 17h18, après le prototype du calendrier de l'ADR 0045)
+Statut : accepted (Charles, 02/11/2026 17h47, « oui vas y » en réponse à la demande de « ok 0048 », avec la validation du prototype ; demande du même jour à 17h18, après le prototype du calendrier de l'ADR 0045 ; relectures de Bilan, Équipe et Extension intégrées)
 Date : 2026-11-02
 Précise : l'ADR 0045 § 1 (ce que chacun voit) et § 2 (les vues), qui ne parlaient que des membres ; P3-14 (heures d'activité de l'agent). Ne change rien à l'ADR 0045 pour les shifts.
 

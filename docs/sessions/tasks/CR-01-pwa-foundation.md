@@ -13,6 +13,8 @@ Nirvana s'installe sur l'écran d'accueil d'un téléphone, pour tous les rôles
 ## À faire
 - [ ] Manifeste (nom, icône maskable faite de la flamme depuis `brand/`, `display: standalone`, portrait) et un `theme-color` par thème ; `viewport-fit=cover` dans `index.html` (sans lui, les zones sûres valent 0 sur iPhone).
 - [ ] Service worker : enveloppe hors ligne ; jamais `/v1/` en cache ; conversations, fans, ventes et argent jamais dans son cache ni dans IndexedDB ; cache propre au compte, vidé à la déconnexion ; mise à jour annoncée, jamais de rechargement forcé (surtout en plein shift). Une dépendance de build éventuelle passe la quarantaine de 14 jours.
+- [ ] `sw.js` et le manifeste servis à la racine en `no-cache`, jamais sous `/assets/` (cache d'un an, `immutable`) : un service worker figé ne se mettrait plus à jour ; la règle `location /` de `nginx.conf.template` convient, un test de l'image Docker le vérifie comme pour HSTS.
+- [ ] La page vide le cache et retire l'abonnement Web Push sur tout 401 de `/v1/me` (session révoquée ou expirée ailleurs), pas seulement au bouton « Se déconnecter » ; sur iPhone, la demande d'autorisation ne part que d'un geste de la personne.
 - [ ] Web Push, sans aucune saisie : le serveur crée la paire VAPID au premier démarrage et garde la clé privée chiffrée en base (`CREDENTIALS_ENCRYPTION_KEYS`, ADR 0016), jamais en configuration ni dans le dépôt ; la renouveler depuis Réglages invalide les abonnements, que chaque appareil refait à sa prochaine ouverture. Abonnement par appareil, préférences par compte, abonnements morts retirés, abonnement de l'appareil retiré à la déconnexion ; contrat Zod de l'abonnement ; module serveur et job d'envoi (propriétaire de `packages/contracts` et `packages/db`) ; la clé publique lue avant de demander l'autorisation (iOS ne demande qu'une fois).
 - [ ] Heures calmes et plafond quotidien par compte (ADR 0042 § 7) dans le domaine, testés ; une notification retenue pendant les heures calmes alimente un récapitulatif à leur fin.
 - [ ] Guide d'installation, page `/aide/installer` : iPhone (Partager › Sur l'écran d'accueil, nécessaire aux notifications) et Android, montré une fois, abandonné après trois refus.
@@ -24,7 +26,7 @@ Nirvana s'installe sur l'écran d'accueil d'un téléphone, pour tous les rôles
 ## Critères d'acceptation
 - Tests : heures calmes qui passent minuit, plafond quotidien, récapitulatif unique, abonnement en double sans doublon.
 - Installée et vérifiée sur un iPhone (Safari) et un Android d'entrée de gamme (Chrome) : icône, ouverture plein écran, notification de test reçue.
-- Lighthouse PWA sans erreur ; poids de l'enveloppe mesuré et noté.
+- Installable selon le panneau Application de Chrome (manifeste, service worker, icône maskable), sans avertissement (Lighthouse n'a plus de catégorie PWA) ; poids de l'enveloppe mesuré et noté.
 - Finition : captures Nuit et Jour, téléphone, mouvement réduit.
 
 ## Hors périmètre

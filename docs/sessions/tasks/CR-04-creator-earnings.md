@@ -15,6 +15,7 @@ La créatrice voit chaque vente (heure, montant, type, contenu, fan, qui a vendu
 - [ ] Fonction pure de la chaîne : brut TTC → hors TVA → net après commission → part de l'agence → part de la créatrice, par compte et par période, entiers, arrondi au centime après chaque étape, demi qui s'éloigne de zéro ; taux de change du jour de la vente.
 - [ ] Route de lecture pour la créatrice (Aujourd'hui, quinzaine, mois, écart au mois précédent à la même date, objectif facultatif), « estimé » tant que la période n'est pas close ; source = celle de la paie du compte.
 - [ ] Écran Ventes : « Ta part » en grand, parcours ligne par ligne, liste des ventes avec le fan, une unité de période par écran.
+- [ ] L'écran n'affiche que les lignes de la chaîne rendues par le serveur (brut, TVA, plateforme, agence, sa part) : aucun calcul d'argent dans le navigateur.
 - [ ] Notification par vente, regroupées au-delà de 3 en 2 minutes, retenues pendant les heures calmes (CR-01).
 
 ## Critères d'acceptation

@@ -16,6 +16,7 @@ La créatrice a un vrai agenda, aussi simple que ceux qu'elle connaît, où l'ag
 - [ ] Son lien iCal de l'agenda, sur la table des liens de calendrier de CR-12 (jeton haché, route sans session, révocable) ; elle peut y ajouter les shifts de ses comptes (ADR 0045 § 5).
 - [ ] La couche « shifts de mes comptes » dans son Agenda (ADR 0045 § 1), par la lecture de CR-12, masquable.
 - [ ] Écrans : Jour et « Ma semaine » sur téléphone, Semaine et Mois sur ordinateur ; appui long ou glisser pour créer, glisser pour déplacer, balayer pour changer de jour ; consultation et coche hors ligne, synchronisées au retour.
+- [ ] Chaque geste (appui long, glisser, balayer) a son équivalent au clavier et par un bouton ; balayer pour changer de jour n'entre jamais en concurrence avec le défilement de la grille.
 - [ ] Écran agence : suggérer une tâche ou un créneau, voir ce qui est accepté, refusé, fait.
 
 ## Critères d'acceptation
