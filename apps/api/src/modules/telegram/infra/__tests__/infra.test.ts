@@ -346,6 +346,34 @@ describe('reading the outbox', () => {
     });
     expect(expiring({ ...reminder, kind: 'passport' })).toBeUndefined();
     expect(expiring({ ...reminder, lastDay: '15/12/2026' })).toBeUndefined();
+    // EQ-06 lot 8: the number, the due date and what blocks the transfer; the total and any name are never read.
+    const dueOf = (type: string, payload: object) => toScannedEvent({ ...base, type, payload })?.signal;
+    const invoiceDue = {
+      invoiceId: '018f3e5c-0000-7000-8000-000000000005',
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      number: 'DEMO-2026-0005',
+      dueOn: '2026-12-01',
+      inclVatMinor: 123456,
+      payoutBlock: { reason: 'tax_residence_unverified', year: '2027' },
+    };
+    expect(dueOf('invoice_overdue', { ...invoiceDue, legalName: 'Kofi Inventé' })).toEqual({
+      kind: 'invoice_due',
+      overdue: true,
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      number: 'DEMO-2026-0005',
+      dueOn: '2026-12-01',
+      payoutBlock: { reason: 'tax_residence_unverified', year: '2027' },
+    });
+    expect(dueOf('invoice_due_soon', { ...invoiceDue, payoutBlock: null })).toMatchObject({
+      overdue: false,
+      payoutBlock: null,
+    });
+    expect(
+      dueOf('invoice_due_soon', {
+        ...invoiceDue,
+        payoutBlock: { reason: 'documents_not_issued', year: '2027' },
+      }),
+    ).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

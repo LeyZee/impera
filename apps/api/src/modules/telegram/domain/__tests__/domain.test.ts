@@ -280,6 +280,42 @@ describe('classification (ADR 0020 §2)', () => {
     );
   });
 
+  it('says an invoice’s due date, as important, with what blocks its transfer, never its amount nor a name', () => {
+    const memberId = '018f3e5c-0000-7000-8000-000000000001';
+    const due = {
+      kind: 'invoice_due',
+      overdue: false,
+      memberId,
+      number: 'DEMO-2026-0005',
+      dueOn: '2026-12-01',
+      payoutBlock: null,
+    } as const;
+    expect(classify(due)).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: null,
+      title: 'Important',
+      body: 'La facture DEMO-2026-0005 d’un prestataire arrive à échéance le 1er décembre 2026.',
+      link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${memberId}` },
+    });
+    const bodyOf = (signal: Parameters<typeof classify>[0]): string => {
+      const outcome = classify(signal);
+      return outcome?.kind === 'notice' ? outcome.body : '';
+    };
+    expect(bodyOf({ ...due, payoutBlock: { reason: 'tax_residence_missing', year: '2027' } })).toBe(
+      'La facture DEMO-2026-0005 d’un prestataire arrive à échéance le 1er décembre 2026. Son versement est bloqué : l’attestation de résidence fiscale 2027 du prestataire est absente. S’il dépasse l’échéance, des pénalités de retard et l’indemnité forfaitaire de 40 € peuvent être réclamées.',
+    );
+    expect(bodyOf({ ...due, overdue: true })).toBe(
+      'La facture DEMO-2026-0005 d’un prestataire a passé son échéance du 1er décembre 2026 sans être réglée : des pénalités de retard et l’indemnité forfaitaire de 40 € peuvent être réclamées.',
+    );
+    expect(
+      bodyOf({ ...due, overdue: true, payoutBlock: { reason: 'documents_not_issued', year: null } }),
+    ).toMatch(/Son versement est bloqué : une facture ou un avoir qu’il paie n’est pas encore émis\.$/);
+    expect(bodyOf({ ...due, payoutBlock: { reason: 'tax_residence_unverified', year: '2027' } })).toMatch(
+      /l’attestation de résidence fiscale 2027 du prestataire attend ta vérification\./,
+    );
+  });
+
   it('says a message could not leave, as important, in the conversation’s thread', () => {
     expect(classify({ kind: 'send_failed', conversationId })).toEqual({
       kind: 'notice',

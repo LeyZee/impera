@@ -9,6 +9,7 @@ import {
   type HandoffCause,
   type InvoiceNotIssuedReason,
   type InvoicePdfPlace,
+  type PayoutBlock,
   type PayPeriod,
   type SystemAlertCode,
   type TelegramTopic,
@@ -46,6 +47,8 @@ export const SCANNED_EVENT_TYPES = [
   'invoice_pdf_missing',
   'invoice_contested',
   'contractor_document_expiring',
+  'invoice_due_soon',
+  'invoice_overdue',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -208,6 +211,36 @@ const longDay = (day: string): string => {
   const month = date.toLocaleDateString('fr-FR', { timeZone: 'UTC', month: 'long', year: 'numeric' });
   const number = date.getUTCDate();
   return `${number === 1 ? '1er' : String(number)} ${month}`;
+};
+
+/** Why the transfer that will pay an invoice is blocked (ADR 0041 § 4), as the Paie says it. */
+const payoutBlockText = (block: PayoutBlock): string => {
+  switch (block.reason) {
+    case 'documents_not_issued':
+      return 'une facture ou un avoir qu’il paie n’est pas encore émis';
+    case 'tax_residence_missing':
+      return `l’attestation de résidence fiscale ${block.year ?? ''} du prestataire est absente`;
+    case 'tax_residence_unverified':
+      return `l’attestation de résidence fiscale ${block.year ?? ''} du prestataire attend ta vérification`;
+  }
+};
+
+/**
+ * An invoice's due date (EQ-06 lot 8): its number and due date, worded to stay true whatever day it is read; when the
+ * transfer is blocked, why, and what passing the due date costs (L441-10: late-payment penalties and the 40 €
+ * indemnity, mentions printed on every invoice). Never its amount: no figure of pay goes to Telegram.
+ */
+const invoiceDueText = (signal: Extract<Signal, { kind: 'invoice_due' }>): string => {
+  const day = longDay(signal.dueOn);
+  const block =
+    signal.payoutBlock === null ? '' : ` Son versement est bloqué : ${payoutBlockText(signal.payoutBlock)}.`;
+  const costs = 'des pénalités de retard et l’indemnité forfaitaire de 40 € peuvent être réclamées';
+  if (signal.overdue) {
+    return `La facture ${signal.number} d’un prestataire a passé son échéance du ${day} sans être réglée : ${costs}.${block}`;
+  }
+  return `La facture ${signal.number} d’un prestataire arrive à échéance le ${day}.${block}${
+    signal.payoutBlock === null ? '' : ` S’il dépasse l’échéance, ${costs}.`
+  }`;
 };
 
 /**
@@ -429,6 +462,16 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         title: 'Important',
         body: `${signal.document === 'invoice' ? `La facture ${signal.number} est contestée` : `L’avoir ${signal.number} est contesté`} par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.`,
         link: PAY_LINK,
+      };
+    // Important, not urgent, even overdue: the urgent group is for a fan at risk (ADR 0020 §2); money waits for the owner.
+    case 'invoice_due':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: null,
+        title: 'Important',
+        body: invoiceDueText(signal),
+        link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${signal.memberId}` },
       };
     // Important, not urgent: the owner asks the contractor for the new document before it is needed.
     case 'contractor_document_expiring':
