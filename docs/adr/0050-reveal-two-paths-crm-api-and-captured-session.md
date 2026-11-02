@@ -35,7 +35,12 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
 
 7. **Remboursements.** `sale_refunded` retranche les montants de la vente. S'il arrive après la validation d'un relevé, il passe par la mécanique existante (ADR 0032, 0036), sans jamais rouvrir le relevé. `refund_asked` compte encore, et se signale.
 
-8. **Base de la paie détectée : `netAmount`, le net réel de Reveal** (Charles, « ok netAmount »). En source « détectée », la base d'une vente est `netAmount` : `agencyRevenue` + `modelRevenue`, une fois retirés la TVA selon le fan, la commission de Reveal et les frais de paiement. Il remplace, pour cette source seule, le début de la chaîne de l'ADR 0023 (brut, euros, hors TVA, net de la commission). Tout le reste de la paie ne change pas et reste calculé par Nirvana : taux de chaque chatteur, paliers, objectif collectif, primes, malus, report, relevés et factures. En source « déclarée », la chaîne de l'ADR 0023 reste entière.
+8. **Le calcul des montants se fait par plateforme** (Charles, « ok netAmount », puis son message du même jour : « un système de calcul par plateforme »). Chaque plateforme a ses commissions et ses règles : la façon d'obtenir la base d'une vente dépend donc de la plateforme.
+
+   - **Reveal, en source « détectée »** : la base est `netAmount`, soit `agencyRevenue` + `modelRevenue`, une fois retirés la TVA selon le fan, la commission de Reveal et les frais de paiement. Nirvana ne calcule ni TVA ni commission de plateforme.
+   - **Les autres plateformes** : notre chaîne (brut, euros, hors TVA, net de la commission, ADR 0023) reste, paramétrée par plateforme.
+   - **Un compte en source « déclarée »**, Reveal compris tant qu'il n'a pas basculé : la chaîne de l'ADR 0023 reste entière, puisque la plateforme ne donne alors aucun net.
+   - **Partout**, Nirvana garde le reste de la paie : taux de chaque chatteur, paliers, objectif collectif, primes, malus, report, relevés et factures.
 
    **Vérification avant toute bascule.** Aucun compte ne passe en « détecté » avant que Charles ait vu, sur une quinzaine passée couverte par le registre : la somme des `netAmount` face à l'export du dashboard et à `/v1/stats/daily`, qui doivent concorder au centime, et les commissions de chaque chatteur calculées sur `netAmount` face à celles de la chaîne de l'ADR 0023, avec l'écart expliqué. La bascule se fait ensuite à une frontière de période (ADR 0023).
 
