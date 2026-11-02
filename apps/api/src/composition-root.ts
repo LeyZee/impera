@@ -35,6 +35,7 @@ import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { FansModule } from './modules/fans';
 import type { MediaModule } from './modules/media';
+import type { NotificationsModule } from './modules/notifications';
 import { invoiceRequeue, type PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
@@ -56,6 +57,7 @@ import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireFans } from './wiring/fans';
 import { wireMedia } from './wiring/media';
+import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
@@ -76,6 +78,7 @@ interface Modules {
   readonly persona: PersonaModule;
   readonly agent: AgentModule;
   readonly media: MediaModule;
+  readonly notifications: NotificationsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -281,6 +284,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media,
   });
   const backups = wireBackups(shared);
+  const notifications = wireNotifications(shared);
   const supervision = wireSupervision(shared, {
     llm,
     activeVoice: agent.activeVoice,
@@ -305,6 +309,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     accounting: accounting.module,
     agent: agent.module,
     media: media.module,
+    notifications: notifications.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -323,6 +328,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...team.tasks,
     ...contractors.tasks,
     ...payroll.tasks,
+    ...notifications.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],
@@ -378,6 +384,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...supervision.routes,
       ...playground.routes,
       ...telegram.routes,
+      ...notifications.routes,
     ],
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),

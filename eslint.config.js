@@ -31,6 +31,7 @@ const MODULE_DEPENDENCIES = {
   contractors: [],
   payroll: ['contractors'],
   accounting: ['payroll', 'contractors'],
+  notifications: [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);

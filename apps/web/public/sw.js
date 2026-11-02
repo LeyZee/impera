@@ -11,7 +11,7 @@
 // Served from the root with `Cache-Control: no-cache` (nginx.conf.template, `location /`), never under /assets/,
 // so the browser always sees a new version. Hand-written, no build dependency: bump VERSION when this file changes.
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `nirvana-shell-${VERSION}`;
 const ASSETS = `nirvana-assets-${VERSION}`;
 /** Hashed files kept at most: each deployment adds new ones, the oldest go first. */
@@ -39,6 +39,84 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'apply-update') self.skipWaiting();
 });
+
+// Web Push (CR-01 lot b). The server sends `{ title, body, url, tag }` and never a fan's name nor a message
+// (ADR 0020): what rings on a locked screen is read by anyone near the phone.
+self.addEventListener('push', (event) => {
+  const message = readPush(event.data);
+  event.waitUntil(
+    self.registration.showNotification(message.title, {
+      body: message.body,
+      tag: message.tag,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-96.png',
+      lang: 'fr',
+      data: { url: message.url },
+    }),
+  );
+});
+
+/** A message as the server sends it; anything else still rings, as plain « Nirvana ». */
+function readPush(data) {
+  let value = {};
+  try {
+    value = data ? data.json() : {};
+  } catch {
+    value = {};
+  }
+  const text = (field, max) => (typeof value[field] === 'string' ? value[field].slice(0, max) : undefined);
+  return {
+    title: text('title', 80) || 'Nirvana',
+    body: text('body', 180),
+    tag: text('tag', 64),
+    url: safePath(value.url),
+  };
+}
+
+/** Only a path of this app opens: never another site, whatever the message says. */
+function safePath(url) {
+  if (typeof url !== 'string' || !url.startsWith('/') || url.startsWith('//') || url.includes('\\'))
+    return '/';
+  return url;
+}
+
+// A touch on the notification brings the app forward on its page, or opens it. An open app moves there itself
+// (src/pwa/notificationOpen.ts): no reload, so a message being written is not lost. Loading the page is only the
+// fallback, when no window answers within a moment (sign-in screen, an older version of the page).
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const path = safePath(event.notification.data && event.notification.data.url);
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (!open) {
+        await self.clients.openWindow(path);
+        return;
+      }
+      await open.focus().catch(() => undefined);
+      if (await movedItself(open, path)) return;
+      // Refused on a window this worker does not control: it stays where it is, brought forward.
+      if ('navigate' in open) await open.navigate(path).catch(() => undefined);
+    })(),
+  );
+});
+
+/** Whether the window moved to `path` itself: it answers on the port within ANSWER_MS. */
+const ANSWER_MS = 1500;
+function movedItself(client, path) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const settle = (moved) => {
+      clearTimeout(timer);
+      channel.port1.close();
+      resolve(moved);
+    };
+    const timer = setTimeout(() => settle(false), ANSWER_MS);
+    channel.port1.onmessage = () => settle(true);
+    client.postMessage({ type: 'open', path }, [channel.port2]);
+  });
+}
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
