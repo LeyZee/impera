@@ -42,13 +42,13 @@ export function InstallNudge(): JSX.Element | null {
     setShown(false);
   };
   return (
-    <aside className="nv-install nv-glass nv-glass--thick" aria-label="Installer Nirvana">
-      <img className="nv-install__icon" src="/icons/icon-192.png" alt="" width={44} height={44} />
-      <div className="nv-install__body">
-        <p className="nv-install__title">Nirvana sur ton écran d’accueil</p>
-        <p className="nv-install__text">Ouverture en un geste, plein écran, et les notifications.</p>
+    <aside className="nv-float nv-install nv-glass nv-glass--thick" aria-label="Installer Nirvana">
+      <img className="nv-float__icon" src="/icons/icon-192.png" alt="" width={44} height={44} />
+      <div className="nv-float__body">
+        <p className="nv-float__title">Nirvana sur ton écran d’accueil</p>
+        <p className="nv-float__text">Ouverture en un geste, plein écran, et les notifications.</p>
       </div>
-      <div className="nv-install__actions">
+      <div className="nv-float__actions">
         <button
           type="button"
           className="nv-btn nv-btn--sm nv-btn--plain"
