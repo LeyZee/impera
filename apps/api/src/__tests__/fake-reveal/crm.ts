@@ -54,6 +54,8 @@ export interface FakeCrm {
   withhold(access: 'stats' | 'sales'): void;
   /** `/v1/sales` answers without `pageInfo` this many times. */
   breakShape(times: number): void;
+  /** The register's position of a sale's line, `null` when none. */
+  positionOf(saleId: string): string | null;
   readonly calls: { readonly path: string; readonly status: number }[];
 }
 
@@ -334,6 +336,8 @@ export function createFakeCrm(): FakeCrm {
     breakShape(times) {
       state.brokenShapes = times;
     },
+    positionOf: (saleId) =>
+      register.find((line) => line.sale.id === saleId && line.event === 'sale_created')?.cursor ?? null,
     calls,
   };
 }

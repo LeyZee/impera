@@ -140,4 +140,9 @@ CREATE TRIGGER "platform_sales_append_only" BEFORE UPDATE OR DELETE ON "platform
   FOR EACH ROW EXECUTE FUNCTION "refuse_change"();--> statement-breakpoint
 -- The Reveal key: read and written through withAdmin only (ADR 0050 § 4). The default privileges of init.sql would
 -- hand DML to the application role; this table keeps it out.
-REVOKE ALL ON "sales_feed_credentials" FROM nirvana_app;
+REVOKE ALL ON "sales_feed_credentials" FROM nirvana_app;--> statement-breakpoint
+-- The application role reads and writes the rest: the register by insert only (its lines are never rewritten), the
+-- cursor, the quarantine (a line is marked released) and the owner's links.
+GRANT SELECT, INSERT ON "platform_sales" TO nirvana_app;--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE ON "sales_feed_cursors", "platform_sales_quarantine" TO nirvana_app;--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE, DELETE ON "sales_feed_models", "sales_feed_chatters" TO nirvana_app;

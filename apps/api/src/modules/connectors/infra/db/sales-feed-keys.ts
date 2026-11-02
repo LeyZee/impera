@@ -26,7 +26,7 @@ const table = schema.salesFeedCredentials;
 type Row = typeof table.$inferSelect;
 
 /** The associated data a key is sealed with: a ciphertext copied to another row, or to the AI keys, does not open. */
-export const salesFeedKeyContext = (platform: Platform): string => `sales_feed:${platform}`;
+const salesFeedKeyContext = (platform: Platform): string => `sales_feed:${platform}`;
 
 /** Enough to tell two keys apart in `audit_log`, nothing usable: 8 hex characters of its SHA-256. */
 function fingerprint(key: string): string {
@@ -152,4 +152,60 @@ export function createSalesFeedKeyStore(
       });
     },
   };
+}
+
+export interface ResealReport {
+  readonly total: number;
+  readonly rewritten: number;
+  /** Platforms whose key no listed encryption key opens: left as they are, so an older key put back recovers them. */
+  readonly unreadable: readonly string[];
+}
+
+/**
+ * After a rotation of CREDENTIALS_ENCRYPTION_KEYS, re-seals every sales feed key with the newest one, in one
+ * transaction (runbooks/rotate-secrets.md). With `dryRun`, only counts what opens (`pnpm ops:check-keys`): nothing is
+ * written, nothing decrypted leaves this function. Re-running it is a no-op.
+ */
+export function resealSalesFeedKeys(
+  adminDb: Database,
+  keys: readonly EncryptionKey[],
+  dryRun = false,
+): Promise<ResealReport> {
+  const current = keys[0]?.version;
+  if (current === undefined) throw new Error('CREDENTIALS_ENCRYPTION_KEYS est vide');
+  return adminDb.transaction(async (tx) => {
+    const query = tx.select({ platform: table.platform, sealed: table.keyCiphertext }).from(table);
+    const rows = dryRun ? await query : await query.for('update');
+    let rewritten = 0;
+    const unreadable: string[] = [];
+    for (const row of rows) {
+      const platform = PlatformSchema.parse(row.platform);
+      let key: string;
+      try {
+        key = decryptSecret(row.sealed, keys, salesFeedKeyContext(platform));
+      } catch {
+        unreadable.push(platform);
+        continue;
+      }
+      if (dryRun || keyVersionOf(row.sealed) === current) continue;
+      const sealed = encryptSecret(key, keys, salesFeedKeyContext(platform));
+      await tx
+        .update(table)
+        .set({ keyCiphertext: sealed, keyVersion: keyVersionOf(sealed) })
+        .where(eq(table.platform, platform));
+      rewritten += 1;
+    }
+    if (rewritten > 0) {
+      await tx.insert(schema.auditLog).values({
+        id: newId(AuditEntryIdSchema),
+        userId: null,
+        ip: null,
+        action: 'sales_feed_key.reencrypted',
+        entity: 'sales_feed_credential',
+        entityId: null,
+        details: { rewritten, keyVersion: current },
+      });
+    }
+    return { total: rows.length, rewritten, unreadable };
+  });
 }

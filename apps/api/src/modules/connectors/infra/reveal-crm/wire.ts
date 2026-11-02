@@ -13,7 +13,7 @@ import { z } from 'zod';
 const cents = z.number().int().min(0);
 const text = z.string().min(1);
 
-export const RevealSaleSchema = z.object({
+const RevealSaleSchema = z.object({
   id: text,
   createdAt: z.iso.datetime({ offset: true }),
   modelId: text,
@@ -30,7 +30,7 @@ export const RevealSaleSchema = z.object({
   chatterId: text.nullable(),
 });
 
-export const RevealSalesLineSchema = z.object({
+const RevealSalesLineSchema = z.object({
   cursor: text,
   event: text,
   occurredAt: z.iso.datetime({ offset: true }),

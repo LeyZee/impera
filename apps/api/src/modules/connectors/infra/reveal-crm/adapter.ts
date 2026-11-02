@@ -28,7 +28,7 @@ import {
 } from './wire';
 
 /** Reveal's CRM API (ADR 0050): `x-api-key`, an agency key, used on the server only. */
-export const REVEAL_CRM_BASE_URL = 'https://api.reveal.me';
+const REVEAL_CRM_BASE_URL = 'https://api.reveal.me';
 
 /** The most `/v1/sales` gives in one page. */
 const PAGE_SIZE = 500;

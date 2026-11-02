@@ -14,7 +14,7 @@ import { createConnectorSessions, type ConnectorSessions } from './application/s
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
-import { createSalesFeedKeyStore } from './infra/db/sales-feed-keys';
+import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
@@ -25,6 +25,23 @@ export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
 export { FakeConnector } from './infra/fake/FakeConnector';
+
+/** `pnpm ops:reencrypt-credentials`: the sales feed keys re-sealed with the newest CREDENTIALS_ENCRYPTION_KEYS. */
+export function resealSalesFeedCredentials(
+  adminDb: Database,
+  keys: readonly EncryptionKey[],
+): Promise<ResealReport> {
+  return resealSalesFeedKeys(adminDb, keys);
+}
+
+/** `pnpm ops:check-keys`: how many sales feed keys the given encryption keys open, read only, no call to Reveal. */
+export async function checkSalesFeedKeys(
+  adminDb: Database,
+  keys: readonly EncryptionKey[],
+): Promise<{ readonly total: number; readonly unreadable: readonly string[] }> {
+  const report = await resealSalesFeedKeys(adminDb, keys, true);
+  return { total: report.total, unreadable: report.unreadable };
+}
 
 /**
  * Reveal's sales feed (ADR 0050): its CRM API, at `baseUrl` (Reveal's own by default; FakeReveal in the tests). No

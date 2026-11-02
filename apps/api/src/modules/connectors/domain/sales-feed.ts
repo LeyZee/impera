@@ -36,7 +36,7 @@ export interface UnknownValue {
 export type SalesFeedResult<T> =
   { readonly ok: true; readonly value: T } | { readonly ok: false; readonly failure: SalesFeedFailure };
 
-export interface SalesPageRead extends PlatformSalesPage {
+interface SalesPageRead extends PlatformSalesPage {
   readonly unknown: readonly UnknownValue[];
 }
 
@@ -157,7 +157,7 @@ export interface SalesFeedKeyStore {
   remove(platform: Platform, by: KeyActor): Promise<boolean>;
 }
 
-export interface SalesCursor {
+interface SalesCursor {
   readonly position: string | null;
   readonly readAt: Date | null;
   readonly pausedUntil: Date | null;
@@ -180,7 +180,7 @@ export interface LinkedAccount {
   readonly creatorId: string;
 }
 
-export interface FeedAccount extends LinkedAccount {
+interface FeedAccount extends LinkedAccount {
   readonly handle: string;
 }
 
