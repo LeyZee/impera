@@ -409,8 +409,11 @@
 :root {
   /* The top of the phone's tab bar (14 px from the bottom, 64 px high): sheets and cards float above it. */
   --nv-above-tabbar: calc(14px + 64px + env(safe-area-inset-bottom, 0px));
-  /* The install card as it lays out on a phone (two lines of text, its buttons, padding), measured (CR-01). */
+  /* The install card as it lays out on a phone (two lines of text, its buttons, padding), measured (CR-01); the card
+     keeps at least this height, so the room the page leaves for it is never short. */
   --nv-install-height: 138px;
+  /* The band under an installed iPhone's clock: the Nuit colour of the browser's bar (THEME_COLORS.night). */
+  --nv-statusbar: #060508;
 }
 .nv-rail__more {
   display: none;
@@ -664,7 +667,7 @@
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background: #060508;
+  background: var(--nv-statusbar);
   pointer-events: none;
 }
 
@@ -1235,6 +1238,7 @@
  */
 .nv-install.nv-glass {
   z-index: 28;
+  min-height: var(--nv-install-height);
   left: max(14px, env(safe-area-inset-left, 0px));
   right: max(14px, env(safe-area-inset-right, 0px));
   bottom: calc(var(--nv-above-tabbar) + 12px);

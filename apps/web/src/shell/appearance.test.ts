@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import indexHtml from '../../index.html?raw';
@@ -5,6 +7,9 @@ import earlyScript from '../../public/appearance.js?raw';
 import manifestText from '../../public/manifest.webmanifest?raw';
 
 import { APPEARANCE_KEY, isDay, parseAppearance, THEME_COLORS } from './appearance';
+
+// Vite turns a CSS import into styles, even raw, under the test runner: read as a file.
+const shellCss = readFileSync(new URL('./shell.css', import.meta.url), 'utf8');
 
 describe('appearance', () => {
   it('is Nuit unless Jour or the device was chosen', () => {
@@ -33,5 +38,7 @@ describe('appearance', () => {
       theme_color: THEME_COLORS.night,
       background_color: THEME_COLORS.night,
     });
+    // The band under an installed iPhone's clock, dark in Nuit and Jour alike.
+    expect(shellCss).toContain(`--nv-statusbar: ${THEME_COLORS.night};`);
   });
 });
