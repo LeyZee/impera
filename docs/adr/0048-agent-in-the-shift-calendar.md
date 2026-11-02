@@ -31,7 +31,7 @@ Sans cela, un créneau sans chatteur se lit « à pourvoir » même quand l'agen
 ### 3. Les données
 
 - Rien de nouveau n'est stocké : la lecture reprend les heures d'activité et le mode déjà en base. Elle ne rend, par créatrice de l'agence, que le mode en vigueur et les créneaux de réponse dans son fuseau ; jamais les heures calmes des relances, la persona, les prompts, le budget ni un chiffre.
-- Elle applique la même frontière que la lecture du calendrier (ADR 0045 § 1) : propriétaire ou scope `agency`, tout ; chatteur actif, toutes les créatrices de l'agence ; tout autre appel, rien. Le propriétaire de `packages/db` choisit de l'ajouter à la même fonction `SECURITY DEFINER` ou d'en écrire une sœur, avec un test d'intégration par frontière, créatrice comprise.
+- Elle applique la même frontière que la lecture du calendrier (ADR 0045 § 1) : propriétaire ou scope `agency`, tout ; chatteur actif, toutes les créatrices de l'agence ; tout autre appel, rien. Les heures et le mode vivent dans des tables par créatrice : la lecture est une fonction sœur `SECURITY DEFINER`, en lecture seule, de celle des shifts. Les deux appellent une même fonction SQL interne qui rend la portée du lecteur (toute l'agence, l'équipe, ses seuls shifts, la créatrice, rien), pour que leurs frontières ne divergent jamais ; celle de l'agent ne rend rien hors de l'agence et de l'équipe, et lit l'arrêt global elle-même (choix de Bilan, 02/11). Un test d'intégration par frontière, créatrice comprise.
 
 ### 4. Ce que le calendrier ne fait pas
 

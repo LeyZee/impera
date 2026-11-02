@@ -14,7 +14,7 @@ Les médias déposés pour les Mass DM partent selon un plan à la semaine vers 
 - [ ] Avant le code : prix éventuel, choix des listes et cadence décidés avec Charles, écrits ici.
 - [ ] Capacités du port : lire les listes de fans, envoyer un Mass DM ; d'abord dans `FakeReveal`.
 - [ ] Plan à la semaine, acceptation d'un geste, clé d'idempotence par envoi, garde d'écriture.
-- [ ] Un média n'est jamais renvoyé, et la base l'impose : index unique sur le média pour l'usage `mass_dm`, média marqué utilisé dans la même transaction que la mise en file, avec sa clé d'idempotence ; « vu par ce fan » appliqué à chaque destinataire ; un média déjà utilisé n'entre jamais dans un plan.
+- [ ] Un média n'est jamais renvoyé, et la base l'impose : `unique (media_asset_id)` sur la table des médias d'un Mass DM (pas un index partiel sur `media_assets`) ; la ligne d'envoi est insérée et le job mis en file par `graphile_worker.add_job(...)` dans la même transaction, avec `job_key` égal à la clé d'idempotence, jamais par `WorkerUtils` après le commit ; « vu par ce fan » appliqué à chaque destinataire ; un média déjà utilisé n'entre jamais dans un plan.
 - [ ] Un Mass DM dont la réponse de Reveal se perd passe en ambre avec sa raison et n'est jamais relancé par le code.
 
 ## Critères d'acceptation
