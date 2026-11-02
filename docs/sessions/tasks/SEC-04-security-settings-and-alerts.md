@@ -14,7 +14,7 @@ Chacun voit et ferme ses sessions, et le groupe Telegram urgent apprend ce qui t
 
 ## À faire (liste vérifiable)
 
-- [ ] Réglages › Sécurité : sessions ouvertes (appareil, pays approximatif, dernière activité), fermer une ou toutes sauf celle-ci ; pour le propriétaire, deuxième facteur actif ou non par membre et « fermer toutes ses sessions ».
+- [ ] Réglages › Sécurité : sessions ouvertes (appareil, pays approximatif, dernière activité), fermer une ou toutes sauf celle-ci (« toutes » oublie aussi les appareils de confiance) ; pour le propriétaire, deuxième facteur actif ou non par membre et « fermer toutes ses sessions ».
 - [ ] Signaux Telegram (groupe urgent) depuis `audit_log` : connexion du propriétaire depuis un appareil nouveau, 5 refus en 15 minutes sur un compte, deuxième facteur remis à zéro, persona activée, mode Automatique allumé, session Reveal remplacée.
 - [ ] Aucun nom de fan, aucun contenu, aucune adresse IP complète dans un message.
 
