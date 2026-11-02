@@ -25,14 +25,14 @@ import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transacti
 import { z } from 'zod';
 
 import { regimeVatOf, reviewOf } from '../../contractors';
+import { CountedSchema } from '../../payroll';
 import type { IssueWarning } from '../domain/billing';
 import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
 import type { PayrollInvoiceStore } from '../domain/ports';
 
 import { enqueueDocumentSettle, enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
-import { CountedSchema } from './read-store';
-import type { PayInputReads } from './snapshot';
+import type { InvoicingReads } from './ports';
 
 const {
   auditLog,
@@ -506,7 +506,7 @@ async function publishNotIssued(
  */
 export function createDrizzlePayrollInvoiceStore(
   adminDb: Database,
-  reads: PayInputReads,
+  reads: InvoicingReads,
   now: () => Date,
 ): PayrollInvoiceStore {
   return {

@@ -2,11 +2,11 @@
 
 **Rôle.** Les exports pour le comptable (ADR 0047 § 1, dernier des quatre modules de la paie ; EQ-06 lot 7) : le journal des achats et son fichier FEC, le récapitulatif DAS2 d'une année et l'archive des PDF d'une période. Sorti de `payroll` sans changer un comportement : les routes restent `/v1/payroll/accounting/journal`, `…/das2` et `…/archive`, propriétaire seul ; les codes d'erreur et leurs statuts HTTP ne changent pas. Aucun job.
 
-**Peut dépendre de.** `payroll` et `contractors`, par leur `index.ts` et, depuis le domaine, leur `pure.ts` (ADR 0051) ; aucun module ne dépend de lui. Un port branché par le composition root (`wiring/accounting.ts`) : `AccountingReads` (le fuseau de l'agence, venu de `scheduling`). Chaque PDF de l'archive se relit par `checkedPdf` de la paie (premier bucket, sinon la copie, jamais un fichier altéré).
+**Peut dépendre de.** `payroll`, `invoicing` et `contractors`, par leur `index.ts` et, depuis le domaine, leur `pure.ts` (ADR 0051) ; aucun module ne dépend de lui. Un port branché par le composition root (`wiring/accounting.ts`) : `AccountingReads` (le fuseau de l'agence, venu de `scheduling`). Chaque PDF de l'archive se relit par `checkedPdf` des factures (premier bucket, sinon la copie, jamais un fichier altéré).
 
 **Tables possédées.** Aucune : il n'écrit que `audit_log` (une ligne par export). Les comptes et les journaux du comptable s'enregistrent avec les réglages de facturation (`contractors`).
 
-**Lectures croisées qui restent** (fiche ARC-07) : `infra/accounting-store.ts` lit directement, sous `withMember`, les relevés, les reports, les documents et leurs règlements (`payroll`), les dossiers et les réglages de facturation (`contractors`). Elles passeront par des ports de lecture qui reçoivent la transaction de l'export.
+**Lectures croisées qui restent** (fiche ARC-07) : `infra/accounting-store.ts` lit directement, sous `withMember`, les documents et leurs règlements (`invoicing`), les relevés et les reports (`payroll`), les dossiers et les réglages de facturation (`contractors`). Elles passeront par des ports de lecture qui reçoivent la transaction de l'export.
 
 **L'export du journal pour le comptable** (EQ-06 lot 7b ; ADR 0023 « journal des achats, comptes paramétrables, validés par le comptable » ; `domain/journal.ts` et `domain/fec.ts`, purs ; `application/accounting.ts` ; `infra/accounting-store.ts`, sous `withMember`) :
 

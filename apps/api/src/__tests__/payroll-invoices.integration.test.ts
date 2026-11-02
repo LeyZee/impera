@@ -19,8 +19,8 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { invoicePdfRetainUntil } from '../modules/contractors/domain/retention';
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
-import { invoicePdfKey } from '../modules/payroll/domain/invoice-pdf';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { invoicePdfKey } from '../modules/invoicing/domain/invoice-pdf';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { AGENCY, setUpInvoicing, TERMS, type Invoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -56,7 +56,7 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
 
   const db = () => team.test.admin.db;
   const issue = (statementId: string) =>
-    team.app.modules.payroll.jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
+    team.app.modules.invoicing.jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
   const statementId = async (member: TeamMember, period: typeof Q1) =>
     (await team.statementOf(member, period)).id;
 
@@ -208,7 +208,7 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
           sql`select payload, max_attempts from graphile_worker._private_jobs where key = ${`${task}:${id}`}`,
         )
       ).rows;
-    const pdfJobs = team.app.modules.payroll.jobs;
+    const pdfJobs = team.app.modules.invoicing.jobs;
     const attempt = { current: 1, max: JOB_MAX_ATTEMPTS['payroll.render_invoice_pdf'] };
 
     // Enqueued with the issue, in its transaction; until it runs, the PDF is « being prepared ».
@@ -413,7 +413,7 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     for (const document of [invoice, note]) {
       const documentId = InvoiceIdSchema.parse(document.id);
       expect(
-        await team.app.modules.payroll.jobs.renderInvoicePdf(documentId, { current: 1, max: 5 }, quiet),
+        await team.app.modules.invoicing.jobs.renderInvoicePdf(documentId, { current: 1, max: 5 }, quiet),
       ).toBe('stored');
       expect(primary.peek(invoicePdfKey(documentId, document.issuedOn))).toBeDefined();
     }
@@ -598,7 +598,7 @@ describe('Équipe › Factures : les primes de palier et d’objectif collectif 
     });
     expect((await team.validate(team.owner, theo, Q1)).statusCode).toBe(200);
 
-    const outcome = await team.app.modules.payroll.jobs.issueInvoices(
+    const outcome = await team.app.modules.invoicing.jobs.issueInvoices(
       CommissionStatementIdSchema.parse(statement.id),
       quiet,
     );

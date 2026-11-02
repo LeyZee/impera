@@ -14,8 +14,8 @@ import {
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { longDay } from '../modules/payroll/domain/invoices';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { longDay } from '../modules/invoicing/domain/invoices';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -47,7 +47,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
   let shift = 0;
 
   const db = () => team.test.admin.db;
-  const payroll = () => team.app.modules.payroll;
+  const invoicingModule = () => team.app.modules.invoicing;
 
   /** Validates the member's statement of `period` and issues its invoice, `daysAgo` days ago by pay's clock. */
   async function issued(member: TeamMember, period: typeof Q1, daysAgo = 0): Promise<InvoiceId> {
@@ -55,7 +55,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     const { id } = await team.statementOf(member, period);
     shift = daysAgo * DAY;
     try {
-      await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(id), quiet);
+      await invoicingModule().jobs.issueInvoices(CommissionStatementIdSchema.parse(id), quiet);
     } finally {
       shift = 0;
     }
@@ -217,7 +217,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     });
 
     // Answered, the dated job does nothing when its time comes.
-    expect(await payroll().jobs.lapseInvoice(id, quiet)).toBe('answered');
+    expect(await invoicingModule().jobs.lapseInvoice(id, quiet)).toBe('answered');
   });
 
   it('keeps the contest’s reason, tells the owner once without it, and lets the owner alone refuse it', async () => {
@@ -246,8 +246,8 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
       }),
     ]);
     expect(await contestAlerts(id)).toEqual([]);
-    expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('published');
-    expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('already');
+    expect(await invoicingModule().jobs.announceInvoiceContest(id, quiet)).toBe('published');
+    expect(await invoicingModule().jobs.announceInvoiceContest(id, quiet)).toBe('already');
     const alerts = await contestAlerts(id);
     expect(alerts).toHaveLength(1);
     const [alert] = alerts;
@@ -309,14 +309,14 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     }
     const [job] = await jobOf(`payroll.lapse_invoice:${late}`);
     expect(job?.run_at.getTime()).toBeLessThan(Date.now());
-    expect(await payroll().jobs.lapseInvoice(late, quiet)).toBe('lapsed');
-    expect(await payroll().jobs.lapseInvoice(late, quiet)).toBe('answered');
+    expect(await invoicingModule().jobs.lapseInvoice(late, quiet)).toBe('lapsed');
+    expect(await invoicingModule().jobs.lapseInvoice(late, quiet)).toBe('answered');
     expect(await read(leaCookie, late)).toMatchObject({
       acceptance: { state: 'tacitly_accepted', reason: null },
       events: [{ kind: 'issued' }, { kind: 'lapsed', by: null, reason: null }],
     });
     expect(await team.audited('invoice.lapse')).toBe(1);
-    expect(await payroll().jobs.lapseInvoice(newId(InvoiceIdSchema), quiet)).toBe('not_found');
+    expect(await invoicingModule().jobs.lapseInvoice(newId(InvoiceIdSchema), quiet)).toBe('not_found');
   });
 
   it('waits for the deadline again when its job runs early', async () => {
@@ -328,7 +328,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     await db().execute(
       sql`update graphile_worker._private_jobs set run_at = now() where key = ${`payroll.lapse_invoice:${id}`}`,
     );
-    expect(await payroll().jobs.lapseInvoice(id, quiet)).toBe('early');
+    expect(await invoicingModule().jobs.lapseInvoice(id, quiet)).toBe('early');
     expect(await jobOf(`payroll.lapse_invoice:${id}`)).toEqual([
       {
         payload: { invoiceId: id },
@@ -350,7 +350,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
       200,
     );
     // The job ran late: the owner, who refused the contest, knows of it.
-    expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
+    expect(await invoicingModule().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
     expect(await contestAlerts(id)).toEqual([]);
     expect(await team.audited('invoice.contest_alert')).toBe(1);
   });
@@ -367,7 +367,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     }
 
     // Answered documents, ended contests and alerts already said are left as they are.
-    expect(await payroll().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
+    expect(await invoicingModule().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
       lapsed: 1,
       announced: 1,
       failed: 0,
@@ -379,7 +379,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     const alerts = await contestAlerts(contested);
     expect(alerts).toEqual([expect.objectContaining({ creatorId: null, actor: 'system' })]);
     expect(EVENT_PAYLOADS.invoice_contested.parse(alerts[0]?.payload).memberId).toBe(theo.id);
-    expect(await payroll().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
+    expect(await invoicingModule().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
       lapsed: 0,
       announced: 0,
       failed: 0,
@@ -467,7 +467,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     // Ended before its alert went out: the job and the hourly sweep leave it, without waiting on its lock.
     const held = await team.holding([`invoices.acceptance:${id}`]);
     try {
-      expect(await payroll().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
+      expect(await invoicingModule().jobs.sweepInvoiceAcceptance(quiet)).toEqual({
         lapsed: 0,
         announced: 0,
         failed: 0,
@@ -475,7 +475,7 @@ describe('Équipe › Factures : l’acceptation, la contestation et ses deux fi
     } finally {
       await held.release();
     }
-    expect(await payroll().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
+    expect(await invoicingModule().jobs.announceInvoiceContest(id, quiet)).toBe('closed');
 
     // Léa leaves the regime of her July invoice before her second half is issued: from that day, another VAT.
     const exempt = newId(BillingRegimeIdSchema);

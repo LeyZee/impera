@@ -55,7 +55,7 @@ import {
   type StatementHead,
 } from '../domain/validation';
 
-import { enqueueDocumentSettle, enqueueInvoiceIssue } from './invoice-queue';
+import type { AfterValidation, PayoutGate } from './ports';
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { closingsSpan, readSnapshot, registeredAmong, type PayInputReads } from './snapshot';
 import { audit } from './writes';
@@ -251,6 +251,8 @@ export function createDrizzlePayrollValidationStore(
   adminDb: Database,
   reads: PayInputReads,
   now: () => Date,
+  gate: PayoutGate,
+  after: AfterValidation,
 ): PayrollValidationStore {
   return {
     validate: (actor, statementId, revision) =>
@@ -324,10 +326,7 @@ export function createDrizzlePayrollValidationStore(
         if (statement.inputsHash !== head.inputsHash) throw new CommissionStatementChanged(head.period);
         if (statement.content.rules.final) {
           // A member who left (ADR 0039 § 6): his documents first, as the base's `keep_final_statement` counts them.
-          const [open] = await tx
-            .execute<{ count: number }>(sql`select "member_documents_open"(${head.memberId}) as count`)
-            .then((result) => z.array(z.object({ count: z.number().int() })).parse(result.rows));
-          assertDocumentsSettled(true, open?.count ?? 0);
+          assertDocumentsSettled(true, await gate.documentsOpen(tx, head.memberId));
         }
         await assertNothingOwedBefore(tx, reads, closed, reports, head.memberId);
 
@@ -367,9 +366,9 @@ export function createDrizzlePayrollValidationStore(
         // reports that came late go.
         await enqueuePayRecalculation(tx, head.period);
         // Its invoice and the credit notes its period owes (EQ-06 lot 3), once this validation commits.
-        await enqueueInvoiceIssue(tx, statementId);
+        await after.issueInvoices(tx, statementId);
         // A cumulated total of zero or below ends the debt of documents already issued (ADR 0038, EQ-06 lot 7a).
-        await enqueueDocumentSettle(tx, head.memberId);
+        await after.settleDocuments(tx, head.memberId);
         return { period: head.period };
       }),
 

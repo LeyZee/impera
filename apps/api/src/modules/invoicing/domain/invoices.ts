@@ -12,9 +12,9 @@ import {
 } from '@nirvana/contracts';
 
 import { addDays } from '../../contractors/pure';
+import { BPS, mulDivRound } from '../../payroll/pure';
 
 import { CreditNoteExceedsInvoice } from './errors';
-import { BPS, mulDivRound } from './rounding';
 
 /**
  * A contractor's invoice and its credit notes (EQ-06, ADR 0023 § Factures and ADR 0036), the pure rules: its number,

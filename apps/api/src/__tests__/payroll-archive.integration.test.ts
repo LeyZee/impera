@@ -14,8 +14,8 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import type { InvoiceObjectStore } from '../modules/contractors/domain/ports';
 import { invoicePdfRetainUntil } from '../modules/contractors/domain/retention';
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
-import { invoicePdfKey } from '../modules/payroll/domain/invoice-pdf';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { invoicePdfKey } from '../modules/invoicing/domain/invoice-pdf';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -74,7 +74,7 @@ describe('Équipe › Factures : l’archive des PDF pour le comptable (EQ-06 lo
     for (const member of [theo, lea, nina]) {
       expect((await team.validate(team.owner, member, Q1)).statusCode).toBe(200);
       const statement = await team.statementOf(member, Q1);
-      await team.app.modules.payroll.jobs.issueInvoices(
+      await team.app.modules.invoicing.jobs.issueInvoices(
         CommissionStatementIdSchema.parse(statement.id),
         quiet,
       );
@@ -82,8 +82,8 @@ describe('Équipe › Factures : l’archive des PDF pour le comptable (EQ-06 lo
     // Théo's and Léa's PDFs are rendered and copied; Nina's job has not run yet.
     for (const member of [theo, lea]) {
       const id = InvoiceIdSchema.parse((await invoiceOf(member)).id);
-      expect(await team.app.modules.payroll.jobs.renderInvoicePdf(id, attempt, quiet)).toBe('stored');
-      expect(await team.app.modules.payroll.jobs.mirrorInvoicePdf(id, attempt, quiet)).toBe('copied');
+      expect(await team.app.modules.invoicing.jobs.renderInvoicePdf(id, attempt, quiet)).toBe('stored');
+      expect(await team.app.modules.invoicing.jobs.mirrorInvoicePdf(id, attempt, quiet)).toBe('copied');
     }
   });
 

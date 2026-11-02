@@ -1,6 +1,8 @@
 import {
   calendarDayAt,
   CommissionStatementStatusSchema,
+  newId,
+  PayAdjustmentIdSchema,
   payPeriodAt,
   payPeriodLastDay,
   PayPeriodSchema,
@@ -21,8 +23,7 @@ import {
   type Transaction,
 } from '@nirvana/db';
 
-import { enqueuePayoutCertificateLock } from '../../contractors';
-import { PayrollForbidden, TeamMemberNotFound } from '../../contractors/pure';
+import { PayrollForbidden, TeamMemberNotFound, type Actor } from '../../contractors/pure';
 import {
   adjustmentPeriod,
   assertJoinedBy,
@@ -47,12 +48,10 @@ import {
   PayoutBlocked,
   PenaltyNotFound,
 } from '../domain/errors';
-import { payoutDecision } from '../domain/payouts';
 import type { PayReader, PayrollEntryStore } from '../domain/ports';
 import type { MemberForPay } from '../domain/recalculation';
 
-import { enqueueDocumentSettle } from './invoice-queue';
-import { payoutFactsOf } from './payout-facts';
+import type { AfterValidation, ContestCorrectionInput, PayoutGate } from './ports';
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { adjustmentOfRow, bonusOfRow, closingsSpan, penaltyOfRow, type PayInputReads } from './snapshot';
 import { audit } from './writes';
@@ -165,7 +164,7 @@ function raced<T>(
 }
 
 /** Puts back in the recalculation queue the periods a write from `from` to `to` changes: none after today's. */
-export async function enqueueChanged(
+async function enqueueChanged(
   tx: Transaction,
   from: PayPeriod,
   to: PayPeriod,
@@ -181,7 +180,7 @@ export async function enqueueChanged(
  * and has a rate in force there. An adjustment typed by a manager and the correction of an upheld contest (ADR 0039)
  * go there alike.
  */
-export async function lockAdjustmentPeriod(
+async function lockAdjustmentPeriod(
   tx: Transaction,
   reads: PayInputReads,
   memberId: TeamMemberId,
@@ -197,6 +196,45 @@ export async function lockAdjustmentPeriod(
   return period;
 }
 
+/** An upheld contest's correction as pay writes it (ADR 0039 § 3): see `ContestCorrectionWrite`. */
+export async function writeContestCorrection(
+  tx: Transaction,
+  reads: PayInputReads,
+  now: () => Date,
+  actor: Actor,
+  correction: ContestCorrectionInput,
+): Promise<{ readonly period: PayPeriod; readonly adjustmentIds: readonly string[] }> {
+  const { memberId, contestedInvoiceId, correctsStatementId, adjustments } = correction;
+  const current = payPeriodAt(now(), await reads.agencyTimeZone(tx));
+  const period = await lockAdjustmentPeriod(tx, reads, memberId, current);
+  const rows = await tx
+    .insert(payAdjustments)
+    .values(
+      adjustments.map((one) => ({
+        id: newId(PayAdjustmentIdSchema),
+        memberId,
+        period,
+        amountMinor: one.amountMinor,
+        reason: one.reason,
+        correctsStatementId,
+        contestedInvoiceId,
+        createdBy: actor.userId,
+      })),
+    )
+    .returning({ id: payAdjustments.id });
+  for (const row of rows) {
+    await audit(
+      tx,
+      actor,
+      'pay_adjustment.create',
+      { kind: 'pay_adjustment', id: row.id },
+      { period, contestedInvoiceId },
+    );
+  }
+  await enqueueChanged(tx, period, period, current);
+  return { period, adjustmentIds: rows.map((row) => row.id) };
+}
+
 /**
  * A member's entries and the payment of a statement (EQ-04, ADR 0032), as the member who writes (`withMember`): the
  * policies keep the four eyes and the owner's payment, the triggers keep the periods closed for the member.
@@ -205,6 +243,8 @@ export function createDrizzlePayrollEntryStore(
   db: Database,
   reads: PayInputReads,
   now: () => Date,
+  gate: PayoutGate,
+  after: AfterValidation,
 ): PayrollEntryStore {
   const currentIn = async (tx: Transaction): Promise<PayPeriod> =>
     payPeriodAt(now(), await reads.agencyTimeZone(tx));
@@ -428,11 +468,12 @@ export function createDrizzlePayrollEntryStore(
           calendarDayAt(now(), await reads.agencyTimeZone(tx)),
         );
         // Its documents all issued, and under a tax treaty the certificate of its year (ADR 0041): never 25 % withheld.
-        const facts = (await payoutFactsOf(tx, [row.memberId])).get(row.memberId);
-        if (facts === undefined) throw new Error('The contractor off the payout facts read');
-        const payout = payoutDecision(facts, statementId, payment.paidOn);
+        const payout = (
+          await gate.verdicts(tx, [{ memberId: row.memberId, statementId }], payment.paidOn)
+        ).get(statementId);
+        if (payout === undefined) throw new Error('The contractor off the payout facts read');
         if (payout.kind === 'blocked') throw new PayoutBlocked(payout);
-        const certificateDocumentId = payout.kind === 'covered' ? payout.certificate.id : null;
+        const certificateDocumentId = payout.kind === 'covered' ? payout.certificateId : null;
         const paid = await tx
           .update(commissionStatements)
           .set({
@@ -470,9 +511,9 @@ export function createDrizzlePayrollEntryStore(
           },
         );
         // The documents this transfer settles, once it commits (EQ-06 lot 7a).
-        await enqueueDocumentSettle(tx, row.memberId);
+        await after.settleDocuments(tx, row.memberId);
         // Its certificate kept ten years after the transfer, by the job (ADR 0041 § 6).
-        if (certificateDocumentId !== null) await enqueuePayoutCertificateLock(tx, statementId);
+        if (certificateDocumentId !== null) await after.lockPayoutCertificate(tx, statementId);
         return { period };
       }),
   };

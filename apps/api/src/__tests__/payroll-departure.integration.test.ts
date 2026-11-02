@@ -10,7 +10,7 @@ import { and, eq, schema, sql, withMember } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -47,7 +47,7 @@ describe('Équipe › départ : la quinzaine de clôture d’un membre parti (EQ
   let shift = 0;
 
   const db = () => team.test.admin.db;
-  const payroll = () => team.app.modules.payroll;
+  const invoicingModule = () => team.app.modules.invoicing;
   /** Whether the member's statement of `period` is final, as its rules say. */
   const finalOf = async (member: TeamMember, period: PayPeriod) =>
     FinalSchema.parse((await team.statementOf(member, period)).rules).final;
@@ -70,7 +70,7 @@ describe('Équipe › départ : la quinzaine de clôture d’un membre parti (EQ
     const { id } = await team.statementOf(member, period);
     shift = daysAgo * DAY;
     try {
-      await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(id), quiet);
+      await invoicingModule().jobs.issueInvoices(CommissionStatementIdSchema.parse(id), quiet);
     } finally {
       shift = 0;
     }
@@ -189,7 +189,7 @@ describe('Équipe › départ : la quinzaine de clôture d’un membre parti (EQ
     expect(await failure(validatedInBase(theo, Q2))).toMatch(/is final from his closing fortnight on/u);
     await finalWritten(theo, Q2, true);
 
-    expect(await payroll().jobs.lapseInvoice(invoiceId, quiet)).toBe('lapsed');
+    expect(await invoicingModule().jobs.lapseInvoice(invoiceId, quiet)).toBe('lapsed');
     expect((await team.validate(team.owner, theo, Q2)).statusCode).toBe(200);
     expect((await team.statementOf(theo, Q2)).status).toBe('validated');
   });
