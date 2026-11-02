@@ -1,5 +1,5 @@
 # EQ-06 (écrans) Factures, dossier du prestataire et exports comptables à l'écran
-Statut : in_progress (lot 8 de `EQ-06-self-billing-invoices.md`, même ID, lancé par Charles le 02/11 (« lot 8 ») ; écrans pour Extension en quatre PR, cinq compléments d'API pour Équipe avant eux ; fait : les cinq compléments d'API, 1, la liste des documents, 5, les pièces à examiner, 2, `remindFrom`, 4, le délai de rappel en écriture, et 3, l'alerte d'échéance ; 8a dans `main` (#374) : Commissions › Factures et Paie › Factures ; 8b dans `main` (#376) : Moi › Dossier, `/moi/factures` et le dossier d'un membre ; le rendu Telegram de l'alerte dans `main` (#373) ; 8c dans `main` (#377) : Réglages › Facturation et Paie › Exports ; 8d en PR : Aujourd'hui et le Dashboard du propriétaire)
+Statut : done (lot 8 de `EQ-06-self-billing-invoices.md`, même ID, lancé par Charles le 02/11 (« lot 8 ») ; écrans pour Extension en quatre PR, cinq compléments d'API pour Équipe avant eux ; fait : les cinq compléments d'API, 1, la liste des documents, 5, les pièces à examiner, 2, `remindFrom`, 4, le délai de rappel en écriture, et 3, l'alerte d'échéance ; 8a dans `main` (#374) : Commissions › Factures et Paie › Factures ; 8b dans `main` (#376) : Moi › Dossier, `/moi/factures` et le dossier d'un membre ; le rendu Telegram de l'alerte dans `main` (#373) ; 8c dans `main` (#377) : Réglages › Facturation et Paie › Exports ; 8d dans `main` (#378) : Aujourd'hui du chatteur et Dashboard du propriétaire ; fiche terminée le 02/11)
 Phase : équipe (ADR 0023)
 Dépend de : `EQ-06-self-billing-invoices.md` lots 1 à 7 (tous dans `main`), EQ-05 (écrans de paie), EQ-11 (coquille par rôle)
 Branche : celle du fil qui la prend (Extension pour les écrans, Équipe pour l'API)
@@ -70,3 +70,6 @@ Quatre PR d'écrans, chacune relue par Équipe, chacune partie seulement quand l
 
 ## Hors périmètre
 Coordonnées de paiement, transmission à une plateforme agréée, notifications sur téléphone (EQ-12), import d'Imperium (EQ-07).
+
+## Résultat
+Terminée le 02/11/2026. Les compléments d'API d'Équipe (#368 à #373, #375) et les quatre PR d'écrans d'Extension (#374, #376, #377, #378) sont dans `main`. Équipe a relu chaque écran et chaque montant avant la fusion : aucun écran ne recalcule une échéance, un état, un règlement, un blocage ni un montant. Choix d'Équipe du 02/11 : le choix (a), l'attestation de résidence hors convention (voir plus haut) ; la partie « propriétaire » d'Aujourd'hui va sur son Dashboard, puisqu'il n'a pas d'Aujourd'hui (ADR 0024).
