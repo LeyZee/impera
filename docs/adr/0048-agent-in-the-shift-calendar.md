@@ -14,9 +14,9 @@ Sans cela, un créneau sans chatteur se lit « à pourvoir » même quand l'agen
 
 ### 1. Ce qui s'affiche
 
-- Pour chaque compte, les heures où l'agent répond (`agent_hours.reply`) et son mode en vigueur (Arrêt quand l'arrêt global est levé) se lisent dans le calendrier, mêlées aux shifts : un trait aux couleurs de l'IA sous les créneaux qu'il couvre, vif en Automatique, pâle en Copilote, absent en Arrêt et hors de ses heures. Un créneau couvert en partie montre la partie couverte.
+- Pour chaque compte, les heures où l'agent répond (`agent_hours.reply`) et son mode en vigueur (Arrêt quand l'arrêt global est levé) s'écrivent en clair, jamais par une marque sans légende : une étiquette sur le compte (« IA automatique · 9 h – 1 h »), et sur chaque ligne de créneau la part qu'il couvre (« IA », « IA dès 9 h », « IA jusqu'à 1 h ») ; rien en Arrêt.
 - Un créneau **sans chatteur** que l'agent couvre en entier **en Automatique** s'affiche « IA seule » et ne compte pas dans les créneaux à pourvoir. En Copilote, il reste « à pourvoir » : chaque brouillon y attend un humain (ADR 0019, ADR 0025).
-- « En poste maintenant » nomme l'agent à côté des membres ; la question « qui avant, qui après » d'un chatteur dit « l'IA seule » quand l'agent tient seul le créneau voisin.
+- En tête du calendrier, une carte par compte dit qui chatte maintenant et jusqu'à quand, si l'agent est actif et dans quel mode, et qui suit ; la question « qui avant, qui après » d'un chatteur dit « l'IA seule » quand l'agent tient seul le créneau voisin.
 - L'IA a sa place dans la légende du calendrier, comme un membre : un geste la suit sur la grille.
 - Pour l'agence seulement, un encart « Couverture des comptes » dit, par compte et pour la semaine affichée, les heures tenues par un chatteur avec l'agent, par un chatteur seul, par l'agent seul (Automatique seulement) et par personne.
 - La vue Mois compte un créneau « IA seule » comme tenu ; le détail d'un jour rappelle, par compte, les heures et le mode de l'agent.
@@ -46,10 +46,11 @@ Positives :
 
 Négatives, à surveiller :
 - Les chatteurs voient les heures de l'agent de toutes les créatrices : ce sont des horaires, rien d'autre.
-- Un trait de plus sous chaque créneau : il reste fin et pâle en Copilote pour ne pas couvrir les shifts ; le prototype le vérifie.
+- Des heures d'activité qui changent selon le jour de la semaine ne tiennent plus sur l'étiquette d'une ligne : le jour qui diffère porte sa propre mention dans ses cases.
 
 ## Alternatives rejetées
 
 - **Une ligne « IA » à part par compte** : plus lourde, et elle sépare ce que Charles veut voir mêlé.
 - **Un badge « IA » dans chaque shift** : essayé dans le prototype, il répète la même marque sur presque chaque case et écrase la hiérarchie.
+- **Un trait dégradé sous les créneaux** : essayé ensuite, Charles ne l'a pas compris (02/11, 17h35).
 - **Montrer l'agent à la créatrice** : contraire à l'ADR 0042 § 2.
