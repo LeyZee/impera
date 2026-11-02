@@ -1,6 +1,6 @@
 # 0047. Ranger le code qui a grossi : la paie en quatre modules, l'argent calculé par le seul serveur, l'assemblage par module, le dashboard par domaine
 
-Statut : accepted (Charles, 02/11/2026 17h29, « ok 0047 », après la relecture de Bilan intégrée ; amendée après la relecture d'Équipe, phrases soumises à Charles avant fusion ; demande du même jour à 17h25, fil « Visualiser l'architecture avec floorplan », après la lecture de la carte d'architecture)
+Statut : accepted (Charles, 02/11/2026 17h29, « ok 0047 », après la relecture de Bilan intégrée ; amendée après les relectures d'Équipe et d'Extension, phrases soumises à Charles avant fusion ; demande du même jour à 17h25, fil « Visualiser l'architecture avec floorplan », après la lecture de la carte d'architecture)
 Date : 2026-11-02
 Précise : l'ADR 0002 (modules et frontières) pour le découpage de `payroll` ; ne change aucune règle de paie, de facture ou de droit d'accès.
 
@@ -54,10 +54,13 @@ La carte d'architecture du 02/11 (Floorplan, hors dépôt) et une mesure rapide 
 - `wiring/` est un nouveau type d'élément pour `eslint-plugin-boundaries` : il importe l'`index.ts` des modules et les dépendances communes, et seul `composition-root.ts` l'importe.
 - Aucun comportement ne change : mêmes routes, mêmes gardes, mêmes jobs, même ordre d'enregistrement.
 
-### 4. Le dashboard se range par domaine
+### 4. Le dashboard se range : les pages par entrée du rail, les données par domaine
 
-- Un dossier par entrée du rail (ADR 0024) sous `apps/web/src/` : `today/`, `dashboard/`, `tracking/`, `train/`, `creators/`, `team/` (membres, planning, rapports), `pay/` (paie, factures, prestataires, comptabilité), `settings/`, `me/` ; plus les dossiers communs `shell/`, `auth/`, `lib/`, `test/`. Chaque dossier tient ses pages, son `api.ts`, son `model.ts` et ses composants. `screens/` disparaît.
-- Le déplacement est une PR de pur déplacement (`git mv` et chemins d'import), sans changement de code, faite à un moment où **aucune autre PR ouverte ne touche `apps/web`**, annoncée à l'avance aux fils Extension et Chantier 7. Les routes de l'application et les URL ne changent pas.
+- **Les pages par entrée du rail** (les onze de `ITEMS` dans `shell/nav.ts`, ADR 0024) : `dashboard/`, `today/`, `tracking/`, `train/`, `planning/`, `commissions/`, `team/`, `pay/`, `creators/`, `settings/`, `me/`. Chaque dossier tient les pages et les composants de son entrée.
+- **Les données par domaine de l'API** : `apps/web/src/domain/<payroll|invoices|contractors|accounting|reports|scheduling|creators|agent|settings>/`, avec l'`api.ts`, le `model.ts` et les composants partagés par plusieurs entrées (une bonne partie de ce code sert plusieurs entrées : `invoices/`, `reports/`, `scheduling/` sont lus par presque toutes).
+- **Les communs** : `shell/`, `auth/`, `lib/`, `test/`. `screens/` disparaît.
+- **Une règle vérifiée par ESLint** (des éléments `boundaries` internes à `apps/web`, ajoutés dans la même PR) : une entrée importe `domain/`, `shell/` et `lib/`, jamais une autre entrée ; `domain/` n'importe jamais une entrée.
+- Le déplacement est une PR de pur déplacement, sans changement de code, en deux commits (les `git mv` seuls, puis les chemins d'import, pour que `git log --follow` garde l'historique de chaque fichier), faite à un moment où **aucune autre PR ouverte ne touche `apps/web`**, annoncée à l'avance aux fils Extension et Chantier 7. Les routes de l'application et les URL ne changent pas.
 
 ### Ordre et relectures
 
