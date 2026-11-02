@@ -254,6 +254,8 @@ const SCREENS = {
   '/paie/releves': 'Historique',
   '/paie/primes-malus': 'Primes et malus',
   '/paie/objectifs': 'Objectifs',
+  '/paie/factures': 'Factures',
+  '/commissions/factures': 'Factures',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',

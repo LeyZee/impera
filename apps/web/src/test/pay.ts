@@ -4,6 +4,7 @@ import {
   CollectiveGoalSchema,
   CommissionStatementLineSchema,
   CommissionStatementSchema,
+  InvoiceListItemSchema,
   PayAdjustmentViewSchema,
   PayrollEntriesSchema,
   PayrollPeriodSchema,
@@ -14,6 +15,7 @@ import {
   type CollectiveGoal,
   type CommissionStatement,
   type CommissionStatementLine,
+  type InvoiceListItem,
   type Me,
   type PayAdjustmentView,
   type PayPeriodSummary,
@@ -370,3 +372,36 @@ export const entriesOf = (
   entries: { bonuses?: unknown[]; penalties?: unknown[]; adjustments?: unknown[] } = {},
 ): PayrollEntries =>
   PayrollEntriesSchema.parse({ period, bonuses: [], penalties: [], adjustments: [], ...entries });
+
+/**
+ * A document of `/v1/payroll/invoices` for `whose`, an invoice of `period` by default: issued on the 2nd of November,
+ * due 60 days later, 100 € excluding VAT and no VAT (reverse charge), accepted, not settled. `n` tells it apart, and
+ * makes its number (`TEST-2026-000n`).
+ */
+export function invoiceOf(
+  n: number,
+  whose: TeamMember,
+  period: string,
+  patch: Partial<Record<keyof InvoiceListItem, unknown>> = {},
+): InvoiceListItem {
+  return InvoiceListItemSchema.parse({
+    id: payId(900 + n),
+    kind: 'invoice',
+    corrective: false,
+    memberId: whose.id,
+    number: `TEST-2026-${String(n).padStart(4, '0')}`,
+    period,
+    statementId: payId(950 + n),
+    creditedInvoiceId: null,
+    issuedOn: '2026-11-02',
+    dueOn: '2027-01-01',
+    exclVatMinor: 10_000,
+    vatMinor: 0,
+    inclVatMinor: 10_000,
+    acceptance: { state: 'accepted', deadline: '2026-11-09T22:59:00.000Z', reason: null },
+    settlement: null,
+    due: 'open',
+    pdfReady: true,
+    ...patch,
+  });
+}

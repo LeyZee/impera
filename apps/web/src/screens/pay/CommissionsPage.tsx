@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
+import { CommissionsNav } from './CommissionsNav';
 import { useCfaFrancs, useCurrentPeriod, usePayNames } from './data';
 import { Chip, Empty, Gauge, GoalTicks, Loading, MoneyPath, Unreachable } from './parts';
 
@@ -95,6 +96,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
       eyebrow={period === null ? 'Quinzaine' : `Quinzaine ${periodLine(period)}`}
       title="Commissions"
       lead="Ce que tu as gagné sur la quinzaine, et comment ta commission se construit."
+      actions={<CommissionsNav />}
     />
   );
 

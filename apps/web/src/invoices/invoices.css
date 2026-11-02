@@ -1,0 +1,188 @@
+/* Invoices and credit notes (EQ-06 lot 8): Commissions › Factures and Paie › Factures. Tokens only; amber when a due
+   date nears, red once it is past (the one urgency), the neon left to each dialog's own answer. */
+
+.iv-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── A document: its number and kind, its facts, its state, its amount; its actions beneath. ── */
+.iv-doc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.iv-doc__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.iv-doc__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--nv-space-2);
+  margin: 0;
+  font-weight: 650;
+}
+.iv-doc__kind {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 560;
+}
+.iv-doc__sub {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.iv-doc__reason {
+  margin: var(--nv-space-1) 0 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+}
+.iv-doc__reason span {
+  color: var(--nv-ink-muted);
+}
+.iv-doc__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-1);
+}
+.iv-doc__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 680;
+  white-space: nowrap;
+}
+.iv-doc__amount small {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+}
+.iv-doc__acts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-1);
+}
+.iv-doc__wait {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+@media (max-width: 560px) {
+  .iv-doc {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .iv-doc__chips {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+  /* Four actions hold on one line of a phone; each keeps its height, the target. */
+  .iv-doc__acts .nv-btn--plain {
+    padding-inline: var(--nv-space-2);
+  }
+}
+
+/* A due date past: the chip says it in red, the row's edge too, so it is seen without reading. */
+.iv-chip--danger {
+  color: var(--nv-danger);
+  background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
+}
+.iv-doc[data-due='overdue'] {
+  box-shadow: inset 3px 0 0 var(--nv-danger);
+}
+.iv-doc[data-due='soon'] {
+  box-shadow: inset 3px 0 0 var(--nv-warning);
+}
+
+/* ── Paie › Factures: how the list is read, by quinzaine or by member ── */
+.iv-filter {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.iv-filter .tm-select {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.iv-more {
+  align-self: center;
+}
+
+/* A span of days without a document, between two years that hold some: said, never a blank. */
+.iv-gap {
+  padding: var(--nv-space-1) var(--nv-space-4);
+}
+
+/* ── A document's detail: its totals, then each dated step of its life ── */
+.iv-totals {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  gap: var(--nv-space-1) var(--nv-space-4);
+  margin: 0;
+}
+.iv-totals dt {
+  color: var(--nv-ink-muted);
+}
+.iv-totals dd {
+  margin: 0;
+  text-align: right;
+}
+.iv-totals dt:last-of-type,
+.iv-totals dd:last-of-type {
+  font-weight: 680;
+}
+.iv-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.iv-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--nv-space-3);
+  border-left: 2px solid var(--nv-hairline);
+}
+.iv-steps__reason {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
+}
+
+/* The list's head: its name first, the filter beneath it when the screen is too narrow for both on a line. */
+.iv-docs > .nv-panel__head {
+  flex-wrap: wrap;
+}
+.iv-docs > .nv-panel__head > :first-child {
+  min-width: min(100%, 15rem);
+}
