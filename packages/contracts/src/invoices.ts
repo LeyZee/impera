@@ -1136,7 +1136,10 @@ export type InvoiceListQuery = z.infer<typeof InvoiceListQuerySchema>;
 /**
  * A document of the list: what its screens show without recomputing a rule. `corrective` marks the invoice that bills
  * again a cancelled one (ADR 0040); `creditedInvoiceId` the invoice a credit note cites; `statementId` the statement it
- * was issued for (`null` on a credit note no validation issued). `pdfReady` says its PDF is rendered, to download.
+ * was issued for (`null` on a credit note no validation issued), and `statementPeriod` that statement's quinzaine, where
+ * the document leads (`Voir le relevé`): for an invoice its own `period`, for a credit note or a corrective invoice the
+ * later quinzaine that owed it, whereas `period` is the one it corrects and prints. `pdfReady` says its PDF is rendered,
+ * to download.
  */
 export const InvoiceListItemSchema = z.object({
   id: InvoiceIdSchema,
@@ -1146,6 +1149,7 @@ export const InvoiceListItemSchema = z.object({
   number: InvoiceNumberSchema,
   period: PayPeriodSchema,
   statementId: CommissionStatementIdSchema.nullable(),
+  statementPeriod: PayPeriodSchema.nullable(),
   creditedInvoiceId: InvoiceIdSchema.nullable(),
   issuedOn: CalendarDaySchema,
   dueOn: CalendarDaySchema,

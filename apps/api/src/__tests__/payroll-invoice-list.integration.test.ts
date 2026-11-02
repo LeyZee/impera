@@ -131,6 +131,7 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
         number: theoInvoice.number,
         period: Q1,
         statementId: theoStatement.id,
+        statementPeriod: Q1,
         creditedInvoiceId: null,
         issuedOn: today,
         dueOn: theoInvoice.dueOn,
@@ -242,13 +243,22 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
     const credit = await invoiceOf(lea, 'credit_note', Q2);
     const firstInvoice = await invoiceOf(lea);
 
-    // Under Q2, the documents its statement issued, the credit note printing the quinzaine it corrects; under Q1, not it.
+    // Under Q2, the documents its statement issued, the credit note printing the quinzaine it corrects and leading to
+    // the statement that owed it; under Q1, not it.
     const second = await documents(team.owner, `period=${Q2}`);
     // Issued the same day, the credit note after the invoice: the higher number first.
-    expect(second.documents.map((one) => [one.id, one.kind, one.period, one.statementId])).toEqual([
-      [credit.id, 'credit_note', Q1, statement.id],
-      [invoice.id, 'invoice', Q2, statement.id],
+    expect(
+      second.documents.map((one) => [one.id, one.kind, one.period, one.statementId, one.statementPeriod]),
+    ).toEqual([
+      [credit.id, 'credit_note', Q1, statement.id, Q2],
+      [invoice.id, 'invoice', Q2, statement.id, Q2],
     ]);
+    // Read without a quinzaine (the contractor's year, the due dates), the credit note still leads to Q2's statement.
+    expect(
+      (await documents(team.owner, `from=${today}&to=${today}&memberId=${lea.id}`)).documents.find(
+        (one) => one.id === credit.id,
+      )?.statementPeriod,
+    ).toBe(Q2);
     expect(second.documents.find((one) => one.id === credit.id)).toMatchObject({
       creditedInvoiceId: firstInvoice.id,
       exclVatMinor: -1_200,

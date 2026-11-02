@@ -213,6 +213,11 @@ async function listOf(
       number: invoices.number,
       period: invoices.period,
       statementId: invoices.statementId,
+      // The quinzaine of the statement that issued it, where the screens lead. Written by hand with the outer table
+      // named: Drizzle leaves a column of a one-table select unqualified, and inside the subquery it would be ambiguous.
+      statementPeriod: sql<string | null>`(
+        select s.period::text from commission_statements s where s.id = "invoices"."statement_id"
+      )`,
       creditedInvoiceId: invoices.creditedInvoiceId,
       reissuedInvoiceId: invoices.reissuedInvoiceId,
       issuedOn: invoices.issuedOn,
@@ -290,6 +295,7 @@ async function listOf(
         number: row.number,
         period: row.period,
         statementId: row.statementId,
+        statementPeriod: row.statementPeriod,
         creditedInvoiceId: row.creditedInvoiceId,
         issuedOn: row.issuedOn,
         dueOn: row.dueOn,
