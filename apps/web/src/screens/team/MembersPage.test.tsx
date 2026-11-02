@@ -256,6 +256,7 @@ describe('Équipe › Membres', () => {
       ['Ses shifts', `/equipe/planning?membre=${THEO.id}`],
       ['Ses rapports', `/equipe/rapports?membre=${THEO.id}`],
       ['Son relevé', `/paie/quinzaine?membre=${THEO.id}`],
+      ['Son dossier', `/equipe/membres/${THEO.id}/dossier`],
     ]);
     fireEvent.click(within(sheet).getByRole('button', { name: 'Fermer la fiche' }));
     await waitFor(() => {
@@ -292,6 +293,8 @@ describe('Équipe › Membres', () => {
     await screen.findByRole('region', { name: 'Théo' });
     expect(screen.queryByRole('button', { name: 'Ajouter un membre' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Lien de nouveau mot de passe' })).toBeNull();
+    // A member's file is the owner's to read and check.
+    expect(screen.queryByRole('link', { name: 'Son dossier' })).toBeNull();
     // Nothing promises him a gesture he does not have.
     expect(screen.getByText(/le propriétaire peut lui créer un lien/u)).toBeDefined();
   });

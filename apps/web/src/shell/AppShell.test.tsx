@@ -105,7 +105,7 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/aujourdhui');
     });
-    expect(tabs()).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions']);
+    expect(tabs()).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
     expect(screen.getByText('Chatteur')).toBeDefined();
     // No Dashboard in his rail: no agent pill reading it either.
     expect(screen.queryByText('Agent')).toBeNull();
@@ -130,7 +130,7 @@ describe('the rail of each role', () => {
   it('names a manager on leave a manager, though he has the chatter’s rail', async () => {
     renderApp({ ...manager, team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' }, '/suivi');
     expect(await screen.findByText('Manager')).toBeDefined();
-    expect(tabs()).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions']);
+    expect(tabs()).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
   });
 
   it('sends a creator who opens Suivi to the Dashboard: she never sees a conversation', async () => {
@@ -151,7 +151,7 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie']);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Moi']);
   });
 });
 

@@ -44,6 +44,7 @@ const THEO_LATE = invoiceOf(3, THEO, OCT1, { issuedOn: '2026-09-02', dueOn: '202
 const THEO_CREDIT = invoiceOf(4, THEO, OCT1, {
   kind: 'credit_note',
   creditedInvoiceId: THEO_LATE.id,
+  statementPeriod: OCT2,
   exclVatMinor: -2_500,
   inclVatMinor: -2_500,
 });
@@ -200,7 +201,7 @@ describe('Paie › Factures', () => {
     const credit = rowIn(documents, THEO_CREDIT.number);
     expect(credit.textContent.replace(NBSP, ' ')).toContain('corrige la quinzaine du 1er – 15 octobre 2026');
     expect(credit.textContent.replace(NBSP, ' ')).toContain('−25,00 €');
-    // Its statement is the one that owed it: the quinzaine of the list, not the one it corrects.
+    // Its statement is the one that owed it, as the server says: not the quinzaine it corrects.
     expect(within(credit).getByRole('link', { name: 'Voir le relevé' }).getAttribute('href')).toBe(
       `/paie/quinzaine?quinzaine=${OCT2}&membre=${THEO.id}`,
     );
@@ -290,8 +291,14 @@ describe('Paie › Factures', () => {
     fireEvent.change(select, { target: { value: THEO.id } });
     expect(filters).toEqual([{ membre: THEO.id }]);
     cleanup();
+    lists = (search) => (search.get('memberId') === THEO.id && search.has('from') ? [THEO_CREDIT] : []);
     renderPage(OWNER, THEO.id);
-    await waitFor(() => panelOf('Théo, sur l’année'));
+    const year = await waitFor(() => panelOf('Théo, sur l’année'));
+    // Read outside its quinzaine, a credit note still leads to the statement that owed it.
+    const credit = await waitFor(() => rowIn(year, THEO_CREDIT.number));
+    expect(within(credit).getByRole('link', { name: 'Voir le relevé' }).getAttribute('href')).toBe(
+      `/paie/quinzaine?quinzaine=${OCT2}&membre=${THEO.id}`,
+    );
     await waitFor(() => {
       expect(reads).toContain(`?memberId=${THEO.id}&from=2025-11-05&to=2026-11-05`);
     });

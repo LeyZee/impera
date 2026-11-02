@@ -252,7 +252,12 @@ describe('Commissions › Factures', () => {
     expect(
       await screen.findByText('Aucun document entre le 5 novembre 2025 et le 5 novembre 2026.'),
     ).toBeTruthy();
-    expect(screen.getByText(/jusqu’à dix ans/u)).toBeTruthy();
+    // How a first invoice comes, beside the way back further.
+    expect(
+      screen.getByText(
+        'Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet. « Plus anciennes » remonte d’une année à la fois, jusqu’à dix ans.',
+      ),
+    ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Plus anciennes' })).toBeTruthy();
     cleanup();
     listStatus = 500;

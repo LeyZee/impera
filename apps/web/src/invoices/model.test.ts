@@ -15,7 +15,6 @@ import {
   periodText,
   readsAgain,
   settlementText,
-  statementPeriodOf,
   yearRange,
   yearSlices,
 } from './model';
@@ -152,16 +151,6 @@ describe('a document in words', () => {
     expect(
       flat(eventLine({ kind: 'issued', at: '2026-11-02T09:00:00.000Z' }, 'credit_note', 'Europe/Paris')),
     ).toBe('Émis le lundi 2 novembre à 10 h');
-  });
-});
-
-describe('the statement a document leads to', () => {
-  it('is its own quinzaine for an invoice, the list’s for a credit note listed under one, none otherwise', () => {
-    expect(statementPeriodOf(invoiceOf(1, THEO, OCT2), null)).toBe(OCT2);
-    const credit = invoiceOf(2, THEO, OCT1, { kind: 'credit_note', creditedInvoiceId: payId(901) });
-    expect(statementPeriodOf(credit, OCT2)).toBe(OCT2);
-    expect(statementPeriodOf(credit, null)).toBeNull();
-    expect(statementPeriodOf({ ...credit, statementId: null }, OCT2)).toBeNull();
   });
 });
 

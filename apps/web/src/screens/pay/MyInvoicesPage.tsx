@@ -1,5 +1,5 @@
-import type { InvoiceListItem } from '@nirvana/contracts';
-import { useState, type JSX } from 'react';
+import type { InvoiceListItem, TeamMemberId } from '@nirvana/contracts';
+import { useState, type JSX, type ReactNode } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
 import { AnswerDialog, DetailDialog, InvoiceRow } from './InvoiceRow';
@@ -21,23 +21,36 @@ type Opened =
   | { readonly kind: 'detail'; readonly item: InvoiceListItem };
 
 /**
- * Commissions › Factures (EQ-06 lot 8, the chatter's; the manager's own at Moi › Factures): the invoices the agency
+ * Commissions › Factures (EQ-06 lot 8, the chatter's) and Moi › Factures (the manager's own, lot 8b): the invoices the agency
  * issues in his name and the credit notes that correct them, the latest first, a year at a time. He accepts or contests
  * each while its delay runs; the payment reads on the document. No due date in colour: that is the agency's to watch.
  */
-export function MyInvoicesPage(): JSX.Element {
+export function MyInvoicesPage({
+  eyebrow = 'Commissions',
+  actions = <CommissionsNav />,
+  memberId,
+}: {
+  /** Commissions for a chatter; Moi for a manager, whose commissions are there (ADR 0024). */
+  eyebrow?: string;
+  actions?: ReactNode;
+  /**
+   * A manager's own member: an active manager reads every document of the agency, so his own list asks for his alone.
+   * A chatter reads only his, without it.
+   */
+  memberId?: TeamMemberId;
+}): JSX.Element {
   const today = useAgencyToday();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
-  const years = useInvoiceYears({}, today);
+  const years = useInvoiceYears(memberId === undefined ? {} : { memberId }, today);
   const [opened, setOpened] = useState<Opened | null>(null);
 
   return (
     <Page>
       <PageHeader
-        eyebrow="Commissions"
+        eyebrow={eyebrow}
         title="Factures"
         lead="Les factures que l’agence émet en ton nom, et les avoirs qui les corrigent. Tu acceptes ou contestes chacune avant la fin de son délai."
-        actions={<CommissionsNav />}
+        actions={actions}
       />
       <div className="py-board">
         <Panel className="nv-enter">
@@ -48,7 +61,8 @@ export function MyInvoicesPage(): JSX.Element {
               years={years}
               today={today}
               what="la liste de tes factures"
-              first="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
+              hint="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
+              first="Aucune facture sur les dix dernières années : la première s’émet quand ton premier relevé est validé, une fois ton dossier complet."
               older="Le serveur ne répond pas : les factures plus anciennes n’ont pas pu être lues."
               row={(item) => (
                 <InvoiceRow

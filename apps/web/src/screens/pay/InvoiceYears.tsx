@@ -15,6 +15,7 @@ export function InvoiceYears({
   years,
   today,
   what,
+  hint,
   first,
   older,
   row,
@@ -23,7 +24,9 @@ export function InvoiceYears({
   today: string | null;
   /** « la liste de tes factures »: what a server that does not answer did not give. */
   what: string;
-  /** Said when ten years hold no document: how a first one comes. */
+  /** How a document comes, said under a first year without one, before « Plus anciennes » reads further. */
+  hint: string;
+  /** Said when ten years hold no document. */
   first: string;
   /** Said when a later year could not be read. */
   older: string;
@@ -50,7 +53,9 @@ export function InvoiceYears({
         <Empty
           whisper={gapText(only.range)}
           text={
-            years.hasNextPage ? '« Plus anciennes » remonte d’une année à la fois, jusqu’à dix ans.' : first
+            years.hasNextPage
+              ? `${hint} « Plus anciennes » remonte d’une année à la fois, jusqu’à dix ans.`
+              : first
           }
         />
       ) : (

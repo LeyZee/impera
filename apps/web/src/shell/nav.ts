@@ -35,6 +35,7 @@ export const READY_SECTIONS = [
   '/equipe',
   '/paie',
   '/creatrices',
+  '/moi',
   '/reglages',
 ] as const;
 export type ReadySection = (typeof READY_SECTIONS)[number];
@@ -256,6 +257,8 @@ const SCREENS = {
   '/paie/objectifs': 'Objectifs',
   '/paie/factures': 'Factures',
   '/commissions/factures': 'Factures',
+  '/moi/dossier': 'Dossier',
+  '/moi/factures': 'Factures',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
