@@ -765,15 +765,6 @@ export const PayPeriodBlockSchema = z.discriminatedUnion('code', [
 ]);
 export type PayPeriodBlock = z.infer<typeof PayPeriodBlockSchema>;
 
-/**
- * `GET /v1/payroll/periods/:period`: the period's statements (every member's for the agency, one's own for a member),
- * with what made them. `window` is `null` while pay has not written the period; `ended` says whether it can be
- * validated (a period validates once it has ended in the agency's zone); `closing` is `null` until its first
- * validation closes it for the team. `beforeFirstClosing` says the period comes before the team's first closing: it is
- * closed for good without a closing of its own and has no statement, and a report of it counts late on the team's
- * first open period (ADR 0032). `blocked` says pay could not compute the period at its last try
- * (`PayPeriodBlockSchema`): its statements are out of date until it can. Absent (an older server) reads as `null`.
- */
 /** A sum of a period's statements in euro cents: a `bigint` in SQL, read only within JavaScript's exact integers. */
 const PeriodSumSchema = z.number().int().min(Number.MIN_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER);
 const StatementCountSchema = z.number().int().min(0);
@@ -818,6 +809,17 @@ export const PeriodPaceSchema = z.object({
 });
 export type PeriodPace = z.infer<typeof PeriodPaceSchema>;
 
+/**
+ * `GET /v1/payroll/periods/:period`: the period's statements (every member's for the agency, one's own for a member),
+ * with what made them. `window` is `null` while pay has not written the period; `ended` says whether it can be
+ * validated (a period validates once it has ended in the agency's zone); `closing` is `null` until its first
+ * validation closes it for the team. `beforeFirstClosing` says the period comes before the team's first closing: it is
+ * closed for good without a closing of its own and has no statement, and a report of it counts late on the team's
+ * first open period (ADR 0032). `blocked` says pay could not compute the period at its last try
+ * (`PayPeriodBlockSchema`): its statements are out of date until it can. Absent (an older server) reads as `null`.
+ * `summary` sums the statements as the list of periods does, and `pace` says where the period is heading: both computed
+ * by the server, never by a screen (ADR 0047 § 2).
+ */
 export const PayrollPeriodSchema = z.object({
   period: PayPeriodSchema,
   window: PayPeriodWindowSchema.nullable(),
