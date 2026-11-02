@@ -15,8 +15,10 @@ import {
   BillingSettingsViewSchema,
   BusinessIdSchema,
   CONTRACTOR_DOCUMENT_MEDIA_TYPES,
+  CONTRACTOR_DOCUMENTS_PENDING_MAX,
   ContestInvoiceBodySchema,
   ContractorDocumentReviewSchema,
+  ContractorDocumentsQuerySchema,
   ContractorProfileBodySchema,
   ContractorProfileSchema,
   CreateBillingRegimeBodySchema,
@@ -40,6 +42,7 @@ import {
   InvoiceSchema,
   JOURNAL_ACCOUNT_NAMES,
   JournalAccountsSchema,
+  PendingContractorDocumentsSchema,
   RefuseInvoiceContestBodySchema,
   RegimeVatSchema,
   SERVICE_DESCRIPTION_MAX,
@@ -726,6 +729,37 @@ describe('invoices', () => {
         ContractorDocumentReviewSchema.safeParse({ decision: 'refused', reason: 'x'.repeat(501) }).success,
       ).toBe(false);
       expect(CONTRACTOR_DOCUMENT_MEDIA_TYPES).toEqual(['application/pdf', 'image/jpeg', 'image/png']);
+    });
+
+    it('lists the documents waiting for the check, and nothing else yet (lot 8)', () => {
+      expect(ContractorDocumentsQuerySchema.parse({ review: 'pending' })).toEqual({ review: 'pending' });
+      for (const query of [{}, { review: 'accepted' }, { review: 'pending,refused' }])
+        expect(ContractorDocumentsQuerySchema.safeParse(query).success, JSON.stringify(query)).toBe(false);
+      const waiting = {
+        id: certificate.id,
+        memberId: '0190a0b0-0000-7000-8000-000000000041',
+        kind: 'tax_residence',
+        issuedOn: '2026-03-03',
+        validUntil: null,
+        lastDay: '2026-12-31',
+        mediaType: 'application/pdf',
+        sha256: 'a'.repeat(64),
+        review: null,
+        purgedAt: null,
+        createdAt: '2026-03-04T08:00:00.000Z',
+        displayName: 'Kofi',
+      };
+      const list = (count: number) => ({
+        documents: Array.from({ length: count }, () => waiting),
+        more: true,
+      });
+      expect(PendingContractorDocumentsSchema.safeParse(list(CONTRACTOR_DOCUMENTS_PENDING_MAX)).success).toBe(
+        true,
+      );
+      expect(
+        PendingContractorDocumentsSchema.safeParse(list(CONTRACTOR_DOCUMENTS_PENDING_MAX + 1)).success,
+      ).toBe(false);
+      expect(PendingContractorDocumentsSchema.safeParse(list(1)).success).toBe(true);
     });
   });
 });

@@ -3,6 +3,7 @@ import type {
   ContractorDocumentId,
   ContractorDocumentMediaType,
   ContractorDocumentReview,
+  PendingContractorDocuments,
   TeamMemberId,
   UploadContractorDocumentQuery,
   UserId,
@@ -200,7 +201,7 @@ function reviewContractorDocument(
   );
 }
 
-/** The documents' three routes, on their store and buckets. */
+/** The documents' routes, on their store and buckets. */
 export interface ContractorDocuments {
   upload(
     actor: Actor,
@@ -221,6 +222,8 @@ export interface ContractorDocuments {
     body: ContractorDocumentReview,
     logger: JobLogger,
   ): Promise<{ document: ContractorDocument; created: boolean }>;
+  /** `GET /v1/payroll/contractors/documents?review=pending`: what waits for the owner's check, never a file. */
+  pending(userId: UserId): Promise<PendingContractorDocuments>;
 }
 
 export function createContractorDocuments(deps: ContractorDocumentDeps): ContractorDocuments {
@@ -230,6 +233,7 @@ export function createContractorDocuments(deps: ContractorDocumentDeps): Contrac
       downloadContractorDocument(deps, userId, memberId, documentId, logger),
     review: (actor, memberId, documentId, body, logger) =>
       reviewContractorDocument(deps, actor, memberId, documentId, body, logger),
+    pending: (userId) => deps.store.pending(userId),
   };
 }
 

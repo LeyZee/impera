@@ -1,7 +1,9 @@
 import {
   calendarDayAt,
+  CONTRACTOR_DOCUMENTS_PENDING_MAX,
   ContractorDocumentDecisionSchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
+  PendingContractorDocumentsSchema,
   type ContractorDocumentId,
   type TeamMemberId,
   type UploadContractorDocumentQuery,
@@ -258,6 +260,29 @@ export function createDrizzlePayrollDocumentStore(
           );
         }
         return { document: documentOf(row, review, null), created: true };
+      }),
+
+    pending: (userId) =>
+      withMember(db, userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
+        // A document without a check has no erasure either: only a refused one is erased.
+        const rows = await tx
+          .select({ row: contractorDocuments, displayName: teamMembers.displayName })
+          .from(contractorDocuments)
+          .innerJoin(teamMembers, eq(teamMembers.id, contractorDocuments.memberId))
+          .leftJoin(
+            contractorDocumentReviews,
+            eq(contractorDocumentReviews.documentId, contractorDocuments.id),
+          )
+          .where(sql`${contractorDocumentReviews.documentId} is null`)
+          .orderBy(contractorDocuments.createdAt, contractorDocuments.id)
+          .limit(CONTRACTOR_DOCUMENTS_PENDING_MAX + 1);
+        return PendingContractorDocumentsSchema.parse({
+          documents: rows
+            .slice(0, CONTRACTOR_DOCUMENTS_PENDING_MAX)
+            .map(({ row, displayName }) => ({ ...documentOf(row, null, null), displayName })),
+          more: rows.length > CONTRACTOR_DOCUMENTS_PENDING_MAX,
+        });
       }),
   };
 }

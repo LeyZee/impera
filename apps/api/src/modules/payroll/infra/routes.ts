@@ -21,6 +21,7 @@ import {
   ContractorDocumentParamsSchema,
   ContractorDocumentReviewSchema,
   ContractorDocumentSchema,
+  ContractorDocumentsQuerySchema,
   ContractorFileSchema,
   ContractorParamsSchema,
   ContractorProfileBodySchema,
@@ -60,6 +61,7 @@ import {
   UploadContractorDocumentQuerySchema,
   PenaltyIdSchema,
   PenaltySchema,
+  PendingContractorDocumentsSchema,
   RefuseInvoiceContestBodySchema,
   UpholdInvoiceContestBodySchema,
   UserIdSchema,
@@ -139,7 +141,8 @@ const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
  * billing regimes (`/payroll/billing-regimes`) are read by any member; the owner alone adds one, records its validation
  * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b). A
  * contractor's documents (`…/contractors/:memberId/documents`, lot 5c) are filed by himself or the owner, read by them
- * and an active manager, and checked once by the owner, never on his own file. The accountant's export
+ * and an active manager, and checked once by the owner, never on his own file; the documents waiting for that check
+ * (`…/contractors/documents?review=pending`, lot 8) are listed to the owner alone. The accountant's export
  * (`/payroll/accounting/journal`, lot 7b), its accounts (`/payroll/billing-settings/accounts`), the DAS2 recap
  * (`/payroll/accounting/das2`, lot 7c) and the archive of the PDFs (`/payroll/accounting/archive`, lot 7d) are the
  * owner's alone. The list of invoices and credit notes (`/payroll/invoices`, lot 8) follows the invoices' policy: one's
@@ -676,6 +679,18 @@ export function createPayrollRoutes(
         );
         return reply.code(created ? 201 : 200).send(assignment);
       },
+    );
+
+    app.get(
+      '/payroll/contractors/documents',
+      {
+        preValidation: owner,
+        schema: {
+          querystring: ContractorDocumentsQuerySchema,
+          response: { 200: PendingContractorDocumentsSchema },
+        },
+      },
+      (request) => documents.pending(userOf(request)),
     );
 
     app.post(

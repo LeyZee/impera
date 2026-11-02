@@ -1,5 +1,5 @@
 # EQ-06 (écrans) Factures, dossier du prestataire et exports comptables à l'écran
-Statut : in_progress (lot 8 de `EQ-06-self-billing-invoices.md`, même ID, lancé par Charles le 02/11 (« lot 8 ») ; écrans pour Extension en quatre PR, cinq compléments d'API pour Équipe avant eux ; fait : complément 1, la liste des documents)
+Statut : in_progress (lot 8 de `EQ-06-self-billing-invoices.md`, même ID, lancé par Charles le 02/11 (« lot 8 ») ; écrans pour Extension en quatre PR, cinq compléments d'API pour Équipe avant eux ; fait : compléments 1, la liste des documents, et 5, les pièces à examiner)
 Phase : équipe (ADR 0023)
 Dépend de : `EQ-06-self-billing-invoices.md` lots 1 à 7 (tous dans `main`), EQ-05 (écrans de paie), EQ-11 (coquille par rôle)
 Branche : celle du fil qui la prend (Extension pour les écrans, Équipe pour l'API)
@@ -26,7 +26,7 @@ Tout ce que le lot 1 à 7 a mis dans l'API se fait depuis l'application, sans `c
 2. **`remindFrom` par pièce** dans le dossier : le jour où le rappel commence (1er décembre de son année pour l'attestation de résidence, `validUntil` moins `documentReminderDays` pour la vigilance), annoncé au lot 5c-2 et reporté ici.
 3. **L'alerte d'échéance** : un job quotidien publie une fois par facture `invoice_due_soon` à J-7 puis `invoice_overdue` le lendemain de l'échéance, tant qu'elle n'est pas réglée, sans nom de prestataire (« d'un prestataire » et le lien, règle de Charles). Elle lit les trois sortes de règlement du lot 7a (`paid`, `imputed`, `compensated` : une facture compensée n'attend plus rien) et dit quand c'est un versement bloqué (ADR 0041) qui approche des 60 jours, puisqu'il peut les dépasser et coûter les pénalités et l'indemnité de 40 €. Le rendu Telegram (important, ambre ; rouge pour `invoice_overdue`) revient au fil Telegram.
 4. **Le délai de rappel des pièces** (`documentReminderDays`, lu par les réglages et le job de rappel, sans route d'écriture) dans `PUT /v1/payroll/billing-settings`. L'échéance (`dueDays`, 45 à 60 jours) y est déjà, et le délai de contestation se fixe dans chaque version du mandat.
-5. **Les pièces à examiner** : `GET /v1/payroll/contractors/documents?review=pending`, le propriétaire seul (lui seul examine) : chaque pièce de tous les membres sans examen, avec son membre (`memberId` et nom affiché), sa sorte, ses jours (`issuedOn`, `validUntil`) et son dépôt ; jamais le fichier. Aujourd'hui ne lit donc pas le dossier de chaque membre un par un.
+5. **Les pièces à examiner** (fait ; au plus 200, les plus anciennes, `more` dit qu'il en reste) : `GET /v1/payroll/contractors/documents?review=pending`, le propriétaire seul (lui seul examine) : chaque pièce de tous les membres sans examen, avec son membre (`memberId` et nom affiché), sa sorte, ses jours (`issuedOn`, `validUntil`) et son dépôt ; jamais le fichier. Aujourd'hui ne lit donc pas le dossier de chaque membre un par un.
 
 Ordre (coordinateur, 02/11) : une PR par complément, chacune relue par Bilan : le 1, puis le 5, le 2 et le 4, et le 3 (le job et son événement) en dernier, son rendu Telegram par le fil Telegram. Extension commence quand ils sont dans `main`.
 
