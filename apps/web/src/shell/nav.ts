@@ -262,6 +262,7 @@ const SCREENS = {
   '/moi/factures': 'Factures',
   '/moi/securite': 'Sécurité',
   '/reglages/modeles-ia': 'Modèles IA',
+  '/reglages/ventes': 'Ventes',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
