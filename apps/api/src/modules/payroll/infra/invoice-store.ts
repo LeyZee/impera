@@ -146,7 +146,9 @@ async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceS
             },
       tierBonus: tier === null ? null : { thresholdMinor: tier.thresholdMinor, bonusMinor: tier.bonusMinor },
       collectiveBonusMinor: statement.collectiveBonusMinor,
-      manualBonusesMinor: statement.bonusesMinor,
+      // The statement keeps one sum of its bonuses, tier and collective included (`bonusesMinor`): the manual ones are
+      // what is left once the two that have a line of their own are taken out.
+      manualBonusesMinor: statement.bonusesMinor - (tier?.bonusMinor ?? 0) - statement.collectiveBonusMinor,
       penaltiesRequestedMinor: statement.penaltiesRequestedMinor,
       penaltiesMinor: statement.penaltiesMinor,
       carryOversInMinor: statement.carryOversInMinor,
