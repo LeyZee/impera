@@ -84,14 +84,14 @@ describe('voice guards', () => {
     expect(codes(['On se retrouve au lit 😏', 'On se voit au prochain live ?'])).toEqual([]);
   });
 
-  it('keeps the ambiguity about meeting one day, without a promise nor a word the platforms flag', () => {
+  it('keeps the ambiguity about meeting one day, without a promise', () => {
     expect(codes(['Si j’ai assez confiance en toi, un jour peut-être… qui sait', 'Pourquoi pas 🫣'])).toEqual(
       [],
     );
-    // The same with « se rencontrer »: no promise, but a word Reveal flags (P3-13).
+    // The same with « se rencontrer »: Reveal flags no word (Charles, 02/11), and nothing is promised.
     expect(
       codes(['Si j’ai assez confiance en toi, un jour peut-être qu’on se rencontrera', 'Pourquoi pas 🫣']),
-    ).toEqual(['platform_meeting_word']);
+    ).toEqual([]);
   });
 
   it('blocks contacts and links', () => {

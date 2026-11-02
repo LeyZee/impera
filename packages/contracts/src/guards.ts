@@ -26,6 +26,7 @@ export const GUARD_CODES = [
   // P3-13.
   'stage_direction',
   'media_not_sent',
+  // Obsolete since 02/11: Reveal flags no word (`OBSOLETE_GUARD_CODES`).
   'platform_meeting_word',
   'fake_emergency',
   'repetition',
@@ -33,3 +34,10 @@ export const GUARD_CODES = [
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;
+
+/**
+ * @public The codes no guard emits any more, kept in `GUARD_CODES` for the refusals and calibration already stored.
+ * `platform_meeting_word` blocked a meeting word even in a refusal; Reveal flags none (Charles, 02/11), and a meeting
+ * proposed with those words is `meeting_promise`.
+ */
+export const OBSOLETE_GUARD_CODES: readonly GuardCode[] = ['platform_meeting_word'];

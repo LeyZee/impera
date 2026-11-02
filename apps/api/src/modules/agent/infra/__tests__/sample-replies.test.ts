@@ -41,7 +41,7 @@ describe('sampleReplyFaults (P5-01)', () => {
       ),
     ).toEqual([
       { index: 1, code: 'stage_direction' },
-      { index: 2, code: 'platform_meeting_word' },
+      { index: 2, code: 'meeting_promise' },
       { index: 3, code: 'fake_emergency' },
       { index: 4, code: 'ai_disclosure' },
     ]);
