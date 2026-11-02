@@ -260,7 +260,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
           primary: deps.invoicePdfs.primary,
           copy: deps.invoicePdfs.copy,
         }),
-        createPayrollAccounting(createDrizzlePayrollAccountingStore(deps.db, deps.reads)),
+        createPayrollAccounting(createDrizzlePayrollAccountingStore(deps.db, deps.reads), pdfs),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),

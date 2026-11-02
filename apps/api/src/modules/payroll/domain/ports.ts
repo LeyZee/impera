@@ -539,6 +539,17 @@ export interface JournalFacts {
   readonly transfersLeftOut: readonly { readonly memberId: TeamMemberId; readonly period: PayPeriod }[];
 }
 
+/** A document of the archive's range (EQ-06 lot 7d): what the manifest says of it, and its PDF once rendered. */
+export interface ArchiveDocument {
+  readonly invoiceId: InvoiceId;
+  readonly memberId: TeamMemberId;
+  readonly number: string;
+  readonly kind: 'invoice' | 'credit_note';
+  readonly corrective: boolean;
+  readonly issuedOn: string;
+  readonly pdf: StoredInvoicePdf | null;
+}
+
 /** What the DAS2 recap reads (EQ-06 lot 7c): each contractor with a transfer made in the year, all their facts. */
 export interface Das2Facts {
   readonly contractors: readonly Das2Contractor[];
@@ -560,6 +571,11 @@ export interface PayrollAccountingStore {
     year: number,
     render: (facts: Das2Facts) => T,
   ): Promise<T>;
+  /**
+   * The documents issued from `from` to `to` (lot 7d), by day of issue then number, for the owner alone. The archive
+   * streams after the transaction: its audit line, the range and how many documents, is written here, when it starts.
+   */
+  archiveDocuments(actor: Actor, from: string, to: string): Promise<readonly ArchiveDocument[]>;
 }
 
 /**

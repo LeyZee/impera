@@ -647,22 +647,23 @@ export const JournalAccountNameSchema = z.enum(JOURNAL_ACCOUNT_NAMES);
 export type JournalAccountName = z.infer<typeof JournalAccountNameSchema>;
 
 /** The longest range one export reads: two years, a first fiscal year lasting up to 24 months. */
-export const ACCOUNTING_JOURNAL_MAX_DAYS = 731;
+export const ACCOUNTING_PERIOD_MAX_DAYS = 731;
 
 const dayNumber = (day: string): number => Date.parse(`${day}T00:00:00Z`) / 86_400_000;
 
 /**
- * `GET /v1/payroll/accounting/journal?from=…&to=…`, the owner only (EQ-06 lot 7b): the contractors' journal of the
- * documents issued and the transfers made from `from` to `to`, both included.
+ * The range of an export, the owner only, from `from` to `to`, both included: the contractors' journal of the
+ * documents issued and the transfers made (`GET /v1/payroll/accounting/journal?from=…&to=…`, EQ-06 lot 7b), the
+ * archive of the documents' PDFs (`GET /v1/payroll/accounting/archive?from=…&to=…`, lot 7d).
  */
-export const AccountingJournalQuerySchema = z
+export const AccountingPeriodQuerySchema = z
   .object({ from: CalendarDaySchema, to: CalendarDaySchema })
   .refine((query) => query.from <= query.to, { message: 'La fin suit le début', path: ['to'] })
-  .refine((query) => dayNumber(query.to) - dayNumber(query.from) < ACCOUNTING_JOURNAL_MAX_DAYS, {
+  .refine((query) => dayNumber(query.to) - dayNumber(query.from) < ACCOUNTING_PERIOD_MAX_DAYS, {
     message: 'Deux ans au plus',
     path: ['to'],
   });
-export type AccountingJournalQuery = z.infer<typeof AccountingJournalQuerySchema>;
+export type AccountingPeriodQuery = z.infer<typeof AccountingPeriodQuerySchema>;
 
 /** The FEC's encoding: the file's bytes are ISO 8859-15. */
 export const ACCOUNTING_JOURNAL_MEDIA_TYPE = 'text/plain; charset=ISO-8859-15';
@@ -686,6 +687,9 @@ export const AccountingJournalSchema = z.object({
   transfersLeftOut: z.array(z.object({ memberId: TeamMemberIdSchema, period: PayPeriodSchema })),
 });
 export type AccountingJournal = z.infer<typeof AccountingJournalSchema>;
+
+/** The archive's media type: its bytes are streamed, never in JSON. */
+export const ACCOUNTING_ARCHIVE_MEDIA_TYPE = 'application/zip';
 
 /** The first year a DAS2 recap reads. */
 export const DAS2_FIRST_YEAR = 2000;

@@ -2,6 +2,8 @@ import {
   calendarDayAt,
   CommissionStatementStatusSchema,
   InvoiceContractorSchema,
+  InvoiceIdSchema,
+  InvoicePdfCopyProviderSchema,
   InvoiceRegimeSchema,
   JournalAccountsSchema,
   PayPeriodSchema,
@@ -12,13 +14,21 @@ import { and, eq, inArray, schema, sql, withMember, type Database, type Transact
 import type { Das2Contractor } from '../domain/accounting';
 import { PayrollForbidden } from '../domain/errors';
 import type { JournalContractor, JournalDocument, JournalStatement } from '../domain/journal';
-import type { Das2Facts, JournalFacts, PayrollAccountingStore } from '../domain/ports';
+import type { ArchiveDocument, Das2Facts, JournalFacts, PayrollAccountingStore } from '../domain/ports';
 
 import type { PayInputReads } from './snapshot';
 import { audit } from './writes';
 
-const { billingSettings, carryOvers, commissionStatements, contractorProfiles, invoices, teamMembers } =
-  schema;
+const {
+  billingSettings,
+  carryOvers,
+  commissionStatements,
+  contractorProfiles,
+  invoicePdfCopies,
+  invoicePdfs,
+  invoices,
+  teamMembers,
+} = schema;
 
 /** The contractors with a document issued or a transfer made from `from` to `to`, as the owner reads them. */
 async function contractorsInRange(tx: Transaction, from: string, to: string): Promise<string[]> {
@@ -259,7 +269,58 @@ async function das2FactsOf(tx: Transaction, year: number): Promise<Das2Facts> {
   };
 }
 
-/** The journal export (EQ-06 lot 7b) and the DAS2 recap (lot 7c): see `PayrollAccountingStore`. */
+/** The documents issued from `from` to `to`, with their PDF and its copies once written (lot 7d). */
+async function documentsInRange(tx: Transaction, from: string, to: string): Promise<ArchiveDocument[]> {
+  const rows = await tx
+    .select({
+      id: invoices.id,
+      memberId: invoices.memberId,
+      number: invoices.number,
+      kind: invoices.kind,
+      reissuedInvoiceId: invoices.reissuedInvoiceId,
+      issuedOn: invoices.issuedOn,
+    })
+    .from(invoices)
+    .where(sql`${invoices.issuedOn} between ${from} and ${to}`)
+    .orderBy(invoices.issuedOn, invoices.prefix, invoices.year, invoices.sequence);
+  if (rows.length === 0) return [];
+  const ids = rows.map((row) => row.id);
+  const pdfs = await tx.select().from(invoicePdfs).where(inArray(invoicePdfs.invoiceId, ids));
+  const copies = await tx
+    .select()
+    .from(invoicePdfCopies)
+    .where(inArray(invoicePdfCopies.invoiceId, ids))
+    .orderBy(invoicePdfCopies.provider);
+  return rows.map((row): ArchiveDocument => {
+    const pdf = pdfs.find((one) => one.invoiceId === row.id);
+    return {
+      invoiceId: InvoiceIdSchema.parse(row.id),
+      memberId: TeamMemberIdSchema.parse(row.memberId),
+      number: row.number,
+      kind: row.kind === 'invoice' ? 'invoice' : 'credit_note',
+      corrective: row.kind === 'invoice' && row.reissuedInvoiceId !== null,
+      issuedOn: row.issuedOn,
+      pdf:
+        pdf === undefined
+          ? null
+          : {
+              key: pdf.storageKey,
+              sha256: pdf.sha256,
+              retainUntil: pdf.retainUntil,
+              copies: copies
+                .filter((copy) => copy.invoiceId === row.id)
+                .map((copy) => ({
+                  provider: InvoicePdfCopyProviderSchema.parse(copy.provider),
+                  key: copy.storageKey,
+                  sha256: copy.sha256,
+                  retainUntil: copy.retainUntil,
+                })),
+            },
+    };
+  });
+}
+
+/** The journal export (EQ-06 lot 7b), the DAS2 recap (lot 7c) and the archive (lot 7d): see `PayrollAccountingStore`. */
 export function createDrizzlePayrollAccountingStore(
   db: Database,
   reads: Pick<PayInputReads, 'agencyTimeZone'>,
@@ -302,6 +363,20 @@ export function createDrizzlePayrollAccountingStore(
           { year, beneficiaries: rendered.beneficiaries.length },
         );
         return rendered;
+      }),
+    archiveDocuments: (actor, from, to) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
+        const documents = await documentsInRange(tx, from, to);
+        // The range and how many, never which: the archive streams once this is written.
+        await audit(
+          tx,
+          actor,
+          'accounting_archive.export',
+          { kind: 'accounting_archive', id: `${from}/${to}` },
+          { from, to, documents: documents.length },
+        );
+        return documents;
       }),
   };
 }
