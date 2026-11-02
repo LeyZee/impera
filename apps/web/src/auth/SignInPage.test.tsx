@@ -89,6 +89,30 @@ describe('SignInPage', () => {
     ).toBeDefined();
   });
 
+  it('sends a backup code typed in the app’s field to the backup check', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        calls.push(url);
+        const body = url.endsWith('/sign-in/email') ? { twoFactorRedirect: true } : {};
+        return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      }),
+    );
+    const onSignedIn = vi.fn();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'a@example.test' } });
+    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'x' } });
+    fireEvent.submit(screen.getByLabelText('Mot de passe').closest('form') ?? document.body);
+    const code = await screen.findByLabelText('Code à 6 chiffres');
+    fireEvent.change(code, { target: { value: 'abcde-fghij' } });
+    fireEvent.submit(code.closest('form') ?? document.body);
+    await waitFor(() => {
+      expect(onSignedIn).toHaveBeenCalled();
+    });
+    expect(calls[1]).toBe('/v1/auth/two-factor/verify-backup-code');
+  });
+
   it('goes back to the password when the code step expired', async () => {
     vi.stubGlobal(
       'fetch',

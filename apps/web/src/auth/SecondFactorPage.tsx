@@ -1,5 +1,5 @@
 import type { SecondFactorSetup } from '@nirvana/contracts';
-import { useState, type JSX, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState, type JSX, type RefObject, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
@@ -50,6 +50,7 @@ export function SecondFactorPage({
   const [step, setStep] = useState<Step>({ kind: 'password' });
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const keyRef = useRef<HTMLElement>(null);
 
   async function sendPassword(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -152,12 +153,17 @@ export function SecondFactorPage({
             <div className="flex flex-col gap-2">
               <span className="nv-field__label">Clé</span>
               <code
+                ref={keyRef}
                 className="nv-glass rounded-[var(--nv-radius-md)] px-3 py-2 font-mono text-sm break-all select-all"
                 aria-label="Clé à recopier dans l’application"
               >
                 {keyOf(setup.totpURI)}
               </code>
-              <CopyButton text={keyOf(setup.totpURI).replace(/\s/gu, '')} label="Copier la clé" />
+              <CopyButton
+                text={keyOf(setup.totpURI).replace(/\s/gu, '')}
+                label="Copier la clé"
+                shown={keyRef}
+              />
             </div>
             <label className="nv-field">
               <span className="nv-field__label">Code affiché par l’application</span>
@@ -187,6 +193,7 @@ export function SecondFactorPage({
 /** Ten backup codes, shown once: copied, saved as a file, and the person says they are kept before going on. */
 function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () => void }): JSX.Element {
   const [kept, setKept] = useState(false);
+  const listRef = useRef<HTMLUListElement>(null);
   const text = `Nirvana : codes de secours (chacun ne sert qu’une fois)\n\n${codes.join('\n')}\n`;
   return (
     <>
@@ -198,6 +205,7 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
         </p>
       </div>
       <ul
+        ref={listRef}
         className="nv-glass grid grid-cols-2 gap-x-6 gap-y-2 rounded-[var(--nv-radius-md)] px-4 py-3 font-mono text-sm"
         aria-label="Codes de secours"
       >
@@ -206,7 +214,7 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
         ))}
       </ul>
       <div className="flex flex-wrap gap-2">
-        <CopyButton text={text} label="Copier les codes" />
+        <CopyButton text={text} label="Copier les codes" shown={listRef} />
         <button
           type="button"
           className="nv-btn nv-btn--soft nv-btn--sm"
@@ -215,8 +223,13 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
             const link = document.createElement('a');
             link.href = url;
             link.download = 'nirvana-codes-de-secours.txt';
+            // In the document for Firefox, and the URL kept a moment: revoked at once, Safari cancels the download.
+            document.body.append(link);
             link.click();
-            URL.revokeObjectURL(url);
+            link.remove();
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 1_000);
           }}
         >
           Enregistrer en fichier
@@ -240,22 +253,52 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }): JSX.Element {
-  const [copied, setCopied] = useState(false);
+/** How long « Copié » or the fallback stays on the button before its label comes back. */
+const COPY_FEEDBACK_MS = 3_000;
+
+/**
+ * Copies `text`. Where the browser refuses (some in-app browsers, a page without focus), the text on screen (`shown`)
+ * is selected instead and the button says to copy it by hand: the person never believes a copy that did not happen.
+ */
+function CopyButton({
+  text,
+  label,
+  shown,
+}: {
+  text: string;
+  label: string;
+  shown: RefObject<HTMLElement | null>;
+}): JSX.Element {
+  const [state, setState] = useState<'idle' | 'copied' | 'selected'>('idle');
+  useEffect(() => {
+    if (state === 'idle') return undefined;
+    const timer = setTimeout(() => {
+      setState('idle');
+    }, COPY_FEEDBACK_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [state]);
   return (
     <button
       type="button"
       className="nv-btn nv-btn--soft nv-btn--sm self-start"
+      aria-live="polite"
       onClick={() => {
-        void navigator.clipboard.writeText(text).then(
-          () => {
-            setCopied(true);
-          },
-          () => undefined,
-        );
+        const refused = () => {
+          if (shown.current !== null) window.getSelection()?.selectAllChildren(shown.current);
+          setState('selected');
+        };
+        try {
+          navigator.clipboard.writeText(text).then(() => {
+            setState('copied');
+          }, refused);
+        } catch {
+          refused();
+        }
       }}
     >
-      {copied ? 'Copié' : label}
+      {state === 'copied' ? 'Copié' : state === 'selected' ? 'Sélectionné : copie-le à la main' : label}
     </button>
   );
 }

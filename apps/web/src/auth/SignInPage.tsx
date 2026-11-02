@@ -1,3 +1,4 @@
+import { isBackupCode } from '@nirvana/contracts';
 import { useState, type JSX, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';
@@ -112,8 +113,10 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
     const form = new FormData(formElement);
     setIsSubmitting(true);
     setError(null);
-    const result = await verifySignInCode(fieldOf(form, 'code'), {
-      backup,
+    const code = fieldOf(form, 'code');
+    // A backup code typed in the app's field is still a backup code: its shape picks the check, not the button.
+    const result = await verifySignInCode(code, {
+      backup: isBackupCode(code),
       trustDevice: form.get('trust') === 'on',
     }).catch((): CodeResult => 'unavailable');
     setIsSubmitting(false);

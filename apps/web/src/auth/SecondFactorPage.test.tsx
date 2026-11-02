@@ -96,6 +96,23 @@ describe('SecondFactorPage', () => {
     expect(screen.queryByLabelText('Codes de secours')).toBeNull();
   });
 
+  it('selects the key and says so when the browser refuses the copy, then gives the label back', async () => {
+    serve({ '/v1/auth/two-factor/enable': () => json({ totpURI: URI, backupCodes: BACKUP_CODES }) });
+    vi.stubGlobal('navigator', { clipboard: { writeText: () => Promise.reject(new Error('refusé')) } });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<SecondFactorPage onActivated={() => undefined} onSignOut={() => undefined} />);
+      await givePassword();
+      fireEvent.click(screen.getByRole('button', { name: 'Copier la clé' }));
+      expect(await screen.findByRole('button', { name: 'Sélectionné : copie-le à la main' })).toBeDefined();
+      expect(window.getSelection()?.toString()).toBe(keyOf(URI));
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(await screen.findByRole('button', { name: 'Copier la clé' })).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('lets the person sign out before the codes are shown', async () => {
     serve({});
     const onSignOut = vi.fn();
