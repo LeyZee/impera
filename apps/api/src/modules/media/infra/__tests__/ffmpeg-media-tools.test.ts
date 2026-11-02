@@ -81,4 +81,33 @@ describe('ffmpeg media tools', () => {
   it('fails on a file that is not a video', async () => {
     await expect(tools.probe(new Uint8Array([1, 2, 3]))).rejects.toThrow();
   });
+
+  // Audit de sécurité du 02/11 (M4): a fan's file never makes ffmpeg open anything but itself.
+  it('refuses a playlist naming other files, whatever its content claims', async () => {
+    const playlist = new TextEncoder().encode(
+      '#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nfile:///etc/hostname\n#EXT-X-ENDLIST\n',
+    );
+    await expect(tools.probe(playlist)).rejects.toThrow();
+    await expect(tools.audioTrack(playlist)).rejects.toThrow();
+    await expect(tools.toJpeg(playlist)).rejects.toThrow();
+  });
+
+  it('refuses a container outside the formats a phone sends', async () => {
+    const bmp = make('pixel.bmp', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64', '-frames:v', '1');
+    await expect(tools.toJpeg(bmp)).rejects.toThrow(/whitelist/);
+  });
+
+  it('kills a call that runs past its time', async () => {
+    const hurried = createFfmpegMediaTools(undefined, { probe: 1, keyframes: 1, audioTrack: 1, toJpeg: 1 });
+    const video = make(
+      'long.mp4',
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc=duration=20:size=640x480:rate=25',
+      '-pix_fmt',
+      'yuv420p',
+    );
+    await expect(hurried.keyframes(video, 4)).rejects.toThrow();
+  });
 });
