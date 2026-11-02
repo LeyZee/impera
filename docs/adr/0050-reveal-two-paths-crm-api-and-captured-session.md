@@ -1,6 +1,6 @@
 # 0050. Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste
 
-Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour ; § 4 et part de la créatrice au § 8 : ses messages du même jour)
+Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour ; § 4 et part de la créatrice au § 8 : ses messages du même jour ; règles de paie d'Équipe aux §§ 5, 7 et 8 : « ok relecture », le même jour)
 Date : 2026-11-02
 Complète : l'ADR 0008, dont la phrase « attendre une API officielle : il n'y en aura pas » est dépassée pour les ventes et les chiffres ; sa stratégie reste celle de tout le reste.
 Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur » ; dans l'ADR 0043 § 5, la phrase « le rapport reste dû pour le commentaire, l'incident, les remontées et le contrôle ».
@@ -31,11 +31,11 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
 
    Une clé par usage, au niveau de l'agence, jamais une par créatrice : Reveal limite à 10 clés actives et partage ses limites de statistiques entre toutes les clés de l'agence. La révoquer se fait dans Reveal, qui la refuse aussitôt. Le pseudo et l'identifiant du fan qu'elle donne suivent les règles des données de fans : hors du dépôt, des fixtures et des logs.
 
-5. **Attribution.** `chatterId` est « l'auteur Reveal » de l'ADR 0025. Une vente portant le membre « bot » revient à l'agent, sans commission. Avec plusieurs membres en poste, l'ADR 0049 s'applique dès que les fans sont confiés ; avant, `chatterId` fait foi. Une vente attribuée à un membre qui n'est pas en poste passe au valideur.
+5. **Attribution.** `chatterId` est « l'auteur Reveal » de l'ADR 0025. Une vente portant le membre « bot » revient à l'agent, sans commission. Avec plusieurs membres en poste, l'ADR 0049 s'applique dès que les fans sont confiés ; avant, `chatterId` fait foi. Une vente attribuée à un membre qui n'était ni en poste ni dans sa marge d'accès (ADR 0025) à l'heure de la vente passe au valideur. En attendant, elle ne compte pour personne. Une fois attribuée par le valideur, elle compte dans la quinzaine de la vente, ou, si celle-ci est clôturée, dans la première quinzaine non clôturée, comme un rapport tardif (ADR 0032).
 
 6. **Contrôle du rapport (ADR 0043 § 4).** Le rapport se compare à `amountTtc` des ventes attribuées au membre. Seuls les `ppv`, `tip` et `paid_message` sans chatteur envoient le rapport au valideur. Les autres ventes sans chatteur (abonnements, renouvellements, liens de paiement, boudoir, Mass DM) n'appartiennent à aucun shift : sinon presque chaque shift en aurait une, et la validation automatique ne se déclencherait jamais. Le contrôle repasse à l'arrivée d'une vente tardive ou d'un remboursement.
 
-7. **Remboursements.** `sale_refunded` retranche les montants de la vente. S'il arrive après la validation d'un relevé, il passe par la mécanique existante (ADR 0032, 0036), sans jamais rouvrir le relevé. `refund_asked` compte encore, et se signale.
+7. **Remboursements.** `sale_refunded` retranche les montants de la vente. S'il arrive après la validation du relevé de la vente, il compte comme une vente tardive négative dans la première quinzaine non clôturée de l'équipe (ADR 0032), avec sa ligne sur le relevé, sans jamais rouvrir l'ancien relevé ni écrire d'avoir pour lui. Pour un membre parti, il suit la correction d'un membre parti (ADR 0039 § 6). `refund_asked` compte encore, et se signale.
 
 8. **Le calcul des montants se fait par plateforme** (Charles, « ok netAmount », puis son message du même jour : « un système de calcul par plateforme »). Chaque plateforme a ses commissions et ses règles : la façon d'obtenir la base d'une vente dépend donc de la plateforme.
 
@@ -43,6 +43,8 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
    - **Les autres plateformes** : notre chaîne (brut, euros, hors TVA, net de la commission, ADR 0023) reste, paramétrée par plateforme.
    - **Un compte en source « déclarée »**, Reveal compris tant qu'il n'a pas basculé : la chaîne de l'ADR 0023 reste entière, puisque la plateforme ne donne alors aucun net.
    - **Partout**, Nirvana garde le reste de la paie : taux de chaque chatteur, paliers, objectif collectif, primes, malus, report, relevés et factures.
+
+   La base d'un compte (`netAmount` ou la chaîne de l'ADR 0023) est une règle de paie datée du compte, posée à une frontière de période et jamais rétroactive. Chaque relevé garde dans ses entrées la base qu'il a lue, et son `inputs_hash` la couvre : recalculer une quinzaine passée ne change jamais de base. Si le compte n'est pas en euros, `netAmount` passe par le taux BCE de l'ADR 0033, comme le brut. Une vente sans chatteur, ou de l'agent, ne compte dans le relevé d'aucun membre ni dans le net de l'équipe (objectif collectif, part d'équipe), comme aujourd'hui.
 
    **Part de la créatrice sur Reveal** (Charles : « c'est le chiffre de Reveal […] c'est le plus fiable ») : sur un compte basculé, `modelRevenue` fait foi, y compris sur son écran (CR-04), et non le pourcentage réglé dans Nirvana (ADR 0042). Un écart avec ce pourcentage se signale au propriétaire, à titre d'information, sans changer aucun montant.
 
