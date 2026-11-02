@@ -1395,6 +1395,12 @@ label.nv-notif__row {
   gap: 10px;
   margin-top: 14px;
 }
+.nv-notif__end {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+}
 .nv-notif__hours .nv-field__control {
   width: 5.5em;
   text-align: center;

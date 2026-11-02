@@ -5,6 +5,7 @@ import {
   PUSH_KEY_URL,
   PUSH_SUBSCRIPTIONS_URL,
   pushState,
+  readServerKey,
   refreshPushSubscription,
   turnOffPush,
   turnOnPush,
@@ -106,33 +107,39 @@ describe('push on this device', () => {
   it('sends an iPhone in Safari to the install guide first: notifications need the installed app', async () => {
     setUp({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148' });
     expect(await pushState()).toBe('needs_install');
-    expect(await turnOnPush()).toBe('needs_install');
+    expect(await turnOnPush(await readServerKey())).toBe('needs_install');
   });
 
-  it('reads the server’s key before asking, then subscribes and tells the server', async () => {
-    const { order, calls } = setUp();
+  it('asks at once from the touch, before any wait, then subscribes with the key read earlier', async () => {
+    const { order, calls, requestPermission } = setUp();
     expect(await pushState()).toBe('off');
-    expect(await turnOnPush()).toBe('on');
-    expect(order).toEqual([`GET ${PUSH_KEY_URL}`, 'ask', `PUT ${PUSH_SUBSCRIPTIONS_URL}`]);
+    const key = await readServerKey();
+    order.length = 0;
+    const turningOn = turnOnPush(key);
+    // Asked in the same tick as the touch: iOS refuses a question that comes after a wait.
+    expect(requestPermission).toHaveBeenCalledOnce();
+    expect(await turningOn).toBe('on');
+    expect(order).toEqual(['ask', `PUT ${PUSH_SUBSCRIPTIONS_URL}`]);
     expect(calls.at(-1)?.body).toMatchObject({ endpoint: ENDPOINT });
     expect(await pushState()).toBe('on');
   });
 
-  it('never asks when the server’s key cannot be read: iOS asks only once', async () => {
+  it('fails to read the server’s key without asking anything', async () => {
     const { requestPermission } = setUp();
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))),
     );
-    expect(await turnOnPush()).toBe('failed');
+    await expect(readServerKey()).rejects.toThrow('push_key_503');
     expect(requestPermission).not.toHaveBeenCalled();
   });
 
   it('says when the person refused, and does not ask again', async () => {
     setUp({ answer: 'denied' });
-    expect(await turnOnPush()).toBe('denied');
+    const key = await readServerKey();
+    expect(await turnOnPush(key)).toBe('denied');
     const { requestPermission } = setUp({ permission: 'denied' });
-    expect(await turnOnPush()).toBe('denied');
+    expect(await turnOnPush(key)).toBe('denied');
     expect(requestPermission).not.toHaveBeenCalled();
   });
 

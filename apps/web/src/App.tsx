@@ -11,6 +11,7 @@ import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
 import { readSession, signOut } from './auth/session';
 import { forgetDevice } from './pwa/device';
+import { listenForNotificationOpens } from './pwa/notificationOpen';
 import { refreshPushSubscription, turnOffPush } from './pwa/push';
 import { createAppRouter, type RouterContext } from './router';
 import { railOf } from './shell/nav';
@@ -132,6 +133,14 @@ export function App(): JSX.Element {
 function SignedIn({ user, onSignOut }: RouterContext): JSX.Element {
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
   const [queryClient] = useState(() => new QueryClient());
+  // A touched notification opens its page here, without a reload (public/sw.js).
+  useEffect(
+    () =>
+      listenForNotificationOpens((path) => {
+        void router.navigate({ href: path });
+      }),
+    [router],
+  );
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} context={{ user, onSignOut }} />

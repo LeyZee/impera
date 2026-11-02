@@ -8,8 +8,9 @@ import { isStandalone, platformOf } from './install';
  *
  * - An iPhone receives notifications only in the installed app, and asks the person once: the request leaves only
  *   from a touch on « Activer », never on its own at opening.
- * - The server's key is read before asking: a key renewed in Réglages makes every device subscribe again at its next
- *   opening (`refreshPushSubscription`).
+ * - The server's key is read when the screen opens (`readServerKey`), never between the touch and the question: iOS
+ *   accepts the request only while the touch still counts, and a network round trip can spend it. A key renewed in
+ *   Réglages makes every device subscribe again at its next opening (`refreshPushSubscription`).
  */
 
 export type PushState =
@@ -49,11 +50,18 @@ async function currentSubscription(): Promise<PushSubscription | null> {
   return (await registration?.pushManager.getSubscription()) ?? null;
 }
 
-export async function pushState(): Promise<PushState> {
+/** What can be known without waiting: everything but whether a subscription exists. */
+function blockedState(): 'needs_install' | 'unsupported' | 'denied' | null {
   if (platformOf(navigator.userAgent, navigator.maxTouchPoints) === 'ios' && !isStandalone())
     return 'needs_install';
   if (!supported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
+  return null;
+}
+
+export async function pushState(): Promise<PushState> {
+  const blocked = blockedState();
+  if (blocked !== null) return blocked;
   try {
     return (await currentSubscription()) === null ? 'off' : 'on';
   } catch {
@@ -61,7 +69,8 @@ export async function pushState(): Promise<PushState> {
   }
 }
 
-async function readServerKey(): Promise<Uint8Array<ArrayBuffer>> {
+/** The server's public key, read before the touch on « Activer » (see above). */
+export async function readServerKey(): Promise<Uint8Array<ArrayBuffer>> {
   const response = await fetch(PUSH_KEY_URL, { credentials: 'include' });
   if (!response.ok) throw new Error(`push_key_${String(response.status)}`);
   return base64UrlToBytes(PushPublicKeySchema.parse(await response.json()).publicKey);
@@ -89,13 +98,15 @@ async function subscribe(key: Uint8Array<ArrayBuffer>): Promise<void> {
 
 export type TurnOnOutcome = 'on' | 'denied' | 'unsupported' | 'needs_install' | 'failed';
 
-/** « Activer les notifications »: only from the person's touch (iOS refuses a request that is not). */
-export async function turnOnPush(): Promise<TurnOnOutcome> {
-  const state = await pushState();
-  if (state === 'unsupported' || state === 'needs_install' || state === 'denied') return state;
+/**
+ * « Activer les notifications », from the person's touch, with the server's key already read: the question leaves
+ * first, before any wait, or iOS may refuse it (and it asks only once). Without the key, the button is not offered:
+ * asking, then failing to subscribe, would spend that one question.
+ */
+export async function turnOnPush(key: Uint8Array<ArrayBuffer>): Promise<TurnOnOutcome> {
+  const blocked = blockedState();
+  if (blocked !== null) return blocked;
   try {
-    // The key first: asking, then failing to subscribe, would spend the one question iOS allows.
-    const key = await readServerKey();
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'failed';
     await subscribe(key);

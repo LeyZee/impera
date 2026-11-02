@@ -3,7 +3,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
-import { pushState, turnOffPush, turnOnPush, type PushState, type TurnOnOutcome } from './push';
+import {
+  PUSH_KEY_URL,
+  pushState,
+  readServerKey,
+  turnOffPush,
+  turnOnPush,
+  type PushState,
+  type TurnOnOutcome,
+} from './push';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf } from '@/scheduling/time';
@@ -46,6 +54,14 @@ function ThisDevice(): JSX.Element {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // Read before the touch on « Activer », so that the question leaves at once (iOS, see push.ts).
+  const serverKey = useQuery({
+    queryKey: [PUSH_KEY_URL],
+    queryFn: readServerKey,
+    enabled: state === 'off',
+    staleTime: Infinity,
+  });
+  const key = serverKey.data;
 
   useEffect(() => {
     let live = true;
@@ -85,10 +101,11 @@ function ThisDevice(): JSX.Element {
             <button
               type="button"
               className="nv-btn nv-btn--neon"
-              disabled={busy}
+              disabled={busy || key === undefined}
               onClick={() => {
+                if (key === undefined) return;
                 void act(async () => {
-                  const outcome = await turnOnPush();
+                  const outcome = await turnOnPush(key);
                   return outcome === 'on' ? null : FAILURE_WORDS[outcome];
                 });
               }}
@@ -134,6 +151,11 @@ function ThisDevice(): JSX.Element {
             {note}
           </p>
         )}
+        {state === 'off' && serverKey.isError ? (
+          <p className="nv-notif__note" role="status">
+            Nirvana ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.
+          </p>
+        ) : null}
       </PanelSection>
     </Panel>
   );
@@ -212,18 +234,21 @@ function QuietHours({ saved }: { saved: NotificationPreferences }): JSX.Element 
               }}
               onUnreadable={onUnreadable}
             />
-            <span className="nv-notif__hint">à</span>
-            <TimeField
-              value={draft.quietHours.endMinute}
-              label="Fin des heures calmes"
-              onChange={(endMinute) => {
-                setDraft({ ...draft, quietHours: { ...draft.quietHours, endMinute } });
-              }}
-              onUnreadable={onUnreadable}
-            />
-            {draft.quietHours.endMinute < draft.quietHours.startMinute ? (
-              <span className="nv-notif__hint">le lendemain</span>
-            ) : null}
+            {/* « à 08:00 le lendemain » stays together, and goes to the next line as one piece. */}
+            <span className="nv-notif__end">
+              <span className="nv-notif__hint">à</span>
+              <TimeField
+                value={draft.quietHours.endMinute}
+                label="Fin des heures calmes"
+                onChange={(endMinute) => {
+                  setDraft({ ...draft, quietHours: { ...draft.quietHours, endMinute } });
+                }}
+                onUnreadable={onUnreadable}
+              />
+              {draft.quietHours.endMinute < draft.quietHours.startMinute ? (
+                <span className="nv-notif__hint">le lendemain</span>
+              ) : null}
+            </span>
           </div>
         ) : null}
       </PanelSection>

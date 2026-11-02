@@ -20,6 +20,25 @@ interface FakeEvent {
   waitUntil: (work: Promise<unknown>) => void;
 }
 
+interface FakeWindow {
+  url: string;
+  focus: ReturnType<typeof vi.fn>;
+  navigate: ReturnType<typeof vi.fn>;
+  postMessage: ReturnType<typeof vi.fn>;
+}
+
+/** An open window of the app; `answers` says whether its page moves itself when told (src/pwa/notificationOpen.ts). */
+function openWindowOf(answers: boolean): FakeWindow {
+  return {
+    url: 'https://crm.test/suivi',
+    focus: vi.fn(() => Promise.resolve()),
+    navigate: vi.fn(() => Promise.resolve()),
+    postMessage: vi.fn((_message: unknown, ports: MessagePort[]) => {
+      if (answers) ports[0]?.postMessage('opened');
+    }),
+  };
+}
+
 function loadWorker(network: (url: string) => Promise<Response>): {
   fire: (
     type: string,
@@ -28,7 +47,7 @@ function loadWorker(network: (url: string) => Promise<Response>): {
   stored: Map<string, Map<string, Response>>;
   skipWaiting: ReturnType<typeof vi.fn>;
   showNotification: ReturnType<typeof vi.fn>;
-  windows: { url: string; focus: ReturnType<typeof vi.fn>; navigate: ReturnType<typeof vi.fn> }[];
+  windows: FakeWindow[];
   openWindow: ReturnType<typeof vi.fn>;
 } {
   const listeners = new Map<string, Listener>();
@@ -64,7 +83,7 @@ function loadWorker(network: (url: string) => Promise<Response>): {
   };
   const skipWaiting = vi.fn();
   const showNotification = vi.fn(() => Promise.resolve());
-  const windows: { url: string; focus: ReturnType<typeof vi.fn>; navigate: ReturnType<typeof vi.fn> }[] = [];
+  const windows: FakeWindow[] = [];
   const openWindow = vi.fn(() => Promise.resolve(null));
   const self = {
     location: { origin: 'https://crm.test' },
@@ -78,7 +97,17 @@ function loadWorker(network: (url: string) => Promise<Response>): {
     addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
   };
   const fetchFake = (request: { url: string }): Promise<Response> => network(request.url);
-  runInNewContext(swSource, { self, caches, fetch: fetchFake, URL, Promise, Math });
+  runInNewContext(swSource, {
+    self,
+    caches,
+    fetch: fetchFake,
+    URL,
+    Promise,
+    Math,
+    MessageChannel,
+    setTimeout,
+    clearTimeout,
+  });
 
   return {
     stored,
@@ -215,20 +244,61 @@ describe('service worker', () => {
     expect(worker.openWindow).toHaveBeenLastCalledWith('/planning');
   });
 
-  it('brings the open app forward on the page instead of opening another', async () => {
+  it('brings the open app forward and lets it move to the page itself, without a reload', async () => {
     const worker = loadWorker((url) => Promise.resolve(ok(url)));
-    const open = {
-      url: 'https://crm.test/suivi',
-      focus: vi.fn(() => Promise.resolve()),
-      navigate: vi.fn(() => Promise.resolve()),
-    };
+    const open = openWindowOf(true);
     worker.windows.push(open);
     await Promise.all(
       worker.fire('notificationclick', { notification: { data: { url: '/commissions' }, close: vi.fn() } })
         .work,
     );
     expect(open.focus).toHaveBeenCalledOnce();
-    expect(open.navigate).toHaveBeenCalledWith('/commissions');
+    // The message comes from the worker's own realm: compared field by field.
+    expect(open.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'open', path: '/commissions' }),
+      expect.anything(),
+    );
+    expect(open.navigate).not.toHaveBeenCalled();
     expect(worker.openWindow).not.toHaveBeenCalled();
+  });
+
+  it('loads the page in the open window only when it does not answer', async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = loadWorker((url) => Promise.resolve(ok(url)));
+      const open = openWindowOf(false);
+      worker.windows.push(open);
+      const done = Promise.all(
+        worker.fire('notificationclick', { notification: { data: { url: '/planning' }, close: vi.fn() } })
+          .work,
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(open.navigate).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(600);
+      await done;
+      expect(open.navigate).toHaveBeenCalledWith('/planning');
+      expect(worker.openWindow).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stays quiet when the window refuses to load the page (a window it does not control)', async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = loadWorker((url) => Promise.resolve(ok(url)));
+      const open = openWindowOf(false);
+      open.navigate.mockRejectedValue(new TypeError('not controlled'));
+      worker.windows.push(open);
+      const done = Promise.all(
+        worker.fire('notificationclick', { notification: { data: { url: '/planning' }, close: vi.fn() } })
+          .work,
+      );
+      await vi.advanceTimersByTimeAsync(1600);
+      await expect(done).resolves.toBeDefined();
+      expect(open.focus).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

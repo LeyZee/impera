@@ -80,7 +80,9 @@ function safePath(url) {
   return url;
 }
 
-// A touch on the notification brings the app forward on its page, or opens it.
+// A touch on the notification brings the app forward on its page, or opens it. An open app moves there itself
+// (src/pwa/notificationOpen.ts): no reload, so a message being written is not lost. Loading the page is only the
+// fallback, when no window answers within a moment (sign-in screen, an older version of the page).
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const path = safePath(event.notification.data && event.notification.data.url);
@@ -88,15 +90,33 @@ self.addEventListener('notificationclick', (event) => {
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
-      if (open) {
-        await open.focus();
-        if ('navigate' in open) await open.navigate(path);
+      if (!open) {
+        await self.clients.openWindow(path);
         return;
       }
-      await self.clients.openWindow(path);
+      await open.focus().catch(() => undefined);
+      if (await movedItself(open, path)) return;
+      // Refused on a window this worker does not control: it stays where it is, brought forward.
+      if ('navigate' in open) await open.navigate(path).catch(() => undefined);
     })(),
   );
 });
+
+/** Whether the window moved to `path` itself: it answers on the port within ANSWER_MS. */
+const ANSWER_MS = 1500;
+function movedItself(client, path) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const settle = (moved) => {
+      clearTimeout(timer);
+      channel.port1.close();
+      resolve(moved);
+    };
+    const timer = setTimeout(() => settle(false), ANSWER_MS);
+    channel.port1.onmessage = () => settle(true);
+    client.postMessage({ type: 'open', path }, [channel.port2]);
+  });
+}
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;

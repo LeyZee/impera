@@ -12,13 +12,17 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsPage } from './NotificationsPage';
-import { pushState, turnOffPush, turnOnPush, type PushState } from './push';
+import { pushState, readServerKey, turnOffPush, turnOnPush, type PushState } from './push';
 
 vi.mock('./push', () => ({
+  PUSH_KEY_URL: '/v1/notifications/push-key',
   pushState: vi.fn(),
+  readServerKey: vi.fn(),
   turnOnPush: vi.fn(),
   turnOffPush: vi.fn(),
 }));
+
+const SERVER_KEY = new Uint8Array(new ArrayBuffer(65)).fill(4);
 
 const DEFAULTS = { quietHours: { startMinute: 1320, endMinute: 480 }, dailyCap: 6 };
 
@@ -85,6 +89,7 @@ const deviceIs = (...states: PushState[]): void => {
 beforeEach(() => {
   vi.stubGlobal('scrollTo', vi.fn());
   vi.mocked(turnOnPush).mockReset();
+  vi.mocked(readServerKey).mockReset().mockResolvedValue(SERVER_KEY);
   vi.mocked(turnOffPush).mockReset().mockResolvedValue(undefined);
 });
 
@@ -99,8 +104,12 @@ describe('Notifications, this device', () => {
     deviceIs('off', 'on');
     vi.mocked(turnOnPush).mockResolvedValue('on');
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Activer les notifications' }));
-    expect(turnOnPush).toHaveBeenCalledOnce();
+    const turnOn = await screen.findByRole('button', { name: 'Activer les notifications' });
+    await waitFor(() => {
+      expect(turnOn).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(turnOn);
+    expect(turnOnPush).toHaveBeenCalledExactlyOnceWith(SERVER_KEY);
     expect(await screen.findByRole('button', { name: 'Envoyer un test' })).toBeTruthy();
     expect(screen.getByText('Cet appareil reçoit les notifications de Nirvana.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Activer les notifications' })).toBeNull();
@@ -111,11 +120,31 @@ describe('Notifications, this device', () => {
     deviceIs('off', 'denied');
     vi.mocked(turnOnPush).mockResolvedValue('denied');
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Activer les notifications' }));
+    const turnOn = await screen.findByRole('button', { name: 'Activer les notifications' });
+    await waitFor(() => {
+      expect(turnOn).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(turnOn);
     expect(await screen.findByText('Refusé : rien ne sonnera sur cet appareil.')).toBeTruthy();
     expect(screen.getByText(/réglages du téléphone ou du navigateur/u)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Activer les notifications' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Envoyer un test' })).toBeNull();
+  });
+
+  it('offers « Activer » only once the server’s key is read, so the question leaves from the touch itself', async () => {
+    serve();
+    deviceIs('off');
+    vi.mocked(readServerKey).mockReset().mockRejectedValue(new Error('push_key_503'));
+    renderPage();
+    expect(
+      await screen.findByText(
+        'Nirvana ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.',
+      ),
+    ).toBeTruthy();
+    const turnOn = screen.getByRole('button', { name: 'Activer les notifications' });
+    expect(turnOn).toHaveProperty('disabled', true);
+    fireEvent.click(turnOn);
+    expect(turnOnPush).not.toHaveBeenCalled();
   });
 
   it('sends a test, and says when the account has no device on the server', async () => {
