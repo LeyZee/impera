@@ -25,7 +25,7 @@ Deuxième port, distinct du connecteur : `PlatformSalesFeed` (`domain/sales-feed
 - `infra/http/sales-feed-routes.ts` : `/v1/settings/sales-feeds…`, propriétaire seul ; connecter ou retirer la clé redemande une connexion récente. Aucune réponse ne contient la clé. Les refus portent un code de `SALES_FEED_ERROR_CODES` et leur phrase.
 - Quarantaine : relier un modèle fait entrer au registre, dans la même transaction, toutes ses ventes en attente ; l'écran peut donc dire « N ventes en attente seront comptées ». Le `quarantined` de la ligne d'état est la somme de celui des modèles. L'aperçu donne aussi les comptes qu'on peut choisir (`accounts`, avec le modèle déjà lié à chacun) et qui a posé chaque lien (`linkedBy` : `auto` par le pseudo à la connexion, ou le membre).
 
-Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed_models`, `sales_feed_chatters`, `platform_sales`, `platform_sales_quarantine` (migration 0062). Tests contre le faux CRM de `__tests__/fake-reveal/crm.ts`.
+Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed_models`, `sales_feed_chatters`, `platform_sales`, `platform_sales_quarantine` (migration 0065). Tests contre le faux CRM de `__tests__/fake-reveal/crm.ts`.
 
 ## Structure
 

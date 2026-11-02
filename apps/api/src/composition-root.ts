@@ -329,7 +329,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     passwordBreaches,
     requireRole,
     routes: [
-      createAuthRoutes(auth, db.db, config, requireRole, logger),
+      createAuthRoutes(auth, db.db, adminDb.db, config, requireRole, logger),
       createInvitationLinkRoutes({
         auth,
         db: db.db,

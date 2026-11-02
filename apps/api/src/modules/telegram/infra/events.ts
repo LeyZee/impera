@@ -9,6 +9,7 @@ import {
   InvoiceNotIssuedReasonSchema,
   KillSwitchScopeSchema,
   PayPeriodSchema,
+  SecurityAlertPayloadSchema,
 } from '@nirvana/contracts';
 import { z } from 'zod';
 
@@ -231,6 +232,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = AutomaticClosedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'automatic_closed', ...parsed.data };
+    }
+    case 'security_alert': {
+      const parsed = SecurityAlertPayloadSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'security_alert', alert: parsed.data };
     }
     default:
       return null;

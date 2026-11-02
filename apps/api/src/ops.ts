@@ -29,6 +29,8 @@ import {
 } from '@nirvana/db';
 import { z } from 'zod';
 
+import { publishSecurityAlert, roleOf } from './security-alerts';
+
 /**
  * Operator commands run from a terminal on the server (operations.md, runbooks). Owner role: they act across
  * creators. Each one leaves an `audit_log` line with `user_id` null, the actor being whoever holds the server.
@@ -200,6 +202,16 @@ export function resetAccountSecondFactor(
         trustedDevicesEnded: reset.trustedDevices,
       },
     });
+    // Told to the urgent groups (ADR 0046 § 8) when there was one to reset: a forgotten account set up anew is not.
+    if (reset.hadSecondFactor) {
+      await publishSecurityAlert(tx, null, {
+        reason: 'second_factor_reset',
+        userId,
+        role: await roleOf(tx, userId),
+        network: null,
+        via: 'ops',
+      });
+    }
     return { hadSecondFactor: reset.hadSecondFactor };
   });
 }

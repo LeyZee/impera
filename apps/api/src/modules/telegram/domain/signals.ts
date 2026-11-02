@@ -11,6 +11,7 @@ import type {
   KillSwitchScope,
   PayoutBlock,
   PayPeriod,
+  SecurityAlertPayload,
   TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -144,6 +145,14 @@ export type Signal =
       /** What the lock misses now, with the server's figures. */
       readonly missing: readonly AutomaticMissing[];
       readonly conversations: number;
+    }
+  | {
+      /**
+       * A security alert (ADR 0046 § 8): which act, the account's role and its network, never a name nor a full
+       * address. The ids it carries are not shown.
+       */
+      readonly kind: 'security_alert';
+      readonly alert: SecurityAlertPayload;
     };
 
 export interface ScannedEvent {

@@ -39,6 +39,7 @@ import {
 import { CurrencySchema } from './money';
 import { PayPeriodSchema } from './pay-periods';
 import { SalesFeedSignalSchema } from './sales-feed';
+import { SecurityAlertPayloadSchema } from './security';
 
 /**
  * The closed list of event types (data-model.md) and their payloads (camelCase, never media content, never a
@@ -211,6 +212,7 @@ export const EVENT_TYPES = [
   'fan_flag_set',
   'fan_flag_cleared',
   'sales_feed_signal',
+  'security_alert',
   'error',
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -439,6 +441,11 @@ export const EVENT_PAYLOADS = {
    * creator, never with a fan's id or pseudo, at most once per kind and value while it lasts.
    */
   sales_feed_signal: z.object({ platform: PlatformSchema, signal: SalesFeedSignalSchema }),
+  /**
+   * A security alert (ADR 0046 § 8), written in the same transaction as the line of `audit_log` it tells, or right
+   * after it. For the urgent Telegram groups: an account by id and role, a network, never a name nor a full address.
+   */
+  security_alert: SecurityAlertPayloadSchema,
   error: z.object({
     code: z.string().min(1),
     jobName: z.string().min(1).optional(),
@@ -499,6 +506,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),
   typedEvent('sales_feed_signal'),
+  typedEvent('security_alert'),
   typedEvent('error'),
 ]);
 export type EventBody = z.infer<typeof EventBodySchema>;
