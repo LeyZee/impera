@@ -14,6 +14,7 @@ import {
   ContractorDocumentIdConflict,
   ContractorDocumentNotFound,
   ContractorDocumentUnavailable,
+  InvoiceStorageRefused,
   InvoiceStorageUnavailable,
 } from '../domain/errors';
 import type {
@@ -268,6 +269,7 @@ export async function purgeRefusedDocuments(
   let purged = 0;
   let skipped = 0;
   const copied: string[] = [];
+  let refused = 0;
   for (const file of await deps.store.dueUnscoped()) {
     const context = { documentId: file.documentId, memberId: file.memberId };
     try {
@@ -291,15 +293,27 @@ export async function purgeRefusedDocuments(
         logger.error(context, 'contractor document purge: the bucket holds another file, nothing erased');
       }
     } catch (error) {
+      if (error instanceof InvoiceStorageRefused) {
+        // A missing right, not a lock (Bilan on #359): said as an error each night, and the run fails.
+        skipped += 1;
+        refused += 1;
+        logger.error(
+          { ...context, error: error.message },
+          'contractor document purge: the bucket refused to erase a version whose lock has ended',
+        );
+        continue;
+      }
       if (!(error instanceof InvoiceStorageUnavailable)) throw error;
       skipped += 1;
       logger.warn({ ...context, error: error.message }, 'contractor document purge: a bucket did not answer');
     }
   }
-  if (copied.length > 0) {
-    throw new Error(
-      `contractor document purge: ${String(copied.length)} refused document(s) found in the second bucket`,
-    );
-  }
+  const failures = [
+    ...(copied.length > 0 ? [`${String(copied.length)} refused document(s) found in the second bucket`] : []),
+    ...(refused > 0
+      ? [`${String(refused)} erasure(s) refused by the first bucket with no lock that holds`]
+      : []),
+  ];
+  if (failures.length > 0) throw new Error(`contractor document purge: ${failures.join('; ')}`);
   return { purged, skipped };
 }

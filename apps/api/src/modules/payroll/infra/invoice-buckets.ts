@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { AwsClient } from 'aws4fetch';
 
-import { InvoiceStorageUnavailable } from '../domain/errors';
+import { InvoiceStorageRefused, InvoiceStorageUnavailable } from '../domain/errors';
 import type { InvoiceObjectStore, StoredObject } from '../domain/ports';
 
 /**
@@ -221,16 +221,31 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
         if (lockHolds(response.headers)) return 'locked';
       }
       // Then erased by their ids, the versions before the markers that hid them.
+      const markers = new Set(listed.markers);
       for (const version of [...listed.versions, ...listed.markers]) {
         const response = await call(key, { method: 'DELETE' }, `versionId=${encodeURIComponent(version)}`);
-        // A compliance lock refuses with 403 AccessDenied (AWS) or 400 « Object is WORM protected » (MinIO): « not
-        // yet », not a failure (a lock lengthened since the read). The next run tries again.
+        // A lock refuses with 403 AccessDenied (AWS) or 400 « Object is WORM protected » (MinIO). The read above has
+        // just found it over: « not yet » only if the version, read again, names a lock lengthened since (the next
+        // run tries again). Otherwise, or for a marker, which has no lock, the key lacks a right (Bilan on #359).
         if (response.status === 403 || response.status === 400) {
           const body = await response.text().catch(() => '');
-          if (response.status === 403 || /WORM protected|ObjectLocked/u.test(body)) return 'locked';
           const code = /<Code>([^<]{1,64})<\/Code>/u.exec(body)?.[1] ?? 'no code';
-          throw new InvoiceStorageUnavailable(
-            `${config.bucket}: DELETE ${key}?versionId answered 400 (${code})`,
+          if (response.status === 400 && !/WORM protected|ObjectLocked/u.test(body)) {
+            throw new InvoiceStorageUnavailable(
+              `${config.bucket}: DELETE ${key}?versionId answered 400 (${code})`,
+            );
+          }
+          if (!markers.has(version)) {
+            const again = await call(key, { method: 'HEAD' }, `versionId=${encodeURIComponent(version)}`);
+            if (!again.ok) {
+              throw new InvoiceStorageUnavailable(
+                `${config.bucket}: HEAD ${key}?versionId answered ${String(again.status)}`,
+              );
+            }
+            if (lockHolds(again.headers)) return 'locked';
+          }
+          throw new InvoiceStorageRefused(
+            `${config.bucket}: DELETE ${key}?versionId answered ${String(response.status)} (${code}) with no lock that holds`,
           );
         }
         if (!response.ok) {

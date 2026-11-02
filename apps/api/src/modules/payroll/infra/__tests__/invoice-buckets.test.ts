@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { InvoiceStorageUnavailable } from '../../domain/errors';
+import { InvoiceStorageRefused, InvoiceStorageUnavailable } from '../../domain/errors';
 import { createMemoryInvoiceStore, createS3InvoiceStore } from '../invoice-buckets';
 
 /** An invented bucket and invented keys (ADR 0010): nothing here reaches a provider. */
@@ -148,6 +148,7 @@ describe('Équipe › Factures : le dépôt dans un seau S3 verrouillé (ADR 003
 
 describe('Équipe › Pièces : l’effacement d’une pièce refusée dans le seau S3 (EQ-06 lot 5c-2, « ok purge a »)', () => {
   const PAST = '2026-01-01T00:00:00Z';
+  const WORM = '<Error><Code>InvalidRequest</Code><Message>Object is WORM protected</Message></Error>';
   /** A listing of the key's versions and markers, as ListObjectVersions writes it. */
   const listing = (
     entries: readonly { kind: 'Version' | 'DeleteMarker'; key?: string; id: string }[],
@@ -158,24 +159,30 @@ describe('Équipe › Pièces : l’effacement d’une pièce refusée dans le s
           `<${one.kind}><Key>${one.key ?? KEY}</Key><VersionId>${one.id}</VersionId><IsLatest>false</IsLatest></${one.kind}>`,
       )
       .join('')}</ListVersionsResult>`;
-  /** A bucket that lists `entries`, gives each version `bytes` under `lock`, and answers each delete with `deleted`. */
+  /**
+   * A bucket that lists `entries`, gives each version `bytes` under `lock`, answers each delete with `deleted`, and
+   * names `relock` (by default `lock`) to a version read again with HEAD.
+   */
   const bucket = (
     entries: Parameters<typeof listing>[0],
     lock: string | null,
-    options: { bytes?: Uint8Array; deleted?: () => Response } = {},
+    options: { bytes?: Uint8Array; deleted?: () => Response; relock?: string } = {},
   ) => {
     const requests: Request[] = [];
+    const lockHeaders = (until: string | null): Record<string, string> =>
+      until === null
+        ? {}
+        : { 'x-amz-object-lock-mode': 'COMPLIANCE', 'x-amz-object-lock-retain-until-date': until };
     const answer = (request: Request): Response => {
       const url = new URL(request.url);
       if (request.method === 'GET' && url.searchParams.has('versions')) {
         return new Response(listing(entries), { status: 200 });
       }
       if (request.method === 'GET') {
-        const headers: Record<string, string> =
-          lock === null
-            ? {}
-            : { 'x-amz-object-lock-mode': 'COMPLIANCE', 'x-amz-object-lock-retain-until-date': lock };
-        return new Response(options.bytes ?? BYTES, { status: 200, headers });
+        return new Response(options.bytes ?? BYTES, { status: 200, headers: lockHeaders(lock) });
+      }
+      if (request.method === 'HEAD') {
+        return new Response(null, { status: 200, headers: lockHeaders(options.relock ?? lock) });
       }
       if (request.method === 'DELETE') return options.deleted?.() ?? new Response(null, { status: 204 });
       return new Response(null, { status: 500 });
@@ -224,7 +231,7 @@ describe('Équipe › Pièces : l’effacement d’une pièce refusée dans le s
     expect(deletes(other.requests)).toEqual([]);
   });
 
-  it('says « absent » for no version, clears a marker left alone, and takes a refused delete for « not yet »', async () => {
+  it('says « absent » for no version, clears a marker left alone, and takes a delete refused under a lock for « not yet »', async () => {
     const empty = bucket([], null);
     expect(await createS3InvoiceStore(CONFIG, empty.fetch).remove(KEY, SHA)).toBe('absent');
     expect(deletes(empty.requests)).toEqual([]);
@@ -232,20 +239,51 @@ describe('Équipe › Pièces : l’effacement d’une pièce refusée dans le s
     const marker = bucket([{ kind: 'DeleteMarker', id: 'm1' }], null);
     expect(await createS3InvoiceStore(CONFIG, marker.fetch).remove(KEY, SHA)).toBe('absent');
     expect(deletes(marker.requests)).toEqual(['m1']);
-    const refused = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+    // A lock lengthened between the read and the delete: the version, read again, names it.
+    const relocked = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
       deleted: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }),
+      relock: '2037-01-01T00:00:00Z',
     });
-    expect(await createS3InvoiceStore(CONFIG, refused.fetch).remove(KEY, SHA)).toBe('locked');
+    expect(await createS3InvoiceStore(CONFIG, relocked.fetch).remove(KEY, SHA)).toBe('locked');
+    expect(relocked.requests.filter((request) => request.method === 'HEAD')).toHaveLength(1);
     const worm = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
-      deleted: () =>
-        new Response(
-          '<Error><Code>InvalidRequest</Code><Message>Object is WORM protected</Message></Error>',
-          {
-            status: 400,
-          },
-        ),
+      deleted: () => new Response(WORM, { status: 400 }),
+      relock: '2037-01-01T00:00:00Z',
     });
     expect(await createS3InvoiceStore(CONFIG, worm.fetch).remove(KEY, SHA)).toBe('locked');
+  });
+
+  it('fails as a refusal, never « not yet », a delete refused with no lock that holds (Bilan on #359)', async () => {
+    // The lock read again is still over: a right the key lacks, never a lock.
+    const denied = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }),
+    });
+    const refusal = createS3InvoiceStore(CONFIG, denied.fetch).remove(KEY, SHA);
+    await expect(refusal).rejects.toBeInstanceOf(InvoiceStorageRefused);
+    await expect(refusal).rejects.toThrow(
+      /DELETE .*\?versionId answered 403 \(AccessDenied\) with no lock that holds$/u,
+    );
+    const unlockedWorm = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response(WORM, { status: 400 }),
+    });
+    await expect(createS3InvoiceStore(CONFIG, unlockedWorm.fetch).remove(KEY, SHA)).rejects.toBeInstanceOf(
+      InvoiceStorageRefused,
+    );
+    // A marker has no lock: refused, it is not read again.
+    const marker = bucket([{ kind: 'DeleteMarker', id: 'm1' }], null, {
+      deleted: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }),
+    });
+    await expect(createS3InvoiceStore(CONFIG, marker.fetch).remove(KEY, SHA)).rejects.toBeInstanceOf(
+      InvoiceStorageRefused,
+    );
+    expect(marker.requests.filter((request) => request.method === 'HEAD')).toEqual([]);
+    // Another 400 is a bucket that answered an error.
+    const other = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response('<Error><Code>InvalidArgument</Code></Error>', { status: 400 }),
+    });
+    await expect(createS3InvoiceStore(CONFIG, other.fetch).remove(KEY, SHA)).rejects.toBeInstanceOf(
+      InvoiceStorageUnavailable,
+    );
   });
 
   it('tells whether a version lies under the key, even behind a marker, and fails on a listing cut in two', async () => {

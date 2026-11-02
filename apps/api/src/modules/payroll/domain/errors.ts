@@ -377,6 +377,18 @@ export class InvoiceStorageUnavailable extends Error {
   }
 }
 
+/**
+ * The bucket refused to erase a version whose lock it has just said is over, or a delete marker, which has no lock
+ * (EQ-06 lot 5c-2, Bilan on #359): almost always a missing right (`s3:DeleteObjectVersion`), never « not yet ». Told
+ * as an error, never tried again quietly.
+ */
+export class InvoiceStorageRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvoiceStorageRefused';
+  }
+}
+
 /** A character the PDF would print that its font has no glyph for: the PDF is not rendered (ADR 0037 § 2). */
 export class InvoicePdfGlyphMissing extends Error {
   constructor(readonly codePoints: readonly number[]) {
