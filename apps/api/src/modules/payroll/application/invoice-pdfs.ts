@@ -326,15 +326,23 @@ export interface PdfToServe {
 }
 
 /**
+ * A rendered PDF read back: its bytes, or why neither bucket gave them. `wrong` when a bucket gave a file unlike its
+ * fingerprint (the owner is alerted), `unreachable` when no bucket answered or the copy is not written yet (nothing is
+ * damaged: a later read may succeed).
+ */
+export type CheckedPdf =
+  { readonly kind: 'ok'; readonly bytes: Uint8Array } | { readonly kind: 'wrong' | 'unreachable' };
+
+/**
  * The bytes of a rendered PDF (ADR 0037 § 7): from the first bucket when its fingerprint matches, from the copy
  * otherwise. A wrong file alerts the owner and is never given; a bucket that does not answer falls back to the copy
- * without an alert, a passing failure not being a damaged file. `null` when neither gives it back.
+ * without an alert, a passing failure not being a damaged file.
  */
 export async function checkedInvoicePdf(
   deps: Pick<InvoicePdfDeps, 'store' | 'primary' | 'copy'>,
   { invoiceId, memberId, number, pdf }: PdfToServe,
   logger: JobLogger,
-): Promise<Uint8Array | null> {
+): Promise<CheckedPdf> {
   const wrong = async (place: 'primary' | InvoicePdfCopyProvider): Promise<void> => {
     await deps.store.alertUnscoped({
       type: 'invoice_pdf_conflict',
@@ -351,22 +359,26 @@ export async function checkedInvoicePdf(
   };
 
   const first = await readChecked(deps.primary, pdf.key, pdf.sha256);
-  if (first.kind === 'ok') return first.bytes;
+  if (first.kind === 'ok') return first;
   if (first.kind === 'wrong') await wrong('primary');
   const copy = copyAt(pdf, COPY_PROVIDER);
-  if (copy === undefined) return null;
+  // Said wrong as soon as one bucket was: the owner has been told, and a new read would not mend it.
+  const missing = (second: 'wrong' | 'unreachable'): CheckedPdf => ({
+    kind: first.kind === 'wrong' || second === 'wrong' ? 'wrong' : 'unreachable',
+  });
+  if (copy === undefined) return missing('unreachable');
   const second = await readChecked(deps.copy, copy.key, copy.sha256);
   if (second.kind === 'ok') {
     logger.warn({ invoiceId, first: first.kind }, 'invoice PDF: served from the copy');
-    return second.bytes;
+    return second;
   }
   if (second.kind === 'wrong') await wrong(COPY_PROVIDER);
-  return null;
+  return missing(second.kind);
 }
 
 /**
  * `GET /v1/payroll/invoices/:id/pdf` (ADR 0037 § 7): the PDF read under the invoice's policy (`checkedInvoicePdf`),
- * `invoice_pdf_unavailable` when neither bucket gives it back.
+ * `invoice_pdf_unavailable` when neither bucket gives it back, whatever the reason.
  */
 export async function downloadInvoicePdf(
   deps: Pick<InvoicePdfDeps, 'store' | 'primary' | 'copy'>,
@@ -377,11 +389,12 @@ export async function downloadInvoicePdf(
   const found = await deps.store.pdfFor(userId, invoiceId);
   if (found === null) throw new InvoiceNotFound();
   if (found.pdf === null) throw new InvoicePdfNotFound();
-  const bytes = await checkedInvoicePdf(
+  const checked = await checkedInvoicePdf(
     deps,
     { invoiceId, memberId: found.memberId, number: found.number, pdf: found.pdf },
     logger,
   );
-  if (bytes === null) throw new InvoicePdfUnavailable();
-  return { fileName: `${found.number}.pdf`, bytes };
+  // A wrong file and buckets out of reach give the same answer: the PDF cannot be served now.
+  if (checked.kind !== 'ok') throw new InvoicePdfUnavailable();
+  return { fileName: `${found.number}.pdf`, bytes: checked.bytes };
 }

@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/payroll';
 import { invoicePdfKey, invoicePdfRetainUntil } from '../modules/payroll/domain/invoice-pdf';
+import type { InvoiceObjectStore } from '../modules/payroll/domain/ports';
 import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
@@ -22,6 +23,12 @@ const Q1 = PayPeriodSchema.parse('2025-05-01');
 const quiet = { warn: () => undefined, error: () => undefined };
 const attempt = { current: 1, max: 5 };
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+/** While `on`, neither bucket answers a read: both providers out of reach, nothing damaged. */
+const outage = { on: false };
+const reachable = (bucket: InvoiceObjectStore): InvoiceObjectStore => ({
+  ...bucket,
+  read: (key) => (outage.on ? Promise.reject(new Error('no answer')) : bucket.read(key)),
+});
 
 describe('Équipe › Factures : l’archive des PDF pour le comptable (EQ-06 lot 7d)', () => {
   const primary = createMemoryInvoiceStore();
@@ -45,7 +52,9 @@ describe('Équipe › Factures : l’archive des PDF pour le comptable (EQ-06 lo
   };
 
   beforeAll(async () => {
-    team = await startPayrollTeam(inject('pgSuperuserUrl'), { invoiceBuckets: { primary, copy } });
+    team = await startPayrollTeam(inject('pgSuperuserUrl'), {
+      invoiceBuckets: { primary: reachable(primary), copy: reachable(copy) },
+    });
     today = calendarDayAt(new Date(), 'Europe/Paris');
     ({ member: theo } = await team.addMember('theo@example.test', 'Théo'));
     ({ member: lea } = await team.addMember('lea@example.test', 'Léa'));
@@ -130,7 +139,7 @@ describe('Équipe › Factures : l’archive des PDF pour le comptable (EQ-06 lo
     // By day of issue then number: LEA, NINA, THEO.
     expect(manifest.slice(1, -2).split('\r\n')).toEqual([
       'Numéro;Nature;Émise le;Fichier;Empreinte SHA-256;État',
-      `${leaInvoice.number};Facture;${frenchDay};;${leaRow?.sha256 ?? ''};PDF illisible chez les deux hébergeurs, propriétaire alerté`,
+      `${leaInvoice.number};Facture;${frenchDay};;${leaRow?.sha256 ?? ''};PDF faux à la relecture, propriétaire alerté`,
       `${ninaInvoice.number};Facture;${frenchDay};;;PDF pas encore rendu`,
       `${theoInvoice.number};Facture;${frenchDay};${theoInvoice.number}.pdf;${theoRow?.sha256 ?? ''};archivé`,
     ]);
@@ -159,6 +168,37 @@ describe('Équipe › Factures : l’archive des PDF pour le comptable (EQ-06 lo
     expect(lines).toEqual([
       { entityId: `${today}/${today}`, details: { from: today, to: today, documents: 3 } },
     ]);
+  });
+
+  it('lists a PDF no bucket answers for as out of reach, to export again, without an alert', async () => {
+    const theoInvoice = await invoiceOf(theo);
+    const leaInvoice = await invoiceOf(lea);
+    const ninaInvoice = await invoiceOf(nina);
+    const conflicts = () =>
+      team.test.admin.db
+        .select()
+        .from(schema.domainEvents)
+        .where(eq(schema.domainEvents.type, 'invoice_pdf_conflict'));
+    const before = (await conflicts()).length;
+    outage.on = true;
+    const response = await archive(team.owner).finally(() => {
+      outage.on = false;
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const files = unzipSync(new Uint8Array(response.rawPayload));
+    expect(Object.keys(files)).toEqual(['manifeste.csv']);
+    const manifest = new TextDecoder('utf-8', { ignoreBOM: true }).decode(files['manifeste.csv']);
+    const states = manifest
+      .slice(1, -2)
+      .split('\r\n')
+      .slice(1)
+      .map((line) => [line.split(';')[0], line.split(';')[3], line.split(';')[5]]);
+    expect(states).toEqual([
+      [leaInvoice.number, '', "hébergeurs injoignables, relancer l'export"],
+      [ninaInvoice.number, '', 'PDF pas encore rendu'],
+      [theoInvoice.number, '', "hébergeurs injoignables, relancer l'export"],
+    ]);
+    expect((await conflicts()).length).toBe(before);
   });
 
   it('gives a range without any document its manifest alone', async () => {

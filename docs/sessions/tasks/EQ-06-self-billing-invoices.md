@@ -338,7 +338,7 @@ Pas d'ADR ni de migration : l'ADR 0023 prévoit l'archive des PDF, et les règle
 
 - **La route** : `GET /v1/payroll/accounting/archive?from=&to=`, propriétaire seul, la même période que le journal (`AccountingPeriodQuerySchema`, renommé depuis `AccountingJournalQuerySchema` puisque les deux exports la partagent). La réponse est le ZIP en flux, `pieces-prestataires_AAAAMMJJ_AAAAMMJJ.zip`, `no-store`.
 - **La lecture** : la règle du téléchargement d'un PDF, sortie dans `checkedInvoicePdf` pour servir aux deux (premier hébergeur, sinon la copie ; un fichier faux alerte le propriétaire, `invoice_pdf_conflict` au stade `download`, une fois par document et par lieu).
-- **Le manifeste** : `manifeste.csv` en dernier, puisqu'il dit ce qu'est devenu chaque document : archivé avec son empreinte, pas encore rendu, ou illisible chez les deux hébergeurs. Un flux ne peut plus changer son code de réponse une fois parti : plutôt qu'une archive coupée, chaque absence est écrite.
+- **Le manifeste** : `manifeste.csv` en dernier, puisqu'il dit ce qu'est devenu chaque document : archivé avec son empreinte, pas encore rendu, faux à la relecture (un hébergeur a rendu un autre fichier, propriétaire alerté) ou hébergeurs injoignables (relancer l'export) ; `checkedInvoicePdf` rend la raison, et le téléchargement répond 503 dans les deux cas. Un flux ne peut plus changer son code de réponse une fois parti : plutôt qu'une archive coupée, chaque absence est écrite.
 - **L'audit** : `accounting_archive.export` avec la période et le nombre de documents, écrit quand le flux part (il ne peut pas attendre la fin d'un flux).
 
 Reste au lot 8 : les champs des comptes dans Réglages › Facturation, les boutons d'export (journal, DAS2, archive) et l'alerte J-7.

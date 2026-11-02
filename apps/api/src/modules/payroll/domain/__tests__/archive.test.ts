@@ -36,14 +36,23 @@ describe('the archive of the PDFs (EQ-06 lot 7d)', () => {
         sha256: null,
         state: 'not_rendered',
       },
+      {
+        number: 'NORA-2026-0004',
+        kind: 'invoice',
+        corrective: false,
+        issuedOn: '2026-10-16',
+        sha256: 'c'.repeat(64),
+        state: 'unreachable',
+      },
     ]);
     expect(text.startsWith('\uFEFF')).toBe(true);
     expect(text.endsWith('\r\n')).toBe(true);
     expect(text.slice(1, -2).split('\r\n')).toEqual([
       'Numéro;Nature;Émise le;Fichier;Empreinte SHA-256;État',
       `NORA-2026-0001;Facture;02/10/2026;NORA-2026-0001.pdf;${fingerprint};archivé`,
-      `NORA-2026-0002;Avoir;09/10/2026;;${'b'.repeat(64)};PDF illisible chez les deux hébergeurs, propriétaire alerté`,
+      `NORA-2026-0002;Avoir;09/10/2026;;${'b'.repeat(64)};PDF faux à la relecture, propriétaire alerté`,
       'NORA-2026-0003;Facture rectificative;09/10/2026;;;PDF pas encore rendu',
+      `NORA-2026-0004;Facture;16/10/2026;;${'c'.repeat(64)};hébergeurs injoignables, relancer l'export`,
     ]);
     expect(archiveManifest([])).toBe('\uFEFFNuméro;Nature;Émise le;Fichier;Empreinte SHA-256;État\r\n');
   });

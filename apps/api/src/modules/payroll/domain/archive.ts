@@ -3,8 +3,11 @@
  * the manifest that says what the archive holds. The bytes are read and zipped by `application/accounting.ts`.
  */
 
-/** What became of a document in the archive. */
-type ArchiveEntryState = 'archived' | 'not_rendered' | 'unreadable';
+/**
+ * What became of a document in the archive: archived; its PDF not rendered yet; wrong at its reading (a bucket gave a
+ * file unlike its fingerprint, the owner is alerted); or out of reach (no bucket answered, the export can run again).
+ */
+export type ArchiveEntryState = 'archived' | 'not_rendered' | 'unreadable' | 'unreachable';
 
 /** A document of the range, as the manifest lists it. */
 export interface ArchiveEntry {
@@ -34,7 +37,8 @@ const NATURES = { invoice: 'Facture', corrective: 'Facture rectificative', credi
 const STATES: Readonly<Record<ArchiveEntryState, string>> = {
   archived: 'archivé',
   not_rendered: 'PDF pas encore rendu',
-  unreadable: 'PDF illisible chez les deux hébergeurs, propriétaire alerté',
+  unreadable: 'PDF faux à la relecture, propriétaire alerté',
+  unreachable: "hébergeurs injoignables, relancer l'export",
 };
 
 const COLUMNS = ['Numéro', 'Nature', 'Émise le', 'Fichier', 'Empreinte SHA-256', 'État'] as const;

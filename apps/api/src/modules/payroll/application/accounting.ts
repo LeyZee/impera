@@ -17,13 +17,14 @@ import {
   archiveFileName,
   archiveManifest,
   type ArchiveEntry,
+  type ArchiveEntryState,
 } from '../domain/archive';
 import { JournalAccountsMissing } from '../domain/errors';
 import { fecText, journalFileName, latin9 } from '../domain/fec';
 import { journalEntries, ledgerAccountsOf } from '../domain/journal';
 import type { Actor, ArchiveDocument, JobLogger, PayrollAccountingStore } from '../domain/ports';
 
-import { checkedInvoicePdf, type InvoicePdfDeps } from './invoice-pdfs';
+import { checkedInvoicePdf, type CheckedPdf, type InvoicePdfDeps } from './invoice-pdfs';
 
 /**
  * The accountant's exports, the owner's alone (EQ-06 lot 7; ADR 0023 « export comptable par période »):
@@ -54,9 +55,17 @@ type ArchivePdfs = Pick<InvoicePdfDeps, 'store' | 'primary' | 'copy'>;
 /**
  * The archive's bytes, pulled by the response: each PDF read back and stored as it is (`ZipPassThrough`, a PDF is
  * compressed already), the next one read only once the bytes before have left, so that the range is never held in
- * memory. The manifest comes last, since it says what became of each document: a PDF not rendered yet, or that
- * neither bucket gives back (the owner alerted by `checkedInvoicePdf`), is listed without a file, never left out.
+ * memory. The manifest comes last, since it says what became of each document: a PDF not rendered yet, wrong at
+ * its reading (the owner alerted by `checkedInvoicePdf`) or out of reach (the export to run again) is listed without
+ * a file, never left out.
  */
+/** What became of a document: no PDF yet, its file, or why neither bucket gave it. */
+function stateOf(checked: CheckedPdf | null): ArchiveEntryState {
+  if (checked === null) return 'not_rendered';
+  if (checked.kind === 'ok') return 'archived';
+  return checked.kind === 'wrong' ? 'unreadable' : 'unreachable';
+}
+
 async function* archiveChunks(
   pdfs: ArchivePdfs,
   documents: readonly ArchiveDocument[],
@@ -77,17 +86,17 @@ async function* archiveChunks(
   const entries: ArchiveEntry[] = [];
   for (const document of documents) {
     const { pdf } = document;
-    const bytes = pdf === null ? null : await checkedInvoicePdf(pdfs, { ...document, pdf }, logger);
+    const checked = pdf === null ? null : await checkedInvoicePdf(pdfs, { ...document, pdf }, logger);
     // Dated of its issue, at noon so that no time zone moves it to another day.
-    if (bytes !== null)
-      add(archiveEntryName(document.number), bytes, new Date(`${document.issuedOn}T12:00:00Z`));
+    if (checked?.kind === 'ok')
+      add(archiveEntryName(document.number), checked.bytes, new Date(`${document.issuedOn}T12:00:00Z`));
     entries.push({
       number: document.number,
       kind: document.kind,
       corrective: document.corrective,
       issuedOn: document.issuedOn,
       sha256: pdf?.sha256 ?? null,
-      state: pdf === null ? 'not_rendered' : bytes === null ? 'unreadable' : 'archived',
+      state: stateOf(checked),
     });
     if (zipping.failure !== null) throw zipping.failure;
     yield* ready.splice(0);
