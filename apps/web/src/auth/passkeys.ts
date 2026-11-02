@@ -67,11 +67,16 @@ export async function deviceHoldsPasskeys(): Promise<boolean> {
 }
 
 /**
- * The gesture as the person knows it on this device: « Face ID » on an iPhone or an iPad, « Touch ID » on a Mac, « ton
+ * The gesture as the person knows it on this device: « Face ID » on an iPhone or an iPad (which may call itself a Mac), « Touch ID » on a Mac, « ton
  * empreinte » on Android, « Windows Hello » on Windows, « une clé d’accès » elsewhere.
  */
-export function gestureName(userAgent: string = navigator.userAgent): string {
+export function gestureName(
+  userAgent: string = navigator.userAgent,
+  touchPoints: number = navigator.maxTouchPoints,
+): string {
   if (/iPhone|iPad|iPod/u.test(userAgent)) return 'Face ID';
+  // Safari on an iPad says « Macintosh » since iPadOS 13; a Mac has no touch screen.
+  if (userAgent.includes('Macintosh') && touchPoints > 1) return 'Face ID';
   if (userAgent.includes('Android')) return 'ton empreinte';
   if (userAgent.includes('Macintosh')) return 'Touch ID';
   if (userAgent.includes('Windows')) return 'Windows Hello';

@@ -18,7 +18,7 @@ vi.mock('@/settings/services/api', () => ({
 }));
 
 import { SecuritySection } from './SecuritySection';
-import { passkeysText } from './view';
+import { dayText, passkeysText } from './view';
 
 /** Invented keys and accounts: no real person, no real device. */
 const minutesAgo = (minutes: number): string => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -84,6 +84,34 @@ describe('Clés d’accès in Sécurité (ADR 0053 § 5)', () => {
     expect(passkeysText(0)).toBe('Aucune clé d’accès');
     expect(passkeysText(1)).toBe('1 clé d’accès');
     expect(passkeysText(3)).toBe('3 clés d’accès');
+    expect(dayText('2026-11-01T10:00:00.000Z')).toBe('1er nov. 2026');
+    expect(dayText('2026-10-28T10:00:00.000Z')).toBe('28 oct. 2026');
+  });
+
+  it('says a refused gesture after a wrong password, not the password’s refusal', async () => {
+    serve({
+      'GET /auth/sessions': noSessions,
+      'GET /auth/passkeys': () => [200, { passkeys: [PHONE_KEY, LAPTOP_KEY] }],
+      'DELETE /auth/passkeys/pk-laptop': () => [403, apiError('reauthentication_forbidden')],
+      'POST /auth/passkey/confirm-options': () => [200, OPTIONS],
+      'POST /auth/passkey/confirm': () => [401, apiError('passkey_unauthenticated')],
+    });
+    confirmIdentity.mockResolvedValue('wrong_credentials');
+    render(<SecuritySection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Retirer la clé Chrome sur Windows' }));
+    fireEvent.change(await screen.findByLabelText('Mot de passe'), { target: { value: 'faux' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
+    expect(await screen.findByText('Mot de passe ou code incorrect.')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: /^Confirmer avec / }));
+    expect(
+      await screen.findByText(
+        'Ce geste n’a pas été reconnu. Réessaie, ou donne ton mot de passe et ton code.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Mot de passe ou code incorrect.')).toBeNull();
   });
 
   it('lists one’s keys, and removes one after a gesture on another key, never itself', async () => {

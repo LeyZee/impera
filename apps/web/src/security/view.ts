@@ -38,7 +38,9 @@ export function passkeysText(count: number): string {
   return `${String(count)}\u00a0clé${count === 1 ? '' : 's'} d’accès`;
 }
 
-/** « 2 nov. 2026 »: the day a key was added. */
+/** « 2 nov. 2026 », « 1er nov. 2026 »: the day a key was added. */
 export function dayText(at: string): string {
-  return new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const text = new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  // « 1er nov. 2026 », never « 1 nov. »
+  return text.replace(/^1 /u, '1er ');
 }

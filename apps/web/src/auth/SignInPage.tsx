@@ -266,7 +266,7 @@ function PasskeyOffer({ onDone }: { onDone: () => void }): JSX.Element {
     if (result.kind === 'cancelled') return;
     setError(
       result.kind === 'refused'
-        ? 'Ce téléphone n’a pas demandé ton visage, ton doigt ou son code : la clé n’a pas été ajoutée.'
+        ? 'Cet appareil n’a pas demandé ton visage, ton doigt ou son code : la clé n’a pas été ajoutée.'
         : 'La clé n’a pas pu être ajoutée. Tu pourras réessayer depuis Sécurité.',
     );
   }

@@ -79,7 +79,9 @@ describe('the gesture’s name', () => {
   it('names the gesture as the device knows it', () => {
     expect(gestureName('Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X)')).toBe('Face ID');
     expect(gestureName('Mozilla/5.0 (Linux; Android 15; Pixel 9)')).toBe('ton empreinte');
-    expect(gestureName('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_1)')).toBe('Touch ID');
+    expect(gestureName('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_1)', 0)).toBe('Touch ID');
+    // Safari on an iPad calls itself a Mac, with a touch screen.
+    expect(gestureName('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_1)', 5)).toBe('Face ID');
     expect(gestureName('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Windows Hello');
     expect(gestureName('Mozilla/5.0 (X11; Linux x86_64)')).toBe('une clé d’accès');
   });

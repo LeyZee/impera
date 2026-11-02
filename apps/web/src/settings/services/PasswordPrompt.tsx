@@ -100,6 +100,7 @@ export function PasswordPrompt({
   async function confirmByGesture(): Promise<void> {
     setIsBusy(true);
     onBusyChange?.(true);
+    setFailure(null);
     setPasskeyNote(null);
     const result = await confirmWithPasskey(excluding).catch((): PasskeyConfirmResult => 'unavailable');
     setIsBusy(false);
