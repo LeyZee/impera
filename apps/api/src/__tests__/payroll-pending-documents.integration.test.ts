@@ -5,9 +5,11 @@ import {
   ContractorDocumentSchema,
   newId,
   PendingContractorDocumentsSchema,
+  TeamMemberIdSchema,
   type ContractorDocument,
   type TeamMember,
 } from '@nirvana/contracts';
+import { schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/payroll';
@@ -117,5 +119,41 @@ describe('Équipe › Pièces du prestataire : les pièces à examiner (EQ-06 lo
     const after = await waiting();
     expect(after.more).toBe(false);
     expect(after.documents.map((one) => one.id)).toEqual(filed.slice(1));
+  });
+
+  it('never lists the owner’s own documents, which he may not check', async () => {
+    // The owner on the team as well: a member of his own, his account the owner's.
+    const own = newId(TeamMemberIdSchema);
+    await team.test.admin.db.insert(schema.teamMembers).values({
+      id: own,
+      userId: team.ownerId,
+      teamRole: 'manager',
+      firstName: 'Patron',
+      lastName: 'Inventé',
+      displayName: 'Patron',
+      country: 'FR',
+      timeZone: 'Europe/Paris',
+      joinedOn: '2025-01-01',
+    });
+    // The whole list, `more` included: the previous case leaves it full.
+    const before = await waiting();
+    const response = await team.server.inject({
+      method: 'POST',
+      url: `/v1/payroll/contractors/${own}/documents?${new URLSearchParams({
+        id: newId(ContractorDocumentIdSchema),
+        kind: 'urssaf_vigilance',
+        issuedOn: today,
+      }).toString()}`,
+      headers: {
+        cookie: team.owner,
+        origin: 'http://localhost:5173',
+        'content-type': 'application/octet-stream',
+      },
+      payload: Buffer.from(pdf('Patron')),
+    });
+    expect(response.statusCode, response.body).toBe(201);
+    const document = ContractorDocumentSchema.parse(response.json());
+    expect((await review(document, { decision: 'accepted' })).statusCode).toBe(403);
+    expect(await waiting()).toEqual(before);
   });
 });

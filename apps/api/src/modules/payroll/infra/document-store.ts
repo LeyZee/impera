@@ -265,7 +265,8 @@ export function createDrizzlePayrollDocumentStore(
     pending: (userId) =>
       withMember(db, userId, async (tx, scope) => {
         if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
-        // A document without a check has no erasure either: only a refused one is erased.
+        // A document without a check has no erasure either: only a refused one is erased. Never his own documents: he
+        // may not check them (`review` above, and the policy `owner_insert` of 0054).
         const rows = await tx
           .select({ row: contractorDocuments, displayName: teamMembers.displayName })
           .from(contractorDocuments)
@@ -274,7 +275,12 @@ export function createDrizzlePayrollDocumentStore(
             contractorDocumentReviews,
             eq(contractorDocumentReviews.documentId, contractorDocuments.id),
           )
-          .where(sql`${contractorDocumentReviews.documentId} is null`)
+          .where(
+            and(
+              sql`${contractorDocumentReviews.documentId} is null`,
+              sql`${teamMembers.userId} <> ${userId}`,
+            ),
+          )
           .orderBy(contractorDocuments.createdAt, contractorDocuments.id)
           .limit(CONTRACTOR_DOCUMENTS_PENDING_MAX + 1);
         return PendingContractorDocumentsSchema.parse({

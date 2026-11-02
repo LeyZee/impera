@@ -1354,7 +1354,7 @@ export const CONTRACTOR_DOCUMENTS_PENDING_MAX = 200;
 /**
  * `GET /v1/payroll/contractors/documents?review=pending` (EQ-06 lot 8), the owner only, who alone checks a document:
  * every member's documents without a check yet, the oldest filed first, so that Aujourd'hui never reads each file one
- * by one. `review` names what the list holds; only the documents waiting exist today.
+ * by one; never his own, which he may not check. `review` names what the list holds; only the documents waiting exist today.
  */
 export const ContractorDocumentsQuerySchema = z.object({ review: z.literal('pending') });
 export type ContractorDocumentsQuery = z.infer<typeof ContractorDocumentsQuerySchema>;

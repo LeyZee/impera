@@ -702,7 +702,7 @@ export interface PayrollDocumentStore {
   ): Promise<{ document: ContractorDocument; created: boolean }>;
   /**
    * Every member's documents without a check, the oldest filed first, with the member's name: the owner only
-   * (`payroll_forbidden` otherwise), who alone checks one (lot 8).
+   * (`payroll_forbidden` otherwise), who alone checks one, never his own ones, which he may not check (lot 8).
    */
   pending(userId: UserId): Promise<PendingContractorDocuments>;
 }
