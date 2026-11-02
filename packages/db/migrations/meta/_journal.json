@@ -407,6 +407,13 @@
       "when": 1793578033084,
       "tag": "0057_contractor_document_purges",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793580735017,
+      "tag": "0058_invoice_settlements",
+      "breakpoints": true
     }
   ]
 }

@@ -64,6 +64,7 @@ import { createDrizzlePayrollReadStore } from './infra/read-store';
 import { createDrizzlePayrollRegimeStore } from './infra/regime-store';
 import { createPayrollRoutes, type RequireRole } from './infra/routes';
 import { createDrizzlePayrollRuleStore } from './infra/rule-store';
+import { createDrizzleSettlementStore } from './infra/settlement-store';
 import type { PayInputReads } from './infra/snapshot';
 import { createDrizzlePayrollValidationStore } from './infra/validation-store';
 
@@ -165,6 +166,12 @@ export interface PayrollModule {
      * upload lock has ended has its file erased from the first bucket, then the erasure recorded; its row stays.
      */
     readonly purgeRefusedDocuments: (logger: JobLogger) => Promise<PurgeOutcome>;
+    /**
+     * `payroll.settle_documents` (EQ-06 lot 7a): each document a paid transfer settles, its own statement's or one it
+     * received in carry-over, marked `paid` (an invoice) or `imputed` (a credit note), once. One contractor, or every
+     * contractor with a document not settled yet (`null`). Returns how many were written.
+     */
+    readonly settleDocuments: (memberId: TeamMemberId | null) => Promise<number>;
   };
 }
 
@@ -267,6 +274,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
           },
           logger,
         ),
+      settleDocuments: (memberId) => createDrizzleSettlementStore(deps.adminDb).settleUnscoped(memberId),
     },
   };
 }

@@ -30,7 +30,7 @@ import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice 
 import type { PayrollInvoiceStore } from '../domain/ports';
 
 import { reviewOf } from './document-rows';
-import { enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
+import { enqueueDocumentSettle, enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
 import { CountedSchema } from './read-store';
 import { regimeVatOf } from './regime-store';
 import type { PayInputReads } from './snapshot';
@@ -413,6 +413,8 @@ async function writeDocument(
   await enqueueInvoicePdfRender(tx, id);
   // Its tacit acceptance at its deadline, unless the contractor answers first (ADR 0039 § 1).
   await enqueueInvoiceLapse(tx, id, document.acceptanceDeadline);
+  // Settled by its transfer if that is paid already (a file that held it back), else once it is (EQ-06 lot 7a).
+  await enqueueDocumentSettle(tx, statement.memberId);
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId: null,

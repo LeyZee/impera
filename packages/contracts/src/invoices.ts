@@ -89,7 +89,12 @@ export const INVOICE_ACCEPTANCE_STATES = [
 export const InvoiceAcceptanceStateSchema = z.enum(INVOICE_ACCEPTANCE_STATES);
 export type InvoiceAcceptanceState = z.infer<typeof InvoiceAcceptanceStateSchema>;
 
-/** A step of an invoice's life, each dated in `invoice_events`, added only. */
+/**
+ * A step of an invoice's life, each dated in `invoice_events`, added only. The last three settle a document in full,
+ * once, and name the statement that settles it (EQ-06 lot 7a): `paid`, an invoice by that statement's transfer;
+ * `imputed`, a credit note deducted from it; `compensated`, a document whose debt ends with no transfer, at a statement
+ * whose cumulated total is zero, or below zero for an invoice (ADR 0038, art. 1347 du Code civil).
+ */
 export const INVOICE_EVENT_KINDS = [
   'issued',
   'accepted',
@@ -98,6 +103,8 @@ export const INVOICE_EVENT_KINDS = [
   'contest_upheld',
   'contest_refused',
   'paid',
+  'imputed',
+  'compensated',
 ] as const;
 export const InvoiceEventKindSchema = z.enum(INVOICE_EVENT_KINDS);
 export type InvoiceEventKind = z.infer<typeof InvoiceEventKindSchema>;
@@ -730,7 +737,7 @@ export const InvoiceSchema = z
   );
 export type Invoice = z.infer<typeof InvoiceSchema>;
 
-/** A dated step of an invoice: who made it (`null` for a job), its reason, and the statement that paid it. */
+/** A dated step of an invoice: who made it (`null` for a job), its reason, and the statement that settled it (`paid`, `imputed`, `compensated`). */
 export const InvoiceEventSchema = z.object({
   id: InvoiceEventIdSchema,
   invoiceId: InvoiceIdSchema,

@@ -793,6 +793,15 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         );
       },
     ),
+    'payroll.settle_documents': defineTask(
+      'payroll.settle_documents',
+      JOB_PAYLOADS['payroll.settle_documents'],
+      logger,
+      async (payload, context) => {
+        const settled = await modules.payroll.jobs.settleDocuments(payload.memberId);
+        context.logger.info({ memberId: payload.memberId, settled }, 'payroll: documents settled');
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

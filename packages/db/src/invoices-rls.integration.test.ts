@@ -1382,7 +1382,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       await event(owner, id, 'contest_refused', { reason: 'La prime est sur la quinzaine suivante' });
     });
 
-    it('a payment is an invoice’s, by a paid statement of its contractor, of its period or a later one, once', async () => {
+    it('a settlement is the job’s alone, by the statement the document’s walk ends at, once (EQ-06 lot 7a)', async () => {
       const pay = (id: string, paidOn: string, paymentReference: string) =>
         as(owner, (tx) =>
           tx
@@ -1399,30 +1399,75 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
             .where(eq(s.commissionStatements.id, id)),
         );
       const paid = statement(kofi, '2026-08-01');
+      const later = statement(kofi, '2026-09-01');
       await pay(paid, '2026-08-20', 'WR-0001');
-      expect(await failure(event(owner, invoice('kofi-aug1'), 'paid'))).toMatch(KEPT);
+      // The owner records none any more, nor the contractor: the job reconciles transfers and documents. A settlement
+      // with an author is the trigger's to refuse, one without the policy's.
+      expect(await failure(event(owner, invoice('kofi-aug1'), 'paid', { statementId: paid }))).toMatch(KEPT);
+      expect(await failure(event(kofi, invoice('kofi-aug1'), 'paid', { statementId: paid }))).toMatch(KEPT);
+      for (const userId of [owner, kofi])
+        expect(
+          await failure(
+            as(userId, (tx) =>
+              tx.insert(s.invoiceEvents).values({
+                id: newId(InvoiceEventIdSchema),
+                invoiceId: invoice('kofi-aug1'),
+                kind: 'paid',
+                statementId: paid,
+                by: null,
+              }),
+            ),
+          ),
+        ).toMatch(RLS);
+      // A settlement names its statement, never another one than where the walk ends, never with an author.
+      expect(await failure(event(null, invoice('kofi-aug1'), 'paid'))).toMatch(KEPT);
+      expect(await failure(event(kofi, invoice('kofi-aug16'), 'accepted', { statementId: paid }))).toMatch(
+        /invoice_events_values_check/u,
+      );
       expect(
         await failure(
-          event(owner, invoice('kofi-aug16'), 'paid', { statementId: statement(kofi, '2026-08-16') }),
+          event(null, invoice('kofi-aug16'), 'paid', { statementId: statement(kofi, '2026-08-16') }),
         ),
       ).toMatch(KEPT);
-      expect(await failure(event(owner, invoice('ama-aug1'), 'paid', { statementId: paid }))).toMatch(KEPT);
-      // Never a credit note's (the reconciliation imputes it), never by a statement before the invoice's period.
-      expect(await failure(event(owner, invoice('kofi-aug1-credit'), 'paid', { statementId: paid }))).toMatch(
+      expect(await failure(event(null, invoice('kofi-aug16'), 'paid', { statementId: paid }))).toMatch(KEPT);
+      expect(await failure(event(null, invoice('ama-aug1'), 'paid', { statementId: paid }))).toMatch(KEPT);
+      expect(
+        await failure(
+          admin((tx) =>
+            tx.insert(s.invoiceEvents).values({
+              id: newId(InvoiceEventIdSchema),
+              invoiceId: invoice('kofi-aug1'),
+              kind: 'paid',
+              statementId: paid,
+              by: owner,
+            }),
+          ),
+        ),
+      ).toMatch(KEPT);
+      // An invoice is paid or compensated, never imputed; a credit note imputed or compensated, never paid.
+      expect(await failure(event(null, invoice('kofi-aug1'), 'imputed', { statementId: paid }))).toMatch(
         KEPT,
       );
-      expect(await failure(event(owner, invoice('kofi-aug16'), 'paid', { statementId: paid }))).toMatch(KEPT);
-      expect(await failure(event(kofi, invoice('kofi-aug1'), 'paid', { statementId: paid }))).toMatch(RLS);
-      await event(owner, invoice('kofi-aug1'), 'paid', { statementId: paid });
-      expect(await failure(event(owner, invoice('kofi-aug1'), 'paid', { statementId: paid }))).toMatch(
-        /invoice_events_paid_unique/u,
+      expect(await failure(event(null, invoice('kofi-aug1'), 'compensated', { statementId: paid }))).toMatch(
+        KEPT,
       );
-      // A later statement pays what was carried over.
-      const later16 = statement(kofi, '2026-08-16');
-      await pay(later16, '2026-09-04', 'WR-0002');
-      await event(owner, invoice('kofi-aug1'), 'paid', { statementId: later16 });
-      // Issued, accepted, paid twice; issued, contested, upheld; issued, lapsed; the three credit notes issued, the
-      // last one contested and its contest refused.
+      // The credit note's statement is validated at a positive total, not paid yet: it waits.
+      for (const kind of ['paid', 'imputed', 'compensated'])
+        expect(await failure(event(null, invoice('kofi-aug1-credit'), kind, { statementId: later }))).toMatch(
+          KEPT,
+        );
+      await event(null, invoice('kofi-aug1'), 'paid', { statementId: paid });
+      expect(await failure(event(null, invoice('kofi-aug1'), 'paid', { statementId: paid }))).toMatch(
+        /invoice_events_settled_unique/u,
+      );
+      // Its statement paid, the credit note is deducted from that transfer, once and of one kind.
+      await pay(later, '2026-09-20', 'WR-0002');
+      await event(null, invoice('kofi-aug1-credit'), 'imputed', { statementId: later });
+      expect(
+        await failure(event(null, invoice('kofi-aug1-credit'), 'compensated', { statementId: later })),
+      ).toMatch(KEPT);
+      // Issued, accepted, paid; issued, contested, upheld; issued, lapsed; the three credit notes issued, the first one
+      // imputed, the last one contested and its contest refused.
       expect(await as(kofi, (tx) => tx.select().from(s.invoiceEvents))).toHaveLength(14);
     });
 

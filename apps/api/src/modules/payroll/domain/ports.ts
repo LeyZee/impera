@@ -651,6 +651,16 @@ export interface PayrollDocumentReminderStore {
   remindUnscoped(): Promise<number>;
 }
 
+/**
+ * `payroll.settle_documents`, as the jobs (`withAdmin`, EQ-06 lot 7a): under each contractor's lock, his statements,
+ * carry-overs and documents read, and the settlements `settlementsDue` finds written (`paid`, `imputed` or
+ * `compensated`, with their lines of `audit_log`). Returns how many were written.
+ */
+export interface PayrollSettlementStore {
+  /** One contractor, or every contractor with a document not settled yet (`null`). */
+  settleUnscoped(memberId: TeamMemberId | null): Promise<number>;
+}
+
 /** A refused document's file, as the purge reads it: where it lies and what it is. */
 interface RefusedFile {
   readonly documentId: ContractorDocumentId;

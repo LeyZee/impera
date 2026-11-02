@@ -83,6 +83,15 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '51 3 * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.purge_refused_documents'] },
   },
+  // The reconciliation of transfers with documents (EQ-06 lot 7a), for every contractor once a night: its own job runs
+  // when a statement is validated or paid or a document issued; this catches one that failed or was lost. Writes only what is
+  // missing, no backfill.
+  {
+    task: 'payroll.settle_documents',
+    match: '33 4 * * *',
+    payload: { memberId: null },
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.settle_documents'] },
+  },
   // The waiting invoices tried again once a day, whatever their trigger (EQ-06 « ok pays »): a member whose country goes
   // back to that of his regime, or any change no trigger of this module sees (the team module never calls payroll),
   // lets his invoices go out within the day. Each statement that waited is enqueued under its own key (a run that waits

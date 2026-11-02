@@ -54,6 +54,7 @@ export const JOB_NAMES = [
   'payroll.sweep_invoice_acceptance',
   'payroll.remind_documents',
   'payroll.purge_refused_documents',
+  'payroll.settle_documents',
   'media.describe',
   'providers.check_credentials',
   'telegram.scan',
@@ -189,6 +190,14 @@ export const JOB_PAYLOADS = {
    * has its file erased from the bucket; its row and its check stay (`contractor_document_purges`).
    */
   'payroll.purge_refused_documents': z.object({}),
+  /**
+   * The reconciliation of a contractor's transfers with his documents (EQ-06 lot 7a): each document is settled by the
+   * first statement its carry-overs lead to that ends its debt: paid (`paid` for an invoice, `imputed` for a credit
+   * note), or validated at a cumulated total of zero, or below zero for an invoice (`compensated`, ADR 0038). Enqueued
+   * when a statement is validated or paid and when documents are issued, under the key
+   * `payroll.settle_documents:<memberId>`; each night for every contractor (`null`). Writes only what is missing.
+   */
+  'payroll.settle_documents': z.object({ memberId: TeamMemberIdSchema.nullable() }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -247,6 +256,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.remind_documents': 1,
   // Each night: the next night is the retry, and an erasure is recorded once its file is gone.
   'payroll.purge_refused_documents': 1,
+  // Replayable: it writes only the settlements still missing, under the contractor's lock.
+  'payroll.settle_documents': 5,
   'media.describe': 3,
   'providers.check_credentials': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
