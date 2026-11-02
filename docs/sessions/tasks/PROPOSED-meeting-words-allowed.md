@@ -9,7 +9,7 @@ La garde bloquante `platform_meeting_word` (P3-13) bloquait « rdv », « rendez
 
 ## À faire
 - [x] Retirer `platform_meeting_word` de `checkVoiceOutput` et sa liste (`PLATFORM_MEETING_WORDS`, `PLATFORM_MEETING_WORDS_VERSION`).
-- [x] Garder le code dans `GUARD_CODES` (un code n'en sort jamais) et le marquer obsolète (`OBSOLETE_GUARD_CODES`) ; libellés du Suivi et du Playground gardés pour les refus déjà enregistrés, dits « garde retirée ».
+- [x] Garder le code dans `GUARD_CODES` (un code n'en sort jamais) et le marquer obsolète (`OBSOLETE_GUARD_CODES`) ; libellé du Playground (qui relit l'historique) dit « garde retirée » ; libellé web gardé en « un mot de rencontre », que le type exige mais qu'aucun serveur n'envoie plus.
 - [x] Élargir `meeting_promise` aux rencontres proposées avec ces mots : « on se fait un rdv », « on prend rendez-vous », « rdv samedi », « rendez-vous le 06/12 », « rdv au café », « je te donne rendez-vous devant… », « on se voit en vrai ? », « on pourrait se rencontrer IRL ». « Rdv au prochain live » reste permis.
 - [x] Tests : les refus passent, les propositions bloquent sous `meeting_promise`, réponses types de la persona (422) alignées.
 - [x] Éval `meeting-refusal-no-word` devenue `meeting-refusal-no-promise` : sans date, sans lieu, sans promesse ; les mots ne sont plus interdits.
