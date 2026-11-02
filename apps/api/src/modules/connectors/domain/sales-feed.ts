@@ -181,7 +181,7 @@ export interface LinkedAccount {
 }
 
 /** A link as stored: `linkedBy` null when it was posed by the handle at connection. */
-export interface ModelLink extends LinkedAccount {
+interface ModelLink extends LinkedAccount {
   readonly linkedBy: string | null;
 }
 
