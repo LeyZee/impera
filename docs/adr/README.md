@@ -32,7 +32,7 @@ Date : AAAA-MM-JJ
 | 0005 | Postgres + Drizzle + RLS par `creator_id` | accepted |
 | 0006 | Graphile Worker, une file série par conversation | accepted |
 | 0007 | Journal d'événements de conversation comme source de vérité | accepted |
-| 0008 | Port `PlatformConnector` ; Reveal via session capturée et client API serveur | accepted |
+| 0008 | Port `PlatformConnector` ; Reveal via session capturée et client API serveur | accepted (complétée par 0050 : l'API CRM pour les ventes et les chiffres) |
 | 0009 | Passerelle LLM unique, trois rôles, règles métier dans le code | accepted |
 | 0010 | Persona = donnée versionnée (YAML + schéma Zod), pas du code | accepted |
 | 0011 | Argent en unités mineures entières ; identifiants UUID v7 typés | accepted |
@@ -42,7 +42,7 @@ Date : AAAA-MM-JJ
 | 0015 | Design system partagé dans `packages/design-system` | accepted |
 | 0016 | Clés des fournisseurs IA saisies dans le dashboard, chiffrées en base | accepted |
 | 0017 | Vision : Gemini en natif, bascule sur Grok en images clés | accepted |
-| 0018 | Port connecteur étendu : scripts natifs, notes, coffre, médias, garde d'écriture | accepted |
+| 0018 | Port connecteur étendu : scripts natifs, notes, coffre, médias, garde d'écriture | accepted (l'alternative « un second port » remplacée par 0050 pour les ventes et les chiffres) |
 | 0019 | Deux taux (au playground, en réel) et la règle qui ouvre le mode Automatique | accepted |
 | 0020 | Notifications Telegram : bots, groupes et routage gérés depuis le CRM | proposed |
 | 0021 | Rester en personnage est fixé dans le code, sans réglage | accepted |
@@ -67,10 +67,11 @@ Date : AAAA-MM-JJ
 | 0040 | Factures : « annuler et refacturer » émet une facture rectificative, sous le régime de la facture annulée | accepted (remplace dans 0039 § 3 la ligne refacturée sur la facture du jour) |
 | 0041 | Factures : l'attestation de résidence fiscale conditionne le versement, pas la facture | accepted (remplace dans 0023 § Factures la phrase sur l'attestation, et les choix (a) et « ok année civile » du lot 5c) |
 | 0042 | Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche | accepted (remplace dans 0023 la phrase de § Rôles sur la créatrice, dans 0024 sa ligne du rail, dans 0030 § 3 la référence de `validated_by`) |
-| 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | accepted (précise 0023 et EQ-03) |
+| 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | accepted (précise 0023 et EQ-03 ; au § 4, la vente sans attribution remplacée par 0050) |
 | 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | accepted (remplace 0030 § 2 et § 4 pour le seul contenu déposé) |
 | 0045 | Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt | accepted (remplace dans 0031 la phrase « la seule porte ») |
 | 0046 | Accès au dashboard : deuxième facteur, connexions bornées, alertes de sécurité | accepted (remplace security.md § 1 sur l'exposition du dashboard) |
 | 0047 | Ranger le code qui a grossi : la paie en quatre modules, l'argent calculé par le seul serveur, l'assemblage par module, le dashboard par domaine | accepted (précise 0002) |
 | 0048 | L'IA dans le calendrier des shifts : ses heures se lisent à côté de celles des chatteurs | accepted (précise 0045) |
 | 0049 | Créneaux libres, plusieurs chatteurs sur un compte, fans confiés ; la créatrice sans notification de shift | accepted (remplace le réglage de créneaux d'EQ-02, la contrainte d'un membre par compte et 0045 § 4 pour la créatrice) |
+| 0050 | Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste | accepted (complète 0008 ; remplace dans 0018 l'alternative « un second port » pour les ventes et les chiffres, dans 0043 § 4 la vente sans attribution ; précise 0023, dont la base de la paie détectée, 0025, 0049) |

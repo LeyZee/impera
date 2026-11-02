@@ -105,6 +105,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Cooldown | `cooldown` | Délai pendant lequel le bot ne pousse pas de vente. |
 | Connecteur | `connector` | Adaptateur d'une plateforme derrière le port `PlatformConnector`. |
 | Clé de fournisseur | `provider_credential` | Clé d'API d'un fournisseur IA (xAI, Google, ElevenLabs…), saisie dans Réglages › Modèles IA et chiffrée en base (ADR 0016). À l'écran, on parle de « services », jamais de « connecteurs ». |
+| API CRM | `crm_api` | L'API officielle de Reveal, à clé d'agence : statistiques, équipe, ventes une par une. Elle ne lit pas les conversations et n'envoie rien (ADR 0050). |
+| Flux de ventes | `PlatformSalesFeed` | Le port qui lit les ventes, les remboursements et les chiffres d'une plateforme par curseur, sans session ; distinct du connecteur (ADR 0050). |
 | Session (plateforme) | `platform_session` | Les jetons/cookies capturés qui permettent au connecteur d'agir. |
 | Jeton d'appareil | `device token` | Secret de l'extension pour déposer une session (`POST /v1/connector/sessions`, `EXTENSION_DEVICE_TOKEN`). |
 | Composeur | `DraftComposer` | Le port par lequel `conversation.respond` demande un brouillon au moteur ; il rend des bulles ou une retenue (`held`) avec sa raison. |

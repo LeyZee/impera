@@ -1,0 +1,5 @@
+# 2026-11-02 — ADR 0050 : Reveal à deux voies, API CRM et session capturée — done
+Fait : documentation de Paramètres › CRM / API de Reveal lue ; comparaison à l'inventaire du connecteur et aux ADR 0008, 0018, 0023, 0025, 0043, 0044, 0049 ; ADR 0050 écrite après le « ok 0050 » de Charles ; index des ADR, glossaire et `connectors.md` à jour.
+Décisions : l'extension et la session capturée restent pour tout ce qui touche aux conversations ; second port `PlatformSalesFeed` lu par curseur ; `listTransactions` n'est pas branché sur cette source ; dans l'ADR 0043 § 4, seuls `ppv`, `tip` et `paid_message` sans chatteur envoient le rapport au valideur ; la paie détectée part de `netAmount` (« ok netAmount » de Charles), après une comparaison sur une quinzaine passée.
+Pas fait : aucun code, aucune clé créée, aucun appel réel à l'API. CGU de Reveal non lues.
+Découvertes : la documentation cite « les bots des clés d'API », alors que la clé décrite n'écrit rien ; question à poser au support de Reveal. Le lot de code (port, adaptateur, FakeReveal) n'a pas encore de fiche.
