@@ -194,7 +194,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     db: db.db,
     adminDb: adminDb.db,
     requireRole,
-    recentLogin: createRequireRecentLogin(auth),
+    recentLogin: createRequireRecentLogin(auth, db.db),
   };
 
   // Each module is built by its own `wiring/` file (ADR 0047 § 3); this file keeps the order and what they share.

@@ -184,7 +184,16 @@ beforeEach(() => {
           team: { netMinor: 75_000, collective: { reachedBps: 5_000, tier: null } },
         }),
       ],
-      { collectiveGoal: goalOf(NOV1), bonusTiers: TIERS },
+      {
+        collectiveGoal: goalOf(NOV1),
+        bonusTiers: TIERS,
+        // A member reads only the share of the goal, and the one forecast of it the owner reads too (« ok A »).
+        pace: {
+          lateNetMinor: null,
+          forecastNetMinor: null,
+          goal: { reachedBps: 5_000, forecastReachedBps: 15_000 },
+        },
+      },
     ),
   };
   serve();
@@ -231,6 +240,7 @@ describe('CommissionsPage', () => {
     );
     expect(text(performance)).toContain('Objectif de l’équipe : 50 %');
     expect(text(performance)).toContain('À 80 %, +10,00 € pour toi ; à 100 %, +25,00 €.');
+    expect(text(performance)).toContain('La marque est là où l’équipe finit à ce rythme.');
     // The team's net is the agency's figure: never said to a chatter.
     expect(text(performance)).not.toContain('750,00');
     expect(text(performance)).not.toContain('1 500,00');

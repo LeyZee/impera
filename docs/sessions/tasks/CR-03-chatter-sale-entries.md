@@ -30,3 +30,5 @@ Le chatteur saisit chaque vente (fan, montant, type) depuis son téléphone, voi
 Le contrôle par les ventes de Reveal et la validation automatique (CR-09) ; les retours de l'IA (CR-10).
 
 ## Notes de session
+
+- 2026-11-02 (fil API CRM) : l'ADR 0050 § 10 (option 3 validée par Charles) retire la saisie d'un compte Reveal dès sa bascule en source « détectée » ; elle reste jusqu'à la bascule et sur les autres plateformes. Recommandation : décider de l'ordre avant de commencer cette fiche, car si le flux de ventes arrive avant elle, « + Vente » n'a plus d'utilité sur Reveal, seule plateforme branchée aujourd'hui.

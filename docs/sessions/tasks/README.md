@@ -95,11 +95,17 @@ Branche : task/<id>-<slug>
 | CR-11 | Mass DM : les médias déposés, envoyés aux listes de fans, jamais deux fois | espaces | blocked (capture Reveal) | CR-06, CR-08, la capture Reveal |
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
+| CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | todo | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
+| CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | todo | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
+| CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
+| CRM-04 | Ventes en direct : alertes Telegram, bilan et revenus de la créatrice | API CRM | todo | CRM-01 |
+| CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | todo | CRM-01, CRM-03 pour les ventes en attente |
+| CRM-06 | CA de l'agent et achats dans la mémoire du fan | API CRM | todo | CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | todo | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | todo | ADR 0046, SEC-02 |
 | SEC-04 | Réglages › Sécurité et alertes de sécurité | exploitation | todo | ADR 0046, ADR 0020, SEC-02 |
-| ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | in_progress | ADR 0047 |
+| ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | in_progress | ADR 0047 |

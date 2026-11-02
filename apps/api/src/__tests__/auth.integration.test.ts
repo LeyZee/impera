@@ -260,6 +260,28 @@ describe('dashboard authentication (P0-07a)', () => {
     expect(users).toEqual([]);
   });
 
+  it('refuses a session opened more than 7 days ago, however much it is used (ADR 0046 § 6)', async () => {
+    const cookie = await signIn(server, OPERATOR.email, OPERATOR.password);
+    const me = () => server.inject({ method: 'GET', url: '/v1/me', headers: { cookie } });
+    const age = (interval: string) =>
+      test.admin.db.execute(
+        sql`update "session" set created_at = now() - ${interval}::interval where user_id = (select id from "user" where email = ${OPERATOR.email})`,
+      );
+    await age('6 days 23 hours');
+    expect((await me()).statusCode).toBe(200);
+    const count = async () =>
+      (
+        await test.admin.db.execute(
+          sql`select 1 from "session" where user_id = (select id from "user" where email = ${OPERATOR.email})`,
+        )
+      ).rows.length;
+    const before = await count();
+    await age('7 days 1 minute');
+    expect((await me()).statusCode).toBe(401);
+    // The refused session is gone, not only turned away.
+    expect(await count()).toBe(before - 1);
+  });
+
   it('signs out and the session stops working', async () => {
     const cookie = await signIn(server, OWNER.email, OWNER.password);
     const out = await server.inject({
