@@ -393,6 +393,13 @@
       "when": 1793574914709,
       "tag": "0055_contractor_document_expiring",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1793574974709,
+      "tag": "0056_telegram_document_expiring",
+      "breakpoints": true
     }
   ]
 }
