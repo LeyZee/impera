@@ -4,4 +4,4 @@ Pas fait : la lecture du champ par l'écran (`statementPeriodOf` d'Extension, en
 Décisions : un champ de la liste plutôt qu'une lecture du relevé par l'écran : la facture rectificative a une échéance, elle peut être en ambre ou en rouge dans « Échéances proches ou passées », hors de toute liste par quinzaine, et le propriétaire doit rejoindre le relevé qui la paie. Découverte d'Extension sur #374.
 Découvertes : aucune.
 Candidats à suppression : aucun.
-Vérifié : intégration `payroll-invoice-list` contre Postgres 16 (la facture mène à sa quinzaine ; l'avoir émis sous Q2 imprime Q1 et mène à Q2, sous la quinzaine comme dans une liste par jours d'émission) ✓.
+Vérifié : intégration `payroll-invoice-list` contre Postgres 16 (la facture mène à sa quinzaine ; l'avoir émis sous Q2 imprime Q1 et mène à Q2, sous la quinzaine comme dans une liste par jours d'émission ; la chatteuse lit la quinzaine de son propre relevé, jamais `null` sous la politique des relevés ; un avoir sans relevé, écrit comme le ferait un import, rend `statementId` et `statementPeriod` à `null` et reste sous la quinzaine qu'il corrige ; demandes de Bilan sur #375) ✓.

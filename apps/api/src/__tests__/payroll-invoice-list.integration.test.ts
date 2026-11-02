@@ -1,6 +1,8 @@
 import {
   calendarDayAt,
   CommissionStatementIdSchema,
+  InvoiceEventIdSchema,
+  InvoiceIdSchema,
   InvoiceListSchema,
   newId,
   PayAdjustmentIdSchema,
@@ -158,9 +160,14 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
     });
     // An active manager reads the team's; a contractor only her own, whatever she asks.
     expect(await documents(monaCookie, `period=${Q1}`)).toEqual(all);
-    expect((await documents(leaCookie, `period=${Q1}`)).documents.map((one) => one.id)).toEqual([
-      leaInvoice.id,
-    ]);
+    // Her statement is hers under the policy of the statements: its quinzaine reads, never `null` for her.
+    expect(
+      (await documents(leaCookie, `period=${Q1}`)).documents.map((one) => [
+        one.id,
+        one.statementId,
+        one.statementPeriod,
+      ]),
+    ).toEqual([[leaInvoice.id, (await team.statementOf(lea, Q1)).id, Q1]]);
     expect((await documents(leaCookie, `period=${Q1}&memberId=${theo.id}`)).documents).toEqual([]);
     expect(
       (await documents(team.owner, `from=${today}&to=${today}&memberId=${lea.id}`)).documents.map(
@@ -327,5 +334,77 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
       ['credit_note', -400, { kind: 'compensated', statementId: statement.id, on: today }, 'settled'],
       ['invoice', 400, { kind: 'compensated', statementId: statement.id, on: today }, 'settled'],
     ]);
+  });
+
+  it('gives a credit note no validation issued neither a statement nor its quinzaine, listed under the one it corrects', async () => {
+    // No route issues one today (every document comes from a statement); the base allows it, as the contract says:
+    // written here as an import would, on Théo's invoice, the next number of his counter.
+    const invoice = await invoiceOf(theo);
+    // Its line copies the kind and the words of a credit note's line the job wrote (Léa's, under Q2).
+    const [model] = await team.test.admin.db
+      .select()
+      .from(schema.invoiceLines)
+      .where(eq(schema.invoiceLines.invoiceId, (await invoiceOf(lea, 'credit_note', Q2)).id));
+    if (model === undefined) throw new Error('no line on Léa’s credit note');
+    const year = Number(today.slice(0, 4));
+    const vatMinor = Math.round((-100 * invoice.vatMinor) / invoice.exclVatMinor);
+    const id = newId(InvoiceIdSchema);
+    await team.test.admin.db.transaction(async (tx) => {
+      // The document, its line and its event `issued`, in one transaction, as the base requires at commit.
+      const counterOf = and(
+        eq(schema.invoiceCounters.memberId, theo.id),
+        eq(schema.invoiceCounters.year, year),
+      );
+      const [counter] = await tx.select().from(schema.invoiceCounters).where(counterOf).for('update');
+      if (counter === undefined) throw new Error('no counter for Théo');
+      const sequence = counter.lastSequence + 1;
+      await tx.update(schema.invoiceCounters).set({ lastSequence: sequence }).where(counterOf);
+      await tx.insert(schema.invoices).values({
+        id,
+        kind: 'credit_note',
+        memberId: theo.id,
+        statementId: null,
+        creditedInvoiceId: invoice.id,
+        reissuedInvoiceId: null,
+        period: invoice.period,
+        prefix: invoice.prefix,
+        year,
+        sequence,
+        number: `${invoice.prefix}-${String(year)}-${String(sequence).padStart(4, '0')}`,
+        idempotencyKey: `test:credit-without-statement:${invoice.id}`,
+        issuedOn: today,
+        dueOn: today,
+        contractor: invoice.contractor,
+        agency: invoice.agency,
+        regimeId: invoice.regimeId,
+        regime: invoice.regime,
+        mentions: invoice.mentions,
+        exclVatMinor: -100,
+        vatMinor,
+        inclVatMinor: -100 + vatMinor,
+        selfAssessedVatMinor: 0,
+        acceptanceDeadline: new Date(Date.now() + 15 * DAY),
+      });
+      await tx.insert(schema.invoiceLines).values({
+        invoiceId: id,
+        position: 1,
+        kind: model.kind,
+        label: model.label,
+        detail: model.detail,
+        amountMinor: -100,
+      });
+      await tx
+        .insert(schema.invoiceEvents)
+        .values({ id: newId(InvoiceEventIdSchema), invoiceId: id, kind: 'issued', by: null });
+    });
+
+    const listed = await documents(team.owner, `period=${Q1}&memberId=${theo.id}`);
+    expect(listed.documents.find((one) => one.id === id)).toMatchObject({
+      kind: 'credit_note',
+      period: Q1,
+      statementId: null,
+      statementPeriod: null,
+      creditedInvoiceId: invoice.id,
+    });
   });
 });
