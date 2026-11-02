@@ -188,6 +188,35 @@ describe('Paie › Relevés : la liste des quinzaines (EQ-05)', () => {
       expect(await read(cookie)).toEqual({ period: Q1, closedAt, closedBy: null, exchangeRates: null });
   });
 
+  it('gives in the period itself the same sums as its line of the list, for every reader (ADR 0047 § 2)', async () => {
+    const detail = async (cookie: string, period: PayPeriod) => {
+      const response = await team.call('GET', `/payroll/periods/${period}`, cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return PayrollPeriodSchema.parse(response.json());
+    };
+    for (const cookie of [team.owner, monaCookie, theoCookie, leaCookie]) {
+      const page = await list(cookie);
+      for (const item of page.items) {
+        const { statements, netMinor, payableMinor, validatedPayableMinor, carriedMinor, paidMinor } = item;
+        expect((await detail(cookie, item.window.period)).summary).toEqual({
+          statements,
+          netMinor,
+          payableMinor,
+          validatedPayableMinor,
+          carriedMinor,
+          paidMinor,
+        });
+      }
+    }
+    // Without a collective goal, a member reads no pace of the team: neither its net nor its late reports.
+    expect((await detail(theoCookie, Q2)).pace).toEqual({
+      lateNetMinor: null,
+      forecastNetMinor: null,
+      goal: null,
+    });
+    expect((await detail(team.owner, Q2)).pace).toMatchObject({ lateNetMinor: 0, goal: null });
+  });
+
   it('pages from the most recent period, and refuses a cursor it did not give', async () => {
     const first = await list(team.owner, '?limit=1');
     expect(first.items.map((item) => item.window.period)).toEqual([Q2]);
