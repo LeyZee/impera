@@ -298,11 +298,11 @@ describe('decisionError', () => {
       decisionError(
         422,
         apiError('draft_unprocessable', {
-          guards: ['platform_meeting_word', 'fake_emergency', 'not_a_guard'],
+          guards: ['meeting_promise', 'fake_emergency', 'not_a_guard'],
         }),
       ),
     ).toBe(
-      'Ce message ne peut pas partir : un mot de rencontre que Reveal repère, une maladie, une dette ou une urgence pour vendre. Retouche-le ou refuse-le.',
+      'Ce message ne peut pas partir : une promesse de rencontre, une maladie, une dette ou une urgence pour vendre. Retouche-le ou refuse-le.',
     );
     expect(decisionError(422, apiError('draft_unprocessable'))).toBe(
       'Ce message ne peut pas partir : une garde le bloque. Retouche-le ou refuse-le.',

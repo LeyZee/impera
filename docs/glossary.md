@@ -64,7 +64,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Sexualisation | `sexualization` | Le moment où la conversation devient sexy, et la stratégie qui le règle. |
 | Note de désir | `desire_score`, `desire_band` | La tension sexuelle d'un fan, de 0 à 100, comptée par le code à partir de signaux fermés et qui retombe quand il se tait ; trois bandes : neutre (`neutral`, 0 à 39), joueur (`playful`, 40 à 69), chaud (`hot`, 70 à 100). Elle ne fait que retenir l'ouverture de l'intime et les offres (P3-12). |
 | Didascalie | `stage_direction` | Une action écrite pour que le fan l'imagine (« *sourit* », « (rires) ») : jamais dans un message d'elle, bloquée par une garde de voix (P3-13). |
-| Mot de rencontre repéré | `platform_meeting_word` | Un mot que les plateformes repèrent même dans un refus (« rdv », « se rencontrer », « IRL ») : bloqué, à la différence de la promesse de rencontre (`meeting_promise`) qui bloque l'invitation (P3-13). |
+| Mot de rencontre repéré | `platform_meeting_word` | Obsolète depuis le 02/11 : la garde qui bloquait « rdv », « se rencontrer » ou « IRL » même dans un refus est retirée, Reveal ne repère aucun mot. Le code reste lisible dans les refus déjà enregistrés (`OBSOLETE_GUARD_CODES`) ; une rencontre proposée avec ces mots est une promesse de rencontre (`meeting_promise`). |
 | Fausse urgence | `fake_emergency` | Une maladie, une dette, le loyer ou une urgence invoqués pour vendre, ou une demande d'argent pour elle : bloquée, jamais utilisée pour vendre (P3-13). |
 | Suivi d'offre | `post_offer` | Ce que fait l'agent après un achat ou une offre refusée. |
 | Mot-clé d'alerte | `alert_keyword` | Un mot qui, écrit par un fan, met l'agent en pause pour ce fan et prévient un humain. |

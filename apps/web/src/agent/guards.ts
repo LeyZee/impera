@@ -25,7 +25,8 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   pet_name: 'un petit nom qu’elle n’emploie pas',
   stage_direction: 'une didascalie (« *sourit* », « (rires) »)',
   media_not_sent: 'un média annoncé qui n’est pas joint',
-  platform_meeting_word: 'un mot de rencontre que Reveal repère',
+  // Obsolete since 02/11 (`OBSOLETE_GUARD_CODES`): kept because every code needs its words; no server sends it any more.
+  platform_meeting_word: 'un mot de rencontre',
   fake_emergency: 'une maladie, une dette ou une urgence pour vendre',
   repetition: 'une phrase déjà dite',
   closed_question_streak: 'trop de questions fermées d’affilée',
