@@ -1,5 +1,5 @@
 # ARC-01 Les sommes et la prévision de quinzaine rendues par le serveur
-Statut : in-progress (partie serveur dans cette PR ; retrait côté web par le fil Extension)
+Statut : in_progress (partie serveur dans cette PR ; retrait côté web par le fil Extension)
 Phase : exploitation
 Dépend de : ADR 0047 § 2
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
