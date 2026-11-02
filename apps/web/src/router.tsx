@@ -15,6 +15,8 @@ import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashb
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
 import { GoalsPage } from './screens/pay/GoalsPage';
+import { InvoicesPage } from './screens/pay/InvoicesPage';
+import { MyInvoicesPage } from './screens/pay/MyInvoicesPage';
 import { PeriodPage } from './screens/pay/PeriodPage';
 import { PeriodsPage } from './screens/pay/PeriodsPage';
 import { MyPlanningPage } from './screens/planning/MyPlanningPage';
@@ -338,13 +340,39 @@ const payPeriods = createRoute({
   },
 });
 
-const commissions = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/commissions',
+const payInvoices = createRoute({
+  getParentRoute: () => pay,
+  path: '/factures',
+  validateSearch: parsePaySearch,
+  component: function PayInvoices() {
+    const { quinzaine, membre } = payInvoices.useSearch();
+    const navigate = payInvoices.useNavigate();
+    const { user } = rootRoute.useRouteContext();
+    return (
+      <InvoicesPage
+        user={user}
+        chosen={quinzaine ?? null}
+        member={membre ?? null}
+        onFilter={(filter) => void navigate({ search: filter })}
+      />
+    );
+  },
+});
+
+// Commissions (EQ-06 lot 8): « Relevés », the page of the period, and « Factures », one's own documents.
+const commissions = createRoute({ getParentRoute: () => rootRoute, path: '/commissions' });
+const commissionsIndex = createRoute({
+  getParentRoute: () => commissions,
+  path: '/',
   component: function Commissions() {
     const { user } = rootRoute.useRouteContext();
     return <CommissionsPage user={user} />;
   },
+});
+const commissionsInvoices = createRoute({
+  getParentRoute: () => commissions,
+  path: '/factures',
+  component: MyInvoicesPage,
 });
 
 const train = createRoute({ getParentRoute: () => rootRoute, path: '/entrainer', component: TrainLayout });
@@ -476,8 +504,8 @@ const routeTree = rootRoute.addChildren([
   today,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers]),
-  pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals]),
-  commissions,
+  pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices]),
+  commissions.addChildren([commissionsIndex, commissionsInvoices]),
   settings.addChildren([
     settingsIndex,
     aiModels,
