@@ -42,6 +42,7 @@ import type {
   InvoicePrefixBody,
   InvoicePdfCopyProvider,
   InvoicePdfPlace,
+  JournalAccounts,
   PayAdjustment,
   PayAdjustmentId,
   PayCommissionStatementBody,
@@ -70,6 +71,7 @@ import type { PngSize } from './agency-logo';
 import type { IssueWarning } from './billing';
 import type { InvoicePdfContent, PdfDocumentSource } from './invoice-pdf';
 import type { DocumentNotIssued, InvoicingFacts, InvoicingPlan } from './invoicing';
+import type { JournalContractor } from './journal';
 import type { PeriodBlockReason } from './period-blocks';
 import type { PeriodPlan, PeriodSnapshot, ReportForPay } from './recalculation';
 
@@ -520,6 +522,29 @@ export interface PayrollBillingSettingsStore {
   addLogo(actor: Actor, bytes: Uint8Array, size: PngSize): Promise<{ logo: AgencyLogo; created: boolean }>;
   /** A logo's bytes for its owner's screen, `null` when none has this fingerprint. */
   logoBytes(userId: UserId, sha256: string): Promise<Uint8Array | null>;
+  /**
+   * Saves the export's accounts and journals (EQ-06 lot 7b), the other settings unchanged; the same values again
+   * write nothing. `billing_settings_missing_conflict` before the settings are first saved.
+   */
+  updateAccounts(actor: Actor, body: JournalAccounts): Promise<BillingSettingsView>;
+}
+
+/** What the journal export reads (EQ-06 lot 7b): the accounts, and each contractor with a line in the range. */
+export interface JournalFacts {
+  readonly accounts: JournalAccounts | null;
+  /** Each contractor with a document issued or a transfer made in the range, all their facts for the lettering. */
+  readonly contractors: readonly JournalContractor[];
+  /** The transfers in the range of a contractor with no document, hence no supplier account: left out of the file. */
+  readonly transfersLeftOut: readonly { readonly memberId: TeamMemberId; readonly period: PayPeriod }[];
+}
+
+/**
+ * The journal export (EQ-06 lot 7b), the owner's alone, under their member context (`withMember`). `render` makes the
+ * file from the facts inside the transaction; the audit line is written only once it has, so a refused export leaves
+ * none.
+ */
+export interface PayrollAccountingStore {
+  exportJournal<T>(actor: Actor, from: string, to: string, render: (facts: JournalFacts) => T): Promise<T>;
 }
 
 /**

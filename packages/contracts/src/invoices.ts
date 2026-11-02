@@ -580,14 +580,111 @@ export type ContractAcceptance = z.infer<typeof ContractAcceptanceSchema>;
 /** An accounting account as the accountant gives it, never written in the code. */
 export const AccountCodeSchema = z.string().regex(/^[0-9A-Z]{1,20}$/u, 'Un compte : chiffres et majuscules');
 
-/** The accounts of the purchase journal; the supplier account is followed by the contractor's prefix. */
-export const JournalAccountsSchema = z.object({
-  expense: AccountCodeSchema,
-  supplierPrefix: AccountCodeSchema,
-  vatDeductible: AccountCodeSchema,
-  vatSelfAssessed: AccountCodeSchema,
-});
+/** A journal's code as the accountant gives it (the FEC's `JournalCode`), never written in the code. */
+export const JournalCodeSchema = z
+  .string()
+  .regex(/^[0-9A-Z]{1,8}$/u, 'Un code de journal : chiffres et majuscules');
+
+/**
+ * The accounts and journals of the accounting export (EQ-06 lot 7b), each `null` until the accountant gives it: the
+ * export refuses while one is missing (`journal_accounts_missing_unprocessable`), and never guesses one.
+ *
+ * - `expense`: the contractors' commissions, excluding VAT (a 6… account).
+ * - `supplier`: the collective supplier account (401…); each contractor's own account is it followed by their prefix
+ *   of numbers (`401` and `NORA` give `401NORA`).
+ * - `vatDeductible`: the VAT a contractor charges, which the agency deducts (44566…).
+ * - `vatSelfAssessedDeductible` and `vatSelfAssessedDue`: under reverse charge, the agency deducts (445662…) and owes
+ *   (4452…) the same VAT; two different accounts, never one of the deductible ones for the VAT owed.
+ * - `bank`: the account the transfers leave from (512…).
+ * - `purchaseJournal` and `bankJournal`: the codes of the two journals, different.
+ *
+ * It is also the body of `PUT /v1/payroll/billing-settings/accounts`, the owner only: the other settings do not change,
+ * and Réglages › Facturation must be saved first (`billing_settings_missing_conflict`).
+ */
+export const JournalAccountsSchema = z
+  .object({
+    expense: AccountCodeSchema.nullable(),
+    supplier: AccountCodeSchema.nullable(),
+    vatDeductible: AccountCodeSchema.nullable(),
+    vatSelfAssessedDeductible: AccountCodeSchema.nullable(),
+    vatSelfAssessedDue: AccountCodeSchema.nullable(),
+    bank: AccountCodeSchema.nullable(),
+    purchaseJournal: JournalCodeSchema.nullable(),
+    bankJournal: JournalCodeSchema.nullable(),
+  })
+  .superRefine((accounts, context) => {
+    const due = accounts.vatSelfAssessedDue;
+    if (due !== null && (due === accounts.vatDeductible || due === accounts.vatSelfAssessedDeductible)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['vatSelfAssessedDue'],
+        message: 'La TVA due ne va jamais sur un compte de TVA déductible.',
+      });
+    }
+    if (accounts.purchaseJournal !== null && accounts.purchaseJournal === accounts.bankJournal) {
+      context.addIssue({
+        code: 'custom',
+        path: ['bankJournal'],
+        message: 'Le journal de banque a un autre code que celui des achats.',
+      });
+    }
+  });
 export type JournalAccounts = z.infer<typeof JournalAccountsSchema>;
+
+/** The names of the export's accounts and journals, in their one order: a refusal lists those missing in it. */
+export const JOURNAL_ACCOUNT_NAMES = [
+  'expense',
+  'supplier',
+  'vatDeductible',
+  'vatSelfAssessedDeductible',
+  'vatSelfAssessedDue',
+  'bank',
+  'purchaseJournal',
+  'bankJournal',
+] as const satisfies readonly (keyof JournalAccounts)[];
+export const JournalAccountNameSchema = z.enum(JOURNAL_ACCOUNT_NAMES);
+export type JournalAccountName = z.infer<typeof JournalAccountNameSchema>;
+
+/** The longest range one export reads: two years, a first fiscal year lasting up to 24 months. */
+export const ACCOUNTING_JOURNAL_MAX_DAYS = 731;
+
+const dayNumber = (day: string): number => Date.parse(`${day}T00:00:00Z`) / 86_400_000;
+
+/**
+ * `GET /v1/payroll/accounting/journal?from=…&to=…`, the owner only (EQ-06 lot 7b): the contractors' journal of the
+ * documents issued and the transfers made from `from` to `to`, both included.
+ */
+export const AccountingJournalQuerySchema = z
+  .object({ from: CalendarDaySchema, to: CalendarDaySchema })
+  .refine((query) => query.from <= query.to, { message: 'La fin suit le début', path: ['to'] })
+  .refine((query) => dayNumber(query.to) - dayNumber(query.from) < ACCOUNTING_JOURNAL_MAX_DAYS, {
+    message: 'Deux ans au plus',
+    path: ['to'],
+  });
+export type AccountingJournalQuery = z.infer<typeof AccountingJournalQuerySchema>;
+
+/** The FEC's encoding: the file's bytes are ISO 8859-15. */
+export const ACCOUNTING_JOURNAL_MEDIA_TYPE = 'text/plain; charset=ISO-8859-15';
+
+/**
+ * The journal export: the file's name (never the legal FEC's, `<SIREN>FEC<AAAAMMJJ>.txt`), its bytes in base64, how
+ * many entries it holds, the settled groups left without a letter because their lines do not add up (a contractor
+ * who charges VAT is invoiced including VAT and paid as the statement says), by contractor's prefix and the period of
+ * the statement that settles them, and the transfers it could not write.
+ */
+export const AccountingJournalSchema = z.object({
+  fileName: z.string().regex(/^journal-prestataires_\d{8}_\d{8}\.txt$/u),
+  mediaType: z.literal(ACCOUNTING_JOURNAL_MEDIA_TYPE),
+  content: z.base64(),
+  entryCount: z.number().int().min(0),
+  unbalanced: z.array(z.object({ prefix: InvoicePrefixSchema, period: PayPeriodSchema })),
+  /**
+   * The transfers in the range left out of the file: their contractor has no document, hence no supplier account (a
+   * transfer recorded before pay asked for its invoice, ADR 0041).
+   */
+  transfersLeftOut: z.array(z.object({ memberId: TeamMemberIdSchema, period: PayPeriodSchema })),
+});
+export type AccountingJournal = z.infer<typeof AccountingJournalSchema>;
 
 /** The agency's billing settings: its identity and payment terms on each invoice, the delays, the journal's accounts. */
 export const BillingSettingsSchema = z.object({
@@ -600,7 +697,7 @@ export const BillingSettingsSchema = z.object({
   serviceDescription: ServiceDescriptionSchema.nullable(),
   /** The fingerprint of the logo each document prints in its head, `null` for none. */
   logoSha256: Sha256Schema.nullable(),
-  /** The purchase journal's accounts, `null` until the accountant gives them: the export never leaves without. */
+  /** The export's accounts and journals, `null` until first given: the export never leaves without them. */
   accounts: JournalAccountsSchema.nullable(),
   updatedAt: z.iso.datetime(),
 });
@@ -1054,6 +1151,8 @@ export const INVOICE_ERROR_CODES = [
   'agency_logo_invalid',
   /** No logo was added with this fingerprint. */
   'agency_logo_not_found',
+  /** Réglages › Facturation is not saved yet: the accounts come after it. */
+  'billing_settings_missing_conflict',
   'billing_regime_backdated_unprocessable',
   /** The regime is not one of the contractor's country: its mentions and its VAT are another country's. */
   'billing_regime_country_unprocessable',
@@ -1094,6 +1193,8 @@ export const INVOICE_ERROR_CODES = [
   'invoice_correction_unprocessable',
   /** The invoice does not exist, or is not the reader's. */
   'invoice_not_found',
+  /** The export needs every account and journal: those missing in `details.missing` (`JOURNAL_ACCOUNT_NAMES`). */
+  'journal_accounts_missing_unprocessable',
   /** Its PDF is not rendered yet (« PDF en préparation », ADR 0037 § 5). */
   'invoice_pdf_not_found',
   /** Neither bucket gave the PDF with its fingerprint: never an altered file (ADR 0037 § 7). */

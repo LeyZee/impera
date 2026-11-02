@@ -5,13 +5,15 @@ import {
   BillingSettingsViewSchema,
   DEFAULT_DOCUMENT_REMINDER_DAYS,
   InvoiceAgencySchema,
+  JOURNAL_ACCOUNT_NAMES,
+  JournalAccountsSchema,
   type AgencyLogo,
   type BillingSettingsView,
   type UpdateBillingSettingsBody,
 } from '@nirvana/contracts';
 import { eq, schema, withMember, type Transaction, type Database } from '@nirvana/db';
 
-import { AgencyLogoNotFound, PayrollForbidden } from '../domain/errors';
+import { AgencyLogoNotFound, BillingSettingsMissing, PayrollForbidden } from '../domain/errors';
 import type { PayrollBillingSettingsStore } from '../domain/ports';
 
 import { enqueueInvoiceRequeue } from './invoice-queue';
@@ -185,6 +187,33 @@ export function createDrizzlePayrollBillingSettingsStore(
           logo: { sha256, mediaType: 'image/png', ...size, byteLength: bytes.length },
           created,
         };
+      }),
+
+    updateAccounts: (actor, body) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        assertOwner(scope);
+        const [row] = await tx
+          .select({ accounts: billingSettings.accounts })
+          .from(billingSettings)
+          .where(eq(billingSettings.id, ROW))
+          .for('update');
+        if (row === undefined) throw new BillingSettingsMissing();
+        const before = row.accounts === null ? null : JournalAccountsSchema.parse(row.accounts);
+        // The names of what changed, never the accounts themselves.
+        const changed = JOURNAL_ACCOUNT_NAMES.filter((name) => (before?.[name] ?? null) !== body[name]);
+        if (changed.length === 0 && before !== null) return viewOf(tx);
+        await tx
+          .update(billingSettings)
+          .set({ accounts: body, updatedBy: actor.userId, updatedAt: now() })
+          .where(eq(billingSettings.id, ROW));
+        await audit(
+          tx,
+          actor,
+          'billing_settings.accounts',
+          { kind: 'billing_settings', id: String(ROW) },
+          { changed },
+        );
+        return viewOf(tx);
       }),
 
     logoBytes: (userId, sha256) =>

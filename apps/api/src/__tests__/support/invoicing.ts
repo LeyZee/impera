@@ -83,7 +83,7 @@ export async function setUpInvoicing(
       serviceDescription: SERVICE,
       logoSha256,
       documentReminderDays: 30,
-      accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
+      accounts: null,
       updatedBy: team.ownerId,
     });
   }

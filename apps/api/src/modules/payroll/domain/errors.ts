@@ -4,6 +4,7 @@ import {
   type AgencyLogoRefusal,
   type ContractorDocumentDecision,
   type ContractorDocumentRefusal,
+  type JournalAccountName,
   type PayPeriod,
 } from '@nirvana/contracts';
 
@@ -444,6 +445,26 @@ export class AgencyLogoInvalid extends DomainError {
 export class AgencyLogoNotFound extends DomainError {
   constructor() {
     super('agency_logo_not_found', 'Logo introuvable : dépose-le d’abord');
+  }
+}
+
+/** Réglages › Facturation is not saved yet: the accounts come after it (EQ-06 lot 7b). */
+export class BillingSettingsMissing extends DomainError {
+  constructor() {
+    super('billing_settings_missing_conflict', 'Enregistre d’abord Réglages › Facturation, puis les comptes');
+  }
+}
+
+/** The export needs every account and journal the accountant gives: it never guesses one (EQ-06 lot 7b). */
+export class JournalAccountsMissing extends DomainError {
+  constructor(missing: readonly JournalAccountName[]) {
+    super(
+      'journal_accounts_missing_unprocessable',
+      'Des comptes du journal manquent : le comptable les donne',
+      {
+        details: { missing },
+      },
+    );
   }
 }
 

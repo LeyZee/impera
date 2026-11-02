@@ -1,4 +1,10 @@
-import type { AgencyLogo, BillingSettingsView, UpdateBillingSettingsBody, UserId } from '@nirvana/contracts';
+import type {
+  AgencyLogo,
+  BillingSettingsView,
+  JournalAccounts,
+  UpdateBillingSettingsBody,
+  UserId,
+} from '@nirvana/contracts';
 
 import { agencyLogoVerdict, logoSidesFit, type PngReading, type PngSize } from '../domain/agency-logo';
 import { AgencyLogoInvalid, AgencyLogoNotFound } from '../domain/errors';
@@ -15,6 +21,8 @@ export type PngReader = (bytes: Uint8Array, decodable: (size: PngSize) => boolea
 export interface PayrollBillingSettings {
   read(userId: UserId): Promise<BillingSettingsView>;
   update(actor: Actor, body: UpdateBillingSettingsBody): Promise<BillingSettingsView>;
+  /** The accounts and journals of the export (lot 7b), once the settings are saved (`billing_settings_missing_conflict`). */
+  updateAccounts(actor: Actor, body: JournalAccounts): Promise<BillingSettingsView>;
   /**
    * Checks the file and keeps it (`agencyLogoVerdict`): a PNG of at most 512 KB, whole, of sides in bounds, with a
    * transparent pixel; refused with its reason (`agency_logo_invalid`). The settings name it only once saved.
@@ -31,6 +39,7 @@ export function createPayrollBillingSettings(
   return {
     read: (userId) => store.read(userId),
     update: (actor, body) => store.update(actor, body),
+    updateAccounts: (actor, body) => store.updateAccounts(actor, body),
     addLogo: (actor, bytes) => {
       const verdict = agencyLogoVerdict(bytes.length, () => readPng(bytes, logoSidesFit));
       if (verdict.kind === 'refused') return Promise.reject(new AgencyLogoInvalid(verdict.reason));

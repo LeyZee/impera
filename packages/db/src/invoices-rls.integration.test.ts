@@ -357,7 +357,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
           'Aucun escompte. Pénalités de retard au triple du taux d’intérêt légal, indemnité de 40 €.',
         dueDays: 60,
         documentReminderDays: 30,
-        accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
+        accounts: null,
         updatedBy: owner,
       };
       expect(
