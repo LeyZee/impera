@@ -463,13 +463,15 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
         body: `${signal.document === 'invoice' ? `La facture ${signal.number} est contestée` : `L’avoir ${signal.number} est contesté`} par son prestataire. Le motif est dans la Paie, où la contestation est à juger fondée ou à refuser.`,
         link: PAY_LINK,
       };
-    // Important, not urgent, even overdue: the urgent group is for a fan at risk (ADR 0020 §2); money waits for the owner.
+    // Coming due, important; overdue, urgent (ADR 0020 §2, « rouge facture » of Charles, 02/11): the penalties run. Without
+    // a group for the urgent, the important ones still hear of it.
     case 'invoice_due':
       return {
         kind: 'notice',
-        topic: 'important',
+        topic: signal.overdue ? 'urgent' : 'important',
+        ...(signal.overdue && { fallbackTopic: 'important' }),
         threadKey: null,
-        title: 'Important',
+        title: signal.overdue ? 'URGENT' : 'Important',
         body: invoiceDueText(signal),
         link: { label: 'Ouvrir sa fiche', path: `/equipe/membres?membre=${signal.memberId}` },
       };

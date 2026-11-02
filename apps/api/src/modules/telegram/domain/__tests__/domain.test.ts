@@ -280,7 +280,7 @@ describe('classification (ADR 0020 §2)', () => {
     );
   });
 
-  it('says an invoice’s due date, as important, with what blocks its transfer, never its amount nor a name', () => {
+  it('says an invoice’s due date, important then urgent once overdue, with what blocks its transfer, never its amount nor a name', () => {
     const memberId = '018f3e5c-0000-7000-8000-000000000001';
     const due = {
       kind: 'invoice_due',
@@ -305,6 +305,12 @@ describe('classification (ADR 0020 §2)', () => {
     expect(bodyOf({ ...due, payoutBlock: { reason: 'tax_residence_missing', year: '2027' } })).toBe(
       'La facture DEMO-2026-0005 d’un prestataire arrive à échéance le 1er décembre 2026. Son versement est bloqué : l’attestation de résidence fiscale 2027 du prestataire est absente. S’il dépasse l’échéance, des pénalités de retard et l’indemnité forfaitaire de 40 € peuvent être réclamées.',
     );
+    expect(classify({ ...due, overdue: true })).toMatchObject({
+      topic: 'urgent',
+      fallbackTopic: 'important',
+      title: 'URGENT',
+    });
+    expect(classify(due)).not.toHaveProperty('fallbackTopic');
     expect(bodyOf({ ...due, overdue: true })).toBe(
       'La facture DEMO-2026-0005 d’un prestataire a passé son échéance du 1er décembre 2026 sans être réglée : des pénalités de retard et l’indemnité forfaitaire de 40 € peuvent être réclamées.',
     );
