@@ -7,6 +7,7 @@ import { BackupBanner } from './BackupBanner';
 import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
+import { PaperworkBanner } from './PaperworkBanner';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TopFans } from './TopFans';
 import { agentRuns, litParts } from './logic';
@@ -282,6 +283,9 @@ function Loaded({
       />
 
       <BackupBanner enabled={forOwner} />
+
+      {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
+      <PaperworkBanner enabled={forOwner} />
 
       {/* The night's alerts and where they go are the team's (Réglages › Telegram). */}
       {forCreator ? null : <NightBanner night={data.telegram} creatorName={data.creator.name} />}

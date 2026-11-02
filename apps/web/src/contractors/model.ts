@@ -189,6 +189,33 @@ export function reminderText(
     : `Son attestation de vigilance se termine le ${end}.`;
 }
 
+/** A document of the regime whose renewal is due, with what to do, as Aujourd'hui says it to its contractor. */
+export interface FileReminder {
+  readonly kind: ContractorDocumentKind;
+  readonly text: string;
+}
+
+/**
+ * The reminders of one's own file (EQ-06 lot 8d, Aujourd'hui): each document the regime in force asks for whose
+ * `remindFrom` has come, in the regime's order, worded as Moi › Dossier words it. Nothing without a regime: no
+ * document is asked for then.
+ */
+export function fileReminders(
+  file: Pick<ContractorFile, 'documents' | 'today'>,
+  regime: Pick<BillingRegime, 'documents' | 'withholding'> | null,
+): FileReminder[] {
+  if (regime === null) return [];
+  const treaty = regime.withholding === 'treaty_exempt';
+  const reminders: FileReminder[] = [];
+  for (const kind of regime.documents) {
+    const standing = documentStanding(kind, file.documents, file.today);
+    if (standing.kind === 'missing') continue;
+    const text = reminderText(standing.document, file.today, true, treaty);
+    if (text !== null) reminders.push({ kind, text });
+  }
+  return reminders;
+}
+
 /** A document's dates, as the file shows them: its issue, and the end it states. */
 export function documentDatesText(document: ContractorFileDocument): string {
   const issued = `délivrée le ${fullDay(document.issuedOn)}`;

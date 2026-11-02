@@ -6,6 +6,7 @@ import {
   ContractorProfileSchema,
   ContractorRegimeSchema,
   ContractTextsSchema,
+  PendingContractorDocumentsSchema,
   type AssignContractorRegimeBody,
   type BillingRegimes,
   type ContractAcceptance,
@@ -16,6 +17,7 @@ import {
   type ContractorProfileBody,
   type ContractorRegime,
   type ContractTexts,
+  type PendingContractorDocuments,
   type UploadContractorDocumentQuery,
 } from '@nirvana/contracts';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
@@ -48,6 +50,22 @@ export function useContractorFile(memberId: string | null): UseQueryResult<Contr
       return read(`${BASE}/${memberId}/file`, (body) => ContractorFileSchema.parse(body));
     },
     enabled: memberId !== null,
+    refetchInterval: 60_000,
+    retry: 1,
+    retryDelay: 400,
+  });
+}
+
+/**
+ * The documents waiting for the owner's check, the oldest first (EQ-06 complement 5), his own left out by the server;
+ * read only when `enabled` (the owner's Dashboard), again each minute.
+ */
+export function usePendingDocuments(enabled: boolean): UseQueryResult<PendingContractorDocuments> {
+  return useQuery({
+    queryKey: [...FILE_KEY, 'pending'],
+    queryFn: () =>
+      read(`${BASE}/documents?review=pending`, (body) => PendingContractorDocumentsSchema.parse(body)),
+    enabled,
     refetchInterval: 60_000,
     retry: 1,
     retryDelay: 400,

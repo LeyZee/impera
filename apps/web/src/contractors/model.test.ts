@@ -6,6 +6,7 @@ import {
   documentStanding,
   documentStateText,
   earliestRegimeDay,
+  fileReminders,
   identityLines,
   olderDocuments,
   prefixOf,
@@ -360,5 +361,29 @@ describe('the prefix', () => {
     expect(prefixOf(' nora ')).toBe('NORA');
     expect(prefixOf('N')).toBeNull();
     expect(prefixOf('NORA-1')).toBeNull();
+  });
+});
+
+describe('the reminders of one’s own file on Aujourd’hui', () => {
+  it('names each document of the regime whose reminder has come, worded as the file words it', () => {
+    const documents = [documentOf(1)];
+    expect(fileReminders({ documents, today: '2026-11-30' }, BENIN_REGIME)).toEqual([]);
+    expect(fileReminders({ documents, today: '2026-12-01' }, BENIN_REGIME)).toEqual([
+      {
+        kind: 'tax_residence',
+        text: 'Ton attestation se termine le 31 décembre. Sans celle de 2027, tes versements à partir du 1er janvier 2027 seront bloqués : demande-la dès janvier.',
+      },
+    ]);
+    // Outside a treaty, the certificate only puts a warning on the invoices (Équipe's choice (a)).
+    expect(
+      fileReminders(
+        { documents, today: '2026-12-01' },
+        { documents: ['tax_residence'], withholding: 'none' },
+      )[0]?.text,
+    ).toMatch(/partiront avec un avertissement/u);
+    // A document the regime does not ask for, a missing one, or no regime: nothing to remind.
+    expect(fileReminders({ documents, today: '2026-12-01' }, FRANCE_REGIME)).toEqual([]);
+    expect(fileReminders({ documents: [], today: '2026-12-01' }, BENIN_REGIME)).toEqual([]);
+    expect(fileReminders({ documents, today: '2026-12-01' }, null)).toEqual([]);
   });
 });

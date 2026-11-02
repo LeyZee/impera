@@ -183,7 +183,14 @@ const trackingAlerts = createRoute({
   },
 });
 
-const today = createRoute({ getParentRoute: () => rootRoute, path: '/aujourdhui', component: TodayPage });
+const today = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/aujourdhui',
+  component: function Today() {
+    const { user } = rootRoute.useRouteContext();
+    return <TodayPage user={user} />;
+  },
+});
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
   path: '/planning',
