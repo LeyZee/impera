@@ -2,6 +2,7 @@ import {
   BillingRegimeIdSchema,
   calendarDayAt,
   ContractorDocumentIdSchema,
+  ContractorFileSchema,
   ContractorRegimeIdSchema,
   EVENT_PAYLOADS,
   newId,
@@ -225,5 +226,66 @@ describe('Équipe › Pièces du prestataire : le rappel avant l’échéance (E
     expect(lines.map((line) => line['QUERY PLAN']).join('\n')).toContain(
       'domain_events_document_expiring_idx',
     );
+  });
+
+  it('shows in the file the first day of each followed document’s reminder, to the contractor as to the owner (lot 8)', async () => {
+    const { member: ama, cookie: amaCookie } = await team.addMember('ama@example.test', 'Ama');
+    const { member: yao, cookie: yaoCookie } = await team.addMember('yao@example.test', 'Yao');
+    await db().update(schema.teamMembers).set({ country: 'BJ' }).where(eq(schema.teamMembers.id, yao.id));
+    await assign(ama, invoicing.regimeId);
+    await assign(yao, benin);
+    const day = today();
+    // Ama, under « France, TVA facturée »: an old certificate accepted, the current one waiting, a newer one refused,
+    // and a certificate of residence her regime does not ask for.
+    const old = await file(
+      ama,
+      { kind: 'urssaf_vigilance', issuedOn: addDays(day, -200), validUntil: addDays(day, -20) },
+      'accepted',
+    );
+    const current = await file(ama, {
+      kind: 'urssaf_vigilance',
+      issuedOn: addDays(day, -10),
+      validUntil: addDays(day, 170),
+    });
+    const refused = await file(
+      ama,
+      { kind: 'urssaf_vigilance', issuedOn: addDays(day, -5), validUntil: addDays(day, 175) },
+      'refused',
+    );
+    const notAsked = await file(ama, { kind: 'tax_residence', issuedOn: day });
+    // Yao, under Benin's regime: his certificate of residence is reminded from the 1st of December, whatever the delay.
+    const residence = await file(yao, { kind: 'tax_residence', issuedOn: day }, 'accepted');
+    // A delay the owner changed: the contractor, who may not read the settings, sees the same day as the owner.
+    await db().update(schema.billingSettings).set({ documentReminderDays: 45 });
+    const read = async (member: TeamMember, cookie: string) => {
+      const response = await team.call('GET', `/payroll/contractors/${member.id}/file`, cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return ContractorFileSchema.parse(response.json());
+    };
+    const reminders = async (member: TeamMember, cookie: string) =>
+      new Map((await read(member, cookie)).documents.map((one) => [one.id, one.remindFrom]));
+    try {
+      const amas = await read(ama, team.owner);
+      expect(amas.today).toBe(day);
+      expect(await reminders(ama, team.owner)).toEqual(
+        new Map([
+          [old, null],
+          [current, addDays(day, 170 - 45)],
+          [refused, null],
+          [notAsked, null],
+        ]),
+      );
+      expect(await read(ama, amaCookie)).toEqual(amas);
+      expect(await reminders(yao, yaoCookie)).toEqual(new Map([[residence, `${day.slice(0, 4)}-12-01`]]));
+
+      // A member who left is never reminded: his file says no day.
+      await db()
+        .update(schema.teamMembers)
+        .set({ status: 'left', leftOn: day })
+        .where(eq(schema.teamMembers.id, ama.id));
+      expect([...(await reminders(ama, team.owner)).values()].every((one) => one === null)).toBe(true);
+    } finally {
+      await db().update(schema.billingSettings).set({ documentReminderDays: 30 });
+    }
   });
 });

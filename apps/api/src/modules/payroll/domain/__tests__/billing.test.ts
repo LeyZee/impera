@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertRegimeChange,
   documentReminderFrom,
+  documentsFollowed,
   documentsToRemind,
   documentState,
   documentValidUntil,
@@ -168,6 +169,25 @@ describe('a contractor’s documents (EQ-06)', () => {
     expect(documentsToRemind(ABROAD, [], '2026-12-01', 30)).toEqual([]);
     expect(documentsToRemind(null, [residence], '2026-12-01', 30)).toEqual([]);
     expect(documentsToRemind(FRANCHISE, [vigilance], '2026-11-19', 30)).toEqual([vigilance]);
+  });
+
+  it('follows, whatever the day, the newest of each kind the regime asks for that the owner has not refused (lot 8)', () => {
+    const of = (id: string, kind: 'tax_residence' | 'urssaf_vigilance', issuedOn: string) => ({
+      id,
+      kind,
+      issuedOn,
+      validUntil: null,
+      review: null,
+    });
+    const residence = of('residence-2026', 'tax_residence', '2026-03-10');
+    const next = of('residence-2027', 'tax_residence', '2027-01-05');
+    const vigilance = of('vigilance', 'urssaf_vigilance', '2026-06-20');
+    expect(documentsFollowed(ABROAD, [residence, vigilance])).toEqual([residence]);
+    expect(documentsFollowed(ABROAD, [residence, next])).toEqual([next]);
+    const refused = { ...next, review: { decision: 'refused', reason: 'Illisible.' } } as const;
+    expect(documentsFollowed(ABROAD, [residence, refused])).toEqual([residence]);
+    expect(documentsFollowed(null, [residence])).toEqual([]);
+    expect(documentsFollowed(FRANCHISE, [residence, vigilance])).toEqual([vigilance]);
   });
 });
 

@@ -1210,8 +1210,23 @@ export type InvoicePrefixBody = z.infer<typeof InvoicePrefixBodySchema>;
  * first invoice froze his prefix, the texts he accepted, the newest version of each kind first, his regimes, and his
  * documents with the owner's check of each.
  */
+/**
+ * A document as the contractor's file shows it (lot 8), with `remindFrom`: the first day its renewal is reminded to the
+ * contractor and the owner (`payroll.remind_documents` says it from that day), the 1st of December of its year for a
+ * tax residence certificate, `documentReminderDays` before its last day for another. Only on a document a reminder
+ * follows: for each kind the regime in force today asks for, the newest the owner has not refused. `null` on any other
+ * (refused, replaced by a newer one, a kind the regime does not ask for, no regime, a member who left), so that the
+ * screen never chooses which one counts.
+ */
+export const ContractorFileDocumentSchema = ContractorDocumentSchema.extend({
+  remindFrom: CalendarDaySchema.nullable(),
+});
+export type ContractorFileDocument = z.infer<typeof ContractorFileDocumentSchema>;
+
 export const ContractorFileSchema = z.object({
   memberId: TeamMemberIdSchema,
+  /** The agency's calendar day the file was read on: `remindFrom` is compared with it, never with the device's clock. */
+  today: CalendarDaySchema,
   country: CountryCodeSchema,
   profile: ContractorProfileSchema.nullable(),
   prefixFrozen: z.boolean(),
@@ -1219,7 +1234,7 @@ export const ContractorFileSchema = z.object({
   /** His regimes, each from its day, the latest first (lot 5b): the one in force is the latest begun. */
   regimes: z.array(ContractorRegimeSchema),
   /** His documents, the latest filed first (lot 5c): a renewal never takes the place of the old one. */
-  documents: z.array(ContractorDocumentSchema),
+  documents: z.array(ContractorFileDocumentSchema),
 });
 export type ContractorFile = z.infer<typeof ContractorFileSchema>;
 

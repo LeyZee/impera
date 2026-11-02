@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import {
+  calendarDayAt,
   CommissionStatementIdSchema,
+  ContractorDocumentKindSchema,
   ContractAcceptanceIdSchema,
   ContractAcceptanceSchema,
   ContractorFileSchema,
@@ -10,6 +12,7 @@ import {
   newId,
   TeamMemberIdSchema,
   type ContractAcceptance,
+  type ContractorDocument,
   type ContractorFile,
   type ContractorProfileBody,
   type ContractText,
@@ -27,6 +30,7 @@ import {
   type Transaction,
 } from '@nirvana/db';
 
+import { documentReminderFrom, documentsFollowed, regimeOn } from '../domain/billing';
 import { profileChanges } from '../domain/contractors';
 import {
   ContractAcceptanceForbidden,
@@ -47,9 +51,11 @@ import type { PayrollContractorStore, PayrollRequeueStore } from '../domain/port
 import { documentOf } from './document-rows';
 import { enqueueInvoiceIssue, enqueueInvoiceRequeue } from './invoice-queue';
 import { assignmentOf } from './regime-store';
+import type { PayInputReads } from './snapshot';
 import { audit } from './writes';
 
 const {
+  billingRegimes,
   commissionStatements,
   contractAcceptances,
   contractorDocumentPurges,
@@ -70,15 +76,23 @@ interface Member {
   readonly id: TeamMemberId;
   readonly userId: string | null;
   readonly country: string;
+  /** A member who left is never reminded (`payroll.remind_documents`). */
+  readonly left: boolean;
+}
+
+/** What a file needs besides its rows: the agency's day and the owner's delay before a document's last day. */
+interface FileDay {
+  readonly today: string;
+  readonly reminderDays: number;
 }
 
 async function memberOf(tx: Transaction, memberId: TeamMemberId): Promise<Member> {
   const [row] = await tx
-    .select({ userId: teamMembers.userId, country: teamMembers.country })
+    .select({ userId: teamMembers.userId, country: teamMembers.country, status: teamMembers.status })
     .from(teamMembers)
     .where(eq(teamMembers.id, memberId));
   if (row === undefined) throw new TeamMemberNotFound();
-  return { id: memberId, userId: row.userId, country: row.country };
+  return { id: memberId, userId: row.userId, country: row.country, left: row.status === 'left' };
 }
 
 /** One write at a time on a file, a prefix, the texts or a contractor's acceptances: each one reads what it changes. */
@@ -160,7 +174,35 @@ async function prefixFrozen(tx: Transaction, memberId: TeamMemberId): Promise<bo
   return row !== undefined;
 }
 
-async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> {
+/**
+ * The first day of each followed document's reminder (lot 8): the documents of the regime in force today, as
+ * `payroll.remind_documents` chooses them (`documentsFollowed`), none for a member who left.
+ */
+async function remindersOf(
+  tx: Transaction,
+  member: Member,
+  regimes: readonly { readonly regimeId: string; readonly effectiveFrom: string }[],
+  documents: readonly ContractorDocument[],
+  day: FileDay,
+): Promise<Map<string, string>> {
+  const assignment = regimeOn(
+    regimes.map((one) => ({ regimeId: one.regimeId, from: one.effectiveFrom })),
+    day.today,
+  );
+  if (member.left || assignment === null) return new Map();
+  const [regime] = await tx
+    .select({ documents: billingRegimes.documents })
+    .from(billingRegimes)
+    .where(eq(billingRegimes.id, assignment.regimeId));
+  const asked = {
+    documents: (regime?.documents ?? []).map((kind) => ContractorDocumentKindSchema.parse(kind)),
+  };
+  return new Map(
+    documentsFollowed(asked, documents).map((one) => [one.id, documentReminderFrom(one, day.reminderDays)]),
+  );
+}
+
+async function fileOf(tx: Transaction, member: Member, day: FileDay): Promise<ContractorFile> {
   const profile = await profileOf(tx, member.id);
   const accepted = await tx
     .select({ acceptance: contractAcceptances })
@@ -180,8 +222,11 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     .leftJoin(contractorDocumentPurges, eq(contractorDocumentPurges.documentId, contractorDocuments.id))
     .where(eq(contractorDocuments.memberId, member.id))
     .orderBy(sql`${contractorDocuments.createdAt} desc`, sql`${contractorDocuments.id} desc`);
+  const filed = documents.map((one) => documentOf(one.row, one.review, one.purge));
+  const reminders = await remindersOf(tx, member, regimes, filed, day);
   return ContractorFileSchema.parse({
     memberId: member.id,
+    today: day.today,
     country: member.country,
     profile:
       profile === null
@@ -196,7 +241,7 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     prefixFrozen: await prefixFrozen(tx, member.id),
     acceptances: accepted.map((row) => acceptanceOf(row.acceptance)),
     regimes: regimes.map(assignmentOf),
-    documents: documents.map((one) => documentOf(one.row, one.review, one.purge)),
+    documents: filed.map((one) => ({ ...one, remindFrom: reminders.get(one.id) ?? null })),
   });
 }
 
@@ -221,10 +266,19 @@ async function ownedProfile(
  * The contractor's file and texts (EQ-06 lot 5a): see `PayrollContractorStore`. A file's `updated_at` is the base's
  * (its trigger sets it at each change), the instant of a check the module's clock.
  */
-export function createDrizzlePayrollContractorStore(db: Database, now: () => Date): PayrollContractorStore {
+export function createDrizzlePayrollContractorStore(
+  db: Database,
+  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  documentReminderDays: () => Promise<number>,
+  now: () => Date,
+): PayrollContractorStore {
+  const dayOf = async (tx: Transaction): Promise<FileDay> => ({
+    today: calendarDayAt(now(), await reads.agencyTimeZone(tx)),
+    reminderDays: await documentReminderDays(),
+  });
   return {
     file: (userId, memberId) =>
-      withMember(db, userId, async (tx) => fileOf(tx, await memberOf(tx, memberId))),
+      withMember(db, userId, async (tx) => fileOf(tx, await memberOf(tx, memberId), await dayOf(tx))),
 
     writeProfile: (actor, memberId, body) =>
       withMember(db, actor.userId, async (tx, scope) => {
@@ -234,7 +288,7 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
         const before = await profileOf(tx, memberId);
         const changed = profileChanges(before === null ? null : bodyOf(before), body);
         if (before !== null && changed.length === 0)
-          return { file: await fileOf(tx, member), created: false };
+          return { file: await fileOf(tx, member, await dayOf(tx)), created: false };
         if (before === null) {
           await tx.insert(contractorProfiles).values({ memberId, ...body, updatedBy: actor.userId });
         } else {
@@ -254,7 +308,7 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
           { changed, checkCleared: before?.verifiedAt !== null && before?.verifiedAt !== undefined },
         );
         await enqueueInvoiceRequeue(tx, memberId);
-        return { file: await fileOf(tx, member), created: before === null };
+        return { file: await fileOf(tx, member, await dayOf(tx)), created: before === null };
       }),
 
     verifyProfile: (actor, memberId, body) =>
@@ -262,7 +316,7 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
         assertOwner(scope);
         const { member, profile } = await ownedProfile(tx, memberId);
         // Checked already: nothing of the identity changed since, or the trigger would have cleared it.
-        if (profile.verifiedAt !== null) return fileOf(tx, member);
+        if (profile.verifiedAt !== null) return fileOf(tx, member, await dayOf(tx));
         if (profile.updatedAt.toISOString() !== body.updatedAt) throw new ContractorProfileChanged();
         await updateProfile(
           tx,
@@ -272,14 +326,14 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
         );
         await audit(tx, actor, 'contractor_profile.verify', { kind: 'contractor_profile', id: memberId }, {});
         await enqueueInvoiceRequeue(tx, memberId);
-        return fileOf(tx, member);
+        return fileOf(tx, member, await dayOf(tx));
       }),
 
     setPrefix: (actor, memberId, body) =>
       withMember(db, actor.userId, async (tx, scope) => {
         assertOwner(scope);
         const { member, profile } = await ownedProfile(tx, memberId);
-        if (profile.invoicePrefix === body.invoicePrefix) return fileOf(tx, member);
+        if (profile.invoicePrefix === body.invoicePrefix) return fileOf(tx, member, await dayOf(tx));
         if (await prefixFrozen(tx, memberId)) throw new InvoicePrefixFrozen();
         // Two owners' tabs giving one prefix to two contractors: the second waits, then finds it taken.
         await lock(tx, `invoice_prefix:${body.invoicePrefix}`);
@@ -302,7 +356,7 @@ export function createDrizzlePayrollContractorStore(db: Database, now: () => Dat
           { from: profile.invoicePrefix, to: body.invoicePrefix },
         );
         await enqueueInvoiceRequeue(tx, memberId);
-        return fileOf(tx, member);
+        return fileOf(tx, member, await dayOf(tx));
       }),
 
     texts: (userId) =>

@@ -38,6 +38,19 @@ interface Filed {
   readonly review: ContractorDocumentReview | null;
 }
 
+/**
+ * The owner's delay before a document's last day (Réglages › Facturation), `DEFAULT_DOCUMENT_REMINDER_DAYS` before the
+ * settings are first saved. On the admin connection: `billing_settings` is the owner's and an active manager's to read,
+ * and a contractor's file shows the day his reminder starts all the same (lot 8).
+ */
+export async function documentReminderDaysOf(tx: Transaction): Promise<number> {
+  const [settings] = await tx
+    .select({ reminderDays: billingSettings.documentReminderDays })
+    .from(billingSettings)
+    .limit(1);
+  return settings?.reminderDays ?? DEFAULT_DOCUMENT_REMINDER_DAYS;
+}
+
 /** Whether `contractor_document_expiring` was already said for this document, read under its lock. */
 async function said(tx: Transaction, documentId: string): Promise<boolean> {
   const [row] = await tx
@@ -66,11 +79,7 @@ export function createDrizzleDocumentReminderStore(
       withAdmin(adminDb, async (tx) => {
         const at = now();
         const today = calendarDayAt(at, await reads.agencyTimeZone(tx));
-        const [settings] = await tx
-          .select({ reminderDays: billingSettings.documentReminderDays })
-          .from(billingSettings)
-          .limit(1);
-        const reminderDays = settings?.reminderDays ?? DEFAULT_DOCUMENT_REMINDER_DAYS;
+        const reminderDays = await documentReminderDaysOf(tx);
         const members = await tx
           .select({ id: teamMembers.id })
           .from(teamMembers)
