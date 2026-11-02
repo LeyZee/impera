@@ -18,7 +18,7 @@ Prévenir chaque membre de l'équipe sur son téléphone, même quand il n'a pas
 - [ ] **Notifications push** (Web Push de CR-01, clés VAPID créées par le serveur et chiffrées en base, ADR 0016), avec l'accord du membre, réglables une par une dans Moi : début de shift, shift non pris (manager), rapport manquant, facture à accepter, nouvelle annonce, pièce du dossier qui expire bientôt (EQ-06), et les motifs des shifts ci-dessous.
 - [ ] **Shifts posés, déplacés, retirés** (ADR 0045 § 4) : un membre est prévenu de chaque shift qui lui est posé, déplacé ou retiré ; un shift qui change de mains prévient l'ancien du retrait et le nouveau de l'ajout ; un ajout en masse fait une seule notification qui ne résume que ce qui a été posé ; un déplacement ne prévient qu'à la fin de ses 5 secondes d'annulation, et seulement s'il tient : le job de notification part 5 s après, relit le shift et ne prévient que s'il est encore dans l'état du déplacement ; la clé du registre porte la version du shift, pour que deux déplacements dans la fenêtre ne fassent qu'une notification, celle de l'état final.
 - [ ] **Rappel avant un shift** (ADR 0045 § 4) : au délai que chaque membre choisit dans Moi (2 h par défaut, ou aucun) ; comme le début de son propre shift, il passe pendant ses heures calmes ; replanifié quand le shift bouge.
-- [ ] **La créatrice** choisit dans Moi si elle est prévenue des shifts de ses comptes ; par défaut, non.
+- [x] ~~La créatrice choisit dans Moi si elle est prévenue des shifts de ses comptes~~ : la créatrice n'a aucune notification de shift, elle voit qui est en poste et le planning (Charles 17h52, ADR 0049 § 4).
 - [ ] **Heures calmes** (`quiet_hours`, réglage et domaine dans CR-01) dans le fuseau du membre : rien n'est envoyé, sauf le début de son propre shift et le rappel qui le précède ; ce qui tombe pendant reste dans Aujourd'hui.
 - [ ] **Une seule fois** : le registre `notification_deliveries` de CR-01 (clé unique membre, objet, motif), écrit dans la même transaction que la décision d'envoyer, garantit qu'un rappel part une seule fois, même rejoué. Le `jobKey` Graphile ne sert qu'à replanifier quand un shift bouge : il ne déduplique qu'un job encore en attente.
 - [ ] Abonnements push (table de CR-01) lus par `withMember`, chacun ne lit que les siens ; un abonnement refusé ou expiré (410) est retiré, sans erreur pour le membre.
@@ -31,7 +31,7 @@ Prévenir chaque membre de l'équipe sur son téléphone, même quand il n'a pas
 - Finition (Charles, 27/10, 15h22 : « que ce soit vraiment très joli… des hovers partout… une belle hiérarchie des informations ») : chaque écran passe la barre de `docs/design/README.md` § Finition d'un écran, preuves comprises (captures Nuit et Jour, bureau et téléphone, mouvement réduit).
 
 ## Hors périmètre
-Envoi d'e-mails ou de SMS, notifications de la créatrice (ventes, CR-04 ; agenda, CR-05) sauf les shifts de ses comptes, signaux de coaching (plus tard), Telegram (jamais pour l'équipe, ADR 0045 § 4).
+Envoi d'e-mails ou de SMS, notifications de la créatrice (ventes, CR-04 ; agenda, CR-05 ; jamais les shifts de ses comptes, ADR 0049 § 4), signaux de coaching (plus tard), Telegram (jamais pour l'équipe, ADR 0045 § 4).
 
 ## Notes de session
 - 2026-11-02 (fil des espaces) : le socle installable, Web Push, les heures calmes et le registre des envois sont faits une fois pour tous les rôles par CR-01 (ADR 0042 § 7) ; cette fiche garde les motifs de l'équipe et prend les rappels et les notifications des shifts de l'ADR 0045 § 4.
