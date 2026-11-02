@@ -1,7 +1,8 @@
 import type { CommissionStatementId, TeamMemberId } from '@nirvana/contracts';
 
+import type { JobLogger } from '../../contractors/pure';
 import { planInvoicing } from '../domain/invoicing';
-import type { InvoicingOutcome, JobLogger, PayrollInvoiceStore, PayrollRequeueStore } from '../domain/ports';
+import type { InvoicingOutcome, PayrollInvoiceStore, PayrollRequeueStore } from '../domain/ports';
 
 /**
  * `payroll.issue_invoices` (EQ-06 lot 3): a validated statement's invoice and the credit notes its period owes, each

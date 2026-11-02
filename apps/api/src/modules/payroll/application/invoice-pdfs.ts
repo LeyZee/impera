@@ -1,17 +1,17 @@
 import type { InvoiceId, InvoicePdfCopyProvider, TeamMemberId, UserId } from '@nirvana/contracts';
 
+import type { InvoiceObjectStore } from '../../contractors';
+import { lockAtLeast, readChecked, sha256Hex } from '../../contractors';
+import { invoicePdfRetainUntil } from '../../contractors/pure';
+import type { JobLogger } from '../../contractors/pure';
 import { InvoiceNotFound, InvoicePdfNotFound, InvoicePdfUnavailable } from '../domain/errors';
-import { invoicePdfContent, invoicePdfKey, invoicePdfRetainUntil } from '../domain/invoice-pdf';
+import { invoicePdfContent, invoicePdfKey } from '../domain/invoice-pdf';
 import type {
-  InvoiceObjectStore,
   InvoicePdfRenderer,
   InvoiceToRender,
-  JobLogger,
   PayrollInvoicePdfStore,
   StoredInvoicePdf,
 } from '../domain/ports';
-
-import { lockAtLeast, readChecked, sha256Hex } from './locked-objects';
 
 /**
  * The PDF of each issued document (EQ-06 lot 4, ADR 0037): rendered once by `payroll.render_invoice_pdf`, copied to

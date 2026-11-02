@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { TRANSPARENT_KINDS } from '../../../contractors/infra/__tests__/invented-png';
 import {
   frenchCharged,
   frenchFranchise,
@@ -18,7 +19,6 @@ import type { InvoiceLogo, InvoicePdfRenderer } from '../../domain/ports';
 import { createPdfkitInvoiceRenderer, loadInvoiceFonts } from '../invoice-pdf-renderer';
 
 import { inventedLogo } from './invented-logo';
-import { TRANSPARENT_KINDS } from './invented-png';
 
 const FONTS_DIR = fileURLToPath(new URL('../fonts/', import.meta.url));
 const ISSUED_AT = new Date('2026-11-17T08:12:00.000Z');

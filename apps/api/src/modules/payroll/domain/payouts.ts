@@ -7,7 +7,8 @@ import {
   type BillingRegime,
   type ContractorDocument,
   type RegimeAssignment,
-} from './billing';
+} from '../../contractors/pure';
+
 import {
   settledByTransfer,
   type SettlementCarryOver,

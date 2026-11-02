@@ -14,7 +14,7 @@ import {
 import { and, eq, inArray, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { addDays } from '../modules/payroll/domain/billing';
+import { addDays } from '../modules/contractors/domain/billing';
 import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';

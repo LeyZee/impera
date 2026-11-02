@@ -6,6 +6,8 @@ import {
 } from '@nirvana/contracts';
 import { sql, type Transaction } from '@nirvana/db';
 
+import type { InvoiceRequeue } from '../../contractors';
+
 /**
  * `payroll.issue_invoices` for a validated statement, once the transaction that validated it commits (EQ-06 lot 3).
  * Its key names the statement, so a statement waits in the queue once: a second enqueue (`enqueueInvoiceRequeue`: a file,
@@ -34,7 +36,7 @@ export async function enqueueInvoiceIssue(
  * whose invoice waited are tried again once it commits. One key per contractor and one for all; a second change
  * replaces the waiting run, and a run never issues twice (each document has its key).
  */
-export async function enqueueInvoiceRequeue(tx: Transaction, memberId: TeamMemberId | null): Promise<void> {
+async function enqueueInvoiceRequeue(tx: Transaction, memberId: TeamMemberId | null): Promise<void> {
   await tx.execute(
     sql`select public.enqueue_job(
       task => 'payroll.requeue_invoice_issues',
@@ -58,23 +60,6 @@ export async function enqueueDocumentSettle(tx: Transaction, memberId: string): 
       payload => ${JSON.stringify({ memberId })}::jsonb,
       max_attempts => ${JOB_MAX_ATTEMPTS['payroll.settle_documents']}::int,
       job_key => ${`payroll.settle_documents:${memberId}`},
-      job_key_mode => 'replace'
-    )`,
-  );
-}
-
-/**
- * `payroll.lock_payout_certificate` for a transfer that relied on a tax residence certificate (ADR 0041 § 6), in the
- * transaction that records it: once it commits, the certificate's lock is lengthened in both buckets, outside the
- * request, so that a bucket that does not answer never refuses a transfer.
- */
-export async function enqueuePayoutCertificateLock(tx: Transaction, statementId: string): Promise<void> {
-  await tx.execute(
-    sql`select public.enqueue_job(
-      task => 'payroll.lock_payout_certificate',
-      payload => ${JSON.stringify({ statementId })}::jsonb,
-      max_attempts => ${JOB_MAX_ATTEMPTS['payroll.lock_payout_certificate']}::int,
-      job_key => ${`payroll.lock_payout_certificate:${statementId}`},
       job_key_mode => 'replace'
     )`,
   );
@@ -151,7 +136,7 @@ export async function enqueueInvoiceContestAnnounce(tx: Transaction, invoiceId: 
  * come is in force only then, and his waiting statements are tried again on it (EQ-06 lot 5b). One key per contractor
  * and day, apart from the one of a change today, so that neither replaces the other.
  */
-export async function enqueueInvoiceRequeueOn(
+async function enqueueInvoiceRequeueOn(
   tx: Transaction,
   memberId: TeamMemberId,
   day: string,
@@ -168,3 +153,9 @@ export async function enqueueInvoiceRequeueOn(
     )`,
   );
 }
+
+/** `InvoiceRequeue` (ADR 0047 § 1), which the composition root gives the contractors' file: the two requeues above. */
+export const invoiceRequeue: InvoiceRequeue = {
+  requeue: enqueueInvoiceRequeue,
+  requeueOn: enqueueInvoiceRequeueOn,
+};

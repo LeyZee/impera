@@ -8,12 +8,12 @@ import type {
 
 import {
   identityComplete,
-  issueDecision,
   type ContractorDocument,
   type ContractorIdentity,
-  type IssueWarning,
   type RegimeAssignment,
-} from './billing';
+} from '../../contractors/pure';
+
+import { issueDecision, type IssueWarning } from './billing';
 import { acceptanceDeadline } from './invoice-acceptance';
 import {
   creditNoteLines,

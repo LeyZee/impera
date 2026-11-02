@@ -1,7 +1,8 @@
 import type { ForeignCurrency } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import type { EcbRate, JobLogger, OverdueRate } from '../../domain/ports';
+import type { JobLogger } from '../../../contractors/domain/ports';
+import type { EcbRate, OverdueRate } from '../../domain/ports';
 import { fetchExchangeRates, type RateJobDeps } from '../exchange-rates';
 
 const logger: JobLogger = { warn: () => undefined, error: () => undefined };

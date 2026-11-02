@@ -4,7 +4,7 @@ import { ContractorDocumentIdSchema, ContractorFileSchema, newId, type TeamMembe
 import { eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createMemoryInvoiceStore } from '../modules/payroll';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
@@ -34,7 +34,7 @@ describe('Équipe › Pièces du prestataire : l’effacement des refusées (EQ-
   const copy = createMemoryInvoiceStore();
 
   const db = () => team.test.admin.db;
-  const purge = () => team.app.modules.payroll.jobs.purgeRefusedDocuments(quiet);
+  const purge = () => team.app.modules.contractors.jobs.purgeRefusedDocuments(quiet);
 
   /**
    * A document of Kofi's as the upload leaves it, its file in the first bucket under `bucketLock`, its upload lock in

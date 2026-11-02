@@ -22,9 +22,8 @@ import {
 import type { PayrollRegimeStore } from '../domain/ports';
 import { assertRegimeOfCountry, dayStartsAt, sameRegime } from '../domain/regimes';
 
-import { enqueueInvoiceRequeue, enqueueInvoiceRequeueOn } from './invoice-queue';
-import type { PayInputReads } from './snapshot';
-import { audit } from './writes';
+import { audit } from './audit';
+import type { ContractorReads, InvoiceRequeue } from './ports';
 
 const { billingRegimes, billingRegimeValidations, contractorRegimes, teamMembers } = schema;
 
@@ -103,7 +102,8 @@ async function regimeById(tx: Transaction, regimeId: string): Promise<BillingReg
  */
 export function createDrizzlePayrollRegimeStore(
   db: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: ContractorReads,
+  requeue: InvoiceRequeue,
   now: () => Date,
 ): PayrollRegimeStore {
   return {
@@ -182,7 +182,7 @@ export function createDrizzlePayrollRegimeStore(
           { validatedOn: body.validatedOn },
         );
         // Every contractor of the regime may have a statement that waited for it.
-        await enqueueInvoiceRequeue(tx, null);
+        await requeue.requeue(tx, null);
         return { regime: { ...regime, validatedOn: body.validatedOn }, created: true };
       }),
 
@@ -242,8 +242,8 @@ export function createDrizzlePayrollRegimeStore(
           { memberId, regimeId: body.regimeId, from: body.from },
         );
         // In force today: his waiting statements are tried at once; from a day to come, on that day.
-        if (body.from === today) await enqueueInvoiceRequeue(tx, memberId);
-        else await enqueueInvoiceRequeueOn(tx, memberId, body.from, dayStartsAt(body.from, timeZone));
+        if (body.from === today) await requeue.requeue(tx, memberId);
+        else await requeue.requeueOn(tx, memberId, body.from, dayStartsAt(body.from, timeZone));
         return { assignment: assignmentOf(row), created: true };
       }),
   };

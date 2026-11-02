@@ -1,13 +1,8 @@
 import { ExchangeRateSchema, ForeignCurrencySchema, type ForeignCurrency } from '@nirvana/contracts';
 
+import type { JobLogger } from '../../contractors/pure';
 import { ECB_SOURCE, ecbDay, eurosPerUnitMicros, isRateOverdue } from '../domain/exchange-rates';
-import type {
-  JobLogger,
-  PayrollRateAlerts,
-  PayrollRateStore,
-  RateJobSince,
-  RateSource,
-} from '../domain/ports';
+import type { PayrollRateAlerts, PayrollRateStore, RateJobSince, RateSource } from '../domain/ports';
 
 /** What one run of the rate job did, for its log line. */
 export interface RateFetchOutcome {

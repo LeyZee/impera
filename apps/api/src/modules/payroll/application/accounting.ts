@@ -10,6 +10,7 @@ import {
 } from '@nirvana/contracts';
 import { Zip, ZipPassThrough } from 'fflate';
 
+import type { Actor, JobLogger } from '../../contractors/pure';
 import { das2Csv, das2Declaration, das2FileName } from '../domain/accounting';
 import {
   ARCHIVE_MANIFEST_NAME,
@@ -22,7 +23,7 @@ import {
 import { JournalAccountsMissing } from '../domain/errors';
 import { fecText, journalFileName, latin9 } from '../domain/fec';
 import { journalEntries, ledgerAccountsOf } from '../domain/journal';
-import type { Actor, ArchiveDocument, JobLogger, PayrollAccountingStore } from '../domain/ports';
+import type { ArchiveDocument, PayrollAccountingStore } from '../domain/ports';
 
 import { checkedInvoicePdf, type CheckedPdf, type InvoicePdfDeps } from './invoice-pdfs';
 

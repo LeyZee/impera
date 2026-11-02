@@ -1,8 +1,8 @@
 import { CommissionStatementIdSchema } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { invoicePdfRetainUntil } from '../../domain/invoice-pdf';
 import type { PayoutCertificate, PayrollPayoutCertificateStore } from '../../domain/ports';
+import { invoicePdfRetainUntil } from '../../domain/retention';
 import { createMemoryInvoiceStore } from '../../infra/invoice-buckets';
 import { lockPayoutCertificates } from '../payout-certificates';
 

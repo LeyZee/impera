@@ -7,17 +7,13 @@ import type {
   TeamMemberId,
   UserId,
 } from '@nirvana/contracts';
-import { withAdmin, type Database } from '@nirvana/db';
+import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import type { InvoiceObjectStore } from '../contractors';
+import type { JobLogger } from '../contractors/pure';
+
 import { createPayrollAccounting } from './application/accounting';
-import { createPayrollBillingSettings } from './application/billing-settings';
-import {
-  createContractorDocuments,
-  purgeRefusedDocuments,
-  remindDocuments,
-  type PurgeOutcome,
-} from './application/contractor-documents';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
@@ -38,20 +34,11 @@ import {
   type RenderOutcome,
 } from './application/invoice-pdfs';
 import { issueInvoices, requeueInvoiceIssues } from './application/invoicing';
-import { lockPayoutCertificates } from './application/payout-certificates';
 import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
-import type { InvoiceObjectStore, InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
+import type { InvoicingOutcome, RateJobSince } from './domain/ports';
 import { createDrizzlePayrollAccountingStore } from './infra/accounting-store';
-import { createDrizzlePayrollBillingSettingsStore } from './infra/billing-settings-store';
-import {
-  createDrizzlePayrollContractorStore,
-  createDrizzlePayrollRequeueStore,
-} from './infra/contractor-store';
-import { createDrizzleDocumentPurgeStore } from './infra/document-purge-store';
-import { createDrizzleDocumentReminderStore, documentReminderDaysOf } from './infra/document-reminder-store';
-import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
 import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
@@ -61,12 +48,10 @@ import { createDrizzlePayrollInvoicePdfStore } from './infra/invoice-pdf-store';
 import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
 import { createDrizzlePayrollJobStore } from './infra/job-store';
 import { createLatestRateRead } from './infra/latest-rate';
-import { createDrizzlePayoutCertificateStore } from './infra/payout-certificate-store';
-import { readPng } from './infra/png';
 import { createPostgresRateAlerts } from './infra/rate-alerts';
 import { createDrizzlePayrollRateStore } from './infra/rate-store';
 import { createDrizzlePayrollReadStore } from './infra/read-store';
-import { createDrizzlePayrollRegimeStore } from './infra/regime-store';
+import { createDrizzlePayrollRequeueStore } from './infra/requeue-store';
 import { createPayrollRoutes, type RequireRole } from './infra/routes';
 import { createDrizzlePayrollRuleStore } from './infra/rule-store';
 import { createDrizzleSettlementStore } from './infra/settlement-store';
@@ -80,11 +65,10 @@ import { createDrizzlePayrollValidationStore } from './infra/validation-store';
 export { enqueuePayRecalculation } from './infra/recalculation-queue';
 
 /**
- * The two buckets of the invoices' PDFs (ADR 0037 § 4 and § 6), which the composition root builds from the
- * configuration: S3 in production, one store in memory shared by the API and its inline worker elsewhere.
+ * What a change of a contractor's file asks of the invoices (`InvoiceRequeue`, ADR 0047 § 1): the composition root plugs
+ * it into `contractors`, which never imports this module.
  */
-export { createMemoryInvoiceStore, createS3InvoiceStore } from './infra/invoice-buckets';
-export type { InvoiceObjectStore } from './domain/ports';
+export { invoiceRequeue } from './infra/invoice-queue';
 
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
@@ -161,37 +145,17 @@ export interface PayrollModule {
      */
     readonly sweepInvoiceAcceptance: (logger: JobLogger) => Promise<SweepOutcome>;
     /**
-     * `payroll.remind_documents`, each hour (EQ-06 lot 5c-2): each document a contractor's regime asks for that comes
-     * to its end, or passed it, with no newer one filed, said once to the owner (`contractor_document_expiring`).
-     * Returns how many were said this run.
-     */
-    readonly remindDocuments: () => Promise<number>;
-    /**
      * `payroll.remind_due_invoices`, each morning (EQ-06 lot 8): each invoice not settled yet said once to the owner
      * seven days before its due date (`invoice_due_soon`), then once the day after it (`invoice_overdue`), with what
      * stops the transfer that will pay it (ADR 0041). Returns how many were said this run.
      */
     readonly remindDueInvoices: () => Promise<number>;
     /**
-     * `payroll.purge_refused_documents`, each night (EQ-06 lot 5c-2, « ok purge a »): each refused document whose
-     * upload lock has ended has its file erased from the first bucket, then the erasure recorded; its row stays.
-     */
-    readonly purgeRefusedDocuments: (logger: JobLogger) => Promise<PurgeOutcome>;
-    /**
      * `payroll.settle_documents` (EQ-06 lot 7a): each document a paid transfer settles, its own statement's or one it
      * received in carry-over, marked `paid` (an invoice) or `imputed` (a credit note), once. One contractor, or every
      * contractor with a document not settled yet (`null`). Returns how many were written.
      */
     readonly settleDocuments: (memberId: TeamMemberId | null) => Promise<number>;
-    /**
-     * `payroll.lock_payout_certificate` (ADR 0041 § 6): the tax residence certificate a transfer relied on, locked in
-     * both buckets ten years after the close of the fiscal year of the transfer. One transfer, or every transfer whose
-     * certificate is not locked yet (`null`). Returns how many were recorded.
-     */
-    readonly lockPayoutCertificates: (
-      statementId: CommissionStatementId | null,
-      logger: JobLogger,
-    ) => Promise<number>;
   };
 }
 
@@ -262,19 +226,6 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         rules,
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
         createPayrollInvoiceAcceptance(acceptanceStore),
-        createPayrollBillingSettings(createDrizzlePayrollBillingSettingsStore(deps.db, now), readPng),
-        createDrizzlePayrollContractorStore(
-          deps.db,
-          deps.reads,
-          () => withAdmin(deps.adminDb, documentReminderDaysOf),
-          now,
-        ),
-        createDrizzlePayrollRegimeStore(deps.db, deps.reads, now),
-        createContractorDocuments({
-          store: createDrizzlePayrollDocumentStore(deps.db, deps.reads, now),
-          primary: deps.invoicePdfs.primary,
-          copy: deps.invoicePdfs.copy,
-        }),
         createPayrollAccounting(createDrizzlePayrollAccountingStore(deps.db, deps.reads), pdfs),
         requireRole,
       ),
@@ -292,29 +243,8 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       announceInvoiceContest: (invoiceId, logger) =>
         announceInvoiceContest(acceptanceStore, invoiceId, logger),
       sweepInvoiceAcceptance: (logger) => sweepInvoiceAcceptance(acceptanceStore, logger),
-      remindDocuments: () =>
-        remindDocuments(createDrizzleDocumentReminderStore(deps.adminDb, deps.reads, now)),
       remindDueInvoices: () => createDrizzleInvoiceDueStore(deps.adminDb, deps.reads, now).remindUnscoped(),
-      purgeRefusedDocuments: (logger) =>
-        purgeRefusedDocuments(
-          {
-            store: createDrizzleDocumentPurgeStore(deps.adminDb),
-            primary: deps.invoicePdfs.primary,
-            copy: deps.invoicePdfs.copy,
-          },
-          logger,
-        ),
       settleDocuments: (memberId) => createDrizzleSettlementStore(deps.adminDb).settleUnscoped(memberId),
-      lockPayoutCertificates: (statementId, logger) =>
-        lockPayoutCertificates(
-          {
-            store: createDrizzlePayoutCertificateStore(deps.adminDb),
-            primary: deps.invoicePdfs.primary,
-            copy: deps.invoicePdfs.copy,
-          },
-          statementId,
-          logger,
-        ),
     },
   };
 }

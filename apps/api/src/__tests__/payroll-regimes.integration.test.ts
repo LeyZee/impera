@@ -16,9 +16,9 @@ import {
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { addDays } from '../modules/payroll/domain/billing';
-import { dayStartsAt } from '../modules/payroll/domain/regimes';
-import { transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
+import { addDays } from '../modules/contractors/domain/billing';
+import { dayStartsAt } from '../modules/contractors/domain/regimes';
+import { transparentLogo } from '../modules/contractors/infra/__tests__/invented-png';
 
 import { setUpInvoicing, type Invoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';

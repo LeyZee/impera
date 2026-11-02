@@ -6,6 +6,7 @@ import {
 } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
+import type { ContractorIdentity } from '../../../contractors/domain/billing';
 import {
   das2Beneficiaries,
   das2Csv,
@@ -15,7 +16,6 @@ import {
   type Das2Document,
   type Das2Statement,
 } from '../accounting';
-import type { ContractorIdentity } from '../billing';
 
 describe('the DAS2 of a year (EQ-06)', () => {
   it('declares what each contractor was paid in the calendar year, over 2 400 € only', () => {

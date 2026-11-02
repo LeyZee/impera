@@ -17,8 +17,9 @@ import {
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createMemoryInvoiceStore } from '../modules/payroll';
-import { invoicePdfKey, invoicePdfRetainUntil } from '../modules/payroll/domain/invoice-pdf';
+import { invoicePdfRetainUntil } from '../modules/contractors/domain/retention';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
+import { invoicePdfKey } from '../modules/payroll/domain/invoice-pdf';
 import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { AGENCY, setUpInvoicing, TERMS, type Invoicing } from './support/invoicing';

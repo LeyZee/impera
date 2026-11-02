@@ -109,3 +109,4 @@ Branche : task/<id>-<slug>
 | SEC-04 | Réglages › Sécurité et alertes de sécurité | exploitation | todo | ADR 0046, ADR 0020, SEC-02 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
+| ARC-03 | Le dossier du prestataire sorti de la paie | exploitation | in_progress | ADR 0047, ADR 0051, ARC-02 |

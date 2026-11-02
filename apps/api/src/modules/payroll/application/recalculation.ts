@@ -1,7 +1,8 @@
 import { DomainError, nextPayPeriod, type PayPeriod } from '@nirvana/contracts';
 
+import type { JobLogger } from '../../contractors/pure';
 import { blockReasonOf } from '../domain/period-blocks';
-import type { JobLogger, OpenPeriodFacts, PayrollJobStore, PeriodDecision } from '../domain/ports';
+import type { OpenPeriodFacts, PayrollJobStore, PeriodDecision } from '../domain/ports';
 import { firstOpenPeriod, planPeriod, type PeriodSnapshot } from '../domain/recalculation';
 
 /** What one period's recalculation did, for the job's log line. */

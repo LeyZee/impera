@@ -1,9 +1,9 @@
 import { WithholdingSchema } from '@nirvana/contracts';
 import { and, eq, inArray, schema, type Transaction } from '@nirvana/db';
 
+import { reviewOf } from '../../contractors';
 import type { PayoutDocument, PayoutFacts } from '../domain/payouts';
 
-import { reviewOf } from './document-rows';
 import { settlementFactsOf } from './settlement-rows';
 
 const { billingRegimes, contractorDocumentReviews, contractorDocuments, contractorRegimes } = schema;

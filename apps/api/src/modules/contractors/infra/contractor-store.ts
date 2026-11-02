@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 
 import {
   calendarDayAt,
-  CommissionStatementIdSchema,
   ContractorDocumentKindSchema,
   ContractAcceptanceIdSchema,
   ContractAcceptanceSchema,
@@ -18,17 +17,7 @@ import {
   type ContractText,
   type TeamMemberId,
 } from '@nirvana/contracts';
-import {
-  and,
-  eq,
-  inArray,
-  schema,
-  sql,
-  withAdmin,
-  withMember,
-  type Database,
-  type Transaction,
-} from '@nirvana/db';
+import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
 
 import { documentReminderFrom, documentsFollowed, regimeOn } from '../domain/billing';
 import { profileChanges } from '../domain/contractors';
@@ -46,17 +35,15 @@ import {
   PayrollForbidden,
   TeamMemberNotFound,
 } from '../domain/errors';
-import type { PayrollContractorStore, PayrollRequeueStore } from '../domain/ports';
+import type { PayrollContractorStore } from '../domain/ports';
 
+import { audit } from './audit';
 import { documentOf } from './document-rows';
-import { enqueueInvoiceIssue, enqueueInvoiceRequeue } from './invoice-queue';
+import type { ContractorReads, InvoiceRequeue } from './ports';
 import { assignmentOf } from './regime-store';
-import type { PayInputReads } from './snapshot';
-import { audit } from './writes';
 
 const {
   billingRegimes,
-  commissionStatements,
   contractAcceptances,
   contractorDocumentPurges,
   contractorDocumentReviews,
@@ -268,8 +255,9 @@ async function ownedProfile(
  */
 export function createDrizzlePayrollContractorStore(
   db: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: ContractorReads,
   documentReminderDays: () => Promise<number>,
+  requeue: InvoiceRequeue,
   now: () => Date,
 ): PayrollContractorStore {
   const dayOf = async (tx: Transaction): Promise<FileDay> => ({
@@ -307,7 +295,7 @@ export function createDrizzlePayrollContractorStore(
           // Every field is identity: a change clears the owner's check (the trigger), said here with the fields' names.
           { changed, checkCleared: before?.verifiedAt !== null && before?.verifiedAt !== undefined },
         );
-        await enqueueInvoiceRequeue(tx, memberId);
+        await requeue.requeue(tx, memberId);
         return { file: await fileOf(tx, member, await dayOf(tx)), created: before === null };
       }),
 
@@ -325,7 +313,7 @@ export function createDrizzlePayrollContractorStore(
           () => new PayrollForbidden({ ownerOnly: true }),
         );
         await audit(tx, actor, 'contractor_profile.verify', { kind: 'contractor_profile', id: memberId }, {});
-        await enqueueInvoiceRequeue(tx, memberId);
+        await requeue.requeue(tx, memberId);
         return fileOf(tx, member, await dayOf(tx));
       }),
 
@@ -355,7 +343,7 @@ export function createDrizzlePayrollContractorStore(
           { kind: 'contractor_profile', id: memberId },
           { from: profile.invoicePrefix, to: body.invoicePrefix },
         );
-        await enqueueInvoiceRequeue(tx, memberId);
+        await requeue.requeue(tx, memberId);
         return fileOf(tx, member, await dayOf(tx));
       }),
 
@@ -454,35 +442,8 @@ export function createDrizzlePayrollContractorStore(
           { kind: text.kind, version: text.version, sha256: text.sha256 },
         );
         // The mandate is what an invoice waits for; the service contract does not hold one back.
-        if (text.kind === 'billing_mandate') await enqueueInvoiceRequeue(tx, memberId);
+        if (text.kind === 'billing_mandate') await requeue.requeue(tx, memberId);
         return { acceptance: acceptanceOf(row), created: true };
-      }),
-  };
-}
-
-/**
- * `payroll.requeue_invoice_issues` as the jobs (`withAdmin`, which reads every member's statements and events): each
- * validated or paid statement of the contractor (of every one for `null`) for which `invoice_not_issued` was said gets
- * its `payroll.issue_invoices` again. That run issues only what is missing, and says only a new reason.
- */
-export function createDrizzlePayrollRequeueStore(adminDb: Database): PayrollRequeueStore {
-  return {
-    requeueUnscoped: (memberId) =>
-      withAdmin(adminDb, async (tx) => {
-        const rows = await tx
-          .select({ id: commissionStatements.id })
-          .from(commissionStatements)
-          .where(
-            and(
-              inArray(commissionStatements.status, ['validated', 'paid']),
-              memberId === null ? undefined : eq(commissionStatements.memberId, memberId),
-              // Written out by hand: Drizzle prints a column of a single-table select without its table.
-              sql`exists (select 1 from domain_events e where e.type = 'invoice_not_issued' and e.payload->>'statementId' = "commission_statements"."id"::text)`,
-            ),
-          )
-          .orderBy(commissionStatements.period, commissionStatements.id);
-        for (const row of rows) await enqueueInvoiceIssue(tx, CommissionStatementIdSchema.parse(row.id));
-        return rows.length;
       }),
   };
 }
