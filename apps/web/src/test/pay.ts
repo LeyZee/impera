@@ -218,7 +218,7 @@ export function periodOf(
   statements: readonly CommissionStatement[],
   patch: Partial<Record<keyof PayrollPeriod, unknown>> = {},
 ): PayrollPeriod {
-  // The server's sums of these statements (ADR 0047 § 2); its pace is left out until the screens read it.
+  // The server's sums of these statements (ADR 0047 § 2). Its pace is neutral here: a test that reads it sets `pace`.
   const sum = (pick: (one: CommissionStatement) => number): number =>
     statements.reduce((total, one) => total + pick(one), 0);
   const count = (keep: (one: CommissionStatement) => boolean): number => statements.filter(keep).length;
