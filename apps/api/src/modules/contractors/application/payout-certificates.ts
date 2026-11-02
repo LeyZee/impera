@@ -1,7 +1,7 @@
 import type { CommissionStatementId } from '@nirvana/contracts';
 
-import { invoicePdfRetainUntil } from '../domain/invoice-pdf';
 import type { InvoiceObjectStore, JobLogger, PayrollPayoutCertificateStore } from '../domain/ports';
+import { invoicePdfRetainUntil } from '../domain/retention';
 
 import { lockAtLeast } from './locked-objects';
 

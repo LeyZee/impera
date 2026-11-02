@@ -1,43 +1,17 @@
 import { JOB_MAX_ATTEMPTS, JOB_PAYLOADS } from '@nirvana/contracts';
 
-import { invoiceBucket, type Config } from '../config';
 import { defineTask } from '../jobs';
-import {
-  createMemoryInvoiceStore,
-  createPayrollModule,
-  createS3InvoiceStore,
-  type InvoiceObjectStore,
-  type PayrollModule,
-} from '../modules/payroll';
+import { createPayrollModule, type PayrollModule } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { TeamModule } from '../modules/team';
 
-import type { Routes, Shared, TasksOf } from './shared';
-
-/** The invoices' two buckets (ADR 0037 § 4 and § 6). */
-export interface InvoiceBuckets {
-  readonly primary: InvoiceObjectStore;
-  readonly copy: InvoiceObjectStore;
-}
-
-/**
- * The configured buckets (always in production, `loadConfig` refuses to start without), or one store in memory each,
- * shared by the API and its inline worker, lost with the process: `volatile`, so that a PDF forgotten by a restart is
- * never alerted as a damaged one.
- */
-function invoiceBuckets(config: Config): InvoiceBuckets {
-  const primary = invoiceBucket(config, 'primary');
-  const copy = invoiceBucket(config, 'copy');
-  return {
-    primary: primary === null ? createMemoryInvoiceStore({ volatile: true }) : createS3InvoiceStore(primary),
-    copy: copy === null ? createMemoryInvoiceStore({ volatile: true }) : createS3InvoiceStore(copy),
-  };
-}
+import type { InvoiceBuckets, ContractorJob } from './contractors';
+import type { JobWithTask, Routes, Shared, TasksNamed } from './shared';
 
 export interface WiredPayroll {
   readonly module: PayrollModule;
-  readonly tasks: TasksOf<'payroll'>;
+  readonly tasks: TasksNamed<Exclude<Extract<JobWithTask, `payroll.${string}`>, ContractorJob>>;
   readonly routes: readonly Routes[];
 }
 
@@ -52,8 +26,8 @@ export function wirePayroll(
     readonly rateJobSince: (() => Promise<Date | null>) | null;
     /** The invoices' fonts: the path depends on where the bundle runs, so `composition-root.ts` gives it. */
     readonly invoiceFontsDir: string;
-    /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
-    readonly invoiceBuckets?: InvoiceBuckets;
+    /** The invoices' two buckets, which `wireContractors` builds and the contractors' documents share. */
+    readonly invoiceBuckets: InvoiceBuckets;
     /**
      * Tests set pay's clock here, to issue a document whose delay to answer is already over (EQ-06 lot 6); the
      * system's otherwise. The database keeps its own: every step of an acceptance is checked on `now()`.
@@ -61,7 +35,7 @@ export function wirePayroll(
     readonly now?: () => Date;
   },
 ): WiredPayroll {
-  const { config, db, adminDb, logger, requireRole } = shared;
+  const { db, adminDb, logger, requireRole } = shared;
   const { scheduling, team, persona } = deps;
   const module = createPayrollModule({
     db,
@@ -75,7 +49,7 @@ export function wirePayroll(
       creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
     },
     rateJobSince: deps.rateJobSince,
-    invoicePdfs: { fontsDir: deps.invoiceFontsDir, ...(deps.invoiceBuckets ?? invoiceBuckets(config)) },
+    invoicePdfs: { fontsDir: deps.invoiceFontsDir, ...deps.invoiceBuckets },
     ...(deps.now !== undefined && { now: deps.now }),
   });
   return {
@@ -202,17 +176,6 @@ export function wirePayroll(
           );
         },
       ),
-      'payroll.remind_documents': defineTask(
-        'payroll.remind_documents',
-        JOB_PAYLOADS['payroll.remind_documents'],
-        logger,
-        async (_payload, context) => {
-          context.logger.info(
-            { reminded: await module.jobs.remindDocuments() },
-            'payroll: expiring documents reminded',
-          );
-        },
-      ),
       'payroll.remind_due_invoices': defineTask(
         'payroll.remind_due_invoices',
         JOB_PAYLOADS['payroll.remind_due_invoices'],
@@ -224,17 +187,6 @@ export function wirePayroll(
           );
         },
       ),
-      'payroll.purge_refused_documents': defineTask(
-        'payroll.purge_refused_documents',
-        JOB_PAYLOADS['payroll.purge_refused_documents'],
-        logger,
-        async (_payload, context) => {
-          context.logger.info(
-            { outcome: await module.jobs.purgeRefusedDocuments(context.logger) },
-            'payroll: refused documents purged',
-          );
-        },
-      ),
       'payroll.settle_documents': defineTask(
         'payroll.settle_documents',
         JOB_PAYLOADS['payroll.settle_documents'],
@@ -242,18 +194,6 @@ export function wirePayroll(
         async (payload, context) => {
           const settled = await module.jobs.settleDocuments(payload.memberId);
           context.logger.info({ memberId: payload.memberId, settled }, 'payroll: documents settled');
-        },
-      ),
-      'payroll.lock_payout_certificate': defineTask(
-        'payroll.lock_payout_certificate',
-        JOB_PAYLOADS['payroll.lock_payout_certificate'],
-        logger,
-        async (payload, context) => {
-          const locked = await module.jobs.lockPayoutCertificates(payload.statementId, context.logger);
-          context.logger.info(
-            { statementId: payload.statementId, locked },
-            'payroll: payout certificates locked',
-          );
         },
       ),
     },

@@ -12,8 +12,8 @@ import { eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
-import { addDays } from '../modules/payroll/domain/billing';
-import { transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
+import { addDays } from '../modules/contractors/domain/billing';
+import { transparentLogo } from '../modules/contractors/infra/__tests__/invented-png';
 
 import { setUpInvoicing, type Invoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -32,7 +32,7 @@ describe('Équipe › Pièces du prestataire : le rappel avant l’échéance (E
   let sam: TeamMember;
 
   const db = () => team.test.admin.db;
-  const remind = () => team.app.modules.payroll.jobs.remindDocuments();
+  const remind = () => team.app.modules.contractors.jobs.remindDocuments();
   const today = () => calendarDayAt(new Date(), ZONE);
 
   /** Benin's regime, under a tax treaty: it asks for a tax residence certificate. Its words are the test's. */

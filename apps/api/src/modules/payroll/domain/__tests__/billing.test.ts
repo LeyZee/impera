@@ -7,12 +7,11 @@ import {
   documentsToRemind,
   documentState,
   documentValidUntil,
-  issueDecision,
   regimeOn,
   taxResidenceOf,
   type BillingRegime,
-  type IssueFacts,
-} from '../billing';
+} from '../../../contractors/domain/billing';
+import { issueDecision, type IssueFacts } from '../billing';
 
 /** Regimes as the owner would set them; their mentions are data, here short invented ones. */
 const ABROAD: BillingRegime = {

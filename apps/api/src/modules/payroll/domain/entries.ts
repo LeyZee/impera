@@ -6,13 +6,14 @@ import {
   type TeamMemberId,
 } from '@nirvana/contracts';
 
+import { PayrollForbidden } from '../../contractors/pure';
+
 import {
   PayPeriodClosed,
   PayPeriodTooFar,
   PaymentAmountMismatch,
   PaymentBeforePeriod,
   PaymentInFuture,
-  PayrollForbidden,
   PayrollOwnForbidden,
   PenaltyCancelConflict,
 } from './errors';

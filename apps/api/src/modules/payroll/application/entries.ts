@@ -4,7 +4,8 @@ import type {
   PayCommissionStatementBody,
 } from '@nirvana/contracts';
 
-import type { Actor, PayrollEntryStore } from '../domain/ports';
+import type { Actor } from '../../contractors/pure';
+import type { PayrollEntryStore } from '../domain/ports';
 
 import type { PayrollReads } from './periods';
 

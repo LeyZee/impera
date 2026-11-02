@@ -12,7 +12,7 @@ import {
 import { schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createMemoryInvoiceStore } from '../modules/payroll';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 

@@ -1,11 +1,11 @@
 import { AuditEntryIdSchema, newId } from '@nirvana/contracts';
 import { schema, type Transaction } from '@nirvana/db';
 
-import type { Actor } from '../domain/ports';
+import type { Actor } from '../../contractors/pure';
 
 /**
- * What pay writes in the audit log: an action on a statement, a period, a member's entry, a team rule, the billing
- * settings, a contractor's file, texts and regimes.
+ * What pay writes in the audit log: an action on a statement, a period, a member's entry, a team rule, the accountant's
+ * exports.
  */
 type AuditedAction =
   | 'commission_statement.validate'
@@ -20,23 +20,9 @@ type AuditedAction =
   | 'collective_goal.create'
   | 'payout_minimum.create'
   | 'payroll_settings.update'
-  | 'billing_settings.update'
-  | 'billing_settings.accounts'
   | 'accounting_journal.export'
   | 'accounting_das2.export'
-  | 'accounting_archive.export'
-  | 'agency_logo.add'
-  | 'contractor_profile.create'
-  | 'contractor_profile.update'
-  | 'contractor_profile.verify'
-  | 'contractor_profile.prefix'
-  | 'contract_text.add'
-  | 'contract.accept'
-  | 'billing_regime.create'
-  | 'billing_regime.validate'
-  | 'contractor_regime.assign'
-  | 'contractor_document.add'
-  | 'contractor_document.review';
+  | 'accounting_archive.export';
 
 /** Who did what (append-only, `audit_log`): never a name. */
 export async function audit(
@@ -54,17 +40,9 @@ export async function audit(
       | 'collective_goal'
       | 'payout_minimum'
       | 'payroll_settings'
-      | 'billing_settings'
       | 'accounting_journal'
       | 'accounting_das2'
-      | 'accounting_archive'
-      | 'agency_logo'
-      | 'contractor_profile'
-      | 'contract_text'
-      | 'contract_acceptance'
-      | 'billing_regime'
-      | 'contractor_regime'
-      | 'contractor_document';
+      | 'accounting_archive';
     readonly id: string;
   },
   details: Record<string, unknown>,

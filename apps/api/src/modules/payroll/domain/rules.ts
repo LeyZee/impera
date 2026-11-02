@@ -1,6 +1,8 @@
 import { collectiveGoalWindow, payPeriodNotBegun, type PayPeriod } from '@nirvana/contracts';
 
-import { CollectiveGoalLate, PayRuleStarted, PayrollForbidden } from './errors';
+import { PayrollForbidden } from '../../contractors/pure';
+
+import { CollectiveGoalLate, PayRuleStarted } from './errors';
 import type { PayReader } from './ports';
 
 /**

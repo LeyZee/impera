@@ -11,7 +11,7 @@ import {
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { inventedPng, transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
+import { inventedPng, transparentLogo } from '../modules/contractors/infra/__tests__/invented-png';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';

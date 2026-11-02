@@ -59,4 +59,40 @@ describe('module boundaries', { timeout: 90_000 }, () => {
   it('rejects an import cycle', async () => {
     expect(ruleIds(await lint('media/domain/cycle-a.ts'))).toContain('import-x/no-cycle');
   });
+
+  // ADR 0051: pure.ts, the second entry point of a module.
+  describe('pure.ts', () => {
+    it('allows a pure.ts that re-exports its own domain', async () => {
+      expect(ruleIds(await lint('contractors/pure.ts'))).toEqual([]);
+    });
+
+    it('allows a domain to use the pure.ts of a module it depends on', async () => {
+      expect(ruleIds(await lint('payroll/domain/uses-pure.ts'))).toEqual([]);
+    });
+
+    // boundaries does not check imports inside one module (`checkInternals` is off): the re-export rule refuses it.
+    it('rejects a pure.ts that imports its infra', async () => {
+      expect(ruleIds(await lint('fans/pure.ts'))).toContain('no-restricted-syntax');
+    });
+
+    it('rejects a pure.ts that imports an npm package', async () => {
+      expect(ruleIds(await lint('media/pure.ts'))).toContain('boundaries/dependencies');
+    });
+
+    it('rejects a pure.ts that writes a function', async () => {
+      expect(ruleIds(await lint('persona/pure.ts'))).toContain('no-restricted-syntax');
+    });
+
+    it('rejects a domain that imports the pure.ts of a module outside its list', async () => {
+      expect(ruleIds(await lint('fans/domain/foreign-pure.ts'))).toContain('boundaries/dependencies');
+    });
+
+    it("rejects a domain that imports another module's domain file", async () => {
+      expect(ruleIds(await lint('payroll/domain/deep-import.ts'))).toContain('boundaries/dependencies');
+    });
+
+    it("rejects a domain that imports another module's index.ts", async () => {
+      expect(ruleIds(await lint('payroll/domain/index-import.ts'))).toContain('boundaries/dependencies');
+    });
+  });
 });

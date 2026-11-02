@@ -27,7 +27,9 @@ const MODULE_DEPENDENCIES = {
   backups: [],
   scheduling: [],
   alerts: [],
-  payroll: [],
+  // ADR 0047 § 1: pay is four modules; contractors imports none of the others.
+  contractors: [],
+  payroll: ['contractors'],
   notifications: [],
 };
 
@@ -38,8 +40,17 @@ const el = (type, captured) => ({ element: captured ? { type, captured } : { typ
 const pkg = (name) => el('package', { package: name });
 const anyOf = (...selectors) => selectors;
 
-/** Module layers, told apart by the file's path inside the module folder. */
-const LAYERS = { domain: 'domain/**', application: 'application/**', infra: 'infra/**', index: 'index.ts' };
+/**
+ * Module layers, told apart by the file's path inside the module folder. `pure.ts` is the second entry point of
+ * ADR 0051: re-exports of the module's own pure domain rules, which the modules depending on it may import anywhere.
+ */
+const LAYERS = {
+  domain: 'domain/**',
+  application: 'application/**',
+  infra: 'infra/**',
+  index: 'index.ts',
+  pure: 'pure.ts',
+};
 const layer = (name, module) => ({
   element: {
     type: 'module',
@@ -48,24 +59,51 @@ const layer = (name, module) => ({
   },
 });
 
-/** For each module: its own layers plus the index.ts of the modules it may depend on. */
+/**
+ * For each module: its own layers, plus the index.ts of the modules it may depend on (outside its domain) and their
+ * pure.ts (everywhere, ADR 0051). Any other file of another module stays out of reach.
+ */
 const moduleRules = moduleNames.flatMap((name) => {
   const own = (layerName) => layer(layerName, name);
-  const allowedIndexes =
-    MODULE_DEPENDENCIES[name].length > 0 ? [layer('index', MODULE_DEPENDENCIES[name])] : [];
+  const dependencies = MODULE_DEPENDENCIES[name];
+  const allowedIndexes = dependencies.length > 0 ? [layer('index', dependencies)] : [];
+  const allowedPures = dependencies.length > 0 ? [layer('pure', dependencies)] : [];
   return [
-    { from: own('domain'), allow: { to: anyOf(own('domain'), pkg('contracts')) } },
+    { from: own('pure'), allow: { to: anyOf(own('domain'), pkg('contracts')) } },
+    { from: own('domain'), allow: { to: anyOf(own('domain'), pkg('contracts'), ...allowedPures) } },
     {
       from: own('application'),
-      allow: { to: anyOf(own('domain'), own('application'), pkg('contracts'), ...allowedIndexes) },
+      allow: {
+        to: anyOf(own('domain'), own('application'), pkg('contracts'), ...allowedIndexes, ...allowedPures),
+      },
     },
     {
       from: own('infra'),
-      allow: { to: anyOf(own('domain'), own('application'), own('infra'), el('package'), ...allowedIndexes) },
+      allow: {
+        to: anyOf(
+          own('domain'),
+          own('application'),
+          own('infra'),
+          own('pure'),
+          el('package'),
+          ...allowedIndexes,
+          ...allowedPures,
+        ),
+      },
     },
     {
       from: own('index'),
-      allow: { to: anyOf(own('domain'), own('application'), own('infra'), el('package'), ...allowedIndexes) },
+      allow: {
+        to: anyOf(
+          own('domain'),
+          own('application'),
+          own('infra'),
+          own('pure'),
+          el('package'),
+          ...allowedIndexes,
+          ...allowedPures,
+        ),
+      },
     },
   ];
 });
@@ -191,6 +229,16 @@ export default tseslint.config(
                 ],
               },
             },
+            // pure.ts has the domain's bans, and no npm package at all (ADR 0051).
+            {
+              from: layer('pure'),
+              disallow: {
+                to: [
+                  { module: { origin: 'external' } },
+                  { module: { origin: 'core', source: '!node:crypto' } },
+                ],
+              },
+            },
             // LLM SDKs never leave packages/llm (ADR 0009).
             {
               from: anyOf(
@@ -201,6 +249,7 @@ export default tseslint.config(
                 layer('application'),
                 layer('infra'),
                 layer('index'),
+                layer('pure'),
                 el('web'),
                 el('extension'),
                 el('api-root'),
@@ -236,6 +285,20 @@ export default tseslint.config(
     // Tests and ops scripts may log to the console.
     files: ['**/*.test.ts', '**/scripts/**', 'evals/**'],
     rules: { 'no-console': 'off', '@typescript-eslint/no-non-null-assertion': 'off' },
+  },
+  {
+    // ADR 0051: a module's pure.ts only re-exports from its own domain; it writes nothing itself.
+    files: ['apps/api/src/modules/*/pure.ts', 'apps/api/src/__tests__/fixtures/boundaries/modules/*/pure.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Program > :not(ExportNamedDeclaration[source.value=/^\\.\\/domain\\//], ExportAllDeclaration[source.value=/^\\.\\/domain\\//])',
+          message: 'pure.ts only re-exports from its own domain/ (ADR 0051).',
+        },
+      ],
+    },
   },
   prettier,
 );

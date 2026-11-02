@@ -11,9 +11,10 @@ import { and, eq, schema } from '@nirvana/db';
 import { unzipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createMemoryInvoiceStore } from '../modules/payroll';
-import { invoicePdfKey, invoicePdfRetainUntil } from '../modules/payroll/domain/invoice-pdf';
-import type { InvoiceObjectStore } from '../modules/payroll/domain/ports';
+import type { InvoiceObjectStore } from '../modules/contractors/domain/ports';
+import { invoicePdfRetainUntil } from '../modules/contractors/domain/retention';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
+import { invoicePdfKey } from '../modules/payroll/domain/invoice-pdf';
 import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';

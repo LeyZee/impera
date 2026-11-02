@@ -22,9 +22,9 @@ import {
 } from '../domain/errors';
 import type { Actor, PayrollDocumentStore } from '../domain/ports';
 
+import { audit } from './audit';
 import { documentOf, mediaTypeOfRow } from './document-rows';
-import type { PayInputReads } from './snapshot';
-import { audit } from './writes';
+import type { ContractorReads } from './ports';
 
 const {
   billingSettings,
@@ -117,7 +117,7 @@ async function recordedUnder(
  */
 export function createDrizzlePayrollDocumentStore(
   db: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: ContractorReads,
   now: () => Date,
 ): PayrollDocumentStore {
   const today = async (tx: Transaction): Promise<string> =>
