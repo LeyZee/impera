@@ -220,7 +220,31 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
           .from(models)
           .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)))
           .for('update');
-        if (current?.platformAccountId === account.platformAccountId) return 'linked';
+        if (current?.platformAccountId === account.platformAccountId) {
+          // The owner confirms a link the handle posed: it becomes theirs, dated, with nothing else moving.
+          if (current.linkedBy !== null || by === null) return 'linked';
+          await tx
+            .update(models)
+            .set({ linkedBy: by, linkedAt: new Date() })
+            .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)));
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId: by,
+            action: 'sales_feed.model_linked',
+            entity: 'sales_feed_model',
+            entityId: `${platform}:${platformModelId}`,
+            details: {
+              platform,
+              platformModelId,
+              platformAccountId: account.platformAccountId,
+              previousAccountId: current.platformAccountId,
+              auto: false,
+              confirmed: true,
+              released: 0,
+            },
+          });
+          return 'linked';
+        }
         // Lines already recorded for another account stay there (append-only): moving the model would split it.
         const [elsewhere] = await withAdmin(adminDb, (admin) =>
           admin

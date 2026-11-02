@@ -55,3 +55,5 @@ La paie, les écrans de vente, tout appel réel sans la demande de Charles.
 - Avec un webhook dont le secret s'ouvre, le passage de la minute ne lit qu'une fois par heure (rattrapage, ADR 0050 § 3) ; une livraison met en file `connector.read_sales` avec `woken` (une seule en attente, `job_key`).
 - Rien n'est appelé chez Reveal tant que le propriétaire n'a pas inscrit le webhook, ce qui attend que le support l'ouvre.
 - Reste : écran Réglages (clé, liens, bouton du webhook).
+
+02/11/2026, Bilan, après la relecture de l'écran (#412) : reposer un lien `auto` vers le même compte le confirme (`linkedBy` passe au propriétaire, ligne `sales_feed.model_linked` avec `confirmed`), sans quarantaine ni vente déplacée.

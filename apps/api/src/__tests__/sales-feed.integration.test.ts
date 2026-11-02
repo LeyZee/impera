@@ -319,6 +319,19 @@ describe('sales feed (CRM-01)', () => {
       .from(schema.platformSalesQuarantine)
       .where(eq(schema.platformSalesQuarantine.platformSaleId, 'sale_q'));
     expect(released?.recordedAt.getTime()).toBeGreaterThan(waited?.recordedAt.getTime() ?? Infinity);
+    // The owner confirms the link the handle posed: it becomes theirs; confirming it again changes nothing.
+    const confirmed = await api('PUT', '/v1/settings/sales-feeds/reveal/models/model_test_01', {
+      platformAccountId: accountId,
+    });
+    expect(confirmed.statusCode).toBe(200);
+    expect(
+      SalesFeedOverviewSchema.parse(confirmed.json()).models.find(
+        (model) => model.platformModelId === 'model_test_01',
+      )?.linkedBy,
+    ).toMatchObject({ kind: 'member' });
+    await api('PUT', '/v1/settings/sales-feeds/reveal/models/model_test_01', {
+      platformAccountId: accountId,
+    });
     const links = await test.admin.db
       .select({ action: schema.auditLog.action, details: schema.auditLog.details })
       .from(schema.auditLog)
@@ -331,6 +344,7 @@ describe('sales feed (CRM-01)', () => {
     expect(links.map((line) => LinkDetailsSchema.parse(line.details))).toEqual([
       { platformModelId: 'model_test_01', auto: true, released: 0 },
       { platformModelId: 'model_test_02', auto: false, released: 2 },
+      { platformModelId: 'model_test_01', auto: false, released: 0 },
     ]);
     expect(await ledgerLines('sale_q')).toBe(1);
     expect(await ledgerLines('sale_q2')).toBe(1);
