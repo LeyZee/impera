@@ -92,6 +92,14 @@ const CRON_JOBS: readonly CronJob[] = [
     payload: { memberId: null },
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.settle_documents'] },
   },
+  // The lock of the certificates transfers relied on (ADR 0041 § 6), once a night: its own job runs with the record of
+  // each transfer; this catches one a bucket failed or that was lost. Records only what is missing, no backfill.
+  {
+    task: 'payroll.lock_payout_certificate',
+    match: '43 4 * * *',
+    payload: { statementId: null },
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.lock_payout_certificate'] },
+  },
   // The waiting invoices tried again once a day, whatever their trigger (EQ-06 « ok pays »): a member whose country goes
   // back to that of his regime, or any change no trigger of this module sees (the team module never calls payroll),
   // lets his invoices go out within the day. Each statement that waited is enqueued under its own key (a run that waits

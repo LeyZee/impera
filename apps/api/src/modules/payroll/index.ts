@@ -37,6 +37,7 @@ import {
   type RenderOutcome,
 } from './application/invoice-pdfs';
 import { issueInvoices, requeueInvoiceIssues } from './application/invoicing';
+import { lockPayoutCertificates } from './application/payout-certificates';
 import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
@@ -57,6 +58,7 @@ import { createDrizzlePayrollInvoicePdfStore } from './infra/invoice-pdf-store';
 import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
 import { createDrizzlePayrollJobStore } from './infra/job-store';
 import { createLatestRateRead } from './infra/latest-rate';
+import { createDrizzlePayoutCertificateStore } from './infra/payout-certificate-store';
 import { readPng } from './infra/png';
 import { createPostgresRateAlerts } from './infra/rate-alerts';
 import { createDrizzlePayrollRateStore } from './infra/rate-store';
@@ -172,6 +174,15 @@ export interface PayrollModule {
      * contractor with a document not settled yet (`null`). Returns how many were written.
      */
     readonly settleDocuments: (memberId: TeamMemberId | null) => Promise<number>;
+    /**
+     * `payroll.lock_payout_certificate` (ADR 0041 § 6): the tax residence certificate a transfer relied on, locked in
+     * both buckets ten years after the close of the fiscal year of the transfer. One transfer, or every transfer whose
+     * certificate is not locked yet (`null`). Returns how many were recorded.
+     */
+    readonly lockPayoutCertificates: (
+      statementId: CommissionStatementId | null,
+      logger: JobLogger,
+    ) => Promise<number>;
   };
 }
 
@@ -275,6 +286,16 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
           logger,
         ),
       settleDocuments: (memberId) => createDrizzleSettlementStore(deps.adminDb).settleUnscoped(memberId),
+      lockPayoutCertificates: (statementId, logger) =>
+        lockPayoutCertificates(
+          {
+            store: createDrizzlePayoutCertificateStore(deps.adminDb),
+            primary: deps.invoicePdfs.primary,
+            copy: deps.invoicePdfs.copy,
+          },
+          statementId,
+          logger,
+        ),
     },
   };
 }

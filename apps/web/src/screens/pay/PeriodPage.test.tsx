@@ -695,6 +695,41 @@ describe('Paie › Quinzaine', () => {
     ]);
   });
 
+  it('says a transfer that waits for a tax residence certificate apart, and offers no « Marquer payé » for it (ADR 0041)', async () => {
+    const validatedAt = '2026-11-02T08:41:00.000Z';
+    periods[OCT2] = periodOf(
+      OCT2,
+      [
+        statementOf(THEO, OCT2, {
+          status: 'validated',
+          payableMinor: 10_000,
+          totalMinor: 10_000,
+          validatedAt,
+          payoutBlock: { reason: 'tax_residence_missing', year: '2026' },
+        }),
+        statementOf(BASILE, OCT2, {
+          status: 'validated',
+          payableMinor: 20_000,
+          totalMinor: 20_000,
+          validatedAt,
+        }),
+      ],
+      { closing: { period: OCT2, exchangeRates: [], closedBy: OWNER_USER, closedAt: validatedAt } },
+    );
+    renderPage(OWNER);
+    expect(text((await screen.findByText('Reste à envoyer')).nextElementSibling)).toBe('300,00 €');
+    expect(text(screen.getByText(/^Dont/u))).toBe('Dont 100,00 € au versement bloqué (1 relevé)');
+    expect(text(row('Théo'))).toContain('Versement bloqué : attestation de résidence 2026 absente.');
+    expect(within(row('Théo')).getByText('Versement bloqué').className).toContain('rp-chip--warn');
+    expect(within(row('Théo')).queryByRole('button', { name: 'Marquer payé' })).toBeNull();
+    expect(within(row('Basile')).getByRole('button', { name: 'Marquer payé' })).toBeTruthy();
+    // Its statement says why in its foot, with nothing to mark paid.
+    fireEvent.click(within(row('Théo')).getByRole('button', { name: 'Théo' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(dialog)).toContain('Versement bloqué : attestation de résidence 2026 absente.');
+    expect(within(dialog).queryByRole('button', { name: 'Marquer payé' })).toBeNull();
+  });
+
   it('never offers a manager to mark a statement paid', async () => {
     periods[OCT2] = periodOf(OCT2, [statementOf(THEO, OCT2, { status: 'validated', canValidate: false })], {
       closing: {

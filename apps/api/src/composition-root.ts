@@ -802,6 +802,18 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         context.logger.info({ memberId: payload.memberId, settled }, 'payroll: documents settled');
       },
     ),
+    'payroll.lock_payout_certificate': defineTask(
+      'payroll.lock_payout_certificate',
+      JOB_PAYLOADS['payroll.lock_payout_certificate'],
+      logger,
+      async (payload, context) => {
+        const locked = await modules.payroll.jobs.lockPayoutCertificates(payload.statementId, context.logger);
+        context.logger.info(
+          { statementId: payload.statementId, locked },
+          'payroll: payout certificates locked',
+        );
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

@@ -55,6 +55,7 @@ export const JOB_NAMES = [
   'payroll.remind_documents',
   'payroll.purge_refused_documents',
   'payroll.settle_documents',
+  'payroll.lock_payout_certificate',
   'media.describe',
   'providers.check_credentials',
   'telegram.scan',
@@ -198,6 +199,13 @@ export const JOB_PAYLOADS = {
    * `payroll.settle_documents:<memberId>`; each night for every contractor (`null`). Writes only what is missing.
    */
   'payroll.settle_documents': z.object({ memberId: TeamMemberIdSchema.nullable() }),
+  /**
+   * Lengthens, in both buckets, the lock of the tax residence certificate a transfer relied on (ADR 0041 § 6) to ten
+   * years after the close of the fiscal year of the transfer, never shorter. Enqueued with the record of the transfer,
+   * under the key `payroll.lock_payout_certificate:<statementId>`; each night for every transfer whose certificate is
+   * not locked yet (`null`). A bucket that does not answer fails the run, never the transfer.
+   */
+  'payroll.lock_payout_certificate': z.object({ statementId: CommissionStatementIdSchema.nullable() }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -258,6 +266,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.purge_refused_documents': 1,
   // Replayable: it writes only the settlements still missing, under the contractor's lock.
   'payroll.settle_documents': 5,
+  // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
+  'payroll.lock_payout_certificate': 5,
   'media.describe': 3,
   'providers.check_credentials': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:

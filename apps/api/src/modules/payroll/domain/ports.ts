@@ -395,8 +395,9 @@ export interface InvoiceToRender {
   /** The month the agency's fiscal year closes in (`billing_settings`), read when the PDF is rendered. */
   readonly fiscalYearEndMonth: number;
   /**
-   * The storage keys of the tax residence certificates an invoice under a tax treaty relies on: those of its member,
-   * accepted by the owner, of its period's civil year (`taxResidenceFor`). Empty for any other document.
+   * The storage keys of the tax residence certificates of an invoice under a tax treaty: those of its member, accepted
+   * by the owner, of its period's civil year, kept as long as the invoice. Empty for any other document, and for an
+   * invoice issued before any (ADR 0041: the invoice no longer waits for them; the transfer locks its own).
    */
   readonly certificateKeys: readonly string[];
   readonly pdf: StoredInvoicePdf | null;
@@ -659,6 +660,29 @@ export interface PayrollDocumentReminderStore {
 export interface PayrollSettlementStore {
   /** One contractor, or every contractor with a document not settled yet (`null`). */
   settleUnscoped(memberId: TeamMemberId | null): Promise<number>;
+}
+
+/** A transfer that relied on a tax residence certificate (ADR 0041 § 4), whose lock the job lengthens (§ 6). */
+export interface PayoutCertificate {
+  readonly statementId: CommissionStatementId;
+  readonly documentId: string;
+  /** The certificate's key in both buckets. */
+  readonly key: string;
+  /** The day of the transfer, and the agency's fiscal year: the lock holds ten years after its close. */
+  readonly paidOn: string;
+  readonly fiscalYearEndMonth: number;
+}
+
+/**
+ * `payroll.lock_payout_certificate`, as the jobs (`withAdmin`): the transfers whose record names a certificate
+ * (`certificateDocumentId` of `commission_statement.pay`) without a line saying it was locked for them, and that line
+ * (`commission_statement.certificate_locked`), written once.
+ */
+export interface PayrollPayoutCertificateStore {
+  /** One transfer, or every transfer whose certificate is not locked yet (`null`). */
+  toLockUnscoped(statementId: CommissionStatementId | null): Promise<readonly PayoutCertificate[]>;
+  /** Both buckets hold it at least until `retainUntil`; `false` when another run said it first. */
+  recordLockedUnscoped(certificate: PayoutCertificate, retainUntil: Date): Promise<boolean>;
 }
 
 /** A refused document's file, as the purge reads it: where it lies and what it is. */

@@ -13,6 +13,8 @@ import {
   InvoiceIdSchema,
   newId,
   PayPeriodSchema,
+  PayrollPeriodSchema,
+  type CommissionStatementId,
   type ContractorProfileBody,
   type TeamMember,
 } from '@nirvana/contracts';
@@ -28,7 +30,7 @@ import { transparentLogo } from '../modules/payroll/infra/__tests__/invented-png
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
-/** A period of 2025: it has ended. Its invoice needs a tax residence certificate of 2025. */
+/** A period of 2025: it has ended. Its invoice goes out without a certificate; its transfer waits for one (ADR 0041). */
 const Q1 = PayPeriodSchema.parse('2025-05-01');
 /** The agency's zone, the scheduling's default: today is its calendar day. */
 const ZONE = 'Europe/Paris';
@@ -70,7 +72,7 @@ const BENIN = {
   taxIdRequired: true,
 };
 
-describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer la facture (EQ-06 lot 5c)', () => {
+describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer le versement (EQ-06 lot 5c, ADR 0041)', () => {
   let team: PayrollTeam;
   let kofi: TeamMember;
   let kofiCookie: string;
@@ -126,6 +128,41 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
       sql`delete from graphile_worker._private_jobs where key like 'payroll.requeue_invoice_issues:%'`,
     );
   const issue = () => payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
+  /** His statement's transfer, recorded as the owner would: `null` when recorded, else the refusal. */
+  const pay = async (paidOn: string) => {
+    const { revision, payableMinor } = await team.statementOf(kofi, Q1);
+    const response = await team.call('POST', `/payroll/statements/${statementId}/pay`, team.owner, {
+      revision,
+      paidOn,
+      method: 'worldremit',
+      sentMinor: payableMinor,
+    });
+    if (response.statusCode === 200) return null;
+    expect(response.statusCode, response.body).toBe(409);
+    const { code, details } = team.refusal(response);
+    return { code, details };
+  };
+  /** What stops his statement's transfer today, as the period's read shows it to `cookie`. */
+  const blockOf = async (cookie: string) => {
+    const response = await team.call('GET', `/payroll/periods/${Q1}`, cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    const read = PayrollPeriodSchema.parse(response.json());
+    const found = read.statements.find((one) => one.id === statementId);
+    if (found === undefined) throw new Error('his statement, not read');
+    return found.payoutBlock;
+  };
+  const lockJobs = async () =>
+    (
+      await db().execute<{ payload: unknown }>(
+        sql`select payload from graphile_worker._private_jobs where key = ${`payroll.lock_payout_certificate:${statementId}`}`,
+      )
+    ).rows.map((row) => row.payload);
+  const forgetLocks = () =>
+    db().execute(
+      sql`delete from graphile_worker._private_jobs where key like 'payroll.lock_payout_certificate:%'`,
+    );
+  const lockCertificates = (id: CommissionStatementId | null) =>
+    payroll().jobs.lockPayoutCertificates(id, quiet);
 
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'), { invoiceBuckets: { primary, copy } });
@@ -211,16 +248,35 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     expect(await team.audited('contractor_document.add')).toBe(0);
   });
 
-  it('holds his invoice under the treaty until the owner accepts a certificate of the period’s year', async () => {
-    expect(await issue()).toMatchObject({ issued: [], notIssued: [{ reason: 'tax_residence_missing' }] });
+  it('issues his invoice under the treaty at once, and holds its transfer until a certificate of its year is accepted (ADR 0041)', async () => {
+    // The invoice waits for no certificate (§ 1): issued, and nothing said to the owner.
+    expect(await issue()).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
+    expect(await toldWhy()).toEqual([]);
 
-    // A certificate of this year does not cover a service of 2025.
+    // Its transfer waits: said on the statement before the owner makes it (§ 4), to a manager too, then refused.
+    const year = today().slice(0, 4);
+    expect(await blockOf(team.owner)).toEqual({ reason: 'tax_residence_missing', year });
+    expect(await blockOf(miaCookie)).toEqual({ reason: 'tax_residence_missing', year });
+    expect(await pay(today())).toEqual({
+      code: 'payout_blocked_conflict',
+      details: { reason: 'tax_residence_missing', year },
+    });
+    // His regime starts today: a transfer dated in 2025 needs it too, since it pays an invoice issued under the treaty.
+    expect(await pay('2025-06-02')).toEqual({
+      code: 'payout_blocked_conflict',
+      details: { reason: 'tax_residence_missing', year: '2025' },
+    });
+
+    // A certificate of this year, filed: this year's transfer waits for the owner's check; 2025's still lacks one.
+    await forgetJobs();
     const thisYear = residence(today());
     expect((await upload(kofiCookie, thisYear, JPEG)).statusCode).toBe(201);
-    expect(await issue()).toMatchObject({ notIssued: [{ reason: 'tax_residence_missing' }] });
+    expect(await blockOf(team.owner)).toEqual({ reason: 'tax_residence_unverified', year });
+    expect((await pay('2025-06-02'))?.details).toEqual({ reason: 'tax_residence_missing', year: '2025' });
+    // No invoice waits for a certificate any more: filing one tries none again.
+    expect(await requeued()).toBe(0);
 
-    // One of 2025: filed, it waits for the owner's check, and the owner is told so once.
-    await forgetJobs();
+    // One of 2025: filed, it waits for the owner's check.
     const of2025 = residence('2025-03-03');
     const first = pdf('certificate of 2025, first scan');
     const filed = await upload(kofiCookie, of2025, first);
@@ -237,7 +293,6 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
       sha256: sha256(first),
       review: null,
     });
-    expect(await requeued()).toBe(1);
     const key = documentStorageKey(kofi.id, of2025.id, 'application/pdf');
     const stored = primary.peek(key);
     expect(stored?.bytes).toEqual(first);
@@ -258,8 +313,7 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     expect(other.statusCode).toBe(409);
     expect(team.refusal(other).code).toBe('contractor_document_id_conflict');
 
-    expect(await issue()).toMatchObject({ notIssued: [{ reason: 'tax_residence_unverified' }] });
-    expect(await toldWhy()).toEqual(['tax_residence_missing', 'tax_residence_unverified']);
+    expect((await pay('2025-06-02'))?.details).toEqual({ reason: 'tax_residence_unverified', year: '2025' });
 
     // He, the owner and a manager read the file, its bytes as filed; another member does not.
     for (const cookie of [kofiCookie, team.owner, miaCookie]) {
@@ -293,11 +347,10 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     // Refused, its file keeps the lock of its upload, and is never copied.
     expect(primary.peek(key)?.retainUntil?.getTime()).toBe(lock);
     expect(copy.peek(key)).toBeUndefined();
-    expect(await issue()).toMatchObject({ notIssued: [{ reason: 'tax_residence_missing' }] });
-    expect(await toldWhy()).toEqual(['tax_residence_missing', 'tax_residence_unverified']);
+    expect((await pay('2025-06-02'))?.details).toEqual({ reason: 'tax_residence_missing', year: '2025' });
+    expect(await team.audited('commission_statement.pay')).toBe(0);
 
-    // A new scan, accepted: its file is locked as long as the invoices it may cover, and the invoice goes out.
-    await forgetJobs();
+    // A new scan, accepted: its file is locked as long as the invoices it may cover.
     const rescan = residence('2025-03-03');
     expect((await upload(kofiCookie, rescan, PNG)).statusCode).toBe(201);
     const accepted = await review(team.owner, rescan.id, { decision: 'accepted' });
@@ -318,11 +371,10 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
       retainUntil: due,
       reviewedBy: team.ownerId,
     });
-    expect(await requeued()).toBe(1);
-    expect(await issue()).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
+    expect(await requeued()).toBe(0);
 
-    // The invoice keeps its proof as long as itself (Bilan on #355): a shorter lock on the accepted certificate of its
-    // year is lengthened to the invoice's, in both buckets, before its PDF is stored. The refused scan and this year's
+    // An invoice under a treaty keeps an accepted certificate of its year as long as itself (Bilan on #355): a shorter
+    // lock is lengthened to the invoice's, in both buckets, before its PDF is stored. The refused scan and this year's
     // certificate are not its proof: their locks do not move.
     const [invoice] = await db()
       .select({ id: schema.invoices.id, issuedOn: schema.invoices.issuedOn })
@@ -330,8 +382,9 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
       .where(eq(schema.invoices.memberId, kofi.id));
     if (invoice === undefined) throw new Error('the invoice just issued');
     const invoiceLock = invoicePdfRetainUntil(invoice.issuedOn, 12);
-    const shorter = new Date(invoiceLock.getTime() - DAY);
-    for (const bucket of [primary, copy]) bucket.plant(rescanKey, { bytes: PNG, retainUntil: shorter });
+    for (const bucket of [primary, copy]) {
+      bucket.plant(rescanKey, { bytes: PNG, retainUntil: new Date(invoiceLock.getTime() - DAY) });
+    }
     const thisYearKey = documentStorageKey(kofi.id, thisYear.id, 'image/jpeg');
     const thisYearLock = primary.peek(thisYearKey)?.retainUntil;
     expect(
@@ -341,6 +394,36 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     expect(copy.peek(rescanKey)?.retainUntil).toEqual(invoiceLock);
     expect(primary.peek(key)?.retainUntil?.getTime()).toBe(lock);
     expect(primary.peek(thisYearKey)?.retainUntil).toEqual(thisYearLock);
+
+    // This year's transfer still waits for the check of its certificate; 2025's goes, recorded with its certificate.
+    expect((await pay(today()))?.details).toEqual({ reason: 'tax_residence_unverified', year });
+    await forgetLocks();
+    expect(await pay('2025-06-02')).toBeNull();
+    expect(await blockOf(team.owner)).toBeNull();
+    const [recorded] = await db()
+      .select({ details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'commission_statement.pay'));
+    expect(recorded?.details).toMatchObject({ paidOn: '2025-06-02', certificateDocumentId: rescan.id });
+    expect(await lockJobs()).toEqual([{ statementId }]);
+
+    // The certificate is kept ten years after the close of the fiscal year of the transfer, in both buckets (§ 6). A
+    // lock a bucket does not name fails the run, nothing recorded; the night's run takes it again.
+    const payoutLock = invoicePdfRetainUntil('2025-06-02', 12);
+    const shorter = new Date(payoutLock.getTime() - DAY);
+    primary.plant(rescanKey, { bytes: PNG, retainUntil: shorter });
+    copy.plant(rescanKey, { bytes: PNG, retainUntil: null });
+    await expect(lockCertificates(CommissionStatementIdSchema.parse(statementId))).rejects.toThrow(
+      /1 certificate\(s\) not locked/u,
+    );
+    expect(await team.audited('commission_statement.certificate_locked')).toBe(0);
+    copy.plant(rescanKey, { bytes: PNG, retainUntil: shorter });
+    expect(await lockCertificates(null)).toBe(1);
+    expect(primary.peek(rescanKey)?.retainUntil).toEqual(payoutLock);
+    expect(copy.peek(rescanKey)?.retainUntil).toEqual(payoutLock);
+    expect(await lockCertificates(null)).toBe(0);
+    expect(await lockCertificates(CommissionStatementIdSchema.parse(statementId))).toBe(0);
+    expect(await team.audited('commission_statement.certificate_locked')).toBe(1);
 
     // His file lists them, the latest filed first, each with its check.
     const file = ContractorFileSchema.parse(

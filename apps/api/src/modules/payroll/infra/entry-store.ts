@@ -42,14 +42,17 @@ import {
   CommissionStatementStatusConflict,
   PayEntryConflict,
   PayPeriodClosed,
+  PayoutBlocked,
   PayrollForbidden,
   PenaltyNotFound,
   TeamMemberNotFound,
 } from '../domain/errors';
+import { payoutDecision } from '../domain/payouts';
 import type { PayReader, PayrollEntryStore } from '../domain/ports';
 import type { MemberForPay } from '../domain/recalculation';
 
-import { enqueueDocumentSettle } from './invoice-queue';
+import { enqueueDocumentSettle, enqueuePayoutCertificateLock } from './invoice-queue';
+import { payoutFactsOf } from './payout-facts';
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { adjustmentOfRow, bonusOfRow, closingsSpan, penaltyOfRow, type PayInputReads } from './snapshot';
 import { audit } from './writes';
@@ -424,6 +427,12 @@ export function createDrizzlePayrollEntryStore(
           { period, payableMinor: row.payableMinor },
           calendarDayAt(now(), await reads.agencyTimeZone(tx)),
         );
+        // Under a tax treaty, the certificate of the transfer's year first (ADR 0041): never 25 % withheld, no transfer.
+        const facts = (await payoutFactsOf(tx, [row.memberId])).get(row.memberId);
+        if (facts === undefined) throw new Error('The contractor off the payout facts read');
+        const payout = payoutDecision(facts, statementId, payment.paidOn);
+        if (payout.kind === 'blocked') throw new PayoutBlocked(payout.reason, payout.year);
+        const certificateDocumentId = payout.kind === 'covered' ? payout.certificate.id : null;
         const paid = await tx
           .update(commissionStatements)
           .set({
@@ -450,10 +459,20 @@ export function createDrizzlePayrollEntryStore(
           actor,
           'commission_statement.pay',
           { kind: 'commission_statement', id: statementId },
-          { period, revision, paidOn: payment.paidOn, method: payment.method, sentMinor: payment.sentMinor },
+          // The certificate that let the transfer go (ADR 0041 § 4), `null` when none was needed.
+          {
+            period,
+            revision,
+            paidOn: payment.paidOn,
+            method: payment.method,
+            sentMinor: payment.sentMinor,
+            certificateDocumentId,
+          },
         );
         // The documents this transfer settles, once it commits (EQ-06 lot 7a).
         await enqueueDocumentSettle(tx, row.memberId);
+        // Its certificate kept ten years after the transfer, by the job (ADR 0041 § 6).
+        if (certificateDocumentId !== null) await enqueuePayoutCertificateLock(tx, statementId);
         return { period };
       }),
   };

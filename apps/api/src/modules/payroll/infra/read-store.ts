@@ -1,6 +1,7 @@
 import {
   BonusSchema,
   BonusTierSchema,
+  calendarDayAt,
   CarryOverSchema,
   CollectiveReachedSchema,
   CommissionStatementIdSchema,
@@ -24,6 +25,7 @@ import {
   PayrollEntriesSchema,
   penaltyCovers,
   UserIdSchema,
+  type PayoutBlock,
   type PayPeriod,
 } from '@nirvana/contracts';
 import { and, eq, inArray, schema, sql, withMember, type Database } from '@nirvana/db';
@@ -31,9 +33,11 @@ import { z } from 'zod';
 
 import { redactAuthors } from '../domain/authors';
 import { PayPeriodCursorInvalid, PayrollEntriesTooMany, PayrollForbidden } from '../domain/errors';
+import { payoutDecision } from '../domain/payouts';
 import { blockFor } from '../domain/period-blocks';
 import type { PayrollReadStore, StoredStatement } from '../domain/ports';
 
+import { payoutFactsOf } from './payout-facts';
 import { blockOfRow } from './period-blocks';
 import {
   adjustmentOfRow,
@@ -172,6 +176,19 @@ export function createDrizzlePayrollReadStore(
           .where(sql`${bonusTierSets.fromPeriod} <= ${period}`);
         const goalRows = await tx.select().from(collectiveGoals).where(eq(collectiveGoals.period, period));
         const settings = await settingsFor(tx, period);
+        // What would stop a transfer recorded today (ADR 0041 § 4): shown before the owner makes it.
+        const toPay = statementRows.filter((row) => row.status === 'validated' && row.payableMinor > 0);
+        const payouts = await payoutFactsOf(
+          tx,
+          toPay.map((row) => row.memberId),
+        );
+        const today = toPay.length === 0 ? null : calendarDayAt(now(), await reads.agencyTimeZone(tx));
+        const payoutBlockOf = (row: (typeof statementRows)[number]): PayoutBlock | null => {
+          const facts = payouts.get(row.memberId);
+          if (facts === undefined || today === null || !toPay.includes(row)) return null;
+          const payout = payoutDecision(facts, row.id, today);
+          return payout.kind === 'blocked' ? { reason: payout.reason, year: payout.year } : null;
+        };
 
         const statements: StoredStatement[] = statementRows.map((row) => {
           if (window === null) throw new Error(`Statement ${row.id} without its period`);
@@ -241,6 +258,7 @@ export function createDrizzlePayrollReadStore(
                       reference: row.paymentReference,
                       sentMinor: row.sentMinor,
                     }),
+              payoutBlock: payoutBlockOf(row),
             },
             team: {
               netMinor: row.teamNetMinor,

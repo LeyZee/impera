@@ -1,0 +1,94 @@
+import { CommissionStatementStatusSchema } from '@nirvana/contracts';
+import { inArray, schema, sql, type Transaction } from '@nirvana/db';
+
+import type { PayoutSettlementDocument } from '../domain/payouts';
+import type { SettlementCarryOver, SettlementStatement } from '../domain/settlements';
+
+const { carryOvers, commissionStatements, invoiceEvents, invoices } = schema;
+
+/** The kinds that settle a document, once (migration 0058's unique index). */
+export const SETTLED = sql.raw(`('paid', 'imputed', 'compensated')`);
+
+/** An issued document as the reconciliation reads it, with its number for the trail. */
+interface SettlementRow extends PayoutSettlementDocument {
+  readonly number: string;
+}
+
+/** One contractor's statements, carry-overs and issued documents, as the reconciliation walks them (lot 7a). */
+export interface SettlementFacts {
+  readonly statements: SettlementStatement[];
+  readonly carryOvers: SettlementCarryOver[];
+  readonly documents: SettlementRow[];
+}
+
+/**
+ * The reconciliation's facts of each contractor of `memberIds`, one read per table whoever reads them: the job under
+ * its lock (`withAdmin`), pay and the period's read through the policies (`withMember`).
+ */
+export async function settlementFactsOf(
+  tx: Transaction,
+  memberIds: readonly string[],
+): Promise<Map<string, SettlementFacts>> {
+  const facts = new Map<string, SettlementFacts>(
+    memberIds.map((id) => [id, { statements: [], carryOvers: [], documents: [] }]),
+  );
+  if (memberIds.length === 0) return facts;
+  const of = (memberId: string): SettlementFacts => {
+    const found = facts.get(memberId);
+    if (found === undefined) throw new Error('A row off the contractors read');
+    return found;
+  };
+  const statements = await tx
+    .select({
+      memberId: commissionStatements.memberId,
+      id: commissionStatements.id,
+      period: commissionStatements.period,
+      status: commissionStatements.status,
+      totalMinor: commissionStatements.totalMinor,
+    })
+    .from(commissionStatements)
+    .where(inArray(commissionStatements.memberId, [...memberIds]));
+  for (const one of statements) {
+    of(one.memberId).statements.push({
+      id: one.id,
+      period: one.period,
+      status: CommissionStatementStatusSchema.parse(one.status),
+      totalMinor: one.totalMinor,
+    });
+  }
+  const carried = await tx
+    .select({
+      memberId: carryOvers.memberId,
+      statementId: carryOvers.statementId,
+      toPeriod: carryOvers.toPeriod,
+    })
+    .from(carryOvers)
+    .where(inArray(carryOvers.memberId, [...memberIds]));
+  for (const one of carried)
+    of(one.memberId).carryOvers.push({ statementId: one.statementId, toPeriod: one.toPeriod });
+  const documents = await tx
+    .select({
+      memberId: invoices.memberId,
+      id: invoices.id,
+      kind: invoices.kind,
+      number: invoices.number,
+      statementId: invoices.statementId,
+      // The regime as the document froze it at its issue.
+      underTreaty: sql<boolean>`(${invoices.regime} ->> 'withholding') = 'treaty_exempt'`,
+      // The outer table by hand: Drizzle writes a column of a one-table select without its table.
+      settled: sql<boolean>`exists (select 1 from ${invoiceEvents} e where e.invoice_id = "invoices"."id" and e.kind in ${SETTLED})`,
+    })
+    .from(invoices)
+    .where(inArray(invoices.memberId, [...memberIds]));
+  for (const one of documents) {
+    of(one.memberId).documents.push({
+      id: one.id,
+      kind: one.kind === 'invoice' ? 'invoice' : 'credit_note',
+      number: one.number,
+      statementId: one.statementId,
+      settled: one.settled,
+      underTreaty: one.underTreaty,
+    });
+  }
+  return facts;
+}
