@@ -1,12 +1,12 @@
 # 0042. Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche
 
-Statut : proposed (cadrage avec Charles le 02/11/2026, fil « Concevoir les espaces modèle et chatteur mobiles » ; à accepter par Charles)
+Statut : accepted (Charles, 02/11/2026 16h17, « ok 0042 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Remplace :
 - dans l'ADR 0023 § Rôles, la phrase « La `creator` voit sa routine, ses revenus, ses factures et qui est en poste, jamais une conversation ni un fan » ;
 - dans l'ADR 0024 § Le rail dépend du rôle, la ligne « Créatrice » du tableau ;
 - dans l'ADR 0030 § 3, les mots « `validated_by` qui référence un membre de l'agence (`team_members.id`, jamais un texte libre) ».
-Les ADR 0023, 0024 et 0030 restent telles quelles ; l'index des ADR renvoie d'elles à celle-ci. La fiche EQ-09 sera réécrite d'après cette ADR une fois acceptée.
+Les ADR 0023, 0024 et 0030 restent telles quelles ; l'index des ADR renvoie d'elles à celle-ci. La fiche EQ-09 sera réécrite d'après cette ADR.
 
 ## Contexte
 

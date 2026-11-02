@@ -1,6 +1,6 @@
 # 0043. Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie
 
-Statut : proposed (cadrage avec Charles le 02/11/2026, fil « Concevoir les espaces modèle et chatteur mobiles » ; à accepter par Charles)
+Statut : accepted (Charles, 02/11/2026 16h17, « ok 0043 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Précise : l'ADR 0023 § Une seule source de revenus par compte et § Rôles (validation des rapports), et la fiche EQ-03 (le rapport porte un montant déclaré). Ne change ni le calcul de la paie, ni ses états, ni son immuabilité (ADR 0023 § Paie, 0032, 0035).
 

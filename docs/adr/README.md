@@ -47,14 +47,14 @@ Date : AAAA-MM-JJ
 | 0020 | Notifications Telegram : bots, groupes et routage gérés depuis le CRM | proposed |
 | 0021 | Rester en personnage est fixé dans le code, sans réglage | accepted |
 | 0022 | La persona fait partie de la version qui ouvre l'Automatique | accepted |
-| 0023 | La gestion d'équipe entre dans Nirvana : planning, rapports, paie, routine des créatrices | accepted (§ Navigation remplacé par 0024, gardes du chatteur par 0025, congés par 0031, attestation de résidence par 0041) |
-| 0024 | Rôles et navigation : chacun ne voit que ce qui le concerne | accepted (Suivi du chatteur remplacé par 0025) |
+| 0023 | La gestion d'équipe entre dans Nirvana : planning, rapports, paie, routine des créatrices | accepted (§ Navigation remplacé par 0024, gardes du chatteur par 0025, congés par 0031, attestation de résidence par 0041, rôle de la créatrice par 0042) |
+| 0024 | Rôles et navigation : chacun ne voit que ce qui le concerne | accepted (Suivi du chatteur remplacé par 0025, ligne Créatrice du rail par 0042) |
 | 0025 | Le chatteur chatte dans Reveal ; dans Nirvana, il traite sa créatrice pendant son shift, et rien hors shift | accepted |
 | 0026 | Serveur MCP de Nirvana : une seconde porte sur les mêmes commandes | accepted |
 | 0027 | Mise en production : deux images, un compose Coolify, un limiteur partagé en Postgres | accepted |
 | 0028 | Export quotidien chiffré de la base, hors de Neon | accepted (§ 1 outils et § 2 `--no-privileges` remplacés par 0029) |
 | 0029 | L'export garde les droits de la base, et s'outille sans binaire hors d'Alpine | accepted |
-| 0030 | Médiathèque : un média, ses liaisons par plateforme, le coffre fait foi | accepted |
+| 0030 | Médiathèque : un média, ses liaisons par plateforme, le coffre fait foi | accepted (§ 3 `validated_by` remplacé par 0042 ; § 2 et § 4 remplacés par 0044 pour le contenu déposé) |
 | 0031 | Congés et échanges de shift : le congé appartient au membre, l'échange se fait entre chatteurs | accepted (remplace en partie 0023 : congés) |
 | 0032 | Paie : la quinzaine se clôture pour toute l'équipe à sa première validation | accepted (complète 0023 § Paie) |
 | 0033 | Paie : le taux dollar → euro vient de la BCE, lu chaque heure par un job | accepted (complète 0023 § Paie et 0032) |
@@ -66,6 +66,6 @@ Date : AAAA-MM-JJ
 | 0039 | Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main | accepted (remplace dans 0036 la phrase sur l'état « créditée » ; précise 0023 § Factures ; au § 3, la ligne refacturée sur la facture du jour et sa conséquence sur le régime remplacées par 0040) |
 | 0040 | Factures : « annuler et refacturer » émet une facture rectificative, sous le régime de la facture annulée | accepted (remplace dans 0039 § 3 la ligne refacturée sur la facture du jour) |
 | 0041 | Factures : l'attestation de résidence fiscale conditionne le versement, pas la facture | accepted (remplace dans 0023 § Factures la phrase sur l'attestation, et les choix (a) et « ok année civile » du lot 5c) |
-| 0042 | Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche | proposed (remplacerait dans 0023 la phrase de § Rôles sur la créatrice, dans 0024 sa ligne du rail, dans 0030 § 3 la référence de `validated_by`) |
-| 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | proposed (précise 0023 et EQ-03) |
-| 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | proposed (remplacerait 0030 § 2 et § 4 pour le seul contenu déposé) |
+| 0042 | Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche | accepted (remplace dans 0023 la phrase de § Rôles sur la créatrice, dans 0024 sa ligne du rail, dans 0030 § 3 la référence de `validated_by`) |
+| 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | accepted (précise 0023 et EQ-03) |
+| 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | accepted (remplace 0030 § 2 et § 4 pour le seul contenu déposé) |

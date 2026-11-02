@@ -1,6 +1,6 @@
 # 0044. Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine
 
-Statut : proposed (cadrage avec Charles le 02/11/2026, fil « Concevoir les espaces modèle et chatteur mobiles » ; à accepter par Charles)
+Statut : accepted (Charles, 02/11/2026 16h17, « ok 0044 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Remplace : dans l'ADR 0030 § 2, les mots « Nirvana ne téléverse rien vers une plateforme et n'a pas de dossier à lui », et dans l'ADR 0030 § 4, la règle « Fichiers : on garde le minimum », **pour le seul contenu déposé pour le feed et les Mass DM**. Pour tout le reste (scripts, médias privés vendus en message), l'ADR 0030 s'applique telle quelle : le coffre de la plateforme fait foi. L'ADR 0030 reste telle quelle ; l'index des ADR renvoie d'elle à celle-ci.
 
