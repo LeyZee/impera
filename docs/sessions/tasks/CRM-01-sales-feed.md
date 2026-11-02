@@ -1,6 +1,6 @@
 # CRM-01 Connecter la clé Reveal et lire les ventes
 
-Statut : todo (ADR 0050, fiches acceptées par Charles le 02/11/2026)
+Statut : in-progress (lecture par curseur faite, PR 1 ; webhooks et écran Réglages restent)
 Phase : API CRM (ADR 0050)
 Dépend de : ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement
 Branche : task/crm-01-sales-feed
@@ -16,15 +16,15 @@ La clé Reveal se connecte depuis les Réglages comme une clé d'IA, et Nirvana 
 
 ## À faire
 
-- [ ] `PlatformSalesFeed` : types dans `packages/contracts`, sans aucune forme Reveal ; adaptateur dans le module `connectors`, avec capacités déclarées.
-- [ ] Adaptateur API CRM : `/v1/sales` par curseur stocké, `/v1/models`, `/v1/chatters`, `/v1/stats/daily`, `/v1/stats/chatters/daily`, schémas Zod stricts, valeur inconnue passée en `other` et signalée.
-- [ ] Coffre et Réglages selon l'ADR 0050 § 4 : vérifiée avant d'être gardée, écriture seule, état « à reconnecter ».
-- [ ] Job rejouable : lecture du registre une fois par minute ; le curseur avance dans la même transaction que les ventes ; une vente unique sur `sale.id` et `event`.
-- [ ] Registre en ajout seul, avec `inputs_hash`. Migration 0062, annoncée libre par Bilan.
-- [ ] Montants en centimes entiers, par conversion décimale exacte si une conversion est nécessaire ; test `netAmount` = `agencyRevenue` + `modelRevenue`.
-- [ ] `modelId` vers créatrice sous `withTenant`, quarantaine si inconnu ; correspondance `chatterId` vers membre posée par le propriétaire.
+- [x] `PlatformSalesFeed` : types dans `packages/contracts`, sans aucune forme Reveal ; adaptateur dans le module `connectors`, avec capacités déclarées.
+- [x] Adaptateur API CRM : `/v1/sales` par curseur stocké, `/v1/models`, `/v1/chatters`, `/v1/stats/daily`, `/v1/stats/chatters/daily`, schémas Zod stricts, valeur inconnue passée en `other` et signalée.
+- [x] (API ; l'écran reste) Coffre et Réglages selon l'ADR 0050 § 4 : vérifiée avant d'être gardée, écriture seule, état « à reconnecter ».
+- [x] Job rejouable : lecture du registre une fois par minute ; le curseur avance dans la même transaction que les ventes ; une vente unique sur `sale.id` et `event`.
+- [x] Registre en ajout seul, avec `inputs_hash`. Migration 0065 (0062 annoncée, renumérotée parce que 0064 est entrée avant : drizzle-kit lit le dernier snapshot par son nom).
+- [x] Montants en centimes entiers, par conversion décimale exacte si une conversion est nécessaire ; test `netAmount` = `agencyRevenue` + `modelRevenue`.
+- [x] `modelId` vers créatrice sous `withTenant`, quarantaine si inconnu ; correspondance `chatterId` vers membre posée par le propriétaire.
 - [ ] Webhooks ensuite, dès que le support les a ouverts : signature sur le corps brut, comparaison en temps constant, horodatage refusé à ± 5 minutes, boîte de réception puis job, secret au coffre, rattrapage par curseur une fois par heure.
-- [ ] FakeReveal : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`, `403`.
+- [x] (sauf webhook) FakeReveal : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`, `403`.
 
 ## Critères d'acceptation
 
@@ -40,3 +40,12 @@ La clé Reveal se connecte depuis les Réglages comme une clé d'IA, et Nirvana 
 La paie, les écrans de vente, tout appel réel sans la demande de Charles.
 
 ## Notes de session
+
+02/11/2026, Bilan, PR 1 :
+- Clé dans une table propre `sales_feed_credentials` (scellée avec `CREDENTIALS_ENCRYPTION_KEYS`, contexte `sales_feed:<plateforme>`, retirée au rôle applicatif), pas dans `provider_credentials` dont l'enum ne connaît que les services d'IA. Rechiffrement et contrôle par `ops:reencrypt-credentials` et `ops:check-keys`.
+- `inputs_hash` du registre = empreinte SHA-256 de la ligne lue ; une ligne relue avec une autre empreinte lève le signal `line_changed` et ne remplace rien. Ce n'est pas l'`inputs_hash` de la paie.
+- Les schémas de l'API ne sont pas `.strict()` : un champ ajouté par Reveal ne casse pas la lecture ; un champ manquant ou une valeur d'argent incohérente refuse la page et ne bouge pas le curseur.
+- Modèle relié automatiquement au compte dont le pseudo est identique (sans casse) à la connexion ; sinon quarantaine jusqu'au lien posé par le propriétaire. Relier ailleurs un modèle qui a déjà des lignes est refusé (409).
+- Relecture Équipe : une ligne sortie de quarantaine prend l'heure de son entrée au registre (`recorded_at`), pour que la paie la lise comme une vente tardive ; chaque lien de modèle ou de chatteur laisse une ligne `audit_log` datée (`sales_feed.model_linked`, `…_unlinked`, `sales_feed.chatter_linked`, `…_unlinked`, avec l'état d'avant). CRM-03 figera dans son `inputs_hash` le lien chatteur lu au calcul.
+- Reste : écran Réglages (Extension ou une PR suivante), webhooks dans une seconde PR (migration 0067 pour la boîte de réception) quand le support les aura ouverts.
+

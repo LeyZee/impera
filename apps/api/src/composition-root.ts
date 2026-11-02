@@ -29,7 +29,7 @@ import type { Logger } from './logger';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
-import type { ConnectorRegistry, ConnectorsModule } from './modules/connectors';
+import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './modules/connectors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { FansModule } from './modules/fans';
 import type { MediaModule } from './modules/media';
@@ -140,6 +140,8 @@ const POOL_OPTIONS = { connectionTimeoutMillis: 5_000, idleTimeoutMillis: 30_000
 export interface AppOptions {
   /** Tests and local development plug a `FakeConnector` here; production gets the real adapters. */
   readonly connectorRegistry?: ConnectorRegistry;
+  /** Tests plug FakeReveal's CRM API here; Reveal's own (`api.reveal.me`) otherwise. */
+  readonly salesFeeds?: SalesFeedRegistry;
   /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
   readonly composer?: DraftComposer;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
@@ -202,6 +204,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const connectors = wireConnectors(shared, {
     ingest: (input) => conversations.module.ingestMessage(input),
     registry: options.connectorRegistry ?? {},
+    ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
   });
   const providers = await wireProviders(shared);
   const alerts = wireAlerts(shared);

@@ -59,6 +59,7 @@ export const JOB_NAMES = [
   'payroll.lock_payout_certificate',
   'media.describe',
   'providers.check_credentials',
+  'connector.read_sales',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -219,6 +220,11 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   'providers.check_credentials': z.object({}),
+  /**
+   * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
+   * lines and the cursor written in one transaction. Replayable: a line already recorded is skipped.
+   */
+  'connector.read_sales': z.object({}),
   ...TELEGRAM_JOB_PAYLOADS,
 } as const satisfies Record<JobName, z.ZodType>;
 
@@ -279,6 +285,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.lock_payout_certificate': 5,
   'media.describe': 3,
   'providers.check_credentials': 1,
+  // Each minute: the next run is the retry, from the cursor the last committed read left.
+  'connector.read_sales': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,

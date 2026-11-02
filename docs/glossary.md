@@ -107,6 +107,10 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Clé de fournisseur | `provider_credential` | Clé d'API d'un fournisseur IA (xAI, Google, ElevenLabs…), saisie dans Réglages › Modèles IA et chiffrée en base (ADR 0016). À l'écran, on parle de « services », jamais de « connecteurs ». |
 | API CRM | `crm_api` | L'API officielle de Reveal, à clé d'agence : statistiques, équipe, ventes une par une. Elle ne lit pas les conversations et n'envoie rien (ADR 0050). |
 | Flux de ventes | `PlatformSalesFeed` | Le port qui lit les ventes, les remboursements et les chiffres d'une plateforme par curseur, sans session ; distinct du connecteur (ADR 0050). |
+| Registre des ventes | `platform_sales` | Les ventes et remboursements lus sur le flux de ventes, une ligne par vente, événement et plateforme, en ajout seul, sous la créatrice du compte. Montants en centimes tels que la plateforme les donne ; `inputs_hash` y est l'empreinte de la ligne lue, pas celle d'un calcul de paie (ADR 0050). |
+| Quarantaine des ventes | `platform_sales_quarantine` | Les lignes lues pour un modèle de la plateforme que le propriétaire n'a encore relié à aucun compte : comptées nulle part, rejointes au registre quand il le relie. |
+| Lien de modèle, lien de chatteur | `sales_feed_models`, `sales_feed_chatters` | Ce que le propriétaire pose dans Réglages : tel modèle de la plateforme est tel compte plateforme ; tel chatteur de la plateforme est tel membre, ou l'agent. |
+| Signal du flux de ventes | `sales_feed_signal` | Événement d'agence levé par la lecture des ventes : clé à reconnecter, valeur inconnue, modèle non relié, ligne changée, réponse inattendue. Jamais un montant ni un fan. |
 | Session (plateforme) | `platform_session` | Les jetons/cookies capturés qui permettent au connecteur d'agir. |
 | Jeton d'appareil | `device token` | Secret de l'extension pour déposer une session (`POST /v1/connector/sessions`, `EXTENSION_DEVICE_TOKEN`). |
 | Composeur | `DraftComposer` | Le port par lequel `conversation.respond` demande un brouillon au moteur ; il rend des bulles ou une retenue (`held`) avec sa raison. |

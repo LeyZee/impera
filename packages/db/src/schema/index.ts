@@ -11,6 +11,7 @@ export * from './media';
 export * from './memory';
 export * from './payroll';
 export * from './persona';
+export * from './sales-feed';
 export * from './scheduling';
 export * from './supervision';
 export * from './system';
