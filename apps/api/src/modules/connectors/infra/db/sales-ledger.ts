@@ -1,4 +1,5 @@
 import {
+  AuditEntryIdSchema,
   EventIdSchema,
   newId,
   SalesLineIdSchema,
@@ -189,7 +190,7 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
       return new Map(
         rows.map((row) => [
           row.platformModelId,
-          { platformAccountId: row.platformAccountId, creatorId: row.creatorId },
+          { platformAccountId: row.platformAccountId, creatorId: row.creatorId, linkedBy: row.linkedBy },
         ]),
       );
     },
@@ -202,9 +203,12 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
             platformAccountId: schema.platformAccounts.id,
             creatorId: schema.platformAccounts.creatorId,
             handle: schema.platformAccounts.handle,
+            creatorDisplayName: schema.creators.displayName,
           })
           .from(schema.platformAccounts)
-          .where(eq(schema.platformAccounts.platform, platform));
+          .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
+          .where(eq(schema.platformAccounts.platform, platform))
+          .orderBy(schema.platformAccounts.handle);
         return rows;
       });
     },
@@ -244,15 +248,44 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
             target: [models.platform, models.platformModelId],
             set: { ...account, linkedBy: by, linkedAt: new Date() },
           });
-        await releaseQuarantine(tx, platform, platformModelId, account);
+        const released = await releaseQuarantine(tx, platform, platformModelId, account);
+        // The link decides whose sales these are (CRM-03 pays by it): dated, and by whom, the handle's own when null.
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: by,
+          action: 'sales_feed.model_linked',
+          entity: 'sales_feed_model',
+          entityId: `${platform}:${platformModelId}`,
+          details: {
+            platform,
+            platformModelId,
+            platformAccountId: account.platformAccountId,
+            previousAccountId: current?.platformAccountId ?? null,
+            auto: by === null,
+            released,
+          },
+        });
         return 'linked';
       });
     },
 
-    async unlinkModel(platform, platformModelId) {
-      await db
-        .delete(models)
-        .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)));
+    async unlinkModel(platform, platformModelId, by) {
+      await db.transaction(async (tx) => {
+        const removed = await tx
+          .delete(models)
+          .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)))
+          .returning({ platformAccountId: models.platformAccountId });
+        const [was] = removed;
+        if (was === undefined) return;
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: by,
+          action: 'sales_feed.model_unlinked',
+          entity: 'sales_feed_model',
+          entityId: `${platform}:${platformModelId}`,
+          details: { platform, platformModelId, previousAccountId: was.platformAccountId },
+        });
+      });
     },
 
     async chatterLinks(platform) {
@@ -280,20 +313,42 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
 
     async linkChatter(platform, platformChatterId, link, by) {
       const key = and(eq(chatters.platform, platform), eq(chatters.platformChatterId, platformChatterId));
-      if (link === null) {
-        await db.delete(chatters).where(key);
-        return;
-      }
-      const values = {
-        kind: link.kind,
-        memberId: link.kind === 'member' ? link.memberId : null,
-        linkedBy: by,
-        linkedAt: new Date(),
-      };
-      await db
-        .insert(chatters)
-        .values({ platform, platformChatterId, ...values })
-        .onConflictDoUpdate({ target: [chatters.platform, chatters.platformChatterId], set: values });
+      await db.transaction(async (tx) => {
+        const [before] = await tx
+          .select({ kind: chatters.kind, memberId: chatters.memberId })
+          .from(chatters)
+          .where(key)
+          .for('update');
+        if (link === null) await tx.delete(chatters).where(key);
+        else {
+          const values = {
+            kind: link.kind,
+            memberId: link.kind === 'member' ? link.memberId : null,
+            linkedBy: by,
+            linkedAt: new Date(),
+          };
+          await tx
+            .insert(chatters)
+            .values({ platform, platformChatterId, ...values })
+            .onConflictDoUpdate({ target: [chatters.platform, chatters.platformChatterId], set: values });
+        }
+        if (before === undefined && link === null) return;
+        // Whose sales a chatter's are (CRM-03 pays by this link): dated, by whom, and what it was before.
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: by,
+          action: link === null ? 'sales_feed.chatter_unlinked' : 'sales_feed.chatter_linked',
+          entity: 'sales_feed_chatter',
+          entityId: `${platform}:${platformChatterId}`,
+          details: {
+            platform,
+            platformChatterId,
+            kind: link?.kind ?? null,
+            memberId: link?.kind === 'member' ? link.memberId : null,
+            previous: before === undefined ? null : { kind: before.kind, memberId: before.memberId },
+          },
+        });
+      });
     },
 
     signal(platform, signal, once, correlationId) {
@@ -332,7 +387,7 @@ async function releaseQuarantine(
   platform: Platform,
   platformModelId: string,
   account: LinkedAccount,
-): Promise<void> {
+): Promise<number> {
   await enterTenant(tx, account.creatorId);
   const waiting = await tx
     .select()
@@ -345,7 +400,8 @@ async function releaseQuarantine(
       ),
     )
     .for('update');
-  if (waiting.length === 0) return;
+  if (waiting.length === 0) return 0;
+  const enteredAt = new Date();
   for (const line of waiting) {
     await tx
       .insert(sales)
@@ -371,14 +427,15 @@ async function releaseQuarantine(
         creatorMinor: line.creatorMinor,
         position: line.position,
         inputsHash: line.inputsHash,
-        // Recorded when it first came, even if counted from now: the line's date is `occurredAt`.
-        recordedAt: line.recordedAt,
+        // Entered the register now, not when it was first read: a period closed in between never counted it, so pay
+        // must see it as a late line (ADR 0032), whatever its `occurredAt`.
+        recordedAt: enteredAt,
       })
       .onConflictDoNothing();
   }
   await tx
     .update(quarantine)
-    .set({ releasedAt: new Date() })
+    .set({ releasedAt: enteredAt })
     .where(
       and(
         eq(quarantine.platform, platform),
@@ -386,4 +443,5 @@ async function releaseQuarantine(
         sql`${quarantine.releasedAt} is null`,
       ),
     );
+  return waiting.length;
 }

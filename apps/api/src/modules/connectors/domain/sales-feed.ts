@@ -180,8 +180,14 @@ export interface LinkedAccount {
   readonly creatorId: string;
 }
 
+/** A link as stored: `linkedBy` null when it was posed by the handle at connection. */
+export interface ModelLink extends LinkedAccount {
+  readonly linkedBy: string | null;
+}
+
 interface FeedAccount extends LinkedAccount {
   readonly handle: string;
+  readonly creatorDisplayName: string;
 }
 
 export type ChatterLink = { readonly kind: 'member'; readonly memberId: string } | { readonly kind: 'agent' };
@@ -201,7 +207,7 @@ export interface SalesLedger {
   /** A 429: no read before `until`. */
   pause(platform: Platform, until: Date): Promise<void>;
   quarantined(platform: Platform): Promise<ReadonlyMap<string, number>>;
-  modelLinks(platform: Platform): Promise<ReadonlyMap<string, LinkedAccount>>;
+  modelLinks(platform: Platform): Promise<ReadonlyMap<string, ModelLink>>;
   /** The platform's accounts in Nirvana, every creator's: what a model can be linked to. */
   accounts(platform: Platform): Promise<readonly FeedAccount[]>;
   /**
@@ -215,7 +221,7 @@ export interface SalesLedger {
     by: string | null,
   ): Promise<'linked' | 'conflict'>;
   /** Further lines of the model wait in quarantine; those recorded stay. */
-  unlinkModel(platform: Platform, platformModelId: string): Promise<void>;
+  unlinkModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;
   chatterLinks(platform: Platform): Promise<ReadonlyMap<string, ChatterLink>>;
   memberExists(memberId: string): Promise<boolean>;
   linkChatter(

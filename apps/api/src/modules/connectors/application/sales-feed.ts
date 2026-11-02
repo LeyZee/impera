@@ -113,11 +113,24 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
 
   async function overview(platform: Platform): Promise<SalesFeedOverview> {
     const status = await statusOf(platform);
-    const [links, quarantined, chatterLinks] = await Promise.all([
+    const [links, quarantined, chatterLinks, platformAccounts] = await Promise.all([
       ledger.modelLinks(platform),
       ledger.quarantined(platform),
       ledger.chatterLinks(platform),
+      ledger.accounts(platform),
     ]);
+    const linkedBy = (id: string): SalesFeedModelLink['linkedBy'] => {
+      const link = links.get(id);
+      if (link === undefined) return null;
+      return link.linkedBy === null ? { kind: 'auto' } : { kind: 'member', userId: link.linkedBy };
+    };
+    const modelOf = new Map([...links].map(([id, link]) => [link.platformAccountId, id]));
+    const accounts = platformAccounts.map((account) => ({
+      platformAccountId: account.platformAccountId,
+      handle: account.handle,
+      creatorDisplayName: account.creatorDisplayName,
+      linkedTo: modelOf.get(account.platformAccountId) ?? null,
+    }));
     const feed = await liveFeed(platform);
     let listError: SalesFeedOverview['listError'] = feed === null ? status.lastErrorKind : null;
     const models: SalesFeedModelLink[] = [];
@@ -131,6 +144,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
             handle: model.handle,
             displayName: model.displayName,
             platformAccountId: links.get(model.platformModelId)?.platformAccountId ?? null,
+            linkedBy: linkedBy(model.platformModelId),
             quarantined: quarantined.get(model.platformModelId) ?? 0,
           });
         }
@@ -151,10 +165,11 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         handle: id,
         displayName: '',
         platformAccountId: links.get(id)?.platformAccountId ?? null,
+        linkedBy: linkedBy(id),
         quarantined: quarantined.get(id) ?? 0,
       });
     }
-    return { status, models, chatters, listError };
+    return { status, models, accounts, chatters, listError };
   }
 
   /** Links each listed model to the one account of the platform with the same handle, when nothing links them yet. */
@@ -171,7 +186,12 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       const [account] = matches;
       if (matches.length !== 1 || account === undefined || linkedAccounts.has(account.platformAccountId))
         continue;
-      await ledger.linkModel(platform, model.platformModelId, account, null);
+      await ledger.linkModel(
+        platform,
+        model.platformModelId,
+        { platformAccountId: account.platformAccountId, creatorId: account.creatorId },
+        null,
+      );
       linkedAccounts.add(account.platformAccountId);
     }
   }
@@ -284,14 +304,19 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     async linkModel(platform, platformModelId, platformAccountId, by) {
       factoryOf(platform);
       if (platformAccountId === null) {
-        await ledger.unlinkModel(platform, platformModelId);
+        await ledger.unlinkModel(platform, platformModelId, by);
         return overview(platform);
       }
       const account = (await ledger.accounts(platform)).find(
         (candidate) => candidate.platformAccountId === platformAccountId,
       );
       if (account === undefined) throw new SalesFeedAccountUnprocessable();
-      const linked = await ledger.linkModel(platform, platformModelId, account, by);
+      const linked = await ledger.linkModel(
+        platform,
+        platformModelId,
+        { platformAccountId: account.platformAccountId, creatorId: account.creatorId },
+        by,
+      );
       if (linked === 'conflict') throw new SalesFeedModelConflict();
       return overview(platform);
     },

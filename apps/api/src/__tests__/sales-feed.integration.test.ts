@@ -2,6 +2,7 @@ import {
   CreatorIdSchema,
   newId,
   PlatformAccountIdSchema,
+  SalesFeedOverviewSchema,
   type CreatorId,
   type PlatformAccountId,
 } from '@nirvana/contracts';
@@ -146,14 +147,23 @@ describe('sales feed (CRM-01)', () => {
     expect(overview.json()).toMatchObject({
       listError: null,
       models: [
-        { platformModelId: 'model_test_01', platformAccountId: accountId, quarantined: 0 },
-        { platformModelId: 'model_test_02', platformAccountId: null },
+        {
+          platformModelId: 'model_test_01',
+          platformAccountId: accountId,
+          linkedBy: { kind: 'auto' },
+          quarantined: 0,
+        },
+        { platformModelId: 'model_test_02', platformAccountId: null, linkedBy: null },
       ],
       chatters: [
         { platformChatterId: 'chatter_test_01', link: null },
         { platformChatterId: 'bot_test_01', isBot: true, link: null },
       ],
     });
+    // Exactly the accounts a model can be linked to, and the model each one already counts.
+    const choices = SalesFeedOverviewSchema.parse(overview.json()).accounts;
+    expect(choices.find((one) => one.platformAccountId === accountId)?.linkedTo).toBe('model_test_01');
+    expect(choices.find((one) => one.platformAccountId === otherAccountId)?.linkedTo).toBeNull();
     const audit = await test.admin.db
       .select({ action: schema.auditLog.action, details: schema.auditLog.details })
       .from(schema.auditLog)
@@ -283,6 +293,37 @@ describe('sales feed (CRM-01)', () => {
       platformAccountId: otherAccountId,
     });
     expect(linked.statusCode).toBe(200);
+    const after = SalesFeedOverviewSchema.parse(linked.json());
+    expect(after.models.find((model) => model.platformModelId === 'model_test_02')).toMatchObject({
+      linkedBy: { kind: 'member' },
+      quarantined: 0,
+    });
+    expect(after.accounts.find((one) => one.platformAccountId === otherAccountId)?.linkedTo).toBe(
+      'model_test_02',
+    );
+    // Entered the register at the link, not at its first read: pay sees it as a late line.
+    const [released] = await test.admin.db
+      .select({ recordedAt: schema.platformSales.recordedAt })
+      .from(schema.platformSales)
+      .where(eq(schema.platformSales.platformSaleId, 'sale_q'));
+    const [waited] = await test.admin.db
+      .select({ recordedAt: schema.platformSalesQuarantine.recordedAt })
+      .from(schema.platformSalesQuarantine)
+      .where(eq(schema.platformSalesQuarantine.platformSaleId, 'sale_q'));
+    expect(released?.recordedAt.getTime()).toBeGreaterThan(waited?.recordedAt.getTime() ?? Infinity);
+    const links = await test.admin.db
+      .select({ action: schema.auditLog.action, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entity, 'sales_feed_model'));
+    const LinkDetailsSchema = z.object({
+      platformModelId: z.string(),
+      auto: z.boolean(),
+      released: z.number(),
+    });
+    expect(links.map((line) => LinkDetailsSchema.parse(line.details))).toEqual([
+      { platformModelId: 'model_test_01', auto: true, released: 0 },
+      { platformModelId: 'model_test_02', auto: false, released: 2 },
+    ]);
     expect(await ledgerLines('sale_q')).toBe(1);
     expect(await ledgerLines('sale_q2')).toBe(1);
     expect(
@@ -292,6 +333,7 @@ describe('sales feed (CRM-01)', () => {
       platformAccountId: accountId,
     });
     expect(moved.statusCode).toBe(409);
+    expect(moved.json()).toMatchObject({ error: { code: 'sales_feed_model_conflict' } });
 
     const chatter = await api('PUT', '/v1/settings/sales-feeds/reveal/chatters/bot_test_01', {
       kind: 'agent',

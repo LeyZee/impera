@@ -167,7 +167,20 @@ export const SalesFeedModelLinkSchema = z.object({
   handle: z.string().min(1),
   displayName: z.string(),
   platformAccountId: z.uuid().nullable(),
-  /** Sales of this model waiting in quarantine, counted nowhere until it is linked (ADR 0050 § 3). */
+  /**
+   * Who posed the link, null when there is none: `auto` when the handle matched one account at connection, a link
+   * that decides whose sales these are and that the owner checks; `member` when the owner chose it.
+   */
+  linkedBy: z
+    .discriminatedUnion('kind', [
+      z.object({ kind: z.literal('auto') }),
+      z.object({ kind: z.literal('member'), userId: z.string().min(1) }),
+    ])
+    .nullable(),
+  /**
+   * Sales of this model waiting in quarantine, counted nowhere until it is linked (ADR 0050 § 3); linking the model
+   * moves every one of them into the register, in the same transaction.
+   */
   quarantined: z.number().int().min(0),
 });
 export type SalesFeedModelLink = z.infer<typeof SalesFeedModelLinkSchema>;
@@ -248,9 +261,22 @@ export type SalesFeedChatterLink = z.infer<typeof SalesFeedChatterLinkSchema>;
  * The Réglages page of a platform's feed: its line, its models and its team as the platform lists them now, with the
  * owner's links. `listError` says why the live lists are missing (no key, a refusal, an outage); the links stay.
  */
+/**
+ * An account of the platform in Nirvana that a model can be linked to: exactly the ones `PUT …/models/:id` accepts.
+ * `linkedTo` is the model already linked to it, which refuses another (`sales_feed_model_conflict`).
+ */
+export const SalesFeedAccountChoiceSchema = z.object({
+  platformAccountId: z.uuid(),
+  handle: z.string().min(1),
+  creatorDisplayName: z.string(),
+  linkedTo: z.string().min(1).nullable(),
+});
+export type SalesFeedAccountChoice = z.infer<typeof SalesFeedAccountChoiceSchema>;
+
 export const SalesFeedOverviewSchema = z.object({
   status: SalesFeedStatusSchema,
   models: z.array(SalesFeedModelLinkSchema),
+  accounts: z.array(SalesFeedAccountChoiceSchema),
   chatters: z.array(SalesFeedChatterLinkSchema),
   listError: SalesFeedErrorKindSchema.nullable(),
 });
@@ -259,3 +285,14 @@ export type SalesFeedOverview = z.infer<typeof SalesFeedOverviewSchema>;
 /** Réglages › Connexions: one line per platform that has a sales feed. */
 export const SalesFeedListSchema = z.object({ feeds: z.array(SalesFeedStatusSchema) });
 export type SalesFeedList = z.infer<typeof SalesFeedListSchema>;
+
+/** The refusals of `/v1/settings/sales-feeds`, each with its French sentence in `message`. */
+export const SALES_FEED_ERROR_CODES = [
+  'sales_feed_not_found',
+  'sales_feed_vault_unavailable',
+  'sales_feed_account_unprocessable',
+  'sales_feed_model_conflict',
+  'sales_feed_member_unprocessable',
+] as const;
+export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
+export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;
