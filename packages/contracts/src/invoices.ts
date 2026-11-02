@@ -65,6 +65,7 @@ export type RegimeVat = z.infer<typeof RegimeVatSchema>;
 /** The 182 B withholding: set aside by the tax treaty with the contractor's country, or not due at all. */
 export const WITHHOLDINGS = ['treaty_exempt', 'none'] as const;
 export const WithholdingSchema = z.enum(WITHHOLDINGS);
+export type Withholding = z.infer<typeof WithholdingSchema>;
 
 /** A document a regime asks of the contractor: the tax residence certificate, or the URSSAF one (vigilance). */
 export const CONTRACTOR_DOCUMENT_KINDS = ['tax_residence', 'urssaf_vigilance'] as const;
@@ -685,6 +686,81 @@ export const AccountingJournalSchema = z.object({
   transfersLeftOut: z.array(z.object({ memberId: TeamMemberIdSchema, period: PayPeriodSchema })),
 });
 export type AccountingJournal = z.infer<typeof AccountingJournalSchema>;
+
+/** The first year a DAS2 recap reads. */
+export const DAS2_FIRST_YEAR = 2000;
+
+/**
+ * `GET /v1/payroll/accounting/das2?year=…`, the owner only (EQ-06 lot 7c): the calendar year of the transfers, a past
+ * one or the current one (by the UTC clock: on the night of 1 January, the new year waits an hour or two).
+ */
+export const Das2QuerySchema = z.object({
+  year: z.coerce
+    .number()
+    .int()
+    .min(DAS2_FIRST_YEAR)
+    .refine((year) => year <= new Date().getUTCFullYear(), { message: 'Une année passée ou en cours' }),
+});
+export type Das2Query = z.infer<typeof Das2QuerySchema>;
+
+/**
+ * What the accountant checks on a beneficiary before declaring it:
+ *
+ * - `identity_missing`: no invoice to read their identity from (a transfer recorded before pay waited for its invoice);
+ * - `profile_changed`: their file differs today from the identity their invoice froze, which the recap keeps;
+ * - `transfer_without_invoice`: a transfer of the year paid no invoice, so its treaty exemption is not known;
+ * - `regimes_mixed`: a transfer paid invoices under two withholdings, so it is left out of the treaty exempt part;
+ * - `vat_charged`: an invoice they were paid charged VAT, while the transfer sent what the statement says, excluding VAT.
+ */
+export const DAS2_WARNINGS = [
+  'identity_missing',
+  'profile_changed',
+  'transfer_without_invoice',
+  'regimes_mixed',
+  'vat_charged',
+] as const;
+export const Das2WarningSchema = z.enum(DAS2_WARNINGS);
+export type Das2Warning = z.infer<typeof Das2WarningSchema>;
+
+/** What a beneficiary was paid for, as the DAS2 names it. */
+export const DAS2_NATURES = ['commissions'] as const;
+
+/**
+ * A beneficiary of the DAS2 (art. 240 of the CGI): a contractor paid more than 2 400 € in the calendar year, by the day
+ * of the transfers; the identity their latest invoice of the year froze; how much was sent, and how much of it paid
+ * invoices under a regime whose tax treaty sets the 182 B withholding aside.
+ */
+export const Das2BeneficiarySchema = z
+  .object({
+    memberId: TeamMemberIdSchema,
+    identity: InvoiceContractorSchema.nullable(),
+    nature: z.enum(DAS2_NATURES),
+    paidMinor: z.number().int().min(0),
+    treatyExemptMinor: z.number().int().min(0),
+    warnings: z.array(Das2WarningSchema),
+  })
+  .refine((beneficiary) => beneficiary.treatyExemptMinor <= beneficiary.paidMinor, {
+    message: 'La part sous convention ne dépasse pas le montant versé',
+    path: ['treatyExemptMinor'],
+  });
+export type Das2Beneficiary = z.infer<typeof Das2BeneficiarySchema>;
+
+/** What the recap always recalls: its amounts are what was sent, by the day of the transfer, never what was invoiced. */
+export const DAS2_NOTES = ['amounts_as_sent'] as const;
+
+/** The recap's file: a CSV the accountant opens in a spreadsheet. */
+export const DAS2_MEDIA_TYPE = 'text/csv; charset=utf-8';
+
+/** The DAS2 recap: its file in base64, and its lines as numbers for the screen and the tests. */
+export const Das2ExportSchema = z.object({
+  year: z.number().int().min(DAS2_FIRST_YEAR),
+  fileName: z.string().regex(/^das2-prestataires_\d{4}\.csv$/u),
+  mediaType: z.literal(DAS2_MEDIA_TYPE),
+  content: z.base64(),
+  beneficiaries: z.array(Das2BeneficiarySchema),
+  notes: z.array(z.enum(DAS2_NOTES)),
+});
+export type Das2Export = z.infer<typeof Das2ExportSchema>;
 
 /** The agency's billing settings: its identity and payment terms on each invoice, the delays, the journal's accounts. */
 export const BillingSettingsSchema = z.object({

@@ -1,20 +1,24 @@
 import {
   calendarDayAt,
   CommissionStatementStatusSchema,
+  InvoiceContractorSchema,
+  InvoiceRegimeSchema,
   JournalAccountsSchema,
   PayPeriodSchema,
   TeamMemberIdSchema,
 } from '@nirvana/contracts';
-import { eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
 
+import type { Das2Contractor } from '../domain/accounting';
 import { PayrollForbidden } from '../domain/errors';
 import type { JournalContractor, JournalDocument, JournalStatement } from '../domain/journal';
-import type { JournalFacts, PayrollAccountingStore } from '../domain/ports';
+import type { Das2Facts, JournalFacts, PayrollAccountingStore } from '../domain/ports';
 
 import type { PayInputReads } from './snapshot';
 import { audit } from './writes';
 
-const { billingSettings, carryOvers, commissionStatements, contractorProfiles, invoices } = schema;
+const { billingSettings, carryOvers, commissionStatements, contractorProfiles, invoices, teamMembers } =
+  schema;
 
 /** The contractors with a document issued or a transfer made from `from` to `to`, as the owner reads them. */
 async function contractorsInRange(tx: Transaction, from: string, to: string): Promise<string[]> {
@@ -143,7 +147,119 @@ async function factsOf(
   return { contractors, transfersLeftOut };
 }
 
-/** The journal export (EQ-06 lot 7b): see `PayrollAccountingStore`. */
+/**
+ * Each contractor with a transfer made in `year`, all their facts whatever the year: a transfer of January pays the
+ * documents of December, and the identity is read on the documents (lot 7c).
+ */
+async function das2FactsOf(tx: Transaction, year: number): Promise<Das2Facts> {
+  const paidIn = await tx
+    .selectDistinct({ memberId: commissionStatements.memberId })
+    .from(commissionStatements)
+    .where(
+      and(
+        eq(commissionStatements.status, 'paid'),
+        sql`${commissionStatements.paidOn} between ${`${String(year)}-01-01`} and ${`${String(year)}-12-31`}`,
+      ),
+    );
+  const members = paidIn.map((one) => one.memberId);
+  if (members.length === 0) return { contractors: [] };
+  const statements = await tx
+    .select({
+      memberId: commissionStatements.memberId,
+      id: commissionStatements.id,
+      period: commissionStatements.period,
+      status: commissionStatements.status,
+      totalMinor: commissionStatements.totalMinor,
+      paidOn: commissionStatements.paidOn,
+      sentMinor: commissionStatements.sentMinor,
+    })
+    .from(commissionStatements)
+    .where(inArray(commissionStatements.memberId, members));
+  const carried = await tx
+    .select({
+      memberId: carryOvers.memberId,
+      statementId: carryOvers.statementId,
+      toPeriod: carryOvers.toPeriod,
+    })
+    .from(carryOvers)
+    .where(inArray(carryOvers.memberId, members));
+  const documents = await tx
+    .select({
+      memberId: invoices.memberId,
+      id: invoices.id,
+      kind: invoices.kind,
+      statementId: invoices.statementId,
+      period: invoices.period,
+      issuedOn: invoices.issuedOn,
+      contractor: invoices.contractor,
+      regime: invoices.regime,
+    })
+    .from(invoices)
+    .where(inArray(invoices.memberId, members))
+    .orderBy(invoices.year, invoices.sequence);
+  const profiles = await tx
+    .select({ profile: contractorProfiles, country: teamMembers.country })
+    .from(contractorProfiles)
+    .innerJoin(teamMembers, eq(teamMembers.id, contractorProfiles.memberId))
+    .where(inArray(contractorProfiles.memberId, members));
+
+  return {
+    contractors: members.map((memberId): Das2Contractor => {
+      const today = profiles.find((one) => one.profile.memberId === memberId);
+      return {
+        memberId: TeamMemberIdSchema.parse(memberId),
+        statements: statements
+          .filter((one) => one.memberId === memberId)
+          .map((one) => ({
+            id: one.id,
+            period: one.period,
+            status: CommissionStatementStatusSchema.parse(one.status),
+            totalMinor: one.totalMinor,
+            payment:
+              one.paidOn === null || one.sentMinor === null
+                ? null
+                : { paidOn: one.paidOn, sentMinor: one.sentMinor },
+          })),
+        carryOvers: carried
+          .filter((one) => one.memberId === memberId)
+          .map((one) => ({ statementId: one.statementId, toPeriod: one.toPeriod })),
+        documents: documents
+          .filter((one) => one.memberId === memberId)
+          .map((one) => {
+            // What the document froze at its issue: its copy of the contractor's file and of their regime.
+            const regime = InvoiceRegimeSchema.parse(one.regime);
+            return {
+              id: one.id,
+              kind: one.kind === 'invoice' ? 'invoice' : 'credit_note',
+              statementId: one.statementId,
+              period: PayPeriodSchema.parse(one.period),
+              issuedOn: one.issuedOn,
+              contractor: InvoiceContractorSchema.parse(one.contractor),
+              withholding: regime.withholding,
+              vatCharged: regime.vat.treatment === 'charged',
+            };
+          }),
+        identityToday:
+          today === undefined
+            ? null
+            : {
+                legalName: today.profile.legalName,
+                address: today.profile.address,
+                country: today.country,
+                taxId: today.profile.taxId,
+                businessId: today.profile.businessId,
+                vatNumber: today.profile.vatNumber,
+                individualEntrepreneur: today.profile.individualEntrepreneur,
+                legalForm: today.profile.legalForm,
+                shareCapitalMinor: today.profile.shareCapitalMinor,
+                rcsCity: today.profile.rcsCity,
+              },
+      };
+    }),
+  };
+}
+
+/** The journal export (EQ-06 lot 7b) and the DAS2 recap (lot 7c): see `PayrollAccountingStore`. */
 export function createDrizzlePayrollAccountingStore(
   db: Database,
   reads: Pick<PayInputReads, 'agencyTimeZone'>,
@@ -170,6 +286,20 @@ export function createDrizzlePayrollAccountingStore(
           'accounting_journal.export',
           { kind: 'accounting_journal', id: `${from}/${to}` },
           { from, to, contractors: facts.contractors.length },
+        );
+        return rendered;
+      }),
+    exportDas2: (actor, year, render) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
+        const rendered = render(await das2FactsOf(tx, year));
+        // The year and how many are declared, never who: the recap holds their names and addresses.
+        await audit(
+          tx,
+          actor,
+          'accounting_das2.export',
+          { kind: 'accounting_das2', id: String(year) },
+          { year, beneficiaries: rendered.beneficiaries.length },
         );
         return rendered;
       }),
