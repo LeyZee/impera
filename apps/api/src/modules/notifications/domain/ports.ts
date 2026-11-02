@@ -1,4 +1,11 @@
-import type { NotificationPreferences, PushMessage, PushSubscriptionInput } from '@nirvana/contracts';
+import type {
+  NotificationPreferences,
+  NotificationRequest,
+  PushMessage,
+  PushSubscriptionInput,
+} from '@nirvana/contracts';
+
+import type { NotificationDecision } from './policy';
 
 /** The server's current VAPID key pair (CR-01): made once, sealed in base, never typed by anyone (ADR 0016). */
 export interface ServerKey {
@@ -43,4 +50,28 @@ export type DeliveryOutcome = 'sent' | 'gone' | 'retry' | 'refused';
 /** Sends one encrypted message to one device; never throws (a network error is `retry`). */
 export interface PushSender {
   send(subscription: StoredSubscription, key: ServerKey, message: PushMessage): Promise<DeliveryOutcome>;
+}
+
+/** What the rules count, read in the transaction that records the notification. */
+interface DeliveryFacts {
+  readonly cappedRungToday: number;
+  readonly salesInBurstWindow: number;
+}
+
+/** A notification the registry kept, with the decision it took. */
+type RecordedDecision = NotificationDecision | { readonly action: 'duplicate' };
+
+/**
+ * `notification_deliveries`: once per account, reason and object (CR-01). `record` writes the request and its decision
+ * in one transaction, one account at a time, and asks for the recap at the end of the quiet hours when it holds it.
+ */
+export interface DeliveryRegistry {
+  record(
+    request: NotificationRequest,
+    at: Date,
+    localDay: string,
+    decide: (facts: DeliveryFacts) => NotificationDecision,
+  ): Promise<RecordedDecision>;
+  /** Marks the account's notifications held until `at` or before as recapped; how many there were. */
+  takeHeld(userId: string, at: Date): Promise<number>;
 }

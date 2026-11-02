@@ -1,9 +1,10 @@
 /** Public entry point of the `notifications` module (CR-01, ADR 0042 § 7). Other modules import this file only. */
-import type { PushMessage, PushTestResult } from '@nirvana/contracts';
+import type { NotificationOutcome, NotificationRequest } from '@nirvana/contracts';
 import type { Database, EncryptionKey } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-import { deliver, type DevicesDeps } from './application/devices';
+import { notify, recap, type NotifyDeps } from './application/notify';
+import { createDeliveryRegistry } from './infra/db/deliveries';
 import { createPreferencesStore, createServerKeyStore, createSubscriptionStore } from './infra/db/stores';
 import { createNotificationRoutes, type RequireRole } from './infra/http/routes';
 import { createPushSender } from './infra/push-sender';
@@ -25,12 +26,17 @@ export interface NotificationsModule {
   readonly name: 'notifications';
   /** Mounted under `/v1` by the server: `/notifications/*`. */
   readonly routes: FastifyPluginAsyncZod;
-  /** Delivers to every device of an account now; null when push is off. The rules of when are the caller's. */
-  readonly deliver: ((userId: string, message: PushMessage) => Promise<PushTestResult>) | null;
+  /**
+   * Asks for a notification to an account: once per reason and object, under its quiet hours and its daily cap; null
+   * when push is off. EQ-12, CR-04 and CR-13 call it from their jobs.
+   */
+  readonly notify: ((request: NotificationRequest, at: Date) => Promise<NotificationOutcome>) | null;
+  /** The task of `notifications.recap`; null when push is off (the held ones then wait, nothing rings). */
+  readonly recap: ((userId: string, at: Date) => Promise<number>) | null;
 }
 
 export function createNotificationsModule(deps: NotificationsDeps): NotificationsModule {
-  const devices: DevicesDeps | null =
+  const devices: NotifyDeps | null =
     deps.encryptionKeys === null
       ? null
       : {
@@ -38,10 +44,12 @@ export function createNotificationsModule(deps: NotificationsDeps): Notification
           subscriptions: createSubscriptionStore(deps.db, deps.adminDb),
           preferences: createPreferencesStore(deps.db),
           sender: createPushSender(deps.webOrigin, deps.fetch),
+          registry: createDeliveryRegistry(deps.db),
         };
   return {
     name: 'notifications',
     routes: createNotificationRoutes(devices, deps.requireRole),
-    deliver: devices === null ? null : (userId, message) => deliver(devices, userId, message),
+    notify: devices === null ? null : (request, at) => notify(devices, request, at),
+    recap: devices === null ? null : (userId, at) => recap(devices, userId, at),
   };
 }

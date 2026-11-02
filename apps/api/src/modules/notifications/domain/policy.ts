@@ -1,3 +1,5 @@
+import type { NotificationReason } from '@nirvana/contracts';
+
 /**
  * When a push notification may ring (ADR 0042 § 7, CR-01), pure. The rules live here, never in a setting nor in a
  * prompt:
@@ -7,9 +9,6 @@
  * - everything else (reminders, routine, streak, team) shares a daily cap, in the account's own day; past it, the
  *   notification stays in the app and does not ring.
  */
-
-/** What a notification is about. A sale and one's own shift start are never capped. */
-type NotificationKind = 'sale' | 'own_shift_start' | 'reminder' | 'routine' | 'streak' | 'team';
 
 /** A span of the local day, in minutes after midnight; it crosses midnight when it ends before it starts. */
 export interface QuietHours {
@@ -86,7 +85,7 @@ export function quietHoursEnd(at: Date, timeZone: string, quiet: QuietHours): Da
 }
 
 export interface NotificationContext {
-  readonly kind: NotificationKind;
+  readonly kind: NotificationReason;
   readonly at: Date;
   readonly timeZone: string;
   readonly quiet: QuietHours;
@@ -107,7 +106,7 @@ export type NotificationDecision =
   /** Over the daily cap: it stays in the app, silent. */
   | { readonly action: 'silent' };
 
-function isCapped(kind: NotificationKind): boolean {
+export function isCapped(kind: NotificationReason): boolean {
   return kind !== 'sale' && kind !== 'own_shift_start';
 }
 

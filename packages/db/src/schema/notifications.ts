@@ -8,6 +8,7 @@ import {
   pgTable,
   smallint,
   text,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -86,6 +87,48 @@ export const notificationPreferences = pgTable(
       sql`${t.quietStartMinute} between 0 and 1439 and ${t.quietEndMinute} between 0 and 1439`,
     ),
     check('notification_preferences_cap_check', sql`${t.dailyCap} between 1 and 30`),
+    pgPolicy('own_rows', {
+      for: 'all',
+      using: sql`${t.userId} = ${currentUser}`,
+      withCheck: sql`${t.userId} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
+ * Every notification asked for an account, once (CR-01): the unique key (account, reason, object) makes a replayed
+ * job a no-op, and the row is written with the decision in one transaction. It is also what the rules count: the
+ * capped ones rung today in the account's day (`local_day`), the sales rung in the last two minutes, the ones held
+ * until the end of the quiet hours (`hold_until`) that the recap gathers. Each account reads only its own.
+ */
+export const notificationDeliveries = pgTable(
+  'notification_deliveries',
+  {
+    id: uuid('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    reason: text('reason').notNull(),
+    objectKey: text('object_key').notNull(),
+    decision: text('decision').notNull(),
+    /** The account's day when it was decided (`YYYY-MM-DD`, in its zone): the cap counts per day. */
+    localDay: text('local_day').notNull(),
+    holdUntil: timestampTz('hold_until'),
+    title: text('title').notNull(),
+    url: text('url').notNull(),
+    decidedAt: timestampTz('decided_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('notification_deliveries_once').on(t.userId, t.reason, t.objectKey),
+    index('notification_deliveries_user_decided_idx').on(t.userId, t.decidedAt),
+    check(
+      'notification_deliveries_decision_check',
+      sql`${t.decision} in ('rang', 'held', 'grouped', 'silent', 'recapped')`,
+    ),
+    check(
+      'notification_deliveries_reason_check',
+      sql`${t.reason} in ('sale', 'own_shift_start', 'reminder', 'routine', 'streak', 'team')`,
+    ),
     pgPolicy('own_rows', {
       for: 'all',
       using: sql`${t.userId} = ${currentUser}`,

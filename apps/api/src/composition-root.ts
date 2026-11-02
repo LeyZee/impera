@@ -311,6 +311,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...scheduling.tasks,
     ...team.tasks,
     ...payroll.tasks,
+    ...notifications.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

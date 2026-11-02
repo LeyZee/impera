@@ -1,9 +1,14 @@
 import { createDecipheriv, createECDH, createHmac, randomBytes } from 'node:crypto';
 
-import { NotificationPreferencesSchema, PushPublicKeySchema, PushTestResultSchema } from '@nirvana/contracts';
+import {
+  NotificationPreferencesSchema,
+  PushPublicKeySchema,
+  PushTestResultSchema,
+  type NotificationReason,
+} from '@nirvana/contracts';
 import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import { afterAll, afterEach, beforeAll, describe, expect, inject, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createOwner } from '../auth';
@@ -117,7 +122,7 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
       const rows = await test.admin.db.select().from(schema.pushServerKeys);
       expect(rows).toHaveLength(1);
       expect(rows[0]?.privateKeyCiphertext.includes(rows[0].publicKey)).toBe(false);
-      expect(again.modules.notifications.deliver).not.toBeNull();
+      expect(again.modules.notifications.notify).not.toBeNull();
     } finally {
       await again.shutdown();
     }
@@ -222,5 +227,106 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
     const wrong = await call('PUT', '/v1/notifications/preferences', creator, { ...late, dailyCap: 0 });
     expect(wrong.statusCode).toBe(400);
     expect(ErrorBodySchema.parse(wrong.json()).error.code).toBe('request_invalid');
+  });
+
+  describe('notify (once, quiet hours, cap, bursts)', () => {
+    const PARIS = 'Europe/Paris';
+    // Only what reaches this phone: the account has the earlier test's device too.
+    const sent: { body: Buffer }[] = [];
+    let phone: ReturnType<typeof device>;
+    let notify: NonNullable<App['modules']['notifications']['notify']>;
+    let recap: NonNullable<App['modules']['notifications']['recap']>;
+    const ask = (reason: NotificationReason, objectKey: string, at: string) =>
+      notify(
+        {
+          userId: creatorId,
+          reason,
+          objectKey,
+          timeZone: PARIS,
+          message: { title: objectKey, url: '/agenda' },
+        },
+        new Date(at),
+      );
+
+    beforeAll(async () => {
+      phone = device('https://fcm.googleapis.com/fcm/send/creator-notify');
+      await call('PUT', '/v1/notifications/subscriptions', creator, phone.subscription);
+      // Back to the defaults the earlier test changed: 22 h – 8 h, 6 a day.
+      await call('PUT', '/v1/notifications/preferences', creator, {
+        quietHours: { startMinute: 1320, endMinute: 480 },
+        dailyCap: 6,
+      });
+      const { notify: n, recap: r } = app.modules.notifications;
+      if (n === null || r === null) throw new Error('push is off');
+      notify = n;
+      recap = r;
+    });
+
+    beforeEach(() => {
+      sent.length = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string, init: { body: Buffer }) => {
+          if (url === phone.subscription.endpoint) sent.push({ body: init.body });
+          return Promise.resolve(new Response(null, { status: 201 }));
+        }),
+      );
+    });
+
+    it('rings once for an object, even replayed', async () => {
+      expect(await ask('reminder', 'task-1', '2026-11-03T11:00:00Z')).toBe('rang');
+      expect(await ask('reminder', 'task-1', '2026-11-03T11:00:05Z')).toBe('duplicate');
+      expect(sent).toHaveLength(1);
+      expect(open(sent[0]?.body ?? Buffer.alloc(0), phone)).toMatchObject({
+        title: 'task-1',
+        url: '/agenda',
+      });
+    });
+
+    it('holds in the quiet hours, rings the start of one’s own shift, and recaps once at their end', async () => {
+      // 23 h and 23 h 30 in Paris (UTC+1 in November), quiet 22 h – 8 h by default.
+      expect(await ask('team', 'announce-1', '2026-11-03T22:00:00Z')).toBe('held');
+      expect(await ask('routine', 'routine-1', '2026-11-03T22:30:00Z')).toBe('held');
+      expect(await ask('own_shift_start', 'shift-1', '2026-11-03T22:45:00Z')).toBe('rang');
+      expect(sent).toHaveLength(1);
+      const jobs = await test.admin.db.execute(
+        sql`select run_at from graphile_worker.jobs where key = ${`notifications.recap:${creatorId}`}`,
+      );
+      expect(jobs.rows).toHaveLength(1);
+      expect(new Date(String(jobs.rows[0]?.['run_at'])).toISOString()).toBe('2026-11-04T07:00:00.000Z');
+
+      expect(await recap(creatorId, new Date('2026-11-04T07:00:00Z'))).toBe(2);
+      expect(open(sent[1]?.body ?? Buffer.alloc(0), phone)).toMatchObject({
+        title: 'Pendant tes heures calmes',
+        body: '2 notifications t’attendent dans Nirvana.',
+      });
+      expect(await recap(creatorId, new Date('2026-11-04T07:01:00Z'))).toBe(0);
+      expect(sent).toHaveLength(2);
+    });
+
+    it('stays silent past the daily cap, in the account’s day, never for a sale', async () => {
+      const capped = { quietHours: { startMinute: 1320, endMinute: 480 }, dailyCap: 2 };
+      expect((await call('PUT', '/v1/notifications/preferences', creator, capped)).statusCode).toBe(200);
+      // 5 November in Paris; the reminder of the 3rd (first test) is another day.
+      expect(await ask('reminder', 'task-2', '2026-11-05T09:00:00Z')).toBe('rang');
+      expect(await ask('streak', 'streak-1', '2026-11-05T10:00:00Z')).toBe('rang');
+      expect(await ask('reminder', 'task-3', '2026-11-05T11:00:00Z')).toBe('silent');
+      expect(await ask('sale', 'sale-0', '2026-11-05T11:05:00Z')).toBe('rang');
+      // 00 h 30 on the 6th in Paris is a new day, but in the quiet hours.
+      expect(await ask('reminder', 'task-4', '2026-11-05T23:30:00Z')).toBe('held');
+      expect(sent).toHaveLength(3);
+    });
+
+    it('groups a burst of sales into one notification that replaces itself', async () => {
+      for (const [index, at] of ['12:00:00', '12:00:20', '12:00:40'].entries()) {
+        expect(await ask('sale', `sale-${String(index + 1)}`, `2026-11-06T${at}Z`)).toBe('rang');
+      }
+      expect(await ask('sale', 'sale-4', '2026-11-06T12:01:00Z')).toBe('grouped');
+      expect(await ask('sale', 'sale-5', '2026-11-06T12:01:10Z')).toBe('grouped');
+      // Three minutes later, the window has passed.
+      expect(await ask('sale', 'sale-6', '2026-11-06T12:05:00Z')).toBe('rang');
+      expect(sent).toHaveLength(6);
+      expect(open(sent[3]?.body ?? Buffer.alloc(0), phone)).toMatchObject({ tag: 'sales-burst' });
+    });
   });
 });

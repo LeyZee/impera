@@ -1,12 +1,15 @@
+import { JOB_PAYLOADS } from '@nirvana/contracts';
 import { parseEncryptionKeys } from '@nirvana/db';
 
 import { secretOrNull } from '../config';
+import { defineTask } from '../jobs';
 import { createNotificationsModule, type NotificationsModule } from '../modules/notifications';
 
-import type { Routes, Shared } from './shared';
+import type { Routes, Shared, TasksOf } from './shared';
 
 export interface WiredNotifications {
   readonly module: NotificationsModule;
+  readonly tasks: TasksOf<'notifications'>;
   readonly routes: readonly Routes[];
 }
 
@@ -20,5 +23,25 @@ export function wireNotifications(shared: Shared): WiredNotifications {
     webOrigin: shared.config.WEB_ORIGIN,
     requireRole: shared.requireRole,
   });
-  return { module, routes: [module.routes] };
+  return {
+    module,
+    tasks: {
+      'notifications.recap': defineTask(
+        'notifications.recap',
+        JOB_PAYLOADS['notifications.recap'],
+        shared.logger,
+        async (payload, context) => {
+          if (module.recap === null) {
+            context.logger.warn('notifications: push is off, the held notifications stay in the app');
+            return;
+          }
+          context.logger.info(
+            { held: await module.recap(payload.userId, new Date()) },
+            'notifications: recap',
+          );
+        },
+      ),
+    },
+    routes: [module.routes],
+  };
 }

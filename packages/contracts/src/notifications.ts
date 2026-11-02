@@ -108,6 +108,38 @@ export const PushTestResultSchema = z.object({
 });
 export type PushTestResult = z.infer<typeof PushTestResultSchema>;
 
+/**
+ * What a notification is about (CR-01): the reason that makes it unique for an account with its object, and sets the
+ * rules. A sale and the start of one's own shift are never capped; the start of one's own shift rings even in the
+ * quiet hours. EQ-12, CR-04 and CR-13 bring their own.
+ */
+export const NOTIFICATION_REASONS = [
+  'sale',
+  'own_shift_start',
+  'reminder',
+  'routine',
+  'streak',
+  'team',
+] as const;
+export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
+export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
+
+/**
+ * A notification asked by another module: once only for an account, its reason and its object (`objectKey`: a sale's
+ * id, a shift's id and day…), even replayed. `timeZone` is the account's own, for its quiet hours and its day.
+ */
+export const NotificationRequestSchema = z.object({
+  userId: z.string().min(1),
+  reason: NotificationReasonSchema,
+  objectKey: z.string().min(1).max(200),
+  timeZone: z.string().min(1),
+  message: PushMessageSchema,
+});
+export type NotificationRequest = z.infer<typeof NotificationRequestSchema>;
+
+/** What became of it: rung now, held for the recap, grouped with a burst of sales, silent past the cap, or already done. */
+export type NotificationOutcome = 'rang' | 'held' | 'grouped' | 'silent' | 'duplicate';
+
 export const NOTIFICATION_ERROR_CODES = [
   /** « Tester » with no device subscribed on this account. */
   'push_subscription_not_found',
