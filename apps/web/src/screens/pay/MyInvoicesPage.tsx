@@ -3,8 +3,9 @@ import { useState, type JSX } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
 import { AnswerDialog, DetailDialog, InvoiceRow } from './InvoiceRow';
+import { InvoiceYears } from './InvoiceYears';
 import { useAgencyToday } from './data';
-import { Empty, Loading, Unreachable } from './parts';
+import { Loading } from './parts';
 
 import { useInvoiceYears } from '@/invoices/api';
 import '@/payroll/pay.css';
@@ -30,8 +31,6 @@ export function MyInvoicesPage(): JSX.Element {
   const years = useInvoiceYears({}, today);
   const [opened, setOpened] = useState<Opened | null>(null);
 
-  const documents = years.data?.pages.flatMap((page) => page.documents) ?? [];
-
   return (
     <Page>
       <PageHeader
@@ -42,61 +41,32 @@ export function MyInvoicesPage(): JSX.Element {
       />
       <div className="py-board">
         <Panel className="nv-enter">
-          {years.isError && documents.length === 0 ? (
-            <Unreachable
-              what="la liste de tes factures"
-              onRetry={() => {
-                void years.refetch();
-              }}
-            />
-          ) : years.data === undefined || timeZone === null ? (
+          {timeZone === null ? (
             <Loading rows={3} />
-          ) : documents.length === 0 ? (
-            <Empty
-              whisper="Aucune facture pour l’instant."
-              text="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
-            />
           ) : (
-            <div className="rp-sec">
-              <ul className="iv-list">
-                {documents.map((item, index) => (
-                  <li key={item.id} className="nv-enter" style={{ '--nv-i': Math.min(index, 8) }}>
-                    <InvoiceRow
-                      item={item}
-                      who={null}
-                      reader={{ contractor: true, agency: false, owner: false }}
-                      timeZone={timeZone}
-                      statementPeriod={null}
-                      onAnswer={(answer) => {
-                        setOpened({ kind: 'answer', item, answer });
-                      }}
-                      onSettle={() => undefined}
-                      onDetail={() => {
-                        setOpened({ kind: 'detail', item });
-                      }}
-                    />
-                  </li>
-                ))}
-              </ul>
-              {years.hasNextPage ? (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm iv-more"
-                  disabled={years.isFetchingNextPage}
-                  aria-busy={years.isFetchingNextPage}
-                  onClick={() => {
-                    void years.fetchNextPage();
+            <InvoiceYears
+              years={years}
+              today={today}
+              what="la liste de tes factures"
+              first="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
+              older="Le serveur ne répond pas : les factures plus anciennes n’ont pas pu être lues."
+              row={(item) => (
+                <InvoiceRow
+                  item={item}
+                  who={null}
+                  reader={{ contractor: true, agency: false, owner: false }}
+                  timeZone={timeZone}
+                  statementPeriod={null}
+                  onAnswer={(answer) => {
+                    setOpened({ kind: 'answer', item, answer });
                   }}
-                >
-                  {years.isFetchingNextPage ? 'Lecture…' : 'Plus anciennes'}
-                </button>
-              ) : null}
-              {years.isError ? (
-                <p className="tm-warn" role="alert">
-                  Le serveur ne répond pas : les factures plus anciennes n’ont pas pu être lues.
-                </p>
-              ) : null}
-            </div>
+                  onSettle={() => undefined}
+                  onDetail={() => {
+                    setOpened({ kind: 'detail', item });
+                  }}
+                />
+              )}
+            />
           )}
         </Panel>
       </div>

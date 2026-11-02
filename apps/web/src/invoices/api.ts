@@ -22,7 +22,7 @@ import {
 import { useCallback } from 'react';
 import { z } from 'zod';
 
-import { yearRange } from './model';
+import { olderYear, yearRange } from './model';
 
 import { PAYROLL_KEY } from '@/payroll/api';
 
@@ -78,7 +78,7 @@ export function useInvoices(filter: InvoiceListFilter | null): UseQueryResult<In
 
 /**
  * One's documents a year at a time, the latest first: the year up to `today`, then each « Plus anciennes » the year
- * before. A year without a document ends the list (nothing is issued before a member's first statement).
+ * before, up to the ten years an invoice is kept. A year without a document does not end the list.
  */
 export function useInvoiceYears(
   filter: Pick<InvoiceListFilter, 'memberId'>,
@@ -91,7 +91,7 @@ export function useInvoiceYears(
       return readList(invoiceListUrl({ ...filter, ...yearRange(today, pageParam) }));
     },
     initialPageParam: 0,
-    getNextPageParam: (last, _pages, back) => (last.documents.length === 0 ? undefined : back + 1),
+    getNextPageParam: (_last, _pages, back) => olderYear(back),
     enabled: today !== null,
     refetchInterval: 60_000,
     retry: 1,

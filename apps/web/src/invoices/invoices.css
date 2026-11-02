@@ -133,6 +133,11 @@
   align-self: center;
 }
 
+/* A span of days without a document, between two years that hold some: said, never a blank. */
+.iv-gap {
+  padding: var(--nv-space-1) var(--nv-space-4);
+}
+
 /* ── A document's detail: its totals, then each dated step of its life ── */
 .iv-totals {
   display: grid;

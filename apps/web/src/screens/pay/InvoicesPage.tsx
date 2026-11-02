@@ -3,6 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import { AnswerDialog, DetailDialog, InvoiceRow, SettleDialog } from './InvoiceRow';
+import { InvoiceYears } from './InvoiceYears';
 import { PayNav } from './PayNav';
 import { useAgencyToday, useCurrentPeriod } from './data';
 import { Empty, Loading, PeriodArrows, Unreachable } from './parts';
@@ -99,7 +100,6 @@ export function InvoicesPage({
     </ul>
   );
 
-  const memberDocuments = byMember.data?.pages.flatMap((page) => page.documents) ?? [];
   const chosenName = memberId === undefined ? null : nameOf(memberId);
 
   return (
@@ -198,42 +198,17 @@ export function InvoicesPage({
             ) : (
               <div className="rp-sec">{list(byPeriod.data.documents, period, timeZone)}</div>
             )
-          ) : byMember.isError && memberDocuments.length === 0 ? (
-            <Unreachable
-              what="la liste des documents"
-              onRetry={() => {
-                void byMember.refetch();
-              }}
-            />
-          ) : byMember.data === undefined || timeZone === null ? (
+          ) : timeZone === null ? (
             <Loading rows={3} />
-          ) : memberDocuments.length === 0 ? (
-            <Empty
-              whisper={`Aucun document pour ${chosenName ?? 'ce membre'} sur l’année.`}
-              text="Ses factures s’émettent à la validation de ses relevés, une fois son dossier complet."
-            />
           ) : (
-            <div className="rp-sec">
-              {list(memberDocuments, null, timeZone)}
-              {byMember.hasNextPage ? (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm iv-more"
-                  disabled={byMember.isFetchingNextPage}
-                  aria-busy={byMember.isFetchingNextPage}
-                  onClick={() => {
-                    void byMember.fetchNextPage();
-                  }}
-                >
-                  {byMember.isFetchingNextPage ? 'Lecture…' : 'Plus anciennes'}
-                </button>
-              ) : null}
-              {byMember.isError ? (
-                <p className="tm-warn" role="alert">
-                  Le serveur ne répond pas : les documents plus anciens n’ont pas pu être lus.
-                </p>
-              ) : null}
-            </div>
+            <InvoiceYears
+              years={byMember}
+              today={today}
+              what="la liste des documents"
+              first={`${chosenName ?? 'Ce membre'} n’a aucun document sur les dix dernières années : ses factures s’émettent à la validation de ses relevés, une fois son dossier complet.`}
+              older="Le serveur ne répond pas : les documents plus anciens n’ont pas pu être lus."
+              row={(item) => row(item, null, timeZone)}
+            />
           )}
         </Panel>
       </div>

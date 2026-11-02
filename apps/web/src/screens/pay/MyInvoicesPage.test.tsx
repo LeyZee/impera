@@ -214,28 +214,50 @@ describe('Commissions › Factures', () => {
     );
   });
 
-  it('reads the year before on « Plus anciennes », and stops at a year without a document', async () => {
+  it('keeps « Plus anciennes » past a year without a document, saying its days, and reads back ten years at most', async () => {
     const older = invoiceOf(3, THEO, '2025-09-01', { issuedOn: '2025-09-17' });
+    const oldest = invoiceOf(4, THEO, '2023-03-01', { issuedOn: '2023-03-17' });
     years.set('2024-11-04', [older]);
+    years.set('2022-11-03', [oldest]);
     renderPage();
     await waitFor(() => rowOf(PENDING.number));
-    fireEvent.click(screen.getByRole('button', { name: 'Plus anciennes' }));
+    const more = () => screen.getByRole('button', { name: 'Plus anciennes' });
+    fireEvent.click(more());
     await waitFor(() => rowOf(older.number));
     expect(reads.at(-1)).toBe('?from=2024-11-04&to=2025-11-04');
-    fireEvent.click(screen.getByRole('button', { name: 'Plus anciennes' }));
+    // A year without a document (a pause, a departure) does not end the list: its days are said, the next year stays near.
+    fireEvent.click(more());
+    expect(
+      await screen.findByText('Aucun document entre le 4 novembre 2023 et le 3 novembre 2024.'),
+    ).toBeTruthy();
+    fireEvent.click(more());
+    await waitFor(() => rowOf(oldest.number));
+    for (let year = 4; year < 10; year += 1) {
+      await waitFor(() => {
+        expect(more().getAttribute('aria-busy')).toBe('false');
+      });
+      fireEvent.click(more());
+    }
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Plus anciennes' })).toBeNull();
     });
+    expect(reads).toHaveLength(10);
+    expect(reads.at(-1)).toBe('?from=2016-10-29&to=2017-10-29');
+    expect(screen.getByText('Aucun document entre le 29 octobre 2016 et le 2 novembre 2022.')).toBeTruthy();
   });
 
-  it('says there is no document yet, and a server that does not answer, never one for the other', async () => {
+  it('says a year without a document by its days, never « none at all », and a server that does not answer', async () => {
     years = new Map();
     renderPage();
-    expect(await screen.findByText('Aucune facture pour l’instant.')).toBeTruthy();
+    expect(
+      await screen.findByText('Aucun document entre le 5 novembre 2025 et le 5 novembre 2026.'),
+    ).toBeTruthy();
+    expect(screen.getByText(/jusqu’à dix ans/u)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Plus anciennes' })).toBeTruthy();
     cleanup();
     listStatus = 500;
     renderPage();
     expect(await screen.findByText(/Le serveur ne répond pas/u)).toBeTruthy();
-    expect(screen.queryByText('Aucune facture pour l’instant.')).toBeNull();
+    expect(screen.queryByText(/Aucun document/u)).toBeNull();
   });
 });

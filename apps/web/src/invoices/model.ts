@@ -1,16 +1,17 @@
-import type {
-  InvoiceAcceptanceState,
-  InvoiceEvent,
-  InvoiceEventKind,
-  InvoiceListItem,
-  PayPeriod,
+import {
+  INVOICE_RETENTION_YEARS,
+  type InvoiceAcceptanceState,
+  type InvoiceEvent,
+  type InvoiceEventKind,
+  type InvoiceListItem,
+  type PayPeriod,
 } from '@nirvana/contracts';
 
 import type { InvoiceRefusal } from './api';
 
 import { dayMonthText, momentAt, type PayChip } from '@/payroll/model';
 import { periodTitle } from '@/reports/model';
-import { addDays } from '@/scheduling/time';
+import { addDays, fullDay } from '@/scheduling/time';
 
 /**
  * The words of the invoices' screens (EQ-06 lot 8): what a document is, where its acceptance, its due date and its
@@ -34,6 +35,40 @@ export function yearRange(today: string, back: number): DayRange {
   const to = addDays(today, -YEAR_DAYS * back);
   return { from: addDays(to, -(YEAR_DAYS - 1)), to };
 }
+
+/**
+ * The year « Plus anciennes » reads next, or `undefined` past the ten years an invoice is kept (ADR 0037): a year
+ * without a document does not end the list, a member may have left, or paused, more than a year.
+ */
+export const olderYear = (back: number): number | undefined =>
+  back + 1 < INVOICE_RETENTION_YEARS ? back + 1 : undefined;
+
+/** What a list read a year at a time shows: documents, or the span of days without one (years in a row, joined). */
+export type YearSlice =
+  | { readonly kind: 'documents'; readonly items: readonly InvoiceListItem[] }
+  | { readonly kind: 'gap'; readonly range: DayRange };
+
+/** The years read, the latest first (`backs[i]` the year of `pages[i]`), as documents and spans without one. */
+export function yearSlices(
+  today: string,
+  pages: readonly { readonly documents: readonly InvoiceListItem[] }[],
+  backs: readonly number[],
+): YearSlice[] {
+  const slices: YearSlice[] = [];
+  pages.forEach((page, index) => {
+    const range = yearRange(today, backs[index] ?? index);
+    const last = slices.at(-1);
+    if (page.documents.length > 0) slices.push({ kind: 'documents', items: page.documents });
+    else if (last?.kind === 'gap')
+      slices[slices.length - 1] = { kind: 'gap', range: { from: range.from, to: last.range.to } };
+    else slices.push({ kind: 'gap', range });
+  });
+  return slices;
+}
+
+/** « Aucun document entre le 5 novembre 2025 et le 5 novembre 2026. » */
+export const gapText = (range: DayRange): string =>
+  `Aucun document entre le ${fullDay(range.from)} et le ${fullDay(range.to)}.`;
 
 /** « Facture », « Facture rectificative », « Avoir »: what a document is, as the glossary names it. */
 export function kindLabel(item: Pick<InvoiceListItem, 'kind' | 'corrective'>): string {
@@ -200,7 +235,7 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
     case 'invoice_answer_forbidden':
       return 'Seul le prestataire répond à sa facture.';
     case 'payroll_forbidden':
-      return 'Seul le propriétaire tranche une contestation.';
+      return 'Seul le propriétaire peut faire ce geste.';
     case 'invoice_acceptance_conflict':
       return 'Ce document a déjà sa réponse, ou son délai est passé : la liste se met à jour.';
     case 'credit_note_amount_unprocessable':

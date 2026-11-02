@@ -115,7 +115,9 @@ export function InvoiceRow({
       </div>
       <p className="iv-doc__amount nv-num">
         {amountText(item.inclVatMinor, 'EUR')}
-        <small>{item.vatMinor === 0 ? 'sans TVA' : `dont ${amountText(item.vatMinor, 'EUR')} de TVA`}</small>
+        <small>
+          {item.vatMinor === 0 ? 'sans TVA facturée' : `dont ${amountText(item.vatMinor, 'EUR')} de TVA`}
+        </small>
       </p>
       <div className="iv-doc__acts">
         {answering ? (
@@ -568,7 +570,7 @@ export function SettleDialog({
                     className={touched && !amountValid ? 'tm-hint tm-hint--error' : 'tm-hint'}
                   >
                     {touched && !amountValid
-                      ? 'Un montant en euros, plus de 0 et jusqu’à 50 000 €, deux décimales au plus.'
+                      ? `Un montant en euros, plus de 0 et jusqu’à ${amountText(PAY_AMOUNT_MAX_MINOR, 'EUR')}, deux décimales au plus.`
                       : 'Il va dans sa prochaine quinzaine ouverte.'}
                   </p>
                 </div>

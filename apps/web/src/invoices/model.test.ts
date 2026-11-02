@@ -8,13 +8,16 @@ import {
   dueChip,
   dueText,
   eventLine,
+  gapText,
   invoiceRefusalText,
   kindLabel,
+  olderYear,
   periodText,
   readsAgain,
   settlementText,
   statementPeriodOf,
   yearRange,
+  yearSlices,
 } from './model';
 
 import { invoiceOf, LOU, NOV1, OCT1 as OCT1_DAY, OCT2 as OCT2_DAY, payId, THEO } from '@/test/pay';
@@ -29,6 +32,33 @@ describe('the year a list reads', () => {
   it('covers 366 days up to today, then the year before without a day left out nor read twice', () => {
     expect(yearRange('2026-11-05', 0)).toEqual({ from: '2025-11-05', to: '2026-11-05' });
     expect(yearRange('2026-11-05', 1)).toEqual({ from: '2024-11-04', to: '2025-11-04' });
+  });
+
+  it('reads back the ten years an invoice is kept, past a year without a document', () => {
+    expect(olderYear(0)).toBe(1);
+    expect(olderYear(8)).toBe(9);
+    expect(olderYear(9)).toBeUndefined();
+  });
+
+  it('says the days without a document, years in a row joined, between the documents', () => {
+    const recent = invoiceOf(1, THEO, OCT2);
+    const old = invoiceOf(2, THEO, '2023-03-01');
+    const none = { documents: [] };
+    expect(
+      yearSlices(
+        '2026-11-05',
+        [{ documents: [recent] }, none, none, { documents: [old] }, none],
+        [0, 1, 2, 3, 4],
+      ),
+    ).toEqual([
+      { kind: 'documents', items: [recent] },
+      { kind: 'gap', range: { from: '2023-11-04', to: '2025-11-04' } },
+      { kind: 'documents', items: [old] },
+      { kind: 'gap', range: { from: '2021-11-02', to: '2022-11-02' } },
+    ]);
+    expect(gapText({ from: '2023-11-04', to: '2025-11-01' })).toBe(
+      'Aucun document entre le 4 novembre 2023 et le 1er novembre 2025.',
+    );
   });
 });
 
