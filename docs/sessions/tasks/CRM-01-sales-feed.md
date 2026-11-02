@@ -59,4 +59,5 @@ La paie, les écrans de vente, tout appel réel sans la demande de Charles.
 02/11/2026, Extension, PR 3 (écran) :
 - Réglages › Ventes (`/reglages/ventes`, propriétaire seul) : clé, réception instantanée, liens des modèles et de l'équipe, dans `apps/web/src/settings/sales-feed/`.
 - Un webhook silencieux n'alerte jamais ; `lastRejectedAt` seul propose « Réinscrire ». L'inscription part en `PUT` sans corps.
-- Reste : rien pour CRM-01. Un lien automatique ne peut pas être confirmé (le serveur ignore un lien identique), à trancher par Bilan si besoin.
+- « Confirmer » repose un lien `auto` vers le même compte : il devient celui du propriétaire avec la #413 (Bilan).
+- Reste : rien pour CRM-01.

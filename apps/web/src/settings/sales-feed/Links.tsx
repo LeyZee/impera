@@ -94,7 +94,7 @@ export function ModelLinks({
         {models.some((model) => model.linkedBy?.kind === 'auto') ? (
           <p className="sv-muted">
             « Relié par pseudo identique » : relié tout seul à la connexion, parce que le pseudo est le même.
-            Vérifie que c’est le bon compte.
+            Vérifie que c’est le bon compte, puis confirme-le : le lien devient le tien.
           </p>
         ) : null}
       </header>
@@ -107,7 +107,23 @@ export function ModelLinks({
             <div className="sf-row__name">
               <span>{label}</span>
               {model.linkedBy?.kind === 'auto' ? (
-                <span className="nv-tag nv-tag--inferred">Relié par pseudo identique</span>
+                <>
+                  <span className="nv-tag nv-tag--inferred">Relié par pseudo identique</span>
+                  {/* The same link posed again by the owner confirms it (#413): nothing moves. */}
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--soft nv-btn--sm"
+                    aria-label={`Confirmer le compte de ${label}`}
+                    disabled={rows.busy !== null}
+                    onClick={() => {
+                      save(id, `${label} n’a pas été confirmé.`, () =>
+                        linkModel(platform, id, model.platformAccountId),
+                      );
+                    }}
+                  >
+                    {rows.busy === id ? 'Confirmation…' : 'Confirmer'}
+                  </button>
+                </>
               ) : null}
             </div>
             <select

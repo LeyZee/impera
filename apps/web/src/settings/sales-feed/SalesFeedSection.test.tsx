@@ -294,6 +294,32 @@ describe('Réglages › Ventes', () => {
     ).toBeTruthy();
   });
 
+  it('confirms a link the handle posed by posing the same account again', async () => {
+    const fetch = serve({
+      [`GET ${BASE}`]: ok({ feeds: [status()] }),
+      [`GET ${BASE}/reveal`]: ok(overview()),
+      [`PUT ${BASE}/reveal/models/m1`]: () => {
+        const after = overview();
+        return {
+          status: 200,
+          body: {
+            ...after,
+            models: after.models.map((m) =>
+              m.platformModelId === 'm1' ? { ...m, linkedBy: { kind: 'member', userId: 'u1' } } : m,
+            ),
+          },
+        };
+      },
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmer le compte de Lune (@lune)' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Relié par pseudo identique')).toBeNull();
+    });
+    const put = fetch.mock.calls.find(([url]) => url === `${BASE}/reveal/models/m1`);
+    expect(put?.[1]?.body).toBe(JSON.stringify({ platformAccountId: ACCOUNT_LUNE }));
+  });
+
   it('links a platform team member to a team member, by the team’s list', async () => {
     const fetch = serve({
       [`GET ${BASE}`]: ok({ feeds: [status()] }),
