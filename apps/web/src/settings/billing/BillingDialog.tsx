@@ -1,5 +1,6 @@
 import {
   AGENCY_LEGAL_FORM_MAX,
+  DOCUMENT_REMINDER_MAX_DAYS,
   INVOICE_DUE_MAX_DAYS,
   INVOICE_DUE_MIN_DAYS,
   LEGAL_NAME_MAX,
@@ -55,7 +56,7 @@ function refusalText(refusal: BillingRefusal): string {
 }
 
 /**
- * The form of Réglages › Facturation, one step at a time: all five the first time, a card's own steps afterwards (plus
+ * The form of Réglages › Facturation, one step at a time: all six the first time, a card's own steps afterwards (plus
  * any whose saved value would be refused, so that the save goes through). Every save sends the whole settings; the
  * logo is sent alone as soon as it is picked, and kept only once saved.
  */
@@ -181,6 +182,8 @@ export function BillingDialog({
           <ServiceStep id={id} draft={draft} problems={problems} set={set} />
         ) : step === 'payment' ? (
           <PaymentStep id={id} draft={draft} problems={problems} set={set} />
+        ) : step === 'reminder' ? (
+          <ReminderStep id={id} draft={draft} problems={problems} set={set} />
         ) : (
           <LogoStep
             logo={draft.logoSha256 === null ? null : logo}
@@ -445,6 +448,30 @@ function ServiceStep(props: StepProps): JSX.Element {
         rows={4}
         maxLength={SERVICE_DESCRIPTION_MAX}
       />
+    </Field>
+  );
+}
+
+/** How long before a document's end its renewal is reminded, to the contractor and to the owner (`remindFrom`). */
+function ReminderStep(props: StepProps): JSX.Element {
+  const { id, problems } = props;
+  return (
+    <Field
+      id={id}
+      field="documentReminderDays"
+      label="Rappel des pièces"
+      hint={`De 1 à ${String(DOCUMENT_REMINDER_MAX_DAYS)} jours : le prestataire et toi lisez le rappel ce nombre de jours avant la fin d’une pièce. L’attestation de résidence fiscale garde le 1er décembre de son année.`}
+      problems={problems}
+    >
+      <div className="bf-days">
+        <input
+          {...control(props, 'documentReminderDays', true)}
+          className="nv-field__control nv-glass nv-num"
+          inputMode="numeric"
+          autoComplete="off"
+        />
+        <span>jours avant la fin</span>
+      </div>
     </Field>
   );
 }

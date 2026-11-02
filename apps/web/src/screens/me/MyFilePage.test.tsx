@@ -262,6 +262,28 @@ describe('Moi › Dossier', () => {
     ).toContain('Tes versements sont bloqués jusqu’à ce que celle de 2027 soit acceptée');
   });
 
+  it('says only a warning on his invoices, and no guide, under a regime without a treaty', async () => {
+    // A regime the accountant could write: no withholding due, the certificate asked all the same.
+    const withoutTreaty = { ...BENIN_REGIME, id: FRANCE_REGIME.id, withholding: 'none' as const };
+    server.regimes = [withoutTreaty];
+    server.file = fileOf({
+      today: '2027-01-04',
+      regimes: [contractorRegimeOf(1, withoutTreaty, '2026-11-01')],
+      documents: [documentOf(1)],
+    });
+    renderPage();
+    const documents = await waitFor(() => panelOf('Tes pièces'));
+    const certificate = await waitFor(() => itemOf(documents, 'Attestation de résidence fiscale'));
+    expect(
+      within(certificate).getByText(
+        'Ton attestation de 2026 s’est terminée le 31 décembre 2026 : dépose celle de 2027. Tes factures partent avec un avertissement en attendant.',
+      ),
+    ).toBeTruthy();
+    expect(certificate.textContent).not.toContain('versements');
+    // The guide says the money cannot leave without it: not shown where it can.
+    expect(within(certificate).queryByText('Comment obtenir ton attestation')).toBeNull();
+  });
+
   it('gives a manager his two screens of Moi', async () => {
     server.members = [IRIS];
     server.file = fileOf({

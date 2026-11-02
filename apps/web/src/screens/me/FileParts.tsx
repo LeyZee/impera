@@ -372,6 +372,8 @@ export function DocumentsPanel({
   onReview: (document: ContractorFileDocument) => void;
 }): JSX.Element {
   const year = file.today.slice(0, 4);
+  // Whether the tax residence certificate gates the payouts (`treatyNeedsResidence`, ADR 0041), or only warns.
+  const treaty = regime?.withholding === 'treaty_exempt';
   return (
     <Panel className="nv-enter" eyebrow="Pièces" title={reader.self ? 'Tes pièces' : 'Ses pièces'}>
       {regime === null ? (
@@ -390,7 +392,7 @@ export function DocumentsPanel({
             const standing = documentStanding(kind, file.documents, file.today);
             const older = olderDocuments(kind, file.documents, standing);
             const shown = standing.kind === 'missing' ? null : standing.document;
-            const reminder = shown === null ? null : reminderText(shown, file.today, reader.self);
+            const reminder = shown === null ? null : reminderText(shown, file.today, reader.self, treaty);
             return (
               <li
                 key={kind}
@@ -430,7 +432,8 @@ export function DocumentsPanel({
                     </button>
                   </div>
                 ) : null}
-                {reader.self && kind === 'tax_residence' && file.country === 'BJ' ? (
+                {/* The guide says the money cannot leave without the certificate: true under a treaty alone. */}
+                {reader.self && kind === 'tax_residence' && file.country === 'BJ' && treaty ? (
                   <details className="cf-guide">
                     <summary>Comment obtenir ton attestation</summary>
                     <BeninGuide year={year} />

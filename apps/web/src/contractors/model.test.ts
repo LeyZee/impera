@@ -166,30 +166,30 @@ describe('the documents', () => {
 
   it('reminds the renewal from remindFrom on the file’s day, with the next year of the guide', () => {
     const certificate = documentOf(1);
-    expect(reminderText(certificate, '2026-11-30', true)).toBeNull();
-    expect(reminderText(certificate, '2026-12-01', true)).toBe(
+    expect(reminderText(certificate, '2026-11-30', true, true)).toBeNull();
+    expect(reminderText(certificate, '2026-12-01', true, true)).toBe(
       'Ton attestation se termine le 31 décembre. Sans celle de 2027, tes versements à partir du 1er janvier 2027 seront bloqués : demande-la dès janvier.',
     );
-    expect(reminderText(certificate, '2026-12-01', false)).toBe(
+    expect(reminderText(certificate, '2026-12-01', false, true)).toBe(
       'Son attestation se termine le 31 décembre. Sans celle de 2027, ses versements à partir du 1er janvier 2027 seront bloqués.',
     );
-    expect(reminderText(documentOf(2, { remindFrom: null }), '2026-12-15', true)).toBeNull();
+    expect(reminderText(documentOf(2, { remindFrom: null }), '2026-12-15', true, true)).toBeNull();
     const vigilance = documentOf(3, {
       kind: 'urssaf_vigilance',
       lastDay: '2027-03-31',
       remindFrom: '2027-03-01',
     });
-    expect(reminderText(vigilance, '2027-03-02', true)).toBe(
+    expect(reminderText(vigilance, '2027-03-02', true, true)).toBe(
       'Ton attestation de vigilance se termine le 31 mars 2027 : dépose la nouvelle avant.',
     );
   });
 
   it('says what holds once the last day passed: the payouts blocked, the invoices with a warning', () => {
     const certificate = documentOf(1);
-    expect(reminderText(certificate, '2027-01-02', true)).toBe(
+    expect(reminderText(certificate, '2027-01-02', true, true)).toBe(
       'Ton attestation de 2026 s’est terminée le 31 décembre 2026. Tes versements sont bloqués jusqu’à ce que celle de 2027 soit acceptée : demande-la à la DGI et dépose-la ici.',
     );
-    expect(reminderText(certificate, '2027-01-02', false)).toBe(
+    expect(reminderText(certificate, '2027-01-02', false, true)).toBe(
       'Son attestation de 2026 s’est terminée le 31 décembre 2026 : ses versements sont bloqués jusqu’à ce que celle de 2027 soit acceptée.',
     );
     const vigilance = documentOf(3, {
@@ -197,12 +197,29 @@ describe('the documents', () => {
       lastDay: '2027-03-31',
       remindFrom: '2027-03-01',
     });
-    expect(reminderText(vigilance, '2027-04-01', true)).toBe(
+    expect(reminderText(vigilance, '2027-04-01', true, true)).toBe(
       'Ton attestation de vigilance s’est terminée le 31 mars 2027 : dépose la nouvelle. Tes factures partent avec un avertissement en attendant.',
     );
-    expect(reminderText(vigilance, '2027-04-01', false)).toBe(
+    expect(reminderText(vigilance, '2027-04-01', false, true)).toBe(
       'Son attestation de vigilance s’est terminée le 31 mars 2027 : ses factures partent avec un avertissement.',
     );
+  });
+
+  it('says only a warning on the invoices for a certificate a regime without a treaty asks for', () => {
+    const certificate = documentOf(1);
+    expect(reminderText(certificate, '2026-12-01', true, false)).toBe(
+      'Ton attestation se termine le 31 décembre 2026. Sans celle de 2027, tes factures à partir du 1er janvier 2027 partiront avec un avertissement : demande-la dès janvier.',
+    );
+    expect(reminderText(certificate, '2026-12-01', false, false)).toBe(
+      'Son attestation se termine le 31 décembre 2026. Sans celle de 2027, ses factures à partir du 1er janvier 2027 partiront avec un avertissement.',
+    );
+    expect(reminderText(certificate, '2027-01-02', true, false)).toBe(
+      'Ton attestation de 2026 s’est terminée le 31 décembre 2026 : dépose celle de 2027. Tes factures partent avec un avertissement en attendant.',
+    );
+    expect(reminderText(certificate, '2027-01-02', false, false)).toBe(
+      'Son attestation de 2026 s’est terminée le 31 décembre 2026 : ses factures partent avec un avertissement.',
+    );
+    expect(reminderText(certificate, '2026-11-30', true, false)).toBeNull();
   });
 
   it('says the last day the API set when a certificate states another than the 31st of December', () => {
@@ -211,7 +228,7 @@ describe('the documents', () => {
       lastDay: '2026-11-30',
       remindFrom: '2026-11-01',
     });
-    expect(reminderText(certificate, '2026-11-02', true)).toMatch(
+    expect(reminderText(certificate, '2026-11-02', true, true)).toMatch(
       /^Ton attestation se termine le 30 novembre 2026\. Sans celle de 2027/u,
     );
   });

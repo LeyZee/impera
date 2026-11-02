@@ -101,7 +101,7 @@ export function EntriesPage({
       actions={
         <>
           {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav />
+          <PayNav user={user} />
           <button
             type="button"
             className="nv-btn nv-btn--neon"

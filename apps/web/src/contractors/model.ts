@@ -144,9 +144,16 @@ export function documentStateText(document: ContractorFileDocument, today: strin
 /**
  * The reminder of a document whose renewal is due, from `remindFrom` on (compared with the file's day, never the
  * device's): `null` before, or on a document the reminder does not follow. The tax residence certificate's is the
- * guide's (`docs/reference/residence-certificate-benin.md`), its years filled in.
+ * guide's (`docs/reference/residence-certificate-benin.md`), its years filled in, under a regime whose tax treaty sets
+ * the withholding aside (`treaty`): the certificate then gates the payouts (ADR 0041). Under any other regime it only
+ * puts a warning on the invoices, as `issueDecision` does (Équipe's choice (a), 8c).
  */
-export function reminderText(document: ContractorFileDocument, today: string, self: boolean): string | null {
+export function reminderText(
+  document: ContractorFileDocument,
+  today: string,
+  self: boolean,
+  treaty: boolean,
+): string | null {
   if (document.remindFrom === null || document.remindFrom > today) return null;
   const end = fullDay(document.lastDay);
   // Past its last day, the reminder says what holds now (ADR 0041 § 5): the payouts are blocked, no longer will be.
@@ -154,6 +161,15 @@ export function reminderText(document: ContractorFileDocument, today: string, se
   if (document.kind === 'tax_residence') {
     const year = document.lastDay.slice(0, 4);
     const next = String(Number(year) + 1);
+    if (!treaty) {
+      if (ended)
+        return self
+          ? `Ton attestation de ${year} s’est terminée le ${end} : dépose celle de ${next}. Tes factures partent avec un avertissement en attendant.`
+          : `Son attestation de ${year} s’est terminée le ${end} : ses factures partent avec un avertissement.`;
+      return self
+        ? `Ton attestation se termine le ${end}. Sans celle de ${next}, tes factures à partir du 1er janvier ${next} partiront avec un avertissement : demande-la dès janvier.`
+        : `Son attestation se termine le ${end}. Sans celle de ${next}, ses factures à partir du 1er janvier ${next} partiront avec un avertissement.`;
+    }
     if (ended)
       return self
         ? `Ton attestation de ${year} s’est terminée le ${end}. Tes versements sont bloqués jusqu’à ce que celle de ${next} soit acceptée : demande-la à la DGI et dépose-la ici.`

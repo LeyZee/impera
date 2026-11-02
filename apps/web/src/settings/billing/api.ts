@@ -3,16 +3,25 @@ import {
   AgencyLogoRefusalSchema,
   AgencyLogoSchema,
   ApiErrorSchema,
+  BillingRegimeSchema,
   BillingSettingsViewSchema,
+  ContractTextSchema,
   type AgencyLogo,
   type AgencyLogoRefusal,
+  type BillingRegime,
   type BillingSettingsView,
+  type ContractText,
+  type CreateBillingRegimeBody,
+  type CreateContractTextBody,
+  type JournalAccounts,
   type UpdateBillingSettingsBody,
+  type ValidateBillingRegimeBody,
 } from '@nirvana/contracts';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { z } from 'zod';
 
+import { write, type InvoiceOutcome } from '@/invoices/api';
 import { PAYROLL_KEY } from '@/payroll/api';
 
 /**
@@ -109,4 +118,32 @@ export async function addLogo(file: Blob): Promise<BillingOutcome<AgencyLogo>> {
 export function useKeepBillingSettings(): (view: BillingSettingsView) => void {
   const client = useQueryClient();
   return useCallback((view) => client.setQueryData(BILLING_KEY, view), [client]);
+}
+
+/**
+ * What else Réglages › Facturation writes (EQ-06 lot 8c), each refusal said by `invoiceRefusalText`: the journal's
+ * accounts, a version of the contract or of the mandate, a regime, and the day the accountant validated one. A text
+ * and a regime are never changed once written; their `id` is the key a retry sends again.
+ */
+
+/** The eight accounts and journals of the export, each `null` until the accountant gives it. */
+export const saveAccounts = (body: JournalAccounts): Promise<InvoiceOutcome<BillingSettingsView>> =>
+  write(`${BASE}/accounts`, 'PUT', { json: body }, BillingSettingsViewSchema);
+
+export const addContractText = (body: CreateContractTextBody): Promise<InvoiceOutcome<ContractText>> =>
+  write('/v1/payroll/contract-texts', 'POST', { json: body }, ContractTextSchema);
+
+export const addRegime = (body: CreateBillingRegimeBody): Promise<InvoiceOutcome<BillingRegime>> =>
+  write('/v1/payroll/billing-regimes', 'POST', { json: body }, BillingRegimeSchema);
+
+export const validateRegime = (
+  regimeId: string,
+  body: ValidateBillingRegimeBody,
+): Promise<InvoiceOutcome<BillingRegime>> =>
+  write(`/v1/payroll/billing-regimes/${regimeId}/validation`, 'POST', { json: body }, BillingRegimeSchema);
+
+/** After a text or a regime is written: the lists read again, the contractors' files too (what they must accept). */
+export function useRefreshPayroll(): () => Promise<void> {
+  const client = useQueryClient();
+  return useCallback(() => client.invalidateQueries({ queryKey: PAYROLL_KEY }), [client]);
 }

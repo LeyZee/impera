@@ -5,11 +5,13 @@ import {
   type AgencyLogo,
   type BillingSettings,
 } from '@nirvana/contracts';
-import { useState, type JSX, type ReactNode } from 'react';
+import { useState, type JSX } from 'react';
 
 import { BillingDialog } from './BillingDialog';
+import { LegalCards } from './LegalCards';
 import { logoUrl, useBillingSettings } from './api';
 import { ALL_STEPS, dueText, closeChoiceText, isReady, logoLine, logoWarning, type StepKey } from './model';
+import { Card, Fact } from './parts';
 
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
@@ -28,6 +30,7 @@ const CARDS = {
   service: { title: 'Désignation de la prestation', steps: ['service'] },
   payment: { title: 'Paiement', steps: ['payment'] },
   logo: { title: 'Logo', steps: ['logo'] },
+  reminder: { title: 'Rappel des pièces', steps: ['reminder'] },
 } as const satisfies Readonly<Record<string, Opened>>;
 
 /**
@@ -223,49 +226,12 @@ function Cards({
         {logo === null ? null : <p className="tm-hint nv-num">{logoLine(logo)}</p>}
         {warning === null ? null : <p className="tm-warn">{warning}</p>}
       </Card>
+      <LegalCards
+        settings={settings}
+        onReminder={() => {
+          onChange(CARDS.reminder);
+        }}
+      />
     </>
-  );
-}
-
-function Card({
-  index,
-  title,
-  sub,
-  onChange,
-  children,
-}: {
-  index: number;
-  title: string;
-  sub: string;
-  onChange: () => void;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <div className="nv-plate rp-account nv-enter" style={{ '--nv-i': Math.min(index + 1, 8) }}>
-      <div className="rp-account__head">
-        <div className="rp-account__who">
-          <h2 className="rp-account__name">{title}</h2>
-          <p className="rp-account__handle">{sub}</p>
-        </div>
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm"
-          aria-label={`Changer : ${title}`}
-          onClick={onChange}
-        >
-          Changer
-        </button>
-      </div>
-      <div className="bf-card__body">{children}</div>
-    </div>
-  );
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }): JSX.Element {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
   );
 }

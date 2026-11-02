@@ -46,6 +46,7 @@ describe('Réglages › Facturation : le formulaire', () => {
     expect(draftOf(null)).toMatchObject({
       legalName: '',
       dueDays: '60',
+      documentReminderDays: '30',
       fiscalYearEndMonth: '12',
       logoSha256: null,
     });
@@ -141,6 +142,7 @@ describe('Réglages › Facturation : le formulaire', () => {
       serviceDescription: 'Prestations de messagerie pour le compte de l’agence.',
       paymentTerms: 'Pas d’escompte pour paiement anticipé.',
       dueDays: 45,
+      documentReminderDays: 30,
       fiscalYearEndMonth: 6,
       logoSha256: null,
     });

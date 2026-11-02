@@ -86,7 +86,7 @@ export function GoalsPage({
       actions={
         <>
           {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav />
+          <PayNav user={user} />
         </>
       }
     />
