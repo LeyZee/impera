@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
 import { TodayPage } from '@/screens/today/TodayPage';
+import { THEO_ME } from '@/test/pay';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -156,7 +157,11 @@ function renderPage(): void {
       </HoldProvider>
     ),
   });
-  const page = createRoute({ getParentRoute: () => root, path: '/aujourdhui', component: TodayPage });
+  const page = createRoute({
+    getParentRoute: () => root,
+    path: '/aujourdhui',
+    component: () => <TodayPage user={THEO_ME} />,
+  });
   const tracking = createRoute({ getParentRoute: () => root, path: '/suivi', component: () => <p>Suivi</p> });
   const router = createRouter({
     routeTree: root.addChildren([page, tracking]),

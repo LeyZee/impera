@@ -1,6 +1,13 @@
-import { SHIFT_REPORT_OPENS_BEFORE_END_MINUTES, type MyShift, type ShiftReport } from '@nirvana/contracts';
+import {
+  SHIFT_REPORT_OPENS_BEFORE_END_MINUTES,
+  type Me,
+  type MyShift,
+  type ShiftReport,
+} from '@nirvana/contracts';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
+
+import { Paperwork } from './Paperwork';
 
 import { MyReportsCard, useMyReports, type MyReports } from '@/reports/MyReports';
 import { ReportPanel } from '@/reports/ReportPanel';
@@ -18,9 +25,10 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 /**
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
  * rapport » as it ends; then the reports left to do and the period's, then the next shift. Read in the chatter's own
- * time, the browser's. The goal and the announcements come with their own cards.
+ * time, the browser's. What waits on his invoices follows (EQ-06 lot 8d). The goal and the announcements come with
+ * their own cards.
  */
-export function TodayPage(): JSX.Element {
+export function TodayPage({ user }: { user: Me }): JSX.Element {
   const mine = useMyShifts();
   const now = useNow();
   const zone = readerZone();
@@ -69,6 +77,7 @@ export function TodayPage(): JSX.Element {
           today={today}
           reports={reports}
           onReport={openReport}
+          user={user}
         />
       )}
       {open === null ? null : (
@@ -93,6 +102,7 @@ function Day({
   today,
   reports,
   onReport,
+  user,
 }: {
   state: DayState;
   now: Date;
@@ -100,6 +110,7 @@ function Day({
   today: string;
   reports: MyReports;
   onReport: (shiftId: string) => void;
+  user: Me;
 }): JSX.Element {
   const next = state.kind === 'on' || state.kind === 'ended' ? state.next : null;
   const heroShift = state.kind === 'on' || state.kind === 'ended' ? state.shift : null;
@@ -127,6 +138,7 @@ function Day({
         }}
       />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} onOpen={onReport} />
+      <Paperwork user={user} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       <Link to="/planning" className="sc-more">
         Tout mon planning

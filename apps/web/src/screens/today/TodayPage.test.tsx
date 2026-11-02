@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { Me } from '@nirvana/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -8,12 +9,14 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TodayPage } from './TodayPage';
 
 import { ReopenProvider } from '@/reports/reopen';
+import { BENIN_REGIME, documentOf, fileOf } from '@/test/contractors';
+import { invoiceOf, IRIS, IRIS_ME, MEMBERS, OCT2, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -52,7 +55,7 @@ function serve(body: unknown): void {
   );
 }
 
-function renderPage(): void {
+function renderPage(user: Me = THEO_ME): void {
   const root = createRootRoute({
     component: () => (
       <ReopenProvider>
@@ -60,7 +63,11 @@ function renderPage(): void {
       </ReopenProvider>
     ),
   });
-  const page = createRoute({ getParentRoute: () => root, path: '/aujourdhui', component: TodayPage });
+  const page = createRoute({
+    getParentRoute: () => root,
+    path: '/aujourdhui',
+    component: () => <TodayPage user={user} />,
+  });
   const router = createRouter({
     routeTree: root.addChildren([page]),
     history: createMemoryHistory({ initialEntries: ['/aujourdhui'] }),
@@ -144,5 +151,101 @@ describe('Aujourd’hui', () => {
     serve({ current: null, next: null, ended: null });
     renderPage();
     expect(await screen.findByRole('heading', { name: 'Rien pour l’instant' })).toBeTruthy();
+  });
+
+  it('says what waits on his invoices: one to answer, a document to renew (EQ-06 lot 8d)', async () => {
+    const pending = invoiceOf(1, THEO, OCT2, {
+      acceptance: { state: 'pending', deadline: '2026-11-09T22:59:00.000Z', reason: null },
+      inclVatMinor: 71_225,
+    });
+    const answers: Record<string, unknown> = {
+      '/v1/scheduling/my-shifts': { current: null, next: null, ended: null },
+      '/v1/team/members': { members: MEMBERS },
+      '/v1/scheduling/settings': SCHEDULING_SETTINGS,
+      [`/v1/payroll/contractors/${THEO.id}/file`]: fileOf({
+        today: '2026-12-02',
+        documents: [documentOf(1)],
+      }),
+      '/v1/payroll/billing-regimes': { regimes: [BENIN_REGIME] },
+      '/v1/payroll/invoices': { today: '2026-12-02', documents: [pending] },
+    };
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const url = new URL(input, 'http://localhost');
+        if (url.pathname === '/v1/payroll/invoices') asked.push(url.search);
+        const body = answers[url.pathname];
+        return Promise.resolve(
+          body === undefined
+            ? new Response('null', { status: 404 })
+            : new Response(JSON.stringify(body), { status: 200 }),
+        );
+      }),
+    );
+    renderPage();
+    const card = (await screen.findByRole('heading', { name: 'À faire pour tes factures' })).closest(
+      'section',
+    );
+    if (card === null) throw new Error('No card');
+    expect(asked).toEqual([`?acceptance=pending&memberId=${THEO.id}`]);
+    const invoice = within(card).getByText('TEST-2026-0001').closest('li');
+    if (invoice === null) throw new Error('No invoice');
+    expect(invoice.textContent).toContain('quinzaine du');
+    expect(invoice.textContent).toMatch(/réponse avant le/u);
+    expect(within(invoice).getByRole('link', { name: 'Accepter ou contester' }).getAttribute('href')).toBe(
+      '/commissions/factures',
+    );
+    const certificate = await within(card).findByText('Attestation de résidence fiscale');
+    const line = certificate.closest('li');
+    expect(line?.getAttribute('data-remind')).toBe('true');
+    expect(line?.textContent).toContain('Ton attestation se termine le 31 décembre.');
+    expect(within(card).getByRole('link', { name: 'Mon dossier' }).getAttribute('href')).toBe('/moi/dossier');
+  });
+
+  it('shows no invoices’ card while nothing waits', async () => {
+    serve({ current: null, next: null, ended: null });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Rien pour l’instant' });
+    expect(screen.queryByRole('heading', { name: 'À faire pour tes factures' })).toBeNull();
+  });
+
+  it('asks a manager’s own invoices only, never the team’s (EQ-06 lot 8d)', async () => {
+    const theirs = invoiceOf(1, THEO, OCT2, {
+      acceptance: { state: 'pending', deadline: '2026-11-09T22:59:00.000Z', reason: null },
+    });
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const url = new URL(input, 'http://localhost');
+        const answers: Record<string, unknown> = {
+          '/v1/scheduling/my-shifts': { current: null, next: null, ended: null },
+          '/v1/team/members': { members: MEMBERS },
+          '/v1/scheduling/settings': SCHEDULING_SETTINGS,
+          [`/v1/payroll/contractors/${IRIS.id}/file`]: fileOf({ today: '2026-12-02', documents: [] }),
+          '/v1/payroll/billing-regimes': { regimes: [BENIN_REGIME] },
+          // As the API does for a manager: everyone's documents unless a member is named.
+          '/v1/payroll/invoices': {
+            today: '2026-12-02',
+            documents: url.searchParams.get('memberId') === IRIS.id ? [] : [theirs],
+          },
+        };
+        if (url.pathname === '/v1/payroll/invoices') asked.push(url.search);
+        const body = answers[url.pathname];
+        return Promise.resolve(
+          body === undefined
+            ? new Response('null', { status: 404 })
+            : new Response(JSON.stringify(body), { status: 200 }),
+        );
+      }),
+    );
+    renderPage(IRIS_ME);
+    await screen.findByRole('heading', { name: 'Rien pour l’instant' });
+    await vi.waitFor(() => {
+      expect(asked).toEqual([`?acceptance=pending&memberId=${IRIS.id}`]);
+    });
+    expect(screen.queryByText('TEST-2026-0001')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'À faire pour tes factures' })).toBeNull();
   });
 });
