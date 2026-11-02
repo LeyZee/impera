@@ -1,6 +1,6 @@
 # 0051. Un second point d'entrée, pur, pour les règles qu'un module prête aux domaines qui en dépendent
 
-Statut : proposed (relue par Bilan le 02/11/2026, trois précisions intégrées : domaine d'un autre module inatteignable, interdits externes du domaine sur `pure.ts`, réexportations seules)
+Statut : accepted (Charles, 02/11/2026 20h40, « ok 0051 », après la relecture de Bilan, dont les trois précisions sont intégrées : domaine d'un autre module inatteignable, interdits externes du domaine sur `pure.ts`, réexportations seules)
 Date : 2026-11-02
 Précise : l'ADR 0002 (un module n'expose que son `index.ts`) et `docs/architecture/modules.md` (« `domain/` importe : `packages/contracts`, d'autres fichiers de `domain/`. Rien d'autre. ») pour les règles pures partagées entre modules ; rend possible le découpage de l'ADR 0047 § 1 sans changer de test.
 
