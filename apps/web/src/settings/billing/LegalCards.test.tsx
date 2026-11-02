@@ -167,7 +167,9 @@ describe('Réglages › Facturation, délais', () => {
     await waitFor(() => {
       expect(card.textContent).toContain('7 jours après l’émission');
     });
-    expect(card.textContent).toContain('Fixée par chaque version du mandat.');
+    expect(card.textContent).toContain(
+      'Celui de la dernière version du mandat. Chaque prestataire garde celui de la version qu’il a acceptée, jusqu’à ce qu’il accepte la nouvelle.',
+    );
     fireEvent.click(within(card).getByRole('button', { name: 'Changer : Délais' }));
     expect(screen.getByRole('dialog', { name: 'Rappel des pièces' })).toBeTruthy();
     expect(within(dialog()).getByLabelText<HTMLInputElement>('Rappel des pièces').value).toBe('30');

@@ -157,7 +157,7 @@ export const VAT_CHOICES: readonly {
   {
     value: 'reverse_charge',
     label: 'Autoliquidée par l’agence',
-    hint: 'Rien n’est facturé : l’agence déclare et déduit la même TVA (art. 283-2 du CGI).',
+    hint: 'Aucune TVA sur la facture : l’agence déclare et déduit la même TVA (art. 283-2 du CGI).',
   },
   {
     value: 'exempt',

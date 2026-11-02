@@ -100,7 +100,10 @@ export function LegalCards({
           </Fact>
           <Fact label="Contestation">
             <ContestDelay days={mandate?.contestDelayDays ?? null} />
-            <span className="bf-fact-note">Fixée par chaque version du mandat.</span>
+            <span className="bf-fact-note">
+              Celui de la dernière version du mandat. Chaque prestataire garde celui de la version qu’il a
+              acceptée, jusqu’à ce qu’il accepte la nouvelle.
+            </span>
           </Fact>
         </dl>
       </Card>

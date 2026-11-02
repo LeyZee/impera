@@ -260,7 +260,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
                     <span className="bf-choice__label">{DOCUMENT_NAMES[kind]}</span>
                     {locked ? (
                       <span className="bf-choice__hint">
-                        Demandée par la convention : sans elle, elle ne s’applique pas.
+                        Exigée sous convention : sans l’attestation de l’année, le versement attend.
                       </span>
                     ) : null}
                   </span>

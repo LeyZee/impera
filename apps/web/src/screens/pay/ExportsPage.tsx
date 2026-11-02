@@ -173,7 +173,7 @@ function JournalReady({
               ? 'Un virement reste hors du fichier'
               : `${String(journal.transfersLeftOut.length)} virements restent hors du fichier`
           }
-          text="Leur membre n’a encore aucun document, donc aucun compte de prestataire : un versement enregistré avant que le paiement attende sa facture. Le comptable le passe à la main."
+          text="Leur membre n’a encore aucun document, donc aucun compte de prestataire : un versement enregistré avant que le paiement attende sa facture. Le comptable les passe à la main."
         >
           {journal.transfersLeftOut.map((transfer) => (
             <li key={`${transfer.memberId}-${transfer.period}`}>
