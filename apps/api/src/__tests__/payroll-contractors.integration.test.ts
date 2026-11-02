@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import {
+  calendarDayAt,
   CommissionStatementIdSchema,
   ContractAcceptanceSchema,
   ContractorFileSchema,
@@ -135,6 +136,8 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
     expect(empty.statusCode, empty.body).toBe(200);
     expect(ContractorFileSchema.parse(empty.json())).toEqual({
       memberId: theo.id,
+      // The agency's day, which a document's reminder is compared with (lot 8).
+      today: calendarDayAt(new Date(), 'Europe/Paris'),
       country: 'FR',
       profile: null,
       prefixFrozen: false,

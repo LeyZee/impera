@@ -154,9 +154,25 @@ function newestOf<T extends ContractorDocument>(
 }
 
 /**
- * The documents to remind on `today` (EQ-06 lot 5c-2): for each kind the regime in force asks for, the newest the owner
- * has not refused, once it is expiring or expired; a newer one filed (even waiting for his check) ends the reminder of
- * the older. A kind with nothing filed is not reminded here: a transfer that needs it says so (`payout_blocked_conflict`,
+ * The documents a reminder follows (EQ-06 lot 5c-2, lot 8): for each kind the regime in force asks for, the newest the
+ * owner has not refused; a newer one filed (even waiting for his check) takes the place of the older. A kind with nothing
+ * filed has none.
+ */
+export function documentsFollowed<T extends ContractorDocument>(
+  regime: Pick<BillingRegime, 'documents'> | null,
+  documents: readonly T[],
+): T[] {
+  const followed: T[] = [];
+  for (const kind of new Set(regime?.documents ?? [])) {
+    const newest = newestOf(documents, kind);
+    if (newest !== null) followed.push(newest);
+  }
+  return followed;
+}
+
+/**
+ * The documents to remind on `today` (EQ-06 lot 5c-2): those a reminder follows (`documentsFollowed`), once expiring or
+ * expired. A kind with nothing filed is not reminded here: a transfer that needs it says so (`payout_blocked_conflict`,
  * ADR 0041) or an invoice warns (`document_missing`).
  */
 export function documentsToRemind<T extends ContractorDocument>(
@@ -165,12 +181,9 @@ export function documentsToRemind<T extends ContractorDocument>(
   today: string,
   reminderDays: number,
 ): T[] {
-  const due: T[] = [];
-  for (const kind of new Set(regime?.documents ?? [])) {
-    const newest = newestOf(documents, kind);
-    if (newest !== null && documentState(newest, today, reminderDays) !== 'valid') due.push(newest);
-  }
-  return due;
+  return documentsFollowed(regime, documents).filter(
+    (document) => documentState(document, today, reminderDays) !== 'valid',
+  );
 }
 
 /**

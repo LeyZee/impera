@@ -7,7 +7,7 @@ import type {
   TeamMemberId,
   UserId,
 } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import { withAdmin, type Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollAccounting } from './application/accounting';
@@ -50,7 +50,7 @@ import {
   createDrizzlePayrollRequeueStore,
 } from './infra/contractor-store';
 import { createDrizzleDocumentPurgeStore } from './infra/document-purge-store';
-import { createDrizzleDocumentReminderStore } from './infra/document-reminder-store';
+import { createDrizzleDocumentReminderStore, documentReminderDaysOf } from './infra/document-reminder-store';
 import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
@@ -253,7 +253,12 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
         createPayrollInvoiceAcceptance(acceptanceStore),
         createPayrollBillingSettings(createDrizzlePayrollBillingSettingsStore(deps.db, now), readPng),
-        createDrizzlePayrollContractorStore(deps.db, now),
+        createDrizzlePayrollContractorStore(
+          deps.db,
+          deps.reads,
+          () => withAdmin(deps.adminDb, documentReminderDaysOf),
+          now,
+        ),
         createDrizzlePayrollRegimeStore(deps.db, deps.reads, now),
         createContractorDocuments({
           store: createDrizzlePayrollDocumentStore(deps.db, deps.reads, now),
