@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ACCOUNTING_JOURNAL_MAX_DAYS,
+  ACCOUNTING_JOURNAL_MEDIA_TYPE,
+  AccountingJournalQuerySchema,
+  AccountingJournalSchema,
   AGENCY_LOGO_REFUSALS,
   AgencyLogoMediaTypeSchema,
   AgencyLogoSchema,
@@ -28,6 +32,8 @@ import {
   InvoiceParamsSchema,
   InvoicePrefixSchema,
   InvoiceSchema,
+  JOURNAL_ACCOUNT_NAMES,
+  JournalAccountsSchema,
   RefuseInvoiceContestBodySchema,
   RegimeVatSchema,
   SERVICE_DESCRIPTION_MAX,
@@ -144,7 +150,7 @@ describe('invoices', () => {
       fiscalYearEndMonth: 12,
       serviceDescription: null,
       logoSha256: null,
-      accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
+      accounts: null,
       updatedAt: '2026-10-31T09:00:00.000Z',
     });
     expect(DEFAULT_INVOICE_DUE_DAYS).toBe(60);
@@ -162,7 +168,7 @@ describe('invoices', () => {
       fiscalYearEndMonth,
       serviceDescription: 'Animation commerciale de comptes',
       logoSha256: 'a'.repeat(64),
-      accounts: { expense: '622', supplierPrefix: '401', vatDeductible: '44566', vatSelfAssessed: '4452' },
+      accounts: null,
       updatedAt: '2026-10-31T09:00:00.000Z',
     });
     expect(DEFAULT_FISCAL_YEAR_END_MONTH).toBe(12);
@@ -170,7 +176,7 @@ describe('invoices', () => {
     for (const wrong of [0, 13, 6.5])
       expect(BillingSettingsSchema.safeParse(settings(wrong)).success).toBe(false);
   });
-  it('keep the journal’s accounts empty until the accountant gives them, whole or not at all (migration 0048)', () => {
+  it('keep the journal’s accounts empty until the accountant gives them, each one named, null until given', () => {
     const settings = (accounts: unknown) => ({
       agency: invoice.agency,
       paymentTerms: 'Aucun escompte.',
@@ -186,6 +192,70 @@ describe('invoices', () => {
     expect(BillingSettingsSchema.safeParse(settings({})).success).toBe(false);
     expect(BillingSettingsSchema.safeParse(settings({ expense: '622' })).success).toBe(false);
     expect(BillingSettingsViewSchema.safeParse({ settings: null, logo: null }).success).toBe(true);
+  });
+
+  it('keep the VAT owed off the deductible accounts and the two journals apart (EQ-06 lot 7b)', () => {
+    const accounts = {
+      expense: '622600',
+      supplier: '401',
+      vatDeductible: '445660',
+      vatSelfAssessedDeductible: '445662',
+      vatSelfAssessedDue: '445200',
+      bank: '512000',
+      purchaseJournal: 'HA',
+      bankJournal: 'BQ',
+    };
+    expect(JournalAccountsSchema.parse(accounts)).toEqual(accounts);
+    const none = Object.fromEntries(JOURNAL_ACCOUNT_NAMES.map((name) => [name, null]));
+    expect(JournalAccountsSchema.safeParse(none).success).toBe(true);
+    expect(JournalAccountsSchema.safeParse({ ...none, expense: '622600' }).success).toBe(true);
+    const refused = (change: Record<string, string>) =>
+      JournalAccountsSchema.safeParse({ ...accounts, ...change });
+    expect(refused({ vatSelfAssessedDue: '445660' }).error?.issues[0]?.path).toEqual(['vatSelfAssessedDue']);
+    expect(refused({ vatSelfAssessedDue: '445662' }).success).toBe(false);
+    expect(refused({ bankJournal: 'HA' }).error?.issues[0]?.path).toEqual(['bankJournal']);
+    for (const code of ['512 000', '512-000', 'ba', '', 'A'.repeat(21)])
+      expect(refused({ bank: code }).success, code).toBe(false);
+    for (const code of ['ha', 'ACHATS123', ''])
+      expect(refused({ purchaseJournal: code }).success, code).toBe(false);
+    // The VAT owed is checked only once given: a deductible account alone is never refused.
+    expect(
+      JournalAccountsSchema.safeParse({ ...none, vatDeductible: '4456', vatSelfAssessedDeductible: '4456' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('export from one day to another, both included, two years at most', () => {
+    expect(AccountingJournalQuerySchema.safeParse({ from: '2026-11-01', to: '2026-11-01' }).success).toBe(
+      true,
+    );
+    expect(AccountingJournalQuerySchema.safeParse({ from: '2026-11-02', to: '2026-11-01' }).success).toBe(
+      false,
+    );
+    // A first fiscal year of 24 months across a 29 February: 731 days.
+    expect(ACCOUNTING_JOURNAL_MAX_DAYS).toBe(731);
+    expect(AccountingJournalQuerySchema.safeParse({ from: '2024-01-01', to: '2025-12-31' }).success).toBe(
+      true,
+    );
+    expect(AccountingJournalQuerySchema.safeParse({ from: '2023-12-31', to: '2025-12-31' }).success).toBe(
+      false,
+    );
+    expect(AccountingJournalQuerySchema.safeParse({ from: '2026-11-01', to: '2026-11-31' }).success).toBe(
+      false,
+    );
+    const journal = {
+      fileName: 'journal-prestataires_20261101_20261115.txt',
+      mediaType: ACCOUNTING_JOURNAL_MEDIA_TYPE,
+      content: btoa('JournalCode\r\n'),
+      entryCount: 0,
+      unbalanced: [],
+      transfersLeftOut: [],
+    };
+    expect(AccountingJournalSchema.safeParse(journal).success).toBe(true);
+    // Never the name of the legal FEC, `<SIREN>FEC<AAAAMMJJ>.txt`.
+    expect(
+      AccountingJournalSchema.safeParse({ ...journal, fileName: '123456789FEC20261231.txt' }).success,
+    ).toBe(false);
   });
 
   it('are saved with the foot of the page whole: legal form, share capital, town of the trade register', () => {

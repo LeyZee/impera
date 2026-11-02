@@ -10,6 +10,7 @@ import type {
 import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { createPayrollAccounting } from './application/accounting';
 import { createPayrollBillingSettings } from './application/billing-settings';
 import {
   createContractorDocuments,
@@ -42,6 +43,7 @@ import { createPayrollReads } from './application/periods';
 import { createRecalculation, type RecalculationOutcome } from './application/recalculation';
 import { createPayrollValidation } from './application/validation';
 import type { InvoiceObjectStore, InvoicingOutcome, JobLogger, RateJobSince } from './domain/ports';
+import { createDrizzlePayrollAccountingStore } from './infra/accounting-store';
 import { createDrizzlePayrollBillingSettingsStore } from './infra/billing-settings-store';
 import {
   createDrizzlePayrollContractorStore,
@@ -258,6 +260,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
           primary: deps.invoicePdfs.primary,
           copy: deps.invoicePdfs.copy,
         }),
+        createPayrollAccounting(createDrizzlePayrollAccountingStore(deps.db, deps.reads)),
         requireRole,
       ),
     latestRate: createLatestRateRead(deps.db),

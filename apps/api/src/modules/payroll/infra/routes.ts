@@ -1,5 +1,7 @@
 import {
   AcceptContractTextBodySchema,
+  AccountingJournalQuerySchema,
+  AccountingJournalSchema,
   AgencyLogoParamsSchema,
   AgencyLogoSchema,
   AssignContractorRegimeBodySchema,
@@ -37,6 +39,7 @@ import {
   InvoiceAcceptanceViewSchema,
   InvoiceParamsSchema,
   InvoicePrefixBodySchema,
+  JournalAccountsSchema,
   PageQuerySchema,
   PayAdjustmentSchema,
   PayCommissionStatementBodySchema,
@@ -66,6 +69,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import type { PayrollAccounting } from '../application/accounting';
 import type { PayrollBillingSettings } from '../application/billing-settings';
 import type { ContractorDocuments } from '../application/contractor-documents';
 import type { PayrollEntries } from '../application/entries';
@@ -130,7 +134,8 @@ const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
  * billing regimes (`/payroll/billing-regimes`) are read by any member; the owner alone adds one, records its validation
  * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b). A
  * contractor's documents (`…/contractors/:memberId/documents`, lot 5c) are filed by himself or the owner, read by them
- * and an active manager, and checked once by the owner, never on his own file.
+ * and an active manager, and checked once by the owner, never on his own file. The accountant's export
+ * (`/payroll/accounting/journal`, lot 7b) and its accounts (`/payroll/billing-settings/accounts`) are the owner's alone.
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -143,6 +148,7 @@ export function createPayrollRoutes(
   contractors: PayrollContractorStore,
   regimes: PayrollRegimeStore,
   documents: ContractorDocuments,
+  accounting: PayrollAccounting,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -421,6 +427,28 @@ export function createPayrollRoutes(
         schema: { body: UpdateBillingSettingsBodySchema, response: { 200: BillingSettingsViewSchema } },
       },
       (request) => billing.update(actorOf(request), request.body),
+    );
+
+    app.put(
+      '/payroll/billing-settings/accounts',
+      {
+        preValidation: owner,
+        schema: { body: JournalAccountsSchema, response: { 200: BillingSettingsViewSchema } },
+      },
+      (request) => billing.updateAccounts(actorOf(request), request.body),
+    );
+
+    app.get(
+      '/payroll/accounting/journal',
+      {
+        preValidation: owner,
+        schema: { querystring: AccountingJournalQuerySchema, response: { 200: AccountingJournalSchema } },
+      },
+      async (request, reply) => {
+        const journal = await accounting.journal(actorOf(request), request.query);
+        // The contractors' names are in it: never kept by a cache.
+        return reply.header('cache-control', 'no-store').send(journal);
+      },
     );
 
     app.post(
