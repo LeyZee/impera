@@ -33,6 +33,7 @@ import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './m
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { FansModule } from './modules/fans';
 import type { MediaModule } from './modules/media';
+import type { NotificationsModule } from './modules/notifications';
 import type { PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
@@ -51,6 +52,7 @@ import { wireConnectors } from './wiring/connectors';
 import { wireConversations } from './wiring/conversations';
 import { wireFans } from './wiring/fans';
 import { wireMedia } from './wiring/media';
+import { wireNotifications } from './wiring/notifications';
 import { wirePayroll, type InvoiceBuckets } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
@@ -71,6 +73,7 @@ interface Modules {
   readonly persona: PersonaModule;
   readonly agent: AgentModule;
   readonly media: MediaModule;
+  readonly notifications: NotificationsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -267,6 +270,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media,
   });
   const backups = wireBackups(shared);
+  const notifications = wireNotifications(shared);
   const supervision = wireSupervision(shared, {
     llm,
     activeVoice: agent.activeVoice,
@@ -289,6 +293,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     payroll: payroll.module,
     agent: agent.module,
     media: media.module,
+    notifications: notifications.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -352,6 +357,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...supervision.routes,
       ...playground.routes,
       ...telegram.routes,
+      ...notifications.routes,
     ],
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),

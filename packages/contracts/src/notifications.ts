@@ -96,3 +96,20 @@ export const PushMessageSchema = z.object({
   tag: z.string().max(64).optional(),
 });
 export type PushMessage = z.infer<typeof PushMessageSchema>;
+
+/** `DELETE /v1/notifications/subscriptions`: the device to forget, by its endpoint. */
+export const PushUnsubscribeBodySchema = z.object({ endpoint: z.string().max(2048) });
+export type PushUnsubscribeBody = z.infer<typeof PushUnsubscribeBodySchema>;
+
+/** `POST /v1/notifications/test`: how many of the account's devices the push services accepted. */
+export const PushTestResultSchema = z.object({
+  devices: z.number().int().nonnegative(),
+  sent: z.number().int().nonnegative(),
+});
+export type PushTestResult = z.infer<typeof PushTestResultSchema>;
+
+export const NOTIFICATION_ERROR_CODES = [
+  /** « Tester » with no device subscribed on this account. */
+  'push_subscription_not_found',
+] as const;
+export type NotificationErrorCode = (typeof NOTIFICATION_ERROR_CODES)[number];

@@ -9,15 +9,7 @@
  */
 
 /** What a notification is about. A sale and one's own shift start are never capped. */
-export const NOTIFICATION_KINDS = [
-  'sale',
-  'own_shift_start',
-  'reminder',
-  'routine',
-  'streak',
-  'team',
-] as const;
-export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+type NotificationKind = 'sale' | 'own_shift_start' | 'reminder' | 'routine' | 'streak' | 'team';
 
 /** A span of the local day, in minutes after midnight; it crosses midnight when it ends before it starts. */
 export interface QuietHours {
@@ -30,15 +22,14 @@ export const DEFAULT_QUIET_HOURS: QuietHours = { startMinute: 22 * 60, endMinute
 /** Notifications other than sales and one's own shift start, per account and per local day. */
 export const DEFAULT_DAILY_CAP = 6;
 
-/** More sales than this within the window ring as one grouped notification. */
-export const SALE_BURST_SIZE = 3;
-export const SALE_BURST_WINDOW_MS = 2 * 60 * 1000;
+/** More sales than this within 2 minutes (the caller's count) ring as one grouped notification. */
+const SALE_BURST_SIZE = 3;
 
 const MINUTE_MS = 60_000;
 const DAY_MINUTES = 24 * 60;
 
 /** Quiet hours whose start equals their end hold nothing (the person turned them off). */
-export function quietHoursOff(quiet: QuietHours): boolean {
+function quietHoursOff(quiet: QuietHours): boolean {
   return quiet.startMinute === quiet.endMinute;
 }
 
@@ -102,7 +93,7 @@ export interface NotificationContext {
   readonly dailyCap: number;
   /** Notifications of capped kinds already rung today, in the account's day. */
   readonly cappedRungToday: number;
-  /** Sales already rung for this account within the burst window before `at`. */
+  /** Sales already rung for this account within the 2 minutes before `at`. */
   readonly salesInBurstWindow: number;
 }
 
@@ -116,7 +107,7 @@ export type NotificationDecision =
   /** Over the daily cap: it stays in the app, silent. */
   | { readonly action: 'silent' };
 
-export function isCapped(kind: NotificationKind): boolean {
+function isCapped(kind: NotificationKind): boolean {
   return kind !== 'sale' && kind !== 'own_shift_start';
 }
 
