@@ -20,7 +20,7 @@ Aucun compte n'ouvre le dashboard avec son seul mot de passe : un code TOTP est 
 - [ ] Routes exposées sous `/v1/auth/two-factor/*` : celles du parcours seulement (activer, vérifier un code, vérifier un code de secours, regénérer les codes), en français, sans jeton dans le corps.
 - [ ] Un compte sans deuxième facteur actif n'ouvre que l'écran d'activation et `/v1/me` : toute autre route répond 403 `second_factor_forbidden`.
 - [ ] La confirmation avant une action sensible demande le mot de passe et le code, appareil de confiance ou non.
-- [ ] Le lien de réinitialisation (EQ-10) remet aussi le deuxième facteur à zéro ; `pnpm ops:reset-second-factor` pour le propriétaire, audité.
+- [ ] Le lien de réinitialisation (EQ-10) remet aussi le deuxième facteur à zéro ; une commande d’exploitation sur le serveur le fait pour le propriétaire, auditée.
 - [ ] Mot de passe connu des fuites refusé à sa création (plugin `haveibeenpwned`).
 - [ ] Écrans : activation (clé à recopier, QR code quand la bibliothèque sort de quarantaine), saisie du code à la connexion, codes de secours montrés une fois.
 
