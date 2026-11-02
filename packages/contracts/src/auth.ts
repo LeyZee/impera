@@ -74,7 +74,10 @@ export const SecondFactorVerifyBodySchema = z.object({
   trustDevice: z.boolean().optional(),
 });
 
-/** `POST /v1/auth/two-factor/generate-backup-codes` (recent confirmation): ten new codes, the old ones stop working. */
+/**
+ * `POST /v1/auth/two-factor/generate-backup-codes` (Réglages › Sécurité), with the password and a code as for a
+ * confirmation (`ReauthenticateBodySchema`): ten new codes, shown once; the old ones stop working.
+ */
 export const BackupCodesSchema = z.object({ backupCodes: z.array(z.string()).length(10) });
 
 /**

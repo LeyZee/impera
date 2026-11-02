@@ -24,7 +24,7 @@ export function MyFilePage({ user }: { user: Me }): JSX.Element {
         eyebrow="Moi"
         title="Dossier"
         lead="Ce qu’il faut pour que l’agence émette tes factures en ton nom : ton identité, ton contrat et ton mandat, les pièces de ton régime."
-        actions={manager ? <MeNav /> : undefined}
+        actions={<MeNav manager={manager} />}
       />
       <div className="py-board">
         {me !== null ? (

@@ -110,7 +110,9 @@ describe('ZoneEditor', () => {
     // Saving again waits for the password, never a second request behind it.
     expect(screen.getByRole('button', { name: 'Enregistrer le fuseau' })).toHaveProperty('disabled', true);
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'staple battery horse' } });
-    fireEvent.change(screen.getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     await waitFor(() => {
       expect(onMoved).toHaveBeenCalled();

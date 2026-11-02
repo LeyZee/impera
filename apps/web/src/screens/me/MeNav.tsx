@@ -1,20 +1,15 @@
 import type { JSX } from 'react';
 
 import { SubNav } from '@/shell/layout';
-import { screenLabel } from '@/shell/nav';
+import { screenLabel, type ScreenPath } from '@/shell/nav';
 
 /**
- * Moi's screens (ADR 0024, EQ-06 lot 8b): « Dossier », and for a manager « Factures », his own documents, which a
- * chatter reads in Commissions. A chatter's Moi holds one screen: no sub-tabs then.
+ * Moi's screens (ADR 0024, EQ-06 lot 8b, SEC-04): « Dossier », for a manager « Factures », his own documents, which a
+ * chatter reads in Commissions, and for everyone « Sécurité », his sessions and backup codes (ADR 0046 § 7).
  */
-export function MeNav(): JSX.Element {
-  return (
-    <SubNav
-      label="Moi"
-      items={[
-        { to: '/moi/dossier', label: screenLabel('/moi/dossier') },
-        { to: '/moi/factures', label: screenLabel('/moi/factures') },
-      ]}
-    />
-  );
+export function MeNav({ manager }: { manager: boolean }): JSX.Element {
+  const screens: readonly ScreenPath[] = manager
+    ? ['/moi/dossier', '/moi/factures', '/moi/securite']
+    : ['/moi/dossier', '/moi/securite'];
+  return <SubNav label="Moi" items={screens.map((to) => ({ to, label: screenLabel(to) }))} />;
 }
