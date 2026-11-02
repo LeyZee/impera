@@ -62,20 +62,6 @@ const ONLINE =
 const CITY =
   '(paris|lyon|marseille|geneve|bruxelles|lausanne|bordeaux|lille|nice|toulouse|nantes|montpellier|strasbourg)';
 
-/** @public Bumped whenever the list below changes: to enrich from the Reveal capture. */
-export const PLATFORM_MEETING_WORDS_VERSION = 'meeting-words-1';
-const PLATFORM_MEETING_WORDS = new RegExp(
-  [
-    '\\b(rdv|rendez ?-? ?vous|irl|in real life|real life|in person|meet ?up|date irl)\\b',
-    // Him, her or both meeting: « se rencontrer », « te rencontrer », « qu'on se rencontre », « nous rencontrer ».
-    "\\b(se|te|me|nous|vous|t'|m') ?rencontr\\w*",
-    '\\brencontres? (reelle|en vrai|irl|physique|en personne|pour de vrai)s?\\b',
-    // « se voir en vrai », « te voir pour de vrai », « en chair et en os », « en personne ».
-    "\\b(se|te|me|nous|vous|t'|m') ?voir (en vrai|pour de vrai|en personne|irl|en chair et en os|dans la vraie vie)\\b",
-    '\\b(en chair et en os|dans la vraie vie|en vrai de vrai)\\b',
-  ].join('|'),
-);
-
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'ai_disclosure',
@@ -148,6 +134,21 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
       ].join('|'),
     ),
   },
+  // A meeting proposed with the words a refusal may say. Reveal flags no word (Charles, 02/11), so « pas de rdv »,
+  // « se rencontrer ? jamais » or « un jour peut-être qu'on se rencontrera » pass; « on se fait un rdv », « rdv
+  // samedi » or « on se voit en vrai ? » propose one and block.
+  {
+    code: 'meeting_promise',
+    pattern: new RegExp(
+      [
+        `\\bon (se )?(fait|donne|fixe|prend) (un )?(rdv|rendez ?-? ?vous)\\b`,
+        `\\bje te donne (un )?(rdv|rendez ?-? ?vous)(?!${ONLINE})\\b`,
+        `\\b(rdv|rendez ?-? ?vous) (le \\d|(le )?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|cette semaine|ce week-end)\\b)`,
+        `\\brdv (a|au|chez|devant)(?!${ONLINE})\\b`,
+        `\\bon (pourrait |peut |va |devrait )?se (voit|voie|voir|verra|retrouve|retrouver|retrouvera|rencontre|rencontrer|rencontrera) (en vrai|pour de vrai|irl|en personne|en chair et en os|dans la vraie vie)\\b`,
+      ].join('|'),
+    ),
+  },
   { code: 'contact_info', pattern: /\b(https?:\/\/|www\.)\S+/ },
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
@@ -192,10 +193,6 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     pattern:
       /(^|\s)(moins |-) ?\d+ ?% (sur (le|la|les|ce|cette|ces|mon|ma|mes|ton|ta|tes|tout)|pour toi|de remise|de reduc|si tu)|\b\d+ ?% (de moins|moins cher) (sur|pour)\b/,
   },
-  // The words the platforms flag in a message, even in a refusal (P3-13, `PLATFORM_MEETING_WORDS_VERSION`):
-  // `meeting_promise` blocks the promise, this the word. « En vrai » alone is a tic, and « j'ai rencontré une
-  // copine » or « on se voit au prochain live » are not about meeting him.
-  { code: 'platform_meeting_word', pattern: PLATFORM_MEETING_WORDS },
 ];
 
 // After a refusal she whines once, playfully, then lets go: no guilt (sales corpus, §2.4). A regeneration, not a block.

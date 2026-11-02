@@ -1,4 +1,4 @@
-import { GUARD_CODES } from '@nirvana/contracts';
+import { GUARD_CODES, OBSOLETE_GUARD_CODES } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -51,7 +51,8 @@ describe('voice guards (P3-13)', () => {
     expect(codes(['Je t’envoie une photo 📸'])).toEqual([]);
   });
 
-  it('blocks the meeting words the platforms flag, even in a refusal, and lets her tic and her life through', () => {
+  it('lets the meeting words through in a refusal, and blocks them when they propose a meeting', () => {
+    // Reveal flags no word (Charles, 02/11): only a meeting proposed or promised blocks (`meeting_promise`).
     for (const bubble of [
       'Pas de rdv, désolée 😇',
       'Un rendez-vous ? Non 😅',
@@ -59,19 +60,30 @@ describe('voice guards (P3-13)', () => {
       'Je ne veux pas te rencontrer',
       'Pas d’IRL avec moi',
       'Se voir en vrai, jamais',
+      'On ne se voit pas en vrai, tu le sais 😉',
       'Une rencontre réelle c’est non',
-      // The platform reads the word, whatever it means.
       'Je vais te rencontrer dans mes rêves 😘',
-    ]) {
-      expect(codes([bubble]), bubble).toContain('platform_meeting_word');
-    }
-    for (const bubble of [
       'En vrai t’es drôle',
       'J’ai rencontré une copine au café ce midi',
       'On se voit au prochain live ?',
+      'Rdv au prochain live 😏',
       'J’ai fait une belle rencontre au travail',
     ]) {
       expect(codes([bubble]), bubble).toEqual([]);
+    }
+    for (const bubble of [
+      'On se fait un rdv samedi ?',
+      'On prend rendez-vous ?',
+      'Rdv demain alors 😘',
+      'Rendez-vous le 06/12',
+      'Rdv au café de la gare',
+      'Je te donne rendez-vous devant la gare',
+      'On se voit en vrai ?',
+      'On pourrait se rencontrer IRL',
+      'Tu veux qu’on se voie pour de vrai ?',
+      'On se rencontrera en vrai un jour',
+    ]) {
+      expect(codes([bubble]), bubble).toEqual(['meeting_promise']);
     }
   });
 
@@ -126,7 +138,7 @@ describe('voice guards (P3-13)', () => {
     expect(previousTurnsOf(long)[0]).toEqual(['h6']);
   });
 
-  it('emits only codes of GUARD_CODES, and each of them has a case that emits it', () => {
+  it('emits only codes of GUARD_CODES, and each one not obsolete has a case that emits it', () => {
     const settings = { ...DEFAULT_GUARD_SETTINGS, forbiddenTerms: ['brocoli'], petNames: ['loulou'] };
     const read = (bubbles: string[], context: GuardContext = {}) =>
       checkVoiceOutput(bubbles, settings, context).map((v) => v.code);
@@ -140,7 +152,7 @@ describe('voice guards (P3-13)', () => {
       ]),
       ...read(['a', 'b', 'c', 'd', 'x'.repeat(300)]),
       ...read(['Envoie-moi des nudes', 'sale radin', 'rien à payer', 'je te fais un petit prix']),
-      ...read(['tu me déçois', '*sourit*', 'pas de rdv', 'j’ai besoin d’argent']),
+      ...read(['tu me déçois', '*sourit*', 'j’ai besoin d’argent']),
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
       ...read(['Tu fais quoi de beau ce soir ?'], {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],
@@ -150,6 +162,8 @@ describe('voice guards (P3-13)', () => {
     ]);
     const known: readonly string[] = GUARD_CODES;
     expect([...emitted].filter((code) => !known.includes(code))).toEqual([]);
-    expect(known.filter((code) => !emitted.has(code))).toEqual([]);
+    const obsolete: readonly string[] = OBSOLETE_GUARD_CODES;
+    expect(known.filter((code) => !emitted.has(code) && !obsolete.includes(code))).toEqual([]);
+    expect([...emitted].filter((code) => obsolete.includes(code))).toEqual([]);
   });
 });

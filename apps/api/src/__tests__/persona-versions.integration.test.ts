@@ -150,7 +150,7 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(error.code).toBe('persona_sample_reply_unprocessable');
     const { faults } = PersonaSampleReplyUnprocessableDetailsSchema.parse(error.details);
     expect(faults).toContainEqual({ index: 1, code: 'stage_direction' });
-    expect(faults).toContainEqual({ index: 1, code: 'platform_meeting_word' });
+    expect(faults).toContainEqual({ index: 1, code: 'meeting_promise' });
     expect(faults.every((fault) => fault.index === 1)).toBe(true);
     await expect(
       app.modules.persona.versions.load(bea, withVersion(taught, '0.9.0'), {

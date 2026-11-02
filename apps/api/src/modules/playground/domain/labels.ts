@@ -14,7 +14,7 @@ const GUARD_LABELS: Readonly<Record<string, string>> = {
   bubble_too_long: 'Bulle trop longue',
   stage_direction: 'Didascalie (« *sourit* », « (rires) »), jamais dans ses messages',
   media_not_sent: 'Annonce un média que le brouillon ne porte pas',
-  platform_meeting_word: 'Mot de rencontre que la plateforme repère, même dans un refus',
+  platform_meeting_word: 'Mot de rencontre (garde retirée le 2 novembre, Reveal ne repère aucun mot)',
   fake_emergency: 'Maladie, dette ou urgence pour vendre, interdit',
   repetition: 'Bulle déjà envoyée ou même ouverture une troisième fois',
   closed_question_streak: 'Troisième question fermée de suite',
