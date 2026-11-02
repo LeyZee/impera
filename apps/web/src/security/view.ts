@@ -1,0 +1,33 @@
+import type { UserRole } from '@nirvana/contracts';
+
+/** « à l’instant », « il y a 12 min », « il y a 3 h », « il y a 2 j »: when a session was last used. */
+export function ago(at: string, now: Date): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(at).getTime()) / 60_000));
+  if (minutes < 1) return 'à l’instant';
+  if (minutes < 60) return `il y a ${String(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${String(hours)} h`;
+  return `il y a ${String(Math.floor(hours / 24))} j`;
+}
+
+export const ROLE_LABELS: Readonly<Record<UserRole, string>> = {
+  owner: 'Propriétaire',
+  operator: 'Équipe',
+  creator: 'Créatrice',
+};
+
+/** « 1 session ouverte », « 3 sessions ouvertes », « Aucune session ouverte ». */
+export function sessionsText(count: number): string {
+  if (count === 0) return 'Aucune session ouverte';
+  return `${String(count)} session${count === 1 ? '' : 's'} ouverte${count === 1 ? '' : 's'}`;
+}
+
+/** What closing sessions ended, said once it is done. */
+export function closedText(sessions: number, trustedDevices: number): string {
+  const closed =
+    sessions === 0
+      ? 'Aucune autre session n’était ouverte'
+      : sessionsText(sessions).replace(' ouverte', ' fermée');
+  if (trustedDevices === 0) return `${closed}.`;
+  return `${closed}, et ${String(trustedDevices)} appareil${trustedDevices === 1 ? '' : 's'} de confiance oublié${trustedDevices === 1 ? '' : 's'}.`;
+}

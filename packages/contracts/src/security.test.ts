@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { REAUTHENTICATION_ERROR_CODE } from './auth';
 import { EVENT_PAYLOADS } from './events';
-import { deviceOf, networkOf, SecurityAlertPayloadSchema } from './security';
+import { deviceOf, networkOf, SECURITY_SETTINGS_ERROR_CODES, SecurityAlertPayloadSchema } from './security';
 
 describe('networkOf', () => {
   it('keeps the first three bytes of an IPv4', () => {
@@ -98,5 +99,12 @@ describe('deviceOf', () => {
     expect(deviceOf(null)).toBe('Appareil inconnu');
     expect(deviceOf('curl/8.4.0')).toBe('Appareil inconnu');
     expect(deviceOf('node')).toBe('Appareil inconnu');
+  });
+});
+
+describe('SECURITY_SETTINGS_ERROR_CODES', () => {
+  it('publishes the refusals of Réglages › Sécurité, the confirmation of a sensitive action among them', () => {
+    expect(SECURITY_SETTINGS_ERROR_CODES).toContain('session_current_conflict');
+    expect(SECURITY_SETTINGS_ERROR_CODES).toContain(REAUTHENTICATION_ERROR_CODE);
   });
 });

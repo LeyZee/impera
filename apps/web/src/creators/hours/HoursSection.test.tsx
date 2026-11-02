@@ -277,7 +277,9 @@ describe('Créatrices › Heures (P3-14)', () => {
       await screen.findByText('Pour changer ses heures, confirme ton mot de passe et ton code.'),
     ).toBeDefined();
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'staple battery horse' } });
-    fireEvent.change(screen.getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     await waitFor(() => {
       expect(puts).toHaveLength(2);

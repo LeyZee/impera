@@ -13,6 +13,7 @@ import {
   type AccountsSecurity,
   type ClosedSessions,
   type OpenSessions,
+  type SecuritySettingsErrorCode,
 } from '@nirvana/contracts';
 import { and, eq, revokeSignIns, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
@@ -43,20 +44,23 @@ const BACKUP_CODES_ACCOUNT_WINDOW = '15 minutes';
 
 class SessionNotFound extends DomainError {
   constructor() {
-    super('session_not_found', 'Cette session est déjà fermée');
+    super('session_not_found' satisfies SecuritySettingsErrorCode, 'Cette session est déjà fermée');
   }
 }
 
 /** The session the request came with is closed by signing out, never from the list. */
 class CurrentSessionConflict extends DomainError {
   constructor() {
-    super('session_current_conflict', 'C’est la session de cet appareil : déconnecte-toi pour la fermer');
+    super(
+      'session_current_conflict' satisfies SecuritySettingsErrorCode,
+      'C’est la session de cet appareil : déconnecte-toi pour la fermer',
+    );
   }
 }
 
 class AccountNotFound extends DomainError {
   constructor() {
-    super('account_not_found', 'Ce compte n’existe pas');
+    super('account_not_found' satisfies SecuritySettingsErrorCode, 'Ce compte n’existe pas');
   }
 }
 

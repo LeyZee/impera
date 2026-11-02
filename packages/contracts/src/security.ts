@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { UserRoleSchema } from './auth';
+import { REAUTHENTICATION_ERROR_CODE, UserRoleSchema } from './auth';
 import { PlatformSchema } from './enums';
 import { PlatformAccountIdSchema } from './ids';
 
@@ -143,6 +143,18 @@ export const AccountSecuritySchema = z.object({
 export type AccountSecurity = z.infer<typeof AccountSecuritySchema>;
 export const AccountsSecuritySchema = z.object({ accounts: z.array(AccountSecuritySchema) });
 export type AccountsSecurity = z.infer<typeof AccountsSecuritySchema>;
+
+/**
+ * The error codes of Réglages › Sécurité, besides those of the confirmation (`reauthentication_unauthenticated`,
+ * `reauthentication_limited`) on new backup codes.
+ */
+export const SECURITY_SETTINGS_ERROR_CODES = [
+  'session_not_found',
+  'session_current_conflict',
+  'account_not_found',
+  REAUTHENTICATION_ERROR_CODE,
+] as const;
+export type SecuritySettingsErrorCode = (typeof SECURITY_SETTINGS_ERROR_CODES)[number];
 
 const BROWSERS: readonly (readonly [RegExp, string])[] = [
   [/\bEdg(?:e|A|iOS)?\//u, 'Edge'],

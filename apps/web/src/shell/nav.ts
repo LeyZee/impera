@@ -260,12 +260,14 @@ const SCREENS = {
   '/commissions/factures': 'Factures',
   '/moi/dossier': 'Dossier',
   '/moi/factures': 'Factures',
+  '/moi/securite': 'Sécurité',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
   '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
+  '/reglages/securite': 'Sécurité',
 } as const;
 export type ScreenPath = keyof typeof SCREENS;
 
