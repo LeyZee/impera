@@ -1,7 +1,7 @@
 # EQ-12 Annonces, prise de poste et notifications de l'équipe, sans Telegram
-Statut : todo (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous »)
+Statut : todo (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous » ; précisée le 02/11/2026 par les ADR 0042 § 7 et 0045 § 4 : le socle installable et Web Push passent à CR-01, les rappels de shift arrivent ici)
 Phase : équipe (ADR 0023, ADR 0024)
-Dépend de : EQ-02 (shifts), EQ-10 (connexion du chatteur), EQ-11 (shell par rôle) ; les rappels de pièces se branchent sur EQ-06 quand elle existe
+Dépend de : CR-01 (application installable, Web Push, heures calmes, registre des envois), EQ-02 (shifts), CR-13 (événements des gestes du calendrier), EQ-10 (connexion du chatteur), EQ-11 (shell par rôle) ; les rappels de pièces se branchent sur EQ-06 quand elle existe
 Branche : task/eq-12-team-notifications
 
 ## Objectif
@@ -14,20 +14,24 @@ Prévenir chaque membre de l'équipe sur son téléphone, même quand il n'a pas
 - [ ] **Annonces** (`announcement`) : le propriétaire ou un manager actif écrit une annonce à toute l'équipe ou aux membres d'une créatrice ; elle s'affiche dans Aujourd'hui avec « Lu » ; l'auteur voit qui l'a lue. Jamais de donnée de fan.
 - [ ] **Prise de poste** (`shift_check_in`) : « Je prends mon poste » en un geste dans Aujourd'hui, et depuis la notification de début de shift. Elle date le vrai début du shift ; le passage pour vendre d'EQ-08 part au premier membre qui a pris son poste.
 - [ ] **Shift non pris** (`unstarted_shift`) : sans prise de poste dans le délai qui suit le début du shift, le manager en poste ou le propriétaire reçoit une alerte importante (jamais urgente) dans À traiter, avec la liste des membres libres sur ce créneau. Le délai est un réglage, pas une valeur dans le code.
-- [ ] **Espace installable** : l'espace du chatteur s'installe comme une app sur le téléphone (manifeste, service worker), sur le modèle prévu pour la PWA de la créatrice (EQ-09). Le service worker ne met en cache que la coquille statique, jamais une réponse de `/v1/*` : un téléphone partagé ou repris ne garde aucune donnée de l'équipe hors session. Sur iPhone, les notifications n'arrivent qu'une fois l'espace ajouté à l'écran d'accueil : l'écran d'installation le dit, pas à pas.
-- [ ] **Notifications push** (Web Push), avec l'accord du membre, réglables une par une dans Moi : début de shift, shift non pris (manager), rapport manquant, facture à accepter, nouvelle annonce, pièce du dossier qui expire bientôt (EQ-06). Les clés VAPID sont créées par le serveur à la première utilisation et chiffrées avec `CREDENTIALS_ENCRYPTION_KEYS`, comme les clés IA (ADR 0016) : rien à poser à la main, rien dans le dépôt.
-- [ ] **Heures calmes** (`quiet_hours`) dans le fuseau du membre : rien n'est envoyé, sauf le début de son propre shift ; ce qui tombe pendant reste dans Aujourd'hui.
-- [ ] **Une seule fois** : un registre `notification_deliveries` à clé unique (membre, objet, motif), écrit dans la même transaction que la décision d'envoyer, garantit qu'un rappel part une seule fois, même rejoué. Le `jobKey` Graphile ne sert qu'à replanifier quand un shift bouge : il ne déduplique qu'un job encore en attente.
-- [ ] Abonnements push dans une table lue par `withMember`, chacun ne lit que les siens ; un abonnement refusé ou expiré (410) est retiré, sans erreur pour le membre.
+- [ ] **Espace installable** : fait par CR-01 pour tous les rôles ; cette fiche vérifie seulement ce qui suit sur l'espace du chatteur. Le service worker ne met en cache que la coquille statique, jamais une réponse de `/v1/*` : un téléphone partagé ou repris ne garde aucune donnée de l'équipe hors session. Sur iPhone, les notifications n'arrivent qu'une fois l'espace ajouté à l'écran d'accueil : l'écran d'installation le dit, pas à pas.
+- [ ] **Notifications push** (Web Push de CR-01, clés VAPID créées par le serveur et chiffrées en base, ADR 0016), avec l'accord du membre, réglables une par une dans Moi : début de shift, shift non pris (manager), rapport manquant, facture à accepter, nouvelle annonce, pièce du dossier qui expire bientôt (EQ-06), et les motifs des shifts ci-dessous.
+- [ ] **Shifts posés, déplacés, retirés** (ADR 0045 § 4) : un membre est prévenu de chaque shift qui lui est posé, déplacé ou retiré ; un shift qui change de mains prévient l'ancien du retrait et le nouveau de l'ajout ; un ajout en masse fait une seule notification qui ne résume que ce qui a été posé ; un déplacement ne prévient qu'à la fin de ses 5 secondes d'annulation, et seulement s'il tient.
+- [ ] **Rappel avant un shift** (ADR 0045 § 4) : au délai que chaque membre choisit dans Moi (2 h par défaut, ou aucun) ; comme le début de son propre shift, il passe pendant ses heures calmes ; replanifié quand le shift bouge.
+- [ ] **La créatrice** choisit dans Moi si elle est prévenue des shifts de ses comptes ; par défaut, non.
+- [ ] **Heures calmes** (`quiet_hours`, réglage et domaine dans CR-01) dans le fuseau du membre : rien n'est envoyé, sauf le début de son propre shift et le rappel qui le précède ; ce qui tombe pendant reste dans Aujourd'hui.
+- [ ] **Une seule fois** : le registre `notification_deliveries` de CR-01 (clé unique membre, objet, motif), écrit dans la même transaction que la décision d'envoyer, garantit qu'un rappel part une seule fois, même rejoué. Le `jobKey` Graphile ne sert qu'à replanifier quand un shift bouge : il ne déduplique qu'un job encore en attente.
+- [ ] Abonnements push (table de CR-01) lus par `withMember`, chacun ne lit que les siens ; un abonnement refusé ou expiré (410) est retiré, sans erreur pour le membre.
 - [ ] Une notification ne contient jamais de donnée de fan, de montant d'un autre membre, ni de lien qui ouvrirait une session sans mot de passe.
 
 ## Critères d'acceptation
-- Tests : rappel envoyé une seule fois par shift (idempotence) ; heures calmes respectées dans le fuseau du membre, changement d'heure compris ; un membre parti ne reçoit plus rien ; un shift pris à temps ne déclenche aucune alerte, un shift non pris en déclenche une seule ; un abonnement expiré est retiré ; un rejeu du job après l'envoi n'envoie rien (registre) ; le service worker ne sert aucune réponse de `/v1/*` depuis son cache.
+- Tests : rappel envoyé une seule fois par shift (idempotence), au délai choisi, replanifié quand le shift bouge ; un déplacement annulé dans les 5 secondes ne prévient personne ; un changement de mains prévient les deux membres ; un ajout en masse fait une seule notification ; heures calmes respectées dans le fuseau du membre, changement d'heure compris ; un membre parti ne reçoit plus rien ; un shift pris à temps ne déclenche aucune alerte, un shift non pris en déclenche une seule ; un abonnement expiré est retiré ; un rejeu du job après l'envoi n'envoie rien (registre) ; le service worker ne sert aucune réponse de `/v1/*` depuis son cache.
 - Le refus des notifications par le membre laisse tout visible dans Aujourd'hui.
 - Aucune durée en dur dans les écrans ; textes en français, apostrophes typographiques.
 - Finition (Charles, 27/10, 15h22 : « que ce soit vraiment très joli… des hovers partout… une belle hiérarchie des informations ») : chaque écran passe la barre de `docs/design/README.md` § Finition d'un écran, preuves comprises (captures Nuit et Jour, bureau et téléphone, mouvement réduit).
 
 ## Hors périmètre
-Envoi d'e-mails ou de SMS, notifications de la créatrice (EQ-09), signaux de coaching (plus tard).
+Envoi d'e-mails ou de SMS, notifications de la créatrice (ventes, CR-04 ; agenda, CR-05) sauf les shifts de ses comptes, signaux de coaching (plus tard), Telegram (jamais pour l'équipe, ADR 0045 § 4).
 
 ## Notes de session
+- 2026-11-02 (fil des espaces) : le socle installable, Web Push, les heures calmes et le registre des envois sont faits une fois pour tous les rôles par CR-01 (ADR 0042 § 7) ; cette fiche garde les motifs de l'équipe et prend les rappels et les notifications des shifts de l'ADR 0045 § 4.

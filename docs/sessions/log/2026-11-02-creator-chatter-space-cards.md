@@ -1,0 +1,7 @@
+# 2026-11-02 — fiches des espaces créatrice et chatteur et du calendrier des shifts (CR-01 à CR-13)
+Fait : treize fiches tirées des ADR 0042 à 0045 acceptées, avec les amendements de relecture déjà validés par Charles (RLS restrictive de la créatrice, clés VAPID créées par le serveur et chiffrées en base, téléversement direct en plusieurs parties, compartiment sans verrou d'objet, index unique du Mass DM, option A de la tolérance d'écart) ; CR-12 et CR-13 pour le calendrier (lecture par une fonction `SECURITY DEFINER`, vue Mois, lien de calendrier ; glisser-déposer, ajout en masse, semaine en modèle, suggestion). EQ-09 remplacée par CR-01 à CR-07 ; EQ-12 s'appuie sur CR-01 et prend les rappels et notifications de shifts (ADR 0045 § 4) ; EQ-14 prend « Modifier » de l'ADR 0045 § 6 ; EQ-02 renvoie la vue de la créatrice à CR-12. Index des fiches mis à jour.
+Pas fait : aucun code ; CR-12 et CR-13 attendent la validation du prototype du calendrier par Charles (ADR 0045 § 7).
+Décisions : un seul socle installable et Web Push pour tous les rôles (CR-01), sur lequel EQ-12 branche les motifs de l'équipe ; une seule table de liens de calendrier, posée par CR-12 et reprise par CR-05.
+Découvertes : le critère d'EQ-02 « un chatteur ne voit que les shifts de ses créatrices » contredisait l'ADR 0045, il est réécrit.
+Candidats à suppression : aucun.
+Vérifié : `pnpm check`.
