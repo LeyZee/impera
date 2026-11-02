@@ -24,6 +24,9 @@ Le prototype (https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE, données invent
 - Les shifts posés à la main ne bougent jamais : ils gardent leurs heures et s'affichent avec elles ; un shift qui ne tombe plus pile dans un créneau est signalé à l'agence. Un shift à cheval sur deux créneaux se dessine sur les deux.
 - « Recaler la semaine modèle » (coché par défaut) : chaque modèle de shift qui tenait un créneau est terminé à la date d'effet et remplacé par un modèle aux nouvelles heures de ce créneau, même membre, même compte ; les shifts déjà posés par ces modèles et pas encore commencés sont retirés puis reposés, et leurs membres prévenus, comme pour « Faire de cette semaine le modèle » (ADR 0045 § 3). Un créneau retiré rend ses heures au créneau d'avant.
 - Les heures de l'agent ne changent pas : elles se relisent sur les nouveaux créneaux (ADR 0048).
+- En base, une ligne par version du réglage (`effective_at timestamptz`, fuseau de la grille, créneaux), jamais un JSON écrasé : une version qui a pris effet est immuable (déclencheur), une version future se retire tant qu'elle n'a pas pris effet. Le réglage en vigueur à un instant est la dernière version dont `effective_at` est passé : par instant et non par jour, puisque « tout de suite » peut tomber en milieu de semaine ; une semaine peut donc avoir deux réglages, que la grille lit jour par jour. La lecture d'un réglage passé prend un paramètre `at`.
+- Les créneaux sont en heure murale (0 à 1440 minutes) : le jour d'un changement d'heure, le créneau qui contient 2 h – 3 h dure une heure de moins ou de plus. CR-12 le teste.
+- Le contrat valide la liste par un `refine` Zod (24 h sans trou ni chevauchement, de 1 h à 12 h, à l'heure pleine, au moins deux créneaux) ; le domaine le revérifie à l'écriture.
 
 ### 2. Des places : plusieurs chatteurs sur un compte
 
@@ -32,7 +35,11 @@ Le prototype (https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE, données invent
 - Un **renfort** se pose sur une case déjà prise, pour tout le créneau ou pour une partie (« 21 h – 0 h » un soir de live), sans changer le réglage : trois chatteurs au plus en même temps sur un compte. Il se lit comme un shift, avec ses heures.
 - Sur la grille, une case à plusieurs chatteurs s'empile (une demi-carte par chatteur, la place libre en pointillé) et sa ligne s'agrandit ; la carte « maintenant » du compte liste chaque chatteur en poste.
 - **Signal de rush**, dès que la capture Reveal donne le volume des messages : le code compare, compte par compte et heure par heure, les messages entrants des quatre dernières semaines aux places du créneau, et propose à l'agence « Soir de Lina : un 2e chatteur conseillé le mercredi » dans la carte « Cette semaine ». Une suggestion qu'un geste accepte (poser un renfort ou passer la place à 2), jamais un changement fait seul, jamais une carte de chaleur (ADR 0045). Les seuils sont des réglages, pas des constantes de prompt.
-- En base, `shifts_account_overlap_excl` est retirée. Le serveur décide sous un verrou par compte (`scheduling.account:`, à côté du verrou par membre) qu'un compte n'a jamais plus de trois shifts non annulés qui se chevauchent ; un membre n'est toujours jamais sur deux shifts à la fois (`shifts_member_overlap_excl` reste). Les places vivent dans le réglage daté du § 1. Nouvelle migration, numéro attribué par Bilan.
+- En base, `shifts_account_overlap_excl` est retirée par une nouvelle migration, la **0063** (la 0021 n'est pas modifiée). Rien ne se perd de la garantie qu'elle donnait :
+  - un **déclencheur de contrainte** `AFTER INSERT OR UPDATE`, `DEFERRABLE INITIALLY DEFERRED`, sur `shifts`, compte les shifts non annulés du compte qui se chevauchent et refuse au-delà de trois, quel que soit le chemin d'écriture (pose, glisser, ajout en masse, renfort, modèles, recalage, échange accepté de l'ADR 0031, départ d'EQ-14) ; un shift sans membre, s'il en existe, compte, puisqu'il réserve une place ;
+  - le **verrou consultatif par compte** (`scheduling.account:`) évite la course entre deux transactions ; les verrous se prennent toujours dans le même ordre, d'abord celui du compte puis ceux des membres, chacun trié par clé, pour qu'un échange (deux membres, un compte) et un renfort (un membre, deux comptes) ne s'interbloquent pas ;
+  - un membre n'est toujours jamais sur deux shifts à la fois (`shifts_member_overlap_excl` reste).
+- Les places vivent dans une table à part, `scheduling_slot_seats` (version du réglage, rang du créneau, `platform_account_id` en clé étrangère, `seats` avec `check (seats between 1 and 2)`), jamais dans le JSON du réglage, où un compte supprimé ou mal saisi ne se verrait pas.
 
 ### 3. Les fans confiés quand plusieurs chatteurs sont en poste
 
@@ -40,6 +47,8 @@ Le prototype (https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE, données invent
 - Chacun voit ses fans en tête dans Nirvana ; un `sale` part au chatteur à qui le fan est confié (EQ-08) ; le brief le dit. Dans Reveal, les deux voient tout : Nirvana ne peut pas l'interdire, la règle est écrite dans le brief et dans la fiche du shift.
 - **La vente revient au chatteur à qui le fan est confié à cet instant** (Charles, carte de 18h09). Quand la capture Reveal montre qu'un autre membre a écrit au fan, l'agence reçoit un signal, sans changer l'attribution. Un seul membre en poste : rien ne change à l'ADR 0025.
 - L'agent répond aux fans qu'aucun humain ne tient, comme aujourd'hui ; un message humain le fait taire sur ce fan (ADR 0025).
+- En base, `shift_fan_assignments` : `creator_id` (RLS), compte, fan, membre, le shift qui la justifie, `starts_at` et `ends_at` (nul tant que l'attribution court). Un fan n'a qu'un chatteur à la fois : `exclude using gist (fan_id with =, tstzrange(starts_at, coalesce(ends_at, 'infinity')) with &&)`. Une ligne ne s'efface jamais, elle se ferme : l'historique sert à la paie. RLS : isolation par créatrice ; un membre ne lit que ses lignes, le propriétaire et l'agence lisent tout ; **la créatrice ne lit rien**, puisqu'à qui un fan est confié dit qui lui écrit (ADR 0042 § 2). Un test RLS le prouve.
+- « À cet instant » est l'**instant de la vente** (`occurred_at` donné par Reveal), jamais celui de sa détection. Le membre est écrit une fois sur la ligne de vente et n'est plus recalculé après la validation du relevé : une attribution corrigée plus tard ne change pas une paie validée, et l'`inputs_hash` ne bouge pas.
 
 ### 4. La créatrice voit, n'est pas prévenue
 
@@ -47,8 +56,8 @@ La créatrice ne reçoit aucune notification de shift ; Moi ne lui propose pas d
 
 ## Conséquences
 
-- `packages/contracts` : `SchedulingSettingsSchema` porte la liste datée des créneaux (début et fin en minutes, nom facultatif, places par compte) ; `SHIFT_SLOT_LENGTHS_MINUTES` disparaît. Lecture d'un réglage passé pour afficher les semaines passées.
-- `packages/db` : migration du réglage daté et des places, retrait de `shifts_account_overlap_excl`, table des fans confiés (`shift_fan_assignments` : compte, fan, membre, depuis, jusqu'à). Bilan relit.
+- `packages/contracts` : `SchedulingSettingsSchema` porte la liste des créneaux (début et fin en minutes, nom facultatif) et leurs places par compte ; `SHIFT_SLOT_LENGTHS_MINUTES` disparaît ; lecture d'un réglage passé par `at`.
+- `packages/db` : migration 0063 (versions du réglage, `scheduling_slot_seats`, retrait de `shifts_account_overlap_excl` et déclencheur de contrainte, `shift_fan_assignments`). Bilan relit.
 - `scheduling` : verrou par compte, plafond de trois, renfort, recalage des modèles, « à pourvoir » en places (la fonction partagée avec EQ-14 et CR-12).
 - `conversations` et EQ-08 : routage d'un `sale` vers le chatteur confié ; ADR 0043 et paie : une vente porte le membre confié, Équipe relit les montants.
 - Fiches : CR-12 (lecture des places et renforts, shift à cheval), CR-13 (réglage des créneaux, places, renfort), EQ-12 (la créatrice n'a plus de motif de shift), EQ-08 (routage).
