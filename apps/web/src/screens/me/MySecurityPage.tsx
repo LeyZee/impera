@@ -19,7 +19,7 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
         lead="Les appareils où ton compte est ouvert, et tes codes de secours."
         actions={<MeNav manager={user.teamScope === 'agency'} />}
       />
-      <SecuritySection owner={false} userId={user.id} />
+      <SecuritySection />
     </Page>
   );
 }

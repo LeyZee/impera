@@ -271,6 +271,16 @@ const SCREENS = {
 } as const;
 export type ScreenPath = keyof typeof SCREENS;
 
+/**
+ * Where an account finds its own sessions and backup codes (SEC-04), from its menu: the owner in Réglages, a manager or
+ * a chatter in Moi, anyone else (an operator, a creator) on a page outside the rail.
+ */
+export const ACCOUNT_SECURITY = '/compte/securite';
+export function securityPathOf(me: Me): '/reglages/securite' | '/moi/securite' | typeof ACCOUNT_SECURITY {
+  if (me.role === 'owner') return '/reglages/securite';
+  return canOpen(railOf(me), '/moi') ? '/moi/securite' : ACCOUNT_SECURITY;
+}
+
 /** The name of a screen inside its section, for its sub-tab. */
 export const screenLabel = (to: ScreenPath): string => SCREENS[to];
 
@@ -278,7 +288,10 @@ const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREEN
 
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
 export function documentTitle(pathname: string, section: Section | null, kind: RailKind): string {
-  if (section === null) return 'Page introuvable · Nirvana';
+  if (section === null)
+    return pathname.replace(/\/+$/u, '') === ACCOUNT_SECURITY
+      ? 'Sécurité · Nirvana'
+      : 'Page introuvable · Nirvana';
   const path = pathname.replace(/\/+$/u, '');
   // A section's own page is no screen of its own: « Suivi · Nirvana », not « Conversations · Suivi ».
   const screen = path === section ? undefined : SCREEN_TITLES.get(path);

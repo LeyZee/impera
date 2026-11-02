@@ -21,8 +21,8 @@ export function CodeInput({
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 }): JSX.Element {
   return (
-    <label className="nv-code">
-      <span className="nv-code__label">{label}</span>
+    <label className="nv-field nv-code">
+      <span className="nv-field__label nv-code__label">{label}</span>
       <input
         ref={ref}
         className="nv-field__control nv-glass font-mono tracking-[0.12em]"

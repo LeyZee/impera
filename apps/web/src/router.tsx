@@ -51,10 +51,11 @@ import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TestsPage } from './screens/train/TestsPage';
 import { TrainLayout } from './screens/train/TrainLayout';
+import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
 import { NotFoundPage } from './shell/NotFoundPage';
-import { canOpen, railOf, sectionOf } from './shell/nav';
+import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -465,6 +466,13 @@ const meSecurity = createRoute({
   },
 });
 
+// Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
+const accountSecurity = createRoute({
+  getParentRoute: () => rootRoute,
+  path: ACCOUNT_SECURITY,
+  component: AccountSecurityPage,
+});
+
 const train = createRoute({ getParentRoute: () => rootRoute, path: '/entrainer', component: TrainLayout });
 const trainIndex = createRoute({
   getParentRoute: () => train,
@@ -612,6 +620,7 @@ const routeTree = rootRoute.addChildren([
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
   me.addChildren([meIndex, meFile, meInvoices, meSecurity]),
+  accountSecurity,
   settings.addChildren([
     settingsIndex,
     aiModels,

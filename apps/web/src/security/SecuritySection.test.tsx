@@ -110,9 +110,9 @@ describe('the words of the screen', () => {
 
   it('says when a session was last used', () => {
     expect(ago('2026-11-02T19:59:40Z', now)).toBe('à l’instant');
-    expect(ago('2026-11-02T19:48:00Z', now)).toBe('il y a 12\u00a0min');
-    expect(ago('2026-11-02T17:00:00Z', now)).toBe('il y a 3\u00a0h');
-    expect(ago('2026-10-31T20:00:00Z', now)).toBe('il y a 2\u00a0j');
+    expect(ago('2026-11-02T19:48:00Z', now)).toBe('il\u00a0y\u00a0a\u00a012\u00a0min');
+    expect(ago('2026-11-02T17:00:00Z', now)).toBe('il\u00a0y\u00a0a\u00a03\u00a0h');
+    expect(ago('2026-10-31T20:00:00Z', now)).toBe('il\u00a0y\u00a0a\u00a02\u00a0j');
     // A clock a little ahead is never « dans ».
     expect(ago('2026-11-02T20:01:00Z', now)).toBe('à l’instant');
   });
@@ -138,15 +138,19 @@ describe('SecuritySection (SEC-04)', () => {
         return { status: 204 };
       },
     });
-    render(<SecuritySection owner={false} userId="u-team" />);
+    render(<SecuritySection />);
 
     const list = await screen.findByRole('list', { name: 'Sessions ouvertes' });
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
     expect(within(present(rows[0])).getByText('Cet appareil')).toBeTruthy();
-    expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · active à l’instant');
-    expect(rows[1]?.textContent).toContain('Réseau 203.0.113.x · active il y a 3\u00a0h');
-    expect(rows[2]?.textContent).toContain('Réseau inconnu · active il y a 3\u00a0j');
+    expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · dernière activité à l’instant');
+    expect(rows[1]?.textContent).toContain(
+      'Réseau 203.0.113.x · dernière activité il\u00a0y\u00a0a\u00a03\u00a0h',
+    );
+    expect(rows[2]?.textContent).toContain(
+      'Réseau inconnu · dernière activité il\u00a0y\u00a0a\u00a03\u00a0j',
+    );
     // This device's session is closed by signing out, never from the list.
     expect(within(present(rows[0])).queryByRole('button')).toBeNull();
 
@@ -172,7 +176,7 @@ describe('SecuritySection (SEC-04)', () => {
         return { status: 200, body: { sessions: 2, trustedDevices: 1 } };
       },
     });
-    render(<SecuritySection owner={false} userId="u-team" />);
+    render(<SecuritySection />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Fermer toutes les autres' }));
     const group = screen.getByRole('group');
@@ -198,7 +202,7 @@ describe('SecuritySection (SEC-04)', () => {
           ? { status: 200, body: { backupCodes: codes } }
           : { status: 401, body: apiError('reauthentication_unauthenticated') },
     });
-    render(<SecuritySection owner={false} userId="u-team" />);
+    render(<SecuritySection />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Créer de nouveaux codes' }));
     const password = screen.getByLabelText('Mot de passe');
@@ -235,7 +239,7 @@ describe('SecuritySection (SEC-04)', () => {
         body: apiError('reauthentication_rate_limited'),
       }),
     });
-    render(<SecuritySection owner={false} userId="u-team" />);
+    render(<SecuritySection />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Créer de nouveaux codes' }));
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'un mot de passe' } });
@@ -272,7 +276,7 @@ describe('SecuritySection (SEC-04)', () => {
       confirmed = true;
       return Promise.resolve('ok');
     });
-    render(<SecuritySection owner userId="u-owner" />);
+    render(<SecuritySection ownerId="u-owner" />);
 
     const list = await screen.findByRole('list', { name: 'Comptes de l’agence' });
     const [owner, team] = within(list).getAllByRole('listitem');
@@ -282,7 +286,9 @@ describe('SecuritySection (SEC-04)', () => {
     expect(within(present(owner)).queryByRole('button')).toBeNull();
     expect(team?.textContent).toContain('Équipe');
     expect(team?.textContent).toContain('Code à 6 chiffres pas encore activé');
-    expect(team?.textContent).toContain('2 sessions ouvertes · active il y a 30\u00a0min');
+    expect(team?.textContent).toContain(
+      '2 sessions ouvertes · dernière activité il\u00a0y\u00a0a\u00a030\u00a0min',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Fermer toutes les sessions de Noé' }));
     expect(

@@ -1,16 +1,9 @@
-/* The code of a confirmation: its label above, small, the field short beside the password. */
+/* The code of a confirmation: its label above, as every field's (`nv-field`), the field short beside the password. */
 .nv-code {
-  display: inline-flex;
   flex: 0 1 11rem;
-  flex-direction: column;
-  gap: 2px;
   min-width: 8.5rem;
 }
 .nv-code__label {
-  font-size: var(--nv-text-caption);
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--nv-ink-muted);
   white-space: nowrap;
 }
 .nv-code > input {

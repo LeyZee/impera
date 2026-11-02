@@ -26,15 +26,15 @@ const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
- * factor. A session shows its device, its network and when it was last used: never a full address, never a country
+ * factor (`ownerId` given). A session shows its device, its network and when it was last used: never a full address, never a country
  * (no geographic base: Charles's choice of 02/11).
  */
-export function SecuritySection({ owner, userId }: { owner: boolean; userId: string }): JSX.Element {
+export function SecuritySection({ ownerId }: { ownerId?: string }): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <SessionsPanel />
       <BackupCodesPanel />
-      {owner ? <AccountsPanel ownerId={userId} /> : null}
+      {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
     </div>
   );
 }
@@ -70,6 +70,7 @@ function SessionsPanel(): JSX.Element {
   async function close(id: string): Promise<void> {
     setBusy(id);
     setNotice(null);
+    setError(null);
     try {
       await closeSession(id);
       setNotice('Session fermée : cet appareil devra se reconnecter.');
@@ -83,6 +84,7 @@ function SessionsPanel(): JSX.Element {
 
   async function closeOthers(): Promise<void> {
     setBusy('others');
+    setError(null);
     try {
       const closed = await closeOtherSessions();
       setAsking(false);
@@ -120,8 +122,8 @@ function SessionsPanel(): JSX.Element {
                     ) : null}
                   </span>
                   <span className={MUTED}>
-                    {session.network === null ? 'Réseau inconnu' : `Réseau ${session.network}`} · active{' '}
-                    {ago(session.lastActiveAt, now)}
+                    {session.network === null ? 'Réseau inconnu' : `Réseau ${session.network}`} · dernière
+                    activité {ago(session.lastActiveAt, now)}
                   </span>
                 </div>
                 {session.current ? null : (
@@ -140,7 +142,11 @@ function SessionsPanel(): JSX.Element {
           </ul>
         )}
         {asking ? (
-          <div className="nv-glass flex flex-col gap-3 rounded-[var(--nv-radius-md)] p-3" role="group">
+          <div
+            className="nv-glass flex flex-col gap-3 rounded-[var(--nv-radius-md)] p-3"
+            role="group"
+            aria-label="Confirmer la fermeture"
+          >
             <p className="text-sm">
               Les {String(others)} autres sessions seront fermées, et tes appareils de confiance oubliés :
               chacun redemandera ton mot de passe et ton code.
@@ -244,8 +250,8 @@ function BackupCodesPanel(): JSX.Element {
         ) : (
           <>
             <p className={MUTED}>
-              Chacun remplace une fois le code de ton application. Tu les as perdus, ou il t’en reste peu ?
-              Crée-en dix nouveaux : les anciens cesseront de marcher.
+              Chacun remplace une fois le code de ton application. Tu les as perdus, ou il t’en reste
+              peu&nbsp;? Crée-en dix nouveaux&nbsp;: les anciens cesseront de marcher.
             </p>
             {step === 'idle' ? (
               <button
@@ -330,6 +336,7 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
   async function closeAll(account: AccountSecurity): Promise<void> {
     setBusy(account.userId);
     setNotice(null);
+    setError(null);
     try {
       const closed = await closeAccountSessions(account.userId);
       setConfirming(null);
@@ -367,7 +374,9 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
                     </span>
                     <span className={MUTED}>
                       {sessionsText(account.sessions)}
-                      {account.lastActiveAt === null ? '' : ` · active ${ago(account.lastActiveAt, now)}`}
+                      {account.lastActiveAt === null
+                        ? ''
+                        : ` · dernière activité ${ago(account.lastActiveAt, now)}`}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

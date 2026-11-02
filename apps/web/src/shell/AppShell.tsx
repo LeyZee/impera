@@ -17,7 +17,15 @@ import { AgentPill } from './AgentPill';
 import { AppearanceChoice } from './AppearanceChoice';
 import { NavIcon } from './NavIcon';
 import { keepTabInside } from './focus';
-import { documentTitle, FAMILY_LABELS, railOf, sectionOf, type NavItem, type Rail } from './nav';
+import {
+  documentTitle,
+  FAMILY_LABELS,
+  railOf,
+  sectionOf,
+  securityPathOf,
+  type NavItem,
+  type Rail,
+} from './nav';
 
 import { initialOf } from '@/lib/utils';
 import { HoldProvider } from '@/reports/Hold';
@@ -37,11 +45,16 @@ const trimSlash = (path: string): string => (path.length > 1 ? path.replace(/\/+
 export interface Account {
   readonly name: string;
   readonly role: string;
+  /** Its sessions and backup codes (SEC-04): the same entry of the account's menu for every role. */
+  readonly security: string;
 }
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   const rail = useMemo(() => railOf(user), [user]);
-  const account = useMemo(() => ({ name: user.name, role: roleLabel(user) }), [user]);
+  const account = useMemo(
+    () => ({ name: user.name, role: roleLabel(user), security: securityPathOf(user) }),
+    [user],
+  );
   // The address on screen: while the next one loads, the screen, its tab and its title are still the last one's.
   const pathname = useRouterState({ select: (state) => (state.resolvedLocation ?? state.location).pathname });
   // A screen the router does not know, even inside a section (/equipe/nexiste-pas), lights no tab (NAV-01): the router
@@ -372,11 +385,21 @@ export function MoreSheet({
             <AppearanceChoice />
           </div>
         )}
+        {account === undefined ? null : (
+          <Link
+            to={account.security}
+            className="nv-more__item nv-enter"
+            style={{ '--nv-i': items.length + 3 }}
+            onClick={onClose}
+          >
+            Sécurité
+          </Link>
+        )}
         {onSignOut === undefined ? null : (
           <button
             type="button"
             className="nv-more__item nv-more__out nv-enter"
-            style={{ '--nv-i': items.length + 3 }}
+            style={{ '--nv-i': items.length + 4 }}
             onClick={onSignOut}
           >
             Se déconnecter
@@ -389,7 +412,8 @@ export function MoreSheet({
 }
 
 /**
- * The account's menu at the foot of the rail: who is signed in, the appearance of this browser (NAV-03), the way out.
+ * The account's menu at the foot of the rail: who is signed in, the appearance of this browser (NAV-03), its security
+ * (SEC-04), the way out.
  * A popover, not a menu: it holds a radio group.
  */
 function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => void }): JSX.Element {
@@ -441,6 +465,15 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
       {open ? (
         <div className="nv-user__menu nv-glass nv-glass--thick" id="nv-user-menu">
           <AppearanceChoice />
+          <Link
+            to={account.security}
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Sécurité
+          </Link>
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onSignOut}>
             Se déconnecter
           </button>
