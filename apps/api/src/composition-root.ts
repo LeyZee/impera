@@ -782,6 +782,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         );
       },
     ),
+    'payroll.remind_due_invoices': defineTask(
+      'payroll.remind_due_invoices',
+      JOB_PAYLOADS['payroll.remind_due_invoices'],
+      logger,
+      async (_payload, context) => {
+        context.logger.info(
+          { said: await modules.payroll.jobs.remindDueInvoices() },
+          'payroll: due invoices reminded',
+        );
+      },
+    ),
     'payroll.purge_refused_documents': defineTask(
       'payroll.purge_refused_documents',
       JOB_PAYLOADS['payroll.purge_refused_documents'],

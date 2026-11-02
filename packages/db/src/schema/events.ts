@@ -25,6 +25,11 @@ export const domainEvents = pgTable(
     index('domain_events_document_expiring_idx')
       .on(sql`(${t.payload}->>'documentId')`)
       .where(sql`${t.type} = 'contractor_document_expiring'`),
+    // « Already said? » of `payroll.remind_due_invoices`, each morning, per invoice and type (EQ-06 lot 8): the two
+    // types of the due date's alert only, read through this index rather than across the whole outbox.
+    index('domain_events_invoice_due_idx')
+      .on(sql`(${t.payload}->>'invoiceId')`, t.type)
+      .where(sql`${t.type} in ('invoice_due_soon', 'invoice_overdue')`),
     tenantPolicy(t.creatorId),
   ],
 );

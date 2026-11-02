@@ -76,6 +76,14 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '37 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.remind_documents'] },
   },
+  // The invoices not settled yet that come to their due date (EQ-06 lot 8): each said once to the owner seven days
+  // before it, then the day after it, in the morning in Paris (06:21 UTC). A day missed is caught up by the next run,
+  // which reads the due states again, no backfill; its retries are the contract's.
+  {
+    task: 'payroll.remind_due_invoices',
+    match: '21 6 * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.remind_due_invoices'] },
+  },
   // The files of refused documents erased once their upload lock has ended (EQ-06 lot 5c-2, « ok purge a » de
   // Charles): their rows stay. The next night is the retry, no backfill.
   {
