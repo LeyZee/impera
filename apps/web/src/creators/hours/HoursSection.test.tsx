@@ -11,10 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HoursSection } from './HoursSection';
 
-const confirmPassword = vi.fn<(password: string) => Promise<string>>();
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/settings/services/api')>()),
-  confirmPassword: (password: string) => confirmPassword(password),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
 }));
 
 /* An invented creator: no real person. */
@@ -85,7 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  confirmPassword.mockReset();
+  confirmIdentity.mockReset();
 });
 
 const save = (): HTMLElement => screen.getByRole('button', { name: 'Enregistrer' });
@@ -266,15 +266,18 @@ describe('Créatrices › Heures (P3-14)', () => {
           ? { status: 200, body: echo(body) }
           : { status: 403, body: apiError(REAUTHENTICATION_ERROR_CODE) },
     });
-    confirmPassword.mockImplementation(() => {
+    confirmIdentity.mockImplementation(() => {
       fresh = true;
       return Promise.resolve('ok');
     });
     renderSection();
     fireEvent.click(await screen.findByRole('radio', { name: 'Par créneaux' }));
     fireEvent.click(save());
-    expect(await screen.findByText('Pour changer ses heures, confirme ton mot de passe.')).toBeDefined();
+    expect(
+      await screen.findByText('Pour changer ses heures, confirme ton mot de passe et ton code.'),
+    ).toBeDefined();
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'staple battery horse' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     await waitFor(() => {
       expect(puts).toHaveLength(2);

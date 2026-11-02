@@ -273,7 +273,7 @@ function HoursForm({
         {problem?.expired === true ? <SignInAgain /> : null}
         {reauth ? (
           <PasswordPrompt
-            lead="Pour changer ses heures, confirme ton mot de passe."
+            lead="Pour changer ses heures, confirme ton mot de passe et ton code."
             onConfirmed={() => {
               setReauth(false);
               void save();

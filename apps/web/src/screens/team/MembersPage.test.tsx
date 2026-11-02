@@ -15,9 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MembersPage } from './MembersPage';
 import { parseTeamSearch } from './model';
 
-const confirmPassword = vi.fn<(password: string) => Promise<string>>();
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', () => ({
-  confirmPassword: (password: string) => confirmPassword(password),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
 }));
 
 /* Invented members and creators: no real data (ADR 0010). */
@@ -197,7 +197,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.useRealTimers();
-  confirmPassword.mockReset();
+  confirmIdentity.mockReset();
 });
 
 describe('Équipe › Membres', () => {
@@ -640,14 +640,15 @@ describe('a link from the sheet', () => {
             };
       },
     });
-    confirmPassword.mockResolvedValue('ok');
+    confirmIdentity.mockResolvedValue('ok');
     renderPage(`/equipe/membres?membre=${THEO.id}`);
     fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
     const password = await screen.findByLabelText('Ton mot de passe');
     fireEvent.change(password, { target: { value: 'mot-de-passe-invente' } });
+    fireEvent.change(screen.getByLabelText('Ton code à 6 chiffres'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     expect(await screen.findByLabelText('Lien à envoyer')).toBeDefined();
-    expect(confirmPassword).toHaveBeenCalledWith('mot-de-passe-invente');
+    expect(confirmIdentity).toHaveBeenCalledWith('mot-de-passe-invente', '123456');
   });
 
   it('keeps the link on screen when the list, read again, carries its end', async () => {

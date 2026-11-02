@@ -7,10 +7,10 @@ import { z } from 'zod';
 
 import { ZoneEditor } from './ZoneEditor';
 
-const confirmPassword = vi.fn<(password: string) => Promise<string>>();
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/settings/services/api')>()),
-  confirmPassword: (password: string) => confirmPassword(password),
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
 }));
 
 /* An invented creator: no real person. */
@@ -53,7 +53,7 @@ describe('ZoneEditor', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
-    confirmPassword.mockReset();
+    confirmIdentity.mockReset();
   });
 
   it('moves her to the zone typed and says so', async () => {
@@ -101,17 +101,21 @@ describe('ZoneEditor', () => {
       { status: 403, body: apiError(REAUTHENTICATION_ERROR_CODE) },
       { status: 200, body: { ...NORA, timezone: 'Asia/Tokyo' } },
     );
-    confirmPassword.mockResolvedValue('ok');
+    confirmIdentity.mockResolvedValue('ok');
     move('Asia/Tokyo');
-    expect(await screen.findByText('Pour changer son fuseau, confirme ton mot de passe.')).toBeDefined();
+    expect(
+      await screen.findByText('Pour changer son fuseau, confirme ton mot de passe et ton code.'),
+    ).toBeDefined();
     expect(onMoved).not.toHaveBeenCalled();
     // Saving again waits for the password, never a second request behind it.
     expect(screen.getByRole('button', { name: 'Enregistrer le fuseau' })).toHaveProperty('disabled', true);
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'staple battery horse' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     await waitFor(() => {
       expect(onMoved).toHaveBeenCalled();
     });
+    expect(confirmIdentity).toHaveBeenCalledWith('staple battery horse', '123456');
     expect(z.array(z.object({ timezone: z.string() })).parse(sent)).toHaveLength(2);
   });
 

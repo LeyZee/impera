@@ -149,7 +149,7 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
-    app = await createApp(config, createLogger(config));
+    app = await createApp(config, createLogger(config), { passwordBreaches: () => Promise.resolve(false) });
     server = await buildServer({
       config,
       logger: createLogger(config),
@@ -569,7 +569,8 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
     const [left] = await auditOf('team_member.status_change').then((rows) =>
       rows.filter((row) => JSON.stringify(row.details).includes('"left"')),
     );
-    expect(left?.details).toEqual({ from: 'active', to: 'left', sessionsEnded: 1, leftOn });
+    // Two sessions: the activation of his code left one, his sign-in with the code another (ADR 0046).
+    expect(left?.details).toEqual({ from: 'active', to: 'left', sessionsEnded: 2, leftOn });
     // Asked again, the same status writes nothing: the day stays the first one.
     expect(await leftOnOf(theo.id)).toBe(leftOn);
 

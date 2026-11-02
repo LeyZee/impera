@@ -22,6 +22,8 @@ Le tout est décrit par `docker-compose.prod.yml`. L'API n'a pas de domaine : le
 
 **Réseau sortant du worker : la BCE.** Le job `payroll.fetch_exchange_rates` lit chaque heure, à la 7ᵉ minute, les taux de référence de la BCE sur `https://www.ecb.europa.eu` (ADR 0033). La requête part en HTTPS, sans clé, et n'envoie aucune donnée de l'agence. Si un pare-feu coupe cet hôte, le job échoue à chaque passage et n'écrit rien. Les brouillons gardent le dernier taux connu. Une clôture est refusée (`exchange_rate_missing_conflict`) dès que le dernier taux date de plus de quatre jours avant la fin de la quinzaine. Rien n'est payé sur un taux deviné. Quand l'hôte revient, le passage suivant rattrape les jours manqués, sur 90 jours au plus.
 
+**Réseau sortant de l'API : Pwned Passwords.** Quand un mot de passe est choisi (lien d'invitation ou de nouveau mot de passe, `pnpm owner:create`), l'API demande à `https://api.pwnedpasswords.com` s'il circule dans des fuites connues (ADR 0046 § 4). Seuls les 5 premiers caractères de son empreinte SHA-1 sortent, jamais le mot de passe ni l'e-mail. Si un pare-feu coupe cet hôte, aucun mot de passe ne peut être choisi (503, l'écran dit de réessayer) : l'autoriser avant d'inviter l'équipe.
+
 ## 1. Première mise en service
 
 ### 1.1 Base Neon
@@ -180,7 +182,7 @@ node dist/scripts/ops-kill-switch.js --on --scope global --reason "<raison>"
 node dist/scripts/ops-kill-switch.js --off --scope global --reason "<raison>"
 ```
 
-Les autres commandes d'exploitation des runbooks (`pnpm ops:revoke-sessions`, `pnpm ops:reencrypt-sessions`, `pnpm ops:reencrypt-credentials`, `pnpm ops:check-keys`, `pnpm db:rebuild-projections`) ont leur équivalent dans l'image : `node dist/scripts/<nom>.js` (`ops-revoke-sessions`, `ops-reencrypt-sessions`, `ops-reencrypt-credentials`, `ops-check-keys`, `rebuild-projections`), mêmes arguments.
+Les autres commandes d'exploitation des runbooks (`pnpm ops:revoke-sessions`, `pnpm ops:reset-second-factor`, `pnpm ops:reencrypt-sessions`, `pnpm ops:reencrypt-credentials`, `pnpm ops:check-keys`, `pnpm db:rebuild-projections`) ont leur équivalent dans l'image : `node dist/scripts/<nom>.js` (`ops-revoke-sessions`, `ops-reset-second-factor`, `ops-reencrypt-sessions`, `ops-reencrypt-credentials`, `ops-check-keys`, `rebuild-projections`), mêmes arguments.
 
 Si Neon ne répond plus, le limiteur de débit laisse passer les requêtes ordinaires (un `warn` « rate limit store unavailable » par requête dans les journaux de `api`), mais la connexion au dashboard répond 503 `service_unavailable` jusqu'au retour de la base (`security.md`). Ce n'est pas une panne de l'API : regarder `/ready` et Neon.
 

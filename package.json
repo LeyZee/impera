@@ -35,6 +35,7 @@
     "persona:load": "pnpm --filter @nirvana/api persona:load",
     "ops:kill-switch": "pnpm --filter @nirvana/api ops:kill-switch",
     "ops:revoke-sessions": "pnpm --filter @nirvana/api ops:revoke-sessions",
+    "ops:reset-second-factor": "pnpm --filter @nirvana/api ops:reset-second-factor",
     "ops:reencrypt-sessions": "pnpm --filter @nirvana/api ops:reencrypt-sessions",
     "ops:reencrypt-credentials": "pnpm --filter @nirvana/api ops:reencrypt-credentials",
     "ops:check-keys": "pnpm --filter @nirvana/api ops:check-keys",

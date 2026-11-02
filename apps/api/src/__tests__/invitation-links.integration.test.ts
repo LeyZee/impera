@@ -13,11 +13,13 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
-import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
+import { DASHBOARD_ORIGIN, signIn, signInWithoutCode } from './support/sign-in';
 
 // Invented people only (ADR 0010).
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 const PASSWORD = 'une phrase de passe assez longue';
+/** The one password the test's breach check knows (ADR 0046 § 4); the real service is never called. */
+const BREACHED = 'un mot de passe déjà fuité';
 
 type Json = Record<string, unknown>;
 
@@ -89,7 +91,9 @@ describe('invitation links (EQ-10)', () => {
       },
     });
     const logger = createLogger(config, sink);
-    app = await createApp(config, logger);
+    app = await createApp(config, logger, {
+      passwordBreaches: (password) => Promise.resolve(password === BREACHED),
+    });
     server = await buildServer({ config, logger, routes: app.routes, readiness: app.readiness });
     await createOwner(app.auth, app.db.db, OWNER);
     owner = await signIn(server, OWNER.email, OWNER.password);
@@ -148,7 +152,7 @@ describe('invitation links (EQ-10)', () => {
 
   it('asks for a recent sign-in before making a link', async () => {
     const { memberId } = await addMember('recent@example.test');
-    await test.admin.db.update(schema.session).set({ createdAt: sql`now() - interval '1 hour'` });
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now() - interval '1 hour'` });
     const stale = await post(
       `/v1/team/members/${memberId}/invitation-link`,
       { purpose: 'invitation' },
@@ -185,6 +189,8 @@ describe('invitation links (EQ-10)', () => {
     expect(codeOf(short)).toMatchObject({ code: 'password_invalid', details: { reason: 'too_short' } });
     const long = await post('/v1/invitation-links/redeem', { token, password: 'x'.repeat(129) });
     expect(codeOf(long)).toMatchObject({ code: 'password_invalid', details: { reason: 'too_long' } });
+    const breached = await post('/v1/invitation-links/redeem', { token, password: BREACHED });
+    expect(codeOf(breached)).toMatchObject({ code: 'password_invalid', details: { reason: 'breached' } });
 
     // A refused password left the link unused.
     const redeemed = await post('/v1/invitation-links/redeem', { token, password: PASSWORD });
@@ -197,8 +203,10 @@ describe('invitation links (EQ-10)', () => {
       teamScope: 'self',
     });
     const cookie = String(redeemed.headers['set-cookie']).split(';')[0] ?? '';
+    // Signed in, straight onto the activation of his code (ADR 0046 § 1).
     const me = await server.inject({ method: 'GET', url: '/v1/me', headers: { cookie } });
-    expect(me.statusCode).toBe(200);
+    expect(me.statusCode).toBe(403);
+    expect(codeOf(me).code).toBe('second_factor_forbidden');
 
     const again = await post('/v1/invitation-links/redeem', { token, password: PASSWORD });
     expect(again.statusCode).toBe(404);
@@ -212,7 +220,7 @@ describe('invitation links (EQ-10)', () => {
       .where(eq(schema.auditLog.userId, userId));
     expect(audit).toContainEqual({
       action: 'invitation_link.redeem',
-      details: { purpose: 'invitation', sessionsEnded: 0 },
+      details: { purpose: 'invitation', sessionsEnded: 0, trustedDevicesEnded: 0, secondFactorReset: false },
     });
   });
 
@@ -273,10 +281,10 @@ describe('invitation links (EQ-10)', () => {
     ).toBe(404);
   });
 
-  it('ends every open session of a member who chooses a new password', async () => {
+  it('ends every open session of a member who chooses a new password, and resets his code', async () => {
     const { memberId, userId } = await addMember('reset@example.test');
     await post('/v1/invitation-links/redeem', { token: (await newLink(memberId)).token, password: PASSWORD });
-    // The first link opened a session too: three are open when the reset is used.
+    // The first link opened a session too, the activation of his code another: four are open when the reset is used.
     const phone = await signIn(server, 'reset@example.test', PASSWORD);
     const laptop = await signIn(server, 'reset@example.test', PASSWORD);
 
@@ -292,13 +300,22 @@ describe('invitation links (EQ-10)', () => {
       );
     }
     await expect(signIn(server, 'reset@example.test', PASSWORD)).rejects.toThrow(/Sign-in failed/);
+    // His lost phone held his code: the new password opens the activation of a new one.
+    const fresh = await signInWithoutCode(server, 'reset@example.test', `${PASSWORD} neuve`);
+    const me = await server.inject({ method: 'GET', url: '/v1/me', headers: { cookie: fresh } });
+    expect(codeOf(me).code).toBe('second_factor_forbidden');
+    expect(
+      await test.admin.db.select().from(schema.twoFactor).where(eq(schema.twoFactor.userId, userId)),
+    ).toEqual([]);
     const resets = await test.admin.db
       .select({ details: schema.auditLog.details })
       .from(schema.auditLog)
       .where(
         sql`${schema.auditLog.userId} = ${userId} and ${schema.auditLog.action} = 'invitation_link.redeem'`,
       );
-    expect(resets).toContainEqual({ details: { purpose: 'reset', sessionsEnded: 3 } });
+    expect(resets).toContainEqual({
+      details: { purpose: 'reset', sessionsEnded: 4, trustedDevicesEnded: 0, secondFactorReset: true },
+    });
   });
 
   it('stops a burst on the redeem route', async () => {

@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 
-import { confirmPassword, type ConfirmResult } from '@/settings/services/api';
+import { CodeInput } from '@/auth/CodeInput';
+import { confirmIdentity, type ConfirmResult } from '@/settings/services/api';
 
 const PASSWORD_MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
-  wrong_credentials: 'Ce n’est pas le bon mot de passe.',
+  wrong_credentials: 'Mot de passe ou code incorrect.',
   too_many_attempts: 'Trop d’essais. Attends une minute avant de réessayer.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
 };
 
 /**
- * The sign-in is older than 10 minutes: the password again, then the caller sends its request again, with the same id
+ * The password and the code were not given in the last 10 minutes (ADR 0046 § 3): both again, then the caller sends
+ * its request again, with the same id
  * (a restore test, a request to export now). `tone`: « Confirmer » is the neon only where the step stands alone (the
  * restore test's dialog); on the page, the neon stays « Noter un essai ».
  */
@@ -26,6 +28,7 @@ export function PasswordStep({
   onCancel: () => void;
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
+  const codeInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<ConfirmResult, 'ok'> | null>(null);
 
@@ -35,15 +38,21 @@ export function PasswordStep({
 
   const confirm = async (): Promise<void> => {
     const password = input.current?.value ?? '';
+    const code = codeInput.current?.value ?? '';
     if (password === '') return;
+    if (code.trim() === '') {
+      codeInput.current?.focus();
+      return;
+    }
     setBusy(true);
-    const result = await confirmPassword(password).catch(() => 'unavailable' as const);
+    const result = await confirmIdentity(password, code).catch(() => 'unavailable' as const);
     setBusy(false);
     if (result === 'ok') {
       onConfirmed();
       return;
     }
     if (input.current !== null) input.current.value = '';
+    if (codeInput.current !== null) codeInput.current.value = '';
     setFailure(result);
   };
 
@@ -70,6 +79,16 @@ export function PasswordStep({
           onKeyDown={(event) => {
             if (event.key !== 'Enter') return;
             // Inside the form of the fields: Enter confirms the password, it does not send the test.
+            event.preventDefault();
+            void confirm();
+          }}
+        />
+        <CodeInput
+          ref={codeInput}
+          disabled={busy}
+          invalid={failure !== null}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
             event.preventDefault();
             void confirm();
           }}
