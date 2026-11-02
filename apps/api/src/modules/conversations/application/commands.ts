@@ -44,6 +44,31 @@ import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
 import { appendEvent, lockConversation, lockDraftFor, setDraftStatus } from './journal';
 
+/**
+ * Automatique switched on by a person (ADR 0046 § 8): its line of `audit_log`, then the security alert the urgent
+ * groups hear, in the transaction of the switch. `scope` says whether all her conversations went, or one.
+ */
+async function automaticSwitchedOn(
+  tx: Transaction,
+  input: { readonly creatorId: CreatorId; readonly userId: UserId },
+  scope: 'creator' | 'conversation',
+  entityId: string,
+  meta: EventMeta,
+): Promise<void> {
+  await tx.audit.record({
+    userId: input.userId,
+    action: 'automatic.on',
+    entity: scope,
+    entityId,
+    details: { correlationId: meta.correlationId },
+  });
+  await tx.events.publish(
+    input.creatorId,
+    { type: 'security_alert', payload: { reason: 'automatic_enabled', userId: input.userId, scope } },
+    meta,
+  );
+}
+
 interface IngestMessage {
   readonly creatorId: CreatorId;
   readonly platformAccountId: PlatformAccountId;
@@ -430,12 +455,16 @@ export function createConversationCommands({
         if (input.mode === 'auto') await requireAutomaticOpen(tx, voice);
         const conversation = await lockConversation(tx, input.conversationId);
         if (conversation.mode === input.mode) return;
+        const meta = humanMeta(input);
         await appendEvent(
           tx,
           conversation,
           { type: 'mode_changed', payload: { userId: input.userId, mode: input.mode } },
-          humanMeta(input),
+          meta,
         );
+        if (input.mode === 'auto') {
+          await automaticSwitchedOn(tx, input, 'conversation', input.conversationId, meta);
+        }
       });
     },
 
@@ -489,6 +518,7 @@ export function createConversationCommands({
         }
         if (!stop) {
           const from = target === 'auto' ? 'copilot' : 'auto';
+          let switched = 0;
           for (const id of await tx.conversations.idsInMode(from)) {
             const conversation = await lockConversation(tx, id);
             if (conversation.mode !== from) continue;
@@ -498,6 +528,11 @@ export function createConversationCommands({
               { type: 'mode_changed', payload: { userId: input.userId, mode: target } },
               meta,
             );
+            switched += 1;
+          }
+          // Automatique goes on when a conversation passes to it, or the agent comes back from a stop in it.
+          if (target === 'auto' && (switched > 0 || switches.creator)) {
+            await automaticSwitchedOn(tx, input, 'creator', input.creatorId, meta);
           }
         }
         return { mode: stop || switches.global ? 'stop' : target, globalStop: switches.global };

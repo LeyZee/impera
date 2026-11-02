@@ -4,6 +4,7 @@ import {
   CustomAlertIdSchema,
   INVOICE_NOT_ISSUED_REASONS,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   TelegramChatIdSchema,
   newId,
 } from '@nirvana/contracts';
@@ -365,6 +366,83 @@ describe('classification (ADR 0020 §2)', () => {
     expect(noPersona?.kind === 'notice' ? noPersona.body : '').toContain(
       'Raison : elle n’a pas de persona active.',
     );
+  });
+
+  it('tells each security alert to the urgent groups, by role and network, never a name nor a full address', () => {
+    const bodyOf = (alert: Parameters<typeof classify>[0] & { kind: 'security_alert' }) => {
+      const outcome = classify(alert);
+      expect(outcome).toMatchObject({
+        kind: 'notice',
+        topic: 'urgent',
+        fallbackTopic: 'important',
+        threadKey: null,
+        title: 'URGENT',
+      });
+      return outcome?.kind === 'notice' ? outcome : null;
+    };
+    const signIn = bodyOf({
+      kind: 'security_alert',
+      alert: { reason: 'new_device_sign_in', userId: 'owner-1', role: 'owner', network: '203.0.113.x' },
+    });
+    expect(signIn?.body).toBe(
+      'Connexion au compte propriétaire depuis un appareil qui n’était pas de confiance (réseau 203.0.113.x). Si ce n’est pas le propriétaire, ferme ses sessions et change son mot de passe.',
+    );
+    expect(signIn?.link).toEqual({ label: 'Ouvrir les Réglages', path: '/reglages' });
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: {
+          reason: 'sign_in_refusals',
+          userId: 'op-1',
+          role: 'operator',
+          network: null,
+          refusals: 5,
+          windowMinutes: 15,
+        },
+      })?.body,
+    ).toBe(
+      '5 refus de mot de passe ou de code en 15 minutes sur un compte de l’équipe : quelqu’un essaie peut-être d’y entrer.',
+    );
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: {
+          reason: 'second_factor_reset',
+          userId: 'op-1',
+          role: 'operator',
+          network: null,
+          via: 'invitation_link',
+        },
+      })?.body,
+    ).toBe(
+      'Deuxième facteur remis à zéro sur un compte de l’équipe, par un lien de réinitialisation : ses sessions et ses appareils de confiance sont fermés.',
+    );
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: { reason: 'persona_activated', userId: null, version: '1.2.0' },
+      })?.body,
+    ).toBe('Une autre version de la persona est maintenant active (1.2.0).');
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: { reason: 'automatic_enabled', userId: 'op-1', scope: 'creator' },
+      })?.body,
+    ).toBe('Mode Automatique allumé : l’agent envoie seul sur toutes ses conversations.');
+    const session = bodyOf({
+      kind: 'security_alert',
+      alert: {
+        reason: 'platform_session_replaced',
+        userId: 'op-1',
+        platformAccountId: PlatformAccountIdSchema.parse('01900000-0000-7000-8000-000000000030'),
+        platform: 'reveal',
+      },
+    });
+    expect(session?.body).toBe(
+      'La session Reveal de l’agent a été remplacée par une autre. Si personne de l’agence ne l’a fait, vérifie le compte branché.',
+    );
+    // The ids the payload carries are never shown.
+    expect(JSON.stringify([signIn, session])).not.toMatch(/owner-1|op-1|01900000/u);
   });
 
   it('opens a thread on an expired session and closes it with a reply when it comes back', () => {

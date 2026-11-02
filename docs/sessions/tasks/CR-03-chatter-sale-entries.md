@@ -1,5 +1,5 @@
 # CR-03 Ventes saisies par le chatteur et rapport de fin de shift qui les reprend
-Statut : todo (ADR 0043 § 1, § 2, § 3 et § 7, acceptée par Charles le 02/11/2026)
+Statut : blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0043)
 Dépend de : EQ-03, EQ-04, CR-01 (téléphone)
 Branche : task/cr-03-chatter-sale-entries
@@ -32,3 +32,4 @@ Le contrôle par les ventes de Reveal et la validation automatique (CR-09) ; les
 ## Notes de session
 
 - 2026-11-02 (fil API CRM) : l'ADR 0050 § 10 (option 3 validée par Charles) retire la saisie d'un compte Reveal dès sa bascule en source « détectée » ; elle reste jusqu'à la bascule et sur les autres plateformes. Recommandation : décider de l'ordre avant de commencer cette fiche, car si le flux de ventes arrive avant elle, « + Vente » n'a plus d'utilité sur Reveal, seule plateforme branchée aujourd'hui.
+- 2026-11-02 (fil API CRM) : ordre fixé. Reveal est la seule plateforme branchée : jusqu'à sa bascule, le chatteur garde son total déclaré (EQ-03), puis CRM-03 prend le relais. Cette fiche reprendra avec une autre plateforme.

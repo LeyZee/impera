@@ -11,6 +11,7 @@ import {
   InvitationLinkPurposeSchema,
   InvitationLinkTokenSchema,
   MeSchema,
+  networkOf,
   newId,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -37,6 +38,7 @@ import { z } from 'zod';
 import { authHeaders, meOf, type Auth, type RequireRole } from './auth';
 import type { Config } from './config';
 import type { PasswordBreachCheck } from './password-breaches';
+import { publishSecurityAlert, roleOf } from './security-alerts';
 
 /** A link is valid 72 hours (EQ-10). */
 const LINK_LIFETIME = '72 hours';
@@ -267,6 +269,16 @@ async function redeemLinkUnscoped(
         secondFactorReset: reset.hadSecondFactor,
       },
     });
+    // A second factor that was active, put back to zero by the link: told to the urgent groups (ADR 0046 § 8).
+    if (reset.hadSecondFactor) {
+      await publishSecurityAlert(tx, null, {
+        reason: 'second_factor_reset',
+        userId: link.userId,
+        role: await roleOf(tx, link.userId),
+        network: networkOf(input.ip),
+        via: 'invitation_link',
+      });
+    }
     const [member] = await tx.select(accountColumns).from(schema.user).where(eq(schema.user.id, link.userId));
     if (member === undefined) throw new InvitationLinkNotFound();
     return member;

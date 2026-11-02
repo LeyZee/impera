@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import {
+  BonusIdSchema,
+  BonusTierSetIdSchema,
+  CollectiveGoalIdSchema,
   CommissionStatementIdSchema,
   EVENT_PAYLOADS,
   InvoiceIdSchema,
@@ -539,5 +542,79 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
       individualEntrepreneur: false,
       ...company,
     });
+  });
+});
+
+describe('Équipe › Factures : les primes de palier et d’objectif collectif sur la facture (EQ-04, EQ-06)', () => {
+  let team: PayrollTeam;
+  let theo: TeamMember;
+
+  beforeAll(async () => {
+    team = await startPayrollTeam(inject('pgSuperuserUrl'), {
+      invoiceBuckets: { primary: createMemoryInvoiceStore(), copy: createMemoryInvoiceStore() },
+    });
+    ({ member: theo } = await team.addMember('theo@example.test', 'Théo'));
+    const invoicing = await setUpInvoicing(team, inventedLogo(), [
+      { member: theo, prefix: 'THEO', legalName: 'Théo Inventé' },
+    ]);
+    await invoicing.acceptMandate(theo);
+  });
+
+  afterAll(() => team.close());
+
+  it('bills the tier, the collective and the manual bonuses the statement counted, each on its line', async () => {
+    const admin = team.test.admin.db;
+    // A Bronze tier at 50 € of net, and a team goal of 100 € whose half brings 10 € to each chatter.
+    await admin.insert(schema.bonusTierSets).values({
+      id: newId(BonusTierSetIdSchema),
+      fromPeriod: Q1,
+      tiers: [{ thresholdMinor: 5_000, bonusMinor: 3_000, label: 'Bronze' }],
+      createdBy: team.ownerId,
+    });
+    await admin.insert(schema.collectiveGoals).values({
+      id: newId(CollectiveGoalIdSchema),
+      period: Q1,
+      targetMinor: 10_000,
+      tiers: [{ reachedBps: 5_000, bonusMinor: 1_000 }],
+      createdBy: team.ownerId,
+    });
+    await team.report(theo, Q1, 12_345);
+    const bonus = await team.call('POST', '/payroll/bonuses', team.owner, {
+      id: newId(BonusIdSchema),
+      memberId: theo.id,
+      period: Q1,
+      amountMinor: 2_000,
+      reason: 'Renfort du samedi',
+    });
+    expect(bonus.statusCode, bonus.body).toBe(201);
+    await team.recalculate(Q1);
+    const statement = await team.statementOf(theo, Q1);
+    // The three kinds of bonus in the one sum the statement keeps: the case the invoice must take apart.
+    expect(statement).toMatchObject({
+      tierBonus: { bonusMinor: 3_000 },
+      collectiveBonusMinor: 1_000,
+      bonusesMinor: 6_000,
+    });
+    expect((await team.validate(team.owner, theo, Q1)).statusCode).toBe(200);
+
+    const outcome = await team.app.modules.payroll.jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statement.id),
+      quiet,
+    );
+    expect(outcome).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
+    const [invoice] = await admin.select().from(schema.invoices).where(eq(schema.invoices.memberId, theo.id));
+    if (invoice === undefined) throw new Error('no invoice');
+    const lines = await admin
+      .select()
+      .from(schema.invoiceLines)
+      .where(eq(schema.invoiceLines.invoiceId, invoice.id))
+      .orderBy(schema.invoiceLines.position);
+    expect(lines.map((line) => [line.kind, line.amountMinor])).toEqual([
+      ['commission', statement.commissionMinor],
+      ['tier_bonus', 3_000],
+      ['collective_bonus', 1_000],
+      ['bonus', 2_000],
+    ]);
+    expect(invoice.exclVatMinor).toBe(statement.commissionMinor + 6_000);
   });
 });
