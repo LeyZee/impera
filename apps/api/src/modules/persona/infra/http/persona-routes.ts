@@ -9,7 +9,7 @@ import {
   type CreatorId,
   type CurrentUser,
 } from '@nirvana/contracts';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -40,6 +40,7 @@ function actorFor(request: FastifyRequest, creatorId: CreatorId): CurrentUser {
 export function createPersonaRoutes(
   store: PersonaVersionStore,
   requireRole: RequireRole,
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
@@ -77,8 +78,10 @@ export function createPersonaRoutes(
     app.post(
       '/creators/:creatorId/persona/versions/:versionId/activate',
       {
-        // The one the agent writes with: the same people who change her persona choose it.
-        preValidation: requireRole('owner', 'creator'),
+        // The one the agent writes with: the same people who change her persona choose it. It changes what the agent
+        // says of her to every fan, so a sign-in of less than 10 minutes is asked, as for her hours (audit de
+        // sécurité du 02/11, M1): a stolen session or a laptop left open is not enough.
+        preValidation: [requireRole('owner', 'creator'), recentLogin],
         schema: {
           params: ActivatePersonaVersionParamsSchema,
           body: ActivatePersonaVersionBodySchema,

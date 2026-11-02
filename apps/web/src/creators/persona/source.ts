@@ -1,5 +1,6 @@
 import {
   ApiErrorSchema,
+  REAUTHENTICATION_ERROR_CODE,
   PersonaOverviewSchema,
   PersonaSchema,
   PersonaSampleReplyUnprocessableDetailsSchema,
@@ -163,7 +164,8 @@ export async function saveVersion(
   return { kind: 'failed' };
 }
 
-export type ActivateResult = 'activated' | 'conflict' | 'forbidden' | 'failed';
+/** `reauth`: her persona speaks to every fan, a sign-in older than 10 minutes asks for the password again (M1). */
+export type ActivateResult = 'activated' | 'conflict' | 'reauth' | 'forbidden' | 'failed';
 
 /**
  * `POST /v1/creators/:id/persona/versions/:versionId/activate`. `expectedActive` is her active version as this screen
@@ -185,5 +187,7 @@ export async function activateVersion(
   );
   if (response.ok) return 'activated';
   if (response.status === 409) return 'conflict';
-  return response.status === 403 ? 'forbidden' : 'failed';
+  if (response.status !== 403) return 'failed';
+  const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  return error.success && error.data.error.code === REAUTHENTICATION_ERROR_CODE ? 'reauth' : 'forbidden';
 }
