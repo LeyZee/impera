@@ -82,7 +82,7 @@ const SIGN_IN_CODE_SECONDS = 10 * 60;
 /** Ten wrong codes in a row lock the account's code for 15 minutes (the plugin's own count, across sign-ins). */
 const CODE_LOCK = { enabled: true, maxFailedAttempts: 10, durationSeconds: 15 * 60 };
 
-class SessionUnauthenticated extends DomainError {
+export class SessionUnauthenticated extends DomainError {
   constructor() {
     super('session_unauthenticated', 'Connexion requise');
   }
@@ -168,13 +168,13 @@ class WrongPassword extends DomainError {
 }
 
 /** A wrong password or a wrong code on the confirmation: one answer, it does not tell which. */
-class ReauthenticationRefused extends DomainError {
+export class ReauthenticationRefused extends DomainError {
   constructor() {
     super('reauthentication_unauthenticated', 'Mot de passe ou code incorrect');
   }
 }
 
-class ReauthenticationLimited extends DomainError {
+export class ReauthenticationLimited extends DomainError {
   constructor() {
     super('reauthentication_limited', 'Trop d’essais : réessaie dans quelques minutes');
   }
@@ -345,7 +345,12 @@ function cookieOf(request: FastifyRequest, name: string): string | undefined {
  * The session of a request, as Better Auth reads it (12 hours without activity), refused past 7 days from its creation
  * whatever its use (ADR 0046 § 6): the row goes, and the request is answered as without a session.
  */
-async function sessionOf(auth: Auth, db: Database, request: FastifyRequest, now: Date = new Date()) {
+export async function sessionOf(
+  auth: Auth,
+  db: Database,
+  request: FastifyRequest,
+  now: Date = new Date(),
+): Promise<Awaited<ReturnType<Auth['api']['getSession']>>> {
   const result = await auth.api.getSession({ headers: authHeaders(request) });
   if (result === null) return null;
   if (now.getTime() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
@@ -478,6 +483,20 @@ async function codeMatches(auth: Auth, request: FastifyRequest, code: SecondFact
     if (isAPIError(error)) return false;
     throw error;
   }
+}
+
+/**
+ * The password, then a code, of the signed-in account (ADR 0046 § 3): the password first, so a wrong one never uses up a
+ * backup code. False when either is wrong.
+ */
+export async function identityConfirmed(
+  auth: Auth,
+  request: FastifyRequest,
+  userId: string,
+  password: string,
+  code: SecondFactorCode,
+): Promise<boolean> {
+  return (await passwordMatches(auth, userId, password)) && (await codeMatches(auth, request, code));
 }
 
 type Membership = Pick<Me, 'team' | 'teamScope'>;
@@ -906,10 +925,7 @@ export function createAuthRoutes(
       async (request, reply) => {
         if (request.user === null) throw new SessionUnauthenticated();
         const { password, code } = request.body;
-        const confirmed =
-          (await passwordMatches(auth, request.user.id, password)) &&
-          (await codeMatches(auth, request, code));
-        if (!confirmed) {
+        if (!(await identityConfirmed(auth, request, request.user.id, password, code))) {
           await refused(request, request.user.id, 'auth.reauthentication_refused');
           throw new ReauthenticationRefused();
         }

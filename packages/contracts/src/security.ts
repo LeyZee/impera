@@ -105,3 +105,71 @@ function ipv6Groups(address: string): string[] | null {
   if (!groups.every((group) => HEXTET.test(group))) return null;
   return groups.map((group) => parseInt(group, 16).toString(16));
 }
+
+/**
+ * One of the signed-in person's open sessions (ADR 0046 § 7), as Réglages › Sécurité lists them: its device read from
+ * the browser, its network (never the full address), when it opened and when it was last used. `id` is the session's
+ * row, never its token.
+ */
+export const OpenSessionSchema = z.object({
+  id: z.string().min(1),
+  device: z.string().min(1),
+  network: NetworkSchema.nullable(),
+  createdAt: z.iso.datetime(),
+  lastActiveAt: z.iso.datetime(),
+  /** The session this request came with: it is closed by signing out, never from the list. */
+  current: z.boolean(),
+});
+export type OpenSession = z.infer<typeof OpenSessionSchema>;
+export const OpenSessionsSchema = z.object({ sessions: z.array(OpenSessionSchema) });
+export type OpenSessions = z.infer<typeof OpenSessionsSchema>;
+
+/** What closing sessions ended: the sessions, and the trusted devices forgotten with them. */
+export const ClosedSessionsSchema = z.object({
+  sessions: z.number().int().min(0),
+  trustedDevices: z.number().int().min(0),
+});
+export type ClosedSessions = z.infer<typeof ClosedSessionsSchema>;
+
+/** For the owner (ADR 0046 § 7): each account's second factor and open sessions, never their devices or networks. */
+export const AccountSecuritySchema = z.object({
+  userId: z.string().min(1),
+  name: z.string(),
+  role: UserRoleSchema,
+  secondFactor: z.boolean(),
+  sessions: z.number().int().min(0),
+  lastActiveAt: z.iso.datetime().nullable(),
+});
+export type AccountSecurity = z.infer<typeof AccountSecuritySchema>;
+export const AccountsSecuritySchema = z.object({ accounts: z.array(AccountSecuritySchema) });
+export type AccountsSecurity = z.infer<typeof AccountsSecuritySchema>;
+
+const BROWSERS: readonly (readonly [RegExp, string])[] = [
+  [/\bEdg(?:e|A|iOS)?\//u, 'Edge'],
+  [/\b(?:OPR|Opera)\//u, 'Opera'],
+  [/\bSamsungBrowser\//u, 'Samsung Internet'],
+  [/\b(?:Firefox|FxiOS)\//u, 'Firefox'],
+  [/\b(?:Chrome|CriOS)\//u, 'Chrome'],
+  [/\bVersion\/[\d.]+.*\bSafari\//u, 'Safari'],
+];
+const SYSTEMS: readonly (readonly [RegExp, string])[] = [
+  [/\biPhone\b/u, 'iPhone'],
+  [/\biPad\b/u, 'iPad'],
+  [/\bAndroid\b/u, 'Android'],
+  [/\bWindows\b/u, 'Windows'],
+  [/\bMac OS X\b|\bMacintosh\b/u, 'Mac'],
+  [/\bCrOS\b/u, 'ChromeOS'],
+  [/\bLinux\b/u, 'Linux'],
+];
+
+/**
+ * A device as a person recognises it, from its browser's `User-Agent`: « Chrome sur Windows », « Safari sur iPhone ».
+ * What cannot be read says « Appareil inconnu »; nothing of the string itself is shown.
+ */
+export function deviceOf(userAgent: string | null | undefined): string {
+  if (userAgent === null || userAgent === undefined) return 'Appareil inconnu';
+  const browser = BROWSERS.find(([pattern]) => pattern.test(userAgent))?.[1];
+  const system = SYSTEMS.find(([pattern]) => pattern.test(userAgent))?.[1];
+  if (browser !== undefined && system !== undefined) return `${browser} sur ${system}`;
+  return browser ?? system ?? 'Appareil inconnu';
+}
