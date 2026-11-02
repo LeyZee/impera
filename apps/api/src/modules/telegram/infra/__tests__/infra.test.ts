@@ -329,6 +329,23 @@ describe('reading the outbox', () => {
       document: 'credit_note',
     });
     expect(contested({ ...contest, document: 'receipt' })).toBeUndefined();
+    // EQ-06 lot 5c-2: the document's kind and last day, the member's id for the link; a name is never read.
+    const expiring = (payload: object) =>
+      toScannedEvent({ ...base, type: 'contractor_document_expiring', payload })?.signal;
+    const reminder = {
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      documentId: '018f3e5c-0000-7000-8000-000000000004',
+      kind: 'urssaf_vigilance',
+      lastDay: '2026-12-15',
+    };
+    expect(expiring({ ...reminder, legalName: 'Kofi Inventé' })).toEqual({
+      kind: 'contractor_document_expiring',
+      memberId: '018f3e5c-0000-7000-8000-000000000001',
+      document: 'urssaf_vigilance',
+      lastDay: '2026-12-15',
+    });
+    expect(expiring({ ...reminder, kind: 'passport' })).toBeUndefined();
+    expect(expiring({ ...reminder, lastDay: '15/12/2026' })).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,
