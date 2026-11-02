@@ -2,8 +2,9 @@ import { schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
+import type { JobLogger } from '../../contractors/domain/ports';
 import { fetchExchangeRates } from '../application/exchange-rates';
-import type { JobLogger, RateJobSince } from '../domain/ports';
+import type { RateJobSince } from '../domain/ports';
 import { createEcbSource, type GetLike } from '../infra/ecb';
 import { createPostgresRateAlerts } from '../infra/rate-alerts';
 import { createDrizzlePayrollRateStore } from '../infra/rate-store';

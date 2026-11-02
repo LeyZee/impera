@@ -1,10 +1,10 @@
 import type { InvoiceContractor } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { invoicePdfRetainUntil } from '../../../contractors/domain/retention';
 import {
   invoicePdfContent,
   invoicePdfKey,
-  invoicePdfRetainUntil,
   type InvoicePdfContent,
   type PdfDocumentSource,
 } from '../invoice-pdf';

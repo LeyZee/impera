@@ -141,7 +141,9 @@ describe('Réglages › Sauvegardes', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Noter l’essai' }));
     fireEvent.change(await within(dialog).findByLabelText('Mot de passe'), { target: { value: 'secret' } });
-    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
 
     expect(await screen.findByRole('heading', { name: 'Essai noté' })).toBeTruthy();
@@ -270,7 +272,9 @@ describe('Réglages › Sauvegardes', () => {
     expect(button.className).toContain('nv-btn--soft');
     fireEvent.click(button);
     fireEvent.change(await screen.findByLabelText('Mot de passe'), { target: { value: 'secret' } });
-    fireEvent.change(screen.getByLabelText('Code à 6 chiffres'), { target: { value: '123456' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
     // « Noter un essai » stays the page's one neon while the password is asked here.
     expect(screen.getByRole('button', { name: 'Confirmer' }).className).toContain('nv-btn--soft');
     expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);

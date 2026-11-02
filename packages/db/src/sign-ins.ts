@@ -1,4 +1,4 @@
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq, like, ne } from 'drizzle-orm';
 
 import type { Transaction } from './client';
 import { session, twoFactor, user, verification } from './schema/auth';
@@ -13,14 +13,20 @@ const TRUSTED_DEVICE_PREFIX = 'trust-device-';
  * Ends every way an account is signed in (`null`: every account): its sessions and its trusted devices, which would
  * otherwise skip the code at the next sign-in for 30 days. Run by every step that must sign an account out everywhere
  * (a reset link, a reset of the second factor, a departure, `ops:revoke-sessions`), in the caller's transaction.
+ * `keepSessionId` spares one session, the one closing all the others (Réglages › Sécurité, SEC-04): its trusted devices
+ * go all the same.
  */
 export async function revokeSignIns(
   tx: Transaction,
   userId: string | null,
+  options: { readonly keepSessionId?: string } = {},
 ): Promise<{ readonly sessions: number; readonly trustedDevices: number }> {
+  const ofAccount = userId === null ? undefined : eq(session.userId, userId);
   const sessions = await tx
     .delete(session)
-    .where(userId === null ? undefined : eq(session.userId, userId))
+    .where(
+      options.keepSessionId === undefined ? ofAccount : and(ofAccount, ne(session.id, options.keepSessionId)),
+    )
     .returning({ id: session.id });
   const isTrustedDevice = like(verification.identifier, `${TRUSTED_DEVICE_PREFIX}%`);
   const devices = await tx

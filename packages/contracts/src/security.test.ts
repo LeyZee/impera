@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { REAUTHENTICATION_ERROR_CODE } from './auth';
 import { EVENT_PAYLOADS } from './events';
-import { networkOf, SecurityAlertPayloadSchema } from './security';
+import { deviceOf, networkOf, SECURITY_SETTINGS_ERROR_CODES, SecurityAlertPayloadSchema } from './security';
 
 describe('networkOf', () => {
   it('keeps the first three bytes of an IPv4', () => {
@@ -69,5 +70,41 @@ describe('security_alert', () => {
       }).success,
     ).toBe(false);
     expect(SecurityAlertPayloadSchema.safeParse({ reason: 'leak', userId: null }).success).toBe(false);
+  });
+});
+
+describe('deviceOf', () => {
+  it('names the browser and the system a person recognises', () => {
+    expect(
+      deviceOf(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      ),
+    ).toBe('Chrome sur Windows');
+    expect(
+      deviceOf(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
+      ),
+    ).toBe('Safari sur iPhone');
+    expect(
+      deviceOf(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+      ),
+    ).toBe('Edge sur Mac');
+    expect(deviceOf('Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0')).toBe(
+      'Firefox sur Android',
+    );
+  });
+
+  it('says it does not know rather than showing the string', () => {
+    expect(deviceOf(null)).toBe('Appareil inconnu');
+    expect(deviceOf('curl/8.4.0')).toBe('Appareil inconnu');
+    expect(deviceOf('node')).toBe('Appareil inconnu');
+  });
+});
+
+describe('SECURITY_SETTINGS_ERROR_CODES', () => {
+  it('publishes the refusals of Réglages › Sécurité, the confirmation of a sensitive action among them', () => {
+    expect(SECURITY_SETTINGS_ERROR_CODES).toContain('session_current_conflict');
+    expect(SECURITY_SETTINGS_ERROR_CODES).toContain(REAUTHENTICATION_ERROR_CODE);
   });
 });

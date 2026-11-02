@@ -9,8 +9,9 @@ import type {
   UserId,
 } from '@nirvana/contracts';
 
+import type { Actor, JobLogger } from '../../contractors/pure';
 import { InvoiceNotFound } from '../domain/errors';
-import type { Actor, JobLogger, PayrollInvoiceAcceptanceStore } from '../domain/ports';
+import type { PayrollInvoiceAcceptanceStore } from '../domain/ports';
 
 /**
  * A document's acceptance (EQ-06 lot 6, ADR 0039 § 1 to 5): the contractor alone answers « J'accepte » or « Je conteste »

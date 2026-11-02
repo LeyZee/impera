@@ -260,26 +260,41 @@ const SCREENS = {
   '/commissions/factures': 'Factures',
   '/moi/dossier': 'Dossier',
   '/moi/factures': 'Factures',
+  '/moi/securite': 'Sécurité',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
   '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
+  '/reglages/securite': 'Sécurité',
 } as const;
 export type ScreenPath = keyof typeof SCREENS;
+
+/**
+ * Where an account finds its own sessions and backup codes (SEC-04), from its menu: the owner in Réglages, a manager or
+ * a chatter in Moi, anyone else (an operator, a creator) on a page outside the rail.
+ */
+export const ACCOUNT_SECURITY = '/compte/securite';
+export function securityPathOf(me: Me): '/reglages/securite' | '/moi/securite' | typeof ACCOUNT_SECURITY {
+  if (me.role === 'owner') return '/reglages/securite';
+  return canOpen(railOf(me), '/moi') ? '/moi/securite' : ACCOUNT_SECURITY;
+}
 
 /** The name of a screen inside its section, for its sub-tab. */
 export const screenLabel = (to: ScreenPath): string => SCREENS[to];
 
 const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREENS));
 
-/** Help pages, open to every role outside the rail (CR-01). */
-const HELP_TITLES: ReadonlyMap<string, string> = new Map([['/aide/installer', 'Installer Nirvana']]);
+/** Pages open to every role outside the rail: help (CR-01), the account's security (SEC-04). */
+const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
+  ['/aide/installer', 'Installer Nirvana'],
+  [ACCOUNT_SECURITY, 'Sécurité'],
+]);
 
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
 export function documentTitle(pathname: string, section: Section | null, kind: RailKind): string {
-  const help = HELP_TITLES.get(pathname.replace(/\/+$/u, ''));
+  const help = OFF_RAIL_TITLES.get(pathname.replace(/\/+$/u, ''));
   if (help !== undefined) return `${help} · Nirvana`;
   if (section === null) return 'Page introuvable · Nirvana';
   const path = pathname.replace(/\/+$/u, '');

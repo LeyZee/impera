@@ -22,7 +22,7 @@ import {
 } from '@nirvana/contracts';
 import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
 
-import { documentValidUntil, treatyNeedsResidence } from '../domain/billing';
+import { documentValidUntil, treatyNeedsResidence } from '../../contractors/pure';
 import type { StatementAnnexSource } from '../domain/invoice-pdf';
 import type { InvoiceLogo, InvoiceToRender, PayrollInvoicePdfStore, StoredInvoicePdf } from '../domain/ports';
 

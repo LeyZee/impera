@@ -7,7 +7,8 @@ import type {
   Withholding,
 } from '@nirvana/contracts';
 
-import type { ContractorIdentity } from './billing';
+import type { ContractorIdentity } from '../../contractors/pure';
+
 import { settlementsDue, type SettlementCarryOver, type SettlementStatement } from './settlements';
 
 /**

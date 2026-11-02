@@ -1,0 +1,11 @@
+/* The code of a confirmation: its label above, as every field's (`nv-field`), the field short beside the password. */
+.nv-code {
+  flex: 0 1 11rem;
+  min-width: 8.5rem;
+}
+.nv-code__label {
+  white-space: nowrap;
+}
+.nv-code > input {
+  width: 100%;
+}

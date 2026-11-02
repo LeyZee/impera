@@ -171,7 +171,7 @@ describe('Réglages › Sauvegardes', () => {
     );
   });
 
-  it('is a tab of the owner, after Telegram, the pay rules and the billing (EQ-06)', async () => {
+  it('is a tab of the owner, after Telegram, the pay rules and the billing (EQ-06), before Sécurité (SEC-04)', async () => {
     const router = renderApp(owner, '/reglages/sauvegardes');
     expect(await subTabs()).toEqual([
       'Modèles IA',
@@ -180,6 +180,7 @@ describe('Réglages › Sauvegardes', () => {
       'Règles de paie',
       'Facturation',
       'Sauvegardes',
+      'Sécurité',
     ]);
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
@@ -191,6 +192,7 @@ describe('Réglages › Sauvegardes', () => {
       '/reglages/alertes',
       '/reglages/regles-de-paie',
       '/reglages/facturation',
+      '/reglages/securite',
       '/reglages/apparence',
     ]) {
       for (const user of [
@@ -507,6 +509,58 @@ describe('the account’s menu (NAV-02, NAV-03)', () => {
         'Appareil suit le réglage clair ou sombre du téléphone ou de l’ordinateur. Le choix vaut pour ce navigateur.',
       ),
     ).toBeDefined();
+  });
+});
+
+describe('the account’s security, from its menu (SEC-04)', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
+  const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
+
+  it('leads each role to its own screen', async () => {
+    for (const [user, path] of [
+      [owner, '/reglages/securite'],
+      [manager, '/moi/securite'],
+      [chatter, '/moi/securite'],
+      [operator, '/compte/securite'],
+      [creator, '/compte/securite'],
+    ] satisfies [Me, string][]) {
+      renderApp(user, '/suivi');
+      fireEvent.click(await screen.findByRole('button', { name: /Nora/u }));
+      const menu = document.getElementById('nv-user-menu');
+      if (menu === null) throw new Error('no menu');
+      expect(within(menu).getByRole('link', { name: 'Sécurité' }).getAttribute('href')).toBe(path);
+      cleanup();
+    }
+  });
+
+  it('opens outside the rail for an operator or a creator, never sent home', async () => {
+    for (const user of [operator, creator]) {
+      const router = renderApp(user, '/compte/securite');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Sécurité' })).toBeDefined();
+      expect(router.state.location.pathname).toBe('/compte/securite');
+      expect(document.title).toBe('Sécurité · Nirvana');
+      expect(screen.queryByRole('heading', { name: 'Comptes de l’agence' })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('is in « Plus » on the phone', async () => {
+    renderApp(creator, '/');
+    fireEvent.click(await screen.findByRole('button', { name: 'Plus' }));
+    const sheet = screen.getByRole('dialog', { name: 'Plus' });
+    expect(within(sheet).getByRole('link', { name: 'Sécurité' }).getAttribute('href')).toBe(
+      '/compte/securite',
+    );
   });
 });
 

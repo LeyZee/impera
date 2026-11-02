@@ -11,7 +11,8 @@ import {
   type RegimeVat,
 } from '@nirvana/contracts';
 
-import { addDays } from './billing';
+import { addDays } from '../../contractors/pure';
+
 import { CreditNoteExceedsInvoice } from './errors';
 import { BPS, mulDivRound } from './rounding';
 

@@ -21,11 +21,11 @@ import {
 import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createMemoryInvoiceStore } from '../modules/payroll';
-import { addDays } from '../modules/payroll/domain/billing';
-import { documentRetainUntil, documentStorageKey } from '../modules/payroll/domain/documents';
-import { invoicePdfRetainUntil } from '../modules/payroll/domain/invoice-pdf';
-import { transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
+import { addDays } from '../modules/contractors/domain/billing';
+import { documentRetainUntil, documentStorageKey } from '../modules/contractors/domain/documents';
+import { invoicePdfRetainUntil } from '../modules/contractors/domain/retention';
+import { transparentLogo } from '../modules/contractors/infra/__tests__/invented-png';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -162,7 +162,7 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
       sql`delete from graphile_worker._private_jobs where key like 'payroll.lock_payout_certificate:%'`,
     );
   const lockCertificates = (id: CommissionStatementId | null) =>
-    payroll().jobs.lockPayoutCertificates(id, quiet);
+    team.app.modules.contractors.jobs.lockPayoutCertificates(id, quiet);
 
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'), { invoiceBuckets: { primary, copy } });

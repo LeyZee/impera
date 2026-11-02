@@ -645,7 +645,9 @@ describe('a link from the sheet', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
     const password = await screen.findByLabelText('Ton mot de passe');
     fireEvent.change(password, { target: { value: 'mot-de-passe-invente' } });
-    fireEvent.change(screen.getByLabelText('Ton code à 6 chiffres'), { target: { value: '123456' } });
+    fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     expect(await screen.findByLabelText('Lien à envoyer')).toBeDefined();
     expect(confirmIdentity).toHaveBeenCalledWith('mot-de-passe-invente', '123456');

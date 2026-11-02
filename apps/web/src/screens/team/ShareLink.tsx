@@ -242,7 +242,7 @@ function PasswordStep({
           aria-invalid={failure !== null}
           disabled={busy}
         />
-        <CodeInput ref={codeInput} disabled={busy} invalid={failure !== null} label="Ton code à 6 chiffres" />
+        <CodeInput ref={codeInput} disabled={busy} invalid={failure !== null} />
         <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={busy} aria-busy={busy}>
           Confirmer
         </button>

@@ -9,7 +9,7 @@ import {
 } from '@nirvana/contracts';
 import { schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 
-import { addDays } from '../domain/billing';
+import { addDays } from '../../contractors/pure';
 import { invoiceDueState } from '../domain/invoices';
 import { payoutDecision } from '../domain/payouts';
 import type { PayrollInvoiceDueStore } from '../domain/ports';

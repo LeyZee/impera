@@ -8,7 +8,7 @@ import {
 
 import { addMonths } from './billing';
 import { ContractorDocumentInvalid } from './errors';
-import { invoicePdfRetainUntil } from './invoice-pdf';
+import { invoicePdfRetainUntil } from './retention';
 
 /**
  * The files of a contractor's documents (EQ-06 lot 5c): what a file is, where it is kept, and how long it is locked.

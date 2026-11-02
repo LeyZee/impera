@@ -7,3 +7,5 @@ pnpm-lock.yaml
 packages/db/migrations/*.sql
 # Markdown is written by people and agents; no formatter rewrites it.
 *.md
+# Written by the tests themselves (toMatchFileSnapshot), byte for byte.
+**/__snapshots__

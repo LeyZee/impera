@@ -16,9 +16,9 @@ import { eq, schema, withMember, type Transaction, type Database } from '@nirvan
 import { AgencyLogoNotFound, BillingSettingsMissing, PayrollForbidden } from '../domain/errors';
 import type { PayrollBillingSettingsStore } from '../domain/ports';
 
-import { enqueueInvoiceRequeue } from './invoice-queue';
+import { audit } from './audit';
 import { pngSize } from './png';
-import { audit } from './writes';
+import type { InvoiceRequeue } from './ports';
 
 const { agencyLogos, billingSettings } = schema;
 
@@ -94,6 +94,7 @@ function changesOf(before: Saved | null, body: UpdateBillingSettingsBody): strin
 /** Réglages › Facturation (EQ-06): see `PayrollBillingSettingsStore`. */
 export function createDrizzlePayrollBillingSettingsStore(
   db: Database,
+  requeue: InvoiceRequeue,
   now: () => Date,
 ): PayrollBillingSettingsStore {
   return {
@@ -165,7 +166,7 @@ export function createDrizzlePayrollBillingSettingsStore(
         );
         // Saved settings may be what every waiting invoice lacked (`agency_missing`): each one is tried again. The
         // reminder delay alone never lets an invoice go out; `payroll.remind_documents` reads it at its next run.
-        if (changed.some((name) => name !== 'documentReminderDays')) await enqueueInvoiceRequeue(tx, null);
+        if (changed.some((name) => name !== 'documentReminderDays')) await requeue.requeue(tx, null);
         return viewOf(tx);
       }),
 

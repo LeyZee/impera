@@ -10,7 +10,7 @@ import {
 import { and, eq, inArray, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createMemoryInvoiceStore } from '../modules/payroll';
+import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
 import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
