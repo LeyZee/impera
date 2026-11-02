@@ -1,7 +1,7 @@
 import type { InvoiceId, JournalAccounts, PayPeriod, TeamMemberId } from '@nirvana/contracts';
 
 import type { Actor } from '../../contractors/pure';
-import type { StoredInvoicePdf } from '../../payroll/pure';
+import type { StoredInvoicePdf } from '../../invoicing/pure';
 
 import type { Das2Contractor } from './accounting';
 import type { JournalContractor } from './journal';

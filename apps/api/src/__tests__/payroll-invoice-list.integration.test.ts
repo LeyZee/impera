@@ -12,7 +12,7 @@ import {
 import { and, eq, schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -74,7 +74,7 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
     for (const member of [theo, lea]) {
       expect((await team.validate(team.owner, member, Q1)).statusCode).toBe(200);
       const statement = await team.statementOf(member, Q1);
-      await team.app.modules.payroll.jobs.issueInvoices(
+      await team.app.modules.invoicing.jobs.issueInvoices(
         CommissionStatementIdSchema.parse(statement.id),
         quiet,
       );
@@ -89,7 +89,7 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
       sentMinor: payableMinor,
     });
     expect(paid.statusCode, paid.body).toBe(200);
-    expect(await team.app.modules.payroll.jobs.settleDocuments(null)).toBe(1);
+    expect(await team.app.modules.invoicing.jobs.settleDocuments(null)).toBe(1);
   });
 
   afterAll(() => team.close());
@@ -245,7 +245,10 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
     await team.recalculate(Q2);
     expect((await team.validate(team.owner, lea, Q2)).statusCode).toBe(200);
     const statement = await team.statementOf(lea, Q2);
-    await team.app.modules.payroll.jobs.issueInvoices(CommissionStatementIdSchema.parse(statement.id), quiet);
+    await team.app.modules.invoicing.jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statement.id),
+      quiet,
+    );
     const invoice = await invoiceOf(lea, 'invoice', Q2);
     const credit = await invoiceOf(lea, 'credit_note', Q2);
     const firstInvoice = await invoiceOf(lea);
@@ -302,7 +305,7 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
       sentMinor: payableMinor,
     });
     expect(paid.statusCode, paid.body).toBe(200);
-    expect(await team.app.modules.payroll.jobs.settleDocuments(lea.id)).toBe(2);
+    expect(await team.app.modules.invoicing.jobs.settleDocuments(lea.id)).toBe(2);
     const settled = await documents(team.owner, `period=${Q2}`);
     expect(new Map(settled.documents.map((one) => [one.id, [one.settlement, one.due]]))).toEqual(
       new Map([
@@ -327,8 +330,11 @@ describe('Équipe › Factures : la liste des documents et leur échéance (EQ-0
     expect((await team.validate(team.owner, lea, Q3)).statusCode).toBe(200);
     const statement = await team.statementOf(lea, Q3);
     expect([statement.totalMinor, statement.payableMinor]).toEqual([0, 0]);
-    await team.app.modules.payroll.jobs.issueInvoices(CommissionStatementIdSchema.parse(statement.id), quiet);
-    expect(await team.app.modules.payroll.jobs.settleDocuments(lea.id)).toBe(2);
+    await team.app.modules.invoicing.jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statement.id),
+      quiet,
+    );
+    expect(await team.app.modules.invoicing.jobs.settleDocuments(lea.id)).toBe(2);
     const third = await documents(team.owner, `period=${Q3}`);
     expect(third.documents.map((one) => [one.kind, one.exclVatMinor, one.settlement, one.due])).toEqual([
       ['credit_note', -400, { kind: 'compensated', statementId: statement.id, on: today }, 'settled'],

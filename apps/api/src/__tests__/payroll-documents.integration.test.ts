@@ -83,7 +83,7 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
   const copy = createMemoryInvoiceStore();
 
   const db = () => team.test.admin.db;
-  const payroll = () => team.app.modules.payroll;
+  const invoicingModule = () => team.app.modules.invoicing;
   const today = () => calendarDayAt(new Date(), ZONE);
 
   const upload = (cookie: string, query: Record<string, string>, bytes: Uint8Array, memberId = kofi.id) =>
@@ -127,7 +127,8 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     db().execute(
       sql`delete from graphile_worker._private_jobs where key like 'payroll.requeue_invoice_issues:%'`,
     );
-  const issue = () => payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
+  const issue = () =>
+    invoicingModule().jobs.issueInvoices(CommissionStatementIdSchema.parse(statementId), quiet);
   /** His statement's transfer, recorded as the owner would: `null` when recorded, else the refusal. */
   const pay = async (paidOn: string) => {
     const { revision, payableMinor } = await team.statementOf(kofi, Q1);
@@ -388,7 +389,11 @@ describe('Équipe › Pièces du prestataire : déposer, vérifier, débloquer l
     const thisYearKey = documentStorageKey(kofi.id, thisYear.id, 'image/jpeg');
     const thisYearLock = primary.peek(thisYearKey)?.retainUntil;
     expect(
-      await payroll().jobs.renderInvoicePdf(InvoiceIdSchema.parse(invoice.id), { current: 1, max: 5 }, quiet),
+      await invoicingModule().jobs.renderInvoicePdf(
+        InvoiceIdSchema.parse(invoice.id),
+        { current: 1, max: 5 },
+        quiet,
+      ),
     ).toBe('stored');
     expect(primary.peek(rescanKey)?.retainUntil).toEqual(invoiceLock);
     expect(copy.peek(rescanKey)?.retainUntil).toEqual(invoiceLock);

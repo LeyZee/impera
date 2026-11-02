@@ -50,7 +50,7 @@ describe('Réglages › Facturation : l’identité de l’agence, la prestation
   let miaCookie: string;
 
   const db = () => team.test.admin.db;
-  const payroll = () => team.app.modules.payroll;
+  const invoicingModule = () => team.app.modules.invoicing;
 
   const upload = (cookie: string, bytes: Uint8Array, contentType = 'image/png') =>
     team.server.inject({
@@ -71,7 +71,7 @@ describe('Réglages › Facturation : l’identité de l’agence, la prestation
   /** Validates the member's statement of `period` and runs the issue; the invoice it wrote, if any. */
   async function issue(member: TeamMember, period: typeof Q1) {
     const { id } = await team.statementOf(member, period);
-    const outcome = await payroll().jobs.issueInvoices(CommissionStatementIdSchema.parse(id), quiet);
+    const outcome = await invoicingModule().jobs.issueInvoices(CommissionStatementIdSchema.parse(id), quiet);
     const [invoice] = await db()
       .select()
       .from(schema.invoices)

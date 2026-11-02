@@ -12,7 +12,7 @@ import { eq, schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -70,7 +70,7 @@ describe('Équipe › Factures : le journal du comptable (EQ-06 lot 7b)', () => 
         .where(eq(schema.commissionStatements.id, id));
       return;
     }
-    await team.app.modules.payroll.jobs.issueInvoices(id, quiet);
+    await team.app.modules.invoicing.jobs.issueInvoices(id, quiet);
     const { revision, payableMinor } = await team.statementOf(member, Q1);
     const paid = await team.call('POST', `/payroll/statements/${id}/pay`, team.owner, {
       revision,

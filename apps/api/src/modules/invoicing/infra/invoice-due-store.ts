@@ -16,8 +16,8 @@ import type { PayrollInvoiceDueStore } from '../domain/ports';
 import { payingStatement, settlementsDue } from '../domain/settlements';
 
 import { payoutFactsOf } from './payout-facts';
+import type { InvoicingReads } from './ports';
 import { SETTLED } from './settlement-rows';
-import type { PayInputReads } from './snapshot';
 
 const { auditLog, domainEvents, invoices } = schema;
 
@@ -45,7 +45,7 @@ async function said(tx: Transaction, type: DueAlert, invoiceId: string): Promise
  */
 export function createDrizzleInvoiceDueStore(
   adminDb: Database,
-  reads: Pick<PayInputReads, 'agencyTimeZone'>,
+  reads: InvoicingReads,
   now: () => Date,
 ): PayrollInvoiceDueStore {
   return {

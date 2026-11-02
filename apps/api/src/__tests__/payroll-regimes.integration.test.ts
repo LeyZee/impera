@@ -74,7 +74,7 @@ describe('Équipe › Régimes de facturation : écrire, valider, attribuer (EQ-
   let miaCookie: string;
 
   const db = () => team.test.admin.db;
-  const payroll = () => team.app.modules.payroll;
+  const invoicingModule = () => team.app.modules.invoicing;
   const today = () => calendarDayAt(new Date(), ZONE);
 
   const addRegime = (cookie: string, body: object) =>
@@ -195,7 +195,7 @@ describe('Équipe › Régimes de facturation : écrire, valider, attribuer (EQ-
   it('gives a contractor a regime of his country from today or later, and tries his invoices on that day', async () => {
     expect((await team.validate(team.owner, theo, Q1)).statusCode).toBe(200);
     const statementId = CommissionStatementIdSchema.parse((await team.statementOf(theo, Q1)).id);
-    const waiting = await payroll().jobs.issueInvoices(statementId, quiet);
+    const waiting = await invoicingModule().jobs.issueInvoices(statementId, quiet);
     expect(waiting).toMatchObject({ issued: [], notIssued: [{ reason: 'no_regime' }] });
 
     const france = { id: newId(ContractorRegimeIdSchema), regimeId: invoicing.regimeId, from: today() };
@@ -239,8 +239,8 @@ describe('Équipe › Régimes de facturation : écrire, valider, attribuer (EQ-
       { memberId: theo.id },
     ]);
     await forgetJobs('payroll.issue_invoices:%');
-    expect(await payroll().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
-    const issued = await payroll().jobs.issueInvoices(statementId, quiet);
+    expect(await invoicingModule().jobs.requeueInvoiceIssues(theo.id)).toBe(1);
+    const issued = await invoicingModule().jobs.issueInvoices(statementId, quiet);
     expect(issued).toMatchObject({ kind: 'planned', issued: [{ kind: 'invoice' }], notIssued: [] });
     const [invoice] = await db()
       .select()
@@ -277,12 +277,12 @@ describe('Équipe › Régimes de facturation : écrire, valider, attribuer (EQ-
     const statementId = CommissionStatementIdSchema.parse((await team.statementOf(theo, Q2)).id);
     // His record moved to Benin after his French regime was given.
     await db().update(schema.teamMembers).set({ country: 'BJ' }).where(eq(schema.teamMembers.id, theo.id));
-    expect(await payroll().jobs.issueInvoices(statementId, quiet)).toMatchObject({
+    expect(await invoicingModule().jobs.issueInvoices(statementId, quiet)).toMatchObject({
       issued: [],
       notIssued: [{ document: 'invoice', reason: 'regime_country_mismatch' }],
     });
     await db().update(schema.teamMembers).set({ country: 'FR' }).where(eq(schema.teamMembers.id, theo.id));
-    expect(await payroll().jobs.issueInvoices(statementId, quiet)).toMatchObject({
+    expect(await invoicingModule().jobs.issueInvoices(statementId, quiet)).toMatchObject({
       issued: [{ kind: 'invoice' }],
       notIssued: [],
     });

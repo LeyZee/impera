@@ -1,0 +1,5 @@
+# 2026-11-02 — ARC-06 : les factures et avoirs sortis de la paie — in_progress
+Fait : ARC-05 fusionnée (#410). Module `invoicing` créé depuis `payroll` : émission, PDF et copies (polices comprises), acceptation et contestation, rapprochement, liste et échéances, leurs routes `/v1/payroll/invoices/…` et leurs neuf jobs (`wiring/invoicing.ts`). La paie déclare `PayoutGate` et `AfterValidation` (`payroll/infra/ports.ts`), branchés par le composition root ; elle écrit les ajustements d'une contestation fondée par `correctContest`. `accounting` lit désormais `invoicing`. Test d'intégration du cas concurrent : un avoir émis pendant un paiement.
+Décisions : `payouts.ts` (la décision) va aux factures, `PayoutHold` (le motif du refus) reste à la paie ; le verrou du certificat passe aussi par `AfterValidation` comme l'écrit l'ADR. Les ports gardent leur nom `Payroll*` pour un diff lisible.
+Pas fait : ports de lecture des tables croisées et tests d'architecture (ARC-07).
+Découvertes : rien de nouveau.

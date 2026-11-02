@@ -34,9 +34,10 @@ import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './m
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { FansModule } from './modules/fans';
+import { invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
 import type { NotificationsModule } from './modules/notifications';
-import { invoiceRequeue, type PayrollModule } from './modules/payroll';
+import type { PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
 import type { ProvidersModule } from './modules/providers';
@@ -56,6 +57,7 @@ import { wireConnectors } from './wiring/connectors';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireFans } from './wiring/fans';
+import { wireInvoicing } from './wiring/invoicing';
 import { wireMedia } from './wiring/media';
 import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
@@ -85,6 +87,7 @@ interface Modules {
   readonly scheduling: SchedulingModule;
   readonly contractors: ContractorsModule;
   readonly payroll: PayrollModule;
+  readonly invoicing: InvoicingModule;
   readonly accounting: AccountingModule;
   /** Null in the worker, or when its persona cannot be read: the API starts without the playground and says why. */
   readonly playground: PlaygroundModule | null;
@@ -132,7 +135,7 @@ const fromRepoRoot = (path: string): string =>
  * The fonts of the invoices' PDFs, beside their renderer: `src/` in development and `dist/` once built both sit one
  * level under `apps/api`, and the image copies the folder to the same place (Dockerfile).
  */
-const INVOICE_FONTS_DIR = fileURLToPath(new URL('../src/modules/payroll/infra/fonts/', import.meta.url));
+const INVOICE_FONTS_DIR = fileURLToPath(new URL('../src/modules/invoicing/infra/fonts/', import.meta.url));
 
 /**
  * Production only: when the rate job was first scheduled, so that a currency that never got a rate is alerted too
@@ -253,11 +256,16 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     team: team.module,
     rateJobSince: rateJobSince(config, adminDb.db),
+    ...(options.payrollClock !== undefined && { now: options.payrollClock }),
+  });
+  const invoicing = wireInvoicing(shared, {
+    scheduling: scheduling.module,
+    payroll: payroll.module,
     invoiceFontsDir: INVOICE_FONTS_DIR,
     invoiceBuckets: contractors.buckets,
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });
-  const accounting = wireAccounting(shared, { scheduling: scheduling.module, payroll: payroll.module });
+  const accounting = wireAccounting(shared, { scheduling: scheduling.module, invoicing: invoicing.module });
   const playground = await wirePlayground(shared, {
     llm,
     persona: persona.module,
@@ -306,6 +314,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     contractors: contractors.module,
     payroll: payroll.module,
+    invoicing: invoicing.module,
     accounting: accounting.module,
     agent: agent.module,
     media: media.module,
@@ -328,6 +337,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...team.tasks,
     ...contractors.tasks,
     ...payroll.tasks,
+    ...invoicing.tasks,
     ...notifications.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
@@ -377,6 +387,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scheduling.routes,
       ...contractors.routes,
       ...payroll.routes,
+      ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
       ...providers.routes,
