@@ -1,0 +1,7 @@
+# 2026-11-02 — payer sans facture est exclu (fil Équipe) — in_progress
+Fait : un versement attend que les documents qu'il paie soient tous émis (ADR 0041, « payer sans facture est exclu », découverte de Bilan sur #362). Les factures moins les avoirs, hors taxes, du relevé et des relevés reportés dans ce versement doivent faire son total (`documentsIssued`, `domain/payouts.ts`), sinon `payout_blocked_conflict` avec la raison `documents_not_issued` et une année `null`, avant l'attestation. `payoutBlock` le dit sur le relevé ; écran : « Versement bloqué : facture ou avoir pas encore émis. » Contrat : `PayoutBlockSchema.year` nullable, `null` pour les documents seulement. Doc : README de la paie, glossaire (« Versement bloqué »), EQ-06.
+Pas fait : rien de plus dans ce périmètre.
+Décisions : une seule égalité (ADR 0036) plutôt qu'une liste de documents attendus : elle couvre la facture du relevé, ses avoirs, sa facture rectificative et les documents des relevés reportés ; sans migration.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : unitaires de la règle (facture absente quel que soit le régime, avant l'attestation ; facture d'un autre relevé ; avoir manquant ; chaîne de reports avec une quinzaine négative) ✓ ; contrat (`year` selon la raison) ✓ ; intégration `payroll-entries` (refus sans facture puis versement une fois la facture émise) et `payroll-periods` contre Postgres 16 ✓ ; toutes les intégrations de la paie (20 fichiers) ✓ ; écrans de la paie ✓.

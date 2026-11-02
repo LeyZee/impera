@@ -1,5 +1,6 @@
 import {
   AccountPayRulesIdSchema,
+  CommissionStatementIdSchema,
   newId,
   PayAdjustmentIdSchema,
   PayPeriodPageSchema,
@@ -13,6 +14,9 @@ import {
 import { schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
+import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+
+import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
 const Q1 = PayPeriodSchema.parse('2025-05-01');
@@ -96,6 +100,15 @@ describe('Paie › Relevés : la liste des quinzaines (EQ-05)', () => {
     for (const member of [theo, lea])
       expect((await team.validate(team.owner, member, Q1)).statusCode).toBe(200);
     expect((await team.validate(team.owner, mona, Q1)).statusCode).toBe(200);
+    // Never paid without its invoice (ADR 0041).
+    const invoicing = await setUpInvoicing(team, inventedLogo(), [
+      { member: theo, prefix: 'THEO', legalName: 'Théo Inventé' },
+    ]);
+    await invoicing.acceptMandate(theo);
+    await team.app.modules.payroll.jobs.issueInvoices(
+      CommissionStatementIdSchema.parse((await team.statementOf(theo, Q1)).id),
+      { warn: () => undefined, error: () => undefined },
+    );
     const paid = await team.statementOf(theo, Q1);
     const payment = {
       revision: paid.revision,

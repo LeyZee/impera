@@ -255,6 +255,10 @@ describe('a statement’s marks', () => {
     expect(payoutBlockText({ reason: 'tax_residence_unverified', year: '2027' })).toBe(
       'Versement bloqué : attestation de résidence 2027 à vérifier.',
     );
+    // Paying without an invoice is ruled out (ADR 0041): the documents first.
+    expect(payoutBlockText({ reason: 'documents_not_issued', year: null })).toBe(
+      'Versement bloqué : facture ou avoir pas encore émis.',
+    );
   });
 
   it('leaves out of a row the stage every row shares, and says what its amount is', () => {
@@ -559,6 +563,16 @@ describe('words', () => {
         names,
       ),
     ).toBe('Versement bloqué : attestation de résidence 2027 absente. Rien n’a été enregistré.');
+    expect(
+      payRefusalText(
+        {
+          kind: 'refused',
+          code: 'payout_blocked_conflict',
+          details: { reason: 'documents_not_issued', year: null },
+        },
+        names,
+      ),
+    ).toBe('Versement bloqué : facture ou avoir pas encore émis. Rien n’a été enregistré.');
     // Every form says it, the payment, the goals and the settings included, none of which has a reason.
     expect(payRefusalText({ kind: 'refused', code: 'request_invalid', details: {} }, names)).toBe(
       'Ces valeurs ne conviennent pas : vérifie le formulaire.',

@@ -20,6 +20,7 @@ import {
   PAYMENT_METHODS,
   PAYROLL_ERROR_CODES,
   PayCommissionStatementBodySchema,
+  PayoutBlockSchema,
   PayPeriodBlockSchema,
   PayPeriodSummarySchema,
   PayrollPeriodSchema,
@@ -276,6 +277,15 @@ describe('payments', () => {
         method,
       ).toEqual([['method']]);
     }
+  });
+
+  it('say why a transfer waits: a year for a certificate, none for the documents (ADR 0041)', () => {
+    const ok = (block: unknown) => PayoutBlockSchema.safeParse(block).success;
+    expect(ok({ reason: 'documents_not_issued', year: null })).toBe(true);
+    expect(ok({ reason: 'tax_residence_missing', year: '2027' })).toBe(true);
+    expect(ok({ reason: 'tax_residence_unverified', year: '2027' })).toBe(true);
+    expect(ok({ reason: 'documents_not_issued', year: '2027' })).toBe(false);
+    expect(ok({ reason: 'tax_residence_missing', year: null })).toBe(false);
   });
 });
 

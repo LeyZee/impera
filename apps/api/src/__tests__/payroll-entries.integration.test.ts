@@ -3,6 +3,7 @@ import {
   BonusIdSchema,
   BonusSchema,
   calendarDayAt,
+  CommissionStatementIdSchema,
   CommissionStatementSchema,
   newId,
   nextPayPeriod,
@@ -19,6 +20,9 @@ import {
 import { schema } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
+import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+
+import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
 /** Periods of 2025: they have ended. */
@@ -320,6 +324,20 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
       (await pay(team.owner, { reference: 'Transfert FR62 1234 5678 9000 00AB C123 456' })).statusCode,
     ).toBe(400);
     expect((await team.statementOf(theo, Q2)).status).toBe('validated');
+
+    // Paying without an invoice is ruled out (ADR 0041): the transfer waits for the documents it pays.
+    expect(team.refusal(await pay(team.owner))).toEqual({
+      code: 'payout_blocked_conflict',
+      details: { reason: 'documents_not_issued', year: null },
+    });
+    const invoicing = await setUpInvoicing(team, inventedLogo(), [
+      { member: theo, prefix: 'THEO', legalName: 'Théo Inventé' },
+    ]);
+    await invoicing.acceptMandate(theo);
+    await team.app.modules.payroll.jobs.issueInvoices(CommissionStatementIdSchema.parse(id), {
+      warn: () => undefined,
+      error: () => undefined,
+    });
 
     const paid = await pay(team.owner, { reference: '  WR-0412 ' });
     expect(paid.statusCode, paid.body).toBe(200);
