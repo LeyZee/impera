@@ -5,7 +5,7 @@
 - TypeScript strict (`tsconfig.base.json` : `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`). ESM partout (`"type": "module"`).
 - Pas de `any`. Pas de `as X` pour contourner le typage ; un `as const` ou un garde de type (`is`) sont les seules formes acceptées. `unknown` aux frontières, puis Zod.
 - Pas de classes pour le domaine sauf machines d'état et erreurs. Fonctions pures + types. Les services d'infra peuvent être des classes ou des fabriques `createX(deps)`.
-- Injection de dépendances **manuelle** : chaque module exporte `createXModule(deps)` ; la composition se fait dans `apps/api/src/composition-root.ts`. Pas de conteneur DI.
+- Injection de dépendances **manuelle** : chaque module exporte `createXModule(deps)` ; chaque module est assemblé par son fichier `apps/api/src/wiring/<module>.ts` (services, routes, jobs nommés d'après lui), et `apps/api/src/composition-root.ts` garde l'ordre d'assemblage et les dépendances communes ; lui seul importe `wiring/` (ADR 0047 § 3, vérifié par ESLint). Pas de conteneur DI.
 - Erreurs : une classe de base `DomainError` (code, message, `cause`), des sous-classes par module (`ConversationNotFound`, `SendRejected`), jamais de `throw "string"`. Les résultats attendus (validation, refus) sont des valeurs : un type `Result<T, E>` maison dans `packages/contracts` (pas de `neverthrow`), les imprévus sont des exceptions.
 - Identifiants : UUID v7 (`v7()` de la bibliothèque `uuid`), générés par l'application, typés par marque (`type ConversationId = Brand<string, 'ConversationId'>`).
 - Argent : entiers en centimes + code devise ISO (`{ amountMinor: number; currency: 'EUR' }`). Jamais de nombre à virgule.
