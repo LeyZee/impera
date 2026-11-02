@@ -302,7 +302,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const persona = createPersonaModule({
     db: db.db,
     requireRole,
-    recentLogin: createRequireRecentLogin(auth),
+    recentLogin: createRequireRecentLogin(auth, db.db),
     // An example the voice imitates never teaches what a hard guard blocks (P5-01).
     sampleReplyFaults,
   });
@@ -420,7 +420,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     fans,
     sender: connectors.outboundSender,
     requireRole,
-    recentLogin: createRequireRecentLogin(auth),
+    recentLogin: createRequireRecentLogin(auth, db.db),
     voice: activeVoice,
     guard,
     composer,
@@ -867,7 +867,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         adminDb: adminDb.db,
         config,
         requireRole,
-        recentLogin: createRequireRecentLogin(auth),
+        recentLogin: createRequireRecentLogin(auth, db.db),
         passwordBreaches,
       }),
       modules.conversations.routes,
@@ -877,14 +877,25 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       modules.team.routes(requireRole),
       modules.scheduling.routes(requireRole),
       modules.payroll.routes(requireRole),
-      modules.backups.routes({ guard: requireRole('owner'), recentLogin: createRequireRecentLogin(auth) }),
-      modules.providers.routes({ guard: requireRole('owner'), recentLogin: createRequireRecentLogin(auth) }),
+      modules.backups.routes({
+        guard: requireRole('owner'),
+        recentLogin: createRequireRecentLogin(auth, db.db),
+      }),
+      modules.providers.routes({
+        guard: requireRole('owner'),
+        recentLogin: createRequireRecentLogin(auth, db.db),
+      }),
       modules.connectors.routes,
       modules.supervision.routes,
       ...(playground === null ? [] : [playground.routes({ guard: requireRole('owner') })]),
       ...(telegram === null
         ? []
-        : [telegram.routes({ guard: requireRole('owner'), recentLogin: createRequireRecentLogin(auth) })]),
+        : [
+            telegram.routes({
+              guard: requireRole('owner'),
+              recentLogin: createRequireRecentLogin(auth, db.db),
+            }),
+          ]),
     ],
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),
