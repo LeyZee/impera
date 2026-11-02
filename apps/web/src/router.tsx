@@ -11,6 +11,7 @@ import { CreatorsPage } from './creators/CreatorsPage';
 import { creatorsSearch, parseCreatorsSearch } from './creators/search';
 import { parsePaySearch } from './payroll/model';
 import { InstallPage } from './pwa/InstallPage';
+import { NotificationsPage } from './pwa/NotificationsPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyFilePage } from './screens/me/MyFilePage';
@@ -581,9 +582,16 @@ const installHelp = createRoute({
   path: '/aide/installer',
   component: InstallPage,
 });
+/** /notifications (CR-01): every role, from the account's menu; this device and the account's quiet hours. */
+const notifications = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/notifications',
+  component: NotificationsPage,
+});
 
 const routeTree = rootRoute.addChildren([
   installHelp,
+  notifications,
   dashboard,
   creators,
   train.addChildren([trainIndex, playground, corrections, tests]),

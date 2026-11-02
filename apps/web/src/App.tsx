@@ -11,6 +11,7 @@ import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
 import { readSession, signOut } from './auth/session';
 import { forgetDevice } from './pwa/device';
+import { refreshPushSubscription, turnOffPush } from './pwa/push';
 import { createAppRouter, type RouterContext } from './router';
 import { railOf } from './shell/nav';
 
@@ -46,6 +47,8 @@ export function App(): JSX.Element {
       (current) => {
         // No session any more (signed out here, revoked or expired elsewhere): the device forgets what it kept.
         if (current.kind === 'signed_out') void forgetDevice();
+        // Signed in: the device's subscription is told to the server again, renewed if the server's key changed.
+        if (current.kind === 'signed_in') void refreshPushSubscription();
         setSession(
           current.kind === 'signed_in'
             ? { status: 'signed_in', user: current.user }
@@ -63,9 +66,12 @@ export function App(): JSX.Element {
 
   const leave = useCallback(() => {
     setSignOutFailed(false);
-    signOut().then(refresh, () => {
-      setSignOutFailed(true);
-    });
+    // While the session still opens the door: the server forgets this device before the account leaves it.
+    turnOffPush()
+      .then(signOut)
+      .then(refresh, () => {
+        setSignOutFailed(true);
+      });
   }, [refresh]);
 
   useEffect(() => {
