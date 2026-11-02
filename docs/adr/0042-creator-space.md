@@ -34,8 +34,9 @@ La lecture fonctionnelle d'Imperium du 02/11 (hors dépôt) a donné la chaîne 
 
 - **Elle voit tout son compte**, en lecture : ses ventes avec le fan qui a acheté, ses fans (pseudo, dépenses, notes), les conversations de ses comptes, ses médias et leurs descriptions, les publications prévues et passées, qui est en poste sur elle (nom affiché et créneau).
 - **Elle ne voit jamais l'équipe** : ni `team_members` (taux, pays, statut, dossier), ni relevé, facture, avoir ou versement d'un prestataire, ni les retours de l'IA à un chatteur (ADR 0043). Un chatteur n'apparaît chez elle que par son nom affiché, par la vue déjà prévue par l'ADR 0023.
+- **Restent fermés aussi** : les brouillons non envoyés, les verdicts des gardes, le journal des appels au modèle (`llm_calls`) et les prompts, les notes de supervision, et l'auteur d'un message envoyé (chatteur ou agent, ADR 0021). Elle voit le message, jamais qui l'a écrit.
 - **Elle n'écrit jamais à un fan depuis Nirvana** : les conversations sont en lecture seule pour elle.
-- La base dit la même chose que l'écran : les tables de l'équipe et de la paie restent fermées au rôle `creator` (scope `self` sans ligne de membre), et un test d'intégration RLS le prouve.
+- La base dit la même chose que l'écran. Les lectures de la créatrice passent par un chemin qui pose son rôle et son `creator_id`, lu côté serveur dans son compte, jamais dans la requête. Sur `conversations`, `messages`, `fans` et `media_descriptions`, une politique RLS restrictive refuse au rôle `creator` toute création, modification et suppression ; ses trois écritures permises (la description d'un de ses médias, la légende d'une de ses publications, le retrait d'une publication prévue) ont chacune leur politique propre. Les tables de l'équipe et de la paie restent fermées au rôle `creator` (scope `self` sans ligne de membre). Un test d'intégration RLS prouve chacun de ces points.
 - **Droit de regard, jamais obligation** : elle peut corriger la description d'un de ses médias et la légende d'une de ses publications, ou retirer une publication prévue. Aucun traitement n'attend son geste. Une validation de description (ADR 0030 § 3) porte désormais l'utilisateur qui valide, membre de l'agence ou créatrice du média, référencé par son identifiant de compte, jamais un texte libre.
 
 ### 3. Personne ne lui impose rien
@@ -72,13 +73,16 @@ La lecture fonctionnelle d'Imperium du 02/11 (hors dépôt) a donné la chaîne 
 
 ### 7. Notifications
 
-- Web Push (clés VAPID en configuration, jamais dans le dépôt), abonnement par appareil, préférences par compte.
+- Web Push, sans aucune saisie : le serveur crée sa paire de clés VAPID au premier démarrage et garde la clé privée chiffrée en base, comme les autres secrets (ADR 0016), jamais en configuration ni dans le dépôt. La renouveler depuis Réglages invalide les abonnements ; chaque appareil se réabonne à sa prochaine ouverture. Abonnement par appareil, préférences par compte.
 - **Une notification par vente**, regroupées seulement en rafale (plus de 3 en 2 minutes). Heures calmes réglables par elle (22 h – 8 h par défaut) : rien ne sonne, et un récapitulatif l'attend à la fin des heures calmes. Un plafond quotidien pour tout le reste (rappels, routine, série), hors ventes.
 
 ### 8. Une seule application installable, et la barre de la créatrice
 
 - Une seule PWA pour tous les rôles : même adresse, même icône, l'écran dépend du rôle (ADR 0024). Manifeste et service worker dans `apps/web` ; l'enveloppe, l'agenda et la routine se consultent et se cochent hors ligne, et se synchronisent au retour ; ventes et argent en ligne seulement. Guide d'installation à part pour iPhone (les notifications exigent l'installation) et Android.
-- La barre de la créatrice devient : **Aujourd'hui · Agenda · Ventes · Contenu · Moi**. Aujourd'hui porte sa journée, qui chatte pour elle et les dernières ventes ; Ventes porte ses gains, ses ventes et ses fans (une conversation s'ouvre depuis un fan) ; Contenu porte ses dépôts et ses publications (ADR 0044) ; Moi porte son profil, ses notifications et son lien iCal.
+- Les conversations, les fans, les ventes et l'argent n'entrent jamais dans le cache du service worker ni dans IndexedDB ; ce cache est propre au compte et vidé à la déconnexion.
+- À la déconnexion, l'abonnement Web Push de l'appareil est retiré.
+- Une coche faite hors ligne part avec une clé d'idempotence et l'heure de l'appareil ; le serveur décide du jour dans le fuseau de la créatrice et refuse une coche vieille de plus de 48 h.
+- La barre de la créatrice devient : **Aujourd'hui · Agenda · Ventes · Contenu · Moi**. Aujourd'hui porte sa journée, qui chatte pour elle et les dernières ventes ; Ventes porte ses gains, ses ventes et ses fans (une conversation s'ouvre depuis un fan) ; Contenu porte ses dépôts et ses publications (ADR 0044) ; Moi porte son profil, ses notifications et son lien iCal. L'onglet Persona que la créatrice a aujourd'hui passe dans Moi. Sur ordinateur, la créatrice a les mêmes cinq onglets.
 - Vérifié sur un iPhone (Safari) et un Android d'entrée de gamme (Chrome), Nuit et Jour, mouvement réduit, avec la barre de finition de `docs/design/README.md`.
 
 ## Ordre

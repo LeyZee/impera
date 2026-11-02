@@ -27,12 +27,14 @@ Rien de cela n'est encore observé dans Reveal : ni le téléversement, ni la pu
 
 - Un **dépôt** (`content_drop`) appartient à une créatrice, a un usage (`feed` ou `mass_dm`) et, pour le feed, une sorte : **séance** (`shoot` : photos et courtes vidéos, une publication) ou **vidéo** (`video` : une vidéo, une publication). Elle peut y ajouter une phrase sur ce qu'elle a fait, que la légende reprend.
 - Elle dépose depuis son téléphone, dans Contenu (ADR 0042 § 8) ; le propriétaire peut déposer pour elle.
+- Chaque fichier part du téléphone directement vers le stockage, par une adresse signée en plusieurs parties, sans passer par le serveur d'API, avec une taille maximale par fichier. L'empreinte `sha256` qui sert à reconnaître un fichier déjà déposé est calculée par le serveur après l'envoi, jamais reçue du téléphone.
 - Chaque fichier devient un média de la médiathèque (empreinte `sha256` unique par créatrice, ADR 0030 § 1) et reçoit sa description par le rôle `sense` (ADR 0030 § 3), qui sert à la légende et au suivi de ce qui a été envoyé. Un fichier déjà déposé (même empreinte) n'est pas repris.
 - Aucun contrôle de ce que montre le contenu : c'est l'affaire de la créatrice et de l'agence.
 
 ### 2. Conservation des fichiers déposés
 
 - Les originaux sont gardés dans le stockage objet de production, privé et chiffré, sous la créatrice, **jusqu'à leur publication ou leur envoi, puis 30 jours**. Ensuite on n'en garde que ce que garde l'ADR 0030 § 4 : l'empreinte, la durée, le type, une vignette et la description.
+- Ils vivent dans un compartiment à part, **sans verrou d'objet** : celui des factures (ADR 0037) est verrouillé dix ans et n'effacerait jamais rien. Chaque original porte sa date d'effacement en base ; un job rejouable l'efface à cette date, et une règle de cycle de vie du compartiment sert de filet. Un effacement refusé passe en ambre, jamais en silence.
 - Un dépôt jamais publié reste tant que la créatrice ou l'agence ne le retire pas. Retirer un dépôt efface ses originaux ; sa trace reste au journal.
 
 ### 3. La semaine de publications
@@ -51,13 +53,15 @@ Rien de cela n'est encore observé dans Reveal : ni le téléversement, ni la pu
 ### 5. Les Mass DM
 
 - Même dépôt (`mass_dm`), même plan à la semaine, même acceptation, même départ par le connecteur, vers une **liste de fans** lue dans Reveal.
-- **Un média n'est jamais renvoyé** : un média parti en Mass DM est marqué utilisé, et la projection « vu par ce fan » de l'ADR 0030 § 5 s'applique à chaque destinataire. La réutilisation de médias anciens demandera sa propre décision.
+- **Un média n'est jamais renvoyé**, et la base l'impose : un index unique sur le média pour l'usage `mass_dm`, et le média est marqué utilisé dans la même transaction que la mise en file de l'envoi, avec sa clé d'idempotence. La projection « vu par ce fan » de l'ADR 0030 § 5 s'applique à chaque destinataire. La réutilisation de médias anciens demandera sa propre décision.
+- Comme pour le feed, un échec ne renvoie jamais à l'aveugle : un Mass DM dont la réponse de Reveal se perd passe en ambre avec sa raison et n'est jamais relancé par le code.
 - Le prix éventuel d'un Mass DM, le choix des listes et la cadence se décident avec Charles dans la fiche du lot Mass DM, avant le code ; ils vivent dans le code, pas dans un prompt.
 
 ### 6. Ce que le connecteur doit apprendre
 
 - Le port gagne des capacités facultatives, déclarées par des drapeaux comme dans l'ADR 0018 : téléverser un média, publier ou programmer une publication avec sa visibilité, lire les statistiques d'une publication, lire les listes de fans, envoyer un Mass DM. Leurs formes sont arrêtées d'après la capture, par le propriétaire de `packages/contracts` et du module `connectors`, avec `FakeReveal` d'abord.
 - Le cœur ne connaît ni la forme Reveal ni ses dossiers (ADR 0003).
+- La session Reveal qui publie et envoie les Mass DM est celle du compte de la créatrice, jamais celle de Charles ni celle du membre « bot » ; l'ADR de la capture Reveal le fixera.
 
 ## Conséquences
 

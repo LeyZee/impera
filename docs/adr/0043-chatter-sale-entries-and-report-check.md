@@ -27,7 +27,7 @@ La lecture d'Imperium du 02/11 (hors dépôt) a montré que ses ventes saisies n
 - Le serveur rattache la vente à un shift **du membre, sur cette créatrice**, en cours ou fini depuis moins de 24 h, et vérifie les trois ; sinon 409.
 - **Idempotence** : chaque saisie porte une clé posée par l'appareil ; un double envoi rend la même vente.
 - Annulable pendant 5 secondes. Ensuite, une vente ne s'efface jamais : elle se corrige par une nouvelle saisie qui la remplace, journalisée, tant que le rapport n'est pas validé ; après, par une correction de rapport (EQ-03).
-- Créer, corriger ou annuler une vente prend le verrou consultatif (membre, période) de la paie, comme un rapport (ADR 0023, 0035) ; une période verrouillée refuse la saisie.
+- Créer, corriger ou annuler une vente prend le verrou consultatif (membre, période) de la paie, comme un rapport (ADR 0023, 0035). Une vente saisie pour un shift d'une quinzaine déjà clôturée n'est jamais refusée : comme un rapport tardif (ADR 0032), elle compte dans la première quinzaine non clôturée.
 
 ### 2. Le rapport de fin de shift devient le feedback
 
@@ -43,7 +43,7 @@ La lecture d'Imperium du 02/11 (hors dépôt) a montré que ses ventes saisies n
 Un contrôle (`report_check`), fonction pure du domaine, tourne à l'envoi du rapport et chaque fois que sa référence change. Il ne modifie jamais un montant : il marque.
 
 - **Toujours** : chaque vente sur la bonne créatrice et le bon shift ; même fan et même montant deux fois en moins de 10 minutes signalés comme doublon possible ; un total au-dessus de trois fois la médiane des shifts du membre sur 30 jours signalé.
-- **Dès que le connecteur lit les ventes de Reveal** : la somme du rapport est comparée aux ventes de Reveal sur la fenêtre du shift (début, fin plus la marge d'accès de l'ADR 0025), au membre si Reveal dit qui a vendu, sinon au compte ; puis rapprochée vente par vente (fan, montant). Un écart d'au plus **5 % et d'au plus 10 €** (réglages de l'agence) valide le rapport automatiquement, au nom du « contrôle automatique », au journal. Au-delà, le rapport passe en ambre « écart » chez le manager en poste ou le propriétaire, avec les deux sommes et le rapprochement ligne par ligne ; il le valide ou le renvoie.
+- **Dès que le connecteur lit les ventes de Reveal** : la somme du rapport est comparée aux ventes de Reveal sur la fenêtre du shift (début, fin plus la marge d'accès de l'ADR 0025), aux seules ventes attribuées à ce membre selon l'ADR 0025 ; une vente de la fenêtre sans attribution envoie le rapport au valideur ; puis rapprochée vente par vente (fan, montant). Un écart d'au plus **5 % et d'au plus 10 €**, dans un sens comme dans l'autre (réglages de l'agence), valide le rapport automatiquement, au nom du « contrôle automatique », au journal. Au-delà, le rapport passe en ambre « écart » chez le manager en poste ou le propriétaire, avec les deux sommes et le rapprochement ligne par ligne ; il le valide ou le renvoie.
 - **Tant que Reveal n'est pas lu**, il n'y a pas de référence extérieure : la validation reste humaine, comme aujourd'hui, et le contrôle ne fait que mettre ses signaux devant le valideur. Aucun rapport n'est validé par le code sans les ventes de la plateforme en face.
 
 ### 5. Quand Reveal est lu
