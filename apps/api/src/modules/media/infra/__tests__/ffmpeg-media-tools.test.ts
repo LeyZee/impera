@@ -110,6 +110,6 @@ describe('ffmpeg media tools', () => {
       '-pix_fmt',
       'yuv420p',
     );
-    await expect(hurried.keyframes(video, 4)).rejects.toThrow();
+    await expect(hurried.keyframes(video, 4)).rejects.toMatchObject({ killed: true, signal: 'SIGKILL' });
   });
 });
