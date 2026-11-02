@@ -1,5 +1,6 @@
 import {
   AgencyLogoSchema,
+  BillingAgencyBodySchema,
   BillingSettingsViewSchema,
   CommissionStatementIdSchema,
   InvoiceAgencySchema,
@@ -7,7 +8,7 @@ import {
   type TeamMember,
   type UpdateBillingSettingsBody,
 } from '@nirvana/contracts';
-import { and, eq, schema } from '@nirvana/db';
+import { and, eq, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { inventedPng, transparentLogo } from '../modules/payroll/infra/__tests__/invented-png';
@@ -248,6 +249,54 @@ describe('Réglages › Facturation : l’identité de l’agence, la prestation
       expect(response.statusCode, JSON.stringify(body)).toBe(status);
       expect(response.json()).toMatchObject({ error: { code } });
     }
+  });
+
+  it('changes the reminder delay when sent, keeps it when omitted, from 1 to 120 days (lot 8)', async () => {
+    const [current] = await db().select().from(schema.billingSettings);
+    if (current === undefined) throw new Error('no settings');
+    // The settings as saved: only the delay changes below.
+    const saved: UpdateBillingSettingsBody = {
+      agency: BillingAgencyBodySchema.parse(current.agency),
+      serviceDescription: current.serviceDescription ?? SETTINGS.serviceDescription,
+      paymentTerms: current.paymentTerms,
+      dueDays: current.dueDays,
+      fiscalYearEndMonth: current.fiscalYearEndMonth,
+      logoSha256: current.logoSha256,
+    };
+    const requeued = async () =>
+      (
+        await db().execute<{ key: string }>(
+          sql`select key from graphile_worker._private_jobs where key = 'payroll.requeue_invoice_issues:all'`,
+        )
+      ).rows.length;
+    await db().execute(
+      sql`delete from graphile_worker._private_jobs where key = 'payroll.requeue_invoice_issues:all'`,
+    );
+    const delay = async () => {
+      const response = await team.call('GET', '/payroll/billing-settings', team.owner);
+      return BillingSettingsViewSchema.parse(response.json()).settings?.documentReminderDays;
+    };
+    expect(await delay()).toBe(30);
+
+    const lines = (await auditOf('billing_settings.update')).length;
+    expect((await save(team.owner, { ...saved, documentReminderDays: 45 })).statusCode).toBe(200);
+    expect(await delay()).toBe(45);
+    const [line] = await auditOf('billing_settings.update');
+    expect(line?.details).toEqual({ changed: ['documentReminderDays'] });
+    // The delay alone never lets an invoice go out: nothing is tried again.
+    expect(await requeued()).toBe(0);
+
+    // Omitted, or the same: kept, nothing written.
+    expect((await save(team.owner, saved)).statusCode).toBe(200);
+    expect((await save(team.owner, { ...saved, documentReminderDays: 45 })).statusCode).toBe(200);
+    expect(await delay()).toBe(45);
+    expect(await auditOf('billing_settings.update')).toHaveLength(lines + 1);
+
+    for (const documentReminderDays of [0, 121, 7.5])
+      expect((await save(team.owner, { ...saved, documentReminderDays })).statusCode).toBe(400);
+    expect(await delay()).toBe(45);
+    expect((await save(team.owner, { ...saved, documentReminderDays: 30 })).statusCode).toBe(200);
+    expect(await delay()).toBe(30);
   });
 
   it('is the owner’s alone: a manager and a chatter neither read nor change it', async () => {

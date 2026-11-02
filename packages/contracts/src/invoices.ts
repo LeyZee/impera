@@ -827,7 +827,9 @@ export type BillingAgencyBody = z.infer<typeof BillingAgencyBodySchema>;
 /**
  * `PUT /v1/payroll/billing-settings`, the owner only: what every invoice issued from now on copies. An invoice issued
  * before keeps its own copy, its PDF never changes. The logo is one the owner added before (`POST …/logos`), or `null`
- * for none; the accounts and the reminder delay are set elsewhere and kept.
+ * for none; the accounts are set elsewhere (`…/accounts`) and kept. `documentReminderDays` (lot 8), 1 to 120 days, is
+ * how long before a document's last day its reminder starts (the tax residence certificate keeps the 1st of December):
+ * omitted, the saved delay is kept, `DEFAULT_DOCUMENT_REMINDER_DAYS` at the first save.
  */
 export const UpdateBillingSettingsBodySchema = z.object({
   agency: BillingAgencyBodySchema,
@@ -836,6 +838,7 @@ export const UpdateBillingSettingsBodySchema = z.object({
   dueDays: z.number().int().min(INVOICE_DUE_MIN_DAYS).max(INVOICE_DUE_MAX_DAYS),
   fiscalYearEndMonth: z.number().int().min(1).max(12),
   logoSha256: Sha256Schema.nullable(),
+  documentReminderDays: z.number().int().min(1).max(DOCUMENT_REMINDER_MAX_DAYS).optional(),
 });
 export type UpdateBillingSettingsBody = z.infer<typeof UpdateBillingSettingsBodySchema>;
 

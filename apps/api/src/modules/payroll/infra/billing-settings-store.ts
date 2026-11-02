@@ -68,6 +68,7 @@ interface Saved {
   readonly dueDays: number;
   readonly fiscalYearEndMonth: number;
   readonly logoSha256: string | null;
+  readonly documentReminderDays: number;
 }
 
 /**
@@ -82,7 +83,12 @@ function changesOf(before: Saved | null, body: UpdateBillingSettingsBody): strin
   const others = (
     ['serviceDescription', 'paymentTerms', 'dueDays', 'fiscalYearEndMonth', 'logoSha256'] as const
   ).filter((key) => before?.[key] !== body[key]);
-  return [...agency, ...others];
+  // The reminder delay, when sent: omitted, it is kept (lot 8).
+  const reminder =
+    body.documentReminderDays !== undefined && before?.documentReminderDays !== body.documentReminderDays
+      ? (['documentReminderDays'] as const)
+      : [];
+  return [...agency, ...others, ...reminder];
 }
 
 /** Réglages › Facturation (EQ-06): see `PayrollBillingSettingsStore`. */
@@ -119,6 +125,7 @@ export function createDrizzlePayrollBillingSettingsStore(
                 dueDays: row.dueDays,
                 fiscalYearEndMonth: row.fiscalYearEndMonth,
                 logoSha256: row.logoSha256,
+                documentReminderDays: row.documentReminderDays,
               };
         const changed = changesOf(before, body);
         if (changed.length === 0) return viewOf(tx);
@@ -129,17 +136,18 @@ export function createDrizzlePayrollBillingSettingsStore(
           dueDays: body.dueDays,
           fiscalYearEndMonth: body.fiscalYearEndMonth,
           logoSha256: body.logoSha256,
+          ...(body.documentReminderDays !== undefined && { documentReminderDays: body.documentReminderDays }),
           updatedBy: actor.userId,
           updatedAt: now(),
         };
         if (row === undefined) {
-          // The first save: the reminder delay takes its default, the accounts wait for the accountant (lot 7).
+          // The first save: the reminder delay takes its default unless sent, the accounts wait for the accountant (lot 7).
           await tx
             .insert(billingSettings)
             .values({
               id: ROW,
-              ...values,
               documentReminderDays: DEFAULT_DOCUMENT_REMINDER_DAYS,
+              ...values,
               accounts: null,
             })
             .onConflictDoUpdate({ target: billingSettings.id, set: values });
@@ -155,8 +163,9 @@ export function createDrizzlePayrollBillingSettingsStore(
             changed,
           },
         );
-        // Saved settings may be what every waiting invoice lacked (`agency_missing`): each one is tried again.
-        await enqueueInvoiceRequeue(tx, null);
+        // Saved settings may be what every waiting invoice lacked (`agency_missing`): each one is tried again. The
+        // reminder delay alone never lets an invoice go out; `payroll.remind_documents` reads it at its next run.
+        if (changed.some((name) => name !== 'documentReminderDays')) await enqueueInvoiceRequeue(tx, null);
         return viewOf(tx);
       }),
 
