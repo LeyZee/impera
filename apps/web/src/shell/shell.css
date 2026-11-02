@@ -1148,3 +1148,182 @@
     justify-self: start;
   }
 }
+
+/* ── Installable app (CR-01) ── */
+/* « Une nouvelle version est prête »: offered at the top, never imposed (src/pwa/UpdateNotice.tsx). */
+.nv-update.nv-glass {
+  --_radius: 22px;
+  position: fixed;
+  z-index: 60;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: max(14px, env(safe-area-inset-left, 0px));
+  right: max(14px, env(safe-area-inset-right, 0px));
+  margin-inline: auto;
+  max-width: 460px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  padding: 12px;
+  box-shadow: var(--nv-shadow-float);
+  animation: nv-more-fade var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.nv-update__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.nv-update__body {
+  min-width: 0;
+}
+.nv-update__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.nv-update__text {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.nv-update__actions {
+  grid-column: 1 / -1;
+}
+/* On a computer, a quiet card in the corner, out of the screen's way. */
+@media (min-width: 821px) {
+  .nv-update.nv-glass {
+    top: auto;
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 380px;
+    margin: 0;
+  }
+}
+.nv-update__actions,
+.nv-install__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.nv-update .nv-btn,
+.nv-install .nv-btn {
+  min-height: 44px;
+}
+
+/* « Nirvana sur ton écran d'accueil »: a card above the phone's tab bar (src/pwa/InstallNudge.tsx). */
+.nv-install.nv-glass {
+  --_radius: 22px;
+  position: fixed;
+  z-index: 40;
+  left: max(14px, env(safe-area-inset-left, 0px));
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: calc(14px + 64px + 12px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  padding: 12px;
+  box-shadow: var(--nv-shadow-float);
+  transform-origin: 50% 100%;
+  animation: nv-more-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.nv-install__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+}
+.nv-install__body {
+  min-width: 0;
+}
+.nv-install__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.nv-install__text {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.nv-install__actions {
+  grid-column: 1 / -1;
+}
+@media (min-width: 821px) {
+  .nv-install.nv-glass {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 380px;
+  }
+}
+
+/* /aide/installer: the steps, the device's own first. */
+.nv-help-install {
+  display: grid;
+  align-content: start;
+  gap: var(--nv-space-4);
+  max-width: 960px;
+}
+.nv-help-install__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-items: start;
+  gap: var(--nv-space-4);
+}
+.nv-help-install__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: nv-step;
+  display: grid;
+  gap: 14px;
+  color: var(--nv-ink-muted);
+}
+.nv-help-install__steps li {
+  counter-increment: nv-step;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+/* The step's number in a small neon ring: the eye follows 1, 2, 3, 4 without reading. */
+.nv-help-install__steps li::before {
+  content: counter(nv-step);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-neon-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--nv-neon-ink) 45%, transparent);
+  /* Centred on the first line of the step, not on its top. */
+  margin-top: -2px;
+}
+.nv-help-install__now {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.nv-help-install__now p,
+.nv-help-install__done p {
+  margin: 0;
+}
+.nv-help-install__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-update,
+  .nv-install {
+    animation: none !important;
+  }
+}
