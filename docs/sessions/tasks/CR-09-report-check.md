@@ -11,6 +11,7 @@ Le code marque chaque rapport (doublon possible, total inhabituel) et, dès que 
 `docs/adr/0043-chatter-sale-entries-and-report-check.md`, ADR 0023 (§ Une seule source), 0025 (marge d'accès), EQ-03, EQ-08.
 
 ## À faire
+- [ ] Signal permanent (ADR 0049 § 3) : même fan et même montant déclarés par deux membres du même compte à moins de 10 minutes d'écart, signalé sur les deux rapports ; les rapports d'une présence commune passent au valideur côte à côte ; une fois les fans confiés, une vente saisie pour un fan confié à un autre membre est signalée.
 - [ ] `report_check`, fonction pure : signaux toujours actifs (bonne créatrice et bon shift, même fan et même montant sous 10 minutes, total au-delà de trois fois la médiane du membre sur 30 jours, seulement avec au moins 5 shifts sur ces 30 jours ; sans cet historique, pas de signal « total inhabituel »).
 - [ ] Réglages de l'agence : seuils d'écart (5 % et 10 € par défaut).
 - [ ] Rapprochement : ventes de Reveal sur la fenêtre du shift (début, fin plus la marge), aux seules ventes attribuées au membre selon l'ADR 0025 ; une vente sans attribution envoie le rapport au valideur ; rapprochement ligne par ligne (fan, montant).

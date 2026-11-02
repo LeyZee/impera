@@ -1,6 +1,6 @@
 # 0049. Créneaux libres, plusieurs chatteurs sur un compte, fans confiés ; la créatrice sans notification de shift
 
-Statut : proposed (demandes de Charles du 02/11/2026 : 17h48 créneaux réglables, 17h52 créatrice sans notification, 18h01 un créneau réglable un à un, 18h07 deux chatteurs ou l'IA et un chatteur en même temps ; carte de 18h09 : « Fans partagés entre les deux »)
+Statut : accepted (Charles, 02/11/2026 18h36, « ok 0049 », après les relectures de Bilan et d'Équipe ; demandes du même jour : 17h48 créneaux réglables, 17h52 créatrice sans notification, 18h01 un créneau réglable un à un, 18h07 deux chatteurs ou l'IA et un chatteur en même temps ; carte de 18h09 : « Fans partagés entre les deux »)
 Date : 2026-11-02
 Remplace : le contrat `SchedulingSettingsSchema` (`slotStartMinute` et `slotLengthMinutes`, des créneaux tous de la même durée) ; la contrainte `shifts_account_overlap_excl` (migration 0021), qui interdit deux shifts qui se chevauchent sur un compte ; dans l'ADR 0045 § 4, la puce « La créatrice choisit dans Moi si elle veut être prévenue des shifts de ses comptes ; par défaut, non » ; dans l'ADR 0025 § « Un humain qui écrit dans Reveal », « le membre en poste sur ce compte (l'auteur Reveal si la capture montre quel membre a écrit) » quand plusieurs membres y sont en poste. Précise l'ADR 0045 § 2 et § 3, l'ADR 0048 § 1 (« IA seule ») et l'ADR 0043 (à qui revient une vente).
 
