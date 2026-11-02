@@ -422,7 +422,7 @@ function Editor({
         />
         {reauth ? (
           <PasswordPrompt
-            lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe."
+            lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code."
             onConfirmed={() => {
               setReauth(false);
               void activate();

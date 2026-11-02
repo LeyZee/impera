@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Dashboard users (Better Auth core schema, Drizzle adapter), plus `role` and `creator_ids` on `user`. Out of RLS:
@@ -24,6 +24,8 @@ export const user = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::uuid[]`),
+    /** A verified authenticator code (ADR 0046 § 1); `false` until the first code is confirmed. */
+    twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
   },
@@ -41,6 +43,11 @@ export const session = pgTable('session', {
     .references(() => user.id, { onDelete: 'cascade' }),
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
+  /**
+   * When the password and the code were last given on this session (ADR 0046 § 3): a sign-in through the code, or the
+   * confirmation before a sensitive action. `null` after a sign-in from a trusted device, which asked for no code.
+   */
+  reauthenticatedAt: tz('reauthenticated_at'),
 });
 
 export const account = pgTable('account', {
@@ -68,4 +75,22 @@ export const verification = pgTable('verification', {
   expiresAt: tz('expires_at').notNull(),
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
+});
+
+/**
+ * The authenticator secret and backup codes of an account (Better Auth `two-factor` plugin, ADR 0046 § 1–2). Both are
+ * encrypted with the Better Auth secret, never stored in clear. `verified` stays `false` between the activation and
+ * the first code; `failed_verification_count` and `locked_until` lock the code after 10 wrong ones in a row.
+ */
+export const twoFactor = pgTable('two_factor', {
+  id: text('id').primaryKey(),
+  secret: text('secret').notNull(),
+  backupCodes: text('backup_codes').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  verified: boolean('verified').notNull().default(true),
+  failedVerificationCount: integer('failed_verification_count').notNull().default(0),
+  lockedUntil: tz('locked_until'),
 });

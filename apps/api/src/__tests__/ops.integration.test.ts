@@ -86,7 +86,8 @@ describe('ops commands (P0-07b)', () => {
     await createOwner(app.auth, app.db.db, owner);
     const cookie = await signIn(server, owner.email, owner.password);
     expect((await server.inject({ method: 'GET', url: '/v1/me', headers: { cookie } })).statusCode).toBe(200);
-    expect(await revokeDashboardSessions(test.admin.db, owner.email)).toBe(1);
+    // Two: the activation of his code left one, the sign-in with the code another.
+    expect(await revokeDashboardSessions(test.admin.db, owner.email)).toBe(2);
     expect((await server.inject({ method: 'GET', url: '/v1/me', headers: { cookie } })).statusCode).toBe(401);
     expect(await audit('auth.sessions_revoked')).toHaveLength(1);
     await server.close();

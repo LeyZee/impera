@@ -19,13 +19,24 @@ import {
   type InvitationLinkPurpose,
   type PasswordInvalidReason,
 } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+import {
+  and,
+  eq,
+  inArray,
+  resetSecondFactor,
+  schema,
+  sql,
+  withAdmin,
+  type Database,
+  type Transaction,
+} from '@nirvana/db';
 import type { FastifyReply, FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { authHeaders, meOf, type Auth, type RequireRole } from './auth';
 import type { Config } from './config';
+import type { PasswordBreachCheck } from './password-breaches';
 
 /** A link is valid 72 hours (EQ-10). */
 const LINK_LIFETIME = '72 hours';
@@ -58,6 +69,7 @@ class PasswordInvalid extends DomainError {
     const message: Record<PasswordInvalidReason, string> = {
       too_short: `Mot de passe trop court (${String(PASSWORD_MIN_LENGTH)} caractères au moins)`,
       too_long: `Mot de passe trop long (${String(PASSWORD_MAX_LENGTH)} caractères au plus)`,
+      breached: 'Ce mot de passe circule dans des fuites de données connues, choisis-en un autre',
       refused: 'Ce mot de passe n’est pas accepté, choisis-en un autre',
     };
     super('password_invalid', message[reason], { details: { reason } });
@@ -198,7 +210,8 @@ type AccountRow = Pick<typeof schema.user.$inferSelect, keyof typeof accountColu
 
 /**
  * `POST /v1/invitation-links/redeem`, in one transaction: uses the link (an atomic update, so two requests at once
- * cannot both succeed), sets the member's password and ends all his sessions. A refused password changes nothing.
+ * cannot both succeed), sets the member's password, ends all his sessions and trusted devices, and puts his second
+ * factor back to zero (ADR 0046 § 2: a lost phone is what a reset link is for). A refused password changes nothing.
  */
 async function redeemLinkUnscoped(
   adminDb: Database,
@@ -241,16 +254,18 @@ async function redeemLinkUnscoped(
         .set({ password: input.passwordHash, updatedAt: sql`now()` })
         .where(eq(schema.account.id, account.id));
     }
-    const ended = await tx
-      .delete(schema.session)
-      .where(eq(schema.session.userId, link.userId))
-      .returning({ id: schema.session.id });
+    const reset = await resetSecondFactor(tx, link.userId);
     await audit(tx, {
       userId: link.userId,
       action: 'invitation_link.redeem',
       linkId: link.id,
       ip: input.ip,
-      details: { purpose: InvitationLinkPurposeSchema.parse(link.purpose), sessionsEnded: ended.length },
+      details: {
+        purpose: InvitationLinkPurposeSchema.parse(link.purpose),
+        sessionsEnded: reset.sessions,
+        trustedDevicesEnded: reset.trustedDevices,
+        secondFactorReset: reset.hadSecondFactor,
+      },
     });
     const [member] = await tx.select(accountColumns).from(schema.user).where(eq(schema.user.id, link.userId));
     if (member === undefined) throw new InvitationLinkNotFound();
@@ -304,6 +319,7 @@ export interface InvitationLinkRoutesDeps {
   readonly config: Pick<Config, 'WEB_ORIGIN'>;
   readonly requireRole: RequireRole;
   readonly recentLogin: preValidationAsyncHookHandler;
+  readonly passwordBreaches: PasswordBreachCheck;
 }
 
 const MemberParamsSchema = z.object({ memberId: TeamMemberIdSchema });
@@ -378,6 +394,9 @@ export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): Fast
         const { token, password } = request.body;
         const problem = passwordProblem(password);
         if (problem !== null) throw new PasswordInvalid(problem);
+        // A dead link says so before the password is sent anywhere; the transaction below checks it again.
+        await inspectLinkUnscoped(deps.adminDb, token);
+        if (await deps.passwordBreaches(password)) throw new PasswordInvalid('breached');
         // Hashed before the transaction: scrypt is slow, and the link's row stays locked only for the writes.
         const passwordHash = await (await deps.auth.$context).password.hash(password);
         const account = await redeemLinkUnscoped(deps.adminDb, { token, passwordHash, ip: request.ip });

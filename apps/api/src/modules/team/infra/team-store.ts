@@ -18,7 +18,17 @@ import {
   type TeamRoleChange,
   type UserId,
 } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+import {
+  and,
+  eq,
+  inArray,
+  revokeSignIns,
+  schema,
+  sql,
+  withMember,
+  type Database,
+  type Transaction,
+} from '@nirvana/db';
 
 import {
   CommissionPresetConflict,
@@ -45,7 +55,6 @@ const {
   commissionPresets,
   memberCommissionRates,
   memberRoles,
-  session,
   teamMemberNotes,
   teamMembers,
   user,
@@ -325,11 +334,8 @@ export function createDrizzleTeamStore(
         let sessionsEnded = 0;
         if (leaving) {
           await tx.update(user).set({ creatorIds: [], updatedAt: now() }).where(eq(user.id, current.userId));
-          const ended = await tx
-            .delete(session)
-            .where(eq(session.userId, current.userId))
-            .returning({ id: session.id });
-          sessionsEnded = ended.length;
+          // Its trusted devices too (ADR 0046 § 3): nothing of the account stays signed in.
+          sessionsEnded = (await revokeSignIns(tx, current.userId)).sessions;
         }
         await audit(
           tx,

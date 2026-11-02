@@ -133,7 +133,7 @@ export function ZoneEditor({
       {problem === 'expired' ? <SignInAgain /> : null}
       {reauth ? (
         <PasswordPrompt
-          lead="Pour changer son fuseau, confirme ton mot de passe."
+          lead="Pour changer son fuseau, confirme ton mot de passe et ton code."
           onConfirmed={() => {
             setReauth(false);
             void save();
