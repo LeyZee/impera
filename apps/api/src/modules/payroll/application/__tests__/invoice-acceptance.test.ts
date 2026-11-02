@@ -24,6 +24,7 @@ function storeWith(
   return {
     calls,
     read: unexpected,
+    list: unexpected,
     answer: unexpected,
     refuseContest: unexpected,
     upholdContest: unexpected,

@@ -6,6 +6,7 @@ import {
   creditNoteMention,
   creditsDue,
   invoiceDueOn,
+  invoiceDueState,
   invoiceLines,
   invoiceNumber,
   invoiceTotals,
@@ -281,6 +282,19 @@ describe('the number and the due date of an invoice (EQ-06)', () => {
     expect(invoiceDueOn('2026-12-20', 15)).toBe('2027-01-04');
     expect(invoiceDueOn('2026-11-01', 0)).toBe('2026-11-01');
     expect(() => invoiceDueOn('2026-11-01', -1)).toThrow(RangeError);
+  });
+
+  it('turns an invoice not settled soon seven days before its due date, overdue the day after (lot 8)', () => {
+    const invoice = { kind: 'invoice', dueOn: '2027-01-01', settled: false } as const;
+    expect(invoiceDueState(invoice, '2026-12-24')).toBe('open');
+    expect(invoiceDueState(invoice, '2026-12-25')).toBe('soon');
+    expect(invoiceDueState(invoice, '2027-01-01')).toBe('soon');
+    expect(invoiceDueState(invoice, '2027-01-02')).toBe('overdue');
+    expect(invoiceDueState({ ...invoice, settled: true }, '2027-03-01')).toBe('settled');
+    // A credit note carries no payment terms: open until a payout takes it off, never late.
+    const creditNote = { kind: 'credit_note', dueOn: '2027-01-01', settled: false } as const;
+    expect(invoiceDueState(creditNote, '2027-03-01')).toBe('open');
+    expect(invoiceDueState({ ...creditNote, settled: true }, '2027-03-01')).toBe('settled');
   });
 });
 

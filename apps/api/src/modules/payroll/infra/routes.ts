@@ -40,6 +40,8 @@ import {
   DomainError,
   ExchangeRatesSchema,
   InvoiceAcceptanceViewSchema,
+  InvoiceListQuerySchema,
+  InvoiceListSchema,
   InvoiceParamsSchema,
   InvoicePrefixBodySchema,
   JournalAccountsSchema,
@@ -140,7 +142,8 @@ const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
  * and an active manager, and checked once by the owner, never on his own file. The accountant's export
  * (`/payroll/accounting/journal`, lot 7b), its accounts (`/payroll/billing-settings/accounts`), the DAS2 recap
  * (`/payroll/accounting/das2`, lot 7c) and the archive of the PDFs (`/payroll/accounting/archive`, lot 7d) are the
- * owner's alone.
+ * owner's alone. The list of invoices and credit notes (`/payroll/invoices`, lot 8) follows the invoices' policy: one's
+ * own for a contractor, all of them for the owner and an active manager, always within a bound.
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -172,6 +175,15 @@ export function createPayrollRoutes(
       (_request, body, done) => {
         done(null, body);
       },
+    );
+
+    app.get(
+      '/payroll/invoices',
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: InvoiceListQuerySchema, response: { 200: InvoiceListSchema } },
+      },
+      (request) => acceptance.list(userOf(request), request.query),
     );
 
     // A file, never JSON: kept out of every cache, named after its number, its type never guessed by the browser.

@@ -33,6 +33,7 @@ import {
   InvoiceAcceptanceViewSchema,
   InvoiceAgencySchema,
   InvoiceContractorSchema,
+  InvoiceListQuerySchema,
   InvoiceNumberSchema,
   InvoiceParamsSchema,
   InvoicePrefixSchema,
@@ -228,6 +229,37 @@ describe('invoices', () => {
       JournalAccountsSchema.safeParse({ ...none, vatDeductible: '4456', vatSelfAssessedDeductible: '4456' })
         .success,
     ).toBe(true);
+  });
+
+  it('lists documents within a bound, with lists of known values once each (lot 8)', () => {
+    const parsed = (query: Record<string, string>) => InvoiceListQuerySchema.safeParse(query);
+    expect(parsed({ due: 'soon,overdue' }).data).toEqual({ due: ['soon', 'overdue'] });
+    expect(parsed({ acceptance: 'contested' }).success).toBe(true);
+    expect(parsed({ acceptance: 'pending,contested' }).success).toBe(true);
+    expect(parsed({ period: '2026-10-16' }).success).toBe(true);
+    expect(parsed({ from: '2024-01-01', to: '2024-12-31', due: 'settled' }).success).toBe(true);
+    // 366 days of issue at most, both ends included.
+    expect(parsed({ from: '2025-01-01', to: '2026-01-01' }).success).toBe(true);
+    expect(parsed({ from: '2025-01-01', to: '2026-01-02' }).success).toBe(false);
+    for (const unbounded of [
+      {},
+      { memberId: '7d3f9c1e-2b4a-4c6d-8e0f-1a2b3c4d5e6f' },
+      { due: 'settled' },
+      { due: 'open,settled' },
+      { acceptance: 'accepted' },
+      { acceptance: 'contested,contest_upheld' },
+    ])
+      expect(parsed(unbounded).success, JSON.stringify(unbounded)).toBe(false);
+    for (const wrong of [
+      { from: '2026-11-01' },
+      { from: '2026-11-02', to: '2026-11-01' },
+      { due: 'late' },
+      { due: 'soon,soon' },
+      { due: '' },
+      { acceptance: 'pending,' },
+      { period: '2026-10-02' },
+    ])
+      expect(parsed(wrong).success, JSON.stringify(wrong)).toBe(false);
   });
 
   it('export from one day to another, both included, two years at most', () => {

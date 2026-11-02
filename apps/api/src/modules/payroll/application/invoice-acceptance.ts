@@ -2,6 +2,8 @@ import type {
   ContestInvoiceBody,
   InvoiceAcceptanceView,
   InvoiceId,
+  InvoiceList,
+  InvoiceListQuery,
   RefuseInvoiceContestBody,
   UpholdInvoiceContestBody,
   UserId,
@@ -20,6 +22,11 @@ import type { Actor, JobLogger, PayrollInvoiceAcceptanceStore } from '../domain/
 export interface PayrollInvoiceAcceptance {
   /** The document's acceptance and its steps, for whoever reads the document (its policy), else `invoice_not_found`. */
   read(userId: UserId, invoiceId: InvoiceId): Promise<InvoiceAcceptanceView>;
+  /**
+   * `GET /v1/payroll/invoices` (EQ-06 lot 8): the documents the reader reads, filtered and bounded
+   * (`InvoiceListQuerySchema`), each with its acceptance, its settlement and its due state computed on the agency's day.
+   */
+  list(userId: UserId, query: InvoiceListQuery): Promise<InvoiceList>;
   accept(actor: Actor, invoiceId: InvoiceId): Promise<InvoiceAcceptanceView>;
   contest(actor: Actor, invoiceId: InvoiceId, body: ContestInvoiceBody): Promise<InvoiceAcceptanceView>;
   refuseContest(
@@ -47,6 +54,7 @@ export function createPayrollInvoiceAcceptance(
       if (view === null) throw new InvoiceNotFound();
       return view;
     },
+    list: (userId, query) => store.list(userId, query),
     accept: (actor, invoiceId) => store.answer(actor, invoiceId, { kind: 'accept' }),
     contest: (actor, invoiceId, body) =>
       store.answer(actor, invoiceId, { kind: 'contest', reason: body.reason }),

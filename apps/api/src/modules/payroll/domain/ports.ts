@@ -39,6 +39,8 @@ import type {
   InvoiceAcceptanceView,
   InvoiceId,
   InvoiceKind,
+  InvoiceList,
+  InvoiceListQuery,
   InvoicePrefixBody,
   InvoicePdfCopyProvider,
   InvoicePdfPlace,
@@ -470,6 +472,11 @@ type InvoiceAnswer = { readonly kind: 'accept' } | { readonly kind: 'contest'; r
 export interface PayrollInvoiceAcceptanceStore {
   /** The document's acceptance as `userId` may read it; `null` when it does not exist or is not theirs to read. */
   read(userId: UserId, invoiceId: InvoiceId): Promise<InvoiceAcceptanceView | null>;
+  /**
+   * The documents `userId` reads (the policy of `invoices`), filtered by `query`, the latest issued first, each with its
+   * acceptance, its settlement and its due state on the agency's calendar day (EQ-06 lot 8).
+   */
+  list(userId: UserId, query: InvoiceListQuery): Promise<InvoiceList>;
   /**
    * Records the contractor's answer, its line of `audit_log`, and for a contest the job that tells the owner
    * (`payroll.announce_invoice_contest`). The same answer sent again writes nothing and gives the view back.
