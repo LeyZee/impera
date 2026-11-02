@@ -1,6 +1,6 @@
 # 0050. Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste
 
-Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour)
+Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour ; § 4 et part de la créatrice au § 8 : ses messages du même jour)
 Date : 2026-11-02
 Complète : l'ADR 0008, dont la phrase « attendre une API officielle : il n'y en aura pas » est dépassée pour les ventes et les chiffres ; sa stratégie reste celle de tout le reste.
 Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur » ; dans l'ADR 0043 § 5, la phrase « le rapport reste dû pour le commentaire, l'incident, les remontées et le contrôle ».
@@ -27,7 +27,9 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
 
 3. **Fiabilité.** Le curseur de `/v1/sales` est lu une fois par minute pour commencer. Les webhooks s'ajoutent ensuite : signature vérifiée, `t` refusé au-delà de 5 minutes, lecture par curseur gardée une fois par heure pour le rattrapage. Une vente est unique en base sur `sale.id` et `event`, et un webhook rejoué n'a aucun effet. Des schémas Zod lisent chaque réponse ; une valeur de `type` ou de `status` inconnue, dont Reveal prévient qu'elle peut s'ajouter, passe en `other` et se signale. Un `429` respecte `Retry-After`. Un `401` ou un `403` arrête la lecture et alerte le propriétaire, sans toucher à la voie capturée.
 
-4. **La clé.** Le propriétaire la saisit dans le dashboard, sur le modèle de l'ADR 0016 : chiffrée en base, jamais dans le chat, le dépôt ou un log. Une clé par usage, avec le plus petit périmètre utile. Le pseudo et l'identifiant du fan qu'elle donne suivent les règles des données de fans : hors du dépôt, des fixtures et des logs.
+4. **La clé se connecte depuis les Réglages, comme une clé d'IA** (Charles, même jour). Elle suit l'ADR 0016 et le même coffre : seul le propriétaire la connecte, la remplace ou la déconnecte, avec ré-authentification ; elle n'est gardée qu'après un appel de vérification réussi (`/v1/models`, plus `/v1/sales` pour l'accès Ventes) ; chiffrée en base ; écriture seule, aucune route ne la renvoie, même masquée ; jamais dans le dépôt, le chat ou un log ; en production, seule la base fait foi. Le secret d'un webhook se garde au même endroit. Un `401` ou un `403` passe la connexion en « à reconnecter ».
+
+   Une clé par usage, au niveau de l'agence, jamais une par créatrice : Reveal limite à 10 clés actives et partage ses limites de statistiques entre toutes les clés de l'agence. La révoquer se fait dans Reveal, qui la refuse aussitôt. Le pseudo et l'identifiant du fan qu'elle donne suivent les règles des données de fans : hors du dépôt, des fixtures et des logs.
 
 5. **Attribution.** `chatterId` est « l'auteur Reveal » de l'ADR 0025. Une vente portant le membre « bot » revient à l'agent, sans commission. Avec plusieurs membres en poste, l'ADR 0049 s'applique dès que les fans sont confiés ; avant, `chatterId` fait foi. Une vente attribuée à un membre qui n'est pas en poste passe au valideur.
 
@@ -41,6 +43,8 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
    - **Les autres plateformes** : notre chaîne (brut, euros, hors TVA, net de la commission, ADR 0023) reste, paramétrée par plateforme.
    - **Un compte en source « déclarée »**, Reveal compris tant qu'il n'a pas basculé : la chaîne de l'ADR 0023 reste entière, puisque la plateforme ne donne alors aucun net.
    - **Partout**, Nirvana garde le reste de la paie : taux de chaque chatteur, paliers, objectif collectif, primes, malus, report, relevés et factures.
+
+   **Part de la créatrice sur Reveal** (Charles : « c'est le chiffre de Reveal […] c'est le plus fiable ») : sur un compte basculé, `modelRevenue` fait foi, y compris sur son écran (CR-04), et non le pourcentage réglé dans Nirvana (ADR 0042). Un écart avec ce pourcentage se signale au propriétaire, à titre d'information, sans changer aucun montant.
 
    **Vérification avant toute bascule.** Aucun compte ne passe en « détecté » avant que Charles ait vu, sur une quinzaine passée couverte par le registre : la somme des `netAmount` face à l'export du dashboard et à `/v1/stats/daily`, qui doivent concorder au centime, et les commissions de chaque chatteur calculées sur `netAmount` face à celles de la chaîne de l'ADR 0023, avec l'écart expliqué. La bascule se fait ensuite à une frontière de période (ADR 0023).
 
