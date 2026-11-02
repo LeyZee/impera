@@ -48,6 +48,15 @@ export const PasskeyGestureBodySchema = z.object({ response: PasskeyCredentialSc
 export type PasskeyGestureBody = z.infer<typeof PasskeyGestureBodySchema>;
 
 /**
+ * The body of the confirmation's options, optional: `excluding` names the key being removed, which may not confirm its
+ * own removal (ADR 0053 § 5, « un geste sur une autre clé »).
+ */
+export const PasskeyConfirmOptionsBodySchema = z
+  .object({ excluding: z.string().min(1).max(64).optional() })
+  .nullish();
+export type PasskeyConfirmOptionsBody = z.infer<typeof PasskeyConfirmOptionsBodySchema>;
+
+/**
  * One of the signed-in person's keys, as Réglages › Sécurité lists them: the device it was added from (read from the
  * browser), the keychain that holds it when the authenticator says (« iCloud Keychain », « Google Password Manager »),
  * when it was added and last used. Never the key itself, never its credential id.

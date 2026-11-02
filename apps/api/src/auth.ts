@@ -7,6 +7,7 @@ import {
   MeSchema,
   newId,
   PASSKEY_ADD_WINDOW_MINUTES,
+  PasskeyConfirmOptionsBodySchema,
   PasskeyGestureBodySchema,
   PasskeySchema,
   REAUTHENTICATION_ERROR_CODE,
@@ -46,6 +47,7 @@ import {
   passkeyOf,
   passkeyOwnerOf,
   recordPasskeyAdded,
+  takeBackPasskey,
   requireUserVerification,
 } from './passkeys';
 import type { PasswordBreachCheck } from './password-breaches';
@@ -143,7 +145,7 @@ function refusalOf(status: number, onUnauthorized: () => DomainError): Error {
   return new Error(`Better Auth answered ${String(status)}`);
 }
 
-class ReauthenticationRequired extends DomainError {
+export class ReauthenticationRequired extends DomainError {
   constructor() {
     super(REAUTHENTICATION_ERROR_CODE, 'Mot de passe et code à confirmer pour cette action');
   }
@@ -308,6 +310,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
       additionalFields: {
         reauthenticatedAt: { type: 'date', input: false, required: false },
         codeConfirmedAt: { type: 'date', input: false, required: false },
+        confirmedPasskeyId: { type: 'string', input: false, required: false },
       },
     },
     // ADR 0046: an authenticator code for every account. The secret and the backup codes are encrypted with the
@@ -951,7 +954,7 @@ export function createAuthRoutes(
       if (!opened.success) return;
       const [session] = await db
         .update(schema.session)
-        .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()` })
+        .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()`, confirmedPasskeyId: null })
         .where(eq(schema.session.token, opened.data.token))
         .returning({ userId: schema.session.userId });
       // A code was asked: no trusted device spared it, which the owner hears of (ADR 0046 § 8).
@@ -1048,7 +1051,11 @@ export function createAuthRoutes(
                   // names the session it replaced, so the new one is found as the account's session opened since.
                   await db
                     .update(schema.session)
-                    .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()` })
+                    .set({
+                      reauthenticatedAt: sql`now()`,
+                      codeConfirmedAt: sql`now()`,
+                      confirmedPasskeyId: null,
+                    })
                     .where(
                       and(
                         eq(schema.session.userId, session.user.id),
@@ -1114,7 +1121,7 @@ export function createAuthRoutes(
         if (result === null) throw new SessionUnauthenticated();
         await db
           .update(schema.session)
-          .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()` })
+          .set({ reauthenticatedAt: sql`now()`, codeConfirmedAt: sql`now()`, confirmedPasskeyId: null })
           .where(eq(schema.session.id, result.session.id));
         await audit(request, request.user.id, 'auth.reauthenticated');
         return reply.code(204).send();
@@ -1131,11 +1138,19 @@ export function createAuthRoutes(
       if (current === null) throw new SessionUnauthenticated();
       return { userId: request.user.id, sessionId: current.session.id };
     };
-    app.post('/auth/passkey/confirm-options', { config: perIp, preValidation: anyRole }, async (request) => {
-      const options = await confirmationOptions(db, relying, await signedInSession(request));
-      if (options === null) throw new NoPasskey();
-      return options;
-    });
+    // `excluding` names the key being removed: a gesture on another key, or the password and the code (ADR 0053 § 5).
+    app.post(
+      '/auth/passkey/confirm-options',
+      { config: perIp, preValidation: anyRole, schema: { body: PasskeyConfirmOptionsBodySchema } },
+      async (request) => {
+        const options = await confirmationOptions(db, relying, {
+          ...(await signedInSession(request)),
+          excluding: request.body?.excluding ?? null,
+        });
+        if (options === null) throw new NoPasskey();
+        return options;
+      },
+    );
     app.post(
       '/auth/passkey/confirm',
       {
@@ -1153,15 +1168,15 @@ export function createAuthRoutes(
       },
       async (request, reply) => {
         const target = await signedInSession(request);
-        const outcome = await confirmGesture(db, relying, { ...target, response: request.body.response });
-        if (outcome === 'expired') throw new PasskeyChallengeExpired();
-        if (outcome === 'refused') {
+        const checked = await confirmGesture(db, relying, { ...target, response: request.body.response });
+        if (checked.outcome !== 'confirmed') {
+          if (checked.outcome === 'expired') throw new PasskeyChallengeExpired();
           await refused(request, target.userId, 'auth.reauthentication_refused');
           throw new PasskeyRefused();
         }
         await db
           .update(schema.session)
-          .set({ reauthenticatedAt: sql`now()` })
+          .set({ reauthenticatedAt: sql`now()`, confirmedPasskeyId: checked.passkeyId })
           .where(eq(schema.session.id, target.sessionId));
         await db.insert(schema.auditLog).values({
           id: newId(AuditEntryIdSchema),
@@ -1201,8 +1216,15 @@ export function createAuthRoutes(
           onUnauthorized: () => new SessionUnauthenticated(),
           refusal: passkeyRefusal,
           onSuccess: async (json) => {
-            added = AddedPasskeySchema.parse(json).id;
-            await recordPasskeyAdded(adminDb, { userId, passkeyId: added, ip: request.ip });
+            const passkeyId = AddedPasskeySchema.parse(json).id;
+            try {
+              await recordPasskeyAdded(adminDb, { userId, passkeyId, ip: request.ip });
+            } catch (failure) {
+              // No audit line, no alert: no key either (the page answers 500 and may try again).
+              await takeBackPasskey(db, passkeyId);
+              throw failure;
+            }
+            added = passkeyId;
           },
           answer: async () => {
             const view = added === null ? null : await passkeyOf(db, userId, added);

@@ -41,6 +41,7 @@ import {
   identityConfirmed,
   ReauthenticationLimited,
   ReauthenticationRefused,
+  ReauthenticationRequired,
   SessionUnauthenticated,
   sessionOf,
   type Auth,
@@ -281,7 +282,13 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
       '/auth/passkeys/:passkeyId',
       { preValidation: [anyone, requireRecentLogin], schema: { params: PasskeyParamsSchema } },
       async (request, reply) => {
-        const { userId } = await signedIn(request);
+        const { userId, sessionId } = await signedIn(request);
+        // A key does not confirm its own removal: a gesture on another key, or the password and the code (§ 5).
+        const [current] = await db
+          .select({ by: schema.session.confirmedPasskeyId })
+          .from(schema.session)
+          .where(eq(schema.session.id, sessionId));
+        if (current?.by === request.params.passkeyId) throw new ReauthenticationRequired();
         await withAdmin(adminDb, async (tx) => {
           const removed = await tx
             .delete(schema.passkey)

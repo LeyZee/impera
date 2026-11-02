@@ -142,6 +142,11 @@ export function recordPasskeyAdded(
   });
 }
 
+/** Takes back a key whose audit line and alert could not be written: no alert must always mean no key (ADR 0053 § 7). */
+export async function takeBackPasskey(db: Database, passkeyId: string): Promise<void> {
+  await db.delete(schema.passkey).where(eq(schema.passkey.id, passkeyId));
+}
+
 /** The owner signed in with a key never used before (ADR 0053 § 7); another account's first use is not told. */
 export function alertOwnerPasskeySignIn(adminDb: Database, userId: string, ip: string): Promise<void> {
   return withAdmin(adminDb, async (tx) => {
@@ -155,7 +160,23 @@ export function alertOwnerPasskeySignIn(adminDb: Database, userId: string, ip: s
   });
 }
 
-const ChallengeSchema = z.object({ challenge: z.string().min(1), userId: z.string().min(1) });
+const ChallengeSchema = z.object({
+  challenge: z.string().min(1),
+  userId: z.string().min(1),
+  /** The key the confirmation may not use: the one being removed (ADR 0053 § 5). */
+  excluding: z.string().min(1).nullable().default(null),
+});
+
+/** The stored challenge, `null` when missing or unreadable (both mean: ask for a new one). */
+function challengeOf(value: string | undefined): z.infer<typeof ChallengeSchema> | null {
+  if (value === undefined) return null;
+  try {
+    const parsed = ChallengeSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
 
 /** An assertion (a gesture on an existing key), as simplewebauthn reads it; null for a registration or anything else. */
 const AssertionSchema = z.object({
@@ -198,12 +219,17 @@ const transportsOf = (value: string | null): AuthenticatorTransportFuture[] | un
 export async function confirmationOptions(
   db: Database,
   relying: Relying,
-  target: { readonly userId: string; readonly sessionId: string },
+  target: { readonly userId: string; readonly sessionId: string; readonly excluding: string | null },
 ): Promise<PublicKeyCredentialRequestOptionsJSON | null> {
   const keys = await db
     .select({ credentialID: schema.passkey.credentialID, transports: schema.passkey.transports })
     .from(schema.passkey)
-    .where(eq(schema.passkey.userId, target.userId));
+    .where(
+      and(
+        eq(schema.passkey.userId, target.userId),
+        target.excluding === null ? undefined : sql`${schema.passkey.id} <> ${target.excluding}`,
+      ),
+    );
   if (keys.length === 0) return null;
   const options = await generateAuthenticationOptions({
     rpID: relying.rpID,
@@ -219,14 +245,19 @@ export async function confirmationOptions(
     await tx.insert(schema.verification).values({
       id: randomUUID(),
       identifier,
-      value: JSON.stringify({ challenge: options.challenge, userId: target.userId }),
+      value: JSON.stringify({
+        challenge: options.challenge,
+        userId: target.userId,
+        excluding: target.excluding,
+      }),
       expiresAt: sql`now() + make_interval(secs => ${CONFIRMATION_SECONDS})`,
     });
   });
   return options;
 }
 
-export type ConfirmationOutcome = 'confirmed' | 'expired' | 'refused';
+export type ConfirmationOutcome =
+  { readonly outcome: 'confirmed'; readonly passkeyId: string } | { readonly outcome: 'expired' | 'refused' };
 
 /**
  * Checks a confirmation gesture against the challenge of this session, used up whatever the outcome: a key of the
@@ -243,8 +274,8 @@ export async function confirmGesture(
     .delete(schema.verification)
     .where(and(eq(schema.verification.identifier, identifier), sql`${schema.verification.expiresAt} > now()`))
     .returning({ value: schema.verification.value });
-  const challenge = ChallengeSchema.safeParse(stored === undefined ? null : JSON.parse(stored.value));
-  if (!challenge.success || challenge.data.userId !== gesture.userId) return 'expired';
+  const challenge = challengeOf(stored?.value);
+  if (challenge?.userId !== gesture.userId) return { outcome: 'expired' };
   const [key] = await db
     .select()
     .from(schema.passkey)
@@ -252,12 +283,13 @@ export async function confirmGesture(
       and(eq(schema.passkey.credentialID, gesture.response.id), eq(schema.passkey.userId, gesture.userId)),
     );
   const assertion = assertionOf(gesture.response);
-  if (key === undefined || assertion === null) return 'refused';
+  if (key === undefined || assertion === null || key.id === challenge.excluding)
+    return { outcome: 'refused' };
   try {
     const transports = transportsOf(key.transports);
     const verification = await verifyAuthenticationResponse({
       response: assertion,
-      expectedChallenge: challenge.data.challenge,
+      expectedChallenge: challenge.challenge,
       expectedOrigin: relying.origin,
       expectedRPID: relying.rpID,
       credential: {
@@ -268,14 +300,15 @@ export async function confirmGesture(
       },
       requireUserVerification: true,
     });
-    if (!verification.verified || !verification.authenticationInfo.userVerified) return 'refused';
+    if (!verification.verified || !verification.authenticationInfo.userVerified)
+      return { outcome: 'refused' };
     await db
       .update(schema.passkey)
       .set({ counter: verification.authenticationInfo.newCounter, lastUsedAt: sql`now()` })
       .where(eq(schema.passkey.id, key.id));
-    return 'confirmed';
+    return { outcome: 'confirmed', passkeyId: key.id };
   } catch {
     // simplewebauthn throws for every check that fails (signature, counter, origin, challenge, user verification).
-    return 'refused';
+    return { outcome: 'refused' };
   }
 }

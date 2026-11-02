@@ -274,6 +274,79 @@ describe('passkeys (ADR 0053)', () => {
     expect((await request('GET', '/me', cookie)).statusCode).toBe(200);
   });
 
+  it('never lets a key confirm its own removal, and keeps a challenge to the session it was issued for', async () => {
+    const { member, cookie } = await team.addMember('lea@example.test', 'Léa');
+    const [first, second] = [new FakePasskey(), new FakePasskey()];
+    const one = PasskeySchema.parse((await add(cookie, first)).json());
+    const two = PasskeySchema.parse((await add(cookie, second)).json());
+    const session = cookiesOf((await signInWith(first)).headers);
+    const confirmWith = async (key: FakePasskey, payload?: object, held = session) => {
+      const options = await request('POST', '/auth/passkey/confirm-options', session, {
+        ...(payload === undefined ? {} : { payload }),
+      });
+      expect(options.statusCode, options.body).toBe(200);
+      return request('POST', '/auth/passkey/confirm', held, {
+        payload: { response: key.assert(options.json()) },
+      });
+    };
+
+    // A challenge asked in one session is worth nothing in another.
+    const elsewhere = await confirmWith(first, undefined, cookie);
+    expect([elsewhere.statusCode, codeOf(elsewhere)]).toEqual([401, 'passkey_challenge_unauthenticated']);
+
+    // Confirmed by the key itself: its removal asks for another one.
+    expect((await confirmWith(first)).statusCode).toBe(204);
+    const itself = await request('DELETE', `/auth/passkeys/${one.id}`, session);
+    expect([itself.statusCode, codeOf(itself)]).toEqual([403, 'reauthentication_forbidden']);
+    // The key being removed is left out of the options, and refused if it answers anyway.
+    const excluded = await confirmWith(first, { excluding: one.id });
+    expect([excluded.statusCode, codeOf(excluded)]).toEqual([401, 'passkey_unauthenticated']);
+    expect((await confirmWith(second, { excluding: one.id })).statusCode).toBe(204);
+    expect((await request('DELETE', `/auth/passkeys/${one.id}`, session)).statusCode).toBe(204);
+
+    // No other key left: the password and the code only.
+    const none = await request('POST', '/auth/passkey/confirm-options', session, {
+      payload: { excluding: two.id },
+    });
+    expect([none.statusCode, codeOf(none)]).toEqual([404, 'passkey_not_found']);
+    expect(await keysOf(member.userId)).toHaveLength(1);
+  });
+
+  it('keeps the plugin’s own routes closed: they would skip the confirmation', async () => {
+    for (const [method, url] of [
+      ['POST', '/auth/passkey/delete-passkey'],
+      ['POST', '/auth/passkey/update-passkey'],
+      ['GET', '/auth/passkey/list-user-passkeys'],
+    ] as const) {
+      const answer = await request(
+        method,
+        url,
+        team.owner,
+        method === 'POST' ? { payload: { id: 'x' } } : {},
+      );
+      expect(answer.statusCode, `${method} ${url}`).toBe(404);
+    }
+  });
+
+  it('takes the key back when its audit line and alert cannot be written', async () => {
+    const { member, cookie } = await team.addMember('ugo@example.test', 'Ugo');
+    await team.test.admin.db.execute(sql`
+      create function refuse_passkey_audit() returns trigger language plpgsql as $$
+      begin raise exception 'audit refused'; end $$`);
+    await team.test.admin.db.execute(sql`
+      create trigger refuse_passkey_audit before insert on audit_log
+      for each row when (new.action = 'auth.passkey_added') execute function refuse_passkey_audit()`);
+    try {
+      const failed = await add(cookie, new FakePasskey());
+      expect(failed.statusCode).toBe(500);
+      expect(await keysOf(member.userId)).toEqual([]);
+    } finally {
+      await team.test.admin.db.execute(sql`drop trigger refuse_passkey_audit on audit_log`);
+      await team.test.admin.db.execute(sql`drop function refuse_passkey_audit()`);
+    }
+    expect((await add(cookie, new FakePasskey())).statusCode).toBe(200);
+  });
+
   it('removes every key at a reset of the second factor and at a departure, never when sessions close', async () => {
     const { member, cookie } = await team.addMember('paul@example.test', 'Paul');
     expect((await add(cookie, new FakePasskey())).statusCode).toBe(200);
