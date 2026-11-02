@@ -36,12 +36,9 @@ import {
   fcfaText,
   firstOpenPeriod,
   flowOf,
-  forecastNet,
   gaugePercent,
-  goalReachedBps,
   goalSpanBps,
   heroPeriodOf,
-  lateNetOf,
   mainLine,
   memberFacts,
   memberPeriodAmount,
@@ -52,6 +49,7 @@ import {
   myStatementWords,
   parsePaySearch,
   parseTarget,
+  periodHeadOf,
   payoutBlockText,
   payRefusalText,
   payoutDelayText,
@@ -61,7 +59,6 @@ import {
   phaseChip,
   rateMissing,
   rateText,
-  reachedBpsOf,
   roundAmountText,
   rulePeriods,
   rowChips,
@@ -73,7 +70,6 @@ import {
   statementChips,
   statementsCsv,
   stopsThePeriod,
-  summaryOf,
   tickAmountText,
   tierAt,
   tierProgress,
@@ -184,47 +180,6 @@ const summary = (
   carriedMinor: 0,
   paidMinor: 0,
   ...patch,
-});
-
-describe('the forecast of a period', () => {
-  const day = (n: number, hours = 0) =>
-    new Date(new Date(WINDOW.startsAt).getTime() + (n * 24 + hours) * 3_600_000);
-
-  it('says nothing before a first full day, then follows the pace of the time gone by', () => {
-    expect(forecastNet(5_000, 0, WINDOW, day(0, 20))).toBeNull();
-    // Five days of fifteen gone: three times what is made.
-    expect(forecastNet(100_000, 0, WINDOW, day(5))).toBe(300_000);
-  });
-
-  it('forecasts nothing for an empty period', () => {
-    expect(forecastNet(0, 0, WINDOW, day(7))).toBe(0);
-  });
-
-  it('is the net itself once the period has ended', () => {
-    expect(forecastNet(123_456, 20_000, WINDOW, day(15))).toBe(123_456);
-    expect(forecastNet(123_456, 0, WINDOW, day(20))).toBe(123_456);
-  });
-
-  it('counts a report validated late once, never as pace', () => {
-    // 100 € of the period's own after five days, and 30 € that came from an earlier, closed period.
-    expect(forecastNet(13_000, 3_000, WINDOW, day(5))).toBe(33_000);
-  });
-
-  it('reads the late share of each line from its gross, onto its net', () => {
-    const late = line({
-      grossMinor: 10_000,
-      netMinor: 8_000,
-      lateReports: [
-        {
-          shiftReportId: newId(ShiftReportIdSchema),
-          period: PayPeriodSchema.parse('2026-10-16'),
-          grossMinor: 2_500,
-        },
-      ],
-    });
-    expect(lateNetOf([statement({ lines: [late, line()] })])).toBe(2_000);
-    expect(lateNetOf([])).toBe(0);
-  });
 });
 
 describe('a statement’s marks', () => {
@@ -357,35 +312,33 @@ describe('a period in the list', () => {
     ]);
   });
 
-  it('sums a period read whole as the list does', () => {
+  it('reads a period whole as the list does, from the server’s figures', () => {
+    const summary = {
+      ...UNREAD.summary,
+      statements: { draft: 1, validated: 1, paid: 1, carried: 1 },
+      paidMinor: 2_125,
+    };
     const period: PayrollPeriod = {
       period: PERIOD,
       window: WINDOW,
       ended: true,
       beforeFirstClosing: false,
       ...UNREAD,
+      summary,
       blocked: null,
       closing: null,
-      statements: [
-        statement({
-          status: 'paid',
-          payment: { paidOn: '2026-11-02', method: 'worldremit', reference: null, sentMinor: 2_125 },
-        }),
-        statement({ carryOverOutMinor: 900, payableMinor: 0 }),
-        statement({ status: 'validated', carryOverOutMinor: 700, payableMinor: 0 }),
-      ],
+      statements: [],
       bonusTiers: null,
       collectiveGoal: null,
       settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null },
     };
-    // The draft under the minimum would carry its total, but only the validated one did.
-    expect(summaryOf(period)).toMatchObject({
-      statements: { draft: 1, validated: 1, paid: 1, carried: 1 },
-      netMinor: 25_500,
-      payableMinor: 2_125,
-      validatedPayableMinor: 2_125,
-      carriedMinor: 700,
-      paidMinor: 2_125,
+    // Nothing is summed in the browser (ADR 0047 § 2): the figures are the server's, beside the period's state.
+    expect(periodHeadOf(period)).toEqual({
+      ...summary,
+      ended: true,
+      closedAt: null,
+      closedBy: null,
+      blocked: null,
     });
   });
 });
@@ -895,12 +848,11 @@ describe('the figures of a period', () => {
     ).toHaveLength(4);
   });
 
-  it('places the goal: reached share floored, the tier reached, a gauge past the last tier', () => {
+  it('places the goal: the tier reached, a gauge past the last tier', () => {
     const tiers = [
       { reachedBps: 8_000, bonusMinor: 1_000 },
       { reachedBps: 10_000, bonusMinor: 2_500 },
     ];
-    expect(reachedBpsOf(99_999, 100_000)).toBe(9_999);
     expect(tierAt(tiers, 9_999)).toEqual(tiers[0]);
     expect(tierAt(tiers, 7_999)).toBeNull();
     expect(goalSpanBps({ tiers })).toBe(13_000);
@@ -1035,21 +987,6 @@ describe('goals and tiers', () => {
   it('puts a tier’s bonus under the gauge without cents when it has none', () => {
     expect(plain(tickAmountText(1_000))).toBe('+10 €');
     expect(plain(tickAmountText(1_250))).toBe('+12,50 €');
-  });
-
-  it('takes the share reached as the engine froze it, else from the team’s net', () => {
-    const goal = { targetMinor: 100_000 };
-    expect(
-      goalReachedBps(
-        { statements: [statement({ netMinor: 30_000 }), statement({ netMinor: 20_000 })] },
-        goal,
-      ),
-    ).toBe(5_000);
-    const frozen = statement({
-      netMinor: 30_000,
-      team: { netMinor: 85_000, collective: { reachedBps: 8_500, tier: null } },
-    });
-    expect(goalReachedBps({ statements: [frozen] }, goal)).toBe(8_500);
   });
 });
 
