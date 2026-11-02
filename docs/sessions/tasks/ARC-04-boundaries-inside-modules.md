@@ -22,6 +22,8 @@ Le lint refuse qu'un `domain/` importe l'`infra/` ou l'`application/` de son pro
 - [ ] Activer la vérification interne (`checkInternals`, ou des éléments par couche) sans désactiver aucune règle existante.
 - [ ] Corriger ce qu'elle trouve dans `apps/api/src/modules/*`, sans changer de comportement ; un écart qui demanderait une décision part en question, pas en contournement.
 - [ ] Fixtures et cas dans `boundaries.test.ts` : un `domain/` qui importe son `infra/` ou son `application/` est refusé ; `application/` vers `domain/` et `infra/` vers les deux restent permis.
+- [ ] `application/` vers l'`infra/` de son module devient refusé aussi (il passe par ses ports de `domain/`, l'`index.ts` assemble) : cas ajouté dans `boundaries.test.ts`, corrections dans la même PR.
+- [ ] `apps/api/src/modules/telegram/__tests__/support/fake-telegram.ts` est hors couche : le ranger dans une couche `__tests__` déclarée ou l'ajouter à `boundaries/ignore`, sans désactiver de règle.
 - [ ] `coding.md` dit que la règle vaut aussi à l'intérieur d'un module.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
