@@ -15,6 +15,7 @@ type Listener = (event: FakeEvent) => void;
 interface FakeEvent {
   request?: { method: string; url: string; mode: string };
   data?: unknown;
+  notification?: { data: unknown; close: () => void };
   respondWith: (response: Promise<Response>) => void;
   waitUntil: (work: Promise<unknown>) => void;
 }
@@ -26,6 +27,9 @@ function loadWorker(network: (url: string) => Promise<Response>): {
   ) => { answered: Promise<Response> | null; work: Promise<unknown>[] };
   stored: Map<string, Map<string, Response>>;
   skipWaiting: ReturnType<typeof vi.fn>;
+  showNotification: ReturnType<typeof vi.fn>;
+  windows: { url: string; focus: ReturnType<typeof vi.fn>; navigate: ReturnType<typeof vi.fn> }[];
+  openWindow: ReturnType<typeof vi.fn>;
 } {
   const listeners = new Map<string, Listener>();
   const stored = new Map<string, Map<string, Response>>();
@@ -59,9 +63,17 @@ function loadWorker(network: (url: string) => Promise<Response>): {
     delete: (name: string) => Promise.resolve(stored.delete(name)),
   };
   const skipWaiting = vi.fn();
+  const showNotification = vi.fn(() => Promise.resolve());
+  const windows: { url: string; focus: ReturnType<typeof vi.fn>; navigate: ReturnType<typeof vi.fn> }[] = [];
+  const openWindow = vi.fn(() => Promise.resolve(null));
   const self = {
     location: { origin: 'https://crm.test' },
-    clients: { claim: () => Promise.resolve() },
+    clients: {
+      claim: () => Promise.resolve(),
+      matchAll: () => Promise.resolve(windows),
+      openWindow,
+    },
+    registration: { showNotification },
     skipWaiting,
     addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
   };
@@ -71,6 +83,9 @@ function loadWorker(network: (url: string) => Promise<Response>): {
   return {
     stored,
     skipWaiting,
+    showNotification,
+    windows,
+    openWindow,
     fire: (type, partial) => {
       let answered: Promise<Response> | null = null;
       const work: Promise<unknown>[] = [];
@@ -139,7 +154,7 @@ describe('service worker', () => {
     worker.stored.set('someone-else', new Map());
     await Promise.all(worker.fire('install', {}).work);
     await Promise.all(worker.fire('activate', {}).work);
-    expect([...worker.stored.keys()].sort()).toEqual(['nirvana-shell-v1', 'someone-else']);
+    expect([...worker.stored.keys()].sort()).toEqual(['nirvana-shell-v2', 'someone-else']);
     worker.fire('message', { data: { type: 'something' } });
     expect(worker.skipWaiting).not.toHaveBeenCalled();
     worker.fire('message', { data: { type: 'apply-update' } });
@@ -152,5 +167,68 @@ describe('service worker', () => {
     for (const path of ['/', '/appearance.js', '/manifest.webmanifest', '/icons/icon-192.png']) {
       expect(swSource).toContain(`'${path}'`);
     }
+  });
+
+  it('shows a pushed message with the app’s icon, cut to size, and rings plain « Nirvana » on anything odd', async () => {
+    const worker = loadWorker((url) => Promise.resolve(ok(url)));
+    const push = (value: unknown, raw = false) =>
+      Promise.all(
+        worker.fire('push', {
+          data: {
+            json: () => {
+              if (raw) throw new SyntaxError('not JSON');
+              return value;
+            },
+          },
+        }).work,
+      );
+    await push({ title: 'Nouvelle vente', body: 'x'.repeat(400), url: '/suivi', tag: 'sale' });
+    expect(worker.showNotification).toHaveBeenLastCalledWith('Nouvelle vente', {
+      body: 'x'.repeat(180),
+      tag: 'sale',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-96.png',
+      lang: 'fr',
+      data: { url: '/suivi' },
+    });
+    await push(null, true);
+    expect(worker.showNotification).toHaveBeenLastCalledWith(
+      'Nirvana',
+      expect.objectContaining({ data: { url: '/' } }),
+    );
+  });
+
+  it('opens only a page of the app from a notification, never another site', async () => {
+    const worker = loadWorker((url) => Promise.resolve(ok(url)));
+    const touch = (url: unknown) =>
+      Promise.all(worker.fire('notificationclick', { notification: { data: { url }, close: vi.fn() } }).work);
+    for (const evil of [
+      'https://evil.example/',
+      '//evil.example/x',
+      '/\\evil.example',
+      'javascript:alert(1)',
+    ]) {
+      await touch(evil);
+      expect(worker.openWindow).toHaveBeenLastCalledWith('/');
+    }
+    await touch('/planning');
+    expect(worker.openWindow).toHaveBeenLastCalledWith('/planning');
+  });
+
+  it('brings the open app forward on the page instead of opening another', async () => {
+    const worker = loadWorker((url) => Promise.resolve(ok(url)));
+    const open = {
+      url: 'https://crm.test/suivi',
+      focus: vi.fn(() => Promise.resolve()),
+      navigate: vi.fn(() => Promise.resolve()),
+    };
+    worker.windows.push(open);
+    await Promise.all(
+      worker.fire('notificationclick', { notification: { data: { url: '/commissions' }, close: vi.fn() } })
+        .work,
+    );
+    expect(open.focus).toHaveBeenCalledOnce();
+    expect(open.navigate).toHaveBeenCalledWith('/commissions');
+    expect(worker.openWindow).not.toHaveBeenCalled();
   });
 });
