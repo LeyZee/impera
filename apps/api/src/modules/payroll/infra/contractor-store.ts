@@ -52,6 +52,7 @@ import { audit } from './writes';
 const {
   commissionStatements,
   contractAcceptances,
+  contractorDocumentPurges,
   contractorDocumentReviews,
   contractorDocuments,
   contractorProfiles,
@@ -173,9 +174,10 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     .where(eq(contractorRegimes.memberId, member.id))
     .orderBy(sql`${contractorRegimes.effectiveFrom} desc`);
   const documents = await tx
-    .select({ row: contractorDocuments, review: contractorDocumentReviews })
+    .select({ row: contractorDocuments, review: contractorDocumentReviews, purge: contractorDocumentPurges })
     .from(contractorDocuments)
     .leftJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
+    .leftJoin(contractorDocumentPurges, eq(contractorDocumentPurges.documentId, contractorDocuments.id))
     .where(eq(contractorDocuments.memberId, member.id))
     .orderBy(sql`${contractorDocuments.createdAt} desc`, sql`${contractorDocuments.id} desc`);
   return ContractorFileSchema.parse({
@@ -194,7 +196,7 @@ async function fileOf(tx: Transaction, member: Member): Promise<ContractorFile> 
     prefixFrozen: await prefixFrozen(tx, member.id),
     acceptances: accepted.map((row) => acceptanceOf(row.acceptance)),
     regimes: regimes.map(assignmentOf),
-    documents: documents.map((one) => documentOf(one.row, one.review)),
+    documents: documents.map((one) => documentOf(one.row, one.review, one.purge)),
   });
 }
 

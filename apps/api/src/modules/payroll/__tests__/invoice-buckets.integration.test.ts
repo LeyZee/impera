@@ -25,6 +25,10 @@ const bytesOf = (text: string): Uint8Array => new TextEncoder().encode(text);
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 /** A lock of one day, to the second: what the provider gives back. */
 const inOneDay = (): Date => new Date(Math.floor(Date.now() / 1000) * 1000 + 86_400_000);
+/** A lock that ends in two seconds, to the second, and the wait until it has ended. */
+const inTwoSeconds = (): Date => new Date(Math.ceil(Date.now() / 1000) * 1000 + 2_000);
+const until = (moment: Date): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, Math.max(0, moment.getTime() - Date.now()) + 1_000));
 
 describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage objet (ADR 0037 § 4 à § 8)', () => {
   let container: StartedTestContainer | undefined;
@@ -156,4 +160,57 @@ describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage ob
     );
     expect(await store().read('invoices/2026/d.pdf')).toBeNull();
   });
+
+  /** What the bucket lists under the exact key: its versions and its delete markers (EQ-06 lot 5c-2). */
+  const listed = async (key: string): Promise<{ versions: number; markers: number }> => {
+    const response = await admin.fetch(`${endpoint}/${bucket}?versions&prefix=${encodeURIComponent(key)}`);
+    const body = await response.text();
+    const count = (kind: string) =>
+      body
+        .split(`<${kind}>`)
+        .slice(1)
+        .filter((block) => (block.split(`</${kind}>`)[0] ?? '').includes(`<Key>${key}</Key>`)).length;
+    return { versions: count('Version'), markers: count('DeleteMarker') };
+  };
+
+  it('erases nothing of a refused file while its compliance lock holds (« ok purge a »)', async () => {
+    const bytes = bytesOf('%PDF-1.7 pièce refusée, encore verrouillée');
+    const key = 'contractor-documents/m/locked.pdf';
+    await store().writeOnce(key, bytes, sha(bytes), inOneDay());
+    expect(await store().remove(key, sha(bytes))).toBe('locked');
+    expect((await store().read(key))?.bytes).toEqual(bytes);
+    expect(await listed(key)).toEqual({ versions: 1, markers: 0 });
+  });
+
+  it('erases the version itself once its lock has ended, nothing left behind a marker', async () => {
+    const bytes = bytesOf('%PDF-1.7 pièce refusée, verrou échu');
+    const key = 'contractor-documents/m/unlocked.pdf';
+    const lock = inTwoSeconds();
+    await store().writeOnce(key, bytes, sha(bytes), lock);
+    await until(lock);
+    // Another file under the key is never erased: the fingerprint is the bucket's, read before.
+    expect(await store().remove(key, sha(bytesOf('autre')))).toBe('altered');
+    expect(await store().remove(key, sha(bytes))).toBe('removed');
+    expect(await store().read(key)).toBeNull();
+    expect(await listed(key)).toEqual({ versions: 0, markers: 0 });
+    expect(await store().holdsVersion(key)).toBe(false);
+    expect(await store().remove(key, sha(bytes))).toBe('absent');
+  }, 20_000);
+
+  it('finds and erases a version a delete marker hides, which a HEAD would take for absent', async () => {
+    const bytes = bytesOf('%PDF-1.7 pièce refusée, cachée par un marqueur');
+    const key = 'contractor-documents/m/hidden.pdf';
+    const lock = inTwoSeconds();
+    await store().writeOnce(key, bytes, sha(bytes), lock);
+    // A plain delete: allowed under the lock, it only adds a marker, the bytes stay.
+    const hidden = await admin.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' });
+    expect(hidden.status, await hidden.text()).toBe(204);
+    expect(await store().read(key)).toBeNull();
+    expect(await store().holdsVersion(key)).toBe(true);
+    expect(await store().remove(key, sha(bytes))).toBe('locked');
+    await until(lock);
+    expect(await store().remove(key, sha(bytes))).toBe('removed');
+    expect(await listed(key)).toEqual({ versions: 0, markers: 0 });
+    expect(await store().holdsVersion(key)).toBe(false);
+  }, 20_000);
 });

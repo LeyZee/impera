@@ -11,7 +11,12 @@ import type { Database } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollBillingSettings } from './application/billing-settings';
-import { createContractorDocuments, remindDocuments } from './application/contractor-documents';
+import {
+  createContractorDocuments,
+  purgeRefusedDocuments,
+  remindDocuments,
+  type PurgeOutcome,
+} from './application/contractor-documents';
 import { createPayrollEntries } from './application/entries';
 import { fetchExchangeRates, type RateFetchOutcome } from './application/exchange-rates';
 import {
@@ -41,6 +46,7 @@ import {
   createDrizzlePayrollContractorStore,
   createDrizzlePayrollRequeueStore,
 } from './infra/contractor-store';
+import { createDrizzleDocumentPurgeStore } from './infra/document-purge-store';
 import { createDrizzleDocumentReminderStore } from './infra/document-reminder-store';
 import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
@@ -154,6 +160,11 @@ export interface PayrollModule {
      * Returns how many were said this run.
      */
     readonly remindDocuments: () => Promise<number>;
+    /**
+     * `payroll.purge_refused_documents`, each night (EQ-06 lot 5c-2, « ok purge a »): each refused document whose
+     * upload lock has ended has its file erased from the first bucket, then the erasure recorded; its row stays.
+     */
+    readonly purgeRefusedDocuments: (logger: JobLogger) => Promise<PurgeOutcome>;
   };
 }
 
@@ -247,6 +258,15 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       sweepInvoiceAcceptance: (logger) => sweepInvoiceAcceptance(acceptanceStore, logger),
       remindDocuments: () =>
         remindDocuments(createDrizzleDocumentReminderStore(deps.adminDb, deps.reads, now)),
+      purgeRefusedDocuments: (logger) =>
+        purgeRefusedDocuments(
+          {
+            store: createDrizzleDocumentPurgeStore(deps.adminDb),
+            primary: deps.invoicePdfs.primary,
+            copy: deps.invoicePdfs.copy,
+          },
+          logger,
+        ),
     },
   };
 }

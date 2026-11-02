@@ -124,6 +124,8 @@ const silent: InvoiceObjectStore = {
   writeOnce: () => Promise.reject(new Error('no answer')),
   read: () => Promise.reject(new Error('no answer')),
   lengthenLock: () => Promise.reject(new Error('no answer')),
+  remove: () => Promise.reject(new Error('no answer')),
+  holdsVersion: () => Promise.reject(new Error('no answer')),
 };
 
 describe('Équipe › Factures : le rendu du PDF, une fois, verrouillé (ADR 0037 § 5)', () => {

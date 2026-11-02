@@ -73,6 +73,7 @@ export function statusForCode(code: string): number {
   if (code.endsWith('_unauthenticated')) return 401;
   if (code.endsWith('_forbidden')) return 403;
   if (code.endsWith('_conflict')) return 409;
+  if (code.endsWith('_gone')) return 410;
   if (code.endsWith('_unprocessable')) return 422;
   if (code.endsWith('_limited')) return 429;
   if (code.endsWith('_unavailable')) return 503;

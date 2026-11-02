@@ -15,6 +15,7 @@ import { documentMediaTypeOfKey } from '../domain/documents';
 
 type DocumentRow = typeof schema.contractorDocuments.$inferSelect;
 type ReviewRow = typeof schema.contractorDocumentReviews.$inferSelect;
+type PurgeRow = typeof schema.contractorDocumentPurges.$inferSelect;
 
 /**
  * The owner's check of a document as its row holds it (`contractor_document_reviews`, lot 5c), `null` while it waits:
@@ -46,8 +47,15 @@ export function mediaTypeOfRow(row: Pick<DocumentRow, 'storageKey'>): Contractor
   return mediaType;
 }
 
-/** A document as the file shows it: its dates, its last day, what its file is, and the owner's check. */
-export function documentOf(row: DocumentRow, review: ReviewRow | null): ContractorDocument {
+/**
+ * A document as the file shows it: its dates, its last day, what its file is, the owner's check, and when its file was
+ * erased (a refused document, « ok purge a »).
+ */
+export function documentOf(
+  row: DocumentRow,
+  review: ReviewRow | null,
+  purge: PurgeRow | null,
+): ContractorDocument {
   const kind = ContractorDocumentKindSchema.parse(row.kind);
   return ContractorDocumentSchema.parse({
     id: row.id,
@@ -59,6 +67,7 @@ export function documentOf(row: DocumentRow, review: ReviewRow | null): Contract
     mediaType: mediaTypeOfRow(row),
     sha256: row.sha256,
     review: review === null ? null : reviewedOf(review),
+    purgedAt: purge?.purgedAt.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   });
 }

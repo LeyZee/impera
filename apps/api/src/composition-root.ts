@@ -782,6 +782,17 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         );
       },
     ),
+    'payroll.purge_refused_documents': defineTask(
+      'payroll.purge_refused_documents',
+      JOB_PAYLOADS['payroll.purge_refused_documents'],
+      logger,
+      async (_payload, context) => {
+        context.logger.info(
+          { outcome: await modules.payroll.jobs.purgeRefusedDocuments(context.logger) },
+          'payroll: refused documents purged',
+        );
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

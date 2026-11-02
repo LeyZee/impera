@@ -341,7 +341,19 @@ export interface InvoiceObjectStore {
    * earlier date is refused by the bucket, and throws.
    */
   lengthenLock(key: string, retainUntil: Date): Promise<void>;
+  /**
+   * Erases every version of the object at `key` for good, and the delete markers over them (« ok purge a » de
+   * Charles, 01/11: a contractor's refused document), only when each version is the file of `sha256` and its lock, as
+   * the bucket names it, has ended. `removed`; `absent` when the key holds no version; `locked` while a lock holds,
+   * which the bucket would refuse anyway, nothing erased; `altered` when a version is another file, nothing erased.
+   * Each version is erased by its id: a plain delete only hides the bytes behind a marker in a locked bucket.
+   */
+  remove(key: string, sha256: string): Promise<RemoveOutcome>;
+  /** Whether the bucket holds a version of `key`, even one hidden behind a delete marker. Reads only. */
+  holdsVersion(key: string): Promise<boolean>;
 }
+
+type RemoveOutcome = 'removed' | 'absent' | 'locked' | 'altered';
 
 /** The agency's logo a document froze by its fingerprint (`agency_logos`), a PNG. */
 export interface InvoiceLogo {
@@ -637,4 +649,26 @@ export interface PayrollRequeueStore {
  */
 export interface PayrollDocumentReminderStore {
   remindUnscoped(): Promise<number>;
+}
+
+/** A refused document's file, as the purge reads it: where it lies and what it is. */
+interface RefusedFile {
+  readonly documentId: ContractorDocumentId;
+  readonly memberId: TeamMemberId;
+  readonly key: string;
+  readonly sha256: string;
+}
+
+/**
+ * `payroll.purge_refused_documents`, as the jobs (`withAdmin`, EQ-06 lot 5c-2, « ok purge a »): the refused documents
+ * whose upload lock has ended and whose file is not erased yet; then the erasure recorded once its file is gone.
+ */
+export interface PayrollDocumentPurgeStore {
+  /** Oldest lock first, a bounded batch: the next night takes the rest. */
+  dueUnscoped(): Promise<readonly RefusedFile[]>;
+  /**
+   * Records the erasure with its line of `audit_log`, once (`false` when it was recorded already). The base refuses it
+   * for a document the owner did not refuse, or whose upload lock has not ended.
+   */
+  recordUnscoped(file: RefusedFile, outcome: 'removed' | 'absent'): Promise<boolean>;
 }

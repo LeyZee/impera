@@ -377,6 +377,18 @@ export class InvoiceStorageUnavailable extends Error {
   }
 }
 
+/**
+ * The bucket refused to erase a version whose lock it has just said is over, or a delete marker, which has no lock
+ * (EQ-06 lot 5c-2, Bilan on #359): almost always a missing right (`s3:DeleteObjectVersion`), never « not yet ». Told
+ * as an error, never tried again quietly.
+ */
+export class InvoiceStorageRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvoiceStorageRefused';
+  }
+}
+
 /** A character the PDF would print that its font has no glyph for: the PDF is not rendered (ADR 0037 § 2). */
 export class InvoicePdfGlyphMissing extends Error {
   constructor(readonly codePoints: readonly number[]) {
@@ -577,6 +589,16 @@ export class ContractorDocumentReviewed extends DomainError {
       decision === 'accepted' ? 'Cette pièce est déjà acceptée' : 'Cette pièce est déjà refusée',
       { details: { decision } },
     );
+  }
+}
+
+/**
+ * The file of a refused document was erased once its upload lock ended (lot 5c-2, « ok purge a »): its row, its reason
+ * and its fingerprint stay, its bytes are gone for good.
+ */
+export class ContractorDocumentFileGone extends DomainError {
+  constructor() {
+    super('contractor_document_file_gone', 'Le fichier de cette pièce refusée a été effacé');
   }
 }
 

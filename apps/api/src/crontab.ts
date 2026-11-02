@@ -76,6 +76,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '37 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.remind_documents'] },
   },
+  // The files of refused documents erased once their upload lock has ended (EQ-06 lot 5c-2, « ok purge a » de
+  // Charles): their rows stay. The next night is the retry, no backfill.
+  {
+    task: 'payroll.purge_refused_documents',
+    match: '51 3 * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.purge_refused_documents'] },
+  },
   // The waiting invoices tried again once a day, whatever their trigger (EQ-06 « ok pays »): a member whose country goes
   // back to that of his regime, or any change no trigger of this module sees (the team module never calls payroll),
   // lets his invoices go out within the day. Each statement that waited is enqueued under its own key (a run that waits

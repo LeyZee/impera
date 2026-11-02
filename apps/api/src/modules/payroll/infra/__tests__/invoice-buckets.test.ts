@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { InvoiceStorageUnavailable } from '../../domain/errors';
+import { InvoiceStorageRefused, InvoiceStorageUnavailable } from '../../domain/errors';
 import { createMemoryInvoiceStore, createS3InvoiceStore } from '../invoice-buckets';
 
 /** An invented bucket and invented keys (ADR 0010): nothing here reaches a provider. */
@@ -146,6 +146,174 @@ describe('Équipe › Factures : le dépôt dans un seau S3 verrouillé (ADR 003
   });
 });
 
+describe('Équipe › Pièces : l’effacement d’une pièce refusée dans le seau S3 (EQ-06 lot 5c-2, « ok purge a »)', () => {
+  const PAST = '2026-01-01T00:00:00Z';
+  const WORM = '<Error><Code>InvalidRequest</Code><Message>Object is WORM protected</Message></Error>';
+  /** A listing of the key's versions and markers, as ListObjectVersions writes it. */
+  const listing = (
+    entries: readonly { kind: 'Version' | 'DeleteMarker'; key?: string; id: string }[],
+  ): string =>
+    `<ListVersionsResult><IsTruncated>false</IsTruncated>${entries
+      .map(
+        (one) =>
+          `<${one.kind}><Key>${one.key ?? KEY}</Key><VersionId>${one.id}</VersionId><IsLatest>false</IsLatest></${one.kind}>`,
+      )
+      .join('')}</ListVersionsResult>`;
+  /**
+   * A bucket that lists `entries`, gives each version `bytes` under `lock`, answers each delete with `deleted`, and
+   * names `relock` (by default `lock`) to a version read again with HEAD.
+   */
+  const bucket = (
+    entries: Parameters<typeof listing>[0],
+    lock: string | null,
+    options: { bytes?: Uint8Array; deleted?: () => Response; relock?: string } = {},
+  ) => {
+    const requests: Request[] = [];
+    const lockHeaders = (until: string | null): Record<string, string> =>
+      until === null
+        ? {}
+        : { 'x-amz-object-lock-mode': 'COMPLIANCE', 'x-amz-object-lock-retain-until-date': until };
+    const answer = (request: Request): Response => {
+      const url = new URL(request.url);
+      if (request.method === 'GET' && url.searchParams.has('versions')) {
+        return new Response(listing(entries), { status: 200 });
+      }
+      if (request.method === 'GET') {
+        return new Response(options.bytes ?? BYTES, { status: 200, headers: lockHeaders(lock) });
+      }
+      if (request.method === 'HEAD') {
+        return new Response(null, { status: 200, headers: lockHeaders(options.relock ?? lock) });
+      }
+      if (request.method === 'DELETE') return options.deleted?.() ?? new Response(null, { status: 204 });
+      return new Response(null, { status: 500 });
+    };
+    return {
+      requests,
+      fetch: (request: Request): Promise<Response> => {
+        requests.push(request);
+        return Promise.resolve(answer(request));
+      },
+    };
+  };
+  const deletes = (requests: readonly Request[]) =>
+    requests
+      .filter((request) => request.method === 'DELETE')
+      .map((request) => new URL(request.url).searchParams.get('versionId'));
+
+  it('erases every version of the exact key by its id, then the markers, once its lock has ended', async () => {
+    const provided = bucket(
+      [
+        { kind: 'Version', id: 'v1' },
+        { kind: 'DeleteMarker', id: 'm1' },
+        // Another key the prefix also lists: never touched.
+        { kind: 'Version', key: `${KEY}.old`, id: 'other' },
+      ],
+      PAST,
+    );
+    expect(await createS3InvoiceStore(CONFIG, provided.fetch).remove(KEY, SHA)).toBe('removed');
+    const [list] = provided.requests;
+    expect(list?.url).toBe(
+      'https://objects.example.test/factures-exemple?versions&prefix=invoices%2F2026%2F0190f1a2-0000-7000-8000-000000000001.pdf',
+    );
+    expect(list?.headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=EXAMPLEKEYID\//u);
+    expect(deletes(provided.requests)).toEqual(['v1', 'm1']);
+  });
+
+  it('erases nothing while a lock holds, when a version is another file, or for a date it cannot read', async () => {
+    const locked = bucket([{ kind: 'Version', id: 'v1' }], '2037-01-01T00:00:00Z');
+    expect(await createS3InvoiceStore(CONFIG, locked.fetch).remove(KEY, SHA)).toBe('locked');
+    expect(deletes(locked.requests)).toEqual([]);
+    const unreadable = bucket([{ kind: 'Version', id: 'v1' }], 'soon');
+    expect(await createS3InvoiceStore(CONFIG, unreadable.fetch).remove(KEY, SHA)).toBe('locked');
+    expect(deletes(unreadable.requests)).toEqual([]);
+    const other = bucket([{ kind: 'Version', id: 'v1' }], PAST, { bytes: new TextEncoder().encode('autre') });
+    expect(await createS3InvoiceStore(CONFIG, other.fetch).remove(KEY, SHA)).toBe('altered');
+    expect(deletes(other.requests)).toEqual([]);
+  });
+
+  it('says « absent » for no version, clears a marker left alone, and takes a delete refused under a lock for « not yet »', async () => {
+    const empty = bucket([], null);
+    expect(await createS3InvoiceStore(CONFIG, empty.fetch).remove(KEY, SHA)).toBe('absent');
+    expect(deletes(empty.requests)).toEqual([]);
+    // A run stopped between the version and its marker: the marker goes, the file was gone already.
+    const marker = bucket([{ kind: 'DeleteMarker', id: 'm1' }], null);
+    expect(await createS3InvoiceStore(CONFIG, marker.fetch).remove(KEY, SHA)).toBe('absent');
+    expect(deletes(marker.requests)).toEqual(['m1']);
+    // A lock lengthened between the read and the delete: the version, read again, names it.
+    const relocked = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }),
+      relock: '2037-01-01T00:00:00Z',
+    });
+    expect(await createS3InvoiceStore(CONFIG, relocked.fetch).remove(KEY, SHA)).toBe('locked');
+    expect(relocked.requests.filter((request) => request.method === 'HEAD')).toHaveLength(1);
+    const worm = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response(WORM, { status: 400 }),
+      relock: '2037-01-01T00:00:00Z',
+    });
+    expect(await createS3InvoiceStore(CONFIG, worm.fetch).remove(KEY, SHA)).toBe('locked');
+  });
+
+  it('fails as a refusal, never « not yet », a delete refused with no lock that holds (Bilan on #359)', async () => {
+    // The lock read again is still over: a right the key lacks, never a lock.
+    const denied = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }),
+    });
+    const refusal = createS3InvoiceStore(CONFIG, denied.fetch).remove(KEY, SHA);
+    await expect(refusal).rejects.toBeInstanceOf(InvoiceStorageRefused);
+    await expect(refusal).rejects.toThrow(
+      /DELETE .*\?versionId answered 403 \(AccessDenied\) with no lock that holds$/u,
+    );
+    const unlockedWorm = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response(WORM, { status: 400 }),
+    });
+    await expect(createS3InvoiceStore(CONFIG, unlockedWorm.fetch).remove(KEY, SHA)).rejects.toBeInstanceOf(
+      InvoiceStorageRefused,
+    );
+    // A marker has no lock: refused, it is not read again.
+    const marker = bucket([{ kind: 'DeleteMarker', id: 'm1' }], null, {
+      deleted: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }),
+    });
+    await expect(createS3InvoiceStore(CONFIG, marker.fetch).remove(KEY, SHA)).rejects.toBeInstanceOf(
+      InvoiceStorageRefused,
+    );
+    expect(marker.requests.filter((request) => request.method === 'HEAD')).toEqual([]);
+    // Another 400 is a bucket that answered an error.
+    const other = bucket([{ kind: 'Version', id: 'v1' }], PAST, {
+      deleted: () => new Response('<Error><Code>InvalidArgument</Code></Error>', { status: 400 }),
+    });
+    await expect(createS3InvoiceStore(CONFIG, other.fetch).remove(KEY, SHA)).rejects.toBeInstanceOf(
+      InvoiceStorageUnavailable,
+    );
+  });
+
+  it('tells whether a version lies under the key, even behind a marker, and fails on a listing cut in two', async () => {
+    const hidden = bucket(
+      [
+        { kind: 'DeleteMarker', id: 'm1' },
+        { kind: 'Version', id: 'v1' },
+      ],
+      PAST,
+    );
+    expect(await createS3InvoiceStore(CONFIG, hidden.fetch).holdsVersion(KEY)).toBe(true);
+    expect(deletes(hidden.requests)).toEqual([]);
+    expect(
+      await createS3InvoiceStore(
+        CONFIG,
+        bucket([{ kind: 'DeleteMarker', id: 'm1' }], null).fetch,
+      ).holdsVersion(KEY),
+    ).toBe(false);
+    const truncated = provider(
+      () =>
+        new Response('<ListVersionsResult><IsTruncated>true</IsTruncated></ListVersionsResult>', {
+          status: 200,
+        }),
+    );
+    await expect(createS3InvoiceStore(CONFIG, truncated.fetch).holdsVersion(KEY)).rejects.toBeInstanceOf(
+      InvoiceStorageUnavailable,
+    );
+  });
+});
+
 describe('Équipe › Factures : le seau en mémoire du développement (ADR 0037 § 8)', () => {
   it('keeps each key once, as given, and gives a copy of its bytes', async () => {
     const store = createMemoryInvoiceStore();
@@ -181,5 +349,18 @@ describe('Équipe › Factures : le seau en mémoire du développement (ADR 0037
     expect(store.peek(KEY)?.retainUntil).toEqual(later);
     store.plant('unlocked', { bytes: BYTES, retainUntil: null });
     await expect(store.lengthenLock('unlocked', later)).rejects.toThrow(/only lengthens/u);
+  });
+
+  it('erases an unlocked object of the right file only, and tells whether it holds one', async () => {
+    const store = createMemoryInvoiceStore();
+    expect(await store.remove(KEY, SHA)).toBe('absent');
+    expect(await store.holdsVersion(KEY)).toBe(false);
+    await store.writeOnce(KEY, BYTES, SHA, LOCK);
+    expect(await store.remove(KEY, SHA)).toBe('locked');
+    store.plant(KEY, { bytes: BYTES, retainUntil: new Date('2026-01-01T00:00:00.000Z') });
+    expect(await store.remove(KEY, '0'.repeat(64))).toBe('altered');
+    expect(await store.holdsVersion(KEY)).toBe(true);
+    expect(await store.remove(KEY, SHA)).toBe('removed');
+    expect(store.peek(KEY)).toBeUndefined();
   });
 });
