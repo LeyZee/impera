@@ -47,9 +47,19 @@ const SESSION_SECONDS = 12 * 60 * 60;
 const SESSION_REFRESH_SECONDS = 60 * 60;
 /** Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit. */
 const AUTH_RATE_LIMIT_PER_MINUTE = 20;
-/** Sign-in attempts per account, whatever the IP: guessing one password from many addresses stays slow. */
-const SIGN_IN_PER_ACCOUNT = 10;
+/**
+ * Sign-in limits (ADR 0046 § 5), password and code each with its own counters: 10 tries per quarter of an hour for an
+ * account from one address, so that someone else's tries never lock its holder out; 100 for an account from all
+ * addresses, against a guess spread over many. A sign-in from a trusted device does not count in the second.
+ */
+const SIGN_IN_PER_ACCOUNT_ADDRESS = 10;
+const SIGN_IN_PER_ACCOUNT = 100;
 const SIGN_IN_ACCOUNT_WINDOW = '15 minutes';
+/** The cookies of Better Auth's `two-factor` plugin: the code step of a sign-in, and a trusted device. */
+const TWO_FACTOR_COOKIE = 'two_factor';
+const TRUST_DEVICE_COOKIE = 'trust_device';
+/** However much it is used, a session opened more than 7 days ago is refused at its next request (ADR 0046 § 6). */
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * The client IP as Fastify resolved it (`trustProxy`, TRUST_PROXY_HOPS), handed to Better Auth under a header of
  * our own: it never reads `x-forwarded-for`, which any client can write.
@@ -315,10 +325,31 @@ const SignInBodySchema = z.looseObject({ email: z.string().min(1) });
 /** The session token in Better Auth's answer to a code, read to stamp that session and never sent on. */
 const SessionTokenSchema = z.object({ token: z.string().min(1) });
 
-/** The account a sign-in targets, for its own limit; a body without an email counts against the IP. */
+/** The account a sign-in targets, for its own limits; a body without an email counts against the IP. */
 function signInAccountKey(request: FastifyRequest): string {
   const parsed = SignInBodySchema.safeParse(request.body);
-  return parsed.success ? `account:${parsed.data.email.trim().toLowerCase()}` : `ip:${request.ip}`;
+  return parsed.success ? `sign-in:${parsed.data.email.trim().toLowerCase()}` : `ip:${request.ip}`;
+}
+
+/** The value of a cookie of the request, or `undefined`. */
+function cookieOf(request: FastifyRequest, name: string): string | undefined {
+  for (const pair of (request.headers.cookie ?? '').split(';')) {
+    const at = pair.indexOf('=');
+    if (at > 0 && pair.slice(0, at).trim() === name) return decodeURIComponent(pair.slice(at + 1).trim());
+  }
+  return undefined;
+}
+
+/**
+ * The session of a request, as Better Auth reads it (12 hours without activity), refused past 7 days from its creation
+ * whatever its use (ADR 0046 § 6): the row goes, and the request is answered as without a session.
+ */
+async function sessionOf(auth: Auth, db: Database, request: FastifyRequest) {
+  const result = await auth.api.getSession({ headers: authHeaders(request) });
+  if (result === null) return null;
+  if (Date.now() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
+  await db.delete(schema.session).where(eq(schema.session.id, result.session.id));
+  return null;
 }
 
 /**
@@ -332,7 +363,7 @@ async function currentUser(
   db: Database,
   request: FastifyRequest,
 ): Promise<{ user: CurrentUser; membership: Membership | null; secondFactorEnabled: boolean } | null> {
-  const result = await auth.api.getSession({ headers: authHeaders(request) });
+  const result = await sessionOf(auth, db, request);
   if (result === null) return null;
   const signedIn = await userOf(db, result.user);
   if (signedIn === null) return null;
@@ -410,10 +441,11 @@ export function createRequireRole(auth: Auth, db: Database): RequireRole {
  */
 export function createRequireRecentLogin(
   auth: Auth,
+  db: Database,
   now: () => Date = () => new Date(),
 ): preValidationAsyncHookHandler {
   return async (request) => {
-    const result = await auth.api.getSession({ headers: authHeaders(request) });
+    const result = await sessionOf(auth, db, request);
     if (result === null) throw new SessionUnauthenticated();
     const confirmedAt = result.session.reauthenticatedAt;
     if (confirmedAt === null || confirmedAt === undefined) throw new ReauthenticationRequired();
@@ -496,13 +528,77 @@ export function createAuthRoutes(
     const perIp = {
       rateLimit: { max: AUTH_RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute', skipOnError: false },
     };
-    // Its own counter: the per-IP limiter has already run on this request, `rateLimit()` would stand down.
+    // Their own counters: the per-IP limiter has already run on this request, `rateLimit()` would stand down. Each
+    // request names the account it counts against (`limitKeys`): the e-mail of a sign-in, the account of a code step.
+    const limitKeys = new WeakMap<FastifyRequest, string>();
+    const accountKeyOf = (request: FastifyRequest) => limitKeys.get(request) ?? `ip:${request.ip}`;
+    const perAccountAddress = app.createRateLimit({
+      max: SIGN_IN_PER_ACCOUNT_ADDRESS,
+      timeWindow: SIGN_IN_ACCOUNT_WINDOW,
+      keyGenerator: (request) => `${accountKeyOf(request)}@${request.ip}`,
+      skipOnError: false,
+    });
     const perAccount = app.createRateLimit({
       max: SIGN_IN_PER_ACCOUNT,
       timeWindow: SIGN_IN_ACCOUNT_WINDOW,
-      keyGenerator: signInAccountKey,
+      keyGenerator: accountKeyOf,
       skipOnError: false,
     });
+    /** Counts one try against both limits, the account's own unless `trusted`; whether one is spent. */
+    const exceeded = async (request: FastifyRequest, reply: FastifyReply, key: string, trusted: boolean) => {
+      limitKeys.set(request, key);
+      for (const limit of trusted ? [perAccountAddress] : [perAccountAddress, perAccount]) {
+        const attempt = await limit(request);
+        if (!attempt.isAllowed && attempt.isExceeded) {
+          void reply.header('retry-after', attempt.ttlInSeconds);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    /**
+     * Whether the browser holds a trusted device of the account this e-mail names (ADR 0046 § 5): its cookie names a
+     * `trust-device-…` row of that account, unexpired. Only spares the limit for all addresses; Better Auth still
+     * checks the cookie's signature before it skips the code.
+     */
+    const trustedDeviceOf = async (request: FastifyRequest): Promise<boolean> => {
+      const asked = SignInBodySchema.safeParse(request.body);
+      if (!asked.success) return false;
+      const context = await auth.$context;
+      const cookie = cookieOf(request, context.createAuthCookie(TRUST_DEVICE_COOKIE).name);
+      // `<token>!<identifier>.<signature>`: the identifier is the row's, random, never shown but in this cookie.
+      const identifier = cookie?.split('!')[1]?.split('.')[0];
+      if (identifier?.startsWith('trust-device-') !== true) return false;
+      const [row] = await db
+        .select({ id: schema.verification.id })
+        .from(schema.verification)
+        .innerJoin(schema.user, eq(schema.user.id, schema.verification.value))
+        .where(
+          and(
+            eq(schema.verification.identifier, identifier),
+            sql`lower(${schema.user.email}) = ${asked.data.email.trim().toLowerCase()}`,
+            sql`${schema.verification.expiresAt} > now()`,
+          ),
+        )
+        .limit(1);
+      return row !== undefined;
+    };
+
+    /** The account of a code step: the signed-in one (activation), or the one the sign-in's `two_factor` cookie names. */
+    const codeAccountKey = async (request: FastifyRequest, signedIn: string | null): Promise<string> => {
+      if (signedIn !== null) return `code:${signedIn}`;
+      const context = await auth.$context;
+      // `<identifier>.<signature>`: the row the plugin wrote for this sign-in, worth nothing once used or expired.
+      const identifier = cookieOf(request, context.createAuthCookie(TWO_FACTOR_COOKIE).name)?.split('.')[0];
+      if (identifier === undefined || identifier === '') return `ip:${request.ip}`;
+      const [row] = await db
+        .select({ userId: schema.verification.value })
+        .from(schema.verification)
+        .where(eq(schema.verification.identifier, identifier))
+        .limit(1);
+      return row === undefined ? `ip:${request.ip}` : `code:${row.userId}`;
+    };
     const forward = async (
       request: FastifyRequest,
       reply: FastifyReply,
@@ -579,16 +675,16 @@ export function createAuthRoutes(
       };
     };
 
-    // Sign-in has both limits: per IP like the rest of `/auth`, and per account (after the body is read).
+    // Sign-in has three limits: per IP like the rest of `/auth`, then per account from this address and per account
+    // from all addresses (after the body is read).
     app.route({
       method: 'POST',
       url: '/auth/sign-in/email',
       config: perIp,
       preValidation: async (request, reply) => {
-        const attempt = await perAccount(request);
-        if (attempt.isAllowed || !attempt.isExceeded) return;
-        void reply.header('retry-after', attempt.ttlInSeconds);
-        throw new SignInLimited();
+        if (await exceeded(request, reply, signInAccountKey(request), await trustedDeviceOf(request))) {
+          throw new SignInLimited();
+        }
       },
       // Better Auth's 401s (unknown e-mail, wrong password, a member who left) all become one French refusal.
       handler: async (request, reply) => {
@@ -678,6 +774,9 @@ export function createAuthRoutes(
       async (request, reply) => {
         const session = await currentUser(auth, db, request);
         if (session?.secondFactorEnabled === true) throw new SecondFactorAlreadyActive();
+        if (await exceeded(request, reply, await codeAccountKey(request, session?.user.id ?? null), false)) {
+          throw new CodeLocked();
+        }
         const startedAt = new Date();
         return forward(request, reply, {
           onUnauthorized: () => new CodeStepExpired(),
@@ -710,6 +809,8 @@ export function createAuthRoutes(
       { config: perIp, schema: { body: SecondFactorVerifyBodySchema } },
       async (request, reply) => {
         if ((await currentUser(auth, db, request)) !== null) throw new SecondFactorAlreadyActive();
+        if (await exceeded(request, reply, await codeAccountKey(request, null), false))
+          throw new CodeLocked();
         return forward(request, reply, {
           onUnauthorized: () => new CodeStepExpired(),
           refusal: secondFactorRefusal,
@@ -751,7 +852,7 @@ export function createAuthRoutes(
           await audit(request, request.user.id, 'auth.reauthentication_refused');
           throw new ReauthenticationRefused();
         }
-        const result = await auth.api.getSession({ headers: authHeaders(request) });
+        const result = await sessionOf(auth, db, request);
         if (result === null) throw new SessionUnauthenticated();
         await db
           .update(schema.session)

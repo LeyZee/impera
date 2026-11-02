@@ -8,7 +8,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
-import { DASHBOARD_ORIGIN } from './support/sign-in';
+import { DASHBOARD_ORIGIN, codeFor, cookiesOf, signIn as signInWithCode } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 
@@ -89,23 +89,65 @@ describe('client IP and sign-in limits (G6)', () => {
     expect(await lastLoginIp()).toBe('192.0.2.10');
   });
 
-  it('limits sign-ins per account across addresses, and only that account', async () => {
+  it('limits an account from one address without locking its holder out elsewhere (ADR 0046 § 5)', async () => {
     const target = 'target@example.test';
     for (let i = 0; i < 10; i += 1) {
-      const response = await signIn(direct, target, 'wrong password!', {
-        remoteAddress: `192.0.2.${String(i + 20)}`,
-      });
+      const response = await signIn(direct, target, 'wrong password!', { remoteAddress: '192.0.2.20' });
       expect(response.statusCode).toBe(401);
     }
     const blocked = await signIn(direct, target.toUpperCase(), 'wrong password!', {
-      remoteAddress: '192.0.2.99',
+      remoteAddress: '192.0.2.20',
     });
     expect(blocked.statusCode).toBe(429);
     expect(blocked.json<{ error: { code: string } }>().error.code).toBe('sign_in_limited');
 
-    const other = await signIn(direct, 'other@example.test', 'wrong password!', {
-      remoteAddress: '192.0.2.99',
+    // The same account from another address, and another account from the same one, are not held back.
+    expect(
+      (await signIn(direct, target, 'wrong password!', { remoteAddress: '192.0.2.21' })).statusCode,
+    ).toBe(401);
+    expect(
+      (await signIn(direct, 'other@example.test', 'wrong password!', { remoteAddress: '192.0.2.20' }))
+        .statusCode,
+    ).toBe(401);
+  });
+
+  it('caps an account at 100 tries from all addresses, a trusted device aside', async () => {
+    const holder = { email: 'holder@example.test', name: 'Holder', password: 'holder correct horse battery' };
+    await createOwner(app.auth, app.db.db, holder);
+    // The holder trusts this browser: password, then the code with « se souvenir de cet appareil ».
+    const session = await signInWithCode(direct, holder.email, holder.password);
+    const pending = await signIn(direct, holder.email, holder.password, { remoteAddress: '192.0.2.30' });
+    const trusted = await direct.inject({
+      method: 'POST',
+      url: '/v1/auth/two-factor/verify-totp',
+      payload: { code: codeFor(holder.email), trustDevice: true },
+      remoteAddress: '192.0.2.30',
+      headers: { origin: DASHBOARD_ORIGIN, cookie: cookiesOf(pending.headers) },
     });
-    expect(other.statusCode).toBe(401);
+    expect(trusted.statusCode).toBe(200);
+    const trustCookie = cookiesOf(trusted.headers)
+      .split('; ')
+      .filter((pair) => pair.includes('trust_device'))
+      .join('; ');
+    expect(trustCookie).not.toBe('');
+    expect(session).not.toBe('');
+
+    // Someone else spreads guesses over many addresses, each under its own limit: with the holder's three sign-ins
+    // above, the account reaches its 100.
+    for (let i = 0; i < 97; i += 1) {
+      const from = { remoteAddress: `198.51.${String(100 + Math.floor(i / 9))}.${String(i % 9)}` };
+      expect((await signIn(direct, holder.email, 'wrong password!', from)).statusCode).toBe(401);
+    }
+    const capped = await signIn(direct, holder.email, holder.password, { remoteAddress: '203.0.113.50' });
+    expect(capped.statusCode).toBe(429);
+    expect(capped.json<{ error: { code: string } }>().error.code).toBe('sign_in_limited');
+
+    // The holder's trusted browser still signs in, without a code.
+    const fromTrusted = await signIn(direct, holder.email, holder.password, {
+      remoteAddress: '192.0.2.31',
+      headers: { cookie: trustCookie },
+    });
+    expect(fromTrusted.statusCode).toBe(200);
+    expect(fromTrusted.json()).toMatchObject({ user: { email: holder.email } });
   });
 });
