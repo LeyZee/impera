@@ -35,7 +35,7 @@ export function paperworkLines(
     lines.push({
       kind: 'invoices',
       tone: 'danger',
-      text: `${count(overdue, 'facture en retard', 'factures en retard')} : l’échéance est passée sans virement.`,
+      text: `${count(overdue, 'facture en retard', 'factures en retard')} : l’échéance est passée sans règlement.`,
     });
   if (soon > 0)
     lines.push({

@@ -90,7 +90,7 @@ describe('the owner’s invoices’ card on the Dashboard (EQ-06 lot 8d)', () =>
     renderBanner(true);
     const card = (await screen.findByText('Factures et pièces')).closest('aside');
     if (card === null) throw new Error('No card');
-    const late = await within(card).findByText('1 facture en retard : l’échéance est passée sans virement.');
+    const late = await within(card).findByText('1 facture en retard : l’échéance est passée sans règlement.');
     expect(late.closest('li')?.getAttribute('data-tone')).toBe('danger');
     expect(within(card).getByText('1 facture arrive à échéance dans les sept jours.')).toBeTruthy();
     expect(within(card).getByText('1 contestation à trancher.')).toBeTruthy();

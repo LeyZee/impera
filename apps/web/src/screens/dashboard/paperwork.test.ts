@@ -32,7 +32,7 @@ describe('the invoices’ card of the owner’s Dashboard', () => {
       null,
     );
     expect(lines.map((line) => [line.tone, line.text])).toEqual([
-      ['danger', '1 facture en retard : l’échéance est passée sans virement.'],
+      ['danger', '1 facture en retard : l’échéance est passée sans règlement.'],
       ['warn', '2 factures arrivent à échéance dans les sept jours.'],
       ['warn', '1 contestation à trancher.'],
     ]);

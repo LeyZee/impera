@@ -22,7 +22,8 @@ export function Paperwork({ user }: { user: Me }): JSX.Element | null {
   const me = members.data?.find((member) => member.userId === user.id) ?? null;
   const file = useContractorFile(me?.id ?? null);
   const regimes = useBillingRegimes();
-  const pending = useInvoices({ acceptance: ['pending'] });
+  // His own, named: the server scopes a chatter to himself, but an owner or an active manager would get everyone's.
+  const pending = useInvoices(me === null ? null : { acceptance: ['pending'], memberId: me.id });
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
 
   const invoices = pending.data?.documents ?? [];
