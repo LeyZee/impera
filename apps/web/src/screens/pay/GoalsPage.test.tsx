@@ -165,12 +165,31 @@ beforeEach(() => {
           },
         }),
       ],
-      { closing: CLOSED, collectiveGoal: goalOf(OCT2), bonusTiers: TIERS },
+      {
+        closing: CLOSED,
+        collectiveGoal: goalOf(OCT2),
+        bonusTiers: TIERS,
+        // The share frozen in the statements, as the server reads it: once ended, it is the forecast too.
+        pace: {
+          lateNetMinor: 0,
+          forecastNetMinor: 127_500,
+          goal: { reachedBps: 8_500, forecastReachedBps: 8_500 },
+        },
+      },
     ),
     [NOV1]: periodOf(
       NOV1,
       [statementOf(THEO, NOV1, { netMinor: 30_000 }), statementOf(BASILE, NOV1, { netMinor: 20_000 })],
-      { collectiveGoal: goalOf(NOV1), bonusTiers: TIERS },
+      {
+        collectiveGoal: goalOf(NOV1),
+        bonusTiers: TIERS,
+        // The server's pace after five days of fifteen: 500 € made, three times as much at the end.
+        pace: {
+          lateNetMinor: 0,
+          forecastNetMinor: 150_000,
+          goal: { reachedBps: 3_333, forecastReachedBps: 10_000 },
+        },
+      },
     ),
     [NOV2]: periodOf(NOV2, [], {
       window: null,
