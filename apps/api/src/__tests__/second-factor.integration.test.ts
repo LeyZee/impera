@@ -134,6 +134,8 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     const first = await signInWithoutCode(server, bea.email, bea.password);
     const { cookie } = await activateSecondFactor(server, bea.email, bea.password, first);
     expect((await get('/v1/me', cookie)).statusCode).toBe(200);
+    // The activation asked for the password and a code: a sensitive action right after passes.
+    expect((await removeKey(cookie)).statusCode).toBe(200);
     // Active: no second secret, and no code checked on the session without the password.
     expect(codeOf(await post('/v1/auth/two-factor/enable', { password: bea.password }, cookie))).toBe(
       'second_factor_conflict',

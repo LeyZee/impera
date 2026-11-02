@@ -19,7 +19,7 @@ import {
   type SecondFactorCode,
   type UserRole,
 } from '@nirvana/contracts';
-import { eq, schema, sql, withMember, type Database } from '@nirvana/db';
+import { and, eq, schema, sql, withMember, type Database } from '@nirvana/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { isAPIError } from 'better-auth/api';
@@ -678,6 +678,7 @@ export function createAuthRoutes(
       async (request, reply) => {
         const session = await currentUser(auth, db, request);
         if (session?.secondFactorEnabled === true) throw new SecondFactorAlreadyActive();
+        const startedAt = new Date();
         return forward(request, reply, {
           onUnauthorized: () => new CodeStepExpired(),
           refusal: secondFactorRefusal,
@@ -685,6 +686,18 @@ export function createAuthRoutes(
             session === null
               ? stampSignIn
               : async () => {
+                  // The password and a first code were both just given: the session the plugin opens in place of
+                  // this one counts as confirmed, so a sensitive action right after does not ask again. Its answer
+                  // names the session it replaced, so the new one is found as the account's session opened since.
+                  await db
+                    .update(schema.session)
+                    .set({ reauthenticatedAt: sql`now()` })
+                    .where(
+                      and(
+                        eq(schema.session.userId, session.user.id),
+                        sql`${schema.session.createdAt} >= ${startedAt}`,
+                      ),
+                    );
                   await audit(request, session.user.id, 'auth.second_factor_enabled');
                 },
         });
