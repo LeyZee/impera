@@ -1,7 +1,10 @@
 import {
+  INVOICE_DUE_SOON_DAYS,
   INVOICE_PREFIX_PATTERN,
   PLATFORM_NAMES,
   payPeriodLastDay,
+  type InvoiceDueState,
+  type InvoiceKind,
   type InvoiceLineKind,
   type PayPeriod,
   type Platform,
@@ -454,6 +457,21 @@ export function invoiceNumber(prefix: string, year: number, sequence: number): s
 export function invoiceDueOn(issuedOn: string, delayDays: number): string {
   if (!Number.isSafeInteger(delayDays) || delayDays < 0) throw new RangeError('A delay is whole days');
   return addDays(issuedOn, delayDays);
+}
+
+/**
+ * Where a document stands with its due date on the agency's calendar day `today` (EQ-06 lot 8, `InvoiceDueStateSchema`):
+ * settled once its debt ended; a credit note, which carries no payment terms, open until then; an invoice overdue from
+ * the day after its due date, soon from `INVOICE_DUE_SOON_DAYS` days before it, open before.
+ */
+export function invoiceDueState(
+  document: { readonly kind: InvoiceKind; readonly dueOn: string; readonly settled: boolean },
+  today: string,
+): InvoiceDueState {
+  if (document.settled) return 'settled';
+  if (document.kind === 'credit_note') return 'open';
+  if (document.dueOn < today) return 'overdue';
+  return document.dueOn <= addDays(today, INVOICE_DUE_SOON_DAYS) ? 'soon' : 'open';
 }
 
 /**

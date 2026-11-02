@@ -1003,6 +1003,132 @@ export const InvoiceAcceptanceViewSchema = z.object({
 });
 export type InvoiceAcceptanceView = z.infer<typeof InvoiceAcceptanceViewSchema>;
 
+/** How a document's debt ended (EQ-06 lot 7a): the last three steps of `INVOICE_EVENT_KINDS`. */
+export const INVOICE_SETTLEMENT_KINDS = ['paid', 'imputed', 'compensated'] as const;
+export const InvoiceSettlementKindSchema = z.enum(INVOICE_SETTLEMENT_KINDS);
+export type InvoiceSettlementKind = z.infer<typeof InvoiceSettlementKindSchema>;
+
+/**
+ * A document's settlement as a list reads it: how its debt ended, the statement that ended it, and the day, the
+ * statement's transfer for `paid` and `imputed` (the day the owner recorded the money as sent), the agency's calendar
+ * day of the step for `compensated`, where nothing is sent.
+ */
+export const InvoiceSettlementSchema = z.object({
+  kind: InvoiceSettlementKindSchema,
+  statementId: CommissionStatementIdSchema,
+  on: CalendarDaySchema,
+});
+export type InvoiceSettlement = z.infer<typeof InvoiceSettlementSchema>;
+
+/** An invoice not settled turns `soon` this many days before its due date, the day its alert goes (EQ-06 lot 8). */
+export const INVOICE_DUE_SOON_DAYS = 7;
+
+/**
+ * Where a document stands with its due date (EQ-06 lot 8), computed by the server on the agency's calendar day, never
+ * by a screen: `settled` once its debt ended (`InvoiceSettlementSchema`); else, for an invoice (a corrective one
+ * included), `overdue` from the day after its due date, `soon` from `INVOICE_DUE_SOON_DAYS` days before it, `open`
+ * before. A credit note is never `soon` nor `overdue`: it carries no payment terms, the contractor's debt is taken off
+ * a payout (ADR 0036), so it stays `open` until then.
+ */
+export const INVOICE_DUE_STATES = ['open', 'soon', 'overdue', 'settled'] as const;
+export const InvoiceDueStateSchema = z.enum(INVOICE_DUE_STATES);
+export type InvoiceDueState = z.infer<typeof InvoiceDueStateSchema>;
+
+/** Days of issue a list covers at most, both ends included (`from` and `to` of `InvoiceListQuerySchema`). */
+export const INVOICE_LIST_MAX_DAYS = 366;
+
+/** A comma-separated list of a query string (`due=soon,overdue`), each value once and known. */
+const listOf = <const T extends readonly [string, ...string[]]>(values: T) =>
+  z
+    .string()
+    .transform((text) => text.split(','))
+    .pipe(
+      z
+        .array(z.enum(values))
+        .min(1)
+        .refine((items) => new Set(items).size === items.length, { message: 'Une valeur une seule fois' }),
+    );
+
+/**
+ * `GET /v1/payroll/invoices` (EQ-06 lot 8): the documents a reader reads (the policy of `invoices`: every one for the
+ * owner and an active manager, one's own for anyone else), filtered. Every filter is optional and they add up, but a
+ * list is always bounded without pages: the query gives a quinzaine (`period`, the documents of its statements), or a
+ * range of days of issue (`from` and `to`, `INVOICE_LIST_MAX_DAYS` at most), or a filter that keeps only documents
+ * still waiting, which are few by nature: `due` without `settled` (a document not settled is 60 days old at most,
+ * unless its payout is blocked), or `acceptance` among `pending` and `contested` (an answer is due within the
+ * mandate's delay). Anything else is a 400.
+ */
+export const InvoiceListQuerySchema = z
+  .object({
+    memberId: TeamMemberIdSchema.optional(),
+    period: PayPeriodSchema.optional(),
+    from: CalendarDaySchema.optional(),
+    to: CalendarDaySchema.optional(),
+    due: listOf(INVOICE_DUE_STATES).optional(),
+    acceptance: listOf(INVOICE_ACCEPTANCE_STATES).optional(),
+  })
+  .refine((query) => (query.from === undefined) === (query.to === undefined), {
+    message: 'Le début et la fin, ensemble',
+    path: ['to'],
+  })
+  .refine((query) => query.from === undefined || query.to === undefined || query.from <= query.to, {
+    message: 'La fin suit le début',
+    path: ['to'],
+  })
+  .refine(
+    (query) =>
+      query.from === undefined ||
+      query.to === undefined ||
+      dayNumber(query.to) - dayNumber(query.from) < INVOICE_LIST_MAX_DAYS,
+    { message: 'Un an au plus', path: ['to'] },
+  )
+  .refine(
+    (query) =>
+      query.period !== undefined ||
+      query.from !== undefined ||
+      (query.due !== undefined && !query.due.includes('settled')) ||
+      (query.acceptance?.every((state) => state === 'pending' || state === 'contested') ?? false),
+    {
+      message:
+        'Une quinzaine, une période, ou un filtre sur les documents encore en attente : la liste reste bornée',
+      path: ['period'],
+    },
+  );
+export type InvoiceListQuery = z.infer<typeof InvoiceListQuerySchema>;
+
+/**
+ * A document of the list: what its screens show without recomputing a rule. `corrective` marks the invoice that bills
+ * again a cancelled one (ADR 0040); `creditedInvoiceId` the invoice a credit note cites; `statementId` the statement it
+ * was issued for (`null` on a credit note no validation issued). `pdfReady` says its PDF is rendered, to download.
+ */
+export const InvoiceListItemSchema = z.object({
+  id: InvoiceIdSchema,
+  kind: InvoiceKindSchema,
+  corrective: z.boolean(),
+  memberId: TeamMemberIdSchema,
+  number: InvoiceNumberSchema,
+  period: PayPeriodSchema,
+  statementId: CommissionStatementIdSchema.nullable(),
+  creditedInvoiceId: InvoiceIdSchema.nullable(),
+  issuedOn: CalendarDaySchema,
+  dueOn: CalendarDaySchema,
+  exclVatMinor: z.number().int(),
+  vatMinor: z.number().int(),
+  inclVatMinor: z.number().int(),
+  acceptance: InvoiceAcceptanceSchema,
+  settlement: InvoiceSettlementSchema.nullable(),
+  due: InvoiceDueStateSchema,
+  pdfReady: z.boolean(),
+});
+export type InvoiceListItem = z.infer<typeof InvoiceListItemSchema>;
+
+/** The list, the latest issued first (day of issue, then number), and the agency's day its `due` was computed on. */
+export const InvoiceListSchema = z.object({
+  today: CalendarDaySchema,
+  documents: z.array(InvoiceListItemSchema),
+});
+export type InvoiceList = z.infer<typeof InvoiceListSchema>;
+
 /**
  * The contractor's file and texts (EQ-06 lot 5a). `memberId` names the contractor; the owner, an active manager and
  * the contractor himself read his file, anyone else gets `team_member_not_found`.

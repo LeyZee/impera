@@ -1,6 +1,6 @@
 # Guide de l'attestation de domiciliation fiscale (chatteur du Bénin)
 
-Statut : **brouillon, à valider par Charles** avant que l'écran l'affiche (lot 8b d'EQ-06, `docs/sessions/tasks/EQ-06-invoice-screens.md`). Une fois validé, l'écran Moi › Dossier le reprend mot pour mot ; un changement de ce texte repasse par Charles.
+Statut : **validé par Charles le 2 novembre 2026** (« ok guide »). L'écran Moi › Dossier (lot 8b d'EQ-06, `docs/sessions/tasks/EQ-06-invoice-screens.md`) le reprend mot pour mot ; un changement de ce texte repasse par Charles.
 
 Source : la recherche du 1er novembre 2026 sur l'attestation béninoise (guide des normes de services de la DGI, février 2026, fiches 1 et 9), gardée hors dépôt avec ses liens. Ce texte en reprend le brouillon d'écran (§ 4), avec cinq changements :
 
@@ -10,7 +10,7 @@ Source : la recherche du 1er novembre 2026 sur l'attestation béninoise (guide d
 - **Le rappel du 1er décembre** suit l'ADR 0041 § 5 : sans l'attestation de l'année suivante, les versements à partir du 1er janvier sont bloqués.
 - **Les mots du glossaire** : les états d'une pièce sont ceux de « Vérification d'une pièce » (en attente, acceptée, refusée), et le texte relie le nom de la pièce dans le dossier (« attestation de résidence fiscale ») au nom du document au guichet (« attestation de domiciliation fiscale »).
 
-Reste ouvert avant de publier : la DGI ne donne aucun exemple de justificatif de domicile ; l'écran n'en cite pas tant que ce n'est pas confirmé (appel au 133). Madagascar n'a pas de guide : son régime reste bloqué (retenue de 10 %).
+Reste ouvert : la DGI ne donne aucun exemple de justificatif de domicile ; l'écran n'en cite pas tant que ce n'est pas confirmé (appel au 133). Madagascar n'a pas de guide : son régime reste bloqué (retenue de 10 %).
 
 Ton : tutoiement, phrases courtes, aucun jargon sans explication. Ambre tant que la pièce manque, jamais rouge : ce n'est pas une urgence.
 

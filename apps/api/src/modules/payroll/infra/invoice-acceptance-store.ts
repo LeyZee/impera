@@ -1,5 +1,7 @@
 import {
   AuditEntryIdSchema,
+  calendarDayAt,
+  CommissionStatementIdSchema,
   EventIdSchema,
   EVENT_PAYLOADS,
   InvoiceEventIdSchema,
@@ -7,15 +9,30 @@ import {
   InvoiceAcceptanceViewSchema,
   InvoiceIdSchema,
   InvoiceKindSchema,
+  InvoiceListSchema,
+  InvoiceSettlementKindSchema,
   newId,
   PayAdjustmentIdSchema,
   payPeriodAt,
   TeamMemberIdSchema,
   type InvoiceAcceptanceView,
   type InvoiceEventKind,
+  type InvoiceList,
+  type InvoiceListQuery,
+  type InvoiceSettlement,
   type UserId,
 } from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
+import {
+  and,
+  eq,
+  inArray,
+  schema,
+  sql,
+  withAdmin,
+  withMember,
+  type Database,
+  type Transaction,
+} from '@nirvana/db';
 import { z } from 'zod';
 
 import {
@@ -36,6 +53,7 @@ import {
   type AcceptanceStep,
   type RecordedStep,
 } from '../domain/invoice-acceptance';
+import { invoiceDueState } from '../domain/invoices';
 import type { Actor, PayrollInvoiceAcceptanceStore } from '../domain/ports';
 
 import { enqueueChanged, lockAdjustmentPeriod } from './entry-store';
@@ -43,7 +61,16 @@ import { enqueueInvoiceContestAnnounce, enqueueInvoiceLapse } from './invoice-qu
 import type { PayInputReads } from './snapshot';
 import { audit } from './writes';
 
-const { auditLog, domainEvents, invoiceEvents, invoices, payAdjustments, teamMembers } = schema;
+const {
+  auditLog,
+  commissionStatements,
+  domainEvents,
+  invoiceEvents,
+  invoicePdfs,
+  invoices,
+  payAdjustments,
+  teamMembers,
+} = schema;
 
 /** What the acceptance writes in the audit log, entity `invoice`. */
 type AcceptanceAction =
@@ -131,6 +158,152 @@ async function viewOf(tx: Transaction, document: Document): Promise<InvoiceAccep
       at: row.createdAt.toISOString(),
     })),
   });
+}
+
+/** A condition of a query, as `sql` builds it. */
+type SQL = ReturnType<typeof sql>;
+
+/** A settlement step: its kind ends a document's debt (EQ-06 lot 7a). */
+const SETTLEMENT_KINDS = sql.raw(`('paid', 'imputed', 'compensated')`);
+/** A step after which a document's acceptance is final: neither `pending` nor `contested` any more. */
+const FINAL_ANSWERS = sql.raw(`('accepted', 'lapsed', 'contest_upheld', 'contest_refused')`);
+
+const hasStep = (kinds: SQL): SQL =>
+  sql`exists (select 1 from ${invoiceEvents} e where e.invoice_id = ${invoices.id} and e.kind in ${kinds})`;
+
+/**
+ * What the base narrows before the list's rules run (`InvoiceListQuerySchema`): the member, the quinzaine, the days of
+ * issue, and for a filter on documents still waiting, those without a settlement or without a final answer, so that
+ * a list without dates stays bounded. The exact filters on `due` and `acceptance` are applied after, on the computed
+ * states.
+ */
+function listConditions(query: InvoiceListQuery): SQL[] {
+  const conditions: SQL[] = [];
+  if (query.memberId !== undefined) conditions.push(eq(invoices.memberId, query.memberId));
+  // A quinzaine's documents are those its statements issued: a credit note or a corrective invoice counts with the
+  // statement that owed it, not with the period it corrects and prints; one without a statement, with that period.
+  if (query.period !== undefined)
+    conditions.push(
+      sql`coalesce((select s.period from ${commissionStatements} s where s.id = ${invoices.statementId}), ${invoices.period}) = ${query.period}`,
+    );
+  if (query.from !== undefined && query.to !== undefined)
+    conditions.push(sql`${invoices.issuedOn} between ${query.from} and ${query.to}`);
+  if (query.due !== undefined && !query.due.includes('settled'))
+    conditions.push(sql`not ${hasStep(SETTLEMENT_KINDS)}`);
+  if (query.acceptance?.every((state) => state === 'pending' || state === 'contested') === true)
+    conditions.push(sql`not ${hasStep(FINAL_ANSWERS)}`);
+  return conditions;
+}
+
+/**
+ * The documents of the list with their steps, the transfer day of the statements that settled them and whether their
+ * PDF is rendered: four reads, whatever the number of documents.
+ */
+async function listOf(
+  tx: Transaction,
+  query: InvoiceListQuery,
+  timeZone: string,
+  today: string,
+): Promise<InvoiceList> {
+  const rows = await tx
+    .select({
+      id: invoices.id,
+      kind: invoices.kind,
+      memberId: invoices.memberId,
+      number: invoices.number,
+      period: invoices.period,
+      statementId: invoices.statementId,
+      creditedInvoiceId: invoices.creditedInvoiceId,
+      reissuedInvoiceId: invoices.reissuedInvoiceId,
+      issuedOn: invoices.issuedOn,
+      dueOn: invoices.dueOn,
+      exclVatMinor: invoices.exclVatMinor,
+      vatMinor: invoices.vatMinor,
+      inclVatMinor: invoices.inclVatMinor,
+      deadline: invoices.acceptanceDeadline,
+    })
+    .from(invoices)
+    .where(and(...listConditions(query)))
+    .orderBy(sql`${invoices.issuedOn} desc`, sql`${invoices.number} desc`);
+  const ids = rows.map((row) => row.id);
+  const steps =
+    ids.length === 0
+      ? []
+      : await tx
+          .select()
+          .from(invoiceEvents)
+          .where(inArray(invoiceEvents.invoiceId, ids))
+          .orderBy(invoiceEvents.createdAt, invoiceEvents.id);
+  const stepsOfDocument = new Map<string, typeof steps>();
+  for (const step of steps)
+    stepsOfDocument.set(step.invoiceId, [...(stepsOfDocument.get(step.invoiceId) ?? []), step]);
+  const settling = steps.filter((step) => InvoiceSettlementKindSchema.safeParse(step.kind).success);
+  const settlingIds = [
+    ...new Set(settling.flatMap((step) => (step.statementId === null ? [] : [step.statementId]))),
+  ];
+  const transfers = new Map(
+    (settlingIds.length === 0
+      ? []
+      : await tx
+          .select({ id: commissionStatements.id, paidOn: commissionStatements.paidOn })
+          .from(commissionStatements)
+          .where(inArray(commissionStatements.id, settlingIds))
+    ).map((row) => [row.id, row.paidOn]),
+  );
+  const rendered = new Set(
+    (ids.length === 0
+      ? []
+      : await tx
+          .select({ invoiceId: invoicePdfs.invoiceId })
+          .from(invoicePdfs)
+          .where(inArray(invoicePdfs.invoiceId, ids))
+    ).map((row) => row.invoiceId),
+  );
+
+  const settlementOf = (documentSteps: typeof steps): InvoiceSettlement | null => {
+    const step = documentSteps.find((one) => InvoiceSettlementKindSchema.safeParse(one.kind).success);
+    if (step === undefined) return null;
+    if (step.statementId === null) throw new Error('A settlement without its statement');
+    const kind = InvoiceSettlementKindSchema.parse(step.kind);
+    const paidOn = transfers.get(step.statementId) ?? null;
+    return {
+      kind,
+      statementId: CommissionStatementIdSchema.parse(step.statementId),
+      on: kind !== 'compensated' && paidOn !== null ? paidOn : calendarDayAt(step.createdAt, timeZone),
+    };
+  };
+
+  const documents = rows.flatMap((row) => {
+    const documentSteps = stepsOfDocument.get(row.id) ?? [];
+    const standing = standingOf(recorded(documentSteps));
+    const kind = InvoiceKindSchema.parse(row.kind);
+    const settlement = settlementOf(documentSteps);
+    const due = invoiceDueState({ kind, dueOn: row.dueOn, settled: settlement !== null }, today);
+    if (query.due !== undefined && !query.due.includes(due)) return [];
+    if (query.acceptance !== undefined && !query.acceptance.includes(standing.state)) return [];
+    return [
+      {
+        id: row.id,
+        kind,
+        corrective: kind === 'invoice' && row.reissuedInvoiceId !== null,
+        memberId: row.memberId,
+        number: row.number,
+        period: row.period,
+        statementId: row.statementId,
+        creditedInvoiceId: row.creditedInvoiceId,
+        issuedOn: row.issuedOn,
+        dueOn: row.dueOn,
+        exclVatMinor: row.exclVatMinor,
+        vatMinor: row.vatMinor,
+        inclVatMinor: row.inclVatMinor,
+        acceptance: { state: standing.state, deadline: row.deadline.toISOString(), reason: standing.reason },
+        settlement,
+        due,
+        pdfReady: rendered.has(row.id),
+      },
+    ];
+  });
+  return InvoiceListSchema.parse({ today, documents });
 }
 
 /**
@@ -252,6 +425,12 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
       withMember(db, userId, async (tx) => {
         const document = await documentOf(tx, invoiceId);
         return document === null ? null : viewOf(tx, document);
+      }),
+
+    list: (userId, query) =>
+      withMember(db, userId, async (tx) => {
+        const timeZone = await reads.agencyTimeZone(tx);
+        return listOf(tx, query, timeZone, calendarDayAt(now(), timeZone));
       }),
 
     answer: (actor, invoiceId, answer) =>

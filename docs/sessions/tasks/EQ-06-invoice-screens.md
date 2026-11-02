@@ -1,5 +1,5 @@
 # EQ-06 (écrans) Factures, dossier du prestataire et exports comptables à l'écran
-Statut : todo (lot 8 de `EQ-06-self-billing-invoices.md`, même ID ; écrans pour Extension en quatre PR, cinq compléments d'API pour Équipe avant eux)
+Statut : in_progress (lot 8 de `EQ-06-self-billing-invoices.md`, même ID, lancé par Charles le 02/11 (« lot 8 ») ; écrans pour Extension en quatre PR, cinq compléments d'API pour Équipe avant eux ; fait : complément 1, la liste des documents)
 Phase : équipe (ADR 0023)
 Dépend de : `EQ-06-self-billing-invoices.md` lots 1 à 7 (tous dans `main`), EQ-05 (écrans de paie), EQ-11 (coquille par rôle)
 Branche : celle du fil qui la prend (Extension pour les écrans, Équipe pour l'API)
@@ -19,16 +19,16 @@ Tout ce que le lot 1 à 7 a mis dans l'API se fait depuis l'application, sans `c
 - Réglages › Facturation : `GET` et `PUT /v1/payroll/billing-settings`, `PUT …/accounts` (huit champs, chacun `null` tant que le comptable ne l'a pas donné ; 400 si la TVA due est un compte déductible ou si les deux journaux ont le même code), logos.
 - Exports, propriétaire seul : `GET /v1/payroll/accounting/journal?from&to` et `…/das2?year` rendent du JSON dont `content` est le fichier en base64 ; `GET …/archive?from&to` rend le ZIP lui-même, en flux.
 
-**À ajouter par Équipe avant les écrans** (deux PR d'API, relues par Bilan) :
-1. **La liste des documents** : `GET /v1/payroll/invoices`, aucune n'existe aujourd'hui. Pour chaque facture, facture rectificative et avoir : identifiant, sorte, numéro, membre, quinzaine, relevé, jour d'émission, échéance, totaux, état d'acceptation et sa fin de délai, règlement (`paid`, `imputed` ou `compensated` avec son jour, sinon `null`, lot 7a) et `due` calculé par le serveur dans le fuseau de l'agence : `settled`, `open`, `soon` (non réglée, échéance dans sept jours au plus) ou `overdue`. Le propriétaire et un manager actif lisent tout, le chatteur les siens (politique de `invoices`). Du plus récent au plus ancien (jour d'émission, puis numéro).
+**À ajouter par Équipe avant les écrans** (une PR d'API par complément, relue par Bilan) :
+1. **La liste des documents** (fait ; règles exactes dans le README de la paie, § La liste des factures et avoirs) : `GET /v1/payroll/invoices`. Pour chaque facture, facture rectificative et avoir : identifiant, sorte, numéro, membre, quinzaine, relevé, jour d'émission, échéance, totaux, état d'acceptation et sa fin de délai, règlement (`paid`, `imputed` ou `compensated` avec son jour, sinon `null`, lot 7a) et `due` calculé par le serveur dans le fuseau de l'agence : `settled`, `open`, `soon` (non réglée, échéance dans sept jours au plus) ou `overdue`. Le propriétaire et un manager actif lisent tout, le chatteur les siens (politique de `invoices`). Du plus récent au plus ancien (jour d'émission, puis numéro).
    - Filtres, tous facultatifs et cumulables : `memberId` ; `period` (une quinzaine : les documents de ses relevés) ; `from` et `to` (jours d'émission, les deux ensemble, 366 jours au plus) ; `due` (liste parmi `open`, `soon`, `overdue`, `settled`) ; `acceptance` (liste d'états de `INVOICE_ACCEPTANCE_STATES`, `contested` pour les contestations à trancher).
-   - Bornée sans pagination : la requête donne `period`, ou `from` et `to`, ou un filtre qui ne garde que des documents encore en attente (`due` sans `settled`, ou `acceptance=contested`), sinon 400. Un document non réglé a 60 jours au plus, sauf versement bloqué : ces listes restent courtes par nature.
+   - Bornée sans pagination : la requête donne `period`, ou `from` et `to`, ou un filtre qui ne garde que des documents encore en attente (`due` sans `settled`, ou `acceptance` limitée à `pending` et `contested`), sinon 400. La réponse donne aussi `today`, le jour de l'agence du calcul, et `pdfReady` par document ; un avoir n'est jamais `soon` ni `overdue`. Un document non réglé a 60 jours au plus, sauf versement bloqué : ces listes restent courtes par nature.
 2. **`remindFrom` par pièce** dans le dossier : le jour où le rappel commence (1er décembre de son année pour l'attestation de résidence, `validUntil` moins `documentReminderDays` pour la vigilance), annoncé au lot 5c-2 et reporté ici.
 3. **L'alerte d'échéance** : un job quotidien publie une fois par facture `invoice_due_soon` à J-7 puis `invoice_overdue` le lendemain de l'échéance, tant qu'elle n'est pas réglée, sans nom de prestataire (« d'un prestataire » et le lien, règle de Charles). Elle lit les trois sortes de règlement du lot 7a (`paid`, `imputed`, `compensated` : une facture compensée n'attend plus rien) et dit quand c'est un versement bloqué (ADR 0041) qui approche des 60 jours, puisqu'il peut les dépasser et coûter les pénalités et l'indemnité de 40 €. Le rendu Telegram (important, ambre ; rouge pour `invoice_overdue`) revient au fil Telegram.
 4. **Le délai de rappel des pièces** (`documentReminderDays`, lu par les réglages et le job de rappel, sans route d'écriture) dans `PUT /v1/payroll/billing-settings`. L'échéance (`dueDays`, 45 à 60 jours) y est déjà, et le délai de contestation se fixe dans chaque version du mandat.
 5. **Les pièces à examiner** : `GET /v1/payroll/contractors/documents?review=pending`, le propriétaire seul (lui seul examine) : chaque pièce de tous les membres sans examen, avec son membre (`memberId` et nom affiché), sa sorte, ses jours (`issuedOn`, `validUntil`) et son dépôt ; jamais le fichier. Aujourd'hui ne lit donc pas le dossier de chaque membre un par un.
 
-Ordre : les compléments 1, 2, 4 et 5 dans une PR d'API, puis le 3 (le job et son événement) dans une seconde, son rendu Telegram par le fil Telegram.
+Ordre (coordinateur, 02/11) : une PR par complément, chacune relue par Bilan : le 1, puis le 5, le 2 et le 4, et le 3 (le job et son événement) en dernier, son rendu Telegram par le fil Telegram. Extension commence quand ils sont dans `main`.
 
 **Côté contrats, avec les écrans** : `INVOICE_ERROR_CODES` reste à part de `PAYROLL_ERROR_CODES` (`packages/contracts`) ; l'écran les traduit dans son propre `switch` exhaustif, comme l'écran de paie le fait pour les siens.
 
@@ -55,7 +55,7 @@ ADR 0024 fixe les sections ; les routes :
 ## Découpage
 Quatre PR d'écrans, chacune relue par Équipe, chacune partie seulement quand la PR d'API dont elle dépend est dans `main` :
 - **8a** : Commissions › Factures, `/moi/factures` et Paie › Factures (compléments 1) ;
-- **8b** : Moi › Dossier et le dossier d'un membre (complément 2 ; le guide du Bénin une fois validé par Charles) ;
+- **8b** : Moi › Dossier et le dossier d'un membre (complément 2 ; le guide du Bénin, validé par Charles le 02/11) ;
 - **8c** : Réglages › Facturation et Paie › Exports (complément 4) ;
 - **8d** : Aujourd'hui et la finition de l'ensemble (compléments 1, 2 et 5 : `remindFrom` pour l'Aujourd'hui du chatteur).
 
