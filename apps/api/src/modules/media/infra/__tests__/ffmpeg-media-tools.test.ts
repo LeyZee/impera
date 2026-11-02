@@ -98,16 +98,18 @@ describe('ffmpeg media tools', () => {
   });
 
   it('kills a call that runs past its time', async () => {
+    // A 1 ms budget is spent before ffmpeg has even started: a tiny clip is enough, and keeps the test fast on a busy
+    // machine (encoding a long one here outgrew Vitest's 5 s during a loaded pre-push).
     const hurried = createFfmpegMediaTools(undefined, { probe: 1, keyframes: 1, audioTrack: 1, toJpeg: 1 });
     const video = make(
-      'long.mp4',
+      'short.mp4',
       '-f',
       'lavfi',
       '-i',
-      'testsrc=duration=20:size=640x480:rate=25',
+      'testsrc=duration=2:size=64x64:rate=10',
       '-pix_fmt',
       'yuv420p',
     );
-    await expect(hurried.keyframes(video, 4)).rejects.toThrow();
+    await expect(hurried.keyframes(video, 4)).rejects.toMatchObject({ killed: true, signal: 'SIGKILL' });
   });
 });
