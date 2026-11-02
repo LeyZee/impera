@@ -110,9 +110,9 @@ describe('the words of the screen', () => {
 
   it('says when a session was last used', () => {
     expect(ago('2026-11-02T19:59:40Z', now)).toBe('à l’instant');
-    expect(ago('2026-11-02T19:48:00Z', now)).toBe('il y a 12 min');
-    expect(ago('2026-11-02T17:00:00Z', now)).toBe('il y a 3 h');
-    expect(ago('2026-10-31T20:00:00Z', now)).toBe('il y a 2 j');
+    expect(ago('2026-11-02T19:48:00Z', now)).toBe('il y a 12\u00a0min');
+    expect(ago('2026-11-02T17:00:00Z', now)).toBe('il y a 3\u00a0h');
+    expect(ago('2026-10-31T20:00:00Z', now)).toBe('il y a 2\u00a0j');
     // A clock a little ahead is never « dans ».
     expect(ago('2026-11-02T20:01:00Z', now)).toBe('à l’instant');
   });
@@ -145,8 +145,8 @@ describe('SecuritySection (SEC-04)', () => {
     expect(rows).toHaveLength(3);
     expect(within(present(rows[0])).getByText('Cet appareil')).toBeTruthy();
     expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · active à l’instant');
-    expect(rows[1]?.textContent).toContain('Réseau 203.0.113.x · active il y a 3 h');
-    expect(rows[2]?.textContent).toContain('Réseau inconnu · active il y a 3 j');
+    expect(rows[1]?.textContent).toContain('Réseau 203.0.113.x · active il y a 3\u00a0h');
+    expect(rows[2]?.textContent).toContain('Réseau inconnu · active il y a 3\u00a0j');
     // This device's session is closed by signing out, never from the list.
     expect(within(present(rows[0])).queryByRole('button')).toBeNull();
 
@@ -282,7 +282,7 @@ describe('SecuritySection (SEC-04)', () => {
     expect(within(present(owner)).queryByRole('button')).toBeNull();
     expect(team?.textContent).toContain('Équipe');
     expect(team?.textContent).toContain('Code à 6 chiffres pas encore activé');
-    expect(team?.textContent).toContain('2 sessions ouvertes · active il y a 30 min');
+    expect(team?.textContent).toContain('2 sessions ouvertes · active il y a 30\u00a0min');
 
     fireEvent.click(screen.getByRole('button', { name: 'Fermer toutes les sessions de Noé' }));
     expect(
