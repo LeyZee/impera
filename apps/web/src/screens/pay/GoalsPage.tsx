@@ -17,16 +17,11 @@ import { Gauge, GoalTicks, Loading, LockIcon, PeriodArrows, PeriodHeading, Unrea
 import { usePayPeriod } from '@/payroll/api';
 import {
   bonusTiersInOrder,
-  forecastNet,
   gaugePercent,
-  goalReachedBps,
   goalSpanBps,
   goalTiersInOrder,
-  lateNetOf,
   momentAt,
-  reachedBpsOf,
   rulePeriods,
-  teamNetOf,
   tierAt,
   whoName,
 } from '@/payroll/model';
@@ -35,7 +30,6 @@ import '@/reports/reports.css';
 import { amountText, followingPeriod, percentText, periodLine, signedAmountText } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
-import { useNow } from '@/scheduling/useNow';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
@@ -58,7 +52,6 @@ export function GoalsPage({
 }): JSX.Element {
   const owner = user.role === 'owner';
   const me = { id: user.id, name: user.name };
-  const now = useNow();
   const current = useCurrentPeriod();
   const today = useAgencyToday();
   const period = chosen ?? current;
@@ -169,7 +162,7 @@ export function GoalsPage({
                 ) : null}
               </div>
             ) : (
-              <GoalGauge data={data} goal={goal} now={now} />
+              <GoalGauge data={data} goal={goal} />
             )}
             {goal === null ? null : (
               <p className="py-quiet">
@@ -280,23 +273,13 @@ function goalTiersLine(goal: CollectiveGoal): string {
 }
 
 /** Where the team is on its goal, and while the period runs, where it heads; each tier on the gauge. */
-function GoalGauge({
-  data,
-  goal,
-  now,
-}: {
-  data: PayrollPeriod;
-  goal: CollectiveGoal;
-  now: Date;
-}): JSX.Element {
-  const net = teamNetOf(data.statements);
-  const reached = goalReachedBps(data, goal);
+function GoalGauge({ data, goal }: { data: PayrollPeriod; goal: CollectiveGoal }): JSX.Element {
+  // The net, the share reached and where both head are the server's (ADR 0047 § 2).
+  const net = data.summary.netMinor;
+  const reached = data.pace.goal?.reachedBps ?? 0;
   const span = goalSpanBps(goal);
-  const forecast =
-    data.ended || data.window === null
-      ? null
-      : forecastNet(net, lateNetOf(data.statements), data.window, now);
-  const forecastBps = forecast === null ? null : reachedBpsOf(forecast, goal.targetMinor);
+  const forecast = data.ended ? null : data.pace.forecastNetMinor;
+  const forecastBps = forecast === null ? null : (data.pace.goal?.forecastReachedBps ?? null);
   const tier = tierAt(goal.tiers, reached);
   const ahead = forecastBps === null ? null : tierAt(goal.tiers, forecastBps);
   const lastDay = payPeriodLastDay(data.period);

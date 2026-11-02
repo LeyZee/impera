@@ -51,29 +51,24 @@ import {
   computedText,
   dayMonthText,
   daysLeft,
-  forecastNet,
   gaugePercent,
-  goalReachedBps,
   goalSpanBps,
-  lateNetOf,
   rateOverdue,
   memberFacts,
   momentAt,
   opensOn,
   payoutBlockText,
   payRefusalText,
+  periodHeadOf,
   phaseChip,
   phaseOf,
   rateText,
-  reachedBpsOf,
   roundAmountText,
   rowChips,
   salesSplit,
   sameStageOf,
   statementsCsv,
   stopsThePeriod,
-  summaryOf,
-  teamNetOf,
   tierAt,
   validatable,
   whoName,
@@ -555,7 +550,7 @@ function leadOf(data: PayrollPeriod | undefined, blocked: boolean, owner: boolea
       ? 'Les relevés se calculent dès qu’un rapport est validé.'
       : `Les relevés se calculent à chaque rapport validé. La quinzaine se valide à partir du ${longDay(opensOn(data.window))}.`;
   if (blocked) return 'Lève d’abord ce qui bloque : la quinzaine se valide ensuite.';
-  const phase = phaseOf(summaryOf(data));
+  const phase = phaseOf(periodHeadOf(data));
   if (phase === 'to_validate')
     return data.closing === null
       ? 'La quinzaine est finie : relis chaque relevé, puis valide-les.'
@@ -602,17 +597,17 @@ function Summary({
   rate: boolean;
 }): JSX.Element {
   const { window, statements } = data;
-  const summary = summaryOf(data);
+  // Every sum, forecast and share of the goal is the server's (ADR 0047 § 2): the screen only words them.
+  const summary = periodHeadOf(data);
   const phase = phaseOf(summary);
-  const net = teamNetOf(statements);
+  const net = data.summary.netMinor;
   const lastDay = payPeriodLastDay(data.period);
-  const forecast =
-    window === null || statements.length === 0 ? null : forecastNet(net, lateNetOf(statements), window, now);
+  const forecast = statements.length === 0 ? null : data.pace.forecastNetMinor;
   const previousNet =
-    previous === undefined || previous.statements.length === 0 ? null : teamNetOf(previous.statements);
+    previous === undefined || previous.statements.length === 0 ? null : previous.summary.netMinor;
   const versus = periodTitle(previousPeriod(data.period), false);
   const goal = data.collectiveGoal;
-  const reached = goal === null ? 0 : goalReachedBps(data, goal);
+  const reached = data.pace.goal?.reachedBps ?? 0;
   const zone = window?.timeZone ?? null;
 
   const state: ReactNode = data.beforeFirstClosing ? (
@@ -670,7 +665,8 @@ function Summary({
     );
   if (goal !== null) {
     const span = goalSpanBps(goal);
-    const forecastBps = !data.ended && forecast !== null ? reachedBpsOf(forecast, goal.targetMinor) : null;
+    const forecastBps =
+      !data.ended && forecast !== null ? (data.pace.goal?.forecastReachedBps ?? null) : null;
     const tier = tierAt(goal.tiers, forecastBps ?? reached);
     const bonus = tier === null ? '' : `${signedAmountText(tier.bonusMinor, 'EUR')} par chatteur`;
     figures.push(

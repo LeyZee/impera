@@ -27,7 +27,6 @@ import {
 } from '@/payroll/api';
 import {
   fcfaText,
-  forecastNet,
   gaugePercent,
   goalSpanBps,
   heroPeriodOf,
@@ -37,9 +36,9 @@ import {
   momentAt,
   myBlockedText,
   myStatementWords,
+  periodHeadOf,
   roundAmountText,
   salesFor,
-  summaryOf,
   tierProgress,
 } from '@/payroll/model';
 import '@/payroll/pay.css';
@@ -239,7 +238,6 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 period={nowData}
                 account={nowNames.account}
                 chatter={user.team?.role !== 'manager'}
-                now={now}
               />
             )}
           </Panel>
@@ -321,7 +319,7 @@ function Hero({
     >
       <div className="py-mehero__top">
         <span className="py-mehero__period nv-num">{periodTitle(period.period, false)}</span>
-        <Chip chip={memberPhaseChip(summaryOf(period))} />
+        <Chip chip={memberPhaseChip(periodHeadOf(period))} />
         <span className="py-quiet nv-num">{words.since}</span>
       </div>
       <p className="py-hero__label">{words.label}</p>
@@ -348,12 +346,10 @@ function Performance({
   period,
   account,
   chatter,
-  now,
 }: {
   period: PayrollPeriod;
   account: (platformAccountId: string) => PlanningAccount | null;
   chatter: boolean;
-  now: Date;
 }): JSX.Element {
   const statement = period.statements[0];
   const net = statement?.netMinor ?? 0;
@@ -379,7 +375,7 @@ function Performance({
           lastDay={payPeriodLastDay(period.period)}
         />
       )}
-      {goal === null ? null : <GoalShare goal={goal} statement={statement} period={period} now={now} />}
+      {goal === null ? null : <GoalShare goal={goal} period={period} />}
     </div>
   );
 }
@@ -449,23 +445,17 @@ function TierLeft({
 /** The team's goal as a chatter follows it: how far in percent, where the pace leads, and what each tier brings them. */
 function GoalShare({
   goal,
-  statement,
   period,
-  now,
 }: {
   goal: Pick<CollectiveGoal, 'targetMinor' | 'tiers'>;
-  statement: CommissionStatement | undefined;
   period: PayrollPeriod;
-  now: Date;
 }): JSX.Element {
-  const reached = statement?.team?.collective?.reachedBps ?? null;
+  const reached = period.pace.goal?.reachedBps ?? null;
   const span = goalSpanBps(goal);
-  // A member never reads the team's net (`netMinor` is null for them), only the percent reached, which grows with the
-  // net: the pace extrapolates the percent. The team's late reports are not theirs to read either, so none is set apart.
+  // A member never reads the team's net, only the share reached; where it heads is the server's one forecast of the
+  // goal, the same the owner reads (ADR 0047 § 2, « ok A »).
   const forecastBps =
-    reached === null || period.ended || period.window === null
-      ? null
-      : forecastNet(reached, 0, period.window, now);
+    reached === null || period.ended ? null : (period.pace.goal?.forecastReachedBps ?? null);
   const tiers = goal.tiers.toSorted((a, b) => a.reachedBps - b.reachedBps);
   return (
     <div className="py-left">
@@ -578,7 +568,7 @@ function MyStatementDialog({
       lead={
         <>
           Relevé de commissions
-          {data === undefined ? null : <Chip chip={memberPhaseChip(summaryOf(data))} />}
+          {data === undefined ? null : <Chip chip={memberPhaseChip(periodHeadOf(data))} />}
         </>
       }
       onClose={onClose}
