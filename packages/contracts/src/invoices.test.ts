@@ -21,6 +21,11 @@ import {
   ContractorProfileSchema,
   CreateBillingRegimeBodySchema,
   CreateContractTextBodySchema,
+  DAS2_FIRST_YEAR,
+  DAS2_MEDIA_TYPE,
+  Das2BeneficiarySchema,
+  Das2ExportSchema,
+  Das2QuerySchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_INVOICE_DUE_DAYS,
   INVOICE_ERROR_CODES,
@@ -256,6 +261,45 @@ describe('invoices', () => {
     expect(
       AccountingJournalSchema.safeParse({ ...journal, fileName: '123456789FEC20261231.txt' }).success,
     ).toBe(false);
+  });
+
+  it('recap one calendar year, past or current, whose beneficiary is never exempt for more than paid', () => {
+    const thisYear = new Date().getUTCFullYear();
+    expect(Das2QuerySchema.parse({ year: String(thisYear) })).toEqual({ year: thisYear });
+    expect(Das2QuerySchema.safeParse({ year: String(thisYear + 1) }).success).toBe(false);
+    expect(Das2QuerySchema.safeParse({ year: String(DAS2_FIRST_YEAR) }).success).toBe(true);
+    expect(Das2QuerySchema.safeParse({ year: String(DAS2_FIRST_YEAR - 1) }).success).toBe(false);
+    for (const year of ['2026.5', 'deux mille', '', '2026-01-01'])
+      expect(Das2QuerySchema.safeParse({ year }).success, year).toBe(false);
+
+    const beneficiary = {
+      memberId: invoice.memberId,
+      identity: invoice.contractor,
+      nature: 'commissions',
+      paidMinor: 300_000,
+      treatyExemptMinor: 300_000,
+      warnings: [],
+    };
+    expect(Das2BeneficiarySchema.safeParse(beneficiary).success).toBe(true);
+    expect(Das2BeneficiarySchema.safeParse({ ...beneficiary, treatyExemptMinor: 300_001 }).success).toBe(
+      false,
+    );
+    expect(
+      Das2BeneficiarySchema.safeParse({ ...beneficiary, identity: null, warnings: ['identity_missing'] })
+        .success,
+    ).toBe(true);
+    expect(Das2BeneficiarySchema.safeParse({ ...beneficiary, warnings: ['unknown'] }).success).toBe(false);
+
+    const recap = {
+      year: 2026,
+      fileName: 'das2-prestataires_2026.csv',
+      mediaType: DAS2_MEDIA_TYPE,
+      content: btoa('Nature;Montant\r\n'),
+      beneficiaries: [beneficiary],
+      notes: ['amounts_as_sent'],
+    };
+    expect(Das2ExportSchema.safeParse(recap).success).toBe(true);
+    expect(Das2ExportSchema.safeParse({ ...recap, fileName: 'das2_2026.csv' }).success).toBe(false);
   });
 
   it('are saved with the foot of the page whole: legal form, share capital, town of the trade register', () => {

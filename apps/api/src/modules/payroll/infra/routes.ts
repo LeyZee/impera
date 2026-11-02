@@ -34,6 +34,8 @@ import {
   CreateCollectiveGoalBodySchema,
   CreatePayAdjustmentBodySchema,
   CreatePenaltyBodySchema,
+  Das2ExportSchema,
+  Das2QuerySchema,
   DomainError,
   ExchangeRatesSchema,
   InvoiceAcceptanceViewSchema,
@@ -135,7 +137,8 @@ const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
  * by the accountant and gives a contractor his regime from a day on (`…/contractors/:memberId/regimes`, lot 5b). A
  * contractor's documents (`…/contractors/:memberId/documents`, lot 5c) are filed by himself or the owner, read by them
  * and an active manager, and checked once by the owner, never on his own file. The accountant's export
- * (`/payroll/accounting/journal`, lot 7b) and its accounts (`/payroll/billing-settings/accounts`) are the owner's alone.
+ * (`/payroll/accounting/journal`, lot 7b), its accounts (`/payroll/billing-settings/accounts`) and the DAS2 recap
+ * (`/payroll/accounting/das2`, lot 7c) are the owner's alone.
  */
 export function createPayrollRoutes(
   reads: PayrollReads,
@@ -448,6 +451,19 @@ export function createPayrollRoutes(
         const journal = await accounting.journal(actorOf(request), request.query);
         // The contractors' names are in it: never kept by a cache.
         return reply.header('cache-control', 'no-store').send(journal);
+      },
+    );
+
+    app.get(
+      '/payroll/accounting/das2',
+      {
+        preValidation: owner,
+        schema: { querystring: Das2QuerySchema, response: { 200: Das2ExportSchema } },
+      },
+      async (request, reply) => {
+        const recap = await accounting.das2(actorOf(request), request.query);
+        // The contractors' names and addresses are in it: never kept by a cache.
+        return reply.header('cache-control', 'no-store').send(recap);
       },
     );
 

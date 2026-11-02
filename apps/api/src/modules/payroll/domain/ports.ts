@@ -67,6 +67,7 @@ import type {
   VerifyContractorProfileBody,
 } from '@nirvana/contracts';
 
+import type { Das2Contractor } from './accounting';
 import type { PngSize } from './agency-logo';
 import type { IssueWarning } from './billing';
 import type { InvoicePdfContent, PdfDocumentSource } from './invoice-pdf';
@@ -538,6 +539,11 @@ export interface JournalFacts {
   readonly transfersLeftOut: readonly { readonly memberId: TeamMemberId; readonly period: PayPeriod }[];
 }
 
+/** What the DAS2 recap reads (EQ-06 lot 7c): each contractor with a transfer made in the year, all their facts. */
+export interface Das2Facts {
+  readonly contractors: readonly Das2Contractor[];
+}
+
 /**
  * The journal export (EQ-06 lot 7b), the owner's alone, under their member context (`withMember`). `render` makes the
  * file from the facts inside the transaction; the audit line is written only once it has, so a refused export leaves
@@ -545,6 +551,15 @@ export interface JournalFacts {
  */
 export interface PayrollAccountingStore {
   exportJournal<T>(actor: Actor, from: string, to: string, render: (facts: JournalFacts) => T): Promise<T>;
+  /**
+   * The DAS2 recap of `year` (lot 7c), on the same terms: `render` makes it from each contractor paid in the year, and
+   * the audit line counts the beneficiaries it declares, never a name.
+   */
+  exportDas2<T extends { readonly beneficiaries: readonly unknown[] }>(
+    actor: Actor,
+    year: number,
+    render: (facts: Das2Facts) => T,
+  ): Promise<T>;
 }
 
 /**
