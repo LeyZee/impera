@@ -10,6 +10,7 @@ import {
   FactCategorySchema,
   MessageAuthorSchema,
   MessageDirectionSchema,
+  PlatformSchema,
   SessionStateSchema,
 } from './enums';
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
@@ -37,6 +38,7 @@ import {
 } from './invoices';
 import { CurrencySchema } from './money';
 import { PayPeriodSchema } from './pay-periods';
+import { SalesFeedSignalSchema } from './sales-feed';
 
 /**
  * The closed list of event types (data-model.md) and their payloads (camelCase, never media content, never a
@@ -208,6 +210,7 @@ export const EVENT_TYPES = [
   'automatic_closed',
   'fan_flag_set',
   'fan_flag_cleared',
+  'sales_feed_signal',
   'error',
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -430,6 +433,12 @@ export const EVENT_PAYLOADS = {
   }),
   fan_flag_set: fanFlagPayload,
   fan_flag_cleared: fanFlagPayload,
+  /**
+   * The sales feed of a platform needs the owner (ADR 0050 § 3): a refused key, a value it does not know, a line for a
+   * model linked to no creator account, a line read again changed, an answer it cannot read. Published with no
+   * creator, never with a fan's id or pseudo, at most once per kind and value while it lasts.
+   */
+  sales_feed_signal: z.object({ platform: PlatformSchema, signal: SalesFeedSignalSchema }),
   error: z.object({
     code: z.string().min(1),
     jobName: z.string().min(1).optional(),
@@ -489,6 +498,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),
+  typedEvent('sales_feed_signal'),
   typedEvent('error'),
 ]);
 export type EventBody = z.infer<typeof EventBodySchema>;

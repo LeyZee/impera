@@ -435,6 +435,13 @@
       "when": 1793641201872,
       "tag": "0061_second_factor",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793649814943,
+      "tag": "0062_sales_feed",
+      "breakpoints": true
     }
   ]
 }
