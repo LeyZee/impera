@@ -1,7 +1,8 @@
 import type { CommissionStatement } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { forecastAtEnd, lateNetOf, periodFigures, periodPace, reachedBpsOf } from '../period-figures';
+import { reachedBpsOf } from '../commission-statements';
+import { forecastAtEnd, lateNetOf, periodFigures, periodPace } from '../period-figures';
 
 const WINDOW = { startsAt: '2026-10-31T23:00:00.000Z', endsAt: '2026-11-15T23:00:00.000Z' };
 const day = (n: number, hours = 0): Date =>
@@ -75,9 +76,12 @@ describe('the forecast at the end of a period', () => {
     expect(lateNetOf([])).toBe(0);
   });
 
-  it('floors a share of the target as the engine does', () => {
+  it('floors a share of the target in integers, as the engine does', () => {
     expect(reachedBpsOf(99_999, 100_000)).toBe(9_999);
     expect(reachedBpsOf(-5_000, 100_000)).toBe(0);
+    expect(reachedBpsOf(5_000, 0)).toBe(0);
+    // Past 2^53 / 10 000 a float product is no longer exact; the integers still floor right.
+    expect(reachedBpsOf(900_719_925_474_099, 900_719_925_474_100)).toBe(9_999);
   });
 });
 
@@ -133,6 +137,20 @@ describe('where a period is heading', () => {
       forecastNetMinor: null,
       goal: { reachedBps: 1_300, forecastReachedBps: 3_300 },
     });
+  });
+
+  it('forecasts once the period has ended exactly the share reached, whatever the late reports', () => {
+    expect(
+      periodPace({
+        statements: [{ lines: [line(16_250, 13_000, [3_750])], team: team(null) }],
+        figures: { netMinor: 13_000 },
+        window: WINDOW,
+        goal,
+        self: false,
+        team: { netMinor: 13_000, lateNetMinor: 3_000 },
+        now: day(16),
+      }).goal,
+    ).toEqual({ reachedBps: 1_300, forecastReachedBps: 1_300 });
   });
 
   it('says nothing of a goal a member has no share of, nor without a window or a goal', () => {

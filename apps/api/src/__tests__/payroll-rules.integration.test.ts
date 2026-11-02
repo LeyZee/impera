@@ -344,3 +344,74 @@ describe('Équipe › Paie : paliers, objectif collectif, minimum et délai de v
     expect((await team.statementOf(theo, R2)).tierBonus).toEqual(raised);
   });
 });
+
+describe('Équipe › Paie : la prévision de l’objectif d’une quinzaine en cours, ventes tardives à part (ADR 0047 § 2)', () => {
+  /** A fortnight of 2025 and the one after, read on the 23rd: the second is under way. */
+  const S1 = PayPeriodSchema.parse('2025-10-01');
+  const S2 = PayPeriodSchema.parse('2025-10-16');
+  const NOW = new Date('2025-10-23T10:00:00Z');
+  let team: PayrollTeam;
+  let theo: TeamMember;
+  let lea: TeamMember;
+  let theoCookie: string;
+  let monaCookie: string;
+
+  beforeAll(async () => {
+    team = await startPayrollTeam(inject('pgSuperuserUrl'), { payrollClock: () => NOW });
+    ({ member: theo, cookie: theoCookie } = await team.addMember('theo@example.test', 'Théo'));
+    ({ member: lea } = await team.addMember('lea@example.test', 'Léa'));
+    ({ cookie: monaCookie } = await team.addMember('mona@example.test', 'Mona', 'manager'));
+  });
+
+  afterAll(() => team.close());
+
+  it('gives a member the same goal and forecast of it as the owner, read by the system on the whole team', async () => {
+    await team.report(theo, S1, 8_000);
+    await team.report(lea, S1, 2_000);
+    await team.recalculate(S1);
+    // S1 closed as a first validation leaves it (ADR 0032): a report of S1 validated after is late, counted in S2.
+    const counted = (await team.test.admin.db.select().from(schema.shiftReports)).filter(
+      (row) => row.period === S1 && row.status === 'validated',
+    );
+    await team.test.admin.db.transaction(async (tx) => {
+      await tx.insert(schema.payPeriodClosings).values({
+        period: S1,
+        teamNetMinor: 0,
+        collective: null,
+        exchangeRates: [],
+        closedBy: team.ownerId,
+      });
+      await tx
+        .insert(schema.payPeriodReports)
+        .values(counted.map((row) => ({ shiftReportId: row.id, period: S1, memberId: row.memberId })));
+    });
+    await team.report(lea, S1, 5_000);
+    await team.report(lea, S2, 3_000);
+    await team.report(theo, S2, 2_000);
+    await team.test.admin.db.insert(schema.collectiveGoals).values({
+      id: newId(CollectiveGoalIdSchema),
+      period: S2,
+      targetMinor: 10_000,
+      tiers: GOAL_TIERS,
+      createdBy: team.ownerId,
+    });
+    await team.recalculate(S2);
+
+    const pace = async (cookie: string) => {
+      const response = await team.call('GET', `/payroll/periods/${S2}`, cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return PayrollPeriodSchema.parse(response.json()).pace;
+    };
+    const owners = await pace(team.owner);
+    // The late report weighs in the net, never in the pace: the forecast is above what was made.
+    expect(owners.lateNetMinor).toBeGreaterThan(0);
+    expect(owners.forecastNetMinor).not.toBeNull();
+    expect(owners.goal?.reachedBps).toBeGreaterThan(0);
+    expect(owners.goal?.forecastReachedBps).toBeGreaterThan(owners.goal?.reachedBps ?? 0);
+    // The owner's forecast of the goal is the forecast net against the target: 10 000, so the same number.
+    expect(owners.goal?.forecastReachedBps).toBe(owners.forecastNetMinor);
+    expect(await pace(monaCookie)).toEqual(owners);
+    // Théo sees only his own statement, yet the goal read on the whole team: the same as the owner's.
+    expect(await pace(theoCookie)).toEqual({ lateNetMinor: null, forecastNetMinor: null, goal: owners.goal });
+  });
+});

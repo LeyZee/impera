@@ -6,6 +6,8 @@ import type {
   PeriodPace,
 } from '@nirvana/contracts';
 
+import { reachedBpsOf } from './commission-statements';
+
 const DAY_MS = 86_400_000;
 
 type FigureStatement = Pick<
@@ -79,10 +81,6 @@ export function forecastAtEnd(
   return Math.round(((value - lateValue) * (ends - starts)) / gone) + lateValue;
 }
 
-/** A net as a share of a goal's target, in basis points, floored as the engine floors it. */
-export const reachedBpsOf = (netMinor: number, targetMinor: number): number =>
-  Math.max(0, Math.floor((netMinor * 10_000) / targetMinor));
-
 interface PaceInput {
   readonly statements: readonly (Pick<CommissionStatement, 'team'> & {
     readonly lines: readonly LateLine[];
@@ -115,9 +113,14 @@ export function periodPace(input: PaceInput): PeriodPace {
   const target = input.goal.targetMinor;
   const frozen = input.statements.map((one) => one.team?.collective ?? null).find((one) => one !== null);
   const reachedBps = frozen?.reachedBps ?? (input.self ? null : reachedBpsOf(input.team.netMinor, target));
+  const ended = window !== null && now.getTime() >= new Date(window.endsAt).getTime();
   const teamForecast =
     window === null ? null : forecastAtEnd(input.team.netMinor, input.team.lateNetMinor, window, now);
-  const forecastReachedBps =
-    teamForecast === null || (input.self && reachedBps === null) ? null : reachedBpsOf(teamForecast, target);
+  // Once the period has ended there is nothing left to forecast: the share reached is the forecast.
+  const forecastReachedBps = ended
+    ? reachedBps
+    : teamForecast === null || (input.self && reachedBps === null)
+      ? null
+      : reachedBpsOf(teamForecast, target);
   return { lateNetMinor, forecastNetMinor, goal: { reachedBps, forecastReachedBps } };
 }
