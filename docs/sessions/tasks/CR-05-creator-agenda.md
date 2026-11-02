@@ -16,6 +16,9 @@ La créatrice a un vrai agenda, aussi simple que ceux qu'elle connaît, où l'ag
 - [ ] Son lien iCal de l'agenda, sur la table des liens de calendrier de CR-12 (jeton haché, route sans session, révocable) ; elle peut y ajouter les shifts de ses comptes (ADR 0045 § 5).
 - [ ] La couche « shifts de mes comptes » dans son Agenda (ADR 0045 § 1), par la lecture de CR-12, masquable.
 - [ ] Écrans : Jour et « Ma semaine » sur téléphone, Semaine et Mois sur ordinateur ; appui long ou glisser pour créer, glisser pour déplacer, balayer pour changer de jour ; consultation et coche hors ligne, synchronisées au retour.
+- [ ] Vue Jour, tâches d'abord (Charles, 02/11, 19h17 et 19h27) : en tête, l'avancement du jour (fait / à faire), la tâche par laquelle commencer et le prochain moment (« Ensuite : … à 21 h, dans 1 h 50 ») ; ses créneaux en cartes lisibles (heure, titre), une barre proportionnelle seulement sur ordinateur ; puis « À faire » et « Programme », où un temps libre se touche pour créer. Pas de grille horaire qui défile dans la page sur téléphone.
+- [ ] Chaque tâche dit à quoi elle sert (une phrase, sans chiffre inventé) et porte son action quand elle en a une : « Déposer » ouvre le dépôt de CR-06 lié à la tâche et la coche quand les fichiers sont envoyés.
+- [ ] Les shifts de ses comptes ne sont jamais sur la frise de sa journée : une ligne discrète sous le Programme, « Qui répond à tes fans dans Reveal : … ». Libellés : « Dispo pour l'agence » pour une disponibilité, « Qui répond à tes fans » pour la couche des shifts ; aucune légende sous la vue Jour.
 - [ ] Chaque geste (appui long, glisser, balayer) a son équivalent au clavier et par un bouton ; balayer pour changer de jour n'entre jamais en concurrence avec le défilement de la grille.
 - [ ] Écran agence : suggérer une tâche ou un créneau, voir ce qui est accepté, refusé, fait.
 
@@ -28,3 +31,5 @@ La créatrice a un vrai agenda, aussi simple que ceux qu'elle connaît, où l'ag
 Le topo de la semaine qui fabrique les suggestions de l'IA (CR-07) ; la catégorie Réseaux automatisée (chantier 6).
 
 ## Notes de session
+
+- 2026-11-02 (fil espaces) : prototype de référence https://claude.ai/artifact/7DVK3ZCP2BwCS7G7itkBsW (copie hors dépôt dans les fichiers du projet, `espaces/prototype-creatrice/`), design validé par Charles le 02/11 à 19h17. La vue Jour a été refaite deux fois à sa demande : la frise d'origine (shifts en bandes, disponibilités hachurées) était illisible sur téléphone et donnait plus de place aux chatteurs qu'à ses tâches. Vérifié à 320, 360, 375, 390 et 414 px de large.
