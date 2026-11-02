@@ -110,3 +110,25 @@ export const RevealChatterDailyStatsSchema = z.object({
     }),
   ),
 });
+
+/**
+ * `POST /v1/webhooks`: 201 with the webhook and its `secret`, shown once. The documentation does not give the rest of
+ * the shape: only the two fields Nirvana keeps are read, at the top level or under `data`.
+ */
+const RevealWebhookSchema = z.object({ id: text, secret: text });
+export const RevealCreatedWebhookSchema = z.union([
+  RevealWebhookSchema,
+  z.object({ data: RevealWebhookSchema }),
+]);
+
+/**
+ * A delivery Reveal posts to Nirvana: `{ id, event, createdAt, data }`, `data` being a line of `/v1/sales`. Only its
+ * id and its position are read: the line itself is read again from `/v1/sales`, in the register's order, so nothing of
+ * the fan in `data` is ever parsed nor kept.
+ */
+const bounded = text.max(200);
+export const RevealDeliverySchema = z.object({
+  id: bounded,
+  event: text,
+  data: z.object({ cursor: bounded }),
+});

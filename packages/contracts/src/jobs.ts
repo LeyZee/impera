@@ -227,7 +227,11 @@ export const JOB_PAYLOADS = {
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
    * lines and the cursor written in one transaction. Replayable: a line already recorded is skipped.
    */
-  'connector.read_sales': z.object({}),
+  'connector.read_sales': z.object({
+    /** Enqueued by a webhook delivery: read now. Without it (the minute's crontab), a feed whose webhook works waits
+     * for its hourly catch-up (ADR 0050 § 3). */
+    woken: z.boolean().optional(),
+  }),
   ...TELEGRAM_JOB_PAYLOADS,
 } as const satisfies Record<JobName, z.ZodType>;
 

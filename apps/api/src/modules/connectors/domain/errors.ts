@@ -76,3 +76,34 @@ export class SalesFeedMemberUnprocessable extends DomainError {
     super('sales_feed_member_unprocessable', 'Ce membre de l’équipe n’existe pas');
   }
 }
+
+/** A webhook needs a connected key: it is registered with it (409). */
+export class SalesFeedNotConnected extends DomainError {
+  constructor() {
+    super('sales_feed_not_connected_conflict', 'Connecte d’abord la clé de l’API CRM');
+  }
+}
+
+/** The platform only posts to a public HTTPS address: AUTH_BASE_URL is not one (422). */
+export class SalesFeedWebhookUrlUnprocessable extends DomainError {
+  constructor() {
+    super(
+      'sales_feed_webhook_url_unprocessable',
+      'L’adresse publique de Nirvana n’est pas en HTTPS : Reveal ne peut pas y envoyer les ventes',
+    );
+  }
+}
+
+/** A delivery whose signature, time or shape does not pass (401): nothing of it is kept. */
+export class SalesFeedDeliveryRefused extends DomainError {
+  constructor() {
+    super('sales_feed_delivery_unauthenticated', 'Envoi refusé');
+  }
+}
+
+/** No webhook is registered for this platform: a delivery has no secret to be checked against (404). */
+export class SalesFeedWebhookNotFound extends DomainError {
+  constructor() {
+    super('sales_feed_webhook_not_found', 'Aucun webhook enregistré pour cette plateforme');
+  }
+}

@@ -46,6 +46,8 @@ export function wireConnectors(
       credentialKeys === null ? null : parseEncryptionKeys(credentialKeys, 'CREDENTIALS_ENCRYPTION_KEYS'),
     // Nothing is called at Reveal until the owner pastes a key in Réglages.
     salesFeeds: deps.salesFeeds ?? { reveal: revealSalesFeed(fetch) },
+    // Deliveries come to the address the owner signs in at; over plain HTTP (development) no webhook is registered.
+    publicBaseUrl: config.AUTH_BASE_URL,
   });
   return {
     module,
@@ -72,9 +74,14 @@ export function wireConnectors(
         'connector.read_sales',
         JOB_PAYLOADS['connector.read_sales'],
         logger,
-        (_payload, context) => module.jobs.readSales(context.logger, `job:${context.jobId}`),
+        (payload, context) =>
+          module.jobs.readSales(context.logger, `job:${context.jobId}`, payload.woken === true),
       ),
     },
-    routes: [module.routes, module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin })],
+    routes: [
+      module.routes,
+      module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin }),
+      module.salesFeedDeliveryRoutes,
+    ],
   };
 }

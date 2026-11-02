@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -50,13 +52,37 @@ export interface FakeCrm {
   rateLimit(requests: number, retryAfterSeconds: number): void;
   /** The key is revoked: every call answers 401. */
   revoke(): void;
-  /** The key loses an access: its routes answer 403. */
-  withhold(access: 'stats' | 'sales'): void;
+  /** The key loses an access: its routes answer 403 (`webhooks`: not opened by the support). */
+  withhold(access: Access): void;
   /** `/v1/sales` answers without `pageInfo` this many times. */
   breakShape(times: number): void;
   /** The register's position of a sale's line, `null` when none. */
   positionOf(saleId: string): string | null;
-  readonly calls: { readonly path: string; readonly status: number }[];
+  readonly calls: { readonly method: string; readonly path: string; readonly status: number }[];
+  /** The webhooks registered, by id: what Reveal would post to. */
+  readonly webhooks: ReadonlyMap<string, { readonly url: string; readonly secret: string }>;
+  /**
+   * The delivery Reveal would post for a line of the register: its raw body and its headers, signed with the webhook's
+   * secret (`secret` and `t` overridable to forge one).
+   */
+  delivery(
+    position: string,
+    options?: {
+      readonly webhookId?: string;
+      readonly secret?: string;
+      readonly t?: number;
+      readonly id?: string;
+    },
+  ): { readonly body: string; readonly headers: Record<string, string> };
+}
+
+type Access = 'stats' | 'sales' | 'webhooks';
+
+/** `X-Reveal-Signature: t=<seconds>,v1=<hex>`, `v1 = HMAC-SHA256(secret, "<t>.<raw body>")`. */
+export function revealSignature(secret: string, t: number, body: string): string {
+  return `t=${String(t)},v1=${createHmac('sha256', secret)
+    .update(`${String(t)}.${body}`)
+    .digest('hex')}`;
 }
 
 const DEFAULT_SALE: Omit<FakeSale, 'id'> = {
@@ -77,12 +103,13 @@ export function createFakeCrm(): FakeCrm {
   const register: RegisterLine[] = [];
   const state = {
     revoked: false,
-    withheld: new Set<'stats' | 'sales'>(),
+    withheld: new Set<Access>(),
     rateLimited: 0,
     retryAfterSeconds: 0,
     brokenShapes: 0,
   };
-  const calls: { path: string; status: number }[] = [];
+  const calls: { method: string; path: string; status: number }[] = [];
+  const webhooks = new Map<string, { url: string; secret: string }>();
   let counter = 1000;
 
   const append = (event: string, sale: FakeSale, occurredAt: string): string => {
@@ -105,8 +132,9 @@ export function createFakeCrm(): FakeCrm {
 
   app.addHook('onRequest', async (request, reply) => {
     const path = request.url.split('?')[0] ?? request.url;
+    const { method } = request;
     const answer = (status: number, body: object) => {
-      calls.push({ path, status });
+      calls.push({ method, path, status });
       return reply.code(status).send(body);
     };
     if (state.rateLimited > 0) {
@@ -117,9 +145,13 @@ export function createFakeCrm(): FakeCrm {
     if (state.revoked || request.headers['x-api-key'] !== FAKE_CRM_KEY) {
       return answer(401, { error: 'unauthorized' });
     }
-    const access = path.startsWith('/v1/sales') ? 'sales' : 'stats';
+    const access: Access = path.startsWith('/v1/sales')
+      ? 'sales'
+      : path.startsWith('/v1/webhooks')
+        ? 'webhooks'
+        : 'stats';
     if (state.withheld.has(access)) return answer(403, { error: 'forbidden' });
-    calls.push({ path, status: 200 });
+    calls.push({ method, path, status: 200 });
     return undefined;
   });
 
@@ -291,12 +323,29 @@ export function createFakeCrm(): FakeCrm {
     };
   });
 
+  app.post('/v1/webhooks', (request, reply) => {
+    const body = z
+      .object({ url: z.url(), events: z.array(z.enum(['sale_created', 'sale_refunded'])).min(1) })
+      .parse(request.body);
+    counter += 1;
+    const id = `webhook_test_${String(counter)}`;
+    const secret = `whsec_test_${String(counter)}`;
+    webhooks.set(id, { url: body.url, secret });
+    return reply.code(201).send({ id, url: body.url, events: body.events, secret });
+  });
+
+  app.delete('/v1/webhooks/:id', (request, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    return webhooks.delete(id) ? reply.code(204).send() : reply.code(404).send({ error: 'not_found' });
+  });
+
   const fetch: SalesFeedFetch = async (url, init) => {
     const target = new URL(url);
     const response = await app.inject({
-      method: 'GET',
+      method: init.method ?? 'GET',
       url: `${target.pathname}${target.search}`,
       headers: init.headers,
+      ...(init.body === undefined ? {} : { payload: init.body }),
     });
     return {
       status: response.statusCode,
@@ -339,5 +388,28 @@ export function createFakeCrm(): FakeCrm {
     positionOf: (saleId) =>
       register.find((line) => line.sale.id === saleId && line.event === 'sale_created')?.cursor ?? null,
     calls,
+    webhooks,
+    delivery(position, options = {}) {
+      const line = register.find((candidate) => candidate.cursor === position);
+      if (line === undefined) throw new Error(`no line at ${position}`);
+      const webhook =
+        options.webhookId === undefined ? [...webhooks.values()].at(-1) : webhooks.get(options.webhookId);
+      const secret = options.secret ?? webhook?.secret;
+      if (secret === undefined) throw new Error('no webhook registered');
+      const body = JSON.stringify({
+        id: options.id ?? `delivery_${position}`,
+        event: line.event,
+        createdAt: line.occurredAt,
+        data: wire(line),
+      });
+      const t = options.t ?? Math.floor(Date.now() / 1000);
+      return {
+        body,
+        headers: {
+          'content-type': 'application/json',
+          'x-reveal-signature': revealSignature(secret, t, body),
+        },
+      };
+    },
   };
 }

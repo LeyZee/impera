@@ -15,10 +15,17 @@ import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domai
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
+import {
+  createSalesFeedJobs,
+  createSalesFeedWebhookStore,
+  resealSalesFeedWebhookSecrets,
+} from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
 import { createConnectorRoutes } from './infra/http/routes';
+import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
+import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
 
 export type { ConnectorRegistry } from './domain/ports';
@@ -26,20 +33,40 @@ export type { SalesFeedRegistry } from './domain/sales-feed';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
 export { FakeConnector } from './infra/fake/FakeConnector';
 
-/** `pnpm ops:reencrypt-credentials`: the sales feed keys re-sealed with the newest CREDENTIALS_ENCRYPTION_KEYS. */
-export function resealSalesFeedCredentials(
+function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
+  return {
+    total: keys.total + webhooks.total,
+    rewritten: keys.rewritten + webhooks.rewritten,
+    unreadable: [...keys.unreadable, ...webhooks.unreadable],
+  };
+}
+
+/**
+ * `pnpm ops:reencrypt-credentials`: the sales feed keys and their webhooks' secrets re-sealed with the newest
+ * CREDENTIALS_ENCRYPTION_KEYS.
+ */
+export async function resealSalesFeedCredentials(
   adminDb: Database,
   keys: readonly EncryptionKey[],
 ): Promise<ResealReport> {
-  return resealSalesFeedKeys(adminDb, keys);
+  return bothReports(
+    await resealSalesFeedKeys(adminDb, keys),
+    await resealSalesFeedWebhookSecrets(adminDb, keys),
+  );
 }
 
-/** `pnpm ops:check-keys`: how many sales feed keys the given encryption keys open, read only, no call to Reveal. */
+/**
+ * `pnpm ops:check-keys`: how many sales feed keys and webhook secrets the given encryption keys open, read only, no
+ * call to Reveal.
+ */
 export async function checkSalesFeedKeys(
   adminDb: Database,
   keys: readonly EncryptionKey[],
 ): Promise<{ readonly total: number; readonly unreadable: readonly string[] }> {
-  const report = await resealSalesFeedKeys(adminDb, keys, true);
+  const report = bothReports(
+    await resealSalesFeedKeys(adminDb, keys, true),
+    await resealSalesFeedWebhookSecrets(adminDb, keys, true),
+  );
   return { total: report.total, unreadable: report.unreadable };
 }
 
@@ -51,6 +78,7 @@ export function revealSalesFeed(fetch: SalesFeedFetch, baseUrl?: string): SalesF
   return {
     create: (key) => createRevealSalesFeed({ key, fetch, ...(baseUrl === undefined ? {} : { baseUrl }) }),
     isPlausibleKey: isPlausibleRevealKey,
+    readDelivery: readRevealDelivery,
   };
 }
 
@@ -67,11 +95,13 @@ export interface ConnectorsModule {
     dispatch(logger: JobLogger): Promise<void>;
     poll(payload: JobPayload<'connector.poll'>, logger: JobLogger): Promise<void>;
     reconcile(payload: JobPayload<'connector.reconcile'>, logger: JobLogger): Promise<void>;
-    /** Every connected sales feed, from its cursor (ADR 0050 § 3). */
-    readSales(logger: JobLogger, correlationId: string): Promise<void>;
+    /** Every connected sales feed, from its cursor (ADR 0050 § 3); `woken` by a webhook delivery: now. */
+    readSales(logger: JobLogger, correlationId: string, woken?: boolean): Promise<void>;
   };
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
+  /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
+  readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
 
 export interface ConnectorsDeps {
@@ -94,6 +124,11 @@ export interface ConnectorsDeps {
   readonly credentialKeys: readonly EncryptionKey[] | null;
   /** One factory per platform with a sales feed: Reveal's CRM API. */
   readonly salesFeeds: SalesFeedRegistry;
+  /**
+   * Nirvana's public HTTPS address (AUTH_BASE_URL), where a platform posts its deliveries; `null` (development over
+   * HTTP) and no webhook can be registered: the minute's reading alone brings the sales.
+   */
+  readonly publicBaseUrl: string | null;
   readonly clock?: Clock;
   readonly random?: () => number;
 }
@@ -112,6 +147,10 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
     registry: deps.salesFeeds,
     clock,
+    webhooks:
+      deps.credentialKeys === null ? null : createSalesFeedWebhookStore(deps.adminDb, deps.credentialKeys),
+    jobs: createSalesFeedJobs(deps.adminDb),
+    webhookUrl: (platform) => salesFeedWebhookUrl(deps.publicBaseUrl, platform),
   });
   return {
     name: 'connectors',
@@ -128,8 +167,16 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       }),
       poll: createPollJob(accountJobs),
       reconcile: createReconcileJob(accountJobs),
-      readSales: (logger, correlationId) => salesFeeds.read(logger, correlationId),
+      readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),
     },
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
+    salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
+}
+
+/** Where a platform posts its deliveries; only over HTTPS, the platform would refuse anything else. */
+function salesFeedWebhookUrl(base: string | null, platform: string): string | null {
+  if (base === null) return null;
+  const url = new URL(`v1/webhooks/sales-feeds/${platform}`, base.endsWith('/') ? base : `${base}/`);
+  return url.protocol === 'https:' ? url.toString() : null;
 }

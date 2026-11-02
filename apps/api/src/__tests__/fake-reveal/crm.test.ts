@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { revealSalesFeed } from '../../modules/connectors';
 
-import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, type FakeCrm } from './crm';
+import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, revealSignature, type FakeCrm } from './crm';
 
 const opened: FakeCrm[] = [];
+
+const revealSalesFeedFactory = () => revealSalesFeed(fetch, FAKE_CRM_BASE_URL);
 
 function setup(key = FAKE_CRM_KEY) {
   const crm = createFakeCrm();
@@ -164,6 +166,58 @@ describe('Reveal sales feed adapter', () => {
       '/v1/models 200',
       '/v1/sales 403',
     ]);
+  });
+
+  it('registers a webhook, gets its secret once, removes it; a webhook Reveal no longer knows counts as removed', async () => {
+    const { crm, feed } = setup();
+    const created = await feed.createWebhook('https://nirvana.example.test/v1/webhooks/sales-feeds/reveal');
+    if (!created.ok) throw new Error('webhook refused');
+    expect(crm.webhooks.get(created.value.platformWebhookId)?.secret).toBe(created.value.secret);
+    expect(await feed.deleteWebhook(created.value.platformWebhookId)).toEqual({ ok: true, value: null });
+    expect(crm.webhooks.size).toBe(0);
+    expect(await feed.deleteWebhook(created.value.platformWebhookId)).toEqual({ ok: true, value: null });
+
+    crm.withhold('webhooks');
+    const refused = await feed.createWebhook('https://nirvana.example.test/v1/webhooks/sales-feeds/reveal');
+    expect(refused).toMatchObject({ ok: false, failure: { kind: 'refused', errorKind: 'missing_access' } });
+  });
+
+  it('reads a delivery only when signed with the secret, within five minutes, over its raw bytes', async () => {
+    const { crm, feed } = setup();
+    const created = await feed.createWebhook('https://nirvana.example.test/v1/webhooks/sales-feeds/reveal');
+    if (!created.ok) throw new Error('webhook refused');
+    const { secret } = created.value;
+    const position = crm.sell({ id: 'sale_a' });
+    const now = new Date();
+    const read = (body: string, headers: Record<string, string>, at = now) =>
+      revealSalesFeedFactory().readDelivery({ rawBody: Buffer.from(body), headers, secret, now: at });
+
+    const signed = crm.delivery(position);
+    expect(read(signed.body, signed.headers)).toEqual({
+      ok: true,
+      deliveryId: `delivery_${position}`,
+      event: 'sale_created',
+      position,
+    });
+    expect(read(signed.body, signed.headers, new Date(now.getTime() + 6 * 60_000))).toEqual({
+      ok: false,
+      reason: 'stale',
+    });
+    expect(read(`${signed.body} `, signed.headers)).toEqual({ ok: false, reason: 'bad_signature' });
+    expect(read(signed.body, {})).toEqual({ ok: false, reason: 'unsigned' });
+    expect(read(signed.body, { 'x-reveal-signature': 'v1=abc' })).toEqual({ ok: false, reason: 'unsigned' });
+    const forged = crm.delivery(position, { secret: 'whsec_other' });
+    expect(read(forged.body, forged.headers)).toEqual({ ok: false, reason: 'bad_signature' });
+    // Signed, but not a delivery: nothing of it is read.
+    const t = Math.floor(now.getTime() / 1000);
+    const odd = '{"hello":"world"}';
+    expect(read(odd, { 'x-reveal-signature': revealSignature(secret, t, odd) })).toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+    // A second signature, as during a rotation of Reveal's secret, is accepted when one of them holds.
+    const both = `${revealSignature('whsec_old', t, signed.body)},v1=${revealSignature(secret, t, signed.body).split('v1=')[1] ?? ''}`;
+    expect(read(signed.body, { 'x-reveal-signature': both })).toMatchObject({ ok: true });
   });
 
   it('lists models, team and statistics in the contract shape', async () => {

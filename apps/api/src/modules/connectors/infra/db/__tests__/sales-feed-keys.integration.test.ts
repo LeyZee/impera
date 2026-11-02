@@ -5,6 +5,7 @@ import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createSalesFeedKeyStore, resealSalesFeedKeys } from '../sales-feed-keys';
+import { createSalesFeedWebhookStore, resealSalesFeedWebhookSecrets } from '../sales-feed-webhooks';
 
 const FAKE_KEY = 'rvl_FAKEFAKEFAKEFAKEFAKE';
 const by = { userId: null, ip: null };
@@ -75,5 +76,40 @@ describe('sales feed key store', () => {
       key: FAKE_KEY,
     });
     await createSalesFeedKeyStore(test.admin.db, lost).remove('reveal', by);
+  });
+
+  it('re-seals a webhook’s secret the same way, and names one no listed key opens', async () => {
+    const v1 = newKey('v1');
+    const v2 = newKey('v2');
+    const created = { platformWebhookId: 'webhook_test_01', secret: 'whsec_FAKEFAKEFAKE' };
+    await createSalesFeedWebhookStore(test.admin.db, v1).save(
+      'reveal',
+      created,
+      'https://nirvana.example.test/v1/webhooks/sales-feeds/reveal',
+      new Date(),
+      by,
+    );
+    expect(await resealSalesFeedWebhookSecrets(test.admin.db, [...v2, ...v1])).toEqual({
+      total: 1,
+      rewritten: 1,
+      unreadable: [],
+    });
+    expect(await createSalesFeedWebhookStore(test.admin.db, v2).find('reveal')).toMatchObject({
+      secret: created.secret,
+    });
+    const [row] = await withAdmin(test.admin.db, (tx) => tx.select().from(schema.salesFeedWebhooks));
+    expect(row?.keyVersion).toBe('v2');
+    expect(row?.secretCiphertext.toString('utf8')).not.toContain(created.secret);
+
+    const stranger = newKey('v3');
+    expect(await resealSalesFeedWebhookSecrets(test.admin.db, stranger, true)).toEqual({
+      total: 1,
+      rewritten: 0,
+      unreadable: ['reveal (webhook)'],
+    });
+    expect(await createSalesFeedWebhookStore(test.admin.db, stranger).find('reveal')).toMatchObject({
+      secret: null,
+    });
+    await createSalesFeedWebhookStore(test.admin.db, v2).remove('reveal', by);
   });
 });
