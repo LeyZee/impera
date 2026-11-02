@@ -1,5 +1,5 @@
 # SEC-04 Réglages › Sécurité et alertes de sécurité
-Statut : in_progress (lot 1, alertes, fusionné ; lot 2, l'écran, en PR)
+Statut : done (alertes #400, écran #404)
 Phase : exploitation
 Dépend de : ADR 0046, ADR 0020, SEC-02
 Branche : claude/project-thread-8fl2b1 (fil « Auditer et sécuriser Nirvana »)
