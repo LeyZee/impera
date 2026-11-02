@@ -1,9 +1,9 @@
 # 0050. Reveal à deux voies : l'API CRM officielle pour les ventes et les chiffres, la session capturée pour tout le reste
 
-Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour)
+Statut : accepted (Charles, 02/11/2026, « ok 0050 », après lecture de l'avis du même jour, fil « Évaluer l'API CRM de Reveal face à l'extension » ; § 8 : « ok netAmount », le même jour ; § 10 : « je valide l'option 3 », le même jour)
 Date : 2026-11-02
 Complète : l'ADR 0008, dont la phrase « attendre une API officielle : il n'y en aura pas » est dépassée pour les ventes et les chiffres ; sa stratégie reste celle de tout le reste.
-Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur ».
+Remplace : dans l'ADR 0018, l'alternative rejetée « un second port », pour les seules ventes et les seuls chiffres ; dans l'ADR 0043 § 4, la phrase « une vente de la fenêtre sans attribution envoie le rapport au valideur » ; dans l'ADR 0043 § 5, la phrase « le rapport reste dû pour le commentaire, l'incident, les remontées et le contrôle ».
 Précise : l'ADR 0023 (source « détectée » et, pour elle seule, le début de la chaîne de calcul), l'ADR 0025 et l'ADR 0049 (l'auteur Reveal d'une vente), l'ADR 0043 § 5.
 
 ## Contexte
@@ -46,16 +46,26 @@ Cette ADR s'appuie sur la seule documentation : aucune clé n'existe encore, auc
 
 9. **Tests.** `FakeReveal` gagne l'API CRM : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`. Aucun appel au vrai Reveal sans la demande de Charles.
 
+10. **Sur Reveal, ventes automatiques et mini feedback** (Charles, « je valide l'option 3 »). L'API sait ce qui a été vendu, pas ce qui s'est passé.
+
+    - **Une fois le compte passé en source « détectée »**, le chatteur ne saisit plus de vente et ne déclare plus de montant. Son téléphone montre ses ventes lues chez Reveal, sa commission estimée et son palier (ADR 0043 § 7, sans « + Vente »).
+    - **Le mini feedback** (`shift_feedback`) remplace pour ce compte le rapport de fin de shift : à la fin du shift, le chatteur voit ses ventes déjà remplies, en lecture seule, et ajoute un commentaire, un incident ou une remontée (mêmes catégories que l'ADR 0043 § 2), ou touche « rien à signaler ». Il ne porte aucun montant et personne n'a à le valider.
+    - **La paie ne dépend pas de lui** : elle lit les ventes de Reveal, attribuées selon le § 5. Un feedback manquant se rappelle au chatteur et n'enlève ou ne bloque aucun montant.
+    - **Il n'y a plus de rapprochement ni de validation automatique pour ce compte**, puisque plus rien n'est déclaré. Restent deux signaux au manager en poste ou au propriétaire : une vente attribuée à un membre qui n'est pas en poste, et une vente `ppv`, `tip` ou `paid_message` sans chatteur. Ils remplacent l'envoi au valideur des §§ 5 et 6 pour ce compte. Le § 6 ne s'applique plus qu'au temps de la transition, si un compte Reveal a encore des ventes saisies alors que ses ventes sont lues.
+    - **Jusqu'à la bascule, et sur les autres plateformes**, l'ADR 0043 s'applique telle quelle : ventes saisies, rapport, contrôle.
+
 ## Conséquences
 
 Positives :
 - La lecture des ventes, CR-09, `sale_detected` et le CA du Dashboard ne dépendent plus de la capture, et la source est officielle.
 - Une session expirée n'arrête plus la lecture des ventes.
 - La paie détectée part d'un montant réel, sans taux à tenir à jour.
+- Sur Reveal, le chatteur ne saisit plus rien et ne peut plus déclarer un montant faux ; il garde 10 secondes de feedback pour ce que l'API ne sait pas.
 - La capture a moins à prouver : le registre répond à la question des ventes et de leur auteur.
 
 Négatives, à surveiller :
 - Deux voies et deux secrets à surveiller.
+- Un feedback sans conséquence sur la paie peut être négligé : le taux de réponse est à suivre, et le rappel à revoir s'il ne suffit pas.
 - `netAmount` retire aussi les frais de paiement : à taux égal, une commission peut baisser par rapport à la chaîne de l'ADR 0023, d'où la comparaison du § 8.
 - La voie capturée garde tout son risque, et Reveal a maintenant un canal officiel qui en exclut volontairement les conversations : les CGU sont à lire avant toute écriture réelle.
 - Le registre ne remonte qu'à 31 jours avant son ouverture ; pour plus ancien, l'export du dashboard ou les statistiques par jour.

@@ -28,3 +28,5 @@ Le code marque chaque rapport (doublon possible, total inhabituel) et, dès que 
 Les retours de l'IA (CR-10).
 
 ## Notes de session
+
+- 2026-11-02 (fil API CRM) : l'ADR 0050 change cette fiche. La source du rapprochement est `PlatformSalesFeed` (lecture par curseur), pas `listTransactions`. Seuls `ppv`, `tip` et `paid_message` sans chatteur comptent comme vente sans attribution (§ 6). Un compte Reveal en source « détectée » n'a plus de rapport à rapprocher : mini feedback et deux signaux seulement (§ 10).
