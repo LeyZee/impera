@@ -389,11 +389,23 @@ export function MoreSheet({
         )}
         {account === undefined ? null : (
           <Link
-            to={account.security}
+            to="/notifications"
             className="nv-more__item nv-enter"
             style={{ '--nv-i': items.length + 3 }}
             onClick={onClose}
           >
+            <NavIcon name="bell" />
+            Notifications
+          </Link>
+        )}
+        {account === undefined ? null : (
+          <Link
+            to={account.security}
+            className="nv-more__item nv-enter"
+            style={{ '--nv-i': items.length + 4 }}
+            onClick={onClose}
+          >
+            <NavIcon name="shield" />
             Sécurité
           </Link>
         )}
@@ -401,7 +413,7 @@ export function MoreSheet({
           <button
             type="button"
             className="nv-more__item nv-more__out nv-enter"
-            style={{ '--nv-i': items.length + 4 }}
+            style={{ '--nv-i': items.length + 5 }}
             onClick={onSignOut}
           >
             Se déconnecter
@@ -467,6 +479,15 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
       {open ? (
         <div className="nv-user__menu nv-glass nv-glass--thick" id="nv-user-menu">
           <AppearanceChoice />
+          <Link
+            to="/notifications"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Notifications
+          </Link>
           <Link
             to={account.security}
             className="nv-btn nv-btn--plain nv-btn--sm"

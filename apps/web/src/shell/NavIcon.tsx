@@ -15,6 +15,8 @@ export type NavIconName =
   | 'team'
   | 'pay'
   | 'me'
+  | 'bell'
+  | 'shield'
   | 'more';
 
 const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
@@ -101,6 +103,18 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
       <circle cx="12" cy="12" r="9.5" />
       <circle className="nav-head" cx="12" cy="10" r="3" />
       <path d="M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />
+      <path d="M10 21h4" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3l7 3v5c0 4.5-3 8.4-7 10-4-1.6-7-5.5-7-10V6z" />
+      <path d="M9 12l2 2 4-4" />
     </>
   ),
   more: (

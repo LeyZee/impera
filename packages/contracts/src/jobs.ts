@@ -39,6 +39,7 @@ export const JOB_NAMES = [
   'fans.purge_facts',
   'rate_limit.purge',
   'backups.check',
+  'notifications.recap',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'team.apply_roles',
@@ -123,6 +124,8 @@ export const JOB_PAYLOADS = {
   'fans.purge_facts': z.object({}),
   'rate_limit.purge': z.object({}),
   'backups.check': z.object({}),
+  /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
+  'notifications.recap': z.object({ userId: z.string().min(1) }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
@@ -254,6 +257,7 @@ export const JOB_MAX_ATTEMPTS = {
   'fans.purge_facts': 1,
   'rate_limit.purge': 1,
   'backups.check': 1,
+  'notifications.recap': 3,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   'team.apply_roles': 1,

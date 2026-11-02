@@ -9,6 +9,7 @@ export * from './invoices';
 export * from './llm';
 export * from './media';
 export * from './memory';
+export * from './notifications';
 export * from './payroll';
 export * from './persona';
 export * from './sales-feed';
