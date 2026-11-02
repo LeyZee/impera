@@ -1,5 +1,5 @@
 # SEC-01 Audit de sécurité : premiers correctifs
-Statut : in_progress
+Statut : done
 Phase : exploitation
 Dépend de : —
 Branche : claude/project-thread-8fl2b1 (fil « Auditer et sécuriser Nirvana »)
