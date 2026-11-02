@@ -4,7 +4,7 @@ Ce qu'on protège, par ordre d'importance : (1) les médias et conversations int
 
 ## 1. Exposition : rien n'est public par défaut
 
-- **Le dashboard n'est jamais exposé directement sur Internet.** Il est derrière Cloudflare Access (identité Google/email, liste d'utilisateurs) ou un réseau privé (Tailscale). Une application que personne ne peut atteindre ne se fait pas pirater « facilement ».
+- **Le dashboard est public, mais un mot de passe ne suffit jamais à y entrer** (ADR 0046) : chaque compte a un deuxième facteur (code d'une application d'authentification), les sessions ont une durée absolue, et les connexions inhabituelles déclenchent une alerte. Cloudflare Access reste possible en plus, côté exploitation. Tant que le lot (a) de l'ADR 0046 n'est pas en production, le mot de passe est la seule barrière : ne pas ouvrir le dashboard à l'équipe avant.
 - L'API n'écoute que sur l'interface privée du VPS (Docker network) ; seul le reverse proxy (Caddy/Traefik via Coolify) la publie, en HTTPS, avec HSTS.
 - L'endpoint que l'extension appelle (capture de session, enregistrements) est authentifié par un **jeton d'appareil** révocable, limité par débit, et n'accepte que les origines de l'extension.
 - Postgres n'est jamais joignable depuis Internet (Neon : IP allowlist ; self-host : réseau Docker uniquement).
