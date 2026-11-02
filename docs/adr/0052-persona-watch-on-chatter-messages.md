@@ -23,7 +23,7 @@ Ce qu'on sait déjà :
 ### 1. Ce qui est relu
 
 - Chaque message **sortant écrit par un membre humain** dans Reveal, lu par le connecteur sur la session capturée, sur un compte dont une créatrice a une persona active. Pas les messages de l'agent, déjà gardés avant l'envoi, ni ceux que la créatrice écrit elle-même : elle est la persona.
-- Le message est rattaché à son auteur Reveal (ADR 0025, 0049). Tant que la capture ne dit pas quel membre a écrit, il est rattaché au membre connecté à l'extension du navigateur d'où l'envoi est parti, puis, à défaut, au membre en poste ; à plusieurs en poste sur des fans partagés sans extension pour trancher, à aucun, et l'écart va au manager seulement.
+- Le message est rattaché à son auteur Reveal (ADR 0025, 0049). Tant que la capture ne dit pas quel membre a écrit, il est rattaché au membre connecté à l'extension du navigateur d'où l'envoi est parti ; sinon au membre qui tient le fan (ADR 0049 § 3) ; sinon au membre en poste s'il est seul, marge comprise (ADR 0025) ; sinon à aucun, et l'écart va au manager seulement.
 - Il est relu **contre la version de la persona active au moment du message**, et l'écart garde l'identifiant de cette version.
 
 ### 2. Trois contrôles, du moins cher au plus cher
@@ -54,7 +54,7 @@ Le message du fan et celui du chatteur entrent dans le prompt comme données, da
 ### 5. Qui d'autre le voit
 
 - **Rouge** : le manager en poste ou, à défaut, le propriétaire, dans le Suivi, à l'instant. Un aveu d'IA, des coordonnées ou une promesse de rencontre partent aussi sur Telegram, en `important`, sans le nom du fan.
-- **Ambre** : dans le rapport ou le mini feedback de fin de shift du chatteur (ADR 0043, 0050), en lecture seule, avec le compte des écarts par contrôle.
+- **Ambre** : dans le rapport ou le mini feedback de fin de shift du chatteur (ADR 0043, 0050), en lecture seule, avec le compte des écarts par contrôle. Les comptes s'affichent à côté du rapport et n'en font pas partie : rien n'est écrit dans le rapport, ni sa remise ni sa validation ne les attendent, et la paie ne les lit pas.
 - **Chaque semaine** : les trois retours de l'IA (ADR 0043 § 6) choisissent d'abord parmi les écarts de la semaine. La vue d'équipe des fautes les plus fréquentes compte les écarts par règle.
 - **Une mesure, sans effet** : la part des messages d'un chatteur sans écart, par shift et par semaine. Lui, le manager et le propriétaire la voient. Elle n'ouvre ni ne ferme rien.
 - **Jamais la créatrice** (ADR 0042 § 2), ni dans ses écrans, ni dans son topo de la semaine.
@@ -67,7 +67,7 @@ Le message du fan et celui du chatteur entrent dans le prompt comme données, da
 ### 7. Les données
 
 - Un écart garde : le message (identifiant de la plateforme), son auteur, la conversation, la version de la persona, le contrôle, la règle, l'extrait et la correction. Il suit la durée de vie des messages de la conversation, sous la RLS du tenant.
-- Le chatteur ne lit que les siens, pendant son shift et sa marge comme le reste (ADR 0025) ; le manager et le propriétaire, ceux de leurs comptes.
+- Le chatteur lit les siens : l'extrait de la conversation pendant son shift et sa marge, comme le reste (ADR 0025) ; la règle, la correction et ses comptes à tout moment dans son espace. Le manager et le propriétaire lisent ceux de leurs comptes.
 - Aucune donnée réelle dans le dépôt : les tests passent par `FakeReveal`, la persona inventée de l'exemple et des fans inventés ; les évals du contrôle 3 utilisent des scénarios fictifs (`evals/`).
 
 ### 8. L'ordre
@@ -90,7 +90,7 @@ Négatives, à surveiller :
 - Le relevé arrive après l'envoi, le temps que la capture lise le message : il corrige la suite, pas ce qui est parti.
 - Des faux signaux en ambre au début, surtout sur les faits : le contrôle 3 reste ambre et passe ses évals avant d'être affiché.
 - Tout dépend de la capture : sans elle, rien n'est relu.
-- Si la capture ne dit pas quel membre a écrit et qu'aucune extension ne l'a vu partir, un écart sur des fans partagés n'est attribué à personne.
+- Si la capture ne dit pas quel membre a écrit, qu'aucune extension ne l'a vu partir et qu'aucun membre ne tient le fan, un écart à plusieurs en poste n'est attribué à personne.
 
 ## Alternatives rejetées
 
