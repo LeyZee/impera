@@ -190,7 +190,7 @@ export const platformSales = pgTable(
     check('platform_sales_net_check', sql`${t.netMinor} = ${t.agencyMinor} + ${t.creatorMinor}`),
     check(
       'platform_sales_amounts_check',
-      sql`${t.grossInclVatMinor} >= 0 and ${t.grossExclVatMinor} >= 0 and ${t.agencyMinor} >= 0 and ${t.creatorMinor} >= 0`,
+      sql`${t.agencyMinor} >= 0 and ${t.creatorMinor} >= 0 and ${t.netMinor} <= ${t.grossExclVatMinor} and ${t.grossExclVatMinor} <= ${t.grossInclVatMinor}`,
     ),
     index('platform_sales_creator_occurred_idx').on(t.creatorId, t.occurredAt),
     index('platform_sales_account_chatter_idx').on(t.platformAccountId, t.platformChatterId, t.occurredAt),
@@ -221,5 +221,9 @@ export const platformSalesQuarantine = pgTable(
     enumCheck('platform_sales_quarantine', t.status, SaleStatusSchema.options),
     enumCheck('platform_sales_quarantine', t.currency, CurrencySchema.options),
     check('platform_sales_quarantine_net_check', sql`${t.netMinor} = ${t.agencyMinor} + ${t.creatorMinor}`),
+    check(
+      'platform_sales_quarantine_amounts_check',
+      sql`${t.agencyMinor} >= 0 and ${t.creatorMinor} >= 0 and ${t.netMinor} <= ${t.grossExclVatMinor} and ${t.grossExclVatMinor} <= ${t.grossInclVatMinor}`,
+    ),
   ],
 );

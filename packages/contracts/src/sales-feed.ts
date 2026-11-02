@@ -51,7 +51,12 @@ export const SaleAmountsSchema = z
     creator: cents.min(0),
   })
   .refine((amounts) => amounts.net === amounts.agency + amounts.creator, {
-    message: 'net must equal agency + creator',
+    message: 'netAmount ≠ agency + model',
+  })
+  // What the platform keeps comes out of the price before VAT, which VAT only adds to: a field swapped on the platform's
+  // side stops the reading instead of reaching pay.
+  .refine((amounts) => amounts.net <= amounts.grossExclVat && amounts.grossExclVat <= amounts.grossInclVat, {
+    message: 'net ≤ amountHt ≤ amountTtc broken',
   });
 export type SaleAmounts = z.infer<typeof SaleAmountsSchema>;
 

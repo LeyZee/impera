@@ -4,7 +4,7 @@
 -- transaction that records the lines. `platform_sales` is the register of linked models, one line per sale and event,
 -- append-only and under the tenant policy; `platform_sales_quarantine` keeps the lines of a model linked to no creator
 -- account until the owner links it. `sales_feed_models` and `sales_feed_chatters` are the owner's links. A new event
--- type, `sales_feed_signal`, in both CHECKs; additive, every existing row still passes.
+-- type, `sales_feed_signal`, in both CHECKs (with `security_alert` of 0064); additive, every existing row still passes.
 CREATE TABLE "platform_sales" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"creator_id" uuid NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE "platform_sales" (
 	CONSTRAINT "platform_sales_status_check" CHECK ("platform_sales"."status" in ('paid', 'refund_asked', 'refunded', 'other')),
 	CONSTRAINT "platform_sales_currency_check" CHECK ("platform_sales"."currency" in ('EUR', 'USD')),
 	CONSTRAINT "platform_sales_net_check" CHECK ("platform_sales"."net_minor" = "platform_sales"."agency_minor" + "platform_sales"."creator_minor"),
-	CONSTRAINT "platform_sales_amounts_check" CHECK ("platform_sales"."gross_incl_vat_minor" >= 0 and "platform_sales"."gross_excl_vat_minor" >= 0 and "platform_sales"."agency_minor" >= 0 and "platform_sales"."creator_minor" >= 0)
+	CONSTRAINT "platform_sales_amounts_check" CHECK ("platform_sales"."agency_minor" >= 0 and "platform_sales"."creator_minor" >= 0 and "platform_sales"."net_minor" <= "platform_sales"."gross_excl_vat_minor" and "platform_sales"."gross_excl_vat_minor" <= "platform_sales"."gross_incl_vat_minor")
 );
 --> statement-breakpoint
 ALTER TABLE "platform_sales" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -69,7 +69,8 @@ CREATE TABLE "platform_sales_quarantine" (
 	CONSTRAINT "platform_sales_quarantine_sale_type_check" CHECK ("platform_sales_quarantine"."sale_type" in ('subscription', 'renewal', 'ppv', 'mass_dm', 'tip', 'payment_link', 'boudoir', 'paid_message', 'other')),
 	CONSTRAINT "platform_sales_quarantine_status_check" CHECK ("platform_sales_quarantine"."status" in ('paid', 'refund_asked', 'refunded', 'other')),
 	CONSTRAINT "platform_sales_quarantine_currency_check" CHECK ("platform_sales_quarantine"."currency" in ('EUR', 'USD')),
-	CONSTRAINT "platform_sales_quarantine_net_check" CHECK ("platform_sales_quarantine"."net_minor" = "platform_sales_quarantine"."agency_minor" + "platform_sales_quarantine"."creator_minor")
+	CONSTRAINT "platform_sales_quarantine_net_check" CHECK ("platform_sales_quarantine"."net_minor" = "platform_sales_quarantine"."agency_minor" + "platform_sales_quarantine"."creator_minor"),
+	CONSTRAINT "platform_sales_quarantine_amounts_check" CHECK ("platform_sales_quarantine"."agency_minor" >= 0 and "platform_sales_quarantine"."creator_minor" >= 0 and "platform_sales_quarantine"."net_minor" <= "platform_sales_quarantine"."gross_excl_vat_minor" and "platform_sales_quarantine"."gross_excl_vat_minor" <= "platform_sales_quarantine"."gross_incl_vat_minor")
 );
 --> statement-breakpoint
 CREATE TABLE "sales_feed_chatters" (

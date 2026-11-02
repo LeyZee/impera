@@ -177,10 +177,14 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
           creator: sale.modelRevenue,
         });
         if (!amounts.success) {
-          // netAmount ≠ agencyRevenue + modelRevenue: no line of this page is recorded, the cursor stays.
+          // Amounts that do not add up (net ≠ agency + model) or out of order (net ≤ HT ≤ TTC): no line of this page is
+          // recorded, the cursor stays. The detail names the rule, never a value.
           return {
             ok: false,
-            failure: { kind: 'unexpected_answer', detail: '/v1/sales: netAmount ≠ agency + model' },
+            failure: {
+              kind: 'unexpected_answer',
+              detail: `/v1/sales: ${amounts.error.issues[0]?.message ?? 'amounts'}`,
+            },
           };
         }
         const type = mapped<SaleType>(SaleTypeSchema, sale.type, 'type', unknown);

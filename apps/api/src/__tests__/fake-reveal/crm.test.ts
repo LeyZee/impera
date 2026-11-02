@@ -108,6 +108,13 @@ describe('Reveal sales feed adapter', () => {
       failure: { kind: 'unexpected_answer', detail: '/v1/sales: netAmount ≠ agency + model' },
     });
 
+    const swapped = setup();
+    swapped.crm.sell({ id: 'sale_a', amountTtc: 1000, amountHt: 1200 });
+    expect(await swapped.feed.readSales(null)).toEqual({
+      ok: false,
+      failure: { kind: 'unexpected_answer', detail: '/v1/sales: net ≤ amountHt ≤ amountTtc broken' },
+    });
+
     const second = setup();
     second.crm.sell({ id: 'sale_a' });
     second.crm.breakShape(1);
