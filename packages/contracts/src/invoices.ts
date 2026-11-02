@@ -539,6 +539,8 @@ export const ContractorDocumentSchema = z.object({
   sha256: Sha256Schema,
   /** The owner's check, `null` while it waits. */
   review: ContractorDocumentReviewedSchema.nullable(),
+  /** When the file of a refused document was erased (« ok purge a »), `null` while the bucket holds it. */
+  purgedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
 });
 export type ContractorDocument = z.infer<typeof ContractorDocumentSchema>;
@@ -1068,6 +1070,11 @@ export const INVOICE_ERROR_CODES = [
   'contractor_document_reviewed_conflict',
   /** The bucket did not give the file with its fingerprint: never an altered file. */
   'contractor_document_unavailable',
+  /**
+   * The file of a refused document, erased once its upload lock ended (« ok purge a » de Charles, 01/11): its row, its
+   * reason and its fingerprint stay.
+   */
+  'contractor_document_file_gone',
   'credit_note_amount_unprocessable',
   'invoice_acceptance_conflict',
   /** Only the contractor answers their document: never the owner, a manager or another member (ADR 0039 § 1). */

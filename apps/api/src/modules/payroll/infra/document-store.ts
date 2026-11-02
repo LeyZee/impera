@@ -25,10 +25,17 @@ import { enqueueInvoiceRequeue } from './invoice-queue';
 import type { PayInputReads } from './snapshot';
 import { audit } from './writes';
 
-const { billingSettings, contractorDocumentReviews, contractorDocuments, teamMembers } = schema;
+const {
+  billingSettings,
+  contractorDocumentPurges,
+  contractorDocumentReviews,
+  contractorDocuments,
+  teamMembers,
+} = schema;
 
 type DocumentRow = typeof contractorDocuments.$inferSelect;
 type ReviewRow = typeof contractorDocumentReviews.$inferSelect;
+type PurgeRow = typeof contractorDocumentPurges.$inferSelect;
 
 /** The member as the reader's policy lets him see it. */
 async function memberOf(
@@ -57,11 +64,16 @@ async function documentById(
   tx: Transaction,
   memberId: TeamMemberId,
   documentId: ContractorDocumentId,
-): Promise<{ readonly row: DocumentRow; readonly review: ReviewRow | null } | null> {
+): Promise<{
+  readonly row: DocumentRow;
+  readonly review: ReviewRow | null;
+  readonly purge: PurgeRow | null;
+} | null> {
   const [found] = await tx
-    .select({ row: contractorDocuments, review: contractorDocumentReviews })
+    .select({ row: contractorDocuments, review: contractorDocumentReviews, purge: contractorDocumentPurges })
     .from(contractorDocuments)
     .leftJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
+    .leftJoin(contractorDocumentPurges, eq(contractorDocumentPurges.documentId, contractorDocuments.id))
     .where(and(eq(contractorDocuments.id, documentId), eq(contractorDocuments.memberId, memberId)));
   return found ?? null;
 }
@@ -75,11 +87,16 @@ async function recordedUnder(
   memberId: TeamMemberId,
   query: UploadContractorDocumentQuery,
   sha256: string,
-): Promise<{ readonly row: DocumentRow; readonly review: ReviewRow | null } | null> {
+): Promise<{
+  readonly row: DocumentRow;
+  readonly review: ReviewRow | null;
+  readonly purge: PurgeRow | null;
+} | null> {
   const [found] = await tx
-    .select({ row: contractorDocuments, review: contractorDocumentReviews })
+    .select({ row: contractorDocuments, review: contractorDocumentReviews, purge: contractorDocumentPurges })
     .from(contractorDocuments)
     .leftJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
+    .leftJoin(contractorDocumentPurges, eq(contractorDocumentPurges.documentId, contractorDocuments.id))
     .where(eq(contractorDocuments.id, query.id));
   if (found === undefined) return null;
   const { row } = found;
@@ -113,7 +130,10 @@ export function createDrizzlePayrollDocumentStore(
         assertWriter(scope, await memberOf(tx, memberId), actor);
         const recorded = await recordedUnder(tx, memberId, query, file.sha256);
         if (recorded !== null) {
-          return { kind: 'recorded', document: documentOf(recorded.row, recorded.review) } as const;
+          return {
+            kind: 'recorded',
+            document: documentOf(recorded.row, recorded.review, recorded.purge),
+          } as const;
         }
         await assertIssued(tx, query.issuedOn);
         return {
@@ -128,7 +148,8 @@ export function createDrizzlePayrollDocumentStore(
         assertWriter(scope, await memberOf(tx, memberId), actor);
         await lock(tx, `contractor_documents:${query.id}`);
         const recorded = await recordedUnder(tx, memberId, query, file.sha256);
-        if (recorded !== null) return { document: documentOf(recorded.row, recorded.review), created: false };
+        if (recorded !== null)
+          return { document: documentOf(recorded.row, recorded.review, recorded.purge), created: false };
         await assertIssued(tx, query.issuedOn);
         const [row] = await tx
           .insert(contractorDocuments)
@@ -164,7 +185,7 @@ export function createDrizzlePayrollDocumentStore(
         );
         // Under a treaty his statements wait for this certificate: tried again, the owner is told it waits for him.
         if (query.kind === 'tax_residence') await enqueueInvoiceRequeue(tx, memberId);
-        return { document: documentOf(row, null), created: true };
+        return { document: documentOf(row, null, null), created: true };
       }),
 
     documentFor: (userId, memberId, documentId) =>
@@ -172,7 +193,7 @@ export function createDrizzlePayrollDocumentStore(
         const found = await documentById(tx, memberId, documentId);
         if (found === null) return null;
         return {
-          document: documentOf(found.row, found.review),
+          document: documentOf(found.row, found.review, found.purge),
           file: { key: found.row.storageKey, sha256: found.row.sha256, mediaType: mediaTypeOfRow(found.row) },
         };
       }),
@@ -196,7 +217,7 @@ export function createDrizzlePayrollDocumentStore(
               ContractorDocumentDecisionSchema.parse(found.review.decision),
             );
           }
-          return { document: documentOf(row, found.review), created: false };
+          return { document: documentOf(row, found.review, found.purge), created: false };
         }
         let retainUntil: Date | null = null;
         if (body.decision === 'accepted') {
@@ -205,7 +226,7 @@ export function createDrizzlePayrollDocumentStore(
             .from(billingSettings)
             .limit(1);
           const due = documentRetainUntil(
-            documentOf(row, null).lastDay,
+            documentOf(row, null, null).lastDay,
             await today(tx),
             settings?.fiscalYearEndMonth ?? DEFAULT_FISCAL_YEAR_END_MONTH,
           );
@@ -240,7 +261,7 @@ export function createDrizzlePayrollDocumentStore(
             retainUntil,
           );
         }
-        return { document: documentOf(row, review), created: true };
+        return { document: documentOf(row, review, null), created: true };
       }),
   };
 }

@@ -36,6 +36,29 @@ async function errorCodeOf(response: Response): Promise<string> {
   return /<Code>([^<]{1,64})<\/Code>/u.exec(body)?.[1] ?? 'no code';
 }
 
+/** The text of the first `<name>` of an XML fragment, its five entities read back; `null` when absent. */
+function xmlText(fragment: string, name: string): string | null {
+  const found = new RegExp(`<${name}>([^<]*)</${name}>`, 'u').exec(fragment)?.[1];
+  if (found === undefined) return null;
+  return found
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll('&amp;', '&');
+}
+
+/**
+ * Whether the lock an answer names still holds, in either mode: an unreadable date is taken for one that holds, so
+ * nothing is ever erased on a guess.
+ */
+function lockHolds(headers: Headers): boolean {
+  const lock = headers.get('x-amz-object-lock-retain-until-date');
+  if (lock === null) return false;
+  const until = new Date(lock);
+  return Number.isNaN(until.getTime()) || until.getTime() > Date.now();
+}
+
 export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLike): InvoiceObjectStore {
   const client = new AwsClient({
     accessKeyId: config.accessKeyId,
@@ -57,6 +80,42 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
     } catch (error) {
       throw new InvoiceStorageUnavailable(`${config.bucket}: no answer for ${key}`, { cause: error });
     }
+  };
+  /**
+   * ListObjectVersions on the exact key (`prefix`, then only the keys equal to it): the ids of its versions and of
+   * the delete markers over them. A marker makes a HEAD answer 404 while the bytes stay: only the listing sees them.
+   */
+  const versionsOf = async (
+    key: string,
+  ): Promise<{ readonly versions: string[]; readonly markers: string[] }> => {
+    const url = `${config.endpoint.replace(/\/+$/u, '')}/${encodeURIComponent(config.bucket)}?versions&prefix=${encodeURIComponent(key)}`;
+    let response: Response;
+    try {
+      const signed = await client.sign(url, { method: 'GET' });
+      response = await send(new Request(signed, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }));
+    } catch (error) {
+      throw new InvoiceStorageUnavailable(`${config.bucket}: no answer for the versions of ${key}`, {
+        cause: error,
+      });
+    }
+    if (!response.ok) {
+      throw new InvoiceStorageUnavailable(
+        `${config.bucket}: GET ?versions of ${key} answered ${String(response.status)} (${await errorCodeOf(response)})`,
+      );
+    }
+    const body = await response.text();
+    if (body.includes('<IsTruncated>true</IsTruncated>')) {
+      throw new InvoiceStorageUnavailable(`${config.bucket}: the versions of ${key} do not fit one answer`);
+    }
+    const versions: string[] = [];
+    const markers: string[] = [];
+    for (const [, kind, block] of body.matchAll(/<(Version|DeleteMarker)>([\s\S]*?)<\/\1>/gu)) {
+      if (block === undefined || xmlText(block, 'Key') !== key) continue;
+      const id = xmlText(block, 'VersionId');
+      if (id === null) throw new InvoiceStorageUnavailable(`${config.bucket}: a version of ${key} has no id`);
+      (kind === 'Version' ? versions : markers).push(id);
+    }
+    return { versions, markers };
   };
   return {
     volatile: false,
@@ -139,6 +198,53 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
       }
       await response.body?.cancel();
     },
+    async remove(key, sha256) {
+      const listed = await versionsOf(key);
+      if (listed.versions.length === 0 && listed.markers.length === 0) return 'absent';
+      // Each version first read, nothing erased yet: its bytes must be the file the row names, its lock ended.
+      for (const version of listed.versions) {
+        const response = await call(key, { method: 'GET' }, `versionId=${encodeURIComponent(version)}`);
+        if (!response.ok) {
+          throw new InvoiceStorageUnavailable(
+            `${config.bucket}: GET ${key}?versionId answered ${String(response.status)} (${await errorCodeOf(response)})`,
+          );
+        }
+        let bytes: Uint8Array;
+        try {
+          bytes = new Uint8Array(await response.arrayBuffer());
+        } catch (error) {
+          throw new InvoiceStorageUnavailable(`${config.bucket}: GET ${key}?versionId cut off`, {
+            cause: error,
+          });
+        }
+        if (createHash('sha256').update(bytes).digest('hex') !== sha256) return 'altered';
+        if (lockHolds(response.headers)) return 'locked';
+      }
+      // Then erased by their ids, the versions before the markers that hid them.
+      for (const version of [...listed.versions, ...listed.markers]) {
+        const response = await call(key, { method: 'DELETE' }, `versionId=${encodeURIComponent(version)}`);
+        // A compliance lock refuses with 403 AccessDenied (AWS) or 400 « Object is WORM protected » (MinIO): « not
+        // yet », not a failure (a lock lengthened since the read). The next run tries again.
+        if (response.status === 403 || response.status === 400) {
+          const body = await response.text().catch(() => '');
+          if (response.status === 403 || /WORM protected|ObjectLocked/u.test(body)) return 'locked';
+          const code = /<Code>([^<]{1,64})<\/Code>/u.exec(body)?.[1] ?? 'no code';
+          throw new InvoiceStorageUnavailable(
+            `${config.bucket}: DELETE ${key}?versionId answered 400 (${code})`,
+          );
+        }
+        if (!response.ok) {
+          throw new InvoiceStorageUnavailable(
+            `${config.bucket}: DELETE ${key}?versionId answered ${String(response.status)} (${await errorCodeOf(response)})`,
+          );
+        }
+        await response.body?.cancel();
+      }
+      return listed.versions.length === 0 ? 'absent' : 'removed';
+    },
+    async holdsVersion(key) {
+      return (await versionsOf(key)).versions.length > 0;
+    },
   };
 }
 
@@ -185,6 +291,17 @@ export function createMemoryInvoiceStore(options: { readonly volatile?: boolean 
       objects.set(key, { ...found, retainUntil });
       return Promise.resolve();
     },
+    remove(key, sha256) {
+      const found = objects.get(key);
+      if (found === undefined) return Promise.resolve('absent');
+      if (createHash('sha256').update(found.bytes).digest('hex') !== sha256)
+        return Promise.resolve('altered');
+      if (found.retainUntil !== null && found.retainUntil.getTime() > Date.now())
+        return Promise.resolve('locked');
+      objects.delete(key);
+      return Promise.resolve('removed');
+    },
+    holdsVersion: (key) => Promise.resolve(objects.has(key)),
     peek: (key) => objects.get(key),
     plant: (key, object) => {
       objects.set(key, object);

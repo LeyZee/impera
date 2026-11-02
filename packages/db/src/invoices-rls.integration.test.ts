@@ -731,6 +731,62 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
       expect(await failure(admin((tx) => tx.delete(s.contractorDocumentReviews)))).toMatch(KEPT);
     });
 
+    it('a refused file’s erasure is the jobs’ alone, once its upload lock has ended; its contractor reads it (lot 5c-2)', async () => {
+      const [locked] = await as(kofi, (tx) =>
+        tx
+          .select({ id: s.contractorDocuments.id })
+          .from(s.contractorDocuments)
+          .orderBy(s.contractorDocuments.issuedOn)
+          .limit(1),
+      );
+      if (locked === undefined) throw new Error('the documents of the tests before');
+      // The refused document of the test before is still under its upload lock (2037): its erasure is refused.
+      expect(
+        await failure(admin((tx) => tx.insert(s.contractorDocumentPurges).values({ documentId: locked.id }))),
+      ).toMatch(/upload lock has ended/u);
+      const unlocked = newId(ContractorDocumentIdSchema);
+      await admin((tx) =>
+        tx.insert(s.contractorDocuments).values({
+          id: unlocked,
+          memberId: member(kofi),
+          kind: 'urssaf_vigilance',
+          issuedOn: '2026-03-02',
+          validUntil: null,
+          storageKey: `contractors/${member(kofi)}/vigilance-2026.pdf`,
+          sha256: HASH,
+          retainUntil: new Date('2026-04-01T00:00:00Z'),
+          createdBy: kofi,
+        }),
+      );
+      // Not refused yet: never erased.
+      expect(
+        await failure(admin((tx) => tx.insert(s.contractorDocumentPurges).values({ documentId: unlocked }))),
+      ).toMatch(/only the file of a refused document/u);
+      await as(owner, (tx) =>
+        tx.insert(s.contractorDocumentReviews).values({
+          documentId: unlocked,
+          decision: 'refused',
+          reason: 'Ce n’est pas la bonne pièce.',
+          reviewedBy: owner,
+          retainUntil: null,
+        }),
+      );
+      // The application role reads erasures, never writes one, not even the owner.
+      expect(
+        await failure(
+          as(owner, (tx) => tx.insert(s.contractorDocumentPurges).values({ documentId: unlocked })),
+        ),
+      ).toMatch(/permission denied/u);
+      await admin((tx) => tx.insert(s.contractorDocumentPurges).values({ documentId: unlocked }));
+      expect(await as(kofi, (tx) => tx.select().from(s.contractorDocumentPurges))).toHaveLength(1);
+      expect(await as(manager, (tx) => tx.select().from(s.contractorDocumentPurges))).toHaveLength(1);
+      expect(await as(ama, (tx) => tx.select().from(s.contractorDocumentPurges))).toHaveLength(0);
+      expect(
+        await failure(admin((tx) => tx.update(s.contractorDocumentPurges).set({ purgedAt: new Date() }))),
+      ).toMatch(KEPT);
+      expect(await failure(admin((tx) => tx.delete(s.contractorDocumentPurges)))).toMatch(KEPT);
+    });
+
     it('a contract text is the next version and carries its SHA-256; the contractor accepts it himself, with it', async () => {
       const body = 'Mandat de facturation (texte inventé pour le test). Délai de contestation : sept jours.';
       const text = (values: Partial<typeof s.contractTexts.$inferInsert> = {}) => ({

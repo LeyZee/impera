@@ -580,6 +580,16 @@ export class ContractorDocumentReviewed extends DomainError {
   }
 }
 
+/**
+ * The file of a refused document was erased once its upload lock ended (lot 5c-2, « ok purge a »): its row, its reason
+ * and its fingerprint stay, its bytes are gone for good.
+ */
+export class ContractorDocumentFileGone extends DomainError {
+  constructor() {
+    super('contractor_document_file_gone', 'Le fichier de cette pièce refusée a été effacé');
+  }
+}
+
 /** The bucket did not give the document's file with its fingerprint: an altered file is never served (lot 5c). */
 export class ContractorDocumentUnavailable extends DomainError {
   constructor() {

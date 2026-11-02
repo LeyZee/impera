@@ -10,6 +10,7 @@ import type {
 
 import { documentExtension, documentMediaTypeOf } from '../domain/documents';
 import {
+  ContractorDocumentFileGone,
   ContractorDocumentIdConflict,
   ContractorDocumentNotFound,
   ContractorDocumentUnavailable,
@@ -19,6 +20,7 @@ import type {
   Actor,
   InvoiceObjectStore,
   JobLogger,
+  PayrollDocumentPurgeStore,
   PayrollDocumentReminderStore,
   PayrollDocumentStore,
 } from '../domain/ports';
@@ -104,6 +106,8 @@ async function downloadContractorDocument(
   const found = await deps.store.documentFor(userId, memberId, documentId);
   if (found === null) throw new ContractorDocumentNotFound();
   const { document, file } = found;
+  // Erased once refused and unlocked (« ok purge a »): said so, never taken for a bucket that lost it.
+  if (document.purgedAt !== null) throw new ContractorDocumentFileGone();
   const served = (bytes: Uint8Array): DownloadedDocument => ({
     fileName: `${document.kind}-${document.issuedOn}.${documentExtension(file.mediaType)}`,
     mediaType: file.mediaType,
@@ -236,4 +240,66 @@ export function createContractorDocuments(deps: ContractorDocumentDeps): Contrac
  */
 export function remindDocuments(store: PayrollDocumentReminderStore): Promise<number> {
   return store.remindUnscoped();
+}
+
+/** What a night of `payroll.purge_refused_documents` did. */
+export interface PurgeOutcome {
+  /** Erasures recorded: files erased, or already absent from the bucket. */
+  readonly purged: number;
+  /** Files left for a later night: a lock the bucket still names, a bucket that did not answer, another file. */
+  readonly skipped: number;
+}
+
+/**
+ * `payroll.purge_refused_documents`, each night (EQ-06 lot 5c-2, « ok purge a » de Charles, 01/11): each refused
+ * document whose upload lock has ended has its file erased from the first bucket, every version by its id, once the
+ * bucket shows it is the file of the row and its lock has ended; then, and only then, the erasure is recorded. A run
+ * stopped between the two finds the file absent and records it. The second bucket is never written: a refused
+ * document is never copied there, and one found there fails the run, nothing erased from it.
+ */
+export async function purgeRefusedDocuments(
+  deps: {
+    readonly store: PayrollDocumentPurgeStore;
+    readonly primary: InvoiceObjectStore;
+    readonly copy: InvoiceObjectStore;
+  },
+  logger: JobLogger,
+): Promise<PurgeOutcome> {
+  let purged = 0;
+  let skipped = 0;
+  const copied: string[] = [];
+  for (const file of await deps.store.dueUnscoped()) {
+    const context = { documentId: file.documentId, memberId: file.memberId };
+    try {
+      if (await deps.copy.holdsVersion(file.key)) {
+        copied.push(file.documentId);
+        logger.error(context, 'contractor document purge: a refused document has a copy, nothing erased');
+        continue;
+      }
+      const outcome = await deps.primary.remove(file.key, file.sha256);
+      if (outcome === 'removed' || outcome === 'absent') {
+        if (await deps.store.recordUnscoped(file, outcome)) purged += 1;
+        continue;
+      }
+      skipped += 1;
+      if (outcome === 'locked') {
+        logger.warn(
+          context,
+          'contractor document purge: the bucket names a lock that holds, tried again later',
+        );
+      } else {
+        logger.error(context, 'contractor document purge: the bucket holds another file, nothing erased');
+      }
+    } catch (error) {
+      if (!(error instanceof InvoiceStorageUnavailable)) throw error;
+      skipped += 1;
+      logger.warn({ ...context, error: error.message }, 'contractor document purge: a bucket did not answer');
+    }
+  }
+  if (copied.length > 0) {
+    throw new Error(
+      `contractor document purge: ${String(copied.length)} refused document(s) found in the second bucket`,
+    );
+  }
+  return { purged, skipped };
 }

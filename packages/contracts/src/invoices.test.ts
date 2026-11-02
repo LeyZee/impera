@@ -86,7 +86,7 @@ const invoice = {
 describe('invoices', () => {
   it('give every error code a suffix that sets its status (api.md)', () => {
     for (const code of INVOICE_ERROR_CODES) {
-      expect(code).toMatch(/_(not_found|invalid|conflict|unprocessable|forbidden|unavailable)$/u);
+      expect(code).toMatch(/_(not_found|invalid|conflict|gone|unprocessable|forbidden|unavailable)$/u);
     }
   });
 

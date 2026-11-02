@@ -449,6 +449,28 @@ export const contractorDocumentReviews = pgTable(
 );
 
 /**
+ * The erasure of a refused document's file (EQ-06 lot 5c-2, « ok purge a » de Charles, 01/11): once its lock of the
+ * upload has ended, `payroll.purge_refused_documents` erases the file from the bucket, and this row says when. The
+ * document's row and its check stay (its dates, its reason, its fingerprint): only the bytes go. Written by the jobs
+ * alone (no INSERT for the application role), added only, and only for a refused document (the migration's trigger).
+ */
+export const contractorDocumentPurges = pgTable(
+  'contractor_document_purges',
+  {
+    documentId: uuid('document_id')
+      .primaryKey()
+      .references(() => contractorDocuments.id),
+    purgedAt: timestampTz('purged_at').notNull().defaultNow(),
+  },
+  (t) => {
+    const documentMember = sql`(select d.member_id from contractor_documents d where d.id = ${t.documentId})`;
+    return [
+      pgPolicy('member_read', { for: 'select', using: sql`${readsTeam} or ${isMine(documentMember)}` }),
+    ];
+  },
+);
+
+/**
  * A version of the service contract or of the billing mandate: the agency's text as its accountant validated it,
  * never written by a session. Each version is the next of its kind; the mandate fixes the delay to contest. Its
  * SHA-256 is the base's (the migration's trigger), so an acceptance proves the exact text.
