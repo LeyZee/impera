@@ -26,7 +26,8 @@ La lecture d'Imperium du 02/11 (hors dépôt, fonctions seulement) a montré un 
 - **Le propriétaire et un manager actif** : tout le planning, comme aujourd'hui, plus la charge de chaque membre (ses heures planifiées dans la semaine).
 - **Un chatteur actif** voit le planning de **toute l'équipe**, en lecture, en semaine et en mois : pour chaque shift, le nom dans l'équipe du membre, sa couleur, la créatrice et le créneau. Rien d'autre : ni congé, ni taux, ni pays, ni statut, ni rapport, ni charge. Un collègue en congé n'a simplement pas de shift. Un membre suspendu ou absent garde son accès restreint (ADR 0023) et ne voit que ses propres shifts.
 - **La créatrice** voit les shifts **de ses comptes**, en lecture, en semaine et en mois, avec le nom dans l'équipe du chatteur et le créneau, dans son Agenda (ADR 0042 § 4), en une couche qu'elle peut masquer. Rien des autres créatrices, rien de l'équipe au-delà.
-- **En base** : ces lectures passent par une vue étroite (membre, nom dans l'équipe, couleur, créatrice, début, fin), lue sous `withMember` pour un membre actif et sous le chemin de la créatrice de l'ADR 0042 § 2 pour elle. La politique `member_read` de `shifts` et l'accès à `team_members` ne changent pas. Un test d'intégration RLS prouve chaque frontière : le chatteur ne lit ni congé ni taux d'un collègue, la créatrice ne lit que ses comptes, un membre restreint ne lit que les siens.
+- **En base** : une vue ordinaire ne convient pas (avec `security_invoker`, elle garde `member_read` ; sans, elle contourne toute RLS, isolation par créatrice comprise). Ces lectures passent donc par une **fonction SQL `SECURITY DEFINER`** (`STABLE`, `search_path` fixé, exécutable par le seul rôle applicatif) qui rend six colonnes (membre, nom dans l'équipe, couleur, créatrice, début, fin) sur une **fenêtre bornée à 6 semaines**, et applique elle-même la frontière : propriétaire ou scope `agency`, tout ; chatteur dont la ligne `team_members` est `active`, toute l'équipe, sinon ses seuls shifts ; créatrice, le seul `app.creator_id` posé par le chemin de l'ADR 0042 § 2 ; tout autre appel, rien. La politique `member_read` de `shifts` et l'accès à `team_members` ne changent pas.
+- **Cas limites** : un créneau à pourvoir n'a pas de membre et s'affiche sans nom ; le shift passé d'un membre parti garde son nom dans l'historique (§ 6) ; la fonction ne joint jamais `leave_requests`. Un test d'intégration RLS couvre chaque frontière : propriétaire, manager, chatteur actif, chatteur suspendu ou absent, créatrice, compte inconnu ; le chatteur ne lit ni congé ni taux d'un collègue, la créatrice ne lit que ses comptes.
 
 ### 2. Les vues
 
@@ -49,19 +50,20 @@ Réservé au propriétaire et à un manager actif. Chaque écriture passe par le
 ### 4. Prévenir
 
 - Les rappels passent par les notifications de l'application installée (Web Push, EQ-12, ADR 0042 § 7), **jamais par Telegram**.
-- Un membre est prévenu de chaque shift qui lui est posé, déplacé ou retiré ; un ajout en masse fait une seule notification qui résume. Il reçoit un rappel avant chacun de ses shifts, au délai qu'il choisit dans Moi (2 h par défaut, ou aucun).
+- Un membre est prévenu de chaque shift qui lui est posé, déplacé ou retiré ; un ajout en masse fait une seule notification qui résume. Pour un déplacement, la notification part à la fin des 5 secondes d'annulation, et seulement si le déplacement tient. Il reçoit un rappel avant chacun de ses shifts, au délai qu'il choisit dans Moi (2 h par défaut, ou aucun).
 - La créatrice choisit dans Moi si elle veut être prévenue des shifts de ses comptes ; par défaut, non.
 - Chaque envoi passe par le registre d'EQ-12 (une seule fois par membre, objet et motif) et respecte les heures calmes de chacun.
 
 ### 5. Le calendrier dans le téléphone
 
 - Chaque membre a un lien iCal secret, révocable, en lecture seule, de **ses propres shifts** ; la créatrice peut ajouter les shifts de ses comptes à son lien de l'ADR 0042 § 4. Le lien ne porte que le créneau, la créatrice et le nom dans l'équipe : jamais de donnée de fan ni de montant.
+- Ce lien et celui de l'ADR 0042 § 4 partagent une seule table : jeton gardé haché (SHA-256) et comparé en temps constant ; route sans session, limitée en débit, réponse `Cache-Control: private, no-store` ; le serveur retrouve le membre par le jeton et lit par la fonction du § 1 avec ses droits, donc un membre restreint n'y garde que ses propres shifts. Le départ (§ 6) révoque le lien.
 - Pas d'export PDF ni CSV du planning.
 
 ### 6. La fiche du chatteur et son départ
 
 - « Modifier » gagne le nom, l'e-mail, le pays et le fuseau ; le rôle change à une date (un 1er ou un 16, jamais avant aujourd'hui), comme le taux ; la fiche montre l'historique des taux et des rôles. Pas de photo : initiales et couleur. Pas de statut « malade » ni « en déplacement » : ce sont des congés (ADR 0031).
-- **Un membre n'est jamais effacé** : ses relevés et ses factures sont gardés dix ans (ADR 0037). Le parcours « Faire partir » (EQ-14) date sa fin, libère ses shifts d'après en « à pourvoir », arrête ses modèles, coupe ses sessions et demande de cocher « Accès Reveal retiré ». Il disparaît alors du planning à venir et des listes, et reste lisible dans l'historique.
+- **Un membre n'est jamais effacé** : ses relevés et ses factures sont gardés dix ans (ADR 0037). Le parcours « Faire partir » (EQ-14) date sa fin, libère ses shifts d'après en « à pourvoir », arrête ses modèles, coupe ses sessions, révoque son lien iCal et demande de cocher « Accès Reveal retiré ». Il disparaît alors du planning à venir et des listes, et reste lisible dans l'historique.
 
 ### 7. Finition
 
