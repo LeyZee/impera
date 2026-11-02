@@ -1,6 +1,6 @@
 # 0041. Factures : l'attestation de résidence fiscale conditionne le versement, pas la facture
 
-Statut : accepted (Charles, 02/11/2026 00h49, « ok 0041 »)
+Statut : accepted (Charles, 02/11/2026 00h49, « ok 0041 » ; les précisions de Bilan aux points 1, 4 et 6 acceptées à 01h10, « Ok 0041 »)
 Date : 2026-11-02
 Remplace : dans l'ADR 0023 § Factures, au point « Retenue à la source », la phrase « Le dossier prestataire garde l'attestation de résidence fiscale datée ; manquante ou de plus d'un an, la validation affiche un avertissement ». Remplace aussi deux décisions de Charles du 01/11 appliquées par le lot 5c (#355) sans ADR : le choix (a) « sans attestation, pas de facture » et « ok année civile » (l'attestation couvre les quinzaines de son année). L'ADR 0023 reste telle quelle ; l'index des ADR renvoie d'elle à celle-ci.
 
