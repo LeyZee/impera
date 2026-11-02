@@ -1,21 +1,30 @@
-import { JOB_MAX_ATTEMPTS, JOB_PAYLOADS } from '@nirvana/contracts';
+import { JOB_PAYLOADS } from '@nirvana/contracts';
 
 import { defineTask } from '../jobs';
+import { enqueuePayoutCertificateLock } from '../modules/contractors';
+import { invoicesAfterValidation, payoutGate } from '../modules/invoicing';
 import { createPayrollModule, type PayrollModule } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { TeamModule } from '../modules/team';
 
-import type { InvoiceBuckets, ContractorJob } from './contractors';
+import type { ContractorJob } from './contractors';
+import type { InvoicingJob } from './invoicing';
 import type { JobWithTask, Routes, Shared, TasksNamed } from './shared';
 
 export interface WiredPayroll {
   readonly module: PayrollModule;
-  readonly tasks: TasksNamed<Exclude<Extract<JobWithTask, `payroll.${string}`>, ContractorJob>>;
+  readonly tasks: TasksNamed<
+    Exclude<Extract<JobWithTask, `payroll.${string}`>, ContractorJob | InvoicingJob>
+  >;
   readonly routes: readonly Routes[];
 }
 
-/** Pay reads the planning's reports and the team's rates in its own transaction, through their `index.ts` (EQ-04). */
+/**
+ * Pay reads the planning's reports and the team's rates in its own transaction, through their `index.ts` (EQ-04). It
+ * asks the invoices whether a transfer may go, and enqueues their jobs and the contractors' certificate lock, through
+ * the ports plugged here (ADR 0047 § 1): pay never imports `invoicing`.
+ */
 export function wirePayroll(
   shared: Shared,
   deps: {
@@ -24,14 +33,7 @@ export function wirePayroll(
     readonly team: TeamModule;
     /** When the rate job was first scheduled, in production only (ADR 0033): `composition-root.ts`. */
     readonly rateJobSince: (() => Promise<Date | null>) | null;
-    /** The invoices' fonts: the path depends on where the bundle runs, so `composition-root.ts` gives it. */
-    readonly invoiceFontsDir: string;
-    /** The invoices' two buckets, which `wireContractors` builds and the contractors' documents share. */
-    readonly invoiceBuckets: InvoiceBuckets;
-    /**
-     * Tests set pay's clock here, to issue a document whose delay to answer is already over (EQ-06 lot 6); the
-     * system's otherwise. The database keeps its own: every step of an acceptance is checked on `now()`.
-     */
+    /** Tests set pay's clock here, the one `wireInvoicing` gets too; the system's otherwise. */
     readonly now?: () => Date;
   },
 ): WiredPayroll {
@@ -49,7 +51,8 @@ export function wirePayroll(
       creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
     },
     rateJobSince: deps.rateJobSince,
-    invoicePdfs: { fontsDir: deps.invoiceFontsDir, ...deps.invoiceBuckets },
+    payouts: payoutGate,
+    afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
     ...(deps.now !== undefined && { now: deps.now }),
   });
   return {
@@ -86,114 +89,6 @@ export function wirePayroll(
             { outcome: await module.jobs.fetchExchangeRates(context.logger) },
             'payroll: exchange rates read',
           );
-        },
-      ),
-      'payroll.issue_invoices': defineTask(
-        'payroll.issue_invoices',
-        JOB_PAYLOADS['payroll.issue_invoices'],
-        logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.issueInvoices(payload.statementId, context.logger);
-          context.logger.info(
-            outcome.kind === 'planned'
-              ? {
-                  statementId: payload.statementId,
-                  issued: outcome.issued,
-                  notIssued: outcome.notIssued.length,
-                }
-              : { statementId: payload.statementId, outcome: outcome.kind },
-            'payroll: invoices issued',
-          );
-        },
-      ),
-      'payroll.requeue_invoice_issues': defineTask(
-        'payroll.requeue_invoice_issues',
-        JOB_PAYLOADS['payroll.requeue_invoice_issues'],
-        logger,
-        async (payload, context) => {
-          const enqueued = await module.jobs.requeueInvoiceIssues(payload.memberId);
-          context.logger.info(
-            { memberId: payload.memberId, enqueued },
-            'payroll: waiting invoices tried again',
-          );
-        },
-      ),
-      'payroll.render_invoice_pdf': defineTask(
-        'payroll.render_invoice_pdf',
-        JOB_PAYLOADS['payroll.render_invoice_pdf'],
-        logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.renderInvoicePdf(
-            payload.invoiceId,
-            { current: context.attempt, max: JOB_MAX_ATTEMPTS['payroll.render_invoice_pdf'] },
-            context.logger,
-          );
-          context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice PDF rendered');
-        },
-      ),
-      'payroll.mirror_invoice_pdf': defineTask(
-        'payroll.mirror_invoice_pdf',
-        JOB_PAYLOADS['payroll.mirror_invoice_pdf'],
-        logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.mirrorInvoicePdf(
-            payload.invoiceId,
-            { current: context.attempt, max: JOB_MAX_ATTEMPTS['payroll.mirror_invoice_pdf'] },
-            context.logger,
-          );
-          context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice PDF copied');
-        },
-      ),
-      'payroll.lapse_invoice': defineTask(
-        'payroll.lapse_invoice',
-        JOB_PAYLOADS['payroll.lapse_invoice'],
-        logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.lapseInvoice(payload.invoiceId, context.logger);
-          context.logger.info({ invoiceId: payload.invoiceId, outcome }, 'payroll: invoice lapse checked');
-        },
-      ),
-      'payroll.announce_invoice_contest': defineTask(
-        'payroll.announce_invoice_contest',
-        JOB_PAYLOADS['payroll.announce_invoice_contest'],
-        logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.announceInvoiceContest(payload.invoiceId, context.logger);
-          context.logger.info(
-            { invoiceId: payload.invoiceId, outcome },
-            'payroll: invoice contest announced',
-          );
-        },
-      ),
-      'payroll.sweep_invoice_acceptance': defineTask(
-        'payroll.sweep_invoice_acceptance',
-        JOB_PAYLOADS['payroll.sweep_invoice_acceptance'],
-        logger,
-        async (_payload, context) => {
-          context.logger.info(
-            { outcome: await module.jobs.sweepInvoiceAcceptance(context.logger) },
-            'payroll: invoice acceptance swept',
-          );
-        },
-      ),
-      'payroll.remind_due_invoices': defineTask(
-        'payroll.remind_due_invoices',
-        JOB_PAYLOADS['payroll.remind_due_invoices'],
-        logger,
-        async (_payload, context) => {
-          context.logger.info(
-            { said: await module.jobs.remindDueInvoices() },
-            'payroll: due invoices reminded',
-          );
-        },
-      ),
-      'payroll.settle_documents': defineTask(
-        'payroll.settle_documents',
-        JOB_PAYLOADS['payroll.settle_documents'],
-        logger,
-        async (payload, context) => {
-          const settled = await module.jobs.settleDocuments(payload.memberId);
-          context.logger.info({ memberId: payload.memberId, settled }, 'payroll: documents settled');
         },
       ),
     },

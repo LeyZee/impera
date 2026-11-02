@@ -34,13 +34,12 @@ import { z } from 'zod';
 import { PayrollForbidden } from '../../contractors/pure';
 import { redactAuthors } from '../domain/authors';
 import { PayPeriodCursorInvalid, PayrollEntriesTooMany } from '../domain/errors';
-import { payoutDecision } from '../domain/payouts';
 import { blockFor } from '../domain/period-blocks';
 import { lateNetOf } from '../domain/period-figures';
-import type { PayrollReadStore, StoredStatement } from '../domain/ports';
+import type { PayoutVerdict, PayrollReadStore, StoredStatement } from '../domain/ports';
 
-import { payoutFactsOf } from './payout-facts';
 import { blockOfRow } from './period-blocks';
+import type { PayoutGate } from './ports';
 import {
   adjustmentOfRow,
   bonusOfRow,
@@ -117,6 +116,7 @@ export function createDrizzlePayrollReadStore(
   adminDb: Database,
   reads: Pick<PayInputReads, 'agencyTimeZone'>,
   now: () => Date,
+  gate: PayoutGate,
 ): PayrollReadStore {
   return {
     // Every statement of the period at its current revision, read as the admin role: only two sums come out.
@@ -222,15 +222,18 @@ export function createDrizzlePayrollReadStore(
         const settings = await settingsFor(tx, period);
         // What would stop a transfer recorded today (ADR 0041 § 4): shown before the owner makes it.
         const toPay = statementRows.filter((row) => row.status === 'validated' && row.payableMinor > 0);
-        const payouts = await payoutFactsOf(
-          tx,
-          toPay.map((row) => row.memberId),
-        );
         const today = toPay.length === 0 ? null : calendarDayAt(now(), await reads.agencyTimeZone(tx));
+        const payouts =
+          today === null
+            ? new Map<string, PayoutVerdict>()
+            : await gate.verdicts(
+                tx,
+                toPay.map((row) => ({ memberId: row.memberId, statementId: row.id })),
+                today,
+              );
         const payoutBlockOf = (row: (typeof statementRows)[number]): PayoutBlock | null => {
-          const facts = payouts.get(row.memberId);
-          if (facts === undefined || today === null || !toPay.includes(row)) return null;
-          const payout = payoutDecision(facts, row.id, today);
+          const payout = payouts.get(row.id);
+          if (payout === undefined || !toPay.includes(row)) return null;
           return payout.kind === 'blocked' ? { reason: payout.reason, year: payout.year } : null;
         };
 

@@ -1,5 +1,3 @@
-import type { PayoutBlockReason } from '@nirvana/contracts';
-
 import {
   regimeOn,
   taxResidenceOf,
@@ -8,6 +6,7 @@ import {
   type ContractorDocument,
   type RegimeAssignment,
 } from '../../contractors/pure';
+import type { PayoutHold } from '../../payroll/pure';
 
 import {
   settledByTransfer,
@@ -54,11 +53,6 @@ export type PayoutDecision<T extends PayoutDocument> =
   /** The certificate of the transfer's year the owner accepted: the newest, which the record keeps. */
   | { readonly kind: 'covered'; readonly certificate: T }
   | ({ readonly kind: 'blocked' } & PayoutHold);
-
-/** Why a transfer waits: its documents, or the certificate of a year. */
-export type PayoutHold =
-  | { readonly reason: 'documents_not_issued'; readonly year: null }
-  | { readonly reason: Exclude<PayoutBlockReason, 'documents_not_issued'>; readonly year: string };
 
 /**
  * Whether the documents a transfer for `statementId` pays are all issued: those of the statement and of the statements

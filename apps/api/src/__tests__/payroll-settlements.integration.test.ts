@@ -11,7 +11,7 @@ import { and, eq, inArray, schema, sql } from '@nirvana/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';
-import { inventedLogo } from '../modules/payroll/infra/__tests__/invented-logo';
+import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -33,14 +33,17 @@ describe('Équipe › Factures : le rapprochement des versements (EQ-06 lot 7a, 
 
   const db = () => team.test.admin.db;
   const settle = (memberId: TeamMember['id'] | null) =>
-    team.app.modules.payroll.jobs.settleDocuments(memberId);
+    team.app.modules.invoicing.jobs.settleDocuments(memberId);
 
   /** The statement of a period, validated, with its documents issued. */
   const close = async (period: PayPeriod) => {
     await team.recalculate(period);
     expect((await team.validate(team.owner, theo, period)).statusCode).toBe(200);
     const statement = await team.statementOf(theo, period);
-    await team.app.modules.payroll.jobs.issueInvoices(CommissionStatementIdSchema.parse(statement.id), quiet);
+    await team.app.modules.invoicing.jobs.issueInvoices(
+      CommissionStatementIdSchema.parse(statement.id),
+      quiet,
+    );
     return team.statementOf(theo, period);
   };
 
