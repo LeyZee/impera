@@ -1,5 +1,5 @@
 # EQ-09 PWA de la créatrice : routine, revenus, qui est en poste
-Statut : todo (lot 5 de l'ADR 0023, phase 5 de la roadmap, ID validé par Charles le 27/10/2026 ; second temps : l'espace des créatrices passe après celui des chatteurs, Charles, 27/10)
+Statut : done (remplacée le 02/11/2026 par les fiches CR-01 à CR-07, après les ADR 0042 à 0044 acceptées par Charles ; rien n'est plus à faire ici, voir la note de session) (lot 5 de l'ADR 0023, ID validé par Charles le 27/10/2026)
 Phase : 5
 Dépend de : EQ-01, EQ-02, EQ-04, ADR 0024
 Branche : task/eq-09-creator-app
@@ -26,3 +26,4 @@ Donner à chaque créatrice une application installable sur son téléphone : sa
 Projets de la créatrice, liens et trafic, ventes Telegram Stars, gamification au-delà de la série.
 
 ## Notes de session
+- 2026-11-02 (fil des espaces) : l'ADR 0042 refait l'espace de la créatrice et la fiche est remplacée : socle installable, Web Push, heures calmes et clés d'accès dans CR-01 (clés VAPID créées par le serveur et chiffrées en base, plus en configuration) ; accès et lecture de son compte dans CR-02 ; revenus au jour le jour dans CR-04 ; routine, série, tâches de l'agence et personnelles (module `creator-tasks`) dans CR-05 ; « qui est en poste » dans CR-12 ; topo de la semaine dans CR-07. Les factures de la créatrice ne sont plus dans son espace (ADR 0042 § 6). Aucun code n'avait été écrit pour cette fiche.
