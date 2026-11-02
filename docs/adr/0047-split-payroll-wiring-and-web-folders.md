@@ -1,6 +1,6 @@
 # 0047. Ranger le code qui a grossi : la paie en quatre modules, l'argent calculé par le seul serveur, l'assemblage par module, le dashboard par domaine
 
-Statut : proposed (demande de Charles, 02/11/2026 17h25, fil « Visualiser l'architecture avec floorplan », après la lecture de la carte d'architecture du même jour)
+Statut : accepted (Charles, 02/11/2026 17h29, « ok 0047 », après la relecture de Bilan intégrée ; demande du même jour à 17h25, fil « Visualiser l'architecture avec floorplan », après la lecture de la carte d'architecture)
 Date : 2026-11-02
 Précise : l'ADR 0002 (modules et frontières) pour le découpage de `payroll` ; ne change aucune règle de paie, de facture ou de droit d'accès.
 

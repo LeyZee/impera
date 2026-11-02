@@ -1,5 +1,5 @@
-# 2026-11-02 — ADR 0047 : ranger la paie, l'argent du dashboard, l'assemblage et les dossiers du web — proposed
+# 2026-11-02 — ADR 0047 : ranger la paie, l'argent du dashboard, l'assemblage et les dossiers du web — accepted
 Fait : ADR 0047 proposée après la carte d'architecture du 02/11 (Floorplan, hors dépôt) et la demande de Charles de 17h25 : `payroll` découpé en `payroll`, `invoicing`, `contractors`, `accounting` sans migration ni renommage de job ; `summary` et prévision de quinzaine rendus par le serveur, plus aucune somme d'argent dans `apps/web` ; `composition-root.ts` découpé en `wiring/<module>.ts` ; `apps/web/src` rangé par entrée du rail, `screens/` supprimé. Ordre des quatre PR et relecteurs fixés dans l'ADR.
 Décisions : le seul lien de `payroll` vers les factures (versement bloqué, ADR 0041 et #363) passe par un port `PayoutGate` ; les noms de jobs `payroll.*` restent pour ne pas perdre les tâches en file.
-Pas fait : le code, qui attend « ok 0047 ».
+Pas fait : le code, en quatre PR selon l’ordre de l’ADR (acceptée par « ok 0047 », 17h29).
 Découvertes : les pages de plus de 1 000 lignes (PeriodPage, ReportsPage, PlanningPage, TelegramSection, persona) sont à découper par le fil qui les retouche.
