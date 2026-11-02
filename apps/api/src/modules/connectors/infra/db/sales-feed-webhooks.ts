@@ -51,6 +51,7 @@ export function createSalesFeedWebhookStore(
       secret,
       createdAt: row.createdAt,
       lastDeliveryAt: row.lastDeliveryAt,
+      lastRejectedAt: row.lastRejectedAt,
     };
   }
 
@@ -70,6 +71,7 @@ export function createSalesFeedWebhookStore(
         keyVersion: keyVersionOf(sealed),
         url,
         lastDeliveryAt: null,
+        lastRejectedAt: null,
         createdAt: at,
       };
       await withAdmin(adminDb, async (tx) => {
@@ -117,6 +119,12 @@ export function createSalesFeedWebhookStore(
         await tx.update(webhooks).set({ lastDeliveryAt: at }).where(eq(webhooks.platform, platform));
         return inserted.length === 0 ? 'duplicate' : 'new';
       });
+    },
+
+    async reject(platform, at) {
+      await withAdmin(adminDb, (tx) =>
+        tx.update(webhooks).set({ lastRejectedAt: at }).where(eq(webhooks.platform, platform)),
+      );
     },
 
     async prune(before) {

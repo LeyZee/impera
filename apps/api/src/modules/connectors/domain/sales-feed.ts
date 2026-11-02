@@ -271,6 +271,7 @@ export interface StoredWebhook {
   readonly secret: string | null;
   readonly createdAt: Date;
   readonly lastDeliveryAt: Date | null;
+  readonly lastRejectedAt: Date | null;
 }
 
 /** `sales_feed_webhooks` and its inbox `sales_feed_deliveries`, through the admin role only. */
@@ -286,6 +287,8 @@ export interface SalesFeedWebhookStore {
     delivery: { readonly deliveryId: string; readonly event: string; readonly position: string },
     at: Date,
   ): Promise<'new' | 'duplicate'>;
+  /** A delivery refused: its hour only, for the Réglages line. */
+  reject(platform: Platform, at: Date): Promise<void>;
   /** Forgets the deliveries received before `before`: the cursor, not the inbox, says what was read. */
   prune(before: Date): Promise<number>;
 }

@@ -2,6 +2,7 @@ import {
   CreatorIdSchema,
   newId,
   PlatformAccountIdSchema,
+  SalesFeedListSchema,
   SalesFeedOverviewSchema,
   type CreatorId,
   type PlatformAccountId,
@@ -412,6 +413,11 @@ describe('sales feed (CRM-01)', () => {
     expect(tampered.statusCode).toBe(401);
     expect(await inbox()).toBe(0);
     expect(await readJobs()).toBe(0);
+    const refused = await api('GET', '/v1/settings/sales-feeds');
+    // The owner sees refusals (their hour only): the one case where re-registering the webhook is needed.
+    const refusedHook = SalesFeedListSchema.parse(refused.json()).feeds[0]?.webhook;
+    expect(refusedHook?.lastDeliveryAt).toBeNull();
+    expect(refusedHook?.lastRejectedAt).not.toBeNull();
 
     expect((await deliver(signed)).statusCode).toBe(204);
     // Reveal sends it again (no answer in time): taken, nothing more.
@@ -444,8 +450,10 @@ describe('sales feed (CRM-01)', () => {
     expect(removed.json()).toMatchObject({ webhook: null });
     expect(crm.webhooks.size).toBe(0);
     expect((await deliver(late)).statusCode).toBe(404);
-    // Registered again for the rest of the file.
-    expect((await api('PUT', '/v1/settings/sales-feeds/reveal/webhook')).statusCode).toBe(200);
+    // Registered again for the rest of the file: a new secret, no refusal yet.
+    const again = await api('PUT', '/v1/settings/sales-feeds/reveal/webhook');
+    expect(again.statusCode).toBe(200);
+    expect(again.json()).toMatchObject({ webhook: { lastRejectedAt: null } });
   });
 
   it('waits out a 429 and stops on a revoked key until it is connected again', async () => {

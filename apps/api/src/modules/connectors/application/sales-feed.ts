@@ -139,6 +139,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
           : {
               createdAt: webhook.createdAt.toISOString(),
               lastDeliveryAt: webhook.lastDeliveryAt?.toISOString() ?? null,
+              lastRejectedAt: webhook.lastRejectedAt?.toISOString() ?? null,
             },
     };
   }
@@ -391,16 +392,18 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       const factory = factoryOf(platform);
       const stored = await deps.webhooks?.find(platform);
       if (stored == null) throw new SalesFeedWebhookNotFound();
+      const now = clock.now();
       if (stored.secret === null) {
+        await webhooksOrThrow().reject(platform, now);
         logger.warn(
           { platform },
           'sales feed delivery refused: no listed encryption key opens the webhook secret',
         );
         throw new SalesFeedDeliveryRefused();
       }
-      const now = clock.now();
       const delivery = factory.readDelivery({ rawBody, headers, secret: stored.secret, now });
       if (!delivery.ok) {
+        await webhooksOrThrow().reject(platform, now);
         // The reason only: never the body, which carries a fan's pseudo.
         logger.warn({ platform, reason: delivery.reason }, 'sales feed delivery refused');
         throw new SalesFeedDeliveryRefused();

@@ -78,6 +78,8 @@ export const salesFeedWebhooks = pgTable(
     /** The address given to the platform, as it was given. */
     url: text('url').notNull(),
     lastDeliveryAt: timestampTz('last_delivery_at'),
+    /** The last delivery refused (signature, time, shape): the hour only, nothing of its body. */
+    lastRejectedAt: timestampTz('last_rejected_at'),
     createdAt: createdAt(),
   },
   (t) => [enumCheck('sales_feed_webhooks', t.platform, PlatformSchema.options)],

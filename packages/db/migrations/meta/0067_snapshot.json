@@ -8329,6 +8329,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "last_rejected_at": {
+          "name": "last_rejected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",

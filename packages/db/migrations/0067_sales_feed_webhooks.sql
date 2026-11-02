@@ -19,6 +19,7 @@ CREATE TABLE "sales_feed_webhooks" (
 	"key_version" text NOT NULL,
 	"url" text NOT NULL,
 	"last_delivery_at" timestamp with time zone,
+	"last_rejected_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "sales_feed_webhooks_platform_check" CHECK ("sales_feed_webhooks"."platform" in ('reveal', 'onlyfans', 'instagram', 'nirvana'))
 );
