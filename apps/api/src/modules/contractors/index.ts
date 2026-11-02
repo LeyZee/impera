@@ -36,7 +36,7 @@ export { enqueuePayoutCertificateLock } from './infra/queue';
 export type { InvoiceRequeue } from './infra/ports';
 /**
  * How a row of this module's tables reads, for the pay stores that still read them directly to issue and render an
- * invoice. They go when those reads go through a read port of this module (ARC-05).
+ * invoice. They go when those reads go through a read port of this module (ARC-07).
  */
 export { reviewOf } from './infra/document-rows';
 export { regimeVatOf } from './infra/regime-store';

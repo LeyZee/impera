@@ -1,7 +1,4 @@
 import {
-  ACCOUNTING_ARCHIVE_MEDIA_TYPE,
-  AccountingPeriodQuerySchema,
-  AccountingJournalSchema,
   BonusIdSchema,
   BonusSchema,
   BonusTierSetSchema,
@@ -14,8 +11,6 @@ import {
   CreateCollectiveGoalBodySchema,
   CreatePayAdjustmentBodySchema,
   CreatePenaltyBodySchema,
-  Das2ExportSchema,
-  Das2QuerySchema,
   DomainError,
   ExchangeRatesSchema,
   InvoiceAcceptanceViewSchema,
@@ -48,7 +43,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { Actor, JobLogger } from '../../contractors/pure';
-import type { PayrollAccounting } from '../application/accounting';
 import type { PayrollEntries } from '../application/entries';
 import type { PayrollInvoiceAcceptance } from '../application/invoice-acceptance';
 import type { DownloadedPdf } from '../application/invoice-pdfs';
@@ -86,10 +80,8 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
  * and values gives back what was recorded (200). A document is answered by its contractor only, and its contest refused
  * or upheld with its correction by the owner only (ADR 0039); the same answer sent again gives back what was recorded
  * (200). The contractors' file (`/payroll/billing-settings`, `/payroll/contractors/…`, `/payroll/contract-texts`,
- * `/payroll/billing-regimes`) is the `contractors` module's (ADR 0047 § 1). The accountant's export
- * (`/payroll/accounting/journal`, lot 7b), its accounts (`/payroll/billing-settings/accounts`), the DAS2 recap
- * (`/payroll/accounting/das2`, lot 7c) and the archive of the PDFs (`/payroll/accounting/archive`, lot 7d) are the
- * owner's alone. The list of invoices and credit notes (`/payroll/invoices`, lot 8) follows the invoices' policy: one's
+ * `/payroll/billing-regimes`) is the `contractors` module's (ADR 0047 § 1). The accountant's exports
+ * (`/payroll/accounting/…`) are the `accounting` module's. The list of invoices and credit notes (`/payroll/invoices`, lot 8) follows the invoices' policy: one's
  * own for a contractor, all of them for the owner and an active manager, always within a bound.
  */
 export function createPayrollRoutes(
@@ -99,11 +91,9 @@ export function createPayrollRoutes(
   rules: PayrollRuleStore,
   downloadPdf: InvoicePdfDownload,
   acceptance: PayrollInvoiceAcceptance,
-  accounting: PayrollAccounting,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
-  const owner = requireRole('owner');
   return (app) => {
     app.get(
       '/payroll/invoices',
@@ -357,47 +347,6 @@ export function createPayrollRoutes(
       '/payroll/exchange-rates',
       { preValidation: ownerOrMember, schema: { response: { 200: ExchangeRatesSchema } } },
       (request) => reads.exchangeRates(userOf(request)),
-    );
-
-    app.get(
-      '/payroll/accounting/journal',
-      {
-        preValidation: owner,
-        schema: { querystring: AccountingPeriodQuerySchema, response: { 200: AccountingJournalSchema } },
-      },
-      async (request, reply) => {
-        const journal = await accounting.journal(actorOf(request), request.query);
-        // The contractors' names are in it: never kept by a cache.
-        return reply.header('cache-control', 'no-store').send(journal);
-      },
-    );
-
-    app.get(
-      '/payroll/accounting/das2',
-      {
-        preValidation: owner,
-        schema: { querystring: Das2QuerySchema, response: { 200: Das2ExportSchema } },
-      },
-      async (request, reply) => {
-        const recap = await accounting.das2(actorOf(request), request.query);
-        // The contractors' names and addresses are in it: never kept by a cache.
-        return reply.header('cache-control', 'no-store').send(recap);
-      },
-    );
-
-    app.get(
-      '/payroll/accounting/archive',
-      { preValidation: owner, schema: { querystring: AccountingPeriodQuerySchema } },
-      async (request, reply) => {
-        const archive = await accounting.archive(actorOf(request), request.query, request.log);
-        // Streamed as it is zipped; the PDFs name the contractors: never kept by a cache.
-        return reply
-          .header('content-type', ACCOUNTING_ARCHIVE_MEDIA_TYPE)
-          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
-          .header('cache-control', 'no-store')
-          .header('x-content-type-options', 'nosniff')
-          .send(archive.stream);
-      },
     );
 
     return Promise.resolve();
