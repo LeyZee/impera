@@ -53,6 +53,11 @@ export const session = pgTable('session', {
    * adding a passkey reads it, so a key never adds another key (ADR 0053 § 2).
    */
   codeConfirmedAt: tz('code_confirmed_at'),
+  /**
+   * The passkey whose gesture gave `reauthenticated_at`, `null` after the password and the code: removing that very key
+   * asks for another one, or the password and the code (ADR 0053 § 5, « un geste sur une autre clé »).
+   */
+  confirmedPasskeyId: text('confirmed_passkey_id'),
 });
 
 export const account = pgTable('account', {

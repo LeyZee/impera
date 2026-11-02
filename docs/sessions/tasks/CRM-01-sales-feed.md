@@ -1,6 +1,6 @@
 # CRM-01 Connecter la clé Reveal et lire les ventes
 
-Statut : in-progress (lecture par curseur faite, PR 1 ; webhooks et écran Réglages restent)
+Statut : in-progress (lecture par curseur, PR 1 ; webhooks, PR 2 ; l'écran Réglages reste)
 Phase : API CRM (ADR 0050)
 Dépend de : ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement
 Branche : task/crm-01-sales-feed
@@ -23,8 +23,8 @@ La clé Reveal se connecte depuis les Réglages comme une clé d'IA, et Nirvana 
 - [x] Registre en ajout seul, avec `inputs_hash`. Migration 0065 (0062 annoncée, renumérotée parce que 0064 est entrée avant : drizzle-kit lit le dernier snapshot par son nom).
 - [x] Montants en centimes entiers, par conversion décimale exacte si une conversion est nécessaire ; test `netAmount` = `agencyRevenue` + `modelRevenue`.
 - [x] `modelId` vers créatrice sous `withTenant`, quarantaine si inconnu ; correspondance `chatterId` vers membre posée par le propriétaire.
-- [ ] Webhooks ensuite, dès que le support les a ouverts : signature sur le corps brut, comparaison en temps constant, horodatage refusé à ± 5 minutes, boîte de réception puis job, secret au coffre, rattrapage par curseur une fois par heure.
-- [x] (sauf webhook) FakeReveal : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`, `403`.
+- [x] (API ; l'écran reste) Webhooks ensuite, dès que le support les a ouverts : signature sur le corps brut, comparaison en temps constant, horodatage refusé à ± 5 minutes, boîte de réception puis job, secret au coffre, rattrapage par curseur une fois par heure.
+- [x] FakeReveal : curseur, vente tardive, remboursement, webhook rejoué ou mal signé, `429`, `401`, `403`.
 
 ## Critères d'acceptation
 
@@ -49,3 +49,9 @@ La paie, les écrans de vente, tout appel réel sans la demande de Charles.
 - Relecture Équipe : une ligne sortie de quarantaine prend l'heure de son entrée au registre (`recorded_at`), pour que la paie la lise comme une vente tardive ; chaque lien de modèle ou de chatteur laisse une ligne `audit_log` datée (`sales_feed.model_linked`, `…_unlinked`, `sales_feed.chatter_linked`, `…_unlinked`, avec l'état d'avant). CRM-03 figera dans son `inputs_hash` le lien chatteur lu au calcul.
 - Reste : écran Réglages (Extension ou une PR suivante), webhooks dans une seconde PR (migration 0067 pour la boîte de réception) quand le support les aura ouverts.
 
+02/11/2026, Bilan, PR 2 (webhooks) :
+- La livraison ne fait que réveiller la lecture par curseur : la boîte `sales_feed_deliveries` (migration 0067) garde l'id, l'événement et la position, jamais la ligne, que le job relit dans l'ordre du registre. Un seul chemin d'écriture, donc pas d'ordre à réconcilier.
+- Inscription depuis les Réglages (propriétaire, connexion récente) à l'adresse `AUTH_BASE_URL` en HTTPS ; le secret est scellé comme la clé et suit la même rotation. Retirer la clé retire le webhook.
+- Avec un webhook dont le secret s'ouvre, le passage de la minute ne lit qu'une fois par heure (rattrapage, ADR 0050 § 3) ; une livraison met en file `connector.read_sales` avec `woken` (une seule en attente, `job_key`).
+- Rien n'est appelé chez Reveal tant que le propriétaire n'a pas inscrit le webhook, ce qui attend que le support l'ouvre.
+- Reste : écran Réglages (clé, liens, bouton du webhook).

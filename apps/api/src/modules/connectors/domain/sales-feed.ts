@@ -58,12 +58,39 @@ export interface PlatformSalesFeed {
   listChatters(): Promise<SalesFeedResult<readonly PlatformChatter[]>>;
   dailyStats(range: DateRange): Promise<SalesFeedResult<readonly PlatformDailyStat[]>>;
   chatterDailyStats(range: DateRange): Promise<SalesFeedResult<readonly PlatformChatterDailyStat[]>>;
+  /** Registers Nirvana's address for the sales and refunds; the secret the platform signs with, given once. */
+  createWebhook(url: string): Promise<SalesFeedResult<CreatedWebhook>>;
+  /** Removes it at the platform; one the platform no longer knows counts as removed. */
+  deleteWebhook(platformWebhookId: string): Promise<SalesFeedResult<null>>;
 }
+
+interface CreatedWebhook {
+  readonly platformWebhookId: string;
+  readonly secret: string;
+}
+
+/** A delivery as it reached Nirvana: its raw bytes, untouched, and its headers (lower-case names). */
+export interface DeliveryRequest {
+  readonly rawBody: Buffer;
+  readonly headers: Readonly<Record<string, string | undefined>>;
+  readonly secret: string;
+  readonly now: Date;
+}
+
+/**
+ * A delivery checked: its id (to tell a second sending of it) and its position in the register. Its content is never
+ * kept: the line is read again by cursor, in the register's order (ADR 0050 § 3, the webhook only wakes the reading).
+ */
+export type DeliveryRead =
+  | { readonly ok: true; readonly deliveryId: string; readonly event: string; readonly position: string }
+  | { readonly ok: false; readonly reason: 'unsigned' | 'bad_signature' | 'stale' | 'malformed' };
 
 /** Builds a platform's feed from its decrypted key, and tells a paste that cannot be one of its keys. */
 export interface SalesFeedFactory {
   create(key: string): PlatformSalesFeed;
   isPlausibleKey(key: string): boolean;
+  /** Checks a delivery's signature and time against the webhook's secret before anything of it is read. */
+  readDelivery(request: DeliveryRequest): DeliveryRead;
 }
 
 /** One factory per platform that has a sales feed (Reveal's CRM API only, today). */
@@ -235,4 +262,38 @@ export interface SalesLedger {
    * (an unknown value, an unlinked model).
    */
   signal(platform: Platform, signal: SalesFeedSignal, once: boolean, correlationId: string): Promise<boolean>;
+}
+
+/** The platform's webhook for Nirvana; `secret` is `null` when no listed encryption key opens it any more. */
+export interface StoredWebhook {
+  readonly platform: Platform;
+  readonly platformWebhookId: string;
+  readonly secret: string | null;
+  readonly createdAt: Date;
+  readonly lastDeliveryAt: Date | null;
+  readonly lastRejectedAt: Date | null;
+}
+
+/** `sales_feed_webhooks` and its inbox `sales_feed_deliveries`, through the admin role only. */
+export interface SalesFeedWebhookStore {
+  find(platform: Platform): Promise<StoredWebhook | null>;
+  /** Saves the webhook, its secret sealed, with its `audit_log` line. */
+  save(platform: Platform, created: CreatedWebhook, url: string, at: Date, by: KeyActor): Promise<void>;
+  /** The webhook removed, `null` when there was none, with its `audit_log` line. */
+  remove(platform: Platform, by: KeyActor): Promise<StoredWebhook | null>;
+  /** Puts a checked delivery in the inbox: `duplicate` when its id came already (a delivery may come twice). */
+  receive(
+    platform: Platform,
+    delivery: { readonly deliveryId: string; readonly event: string; readonly position: string },
+    at: Date,
+  ): Promise<'new' | 'duplicate'>;
+  /** A delivery refused: its hour only, for the Réglages line. */
+  reject(platform: Platform, at: Date): Promise<void>;
+  /** Forgets the deliveries received before `before`: the cursor, not the inbox, says what was read. */
+  prune(before: Date): Promise<number>;
+}
+
+/** Wakes the reading of the register now, beside its minute (`connector.read_sales`). */
+export interface SalesFeedJobs {
+  readNow(correlationId: string): Promise<void>;
 }

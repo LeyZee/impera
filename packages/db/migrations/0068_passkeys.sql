@@ -4,7 +4,8 @@
 -- `last_used_at` is written by the server at each gesture, so the owner hears of a sign-in with a key never used before.
 -- Removed with the account (cascade), at a reset of the second factor, a reset link and a departure.
 -- `session.code_confirmed_at`: when the password and the code themselves were last given, never stamped by a passkey
--- gesture, so a key never adds another key (ADR 0053 § 2). Additive.
+-- gesture, so a key never adds another key (ADR 0053 § 2). `session.confirmed_passkey_id`: the key whose gesture gave
+-- the last confirmation, which cannot then remove itself (§ 5, « un geste sur une autre clé »). Additive.
 CREATE TABLE "passkey" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text,
@@ -21,7 +22,8 @@ CREATE TABLE "passkey" (
 	CONSTRAINT "passkey_credential_id_unique" UNIQUE("credential_id")
 );
 --> statement-breakpoint
+ALTER TABLE "session" ADD COLUMN "code_confirmed_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "session" ADD COLUMN "confirmed_passkey_id" text;--> statement-breakpoint
 ALTER TABLE "passkey" ADD CONSTRAINT "passkey_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "passkey_user_id_idx" ON "passkey" USING btree ("user_id");--> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE, DELETE ON "passkey" TO nirvana_app;--> statement-breakpoint
-ALTER TABLE "session" ADD COLUMN "code_confirmed_at" timestamp with time zone;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "passkey" TO nirvana_app;
