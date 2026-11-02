@@ -409,8 +409,11 @@
 :root {
   /* The top of the phone's tab bar (14 px from the bottom, 64 px high): sheets and cards float above it. */
   --nv-above-tabbar: calc(14px + 64px + env(safe-area-inset-bottom, 0px));
-  /* The install card as it lays out on a phone (two lines of text, its buttons, padding), measured (CR-01). */
+  /* The install card as it lays out on a phone (two lines of text, its buttons, padding), measured (CR-01); the card
+     keeps at least this height, so the room the page leaves for it is never short. */
   --nv-install-height: 138px;
+  /* The band under an installed iPhone's clock: the Nuit colour of the browser's bar (THEME_COLORS.night). */
+  --nv-statusbar: #060508;
 }
 .nv-rail__more {
   display: none;
@@ -664,7 +667,7 @@
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background: #060508;
+  background: var(--nv-statusbar);
   pointer-events: none;
 }
 
@@ -1235,6 +1238,7 @@
  */
 .nv-install.nv-glass {
   z-index: 28;
+  min-height: var(--nv-install-height);
   left: max(14px, env(safe-area-inset-left, 0px));
   right: max(14px, env(safe-area-inset-right, 0px));
   bottom: calc(var(--nv-above-tabbar) + 12px);
@@ -1329,4 +1333,102 @@
   .nv-float {
     animation: none !important;
   }
+}
+
+/* /notifications (CR-01): this device, then when it rings. */
+.nv-notif {
+  display: grid;
+  align-content: start;
+  gap: var(--nv-space-4);
+  max-width: 720px;
+}
+.nv-notif__device {
+  display: grid;
+  gap: 14px;
+}
+.nv-notif__state {
+  margin: 0;
+  color: var(--nv-ink);
+}
+.nv-notif__state[data-state='denied'] {
+  color: var(--nv-warning);
+}
+.nv-notif__state[data-state='reading'] {
+  color: var(--nv-ink-faint);
+}
+.nv-notif__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.nv-notif__actions:empty {
+  display: none;
+}
+.nv-notif__note {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  animation: nv-shell-rise var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.nv-notif__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: default;
+}
+label.nv-notif__row {
+  cursor: pointer;
+}
+.nv-notif__label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.nv-notif__hint {
+  color: var(--nv-ink-muted);
+  font-size: 14px;
+}
+.nv-notif__hours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.nv-notif__end {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+}
+.nv-notif__hours .nv-field__control {
+  width: 5.5em;
+  text-align: center;
+}
+.nv-notif__stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.nv-notif__stepper .nv-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+  font-size: 18px;
+}
+.nv-notif__stepper output {
+  min-width: 2ch;
+  text-align: center;
+  font-size: 18px;
+  color: var(--nv-ink);
+}
+.nv-notif__save {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }

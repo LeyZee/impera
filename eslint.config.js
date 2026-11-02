@@ -30,6 +30,7 @@ const MODULE_DEPENDENCIES = {
   // ADR 0047 § 1: pay is four modules; contractors imports none of the others.
   contractors: [],
   payroll: ['contractors'],
+  notifications: [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);
