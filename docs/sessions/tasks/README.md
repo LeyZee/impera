@@ -97,4 +97,7 @@ Branche : task/<id>-<slug>
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
-| SEC-01 | Audit de sécurité : premiers correctifs | exploitation | in_progress | — |
+| SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
+| SEC-02 | Deuxième facteur pour tous les comptes | exploitation | todo | ADR 0046, SEC-01 |
+| SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | todo | ADR 0046, SEC-02 |
+| SEC-04 | Réglages › Sécurité et alertes de sécurité | exploitation | todo | ADR 0046, ADR 0020, SEC-02 |
