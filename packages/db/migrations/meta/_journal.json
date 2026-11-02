@@ -421,6 +421,13 @@
       "when": 1793618623983,
       "tag": "0059_invoice_due_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793618683983,
+      "tag": "0060_telegram_invoice_due",
+      "breakpoints": true
     }
   ]
 }
