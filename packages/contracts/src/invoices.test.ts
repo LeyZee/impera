@@ -372,6 +372,14 @@ describe('invoices', () => {
       false,
     );
     expect(UpdateBillingSettingsBodySchema.safeParse({ ...body, dueDays: 61 }).success).toBe(false);
+    // The reminder delay (lot 8): optional, kept when omitted, 1 to 120 whole days.
+    expect(
+      UpdateBillingSettingsBodySchema.parse({ ...body, documentReminderDays: 45 }).documentReminderDays,
+    ).toBe(45);
+    for (const documentReminderDays of [0, 121, 7.5])
+      expect(UpdateBillingSettingsBodySchema.safeParse({ ...body, documentReminderDays }).success).toBe(
+        false,
+      );
   });
 
   it('save a SIREN only with its check key, and the VAT number that SIREN gives', () => {
