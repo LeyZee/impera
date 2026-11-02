@@ -274,8 +274,13 @@ export const screenLabel = (to: ScreenPath): string => SCREENS[to];
 
 const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREENS));
 
+/** Help pages, open to every role outside the rail (CR-01). */
+const HELP_TITLES: ReadonlyMap<string, string> = new Map([['/aide/installer', 'Installer Nirvana']]);
+
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
 export function documentTitle(pathname: string, section: Section | null, kind: RailKind): string {
+  const help = HELP_TITLES.get(pathname.replace(/\/+$/u, ''));
+  if (help !== undefined) return `${help} · Nirvana`;
   if (section === null) return 'Page introuvable · Nirvana';
   const path = pathname.replace(/\/+$/u, '');
   // A section's own page is no screen of its own: « Suivi · Nirvana », not « Conversations · Suivi ».

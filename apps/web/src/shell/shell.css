@@ -406,6 +406,12 @@
 }
 
 /* ── « Plus », the phone's fifth place, and its sheet ── */
+:root {
+  /* The top of the phone's tab bar (14 px from the bottom, 64 px high): sheets and cards float above it. */
+  --nv-above-tabbar: calc(14px + 64px + env(safe-area-inset-bottom, 0px));
+  /* The install card as it lays out on a phone (two lines of text, its buttons, padding), measured (CR-01). */
+  --nv-install-height: 138px;
+}
 .nv-rail__more {
   display: none;
 }
@@ -424,7 +430,7 @@
   z-index: 41;
   left: max(14px, env(safe-area-inset-left, 0px));
   right: max(14px, env(safe-area-inset-right, 0px));
-  bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--nv-above-tabbar) + 10px);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -644,6 +650,22 @@
 .nv-stage:focus:not(:focus-visible),
 .nv-stage h1:focus:not(:focus-visible) {
   outline: none;
+}
+
+/*
+ * Installed on an iPhone, the status bar is translucent and its clock always white (black-translucent): a dark band
+ * under it, in Nuit and Jour alike, keeps the hour readable and the page from showing through. Zero high elsewhere.
+ */
+.nv-app::before {
+  content: '';
+  position: fixed;
+  z-index: 55;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: #060508;
+  pointer-events: none;
 }
 
 /* A word the route guard left (NAV-21): above everything, a few seconds, then gone. */
@@ -986,7 +1008,8 @@
   .nv-app {
     /* The room the stage keeps under the page for the tab bar, and above it. */
     --nv-tabbar-room: calc(110px + env(safe-area-inset-bottom, 0px));
-    --nv-stage-top: 8px;
+    /* Installed on an iPhone, the page runs under the clock and the notch (viewport-fit=cover): it starts below. */
+    --nv-stage-top: calc(8px + env(safe-area-inset-top, 0px));
     height: auto;
     min-height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
@@ -1146,5 +1169,164 @@
   .nv-silent__retry {
     grid-column: 2;
     justify-self: start;
+  }
+}
+
+/* ── Installable app (CR-01) ── */
+/*
+ * A floating card: the update offer and the install card share it (and the next ones, CR-12). Each keeps only its
+ * place and its entrance.
+ */
+.nv-float.nv-glass {
+  --_radius: 22px;
+  position: fixed;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  padding: 12px;
+  box-shadow: var(--nv-shadow-float);
+}
+.nv-float__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+}
+.nv-float__body {
+  min-width: 0;
+}
+.nv-float__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.nv-float__text {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.nv-float__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.nv-float .nv-btn {
+  min-height: 44px;
+}
+
+/* « Nouvelle version de Nirvana »: offered at the top, never imposed (src/pwa/UpdateNotice.tsx). */
+.nv-update.nv-glass {
+  /* Fuller than the other glass: the page's text must not read through the message (relecture #402). */
+  --nv-glass-thick: var(--nv-void);
+  z-index: 60;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: max(14px, env(safe-area-inset-left, 0px));
+  right: max(14px, env(safe-area-inset-right, 0px));
+  margin-inline: auto;
+  max-width: 460px;
+  animation: nv-more-fade var(--nv-dur-base) var(--nv-ease-out) both;
+}
+
+/*
+ * « Nirvana sur ton écran d'accueil »: above the phone's tab bar, in the thumb's reach like the « Plus » sheet, and
+ * under the sheet's veil (src/pwa/InstallNudge.tsx).
+ */
+.nv-install.nv-glass {
+  z-index: 28;
+  left: max(14px, env(safe-area-inset-left, 0px));
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--nv-above-tabbar) + 12px);
+  transform-origin: 50% 100%;
+  animation: nv-more-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+@media (max-width: 820px) {
+  /* While the card is there, the page keeps room for it too: nothing scrolls under it, a composer stays in view. */
+  .nv-app:has(.nv-install) {
+    --nv-tabbar-room: calc(110px + var(--nv-install-height) + 12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* On a computer, quiet cards in the corner, out of the screen's way; the update above the install card. */
+@media (min-width: 821px) {
+  .nv-update.nv-glass,
+  .nv-install.nv-glass {
+    top: auto;
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 380px;
+    margin: 0;
+  }
+  body:has(.nv-install) .nv-update.nv-glass {
+    bottom: calc(24px + var(--nv-install-height) + 12px);
+  }
+}
+
+/* /aide/installer: the steps, the device's own first. */
+.nv-help-install {
+  display: grid;
+  align-content: start;
+  gap: var(--nv-space-4);
+  max-width: 960px;
+}
+.nv-help-install__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-items: start;
+  gap: var(--nv-space-4);
+}
+.nv-help-install__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: nv-step;
+  display: grid;
+  gap: 14px;
+  color: var(--nv-ink-muted);
+}
+.nv-help-install__steps li {
+  counter-increment: nv-step;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+/* The step's number in a small neon ring: the eye follows 1, 2, 3, 4 without reading. */
+.nv-help-install__steps li::before {
+  content: counter(nv-step);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-neon-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--nv-neon-ink) 45%, transparent);
+  /* Centred on the first line of the step, not on its top. */
+  margin-top: -2px;
+}
+.nv-help-install__now {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.nv-help-install__now p,
+.nv-help-install__done p {
+  margin: 0;
+}
+.nv-help-install__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-float {
+    animation: none !important;
   }
 }
