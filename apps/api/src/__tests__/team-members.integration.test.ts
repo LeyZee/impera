@@ -584,7 +584,13 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
       rows.filter((row) => JSON.stringify(row.details).includes('"left"')),
     );
     // Two sessions: the activation of his code left one, his sign-in with the code another (ADR 0046).
-    expect(left?.details).toEqual({ from: 'active', to: 'left', sessionsEnded: 2, leftOn });
+    expect(left?.details).toEqual({
+      from: 'active',
+      to: 'left',
+      sessionsEnded: 2,
+      passkeysRemoved: 0,
+      leftOn,
+    });
     // Asked again, the same status writes nothing: the day stays the first one.
     expect(await leftOnOf(theo.id)).toBe(leftOn);
 

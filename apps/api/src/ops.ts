@@ -200,6 +200,7 @@ export function resetAccountSecondFactor(
         hadSecondFactor: reset.hadSecondFactor,
         sessionsEnded: reset.sessions,
         trustedDevicesEnded: reset.trustedDevices,
+        passkeysRemoved: reset.passkeys,
       },
     });
     // Told to the urgent groups (ADR 0046 § 8) when there was one to reset: a forgotten account set up anew is not.

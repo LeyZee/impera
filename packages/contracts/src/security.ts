@@ -15,11 +15,13 @@ export const SECURITY_ALERT_REASONS = [
   'persona_activated',
   'automatic_enabled',
   'platform_session_replaced',
+  'passkey_added',
+  'passkey_new_sign_in',
 ] as const;
 export const SecurityAlertReasonSchema = z.enum(SECURITY_ALERT_REASONS);
 export type SecurityAlertReason = z.infer<typeof SecurityAlertReasonSchema>;
 
-/** Refusals of a password or a code on one account that make an alert, and the window they are counted in. */
+/** Refusals of a password, a code or a passkey on one account that make an alert, and the window they are counted in. */
 export const SIGN_IN_REFUSALS_ALERT_AT = 5;
 export const SIGN_IN_REFUSALS_WINDOW_MINUTES = 15;
 
@@ -40,7 +42,7 @@ const actor = { userId: z.string().min(1).nullable() };
 export const SecurityAlertPayloadSchema = z.discriminatedUnion('reason', [
   /** The owner's account signed in from a device that was not trusted: a code was asked, or none was set yet. */
   z.object({ reason: z.literal('new_device_sign_in'), ...account }),
-  /** Refusals of a password or a code on one account reached the threshold within the window. */
+  /** Refusals of a password, a code or a passkey on one account reached the threshold within the window. */
   z.object({
     reason: z.literal('sign_in_refusals'),
     ...account,
@@ -53,6 +55,10 @@ export const SecurityAlertPayloadSchema = z.discriminatedUnion('reason', [
     ...account,
     via: z.enum(['invitation_link', 'ops']),
   }),
+  /** A passkey was added to an account (ADR 0053 § 7): a lasting way in, like a second factor set up anew. */
+  z.object({ reason: z.literal('passkey_added'), ...account }),
+  /** The owner's account signed in with a passkey never used before (ADR 0053 § 7). */
+  z.object({ reason: z.literal('passkey_new_sign_in'), ...account }),
   /** Another version of her persona became the active one. */
   z.object({ reason: z.literal('persona_activated'), ...actor, version: z.string().min(1).max(64) }),
   /** Automatique was switched on: for all her conversations, or for one. */
@@ -138,6 +144,8 @@ export const AccountSecuritySchema = z.object({
   role: UserRoleSchema,
   secondFactor: z.boolean(),
   sessions: z.number().int().min(0),
+  /** Its passkeys (ADR 0053 § 5): how many, never which device. */
+  passkeys: z.number().int().min(0),
   lastActiveAt: z.iso.datetime().nullable(),
 });
 export type AccountSecurity = z.infer<typeof AccountSecuritySchema>;
