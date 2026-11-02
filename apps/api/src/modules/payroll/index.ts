@@ -55,6 +55,7 @@ import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createEcbSource, type GetLike } from './infra/ecb';
 import { createDrizzlePayrollEntryStore } from './infra/entry-store';
 import { createDrizzlePayrollInvoiceAcceptanceStore } from './infra/invoice-acceptance-store';
+import { createDrizzleInvoiceDueStore } from './infra/invoice-due-store';
 import { createPdfkitInvoiceRenderer, loadInvoiceFonts } from './infra/invoice-pdf-renderer';
 import { createDrizzlePayrollInvoicePdfStore } from './infra/invoice-pdf-store';
 import { createDrizzlePayrollInvoiceStore } from './infra/invoice-store';
@@ -165,6 +166,12 @@ export interface PayrollModule {
      * Returns how many were said this run.
      */
     readonly remindDocuments: () => Promise<number>;
+    /**
+     * `payroll.remind_due_invoices`, each morning (EQ-06 lot 8): each invoice not settled yet said once to the owner
+     * seven days before its due date (`invoice_due_soon`), then once the day after it (`invoice_overdue`), with what
+     * stops the transfer that will pay it (ADR 0041). Returns how many were said this run.
+     */
+    readonly remindDueInvoices: () => Promise<number>;
     /**
      * `payroll.purge_refused_documents`, each night (EQ-06 lot 5c-2, « ok purge a »): each refused document whose
      * upload lock has ended has its file erased from the first bucket, then the erasure recorded; its row stays.
@@ -284,6 +291,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
       sweepInvoiceAcceptance: (logger) => sweepInvoiceAcceptance(acceptanceStore, logger),
       remindDocuments: () =>
         remindDocuments(createDrizzleDocumentReminderStore(deps.adminDb, deps.reads, now)),
+      remindDueInvoices: () => createDrizzleInvoiceDueStore(deps.adminDb, deps.reads, now).remindUnscoped(),
       purgeRefusedDocuments: (logger) =>
         purgeRefusedDocuments(
           {

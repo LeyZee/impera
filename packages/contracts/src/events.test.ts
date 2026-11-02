@@ -209,6 +209,39 @@ describe('events', () => {
     ).toBe(false);
   });
 
+  it('tells an invoice coming to its due date by ids, its number, its day and its total, never a name (EQ-06 lot 8)', () => {
+    const body = {
+      invoiceId: newId(InvoiceIdSchema),
+      memberId: newId(TeamMemberIdSchema),
+      number: 'KOFI-2026-0007',
+      dueOn: '2026-12-31',
+      inclVatMinor: 12_000,
+      payoutBlock: null,
+    };
+    for (const type of ['invoice_due_soon', 'invoice_overdue'] as const) {
+      expect(EVENT_PAYLOADS[type].parse({ ...body, legalName: 'Kofi Inventé' })).toEqual(body);
+      // What stops its transfer (ADR 0041): a certificate of a year, or documents not all issued, without a year.
+      const blocked = { ...body, payoutBlock: { reason: 'tax_residence_missing', year: '2027' } };
+      expect(EVENT_PAYLOADS[type].parse(blocked)).toEqual(blocked);
+      for (const patch of [
+        { dueOn: '31/12/2026' },
+        { inclVatMinor: -1 },
+        { inclVatMinor: 1.5 },
+        { number: 'K-1' },
+        { payoutBlock: { reason: 'tax_residence_missing', year: null } },
+        { payoutBlock: { reason: 'documents_not_issued', year: '2027' } },
+        { payoutBlock: undefined },
+      ])
+        expect(
+          [type, EVENT_PAYLOADS[type].safeParse({ ...body, ...patch }).success],
+          JSON.stringify(patch),
+        ).toEqual([type, false]);
+      expect(
+        DomainEventSchema.safeParse({ ...envelope(), creatorId: null, type, payload: body }).success,
+      ).toBe(true);
+    }
+  });
+
   it('accepts a human actor only with a user id', () => {
     const base = { ...envelope(), creatorId: null, type: 'error', payload: { code: 'x', retryable: false } };
     expect(DomainEventSchema.safeParse({ ...base, actor: `human:${newId(MessageIdSchema)}` }).success).toBe(

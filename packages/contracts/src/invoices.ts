@@ -1023,6 +1023,40 @@ export const InvoiceSettlementSchema = z.object({
 });
 export type InvoiceSettlement = z.infer<typeof InvoiceSettlementSchema>;
 
+/**
+ * Why the transfer of a validated statement cannot be recorded (ADR 0041). The documents it pays are not all issued
+ * (`documents_not_issued`): the invoices less the credit notes of the statement and of those carried into it do not
+ * come to what it pays yet, and paying without an invoice is ruled out. Or, under a tax treaty that sets the 182 B
+ * withholding aside, the contractor's tax residence certificate of the transfer's calendar year is missing or refused
+ * (`tax_residence_missing`), or filed and not checked by the owner yet (`tax_residence_unverified`). The agency never
+ * withholds 25 %: it does not pay.
+ */
+export const PAYOUT_BLOCK_REASONS = [
+  'documents_not_issued',
+  'tax_residence_missing',
+  'tax_residence_unverified',
+] as const;
+export const PayoutBlockReasonSchema = z.enum(PAYOUT_BLOCK_REASONS);
+export type PayoutBlockReason = z.infer<typeof PayoutBlockReasonSchema>;
+
+/**
+ * A transfer that waits (ADR 0041 § 4): why, and for a certificate the calendar year it must cover (`null` for the
+ * documents).
+ */
+export const PayoutBlockSchema = z
+  .object({
+    reason: PayoutBlockReasonSchema,
+    year: z
+      .string()
+      .regex(/^\d{4}$/u)
+      .nullable(),
+  })
+  .refine((block) => (block.year === null) === (block.reason === 'documents_not_issued'), {
+    message: 'Une année pour une attestation, aucune pour les documents',
+    path: ['year'],
+  });
+export type PayoutBlock = z.infer<typeof PayoutBlockSchema>;
+
 /** An invoice not settled turns `soon` this many days before its due date, the day its alert goes (EQ-06 lot 8). */
 export const INVOICE_DUE_SOON_DAYS = 7;
 

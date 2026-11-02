@@ -99,3 +99,29 @@ export function settledByTransfer(
   const paid = statements.map((one) => (one.id === statementId ? { ...one, status: 'paid' as const } : one));
   return settlementsDue(paid, carryOvers, documents).filter((one) => one.statementId === statementId);
 }
+
+/**
+ * The statement whose transfer will pay `document` (EQ-06 lot 8, the due date's alert): walking from its own statement
+ * through the carry-overs, the first that is not carried further, if it is validated with something to pay. `null`
+ * when the walk stops before one: a statement still a draft, a carry-over whose next statement is not there yet, or a
+ * statement that already ended the document's debt (paid, or compensated at zero or below).
+ */
+export function payingStatement(
+  statements: readonly SettlementStatement[],
+  carryOvers: readonly SettlementCarryOver[],
+  document: Pick<SettlementDocument, 'statementId'>,
+): SettlementStatement | null {
+  const byId = new Map(statements.map((one) => [one.id, one]));
+  const byPeriod = new Map(statements.map((one) => [one.period, one]));
+  const carriedTo = new Map(carryOvers.map((one) => [one.statementId, one.toPeriod]));
+  const seen = new Set<string>();
+  let statement = document.statementId === null ? undefined : byId.get(document.statementId);
+  while (statement !== undefined && !seen.has(statement.id)) {
+    seen.add(statement.id);
+    const toPeriod = carriedTo.get(statement.id);
+    if (toPeriod === undefined)
+      return statement.status === 'validated' && statement.totalMinor > 0 ? statement : null;
+    statement = byPeriod.get(toPeriod);
+  }
+  return null;
+}

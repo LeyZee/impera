@@ -722,6 +722,16 @@ export interface PayrollDocumentReminderStore {
 }
 
 /**
+ * `payroll.remind_due_invoices`, as the jobs (`withAdmin`, EQ-06 lot 8): each invoice not settled yet, whose due state
+ * is `soon` or `overdue` on the agency's day (`invoiceDueState`, the list's rule), is said once per type
+ * (`invoice_due_soon`, `invoice_overdue`, with its line of `audit_log`), with what stops the transfer that will pay it
+ * (`payingStatement`, `payoutDecision`). Returns how many were said this run.
+ */
+export interface PayrollInvoiceDueStore {
+  remindUnscoped(): Promise<number>;
+}
+
+/**
  * `payroll.settle_documents`, as the jobs (`withAdmin`, EQ-06 lot 7a): under each contractor's lock, his statements,
  * carry-overs and documents read, and the settlements `settlementsDue` finds written (`paid`, `imputed` or
  * `compensated`, with their lines of `audit_log`). Returns how many were written.

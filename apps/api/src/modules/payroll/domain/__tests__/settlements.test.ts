@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  payingStatement,
   settlementsDue,
   type SettlementCarryOver,
   type SettlementDocument,
@@ -147,5 +148,48 @@ describe('Équipe › Factures : le rapprochement des versements (EQ-06 lot 7a)'
     expect(settlementsDue(paid, [], [invoice('i1', 's1')])).toEqual([
       { documentId: 'i1', kind: 'paid', statementId: 's1' },
     ]);
+  });
+});
+
+describe('Équipe › Factures : le relevé qui versera une facture (EQ-06 lot 8)', () => {
+  it('finds the statement whose transfer pays an invoice, through each carry-over', () => {
+    const statements = [
+      statement('s1', '2026-09-01', 'validated', 900),
+      statement('s2', '2026-09-16', 'validated', 1_300),
+      statement('s3', '2026-10-01', 'validated', 2_200),
+    ];
+    const carryOvers = [carry('s1', '2026-09-16'), carry('s2', '2026-10-01')];
+    expect(payingStatement(statements, carryOvers, invoice('i1', 's1'))).toEqual(statements[2]);
+    expect(payingStatement(statements, carryOvers, invoice('i3', 's3'))).toEqual(statements[2]);
+    // Not carried, its own statement pays it.
+    expect(payingStatement(statements, [], invoice('i1', 's1'))).toEqual(statements[0]);
+  });
+
+  it('finds none while the walk stops before a validated statement with something to pay', () => {
+    // The next statement is still a draft, or not there yet.
+    const draft = [
+      statement('s1', '2026-09-01', 'validated', 900),
+      statement('s2', '2026-09-16', 'draft', 0),
+    ];
+    expect(payingStatement(draft, [carry('s1', '2026-09-16')], invoice('i1', 's1'))).toBeNull();
+    expect(payingStatement(draft.slice(0, 1), [carry('s1', '2026-09-16')], invoice('i1', 's1'))).toBeNull();
+    // A statement that ended the debt already: paid, or compensated at zero or below.
+    for (const ended of [
+      statement('s1', '2026-09-01', 'paid', 900),
+      statement('s1', '2026-09-01', 'validated', 0),
+      statement('s1', '2026-09-01', 'validated', -300),
+    ])
+      expect(payingStatement([ended], [], invoice('i1', 's1'))).toBeNull();
+    // A statement unknown, or none.
+    expect(payingStatement([], [], invoice('i1', 's1'))).toBeNull();
+    expect(payingStatement(draft, [], creditNote('c0', null))).toBeNull();
+    // A loop of carry-overs, which pay never writes, ends the walk.
+    const loop = [
+      statement('s1', '2026-09-01', 'validated', 900),
+      statement('s2', '2026-09-16', 'validated', 900),
+    ];
+    expect(
+      payingStatement(loop, [carry('s1', '2026-09-16'), carry('s2', '2026-09-01')], invoice('i1', 's1')),
+    ).toBeNull();
   });
 });

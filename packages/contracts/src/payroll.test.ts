@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { PayoutBlockSchema } from './invoices';
 import { PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema } from './pay-periods';
 import {
@@ -20,7 +21,6 @@ import {
   PAYMENT_METHODS,
   PAYROLL_ERROR_CODES,
   PayCommissionStatementBodySchema,
-  PayoutBlockSchema,
   PayPeriodBlockSchema,
   PayPeriodSummarySchema,
   PayrollPeriodSchema,

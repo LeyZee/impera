@@ -53,6 +53,7 @@ export const JOB_NAMES = [
   'payroll.announce_invoice_contest',
   'payroll.sweep_invoice_acceptance',
   'payroll.remind_documents',
+  'payroll.remind_due_invoices',
   'payroll.purge_refused_documents',
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
@@ -187,6 +188,12 @@ export const JOB_PAYLOADS = {
    */
   'payroll.remind_documents': z.object({}),
   /**
+   * Each morning (crontab, EQ-06 lot 8): each invoice not settled yet that comes to its due date is said once to the
+   * owner, `invoice_due_soon` from seven days before it, `invoice_overdue` from the day after, with what stops the
+   * transfer that will pay it (ADR 0041).
+   */
+  'payroll.remind_due_invoices': z.object({}),
+  /**
    * Each night (crontab, EQ-06 lot 5c-2, « ok purge a » de Charles): each refused document whose upload lock has ended
    * has its file erased from the bucket; its row and its check stay (`contractor_document_purges`).
    */
@@ -262,6 +269,8 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.sweep_invoice_acceptance': 1,
   // Each hour: the next run is the retry, and a document is said once.
   'payroll.remind_documents': 1,
+  // Each morning, and replayable: an invoice is said once per type, and a day missed is caught up by the next one.
+  'payroll.remind_due_invoices': 5,
   // Each night: the next night is the retry, and an erasure is recorded once its file is gone.
   'payroll.purge_refused_documents': 1,
   // Replayable: it writes only the settlements still missing, under the contractor's lock.

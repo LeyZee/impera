@@ -33,6 +33,7 @@ import {
   InvoiceNotIssuedReasonSchema,
   InvoiceNumberSchema,
   InvoicePdfPlaceSchema,
+  PayoutBlockSchema,
 } from './invoices';
 import { CurrencySchema } from './money';
 import { PayPeriodSchema } from './pay-periods';
@@ -201,6 +202,8 @@ export const EVENT_TYPES = [
   'invoice_pdf_conflict',
   'invoice_pdf_missing',
   'invoice_contested',
+  'invoice_due_soon',
+  'invoice_overdue',
   'contractor_document_expiring',
   'automatic_closed',
   'fan_flag_set',
@@ -209,6 +212,21 @@ export const EVENT_TYPES = [
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
 export type EventType = z.infer<typeof EventTypeSchema>;
+
+/**
+ * What the due date's alert says of an invoice (EQ-06 lot 8): its number, its due date and its total including VAT,
+ * and, when the transfer that will pay it cannot be recorded today (ADR 0041, `payout_blocked_conflict`), why
+ * (`payoutBlock`): a blocked transfer may pass the due date, and the late-payment penalties and the 40 € indemnity
+ * with it. `null` when nothing stops it, or no statement can pay it yet.
+ */
+const invoiceDuePayload = z.object({
+  invoiceId: InvoiceIdSchema,
+  memberId: TeamMemberIdSchema,
+  number: InvoiceNumberSchema,
+  dueOn: z.iso.date(),
+  inclVatMinor: z.number().int().min(0),
+  payoutBlock: PayoutBlockSchema.nullable(),
+});
 
 /** Payload schema of every event type. Adding a type here is a contract change (ADR 0007). */
 export const EVENT_PAYLOADS = {
@@ -378,6 +396,15 @@ export const EVENT_PAYLOADS = {
     document: InvoiceKindSchema,
   }),
   /**
+   * An invoice not settled yet comes to its due date (EQ-06 lot 8): `invoice_due_soon` from `INVOICE_DUE_SOON_DAYS` days
+   * before it, `invoice_overdue` from the day after, as the list computes its due state (`soon`, `overdue`). Published
+   * once per invoice and type by `payroll.remind_due_invoices`, with no creator, for the owner; never for a credit note,
+   * which a transfer takes off, nor for an invoice paid, imputed or compensated. Never a name: the member by id, the
+   * invoice by its number.
+   */
+  invoice_due_soon: invoiceDuePayload,
+  invoice_overdue: invoiceDuePayload,
+  /**
    * A document a contractor's regime asks for comes to its end, or has passed it, and no newer one is filed (EQ-06 lot
    * 5c-2): a tax residence certificate from 1 December of its year (it is renewed in January), another from the
    * owner's delay before its last day (`documentReminderDays`). Published once per document by
@@ -456,6 +483,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('invoice_pdf_conflict'),
   typedEvent('invoice_pdf_missing'),
   typedEvent('invoice_contested'),
+  typedEvent('invoice_due_soon'),
+  typedEvent('invoice_overdue'),
   typedEvent('contractor_document_expiring'),
   typedEvent('automatic_closed'),
   typedEvent('fan_flag_set'),
