@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { NOTIFICATION_REASONS } from '@nirvana/contracts';
+import { JOB_MAX_ATTEMPTS, NOTIFICATION_REASONS } from '@nirvana/contracts';
 import { and, eq, inArray, schema, sql, withMember, type Database } from '@nirvana/db';
 
 import { isCapped } from '../../domain/policy';
@@ -76,7 +76,7 @@ export function createDeliveryRegistry(db: Database): DeliveryRegistry {
               task => 'notifications.recap',
               payload => ${JSON.stringify({ userId: request.userId })}::jsonb,
               run_at => ${decision.until.toISOString()}::timestamptz,
-              max_attempts => 3,
+              max_attempts => ${JOB_MAX_ATTEMPTS['notifications.recap']}::int,
               job_key => ${`notifications.recap:${request.userId}`},
               job_key_mode => 'replace'
             )`,

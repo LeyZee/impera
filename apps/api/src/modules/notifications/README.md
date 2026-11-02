@@ -7,7 +7,7 @@
 **Tables possédées** (migration `push_notifications`) :
 
 - `push_server_keys`. La paire VAPID du serveur, créée au premier usage sous un verrou consultatif, sans aucune saisie (ADR 0016). La clé privée est scellée avec `CREDENTIALS_ENCRYPTION_KEYS` (contexte `push:vapid`). La table est hors RLS et retirée au rôle applicatif.
-- `push_subscriptions`. Un appareil par ligne, sous RLS forcée (`own_rows`) : chacun ne lit que les siens. L'enregistrement passe par le rôle admin, avec le compte pris dans la session : un appareil qui a servi à un autre compte passe ainsi à celui-ci.
+- `push_subscriptions`. Un appareil par ligne, sous RLS forcée (`own_rows`) : chacun ne lit que les siens. L'enregistrement passe par le rôle admin, avec le compte pris dans la session : un appareil qui a servi à un autre compte passe ainsi à celui-ci (téléphone partagé). Un compte qui connaîtrait l'adresse d'abonnement d'un autre pourrait donc prendre son appareil ; cette adresse est une URL imprévisible donnée par le service push du navigateur, jamais montrée ni renvoyée par l'API, et le risque est jugé faible (relecture de #407).
 - `notification_preferences`. Heures calmes et plafond, sous RLS forcée. Sans ligne, les réglages par défaut s'appliquent (22 h – 8 h, 6 par jour).
 
 **Routes** (montées sous `/v1`, contrat `packages/contracts/src/notifications.ts`, tous les rôles, chacun pour lui-même) :
