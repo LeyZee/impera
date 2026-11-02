@@ -105,6 +105,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Cooldown | `cooldown` | Délai pendant lequel le bot ne pousse pas de vente. |
 | Connecteur | `connector` | Adaptateur d'une plateforme derrière le port `PlatformConnector`. |
 | Clé de fournisseur | `provider_credential` | Clé d'API d'un fournisseur IA (xAI, Google, ElevenLabs…), saisie dans Réglages › Modèles IA et chiffrée en base (ADR 0016). À l'écran, on parle de « services », jamais de « connecteurs ». |
+| API CRM | `crm_api` | L'API officielle de Reveal, à clé d'agence : statistiques, équipe, ventes une par une. Elle ne lit pas les conversations et n'envoie rien (ADR 0050). |
+| Flux de ventes | `PlatformSalesFeed` | Le port qui lit les ventes, les remboursements et les chiffres d'une plateforme par curseur, sans session ; distinct du connecteur (ADR 0050). |
 | Session (plateforme) | `platform_session` | Les jetons/cookies capturés qui permettent au connecteur d'agir. |
 | Jeton d'appareil | `device token` | Secret de l'extension pour déposer une session (`POST /v1/connector/sessions`, `EXTENSION_DEVICE_TOKEN`). |
 | Composeur | `DraftComposer` | Le port par lequel `conversation.respond` demande un brouillon au moteur ; il rend des bulles ou une retenue (`held`) avec sa raison. |
@@ -244,6 +246,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Topo de la semaine | `creator.weekly_brief` | Le job du dimanche 18 h qui rédige, à partir de faits calculés par le code, le bilan de la semaine d'une créatrice et ses suggestions ; relu par l'agence, il part le lundi matin (ADR 0042). |
 | Vente saisie | `sale_entry` | Une vente qu'un chatteur saisit pendant ou après son shift : fan, montant brut, type ; rattachée à un de ses shifts sur cette créatrice, idempotente, jamais effacée (ADR 0043). Distincte de la vente détectée (`sale`). |
 | Remontée | `report_signal` | Ce que le chatteur signale dans son rapport de fin de shift pour la créatrice : une demande d'un fan, un script ou un contenu qui manque ; va au topo de la semaine (ADR 0043). |
+| Mini feedback | `shift_feedback` | Ce que le chatteur ajoute à la fin d'un shift sur un compte en source « détectée » : commentaire, incident, remontée, ou « rien à signaler ». Sans montant, sans validation, sans effet sur la paie (ADR 0050). Sur un compte en source « déclarée », c'est le rapport de fin de shift. |
 | Contrôle du rapport | `report_check` | La fonction du domaine qui marque un rapport de fin de shift (doublon possible, total inhabituel) et, quand les ventes de Reveal sont lues, le rapproche des ventes attribuées au membre : en dessous d'elles et dans le seuil d'écart, il est validé par le contrôle automatique ; au-dessus d'elles, au-delà du seuil ou avec une vente de la fenêtre sans attribution, il passe en ambre « écart » (ADR 0043). |
 | Retour de chatting | `chatting_feedback` | Un des trois points au plus que l'IA rend chaque semaine à un chatteur : l'extrait, ce qui n'allait pas, ce qu'il aurait fallu faire ; sans aucun effet sur la paie (ADR 0043). |
 | Dépôt de contenu | `content_drop` | Ce que la créatrice dépose dans Nirvana pour le feed ou les Mass DM ; seule exception à « la médiathèque ne se remplit que par synchronisation » (ADR 0044). |

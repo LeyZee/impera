@@ -1,6 +1,8 @@
 # Connecteurs : le port `PlatformConnector` et Reveal
 
-Dernière revue : 2026-10-16. Décision : ADR 0008.
+Dernière revue : 2026-11-02. Décisions : ADR 0008, ADR 0050.
+
+**Reveal à deux voies (ADR 0050)** : ventes, statistiques, modèles et équipe se lisent par l'API CRM officielle, derrière le port `PlatformSalesFeed` (à écrire, lecture par curseur, sans session). Ce document décrit l'autre voie, celle de la session capturée : conversations, envois, scripts, notes, coffre, feed et Mass DM.
 
 ## Le port
 
