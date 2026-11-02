@@ -1,6 +1,6 @@
 # 0045. Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt
 
-Statut : proposed (décisions de Charles du 02/11/2026 16h44 ; à accepter par Charles)
+Statut : accepted (Charles, 02/11/2026 17h03, « ok vas y » en réponse à la demande de « ok 0045 », après les accords de Bilan et Équipe ; décisions du même jour à 16h44, fil « Concevoir les espaces modèle et chatteur mobiles »)
 Date : 2026-11-02
 Remplace : dans l'ADR 0031 § Échanges, la phrase « C'est la seule porte par laquelle un chatteur lit le planning d'un autre. » Précise l'ADR 0024 (le Planning du chatteur montre « le sien, celui de l'équipe »), l'ADR 0042 § 2 et § 4 (ce que la créatrice voit de qui est en poste), et les fiches EQ-02, EQ-12 et EQ-14.
 
