@@ -1,5 +1,5 @@
 # ARC-02 L'assemblage module par module
-Statut : in_progress
+Statut : done
 Phase : exploitation
 Dépend de : ADR 0047 § 3
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
@@ -31,3 +31,4 @@ Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 
 - 02/11 : les chemins des polices de factures et des personas restent dans `composition-root.ts` : le paquet de production (tsup) les lit depuis `dist/index.js`, au même niveau que `src/composition-root.ts`, pas depuis `src/wiring/`.
+- 02/11 : fusionnée (#395, 6057395).
