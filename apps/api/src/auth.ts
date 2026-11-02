@@ -60,7 +60,7 @@ const SIGN_IN_ACCOUNT_WINDOW = '15 minutes';
 const TWO_FACTOR_COOKIE = 'two_factor';
 const TRUST_DEVICE_COOKIE = 'trust_device';
 /** However much it is used, a session opened more than 7 days ago is refused at its next request (ADR 0046 § 6). */
-const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * The client IP as Fastify resolved it (`trustProxy`, TRUST_PROXY_HOPS), handed to Better Auth under a header of
  * our own: it never reads `x-forwarded-for`, which any client can write.

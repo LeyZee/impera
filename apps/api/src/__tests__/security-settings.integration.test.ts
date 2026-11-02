@@ -124,6 +124,15 @@ describe('Réglages › Sécurité (ADR 0046 § 7, SEC-04)', () => {
     expect(await me(laptop)).toBe(200);
     const again = await request('DELETE', `/v1/auth/sessions/${onPhone.id}`, laptop);
     expect([again.statusCode, codeOf(again)]).toEqual([404, 'session_not_found']);
+
+    // A session past its 7 days (ADR 0046 § 6) is refused at its next request: it is not listed either.
+    const [old] = (await sessionsOf(laptop)).filter((session) => !session.current);
+    if (old === undefined) throw new Error('the first sign-in’s session expected');
+    await test.admin.db
+      .update(schema.session)
+      .set({ createdAt: sql`now() - interval '8 days'` })
+      .where(eq(schema.session.id, old.id));
+    expect((await sessionsOf(laptop)).map((session) => session.id)).not.toContain(old.id);
   });
 
   it('never closes someone else’s session', async () => {
@@ -195,7 +204,7 @@ describe('Réglages › Sécurité (ADR 0046 § 7, SEC-04)', () => {
 
   it('shows the owner each account’s second factor and sessions, and closes all of one account', async () => {
     const [quinn, rosa] = [account('quinn'), account('rosa')];
-    await createOwner(app.auth, app.db.db, quinn);
+    const { userId: quinnId } = await createOwner(app.auth, app.db.db, quinn);
     const { userId: rosaId } = await createOwner(app.auth, app.db.db, rosa);
     await test.admin.db.update(schema.user).set({ role: 'operator' }).where(eq(schema.user.id, rosaId));
     const owner = await signIn(server, quinn.email, quinn.password);
@@ -221,6 +230,10 @@ describe('Réglages › Sécurité (ADR 0046 § 7, SEC-04)', () => {
     expect(await me(operator)).toBe(401);
     const unknown = await request('POST', '/v1/settings/security/accounts/nobody/close-sessions', owner);
     expect([unknown.statusCode, codeOf(unknown)]).toEqual([404, 'account_not_found']);
+    // His own account would sign him out: he closes his other sessions above instead.
+    const own = await request('POST', `/v1/settings/security/accounts/${quinnId}/close-sessions`, owner);
+    expect([own.statusCode, codeOf(own)]).toEqual([409, 'account_current_conflict']);
+    expect(await me(owner)).toBe(200);
 
     // A sensitive action: a confirmation older than 10 minutes is asked again.
     await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now() - interval '11 minutes'` });

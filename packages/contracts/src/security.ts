@@ -152,6 +152,7 @@ export const SECURITY_SETTINGS_ERROR_CODES = [
   'session_not_found',
   'session_current_conflict',
   'account_not_found',
+  'account_current_conflict',
   REAUTHENTICATION_ERROR_CODE,
 ] as const;
 export type SecuritySettingsErrorCode = (typeof SECURITY_SETTINGS_ERROR_CODES)[number];

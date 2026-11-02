@@ -22,6 +22,7 @@ import { z } from 'zod';
 
 import {
   authHeaders,
+  SESSION_MAX_AGE_MS,
   identityConfirmed,
   ReauthenticationLimited,
   ReauthenticationRefused,
@@ -54,6 +55,16 @@ class CurrentSessionConflict extends DomainError {
     super(
       'session_current_conflict' satisfies SecuritySettingsErrorCode,
       'C’est la session de cet appareil : déconnecte-toi pour la fermer',
+    );
+  }
+}
+
+/** The owner's own account is closed from the list of its sessions above, never all at once: that would sign him out. */
+class OwnAccountConflict extends DomainError {
+  constructor() {
+    super(
+      'account_current_conflict' satisfies SecuritySettingsErrorCode,
+      'C’est ton compte : ferme tes autres sessions plus haut',
     );
   }
 }
@@ -121,7 +132,14 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
               updatedAt: schema.session.updatedAt,
             })
             .from(schema.session)
-            .where(and(eq(schema.session.userId, userId), sql`${schema.session.expiresAt} > now()`))
+            // Alive only: a session past its 7 days (ADR 0046 § 6) is refused at its next request, never shown.
+            .where(
+              and(
+                eq(schema.session.userId, userId),
+                sql`${schema.session.expiresAt} > now()`,
+                sql`${schema.session.createdAt} > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})`,
+              ),
+            )
             .orderBy(sql`${schema.session.updatedAt} desc`),
         );
         return {
@@ -169,20 +187,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
       async (request): Promise<ClosedSessions> => {
         const { userId, sessionId } = await signedIn(request);
         return withAdmin(adminDb, async (tx) => {
-          const sessions = await tx
-            .delete(schema.session)
-            .where(and(eq(schema.session.userId, userId), sql`${schema.session.id} <> ${sessionId}`))
-            .returning({ id: schema.session.id });
-          const trustedDevices = await tx
-            .delete(schema.verification)
-            .where(
-              and(
-                eq(schema.verification.value, userId),
-                sql`${schema.verification.identifier} like 'trust-device-%'`,
-              ),
-            )
-            .returning({ id: schema.verification.id });
-          const closed = { sessions: sessions.length, trustedDevices: trustedDevices.length };
+          const closed = await revokeSignIns(tx, userId, { keepSessionId: sessionId });
           await audit(tx, {
             userId,
             action: 'auth.sessions_revoked',
@@ -190,7 +195,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             ip: request.ip,
             details: { scope: 'others', revoked: closed.sessions, trustedDevices: closed.trustedDevices },
           });
-          return closed;
+          return { sessions: closed.sessions, trustedDevices: closed.trustedDevices };
         });
       },
     );
@@ -220,7 +225,12 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
         const { userId } = await signedIn(request);
         const { password, code } = request.body;
         if (!(await identityConfirmed(auth, request, userId, password, code))) {
-          await recordRefusal(adminDb, { userId, action: 'auth.reauthentication_refused', ip: request.ip });
+          // Counted for the alert of repeated refusals; a line that cannot be written never changes the answer.
+          try {
+            await recordRefusal(adminDb, { userId, action: 'auth.reauthentication_refused', ip: request.ip });
+          } catch (error) {
+            request.log.warn({ err: error }, 'security: a refusal could not be recorded');
+          }
           throw new ReauthenticationRefused();
         }
         const generated = GeneratedSchema.parse(
@@ -251,6 +261,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
               count(s.id)::int as sessions, max(s.updated_at) as last_active_at
             from "user" u
             left join session s on s.user_id = u.id and s.expires_at > now()
+              and s.created_at > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})
             where not exists (select 1 from team_members m where m.user_id = u.id and m.status = 'left')
             group by u.id
             order by (u.role = 'owner') desc, u.name`),
@@ -278,6 +289,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
       async (request): Promise<ClosedSessions> => {
         const { userId: ownerId } = await signedIn(request);
         const target = request.params.userId;
+        if (target === ownerId) throw new OwnAccountConflict();
         return withAdmin(adminDb, async (tx) => {
           const [account] = await tx
             .select({ id: schema.user.id })
