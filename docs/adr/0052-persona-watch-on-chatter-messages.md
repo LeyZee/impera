@@ -1,6 +1,6 @@
 # 0052. Le chatteur sous l'œil de la persona : chaque message qu'il écrit dans Reveal est relu, chaque écart lui est signalé, rien n'est bloqué ni retenu sur sa paie
 
-Statut : proposed (demande de Charles du 02/11/2026 à 20h17)
+Statut : accepted (Charles, 02/11/2026 21h34, « ok 0052 » ; demande du même jour à 20h17)
 Date : 2026-11-02
 Précise : l'ADR 0025 (§ Conséquences, « ce que le chatteur tape dans Reveal est hors des gardes de Nirvana » : toujours sans blocage, mais désormais relu et signalé) et l'ADR 0043 § 6 (les retours de l'IA de la semaine choisissent d'abord parmi les écarts relevés ici).
 S'appuie sur : l'ADR 0050 (les conversations ne se lisent que par la session capturée), l'ADR 0042 § 2 (la créatrice ne voit rien de l'équipe), l'ADR 0021 (rester en personnage), l'ADR 0010 (la persona et les données réelles hors du dépôt).
