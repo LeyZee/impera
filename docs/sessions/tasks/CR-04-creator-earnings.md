@@ -1,7 +1,7 @@
 # CR-04 Gains et ventes de la créatrice, au jour le jour
 Statut : todo (ADR 0042 § 6 et § 7, acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0042)
-Dépend de : CR-02, CR-03, EQ-01 (paramètres de plateforme)
+Dépend de : CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme)
 Branche : task/cr-04-creator-earnings
 
 ## Objectif
