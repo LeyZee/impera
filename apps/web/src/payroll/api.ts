@@ -187,7 +187,7 @@ const DetailsSchema = z
     today: z.string(),
     currency: z.string(),
     reason: PayoutBlockReasonSchema,
-    year: z.string(),
+    year: z.string().nullable(),
   })
   .partial();
 export type PayRefusalDetails = z.infer<typeof DetailsSchema>;

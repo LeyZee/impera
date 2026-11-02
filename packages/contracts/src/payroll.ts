@@ -657,20 +657,37 @@ export const StatementPaymentSchema = z.object({
 export type StatementPayment = z.infer<typeof StatementPaymentSchema>;
 
 /**
- * Why the transfer of a validated statement cannot be recorded (ADR 0041): under a tax treaty that sets the 182 B
+ * Why the transfer of a validated statement cannot be recorded (ADR 0041). The documents it pays are not all issued
+ * (`documents_not_issued`): the invoices less the credit notes of the statement and of those carried into it do not
+ * come to what it pays yet, and paying without an invoice is ruled out. Or, under a tax treaty that sets the 182 B
  * withholding aside, the contractor's tax residence certificate of the transfer's calendar year is missing or refused
  * (`tax_residence_missing`), or filed and not checked by the owner yet (`tax_residence_unverified`). The agency never
  * withholds 25 %: it does not pay.
  */
-export const PAYOUT_BLOCK_REASONS = ['tax_residence_missing', 'tax_residence_unverified'] as const;
+export const PAYOUT_BLOCK_REASONS = [
+  'documents_not_issued',
+  'tax_residence_missing',
+  'tax_residence_unverified',
+] as const;
 export const PayoutBlockReasonSchema = z.enum(PAYOUT_BLOCK_REASONS);
 export type PayoutBlockReason = z.infer<typeof PayoutBlockReasonSchema>;
 
-/** A transfer that waits (ADR 0041 § 4): why, and the calendar year the certificate must cover. */
-export const PayoutBlockSchema = z.object({
-  reason: PayoutBlockReasonSchema,
-  year: z.string().regex(/^\d{4}$/u),
-});
+/**
+ * A transfer that waits (ADR 0041 § 4): why, and for a certificate the calendar year it must cover (`null` for the
+ * documents).
+ */
+export const PayoutBlockSchema = z
+  .object({
+    reason: PayoutBlockReasonSchema,
+    year: z
+      .string()
+      .regex(/^\d{4}$/u)
+      .nullable(),
+  })
+  .refine((block) => (block.year === null) === (block.reason === 'documents_not_issued'), {
+    message: 'Une année pour une attestation, aucune pour les documents',
+    path: ['year'],
+  });
 export type PayoutBlock = z.infer<typeof PayoutBlockSchema>;
 
 /**
@@ -890,7 +907,8 @@ export type ValidateCommissionStatementBody = z.infer<typeof ValidateCommissionS
  * (`payment_before_period_unprocessable`). `reference` is refused when it holds an IBAN (400, `containsIban`).
  * `sentMinor` is what was sent, and it must be what the statement pays (`payment_amount_unprocessable`; whether another
  * amount may be recorded is a question the EQ-05 card keeps open): a statement that pays nothing, its total carried
- * over, stays validated.
+ * over, stays validated. The transfer waits (`payout_blocked_conflict`, ADR 0041) until the documents it pays are all
+ * issued, and under a tax treaty until the certificate of its year is accepted.
  */
 export const PayCommissionStatementBodySchema = z.object({
   revision: z.number().int().min(1),
@@ -935,8 +953,9 @@ export function mayValidateStatement(
  * `payment_in_future_unprocessable` 422, a payment dated after today in the agency's zone ;
  * `payment_before_period_unprocessable` 422, a payment dated before the first day of the statement's period ;
  * `payment_amount_unprocessable` 422, an amount sent that is not what the statement pays ;
- * `payout_blocked_conflict` 409, a transfer under a tax treaty without the contractor's tax residence certificate of
- * its calendar year accepted by the owner (ADR 0041, `details.reason` and `details.year`) ;
+ * `payout_blocked_conflict` 409, a transfer whose documents are not all issued, or under a tax treaty without the
+ * contractor's tax residence certificate of its calendar year accepted by the owner (ADR 0041, `details.reason` and
+ * `details.year`) ;
  * `cursor_invalid` 400, a page cursor the periods' list did not give ;
  * `payroll_entries_too_many_unprocessable` 422, more than `PAYROLL_ENTRIES_MAX` entries of a kind in one period ;
  * `payroll_own_forbidden` 403, one's own statement, bonus, penalty or adjustment ;

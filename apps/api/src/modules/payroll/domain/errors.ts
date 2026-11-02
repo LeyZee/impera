@@ -5,8 +5,9 @@ import {
   type ContractorDocumentDecision,
   type ContractorDocumentRefusal,
   type PayPeriod,
-  type PayoutBlockReason,
 } from '@nirvana/contracts';
+
+import type { PayoutHold } from './payouts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
 
@@ -114,18 +115,26 @@ export class CommissionStatementDocumentsOpen extends DomainError {
 }
 
 /**
- * A transfer under a tax treaty without the contractor's tax residence certificate of its calendar year accepted by
- * the owner (ADR 0041 § 2 and § 4): the agency never withholds 25 %, it does not pay.
+ * A transfer whose documents are not all issued, or under a tax treaty without the contractor's tax residence
+ * certificate of its calendar year accepted by the owner (ADR 0041 § 2 and § 4): no transfer without its invoice, and
+ * the agency never withholds 25 %, it does not pay.
  */
 export class PayoutBlocked extends DomainError {
-  constructor(reason: PayoutBlockReason, year: string) {
-    super(
-      'payout_blocked_conflict',
-      reason === 'tax_residence_missing'
-        ? `Versement bloqué : l’attestation de résidence fiscale ${year} de ce prestataire manque`
-        : `Versement bloqué : l’attestation de résidence fiscale ${year} de ce prestataire attend ta vérification`,
-      { details: { reason, year } },
-    );
+  constructor(hold: PayoutHold) {
+    super('payout_blocked_conflict', payoutBlockedMessage(hold), {
+      details: { reason: hold.reason, year: hold.year },
+    });
+  }
+}
+
+function payoutBlockedMessage(hold: PayoutHold): string {
+  switch (hold.reason) {
+    case 'documents_not_issued':
+      return 'Versement bloqué : les factures et avoirs de ce versement ne sont pas tous émis';
+    case 'tax_residence_missing':
+      return `Versement bloqué : l’attestation de résidence fiscale ${hold.year} de ce prestataire manque`;
+    case 'tax_residence_unverified':
+      return `Versement bloqué : l’attestation de résidence fiscale ${hold.year} de ce prestataire attend ta vérification`;
   }
 }
 

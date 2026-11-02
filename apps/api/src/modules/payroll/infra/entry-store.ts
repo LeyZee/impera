@@ -427,11 +427,11 @@ export function createDrizzlePayrollEntryStore(
           { period, payableMinor: row.payableMinor },
           calendarDayAt(now(), await reads.agencyTimeZone(tx)),
         );
-        // Under a tax treaty, the certificate of the transfer's year first (ADR 0041): never 25 % withheld, no transfer.
+        // Its documents all issued, and under a tax treaty the certificate of its year (ADR 0041): never 25 % withheld.
         const facts = (await payoutFactsOf(tx, [row.memberId])).get(row.memberId);
         if (facts === undefined) throw new Error('The contractor off the payout facts read');
         const payout = payoutDecision(facts, statementId, payment.paidOn);
-        if (payout.kind === 'blocked') throw new PayoutBlocked(payout.reason, payout.year);
+        if (payout.kind === 'blocked') throw new PayoutBlocked(payout);
         const certificateDocumentId = payout.kind === 'covered' ? payout.certificate.id : null;
         const paid = await tx
           .update(commissionStatements)

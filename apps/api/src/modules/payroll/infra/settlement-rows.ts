@@ -73,6 +73,7 @@ export async function settlementFactsOf(
       kind: invoices.kind,
       number: invoices.number,
       statementId: invoices.statementId,
+      exclVatMinor: invoices.exclVatMinor,
       // The regime as the document froze it at its issue.
       underTreaty: sql<boolean>`(${invoices.regime} ->> 'withholding') = 'treaty_exempt'`,
       // The outer table by hand: Drizzle writes a column of a one-table select without its table.
@@ -86,6 +87,7 @@ export async function settlementFactsOf(
       kind: one.kind === 'invoice' ? 'invoice' : 'credit_note',
       number: one.number,
       statementId: one.statementId,
+      exclVatMinor: one.exclVatMinor,
       settled: one.settled,
       underTreaty: one.underTreaty,
     });
