@@ -205,6 +205,15 @@ export function MemberSheet({
         <Link to="/paie/quinzaine" search={{ membre: member.id }} className="nv-btn nv-btn--plain nv-btn--sm">
           Son relevé
         </Link>
+        {canManage ? (
+          <Link
+            to="/equipe/membres/$memberId/dossier"
+            params={{ memberId: member.id }}
+            className="nv-btn nv-btn--plain nv-btn--sm"
+          >
+            Son dossier
+          </Link>
+        ) : null}
       </nav>
 
       {gone ? null : (

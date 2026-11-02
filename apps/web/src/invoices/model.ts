@@ -4,7 +4,6 @@ import {
   type InvoiceEvent,
   type InvoiceEventKind,
   type InvoiceListItem,
-  type PayPeriod,
 } from '@nirvana/contracts';
 
 import type { InvoiceRefusal } from './api';
@@ -175,17 +174,6 @@ export function deadlineText(
 export const answerable = (item: Pick<InvoiceListItem, 'acceptance'>): boolean =>
   item.acceptance.state === 'pending';
 
-/** The period of the statement a document leads to, when the screen knows it: an invoice bills its own period. */
-export function statementPeriodOf(
-  item: Pick<InvoiceListItem, 'kind' | 'corrective' | 'statementId' | 'period'>,
-  listed: PayPeriod | null,
-): PayPeriod | null {
-  if (item.statementId === null) return null;
-  if (item.kind === 'invoice' && !item.corrective) return item.period;
-  // A credit note or a corrective invoice listed under a quinzaine: its statement is that quinzaine's (the list's bound).
-  return listed;
-}
-
 /** The contests the owner has to settle first, then the rest, each group in the server's order. */
 export function contestsFirst<T extends Pick<InvoiceListItem, 'acceptance'>>(items: readonly T[]): T[] {
   return [
@@ -255,7 +243,7 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
     case 'billing_settings_missing_conflict':
       return 'Enregistre d’abord l’identité de l’agence dans Réglages › Facturation.';
     case 'billing_regime_backdated_unprocessable':
-      return 'Un régime s’attribue à partir d’aujourd’hui au plus tôt.';
+      return 'Un régime s’attribue à partir d’aujourd’hui au plus tôt, et après le dernier déjà attribué.';
     case 'billing_regime_country_unprocessable':
       return 'Ce régime n’est pas celui du pays du prestataire.';
     case 'billing_regime_id_conflict':
@@ -305,6 +293,8 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
       return 'Ton rôle ne permet pas ce geste.';
     case 'request_invalid':
       return 'Ces valeurs ne conviennent pas : vérifie le formulaire.';
+    case 'team_member_not_found':
+      return 'Ce membre n’existe plus, ou son dossier n’est pas à toi.';
   }
 }
 

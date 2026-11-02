@@ -91,8 +91,11 @@ describe('railOf, with the screens of today', () => {
     // Nor Entraîner: the server keeps the playground to the owner.
     // Nor Réglages: every page of it is the owner's (NAV-18).
     expect(labels(operator)).toEqual(['Dashboard', 'Suivi', 'Créatrices']);
-    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie']);
-    expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions']);
+    // Moi, the fifth tab of the manager and the chatter, on the phone's bar too (EQ-06 lot 8b): no « Plus ».
+    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Moi']);
+    expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
+    expect(railOf(manager).more.size).toBe(0);
+    expect(railOf(chatter).more.size).toBe(0);
     // A creator never sees a conversation (ADR 0023): no Suivi. Her Créatrices is her own persona (NAV-18).
     expect(labels(creator)).toEqual(['Dashboard', 'Persona']);
   });

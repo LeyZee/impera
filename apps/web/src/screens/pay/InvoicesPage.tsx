@@ -9,7 +9,6 @@ import { useAgencyToday, useCurrentPeriod } from './data';
 import { Empty, Loading, PeriodArrows, Unreachable } from './parts';
 
 import { useInvoices, useInvoiceYears } from '@/invoices/api';
-import { statementPeriodOf } from '@/invoices/model';
 import '@/payroll/pay.css';
 import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
@@ -71,13 +70,13 @@ export function InvoicesPage({
     team.find((one) => one.id === memberId)?.displayName ?? 'Un membre';
   const mine = (memberId: string): boolean => team.find((one) => one.id === memberId)?.userId === user.id;
 
-  const row = (item: InvoiceListItem, listed: PayPeriod | null, zone: string): JSX.Element => (
+  const row = (item: InvoiceListItem, zone: string): JSX.Element => (
     <InvoiceRow
       item={item}
       who={nameOf(item.memberId)}
       reader={{ contractor: mine(item.memberId), agency: true, owner }}
       timeZone={zone}
-      statementPeriod={statementPeriodOf(item, listed)}
+      statementPeriod={item.statementPeriod}
       onAnswer={(answer) => {
         setOpened({ kind: 'answer', item, answer });
       }}
@@ -90,11 +89,11 @@ export function InvoicesPage({
     />
   );
 
-  const list = (items: readonly InvoiceListItem[], listed: PayPeriod | null, zone: string): JSX.Element => (
+  const list = (items: readonly InvoiceListItem[], zone: string): JSX.Element => (
     <ul className="iv-list">
       {items.map((item, index) => (
         <li key={item.id} className="nv-enter" style={{ '--nv-i': Math.min(index, 8) }}>
-          {row(item, listed, zone)}
+          {row(item, zone)}
         </li>
       ))}
     </ul>
@@ -119,7 +118,7 @@ export function InvoicesPage({
               what="la liste des contestations"
               lead={owner ? null : 'Le propriétaire les tranche.'}
             >
-              {(items) => list(items, null, timeZone)}
+              {(items) => list(items, timeZone)}
             </Waiting>
             <Waiting
               query={dues}
@@ -127,7 +126,7 @@ export function InvoicesPage({
               what="la liste des échéances"
               lead={null}
             >
-              {(items) => list(items, null, timeZone)}
+              {(items) => list(items, timeZone)}
             </Waiting>
           </>
         )}
@@ -196,7 +195,7 @@ export function InvoicesPage({
                 text="Les factures s’émettent à la validation des relevés, pour chaque membre au dossier complet."
               />
             ) : (
-              <div className="rp-sec">{list(byPeriod.data.documents, period, timeZone)}</div>
+              <div className="rp-sec">{list(byPeriod.data.documents, timeZone)}</div>
             )
           ) : timeZone === null ? (
             <Loading rows={3} />
@@ -205,9 +204,10 @@ export function InvoicesPage({
               years={byMember}
               today={today}
               what="la liste des documents"
+              hint="Ses factures s’émettent à la validation de ses relevés, une fois son dossier complet."
               first={`${chosenName ?? 'Ce membre'} n’a aucun document sur les dix dernières années : ses factures s’émettent à la validation de ses relevés, une fois son dossier complet.`}
               older="Le serveur ne répond pas : les documents plus anciens n’ont pas pu être lus."
-              row={(item) => row(item, null, timeZone)}
+              row={(item) => row(item, timeZone)}
             />
           )}
         </Panel>

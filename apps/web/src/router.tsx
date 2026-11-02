@@ -12,6 +12,8 @@ import { creatorsSearch, parseCreatorsSearch } from './creators/search';
 import { parsePaySearch } from './payroll/model';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
+import { MyFilePage } from './screens/me/MyFilePage';
+import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
 import { GoalsPage } from './screens/pay/GoalsPage';
@@ -31,6 +33,7 @@ import {
   SettingsLayout,
   TelegramPage,
 } from './screens/settings/SettingsLayout';
+import { MemberFilePage } from './screens/team/MemberFilePage';
 import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
@@ -264,6 +267,23 @@ const teamMembers = createRoute({
   },
 });
 
+// A member's file (EQ-06 lot 8b), the owner's alone: anyone else is sent back to the members.
+const teamMemberFile = createRoute({
+  getParentRoute: () => team,
+  path: '/membres/$memberId/dossier',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/equipe/membres', replace: true });
+    }
+  },
+  component: function MemberFile() {
+    const { memberId } = teamMemberFile.useParams();
+    const { user } = rootRoute.useRouteContext();
+    return <MemberFilePage user={user} memberId={memberId} />;
+  },
+});
+
 const pay = createRoute({ getParentRoute: () => rootRoute, path: '/paie' });
 const payIndex = createRoute({
   getParentRoute: () => pay,
@@ -373,6 +393,41 @@ const commissionsInvoices = createRoute({
   getParentRoute: () => commissions,
   path: '/factures',
   component: MyInvoicesPage,
+});
+
+// Moi (ADR 0024, EQ-06 lot 8b): the file of a chatter and of a manager, and the manager's own invoices, which a
+// chatter reads in Commissions.
+const me = createRoute({ getParentRoute: () => rootRoute, path: '/moi' });
+const meIndex = createRoute({
+  getParentRoute: () => me,
+  path: '/',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/moi/dossier', replace: true });
+  },
+});
+const meFile = createRoute({
+  getParentRoute: () => me,
+  path: '/dossier',
+  component: function MyFile() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyFilePage user={user} />;
+  },
+});
+const meInvoices = createRoute({
+  getParentRoute: () => me,
+  path: '/factures',
+  // A manager's: a chatter, or a manager on leave with the chatter's rail, reads his in Commissions.
+  beforeLoad: ({ context }) => {
+    if (context.user.teamScope !== 'agency') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/commissions/factures', replace: true });
+    }
+  },
+  component: function MyOwnInvoices() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyOwnInvoicesPage user={user} />;
+  },
 });
 
 const train = createRoute({ getParentRoute: () => rootRoute, path: '/entrainer', component: TrainLayout });
@@ -503,9 +558,10 @@ const routeTree = rootRoute.addChildren([
   trackingAlerts,
   today,
   myPlanning,
-  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers]),
+  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
+  me.addChildren([meIndex, meFile, meInvoices]),
   settings.addChildren([
     settingsIndex,
     aiModels,

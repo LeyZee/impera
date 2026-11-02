@@ -121,7 +121,7 @@ export const invoicePdfUrl = (invoiceId: string): string => `${BASE}/${invoiceId
 
 /** Besides the invoices' own: an end of a contest by anyone but the owner, a role guard, a body let through. */
 export type InvoiceRefusalCode =
-  InvoiceErrorCode | 'payroll_forbidden' | 'role_forbidden' | 'request_invalid';
+  InvoiceErrorCode | 'payroll_forbidden' | 'role_forbidden' | 'request_invalid' | 'team_member_not_found';
 
 const DetailsSchema = z.object({ reason: z.string() }).partial();
 
@@ -141,6 +141,7 @@ const KNOWN: ReadonlySet<string> = new Set<string>([
   'payroll_forbidden',
   'role_forbidden',
   'request_invalid',
+  'team_member_not_found',
 ]);
 const isKnown = (code: string): code is InvoiceRefusalCode => KNOWN.has(code);
 
@@ -151,24 +152,39 @@ async function refusalOf(response: Response): Promise<InvoiceRefusal> {
   return { kind: 'refused', code: parsed.data.error.code, details: details.success ? details.data : {} };
 }
 
-async function answer(
-  invoiceId: string,
-  path: string,
-  body: unknown,
-): Promise<InvoiceOutcome<InvoiceAcceptanceView>> {
+/** What a write sends: a JSON body, or a file's bytes as they are. */
+export type WriteBody = { readonly json: unknown } | { readonly bytes: Blob };
+
+/**
+ * A write to the payroll API (the invoices, the contractor's file): its answer parsed with the contract, or its refusal
+ * by code; a server that does not answer, or answers what the contract does not know, is `failed`.
+ */
+export async function write<T>(
+  url: string,
+  method: 'POST' | 'PUT',
+  body: WriteBody,
+  schema: z.ZodType<T>,
+): Promise<InvoiceOutcome<T>> {
   try {
-    const response = await fetch(`${BASE}/${invoiceId}/${path}`, {
-      method: 'POST',
+    const response = await fetch(url, {
+      method,
       credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: { 'content-type': 'json' in body ? 'application/json' : 'application/octet-stream' },
+      body: 'json' in body ? JSON.stringify(body.json) : body.bytes,
     });
     if (!response.ok) return await refusalOf(response);
-    return { kind: 'ok', value: InvoiceAcceptanceViewSchema.parse(await response.json()) };
+    return { kind: 'ok', value: schema.parse(await response.json()) };
   } catch {
     return { kind: 'failed' };
   }
 }
+
+const answer = (
+  invoiceId: string,
+  path: string,
+  body: unknown,
+): Promise<InvoiceOutcome<InvoiceAcceptanceView>> =>
+  write(`${BASE}/${invoiceId}/${path}`, 'POST', { json: body }, InvoiceAcceptanceViewSchema);
 
 /** « J'accepte » : the contractor alone; the same answer sent again gives the view back. */
 export const acceptInvoice = (invoiceId: string): Promise<InvoiceOutcome<InvoiceAcceptanceView>> =>

@@ -211,3 +211,69 @@ describe('App signing out', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+describe('App on the screens of a contractor’s file', () => {
+  const member = (role: 'chatter' | 'manager'): Me => ({
+    id: `u-${role}`,
+    email: `${role}@example.test`,
+    name: role === 'chatter' ? 'Théo' : 'Iris',
+    role: 'operator',
+    creatorIds: [],
+    routedCreatorIds: [],
+    team: { role, status: 'active' },
+    teamScope: role === 'chatter' ? 'self' : 'agency',
+  });
+
+  function serveAs(me: Me): void {
+    vi.stubGlobal('scrollTo', vi.fn());
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) =>
+        input === '/v1/me'
+          ? Promise.resolve(Response.json(me))
+          : // The screens stay on their loading state: only where each address leads is under test.
+            new Promise<Response>(() => undefined),
+      ),
+    );
+  }
+
+  it('leads Moi to its file, and a chatter’s own invoices to Commissions, where he reads them', async () => {
+    serveAs(member('chatter'));
+    window.history.replaceState(null, '', '/moi');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Dossier' })).toBeDefined();
+    expect(window.location.pathname).toBe('/moi/dossier');
+    cleanup();
+    window.history.replaceState(null, '', '/moi/factures');
+    render(<App />);
+    await vi.waitFor(() => {
+      expect(window.location.pathname).toBe('/commissions/factures');
+    });
+  });
+
+  it('gives a manager his own invoices in Moi, and keeps a member’s file to the owner', async () => {
+    serveAs(member('manager'));
+    window.history.replaceState(null, '', '/moi/factures');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Factures' })).toBeDefined();
+    expect(window.location.pathname).toBe('/moi/factures');
+    cleanup();
+    window.history.replaceState(null, '', '/equipe/membres/0199f2a0-0000-7000-8000-000000000021/dossier');
+    render(<App />);
+    await vi.waitFor(() => {
+      expect(window.location.pathname).toBe('/equipe/membres');
+    });
+  });
+});
