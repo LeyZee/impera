@@ -17,9 +17,11 @@ import type {
   ShiftId,
   ShiftReportId,
   ShiftReportStatus,
+  ShiftSlot,
   ShiftSwapRequestId,
   ShiftSwapStatus,
   ShiftTemplateId,
+  SlotSeat,
   TeamMemberId,
   TeamMemberStatus,
   TeamScope,
@@ -141,6 +143,14 @@ export interface PlanningClock {
   readonly timeZone: string;
 }
 
+/** A version of the créneaux to write: when it takes effect, in which zone, its créneaux and its places. */
+interface NewSlotVersion {
+  readonly effectiveAt: Date;
+  readonly timeZone: string;
+  readonly slots: readonly ShiftSlot[];
+  readonly seats: readonly SlotSeat[];
+}
+
 /**
  * Storage of the planning, implemented in `infra/` with `withTenantMember`: the policies decide what each scope
  * reads, and the rules that need stored rows (a member's status, a shift under way) run in the same transaction.
@@ -158,6 +168,17 @@ export interface PlanningStore {
   ): Promise<SchedulingSettings>;
   /** Owner: the zone and the margin. */
   saveSettings(actor: Actor, settings: SchedulingSettingsInput): Promise<void>;
+  /**
+   * Owner: a version of the créneaux and its places, at `effectiveAt` (ahead), in the zone of the grid then (ADR 0049
+   * § 1); its id. `slot_version_conflict` on another version's instant, `platform_account_not_found` for a place on an
+   * account that does not exist, `slot_version_date_invalid` when its instant has passed by the write.
+   */
+  addSlotVersion(actor: Actor, version: NewSlotVersion): Promise<string>;
+  /**
+   * Owner: withdraws a version still ahead, its places with it. `slot_version_not_found`, or
+   * `slot_version_effective_conflict` once it took effect.
+   */
+  withdrawSlotVersion(actor: Actor, id: string): Promise<void>;
   read(
     actor: UserId,
     creatorIds: readonly CreatorId[],

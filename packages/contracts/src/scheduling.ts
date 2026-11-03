@@ -198,6 +198,42 @@ export const SchedulingSettingsInputSchema = z.strictObject({
 });
 export type SchedulingSettingsInput = z.infer<typeof SchedulingSettingsInputSchema>;
 
+/**
+ * `POST /v1/scheduling/settings/versions` (ADR 0049 § 1 and § 2, the owner's alone): new créneaux and their places.
+ * `startsOn` is the Monday they take effect, at the first créneau's start in the grid's zone; `null` is « tout de
+ * suite » for the créneaux not begun: from the next start of one of them. Never in the past, never on the instant of
+ * another version. A place names a créneau of the list and an account once; 1 is the default, so only 2 needs saying.
+ */
+export const SlotVersionInputSchema = z
+  .strictObject({
+    startsOn: CalendarDaySchema.nullable(),
+    slots: ShiftSlotsSchema,
+    seats: z.array(SlotSeatSchema).max(SHIFT_SLOTS_MAX * 64),
+  })
+  .superRefine((version, context) => {
+    const named = new Set<string>();
+    for (const [index, seat] of version.seats.entries()) {
+      const key = `${String(seat.slotRank)}:${seat.platformAccountId}`;
+      if (seat.slotRank >= version.slots.length)
+        context.addIssue({
+          code: 'custom',
+          message: 'Une place nomme un créneau de sa version',
+          path: ['seats', index],
+        });
+      else if (named.has(key))
+        context.addIssue({
+          code: 'custom',
+          message: 'Une place par créneau et par compte',
+          path: ['seats', index],
+        });
+      named.add(key);
+    }
+  });
+export type SlotVersionInput = z.infer<typeof SlotVersionInputSchema>;
+
+/** `DELETE /v1/scheduling/settings/versions/:id`: a version still ahead (ADR 0049 § 1). */
+export const SlotVersionParamsSchema = z.object({ id: z.uuid() });
+
 /** `GET /v1/scheduling/settings?at=…`: the créneaux in force at `at` (now by default), and those ahead of it. */
 export const SchedulingSettingsQuerySchema = z.object({ at: z.iso.datetime().optional() });
 
@@ -823,5 +859,9 @@ export const SCHEDULING_ERROR_CODES = [
   'shift_swap_self_invalid',
   'calendar_link_forbidden',
   'calendar_feed_not_found',
+  'slot_version_not_found',
+  'slot_version_conflict',
+  'slot_version_effective_conflict',
+  'slot_version_date_invalid',
 ] as const;
 export type SchedulingErrorCode = (typeof SCHEDULING_ERROR_CODES)[number];

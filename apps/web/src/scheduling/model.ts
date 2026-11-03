@@ -73,6 +73,10 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_swap_self_invalid: 'Un échange se fait avec un collègue.',
   calendar_link_forbidden: 'Le lien de calendrier est réservé aux membres de l’équipe.',
   calendar_feed_not_found: 'Ce lien de calendrier n’est plus valable.',
+  slot_version_not_found: 'Ce réglage des créneaux n’existe plus : la liste est relue.',
+  slot_version_conflict: 'Un autre réglage des créneaux prend déjà effet à cet instant.',
+  slot_version_effective_conflict: 'Ce réglage des créneaux a déjà pris effet : il ne se retire plus.',
+  slot_version_date_invalid: 'Un réglage des créneaux prend effet un lundi à venir.',
   role_forbidden: 'Ton accès au planning a changé. Recharge la page.',
   request_invalid: 'Ces valeurs ne vont pas : vérifie les heures et le jour.',
 };
