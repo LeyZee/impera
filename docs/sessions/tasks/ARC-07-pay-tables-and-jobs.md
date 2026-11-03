@@ -1,5 +1,5 @@
 # ARC-07 Une table lue par son seul propriétaire, un job par tâche
-Statut : in_progress (lot a fusionné, #415 ; lot b)
+Statut : in_progress (lots a à c fusionnés, #415, #418, #419 ; lot d)
 Phase : exploitation
 Dépend de : ADR 0047 § 1, ARC-06
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
@@ -21,7 +21,7 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 - **a** : le test d'architecture et la liste exacte des lectures encore ouvertes (38, dans 9 fichiers) ; les deux remarques de README d'Équipe sur ARC-06 ; ARC-06 passée à done.
 - **b** : le dossier (`contractors`) : le préfixe figé par une première facture (`invoices`) et l'attestation d'un versement (`commission_statements`), par des ports que déclare `contractors` (il n'importe aucun des trois autres) et que branche le composition root.
 - **c** : les exports (`accounting`) : relevés, reports, dossiers, réglages et documents lus par les `index.ts` de leurs propriétaires, dans la transaction de l'export.
-- **d** : les factures (`invoicing`) : relevés, lignes, saisies et reports de la paie, dossier, régimes, pièces, contrats et réglages du dossier, lus par les `index.ts` de leurs propriétaires ; `reviewOf` et `regimeVatOf` quittent l'`index.ts` de `contractors` s'ils ne servent plus.
+- **d** : les factures (`invoicing`) : relevés, lignes, saisies et reports de la paie, dossier, régimes, pièces, contrats et réglages du dossier, lus par les `index.ts` de leurs propriétaires ; `reviewOf` et `regimeVatOf` quittent l'`index.ts` de `contractors` s'ils ne servent plus. En deux PR : **d1** les tables de la paie, **d2** celles du dossier.
 
 ## À faire (liste vérifiable)
 
@@ -29,7 +29,8 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 - [x] a. README d'`invoicing` : en-tête des règles pures sans `domain/accounting.ts`, première puce renvoyée au dossier, migration 0045 des PDF ; renvoi à `OPEN_CROSSINGS` dans les trois README ; `modules.md`.
 - [x] b. Lectures de `contractors` fermées : `ContractorInvoiceReads.hasDocument` (`invoiceReadsForContractors` d'`invoicing`) et `ContractorPayReads.paidOn` (`payReadsForContractors` de `payroll`), branchés par `wiring/contractors.ts`.
 - [x] c. Lectures d'`accounting` fermées : `payReadsForAccounting`, `invoiceReadsForAccounting` et `contractorReadsForAccounting`, lus par l'`index.ts` de chaque propriétaire dans la transaction de l'export.
-- [ ] d. Lectures d'`invoicing` fermées ; `OPEN_CROSSINGS` vide, puis retiré.
+- [x] d1. Lectures par `invoicing` des tables de la paie fermées : `payReadsForInvoicing`, lu par l'`index.ts` de `payroll` dans la transaction de l'appelant.
+- [ ] d2. Lectures par `invoicing` des tables du dossier fermées ; `OPEN_CROSSINGS` vide, puis retiré.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
@@ -51,3 +52,4 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 - 02/11, lot a : `crontab.ts` met aussi des jobs en file, hors des modules donc hors du test ; aujourd'hui seulement des balayages (relecture de Bilan).
 - 03/11, lot b : l'attestation d'un versement lisait relevé et pièce dans une seule jointure ; elle lit maintenant le journal et la pièce, puis le jour de chaque virement encore payé par `paidOn`, dans la même transaction, et trie comme avant (jour du virement, puis id dans l'ordre des `uuid` de Postgres). Le préfixe figé garde sa requête, déplacée chez son propriétaire.
 - 03/11, lot c : `accounting` dépend déjà des trois autres, donc il importe leurs lecteurs directement, sans port branché par le composition root. Les requêtes sont déplacées telles quelles. Les deux qui changent de forme : l'union des membres d'une période (documents puis virements, sans doublon, dans le même ordre d'arrivée, que l'export ne lit pas) et le nom figé par un document, lu par Zod au lieu de `contractor ->> 'legalName'` (`null` quand la copie n'en a pas, comme avant). Le journal lit les dossiers avec le pays de la fiche, comme la DAS2 : le propriétaire voit chaque membre, donc la jointure ne retire personne.
+- 03/11, lot d1 : les sous-requêtes corrélées sur `commission_statements` deviennent des lectures de la paie dans la même transaction : le filtre d'une quinzaine prend les relevés de la quinzaine puis garde les documents émis par l'un d'eux, ou sans relevé et de cette quinzaine (la clé étrangère et la même politique de lecture garantissent que le relevé d'un document existe et se lit là où le document se lit) ; la quinzaine du relevé, le jour du virement et le relevé d'une facture contestée sont lus après les documents. La relance de l'émission lit les `invoice_not_issued` de `domain_events` côté factures, puis la paie garde les relevés validés ou payés, triés comme avant (quinzaine, puis id). Les lignes de l'annexe restent jointes à leurs comptes chez la paie, pour garder le tri de Postgres.

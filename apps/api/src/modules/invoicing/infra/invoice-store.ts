@@ -25,7 +25,7 @@ import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transacti
 import { z } from 'zod';
 
 import { regimeVatOf, reviewOf } from '../../contractors';
-import { CountedSchema } from '../../payroll';
+import { CountedSchema, payReadsForInvoicing as payReads, type StatementForInvoicing } from '../../payroll';
 import type { IssueWarning } from '../domain/billing';
 import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
@@ -39,8 +39,6 @@ const {
   billingRegimes,
   billingRegimeValidations,
   billingSettings,
-  commissionStatementLines,
-  commissionStatements,
   contractAcceptances,
   contractorDocumentReviews,
   contractorDocuments,
@@ -52,12 +50,11 @@ const {
   invoiceEvents,
   invoiceLines,
   invoices,
-  payAdjustments,
   platformAccounts,
   teamMembers,
 } = schema;
 
-type Statement = typeof commissionStatements.$inferSelect;
+type Statement = StatementForInvoicing;
 
 /** What an invoice's credit notes took off, summed by Postgres as a `bigint` text: a whole amount, never negative. */
 const CreditedSchema = z.coerce.number().int().nonnegative();
@@ -68,20 +65,7 @@ const CreditedSchema = z.coerce.number().int().nonnegative();
  * accounts, and the period each adjustment corrects, that of the statement it cites.
  */
 async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceSource> {
-  const rows = await tx
-    .select({
-      platformAccountId: commissionStatementLines.platformAccountId,
-      netMinor: commissionStatementLines.netMinor,
-      commissionMinor: commissionStatementLines.commissionMinor,
-    })
-    .from(commissionStatementLines)
-    .where(
-      and(
-        eq(commissionStatementLines.statementId, statement.id),
-        eq(commissionStatementLines.revision, statement.revision),
-      ),
-    )
-    .orderBy(commissionStatementLines.platformAccountId);
+  const rows = await payReads.linesOf(tx, statement.id, statement.revision);
   const perAccount = new Map<string, { netMinor: number; commissionMinor: number }>();
   for (const row of rows) {
     const one = perAccount.get(row.platformAccountId) ?? { netMinor: 0, commissionMinor: 0 };
@@ -106,25 +90,15 @@ async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceS
   const corrected = counted.adjustments.flatMap((one) =>
     one.correctsStatementId === null ? [] : [one.correctsStatementId],
   );
-  const correctedPeriods =
-    corrected.length === 0
-      ? []
-      : await tx
-          .select({ id: commissionStatements.id, period: commissionStatements.period })
-          .from(commissionStatements)
-          .where(inArray(commissionStatements.id, corrected));
-  const periodOf = new Map(correctedPeriods.map((row) => [row.id, PayPeriodSchema.parse(row.period)]));
+  const periodOf = new Map(
+    [...(await payReads.periodsOf(tx, corrected))].map(([id, period]) => [id, PayPeriodSchema.parse(period)]),
+  );
   // The document whose upheld contest each adjustment corrects (ADR 0039 § 3): read from the row, which never changes,
   // and not from the statement's copy of the entries, whose shape its inputs' hash keeps.
-  const adjustmentIds = counted.adjustments.map((one) => one.id);
-  const contested =
-    adjustmentIds.length === 0
-      ? []
-      : await tx
-          .select({ id: payAdjustments.id, contestedInvoiceId: payAdjustments.contestedInvoiceId })
-          .from(payAdjustments)
-          .where(inArray(payAdjustments.id, adjustmentIds));
-  const contestedOf = new Map(contested.map((row) => [row.id, row.contestedInvoiceId]));
+  const contestedOf = await payReads.contestsOf(
+    tx,
+    counted.adjustments.map((one) => one.id),
+  );
   const rules = CommissionStatementRulesSchema.parse(statement.rules);
   const tier = BonusTierSchema.nullable().parse(statement.tierBonus);
   return {
@@ -512,18 +486,12 @@ export function createDrizzlePayrollInvoiceStore(
   return {
     issueUnscoped: (statementId: CommissionStatementId, plan) =>
       withAdmin(adminDb, async (tx) => {
-        const [found] = await tx
-          .select({ memberId: commissionStatements.memberId })
-          .from(commissionStatements)
-          .where(eq(commissionStatements.id, statementId));
-        if (found === undefined) return { kind: 'not_validated' };
+        const memberId = await payReads.memberOfStatement(tx, statementId);
+        if (memberId === null) return { kind: 'not_validated' };
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`invoices.issue:${found.memberId}`}, 0))`,
+          sql`select pg_advisory_xact_lock(hashtextextended(${`invoices.issue:${memberId}`}, 0))`,
         );
-        const [statement] = await tx
-          .select()
-          .from(commissionStatements)
-          .where(eq(commissionStatements.id, statementId));
+        const statement = await payReads.statementOf(tx, statementId);
         if (statement === undefined || CommissionStatementStatusSchema.parse(statement.status) === 'draft') {
           return { kind: 'not_validated' };
         }
