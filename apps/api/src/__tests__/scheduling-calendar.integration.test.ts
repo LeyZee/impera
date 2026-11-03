@@ -196,6 +196,11 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
           [ines, 'copilot', 'always'],
         ].toSorted(),
       );
+      // Always open: he answers the whole window, read on her clock by the server.
+      expect(read.agent.map((agent) => agent.answers)).toEqual([
+        [{ startsAt: from.toISOString(), endsAt: to.toISOString() }],
+        [{ startsAt: from.toISOString(), endsAt: to.toISOString() }],
+      ]);
       const agency = read.agency;
       expect(agency).not.toBeNull();
       if (agency === null) return;
@@ -320,6 +325,7 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     });
     const stopped = await calendar(owner);
     expect(stopped.agent.map((agent) => agent.mode)).toEqual(['stop', 'stop']);
+    expect(stopped.agent.map((agent) => agent.answers)).toEqual([[], []]);
     await expectSameModeAsDashboard(stopped);
     expect(stopped.agency?.aiAlone).toEqual([]);
     expect(stopped.agency?.toFill).toHaveLength(8);
