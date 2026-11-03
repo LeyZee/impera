@@ -1,0 +1,65 @@
+/*
+ * Créatrices › Pourcentage (CR-04). The head, panel, blocks, hints and errors are the persona's (`ps-*`); only the two
+ * fields side by side and the history live here, prefixed `ar-`. A percentage is data, not an alarm: a warm neutral,
+ * never the neon; the one neon of the screen is « Enregistrer » in the confirmation.
+ */
+.ar-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.ar-percent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ar-percent .ps-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.ar-percent__sign {
+  color: var(--nv-ink-muted);
+}
+
+.ar-notice {
+  color: var(--nv-ink);
+}
+
+.ar-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ar-history__row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+}
+.ar-history__value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ar-history__day {
+  color: var(--nv-ink-muted);
+  min-width: 0;
+}
+.ar-history__tag {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.ar-history__row[data-standing='current'] .ar-history__tag {
+  color: var(--nv-ink);
+}
+.ar-history__row[data-standing='past'] .ar-history__value {
+  color: var(--nv-ink-muted);
+  font-weight: 400;
+}

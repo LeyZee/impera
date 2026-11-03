@@ -716,7 +716,10 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
         'Parle à la persona comme un fan, avant qu’un vrai fan ne la lise : rien n’est envoyé.',
       ],
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
-      ['/creatrices', 'La fiche de chaque créatrice : sa persona, ses heures d’activité et son accès.'],
+      [
+        '/creatrices',
+        'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.',
+      ],
     ] as const) {
       renderApp(owner, path);
       const title = await screen.findByRole('heading', { level: 1 });

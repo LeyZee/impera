@@ -117,6 +117,40 @@ export const accountPayRules = pgTable(
   ],
 );
 
+/**
+ * The agency's percentage of a creator from `from_day` on (contracts `agency-rates.ts`, ADR 0042 § 6, CR-04): one per
+ * creator and day at most, whole basis points, never a default. Read and added by the owner alone, inside
+ * `withTenantMember` of that creator: neither a manager, nor a chatter, nor her own account reads it (her earnings are
+ * computed by the server). Added only, like an account's pay rules: a mistake is put right by the next percentage.
+ */
+export const creatorAgencyRates = pgTable(
+  'creator_agency_rates',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    fromDay: date('from_day').notNull(),
+    agencyBps: integer('agency_bps').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('creator_agency_rates_creator_day_unique').on(t.creatorId, t.fromDay),
+    check('creator_agency_rates_bps_check', sql`${t.agencyBps} between 0 and 10000`),
+    pgPolicy('owner_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}`,
+    }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.createdBy} = ${currentUser}`,
+    }),
+  ],
+);
+
 /*
  * Commission statements (EQ-04, contracts `payroll.ts`). Out of the creators' RLS (no `creator_id`): a member reads
  * their own rows, the scope `owner` | `agency` of `withMember` reads every row. Statements and their lines are written
