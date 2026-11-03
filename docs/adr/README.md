@@ -88,3 +88,4 @@ Date : AAAA-MM-JJ
 | 0062 | Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel | accepted |
 | 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte ») |
 | 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | accepted (remplace dans 0056 § 3 la phrase sur la palette) |
+| 0066 | Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret | accepted (précise 0008 et 0062 § 8) |

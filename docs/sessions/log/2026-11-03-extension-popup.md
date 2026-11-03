@@ -1,0 +1,7 @@
+# 2026-11-03 — Popup de l'extension : connexion par le CRM, état, raccourcis (ADR 0066) — in progress
+Fait : ADR 0066 (proposed) ; popup refait (`apps/extension/src/entrypoints/popup`) : lecture de `GET /v1/me` à l'adresse du CRM avec le cookie du navigateur, écrans Déconnecté, Connecté (bonjour, compte, onglet Reveal ou Instagram, raccourcis par rôle), Code à activer, CRM injoignable, Autoriser l'adresse, Adresse du CRM ; Nuit et Jour selon l'appareil ; `key` publique dans le manifeste (ID fixe), `storage` et `activeTab`, `localhost` en droit d'hôte, `https://*/*` en optionnel ; modules purs `lib/` testés (53 tests).
+Pas fait : capture Reveal (P2), liaison par personne (VEI-01 b), veille (VEI-02).
+Décisions : on se connecte dans le CRM, jamais dans le popup (les clés d'accès sont liées au domaine du CRM) ; le popup n'écrit rien dans l'API ; une adresse dont Chrome encoderait l'hôte (`crm impera` → `crm%20impera`) est refusée.
+Vérifié : dans Chromium avec l'extension chargée et un CRM factice, un cookie `HttpOnly; SameSite=Lax` posé par le CRM part bien avec la lecture du popup (Déconnecté → Connecté). Captures Nuit et Jour : `/mnt/project-files/extension/popup-v1/`.
+Découvertes : aucune fiche pour le panneau latéral commun (copilote + supervision ADR 0052) ; idées d'usages listées dans `/mnt/project-files/extension/a-quoi-sert-l-extension.md`, à trancher par Charles.
+Candidats à suppression : aucun.
