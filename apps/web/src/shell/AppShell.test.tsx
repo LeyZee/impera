@@ -619,6 +619,26 @@ describe('the shell while a screen loads (review of #313)', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 
+  it('says nothing when the app opens on its own address, for a rail without the Dashboard (relecture #484)', async () => {
+    const creator: Me = { ...base, role: 'creator', creatorIds: [], team: null, teamScope: 'self' };
+    for (const [user, home] of [
+      [creator, '/aujourdhui'],
+      [chatter, '/aujourdhui'],
+    ] satisfies [Me, string][]) {
+      const router = renderApp(user, '/');
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(home);
+      });
+      await screen.findByRole('navigation', { name: 'Navigation' });
+      const region = screen
+        .getAllByRole('status')
+        .find((node) => node.classList.contains('nv-notice-region'));
+      expect(region?.textContent).toBe('');
+      expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
+      cleanup();
+    }
+  });
+
   it('says it once: neither « Précédent » nor a reload says it again', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
