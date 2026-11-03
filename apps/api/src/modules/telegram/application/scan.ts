@@ -85,13 +85,18 @@ export async function scanEvents(deps: ScanDeps): Promise<number> {
     const outcome = classify(event.signal, await nameOf(event), await memberNameOf(event));
     let deliveries: readonly NewDelivery[] = [];
     if (outcome?.kind === 'notice') {
+      const routedTo = outcome.allCreatorsOnly === true ? null : event.creatorId;
       const reach = (topic: TelegramTopic) =>
-        chatsFor(routes, event.creatorId, topic).filter((id) => reachable.has(id));
+        chatsFor(routes, routedTo, topic).filter((id) => reachable.has(id));
       let notice = outcome;
       let targets = reach(notice.topic);
       if (targets.length === 0 && notice.fallbackTopic !== undefined) {
         notice = { ...notice, topic: notice.fallbackTopic };
         targets = reach(notice.topic);
+      }
+      if (notice.oncePerThread === true && notice.threadKey !== null) {
+        const told = await deps.deliveries.threadRoots(notice.threadKey);
+        if (told.length > 0) targets = [];
       }
       if (targets.length === 0 && notice.topic === 'urgent') deps.onUncovered(event);
       const creatorName =

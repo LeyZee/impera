@@ -147,6 +147,31 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('tells the owner her share strays from the percentage, to the groups for all, once, no amount (CRM-04 d3)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'agency_share_mismatch',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        from: PayPeriodSchema.parse('2026-11-01'),
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      allCreatorsOnly: true,
+      oncePerThread: true,
+      threadKey: 'agency_share:018f3e5c-0000-7000-8000-0000000000a1:2026-11-01',
+      title: 'Important',
+      body: 'Part créatrice chez Reveal : sur la quinzaine du 1er au 15 nov., elle s’écarte du pourcentage de l’agence réglé pour elle. À titre d’information.',
+      link: {
+        label: 'Ouvrir le pourcentage',
+        path: `/creatrices?onglet=pourcentage&creatrice=${creatorId}`,
+      },
+    });
+  });
+
   it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
     expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
       kind: 'notice',
