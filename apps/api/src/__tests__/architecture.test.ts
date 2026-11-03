@@ -37,8 +37,6 @@ const OPEN_CROSSINGS = [
   'accounting/infra/accounting-store.ts: invoice_pdf_copies',
   'accounting/infra/accounting-store.ts: invoice_pdfs',
   'accounting/infra/accounting-store.ts: invoices',
-  'contractors/infra/contractor-store.ts: invoices',
-  'contractors/infra/payout-certificate-store.ts: commission_statements',
   'invoicing/infra/invoice-acceptance-store.ts: commission_statements',
   'invoicing/infra/invoice-acceptance-store.ts: pay_adjustments',
   'invoicing/infra/invoice-pdf-store.ts: agency_logos',

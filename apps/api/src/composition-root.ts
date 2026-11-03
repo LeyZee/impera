@@ -34,10 +34,10 @@ import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './m
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { FansModule } from './modules/fans';
-import { invoiceRequeue, type InvoicingModule } from './modules/invoicing';
+import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
 import type { NotificationsModule } from './modules/notifications';
-import type { PayrollModule } from './modules/payroll';
+import { payReadsForContractors, type PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
 import type { ProvidersModule } from './modules/providers';
@@ -248,6 +248,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
+    invoices: invoiceReadsForContractors,
+    pay: payReadsForContractors,
     ...(options.invoiceBuckets !== undefined && { invoiceBuckets: options.invoiceBuckets }),
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });

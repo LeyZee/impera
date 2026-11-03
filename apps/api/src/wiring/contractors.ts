@@ -6,6 +6,8 @@ import {
   createContractorsModule,
   createMemoryInvoiceStore,
   createS3InvoiceStore,
+  type ContractorInvoiceReads,
+  type ContractorPayReads,
   type ContractorsModule,
   type InvoiceObjectStore,
   type InvoiceRequeue,
@@ -51,13 +53,17 @@ export interface WiredContractors {
 
 /**
  * The contractors' file reads the agency's time zone from the planning (`index.ts`), and asks pay to try its waiting
- * invoices again through `InvoiceRequeue`, which the invoices implement: the module never imports them (ADR 0047 § 1).
+ * invoices again through `InvoiceRequeue`, which the invoices implement, and reads the invoices and pay through
+ * `ContractorInvoiceReads` and `ContractorPayReads`: the module never imports them (ADR 0047 § 1).
  */
 export function wireContractors(
   shared: Shared,
   deps: {
     readonly scheduling: SchedulingModule;
     readonly requeue: InvoiceRequeue;
+    /** What the file reads of the invoices and of pay (ARC-07). */
+    readonly invoices: ContractorInvoiceReads;
+    readonly pay: ContractorPayReads;
     /** Tests plug the two buckets here, to read what the jobs wrote; the configuration's otherwise. */
     readonly invoiceBuckets?: InvoiceBuckets;
     /** Tests set the clock here (`payrollClock`); the system's otherwise. */
@@ -71,6 +77,8 @@ export function wireContractors(
     adminDb,
     reads: { agencyTimeZone: deps.scheduling.pay.agencyTimeZone },
     requeue: deps.requeue,
+    invoices: deps.invoices,
+    pay: deps.pay,
     buckets,
     ...(deps.now !== undefined && { now: deps.now }),
   });

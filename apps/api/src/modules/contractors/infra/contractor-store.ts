@@ -39,7 +39,7 @@ import type { PayrollContractorStore } from '../domain/ports';
 
 import { audit } from './audit';
 import { documentOf } from './document-rows';
-import type { ContractorReads, InvoiceRequeue } from './ports';
+import type { ContractorInvoiceReads, ContractorReads, InvoiceRequeue } from './ports';
 import { assignmentOf } from './regime-store';
 
 const {
@@ -51,7 +51,6 @@ const {
   contractorProfiles,
   contractorRegimes,
   contractTexts,
-  invoices,
   teamMembers,
 } = schema;
 
@@ -151,16 +150,6 @@ const acceptanceOf = (row: {
     acceptedAt: row.acceptedAt.toISOString(),
   });
 
-/** Whether the contractor has a document: his first invoice froze his prefix (the base's trigger says it again). */
-async function prefixFrozen(tx: Transaction, memberId: TeamMemberId): Promise<boolean> {
-  const [row] = await tx
-    .select({ id: invoices.id })
-    .from(invoices)
-    .where(eq(invoices.memberId, memberId))
-    .limit(1);
-  return row !== undefined;
-}
-
 /**
  * The first day of each followed document's reminder (lot 8): the documents of the regime in force today, as
  * `payroll.remind_documents` chooses them (`documentsFollowed`), none for a member who left.
@@ -189,7 +178,12 @@ async function remindersOf(
   );
 }
 
-async function fileOf(tx: Transaction, member: Member, day: FileDay): Promise<ContractorFile> {
+async function fileOf(
+  tx: Transaction,
+  member: Member,
+  day: FileDay,
+  invoices: ContractorInvoiceReads,
+): Promise<ContractorFile> {
   const profile = await profileOf(tx, member.id);
   const accepted = await tx
     .select({ acceptance: contractAcceptances })
@@ -225,7 +219,7 @@ async function fileOf(tx: Transaction, member: Member, day: FileDay): Promise<Co
             verifiedAt: profile.verifiedAt?.toISOString() ?? null,
             updatedAt: profile.updatedAt.toISOString(),
           }),
-    prefixFrozen: await prefixFrozen(tx, member.id),
+    prefixFrozen: await invoices.hasDocument(tx, member.id),
     acceptances: accepted.map((row) => acceptanceOf(row.acceptance)),
     regimes: regimes.map(assignmentOf),
     documents: filed.map((one) => ({ ...one, remindFrom: reminders.get(one.id) ?? null })),
@@ -258,6 +252,7 @@ export function createDrizzlePayrollContractorStore(
   reads: ContractorReads,
   documentReminderDays: () => Promise<number>,
   requeue: InvoiceRequeue,
+  invoices: ContractorInvoiceReads,
   now: () => Date,
 ): PayrollContractorStore {
   const dayOf = async (tx: Transaction): Promise<FileDay> => ({
@@ -266,7 +261,9 @@ export function createDrizzlePayrollContractorStore(
   });
   return {
     file: (userId, memberId) =>
-      withMember(db, userId, async (tx) => fileOf(tx, await memberOf(tx, memberId), await dayOf(tx))),
+      withMember(db, userId, async (tx) =>
+        fileOf(tx, await memberOf(tx, memberId), await dayOf(tx), invoices),
+      ),
 
     writeProfile: (actor, memberId, body) =>
       withMember(db, actor.userId, async (tx, scope) => {
@@ -276,7 +273,7 @@ export function createDrizzlePayrollContractorStore(
         const before = await profileOf(tx, memberId);
         const changed = profileChanges(before === null ? null : bodyOf(before), body);
         if (before !== null && changed.length === 0)
-          return { file: await fileOf(tx, member, await dayOf(tx)), created: false };
+          return { file: await fileOf(tx, member, await dayOf(tx), invoices), created: false };
         if (before === null) {
           await tx.insert(contractorProfiles).values({ memberId, ...body, updatedBy: actor.userId });
         } else {
@@ -296,7 +293,7 @@ export function createDrizzlePayrollContractorStore(
           { changed, checkCleared: before?.verifiedAt !== null && before?.verifiedAt !== undefined },
         );
         await requeue.requeue(tx, memberId);
-        return { file: await fileOf(tx, member, await dayOf(tx)), created: before === null };
+        return { file: await fileOf(tx, member, await dayOf(tx), invoices), created: before === null };
       }),
 
     verifyProfile: (actor, memberId, body) =>
@@ -304,7 +301,7 @@ export function createDrizzlePayrollContractorStore(
         assertOwner(scope);
         const { member, profile } = await ownedProfile(tx, memberId);
         // Checked already: nothing of the identity changed since, or the trigger would have cleared it.
-        if (profile.verifiedAt !== null) return fileOf(tx, member, await dayOf(tx));
+        if (profile.verifiedAt !== null) return fileOf(tx, member, await dayOf(tx), invoices);
         if (profile.updatedAt.toISOString() !== body.updatedAt) throw new ContractorProfileChanged();
         await updateProfile(
           tx,
@@ -314,15 +311,16 @@ export function createDrizzlePayrollContractorStore(
         );
         await audit(tx, actor, 'contractor_profile.verify', { kind: 'contractor_profile', id: memberId }, {});
         await requeue.requeue(tx, memberId);
-        return fileOf(tx, member, await dayOf(tx));
+        return fileOf(tx, member, await dayOf(tx), invoices);
       }),
 
     setPrefix: (actor, memberId, body) =>
       withMember(db, actor.userId, async (tx, scope) => {
         assertOwner(scope);
         const { member, profile } = await ownedProfile(tx, memberId);
-        if (profile.invoicePrefix === body.invoicePrefix) return fileOf(tx, member, await dayOf(tx));
-        if (await prefixFrozen(tx, memberId)) throw new InvoicePrefixFrozen();
+        if (profile.invoicePrefix === body.invoicePrefix)
+          return fileOf(tx, member, await dayOf(tx), invoices);
+        if (await invoices.hasDocument(tx, memberId)) throw new InvoicePrefixFrozen();
         // Two owners' tabs giving one prefix to two contractors: the second waits, then finds it taken.
         await lock(tx, `invoice_prefix:${body.invoicePrefix}`);
         const [holder] = await tx
@@ -344,7 +342,7 @@ export function createDrizzlePayrollContractorStore(
           { from: profile.invoicePrefix, to: body.invoicePrefix },
         );
         await requeue.requeue(tx, memberId);
-        return fileOf(tx, member, await dayOf(tx));
+        return fileOf(tx, member, await dayOf(tx), invoices);
       }),
 
     texts: (userId) =>
