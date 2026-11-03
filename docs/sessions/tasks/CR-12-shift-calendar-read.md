@@ -58,3 +58,8 @@ Poser, déplacer, ajouter en masse, suggérer (CR-13) ; notifications et rappels
 - Le départ (EQ-14) n'a rien à faire de plus : le flux refuse dès que le membre est `left`. Il pourra révoquer la ligne pour l'audit.
 - Reste (lot c2) : « Mon agenda » dans Moi (créer, copier, « Ajouter à Apple Agenda » en `webcal://`, « Ajouter à Google Agenda », remplacer, révoquer) et la vérification à l'œil dans Apple Agenda et Google Agenda.
 
+### 03/11/2026, lot c2 (Moi › Agenda)
+- Moi gagne « Calendrier » (`/moi/calendrier`, chatteur et manager ; pas « Agenda », que le glossaire garde à la créatrice) : « Créer mon lien », puis l'adresse montrée une seule fois, qui prend le focus, avec « Ajouter au Calendrier d’Apple » (`webcal://`), « Ajouter à Google Agenda » (`calendar.google.com/calendar/render?cid=`) et « Copier le lien » ; ensuite « Ton lien marche depuis le … », « Remplacer le lien » et « Couper le lien », chacun après une phrase qui dit ce qu'il fait, « Annuler » ayant le focus. Le texte dit que le Calendrier d’Apple relit le flux à peu près toutes les heures et que Google Agenda peut mettre jusqu’à une journée.
+- L'adresse se compose sur l'origine du tableau de bord (`nginx` passe `/v1/calendar-feed/` à l'API) : `scheduling/calendar-link.ts`, testé.
+- Reste : l'essai à l'œil dans Apple Agenda et Google Agenda, une fois déployé (Google lit l'adresse depuis ses serveurs) ; les boutons `nv-btn--sm` font 34 px de haut sur téléphone, comme dans Moi › Sécurité, à reprendre dans une passe téléphone commune.
+

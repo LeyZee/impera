@@ -1,5 +1,7 @@
 import {
   ApiErrorSchema,
+  CalendarLinkCreatedSchema,
+  CalendarLinkStateSchema,
   CalendarSchema,
   LeaveRequestListSchema,
   LeaveRequestSchema,
@@ -14,6 +16,8 @@ import {
   ShiftTemplateSchema,
   SwapCandidatesSchema,
   type Calendar,
+  type CalendarLinkCreated,
+  type CalendarLinkState,
   type CreateLeaveRequestBody,
   type CreateShiftBody,
   type CreateShiftSwapRequestBody,
@@ -266,6 +270,22 @@ export const answerSwap = (
 /** The requester or the agency withdraws a proposal; the agency reverts an accepted swap. */
 export const endSwap = (shiftSwapRequestId: string): Promise<Outcome<null>> =>
   send('DELETE', `/v1/scheduling/swap-requests/${shiftSwapRequestId}`, undefined, () => null);
+
+/** Moi › Agenda (CR-12, ADR 0045 § 5): whether the member has a live calendar link, never its address. */
+export function useCalendarLink(): UseQueryResult<CalendarLinkState> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'calendar-link'],
+    queryFn: () => read('/v1/scheduling/calendar-link', (body) => CalendarLinkStateSchema.parse(body)),
+    retry: 1,
+  });
+}
+
+/** A new address, which stops the one before; shown once. */
+export const createCalendarLink = (): Promise<Outcome<CalendarLinkCreated>> =>
+  send('POST', '/v1/scheduling/calendar-link', undefined, (json) => CalendarLinkCreatedSchema.parse(json));
+
+export const revokeCalendarLink = (): Promise<Outcome<null>> =>
+  send('DELETE', '/v1/scheduling/calendar-link', undefined, () => null);
 
 /**
  * After a write, and after a refusal that says « la liste est relue »: the week, who is on shift, the templates, the
