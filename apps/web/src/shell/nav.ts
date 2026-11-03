@@ -12,6 +12,7 @@ import type { NavIconName } from './NavIcon';
 export const SECTIONS = [
   '/',
   '/aujourdhui',
+  '/agenda',
   '/suivi',
   '/entrainer',
   '/planning',
@@ -29,6 +30,7 @@ export type Section = (typeof SECTIONS)[number];
 export const READY_SECTIONS = [
   '/',
   '/aujourdhui',
+  '/agenda',
   '/suivi',
   '/entrainer',
   '/planning',
@@ -56,6 +58,7 @@ export interface NavItem {
 const ITEMS: Readonly<Record<Section, { readonly label: string; readonly icon: NavIconName }>> = {
   '/': { label: 'Dashboard', icon: 'dashboard' },
   '/aujourdhui': { label: 'Aujourd’hui', icon: 'today' },
+  '/agenda': { label: 'Agenda', icon: 'planning' },
   '/suivi': { label: 'Suivi', icon: 'tracking' },
   '/entrainer': { label: 'Entraîner', icon: 'train' },
   '/planning': { label: 'Planning', icon: 'planning' },
@@ -130,16 +133,17 @@ const RAILS: Readonly<Record<RailKind, RailPlan>> = {
     settings: false,
     phone: ['/', '/suivi', '/creatrices'],
   },
-  // Agenda (CR-05) and Contenu (CR-06) join it with their screens; Ventes holds her fans first, then her earnings
-  // and her sales (CR-04); her persona lives in Moi.
+  // Contenu (CR-06) joins it with its screen; Agenda holds her tasks and dispos (CR-05); Ventes her fans first, then
+  // her earnings and her sales (CR-04); her persona lives in Moi.
   creator: {
     sections: [
       ['/aujourdhui', null],
+      ['/agenda', null],
       ['/ventes', null],
       ['/moi', null],
     ],
     settings: false,
-    phone: ['/aujourdhui', '/ventes', '/moi'],
+    phone: ['/aujourdhui', '/agenda', '/ventes', '/moi'],
   },
 };
 

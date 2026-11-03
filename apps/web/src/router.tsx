@@ -14,6 +14,8 @@ import { parsePaySearch } from './payroll/model';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
+import { AgendaPage } from './screens/agenda/AgendaPage';
+import { parseAgendaSearch, viewOf } from './screens/agenda/search';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
@@ -225,6 +227,42 @@ const today = createRoute({
   component: function Today() {
     const { user } = rootRoute.useRouteContext();
     return user.role === 'creator' ? <CreatorTodayPage /> : <TodayPage user={user} />;
+  },
+});
+/**
+ * Agenda, the creator's alone (CR-05, ADR 0042 § 8): her day (`?jour=`), or her week as a list (`?vue=semaine`). Any
+ * other account is sent home by the root, as this section is not on its rail.
+ */
+const agenda = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/agenda',
+  validateSearch: parseAgendaSearch,
+  component: function Agenda() {
+    const search = agenda.useSearch();
+    const navigate = agenda.useNavigate();
+    return (
+      <AgendaPage
+        day={search.jour ?? null}
+        view={viewOf(search)}
+        onDay={(day) =>
+          void navigate({
+            search: ({ vue }) => ({
+              ...(day === null ? {} : { jour: day }),
+              ...(vue === undefined ? {} : { vue }),
+            }),
+            replace: true,
+          })
+        }
+        onView={(view) =>
+          void navigate({
+            search: ({ jour }) => ({
+              ...(jour === undefined ? {} : { jour }),
+              ...(view === 'week' ? { vue: 'semaine' as const } : {}),
+            }),
+          })
+        }
+      />
+    );
   },
 });
 /**
@@ -745,6 +783,7 @@ const routeTree = rootRoute.addChildren([
   tracking,
   trackingAlerts,
   today,
+  agenda,
   sales,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
