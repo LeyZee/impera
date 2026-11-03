@@ -10,10 +10,13 @@ import {
   CreateCollectiveGoalBodySchema,
   CreatePayAdjustmentBodySchema,
   CreatePaySaleDecisionBodySchema,
+  CreatePaySaleSignalBodySchema,
   CreatePenaltyBodySchema,
   DomainError,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  MySalesQuerySchema,
+  MySalesSchema,
   PageQuerySchema,
   PayAdjustmentSchema,
   PayCommissionStatementBodySchema,
@@ -24,6 +27,7 @@ import {
   PayrollSettingsSchema,
   PayoutMinimumSchema,
   PaySaleDecisionSchema,
+  PaySaleSignalSchema,
   CreatePayoutMinimumBodySchema,
   UpdatePayrollSettingsBodySchema,
   PenaltyIdSchema,
@@ -41,7 +45,7 @@ import type { Actor } from '../../contractors/pure';
 import type { PayrollEntries } from '../application/entries';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
-import type { PayrollRuleStore, PayrollSaleDecisionStore } from '../domain/ports';
+import type { PayrollRuleStore, PayrollSaleDecisionStore, PayrollSaleSignalStore } from '../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -63,7 +67,8 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
  * is the database's call (`withMember`): every statement for the owner and an active manager, one's own for anyone
  * else; a validation, a bonus, a penalty or an adjustment by the owner or an active manager, never for oneself; a
  * payment and the team's rules (tiers, goals, minimum payout) by the owner only; the held sales and a decision on one
- * by the owner or an active manager, never on a sale of their own (CRM-03). A create sent again with the same `id`
+ * by the owner or an active manager, never on a sale of their own (CRM-03); one's own sales on the platform's net and a
+ * signal on one of them by any member, on their own statement only (CRM-03 lot b4c). A create sent again with the same `id`
  * and values gives back what was recorded (200). The contractors' file (`/payroll/billing-settings`,
  * `/payroll/contractors/…`, `/payroll/contract-texts`, `/payroll/billing-regimes`) is the `contractors` module's, the
  * invoices and credit notes (`/payroll/invoices/…`) the `invoicing` module's and the accountant's exports
@@ -75,6 +80,7 @@ export function createPayrollRoutes(
   entries: PayrollEntries,
   rules: PayrollRuleStore,
   decisions: PayrollSaleDecisionStore,
+  signals: PayrollSaleSignalStore,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -118,6 +124,31 @@ export function createPayrollRoutes(
       },
       async (request, reply) => {
         const { value, created } = await decisions.decide(actorOf(request), request.body);
+        return reply.code(created ? 201 : 200).send(value);
+      },
+    );
+
+    // CRM-03 lot b4c, ADR 0050 §§ 5, 10: one's own sales on the platform's net, and a signal on one of them.
+    app.get(
+      '/payroll/my-sales',
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: MySalesQuerySchema, response: { 200: MySalesSchema } },
+      },
+      (request) => signals.mySales(userOf(request), request.query),
+    );
+
+    app.post(
+      '/payroll/sale-signals',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          body: CreatePaySaleSignalBodySchema,
+          response: { 200: PaySaleSignalSchema, 201: PaySaleSignalSchema },
+        },
+      },
+      async (request, reply) => {
+        const { value, created } = await signals.signal(actorOf(request), request.body);
         return reply.code(created ? 201 : 200).send(value);
       },
     );

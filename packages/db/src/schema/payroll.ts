@@ -16,6 +16,7 @@ import {
   SALE_HELD_REASONS,
   SaleDecisionOutcomeSchema,
   SaleEventSchema,
+  SaleSignalKindSchema,
 } from '@nirvana/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -782,6 +783,70 @@ export const paySaleDecisions = pgTable(
     pgPolicy('agency_insert', {
       for: 'insert',
       withCheck: sql`${readsTeam} and ${t.decidedBy} = ${currentUser} and (${t.authorMemberId} is null or not ${isMine(t.authorMemberId)})`,
+    }),
+  ],
+);
+
+/**
+ * A member's signals on lines of their own statement (CRM-03 lot b4c, ADR 0050 § 5): « ce n'est pas ma vente »
+ * (`signal`), or its withdrawal (`withdraw`). Added only, numbered per line, member and period from 1: the latest counts,
+ * a withdrawal never first nor after another. Each keeps what the line was on the member's statement then (account,
+ * currency, signed net, instant), which the trigger checks, so that the member still reads it once the line has left.
+ * Written by the member alone on their own statement of a period no closing closed, on a line no closing counted; read
+ * by the member, the owner and an active manager. A signal changes no amount: the validator decides.
+ */
+export const paySaleSignals = pgTable(
+  'pay_sale_signals',
+  {
+    id: id(),
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    event: text('event').notNull(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    period: date('period')
+      .notNull()
+      .references(() => payPeriods.period),
+    revision: integer('revision').notNull(),
+    kind: text('kind').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    currency: text('currency').notNull(),
+    netMinor: integer('net_minor').notNull(),
+    occurredAt: timestampTz('occurred_at'),
+    note: text('note'),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('pay_sale_signals_revision_unique').on(
+      t.platform,
+      t.platformSaleId,
+      t.event,
+      t.memberId,
+      t.period,
+      t.revision,
+    ),
+    index('pay_sale_signals_period_member_idx').on(t.period, t.memberId),
+    enumCheck('pay_sale_signals', t.platform, PlatformSchema.options),
+    enumCheck('pay_sale_signals', t.event, SaleEventSchema.options),
+    enumCheck('pay_sale_signals', t.kind, SaleSignalKindSchema.options),
+    enumCheck('pay_sale_signals', t.currency, CurrencySchema.options),
+    periodCheck('pay_sale_signals_period_check', t.period),
+    check('pay_sale_signals_revision_check', sql`${t.revision} >= 1`),
+    check('pay_sale_signals_note_check', sql`${t.note} is null or char_length(${t.note}) between 1 and 500`),
+    check(
+      'pay_sale_signals_net_check',
+      sql`(${t.event} = 'sale' and ${t.netMinor} >= 0) or (${t.event} = 'refund' and ${t.netMinor} <= 0)`,
+    ),
+    memberRead(t.memberId),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
     }),
   ],
 );

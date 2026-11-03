@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { pageOf } from './conversations';
+import { pageOf, PageQuerySchema } from './conversations';
 import { PlatformSchema } from './enums';
 import {
   BonusIdSchema,
@@ -10,6 +10,7 @@ import {
   CommissionStatementIdSchema,
   PayAdjustmentIdSchema,
   PaySaleDecisionIdSchema,
+  PaySaleSignalIdSchema,
   PenaltyIdSchema,
   PayoutMinimumIdSchema,
   PlatformAccountIdSchema,
@@ -985,6 +986,21 @@ export const SaleDecisionInForceSchema = z.enum(['count', 'exclude']);
 export type SaleDecisionInForce = z.infer<typeof SaleDecisionInForceSchema>;
 
 /**
+ * What a member says of a line on their own statement (CRM-03 lot b4c, ADR 0050 § 5): `signal`, it is not theirs;
+ * `withdraw` takes the signal back. A signal changes no amount: it shows the line to the validator, who decides.
+ */
+export const SaleSignalKindSchema = z.enum(['signal', 'withdraw']);
+export type SaleSignalKind = z.infer<typeof SaleSignalKindSchema>;
+
+/** A member's signal in force on a line: who, their note, and when. */
+export const SaleSignalInForceSchema = z.object({
+  memberId: TeamMemberIdSchema,
+  note: PayReasonSchema.nullable(),
+  signalledAt: z.iso.datetime(),
+});
+export type SaleSignalInForce = z.infer<typeof SaleSignalInForceSchema>;
+
+/**
  * A line an open period holds, or that a decision in force settles (CRM-03 lot b3), as the owner and an active manager
  * read it: the line, the member its chatter is linked to (`null` for a chatter not linked), why it is held without a
  * decision, the decision in force and what may be decided on its sale. A line a closing left held, or a decided one no
@@ -1011,12 +1027,17 @@ export const HeldSaleSchema = z.object({
   /** The decision in force on its sale, `null` for none. */
   decision: SaleDecisionInForceSchema.nullable(),
   outcomes: z.array(SaleDecisionOutcomeSchema),
+  /**
+   * The signal in force of the member the line would pay (CRM-03 lot b4c): « ce n'est pas ma vente ». `null` for none,
+   * or once the line would no longer pay them (linked again, for instance): the signal then has no effect.
+   */
+  signal: SaleSignalInForceSchema.nullable(),
 });
 export type HeldSale = z.infer<typeof HeldSaleSchema>;
 
 /**
- * `GET /v1/payroll/periods/:period/held-sales` (owner, active manager) → 200: the lines the period holds or a decision
- * in force settles, in the order of their keys. A closed period shows none: what its closing left shows in the team's
+ * `GET /v1/payroll/periods/:period/held-sales` (owner, active manager) → 200: the lines the period holds, those a
+ * decision in force settles, and those a member signalled while the line would pay them, in the order of their keys. A closed period shows none: what its closing left shows in the team's
  * first open period, and before the team's first closing a period shows the earlier ones too, which its closing would
  * leave held.
  */
@@ -1065,9 +1086,111 @@ export const CreatePaySaleDecisionBodySchema = z.object({
 export type CreatePaySaleDecisionBody = z.infer<typeof CreatePaySaleDecisionBodySchema>;
 
 /**
+ * A member's signal on a line of their own statement, or its withdrawal (CRM-03 lot b4c, ADR 0050 § 5), added only and
+ * numbered per line, member and period from 1: the latest counts. It keeps what the line was on the statement when it
+ * was written (account, currency, signed net, instant), so that the member still reads it once the line has left.
+ */
+export const PaySaleSignalSchema = z.object({
+  id: PaySaleSignalIdSchema,
+  period: PayPeriodSchema,
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1),
+  event: SaleEventSchema,
+  memberId: TeamMemberIdSchema,
+  revision: z.number().int().min(1),
+  kind: SaleSignalKindSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+  netMinor: z.number().int(),
+  occurredAt: z.iso.datetime().nullable(),
+  note: PayReasonSchema.nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type PaySaleSignal = z.infer<typeof PaySaleSignalSchema>;
+
+/**
+ * `POST /v1/payroll/sale-signals` (any member, on their own statement) → 201 `PaySaleSignalSchema`, 200 for the same
+ * `id` and values. The line is on the member's statement of `period`, which no closing has closed, and no closing
+ * counted it: `signal` when none is in force, `withdraw` when one is. Nothing is computed again: a signal changes no
+ * amount until the validator excludes the sale.
+ */
+export const CreatePaySaleSignalBodySchema = z.object({
+  id: PaySaleSignalIdSchema,
+  period: PayPeriodSchema,
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1).max(200),
+  event: SaleEventSchema,
+  kind: SaleSignalKindSchema,
+  note: PayReasonSchema.nullable(),
+});
+export type CreatePaySaleSignalBody = z.infer<typeof CreatePaySaleSignalBodySchema>;
+
+/**
+ * Where one of the member's own lines stands for them (CRM-03 lot b4c):
+ * - `counted`, on their statement, no signal in force;
+ * - `signalled`, on their statement, their signal in force: the validator sees it;
+ * - `excluded`, signalled, then left their statement on the validator's exclusion;
+ * - `removed`, signalled, then left their statement otherwise (linked again to another member, for instance).
+ */
+export const MySaleStateSchema = z.enum(['counted', 'signalled', 'excluded', 'removed']);
+export type MySaleState = z.infer<typeof MySaleStateSchema>;
+
+/**
+ * A line of the platform's net as its member reads it (CRM-03 lot b4c, ADR 0050 § 10): when, on which account, its
+ * signed net, the earlier period it comes late from, where it stands, their own signal (`null` for none ever) and
+ * whether they may signal it or withdraw the signal now (`open`: their period not closed, no closing counted it). Never
+ * the fan.
+ */
+export const MySaleSchema = z.object({
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1),
+  event: SaleEventSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+  netMinor: z.number().int(),
+  /** The line's own instant; `null` on a statement written before it was kept. */
+  occurredAt: z.iso.datetime().nullable(),
+  lateFrom: PayPeriodSchema.nullable(),
+  state: MySaleStateSchema,
+  signal: z.object({ note: PayReasonSchema.nullable(), signalledAt: z.iso.datetime() }).nullable(),
+  open: z.boolean(),
+});
+export type MySale = z.infer<typeof MySaleSchema>;
+
+/**
+ * A day of the member's lines on their statement (signals left aside once the line has left it), in the agency's zone:
+ * how many sales and refunds, and their net in each currency. `day` is `null` for lines without an instant.
+ */
+export const MySalesDaySchema = z.object({
+  day: CalendarDaySchema.nullable(),
+  sales: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+  nets: z.array(z.object({ currency: CurrencySchema, netMinor: z.number().int() })),
+});
+export type MySalesDay = z.infer<typeof MySalesDaySchema>;
+
+/**
+ * `GET /v1/payroll/my-sales?period=&limit=&cursor=` (any member) → 200: the member's own lines of `period`, the most
+ * recent first, a page at a time (api.md § Pagination), with every day of the period at once. Read from their own
+ * statement and signals only, never from the register: a member never reads another's sale. Empty for the owner
+ * outside the team, and for a period without a statement on the platform's net. 400 `cursor_invalid`.
+ */
+export const MySalesQuerySchema = PageQuerySchema.extend({ period: PayPeriodSchema });
+export type MySalesQuery = z.infer<typeof MySalesQuerySchema>;
+
+export const MySalesSchema = pageOf(MySaleSchema).extend({
+  period: PayPeriodSchema,
+  /** A closing closed the period: nothing more is signalled or withdrawn on it. */
+  closed: z.boolean(),
+  days: z.array(MySalesDaySchema),
+});
+export type MySales = z.infer<typeof MySalesSchema>;
+
+/**
  * The error codes of `/v1/payroll`, for the screen to say them in French (the suffix gives the status, api.md):
  * `team_member_not_found`, `commission_statement_not_found`, `bonus_not_found`, `penalty_not_found` 404 ;
  * `pay_sale_not_found` 404, a sale the period does not hold nor pay a member for as the validator reads it (CRM-03) ;
+ * `pay_sale_signal_not_found` 404, a line that is not on the member's own statement of the period (CRM-03 lot b4c) ;
  * `commission_statement_changed_conflict` 409, another revision or other inputs than the reader saw ;
  * `commission_statement_status_conflict` 409, validating what is not a draft, paying what is not validated, correcting
  * a draft ;
@@ -1082,12 +1205,14 @@ export type CreatePaySaleDecisionBody = z.infer<typeof CreatePaySaleDecisionBody
  * `details.count`) ;
  * `pay_period_not_computed_conflict` 409, a period to close that pay has not written yet (`details.period`) ;
  * `pay_period_closed_conflict` 409, a bonus, a penalty, tiers or a goal for a period already validated, or for a
- * member before they joined (`details.period`) ;
+ * member before they joined, or a signal on a period closed or a line a closing counted (`details.period`) ;
  * `penalty_cancel_conflict` 409, every period of the penalty is closed ;
  * `bonus_conflict`, `penalty_conflict`, `pay_adjustment_conflict`, `bonus_tier_set_conflict`,
  * `collective_goal_conflict`, `payout_minimum_conflict`, `pay_sale_decision_conflict` 409, the same `id` with other
  * values (a decision written meanwhile on the same sale too) ;
  * `pay_sale_outcome_conflict` 409, an outcome the sale does not offer (`details.outcomes`, those it does) ;
+ * `pay_sale_signal_conflict` 409, the same signal `id` with other values ;
+ * `pay_sale_signal_state_conflict` 409, a line already signalled, or a withdrawal without a signal in force ;
  * `pay_rule_started_invalid` 400, tiers or a payout minimum from a period that has begun (PAIE-22, `details.period`) ;
  * `collective_goal_late_invalid` 400, a goal for a period past its 3rd day (PAIE-22, `details.period`) ;
  * `exchange_rate_missing_conflict` 409, a currency without a rate read ;
@@ -1110,6 +1235,7 @@ export const PAYROLL_ERROR_CODES = [
   'bonus_not_found',
   'penalty_not_found',
   'pay_sale_not_found',
+  'pay_sale_signal_not_found',
   'commission_statement_changed_conflict',
   'commission_statement_status_conflict',
   'commission_statement_open_conflict',
@@ -1130,6 +1256,8 @@ export const PAYROLL_ERROR_CODES = [
   'payout_minimum_conflict',
   'pay_sale_decision_conflict',
   'pay_sale_outcome_conflict',
+  'pay_sale_signal_conflict',
+  'pay_sale_signal_state_conflict',
   'pay_rule_started_invalid',
   'collective_goal_late_invalid',
   'exchange_rate_missing_conflict',

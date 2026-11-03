@@ -446,6 +446,7 @@ export function heldSaleOf(patch: Partial<HeldSale> = {}): HeldSale {
     reason: 'off_shift',
     decision: null,
     outcomes: ['count', 'exclude'],
+    signal: null,
     ...patch,
   });
 }

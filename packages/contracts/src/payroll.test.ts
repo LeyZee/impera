@@ -14,9 +14,12 @@ import {
   CreateBonusTierSetBodySchema,
   CreateCollectiveGoalBodySchema,
   CreatePayAdjustmentBodySchema,
+  CreatePaySaleSignalBodySchema,
   CreatePenaltyBodySchema,
   ExchangeRateSchema,
   mayValidateStatement,
+  MySalesQuerySchema,
+  MySalesSchema,
   PAY_PERIOD_BLOCK_CODES,
   PAYMENT_METHODS,
   PAYROLL_ERROR_CODES,
@@ -444,5 +447,55 @@ describe('the payout minimum and delay (PAIE-22, PAIE-32)', () => {
         payoutDelayBusinessDays: null,
       }),
     ).toEqual({ minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null });
+  });
+});
+
+describe('a member’s signal on a sale (CRM-03 lot b4c)', () => {
+  const signal = {
+    id: '0199f2a0-0000-7000-8000-0000000000c1',
+    period: '2026-11-01',
+    platform: 'reveal',
+    platformSaleId: 'vente-1',
+    event: 'sale',
+    kind: 'signal',
+    note: 'Vendue pendant le shift de Lou',
+  };
+
+  it('names the line by its key and period, with a note of 500 characters at most, trimmed', () => {
+    expect(CreatePaySaleSignalBodySchema.parse({ ...signal, note: '  Pas à moi  ' }).note).toBe('Pas à moi');
+    expect(CreatePaySaleSignalBodySchema.safeParse({ ...signal, note: 'x'.repeat(501) }).success).toBe(false);
+    expect(CreatePaySaleSignalBodySchema.safeParse({ ...signal, note: '   ' }).success).toBe(false);
+    expect(CreatePaySaleSignalBodySchema.safeParse({ ...signal, kind: 'count' }).success).toBe(false);
+    expect(CreatePaySaleSignalBodySchema.safeParse({ ...signal, period: '2026-11-02' }).success).toBe(false);
+    expect(CreatePaySaleSignalBodySchema.parse({ ...signal, kind: 'withdraw', note: null }).kind).toBe(
+      'withdraw',
+    );
+  });
+
+  it('reads one’s own sales of a period a page at a time, with every day at once', () => {
+    expect(MySalesQuerySchema.parse({ period: '2026-11-01' })).toEqual({ period: '2026-11-01', limit: 50 });
+    expect(MySalesQuerySchema.safeParse({ period: '2026-11-03' }).success).toBe(false);
+    const page = MySalesSchema.parse({
+      period: '2026-11-01',
+      closed: false,
+      items: [
+        {
+          platform: 'reveal',
+          platformSaleId: 'vente-1',
+          event: 'refund',
+          platformAccountId: '0199f2a0-0000-7000-8000-0000000000a1',
+          currency: 'EUR',
+          netMinor: -4_200,
+          occurredAt: null,
+          lateFrom: null,
+          state: 'signalled',
+          signal: { note: null, signalledAt: '2026-11-02T09:00:00.000Z' },
+          open: true,
+        },
+      ],
+      nextCursor: null,
+      days: [{ day: null, sales: 0, refunds: 1, nets: [{ currency: 'EUR', netMinor: -4_200 }] }],
+    });
+    expect(page.items[0]?.state).toBe('signalled');
   });
 });
