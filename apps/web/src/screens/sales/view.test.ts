@@ -1,4 +1,4 @@
-import { MessageIdSchema, type CreatorMessage } from '@nirvana/contracts';
+import { MessageIdSchema, type CreatorMessage } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { amountOf, fanName, seenOf, threadOf, unlockedOf } from './view';

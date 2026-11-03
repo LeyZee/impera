@@ -1,4 +1,4 @@
-import type { CreatorFan } from '@nirvana/contracts';
+import type { CreatorFan } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { CreatorReader } from './CreatorReader';

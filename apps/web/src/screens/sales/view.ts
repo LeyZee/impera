@@ -1,4 +1,4 @@
-import type { CreatorFanSpent, CreatorMessage, Currency } from '@nirvana/contracts';
+import type { CreatorFanSpent, CreatorMessage, Currency } from '@impera/contracts';
 
 import { addDays, clockAt, dayOf, longDay } from '@/scheduling/time';
 

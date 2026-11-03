@@ -5,7 +5,7 @@ import {
   type CreatorConversation,
   type CreatorFanPage,
   type CreatorMessagePage,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   useInfiniteQuery,
   useQuery,
