@@ -4,6 +4,7 @@ import { DropCategorySchema } from './content-drops';
 import {
   ContentIdeaIdSchema,
   CreatorIdSchema,
+  ExtensionLinkIdSchema,
   TrendReadingIdSchema,
   TrendSignalIdSchema,
   WatchSessionIdSchema,
@@ -233,3 +234,62 @@ export const ContentIdeaSchema = ContentIdeaDraftSchema.extend({
   refusalReason: z.string().max(280).nullable(),
 });
 export type ContentIdea = z.infer<typeof ContentIdeaSchema>;
+
+/** What `POST /v1/trends/links` answers: the signal, and whether this paste added it (a second paste adds nothing). */
+export const PastedTrendLinkSchema = z.strictObject({
+  created: z.boolean(),
+  url: z.string().max(2048),
+  expiresAt: z.iso.datetime().nullable(),
+});
+export type PastedTrendLink = z.infer<typeof PastedTrendLinkSchema>;
+
+/**
+ * The link of one browser's extension to the server (VEI-01 lot b), 256 random bits in base64url: shown once at its
+ * creation, kept as a hash only, sent by the extension in `x-extension-link` with each batch of readings.
+ */
+export const ExtensionLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/u);
+
+/** A person links one extension per browser, this many at most at once (Chrome and Edge, a laptop). */
+export const EXTENSION_LINKS_LIVE_MAX = 3;
+
+/** The browser a link was made for, as the person names it (« Chrome », « Edge du bureau »). */
+export const ExtensionLinkLabelSchema = z.string().trim().min(1).max(40);
+
+/** One live link, never its token. `lastUsedAt`: the last batch it brought, null before the first. */
+export const ExtensionLinkSchema = z.strictObject({
+  id: ExtensionLinkIdSchema,
+  label: z.string(),
+  createdAt: z.iso.datetime(),
+  lastUsedAt: z.iso.datetime().nullable(),
+});
+export type ExtensionLink = z.infer<typeof ExtensionLinkSchema>;
+
+/** `GET /v1/trends/extension-links`: the person's live links, the oldest first. */
+export const ExtensionLinkListSchema = z.strictObject({ items: z.array(ExtensionLinkSchema) });
+export type ExtensionLinkList = z.infer<typeof ExtensionLinkListSchema>;
+
+/**
+ * `POST /v1/trends/extension-links` (« Relier l'extension »): a live link of the same label is replaced (the same
+ * browser linked again), otherwise one is added; past `EXTENSION_LINKS_LIVE_MAX`, 409 `extension_links_full_conflict`.
+ */
+export const CreateExtensionLinkBodySchema = z.strictObject({ label: ExtensionLinkLabelSchema });
+export type CreateExtensionLinkBody = z.infer<typeof CreateExtensionLinkBodySchema>;
+
+/** Its answer: the new token, once. */
+export const ExtensionLinkCreatedSchema = ExtensionLinkSchema.omit({ lastUsedAt: true }).extend({
+  token: ExtensionLinkTokenSchema,
+});
+export type ExtensionLinkCreated = z.infer<typeof ExtensionLinkCreatedSchema>;
+
+/**
+ * `GET /v1/trends/readings/creators`, with `x-extension-link`: the creators the linked person may mark a post for,
+ * as `POST /v1/trends/readings` checks them (herself for a creator; every creator for the agency).
+ */
+export const ExtensionLinkCreatorsSchema = z.strictObject({
+  items: z.array(z.strictObject({ id: CreatorIdSchema, displayName: z.string() })),
+});
+export type ExtensionLinkCreators = z.infer<typeof ExtensionLinkCreatorsSchema>;
+
+/** `POST /v1/trends/readings`: how many posts of the batch were kept, new or seen again. */
+export const TrendReadingsAcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
+export type TrendReadingsAccepted = z.infer<typeof TrendReadingsAcceptedSchema>;
