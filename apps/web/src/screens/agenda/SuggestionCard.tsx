@@ -1,12 +1,14 @@
-import { CREATOR_TASK_CATEGORY_LABELS, type CreatorSuggestion } from '@impera/contracts';
+import { CREATOR_TASK_CATEGORY_LABELS, type CreatorAgenda, type CreatorSuggestion } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 
 import { acceptSuggestion, AGENDA_KEY } from './api';
 import { CategoryMark } from './category';
 import { whenWords } from './words';
 
 import { lengthOf } from '@/scheduling/time';
+import { Dialog } from '@/screens/team/Dialog';
+import '@/screens/team/team.css';
 
 /** When a suggestion asks for, in her words; « Sans date » when it found no room in her dispos. */
 function suggestedWhen(suggestion: CreatorSuggestion, zone: string): string {
@@ -109,5 +111,33 @@ export function SuggestionCard({
         </button>
       </div>
     </article>
+  );
+}
+
+/** A suggestion touched in Semaine, opened over the grid; it closes once she has accepted it or said « Non merci ». */
+export function SuggestionDialog({
+  agenda,
+  suggestion,
+  onClose,
+  onDecline,
+  onPlace,
+}: {
+  agenda: CreatorAgenda;
+  suggestion: CreatorSuggestion;
+  onClose: () => void;
+  onDecline: (suggestion: CreatorSuggestion) => void;
+  onPlace: (suggestion: CreatorSuggestion) => void;
+}): JSX.Element | null {
+  const live = agenda.suggestions.find((one) => one.id === suggestion.id);
+  useEffect(() => {
+    if (live === undefined) onClose();
+  }, [live, onClose]);
+  if (live === undefined) return null;
+  return (
+    <Dialog title="Proposé par l’agence" lead={live.title} onClose={onClose}>
+      <div className="tm-dialog__body ag-suggestion-dialog">
+        <SuggestionCard suggestion={live} zone={agenda.timeZone} onDecline={onDecline} onPlace={onPlace} />
+      </div>
+    </Dialog>
   );
 }

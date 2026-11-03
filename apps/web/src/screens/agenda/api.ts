@@ -9,7 +9,9 @@ import {
   type CreateCreatorTaskBody,
   type CreatorAgenda,
   type CreatorTask,
+  type CreatorTaskWhen,
   type DeclineSuggestionBody,
+  type UpdateCreatorTaskBody,
 } from '@impera/contracts';
 import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
@@ -242,7 +244,7 @@ export type Outcome<T> =
   | { readonly kind: 'failed' };
 
 async function send<T>(
-  method: 'POST' | 'DELETE',
+  method: 'POST' | 'PATCH' | 'DELETE',
   url: string,
   body: unknown,
   parse: (json: unknown) => T,
@@ -265,6 +267,30 @@ async function send<T>(
 
 export const createTask = (body: CreateCreatorTaskBody): Promise<Outcome<CreatorTask>> =>
   send('POST', `${BASE}/tasks`, body, (json) => CreatorTaskSchema.parse(json));
+
+/** Moves a task (a drag in Semaine, « Changer le moment »): online only, like every change but a tick. */
+export const updateTask = (taskId: string, body: UpdateCreatorTaskBody): Promise<Outcome<CreatorTask>> =>
+  send('PATCH', `${BASE}/tasks/${taskId}`, body, (json) => CreatorTaskSchema.parse(json));
+
+/**
+ * Moves a task where her drag left it: shown there at once, then sent. `false` when the server did not take it (no
+ * network, the task changed): her agenda is read again and the task goes back where it is.
+ */
+export async function moveTask(
+  client: QueryClient,
+  task: CreatorTask,
+  when: CreatorTaskWhen,
+): Promise<boolean> {
+  await client.cancelQueries({ queryKey: AGENDA_KEY });
+  client.setQueriesData<CreatorAgenda>({ queryKey: AGENDA_KEY }, (agenda) =>
+    agenda === undefined
+      ? agenda
+      : { ...agenda, tasks: agenda.tasks.map((one) => (one.id === task.id ? { ...one, when } : one)) },
+  );
+  const outcome = await updateTask(task.id, { when });
+  await client.invalidateQueries({ queryKey: AGENDA_KEY });
+  return outcome.kind === 'ok';
+}
 
 export const archiveTask = (taskId: string): Promise<Outcome<null>> =>
   send('DELETE', `${BASE}/tasks/${taskId}`, undefined, () => null);
