@@ -6,6 +6,7 @@ import type {
   ShiftTemplate,
   TeamMember,
 } from '@nirvana/contracts';
+import { slotVersionAt } from '@nirvana/contracts';
 import { useMemo, useRef, useState, type JSX } from 'react';
 
 import { ShiftPanel, type ShiftStart } from './ShiftPanel';
@@ -181,7 +182,11 @@ export function PlanningPage({
   const month = view.mois ?? thisMonth;
   const byMonth = view.affichage === 'mois';
   const window = agency === null || !byMonth ? null : monthWindow(month, agency);
-  const startMinute = data?.settings.slotStartMinute ?? 0;
+  // The week begins at Monday's first créneau, in the version in force then.
+  const startMinute =
+    data === undefined || agency === null
+      ? 0
+      : (slotVersionAt(data.settings.versions, zonedInstant(monday, 0, agency)).slots[0]?.startMinute ?? 0);
   const calendar = useCalendar(
     agency === null
       ? null

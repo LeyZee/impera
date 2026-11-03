@@ -25,7 +25,7 @@ import type {
   StoredAccount,
   StoredShift,
 } from '../domain/ports';
-import { assertPlanningRange, DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
+import { assertPlanningRange } from '../domain/shifts';
 
 import { toPlanningAccount } from './dto';
 
@@ -57,7 +57,7 @@ export function createCalendarService(
         window,
         directory.map((creator) => creator.id),
       );
-      const settings = read.settings ?? DEFAULT_SCHEDULING_SETTINGS;
+      const { settings } = read;
       // The filters narrow what is sent back; the database already decided what the reader may read.
       const askedCreator = (creatorId: CreatorId) =>
         query.creatorId === undefined || creatorId === query.creatorId;

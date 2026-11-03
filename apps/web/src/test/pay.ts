@@ -25,6 +25,8 @@ import {
   type TeamMember,
 } from '@nirvana/contracts';
 
+import { settingsOf } from '@/test/settings';
+
 /*
  * Pay's fakes, shared by Paie's and Commissions' tests (EQ-05): an invented team (ADR 0010) — Théo, Basile and Lou
  * chat, Iris manages — on Nora Vidal's Reveal account in euros and Léa's OnlyFans account in dollars. Théo lives in
@@ -278,12 +280,7 @@ export function summaryFor(period: PayrollPeriod): PayPeriodSummary {
   };
 }
 
-export const SCHEDULING_SETTINGS = {
-  timeZone: 'Europe/Paris',
-  slotStartMinute: 0,
-  slotLengthMinutes: 360,
-  accessMarginMinutes: 15,
-};
+export const SCHEDULING_SETTINGS = settingsOf();
 
 /** A bonus of `whose` for `period`, made by the owner: `n` tells it apart. */
 export function bonusOf(

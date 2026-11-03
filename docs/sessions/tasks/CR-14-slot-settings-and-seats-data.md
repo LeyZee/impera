@@ -1,5 +1,5 @@
 # CR-14 Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049
-Statut : in_progress, lot a en relecture (ADR 0049, acceptée par Charles le 02/11/2026 à 18h36 ; fiche ouverte le 03/11/2026 pour porter la base que CR-12 lit et que CR-13 écrit)
+Statut : in_progress, lot a fusionné (#440), lot b1 en relecture (ADR 0049, acceptée par Charles le 02/11/2026 à 18h36 ; fiche ouverte le 03/11/2026 pour porter la base que CR-12 lit et que CR-13 écrit)
 Phase : espaces (ADR 0045, ADR 0049)
 Dépend de : EQ-02 (module `scheduling`), CR-12 lot a (lecture du calendrier)
 Branche : task/cr-14-slot-settings-and-seats-data (lot a : `claude/project-thread-1yc7m9-adr-0049`)
@@ -20,7 +20,7 @@ La base sait ce que l'ADR 0049 décide : des créneaux aux heures libres réglé
 - [x] La paie lit toujours les shifts par `scheduling.pay.shifts` (membre, compte, début, fin, arrêt) : colonnes et sens inchangés.
 
 ### Lot b : le contrat et la lecture
-- [ ] `SchedulingSettingsSchema` porte la liste des créneaux (début, fin, nom facultatif) et les places par compte ; `refine` Zod (24 h sans trou ni chevauchement, de 1 h à 12 h, à l'heure pleine, au moins deux créneaux), revérifié par le domaine à l'écriture ; lecture d'un réglage passé par `at` ; la grille lit le réglage en vigueur jour par jour.
+- [x] `SchedulingSettingsSchema` porte la liste des créneaux (début, fin, nom facultatif) et les places par compte ; `refine` Zod (24 h sans trou ni chevauchement, de 1 h à 12 h, à l'heure pleine, au moins deux créneaux), revérifié par le domaine à l'écriture ; lecture d'un réglage passé par `at` ; la grille lit le réglage en vigueur jour par jour.
 - [ ] `slotsToFill` compte des places ; « IA seule » ne tient lieu que d'une place unique (ADR 0048 § 1).
 - [ ] Le rang d'une place existe dans sa version (domaine, revérifié à l'écriture ; déclencheur d'insertion si Bilan le demande), relevé de la relecture de Bilan sur #440.
 - [ ] README du module : la limite de trois tient parce que les écritures sur `shifts` tournent en READ COMMITTED (le comptage de `shifts_account_cap` lit après le verrou) ; une écriture en repeatable read la casserait.
@@ -42,4 +42,7 @@ Les écrans (CR-12 lot d2, CR-13), le recalage des modèles (CR-13), le routage 
 - L'index GiST `shifts_account_range_idx` (compte, plage, shifts non annulés) remplace celui que portait l'exclusion retirée : la garde du serveur et la paie le lisent.
 - `shift_fan_assignments` : le rôle de l'application n'a que `SELECT` ; EQ-08 donnera l'insertion et la fermeture avec leurs politiques. L'exclusion porte sur `tstzrange(starts_at, ends_at, '[)')`, une fin nulle étant l'infini.
 - Les places d'une version passée sont figées par un déclencheur (`refuse_effective_slot_seats`), y compris pour le rôle admin ; une version future se retire entière (cascade) et se réécrit, jamais modifiée.
+- Lot b1 (03/11) : `SchedulingSettingsSchema` = fuseau, marge, `versions` (la version en vigueur au début de ce qu'on lit, puis celles qui prennent effet avant sa fin, ou toutes celles à venir pour `GET ?at=`). `SHIFT_SLOT_LENGTHS_MINUTES` disparaît ; `ShiftSlotsSchema` porte le `superRefine` (24 h sans trou ni chevauchement, 1 h à 12 h, à l'heure pile, 2 à 24). `PUT /scheduling/settings` n'écrit plus que le fuseau et la marge (corps strict) ; les colonnes `slot_*` de `scheduling_settings` restent pour la 0078 et ne sont plus lues.
+- Découpage jour par jour (`slotWindowsOf`, contrat, partagé par le serveur et le web) : un créneau appartient à la version en vigueur à son début ; celui qui précède le premier créneau d'une nouvelle version finit où elle commence (raccourci ou étiré). Une version qui prend effet un lundi à 5 h sur des créneaux de minuit garde donc un créneau 0 h – 5 h de l'ancienne version le lundi. Les créneaux d'une version se lisent dans le fuseau de la grille d'aujourd'hui ; `time_zone` de la version garde celui de son écriture.
+- Les places ne partent qu'au propriétaire et à l'agence ; « à pourvoir » en places, l'écriture et le retrait d'une version : lot b2.
 

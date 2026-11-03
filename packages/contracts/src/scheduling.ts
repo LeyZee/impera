@@ -70,8 +70,11 @@ import { CalendarDaySchema, MemberColorSchema } from './team-members';
  * approval and a new shift at the same moment cannot both win.
  */
 
-/** Slot lengths that divide a day, so the slots tile it (4 × 6 h by default, like Imperium's grid). */
-export const SHIFT_SLOT_LENGTHS_MINUTES = [60, 120, 180, 240, 360, 480, 720] as const;
+/** The shortest and the longest créneau (ADR 0049 § 1), and how many a day holds. */
+export const SHIFT_SLOT_MIN_MINUTES = 60;
+export const SHIFT_SLOT_MAX_MINUTES = 12 * 60;
+export const SHIFT_SLOTS_MIN = 2;
+export const SHIFT_SLOTS_MAX = 24;
 
 /** The longest shift: beyond a day, it is a typing mistake. */
 export const SHIFT_MAX_MINUTES = 24 * 60;
@@ -85,44 +88,199 @@ export const PLANNING_MAX_DAYS = 42;
 /** A minute of the day in the grid's zone, from midnight: 0 to 1439. */
 export const MinuteOfDaySchema = z.number().int().min(0).max(1439);
 
-/**
- * The owner's planning settings (`GET`, `PUT /v1/scheduling/settings`). Changing the slots moves no shift and no
- * template: they keep their hours.
- */
-export const SchedulingSettingsSchema = z
-  .object({
-    /** The agency's zone: the slots and the templates speak in it, and the pay periods follow it (ADR 0023, EQ-03). */
-    timeZone: TimezoneSchema,
-    /** Where the day's first slot starts, in minutes after midnight; earlier than the end of that slot. */
-    slotStartMinute: MinuteOfDaySchema,
-    slotLengthMinutes: z.literal(SHIFT_SLOT_LENGTHS_MINUTES),
-    /** ADR 0025: how long before and after their shift a chatter keeps their creators in Nirvana. */
-    accessMarginMinutes: z.number().int().min(0).max(120),
-  })
-  .refine((settings) => settings.slotStartMinute < settings.slotLengthMinutes, {
-    message: 'Le premier créneau commence moins d’une durée de créneau après minuit',
-    path: ['slotStartMinute'],
-  });
-export type SchedulingSettings = z.infer<typeof SchedulingSettingsSchema>;
-
-/** One slot of the day (`ShiftSlot`, never `slot` alone): an end at or before its start is the next day. */
-export const ShiftSlotSchema = z.object({ startMinute: MinuteOfDaySchema, endMinute: MinuteOfDaySchema });
-export type ShiftSlot = z.infer<typeof ShiftSlotSchema>;
-
 const MINUTES_PER_DAY = 24 * 60;
 
-/** The day's slots, in order from the first one: `{ 0, 360 }, { 360, 720 }…` with the defaults. */
-export function shiftSlotsOf(
-  settings: Pick<SchedulingSettings, 'slotStartMinute' | 'slotLengthMinutes'>,
-): ShiftSlot[] {
-  const count = MINUTES_PER_DAY / settings.slotLengthMinutes;
-  return Array.from({ length: count }, (_, index) => {
-    const startMinute = settings.slotStartMinute + index * settings.slotLengthMinutes;
-    return {
-      startMinute: startMinute % MINUTES_PER_DAY,
-      endMinute: (startMinute + settings.slotLengthMinutes) % MINUTES_PER_DAY,
-    };
+/**
+ * One créneau of the day (`ShiftSlot`, never `slot` alone), in wall-clock minutes of the grid's zone: an end at or
+ * before its start is the next day. `name` is the owner's (« Live »), or `null`: the screens then name it from its
+ * hours (ADR 0049 § 1).
+ */
+export const ShiftSlotSchema = z.object({
+  startMinute: MinuteOfDaySchema,
+  endMinute: MinuteOfDaySchema,
+  name: z.string().trim().min(1).max(24).nullable(),
+});
+export type ShiftSlot = z.infer<typeof ShiftSlotSchema>;
+
+/** How long a créneau lasts in wall-clock minutes: 1 to 1440, an end at its start making a whole day. */
+export const slotLengthOf = (slot: Pick<ShiftSlot, 'startMinute' | 'endMinute'>): number =>
+  (slot.endMinute - slot.startMinute + MINUTES_PER_DAY) % MINUTES_PER_DAY || MINUTES_PER_DAY;
+
+/**
+ * The day's créneaux, in order from the first (ADR 0049 § 1): each begins where the one before ends and the last ends
+ * where the first begins, so that they cover 24 h without a gap or an overlap; each lasts 1 h to 12 h, on the hour; two
+ * to twenty-four of them. The domain checks it again before writing.
+ */
+export const ShiftSlotsSchema = z
+  .array(ShiftSlotSchema)
+  .min(SHIFT_SLOTS_MIN)
+  .max(SHIFT_SLOTS_MAX)
+  .superRefine((slots, context) => {
+    slots.forEach((slot, index) => {
+      const length = slotLengthOf(slot);
+      if (slot.startMinute % 60 !== 0 || slot.endMinute % 60 !== 0)
+        context.addIssue({
+          code: 'custom',
+          message: 'Un créneau commence et finit à l’heure pile',
+          path: [index],
+        });
+      if (length < SHIFT_SLOT_MIN_MINUTES || length > SHIFT_SLOT_MAX_MINUTES)
+        context.addIssue({ code: 'custom', message: 'Un créneau dure de 1 h à 12 h', path: [index] });
+      const next = slots[(index + 1) % slots.length];
+      if (next !== undefined && next.startMinute !== slot.endMinute)
+        context.addIssue({
+          code: 'custom',
+          message: 'Les créneaux se suivent sans trou ni chevauchement',
+          path: [index],
+        });
+    });
+    const total = slots.reduce((sum, slot) => sum + slotLengthOf(slot), 0);
+    if (total !== MINUTES_PER_DAY)
+      context.addIssue({ code: 'custom', message: 'Les créneaux couvrent 24 h, une seule fois', path: [] });
   });
+
+/**
+ * How many chatters an account wants at once on a créneau of a version (ADR 0049 § 2): 2 at most; an account and a
+ * créneau without a line want 1. `slotRank` is the créneau's place in its version's list.
+ */
+export const SlotSeatSchema = z.object({
+  slotRank: z
+    .number()
+    .int()
+    .min(0)
+    .max(SHIFT_SLOTS_MAX - 1),
+  platformAccountId: PlatformAccountIdSchema,
+  seats: z.union([z.literal(1), z.literal(2)]),
+});
+export type SlotSeat = z.infer<typeof SlotSeatSchema>;
+
+/**
+ * One version of the créneaux (ADR 0049 § 1): in force from `effectiveAt` until the next version's. `id` and
+ * `effectiveAt` are `null` for the module's default, before the owner saved any. A version that took effect never
+ * changes; one still ahead can be withdrawn. `seats` holds only the accounts the reader may read.
+ */
+export const SlotVersionSchema = z
+  .object({
+    id: z.uuid().nullable(),
+    effectiveAt: z.iso.datetime().nullable(),
+    slots: ShiftSlotsSchema,
+    seats: z.array(SlotSeatSchema),
+  })
+  .refine((version) => version.seats.every((seat) => seat.slotRank < version.slots.length), {
+    message: 'Une place nomme un créneau de sa version',
+    path: ['seats'],
+  });
+export type SlotVersion = z.infer<typeof SlotVersionSchema>;
+
+/**
+ * The owner's planning settings (`GET`, `PUT /v1/scheduling/settings`). `versions` are the créneaux' versions, oldest
+ * first: the one in force at the start of what is read (`at` for `GET`, the window of a planning or calendar read),
+ * then those that take effect after it, within that window (every one ahead for `GET`). A week can so hold two
+ * versions, which the grid reads day by day (`slotWindowsOf`). Changing the créneaux moves no shift and no template:
+ * they keep their hours.
+ */
+export const SchedulingSettingsSchema = z.object({
+  /** The agency's zone: the créneaux and the templates speak in it, and the pay periods follow it (ADR 0023, EQ-03). */
+  timeZone: TimezoneSchema,
+  /** ADR 0025: how long before and after their shift a chatter keeps their creators in Nirvana. */
+  accessMarginMinutes: z.number().int().min(0).max(120),
+  versions: z.array(SlotVersionSchema).min(1),
+});
+export type SchedulingSettings = z.infer<typeof SchedulingSettingsSchema>;
+
+/**
+ * `PUT /v1/scheduling/settings`: the zone and the margin; the créneaux are written as versions. Strict: a client that
+ * still sends `slotStartMinute` hears it, instead of losing it without a word.
+ */
+export const SchedulingSettingsInputSchema = z.strictObject({
+  timeZone: SchedulingSettingsSchema.shape.timeZone,
+  accessMarginMinutes: SchedulingSettingsSchema.shape.accessMarginMinutes,
+});
+export type SchedulingSettingsInput = z.infer<typeof SchedulingSettingsInputSchema>;
+
+/** `GET /v1/scheduling/settings?at=…`: the créneaux in force at `at` (now by default), and those ahead of it. */
+export const SchedulingSettingsQuerySchema = z.object({ at: z.iso.datetime().optional() });
+
+/** The version in force at `at`: the last whose `effectiveAt` has passed, the first when none has. */
+export function slotVersionAt(versions: readonly SlotVersion[], at: Date): SlotVersion {
+  const inForce = versions.filter(
+    (version) => version.effectiveAt === null || Date.parse(version.effectiveAt) <= at.getTime(),
+  );
+  const version = inForce.at(-1) ?? versions[0];
+  if (version === undefined) throw new Error('slotVersionAt: no version');
+  return version;
+}
+
+/** The créneaux of the version in force now, in order from the first. */
+export function shiftSlotsOf(settings: Pick<SchedulingSettings, 'versions'>, at = new Date()): ShiftSlot[] {
+  return [...slotVersionAt(settings.versions, at).slots];
+}
+
+/** The seats an account wants on a créneau of `version`: 1 without a line. */
+export const seatsOf = (version: SlotVersion, slotRank: number, accountId: string): 1 | 2 =>
+  version.seats.find((seat) => seat.slotRank === slotRank && seat.platformAccountId === accountId)?.seats ??
+  1;
+
+/** A créneau on a day of the grid: its instants, its place in its version and that version. */
+export interface SlotWindow {
+  /** The grid's day it belongs to: a day of créneaux begins at its first, so 2 h is the night before at 5 h. */
+  readonly day: string;
+  readonly from: Date;
+  readonly to: Date;
+  readonly rank: number;
+  readonly slot: ShiftSlot;
+  readonly version: SlotVersion;
+}
+
+/**
+ * The créneaux of `days` (consecutive grid days, `YYYY-MM-DD`), each day cut by the version in force (ADR 0049 § 1).
+ * `toInstant(day, minute)` reads a wall-clock minute of the grid's zone on that day (beyond 1440 for the next day), so
+ * that a day of a change of time has a créneau an hour shorter or longer. A créneau belongs to the version in force
+ * when it begins; where a version takes effect, the créneau before it ends where the first of the new version begins
+ * (cut short, or stretched: « un créneau retiré rend ses heures au créneau d'avant »).
+ */
+export function slotWindowsOf(
+  versions: readonly SlotVersion[],
+  days: readonly string[],
+  toInstant: (day: string, minute: number) => Date,
+): SlotWindow[] {
+  const first = days[0];
+  const last = days.at(-1);
+  if (first === undefined || last === undefined) return [];
+  // A day on each side, so that a version taking effect at a day's edge cuts the créneau that runs into it.
+  const around = [shiftDay(first, -1), ...days, shiftDay(last, 1)];
+  const effective = versions.map((version) =>
+    version.effectiveAt === null ? Number.NEGATIVE_INFINITY : Date.parse(version.effectiveAt),
+  );
+  const all: SlotWindow[] = [];
+  for (const day of around) {
+    versions.forEach((version, index) => {
+      // The first version also holds what comes before its own date: the grid has no créneaux before the first.
+      const from = index === 0 ? Number.NEGATIVE_INFINITY : (effective[index] ?? Number.NEGATIVE_INFINITY);
+      const next = effective[index + 1] ?? Number.POSITIVE_INFINITY;
+      const dayStart = version.slots[0]?.startMinute ?? 0;
+      version.slots.forEach((slot, rank) => {
+        const start = slot.startMinute + (slot.startMinute < dayStart ? MINUTES_PER_DAY : 0);
+        const begins = toInstant(day, start);
+        const at = begins.getTime();
+        if (at < from || at >= next) return;
+        all.push({ day, from: begins, to: toInstant(day, start + slotLengthOf(slot)), rank, slot, version });
+      });
+    });
+  }
+  all.sort((a, b) => a.from.getTime() - b.from.getTime());
+  const joined = all.map((window, index) => {
+    const after = all[index + 1];
+    return after === undefined || after.version === window.version ? window : { ...window, to: after.from };
+  });
+  return joined.filter((window) => window.day >= first && window.day <= last && window.to > window.from);
+}
+
+/** `YYYY-MM-DD` shifted by `days`, on the calendar alone. */
+function shiftDay(day: string, days: number): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 /** A member's shift on one account of a creator. A cancelled shift is never sent back. */

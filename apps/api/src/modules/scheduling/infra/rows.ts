@@ -10,10 +10,13 @@ import {
   PlatformAccountIdSchema,
   PlatformSchema,
   ShiftIdSchema,
+  ShiftSlotsSchema,
   ShiftTemplateIdSchema,
+  SlotVersionSchema,
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
   type CreatorId,
+  type SchedulingSettings,
   type TeamMemberId,
 } from '@nirvana/contracts';
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
@@ -43,6 +46,8 @@ const {
   leaveRequests,
   platformAccounts,
   schedulingSettings,
+  schedulingSlotSeats,
+  schedulingSlotVersions,
   shiftReports,
   shiftTemplates,
   shifts,
@@ -50,13 +55,104 @@ const {
   user,
 } = schema;
 
-/** The agency's settings as the screens read them, from one place (Bilan's review of #427). */
-export const settingsColumns = {
+/**
+ * The zone and the margin of the agency's settings, from one place (Bilan's review of #427). The legacy
+ * `slot_start_minute` and `slot_length_minutes` are read no more: the créneaux are versions (ADR 0049, migration 0078).
+ */
+const settingsColumns = {
   timeZone: schedulingSettings.timeZone,
-  slotStartMinute: schedulingSettings.slotStartMinute,
-  slotLengthMinutes: schedulingSettings.slotLengthMinutes,
   accessMarginMinutes: schedulingSettings.accessMarginMinutes,
 };
+
+/** What a read of the settings covers: the version in force at `from`, then those taking effect before `to`. */
+export interface SettingsRange {
+  readonly from: Date;
+  /** `null`: every version ahead. */
+  readonly to: Date | null;
+}
+
+const VersionRowSchema = z.object({
+  id: z.uuid(),
+  // Milliseconds since the epoch, `null` for the version copied at `-infinity` by migration 0078.
+  effective: z.string().nullable(),
+  slots: ShiftSlotsSchema,
+});
+
+/**
+ * The settings as one read sees them, in `tx` (ADR 0049 § 1): the zone and the margin, and the créneaux' versions over
+ * `range`, the module's defaults where nothing is saved. The default créneaux stand first when no saved version is in
+ * force at `range.from`. `withSeats` for the owner and the agency alone: a chatter or a creator reads no account's
+ * seats.
+ */
+export async function settingsIn(
+  tx: Transaction,
+  range: SettingsRange,
+  withSeats: boolean,
+): Promise<SchedulingSettings> {
+  const [row] = await tx.select(settingsColumns).from(schedulingSettings);
+  const columns = {
+    id: schedulingSlotVersions.id,
+    effective: sql<
+      string | null
+    >`(extract(epoch from nullif(${schedulingSlotVersions.effectiveAt}, '-infinity'::timestamptz)) * 1000)::bigint::text`,
+    slots: schedulingSlotVersions.slots,
+  };
+  const inForce = await tx
+    .select(columns)
+    .from(schedulingSlotVersions)
+    .where(sql`${schedulingSlotVersions.effectiveAt} <= ${range.from}`)
+    .orderBy(sql`${schedulingSlotVersions.effectiveAt} desc`)
+    .limit(1);
+  const ahead = await tx
+    .select(columns)
+    .from(schedulingSlotVersions)
+    .where(
+      range.to === null
+        ? sql`${schedulingSlotVersions.effectiveAt} > ${range.from}`
+        : sql`${schedulingSlotVersions.effectiveAt} > ${range.from} and ${schedulingSlotVersions.effectiveAt} < ${range.to}`,
+    )
+    .orderBy(sql`${schedulingSlotVersions.effectiveAt} asc`);
+  const rows = [...inForce, ...ahead].map((one) => VersionRowSchema.parse(one));
+  const seats =
+    withSeats && rows.length > 0
+      ? await tx
+          .select({
+            versionId: schedulingSlotSeats.versionId,
+            slotRank: schedulingSlotSeats.slotRank,
+            platformAccountId: schedulingSlotSeats.platformAccountId,
+            seats: schedulingSlotSeats.seats,
+          })
+          .from(schedulingSlotSeats)
+          .where(
+            inArray(
+              schedulingSlotSeats.versionId,
+              rows.map((one) => one.id),
+            ),
+          )
+      : [];
+  const saved = rows.map((one) =>
+    SlotVersionSchema.parse({
+      id: one.id,
+      effectiveAt: one.effective === null ? null : new Date(Number(one.effective)).toISOString(),
+      slots: one.slots,
+      seats: seats
+        .filter((seat) => seat.versionId === one.id)
+        .map(({ slotRank, platformAccountId, seats: count }) => ({
+          slotRank,
+          platformAccountId,
+          seats: count,
+        }))
+        .toSorted(
+          (a, b) => a.slotRank - b.slotRank || a.platformAccountId.localeCompare(b.platformAccountId),
+        ),
+    }),
+  );
+  return {
+    timeZone: row?.timeZone ?? DEFAULT_SCHEDULING_SETTINGS.timeZone,
+    accessMarginMinutes: row?.accessMarginMinutes ?? DEFAULT_SCHEDULING_SETTINGS.accessMarginMinutes,
+    versions: inForce.length === 0 ? [...DEFAULT_SCHEDULING_SETTINGS.versions, ...saved] : saved,
+  };
+}
 
 export const shiftColumns = {
   id: shifts.id,

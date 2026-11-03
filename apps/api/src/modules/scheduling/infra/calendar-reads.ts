@@ -4,7 +4,6 @@ import {
   CreatorIdSchema,
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
-  SchedulingSettingsSchema,
   type CalendarView,
 } from '@nirvana/contracts';
 import { and, enterCreator, eq, schema, sql, SNAPSHOT_READ, withMember, type Database } from '@nirvana/db';
@@ -12,9 +11,9 @@ import { z } from 'zod';
 
 import type { CalendarReads, StoredAccount, StoredShift } from '../domain/ports';
 
-import { settingsColumns, shiftColumns, StoredAccountSchema, toShift } from './rows';
+import { settingsIn, shiftColumns, StoredAccountSchema, toShift } from './rows';
 
-const { platformAccounts, schedulingSettings, shifts: shiftTable, teamMembers } = schema;
+const { platformAccounts, shifts: shiftTable, teamMembers } = schema;
 
 const ShiftRowSchema = z.object({
   member_id: TeamMemberIdSchema,
@@ -58,7 +57,7 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
             sql`select * from public.calendar_shifts(${window.from}, ${window.to})`,
           );
           const agents = await tx.execute(sql`select * from public.calendar_agent()`);
-          const [settings] = await tx.select(settingsColumns).from(schedulingSettings);
+          const settings = await settingsIn(tx, window, view === 'agency');
           let agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null = null;
           if (view === 'agency') {
             agency = { accounts: [], shifts: [] };
@@ -88,7 +87,7 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
           }
           return {
             view,
-            settings: settings === undefined ? null : SchedulingSettingsSchema.parse(settings),
+            settings,
             agency,
             shifts: shifts.rows.map((raw) => {
               const row = ShiftRowSchema.parse(raw);

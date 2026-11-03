@@ -13,6 +13,8 @@ import {
 } from './calendar';
 import { zonedInstant } from './time';
 
+import { settingsOf } from '@/test/settings';
+
 const PARIS = 'Europe/Paris';
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
 const INES = id(1);
@@ -27,7 +29,7 @@ const words = (text: string): string => text.replaceAll(NBSP, ' ');
 const calendarOf = (patch: Partial<z.input<typeof CalendarSchema>> = {}): Calendar =>
   CalendarSchema.parse({
     view: 'team',
-    settings: { timeZone: PARIS, slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+    settings: settingsOf(),
     creators: [{ id: INES, name: 'Inès' }],
     members: [
       { id: KOFI, displayName: 'Kofi', color: '#7aa2ff' },

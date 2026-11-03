@@ -16,6 +16,7 @@ import { PlanningPage } from './PlanningPage';
 import { parsePlanningSearch } from './model';
 
 import { parseCalendarSearch } from '@/scheduling/calendar';
+import { settingsOf } from '@/test/settings';
 
 const reader = vi.hoisted(() => ({ zone: 'Europe/Paris' }));
 vi.mock('@/scheduling/time', async (importOriginal) => ({
@@ -77,7 +78,7 @@ const planning = (
   accounts: unknown[] = ACCOUNTS,
   slotStartMinute = 0,
 ): unknown => ({
-  settings: { timeZone: 'Europe/Paris', slotStartMinute, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+  settings: settingsOf({ start: slotStartMinute }),
   accounts,
   members: [{ id: THEO, displayName: 'Théo', color: '#c2410c' }],
   shifts,
@@ -299,12 +300,7 @@ const agencyCalendar =
   (mode: 'auto' | 'copilot', slotStartMinute = 0) =>
   (from: string, to: string): unknown => ({
     view: 'agency',
-    settings: {
-      timeZone: 'Europe/Paris',
-      slotStartMinute,
-      slotLengthMinutes: 360,
-      accessMarginMinutes: 15,
-    },
+    settings: settingsOf({ start: slotStartMinute }),
     creators: [{ id: NORA, name: 'Nora Vidal' }],
     members: [{ id: THEO, displayName: 'Théo', color: '#c2410c' }],
     shifts: [{ memberId: THEO, creatorId: NORA, startsAt: night.startsAt, endsAt: night.endsAt }],

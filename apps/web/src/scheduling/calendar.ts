@@ -1,6 +1,6 @@
 import {
   CALENDAR_MAX_DAYS,
-  shiftSlotsOf,
+  slotWindowsOf,
   type Calendar,
   type CalendarAgent,
   type CalendarShift,
@@ -116,14 +116,13 @@ export function agentOnSlot(
 export function calendarRows(calendar: Calendar, days: readonly string[], now: Date): CalendarRow[] {
   const { settings } = calendar;
   const zone = settings.timeZone;
-  const slots = shiftSlotsOf(settings);
-  const length = settings.slotLengthMinutes;
+  // Each day cut by the version in force (ADR 0049 § 1): a week can change créneaux on one of its days.
+  const all = slotWindowsOf(settings.versions, days, (day, minute) => zonedInstant(day, minute, zone));
   const windows = days.map((day) => ({
     day,
-    cuts: slots.map((_, index) => ({
-      from: zonedInstant(day, settings.slotStartMinute + index * length, zone).getTime(),
-      to: zonedInstant(day, settings.slotStartMinute + (index + 1) * length, zone).getTime(),
-    })),
+    cuts: all
+      .filter((window) => window.day === day)
+      .map((window) => ({ from: window.from.getTime(), to: window.to.getTime() })),
   }));
   return calendar.creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;

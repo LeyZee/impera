@@ -32,14 +32,24 @@ import {
 /** Planning rules (EQ-02, contract `scheduling.ts`), pure. */
 
 /**
- * Until the owner saves their own (no `scheduling_settings` row): Imperium's grid of four 6-hour slots from midnight,
+ * Until the owner saves their own (no `scheduling_settings` row, no version): Imperium's grid of four 6-hour créneaux from midnight,
  * in Paris, and a quarter of an hour of margin around a chatter's shift (ADR 0025).
  */
 export const DEFAULT_SCHEDULING_SETTINGS: SchedulingSettings = {
   timeZone: 'Europe/Paris',
-  slotStartMinute: 0,
-  slotLengthMinutes: 360,
   accessMarginMinutes: 15,
+  versions: [
+    {
+      id: null,
+      effectiveAt: null,
+      slots: [0, 1, 2, 3].map((index) => ({
+        startMinute: index * 360,
+        endMinute: ((index + 1) * 360) % 1440,
+        name: null,
+      })),
+      seats: [],
+    },
+  ],
 };
 
 const MINUTE_MS = 60_000;
