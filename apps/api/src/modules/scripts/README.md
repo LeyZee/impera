@@ -16,6 +16,7 @@
 **Routes** (montées sous `/v1`, codes d'erreur `SCRIPT_ERROR_CODES`) :
 
 - `GET /script-structures`, `GET /script-structures/:structureId` : propriétaire et opérateurs (la RLS ne montre rien à un chatteur) ;
+- `GET /script-structures/starters` : les structures de départ (`SCRIPT_STARTERS`, ADR 0064 § 4), données des contrats, les mêmes pour toute agence ; en dupliquer une, c'est un `POST` de son corps sous un nouvel identifiant ;
 - `POST /script-structures` (propriétaire) : écrit la structure et sa version 1 sous l'identifiant du client (201) ; le même envoi rejoue (200) ; le même identifiant avec un autre contenu donne 409 `script_structure_conflict`. Une règle cassée donne 400 avec le message à la place du segment fautif ;
 - `PUT /script-structures/:structureId` (propriétaire) : enregistre sur `basedOnVersion` ; 409 `script_structure_stale_conflict` si une autre version a été écrite depuis ; 400 `script_structure_creator_invalid` si la créatrice réservée n'existe pas ou si la structure est déjà dans la file d'une autre ;
 - `DELETE /script-structures/:structureId` (propriétaire) : archive (204) ;

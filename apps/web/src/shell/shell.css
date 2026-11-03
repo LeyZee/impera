@@ -88,7 +88,7 @@
   width: 30px;
   height: 30px;
   flex: none;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--nv-neon) 45%, transparent));
+  /* No glow of its own: the laurel in the mark is the only light (brand/README.md). */
 }
 .nv-rail__name {
   font-family: var(--nv-font-wordmark);
