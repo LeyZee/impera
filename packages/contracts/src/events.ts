@@ -16,6 +16,8 @@ import {
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
 import {
   CommissionStatementIdSchema,
+  ContentDropIdSchema,
+  ContentRequestIdSchema,
   ContractorDocumentIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
@@ -239,6 +241,7 @@ export const EVENT_TYPES = [
   'agency_share_mismatch',
   'connection_state_changed',
   'security_alert',
+  'content_drop_received',
   'error',
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -467,6 +470,15 @@ export const EVENT_PAYLOADS = {
    * `payroll.remind_documents`, with no creator, for the owner; the member sees it in his file. Never a name: the
    * member and the document by id.
    */
+  /**
+   * Every file of her drop arrived whole in the media storage (CR-06 b): the receipt job publishes it in the
+   * transaction that moves the drop to « Reçu », once per drop. The trend watch reads `requestId` to mark the idea
+   * that asked for it (VEI-01 d).
+   */
+  content_drop_received: z.object({
+    dropId: ContentDropIdSchema,
+    requestId: ContentRequestIdSchema.nullable(),
+  }),
   contractor_document_expiring: z.object({
     memberId: TeamMemberIdSchema,
     documentId: ContractorDocumentIdSchema,
@@ -621,6 +633,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('agency_share_mismatch'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
+  typedEvent('content_drop_received'),
   typedEvent('error'),
 ]);
 export type EventBody = z.infer<typeof EventBodySchema>;

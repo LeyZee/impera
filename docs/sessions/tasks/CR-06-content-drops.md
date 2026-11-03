@@ -1,5 +1,5 @@
 # CR-06 Dépôt de contenu : feed et Mass DM, depuis le téléphone
-Statut : in_progress (lot a fait ; ADR 0044 § 1 et § 2, acceptée par Charles le 02/11/2026)
+Statut : in_progress (lots a et b1 faits ; ADR 0044 § 1 et § 2, acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0044)
 Dépend de : CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037)
 Branche : task/cr-06-content-drops
@@ -42,3 +42,5 @@ Le plan de publication et l'envoi vers Reveal (CR-08, CR-11).
 ## Notes de session
 - 03/11, lot a (migration 0108) : contrats (`content-drops.ts` : catégories, règles de format par catégorie, dépôts, fichiers déclarés, demandes, erreurs), tables `content_requests`, `content_drops`, `content_drop_files` avec FORCE RLS, politiques étroites et deux déclencheurs (elle dépose, retire un dépôt que rien n'a programmé, refuse une demande ; l'agence dépose pour elle, corrige une catégorie au journal, retire, demande, annule ; un dépôt retiré et une demande close ne reviennent jamais), module `content-drops` et ses routes. Le découpage : b envoi direct, nettoyage (ffprobe, EXIF, GPS, atomes QuickTime), empreinte, doublons, CSP, MinIO ; c effacement daté et `released/` ; d écran Contenu et captures.
 - Reste après le lot a : la tâche d'Agenda d'une demande et ses deux rappels (avec le fil de l'Agenda, CR-05 b), les demandes nées du stock et de la cadence (jobs), les seuils de stock et le réglage des règles de format par l'agence (avec l'écran), la description par `sense` (clé de vision).
+- 03/11, lot b1 (migration 0109) : le bucket des médias (`S3_*`, cinq réglages ensemble, le nom seul ne compte pas), l'envoi direct par morceaux de 8 Mio à des adresses signées pour leur taille exacte, la reprise d'un envoi coupé (ListParts), l'assemblage et la vérification de la taille, l'état « reçu » d'un fichier et le job `content_drops.receive_file` ; `connect-src` du CRM ouvert à l'origine du bucket (`MEDIA_ORIGIN`) ; runbook deploy.md § 4.4 (CORS, règle de 24 h sur `incoming/`). Tests contre MinIO (moto en local, sans Docker : la vérification des signatures n'y est pas faite, `IMPERA_TEST_S3_CHECKS_SIGNATURES=false`).
+- Reste du lot b (b2) : le nettoyage (ffprobe, EXIF, GPS, atomes QuickTime, HEIC), le format vérifié sur le fichier arrivé, l'empreinte, le média de la médiathèque ou le doublon, le brut effacé ; un dépôt abandonné en cours d'envoi (lot c).

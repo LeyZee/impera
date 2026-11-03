@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
+  ContentDropFileIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
@@ -63,6 +64,7 @@ export const JOB_NAMES = [
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
   'media.describe',
+  'content_drops.receive_file',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -242,6 +244,15 @@ export const JOB_PAYLOADS = {
     mediaAssetId: MediaAssetIdSchema,
     correlationId: z.string().min(1),
   }),
+  /**
+   * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared,
+   * then marks the file received, and its drop when it was the last one. One per file (job key), replayable.
+   */
+  'content_drops.receive_file': z.object({
+    creatorId: CreatorIdSchema,
+    fileId: ContentDropFileIdSchema,
+    correlationId: z.string().min(1),
+  }),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -324,6 +335,9 @@ export const JOB_MAX_ATTEMPTS = {
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
   'media.describe': 3,
+  // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
+  // short outage of the storage; a file left waiting is sent again by her phone.
+  'content_drops.receive_file': 9,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,

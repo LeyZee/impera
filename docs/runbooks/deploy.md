@@ -85,7 +85,8 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `TRUST_PROXY_HOPS` | `2` (le proxy de Coolify, puis le nginx de `web`) ; défaut du compose |
 | `PLAYGROUND_PERSONA_PATH` | facultatif : chemin **dans le conteneur** de la persona du playground (§ 1.5) ; démo sans lui. Les brouillons, les gardes et « À apprendre » ne le lisent pas |
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |
-| `SENTRY_DSN`, `LANGFUSE_*`, `S3_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
+| `S3_*` | § 4.4 ; sans elles, la créatrice ne peut pas envoyer de fichier (l'envoi répond « réessaie dans un moment ») |
+| `SENTRY_DSN`, `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
 
 Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des variables en production : elles se collent dans Réglages › Modèles IA › Services (ADR 0016). Les deux clés de chiffrement se gardent aussi hors du serveur (gestionnaire de mots de passe) : les perdre rend illisibles les sessions et les clés stockées.
 
@@ -185,6 +186,29 @@ Avant la première facture réelle (EQ-06 lot 4, ADR 0037). En production, l'API
 
    Puis, chez Hetzner : la clé de l'application ne liste pas le bucket des sauvegardes, et la clé de `backup` ne liste pas celui des factures (deux `aws s3api list-objects-v2`, refusés). Le verrou de l'objet d'essai tombe le lendemain ; l'objet reste, quelques octets, sans gêne.
 6. **Après la première facture réelle** : `invoice_pdfs` et `invoice_pdf_copies` ont chacune sa ligne, avec la même empreinte, et le téléchargement (`GET /v1/payroll/invoices/<id>/pdf`) rend le PDF. Sinon, le job dit pourquoi dans son journal, et le propriétaire reçoit `invoice_pdf_missing` après environ une heure.
+
+### 4.4 Le bucket des médias
+
+Avant le premier dépôt réel d'une créatrice (CR-06 b, ADR 0055 § 3). Son téléphone envoie chaque fichier **directement** au bucket, par morceaux de 8 Mio, chacun à une adresse que l'API signe pour une heure et pour sa taille exacte. Le fichier brut arrive sous `incoming/` ; le nettoyage (CR-06 b2) en retire les métadonnées, garde le fichier nettoyé, puis efface le brut. Charles crée le projet Hetzner (aucune commande à taper) ; la session de mise en service fait le reste, sans jamais coller une clé dans un chat.
+
+1. **Hetzner, un projet pour les médias** (`impera-medias`) : ni les sauvegardes ni les factures n'y vivent, la clé de l'application ne les voit donc pas. Object Storage, même région que le VPS, un bucket **privé**, sans versioning ni verrou (un fichier effacé doit l'être vraiment, CR-06 c).
+2. **Deux règles de cycle de vie** sur le préfixe `incoming/` : expiration au bout d'**un jour** (tout brut disparaît en 24 h, même si le nettoyage n'a pas eu lieu), et abandon des envois par morceaux non terminés au bout d'un jour.
+
+   ```json
+   {"Rules": [{"ID": "brut-24h", "Status": "Enabled", "Filter": {"Prefix": "incoming/"},
+     "Expiration": {"Days": 1}, "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}}]}
+   ```
+
+3. **CORS** : le navigateur de la créatrice envoie ses morceaux depuis l'adresse du CRM et doit lire l'`ETag` de chaque réponse, sans quoi l'envoi ne peut pas se terminer.
+
+   ```json
+   {"CORSRules": [{"AllowedOrigins": ["https://app.<domaine>"], "AllowedMethods": ["PUT"],
+     "AllowedHeaders": ["*"], "ExposeHeaders": ["ETag"], "MaxAgeSeconds": 3600}]}
+   ```
+
+4. **Une clé pour l'application** (API et worker) : lire, écrire, lister et supprimer des objets de ce bucket, et rien d'autre.
+5. **Coolify**, sur `api` et `worker` : `S3_ENDPOINT` (`https://<région>.your-objectstorage.com`, sans le bucket), `S3_REGION` (`fsn1`, `nbg1`…), `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. Les cinq ensemble, l'adresse en `https`, sinon l'API refuse de démarrer en nommant le réglage. Le service `web` reçoit `S3_ENDPOINT` comme `MEDIA_ORIGIN` : c'est la seule autre adresse que sa politique de sécurité (`connect-src`) laisse joindre.
+6. **L'essai** : la créatrice de recette dépose une photo depuis son téléphone ; le dépôt passe à « Reçu », et un objet existe sous `incoming/<créatrice>/<fichier>` jusqu'au nettoyage. Un dépôt retiré pendant l'envoi n'y laisse rien.
 
 ## 5. Coupe-circuit
 
