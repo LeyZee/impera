@@ -4,14 +4,15 @@ import type {
   SalesFeedChatterLink,
   SalesFeedModelLink,
 } from '@nirvana/contracts';
-import { useId, useState, type JSX } from 'react';
+import { useEffect, useId, useState, type JSX } from 'react';
 
 import { CheckReport } from './CheckReport';
-import { runCheck } from './api';
+import { fetchLastCheck, runCheck } from './api';
 import {
   decodeExport,
   EXPORT_MAX_CHARS,
   fortnightsOver,
+  isWholeFortnight,
   lastDayOver,
   rangeLabel,
   rangeProblem,
@@ -22,6 +23,15 @@ import { platformName, shownOf, type Notice } from './shown';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 type Choice = 0 | 1 | 'custom';
+
+interface Shown {
+  readonly report: SalesFeedCheckReport;
+  /** `null` until the server said whether the switch can rest on it. */
+  readonly clean: boolean | null;
+  readonly at: Date;
+  /** Read back on return, not run on this visit. */
+  readonly isKept: boolean;
+}
 
 interface ChosenExport {
   readonly name: string;
@@ -61,7 +71,25 @@ export function CheckPanel({
   const [fileProblem, setFileProblem] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [result, setResult] = useState<{ report: SalesFeedCheckReport; at: Date } | null>(null);
+  const [result, setResult] = useState<Shown | null>(null);
+
+  // The latest report kept is shown again on return (CRM-03); a check run since replaces it. Failing to read it hides
+  // nothing the owner needs: the form is there to check again.
+  useEffect(() => {
+    let isCurrent = true;
+    fetchLastCheck(platform).then(
+      ({ last }) => {
+        if (!isCurrent || last === null) return;
+        setResult(
+          (before) => before ?? { report: last.report, clean: last.clean, at: new Date(), isKept: true },
+        );
+      },
+      () => undefined,
+    );
+    return () => {
+      isCurrent = false;
+    };
+  }, [platform]);
 
   const range: DayRange = choice === 'custom' ? custom : fortnights[choice];
   const problem = rangeProblem(range, lastOver);
@@ -98,7 +126,16 @@ export function CheckPanel({
       .then(
         (answer) => {
           if (answer.ok) {
-            setResult({ report: answer.report, at: new Date() });
+            const { report } = answer;
+            setResult({ report, clean: null, at: new Date(), isKept: false });
+            // Whether the switch can rest on it is the server's rule: read back with the report it kept.
+            fetchLastCheck(platform).then(
+              ({ last }) => {
+                if (last?.report.generatedAt !== report.generatedAt) return;
+                setResult((shown) => (shown?.report === report ? { ...shown, clean: last.clean } : shown));
+              },
+              () => undefined,
+            );
             return;
           }
           setNotice({ message: `${lead} ${answer.refusal.message}`, isSessionExpired: false, tone: 'error' });
@@ -200,7 +237,10 @@ export function CheckPanel({
             </div>
           ) : null}
           {problem === null ? (
-            <p className="sv-muted sf-small">Des jours déjà terminés, à l’heure de Paris, 31 au plus.</p>
+            <p className="sv-muted sf-small">
+              Des jours déjà terminés, à l’heure de Paris, 31 au plus.
+              {isWholeFortnight(range) ? null : ' La bascule du compte demandera une quinzaine entière.'}
+            </p>
           ) : (
             <p className="sf-warn" role="status">
               {problem}
@@ -282,6 +322,8 @@ export function CheckPanel({
       {result === null ? null : (
         <CheckReport
           report={result.report}
+          isKept={result.isKept}
+          clean={result.clean}
           platformName={name}
           models={models}
           chatters={chatters}
