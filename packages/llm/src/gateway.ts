@@ -6,13 +6,19 @@ import { generateText, transcribe as transcribeAudio } from 'ai';
 import { budgetStatus, type BudgetStatus } from './budget';
 import type { LlmCallLog } from './call-log';
 import { classify, createCallRunner } from './call-runner';
-import { MODELS, TRANSCRIPTION_MODEL } from './catalog';
+import { acceptsInput, MODELS, TRANSCRIPTION_MODEL } from './catalog';
 import type { ProviderId } from './config';
 import { alertsBlock, describeBrief, notesBlock, toMessages } from './conversation-messages';
 import type { LlmFailure, LlmGateway, LlmGatewayDeps, VideoKeyframes } from './gateway-types';
 import { computeHealth } from './health';
 import { loadPrompt, renderPrompt } from './prompts';
-import { BriefSchema, JudgeOutputSchema, SenseOutputSchema, VoiceOutputSchema } from './schemas';
+import {
+  BriefSchema,
+  JudgeOutputSchema,
+  SenseOutputSchema,
+  TrendCapturesOutputSchema,
+  VoiceOutputSchema,
+} from './schemas';
 import { senseContent } from './sense-content';
 import { wrapUntrusted } from './untrusted';
 
@@ -26,6 +32,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     sense: loadPrompt('sense'),
   };
   const judgePrompt = prompts.judge ?? loadPrompt('judge');
+  const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
   const reportRefusal = (provider: ProviderId, status: 401 | 403): void => {
@@ -226,6 +233,40 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         });
         return err({ code: 'all_models_failed', attempts: [{ ...ref, outcome }] });
       }
+    },
+
+    describeTrendCaptures(input) {
+      const system = renderPrompt(trendCapturesPrompt, { canary });
+      const intro =
+        input.durationS === null
+          ? `${String(input.captures.length)} capture(s) d'un post, photo ou carrousel.`
+          : `${String(input.captures.length)} capture(s) d'une vidéo de ${String(Math.round(input.durationS))} s.`;
+      return run(
+        'sense',
+        trendCapturesPrompt,
+        system,
+        (ref) =>
+          Promise.resolve(
+            // A model that reads no image is skipped for the fallback.
+            acceptsInput(ref, 'image')
+              ? [
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: intro },
+                      ...input.captures.map((capture) => ({
+                        type: 'file' as const,
+                        data: capture.data,
+                        mediaType: capture.mediaType,
+                      })),
+                    ],
+                  },
+                ]
+              : undefined,
+          ),
+        TrendCapturesOutputSchema,
+        { ...input.trace, purpose: 'trend_watch' },
+      );
     },
 
     health() {

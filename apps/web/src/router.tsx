@@ -11,11 +11,12 @@ import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { creatorsSearch, parseCreatorsSearch, sheetOf } from './creators/search';
 import { parsePaySearch } from './payroll/model';
+import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { AgendaPage } from './screens/agenda/AgendaPage';
-import { parseAgendaSearch, viewOf } from './screens/agenda/search';
+import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
@@ -230,8 +231,8 @@ const today = createRoute({
   },
 });
 /**
- * Agenda, the creator's alone (CR-05, ADR 0042 § 8): her day (`?jour=`), or her week as a list (`?vue=semaine`). Any
- * other account is sent home by the root, as this section is not on its rail.
+ * Agenda, the creator's alone (CR-05, ADR 0042 § 8): her day (`?jour=`), her week (`?vue=semaine`) or her month
+ * (`?vue=mois`). Any other account is sent home by the root, as this section is not on its rail.
  */
 const agenda = createRoute({
   getParentRoute: () => rootRoute,
@@ -257,7 +258,7 @@ const agenda = createRoute({
           void navigate({
             search: ({ jour }) => ({
               ...(jour === undefined ? {} : { jour }),
-              ...(view === 'week' ? { vue: 'semaine' as const } : {}),
+              ...vueOf(view),
             }),
           })
         }
@@ -766,6 +767,16 @@ const installHelp = createRoute({
   path: '/aide/installer',
   component: InstallPage,
 });
+/** /aide/extension (ADR 0067): the extension's guide, outside the rail like the phone's; the menu offers it to the team. */
+const extensionHelp = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/aide/extension',
+  component: function ExtensionHelp() {
+    const { user } = rootRoute.useRouteContext();
+    // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
+    return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
+  },
+});
 /** /notifications (CR-01): every role, from the account's menu; this device and the account's quiet hours. */
 const notifications = createRoute({
   getParentRoute: () => rootRoute,
@@ -775,6 +786,7 @@ const notifications = createRoute({
 
 const routeTree = rootRoute.addChildren([
   installHelp,
+  extensionHelp,
   notifications,
   dashboard,
   creators,

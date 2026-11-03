@@ -55,6 +55,7 @@ export {
   type SenseInput,
   type SenseMedia,
   type Transcript,
+  type TrendCapturesInput,
   type TurnMedia,
   type VideoFrame,
   type VideoKeyframes,

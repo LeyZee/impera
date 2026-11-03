@@ -1,25 +1,42 @@
-import type { CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
+import type { CreatorAgenda, CreatorSuggestion, CreatorTask, CreatorTaskWhen } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type JSX } from 'react';
 
 import { AddDialog, type AddPreset } from './AddDialog';
 import { DayView } from './DayView';
+import { MonthView } from './MonthView';
+import { SuggestionDialog } from './SuggestionCard';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
+import { WeekGrid } from './WeekGrid';
 import { WeekList } from './WeekList';
-import { tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
+import { moveTask, tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
+import { monthLabel, monthOf, monthRange } from './grid';
+import { useWide } from './useWide';
 import './agenda.css';
 
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
 
-export type AgendaView = 'day' | 'week';
+export type AgendaView = 'day' | 'week' | 'month';
 
-const VIEWS: readonly (readonly [AgendaView, string])[] = [
+/** On her phone her week is a list and there is no month; on a computer, Semaine is a grid of hours, and Mois. */
+const PHONE_VIEWS: readonly (readonly [AgendaView, string])[] = [
   ['day', 'Jour'],
   ['week', 'Ma semaine'],
 ];
+const WIDE_VIEWS: readonly (readonly [AgendaView, string])[] = [
+  ['day', 'Jour'],
+  ['week', 'Semaine'],
+  ['month', 'Mois'],
+];
+
+const STEP: Record<AgendaView, readonly [string, string]> = {
+  day: ['Jour précédent', 'Jour suivant'],
+  week: ['Semaine précédente', 'Semaine suivante'],
+  month: ['Mois précédent', 'Mois suivant'],
+};
 
 /** What is open over the agenda: one dialog at a time. */
 type Open =
@@ -27,12 +44,14 @@ type Open =
   | { readonly kind: 'task'; readonly task: CreatorTask; readonly day: string }
   | { readonly kind: 'decline'; readonly suggestion: CreatorSuggestion }
   | { readonly kind: 'place'; readonly suggestion: CreatorSuggestion }
+  | { readonly kind: 'suggestion'; readonly suggestion: CreatorSuggestion }
   | null;
 
 /**
- * Agenda, the creator's (CR-05, ADR 0042 § 3 and § 8): her day, tasks first, and her week as a list. Only two words:
- * a tâche and a dispo. She ticks offline; her phone sends it back online. The agency only suggests: she accepts or
- * says « Non merci ». Read in her zone, the one the server answers with.
+ * Agenda, the creator's (CR-05, ADR 0042 § 3 and § 8): her day, tasks first; her week as a list on her phone, as a
+ * grid of hours on a computer, where a drag creates or moves a task; her month on a computer. Only two words: a tâche
+ * and a dispo. She ticks offline; her phone sends it back online. The agency only suggests: she accepts or says « Non
+ * merci ». Read in her zone, the one the server answers with.
  */
 export function AgendaPage({
   day,
@@ -47,12 +66,17 @@ export function AgendaPage({
   onView: (view: AgendaView) => void;
 }): JSX.Element {
   const client = useQueryClient();
+  const wide = useWide();
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const today = dayOf(new Date(), readerZone());
   const shown = day ?? today;
   const monday = mondayOf(shown);
-  const read = useAgenda(monday, addDays(monday, 6));
+  // Mois is a computer's: on her phone, the same link shows her week.
+  const seen: AgendaView = view === 'month' && !wide ? 'week' : view;
+  const views = wide ? WIDE_VIEWS : PHONE_VIEWS;
+  const range = seen === 'month' ? monthRange(shown) : { from: monday, to: addDays(monday, 6) };
+  const read = useAgenda(range.from, range.to);
   const { agenda, waiting } = useWithPending(read.data);
 
   const onSent = useCallback(({ refused, expired }: Flushed) => {
@@ -71,13 +95,28 @@ export function AgendaPage({
     void tickTask(client, task, onDayOf, on).then(onSent);
   };
 
+  const move = (task: CreatorTask, when: CreatorTaskWhen): void => {
+    void moveTask(client, task, when).then((moved) => {
+      if (!moved)
+        setNotice(
+          'Le déplacement n’a pas pu se faire : pas de réseau, ou la tâche a changé. Ton agenda est relu.',
+        );
+    });
+  };
+
+  const step = (forward: boolean): void => {
+    const sign = forward ? 1 : -1;
+    if (seen === 'month') onDay(monthOf(shown, sign));
+    else onDay(addDays(shown, seen === 'day' ? sign : 7 * sign));
+  };
+
   const herToday = agenda?.today ?? today;
   const offline = read.isError || (read.isFetched && read.fetchStatus === 'paused');
 
   return (
     <Page className="ag-page">
       <PageHeader
-        eyebrow={view === 'day' ? longDay(shown) : weekLabel(monday)}
+        eyebrow={seen === 'day' ? longDay(shown) : seen === 'month' ? monthLabel(shown) : weekLabel(monday)}
         title="Agenda"
         actions={
           <button
@@ -101,18 +140,18 @@ export function AgendaPage({
           role="radiogroup"
           aria-label="Affichage"
           style={{
-            '--nv-seg-count': VIEWS.length,
-            '--nv-seg-index': VIEWS.findIndex(([one]) => one === view),
+            '--nv-seg-count': views.length,
+            '--nv-seg-index': views.findIndex(([one]) => one === seen),
           }}
         >
           <span className="nv-seg__thumb nv-glass nv-glass--thin" aria-hidden="true" />
-          {VIEWS.map(([one, label]) => (
+          {views.map(([one, label]) => (
             <button
               key={one}
               type="button"
               role="radio"
               className="nv-seg__opt"
-              aria-checked={one === view}
+              aria-checked={one === seen}
               onClick={() => {
                 onView(one);
               }}
@@ -125,9 +164,9 @@ export function AgendaPage({
           <button
             type="button"
             className="ag-arrow"
-            aria-label={view === 'day' ? 'Jour précédent' : 'Semaine précédente'}
+            aria-label={STEP[seen][0]}
             onClick={() => {
-              onDay(addDays(shown, view === 'day' ? -1 : -7));
+              step(false);
             }}
           >
             <svg viewBox="0 0 16 16" aria-hidden="true" className="ag-icon">
@@ -137,9 +176,9 @@ export function AgendaPage({
           <button
             type="button"
             className="ag-arrow"
-            aria-label={view === 'day' ? 'Jour suivant' : 'Semaine suivante'}
+            aria-label={STEP[seen][1]}
             onClick={() => {
-              onDay(addDays(shown, view === 'day' ? 1 : 7));
+              step(true);
             }}
           >
             <svg viewBox="0 0 16 16" aria-hidden="true" className="ag-icon">
@@ -199,12 +238,14 @@ export function AgendaPage({
       ) : (
         <Views
           agenda={agenda}
-          view={view}
+          view={seen}
+          wide={wide}
           day={shown}
           monday={monday}
           onDay={onDay}
           onView={onView}
           onTick={tick}
+          onMove={move}
           onOpen={setOpen}
         />
       )}
@@ -212,6 +253,7 @@ export function AgendaPage({
         <Dialogs
           agenda={agenda}
           open={open}
+          onOpen={setOpen}
           onClose={() => {
             setOpen(null);
           }}
@@ -225,20 +267,24 @@ export function AgendaPage({
 function Views({
   agenda,
   view,
+  wide,
   day,
   monday,
   onDay,
   onView,
   onTick,
+  onMove,
   onOpen,
 }: {
   agenda: CreatorAgenda;
   view: AgendaView;
+  wide: boolean;
   day: string;
   monday: string;
   onDay: (day: string | null) => void;
   onView: (view: AgendaView) => void;
   onTick: (task: CreatorTask, on: boolean, day: string) => void;
+  onMove: (task: CreatorTask, when: CreatorTaskWhen) => void;
   onOpen: (open: Open) => void;
 }): JSX.Element {
   const actions = {
@@ -256,29 +302,39 @@ function Views({
       onOpen({ kind: 'place', suggestion });
     },
   };
-  return view === 'day' ? (
-    <DayView agenda={agenda} day={day} monday={monday} onDay={onDay} {...actions} />
-  ) : (
-    <WeekList
+  const openDay = (one: string): void => {
+    onDay(one);
+    onView('day');
+  };
+  if (view === 'day')
+    return <DayView agenda={agenda} day={day} monday={monday} wide={wide} onDay={onDay} {...actions} />;
+  if (view === 'month') return <MonthView agenda={agenda} day={day} onOpenDay={openDay} />;
+  return wide ? (
+    <WeekGrid
       agenda={agenda}
       monday={monday}
-      onOpenDay={(one) => {
-        onDay(one);
-        onView('day');
+      onOpenDay={openDay}
+      onMove={onMove}
+      onSuggestion={(suggestion) => {
+        onOpen({ kind: 'suggestion', suggestion });
       }}
       {...actions}
     />
+  ) : (
+    <WeekList agenda={agenda} monday={monday} onOpenDay={openDay} {...actions} />
   );
 }
 
 function Dialogs({
   agenda,
   open,
+  onOpen,
   onClose,
   onNotice,
 }: {
   agenda: CreatorAgenda;
   open: NonNullable<Open>;
+  onOpen: (open: Open) => void;
   onClose: () => void;
   onNotice: (notice: string) => void;
 }): JSX.Element {
@@ -286,7 +342,23 @@ function Dialogs({
     case 'add':
       return <AddDialog zone={agenda.timeZone} preset={open.preset} onClose={onClose} />;
     case 'task':
-      return <TaskDialog agenda={agenda} task={open.task} day={open.day} onClose={onClose} />;
+      return (
+        <TaskDialog agenda={agenda} task={open.task} day={open.day} onClose={onClose} onNotice={onNotice} />
+      );
+    case 'suggestion':
+      return (
+        <SuggestionDialog
+          agenda={agenda}
+          suggestion={open.suggestion}
+          onClose={onClose}
+          onDecline={(suggestion) => {
+            onOpen({ kind: 'decline', suggestion });
+          }}
+          onPlace={(suggestion) => {
+            onOpen({ kind: 'place', suggestion });
+          }}
+        />
+      );
     case 'decline':
       return <DeclineDialog suggestion={open.suggestion} onClose={onClose} onNotice={onNotice} />;
     case 'place':

@@ -293,3 +293,56 @@ export type ExtensionLinkCreators = z.infer<typeof ExtensionLinkCreatorsSchema>;
 /** `POST /v1/trends/readings`: how many posts of the batch were kept, new or seen again. */
 export const TrendReadingsAcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
 export type TrendReadingsAccepted = z.infer<typeof TrendReadingsAcceptedSchema>;
+
+/* ---- The captures of a marked post (ADR 0060 § 2, source 6; VEI-01 lot c2) ---- */
+
+/** At most four captures of the visible tab, taken while the marked post shows. */
+export const TREND_CAPTURES_MAX = 4;
+/** One capture, decoded: a JPEG of a full-HD tab at the extension's quality stays well under it. */
+export const TREND_CAPTURE_MAX_BYTES = 750_000;
+/** Its base64, padding included. */
+const TREND_CAPTURE_MAX_BASE64 = Math.ceil(TREND_CAPTURE_MAX_BYTES / 3) * 4;
+
+export const TrendCaptureSchema = z.strictObject({
+  mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  data: z.base64().max(TREND_CAPTURE_MAX_BASE64),
+});
+export type TrendCapture = z.infer<typeof TrendCaptureSchema>;
+
+/**
+ * `POST /v1/trends/readings/captures`, with `x-extension-link`: the captures of one post the person marked in this watch
+ * session, its reading already sent. Held in memory for the vision call only, then dropped: never written, never logged,
+ * never echoed. Only the description stays, on the reading.
+ */
+export const TrendCapturesBodySchema = z.strictObject({
+  watchSession: WatchSessionIdSchema,
+  code: InstagramPostCodeSchema,
+  /** The length of the video as its element shows it; null for a photo or a carousel. */
+  durationS: z.number().positive().max(3_600).nullable(),
+  captures: z.array(TrendCaptureSchema).min(1).max(TREND_CAPTURES_MAX),
+});
+export type TrendCapturesBody = z.infer<typeof TrendCapturesBodySchema>;
+
+/** What the vision model says of a post from its captures: how it is made, never the post itself. */
+export const TrendCaptureDescriptionSchema = z.strictObject({
+  /** What holds the eye in the first seconds, in a sentence. */
+  hook: z.string().min(1).max(300),
+  /** The angles and shots, a few words each. */
+  angles: z.array(z.string().min(1).max(120)).max(6),
+  /** The text written on the screen, copied as it shows; null when there is none. */
+  onScreenText: z.string().min(1).max(500).nullable(),
+  /** The cutting and its pace, as far as the captures let it be judged. */
+  editing: z.string().min(1).max(300),
+});
+export type TrendCaptureDescription = z.infer<typeof TrendCaptureDescriptionSchema>;
+
+/** Its answer: the description kept on the reading. */
+export const TrendCapturesDescribedSchema = z.strictObject({ description: TrendCaptureDescriptionSchema });
+export type TrendCapturesDescribed = z.infer<typeof TrendCapturesDescribedSchema>;
+
+/** No reading of that post in that session marked for a creator: send the reading, marked, first. */
+export const TREND_CAPTURE_READING_NOT_FOUND = 'trend_capture_reading_not_found';
+/** The trend watch's cap of the day is spent (ADR 0060 § 7): no vision until midnight, shown in amber. */
+export const TREND_WATCH_BUDGET_LIMITED = 'trend_watch_budget_limited';
+/** No vision model answered (no key, every model failed): the captures are dropped, the reading stays. */
+export const TREND_CAPTURE_VISION_UNAVAILABLE = 'trend_capture_vision_unavailable';
