@@ -151,7 +151,13 @@ export function eveningDigestText(
     lines.push(
       `${plural(all.sales, 'vente', 'ventes')} · ${plural(all.refunds, 'remboursement', 'remboursements')}`,
     );
-    const sellers = [...entry.sellers].sort(([a], [b]) => sellerRank(a) - sellerRank(b));
+    // Members first, the best seller at the top (then by name, so the text is stable), then the agent and the rest.
+    const sellers = [...entry.sellers].sort(
+      ([a, sa], [b, sb]) =>
+        sellerRank(a) - sellerRank(b) ||
+        sb.gross - sa.gross ||
+        sellerLabel(a, memberNameOf).localeCompare(sellerLabel(b, memberNameOf), 'fr'),
+    );
     for (const [key, sums] of sellers) {
       const refunds =
         sums.refunds === 0 ? '' : `, ${plural(sums.refunds, 'remboursement', 'remboursements')}`;
@@ -167,7 +173,7 @@ export function eveningDigestText(
     );
   }
   return {
-    text: `💰 <b>Bilan du soir · ${renderPlain(creatorName)}</b>\n${lines.map(renderPlain).join('\n')}`,
+    text: `💰 <b>Bilan du soir · ${renderPlain(creatorName)} · jusqu’à 23 h</b>\n${lines.map(renderPlain).join('\n')}`,
     summary: lines[0] ?? '',
   };
 }

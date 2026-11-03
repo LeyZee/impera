@@ -648,7 +648,7 @@ describe('sales topic (CRM-04 lot b)', () => {
     const nbsp = (value: string) => value.replaceAll(' ', '\u202f');
     expect(text).toBe(
       [
-        '💰 <b>Bilan du soir · Nora</b>',
+        '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>',
         `Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`,
         'Part de l’agence 411,50\u00a0€ · part de la créatrice 411,50\u00a0€',
         '12 ventes · 1 remboursement',
@@ -660,7 +660,7 @@ describe('sales topic (CRM-04 lot b)', () => {
     );
     expect(summary).toBe(`Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`);
     expect(eveningDigestText('Nora', { ...totals, rows: [], refundsWithoutSale: 0 }, () => null).text).toBe(
-      '💰 <b>Bilan du soir · Nora</b>\nAucune vente aujourd’hui.',
+      '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>\nAucune vente aujourd’hui.',
     );
   });
 });

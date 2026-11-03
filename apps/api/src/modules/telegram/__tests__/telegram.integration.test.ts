@@ -512,7 +512,7 @@ describe('telegram module on Postgres', () => {
       isSilent: true,
       sourceKey: `evening:${creatorId}:2026-11-03`,
     });
-    expect(row?.text).toContain('💰 <b>Bilan du soir · Démo</b>');
+    expect(row?.text).toContain('💰 <b>Bilan du soir · Démo · jusqu’à 23 h</b>');
     expect(row?.text).toContain('Théo : 90,00\u00a0€ (2 ventes)');
 
     // An hour earlier is not her 23 h; turned off, nothing goes the next day.
