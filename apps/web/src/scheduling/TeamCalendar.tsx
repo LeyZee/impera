@@ -14,6 +14,7 @@ import {
   monthLabel,
   monthMarks,
   nameFor,
+  slotLinesOf,
   type CalendarCell,
   type CalendarRow,
 } from './calendar';
@@ -155,7 +156,7 @@ export function TeamWeek({ calendar, days, today, now, me, focus, loading }: Cal
   const members = membersOf(calendar);
   const [picked, setPicked] = useState<number | null>(null);
   const pickedIndex = picked ?? Math.max(0, days.indexOf(today));
-  const slotCount = rows[0]?.days.get(days[0] ?? today)?.length ?? 0;
+  const slotCount = slotLinesOf(rows.map((row) => row.days));
   if (rows.length === 0) {
     return (
       <div className="nv-coming__in sc-notice">

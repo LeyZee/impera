@@ -1,6 +1,6 @@
 import {
   CALENDAR_MAX_DAYS,
-  shiftSlotsOf,
+  slotWindowsOf,
   type Calendar,
   type CalendarAgent,
   type CalendarShift,
@@ -109,6 +109,16 @@ export function agentOnSlot(
 }
 
 /**
+ * The lines a week cut into créneaux takes: the most créneaux any day of any row has, so that a version which adds one
+ * mid-week (ADR 0049 § 1) gets its line from the first day, the subgrid adding none.
+ */
+export function slotLinesOf(rows: Iterable<ReadonlyMap<string, readonly unknown[]> | null>): number {
+  let lines = 0;
+  for (const days of rows) for (const cells of days?.values() ?? []) lines = Math.max(lines, cells.length);
+  return lines;
+}
+
+/**
  * Each creator's days cut into the agency's créneaux (`settings`), from `days` (calendar days in the agency's zone).
  * A créneau ends where the next starts, in wall-clock time: the night of a change of time has one an hour longer or
  * shorter. `now` decides what is left of a créneau under way.
@@ -116,14 +126,13 @@ export function agentOnSlot(
 export function calendarRows(calendar: Calendar, days: readonly string[], now: Date): CalendarRow[] {
   const { settings } = calendar;
   const zone = settings.timeZone;
-  const slots = shiftSlotsOf(settings);
-  const length = settings.slotLengthMinutes;
+  // Each day cut by the version in force (ADR 0049 § 1): a week can change créneaux on one of its days.
+  const all = slotWindowsOf(settings.versions, days, (day, minute) => zonedInstant(day, minute, zone));
   const windows = days.map((day) => ({
     day,
-    cuts: slots.map((_, index) => ({
-      from: zonedInstant(day, settings.slotStartMinute + index * length, zone).getTime(),
-      to: zonedInstant(day, settings.slotStartMinute + (index + 1) * length, zone).getTime(),
-    })),
+    cuts: all
+      .filter((window) => window.day === day)
+      .map((window) => ({ from: window.from.getTime(), to: window.to.getTime() })),
   }));
   return calendar.creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;

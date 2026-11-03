@@ -12,6 +12,7 @@ import type {
   PlatformAccountId,
   ReportSignal,
   SchedulingSettings,
+  SchedulingSettingsInput,
   ShiftFeedbackId,
   ShiftId,
   ShiftReportId,
@@ -147,10 +148,16 @@ export interface PlanningClock {
  * shift in the way.
  */
 export interface PlanningStore {
-  /** Any team scope; `null` until the owner saves them. */
-  settings(actor: UserId): Promise<SchedulingSettings | null>;
-  /** Owner. */
-  saveSettings(actor: Actor, settings: SchedulingSettings): Promise<void>;
+  /**
+   * Any team scope: the zone, the margin and the créneaux' versions over `range` (the version in force at `from`, then
+   * those taking effect before `to`), the module's defaults where nothing is saved; seats for the owner and the agency.
+   */
+  settings(
+    actor: UserId,
+    range: { readonly from: Date; readonly to: Date | null },
+  ): Promise<SchedulingSettings>;
+  /** Owner: the zone and the margin. */
+  saveSettings(actor: Actor, settings: SchedulingSettingsInput): Promise<void>;
   read(
     actor: UserId,
     creatorIds: readonly CreatorId[],
@@ -203,8 +210,8 @@ export interface PlanningAdmin {
   } | null>;
   /** `onShift` on a creator at `at`, without the margin: her active members whose shift covers it. */
   onShiftUnscoped(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
-  /** The settings, for the job (no member behind it). */
-  settingsUnscoped(): Promise<SchedulingSettings | null>;
+  /** The settings in force now, for the job (no member behind it). */
+  settingsUnscoped(): Promise<SchedulingSettings>;
   /** The templates running on `today` (a calendar day in the grid's zone), for the job. */
   runningTemplatesUnscoped(today: string): Promise<ShiftTemplateId[]>;
   /**
@@ -564,7 +571,7 @@ export interface CalendarReads {
     creatorIds: readonly CreatorId[],
   ): Promise<{
     view: CalendarView;
-    settings: SchedulingSettings | null;
+    settings: SchedulingSettings;
     shifts: CalendarRow[];
     agents: CreatorAgent[];
     agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null;

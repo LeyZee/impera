@@ -1,5 +1,4 @@
 import type { JobLogger, PlanningAdmin } from '../domain/ports';
-import { DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
 import { calendarDayIn } from '../domain/time';
 
 /**
@@ -10,7 +9,7 @@ import { calendarDayIn } from '../domain/time';
 export async function makeShifts(admin: PlanningAdmin, logger: JobLogger, now: Date): Promise<number> {
   const clock = {
     now,
-    timeZone: ((await admin.settingsUnscoped()) ?? DEFAULT_SCHEDULING_SETTINGS).timeZone,
+    timeZone: (await admin.settingsUnscoped()).timeZone,
   };
   let made = 0;
   for (const templateId of await admin.runningTemplatesUnscoped(calendarDayIn(now, clock.timeZone))) {

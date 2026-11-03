@@ -1,10 +1,11 @@
 import {
-  shiftSlotsOf,
+  slotWindowsOf,
   type AgentHours,
   type AgentMode,
   type CreatorId,
   type PlatformAccountId,
   type SchedulingSettings,
+  type SlotWindow,
   type TeamMemberId,
 } from '@nirvana/contracts';
 
@@ -111,35 +112,25 @@ export interface GridSlot {
 }
 
 /**
- * The créneaux of `window` at the agency's hours, day by day of its zone: each day cut from `slotStartMinute` in
- * `slotLengthMinutes`, read in wall-clock time, so that a day of a change of time has one créneau an hour longer or
- * shorter. Only those that overlap the window.
+ * The créneaux of `window` at the agency's hours, day by day of its zone, each day cut by the version in force
+ * (`slotWindowsOf`, ADR 0049 § 1) and read in wall-clock time, so that a day of a change of time has one créneau an
+ * hour longer or shorter. Only those that overlap the window.
  */
 export function gridSlots(
-  settings: Pick<SchedulingSettings, 'timeZone' | 'slotStartMinute' | 'slotLengthMinutes'>,
+  settings: Pick<SchedulingSettings, 'timeZone' | 'versions'>,
   window: Span,
-): Span[] {
+): SlotWindow[] {
   const zone = settings.timeZone;
-  const slots = shiftSlotsOf(settings);
-  const first = addDays(calendarDayIn(window.from, zone), -1);
-  const last = calendarDayIn(window.to, zone);
-  const out: Span[] = [];
-  for (let day = first; day <= last; day = addDays(day, 1)) {
-    slots.forEach((_, index) => {
-      const from = wallClockToInstant(
-        day,
-        settings.slotStartMinute + index * settings.slotLengthMinutes,
-        zone,
-      );
-      const to = wallClockToInstant(
-        day,
-        settings.slotStartMinute + (index + 1) * settings.slotLengthMinutes,
-        zone,
-      );
-      if (ms(from) < ms(window.to) && ms(to) > ms(window.from)) out.push({ from, to });
-    });
-  }
-  return out;
+  const days: string[] = [];
+  for (
+    let day = addDays(calendarDayIn(window.from, zone), -1);
+    day <= calendarDayIn(window.to, zone);
+    day = addDays(day, 1)
+  )
+    days.push(day);
+  return slotWindowsOf(settings.versions, days, (day, minute) =>
+    wallClockToInstant(day, minute, zone),
+  ).filter((slot) => ms(slot.from) < ms(window.to) && ms(slot.to) > ms(window.from));
 }
 
 /** The stretches of `span` that no span of `spans` covers, in order. */
@@ -166,7 +157,7 @@ function gapsIn(span: Span, spans: readonly Span[]): Span[] {
  * The one count of the créneaux to fill: the calendar, Planning and EQ-14's departure alert read this function.
  */
 export function slotsToFill(input: {
-  readonly settings: Pick<SchedulingSettings, 'timeZone' | 'slotStartMinute' | 'slotLengthMinutes'>;
+  readonly settings: Pick<SchedulingSettings, 'timeZone' | 'versions'>;
   readonly accounts: readonly GridAccount[];
   readonly shifts: readonly GridShift[];
   readonly agents: readonly CreatorAgent[];

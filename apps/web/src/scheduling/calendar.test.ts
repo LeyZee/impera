@@ -10,8 +10,11 @@ import {
   monthMarks,
   monthBounds,
   monthWindow,
+  slotLinesOf,
 } from './calendar';
 import { zonedInstant } from './time';
+
+import { settingsOf } from '@/test/settings';
 
 const PARIS = 'Europe/Paris';
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -27,7 +30,7 @@ const words = (text: string): string => text.replaceAll(NBSP, ' ');
 const calendarOf = (patch: Partial<z.input<typeof CalendarSchema>> = {}): Calendar =>
   CalendarSchema.parse({
     view: 'team',
-    settings: { timeZone: PARIS, slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+    settings: settingsOf(),
     creators: [{ id: INES, name: 'Inès' }],
     members: [
       { id: KOFI, displayName: 'Kofi', color: '#7aa2ff' },
@@ -133,6 +136,19 @@ describe('calendarRows', () => {
     const cells = cellsOf(calendarOf(), at(0, '2027-03-20'), day);
     const hours = cells.map((cell) => (cell.to.getTime() - cell.from.getTime()) / 3_600_000);
     expect(hours).toEqual([5, 6, 6, 6]);
+  });
+});
+
+describe('slotLinesOf', () => {
+  it('takes the most créneaux of the week, a version adding one mid-week getting its line (ADR 0049 § 1)', () => {
+    const three = [0, 1, 2];
+    const four = [0, 1, 2, 3];
+    const row = new Map([
+      ['2026-10-28', three],
+      ['2026-10-29', four],
+    ]);
+    expect(slotLinesOf([null, row, new Map([['2026-10-28', three]])])).toBe(4);
+    expect(slotLinesOf([null])).toBe(0);
   });
 });
 
