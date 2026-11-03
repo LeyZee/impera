@@ -76,6 +76,7 @@ const assemble = (
     deadJobs: health.deadJobs === undefined ? 0 : health.deadJobs,
     telegram: telegram === 'off' ? undefined : telegram,
     automatic: { gate: automatic, reading },
+    revealSales: null,
   });
 
 describe('dashboard', () => {

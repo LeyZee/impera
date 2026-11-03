@@ -4,6 +4,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';
 import { createDashboardReader } from './infra/views/dashboard-reader';
+import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
 
 export interface SupervisionModule {
   readonly name: 'supervision';
@@ -11,14 +12,20 @@ export interface SupervisionModule {
   readonly routes: FastifyPluginAsyncZod;
 }
 
-export interface SupervisionDeps extends Omit<DashboardRouteDeps, 'reader'> {
+export interface SupervisionDeps extends Omit<DashboardRouteDeps, 'reader' | 'revealSales'> {
   /** Application role: the Dashboard reads in tenant transactions (RLS). */
   readonly db: Database;
+  /** The connectors' `salesFeedTotals.totalsOf` (CRM-04), for the sales panel. */
+  readonly salesTotalsOf: SalesTotalsOf;
 }
 
 export function createSupervisionModule(deps: SupervisionDeps): SupervisionModule {
   return {
     name: 'supervision',
-    routes: createDashboardRoutes({ ...deps, reader: createDashboardReader(deps.db) }),
+    routes: createDashboardRoutes({
+      ...deps,
+      reader: createDashboardReader(deps.db),
+      revealSales: createRevealSalesReader(deps.db, deps.salesTotalsOf),
+    }),
   };
 }

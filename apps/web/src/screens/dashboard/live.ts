@@ -6,10 +6,11 @@ import {
 } from '@nirvana/contracts';
 
 import { eur } from './logic';
-import type { AgentCard, AgentState, Dashboard, Fan, Todo } from './model';
+import type { AgentCard, AgentState, Dashboard, Fan, RevealSales, RevealSeller, Todo } from './model';
 
 import { CAUSE_LABELS } from '@/agent/causes';
 import { percent } from '@/agent/mode';
+import { platformName } from '@/scheduling/model';
 import { cityOf, clockAt, lengthOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
 import { telegramNightOf } from '@/settings/telegram/NightBanner';
 
@@ -420,6 +421,74 @@ export function usdNote(usdSales: ApiDashboard['usdSales']): string | undefined 
   return `Dollars convertis en euros au taux BCE du ${day}.`;
 }
 
+/** « 5 ventes · 1 remboursement », « Aucune vente » when the period holds neither. */
+function countsOf(figures: { readonly sales: number; readonly refunds: number }): string {
+  const parts = [
+    ...(figures.sales > 0 ? [plural(figures.sales, 'vente', 'ventes')] : []),
+    ...(figures.refunds > 0 ? [plural(figures.refunds, 'remboursement', 'remboursements')] : []),
+  ];
+  return parts.length === 0 ? 'Aucune vente' : parts.join(' · ');
+}
+
+const SELLER_NAME: Readonly<Record<Exclude<RevealSeller['kind'], 'member'>, string>> = {
+  agent: 'L’agent',
+  unlinked: 'Chatteur non relié',
+  none: 'Sans chatteur',
+};
+
+/** Cents as euros for the screen: the server summed them, nothing is computed here. */
+const euros = (minor: number): number => minor / 100;
+
+type ApiRevealSales = NonNullable<ApiDashboard['revealSales']>;
+type ApiSellerLine = NonNullable<ApiRevealSales['bySeller']>[number];
+
+function sellerOf(line: ApiSellerLine): RevealSeller {
+  const { seller } = line;
+  const counts = countsOf(line);
+  return {
+    key: seller.kind === 'member' ? `member-${seller.memberId}` : seller.kind,
+    kind: seller.kind,
+    name: seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind],
+    // A chatter of the platform nobody linked yet: his sales count for no one until the owner links him (ADR 0050 § 5).
+    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Réglages › Ventes` : counts,
+    revenue: euros(line.revenueMinor),
+    net: euros(line.netMinor),
+    agency: euros(line.agencyMinor),
+    creator: euros(line.creatorMinor),
+  };
+}
+
+/** « Reveal », « Reveal et OnlyFans », « Reveal, OnlyFans et Instagram »: never a platform written in the code. */
+function platformsText(platforms: ApiRevealSales['platforms']): string {
+  const names = platforms.map(platformName);
+  const last = names.at(-1) ?? 'la plateforme';
+  return names.length <= 1 ? last : `${names.slice(0, -1).join(', ')} et ${last}`;
+}
+
+/** The sales read in the platforms' registers, in the screen's words (CRM-04 lot c). */
+export function revealSalesOf(sales: ApiRevealSales): RevealSales {
+  const dollars = usdNote(sales.usd);
+  const where = platformsText(sales.platforms);
+  return {
+    where,
+    revenue: euros(sales.totals.revenueMinor),
+    net: euros(sales.totals.netMinor),
+    agency: euros(sales.totals.agencyMinor),
+    creator: euros(sales.totals.creatorMinor),
+    counts: countsOf(sales.totals),
+    sellers: sales.bySeller?.map(sellerOf) ?? null,
+    notes: [
+      `Lus chez ${where} : les montants au centime, chaque remboursement retiré du jour de sa vente.`,
+      ...(dollars === undefined ? [] : [dollars]),
+      ...(sales.refundsWithoutSale === 0
+        ? []
+        : [
+            `${plural(sales.refundsWithoutSale, 'remboursement porte', 'remboursements portent')} sur une vente plus ancienne que le registre : ${sales.refundsWithoutSale > 1 ? 'ils ne sont comptés' : 'il n’est compté'} nulle part.`,
+          ]),
+    ],
+  };
+}
+
 /**
  * Who reads the Dashboard: the owner, who holds Réglages; the rest of the team; or the creator, who reads her agent's
  * state only (ADR 0023).
@@ -444,6 +513,7 @@ export function fromApi(
     agent: agentState(api, now, reader),
     todos: api.todos.map((todo) => todoOf(todo, timeZone)),
     sales: null,
+    revealSales: api.revealSales === null ? null : revealSalesOf(api.revealSales),
     telegram: telegramNightOf(api),
     fans: api.fans.map((fan) => fanOf(fan, now)),
     ...(dollars === undefined ? {} : { usdNote: dollars }),
