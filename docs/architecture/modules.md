@@ -30,12 +30,12 @@ agent ──▶ fans, persona, media, packages/llm
 supervision ──▶ conversations, fans
 media ──▶ packages/llm
 sales ──▶ conversations, media            (phase 6, non créé)
-scripts ──▶ sales, media, conversations   (phase 6, non créé)
+scripts ──▶ (feuille pour l'instant ; limites de la persona par le composition root, SC-01)
 playground ──▶ agent, packages/llm        (écran Entraîner, P3-06)
 payroll ──▶ contractors                   (paie en quatre modules, ADR 0047 § 1)
 invoicing ──▶ payroll, contractors       (factures et avoirs, ADR 0047 § 1)
 accounting ──▶ payroll, invoicing, contractors  (exports du comptable, ADR 0047 § 1)
-fans, persona, providers, telegram, team, backups, scheduling, alerts, contractors, notifications ──▶ (feuilles)
+fans, persona, providers, telegram, team, backups, scheduling, alerts, contractors, notifications, scripts ──▶ (feuilles)
 ```
 
 Ce graphe est **sans cycle**, et `import-x/no-cycle` le vérifie. Deux inversions le rendent possible :
@@ -76,7 +76,7 @@ Chaque table a exactement un module propriétaire (voir le README de chaque modu
 | media | 3 (sens), 6 (catalogue) | descriptions au vocabulaire Nirvana, ffmpeg vérifié au démarrage ; la lecture des médias Reveal attend la capture |
 | supervision | 4 | Dashboard (`/v1/dashboard`) : santé, jobs bloqués, taux en réel ; « À traiter » de toutes les créatrices suivies et le compte de chacune (`/v1/dashboard/todos`, une transaction RLS par créatrice, SUIVI-09 et DASH-03) |
 | sales | 6 | non créé : offres à prix codés, ventes détectées, règles de prix ; propriétaire de `offers`, `sales` (montants en centimes entiers + devise) |
-| scripts | 6 | non créé : structures, étapes, cartons, runs de script par conversation (machine d'état explicite) ; propriétaire de `scripts`, `script_steps`, `script_runs`, `cards` |
+| scripts (ADR 0056) | scripts | structures de script de l'agence et leurs versions (figées dès qu'une demande les prend), file de structures par créatrice filtrée par les limites de sa persona, routes `/v1/script-structures` et `/v1/creators/:creatorId/script-queue` (SC-01 lot a) ; à venir : cartons, demande et parcours, nomenclature, runs de script par conversation |
 | playground | 3 | API de l'écran Entraîner (P3-06) |
 | providers (clés des services IA, ADR 0016) | 3 | clés vérifiées et scellées, routes `/v1/settings/providers`, page Services, revérification toutes les 15 minutes (P3-03) |
 | telegram (alertes de l'équipe, ADR 0020) | 3 | bots et groupes depuis Réglages › Telegram (`/v1/settings/telegram`), alertes vérifiées de bout en bout (P3-07) |

@@ -547,6 +547,13 @@
       "when": 1793703155743,
       "tag": "0082_creator_account",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793705020609,
+      "tag": "0084_script_structures",
+      "breakpoints": true
     }
   ]
 }
