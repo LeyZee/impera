@@ -39,15 +39,11 @@ export { lockAtLeast, readChecked, sha256Hex } from './application/locked-object
 /** `payroll.lock_payout_certificate`, which recording a transfer enqueues in its transaction (ADR 0041 § 6). */
 export { enqueuePayoutCertificateLock } from './infra/queue';
 export type { ContractorInvoiceReads, ContractorPayReads, InvoiceRequeue } from './infra/ports';
-/**
- * How a row of this module's tables reads, for the pay stores that still read them directly to issue and render an
- * invoice. They go when those reads go through a read port of this module (ARC-07).
- */
-export { reviewOf } from './infra/document-rows';
-export { regimeVatOf } from './infra/regime-store';
 
 /** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
 export { contractorReadsForAccounting } from './infra/accounting-reads';
+/** What the invoices read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { contractorReadsForInvoicing } from './infra/invoicing-reads';
 /**
  * Public entry point of the `contractors` module (ADR 0047 § 1): the contractor's file (identity, company, contract and
  * mandate, regimes, documents and their check, residence certificates, reminders, purge of refused documents) and the

@@ -113,4 +113,4 @@ Branche : task/<id>-<slug>
 | ARC-04 | Les frontières vérifiées aussi à l'intérieur d'un module | exploitation | todo | ARC-03 |
 | ARC-05 | Les exports du comptable sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-03 |
 | ARC-06 | Les factures et avoirs sortis de la paie | exploitation | done | ADR 0047, ADR 0051, ARC-05 |
-| ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | in_progress | ADR 0047, ARC-06 |
+| ARC-07 | Une table lue par son seul propriétaire, un job par tâche | exploitation | done | ADR 0047, ARC-06 |
