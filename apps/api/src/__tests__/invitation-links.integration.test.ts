@@ -513,6 +513,44 @@ describe('invitation links (EQ-10)', () => {
     expect(codeOf(redeem).code).toBe('invitation_link_not_found');
   });
 
+  it('tells the owner where her account stands: none, invited, then in (CR-02)', async () => {
+    const creatorId = await addCreator('Sara');
+    const read = () =>
+      server.inject({ method: 'GET', url: `/v1/creators/${creatorId}/account`, headers: { cookie: owner } });
+
+    const before = await read();
+    expect(before.statusCode, before.body).toBe(200);
+    expect(before.json()).toEqual({ account: null });
+
+    const made = await inviteCreator(creatorId, { purpose: 'invitation', email: 'sara@example.test' });
+    const { expiresAt, url } = made.json<{ expiresAt: string; url: string }>();
+    expect((await read()).json()).toEqual({
+      account: { email: 'sara@example.test', invitationPending: true, invitationExpiresAt: expiresAt },
+    });
+
+    const token = new URL(url).hash.slice('#t='.length);
+    expect((await post('/v1/invitation-links/redeem', { token, password: PASSWORD })).statusCode).toBe(200);
+    expect((await read()).json()).toEqual({
+      account: { email: 'sara@example.test', invitationPending: false, invitationExpiresAt: null },
+    });
+
+    // Hers alone to read for the owner: her own account, once in, is refused; an unknown creator is 404.
+    const sara = await signIn(server, 'sara@example.test', PASSWORD);
+    const own = await server.inject({
+      method: 'GET',
+      url: `/v1/creators/${creatorId}/account`,
+      headers: { cookie: sara },
+    });
+    expect(own.statusCode).toBe(403);
+    const unknown = await server.inject({
+      method: 'GET',
+      url: `/v1/creators/${newId(CreatorIdSchema)}/account`,
+      headers: { cookie: owner },
+    });
+    expect(unknown.statusCode).toBe(404);
+    expect(codeOf(unknown).code).toBe('creator_not_found');
+  });
+
   it('keeps the table out of reach of the application role', async () => {
     await expect(test.app.db.select().from(schema.invitationLinks)).rejects.toMatchObject({
       cause: { code: '42501' },

@@ -113,8 +113,8 @@ const creators = createRoute({
   getParentRoute: () => rootRoute,
   path: '/creatrices',
   validateSearch: parseCreatorsSearch,
-  // Her hours (P3-14) and the agency's percentage (CR-04) are the owner's alone: anyone else lands on the persona, not
-  // on a page the server would refuse.
+  // Her hours (P3-14), her access (CR-02) and the agency's percentage (CR-04) are the owner's alone: anyone else lands
+  // on the persona, not on a page the server would refuse.
   beforeLoad: ({ context, search }) => {
     if (search.onglet !== undefined && context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.

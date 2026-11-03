@@ -174,6 +174,11 @@ export interface AppOptions {
    * (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
+  /**
+   * Tests set the connectors' clock here, to make an unreachable register last a quarter of an hour (Telegram P3-12);
+   * the system's otherwise.
+   */
+  readonly connectorsClock?: () => Date;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
 }
@@ -221,6 +226,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ingest: (input) => conversations.module.ingestMessage(input),
     registry: options.connectorRegistry ?? {},
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
+    ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
   });
   const providers = await wireProviders(shared);
   const alerts = wireAlerts(shared);

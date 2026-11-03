@@ -4,6 +4,7 @@ import {
   AuditEntryIdSchema,
   CreateCreatorInvitationLinkBodySchema,
   CreateInvitationLinkBodySchema,
+  CreatorAccountSchema,
   CreatorIdSchema,
   DomainError,
   InspectInvitationLinkBodySchema,
@@ -324,6 +325,51 @@ async function createCreatorLinkUnscoped(
   });
 }
 
+/**
+ * `GET /v1/creators/:creatorId/account` (owner; CR-02): her own account, whether her password is chosen, and when the
+ * link out stops working. Read by the admin role, as the links are: `account` is Better Auth's table.
+ */
+async function creatorAccountUnscoped(adminDb: Database, creatorId: string) {
+  return withAdmin(adminDb, async (tx) => {
+    const [creator] = await tx
+      .select({ id: schema.creators.id })
+      .from(schema.creators)
+      .where(eq(schema.creators.id, creatorId));
+    if (creator === undefined) throw new CreatorNotFound();
+    const [own] = await tx
+      .select({ id: schema.user.id, email: schema.user.email })
+      .from(schema.user)
+      .where(
+        and(eq(schema.user.role, 'creator'), sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`),
+      );
+    if (own === undefined) return CreatorAccountSchema.parse({ account: null });
+    // Better Auth's password account: none until her invitation link is used (EQ-10).
+    const [password] = await tx
+      .select({ userId: schema.account.userId })
+      .from(schema.account)
+      .where(and(eq(schema.account.userId, own.id), eq(schema.account.providerId, 'credential')));
+    const [link] = await tx
+      .select({ expiresAt: schema.invitationLinks.expiresAt })
+      .from(schema.invitationLinks)
+      .where(
+        and(
+          eq(schema.invitationLinks.userId, own.id),
+          sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null`,
+        ),
+      )
+      // One live link per account (0089's unique index); the latest one even so.
+      .orderBy(sql`${schema.invitationLinks.createdAt} desc`)
+      .limit(1);
+    return CreatorAccountSchema.parse({
+      account: {
+        email: own.email,
+        invitationPending: password === undefined,
+        invitationExpiresAt: link?.expiresAt.toISOString() ?? null,
+      },
+    });
+  });
+}
+
 /** `POST /v1/invitation-links/inspect`: what the page shows before the link is used; reading does not use it. */
 async function inspectLinkUnscoped(adminDb: Database, token: string) {
   const [row] = await withAdmin(adminDb, (tx) =>
@@ -552,6 +598,15 @@ export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): Fast
         url.hash = `t=${token}`;
         return { url: url.toString(), expiresAt: expiresAt.toISOString() };
       },
+    );
+
+    app.get(
+      '/creators/:creatorId/account',
+      {
+        preValidation: deps.requireRole('owner'),
+        schema: { params: CreatorParamsSchema, response: { 200: CreatorAccountSchema } },
+      },
+      (request) => creatorAccountUnscoped(deps.adminDb, request.params.creatorId),
     );
 
     app.post(

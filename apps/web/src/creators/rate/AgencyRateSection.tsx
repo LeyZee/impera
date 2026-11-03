@@ -1,4 +1,9 @@
-import { CreatorAgencyRateIdSchema, newId, type CreatorAgencyRateList } from '@nirvana/contracts';
+import {
+  CreatorAgencyRateIdSchema,
+  newId,
+  type CreatorAgencyRateList,
+  type CreatorId,
+} from '@nirvana/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
@@ -28,7 +33,7 @@ export function AgencyRateSection({
   creatorName,
   onDirty = ignore,
 }: {
-  creatorId: string;
+  creatorId: CreatorId;
   creatorName: string;
   /** Told whether a percentage is typed and not saved, so that leaving the page can ask first. Must be stable. */
   onDirty?: (dirty: boolean) => void;
@@ -84,7 +89,7 @@ function RateSheet({
   list,
   onDirty,
 }: {
-  creatorId: string;
+  creatorId: CreatorId;
   creatorName: string;
   list: CreatorAgencyRateList;
   onDirty: (dirty: boolean) => void;

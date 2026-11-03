@@ -2,6 +2,7 @@ import type { CreatorId } from '@nirvana/contracts';
 import { useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
+import { AccessSection } from './AccessSection';
 import { NewCreatorForm } from './NewCreatorForm';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
@@ -15,10 +16,10 @@ export type CreatorTab = CreatorSheet;
 
 /**
  * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
- * not to the settings), then for the owner alone her hours (P3-14) and the agency's percentage (CR-04). With several
- * creators, a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and the
- * creator live in the address (`?onglet=heures&creatrice=<id>`). Changes not saved are never lost silently: leaving
- * asks first.
+ * not to the settings), then for the owner alone her hours (P3-14), her access to her own space (CR-02) and the
+ * agency's percentage (CR-04). With several creators, a row of chips picks one; with one, her name is enough. The
+ * owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
+ * not saved are never lost silently: leaving asks first.
  */
 export function CreatorsPage({
   tab,
@@ -51,7 +52,7 @@ export function CreatorsPage({
   const showForm = isOwner && (adding || (query.isSuccess && creators.length === 0));
   const current = creators.find((creator) => creator.id === creatorId) ?? creators[0];
   const selected = current?.id ?? null;
-  // The router keeps anyone but the owner off the hours and the percentage; here they also need a creator for them.
+  // The router keeps anyone but the owner off the hours, the access and the percentage; here they also need a creator.
   const shown: CreatorTab = isOwner && current !== undefined ? tab : 'persona';
 
   const leaving = blocker.status === 'blocked' || pending !== null;
@@ -128,6 +129,9 @@ export function CreatorsPage({
         </section>
       );
     }
+    if (shown === 'access' && current !== undefined) {
+      return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
+    }
     if (shown === 'rate' && current !== undefined) {
       return (
         <AgencyRateSection
@@ -172,7 +176,7 @@ export function CreatorsPage({
           own
             ? 'Ta fiche : ce que l’agent sait de toi et la façon dont il parle.'
             : isOwner
-              ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité et le pourcentage de l’agence.'
+              ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
@@ -192,6 +196,12 @@ export function CreatorsPage({
                     search: creatorsSearch('hours', selected),
                     current: shown === 'hours',
                     label: 'Heures d’activité',
+                  },
+                  {
+                    to: '/creatrices',
+                    search: creatorsSearch('access', selected),
+                    current: shown === 'access',
+                    label: 'Accès',
                   },
                   {
                     to: '/creatrices',

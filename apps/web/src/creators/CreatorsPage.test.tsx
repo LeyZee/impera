@@ -111,6 +111,25 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
   });
 
+  it('gives the owner her Accès, in the address, and keeps it from anyone else (CR-02)', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
+    fireEvent.click(within(views).getByRole('link', { name: 'Accès' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'acces', creatrice: ANNA.id });
+    });
+    // Her account: the list answers 404 here, so the sheet says it does not load, never a form to fill.
+    expect(await screen.findByText('Son accès ne se charge pas')).toBeDefined();
+
+    cleanup();
+    await serve([ANNA]);
+    const other = renderAt(operator, `/creatrices?onglet=acces&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+  });
+
   it('asks before dropping changes not saved, and stays when told to', async () => {
     await serve([ANNA, BEA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);

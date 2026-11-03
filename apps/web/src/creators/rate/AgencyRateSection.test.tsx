@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreateCreatorAgencyRateBodySchema } from '@nirvana/contracts';
+import { CreateCreatorAgencyRateBodySchema, CreatorIdSchema } from '@nirvana/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgencyRateSection } from './AgencyRateSection';
 
 /* An invented creator and percentages: never the agency's own. */
-const CREATOR = '0192f3a0-0000-7000-8000-0000000000c1';
+const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000c1');
 const TODAY = '2026-11-03';
 
 interface Rate {

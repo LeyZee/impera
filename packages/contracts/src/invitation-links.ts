@@ -50,6 +50,26 @@ export const CreateCreatorInvitationLinkBodySchema = z.discriminatedUnion('purpo
 export type CreateCreatorInvitationLinkBody = z.infer<typeof CreateCreatorInvitationLinkBodySchema>;
 
 /**
+ * `GET /v1/creators/:creatorId/account` (owner; CR-02): her own account, for the Accès tab of her sheet. `account` is
+ * `null` before her first invitation. Unknown creator: 404 `creator_not_found`.
+ */
+export const CreatorAccountSchema = z.strictObject({
+  account: z
+    .strictObject({
+      email: z.email(),
+      /** No password yet: her invitation link has not been used. */
+      invitationPending: z.boolean(),
+      /**
+       * When the link out stops working, for « Lien valable jusqu'à… » or « Lien expiré »; `null` with none out (none
+       * made yet, used or cancelled).
+       */
+      invitationExpiresAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
+});
+export type CreatorAccount = z.infer<typeof CreatorAccountSchema>;
+
+/**
  * `POST /v1/invitation-links/inspect`: what the page shows before the link is used (« Bienvenue, Théo », the e-mail read
  * only); reading does not use it. Unknown, used, cancelled or expired all answer `invitation_link_not_found`, so the
  * answer tells nothing about which.

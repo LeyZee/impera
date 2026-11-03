@@ -1,4 +1,9 @@
-import { CalendarDaySchema, CreatorAgencyRateIdSchema, CreatorIdSchema } from '@nirvana/contracts';
+import {
+  BasisPointsSchema,
+  CalendarDaySchema,
+  CreatorAgencyRateIdSchema,
+  CreatorIdSchema,
+} from '@nirvana/contracts';
 import { and, eq, schema, SNAPSHOT_READ, sql, withTenantMember, type Database } from '@nirvana/db';
 import { z } from 'zod';
 
@@ -24,11 +29,12 @@ const rateColumns = {
   createdAt: creatorAgencyRates.createdAt,
 };
 
+// The bounds are read again, as the table's check holds them: a row out of them fails here, never on a screen.
 const StoredAgencyRateSchema = z.object({
   id: CreatorAgencyRateIdSchema,
   creatorId: CreatorIdSchema,
   fromDay: CalendarDaySchema,
-  agencyBps: z.number().int(),
+  agencyBps: BasisPointsSchema,
   createdAt: z.date(),
 });
 

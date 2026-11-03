@@ -6,6 +6,7 @@ import {
   type CreateCreatorAgencyRateBody,
   type CreatorAgencyRate,
   type CreatorAgencyRateList,
+  type CreatorId,
 } from '@nirvana/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -58,9 +59,9 @@ const CODE_KINDS: ReadonlyMap<string, RateErrorKind> = new Map<AgencyRateErrorCo
   ['agency_rate_conflict', 'conflict'],
 ]);
 
-const path = (creatorId: string): string => `/v1/creators/${encodeURIComponent(creatorId)}/agency-rates`;
+const path = (creatorId: CreatorId): string => `/v1/creators/${encodeURIComponent(creatorId)}/agency-rates`;
 
-async function call(creatorId: string, init: RequestInit = {}): Promise<unknown> {
+async function call(creatorId: CreatorId, init: RequestInit = {}): Promise<unknown> {
   const what = `${init.method ?? 'GET'} agency-rates`;
   let response: Response;
   try {
@@ -82,16 +83,16 @@ async function call(creatorId: string, init: RequestInit = {}): Promise<unknown>
   throw new RateError('unavailable', detail);
 }
 
-export const ratesQueryKey = (creatorId: string): readonly string[] => ['agency-rates', creatorId];
+export const ratesQueryKey = (creatorId: CreatorId): readonly string[] => ['agency-rates', creatorId];
 
 /** Her percentages newest first, the agency's day, and the one in force (`null`: « à régler »). */
-export async function fetchAgencyRates(creatorId: string): Promise<CreatorAgencyRateList> {
+export async function fetchAgencyRates(creatorId: CreatorId): Promise<CreatorAgencyRateList> {
   const list = CreatorAgencyRateListSchema.safeParse(await call(creatorId));
   if (list.success) return list.data;
   throw new RateError('unavailable', 'GET agency-rates: réponse inattendue');
 }
 
-export function useAgencyRates(creatorId: string): UseQueryResult<CreatorAgencyRateList> {
+export function useAgencyRates(creatorId: CreatorId): UseQueryResult<CreatorAgencyRateList> {
   // One retry, not three: « Le serveur ne répond pas » comes in under two seconds instead of a long skeleton (CREA-30).
   return useQuery({
     queryKey: ratesQueryKey(creatorId),
@@ -103,7 +104,7 @@ export function useAgencyRates(creatorId: string): UseQueryResult<CreatorAgencyR
 
 /** Adds a percentage; its `id` is made once per form, so a retry records it once. */
 export async function addAgencyRate(
-  creatorId: string,
+  creatorId: CreatorId,
   body: CreateCreatorAgencyRateBody,
 ): Promise<CreatorAgencyRate> {
   const rate = CreatorAgencyRateSchema.safeParse(
