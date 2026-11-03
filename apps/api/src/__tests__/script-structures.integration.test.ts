@@ -1,5 +1,6 @@
 import {
   newId,
+  ScriptQueueRefusalsSchema,
   ScriptQueueSchema,
   ScriptStarterListSchema,
   ScriptStructureIdSchema,
@@ -260,7 +261,8 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     await activateDemoPersona(app, nora.id);
     const refused = await setQueue(nora.id, [fine.id, harsh.id]);
     expect(errorOf(refused)).toEqual([422, 'script_queue_disgust_unprocessable']);
-    expect(ErrorBodySchema.parse(refused.json()).error.details).toEqual({
+    // The screen reads these details with the contract's schema.
+    expect(ScriptQueueRefusalsSchema.parse(ErrorBodySchema.parse(refused.json()).error.details)).toEqual({
       refusals: [
         {
           structureId: harsh.id,

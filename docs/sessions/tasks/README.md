@@ -96,7 +96,7 @@ Branche : task/<id>-<slug>
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
-| SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | todo | ADR 0056, la persona |
+| SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
 | SC-04 | Descriptions des médias d'un script et validation rapide | scripts | blocked (clé de vision) | SC-02, P3-04 |

@@ -31,6 +31,7 @@ import {
   stackSummary,
   type Draft,
 } from './model';
+import { useDragSort } from './useDragSort';
 import { useFlip } from './useFlip';
 import { usePreview } from './usePreview';
 
@@ -82,6 +83,8 @@ export function Workshop({
   const id = useId();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(start.draft);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [saved, setSaved] = useState<Draft>(start.draft);
   const [basedOn, setBasedOn] = useState(start.basedOnVersion);
   const [frozen, setFrozen] = useState(start.frozen);
@@ -108,6 +111,13 @@ export function Workshop({
 
   const issues = useMemo(() => issuesOf(draft), [draft]);
   useFlip(flowRef, draft.segments.map((segment) => segment.key).join(' '));
+  const sort = useDragSort(flowRef, (key, delta) => {
+    const at = draftRef.current.segments.findIndex((segment) => segment.key === key);
+    if (at === -1) return;
+    const next = move(draftRef.current.segments, at, delta);
+    draftRef.current = { ...draftRef.current, segments: next };
+    segments(next, key);
+  });
   const titles = useMemo(() => segmentTitles(draft.segments), [draft.segments]);
   const index = Math.max(
     0,
@@ -381,11 +391,19 @@ export function Workshop({
                   <li
                     className="st-flow__item nv-enter"
                     data-flip={segment.key}
+                    data-sort={segment.key}
+                    data-dragging={sort.dragging === segment.key}
                     data-kind={segment.kind}
                     data-current={here}
-                    style={{ '--nv-i': Math.min(at, 12) }}
+                    style={{ '--nv-i': Math.min(at, 12), ...sort.styleOf(segment.key) }}
+                    {...sort.press(segment.key)}
                   >
-                    <span className="st-flow__rail" aria-hidden="true">
+                    <span
+                      className="st-flow__rail"
+                      aria-hidden="true"
+                      title="Glisser pour déplacer"
+                      data-sort-handle=""
+                    >
                       <span className="st-flow__node">{segment.kind === 'stage' ? number : null}</span>
                     </span>
                     <div className="st-step">
