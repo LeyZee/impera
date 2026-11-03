@@ -834,23 +834,30 @@ function Grid({
     return new Map(
       [...cells].map(([day, slots]) => [
         day,
-        slots.map((slot) =>
-          agentOnSlot(agent, { from: slot.from.getTime(), to: slot.to.getTime() }, spans, now),
-        ),
+        slots.map((slot) => {
+          const onSlot = agentOnSlot(agent, { from: slot.from.getTime(), to: slot.to.getTime() }, spans, now);
+          // The agent never stands for a second chatter (ADR 0049 § 2): « IA seule » is for a single place.
+          return slot.seats === 1 ? onSlot : { ...onSlot, aiAlone: false };
+        }),
       ]),
     );
   });
-  // A créneau the agent holds alone in Automatique is not one to fill (ADR 0048 § 1): the server's count.
+  // The places to fill (ADR 0049 § 2), less a créneau the agent holds alone in Automatique (ADR 0048 § 1): the
+  // server's count (`slotsToFill`).
   const toFill = slotted.reduce(
     (sum, cells, index) =>
       sum +
       [...(cells?.values() ?? [])].reduce(
         (inDay, slots, dayIndex) =>
           inDay +
-          slots.filter(
-            (slot, slotIndex) =>
-              isOpen(slot) && !(ai[index]?.get(days[dayIndex] ?? '')?.[slotIndex]?.aiAlone ?? false),
-          ).length,
+          slots.reduce(
+            (inSlots, slot, slotIndex) =>
+              inSlots +
+              (isOpen(slot) && !(ai[index]?.get(days[dayIndex] ?? '')?.[slotIndex]?.aiAlone ?? false)
+                ? slot.places
+                : 0),
+            0,
+          ),
         0,
       ),
     0,
@@ -895,7 +902,7 @@ function Grid({
               {week.length === 0 ? '' : ` · ${lengthOf(total)}`}
               {toFill === 0 ? null : (
                 <span className="sc-grid__tofill">
-                  {toFill === 1 ? ' · 1 créneau à pourvoir' : ` · ${String(toFill)} créneaux à pourvoir`}
+                  {toFill === 1 ? ' · 1 place à pourvoir' : ` · ${String(toFill)} places à pourvoir`}
                 </span>
               )}
             </span>
@@ -1048,6 +1055,7 @@ function Cell({
               <div
                 key={slot.from.getTime()}
                 className="sc-slot cal-slot"
+                data-seats={slot.seats === 2 ? '2' : undefined}
                 data-ai={agent === null || alone ? undefined : agent.full ? 'full' : 'part'}
               >
                 {slot.chips.map(chipOf)}
@@ -1060,6 +1068,8 @@ function Cell({
                 ) : slot.open !== null ? (
                   <OpenStretch
                     open={slot.open}
+                    second={slot.seats === 2 && slot.places === 1}
+                    places={slot.places}
                     agency={agency}
                     zone={zone}
                     where={where}
@@ -1111,6 +1121,8 @@ function Cell({
  */
 function OpenStretch({
   open,
+  second = false,
+  places = 1,
   agency,
   zone,
   where,
@@ -1118,6 +1130,10 @@ function OpenStretch({
   onAdd,
 }: {
   open: { readonly from: Date; readonly to: Date };
+  /** A chatter already holds the créneau, which wants two (ADR 0049 § 2): « + 2e chatteur ». */
+  second?: boolean;
+  /** The places to fill there: two on a créneau that wants two and has nobody. */
+  places?: number;
   agency: string;
   zone: string;
   where: string;
@@ -1130,7 +1146,8 @@ function OpenStretch({
     <button
       type="button"
       className="sc-slot__fill"
-      aria-label={`À pourvoir : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}${agentWords}`}
+      data-second={second ? 'true' : undefined}
+      aria-label={`${second ? '2e chatteur à pourvoir' : places === 2 ? 'À pourvoir, 2 places' : 'À pourvoir'} : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}${agentWords}`}
       onClick={() => {
         onAdd({
           day: dayOf(open.from, agency),
@@ -1138,7 +1155,9 @@ function OpenStretch({
         });
       }}
     >
-      <span className="sc-slot__label">À pourvoir</span>
+      <span className="sc-slot__label">
+        {second ? '+ 2e chatteur' : places === 2 ? 'À pourvoir · 2 places' : 'À pourvoir'}
+      </span>
       <span className="sc-slot__hours nv-num">{hours}</span>
     </button>
   );

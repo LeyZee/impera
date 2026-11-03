@@ -15,7 +15,7 @@ import type {
   ShiftSwapStatus,
   ShiftTemplate,
 } from '@nirvana/contracts';
-import { slotWindowsOf } from '@nirvana/contracts';
+import { seatsOf, slotWindowsOf } from '@nirvana/contracts';
 
 import type { SchedulingRefusalCode } from './api';
 import {
@@ -401,11 +401,18 @@ export interface SlotCell {
   readonly chips: readonly SlotChip[];
   /** A shift of the account overlaps it, whether it starts in it or earlier (a long shift covers the next one). */
   readonly covered: boolean;
+  /** The chatters the account wants at once on it (ADR 0049 § 2): 1, or 2 where its version says so. */
+  readonly seats: 1 | 2;
   /**
-   * The first stretch of it still ahead with nobody on the account, from now at the minute for the créneau under way;
-   * `null` when nothing of it is left to fill. A shift stopped under way, or a short one, leaves one.
+   * The first stretch of it still ahead with fewer shifts than `seats`, from now at the minute for the créneau under
+   * way; `null` when nothing of it is left to fill. A shift stopped under way, or a short one, leaves one.
    */
   readonly open: { readonly from: Date; readonly to: Date } | null;
+  /**
+   * The places to fill, as the server's `slotsToFill` counts them: `seats` less the fewest shifts at once over what is
+   * left of it; 0 when `open` is `null`. One that wants two with a chatter on all of it counts one (« + 2e chatteur »).
+   */
+  readonly places: number;
 }
 
 /**
@@ -454,32 +461,59 @@ export function slotRowOf(
   const cells = windows.map((window, index): SlotCell => {
     const from = window.from.getTime();
     const to = window.to.getTime();
+    const seats = seatsOf(window.version, window.rank, row.account.id);
+    const { open, fewest } = shortIn(Math.max(from, ahead), to, spans, seats);
     return {
       slot: window.slot,
       from: window.from,
       to: window.to,
       chips: placed[index] ?? [],
       covered: spans.some((span) => span.from < to && span.to > from),
-      open: gapIn(Math.max(from, ahead), to, spans),
+      seats,
+      open,
+      places: open === null ? 0 : seats - fewest,
     };
   });
   return new Map(days.map((day) => [day, cells.filter((_, index) => windows[index]?.day === day)]));
 }
 
-/** The first stretch of [from, to) that no span covers, or `null`; `spans` sorted by start. */
-function gapIn(
+/**
+ * Over [from, to), the first stretch with fewer spans at once than `seats` (`null` when there is none, or nothing is
+ * left of it), and the fewest spans at once. Each span is one shift: two that overlap hold two places (ADR 0049 § 2).
+ */
+function shortIn(
   from: number,
   to: number,
   spans: readonly { readonly from: number; readonly to: number }[],
-): { from: Date; to: Date } | null {
-  let at = from;
-  for (const span of spans) {
-    if (at >= to) return null;
-    if (span.to <= at) continue;
-    if (span.from > at) return { from: new Date(at), to: new Date(Math.min(span.from, to)) };
-    at = span.to;
+  seats: number,
+): { open: { from: Date; to: Date } | null; fewest: number } {
+  if (to <= from) return { open: null, fewest: seats };
+  const inside = spans.filter((span) => span.from < to && span.to > from);
+  const cuts = [
+    ...new Set([
+      from,
+      to,
+      ...inside.flatMap((span) => [span.from, span.to]).filter((at) => at > from && at < to),
+    ]),
+  ].sort((a, b) => a - b);
+  let fewest = Number.POSITIVE_INFINITY;
+  let open: { from: number; to: number } | null = null;
+  let done = false;
+  for (let index = 0; index + 1 < cuts.length; index += 1) {
+    const start = cuts[index] ?? from;
+    const end = cuts[index + 1] ?? to;
+    const depth = inside.filter((span) => span.from <= start && start < span.to).length;
+    fewest = Math.min(fewest, depth);
+    if (depth < seats && !done) {
+      if (open === null) open = { from: start, to: end };
+      else if (open.to === start) open.to = end;
+      else done = true;
+    } else if (open !== null) done = true;
   }
-  return at < to ? { from: new Date(at), to: new Date(to) } : null;
+  return {
+    open: open === null ? null : { from: new Date(open.from), to: new Date(open.to) },
+    fewest: fewest === Number.POSITIVE_INFINITY ? 0 : fewest,
+  };
 }
 
 /** « Lun. 26 · 23 h – 5 h · Théo est déjà sur un autre shift »: one occurrence a template could not place. */
