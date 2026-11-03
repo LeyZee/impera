@@ -125,6 +125,14 @@ describe('the sales feed read by pay', () => {
         chatter: 'chatter_bot',
         net: 800,
       }),
+      // Refunded with a chatter named on the refund only: still nobody's, as its sale was.
+      line(account, {
+        id: 'sale_d',
+        event: 'refund',
+        at: '2026-10-21T09:00:00Z',
+        chatter: 'chatter_bot',
+        net: 1000,
+      }),
       // A refund whose sale is older than the register.
       line(account, { id: 'sale_old', event: 'refund', at: '2026-10-12T09:00:00Z', chatter: null, net: 200 }),
       line(other, { id: 'sale_other', at: '2026-10-10T10:00:00Z', chatter: null, net: 999 }),
@@ -145,6 +153,7 @@ describe('the sales feed read by pay', () => {
     expect(lines.map((one) => [one.platformSaleId, one.event, one.netMinor, one.saleDay])).toEqual([
       ['sale_c', 'sale', 300, '2026-10-10'],
       ['sale_d', 'sale', 1000, '2026-10-11'],
+      ['sale_d', 'refund', -1000, '2026-10-11'],
       ['sale_old', 'refund', -200, null],
       ['sale_a', 'sale', 800, '2026-10-15'],
       ['sale_a', 'refund', -800, '2026-10-15'],
@@ -178,6 +187,8 @@ describe('the sales feed read by pay', () => {
     expect(author('sale_b')).toMatchObject({ kind: 'agent', platformChatterId: 'chatter_bot' });
     expect(author('sale_c')).toEqual({ kind: 'unlinked', platformChatterId: 'chatter_new' });
     expect(author('sale_d')).toEqual({ kind: 'none' });
+    const refundOfD = lines.find((one) => one.platformSaleId === 'sale_d' && one.event === 'refund');
+    expect(refundOfD?.author).toEqual({ kind: 'none' });
     expect(lines.some((one) => one.platformSaleId === 'sale_other')).toBe(false);
   });
 
@@ -208,6 +219,7 @@ describe('the sales feed read by pay', () => {
       salesFeedReadsForPay.linesRecordedBetween(tx, range('2026-10-16T00:00:00Z', '2026-11-01T00:00:00Z')),
     );
     expect(lines.map((one) => [one.platformSaleId, one.event, one.saleDay])).toEqual([
+      ['sale_d', 'refund', '2026-10-11'],
       ['sale_a', 'refund', '2026-10-15'],
     ]);
   });
