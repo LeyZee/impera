@@ -236,6 +236,7 @@ export const EVENT_TYPES = [
   'fan_flag_cleared',
   'sales_feed_signal',
   'sales_feed_mismatch',
+  'agency_share_mismatch',
   'connection_state_changed',
   'security_alert',
   'error',
@@ -517,6 +518,27 @@ export const EVENT_PAYLOADS = {
       .max(SALES_FEED_MISMATCH_DAYS_MAX),
   }),
   /**
+   * CRM-04 lot d3 (ADR 0054 § 2, question 5): on the fortnight just over, a creator's part as the platform reads it
+   * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale and per refund, on
+   * one account and in one currency. Only the days a percentage covers are compared, each with its own; `sales` and
+   * `refunds` count them, and `expectedCreatorMinor` is the net less the agency's share, rounded to the cent. In signed cents (`differenceMinor` =
+   * read − expected). Published once per account, fortnight and currency; never a fan, a chatter nor a seller.
+   * Information for the owner: no amount changes, pay never reads it.
+   */
+  agency_share_mismatch: z.object({
+    creatorId: CreatorIdSchema,
+    platform: PlatformSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    from: PayPeriodSchema,
+    to: z.iso.date(),
+    currency: CurrencySchema,
+    sales: z.number().int().min(0),
+    refunds: z.number().int().min(0),
+    creatorMinor: z.number().int(),
+    expectedCreatorMinor: z.number().int(),
+    differenceMinor: z.number().int(),
+  }),
+  /**
    * A service went down, or came back after a published `down` (Telegram P3-12). Published with no creator, at the
    * transition only, never at each check; `since` is when the publisher saw it. The rule of each service lives in its
    * publisher (`providers`, `connectors`). Never the key, never a word of the service's answer.
@@ -596,6 +618,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('fan_flag_cleared'),
   typedEvent('sales_feed_signal'),
   typedEvent('sales_feed_mismatch'),
+  typedEvent('agency_share_mismatch'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('error'),

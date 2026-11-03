@@ -34,6 +34,14 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '0 6 2,17 * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.check_sales'] },
   },
+  // The agency's percentage of each creator against her part read on the register (CRM-04 lot d3): the same days,
+  // half an hour later, the fortnight just over in the agency's zone. No backfill: a missed run waits for the next
+  // fortnight, and the event is published once per account and fortnight anyway.
+  {
+    task: 'scheduling.check_agency_shares',
+    match: '30 6 2,17 * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_agency_shares'] },
+  },
   // What a member no longer `active` still held (a takeover, a routed conversation) is handed back within the minute
   // (EQ-13): he already reads none of it. No backfill: the next run finds them all anyway.
   {

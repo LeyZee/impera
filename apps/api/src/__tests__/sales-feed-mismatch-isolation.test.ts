@@ -25,3 +25,16 @@ describe('sales_feed_mismatch stays out of pay', () => {
     expect(readers).toEqual([]);
   });
 });
+
+/**
+ * The agency percentages' check publishes `agency_share_mismatch` for the owner (CRM-04 lot d3): `scheduling` writes
+ * it, and pay never reads it, so a gap with her percentage never changes a statement or an invoice.
+ */
+describe('agency_share_mismatch stays out of pay', () => {
+  it('is named by no source of payroll, contractors or invoicing', () => {
+    const readers = ['payroll', 'contractors', 'invoicing']
+      .flatMap((module) => sources(join(MODULES, module)))
+      .filter((path) => readFileSync(path, 'utf8').includes('agency_share_mismatch'));
+    expect(readers).toEqual([]);
+  });
+});
