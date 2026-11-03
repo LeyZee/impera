@@ -475,6 +475,29 @@ describe('Réglages › Telegram, the sales settings (CRM-04)', () => {
     });
   });
 
+  it('drops the failure notice once a later save goes through: it sent the whole state', async () => {
+    // The first save fails while the second already waits behind it.
+    let failFirst: (reason: Error) => void = () => undefined;
+    vi.mocked(saveSaleSettings).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failFirst = reject;
+        }),
+    );
+    await openSales();
+    fireEvent.click(screen.getByRole('switch', { name: /Bilan du soir/ }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Celles de l’agent seulement' }));
+    failFirst(new Error('offline'));
+    await waitFor(() => {
+      expect(saveSaleSettings).toHaveBeenLastCalledWith([
+        { creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: false },
+      ]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/n’a pas été enregistré/)).toBeNull();
+    });
+  });
+
   it('turns the evening digest off', async () => {
     await openSales();
     fireEvent.click(screen.getByRole('switch', { name: /Bilan du soir/ }));
