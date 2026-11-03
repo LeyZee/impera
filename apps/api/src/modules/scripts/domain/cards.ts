@@ -237,7 +237,8 @@ export function wrap(text: string, width: number, lines: number): string[] {
   if (out.length <= lines) return out;
   const kept = out.slice(0, lines);
   const end = kept[lines - 1] ?? '';
-  kept[lines - 1] = `${end.length >= width ? end.slice(0, width - 1) : end}…`;
+  // « doucement… », never « doucement,… »: the punctuation before the cut goes.
+  kept[lines - 1] = `${(end.length >= width ? end.slice(0, width - 1) : end).replace(/[\s,;:.]+$/u, '')}…`;
   return kept;
 }
 
@@ -255,7 +256,8 @@ export function quoteLines(quote: string, tag: string | null, width: number, lin
   if (end === last && end.length + close.length <= width) cut[cut.length - 1] = `${end}${close}`;
   else {
     const room = Math.max(1, width - close.length - 1);
-    cut[cut.length - 1] = `${end.length > room ? end.slice(0, room).trimEnd() : end}…${close}`;
+    cut[cut.length - 1] =
+      `${(end.length > room ? end.slice(0, room) : end).replace(/[\s,;:.]+$/u, '')}…${close}`;
   }
   return cut;
 }

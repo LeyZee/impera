@@ -25,9 +25,11 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 
 FROM ${NODE_IMAGE} AS runtime
 # ffmpeg/ffprobe read the fans' videos and voice notes (module media); tini forwards SIGTERM and reaps them.
-# The script cards' PNGs need ffmpeg's librsvg decoder (SC-01 lot b): the build fails here rather than in production.
-RUN apk add --no-cache ffmpeg tini \
-  && ffmpeg -hide_banner -decoders | grep -q librsvg \
+# The script cards' PNGs are drawn by rsvg-convert (SC-01 lot b): Alpine's ffmpeg has no librsvg decoder. The build
+# draws one SVG here, so it fails rather than production.
+RUN apk add --no-cache ffmpeg rsvg-convert tini \
+  && echo '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>' \
+    | rsvg-convert --format png > /dev/null \
   && mkdir -p /data/training && chown node:node /data/training
 ENV NODE_ENV=production PORT=3000 NIRVANA_TRAINING_DIR=/data/training
 # The layout mirrors the repository: the bundled code reads `../migrations` (packages/db), `../prompts`

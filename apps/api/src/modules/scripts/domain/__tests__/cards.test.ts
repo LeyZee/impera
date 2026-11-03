@@ -248,6 +248,10 @@ describe('cardSvg', () => {
     expect(svg).not.toMatch(/<text[^>]*fill-opacity/u);
   });
 
+  it('drops the punctuation before a cut', () => {
+    expect(wrap('Elle arrive doucement, puis se retourne', 22, 1)).toEqual(['Elle arrive doucement…']);
+  });
+
   it('holds the quote marks to their words, and keeps the tag when the quote is cut', () => {
     expect(quoteLines('Elle se dévoile', 'GRATUIT', 40, 2)).toEqual([
       `«${NBSP}Elle se dévoile${NBSP}» (GRATUIT)`,

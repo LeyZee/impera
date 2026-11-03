@@ -6,8 +6,10 @@ import { join } from 'node:path';
 import type { RasterizeCard } from '../domain/ports';
 
 /**
- * A card's SVG turned into a PNG by ffmpeg's librsvg decoder (SC-01 lot b): ffmpeg is on every machine already
- * (module `media`), so no new dependency. Its own fontconfig names only the fonts of `fonts/` (Geist and Instrument
+ * A card's SVG turned into a PNG by librsvg (SC-01 lot b): through `rsvg-convert` where it is installed (the Docker
+ * image: Alpine's ffmpeg is built without librsvg), otherwise through ffmpeg's librsvg decoder (a dev machine and the
+ * CI, whose ffmpeg has it; ffmpeg is there already for the module `media`). The same library draws in both. The tool
+ * is chosen once per process, so one image always draws with the same one. Its own fontconfig names only the fonts of `fonts/` (Geist and Instrument
  * Serif, SIL OFL 1.1), never the machine's: the same SVG gives the same PNG within one Docker image (another librsvg,
  * pango or freetype may anti-alias differently, so a PNG is never compared across machines). Two renders at most run at
  * once, the others wait their turn: a screen of previews never starts a crowd of ffmpeg beside the API.
@@ -19,7 +21,34 @@ const CONCURRENT_RENDERS = 2;
 const MAX_PNG_BYTES = 8 * 1024 * 1024;
 
 const missingMessage =
-  'ffmpeg absent : introuvable sur le PATH. Installe ffmpeg (avec librsvg), puis relance.';
+  'Ni rsvg-convert ni ffmpeg sur le PATH : installe rsvg-convert (ou ffmpeg avec librsvg), puis relance.';
+
+type Tool = 'rsvg-convert' | 'ffmpeg';
+
+/** The command line of each tool, for one SVG file, the PNG on its standard output. */
+const commandOf = (tool: Tool, input: string): readonly string[] =>
+  tool === 'rsvg-convert'
+    ? ['--format', 'png', input]
+    : [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        // Only our SVG, from a file (the decoder cannot probe a pipe). It names no file, image nor link (`cardSvg`),
+        // so librsvg opens nothing else.
+        '-protocol_whitelist',
+        'file',
+        '-f',
+        'svg_pipe',
+        '-i',
+        input,
+        '-frames:v',
+        '1',
+        '-f',
+        'image2pipe',
+        '-vcodec',
+        'png',
+        'pipe:1',
+      ];
 
 const isNotFound = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
@@ -58,44 +87,34 @@ export function createCardRasterizer(fontsDir: string): RasterizeCard {
     };
   };
 
+  /** `rsvg-convert` until it is found missing, then ffmpeg for the rest of the process. */
+  let tool: Tool = 'rsvg-convert';
   return async (svg) => {
     const release = await acquire();
     try {
-      return await render(await configFile(), svg);
+      const file = await configFile();
+      try {
+        return await render(tool, file, svg);
+      } catch (error) {
+        if (tool === 'ffmpeg' || !isNotFound(error)) throw error;
+        tool = 'ffmpeg';
+        return await render(tool, file, svg);
+      }
     } finally {
       release();
     }
   };
 }
 
-async function render(file: string, svg: string): Promise<Buffer> {
+async function render(tool: Tool, file: string, svg: string): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'nirvana-card-'));
   const input = join(dir, 'card.svg');
   try {
     await writeFile(input, svg);
     return await new Promise<Buffer>((resolve, reject) => {
       execFile(
-        'ffmpeg',
-        [
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          // Only our SVG, from a file (the decoder cannot probe a pipe). It names no file, image nor link (`cardSvg`),
-          // so librsvg opens nothing else.
-          '-protocol_whitelist',
-          'file',
-          '-f',
-          'svg_pipe',
-          '-i',
-          input,
-          '-frames:v',
-          '1',
-          '-f',
-          'image2pipe',
-          '-vcodec',
-          'png',
-          'pipe:1',
-        ],
+        tool,
+        commandOf(tool, input),
         {
           encoding: 'buffer',
           maxBuffer: MAX_PNG_BYTES,
@@ -105,7 +124,10 @@ async function render(file: string, svg: string): Promise<Buffer> {
         },
         (error, stdout) => {
           if (error !== null) {
-            reject(isNotFound(error) ? new Error(missingMessage, { cause: error }) : error);
+            // Not found: the caller tries ffmpeg; ffmpeg not found either says what to install.
+            reject(
+              isNotFound(error) && tool === 'ffmpeg' ? new Error(missingMessage, { cause: error }) : error,
+            );
             return;
           }
           resolve(stdout);
