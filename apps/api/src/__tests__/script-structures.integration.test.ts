@@ -253,6 +253,35 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     ).toBe(404);
   });
 
+  it('draws a card of the current version: SVG in the app, the same PNG twice for the folder', async () => {
+    const structure = ScriptStructureSchema.parse((await post(owner, body())).json());
+    const card = (headers: Record<string, string>, path: string) =>
+      server.inject({ method: 'GET', url: `/v1/script-structures/${structure.id}/cards/${path}`, headers });
+
+    const svg = await card(manager, 'canape');
+    expect(svg.statusCode).toBe(200);
+    expect(svg.headers['content-type']).toBe('image/svg+xml; charset=utf-8');
+    expect(svg.headers['content-security-policy']).toBe("default-src 'none'");
+    // Nuit by the structure's moment, Jour when asked.
+    expect(svg.body).toContain('>Canapé</text>');
+    expect(svg.body).toContain('#060508');
+    expect((await card(manager, 'canape?theme=day')).body).toContain('#f6f1f3');
+
+    const png = await card(owner, 'canape-lit?format=folder');
+    expect(png.statusCode).toBe(200);
+    expect(png.headers['content-type']).toBe('image/png');
+    expect(png.rawPayload.subarray(1, 4).toString('latin1')).toBe('PNG');
+    expect((await card(owner, 'canape-lit?format=folder')).rawPayload.equals(png.rawPayload)).toBe(true);
+    const thumbnail = await card(owner, 'lit?format=thumbnail');
+    // The PNG's width, from its header: 320 for the chatters' thumbnail.
+    expect(thumbnail.rawPayload.readUInt32BE(16)).toBe(320);
+
+    expect(errorOf(await card(owner, 'absente'))).toEqual([404, 'script_card_not_found']);
+    expect(errorOf(await card(owner, 'canape?variant=A'))).toEqual([404, 'script_card_not_found']);
+    expect((await card(owner, 'canape?format=pdf')).statusCode).toBe(400);
+    expect((await card(chatter, 'canape')).statusCode).toBe(404);
+  });
+
   async function ownerId(): Promise<string> {
     const [row] = await test.admin.db
       .select({ id: schema.user.id })

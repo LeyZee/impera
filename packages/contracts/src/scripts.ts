@@ -340,5 +340,30 @@ export const SCRIPT_ERROR_CODES = [
   'script_queue_structure_unprocessable',
   /** A stage touches her disgusts: `details.blocks` by structure. */
   'script_queue_disgust_unprocessable',
+  /** The structure has no such segment, or the stage no such variant. */
+  'script_card_not_found',
 ] as const;
 export type ScriptErrorCode = (typeof SCRIPT_ERROR_CODES)[number];
+
+/** The sizes a card is drawn in (ADR 0056 § 3): in the app (SVG), in the folder and as a thumbnail (PNG). */
+export const SCRIPT_CARD_FORMATS = ['card', 'folder', 'thumbnail'] as const;
+export const ScriptCardFormatSchema = z.enum(SCRIPT_CARD_FORMATS);
+export type ScriptCardFormat = z.infer<typeof ScriptCardFormatSchema>;
+
+/** Jour or Nuit: absent, the structure's moment says it, and « les deux » is Nuit. */
+export const SCRIPT_CARD_THEMES = ['day', 'night'] as const;
+export const ScriptCardThemeSchema = z.enum(SCRIPT_CARD_THEMES);
+export type ScriptCardTheme = z.infer<typeof ScriptCardThemeSchema>;
+
+export const ScriptCardParamsSchema = z.strictObject({
+  structureId: ScriptStructureIdSchema,
+  segmentKey: ScriptSegmentKeySchema,
+});
+
+export const ScriptCardQuerySchema = z.strictObject({
+  format: ScriptCardFormatSchema.default('card'),
+  theme: ScriptCardThemeSchema.optional(),
+  /** One of the stage's variants: its own card. */
+  variant: ScriptVariantLetterSchema.optional(),
+});
+export type ScriptCardQuery = z.infer<typeof ScriptCardQuerySchema>;

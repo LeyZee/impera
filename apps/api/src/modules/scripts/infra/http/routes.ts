@@ -3,6 +3,8 @@ import {
   CreatorIdSchema,
   DomainError,
   SaveScriptStructureBodySchema,
+  ScriptCardParamsSchema,
+  ScriptCardQuerySchema,
   ScriptQueueBodySchema,
   ScriptQueueSchema,
   ScriptStructureIdSchema,
@@ -17,7 +19,8 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import type { QueueRefusal, ScriptStructureStore } from '../../domain/ports';
+import { cardContent, cardSvg, defaultCardTheme } from '../../domain/cards';
+import type { QueueRefusal, RasterizeCard, ScriptStructureStore } from '../../domain/ports';
 import { queueRefusals, queueView } from '../../domain/queue';
 
 const StructureParamsSchema = z.object({ structureId: ScriptStructureIdSchema });
@@ -72,6 +75,12 @@ class ScriptQueueStructureUnprocessable extends DomainError {
   }
 }
 
+class ScriptCardNotFound extends DomainError {
+  constructor() {
+    super('script_card_not_found' satisfies ScriptErrorCode, 'Ce carton n’existe pas dans la structure');
+  }
+}
+
 /** A stage touches what she never does, never shows, or is disgusted by: the screen names it (ADR 0056 § 1). */
 class ScriptQueueDisgustUnprocessable extends DomainError {
   constructor(refusals: readonly QueueRefusal[]) {
@@ -103,6 +112,7 @@ export function createScriptRoutes(
   store: ScriptStructureStore,
   limitsOf: LimitsOf,
   requireRole: RequireRole,
+  rasterize: RasterizeCard,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
@@ -124,6 +134,36 @@ export function createScriptRoutes(
         const found = await store.get(request.params.structureId, signedIn(request.user));
         if (found === null) throw new ScriptStructureNotFound();
         return found;
+      },
+    );
+
+    // A card of the structure's current version (ADR 0056 § 3): SVG in the app, PNG for the folder and the
+    // thumbnail. What the agency wrote is escaped in the SVG, which names no file, image nor link; the CSP forbids
+    // everything else to a browser that opens it directly.
+    app.get(
+      '/script-structures/:structureId/cards/:segmentKey',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: { params: ScriptCardParamsSchema, querystring: ScriptCardQuerySchema },
+      },
+      async (request, reply) => {
+        const found = await store.get(request.params.structureId, signedIn(request.user));
+        if (found === null) throw new ScriptStructureNotFound();
+        const { format, variant } = request.query;
+        const theme = request.query.theme ?? defaultCardTheme(found.current.moment);
+        const content = cardContent(found.current, request.params.segmentKey, {
+          theme,
+          ...(variant !== undefined && { variant }),
+        });
+        if (content === null) throw new ScriptCardNotFound();
+        const svg = cardSvg(content, theme, format);
+        void reply.header('cache-control', 'private, no-cache').header('x-content-type-options', 'nosniff');
+        if (format === 'card')
+          return reply
+            .header('content-security-policy', "default-src 'none'")
+            .type('image/svg+xml; charset=utf-8')
+            .send(svg);
+        return reply.type('image/png').send(Buffer.from(await rasterize(svg)));
       },
     );
 

@@ -1,6 +1,6 @@
 # Module `scripts`
 
-**Rôle.** Les scripts que la créatrice tourne carton par carton (ADR 0056). Pour l'instant (SC-01 lot a) : l'atelier des **structures** de l'agence, leurs versions, et la **file de structures** de chaque créatrice. Viendront le rendu des cartons (SC-01 lot b), la demande de script et son parcours (SC-02), la nomenclature et l'export (SC-03).
+**Rôle.** Les scripts que la créatrice tourne carton par carton (ADR 0056). Pour l'instant (SC-01 lots a et b) : l'atelier des **structures** de l'agence, leurs versions, la **file de structures** de chaque créatrice et le rendu des **cartons**. Viendront la demande de script et son parcours (SC-02), la nomenclature et l'export (SC-03).
 
 **Peut dépendre de.** aucun module métier (feuille). Les limites de la persona lui viennent de `persona` par le composition root (`limitsOf`, sa version active).
 
@@ -22,10 +22,15 @@
 - `GET /creators/:creatorId/script-queue` : la file, chaque entrée avec ce qui la bloque aujourd'hui (`blocks`) ; `personaChecked` vaut `false` sans persona active ;
 - `PUT /creators/:creatorId/script-queue` (propriétaire) : remplace la file ; 422 `script_queue_structure_unprocessable` (inconnue, archivée, réservée à une autre) ou 422 `script_queue_disgust_unprocessable` avec, par structure, l'étape et l'entrée de sa persona qui bloquent.
 
+- `GET /script-structures/:structureId/cards/:segmentKey?format=card|folder|thumbnail&theme=day|night&variant=A|B|C` : le carton d'un segment de la version courante. `card` (défaut) rend le SVG pour l'application, `folder` un PNG de 1080 × 1080 pour le dossier, `thumbnail` un PNG de 320 × 320 pour les chatteurs. Sans `theme`, le moment de la structure décide (« les deux » donne Nuit). 404 `script_card_not_found` pour une clé ou une variante absente.
+
+**Cartons** (`domain/cards.ts`, ADR 0056 § 3). Un dessin, trois tailles : un SVG pur, fonction de la version, du segment, de la variante et du thème, donc les mêmes octets pour la même entrée. Palette du design system (Nuit = thème sombre, Jour = thème clair ; un test la compare à `tokens.css`), titre en Instrument Serif, le reste en Geist. Le carton dit le numéro de l'étape, ce qu'il faut tourner (« 2 photos, 1 vidéo de 1 à 2 min »), l'intention, la variante, les indications par emplacement et l'ambiance ; un pont dit les deux étapes qu'il relie. Le texte de l'agence est échappé ; le SVG ne nomme ni fichier, ni image, ni lien, et la route l'envoie avec `Content-Security-Policy: default-src 'none'`. Le PNG est tiré par ffmpeg et son décodeur librsvg (`infra/card-rasterizer.ts`, aucune dépendance nouvelle), avec une configuration de polices qui ne nomme que `infra/fonts/` (Geist et Instrument Serif en TTF, SIL OFL 1.1, licences à côté) : le même SVG donne le même PNG sur chaque machine. L'image Docker copie ce dossier comme celui des factures.
+
 Chaque écriture ajoute une ligne `script_structure.create`, `.update`, `.archive`, `.freeze` ou `script_queue.update` dans `audit_log`.
 
 ## Structure
 
-- `domain/` : limites de la persona, décision d'enregistrement, vue de la file, port `ScriptStructureStore`. Zéro I/O.
+- `domain/` : limites de la persona, décision d'enregistrement, vue de la file, cartons, ports `ScriptStructureStore` et `RasterizeCard`. Zéro I/O.
 - `infra/db/` : les tables, chaque ligne relue par le contrat.
 - `infra/http/` : les routes.
+- `infra/card-rasterizer.ts` et `infra/fonts/` : le PNG d'un carton.

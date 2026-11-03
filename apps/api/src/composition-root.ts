@@ -139,6 +139,8 @@ const fromRepoRoot = (path: string): string =>
  * level under `apps/api`, and the image copies the folder to the same place (Dockerfile).
  */
 const INVOICE_FONTS_DIR = fileURLToPath(new URL('../src/modules/invoicing/infra/fonts/', import.meta.url));
+/** The fonts of the script cards (SC-01 lot b), laid out like the invoices' ones. */
+const CARD_FONTS_DIR = fileURLToPath(new URL('../src/modules/scripts/infra/fonts/', import.meta.url));
 
 /**
  * Production only: when the rate job was first scheduled, so that a currency that never got a rate is alerted too
@@ -248,7 +250,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
-  const scripts = wireScripts(shared, { persona: persona.module });
+  const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,

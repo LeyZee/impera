@@ -1,5 +1,5 @@
 # SC-01 Structures de script et cartons : l'atelier de l'agence
-Statut : in-progress (lot a fait : contrats, règles, base, routes ; restent lot b cartons, lot c écran)
+Statut : in-progress (lots a et b faits : contrats, règles, base, routes, rendu des cartons ; reste lot c écran)
 Phase : scripts (ADR 0056)
 Dépend de : ADR 0056, la persona (dégoûts), le design system
 Branche : task/sc-01-script-structures
@@ -14,7 +14,7 @@ L'agence crée, duplique, réordonne et versionne ses structures de script, voit
 - [x] Contrats (propriétaire de `packages/contracts`) : structure, version, segment (`stage` | `bridge`), emplacement (`media_slot` : `image` | `video` | `audio`, durées), variante (A, B, C), moment.
 - [x] Base (propriétaire de `packages/db`) : structures et versions immuables, file de structures par créatrice ; RLS par agence, lecture créatrice limitée aux versions qui lui sont demandées.
 - [x] Domaine pur et testé : les six règles de l'ADR 0056 § 1 (clé stable, numéro dérivé, ponts par clé, étape sans emplacement refusée, trois variantes au plus, version figée dès qu'elle est demandée) ; filtre des dégoûts de la persona.
-- [ ] Rendu des cartons côté serveur : palette tirée des jetons, typographie Nirvana ; trois formats (carte, PNG du dossier, vignette) ; même entrée = même image (test d'instantané).
+- [x] Rendu des cartons côté serveur : palette tirée des jetons, typographie Nirvana ; trois formats (carte, PNG du dossier, vignette) ; même entrée = même image (test d'instantané).
 - [ ] Écran Créatrices › Structures (Extension) : pile à réordonner au glisser, aperçu du carton en direct, duplication, structures de départ, refus lisible d'une étape qui touche un dégoût ; file de structures par créatrice.
 - [ ] Relecture Extension : pile réordonnable aussi au clavier ; un pont ne relie que deux étapes voisines ; carton PNG à plat (sans effet de verre), thème selon le moment (Jour clair, Nuit sombre).
 
@@ -29,3 +29,4 @@ La demande de script et le dépôt (SC-02), les textes (SC-05), les prix (P6-01)
 ## Notes de session
 
 - 03/11/2026, lot a (fil Médias) : module `scripts` créé (feuille), contrat `packages/contracts/src/scripts.ts`, migration 0084 (`script_structures`, `script_structure_versions`, `script_structure_queue`), routes `/v1/script-structures` et `/v1/creators/:creatorId/script-queue`. Les règles de structure vivent dans le contrat (`scriptStructureFaults`, `scriptSegmentCodes`) pour que l'écran du lot c dise la même chose que le serveur ; la règle 6 est tenue en base par un déclencheur ; le filtre des limites lit `never_do`, `never_show` et `disgusts` de la persona active (pas `never_say` : une étape se tourne, elle ne se dit pas) ; l'accroche d'un pont, elle, se dit : elle est lue contre `never_say` et `disgusts` (relecture Agent). Sans persona active, rien n'est filtré et la file le dit (`personaChecked: false`). « Lecture créatrice limitée aux versions qui lui sont demandées » : aucune lecture créatrice dans ce lot, elle passera par la demande (SC-02). `structures.freeze` attend SC-02. Le champ des emplacements s'appelle `mediaSlots` (glossaire : jamais `slot` seul).
+- 03/11/2026, lot b (fil Médias) : `domain/cards.ts` dessine le carton en SVG pur (palette du design system comparée à `tokens.css` par un test, Instrument Serif et Geist), trois formats d'un même dessin (SVG 1080 pour l'application, PNG 1080 pour le dossier, PNG 320 pour la vignette), instantané `__snapshots__/card-night-folder.svg`. Le PNG est tiré par ffmpeg (librsvg) avec ses propres polices TTF (`infra/fonts/`, OFL) : pas de dépendance nouvelle, mêmes octets d'une machine à l'autre (test d'intégration : deux tirages identiques). Route `GET /v1/script-structures/:structureId/cards/:segmentKey`. Le thème suit le moment, « les deux » donne Nuit. Le woff2 ne se dessine pas par librsvg, d'où le TTF. À vérifier par la CI Docker : l'ffmpeg d'Alpine porte librsvg, l'image copie `infra/fonts`.

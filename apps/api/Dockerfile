@@ -29,7 +29,8 @@ RUN apk add --no-cache ffmpeg tini \
   && mkdir -p /data/training && chown node:node /data/training
 ENV NODE_ENV=production PORT=3000 NIRVANA_TRAINING_DIR=/data/training
 # The layout mirrors the repository: the bundled code reads `../migrations` (packages/db), `../prompts`
-# (packages/llm), `../src/modules/invoicing/infra/fonts` (the invoices' fonts, EQ-06 lot 4) and `../../../personas`
+# (packages/llm), `../src/modules/invoicing/infra/fonts` (the invoices' fonts, EQ-06 lot 4), `../src/modules/scripts/infra/fonts`
+# (the script cards' fonts, SC-01 lot b) and `../../../personas`
 # relative to dist.
 WORKDIR /app/apps/api
 COPY --from=build /repo/node_modules /app/node_modules
@@ -39,6 +40,7 @@ COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/packages/db/migrations ./migrations
 COPY --from=build /repo/packages/llm/prompts ./prompts
 COPY --from=build /repo/apps/api/src/modules/invoicing/infra/fonts ./src/modules/invoicing/infra/fonts
+COPY --from=build /repo/apps/api/src/modules/scripts/infra/fonts ./src/modules/scripts/infra/fonts
 COPY --from=build /repo/personas/demo /app/personas/demo
 USER node
 VOLUME /data/training
