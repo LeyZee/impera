@@ -37,7 +37,7 @@ import {
 } from '@/invoices/model';
 import { dayMonthText } from '@/payroll/model';
 import { amountText, parseAmount } from '@/reports/model';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 /**
  * A document of the invoices' lists (EQ-06 lot 8) and what is done from it: the contractor's answer, the owner's end of

@@ -9,8 +9,6 @@ import {
 } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
-import { Dialog } from './Dialog';
-
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { createShift, createTemplate, useRefreshPlanning, type Refusal } from '@/scheduling/api';
 import { accountLine, ERROR_MESSAGES, type Fill } from '@/scheduling/model';
@@ -25,6 +23,7 @@ import {
   weekdayOf,
   zonedInstant,
 } from '@/scheduling/time';
+import { Dialog } from '@/shell/Dialog';
 
 /** The day and slot the panel opens on: the first slot that starts after now, on `day` or else the day after. */
 function firstSlotOf(

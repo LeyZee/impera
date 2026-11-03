@@ -25,7 +25,7 @@ import { TEXT_NAMES } from '@/contractors/model';
 import type { InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { fullDay } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 /** A refusal of the server, in French, never a raw code. */
 function Refusal({ refusal }: { refusal: InvoiceRefusal | null }): JSX.Element | null {

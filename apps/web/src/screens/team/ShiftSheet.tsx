@@ -9,8 +9,6 @@ import type {
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
 
-import { Dialog } from './Dialog';
-
 import { AGENCY_STATUS, amountText, periodAt, reportOf, STATUS_TONES, validatedTotal } from '@/reports/model';
 import '@/reports/reports.css';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
@@ -37,6 +35,7 @@ import {
   rangeAt,
   zonedInstant,
 } from '@/scheduling/time';
+import { Dialog } from '@/shell/Dialog';
 
 const PHASE_LABELS: Readonly<Record<Phase, string>> = { later: 'À venir', live: 'En poste', past: 'Fini' };
 

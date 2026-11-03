@@ -5,7 +5,7 @@ import { useState, type JSX } from 'react';
 import { AGENDA_KEY, archiveTask } from './api';
 import { whenWords } from './words';
 
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 /** One of her tasks, opened: what it is, what it is for, and « Retirer » (archived, never deleted). */
