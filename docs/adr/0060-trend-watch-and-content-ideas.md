@@ -1,6 +1,6 @@
 # 0060. Veille et idées de contenu : des signaux de sources propres, des idées filtrées par le code, validées par l'agence, proposées à la créatrice
 
-Statut : accepted (Charles, 03/11/2026, 11 h 32, « je te donne mon OK aux deux ADR qui attendent » ; capture passive par l'extension : « Go extension alors ;) », 11 h 34 ; « c'est moi qui va pouvoir scroll […] il n'y a pas besoin de payer quelqu'un », 11 h 34 ; demande de Charles du 03/11/2026, 11 h 19, fil « Faire la veille Instagram pour les modèles » ; étude et variantes : `/mnt/project-files/veille-instagram/`, hors dépôt)
+Statut : accepted (Charles, 03/11/2026, 11 h 32, « je te donne mon OK aux deux ADR qui attendent » ; capture passive par l'extension : « Go extension alors ;) », 11 h 34 ; « c'est moi qui va pouvoir scroll […] il n'y a pas besoin de payer quelqu'un », 11 h 34 ; phrases ajoutées après le « ok » et relectures Extension et Bilan : « ok phrases 0060 », 12 h 00 ; demande de Charles du 03/11/2026, 11 h 19, fil « Faire la veille Instagram pour les modèles » ; étude et variantes : `/mnt/project-files/veille-instagram/`, hors dépôt)
 Date : 2026-11-03
 Précise : l'ADR 0042 (§ 4 suggestions et fiche de tournage ; catégorie « Réseaux » de l'agenda, remplie par ce chantier), l'ADR 0055 (§ 1 catégories, § 4 demande de contenu), l'ADR 0056 (§ 2 file des structures), l'ADR 0057 (§ 1 API officielles seulement, § 3 statistiques à 48 h, § 6 garde Instagram), l'ADR 0030 (description validée), l'ADR 0010 (aucune donnée réelle dans le dépôt).
 
@@ -27,14 +27,15 @@ Vérifié le 03/11 (documentation de Meta) :
 ### 2. Les signaux
 
 - Un **signal de tendance** (`trend_signal`) dit qu'un format, un son, un thème ou une date monte. Il a une source, un texte court, un lien facultatif, un format, des chiffres facultatifs, une date et une **péremption** (14 jours par défaut, réglage d'agence) ; un signal périmé n'est plus lu.
-- Cinq sources, toutes officielles ou humaines, chacune un adaptateur derrière un port du module, avec son faux pour les tests :
+- Six sources, toutes officielles ou humaines, chacune un adaptateur derrière un port du module, avec son faux pour les tests :
   1. **les statistiques de la créatrice**, par son connecteur Instagram (ADR 0057) ;
   2. **la recherche de Grok** sur X et le web, une fois par jour pour toute l'agence ; Grok rend des signaux sourcés, jamais une idée ;
   3. **une liste de comptes de référence** choisie par l'agence, lue par Business Discovery depuis le compte professionnel de l'agence ; un post qui dépasse nettement la moyenne de son compte devient un signal ;
   4. **un membre de l'agence** qui colle un lien dans Nirvana avec une ligne et un format (partage depuis Instagram sur Android, coller sur iPhone) ;
   5. **la créatrice**, si elle le veut, par le même geste depuis sa PWA ;
   6. **la capture passive par l'extension** : quand un membre de l'agence ou la créatrice active « Veille » dans l'extension et regarde les Reels, l'Explorer ou le profil d'un compte sur instagram.com, l'extension relève, pour chaque post affiché, son lien, le nom du compte, les vues, j'aime et commentaires quand la page les affiche, sa légende et ses hashtags, le nom du son et le temps passé dessus ; un geste de l'extension marque un post pour une créatrice. Elle ne relève jamais les messages privés, les stories, un compte privé, ni le média lui-même. La veille s'arrête seule au bout de 45 minutes ou quand on quitte Instagram, et l'extension montre qu'elle relève. Un post relevé devient un signal s'il a été marqué, ou si ses chiffres dépassent nettement la moyenne de son compte ; les relevés suivent la péremption des signaux. Si la page change et que le relevé échoue, l'extension le dit en ambre et ne recharge jamais la page pour réessayer. Les relevés de test sont fabriqués, jamais enregistrés sur de vrais comptes (ADR 0010).
-- La veille est un geste de l'agence, fait par un de ses membres sur son propre navigateur : elle n'ouvre ni shift, ni rémunération, ni ligne de paie.
+- Le compte Instagram ouvert dans le navigateur est celui de la personne qui fait la veille ou un compte de l'agence ; le compte d'une créatrice n'y sert que si elle l'a accepté.
+- La veille n'ouvre ni shift, ni rémunération, ni ligne de paie, qu'elle soit faite par un membre de l'agence ou par la créatrice.
 - La recherche par hashtag n'est pas une source de cette ADR.
 
 ### 3. Le profil de contenu
