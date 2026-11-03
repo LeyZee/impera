@@ -20,3 +20,4 @@ export * from './system';
 export * from './tenancy';
 export * from './team';
 export * from './telegram';
+export * from './trends';

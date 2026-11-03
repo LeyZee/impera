@@ -49,7 +49,7 @@ Une créatrice sur une plateforme d'abonnement reçoit chaque jour des dizaines 
 | **L'agence** (propriétaire, managers) | Dashboard en direct (santé de l'agent, ventes, fans à traiter), Suivi des conversations et de leurs alertes, Entraîner (playground, corrections, tests à l'aveugle), Créatrices (persona, pourcentage de l'agence, heures de l'agent), Réglages (modèles IA, flux de ventes, alertes, Telegram, règles de paie, facturation, sauvegardes, sécurité) |
 | **Les chatteurs** | Aujourd'hui, leurs conversations pendant leur shift et rien en dehors, leur planning avec congés et échanges de shifts, leurs ventes saisies une à une, leurs commissions et leurs factures |
 | **L'équipe** | Planning partagé où l'agence pose et déplace les shifts au doigt, rapports de fin de shift contrôlés par le code, paie par quinzaine au centime, factures PDF/A et avoirs, exports pour le comptable |
-| **La créatrice** | Une appli sur son téléphone (PWA) : sa journée et qui répond à ses fans, sa persona ; ses fans et leurs conversations en lecture seule arrivent avec Ventes. Elle ne voit ni l'IA, ni qui a écrit un message, ni la paie de l'équipe, ni les notes de l'agence sur ses fans ([ADR 0042](docs/adr/0042-creator-space.md), [ADR 0063](docs/adr/0063-no-fan-notes-for-the-creator.md)) |
+| **La créatrice** | Une appli sur son téléphone (PWA) : sa journée et qui répond à ses fans, sa persona, et dans Ventes ses fans et leurs conversations en lecture seule. Elle ne voit ni l'IA, ni qui a écrit un message, ni la paie de l'équipe, ni les notes de l'agence sur ses fans ([ADR 0042](docs/adr/0042-creator-space.md), [ADR 0063](docs/adr/0063-no-fan-notes-for-the-creator.md)) |
 
 Le cœur ne connaît aucune plateforme. Reveal.me est la première, branchée par un adaptateur ; d'autres suivront, puis la plateforme propre d'Impera, sans rien changer au cœur.
 
@@ -199,9 +199,12 @@ Les principes qui tiennent tout ([`docs/architecture/overview.md`](docs/architec
     <td width="50%"><img src="docs/design/images/crm-telephone.jpg" alt="Trois écrans sur téléphone"></td>
     <td width="50%"><img src="docs/design/images/palette.jpg" alt="Palette des thèmes Nuit et Jour"></td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="docs/design/images/marque.jpg" alt="Logo : buste de marbre couronné de laurier, lockups Nuit et Jour, petites tailles"></td>
+  </tr>
 </table>
 
-Guide du design system : [`docs/design/README.md`](docs/design/README.md). Code : [`packages/design-system`](packages/design-system). Logo et règles : [`brand/`](brand/README.md).
+Guide du design system : [`docs/design/README.md`](docs/design/README.md). Code : [`packages/design-system`](packages/design-system). Le logo, un buste de marbre couronné de laurier redessiné en Liquid Glass, et ses règles : [`brand/`](brand/README.md).
 
 ## Installer et lancer
 
@@ -240,7 +243,7 @@ Rien ne part vers une plateforme ni vers un fan en local : chaque compte de plat
 - **Propriétaire et managers** : le **Dashboard** dit ce qui attend (fans à traiter, jobs bloqués, sauvegarde en retard, papiers manquants). **Suivi** liste les conversations de chaque créatrice suivie, avec la fiche du fan et l'historique des alertes. En copilote, les brouillons de l'agent s'y valident, se corrigent ou se rejettent. **Entraîner** sert à tester l'agent sans fan réel : playground, corrections, tests à l'aveugle qui ouvrent le mode Automatique ([ADR 0019](docs/adr/0019-two-rates-and-automatic-mode-gate.md)).
 - **Équipe** : **Planning** pour poser et déplacer les shifts, **Rapports** pour les fins de shift, **Paie** pour clôturer la quinzaine, ajouter primes et malus, émettre les factures et sortir les exports du comptable.
 - **Chatteurs** : **Aujourd'hui** pour la journée, **Suivi** pour la créatrice qu'ils ont en shift (rien hors shift, [ADR 0025](docs/adr/0025-chatter-access-during-shift.md)), **Planning** pour leurs shifts, congés et échanges, **Commissions** pour leurs ventes et leurs factures. Leur calendrier s'abonne depuis Moi › Calendrier.
-- **Créatrice** : elle installe l'appli depuis le navigateur de son téléphone, guidée pas à pas par la page `/aide/installer`, puis règle ses notifications sur la page `/notifications` (depuis le menu de son compte). Elle y voit sa journée et sa persona ; ses fans, ses gains, son agenda et son contenu arrivent avec leurs écrans ([ADR 0042](docs/adr/0042-creator-space.md)).
+- **Créatrice** : elle installe l'appli depuis le navigateur de son téléphone, guidée pas à pas par la page `/aide/installer`, puis règle ses notifications sur la page `/notifications` (depuis le menu de son compte). Elle y voit sa journée, sa persona, et dans Ventes ses fans et leurs conversations en lecture seule ; ses gains, son agenda et son contenu arrivent avec leurs écrans ([ADR 0042](docs/adr/0042-creator-space.md)).
 
 ### Extension Chrome
 

@@ -4,7 +4,7 @@
 //     until the code exists (--strict turns them into errors).
 //  2. Every task card docs/sessions/tasks/<ID>-*.md is listed in docs/sessions/tasks/README.md, and vice versa.
 //     Same for ADRs and docs/adr/README.md.
-//  3. No tracked file above 500 KB (media and exports do not belong in the repository).
+//  3. No tracked file above 500 KB (media and exports do not belong in the repository); Drizzle's snapshots excepted.
 //  4. No forbidden file names (*.bak, *.orig, *.copy, *-v2.*, *_final*, tmp/, old/): docs/conventions/hygiene.md.
 //  5. Every TODO/FIXME in code carries a task card id: `TODO(P2-03): ...` (docs/conventions/coding.md).
 //  6. Every `pnpm <script>` cited in the docs exists in the root package.json.
@@ -99,8 +99,12 @@ const rel = (f) => relative(root, f).split(sep).join('/');
 for (const f of files) {
   const r = rel(f);
   // The compiler's incremental state (`incremental` in tsconfig.base.json) is ignored by git and rewritten by every
-  // typecheck, which runs before this script: its size says nothing about the repository.
-  if (statSync(f).size > MAX_BYTES && !r.endsWith('.tsbuildinfo')) errors.push(`${r}: larger than 500 KB`);
+  // typecheck, which runs before this script: its size says nothing about the repository. Drizzle's snapshots are
+  // generated text, one per migration and the whole schema each, never edited by hand (packages/db/README.md): they grow
+  // with the schema, past 500 KB from 0100 on, and are neither media nor an export.
+  const generated =
+    r.endsWith('.tsbuildinfo') || /^packages\/db\/migrations\/meta\/\d{4}_snapshot\.json$/.test(r);
+  if (statSync(f).size > MAX_BYTES && !generated) errors.push(`${r}: larger than 500 KB`);
   if (FORBIDDEN_NAMES.some((re) => re.test(r))) errors.push(`${r}: forbidden file name (hygiene.md)`);
   if (/\.(ts|tsx|mjs|js)$/.test(r) && !r.startsWith('scripts/check-repo')) {
     const lines = readFileSync(f, 'utf8').split('\n');

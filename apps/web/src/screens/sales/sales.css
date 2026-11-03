@@ -1,0 +1,199 @@
+/* Ventes, the creator's (CR-02 c3): her fans, and a conversation read only. */
+
+.vt-cols {
+  display: grid;
+  gap: var(--nv-space-4);
+  align-items: start;
+}
+.vt-note,
+.vt-empty,
+.vt-hint {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.vt-hint {
+  padding: var(--nv-space-6) var(--nv-space-4);
+  text-align: center;
+}
+.vt-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 calc(var(--nv-space-2) * -1);
+  padding: 0;
+  list-style: none;
+}
+.vt-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--nv-space-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--nv-space-2);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.vt-row--tap {
+  cursor: pointer;
+  transition: background var(--nv-dur-fast);
+}
+.vt-row--tap:hover {
+  background: var(--nv-plate-hover);
+}
+.vt-row--tap.is-current {
+  background: var(--nv-select);
+}
+.vt-row__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vt-row__who b {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vt-row__seen {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.vt-row__amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vt-more,
+.vt-older {
+  align-self: center;
+}
+.vt-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.vt-skeleton i {
+  height: 48px;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+  animation: vt-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+.vt-skeleton i:nth-child(2) {
+  animation-delay: calc(var(--nv-stagger) * 2);
+}
+.vt-skeleton i:nth-child(3) {
+  animation-delay: calc(var(--nv-stagger) * 4);
+}
+@keyframes vt-breathe {
+  to {
+    opacity: 0.4;
+  }
+}
+
+/* The reader. */
+.vt-reader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  padding: var(--nv-space-4);
+}
+.vt-reader__top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.vt-back {
+  align-self: flex-start;
+}
+.vt-reader__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.vt-reader__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vt-reader__who h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--nv-text-headline);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vt-reader__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.vt-warn {
+  margin: 0;
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.vt-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.vt-day__label {
+  margin: 0;
+  align-self: center;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.vt-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Set back by their size alone: on the neon bubble, no opacity keeps 4.5:1 (relecture d'Extension). */
+.vt-media,
+.vt-paid,
+.vt-time {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.nv-bubble--fan :is(.vt-media, .vt-paid, .vt-time) {
+  color: var(--nv-ink-muted);
+}
+.vt-time {
+  align-self: flex-end;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+
+/* A phone shows the list, or the conversation opened from it. */
+@media (max-width: 899px) {
+  .vt-page--reading .vt-list,
+  .vt-page--reading .nv-page__head,
+  .vt-page:not(.vt-page--reading) .vt-side {
+    display: none;
+  }
+}
+
+/* From 900 px, the list and the conversation side by side; the thread scrolls on its own and opens at its end. */
+@media (min-width: 900px) {
+  .vt-cols {
+    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+  }
+  .vt-reader .vt-back {
+    display: none;
+  }
+  .vt-reader {
+    max-height: calc(100dvh - 12rem);
+  }
+  .vt-reader__body {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
