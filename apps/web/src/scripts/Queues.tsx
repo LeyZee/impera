@@ -2,7 +2,6 @@ import {
   SCRIPT_QUEUE_MAX,
   type CreatorId,
   type CreatorSummary,
-  type ScriptColor,
   type ScriptMoment,
   type ScriptQueue,
   type ScriptQueueRefusals,
@@ -14,13 +13,11 @@ import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react
 
 import { queueKey, saveQueue, useQueue, type QueueSaveResult } from './api';
 import { ScIcon } from './icons';
+import { scriptGradient } from './model';
 import { useDragSort } from './useDragSort';
 import { useFlip } from './useFlip';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
-
-const gradient = (color: ScriptColor): string =>
-  `linear-gradient(135deg, ${color.primary}, ${color.secondary} 55%, ${color.accent})`;
 
 /** The time a drag or a run of clicks has to settle before the queue is written. */
 const SETTLE_MS = 450;
@@ -107,9 +104,14 @@ function Queue({
   const orderRef = useRef(ids);
   orderRef.current = ids;
   useFlip(listRef, ids.join(' '));
+  // Leaving her queue (another creator, the library) while a change waits writes it now: never lost in silence.
+  const flush = useRef<() => void>(() => undefined);
   useEffect(
     () => () => {
-      if (timer.current !== null) clearTimeout(timer.current);
+      if (timer.current === null) return;
+      clearTimeout(timer.current);
+      timer.current = null;
+      flush.current();
     },
     [],
   );
@@ -139,6 +141,14 @@ function Queue({
     }
     setProblem(PROBLEMS[result.kind]);
   }
+
+  flush.current = () => {
+    const next = orderRef.current;
+    void saveQueue(creator.id, next).then(async (result) => {
+      await queryClient.invalidateQueries({ queryKey: queueKey(creator.id) });
+      return result;
+    });
+  };
 
   const change = (next: ScriptStructureId[], now = false): void => {
     setOrder(next);
@@ -258,11 +268,14 @@ function Queue({
                   className="st-qrow__chip"
                   aria-hidden="true"
                   style={
-                    structure === undefined ? undefined : { background: gradient(structure.current.color) }
+                    structure === undefined
+                      ? undefined
+                      : { background: scriptGradient(structure.current.color) }
                   }
                 />
                 <span
                   className="st-qrow__text"
+                  role="group"
                   tabIndex={0}
                   aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                   aria-label={`${String(at + 1)}. ${name}`}
@@ -348,7 +361,7 @@ function Queue({
                     <span
                       className="st-qrow__chip"
                       aria-hidden="true"
-                      style={{ background: gradient(structure.current.color) }}
+                      style={{ background: scriptGradient(structure.current.color) }}
                     />
                     <span className="st-pick__name">{structure.current.name}</span>
                     <ScIcon name="plus" size={15} />

@@ -3,7 +3,6 @@ import {
   SCRIPT_SEGMENTS_MAX,
   SCRIPT_STRUCTURE_NAME_MAX,
   type ScriptCardPreviewBody,
-  type ScriptColor,
   type ScriptMoment,
   type ScriptSegment,
   type ScriptStructure,
@@ -30,6 +29,7 @@ import {
   segmentTitles,
   stackSummary,
   type Draft,
+  scriptGradient,
 } from './model';
 import { useDragSort } from './useDragSort';
 import { useFlip } from './useFlip';
@@ -62,9 +62,6 @@ const SAVE_PROBLEMS: Record<Exclude<SaveResult['kind'], 'saved' | 'invalid'>, st
 
 /** Where the stack, the card and the sheet stand one under the other (`structures.css`). */
 const NARROW = '(max-width: 860px)';
-
-const gradient = (color: ScriptColor): string =>
-  `linear-gradient(135deg, ${color.primary}, ${color.secondary} 55%, ${color.accent})`;
 
 /**
  * The workshop of one structure (SC-01 lot c, ADR 0056 and 0064): its name, its moment, its colour, its stack of stages
@@ -224,7 +221,11 @@ export function Workshop({
         <button type="button" className="nv-btn nv-btn--plain nv-btn--sm st-bar__back" onClick={onClose}>
           ← Structures
         </button>
-        <span className="st-bar__chip" style={{ background: gradient(draft.color) }} aria-hidden="true" />
+        <span
+          className="st-bar__chip"
+          style={{ background: scriptGradient(draft.color) }}
+          aria-hidden="true"
+        />
         <label className="sr-only" htmlFor={`${id}-name`}>
           Nom de la structure
         </label>
@@ -313,7 +314,7 @@ export function Workshop({
                 aria-checked={!customColor && presetOf(draft.color) === preset.key}
                 title={preset.name}
                 aria-label={preset.name}
-                style={{ background: gradient(preset.color) }}
+                style={{ background: scriptGradient(preset.color) }}
                 onClick={() => {
                   setCustomColor(false);
                   edit({ color: preset.color });
@@ -325,7 +326,7 @@ export function Workshop({
             <div className="st-free">
               <span
                 className="st-free__bar"
-                style={{ background: gradient(draft.color) }}
+                style={{ background: scriptGradient(draft.color) }}
                 aria-hidden="true"
               />
               <div className="st-free__tones">

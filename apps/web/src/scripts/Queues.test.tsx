@@ -164,4 +164,21 @@ describe('the queue of a creator', () => {
       { timeout: 2000 },
     );
   });
+
+  it('writes a move still waiting when she leaves her queue, never drops it', async () => {
+    const third = structure(ScriptStructureIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a4'), 'Lente');
+    const calls = serve([SOFT, third.id]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const shown = render(
+      <QueryClientProvider client={client}>
+        <Queues creators={[CREATOR]} structures={[...LIBRARY, third]} />
+      </QueryClientProvider>,
+    );
+    fireEvent.keyDown(await screen.findByLabelText('2. Lente'), { key: 'ArrowUp', altKey: true });
+    // Gone before the change settled: another creator, the library.
+    shown.unmount();
+    await waitFor(() => {
+      expect(calls.puts).toEqual([[third.id, SOFT]]);
+    });
+  });
 });

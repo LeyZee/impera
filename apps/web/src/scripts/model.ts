@@ -225,3 +225,7 @@ export function stackSummary(segments: readonly ScriptSegment[]): string {
   if (slots.length > 0) parts.push(slotsSummary(slots));
   return parts.join(' · ');
 }
+
+/** The script's colour as the screen paints it (covers, chips, swatches): its three tones, corner to corner. */
+export const scriptGradient = (color: ScriptColor): string =>
+  `linear-gradient(135deg, ${color.primary}, ${color.secondary} 55%, ${color.accent})`;
