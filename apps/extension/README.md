@@ -14,4 +14,4 @@ Contraintes : `host_permissions` limitées à `https://*.reveal.me/*` et au CRM 
 
 Chargement en dev : `pnpm --filter @impera/extension dev` (serveur de dev WXT sur le port 3100, le 3000 étant celui de l'API), puis `chrome://extensions` → mode développeur → charger `.output/chrome-mv3-dev`.
 
-Icônes : `public/icon/<taille>.png`, rendues depuis `brand/` sans retouche : 16 depuis `favicon.svg`, 32 et 48 depuis `impera-mark-small.svg`, 128 depuis `impera-mark.svg` (le verre) ; WXT les met dans le manifeste. `public/icon/mark.svg`, l'en-tête du popup, est `impera-mark-small.svg`. Paquet à installer ou à publier : `pnpm --filter @impera/extension zip` (dans `.output/`).
+Icônes : `public/icon/<taille>.png`, rendues depuis `brand/` sans retouche : 16 depuis `favicon.svg`, 32 et 48 depuis `impera-mark-small.svg`, 128 depuis `impera-mark.svg` (le verre) ; WXT les met dans le manifeste. `public/icon/mark.svg`, l'en-tête du popup, est `impera-mark-small.svg`. Paquet à installer ou à publier : `pnpm --filter @impera/extension zip` (`.output/impera.zip`). L'image du CRM le fabrique et le sert à `/extension/impera.zip` ; le guide de l'équipe est `/aide/extension` (ADR 0067).
