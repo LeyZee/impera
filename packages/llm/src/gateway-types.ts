@@ -1,4 +1,4 @@
-import type { MediaDescription, Result } from '@impera/contracts';
+import type { LlmPurpose, MediaDescription, Result } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
 
 import type { BudgetEvent } from './budget';
@@ -56,6 +56,11 @@ export interface CallTrace {
   readonly creatorId?: string;
   readonly conversationId?: string;
   readonly draftId?: string;
+  /**
+   * `trend_watch` for a call of the trend watch: refused at its own cap as well as at the daily one (ADR 0060 § 7).
+   * Absent is `chatting`, which only the daily cap stops.
+   */
+  readonly purpose?: LlmPurpose;
 }
 
 export interface SenseInput {
@@ -113,8 +118,12 @@ export interface LlmSuccess<T> {
 }
 
 export interface LlmFailure {
-  /** `budget_reached`: the daily cap is spent, nothing was called; the chatters take over until midnight. */
-  readonly code: 'all_models_failed' | 'budget_reached';
+  /**
+   * `budget_reached`: the daily cap is spent, nothing was called; the chatters take over until midnight.
+   * `trend_watch_budget_reached`: a trend watch call, refused at the watch's own cap; its jobs stop until midnight,
+   * the fans' answers go on.
+   */
+  readonly code: 'all_models_failed' | 'budget_reached' | 'trend_watch_budget_reached';
   readonly attempts: readonly {
     readonly provider: ProviderId;
     readonly model: string;
@@ -172,6 +181,8 @@ export interface LlmGatewayDeps {
   readonly onKeyRefused?: (refusal: KeyRefusal) => void;
   /** The cap in euros set in Réglages (later); `config.dailyBudget.capEur` otherwise. Read before each call. */
   readonly dailyCapEur?: () => number;
+  /** The trend watch's cap in euros, inside the daily one; `config.dailyBudget.trendWatchCapEur` otherwise. */
+  readonly trendWatchCapEur?: () => number;
   /** Once per day and kind: alert at 80 %, then cap reached. Never throws into a call. */
   readonly onBudget?: (event: BudgetEvent) => void;
   /** Waits before a transient retry (backoff); a real timer unless a test passes its own. */

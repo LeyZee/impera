@@ -161,10 +161,16 @@ importers:
 
   apps/extension:
     dependencies:
+      '@impera/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@impera/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
     devDependencies:
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1(@noble/hashes@2.4.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3

@@ -24,7 +24,7 @@ function voiceHealth(records: LlmCallRecord[]) {
   const log = createInMemoryCallLog();
   for (const r of records) log.append(r);
   const budget = budgetStatus(DEFAULT_LLM_CONFIG.dailyBudget, 20, log, NOW);
-  return computeHealth(DEFAULT_LLM_CONFIG, { LLM_XAI_API_KEY: 'k' }, log, NOW, budget).roles.find(
+  return computeHealth(DEFAULT_LLM_CONFIG, { LLM_XAI_API_KEY: 'k' }, log, NOW, budget, budget).roles.find(
     (r) => r.role === 'voice',
   );
 }

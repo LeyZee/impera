@@ -1,6 +1,6 @@
 {
-  "id": "99f37857-8e16-4f2a-b389-44d6bb88e231",
-  "prevId": "996bc225-fdcf-47c9-b2d2-a8bd4601b729",
+  "id": "aaf1bd88-b6f3-44aa-b461-249e4959fa11",
+  "prevId": "64521240-155e-43e3-b529-901215bf4a3a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6245,6 +6245,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'chatting'"
+        },
         "provider": {
           "name": "provider",
           "type": "text",
@@ -6404,6 +6411,10 @@
         "llm_calls_role_check": {
           "name": "llm_calls_role_check",
           "value": "\"llm_calls\".\"role\" in ('sense', 'brain', 'voice', 'judge')"
+        },
+        "llm_calls_purpose_check": {
+          "name": "llm_calls_purpose_check",
+          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch')"
         },
         "llm_calls_status_check": {
           "name": "llm_calls_status_check",

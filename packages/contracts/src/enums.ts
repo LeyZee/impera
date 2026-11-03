@@ -68,6 +68,14 @@ export type FactKind = z.infer<typeof FactKindSchema>;
 export const LlmRoleSchema = z.enum(['sense', 'brain', 'voice', 'judge']);
 export type LlmRole = z.infer<typeof LlmRoleSchema>;
 
+/**
+ * What an LLM call is for, journaled in `llm_calls.purpose` (ADR 0060 § 7). `chatting` is every call that serves
+ * the fans and their conversations; `trend_watch` is the trend watch, which has its own cap inside the daily one and
+ * never deprives a fan's answer of budget.
+ */
+export const LlmPurposeSchema = z.enum(['chatting', 'trend_watch']);
+export type LlmPurpose = z.infer<typeof LlmPurposeSchema>;
+
 /** Who wrote an event: the system, the AI, a dashboard user (`human:<userId>`) or the fan. */
 export const ActorSchema = z.union([
   z.enum(['system', 'ai', 'fan']),
