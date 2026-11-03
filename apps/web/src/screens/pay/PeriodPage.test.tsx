@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me, PayrollPeriod } from '@nirvana/contracts';
+import type { HeldSale, Me, PayrollPeriod } from '@nirvana/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -21,6 +21,7 @@ import {
   BASILE,
   euroLine,
   goalOf,
+  heldSaleOf,
   IRIS,
   IRIS_ME,
   LEA_ONLYFANS,
@@ -54,6 +55,8 @@ const AN_ID: unknown = expect.any(String);
 
 let periods: Record<string, PayrollPeriod | 'down'>;
 let reports: unknown[];
+/** The sales each period holds or a decision settles (CRM-03 lot b4b); `'down'` answers a server error. */
+let held: Record<string, HeldSale[] | 'down'>;
 let rules: unknown;
 /** The latest dollar rate the daily job read. */
 let usd: unknown;
@@ -75,6 +78,12 @@ function serve(): void {
         writes.push({ path: url.pathname, body });
         const answered = answer(url.pathname);
         return json(answered.body, answered.status);
+      }
+      const holding = /^\/v1\/payroll\/periods\/([^/]+)\/held-sales$/u.exec(url.pathname)?.[1];
+      if (holding !== undefined) {
+        const sales = held[holding] ?? [];
+        if (sales === 'down') return json({ error: { code: 'internal', message: 'down' } }, 500);
+        return json({ period: holding, sales });
       }
       const period = /^\/v1\/payroll\/periods\/(.+)$/u.exec(url.pathname)?.[1];
       if (period !== undefined) {
@@ -199,6 +208,7 @@ beforeEach(() => {
   writes.length = 0;
   gate = null;
   reports = [];
+  held = {};
   rules = PAY_RULES;
   periods = {
     [OCT1]: periodOf(OCT1, [statementOf(THEO, OCT1, { netMinor: 100_000, ...PAID })], {
@@ -963,6 +973,184 @@ describe('Paie › Quinzaine', () => {
     expect(text(goal?.querySelector('.py-fig__note'))).toBe(
       'prévu 100 % : palier 100 %, +25,00 € par chatteur',
     );
+  });
+});
+
+describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
+  const panel = async (): Promise<HTMLElement> => {
+    const found = (await screen.findByText('Ventes en attente')).closest('section');
+    if (found === null) throw new Error('No panel of held sales');
+    return found;
+  };
+  const card = (inside: HTMLElement, what: RegExp): HTMLElement => {
+    const found = within(inside).getByText(what).closest('li');
+    if (found === null) throw new Error(`No card for ${String(what)}`);
+    return found;
+  };
+
+  it('shows nothing while the period holds no sale', async () => {
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    await screen.findByRole('button', { name: 'Théo' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(screen.queryByText('Ventes en attente')).toBeNull();
+  });
+
+  it('lists what waits and what was decided, why, and the gestures each one offers', async () => {
+    held[OCT2] = [
+      heldSaleOf(),
+      heldSaleOf({
+        platformSaleId: 'vente-2',
+        memberId: null,
+        reason: 'chatter_unlinked',
+        outcomes: ['exclude'],
+        netMinor: 2_500,
+      }),
+      heldSaleOf({ platformSaleId: 'vente-3', reason: null, decision: 'exclude', outcomes: ['withdraw'] }),
+    ];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    expect(text(list)).toContain('2 attendent une décision · 1 décidée');
+    expect(text(list)).toContain('Elles n’empêchent pas la clôture');
+
+    const offShift = card(list, /^Théo n’était ni en poste/u);
+    expect(text(offShift)).toContain('Nora Vidal · @nora sur Reveal');
+    expect(text(offShift)).toContain('Vente du mercredi 28 octobre à 22 h · chatteur Théo');
+    expect(text(offShift)).toContain('+42,00 €');
+    expect(within(offShift).getByText('En attente').className).toContain('rp-chip--warn');
+    expect(within(offShift).getByRole('button', { name: 'Compter pour Théo' })).toBeTruthy();
+    expect(within(offShift).getByRole('button', { name: 'Écarter' })).toBeTruthy();
+
+    const unlinked = card(list, /^Son chatteur sur Reveal n’est relié à aucun membre/u);
+    expect(text(unlinked)).toContain('chatteur non relié');
+    expect(within(unlinked).queryByRole('button', { name: /^Compter/u })).toBeNull();
+
+    const excluded = card(list, /^Écartée$/u);
+    expect(within(excluded).getByRole('button', { name: 'Retirer la décision' })).toBeTruthy();
+  });
+
+  it('counts a sale for its member after reading it again, with a note, then reads the list again', async () => {
+    held[OCT2] = [heldSaleOf()];
+    answer = () => ({
+      status: 201,
+      body: {
+        id: payId(900),
+        platform: 'reveal',
+        platformSaleId: 'vente-1',
+        revision: 1,
+        platformAccountId: payId(11),
+        outcome: 'count',
+        reason: 'off_shift',
+        memberId: THEO.id,
+        note: 'Shift prolongé d’une heure.',
+        decidedBy: OWNER_USER,
+        createdAt: '2026-11-02T09:00:00.000Z',
+      },
+    });
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(within(await panel()).getByRole('button', { name: 'Compter pour Théo' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(dialog)).toContain('Compter cette vente pour Théo ?');
+    expect(text(dialog)).toContain('Elle va sur son relevé, ses remboursements avec elle.');
+    expect(writes).toEqual([]);
+
+    fireEvent.change(within(dialog).getByLabelText('Note (facultatif)'), {
+      target: { value: '  Shift prolongé d’une heure.  ' },
+    });
+    held[OCT2] = [heldSaleOf({ decision: 'count', outcomes: ['exclude', 'withdraw'] })];
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Compter pour Théo' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(writes).toEqual([
+      {
+        path: '/v1/payroll/sale-decisions',
+        body: {
+          id: AN_ID,
+          period: OCT2,
+          platform: 'reveal',
+          platformSaleId: 'vente-1',
+          outcome: 'count',
+          note: 'Shift prolongé d’une heure.',
+        },
+      },
+    ]);
+    expect(await within(await panel()).findByText('Comptée pour Théo')).toBeTruthy();
+  });
+
+  it('says a refusal in the dialog, keeps the same id to send again, and reads the list again when it moved', async () => {
+    held[OCT2] = [heldSaleOf()];
+    answer = () => ({ status: 404, body: refusal('pay_sale_not_found') });
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(within(await panel()).getByRole('button', { name: 'Écarter' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Écarter' }));
+    expect(text(await within(dialog).findByRole('alert'))).toBe(
+      'Cette vente n’attend plus de décision dans cette quinzaine : la liste est relue.',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Écarter' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(2);
+    });
+    const [first, second] = writes.map((one) => JSON.stringify(one.body));
+    expect(second).toBe(first);
+    expect(writes[0]?.body).toMatchObject({ outcome: 'exclude', note: null });
+  });
+
+  it('says a list it could not read, never an empty one, and reads it again on « Réessayer »', async () => {
+    held[OCT2] = 'down';
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    expect(
+      await within(list).findByText(
+        'Le serveur ne répond pas : la liste des ventes en attente n’a pas pu être lue.',
+      ),
+    ).toBeTruthy();
+    held[OCT2] = [heldSaleOf()];
+    fireEvent.click(within(list).getByRole('button', { name: 'Réessayer' }));
+    expect(await within(await panel()).findByText('1 attend une décision')).toBeTruthy();
+  });
+
+  it('never asks for the list for a member the server would refuse, a manager on leave', async () => {
+    held[OCT2] = [heldSaleOf()];
+    renderPage(
+      { ...IRIS_ME, team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' },
+      `/paie/quinzaine?quinzaine=${OCT2}`,
+    );
+    await screen.findByRole('button', { name: 'Théo' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    const asked = vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) =>
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      );
+    expect(asked.some((one) => one.endsWith('/held-sales'))).toBe(false);
+    expect(screen.queryByText('Ventes en attente')).toBeNull();
+  });
+
+  it('names its sale to each gesture, for a screen reader out of the list', async () => {
+    held[OCT2] = [heldSaleOf()];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const count = within(await panel()).getByRole('button', { name: 'Compter pour Théo' });
+    const described = (count.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => text(document.getElementById(id)));
+    expect(described).toEqual([
+      'Nora Vidal · @nora sur Reveal',
+      'Vente du mercredi 28 octobre à 22 h · chatteur Théo',
+      '+42,00 €',
+    ]);
+  });
+
+  it('leaves a sale of the reader’s own chatter to another member', async () => {
+    held[OCT2] = [heldSaleOf({ memberId: IRIS.id })];
+    renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    expect(text(list)).toContain('C’est une vente de ton chatteur : un autre membre en décide.');
+    expect(within(list).queryByRole('button', { name: /^Compter|^Écarter/u })).toBeNull();
   });
 });
 

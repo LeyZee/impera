@@ -11,6 +11,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import { CloseDialog } from './CloseDialog';
+import { HeldSalesPanel } from './HeldSalesPanel';
 import { PayNav } from './PayNav';
 import { StatementDialog } from './StatementDialog';
 import {
@@ -502,6 +503,13 @@ function PeriodView({
             {rows.length === 0 ? null : <p className="py-quiet">{quietOf(data, now)}</p>}
           </div>
         </Panel>
+        <HeldSalesPanel
+          period={data.period}
+          names={names}
+          me={me}
+          owner={owner}
+          reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+        />
       </div>
       {openedStatement === undefined || opened === null ? null : (
         <StatementDialog

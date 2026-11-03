@@ -1173,3 +1173,91 @@
 .py-mehero__top .py-quiet {
   margin-left: auto;
 }
+
+/* Paie › Quinzaine: the sales a period holds or a decision settles (CRM-03 lot b4b). One card a sale: who and when on
+   the left, its net and its state on the right, the gestures under them. */
+.py-held .py-quiet {
+  max-width: 68ch;
+}
+.py-held__count {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.py-held__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.py-held__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+.py-held__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.py-held__who {
+  margin: 0;
+  font-weight: 600;
+}
+.py-held__account {
+  color: var(--nv-ink-muted);
+  font-weight: 400;
+}
+/* Why it waits, under both columns: on a phone the amount's column would leave it a third of the width. */
+.py-held__reason,
+.py-held__own {
+  grid-column: 1 / -1;
+  max-width: 72ch;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
+.py-held__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--nv-space-1);
+}
+.py-held__amount {
+  margin: 0;
+  font-weight: 650;
+}
+.py-held__acts {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-1);
+}
+/* A narrow phone: the count goes under the head, which keeps « Ventes en attente » on one line. */
+@media (max-width: 480px) {
+  .py-held .nv-panel__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+/* On a phone, one column: the net and its state on one line under who and when, the text keeps the width. */
+@media (max-width: 640px) {
+  .py-held__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .py-held__side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
