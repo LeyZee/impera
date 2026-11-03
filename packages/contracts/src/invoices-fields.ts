@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 import { trimmed } from './invoices-internal';
 
+/**
+ * The invoices' field rules (EQ-06): lengths, delays, retention, prefix and number, SHA-256, SIREN and VAT numbers,
+ * trimmed texts.
+ */
+
 /** A contractor's prefix: two to eight capitals or digits, his own, frozen at his first invoice. */
 export const INVOICE_PREFIX_PATTERN = '^[A-Z0-9]{2,8}$';
 export const InvoicePrefixSchema = z

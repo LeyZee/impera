@@ -16,6 +16,10 @@ import { PayPeriodSchema } from './pay-periods';
 import { CalendarDaySchema } from './team-members';
 
 /**
+ * The invoices through the routes (EQ-06): params, the contest bodies, the acceptance view and the list.
+ */
+
+/**
  * An invoice or a credit note in a path, for whoever reads it (the contractor, the owner, an active manager):
  *
  * - `GET /v1/payroll/invoices/:invoiceId/pdf` (EQ-06 lot 4, ADR 0037 § 7): its PDF, as `application/pdf` named after

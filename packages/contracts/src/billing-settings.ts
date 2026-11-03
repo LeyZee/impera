@@ -18,6 +18,10 @@ import { trimmed } from './invoices-internal';
 import { AgencyLogoSchema, BillingRegimeSchema, InvoiceAgencySchema } from './invoices-parties';
 import { CalendarDaySchema } from './team-members';
 
+/**
+ * The agency's billing settings and the regimes through the routes (EQ-06): bodies, params and views.
+ */
+
 /** The agency's billing settings: its identity and payment terms on each invoice, the delays, the journal's accounts. */
 export const BillingSettingsSchema = z.object({
   agency: InvoiceAgencySchema,

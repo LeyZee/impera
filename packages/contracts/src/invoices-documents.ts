@@ -28,6 +28,11 @@ import {
 import { PayPeriodSchema } from './pay-periods';
 import { CalendarDaySchema } from './team-members';
 
+/**
+ * An issued invoice or credit note (EQ-06, ADR 0036): its lines, totals, regime, events, acceptance, due state,
+ * settlement and payout blocks.
+ */
+
 /** The regime as an invoice copies it at its issue. */
 export const InvoiceRegimeSchema = BillingRegimeSchema.omit({ createdAt: true, countries: true });
 export type InvoiceRegime = z.infer<typeof InvoiceRegimeSchema>;

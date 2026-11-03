@@ -21,6 +21,11 @@ import { CountryCodeSchema } from './team';
 import { CalendarDaySchema, TeamMemberSchema } from './team-members';
 
 /**
+ * The contractor's file through the routes (EQ-06): bodies, params, queries and views of the file, its documents and
+ * texts.
+ */
+
+/**
  * The contractor's file and texts (EQ-06 lot 5a). `memberId` names the contractor; the owner, an active manager and
  * the contractor himself read his file, anyone else gets `team_member_not_found`.
  */

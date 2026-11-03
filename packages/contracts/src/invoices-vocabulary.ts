@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 import { BasisPointsSchema } from './team';
 
+/**
+ * The invoices' closed lists (EQ-06, ADR 0036): kinds of invoice, line, event, acceptance, VAT, withholding, document
+ * and contract text.
+ */
+
 /** An invoice, or a credit note that cites one: both numbered in the contractor's one sequence. */
 export const INVOICE_KINDS = ['invoice', 'credit_note'] as const;
 export const InvoiceKindSchema = z.enum(INVOICE_KINDS);

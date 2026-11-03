@@ -20,6 +20,11 @@ import { CountryCodeSchema } from './team';
 import { CalendarDaySchema } from './team-members';
 
 /**
+ * The parties an invoice copies at its issue (EQ-06, ADR 0036): the agency and its logo, the contractor, the regimes,
+ * the footer.
+ */
+
+/**
  * The agency's logo, a setting kept by its fingerprint (EQ-06 lot 4): a PNG of at most 512 KB, transparent so that it
  * sits on the white page. Neither a JPEG (no transparency, CMYK breaks PDF/A) nor an SVG (PDFKit draws none, and an
  * extra library would put PDF/A in doubt).

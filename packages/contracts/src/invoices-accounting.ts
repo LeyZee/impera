@@ -7,6 +7,10 @@ import { InvoiceContractorSchema } from './invoices-parties';
 import { PayPeriodSchema } from './pay-periods';
 import { CalendarDaySchema } from './team-members';
 
+/**
+ * The accounting exports (EQ-06): journal, archive, accounts and the DAS2.
+ */
+
 /** An accounting account as the accountant gives it, never written in the code. */
 export const AccountCodeSchema = z.string().regex(/^[0-9A-Z]{1,20}$/u, 'Un compte : chiffres et majuscules');
 

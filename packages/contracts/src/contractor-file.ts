@@ -25,6 +25,11 @@ import { ContractTextKindSchema, ContractorDocumentKindSchema } from './invoices
 import { CalendarDaySchema } from './team-members';
 
 /**
+ * The contractor's file as the base keeps it (EQ-06): profile, documents and their review, contract texts and
+ * acceptances.
+ */
+
+/**
  * A contractor's file: who his invoices are in the name of. He fills it himself, the owner checks it; any change of
  * identity asks for a new check. The country is his member record's (EQ-01). The prefix is frozen at his first invoice.
  */
