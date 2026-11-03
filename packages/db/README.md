@@ -24,6 +24,20 @@ Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DAT
 2. Relire le SQL et compléter à la main dans le même fichier : `FORCE ROW LEVEL SECURITY` pour toute nouvelle table à `creator_id` (la politique vient de `tenantPolicy()` dans le schéma), `GRANT` à `nirvana_app`, triggers. La fin de `0000_core.sql` sert de modèle.
 3. Une migration appliquée ne se modifie jamais (`hygiene.md`) ; expand/contract pour les colonnes (`operations.md`).
 
+### Numéros de migration entre fils
+
+- Bilan attribue le numéro. La PR l'annonce à son ouverture, et c'est l'ordre de fusion qui fait foi.
+- `drizzle-kit generate` nomme le fichier d'après l'index du journal et réécrit le snapshot de ce numéro. Il faut donc :
+  - renommer le SQL et le snapshot au numéro attribué ;
+  - restaurer l'ancien snapshot (`git checkout`) ;
+  - corriger le `tag` du journal.
+- Quand une autre migration fusionne avant la sienne, la seconde PR se remet sur `main` et **régénère** :
+  - supprimer sa migration, son snapshot et son entrée de journal ;
+  - relancer `pnpm db:generate` ;
+  - compléter de nouveau le SQL à la main si besoin, puis renommer comme ci-dessus.
+- Un numéro plus petit que le plus grand déjà dans `main` ne peut plus servir : `check-drift` lirait l'ancien snapshot. La PR prend alors le prochain numéro libre, et l'ancien reste un trou (0086 et 0087 en sont, 03/11).
+- On n'édite jamais le journal à la main pour réordonner. `check-drift` compare au plus grand snapshot par nom, et Drizzle saute en silence une entrée dont le `when` est plus ancien que la dernière appliquée.
+
 ## Tests d'intégration
 
 `pnpm --filter @nirvana/db test:integration` démarre un Postgres 16 avec Testcontainers (Docker requis), crée les deux rôles comme en production, puis une base migrée par fichier de test (`createTestDb`). Sans Docker, `NIRVANA_TEST_PG_URL` donne l'URL superutilisateur d'un Postgres 16 jetable à utiliser à la place.
