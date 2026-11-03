@@ -1,0 +1,5 @@
+# 2026-11-03 — Renommer Nirvana en Impera : inventaire et ADR 0062 — proposed
+Fait : inventaire des occurrences de « nirvana » sur `main` (75c5168) : 1 253 fichiers, 2 456 lignes, plus 6 389 occurrences du préfixe CSS `nv-`. ADR 0062 proposée : ce qui se renomme (nom affiché, paquets `@impera/*`, variables `IMPERA_*`, en-tête, clés locales avec reprise de l'ancienne, caches, base et ops, valeur de plateforme par une migration nouvelle), ce qui reste (rôles Postgres cités par 40 migrations appliquées, version de moteur de paie `nirvana-N`, historique, préfixe `nv-` jusqu'au peaufinage du design system, URL du dépôt et dossier local renommés par Charles), un script idempotent et une seule PR dans une fenêtre de gel.
+Décisions : aucune avant « ok 0062 ».
+Pas fait : le script et la PR de renommage (après « ok 0062 » et le créneau de gel), le logo (fichier du logo IMPERA demandé à Charles).
+Découvertes : gitleaks absent du conteneur cloud, le hook pre-commit refuse donc le commit local ; ce commit est poussé par l'API GitHub, la CI fait tourner gitleaks.
