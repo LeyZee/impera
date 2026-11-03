@@ -21,13 +21,14 @@ Un interdit part sur Telegram au moment où il est relevé quand il met en dange
 - **`urgent`** : un explicite avant l'âge confirmé (`explicit_before_age`), une promesse de rencontre (`meeting_promise`) ;
 - **`important`** : un aveu d'IA (`ai_disclosure`), des coordonnées ou un autre réseau (`contact_info`), une maladie, une dette ou une urgence pour vendre (`fake_emergency`), un mensonge sur un paiement (`payment_lie`), une demande de photos intimes (`asks_for_nudes`).
 
-La liste est dans le code, à côté des gardes, et un test la fige. Un interdit qui n'y figure pas ne part jamais seul.
+La liste est dans le code de `supervision`, à côté des gardes, et un test la fige. Un interdit qui n'y figure pas ne part jamais seul.
 
-Une seule alerte par conversation, par règle et par shift : le même interdit répété dans la même conversation ne repart pas.
+Une seule alerte par conversation, par règle et par shift : le même interdit répété dans la même conversation ne repart pas. Un message écrit hors de tout shift prend pour clé le jour calendaire dans le fuseau du planning de l'agence. C'est `supervision` qui tranche, au commit qui enregistre l'écart, par une contrainte unique sur (conversation, règle, shift ou jour) : la décision est rejouable et Telegram ne la recalcule jamais.
 
 ### 2. Le soir : tous les rouges du jour, comptés
 
-- Un **bilan du soir des écarts** part une fois par jour et par créatrice, à l'heure du bilan du soir des ventes (ADR 0020), sur le sujet `info`. Il compte les rouges des dernières 24 heures par règle (« 3 remises, 1 culpabilisation ») et donne le nombre de chatteurs concernés, avec un lien vers le Suivi. Les rouges déjà partis tout de suite y sont comptés aussi.
+- Un **bilan du soir des écarts** part une fois par jour et par créatrice, à l'heure du bilan du soir des ventes (ADR 0020), sur le sujet `info`. Il compte par règle (« 3 remises, 1 culpabilisation ») les rouges relevés depuis le précédent bilan des écarts envoyé, jusqu'à l'envoi ; le premier couvre les 24 heures qui précèdent. Aucun rouge n'est ainsi compté deux fois ni perdu quand l'heure change ou qu'un envoi part en retard. Un lien ouvre le Suivi. Les rouges déjà partis tout de suite y sont comptés aussi.
+- Le bilan ne donne **pas le nombre de chatteurs** : avec un seul chatteur de nuit, « 1 chatteur » le nommerait de fait. Le Suivi le donne.
 - **Aucun rouge, aucun message.** L'ambre n'y figure jamais : il reste au rapport de fin de shift (ADR 0052 § 5).
 - Les rouges marqués « Faux signal » restent comptés, et le bilan dit combien l'ont été.
 
@@ -39,15 +40,16 @@ Une seule alerte par conversation, par règle et par shift : le même interdit r
 
 ### 4. L'événement
 
-- `persona_slip_flagged` { `slipId`, `conversationId`, `memberId`, `rule` } est publié à chaque rouge, avec sa créatrice, au commit qui enregistre l'écart. Telegram ne lit que `rule` et `conversationId` (pour la déduplication et le lien) : jamais `memberId`.
-- Le bilan du soir des écarts est produit par le module `telegram`, comme celui des ventes. Il lit les comptes par une fonction publiée par l'index de `supervision`, qui ne rend que des nombres par règle et le nombre de chatteurs.
+- `persona_slip_flagged` { `slipId`, `conversationId`, `rule`, `notify` } est publié à chaque rouge, avec sa créatrice, au commit qui enregistre l'écart, et décrit dans `EVENT_PAYLOADS` (Zod). `rule` prend les valeurs des codes de garde du contrat. `notify` vaut `urgent`, `important` ou `null` (règle non grave, ou doublon de la même conversation, règle et shift) : Telegram rend ce que l'événement lui dit.
+- L'événement ne porte **aucun identifiant de membre** : `slipId` suffit au Suivi pour retrouver le chatteur.
+- Le bilan du soir des écarts est produit par le module `telegram`, comme celui des ventes. Il lit les comptes par une fonction publiée par l'index de `supervision`, qui prend une créatrice et une fenêtre et ne rend que des nombres : les rouges par règle et le nombre de faux signaux.
 
 ## Conséquences
 
 Positives :
 
 - La nuit, le danger réveille quelqu'un, le reste attend le soir sans bruit.
-- Le manager voit chaque jour si l'équipe dérape, sans qu'aucun nom ne circule dans le groupe.
+- Le manager voit chaque jour si l'équipe dérape, sans qu'aucun nom ne circule dans le groupe, ni de fait par un compte de chatteurs.
 
 Négatives, à surveiller :
 
