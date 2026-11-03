@@ -1177,6 +1177,27 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     expect(text(list)).toContain('C’est une vente de ton chatteur : un autre membre en décide.');
     expect(within(list).queryByRole('button', { name: /^Compter|^Écarter/u })).toBeNull();
   });
+
+  it('says a refund line in its own words: its chip, its gesture and the reader’s own chatter', async () => {
+    const refund = {
+      event: 'refund' as const,
+      occurredAt: '2026-10-30T09:15:00.000Z',
+      netMinor: -4_200,
+    };
+    held[OCT2] = [
+      heldSaleOf({ ...refund, reason: null, decision: 'exclude', outcomes: ['withdraw'] }),
+      heldSaleOf({ ...refund, platformSaleId: 'vente-2', memberId: IRIS.id }),
+    ];
+    renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    expect(text(list)).toContain('C’est un remboursement de ton chatteur : un autre membre en décide.');
+    const excluded = card(list, /^Écarté$/u);
+    fireEvent.click(within(excluded).getByRole('button', { name: 'Retirer la décision' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(dialog)).toContain(
+      'Le remboursement suit de nouveau les règles : il se déduit des ventes de Théo.',
+    );
+  });
 });
 
 function report(n: number, memberId: string) {
