@@ -17,6 +17,7 @@ import {
   UserIdSchema,
   type UserRole,
 } from '@impera/contracts';
+import { DEFAULT_LLM_CONFIG, startOfLocalDay } from '@impera/llm';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ import {
   ExtensionLinkNotFound,
   ExtensionLinksFull,
   ExtensionLinkUnauthenticated,
+  TrendWatchBudgetLimited,
 } from '../../domain/errors';
 import type {
   CaptureVision,
@@ -46,6 +48,15 @@ const READINGS_LIMIT = { max: 30, timeWindow: '1 minute', skipOnError: false };
 
 /** Four captures in base64 (4/3 of their bytes) and the JSON around them: the server's 1 MiB would refuse them. */
 const CAPTURES_BODY_LIMIT = Math.ceil((TREND_CAPTURES_MAX * TREND_CAPTURE_MAX_BYTES * 4) / 3) + 16_384;
+
+/** Seconds until the next midnight in the budget's zone, when the trend watch's cap starts again (ADR 0060 § 7). */
+function secondsUntilBudgetDay(now: Date): number {
+  const { timeZone } = DEFAULT_LLM_CONFIG.dailyBudget;
+  const today = startOfLocalDay(now, timeZone);
+  // 36 h after this midnight is always within the next day, whatever the clock change.
+  const tomorrow = startOfLocalDay(new Date(today.getTime() + 36 * 3_600_000), timeZone);
+  return Math.max(1, Math.ceil((tomorrow.getTime() - now.getTime()) / 1_000));
+}
 
 const LinkHeadersSchema = z.looseObject({ 'x-extension-link': z.string().optional() });
 
@@ -168,7 +179,16 @@ export function createTrendRoutes(
           response: { 200: TrendCapturesDescribedSchema },
         },
       },
-      (request) => describeCaptures(stores.readings, stores.vision, holderOf(request), request.body),
+      async (request, reply) => {
+        try {
+          return await describeCaptures(stores.readings, stores.vision, holderOf(request), request.body);
+        } catch (error) {
+          // The cap is spent until midnight in the budget's zone: the extension waits that long, not a minute.
+          if (error instanceof TrendWatchBudgetLimited)
+            void reply.header('retry-after', String(secondsUntilBudgetDay(new Date())));
+          throw error;
+        }
+      },
     );
     return Promise.resolve();
   };

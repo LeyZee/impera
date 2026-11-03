@@ -424,6 +424,10 @@ describe('/v1/trends', () => {
     visionFails = 'trend_watch_budget_reached';
     const spent = await captures('Mk1Mk2Mk3');
     expect([spent.statusCode, codeOf(spent)]).toEqual([429, 'trend_watch_budget_limited']);
+    // Until midnight in Paris, never more than a day.
+    const wait = Number(spent.headers['retry-after']);
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThanOrEqual(25 * 3_600);
     visionFails = 'budget_reached';
     expect((await captures('Mk1Mk2Mk3')).statusCode).toBe(429);
     visionFails = 'all_models_failed';
