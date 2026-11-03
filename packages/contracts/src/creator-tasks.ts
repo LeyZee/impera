@@ -120,7 +120,9 @@ export type CreatorTick = z.infer<typeof CreatorTickSchema>;
 
 /**
  * `POST /v1/creator-space/ticks` (creator): her ticks, one or the ones her phone kept offline. Replayed any number of
- * times, in any order, they add nothing twice (`applyTicks`). A tick for a day the task does not have is refused.
+ * times, in any order, they add nothing twice (`applyTicks`). A tick for a day the task does not have is refused, and
+ * so is one made more than 48 h ago, or a routine tick for another day than the one she ticked it in her zone
+ * (422 `creator_tick_late_unprocessable`, ADR 0042 § 8).
  */
 export const CreatorTicksBodySchema = z.strictObject({ ticks: z.array(CreatorTickSchema).min(1).max(200) });
 export type CreatorTicksBody = z.infer<typeof CreatorTicksBodySchema>;
@@ -269,6 +271,7 @@ export type AgencySuggestionList = z.infer<typeof AgencySuggestionListSchema>;
 export const CREATOR_TASK_NOT_FOUND = 'creator_task_not_found';
 export const CREATOR_TASK_CHANGED_CONFLICT = 'creator_task_changed_conflict';
 export const CREATOR_TICK_DAY_UNPROCESSABLE = 'creator_tick_day_unprocessable';
+export const CREATOR_TICK_LATE_UNPROCESSABLE = 'creator_tick_late_unprocessable';
 export const AVAILABILITY_NOT_FOUND = 'availability_not_found';
 export const SUGGESTION_NOT_FOUND = 'creator_suggestion_not_found';
 export const SUGGESTION_DECIDED_CONFLICT = 'creator_suggestion_decided_conflict';

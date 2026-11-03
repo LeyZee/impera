@@ -188,6 +188,15 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ticks: [{ ...tick, day: addDays(today, 1) }],
     });
     expect(offDay.statusCode).toBe(422);
+    // ADR 0042 § 8: never a tick older than 48 h, nor a routine tick for a day she did not tick it on.
+    const stale = await call('POST', '/v1/creator-space/ticks', 'nora', {
+      ticks: [{ ...tick, doneAt: new Date(Date.now() - 49 * 3_600_000).toISOString() }],
+    });
+    expect(stale.json()).toMatchObject({ error: { code: 'creator_tick_late_unprocessable' } });
+    const mended = await call('POST', '/v1/creator-space/ticks', 'nora', {
+      ticks: [{ ...tick, day: addDays(today, -7) }],
+    });
+    expect(mended.statusCode).toBe(422);
     const back = await call('DELETE', `/v1/creator-space/tasks/${id}/ticks/${today}`, 'nora');
     expect(back.statusCode, back.body).toBe(200);
     CreatorStreakResultSchema.parse(back.json());
