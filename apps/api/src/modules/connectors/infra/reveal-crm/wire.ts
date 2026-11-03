@@ -73,6 +73,8 @@ const day = z.iso.date();
 const laterCount = cents.nullable();
 
 export const RevealDailyStatsSchema = z.object({
+  /** The zone of its days: Reveal documents `Europe/Paris`. */
+  timezone: text.optional(),
   currency: text,
   data: z.array(
     z.object({
@@ -93,6 +95,8 @@ export const RevealDailyStatsSchema = z.object({
 });
 
 export const RevealChatterDailyStatsSchema = z.object({
+  /** The zone of its days: Reveal documents `Europe/Paris`. */
+  timezone: text.optional(),
   currency: text,
   data: z.array(
     z.object({

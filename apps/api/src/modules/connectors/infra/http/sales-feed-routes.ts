@@ -2,6 +2,8 @@ import {
   LinkSalesFeedChatterBodySchema,
   LinkSalesFeedModelBodySchema,
   PlatformSchema,
+  SalesFeedCheckBodySchema,
+  SalesFeedCheckReportSchema,
   SalesFeedListSchema,
   SalesFeedOverviewSchema,
   SalesFeedRefusalSchema,
@@ -22,6 +24,10 @@ const ChatterParamsSchema = PlatformParamsSchema.extend({ platformChatterId: opa
 
 /** Each paste calls Reveal twice: per address, far below a person's pace and Reveal's 200 calls a minute. */
 const KEY_CALLS_PER_MINUTE = 10;
+/** A check calls the statistics twice; Reveal allows ten such calls a minute a key, 500 a day for the agency. */
+const CHECKS_PER_MINUTE = 3;
+/** The dashboard's export as text (2 MB) inside its JSON body. */
+const CHECK_BODY_LIMIT = 3 * 1024 * 1024;
 
 export interface SalesFeedRoutesOptions {
   /** `requireRole('owner')`: the key and the links are agency settings (ADR 0050 § 4). */
@@ -140,6 +146,24 @@ export function createSalesFeedRoutes(
           request.body,
           request.user?.id ?? null,
         ),
+    );
+
+    app.post(
+      '/settings/sales-feeds/:platform/check',
+      {
+        bodyLimit: CHECK_BODY_LIMIT,
+        config: { rateLimit: { max: CHECKS_PER_MINUTE, timeWindow: '1 minute' } },
+        schema: {
+          params: PlatformParamsSchema,
+          body: SalesFeedCheckBodySchema,
+          // 502: the platform refused or failed (its kind and sentence); 422 is the export's, a domain error.
+          response: { 200: SalesFeedCheckReportSchema, 502: SalesFeedRefusalSchema },
+        },
+      },
+      async (request, reply) => {
+        const result = await feeds.check(request.params.platform, request.body);
+        return result.ok ? reply.send(result.value) : reply.code(502).send(result.error);
+      },
     );
 
     return Promise.resolve();
