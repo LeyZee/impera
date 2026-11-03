@@ -84,6 +84,7 @@ Date : AAAA-MM-JJ
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted |
 | 0058 | Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui | accepted (amende 0026 § 5 pour la seule publication) |
 | 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |
+| 0060 | Veille et idées de contenu : signaux de sources propres, capture passive par l'extension, idées filtrées par le code et validées par l'agence | accepted |
 | 0062 | Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel | accepted |
 | 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte ») |
 | 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | accepted (remplace dans 0056 § 3 la phrase sur la palette) |
