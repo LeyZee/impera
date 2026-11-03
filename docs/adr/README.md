@@ -83,4 +83,4 @@ Date : AAAA-MM-JJ
 | 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés) |
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted |
 | 0058 | Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui | accepted (amende 0026 § 5 pour la seule publication) |
-| 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | proposed (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |
+| 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |

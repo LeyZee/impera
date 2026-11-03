@@ -1,6 +1,6 @@
 # 0059. Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom
 
-Statut : proposed (Charles, 03/11/2026 11h14, sur l'alerte Telegram quand un chatteur part en rouge : « fais ce qu'il y a de plus de sens et qui est cohérent au niveau métier »)
+Statut : accepted (Charles, 03/11/2026 11h32, « je te donne mon OK aux deux ADR qui attendent » ; demande du même jour à 11h14, sur l'alerte Telegram quand un chatteur part en rouge : « fais ce qu'il y a de plus de sens et qui est cohérent au niveau métier »)
 Date : 2026-11-03
 Remplace : dans l'ADR 0052 § 5, la phrase « Un aveu d'IA, des coordonnées ou une promesse de rencontre partent aussi sur Telegram, en `important`, sans le nom du fan. »
 Précise : l'ADR 0020 (deux sujets d'alerte et un bilan du soir de plus, un événement nouveau) et l'ADR 0052 § 5 (qui d'autre voit le rouge).

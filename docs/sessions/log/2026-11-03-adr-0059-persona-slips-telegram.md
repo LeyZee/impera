@@ -1,4 +1,4 @@
-# 2026-11-03 — ADR 0059 : les écarts de persona sur Telegram — proposed
+# 2026-11-03 — ADR 0059 : les écarts de persona sur Telegram — accepted
 Fait :
 - ADR 0059 proposée. Les interdits graves partent sur Telegram tout de suite : explicite avant l'âge et promesse de rencontre en `urgent` ; aveu d'IA, coordonnées, urgence inventée, mensonge sur un paiement et demande de photos intimes en `important`. Les autres rouges vont au bilan du soir des écarts, qui donne des comptes par règle, jamais un nom de chatteur ni de fan.
 - Nouvel événement `persona_slip_flagged`. Le bilan du soir des écarts est entré au glossaire et l'index des ADR est à jour.
