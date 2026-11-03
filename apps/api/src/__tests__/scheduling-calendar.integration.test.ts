@@ -1,6 +1,7 @@
 import {
   ApiErrorSchema,
   CalendarSchema,
+  DashboardSchema,
   ConversationIdSchema,
   FanIdSchema,
   KillSwitchIdSchema,
@@ -113,6 +114,15 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
       },
     });
     expect(response.statusCode).toBe(201);
+  };
+
+  /** The calendar's agent says the dashboard's mode (supervision), on the same data: the two never diverge (Bilan). */
+  const expectSameModeAsDashboard = async (read: { agent: { creatorId: string; mode: string }[] }) => {
+    for (const agent of read.agent) {
+      const response = await call(`/dashboard?creatorId=${agent.creatorId}`, owner);
+      expect(response.statusCode, response.body).toBe(200);
+      expect(DashboardSchema.parse(response.json()).mode).toBe(agent.mode);
+    }
   };
 
   const setStatus = (member: TeamMember, status: 'active' | 'sick') =>
@@ -256,6 +266,7 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
   });
 
   it('counts a créneau the agent holds alone in Automatique apart, and none under Arrêt', async () => {
+    await expectSameModeAsDashboard(await calendar(owner));
     const fanId = newId(FanIdSchema);
     await test.admin.db.insert(schema.fans).values({
       id: fanId,
@@ -273,6 +284,7 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
       mode: 'auto',
     });
     const auto = await calendar(owner);
+    await expectSameModeAsDashboard(auto);
     expect(auto.agent.find((agent) => agent.creatorId === ines)?.mode).toBe('auto');
     expect(auto.agency?.aiAlone.filter((slot) => slot.platformAccountId === inesAccount)).toHaveLength(3);
     expect(auto.agency?.toFill.filter((slot) => slot.platformAccountId === inesAccount)).toEqual([]);
@@ -294,6 +306,7 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     });
     const stopped = await calendar(owner);
     expect(stopped.agent.map((agent) => agent.mode)).toEqual(['stop', 'stop']);
+    await expectSameModeAsDashboard(stopped);
     expect(stopped.agency?.aiAlone).toEqual([]);
     expect(stopped.agency?.toFill).toHaveLength(5);
   });
