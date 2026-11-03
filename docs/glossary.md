@@ -87,6 +87,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript, dans la couleur du script (ADR 0064). |
 | Couleur du script | `script_color` | Les trois tons d'une structure, qui colorent tous ses cartons pour qu'on retrouve le script d'un coup d'œil (ADR 0064). |
 | Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
+| Structure de départ | `script_starter` | Structure proposée par l'atelier, à dupliquer puis ajuster : données des contrats (`SCRIPT_STARTERS`), dont celle d'OnlyScript avec ses noms d'étapes (ADR 0064 § 4). |
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
 | Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |

@@ -9,6 +9,8 @@ import {
   ScriptQueueSchema,
   ScriptStructureIdSchema,
   ScriptStructureListSchema,
+  SCRIPT_STARTERS,
+  ScriptStarterListSchema,
   ScriptStructureSchema,
   type CreatorId,
   type PersonaLimits,
@@ -122,6 +124,17 @@ export function createScriptRoutes(
         schema: { response: { 200: ScriptStructureListSchema } },
       },
       (request) => store.list(signedIn(request.user)),
+    );
+
+    // The starter structures the workshop offers to duplicate (ADR 0064 § 4): data of the contracts, the same for every
+    // agency. Duplicating one is an ordinary POST of its body under a new id.
+    app.get(
+      '/script-structures/starters',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: { response: { 200: ScriptStarterListSchema } },
+      },
+      () => ({ starters: [...SCRIPT_STARTERS] }),
     );
 
     app.get(
