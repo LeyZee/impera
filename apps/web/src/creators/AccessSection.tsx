@@ -68,6 +68,8 @@ export function AccessSection({
             className="nv-field__control nv-glass"
             type="email"
             autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
             inputMode="email"
             value={email}
             onChange={(event) => {
@@ -97,9 +99,9 @@ export function AccessSection({
           : access.kind === 'reset-sent'
             ? `Son mot de passe est choisi. Un lien pour en choisir un nouveau a été créé : il marche jusqu’à ${deadline(access.until)}.`
             : access.kind === 'valid'
-              ? `Lien d’invitation créé pour ${account.email}, pas encore ouvert. Il marche jusqu’à ${deadline(access.until)}.`
+              ? `Lien d’invitation créé pour ${account.email}, pas encore utilisé. Il marche jusqu’à ${deadline(access.until)}.`
               : access.kind === 'expired'
-                ? `Son lien d’invitation a expiré sans être ouvert. Crée-lui un nouveau lien.`
+                ? `Son lien d’invitation a expiré sans être utilisé. Crée-lui un nouveau lien.`
                 : `Son compte attend son premier lien (${account.email}).`}
       </p>
       <LinkShare

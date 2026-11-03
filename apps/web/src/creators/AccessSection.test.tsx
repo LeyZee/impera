@@ -100,7 +100,7 @@ describe('AccessSection (CR-02)', () => {
       },
     ]);
     show();
-    expect(await screen.findByText(/a expiré sans être ouvert/u)).toBeDefined();
+    expect(await screen.findByText(/a expiré sans être utilisé/u)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Nouveau lien' }));
     await screen.findByRole('textbox', { name: 'Lien à envoyer' });
     expect(sent).toEqual([{ purpose: 'invitation', email: 'nora@example.test' }]);

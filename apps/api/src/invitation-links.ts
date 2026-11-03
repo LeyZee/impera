@@ -356,7 +356,10 @@ async function creatorAccountUnscoped(adminDb: Database, creatorId: string) {
           eq(schema.invitationLinks.userId, own.id),
           sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null`,
         ),
-      );
+      )
+      // One live link per account (0089's unique index); the latest one even so.
+      .orderBy(sql`${schema.invitationLinks.createdAt} desc`)
+      .limit(1);
     return CreatorAccountSchema.parse({
       account: {
         email: own.email,
