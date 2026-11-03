@@ -16,7 +16,14 @@ export type LineForInvoicing = Pick<LineRow, 'platformAccountId' | 'netMinor' | 
 /** A line of a statement as the annex of an invoice's PDF prints it, with the name of its account. */
 export type AnnexLineForInvoicing = Pick<
   LineRow,
-  'currency' | 'rateMicros' | 'grossMinor' | 'grossEurMinor' | 'exclVatMinor' | 'netMinor' | 'commissionMinor'
+  | 'currency'
+  | 'rateMicros'
+  | 'grossMinor'
+  | 'grossEurMinor'
+  | 'exclVatMinor'
+  | 'netMinor'
+  | 'commissionMinor'
+  | 'base'
 > & {
   readonly handle: string;
   readonly platform: string;
@@ -102,6 +109,7 @@ export const payReadsForInvoicing = {
         exclVatMinor: commissionStatementLines.exclVatMinor,
         netMinor: commissionStatementLines.netMinor,
         commissionMinor: commissionStatementLines.commissionMinor,
+        base: commissionStatementLines.base,
       })
       .from(commissionStatementLines)
       .innerJoin(platformAccounts, eq(platformAccounts.id, commissionStatementLines.platformAccountId))
@@ -117,6 +125,8 @@ export const payReadsForInvoicing = {
         commissionStatementLines.currency,
         commissionStatementLines.vatBps,
         commissionStatementLines.platformFeeBps,
+        // An account's two bases in one period are two rows, its reports' first (CRM-03).
+        commissionStatementLines.base,
       ),
 
   /** The period of each of these statements. */

@@ -266,6 +266,114 @@ describe('Équipe › Factures : ce que la facture imprime (EQ-06 lot 4, audit d
     ]);
   });
 
+  it('prints a row on the platform’s net with its net only, the chain’s columns empty (CRM-03)', () => {
+    const source = sampleInvoice();
+    const annex = source.annex;
+    if (annex === null) throw new Error('no annex');
+    const [first, second] = annex.accounts;
+    if (first === undefined || second === undefined) throw new Error('two accounts');
+    const onNet = { ...second, base: 'platform_net' as const, grossMinor: 41_250, grossEurMinor: 41_250 };
+    const content = invoicePdfContent({
+      ...source,
+      annex: {
+        ...annex,
+        accounts: [
+          { ...first, exclVatMinor: 192_958 },
+          { ...onNet, exclVatMinor: 41_250 },
+        ],
+      },
+    });
+    expect(content.annex?.accounts.header.map((cell) => cell.text)).toEqual([
+      'Compte',
+      'Ventes brutes',
+      'TVA',
+      'Commission plateforme',
+      'Net',
+      'Taux',
+      'Commission',
+    ]);
+    expect(
+      content.annex?.accounts.rows.map((row) => [row.cells.map((cell) => plain(cell.text)), row.detail]),
+    ).toEqual([
+      [['@awa.demo · Reveal', '2 315,50 €', '-385,92 €', '-77,18 €', '1 852,40 €', '40 %', '740,96 €'], null],
+      [
+        ['@awa.second · Reveal', '—', '—', '—', '412,50 €', '40 %', '165,00 €'],
+        'Net Reveal des ventes lues, TVA et commission de Reveal déjà retenues',
+      ],
+    ]);
+    // The chain's totals are those of its rows; the net and the commissions, every row's.
+    expect(content.annex?.accounts.total.map((cell) => plain(cell.text))).toEqual([
+      'Total des comptes',
+      '2 315,50 €',
+      '-385,92 €',
+      '-77,18 €',
+      '2 264,90 €',
+      '',
+      '905,96 €',
+    ]);
+  });
+
+  it('prints a statement on the platform’s net alone without the chain’s columns, a foreign net with its rate', () => {
+    const source = sampleInvoice();
+    const annex = source.annex;
+    if (annex === null) throw new Error('no annex');
+    const [first, second] = annex.accounts;
+    if (first === undefined || second === undefined) throw new Error('two accounts');
+    // 2 005,93 $US of net at 0,923456 € make 1 852,40 €.
+    const content = invoicePdfContent({
+      ...source,
+      annex: {
+        ...annex,
+        accounts: [
+          {
+            ...first,
+            base: 'platform_net',
+            currency: 'USD',
+            rateMicros: 923_456,
+            rateOn: '2026-11-13',
+            grossMinor: 200_593,
+            grossEurMinor: 185_240,
+            exclVatMinor: 185_240,
+          },
+          {
+            ...second,
+            base: 'platform_net',
+            grossMinor: 41_250,
+            grossEurMinor: 41_250,
+            exclVatMinor: 41_250,
+          },
+        ],
+      },
+    });
+    expect(content.annex?.accounts.header.map((cell) => cell.text)).toEqual([
+      'Compte',
+      'Net de la plateforme',
+      'Taux',
+      'Commission',
+    ]);
+    expect(
+      content.annex?.accounts.rows.map((row) => [
+        row.cells.map((cell) => plain(cell.text)),
+        row.detail && plain(row.detail),
+      ]),
+    ).toEqual([
+      [
+        ['@awa.demo · Reveal', '1 852,40 €', '40 %', '740,96 €'],
+        'Net Reveal des ventes lues, TVA et commission de Reveal déjà retenues : 2 005,93 $US convertis à 1 $US = 0,923456 € (cours BCE du 13 novembre 2026)',
+      ],
+      [
+        ['@awa.second · Reveal', '412,50 €', '40 %', '165,00 €'],
+        'Net Reveal des ventes lues, TVA et commission de Reveal déjà retenues',
+      ],
+    ]);
+    expect(content.annex?.accounts.total.map((cell) => plain(cell.text))).toEqual([
+      'Total des comptes',
+      '2 264,90 €',
+      '',
+      '905,96 €',
+    ]);
+  });
+
   it('refuses an annex whose elements do not add up to the amount invoiced', () => {
     expect(() =>
       invoicePdfContent(

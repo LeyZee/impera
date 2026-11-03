@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommissionsPage } from './CommissionsPage';
 
 import {
+  euroLine,
   goalOf,
   LOU,
   NORA_REVEAL,
@@ -372,6 +373,39 @@ describe('CommissionsPage', () => {
     const carried = await within(panelOf).findByRole('button', { name: /^1er – 15 octobre/u });
     expect(text(carried)).toContain('Reporté6,67 €reporté sur le 16 – 31 octobre');
     expect(text(carried)).not.toContain('touché');
+  });
+
+  it('says the sales read and the net of Reveal once Nora’s account is paid on it (CRM-03)', async () => {
+    const onNet = euroLine({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 1, late: 1, lateNetMinor: 1_500 },
+    });
+    for (const period of [OCT2, NOV1]) {
+      const one = periods[period];
+      if (one === undefined) throw new Error(`No ${period}`);
+      periods[period] = {
+        ...one,
+        statements: one.statements.map((statement) => ({ ...statement, lines: [onNet] })),
+      };
+    }
+    renderPage();
+    const path = await waitFor(() => panel('Le parcours de ton argent'));
+    expect(text(path)).toContain('3 ventes lues, 1 remboursement, dont 1 après la clôture d’avant');
+    expect(text(path)).toContain('Net Reveal');
+    expect(text(path)).not.toContain('Hors TVA');
+    const performance = panel('Ma performance');
+    // 200 € of net to go, and the net is Reveal's already: 200 € of it, nothing to take back.
+    await waitFor(() => {
+      expect(text(performance)).toContain(
+        'Soit environ 200 € de net Reveal d’ici le dimanche 15 novembre, pour +10,00 €.',
+      );
+    });
   });
 
   it('tells a new chatter where their first statement comes from', async () => {
