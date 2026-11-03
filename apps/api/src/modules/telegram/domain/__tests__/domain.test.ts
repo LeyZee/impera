@@ -135,7 +135,7 @@ describe('classification (ADR 0020 §2)', () => {
       body: 'Plafond IA : 16 € sur 20 € aujourd’hui.',
     });
     const reached = classify({ kind: 'budget', threshold: 'reached', spentMinor: 2000, capMinor: 2000 });
-    expect(reached).toMatchObject({ topic: 'urgent', title: 'URGENT' });
+    expect(reached).toMatchObject({ topic: 'urgent', title: 'URGENT', fallbackTopic: 'important' });
     expect(reached?.kind === 'notice' ? reached.body : '').toContain('Plafond IA atteint (20 €)');
   });
 

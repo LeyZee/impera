@@ -464,6 +464,8 @@ export function classify(
       return {
         kind: 'notice',
         topic: signal.threshold === 'reached' ? 'urgent' : 'important',
+        // An agency with no Urgent group yet still hears it, in Important, as the overdue invoice does.
+        ...(signal.threshold === 'reached' && { fallbackTopic: 'important' }),
         threadKey: null,
         title: signal.threshold === 'reached' ? 'URGENT' : 'Important',
         body:
