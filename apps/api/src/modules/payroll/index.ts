@@ -28,6 +28,8 @@ import { createDrizzlePayrollValidationStore } from './infra/validation-store';
  * report, through the composition root (EQ-04). One key and one number of attempts for every writer.
  */
 export { enqueuePayRecalculation } from './infra/recalculation-queue';
+/** What the contractors' file reads of pay, plugged into it by the composition root (ARC-07). */
+export { payReadsForContractors } from './infra/contractor-reads';
 
 /**
  * What pay asks of the other modules of pay and what it gives them (ADR 0047 § 1): the composition root plugs

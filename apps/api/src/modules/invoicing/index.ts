@@ -43,6 +43,8 @@ import { createDrizzleSettlementStore } from './infra/settlement-store';
  * it into `contractors`, which never imports this module.
  */
 export { invoiceRequeue } from './infra/invoice-queue';
+/** What the contractors' file reads of the invoices, plugged into it by the composition root (ARC-07). */
+export { invoiceReadsForContractors } from './infra/contractor-reads';
 /**
  * What pay asks of the invoices before a transfer (`PayoutGate`) and after a validation (`AfterValidation`, with the
  * contractors' certificate lock), plugged into `payroll` by the composition root: pay never imports this module.
