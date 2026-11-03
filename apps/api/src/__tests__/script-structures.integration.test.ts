@@ -8,7 +8,7 @@ import {
   type CreateScriptStructureBody,
   type ScriptStage,
 } from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -40,6 +40,7 @@ const stage = (key: string, name: string): ScriptStage => ({
   key,
   name,
   intention: 'Elle se dévoile un peu plus',
+  access: 'paid',
   mood: 'Lumière tamisée',
   mediaSlots: [
     { kind: 'image', optional: false, hint: null },
@@ -100,10 +101,18 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     id: newId(ScriptStructureIdSchema),
     name: 'Soirée au salon',
     moment: 'night',
+    color: { primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' },
     reservedCreatorId: null,
     segments: [
       stage('canape', 'Canapé'),
-      { kind: 'bridge', key: 'canape-lit', from: 'canape', to: 'lit', teaser: 'On passe à côté ?' },
+      {
+        kind: 'bridge',
+        key: 'canape-lit',
+        from: 'canape',
+        to: 'lit',
+        teaser: 'On passe à côté ?',
+        mediaSlots: [],
+      },
       stage('lit', 'Lit'),
     ],
     ...extra,
@@ -181,6 +190,24 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     ]);
   });
 
+  it('reads a version written before ADR 0064 as a paid stage and a bridge without slots', async () => {
+    const first = body();
+    await post(owner, first);
+    // As migration 0095 found them: no `access` on a stage, no `mediaSlots` on a bridge.
+    await test.admin.db.execute(sql`
+      UPDATE script_structure_versions SET segments = (
+        SELECT jsonb_agg(segment - 'access' - 'mediaSlots' || CASE WHEN segment->>'kind' = 'stage'
+          THEN jsonb_build_object('mediaSlots', segment->'mediaSlots') ELSE '{}'::jsonb END ORDER BY position)
+        FROM jsonb_array_elements(segments) WITH ORDINALITY AS listed(segment, position))
+      WHERE structure_id = ${first.id}`);
+    const frozen = await app.modules.scripts.structures.freeze(first.id, await ownerId());
+    const segments = frozen?.segments ?? [];
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments)
+      if (segment.kind === 'stage') expect(segment.access).toBe('paid');
+      else expect(segment.mediaSlots).toEqual([]);
+  });
+
   it('keeps out of her queue a structure whose stage touches her limits, and names the stage', async () => {
     const nora = await app.modules.persona.creators.create({ displayName: 'Nora' });
     const fine = body();
@@ -251,6 +278,35 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
       (await server.inject({ method: 'GET', url: `/v1/script-structures/${kept.id}`, headers: owner }))
         .statusCode,
     ).toBe(404);
+  });
+
+  it('draws a card of the current version: SVG in the app, the same PNG twice for the folder', async () => {
+    const structure = ScriptStructureSchema.parse((await post(owner, body())).json());
+    const card = (headers: Record<string, string>, path: string) =>
+      server.inject({ method: 'GET', url: `/v1/script-structures/${structure.id}/cards/${path}`, headers });
+
+    const svg = await card(manager, 'canape');
+    expect(svg.statusCode).toBe(200);
+    expect(svg.headers['content-type']).toBe('image/svg+xml; charset=utf-8');
+    expect(svg.headers['content-security-policy']).toBe("default-src 'none'");
+    // The script's colour, over the whole card (ADR 0064); no theme to ask any more.
+    expect(svg.body).toContain('>Canapé</text>');
+    expect(svg.body).toContain('stop-color="#911e42"');
+    expect((await card(manager, 'canape?theme=day')).statusCode).toBe(400);
+
+    const png = await card(owner, 'canape-lit?format=folder');
+    expect(png.statusCode).toBe(200);
+    expect(png.headers['content-type']).toBe('image/png');
+    expect(png.rawPayload.subarray(1, 4).toString('latin1')).toBe('PNG');
+    expect((await card(owner, 'canape-lit?format=folder')).rawPayload.equals(png.rawPayload)).toBe(true);
+    const thumbnail = await card(owner, 'lit?format=thumbnail');
+    // The PNG's width, from its header: 320 for the chatters' thumbnail.
+    expect(thumbnail.rawPayload.readUInt32BE(16)).toBe(320);
+
+    expect(errorOf(await card(owner, 'absente'))).toEqual([404, 'script_card_not_found']);
+    expect(errorOf(await card(owner, 'canape?variant=A'))).toEqual([404, 'script_card_not_found']);
+    expect((await card(owner, 'canape?format=pdf')).statusCode).toBe(400);
+    expect((await card(chatter, 'canape')).statusCode).toBe(404);
   });
 
   async function ownerId(): Promise<string> {

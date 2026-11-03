@@ -85,12 +85,24 @@ export const ScriptVariantSchema = z.strictObject({
 });
 export type ScriptVariant = z.infer<typeof ScriptVariantSchema>;
 
+/**
+ * Offered or paid: what the card says, « (GRATUIT) » or « (PAYANT) » (ADR 0064 § 3). Never a price, and never read by
+ * the agent: it does not sell by it (Agent's review of SC-01 b). A stage written before ADR 0064 is « paid ».
+ */
+export const SCRIPT_STAGE_ACCESS = ['free', 'paid'] as const;
+export const ScriptStageAccessSchema = z.enum(SCRIPT_STAGE_ACCESS);
+export type ScriptStageAccess = z.infer<typeof ScriptStageAccessSchema>;
+
+/** A bridge's media: a teaser photo, most of the time (ADR 0064 § 3). */
+export const BRIDGE_MEDIA_SLOTS_MAX = 3;
+
 export const ScriptStageSchema = z.strictObject({
   kind: z.literal('stage'),
   key: ScriptSegmentKeySchema,
   name: sentence(SCRIPT_STAGE_NAME_MAX),
   /** What it sells, in one sentence. */
   intention: sentence(SCRIPT_SENTENCE_MAX),
+  access: ScriptStageAccessSchema,
   /** The mood the card gives her. */
   mood: sentence(SCRIPT_SENTENCE_MAX).nullable(),
   mediaSlots: z.array(MediaSlotSchema).max(MEDIA_SLOTS_MAX),
@@ -105,6 +117,8 @@ export const ScriptBridgeSchema = z.strictObject({
   from: ScriptSegmentKeySchema,
   to: ScriptSegmentKeySchema,
   teaser: sentence(SCRIPT_SENTENCE_MAX),
+  /** Always offered: its card says « (GRATUIT) ». */
+  mediaSlots: z.array(MediaSlotSchema).max(BRIDGE_MEDIA_SLOTS_MAX),
 });
 export type ScriptBridge = z.infer<typeof ScriptBridgeSchema>;
 
@@ -243,10 +257,109 @@ export const ScriptSegmentsSchema = z
     }
   });
 
+const HEX_COLOR = /^#[0-9a-f]{6}$/u;
+const hex = z.string().regex(HEX_COLOR, { message: 'Une couleur s’écrit #rrggbb, en minuscules' });
+
+/**
+ * A script's colour (ADR 0064 § 1): three tones of a diagonal gradient, close tones for a flat one. It is how a
+ * script is found at a glance, in a folder, in the vault, on the chatters' screen.
+ */
+export const ScriptColorSchema = z.strictObject({ primary: hex, secondary: hex, accent: hex });
+export type ScriptColor = z.infer<typeof ScriptColorSchema>;
+
+/** The two inks a card is written in: the code picks the one that reads best on the script's colour. */
+export const SCRIPT_CARD_INKS = { light: '#ffffff', dark: '#14080e' } as const;
+/** WCAG AA for text: below it, on any of the three tones, the colour is refused. */
+export const SCRIPT_CARD_MIN_CONTRAST = 4.5;
+
+function luminance(color: string): number {
+  const channel = (offset: number): number => {
+    const value = Number.parseInt(color.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.039_28 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/** The WCAG contrast ratio of two `#rrggbb` colours, from 1 to 21. */
+export function contrastRatio(a: string, b: string): number {
+  const [first, second] = [luminance(a), luminance(b)];
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+const mix = (a: string, b: string, share: number): string => {
+  const channel = (offset: number): string =>
+    Math.round(
+      Number.parseInt(a.slice(offset, offset + 2), 16) * (1 - share) +
+        Number.parseInt(b.slice(offset, offset + 2), 16) * share,
+    )
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(1)}${channel(3)}${channel(5)}`;
+};
+
+/**
+ * The colours the card's text may sit on: its three tones and the blends between them, as the gradient draws them
+ * (in sRGB). A blend can be darker than both its ends: a dark ink is checked on it too (Extension's review of SC-01 b).
+ */
+function gradientSamples(color: ScriptColor): string[] {
+  const shares = [0, 0.25, 0.5, 0.75];
+  return [
+    ...shares.map((share) => mix(color.primary, color.secondary, share)),
+    ...shares.map((share) => mix(color.secondary, color.accent, share)),
+    color.accent,
+  ];
+}
+
+/**
+ * The ink of a script's cards: light or dark, whichever has the better contrast on its worst point of the gradient.
+ * `null` when neither reaches `SCRIPT_CARD_MIN_CONTRAST` everywhere, the text being drawn in the ink at full opacity: the colour is refused (ADR 0064 § 1).
+ */
+export function scriptCardInk(color: ScriptColor): string | null {
+  const tones = gradientSamples(color);
+  const worst = (ink: string): number => Math.min(...tones.map((tone) => contrastRatio(ink, tone)));
+  const [ink, score] = [SCRIPT_CARD_INKS.light, SCRIPT_CARD_INKS.dark]
+    .map((candidate) => [candidate, worst(candidate)] as const)
+    .reduce((best, next) => (next[1] > best[1] ? next : best));
+  return score >= SCRIPT_CARD_MIN_CONTRAST ? ink : null;
+}
+
+/** A colour whose cards can be read: refused otherwise, with the reason. */
+export const ReadableScriptColorSchema = ScriptColorSchema.refine((color) => scriptCardInk(color) !== null, {
+  message: 'Le texte du carton ne se lirait pas sur ces tons : choisis des tons plus sombres ou plus clairs',
+});
+
+/**
+ * Named colours for the workshop, after OnlyScript's (ADR 0064 § 1): flat ones and gradients, each readable (a test
+ * holds it). The owner may also pick his own.
+ */
+export const SCRIPT_COLOR_PRESETS = [
+  { key: 'rouge', name: 'Rouge', color: { primary: '#b0213a', secondary: '#c8283f', accent: '#d8324b' } },
+  {
+    key: 'framboise',
+    name: 'Framboise',
+    color: { primary: '#9d174d', secondary: '#be185d', accent: '#db2777' },
+  },
+  { key: 'berry', name: 'Berry', color: { primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' } },
+  { key: 'or-rose', name: 'Or rose', color: { primary: '#f7cac9', secondary: '#e0bfb8', accent: '#f3d9d2' } },
+  {
+    key: 'sunset',
+    name: 'Coucher de soleil',
+    color: { primary: '#ff7e5f', secondary: '#feb47b', accent: '#ffcc70' },
+  },
+  { key: 'miami', name: 'Miami', color: { primary: '#ff6ad5', secondary: '#c774e8', accent: '#94d0ff' } },
+  { key: 'violet', name: 'Violet', color: { primary: '#3b0764', secondary: '#581c87', accent: '#7e22ce' } },
+  { key: 'ocean', name: 'Océan', color: { primary: '#003f63', secondary: '#005f88', accent: '#0077a8' } },
+  { key: 'foret', name: 'Forêt', color: { primary: '#0a3d25', secondary: '#0a5f38', accent: '#3f6b4e' } },
+  { key: 'desert', name: 'Désert', color: { primary: '#f0c987', secondary: '#e6d5ac', accent: '#f3e5ab' } },
+  { key: 'luxe', name: 'Noir et or', color: { primary: '#0f0f0f', secondary: '#1a1a1a', accent: '#3a2f12' } },
+  { key: 'pastel', name: 'Pastel', color: { primary: '#ffcad4', secondary: '#c7ceea', accent: '#b5ead7' } },
+] as const satisfies readonly { key: string; name: string; color: ScriptColor }[];
+
 /** What the owner writes in the workshop. */
 export const ScriptStructureBodySchema = z.strictObject({
   name: sentence(SCRIPT_STRUCTURE_NAME_MAX),
   moment: ScriptMomentSchema,
+  color: ReadableScriptColorSchema,
   /** Kept for one creator: asked of her alone. `null`: any creator. */
   reservedCreatorId: CreatorIdSchema.nullable(),
   segments: ScriptSegmentsSchema,
@@ -270,6 +383,7 @@ export const ScriptStructureVersionSchema = z.object({
   version: z.number().int().min(1),
   name: z.string(),
   moment: ScriptMomentSchema,
+  color: ScriptColorSchema,
   segments: z.array(ScriptSegmentSchema),
   /** Asked of a creator, or being shot: it never changes again (rule 6). */
   frozen: z.boolean(),
@@ -340,5 +454,24 @@ export const SCRIPT_ERROR_CODES = [
   'script_queue_structure_unprocessable',
   /** A stage touches her disgusts: `details.blocks` by structure. */
   'script_queue_disgust_unprocessable',
+  /** The structure has no such segment, or the stage no such variant. */
+  'script_card_not_found',
 ] as const;
 export type ScriptErrorCode = (typeof SCRIPT_ERROR_CODES)[number];
+
+/** The sizes a card is drawn in (ADR 0056 § 3): in the app (SVG), in the folder and as a thumbnail (PNG). */
+export const SCRIPT_CARD_FORMATS = ['card', 'folder', 'thumbnail'] as const;
+export const ScriptCardFormatSchema = z.enum(SCRIPT_CARD_FORMATS);
+export type ScriptCardFormat = z.infer<typeof ScriptCardFormatSchema>;
+
+export const ScriptCardParamsSchema = z.strictObject({
+  structureId: ScriptStructureIdSchema,
+  segmentKey: ScriptSegmentKeySchema,
+});
+
+export const ScriptCardQuerySchema = z.strictObject({
+  format: ScriptCardFormatSchema.default('card'),
+  /** One of the stage's variants: its series card. */
+  variant: ScriptVariantLetterSchema.optional(),
+});
+export type ScriptCardQuery = z.infer<typeof ScriptCardQuerySchema>;

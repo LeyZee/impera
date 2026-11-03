@@ -7,6 +7,7 @@ import {
   ScriptStructureVersionIdSchema,
   ScriptStructureVersionSchema,
   type CreatorId,
+  type ScriptColor,
   type ScriptStructure,
   type ScriptStructureBody,
   type ScriptStructureVersion,
@@ -34,6 +35,22 @@ const structures = schema.scriptStructures;
 const versions = schema.scriptStructureVersions;
 const queue = schema.scriptStructureQueue;
 
+/**
+ * A version frozen before migration 0095 has no `access` on its stages nor `mediaSlots` on its bridges, and never
+ * changes again (rule 6): it is read with the defaults ADR 0064 § 3 names, a paid stage and a bridge without slots.
+ * What a segment already says wins.
+ */
+const withSegmentDefaults = (segments: unknown): unknown => {
+  if (!Array.isArray(segments)) return segments;
+  const listed: readonly unknown[] = segments;
+  return listed.map((segment) => {
+    if (typeof segment !== 'object' || segment === null || !('kind' in segment)) return segment;
+    if (segment.kind === 'stage') return { access: 'paid', ...segment };
+    if (segment.kind === 'bridge') return { mediaSlots: [], ...segment };
+    return segment;
+  });
+};
+
 /** A row as the contract has it, parsed: the table is written by this module only, but a row is still a boundary. */
 const toVersion = (row: VersionRow): ScriptStructureVersion =>
   ScriptStructureVersionSchema.parse({
@@ -41,7 +58,8 @@ const toVersion = (row: VersionRow): ScriptStructureVersion =>
     version: row.version,
     name: row.name,
     moment: row.moment,
-    segments: row.segments,
+    color: row.color,
+    segments: withSegmentDefaults(row.segments),
     frozen: row.frozenAt !== null,
     updatedAt: row.updatedAt.toISOString(),
   });
@@ -58,8 +76,15 @@ const toStructure = (row: StructureRow, latest: VersionRow): ScriptStructure =>
 const contentOf = (value: {
   readonly name: string;
   readonly moment: string;
+  readonly color: ScriptColor;
   readonly segments: unknown;
-}): string => JSON.stringify([value.name, value.moment, value.segments]);
+}): string =>
+  JSON.stringify([
+    value.name,
+    value.moment,
+    [value.color.primary, value.color.secondary, value.color.accent],
+    value.segments,
+  ]);
 
 const sameBody = (stored: ScriptStructure, body: ScriptStructureBody): boolean =>
   stored.reservedCreatorId === body.reservedCreatorId && contentOf(stored.current) === contentOf(body);
@@ -194,6 +219,7 @@ export function createDrizzleScriptStructureStore(db: Database): ScriptStructure
           version: 1,
           name: body.name,
           moment: body.moment,
+          color: body.color,
           segments: body.segments,
           updatedBy: userId,
         });
@@ -218,7 +244,13 @@ export function createDrizzleScriptStructureStore(db: Database): ScriptStructure
           const holders = await queuedOn(tx, id, creators);
           if (holders.some((creatorId) => creatorId !== body.reservedCreatorId)) return 'creator_invalid';
         }
-        const content = { name: body.name, moment: body.moment, segments: body.segments, updatedBy: userId };
+        const content = {
+          name: body.name,
+          moment: body.moment,
+          color: body.color,
+          segments: body.segments,
+          updatedBy: userId,
+        };
         if (decision === 'update')
           await tx
             .update(versions)

@@ -84,11 +84,12 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
-| Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript. |
+| Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript, dans la couleur du script (ADR 0064). |
+| Couleur du script | `script_color` | Les trois tons d'une structure, qui colorent tous ses cartons pour qu'on retrouve le script d'un coup d'œil (ADR 0064). |
 | Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
-| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). |
+| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
 | Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
 | Catégorie de dépôt | `drop_category` | Ce que la créatrice dit d'un dépôt, liste fermée : séance boudoir, vidéo short, script, relance, story Reveal, story Insta, Reel Insta, photo Insta, Telegram ; elle décide de la sortie (ADR 0055). |
