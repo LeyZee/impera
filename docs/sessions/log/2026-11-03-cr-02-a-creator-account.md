@@ -1,0 +1,5 @@
+# 2026-11-03 — CR-02 lot a : le compte de la créatrice dans la base — done
+Fait : `withCreatorAccount` et `NotACreatorAccount` (`packages/db`) ; `withMember` pose `app.account_role` ; migration 0082 (`user_creator_link_check`, politiques restrictives `creatorReadsOnly()` sur conversations, messages, fans, media_descriptions et `closedToCreator()` sur drafts, llm_calls, calibration_ratings, conversation_events) ; test d'intégration `creator-account-rls` (7 tests) ; deux tests existants liés à une créatrice ; README de `packages/db`.
+Décisions : réglages et nom de l'aide accordés avec Bilan et Équipe ; restrictives plutôt que permissives, pour qu'aucune politique ne les rouvre ; `drafts` fermés en entier (le texte envoyé est dans `messages`) ; `conversation_events` fermés (l'acteur d'un envoi y est écrit).
+Pas fait : écritures permises (CR-06) ; routes de la créatrice sur la nouvelle porte, invitation, lectures, écrans (lots b et c).
+Découvertes : le Dashboard et la Persona de la créatrice passent par `withTenant` : à basculer au lot b.

@@ -24,10 +24,12 @@ import {
 import type {
   AutomaticView,
   DashboardReader,
+  RevealSalesView,
   TelegramView,
   UsdRateView,
   VoiceVersion,
 } from '../../domain/dashboard-ports';
+import { revealSalesPanel, salesDays } from '../../domain/reveal-sales';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -45,6 +47,8 @@ export interface DashboardRouteDeps {
   readonly automatic: AutomaticView;
   /** The last ECB rate known for the dollar (pay's), to rank the best fans in euros. */
   readonly usdRate: UsdRateView;
+  /** The sales read in the platform's register (CRM-04 lot c). */
+  readonly revealSales: RevealSalesView;
   /** Absent when Telegram is off (no encryption key): both Telegram fields are null. */
   readonly telegram?: TelegramView;
   /** Every creator, for the owner's « À traiter » across creators (`persona` module, by the composition root). */
@@ -90,10 +94,18 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           usdRate,
         );
         if (read === undefined) throw new DomainError('creator_not_found', 'Créatrice introuvable');
-        const [telegram, automatic, deadJobs] = await Promise.all([
+        const [telegram, automatic, deadJobs, sales] = await Promise.all([
           deps.telegram?.read(creatorId),
           deps.automatic.read(creatorId),
           deps.deadJobs(creatorId),
+          // The creator reads her own screen (CRM-04 lot d), never who sold (ADR 0042 § 2): no register read for her.
+          user.role === 'creator'
+            ? undefined
+            : deps.revealSales.read(
+                creatorId,
+                UserIdSchema.parse(user.id),
+                salesDays(period, now, read.facts.creator.timezone),
+              ),
         ]);
         const dashboard = assembleDashboard({
           creatorId,
@@ -105,6 +117,7 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           deadJobs,
           telegram,
           automatic,
+          revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),
         });
         // ADR 0023: a creator never sees a conversation nor a fan, nor the agency's figures (the day's AI spend of
         // every creator, the jobs of no creator). Her Dashboard keeps her own aggregates only.

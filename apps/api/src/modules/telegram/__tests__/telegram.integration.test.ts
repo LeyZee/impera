@@ -528,7 +528,7 @@ describe('telegram module on Postgres', () => {
   });
 
   it('keeps the settings out of reach of the application role', async () => {
-    // 42501: insufficient_privilege (REVOKE ALL in 0080, like the other telegram tables).
+    // 42501: insufficient_privilege (REVOKE ALL in 0083, like the other telegram tables).
     await expect(test.app.db.select().from(schema.telegramSettings)).rejects.toMatchObject({
       cause: { code: '42501' },
     });

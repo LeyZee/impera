@@ -24,3 +24,4 @@ Les médias déposés pour les Mass DM partent selon un plan à la semaine vers 
 Réutilisation des médias anciens (décision à part).
 
 ## Notes de session
+- 03/11/2026 : l'ADR 0055 (proposée) nomme la catégorie « Relance » (`mass_dm`) : une petite photo, une petite vidéo ou un petit vocal pour relancer les fans (Charles, 9 h 53).

@@ -1,13 +1,15 @@
 import { z } from 'zod';
 
 import { AutomaticGateSchema } from './automatic';
+import { PlatformSchema } from './enums';
 import { HandoffCauseSchema } from './events';
-import { ConversationIdSchema, CreatorIdSchema, FanIdSchema } from './ids';
+import { ConversationIdSchema, CreatorIdSchema, FanIdSchema, TeamMemberIdSchema } from './ids';
 
 /**
  * `GET /v1/dashboard`: what the Dashboard shows for one creator (maquette v6, revue 08). Read only; every figure is
  * computed by the server. Money is in euros, durations in minutes unless named otherwise, rates in % (0 to 100).
- * Sales (ventes, leviers, entonnoir) are left out until the Reveal connector observes purchases.
+ * The captured sales (ventes, leviers, entonnoir) are left out until the Reveal connector observes purchases; the
+ * sales read in a platform's register come in `revealSales` (CRM-04 lot c).
  */
 
 export const DashboardPeriodSchema = z.enum(['day', 'week', 'month']);
@@ -112,6 +114,58 @@ export const DashboardFanSchema = z.object({
 });
 export type DashboardFan = z.infer<typeof DashboardFanSchema>;
 
+/** Integer euro cents, a refund taken off: negative when the refunds of a period outweigh its sales. */
+const signedCents = z.number().int();
+
+/** The figures of a period's sales read in a platform's register, as `salesTotals` sums them (CRM-04). */
+export const DashboardSalesFiguresSchema = z.object({
+  sales: count,
+  refunds: count,
+  /** The « Chiffre d'affaires »: what the fans paid, VAT included, refunds taken off (Reveal's `revenueTtc`). */
+  revenueMinor: signedCents,
+  /** What the agency and the creator share (`netAmount`). */
+  netMinor: signedCents,
+  agencyMinor: signedCents,
+  /** Her part (`modelRevenue`, ADR 0050 § 8). */
+  creatorMinor: signedCents,
+});
+export type DashboardSalesFigures = z.infer<typeof DashboardSalesFiguresSchema>;
+
+/**
+ * Who sold, as the owner links the platform's chatters (ADR 0050 § 5): a member by his display name, the agent, a
+ * chatter nobody linked yet, or no chatter at all.
+ */
+export const DashboardSalesSellerSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('member'), memberId: TeamMemberIdSchema, name: z.string().min(1) }),
+  z.object({ kind: z.literal('agent') }),
+  z.object({ kind: z.literal('unlinked') }),
+  z.object({ kind: z.literal('none') }),
+]);
+export type DashboardSalesSeller = z.infer<typeof DashboardSalesSellerSchema>;
+
+/**
+ * The period's sales read in the platform's register (CRM-04 lot c, ADR 0050), in euro cents: the platform's own
+ * amounts summed by `salesTotals`, never computed again; dollars at pay's last ECB rate known (ADR 0033), left out
+ * without one. Each day is the sale's, a refund taken off its sale's day.
+ */
+export const DashboardRevealSalesSchema = z.object({
+  /** The platforms of her accounts linked to the register, in order: the screen names them, never one written in the code. */
+  platforms: z.array(PlatformSchema).min(1),
+  from: z.iso.date(),
+  to: z.iso.date(),
+  totals: DashboardSalesFiguresSchema,
+  /**
+   * The same figures by seller, the largest revenue first. Null for whoever is neither the owner nor an active
+   * manager: a chatter never sees another's figures (ADR 0043 § 7).
+   */
+  bySeller: z.array(DashboardSalesFiguresSchema.extend({ seller: DashboardSalesSellerSchema })).nullable(),
+  /** As `usdSales`: a dollar sale falls in the period, and the ECB day of its rate (`null`: not counted). */
+  usd: z.object({ seen: z.boolean(), rate: z.object({ day: z.iso.date() }).nullable() }),
+  /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
+  refundsWithoutSale: count,
+});
+export type DashboardRevealSales = z.infer<typeof DashboardRevealSalesSchema>;
+
 export const DashboardSchema = z.object({
   creator: z.object({ id: CreatorIdSchema, name: z.string().min(1), timezone: z.string().min(1), now: at }),
   period: DashboardPeriodSchema,
@@ -196,5 +250,10 @@ export const DashboardSchema = z.object({
    * rate is known yet, and then they are not counted.
    */
   usdSales: z.object({ seen: z.boolean(), rate: z.object({ day: z.iso.date() }).nullable() }),
+  /**
+   * The sales read in the platform's register (CRM-04 lot c), once one of her accounts is linked to it; null before,
+   * and for the creator herself, who reads her own screen (CRM-04 lot d) and never sees who sold (ADR 0042 § 2).
+   */
+  revealSales: DashboardRevealSalesSchema.nullable(),
 });
 export type Dashboard = z.infer<typeof DashboardSchema>;

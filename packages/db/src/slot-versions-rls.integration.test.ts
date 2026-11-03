@@ -110,9 +110,14 @@ describe('créneaux, seats and fans held (CR-14)', () => {
         [creatorUser, 'creator', null],
       ] as const;
       for (const [userId, role, teamRole] of people) {
-        await tx
-          .insert(s.user)
-          .values({ id: userId, name: `Compte ${role}`, email: `${userId}@example.test`, role });
+        await tx.insert(s.user).values({
+          id: userId,
+          name: `Compte ${role}`,
+          email: `${userId}@example.test`,
+          role,
+          // A creator's account opens exactly one creator (CR-02).
+          creatorIds: role === 'creator' ? [nora.creatorId] : [],
+        });
         if (teamRole === null) continue;
         const memberId = newId(TeamMemberIdSchema);
         memberOf.set(userId, memberId);
