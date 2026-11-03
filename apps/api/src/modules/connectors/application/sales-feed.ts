@@ -485,6 +485,12 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       logger.warn({ platform, from, kind: built.error.kind }, 'sales feed automatic check refused');
       return 'refused';
     }
+    // Without the platform's statistics nothing was compared: not an agreement, the job is tried again (Équipe, #476).
+    const statsNote = built.value.report.notes.find((note) => note.kind === 'stats_unavailable');
+    if (statsNote !== undefined) {
+      logger.warn({ platform, from, kind: statsNote.errorKind }, 'sales feed automatic check: no statistics');
+      return 'refused';
+    }
     const modelAccounts = new Map(
       [...built.value.modelLinks].map(
         ([platformModelId, link]) => [platformModelId, link.platformAccountId] as const,

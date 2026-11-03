@@ -166,4 +166,11 @@ describe('sales feed automatic check (CRM-04 b3)', () => {
     expect(JSON.stringify(events[0]?.payload)).not.toMatch(/chatter|fan/iu);
     expect(await test.admin.db.select().from(schema.salesFeedChecks)).toEqual([]);
   });
+
+  it('is tried again, never an agreement, when the platform does not give its statistics', async () => {
+    crm.withhold('stats');
+    const before = (await mismatches()).length;
+    await expect(run()).rejects.toThrow(/refused by reveal/u);
+    expect(await mismatches()).toHaveLength(before);
+  });
 });
