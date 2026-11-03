@@ -593,7 +593,14 @@
     {
       "idx": 84,
       "version": "7",
-      "when": 1793713342430,
+      "when": 1793713171025,
+      "tag": "0093_connection_state_changed",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1793714426602,
       "tag": "0097_telegram_scan_mismatch",
       "breakpoints": true
     }

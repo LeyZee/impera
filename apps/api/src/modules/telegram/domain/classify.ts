@@ -632,7 +632,6 @@ export function classify(
         body: `${SALE_TYPE_TEXT[signal.saleType]} · ${saleAmount(signal.grossInclVatMinor, signal.currency)} · ${sellerText(signal.seller, memberNameOf)}`,
         link: null,
       };
-    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     // Important (question 6 of CRM-04, Charles 03/11/2026): pay still reads the platform's net, the owner checks before
     // closing. No amount: the check of Réglages › Ventes has them.
     case 'sales_feed_mismatch':
@@ -644,6 +643,7 @@ export function classify(
         body: `Ventes ${PLATFORM_NAMES[signal.platform]} : la vérification de ${periodText(signal.from)} ne concorde plus avec les statistiques de ${PLATFORM_NAMES[signal.platform]}, sur ${countText(signal.days, 'jour', 'jours')} et ${countText(signal.accounts, 'compte', 'comptes')}. La paie lit toujours le net de ${PLATFORM_NAMES[signal.platform]} : vérifie avant de clôturer.`,
         link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
       };
+    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     case 'security_alert':
       return {
         kind: 'notice',
