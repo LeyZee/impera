@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { MISSING, scanFor } from './gitleaks-hook.mjs';
+import { MISSING, PUSH_FOUND, recentEnough, scanFor, TOO_OLD, versionOf } from './gitleaks-hook.mjs';
 
 const SCRIPT = fileURLToPath(new URL('./gitleaks-hook.mjs', import.meta.url));
 
@@ -35,6 +35,40 @@ test('stops the hook with the way to install gitleaks when it is not on the PATH
   assert.ok(run.stderr.includes(MISSING));
 });
 
+test('reads the version gitleaks prints, with or without its v', () => {
+  assert.deepEqual(versionOf('8.24.2\n'), [8, 24, 2]);
+  assert.deepEqual(versionOf('v8.18.4'), [8, 18, 4]);
+  assert.equal(versionOf('unknown command "version"'), null);
+});
+
+test('asks for gitleaks 8.19 or later, the first with `gitleaks git`', () => {
+  assert.equal(recentEnough([8, 19, 0]), true);
+  assert.equal(recentEnough([8, 24, 2]), true);
+  assert.equal(recentEnough([9, 0, 0]), true);
+  assert.equal(recentEnough([8, 18, 4]), false);
+  assert.equal(recentEnough([7, 30, 0]), false);
+});
+
+test(
+  'stops the hook with the way to update an old gitleaks',
+  { skip: process.platform === 'win32' && 'shell stub' },
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-old-'));
+    try {
+      const fake = join(dir, 'gitleaks');
+      writeFileSync(fake, '#!/bin/sh\necho v8.18.4\n', { mode: 0o755 });
+      const run = spawnSync(process.execPath, [SCRIPT, 'push'], {
+        env: { ...process.env, PATH: dir },
+        encoding: 'utf8',
+      });
+      assert.equal(run.status, 1);
+      assert.ok(run.stderr.includes(TOO_OLD('8.18.4')));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
 const hasGitleaks = spawnSync('gitleaks', ['version']).error === undefined;
 
 test('refuses a push that carries an invented secret', { skip: !hasGitleaks && 'gitleaks absent' }, () => {
@@ -48,8 +82,8 @@ test('refuses a push that carries an invented secret', { skip: !hasGitleaks && '
     writeFileSync(join(repo, 'README.md'), 'rien\n');
     git('add', '.');
     git('commit', '-q', '-m', 'clean');
-    const scan = () => spawnSync(process.execPath, [SCRIPT, 'push'], { cwd: repo, encoding: 'utf8' }).status;
-    assert.equal(scan(), 0);
+    const scan = () => spawnSync(process.execPath, [SCRIPT, 'push'], { cwd: repo, encoding: 'utf8' });
+    assert.equal(scan().status, 0);
     // An invented key in the shape of a real provider's (ADR 0010: nothing real).
     writeFileSync(
       join(repo, 'config.ts'),
@@ -57,7 +91,10 @@ test('refuses a push that carries an invented secret', { skip: !hasGitleaks && '
     );
     git('add', '.');
     git('commit', '-q', '-m', 'leak');
-    assert.equal(scan(), 1);
+    const found = scan();
+    assert.equal(found.status, 1);
+    // It says which commits a push reads, and what to do with an old branch.
+    assert.ok(found.stderr.includes(PUSH_FOUND));
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
