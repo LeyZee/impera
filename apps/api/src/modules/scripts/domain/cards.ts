@@ -124,7 +124,7 @@ export function shootSummary(slots: readonly MediaSlot[]): string {
  * is the stage's. `null` for a key the version does not hold, or a variant the stage does not have.
  */
 export function cardContent(
-  version: ScriptStructureVersion,
+  version: Pick<ScriptStructureVersion, 'name' | 'moment' | 'color' | 'segments'>,
   key: string,
   options: { readonly variant?: ScriptVariantLetter } = {},
 ): CardContent | null {

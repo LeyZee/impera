@@ -110,7 +110,9 @@ export function createTrendRoutes(
       config: { originCheck: false, rateLimit: READINGS_LIMIT },
       preParsing: async (request: FastifyRequest, _reply: unknown, payload: unknown) => {
         const token = ExtensionLinkTokenSchema.safeParse(request.headers['x-extension-link']);
-        const holder = token.success ? await stores.links.holder(token.data) : null;
+        // Only a batch counts as its last use: asking for the creators does not.
+        const touch = request.method === 'POST';
+        const holder = token.success ? await stores.links.holder(token.data, { touch }) : null;
         if (holder === null) throw new ExtensionLinkUnauthenticated();
         holders.set(request, holder);
         return payload;

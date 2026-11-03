@@ -10,12 +10,12 @@ import {
 } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
-/** A condition on `extension_links`, as the operators build it. */
-type Condition = ReturnType<typeof eq>;
-
 import type { ExtensionLinkStore, LinkHolder, TrendActor } from '../../domain/ports';
 
 const { auditLog, extensionLinks, teamMembers, user } = schema;
+
+/** A condition on `extension_links`, as the operators build it. */
+type Condition = ReturnType<typeof eq>;
 
 /** 256 random bits, base64url: 43 characters (`ExtensionLinkTokenSchema`). */
 const TOKEN_BYTES = 32;
@@ -124,7 +124,7 @@ export function createDrizzleExtensionLinkStore(adminDb: Database): ExtensionLin
     revoke: (actor, linkId) =>
       withAdmin(adminDb, async (tx) => (await revokeLive(tx, actor, eq(extensionLinks.id, linkId))) > 0),
 
-    holder: (token) =>
+    holder: (token, { touch }) =>
       withAdmin(adminDb, async (tx) => {
         const hash = hashOf(token);
         const [row] = await tx
@@ -139,10 +139,11 @@ export function createDrizzleExtensionLinkStore(adminDb: Database): ExtensionLin
         // Read again at each batch: a member who left, an account gone, and the link no longer names anyone.
         const holder = await holderOf(tx, row.userId, false);
         if (holder === null) return null;
-        await tx
-          .update(extensionLinks)
-          .set({ lastUsedAt: sql`now()` })
-          .where(eq(extensionLinks.id, row.id));
+        if (touch)
+          await tx
+            .update(extensionLinks)
+            .set({ lastUsedAt: sql`now()` })
+            .where(eq(extensionLinks.id, row.id));
         return holder;
       }),
   };

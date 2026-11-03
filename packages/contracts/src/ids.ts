@@ -208,3 +208,15 @@ export type ExtensionLinkId = z.infer<typeof ExtensionLinkIdSchema>;
 /** A watch session of the extension, drawn by the extension when someone turns « Veille » on (ADR 0060 § 2). */
 export const WatchSessionIdSchema = uuid.brand<'WatchSessionId'>();
 export type WatchSessionId = z.infer<typeof WatchSessionIdSchema>;
+
+/** A task of her agenda (`creator_tasks`, CR-05): timed, of a day, or of her routine. */
+export const CreatorTaskIdSchema = uuid.brand<'CreatorTaskId'>();
+export type CreatorTaskId = z.infer<typeof CreatorTaskIdSchema>;
+
+/** A dispo she opens to the agency (`creator_availabilities`, CR-05). */
+export const AvailabilityIdSchema = uuid.brand<'AvailabilityId'>();
+export type AvailabilityId = z.infer<typeof AvailabilityIdSchema>;
+
+/** A suggestion of the agency or the AI for her agenda (`creator_suggestions`, CR-05, ADR 0042 § 3). */
+export const SuggestionIdSchema = uuid.brand<'SuggestionId'>();
+export type SuggestionId = z.infer<typeof SuggestionIdSchema>;

@@ -89,6 +89,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Couleur du script | `script_color` | Les trois tons d'une structure, qui colorent tous ses cartons pour qu'on retrouve le script d'un coup d'œil (ADR 0064). |
 | Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
 | Structure de départ | `script_starter` | Structure proposée par l'atelier, à dupliquer puis ajuster : données des contrats (`SCRIPT_STARTERS`), dont celle d'OnlyScript avec ses noms d'étapes (ADR 0064 § 4). |
+| Tenue | `outfit` | Ce que la créatrice porte pour une étape (« Lingerie noire ») ; `null` quand l'agence la laisse choisir. Le mode tournage regroupe les étapes par tenue (SC-07). |
+| Lieu | `place` | Où se tourne une étape (« Chambre ») ; `null` quand l'agence la laisse choisir. Le mode tournage regroupe ensuite par lieu (SC-07). |
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
 | Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
@@ -296,6 +298,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Part de la créatrice | `creatorShare` | Ce qui part à la créatrice : le net moins la part de l'agence, montré « estimé » jusqu'à la clôture de la période, avec le parcours ligne par ligne (ADR 0042). |
 | Routine | `routine` | Les tâches quotidiennes qu'une créatrice coche dans son application : celles de l'agence comptent pour la série, les siennes non. |
 | Série | `streak` | Le nombre de jours d'affilée où la créatrice a coché ses tâches essentielles. |
+| Joker | `joker` | La journée manquée qu'une série pardonne, une seule fois : la deuxième la casse. Dépensé seulement s'il sauve une journée réussie d'avant (CR-05, ADR 0042 § 3). |
 | Suggestion | `suggestion` | Ce que l'agence ou l'IA voudrait voir dans l'agenda d'une créatrice (tâche avec ou sans heure, tâche de routine) : elle l'accepte, la déplace ou la refuse ; seule une suggestion acceptée entre dans son agenda. À ne pas confondre avec le brouillon (`draft`) de l'agent (ADR 0042). |
 | Dispo (disponibilité) | `availability` | Une plage que la créatrice ouvre à l'agence, récurrente ou ponctuelle ; les suggestions datées ne tombent que dedans (ADR 0042). « Dispo pour l'agence » à l'écran ; jamais « créneau », réservé aux shifts (CR-05, Charles 02/11). |
 | Tâche (agenda) | `creator_task` | Ce que la créatrice a à faire dans son agenda : avec une heure de début et de fin (tournage, live, rendez-vous ; le « créneau » de l'ADR 0042 § 3) ou juste un jour, à cocher. Seuls mots de son agenda : tâche et dispo (CR-05, Charles 02/11). |

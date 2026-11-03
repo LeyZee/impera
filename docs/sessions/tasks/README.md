@@ -102,6 +102,9 @@ Branche : task/<id>-<slug>
 | SC-04 | Descriptions des médias d'un script et validation rapide | scripts | blocked (clé de vision) | SC-02, P3-04 |
 | SC-05 | Textes de vente d'un script, proposés par le modèle et validés par l'agence | scripts | blocked (clé xAI, P6-01) | SC-04, P3-01, P3-13 |
 | SC-06 | Téléverser un script dans Reveal, dans l'ordre | scripts | blocked (capture Reveal) | SC-03, SC-05 |
+| SC-07 | Mode tournage et ordre de tournage sur le téléphone de la créatrice | scripts | todo | SC-02 |
+| SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
+| SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | blocked (bot Telegram) | CR-06, CR-08, P3-07 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |

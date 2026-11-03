@@ -25,6 +25,8 @@ function stage(key: string, extra: Partial<ScriptStage> = {}): ScriptStage {
     intention: 'Elle se dévoile un peu',
     access: 'paid',
     mood: null,
+    outfit: null,
+    place: null,
     mediaSlots: [{ kind: 'image', optional: false, hint: null }],
     variants: [],
     ...extra,

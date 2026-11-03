@@ -1,6 +1,6 @@
 {
-  "id": "56df7d38-4b3c-40d4-bf97-7d18e55a9bde",
-  "prevId": "c97c39ef-940c-4b15-8e29-0794547f83a1",
+  "id": "996bc225-fdcf-47c9-b2d2-a8bd4601b729",
+  "prevId": "6e28e23c-553e-408f-96cc-dc1240406c43",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2061,6 +2061,831 @@
         "messages_price_minor_check": {
           "name": "messages_price_minor_check",
           "value": "\"messages\".\"price_minor\" is null or \"messages\".\"price_minor\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_availabilities": {
+      "name": "creator_availabilities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "weekday": {
+          "name": "weekday",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_minute": {
+          "name": "start_minute",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_minute": {
+          "name": "end_minute",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "creator_availabilities_creator_idx": {
+          "name": "creator_availabilities_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_availabilities_creator_id_creators_id_fk": {
+          "name": "creator_availabilities_creator_id_creators_id_fk",
+          "tableFrom": "creator_availabilities",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_availabilities_created_by_user_id_fk": {
+          "name": "creator_availabilities_created_by_user_id_fk",
+          "tableFrom": "creator_availabilities",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "creator_read": {
+          "name": "creator_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_availabilities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_availabilities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_availabilities\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_update": {
+          "name": "creator_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_availabilities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_availabilities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_availabilities\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "creator_availabilities_kind_check": {
+          "name": "creator_availabilities_kind_check",
+          "value": "\"creator_availabilities\".\"kind\" in ('weekly', 'once')"
+        },
+        "creator_availabilities_when_check": {
+          "name": "creator_availabilities_when_check",
+          "value": "(\n        \"creator_availabilities\".\"kind\" = 'weekly' and \"creator_availabilities\".\"weekday\" between 1 and 7 and \"creator_availabilities\".\"start_minute\" between 0 and 1439\n          and \"creator_availabilities\".\"end_minute\" between 0 and 1439\n          and \"creator_availabilities\".\"starts_at\" is null and \"creator_availabilities\".\"ends_at\" is null\n      ) or (\n        \"creator_availabilities\".\"kind\" = 'once' and \"creator_availabilities\".\"ends_at\" > \"creator_availabilities\".\"starts_at\" and \"creator_availabilities\".\"ends_at\" - \"creator_availabilities\".\"starts_at\" <= interval '1 day'\n          and \"creator_availabilities\".\"weekday\" is null and \"creator_availabilities\".\"start_minute\" is null and \"creator_availabilities\".\"end_minute\" is null\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_suggestions": {
+      "name": "creator_suggestions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origin": {
+          "name": "origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "weekdays": {
+          "name": "weekdays",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "minutes": {
+          "name": "minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "week": {
+          "name": "week",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'suggested'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_on": {
+          "name": "decided_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "creator_suggestions_creator_week_idx": {
+          "name": "creator_suggestions_creator_week_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "week",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_suggestions_creator_id_creators_id_fk": {
+          "name": "creator_suggestions_creator_id_creators_id_fk",
+          "tableFrom": "creator_suggestions",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_suggestions_created_by_user_id_fk": {
+          "name": "creator_suggestions_created_by_user_id_fk",
+          "tableFrom": "creator_suggestions",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_suggestions_task_fk": {
+          "name": "creator_suggestions_task_fk",
+          "tableFrom": "creator_suggestions",
+          "tableTo": "creator_tasks",
+          "columnsFrom": ["task_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "creator_suggestions_creator_unique": {
+          "name": "creator_suggestions_creator_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "creator_id"]
+        }
+      },
+      "policies": {
+        "creator_read": {
+          "name": "creator_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_decide": {
+          "name": "creator_decide",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "team_insert": {
+          "name": "team_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_suggestions\".\"origin\" = 'agency' and \"creator_suggestions\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "creator_suggestions_origin_check": {
+          "name": "creator_suggestions_origin_check",
+          "value": "\"creator_suggestions\".\"origin\" in ('agency', 'ai')"
+        },
+        "creator_suggestions_kind_check": {
+          "name": "creator_suggestions_kind_check",
+          "value": "\"creator_suggestions\".\"kind\" in ('timed', 'day', 'routine')"
+        },
+        "creator_suggestions_category_check": {
+          "name": "creator_suggestions_category_check",
+          "value": "\"creator_suggestions\".\"category\" in ('shoot', 'live', 'post', 'socials', 'appointment', 'personal')"
+        },
+        "creator_suggestions_state_check": {
+          "name": "creator_suggestions_state_check",
+          "value": "\"creator_suggestions\".\"state\" in ('suggested', 'accepted', 'declined')"
+        },
+        "creator_suggestions_when_check": {
+          "name": "creator_suggestions_when_check",
+          "value": "(\"creator_suggestions\".\"kind\" = 'timed' and \"creator_suggestions\".\"starts_at\" is null and \"creator_suggestions\".\"ends_at\" is null and \"creator_suggestions\".\"day\" is null and \"creator_suggestions\".\"weekdays\" is null)\n        or (\n  (\"creator_suggestions\".\"kind\" = 'timed' and \"creator_suggestions\".\"starts_at\" is not null and \"creator_suggestions\".\"ends_at\" > \"creator_suggestions\".\"starts_at\"\n    and \"creator_suggestions\".\"ends_at\" - \"creator_suggestions\".\"starts_at\" <= interval '1 day' and \"creator_suggestions\".\"day\" is null and \"creator_suggestions\".\"weekdays\" is null)\n  or (\"creator_suggestions\".\"kind\" = 'day' and \"creator_suggestions\".\"day\" is not null and \"creator_suggestions\".\"starts_at\" is null and \"creator_suggestions\".\"ends_at\" is null and \"creator_suggestions\".\"weekdays\" is null)\n  or (\"creator_suggestions\".\"kind\" = 'routine' and \"creator_suggestions\".\"weekdays\" is not null and cardinality(\"creator_suggestions\".\"weekdays\") between 1 and 7\n    and \"creator_suggestions\".\"weekdays\" <@ array[1, 2, 3, 4, 5, 6, 7] and \"creator_suggestions\".\"starts_at\" is null and \"creator_suggestions\".\"ends_at\" is null and \"creator_suggestions\".\"day\" is null)\n)"
+        },
+        "creator_suggestions_minutes_check": {
+          "name": "creator_suggestions_minutes_check",
+          "value": "(\"creator_suggestions\".\"kind\" = 'timed') = (\"creator_suggestions\".\"minutes\" is not null) and coalesce(\"creator_suggestions\".\"minutes\", 1) between 1 and 1440"
+        },
+        "creator_suggestions_title_check": {
+          "name": "creator_suggestions_title_check",
+          "value": "char_length(\"creator_suggestions\".\"title\") between 1 and 80"
+        },
+        "creator_suggestions_purpose_check": {
+          "name": "creator_suggestions_purpose_check",
+          "value": "\"creator_suggestions\".\"purpose\" is null or char_length(\"creator_suggestions\".\"purpose\") between 1 and 160"
+        },
+        "creator_suggestions_reason_check": {
+          "name": "creator_suggestions_reason_check",
+          "value": "\"creator_suggestions\".\"reason\" is null or (\"creator_suggestions\".\"state\" = 'declined' and char_length(\"creator_suggestions\".\"reason\") between 1 and 200)"
+        },
+        "creator_suggestions_week_check": {
+          "name": "creator_suggestions_week_check",
+          "value": "extract(isodow from \"creator_suggestions\".\"week\") = 1"
+        },
+        "creator_suggestions_decision_check": {
+          "name": "creator_suggestions_decision_check",
+          "value": "(\"creator_suggestions\".\"state\" = 'suggested') = (\"creator_suggestions\".\"decided_at\" is null and \"creator_suggestions\".\"decided_on\" is null)\n        and (\"creator_suggestions\".\"state\" = 'accepted') = (\"creator_suggestions\".\"task_id\" is not null)"
+        },
+        "creator_suggestions_author_check": {
+          "name": "creator_suggestions_author_check",
+          "value": "(\"creator_suggestions\".\"origin\" = 'agency') = (\"creator_suggestions\".\"created_by\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_task_ticks": {
+      "name": "creator_task_ticks",
+      "schema": "",
+      "columns": {
+        "task_id": {
+          "name": "task_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "done_at": {
+          "name": "done_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "creator_task_ticks_creator_day_idx": {
+          "name": "creator_task_ticks_creator_day_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_task_ticks_creator_id_creators_id_fk": {
+          "name": "creator_task_ticks_creator_id_creators_id_fk",
+          "tableFrom": "creator_task_ticks",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_task_ticks_created_by_user_id_fk": {
+          "name": "creator_task_ticks_created_by_user_id_fk",
+          "tableFrom": "creator_task_ticks",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_task_ticks_task_fk": {
+          "name": "creator_task_ticks_task_fk",
+          "tableFrom": "creator_task_ticks",
+          "tableTo": "creator_tasks",
+          "columnsFrom": ["task_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "creator_task_ticks_unique": {
+          "name": "creator_task_ticks_unique",
+          "nullsNotDistinct": false,
+          "columns": ["task_id", "day"]
+        }
+      },
+      "policies": {
+        "creator_read": {
+          "name": "creator_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_task_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_task_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_task_ticks\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_delete": {
+          "name": "creator_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_task_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_task_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.creator_tasks": {
+      "name": "creator_tasks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "weekdays": {
+          "name": "weekdays",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "essential": {
+          "name": "essential",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "reminder_minutes": {
+          "name": "reminder_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suggestion_id": {
+          "name": "suggestion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "creator_tasks_creator_starts_idx": {
+          "name": "creator_tasks_creator_starts_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "creator_tasks_creator_day_idx": {
+          "name": "creator_tasks_creator_day_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_tasks_creator_id_creators_id_fk": {
+          "name": "creator_tasks_creator_id_creators_id_fk",
+          "tableFrom": "creator_tasks",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_tasks_created_by_user_id_fk": {
+          "name": "creator_tasks_created_by_user_id_fk",
+          "tableFrom": "creator_tasks",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_tasks_suggestion_fk": {
+          "name": "creator_tasks_suggestion_fk",
+          "tableFrom": "creator_tasks",
+          "tableTo": "creator_suggestions",
+          "columnsFrom": ["suggestion_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "creator_tasks_suggestion_unique": {
+          "name": "creator_tasks_suggestion_unique",
+          "nullsNotDistinct": false,
+          "columns": ["suggestion_id"]
+        },
+        "creator_tasks_creator_unique": {
+          "name": "creator_tasks_creator_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "creator_id"]
+        }
+      },
+      "policies": {
+        "creator_read": {
+          "name": "creator_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_tasks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_tasks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_tasks\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and (not \"creator_tasks\".\"essential\" or exists (\n        select 1 from creator_suggestions s\n         where s.id = \"creator_tasks\".\"suggestion_id\" and s.creator_id = \"creator_tasks\".\"creator_id\" and s.kind = 'routine' and s.state = 'suggested'\n      ))"
+        },
+        "creator_update": {
+          "name": "creator_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_tasks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_tasks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_tasks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "creator_tasks_kind_check": {
+          "name": "creator_tasks_kind_check",
+          "value": "\"creator_tasks\".\"kind\" in ('timed', 'day', 'routine')"
+        },
+        "creator_tasks_category_check": {
+          "name": "creator_tasks_category_check",
+          "value": "\"creator_tasks\".\"category\" in ('shoot', 'live', 'post', 'socials', 'appointment', 'personal')"
+        },
+        "creator_tasks_when_check": {
+          "name": "creator_tasks_when_check",
+          "value": "(\n  (\"creator_tasks\".\"kind\" = 'timed' and \"creator_tasks\".\"starts_at\" is not null and \"creator_tasks\".\"ends_at\" > \"creator_tasks\".\"starts_at\"\n    and \"creator_tasks\".\"ends_at\" - \"creator_tasks\".\"starts_at\" <= interval '1 day' and \"creator_tasks\".\"day\" is null and \"creator_tasks\".\"weekdays\" is null)\n  or (\"creator_tasks\".\"kind\" = 'day' and \"creator_tasks\".\"day\" is not null and \"creator_tasks\".\"starts_at\" is null and \"creator_tasks\".\"ends_at\" is null and \"creator_tasks\".\"weekdays\" is null)\n  or (\"creator_tasks\".\"kind\" = 'routine' and \"creator_tasks\".\"weekdays\" is not null and cardinality(\"creator_tasks\".\"weekdays\") between 1 and 7\n    and \"creator_tasks\".\"weekdays\" <@ array[1, 2, 3, 4, 5, 6, 7] and \"creator_tasks\".\"starts_at\" is null and \"creator_tasks\".\"ends_at\" is null and \"creator_tasks\".\"day\" is null)\n)"
+        },
+        "creator_tasks_title_check": {
+          "name": "creator_tasks_title_check",
+          "value": "char_length(\"creator_tasks\".\"title\") between 1 and 80"
+        },
+        "creator_tasks_purpose_check": {
+          "name": "creator_tasks_purpose_check",
+          "value": "\"creator_tasks\".\"purpose\" is null or char_length(\"creator_tasks\".\"purpose\") between 1 and 160"
+        },
+        "creator_tasks_reminder_check": {
+          "name": "creator_tasks_reminder_check",
+          "value": "\"creator_tasks\".\"reminder_minutes\" is null or (\"creator_tasks\".\"kind\" = 'timed' and \"creator_tasks\".\"reminder_minutes\" between 0 and 1440)"
+        },
+        "creator_tasks_essential_check": {
+          "name": "creator_tasks_essential_check",
+          "value": "not \"creator_tasks\".\"essential\" or (\"creator_tasks\".\"kind\" = 'routine' and \"creator_tasks\".\"suggestion_id\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -13214,328 +14039,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.audit_log": {
-      "name": "audit_log",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "action": {
-          "name": "action",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entity": {
-          "name": "entity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entity_id": {
-          "name": "entity_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "details": {
-          "name": "details",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "ip": {
-          "name": "ip",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "audit_log_created_at_idx": {
-          "name": "audit_log_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.creators": {
-      "name": "creators",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name_key": {
-          "name": "name_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "settings": {
-          "name": "settings",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "agent_hours": {
-          "name": "agent_hours",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "creators_name_key_unique": {
-          "name": "creators_name_key_unique",
-          "columns": [
-            {
-              "expression": "name_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "creators_agent_hours_object_check": {
-          "name": "creators_agent_hours_object_check",
-          "value": "\"creators\".\"agent_hours\" is null or jsonb_typeof(\"creators\".\"agent_hours\") = 'object'"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.platform_accounts": {
-      "name": "platform_accounts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "handle": {
-          "name": "handle",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "session_state": {
-          "name": "session_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "session_ciphertext": {
-          "name": "session_ciphertext",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "session_updated_at": {
-          "name": "session_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_poll_at": {
-          "name": "last_poll_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "consecutive_errors": {
-          "name": "consecutive_errors",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "paused_until": {
-          "name": "paused_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "connector_config": {
-          "name": "connector_config",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "platform_accounts_creator_idx": {
-          "name": "platform_accounts_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "platform_accounts_creator_id_creators_id_fk": {
-          "name": "platform_accounts_creator_id_creators_id_fk",
-          "tableFrom": "platform_accounts",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "platform_accounts_platform_handle_unique": {
-          "name": "platform_accounts_platform_handle_unique",
-          "nullsNotDistinct": false,
-          "columns": ["platform", "handle"]
-        },
-        "platform_accounts_id_creator_unique": {
-          "name": "platform_accounts_id_creator_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id", "creator_id"]
-        }
-      },
-      "policies": {
-        "tenant_isolation": {
-          "name": "tenant_isolation",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "\"platform_accounts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
-          "withCheck": "\"platform_accounts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_no_insert": {
-          "name": "creator_no_insert",
-          "as": "RESTRICTIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
-        "creator_no_update": {
-          "name": "creator_no_update",
-          "as": "RESTRICTIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
-        "creator_no_delete": {
-          "name": "creator_no_delete",
-          "as": "RESTRICTIVE",
-          "for": "DELETE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "platform_accounts_platform_check": {
-          "name": "platform_accounts_platform_check",
-          "value": "\"platform_accounts\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
-        },
-        "platform_accounts_session_state_check": {
-          "name": "platform_accounts_session_state_check",
-          "value": "\"platform_accounts\".\"session_state\" in ('none', 'valid', 'warning', 'expired')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.commission_presets": {
       "name": "commission_presets",
       "schema": "",
@@ -14894,6 +15397,328 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_log": {
+      "name": "audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "details": {
+          "name": "details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "audit_log_created_at_idx": {
+          "name": "audit_log_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.creators": {
+      "name": "creators",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settings": {
+          "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "agent_hours": {
+          "name": "agent_hours",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "creators_name_key_unique": {
+          "name": "creators_name_key_unique",
+          "columns": [
+            {
+              "expression": "name_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "creators_agent_hours_object_check": {
+          "name": "creators_agent_hours_object_check",
+          "value": "\"creators\".\"agent_hours\" is null or jsonb_typeof(\"creators\".\"agent_hours\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.platform_accounts": {
+      "name": "platform_accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "handle": {
+          "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_state": {
+          "name": "session_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "session_ciphertext": {
+          "name": "session_ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "session_updated_at": {
+          "name": "session_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_poll_at": {
+          "name": "last_poll_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consecutive_errors": {
+          "name": "consecutive_errors",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "paused_until": {
+          "name": "paused_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connector_config": {
+          "name": "connector_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "platform_accounts_creator_idx": {
+          "name": "platform_accounts_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_accounts_creator_id_creators_id_fk": {
+          "name": "platform_accounts_creator_id_creators_id_fk",
+          "tableFrom": "platform_accounts",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "platform_accounts_platform_handle_unique": {
+          "name": "platform_accounts_platform_handle_unique",
+          "nullsNotDistinct": false,
+          "columns": ["platform", "handle"]
+        },
+        "platform_accounts_id_creator_unique": {
+          "name": "platform_accounts_id_creator_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "creator_id"]
+        }
+      },
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"platform_accounts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "\"platform_accounts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "platform_accounts_platform_check": {
+          "name": "platform_accounts_platform_check",
+          "value": "\"platform_accounts\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "platform_accounts_session_state_check": {
+          "name": "platform_accounts_session_state_check",
+          "value": "\"platform_accounts\".\"session_state\" in ('none', 'valid', 'warning', 'expired')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.content_ideas": {

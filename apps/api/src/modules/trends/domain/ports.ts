@@ -45,8 +45,8 @@ export interface ExtensionLinkStore {
   create(actor: TrendActor, label: string): Promise<ExtensionLinkCreated | 'full' | null>;
   /** Whether that live link of the actor's was revoked. */
   revoke(actor: TrendActor, linkId: ExtensionLinkId): Promise<boolean>;
-  /** Who a token names, or null: unknown, revoked, or an account gone. */
-  holder(token: string): Promise<LinkHolder | null>;
+  /** Who a token names, or null: unknown, revoked, or an account gone. `touch`: a batch it brings (`lastUsedAt`). */
+  holder(token: string, options: { readonly touch: boolean }): Promise<LinkHolder | null>;
 }
 
 /** A creator the linked person may mark a post for. */

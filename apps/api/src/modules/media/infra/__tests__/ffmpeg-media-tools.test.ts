@@ -113,3 +113,16 @@ describe('ffmpeg media tools', () => {
     await expect(hurried.keyframes(video, 4)).rejects.toMatchObject({ killed: true, signal: 'SIGKILL' });
   });
 });
+
+describe('the start-up check of the media binaries', () => {
+  it('counts a binary too slow to answer as present, not missing', async () => {
+    // 1 ms: ffmpeg is killed before it prints its version, as on a machine under the whole suite's load.
+    expect(await missingMediaBinaries({ ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, 1)).toEqual([]);
+  });
+
+  it('names a binary that cannot start', async () => {
+    expect(await missingMediaBinaries({ ffmpeg: 'impera-no-such-ffmpeg', ffprobe: 'ffprobe' })).toEqual([
+      'ffmpeg',
+    ]);
+  });
+});
