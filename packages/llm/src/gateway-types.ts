@@ -1,4 +1,4 @@
-import type { LlmPurpose, MediaDescription, Result } from '@impera/contracts';
+import type { LlmPurpose, MediaDescription, Result, TrendCaptureDescription } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
 
 import type { BudgetEvent } from './budget';
@@ -103,6 +103,15 @@ export interface JudgeInput extends ConversationInput {
   readonly criteria: readonly JudgeCriterion[];
 }
 
+/** The captures of a post marked during a trend watch (ADR 0060 § 2, source 6), in memory only. */
+export interface TrendCapturesInput {
+  readonly captures: readonly { readonly mediaType: string; readonly data: Uint8Array }[];
+  /** The video's length as the page showed it; null for a photo or a carousel. */
+  readonly durationS: number | null;
+  /** Always a trend watch call: its purpose is set by the gateway. */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
+}
+
 export interface CallMeta {
   readonly provider: ProviderId;
   readonly model: string;
@@ -145,6 +154,13 @@ export interface LlmGateway {
   voice(input: VoiceInput): Promise<Result<LlmSuccess<VoiceOutput>, LlmFailure>>;
   /** Scores a reply against the rubric criteria (`pnpm evals`). */
   judge(input: JudgeInput): Promise<Result<LlmSuccess<JudgeOutput>, LlmFailure>>;
+  /**
+   * How a marked post is made, from its captures (vision, role `sense`): a trend watch call, under the watch's cap
+   * (`trend_watch_budget_reached`) and the daily one. The captures are read, never kept nor journaled.
+   */
+  describeTrendCaptures(
+    input: TrendCapturesInput,
+  ): Promise<Result<LlmSuccess<TrendCaptureDescription>, LlmFailure>>;
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
@@ -169,6 +185,7 @@ export interface LlmGatewayDeps {
     readonly brain: PromptTemplate;
     readonly sense: PromptTemplate;
     readonly judge?: PromptTemplate;
+    readonly trendCaptures?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */
   readonly canary?: string;

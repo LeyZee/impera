@@ -28,6 +28,18 @@ server {
         proxy_read_timeout 90s;
     }
 
+    # The captures of a marked post (VEI-01 c2, ADR 0060 § 2): four captures in base64 pass the API's 1 MiB, the route
+    # takes up to 4 MiB; the vision answers within its two models' timeouts (90 s each), so the read waits longer.
+    location = /v1/trends/readings/captures {
+        proxy_pass $api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        client_max_body_size 4m;
+        proxy_read_timeout 200s;
+    }
+
     # The calendar feed (CR-12, ADR 0045 § 5): its secret is in the path, so this location keeps no access log, and
     # its error log only what stops nginx itself (an API that does not answer would otherwise write the URL there).
     # The API logs nothing below `warn` for it either.

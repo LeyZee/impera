@@ -1,4 +1,9 @@
-import { BriefIntentSchema, DESIRE_BRAIN_SIGNALS, MediaDescriptionSchema } from '@impera/contracts';
+import {
+  BriefIntentSchema,
+  DESIRE_BRAIN_SIGNALS,
+  MediaDescriptionSchema,
+  TrendCaptureDescriptionSchema,
+} from '@impera/contracts';
 import { z } from 'zod';
 
 /** Her alerts the brain reads at most, and how it names them (`a1`, `a2`…): short ids, never her alert's own. */
@@ -94,3 +99,6 @@ export const JudgeOutputSchema = z.object({
     .max(9),
 });
 export type JudgeOutput = z.infer<typeof JudgeOutputSchema>;
+
+/** The vision's reading of a marked post's captures (ADR 0060 § 2): the contract's fields, extra ones dropped. */
+export const TrendCapturesOutputSchema = z.object(TrendCaptureDescriptionSchema.shape);
