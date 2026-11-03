@@ -23,6 +23,7 @@ import {
 import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
 
 import { documentValidUntil, treatyNeedsResidence } from '../../contractors/pure';
+import { payReadsForInvoicing as payReads } from '../../payroll';
 import type { StatementAnnexSource } from '../domain/invoice-pdf';
 import type { InvoiceLogo, InvoiceToRender, PayrollInvoicePdfStore, StoredInvoicePdf } from '../domain/ports';
 
@@ -33,8 +34,6 @@ const {
   agencyLogos,
   auditLog,
   billingSettings,
-  commissionStatementLines,
-  commissionStatements,
   contractAcceptances,
   contractorDocumentReviews,
   contractorDocuments,
@@ -44,7 +43,6 @@ const {
   invoicePdfCopies,
   invoicePdfs,
   invoices,
-  platformAccounts,
 } = schema;
 
 /** A PDF's row and its copies, read in the caller's transaction (its policies apply). */
@@ -106,44 +104,11 @@ async function annexOf(
   statementId: string,
   timeZone: string,
 ): Promise<StatementAnnexSource | null> {
-  const [statement] = await tx
-    .select({
-      revision: commissionStatements.revision,
-      rules: commissionStatements.rules,
-      validatedAt: commissionStatements.validatedAt,
-    })
-    .from(commissionStatements)
-    .where(eq(commissionStatements.id, statementId));
+  const statement = await payReads.annexOf(tx, statementId);
   // An invoice is issued from a validated statement only (lot 3): anything else is a fault, never an annex guessed.
   if (statement?.validatedAt == null)
     throw new Error(`The statement ${statementId} of an invoice is not validated`);
-  const rows = await tx
-    .select({
-      handle: platformAccounts.handle,
-      platform: platformAccounts.platform,
-      currency: commissionStatementLines.currency,
-      rateMicros: commissionStatementLines.rateMicros,
-      grossMinor: commissionStatementLines.grossMinor,
-      grossEurMinor: commissionStatementLines.grossEurMinor,
-      exclVatMinor: commissionStatementLines.exclVatMinor,
-      netMinor: commissionStatementLines.netMinor,
-      commissionMinor: commissionStatementLines.commissionMinor,
-    })
-    .from(commissionStatementLines)
-    .innerJoin(platformAccounts, eq(platformAccounts.id, commissionStatementLines.platformAccountId))
-    .where(
-      and(
-        eq(commissionStatementLines.statementId, statementId),
-        eq(commissionStatementLines.revision, statement.revision),
-      ),
-    )
-    .orderBy(
-      platformAccounts.handle,
-      platformAccounts.platform,
-      commissionStatementLines.currency,
-      commissionStatementLines.vatBps,
-      commissionStatementLines.platformFeeBps,
-    );
+  const rows = await payReads.annexLinesOf(tx, statementId, statement.revision);
   const rules = CommissionStatementRulesSchema.parse(statement.rules);
   /** The day of the rate a line was converted at: the statement's copy of it, never a rate read again. */
   const rateOn = (currency: string, rateMicros: number): string | null => {

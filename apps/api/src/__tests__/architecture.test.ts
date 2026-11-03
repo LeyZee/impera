@@ -30,12 +30,8 @@ const PAY_SCHEMAS = ['payroll.ts', 'invoices.ts'];
  * shrinks: a new read fails the test, and a read closed by a port fails it too until its line is removed here.
  */
 const OPEN_CROSSINGS = [
-  'invoicing/infra/invoice-acceptance-store.ts: commission_statements',
-  'invoicing/infra/invoice-acceptance-store.ts: pay_adjustments',
   'invoicing/infra/invoice-pdf-store.ts: agency_logos',
   'invoicing/infra/invoice-pdf-store.ts: billing_settings',
-  'invoicing/infra/invoice-pdf-store.ts: commission_statement_lines',
-  'invoicing/infra/invoice-pdf-store.ts: commission_statements',
   'invoicing/infra/invoice-pdf-store.ts: contract_acceptances',
   'invoicing/infra/invoice-pdf-store.ts: contract_texts',
   'invoicing/infra/invoice-pdf-store.ts: contractor_document_reviews',
@@ -43,22 +39,16 @@ const OPEN_CROSSINGS = [
   'invoicing/infra/invoice-store.ts: billing_regime_validations',
   'invoicing/infra/invoice-store.ts: billing_regimes',
   'invoicing/infra/invoice-store.ts: billing_settings',
-  'invoicing/infra/invoice-store.ts: commission_statement_lines',
-  'invoicing/infra/invoice-store.ts: commission_statements',
   'invoicing/infra/invoice-store.ts: contract_acceptances',
   'invoicing/infra/invoice-store.ts: contract_texts',
   'invoicing/infra/invoice-store.ts: contractor_document_reviews',
   'invoicing/infra/invoice-store.ts: contractor_documents',
   'invoicing/infra/invoice-store.ts: contractor_profiles',
   'invoicing/infra/invoice-store.ts: contractor_regimes',
-  'invoicing/infra/invoice-store.ts: pay_adjustments',
   'invoicing/infra/payout-facts.ts: billing_regimes',
   'invoicing/infra/payout-facts.ts: contractor_document_reviews',
   'invoicing/infra/payout-facts.ts: contractor_documents',
   'invoicing/infra/payout-facts.ts: contractor_regimes',
-  'invoicing/infra/requeue-store.ts: commission_statements',
-  'invoicing/infra/settlement-rows.ts: carry_overs',
-  'invoicing/infra/settlement-rows.ts: commission_statements',
 ];
 
 const read = (file: string): string => readFileSync(file, 'utf8');
