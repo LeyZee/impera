@@ -107,7 +107,7 @@ describe('the workshop of a structure', () => {
   it('writes a new structure under its id, with the stage added', async () => {
     const calls = serve();
     renderWorkshop();
-    fireEvent.click(screen.getByRole('button', { name: '+ Ajouter une étape' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter une étape' }));
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     await screen.findByText('Enregistrée, version 1.');
     expect(calls.posts).toHaveLength(1);
@@ -119,7 +119,7 @@ describe('the workshop of a structure', () => {
   it('moves a stage with Alt and the arrows, and drops the bridge it leaves', () => {
     serve();
     renderWorkshop();
-    const bridges = (): number => screen.getAllByText(/^Pont \d & \d$/).length;
+    const bridges = (): number => screen.getAllByRole('button', { name: /^Pont \d & \d :/ }).length;
     const before = bridges();
     const second = screen.getByRole('button', { name: /^Étape 2/ });
     fireEvent.keyDown(second, { key: 'ArrowUp', altKey: true });

@@ -20,6 +20,7 @@ import {
   remove,
   segmentTitles,
   slotsSummary,
+  stackSummary,
   type Draft,
 } from './model';
 
@@ -143,5 +144,11 @@ describe('the workshop draft', () => {
     if (stage?.kind !== 'stage') throw new Error('stage expected');
     expect(slotsSummary(stage.mediaSlots)).toBe('3 photos, 1 vidéo');
     expect(slotsSummary([])).toBe('Rien à tourner');
+  });
+
+  it('sums up the whole stack in one line', () => {
+    expect(stackSummary(emptyDraft().segments)).toBe('1 étape · 3 photos, 1 vidéo');
+    const bridged = addBridgeAfter(addStage(emptyDraft().segments, null), 0);
+    expect(stackSummary(bridged)).toBe('2 étapes · 1 pont · 7 photos, 2 vidéos');
   });
 });

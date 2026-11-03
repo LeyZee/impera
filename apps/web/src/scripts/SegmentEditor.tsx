@@ -13,11 +13,41 @@ import {
 } from '@impera/contracts';
 import { useId, type JSX } from 'react';
 
-import { nextLetter, photo, video, voice } from './model';
+import { ScIcon } from './icons';
+import { nextLetter, photo, slotsSummary, video, voice } from './model';
 
 import { Field, Segment, TextArea, TextInput } from '@/creators/persona/fields';
 
 const KIND_LABELS = { image: 'Photo', video: 'Vidéo', audio: 'Vocal' } as const;
+const PLACEHOLDERS = {
+  image: 'De dos, en lingerie…',
+  video: 'Plan large, elle se retourne…',
+  audio: 'Chuchoté, tout près du micro…',
+} as const;
+const KINDS = ['image', 'video', 'audio'] as const;
+/** « la photo 2 », « le vocal 1 »: the words of the labels a screen reader says. */
+const THE = { image: 'la photo', video: 'la vidéo', audio: 'le vocal' } as const;
+const OF_THE = { image: 'de la photo', video: 'de la vidéo', audio: 'du vocal' } as const;
+const A = { image: 'une photo', video: 'une vidéo', audio: 'un vocal' } as const;
+
+/** What a segment has to shoot, as small counted icons; the words stay for screen readers. */
+export function Counts({ slots }: { slots: readonly MediaSlot[] }): JSX.Element {
+  if (slots.length === 0) return <span className="st-counts st-counts--none">Rien à tourner</span>;
+  return (
+    <span className="st-counts">
+      <span className="sr-only">{slotsSummary(slots)}</span>
+      {KINDS.map((kind) => {
+        const n = slots.filter((slot) => slot.kind === kind).length;
+        return n === 0 ? null : (
+          <span key={kind} className="st-count" aria-hidden="true">
+            <ScIcon name={kind} size={14} />
+            {n}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 /** An empty field is « rien » for the optional sentences: `null`, never an empty string the contract refuses. */
 const orNull = (value: string): string | null => (value.trim() === '' ? null : value);
@@ -43,11 +73,14 @@ export function SegmentEditor({
   const id = useId();
   if (segment.kind === 'bridge') {
     return (
-      <div className="ps-block sc-sheet">
-        <p className="sc-sheet__eyebrow">{title}</p>
-        <p className="ps-muted">
-          Le pont se donne toujours : il fait comprendre au fan ce qui vient ensuite, avec une photo teasing.
-        </p>
+      <div className="ps-block st-sheet">
+        <header className="st-sheet__head">
+          <span className="st-sheet__eyebrow">{title}</span>
+          <h2 className="st-sheet__title">Le pont</h2>
+          <p className="ps-muted">
+            Toujours offert : il fait comprendre au fan ce qui vient ensuite, avec une photo teasing.
+          </p>
+        </header>
         <Field label="Teaser" id={`${id}-teaser`} hint="Ce que le pont fait attendre, en une phrase.">
           <TextArea
             id={`${id}-teaser`}
@@ -70,10 +103,13 @@ export function SegmentEditor({
     );
   }
   return (
-    <div className="ps-block sc-sheet">
-      <p className="sc-sheet__eyebrow">{title}</p>
-      <h3 className="sc-group__title">L’essentiel</h3>
-      <div className="sc-grid">
+    <div className="ps-block st-sheet">
+      <header className="st-sheet__head">
+        <span className="st-sheet__eyebrow">{title}</span>
+        <h2 className="st-sheet__title">{segment.name.trim() === '' ? 'Sans nom' : segment.name}</h2>
+      </header>
+      <h3 className="st-group__title">L’essentiel</h3>
+      <div className="st-grid">
         <Field label="Nom de l’étape" id={`${id}-name`}>
           <TextInput
             id={`${id}-name`}
@@ -115,8 +151,8 @@ export function SegmentEditor({
           }}
         />
       </Field>
-      <h3 className="sc-group__title">Le tournage</h3>
-      <div className="sc-grid sc-grid--three">
+      <h3 className="st-group__title">Le tournage</h3>
+      <div className="st-grid st-grid--three">
         <Field label="Ambiance" id={`${id}-mood`}>
           <TextInput
             id={`${id}-mood`}
@@ -179,29 +215,54 @@ function Slots({
   };
   const full = slots.length >= max;
   return (
-    <fieldset className="sc-fieldset">
-      <legend className="sc-group__title">À tourner</legend>
+    <fieldset className="st-fieldset">
+      <legend className="st-group__title">À tourner</legend>
       {slots.length === 0 ? <p className="ps-muted">Rien à tourner pour l’instant.</p> : null}
-      <ol className="sc-slots">
-        {slots.map((slot, index) => (
-          // A frame has no id of its own: its place in the list is it.
-          <li key={index} className="sc-slot">
-            <span className="sc-slot__kind" data-kind={slot.kind}>
-              {KIND_LABELS[slot.kind]}
-            </span>
-            <input
-              className="nv-glass nv-field__control ps-input sc-slot__hint"
-              aria-label={`Indication de la ${KIND_LABELS[slot.kind].toLowerCase()} ${String(index + 1)}`}
-              placeholder="De dos, en lingerie…"
-              maxLength={MEDIA_SLOT_HINT_MAX}
-              value={slot.hint ?? ''}
-              onChange={(event) => {
-                set(index, { ...slot, hint: orNull(event.target.value) });
-              }}
-            />
-            <span className="sc-slot__meta">
+      <ol className="st-slots">
+        {slots.map((slot, index) => {
+          const n = String(index + 1);
+          return (
+            // A frame has no id of its own: its place in the list is it.
+            <li key={index} className="st-slot" data-kind={slot.kind} data-optional={slot.optional}>
+              <span className="st-slot__kind">
+                <ScIcon name={slot.kind} />
+                {KIND_LABELS[slot.kind]}
+              </span>
+              <input
+                className="nv-glass nv-field__control ps-input st-slot__hint"
+                aria-label={`Indication ${OF_THE[slot.kind]} ${n}`}
+                placeholder={PLACEHOLDERS[slot.kind]}
+                maxLength={MEDIA_SLOT_HINT_MAX}
+                value={slot.hint ?? ''}
+                onChange={(event) => {
+                  set(index, { ...slot, hint: orNull(event.target.value) });
+                }}
+              />
+              <button
+                type="button"
+                className="st-pill st-slot__optional"
+                aria-pressed={slot.optional}
+                title="Une prise facultative peut manquer sans bloquer le dépôt."
+                onClick={() => {
+                  set(index, { ...slot, optional: !slot.optional });
+                }}
+              >
+                Facultative
+              </button>
+              <button
+                type="button"
+                className="st-tool st-tool--danger st-slot__remove"
+                aria-label={`Retirer ${THE[slot.kind]} ${n}`}
+                title="Retirer"
+                onClick={() => {
+                  onChange(slots.filter((_, at) => at !== index));
+                }}
+              >
+                <ScIcon name="close" />
+              </button>
               {slot.kind === 'video' ? (
-                <span className="sc-slot__length">
+                <span className="st-slot__length">
+                  Durée
                   <Seconds
                     label={`Durée minimale de la vidéo ${String(index + 1)}`}
                     value={slot.minSeconds}
@@ -219,11 +280,11 @@ function Slots({
                       set(index, { ...slot, maxSeconds });
                     }}
                   />
-                  <span aria-hidden="true">s</span>
+                  <span aria-hidden="true">secondes</span>
                 </span>
               ) : slot.kind === 'audio' ? (
-                <span className="sc-slot__length">
-                  <span aria-hidden="true">jusqu’à</span>
+                <span className="st-slot__length">
+                  Jusqu’à
                   <Seconds
                     label={`Durée maximale du vocal ${String(index + 1)}`}
                     value={slot.maxSeconds}
@@ -232,34 +293,14 @@ function Slots({
                       set(index, { ...slot, maxSeconds });
                     }}
                   />
-                  <span aria-hidden="true">s</span>
+                  <span aria-hidden="true">secondes</span>
                 </span>
               ) : null}
-              <label className="sc-slot__optional">
-                <input
-                  type="checkbox"
-                  checked={slot.optional}
-                  onChange={(event) => {
-                    set(index, { ...slot, optional: event.target.checked });
-                  }}
-                />
-                Facultative
-              </label>
-            </span>
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
-              aria-label={`Retirer la ${KIND_LABELS[slot.kind].toLowerCase()} ${String(index + 1)}`}
-              onClick={() => {
-                onChange(slots.filter((_, at) => at !== index));
-              }}
-            >
-              Retirer
-            </button>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
-      <div className="sc-actions" aria-describedby={full ? `${id}-full` : undefined}>
+      <div className="st-actions" aria-describedby={full ? `${id}-full` : undefined}>
         {(
           [
             ['Photo', photo],
@@ -270,13 +311,15 @@ function Slots({
           <button
             key={label}
             type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
+            className="nv-btn nv-btn--soft nv-btn--sm st-add"
+            aria-label={`Ajouter ${A[make().kind]}`}
             disabled={full}
             onClick={() => {
               onChange([...slots, make()]);
             }}
           >
-            {`+ ${label}`}
+            <ScIcon name={make().kind} size={15} />
+            {label}
           </button>
         ))}
         {full ? (
@@ -304,7 +347,7 @@ function Seconds({
     <input
       type="number"
       inputMode="numeric"
-      className="nv-glass nv-field__control ps-input sc-seconds"
+      className="nv-glass nv-field__control ps-input st-seconds"
       aria-label={label}
       min={1}
       max={max}
@@ -330,17 +373,17 @@ function Series({
 }): JSX.Element {
   const letter = nextLetter(stage);
   return (
-    <fieldset className="sc-fieldset">
-      <legend className="sc-group__title">Séries</legend>
+    <fieldset className="st-fieldset">
+      <legend className="st-group__title">Séries</legend>
       <p className="ps-hint">
         Les mêmes médias tournés autrement : chaque série a son carton, avec sa pastille en pied.
       </p>
-      <ul className="sc-series">
+      <ul className="st-series">
         {stage.variants.map((series) => (
-          <li key={series.letter} className="sc-series__row">
+          <li key={series.letter} className="st-series__row">
             <button
               type="button"
-              className="nv-chip sc-series__letter"
+              className="nv-chip st-series__letter"
               aria-pressed={variant === series.letter}
               aria-label={`Voir le carton de la série ${series.letter}`}
               onClick={() => {
@@ -366,23 +409,24 @@ function Series({
             />
             <button
               type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
+              className="st-tool st-tool--danger"
               aria-label={`Retirer la série ${series.letter}`}
+              title="Retirer"
               onClick={() => {
                 if (variant === series.letter) onVariant(null);
                 onChange({ ...stage, variants: stage.variants.filter((v) => v.letter !== series.letter) });
               }}
             >
-              Retirer
+              <ScIcon name="close" />
             </button>
           </li>
         ))}
       </ul>
       {letter === null ? null : (
-        <div className="sc-actions">
+        <div className="st-actions">
           <button
             type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
+            className="nv-btn nv-btn--soft nv-btn--sm st-add"
             onClick={() => {
               onChange({
                 ...stage,
@@ -391,7 +435,8 @@ function Series({
               onVariant(letter);
             }}
           >
-            {`+ Série ${letter}`}
+            <ScIcon name="plus" size={15} />
+            {`Série ${letter}`}
           </button>
         </div>
       )}

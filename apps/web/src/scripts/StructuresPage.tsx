@@ -115,29 +115,29 @@ export function StructuresPage(): JSX.Element {
             Aucune structure encore. Pars de la structure de départ, ou commence une structure vide.
           </p>
         ) : null}
-        <ul className="sc-library">
+        <ul className="st-library">
           {structures.data.map((structure) => (
             <li key={structure.id}>
               <button
                 type="button"
-                className="nv-plate sc-tile"
+                className="nv-plate st-tile"
                 onClick={() => {
                   openStructure(structure);
                 }}
               >
                 <span
-                  className="sc-tile__cover"
+                  className="st-tile__cover"
                   style={{
                     background: gradient(structure.current.color),
                     color: scriptCardInk(structure.current.color) ?? SCRIPT_CARD_INKS.dark,
                   }}
                 >
-                  <span className="sc-tile__moment">{MOMENT_LABELS[structure.current.moment]}</span>
-                  <span className="sc-tile__title">{structure.current.name}</span>
+                  <span className="st-tile__moment">{MOMENT_LABELS[structure.current.moment]}</span>
+                  <span className="st-tile__title">{structure.current.name}</span>
                 </span>
-                <span className="sc-tile__body">
-                  <span className="sc-tile__sub">{stagesOf(structure.current.segments)}</span>
-                  <span className="sc-tile__sub">
+                <span className="st-tile__body">
+                  <span className="st-tile__sub">{stagesOf(structure.current.segments)}</span>
+                  <span className="st-tile__sub">
                     {`Version ${String(structure.current.version)}${structure.current.frozen ? ' · déjà demandée' : ''}`}
                   </span>
                 </span>
@@ -146,15 +146,15 @@ export function StructuresPage(): JSX.Element {
           ))}
         </ul>
         {(starters.data ?? []).length === 0 ? null : (
-          <div className="nv-plate ps-panel sc-starters">
+          <div className="nv-plate ps-panel st-starters">
             <p className="nv-eyebrow">Pour démarrer</p>
             {(starters.data ?? []).map((starter) => (
-              <div key={starter.key} className="sc-starter">
-                <span className="sc-tile__color" style={{ background: gradient(starter.body.color) }} />
-                <span className="sc-starter__text">
-                  <span className="sc-tile__name">{starter.body.name}</span>
-                  <span className="sc-tile__sub">{starter.summary}</span>
-                  <span className="sc-tile__sub">
+              <div key={starter.key} className="st-starter">
+                <span className="st-tile__color" style={{ background: gradient(starter.body.color) }} />
+                <span className="st-starter__text">
+                  <span className="st-tile__name">{starter.body.name}</span>
+                  <span className="st-tile__sub">{starter.summary}</span>
+                  <span className="st-tile__sub">
                     {`${MOMENT_LABELS[starter.body.moment]} · ${stagesOf(starter.body.segments)}`}
                   </span>
                 </span>

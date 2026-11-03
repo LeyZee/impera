@@ -1,5 +1,6 @@
 import {
   SCRIPT_COLOR_PRESETS,
+  SCRIPT_SEGMENTS_MAX,
   SCRIPT_STRUCTURE_NAME_MAX,
   type ScriptCardPreviewBody,
   type ScriptColor,
@@ -10,10 +11,11 @@ import {
   type ScriptVariantLetter,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
-import { SegmentEditor } from './SegmentEditor';
+import { Counts, SegmentEditor } from './SegmentEditor';
 import { saveStructure, structuresKey, type SaveResult } from './api';
+import { ScIcon } from './icons';
 import {
   addBridgeAfter,
   addStage,
@@ -26,9 +28,10 @@ import {
   remove,
   replace,
   segmentTitles,
-  slotsSummary,
+  stackSummary,
   type Draft,
 } from './model';
+import { useFlip } from './useFlip';
 import { usePreview } from './usePreview';
 
 import { Segment } from '@/creators/persona/fields';
@@ -87,6 +90,7 @@ export function Workshop({
   const [saving, setSaving] = useState(false);
   const sending = useRef(false);
   const previewRef = useRef<HTMLElement>(null);
+  const flowRef = useRef<HTMLOListElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [customColor, setCustomColor] = useState(presetOf(start.draft.color) === null);
@@ -103,6 +107,7 @@ export function Workshop({
   );
 
   const issues = useMemo(() => issuesOf(draft), [draft]);
+  useFlip(flowRef, draft.segments.map((segment) => segment.key).join(' '));
   const titles = useMemo(() => segmentTitles(draft.segments), [draft.segments]);
   const index = Math.max(
     0,
@@ -164,6 +169,16 @@ export function Workshop({
     setProblem(result.kind === 'invalid' ? result.message : SAVE_PROBLEMS[result.kind]);
   }
 
+  /** Opens a segment's sheet; on a phone the card and the sheet sit under the whole stack, so a tap leads there. */
+  const select = (key: string, follow = true): void => {
+    setSelected(key);
+    setVariant(null);
+    setNotice(null);
+    if (follow && window.matchMedia(NARROW).matches) {
+      previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   /** Alt + ↑ / ↓ moves the stage or the bridge under the focus, as its two buttons do. */
   const onRowKey = (event: KeyboardEvent, at: number): void => {
     if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
@@ -193,18 +208,18 @@ export function Workshop({
   ];
 
   return (
-    <section className="ps-page sc-workshop" aria-label="Atelier de la structure">
-      <div className="nv-glass nv-glass--thin sc-bar">
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm sc-bar__back" onClick={onClose}>
+    <section className="ps-page st-workshop" aria-label="Atelier de la structure">
+      <div className="nv-glass nv-glass--thin st-bar">
+        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm st-bar__back" onClick={onClose}>
           ← Structures
         </button>
-        <span className="sc-bar__chip" style={{ background: gradient(draft.color) }} aria-hidden="true" />
+        <span className="st-bar__chip" style={{ background: gradient(draft.color) }} aria-hidden="true" />
         <label className="sr-only" htmlFor={`${id}-name`}>
           Nom de la structure
         </label>
         <input
           id={`${id}-name`}
-          className="sc-bar__name"
+          className="st-bar__name"
           value={draft.name}
           maxLength={SCRIPT_STRUCTURE_NAME_MAX}
           placeholder="Nom de la structure"
@@ -213,7 +228,7 @@ export function Workshop({
             edit({ name: event.target.value });
           }}
         />
-        <span className="sc-bar__state" data-state={state.tone} aria-live="polite">
+        <span className="st-bar__state" data-state={state.tone} aria-live="polite">
           <span className="ps-dot" data-dot={state.tone === 'warn' ? 'warn' : 'ok'} />
           {state.text}
         </span>
@@ -229,7 +244,7 @@ export function Workshop({
         </button>
       </div>
       {frozen || headIssues.length > 0 || problem !== null ? (
-        <div className="sc-notes">
+        <div className="st-notes">
           {frozen ? (
             <p className="ps-hint">
               Cette version est déjà demandée à une créatrice : l’enregistrement en écrit une nouvelle, la
@@ -249,8 +264,8 @@ export function Workshop({
         </div>
       ) : null}
 
-      <div className="nv-plate sc-look">
-        <div className="sc-look__moment">
+      <div className="nv-plate st-look">
+        <div className="st-look__moment">
           <span className="nv-field__label">Moment</span>
           <Segment
             label="Moment"
@@ -262,18 +277,28 @@ export function Workshop({
           />
           <span className="ps-hint">Soleil, lune, ou les deux en haut de chaque carton.</span>
         </div>
-        <fieldset className="sc-fieldset sc-look__color">
-          <legend className="nv-field__label">
+        <fieldset className="st-fieldset st-look__color">
+          <legend className="nv-field__label st-look__legend">
             Couleur du script
-            <span className="sc-look__picked">{customColor ? 'Libre' : (presetName ?? 'Libre')}</span>
+            <span className="st-look__picked">{customColor ? 'Libre' : (presetName ?? 'Libre')}</span>
+            <button
+              type="button"
+              className="st-pill st-look__free"
+              aria-pressed={customColor}
+              onClick={() => {
+                setCustomColor(!customColor);
+              }}
+            >
+              Couleur libre
+            </button>
           </legend>
-          <div className="sc-swatches" role="radiogroup" aria-label="Couleur du script">
+          <div className="st-swatches" role="radiogroup" aria-label="Couleur du script">
             {SCRIPT_COLOR_PRESETS.map((preset) => (
               <button
                 key={preset.key}
                 type="button"
                 role="radio"
-                className="sc-swatch"
+                className="st-swatch"
                 aria-checked={!customColor && presetOf(draft.color) === preset.key}
                 title={preset.name}
                 aria-label={preset.name}
@@ -284,28 +309,17 @@ export function Workshop({
                 }}
               />
             ))}
-            <button
-              type="button"
-              role="radio"
-              className="sc-swatch sc-swatch--free"
-              aria-checked={customColor}
-              onClick={() => {
-                setCustomColor(true);
-              }}
-            >
-              Libre
-            </button>
           </div>
           {customColor ? (
-            <div className="sc-free">
+            <div className="st-free">
               <span
-                className="sc-free__bar"
+                className="st-free__bar"
                 style={{ background: gradient(draft.color) }}
                 aria-hidden="true"
               />
-              <div className="sc-free__tones">
+              <div className="st-free__tones">
                 {(['primary', 'secondary', 'accent'] as const).map((tone, at) => (
-                  <label key={tone} className="sc-free__tone">
+                  <label key={tone} className="st-free__tone">
                     <input
                       type="color"
                       value={draft.color[tone]}
@@ -315,7 +329,7 @@ export function Workshop({
                     />
                     <span>
                       {['Début', 'Milieu', 'Fin'][at]}
-                      <span className="sc-free__hex">{draft.color[tone]}</span>
+                      <span className="st-free__hex">{draft.color[tone]}</span>
                     </span>
                   </label>
                 ))}
@@ -343,135 +357,162 @@ export function Workshop({
         </fieldset>
       </div>
 
-      <div className="sc-columns">
-        <div className="nv-plate ps-panel sc-stack" style={{ '--sc-accent': gradient(draft.color) }}>
-          <p className="nv-eyebrow">Ordre de vente</p>
-          <ol className="sc-rows">
+      <div className="st-columns">
+        <div className="nv-plate ps-panel st-stack" style={{ '--st-accent': draft.color.primary }}>
+          <div className="st-stack__head">
+            <p className="nv-eyebrow">Ordre de vente</p>
+            <span className="st-stack__sum">{stackSummary(draft.segments)}</span>
+          </div>
+          <ol className="st-flow" ref={flowRef}>
             {draft.segments.map((segment, at) => {
               const wrong = issues.has(segment.key);
+              const title = titles.get(segment.key) ?? '';
+              const here = segment.key === current?.key;
+              const number = draft.segments.slice(0, at + 1).filter((s) => s.kind === 'stage').length;
               return (
-                <li
-                  key={segment.key}
-                  className="sc-rows__item nv-enter"
-                  style={{ '--nv-i': Math.min(at, 12) }}
-                >
-                  <div
-                    className="sc-row"
+                <Fragment key={segment.key}>
+                  <li
+                    className="st-flow__item nv-enter"
+                    data-flip={segment.key}
                     data-kind={segment.kind}
-                    data-current={segment.key === current?.key}
+                    data-current={here}
+                    style={{ '--nv-i': Math.min(at, 12) }}
                   >
-                    <button
-                      type="button"
-                      className="sc-row__main"
-                      aria-current={segment.key === current?.key ? 'true' : undefined}
-                      aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                      onClick={() => {
-                        setSelected(segment.key);
-                        setVariant(null);
-                        // On a phone the card and the sheet sit under the whole stack: the tap leads there.
-                        if (window.matchMedia(NARROW).matches) {
-                          previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                      }}
-                      onKeyDown={(event) => {
-                        onRowKey(event, at);
-                      }}
-                    >
-                      <span className="sc-row__badge" aria-hidden="true">
-                        {(titles.get(segment.key) ?? '').replace(/^(Étape|Pont) /u, '').replace(' & ', '·')}
-                      </span>
-                      <span className="sc-row__text">
-                        <span className="sc-row__code">{titles.get(segment.key)}</span>
-                        <span className="sc-row__name">
-                          {segment.kind === 'stage'
-                            ? segment.name || 'Sans nom'
-                            : segment.teaser || 'Sans teaser'}
-                        </span>
-                        <span className="sc-row__sub">
-                          {wrong ? <span className="ps-dot" data-dot="warn" aria-label="À corriger" /> : null}
-                          <span
-                            className="sc-access"
-                            data-access={segment.kind === 'stage' ? segment.access : 'free'}
-                          >
-                            {segment.kind === 'stage' && segment.access === 'paid' ? 'Payant' : 'Gratuit'}
-                          </span>
-                          {slotsSummary(segment.mediaSlots)}
-                          {segment.kind === 'stage' && segment.variants.length > 0 ? (
-                            <span className="sc-row__series">
-                              {`séries ${segment.variants.map((v) => v.letter).join(' ')}`}
-                            </span>
-                          ) : null}
-                        </span>
-                      </span>
-                    </button>
-                    <span className="sc-row__tools">
-                      <button
-                        type="button"
-                        className="nv-btn nv-btn--plain nv-btn--sm sc-row__tool"
-                        aria-label={`Monter ${titles.get(segment.key) ?? ''}`}
-                        disabled={at === 0}
-                        onClick={() => {
-                          segments(move(draft.segments, at, -1), segment.key);
-                        }}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="nv-btn nv-btn--plain nv-btn--sm sc-row__tool"
-                        aria-label={`Descendre ${titles.get(segment.key) ?? ''}`}
-                        disabled={at === draft.segments.length - 1}
-                        onClick={() => {
-                          segments(move(draft.segments, at, 1), segment.key);
-                        }}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="nv-btn nv-btn--plain nv-btn--sm sc-row__tool"
-                        aria-label={`Retirer ${titles.get(segment.key) ?? ''}`}
-                        disabled={
-                          segment.kind === 'stage' &&
-                          draft.segments.filter((other) => other.kind === 'stage').length === 1
-                        }
-                        onClick={() => {
-                          segments(remove(draft.segments, at));
-                        }}
-                      >
-                        ×
-                      </button>
+                    <span className="st-flow__rail" aria-hidden="true">
+                      <span className="st-flow__node">{segment.kind === 'stage' ? number : null}</span>
                     </span>
-                  </div>
+                    <div className="st-step">
+                      <button
+                        type="button"
+                        className="st-step__main"
+                        aria-current={here ? 'true' : undefined}
+                        aria-label={`${title} : ${segment.kind === 'stage' ? segment.name || 'sans nom' : segment.teaser || 'sans teaser'}`}
+                        aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                        onClick={() => {
+                          select(segment.key);
+                        }}
+                        onKeyDown={(event) => {
+                          onRowKey(event, at);
+                        }}
+                      >
+                        {segment.kind === 'stage' ? (
+                          <>
+                            <span className="st-step__top">
+                              <span className="st-step__name">{segment.name || 'Sans nom'}</span>
+                              <span className="st-access" data-access={segment.access}>
+                                {segment.access === 'paid' ? 'Payant' : 'Gratuit'}
+                              </span>
+                              {wrong ? (
+                                <span className="ps-dot" data-dot="warn" aria-label="À corriger" />
+                              ) : null}
+                            </span>
+                            <span className="st-step__sub">
+                              <Counts slots={segment.mediaSlots} />
+                              {segment.variants.length > 0 ? (
+                                <span className="st-step__series">
+                                  {segment.variants.map((v) => (
+                                    <span key={v.letter} className="st-step__letter">
+                                      {v.letter}
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : null}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="st-step__bridge">
+                            <span className="st-step__code">{title}</span>
+                            <span className="st-step__teaser">{segment.teaser || 'Sans teaser'}</span>
+                            {wrong ? (
+                              <span className="ps-dot" data-dot="warn" aria-label="À corriger" />
+                            ) : null}
+                          </span>
+                        )}
+                      </button>
+                      <span className="st-step__tools">
+                        <button
+                          type="button"
+                          className="st-tool"
+                          aria-label={`Monter ${title}`}
+                          title="Monter (Alt + ↑)"
+                          disabled={at === 0}
+                          onClick={() => {
+                            segments(move(draft.segments, at, -1), segment.key);
+                          }}
+                        >
+                          <ScIcon name="up" />
+                        </button>
+                        <button
+                          type="button"
+                          className="st-tool"
+                          aria-label={`Descendre ${title}`}
+                          title="Descendre (Alt + ↓)"
+                          disabled={at === draft.segments.length - 1}
+                          onClick={() => {
+                            segments(move(draft.segments, at, 1), segment.key);
+                          }}
+                        >
+                          <ScIcon name="down" />
+                        </button>
+                        <button
+                          type="button"
+                          className="st-tool st-tool--danger"
+                          aria-label={`Retirer ${title}`}
+                          title="Retirer"
+                          disabled={
+                            segment.kind === 'stage' &&
+                            draft.segments.filter((other) => other.kind === 'stage').length === 1
+                          }
+                          onClick={() => {
+                            segments(remove(draft.segments, at));
+                          }}
+                        >
+                          <ScIcon name="close" />
+                        </button>
+                      </span>
+                    </div>
+                  </li>
                   {canBridgeAfter(draft.segments, at) ? (
-                    <button
-                      type="button"
-                      className="sc-bridge-add"
-                      onClick={() => {
-                        const next = addBridgeAfter(draft.segments, at);
-                        segments(next, next[at + 1]?.key);
-                      }}
-                    >
-                      + Pont entre ces deux étapes
-                    </button>
+                    <li className="st-flow__gap" data-flip={`${segment.key}+gap`}>
+                      <span className="st-flow__rail" aria-hidden="true" />
+                      <button
+                        type="button"
+                        className="st-flow__bridge"
+                        onClick={() => {
+                          const next = addBridgeAfter(draft.segments, at);
+                          segments(next, next[at + 1]?.key);
+                        }}
+                      >
+                        <ScIcon name="plus" size={14} />
+                        {`Pont entre l’étape ${String(number)} et la ${String(number + 1)}`}
+                      </button>
+                    </li>
                   ) : null}
-                </li>
+                </Fragment>
               );
             })}
+            <li className="st-flow__item st-flow__item--add">
+              <span className="st-flow__rail" aria-hidden="true">
+                <span className="st-flow__node">
+                  <ScIcon name="plus" size={14} />
+                </span>
+              </span>
+              <button
+                type="button"
+                className="st-flow__add"
+                disabled={draft.segments.length >= SCRIPT_SEGMENTS_MAX}
+                onClick={() => {
+                  const next = addStage(draft.segments, null);
+                  segments(next, next.at(-1)?.key);
+                }}
+              >
+                Ajouter une étape
+              </button>
+            </li>
           </ol>
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm sc-stack__add"
-            onClick={() => {
-              const next = addStage(draft.segments, null);
-              segments(next, next.at(-1)?.key);
-            }}
-          >
-            + Ajouter une étape
-          </button>
         </div>
 
-        <div className="nv-plate ps-panel sc-editor">
+        <div className="nv-plate ps-panel st-editor">
           {current === undefined ? null : (
             <>
               <SegmentEditor
@@ -485,7 +526,7 @@ export function Workshop({
                 }}
               />
               {(issues.get(current.key) ?? []).length === 0 ? null : (
-                <ul className="sc-issues">
+                <ul className="st-issues">
                   {(issues.get(current.key) ?? []).map((issue) => (
                     <li key={issue} className="ps-error">
                       {issue}
@@ -497,14 +538,59 @@ export function Workshop({
           )}
         </div>
 
-        <aside className="sc-preview" aria-label="Aperçu du carton" ref={previewRef}>
-          <div className="sc-preview__card">
+        <aside className="st-preview" aria-label="Aperçu du carton" ref={previewRef}>
+          <div className="st-preview__head">
+            <button
+              type="button"
+              className="st-tool"
+              aria-label="Carton précédent"
+              disabled={index === 0}
+              onClick={() => {
+                select(draft.segments[index - 1]?.key ?? selected, false);
+              }}
+            >
+              <ScIcon name="prev" />
+            </button>
+            <span className="st-preview__where">
+              <span className="st-preview__title">{titles.get(current?.key ?? '') ?? ''}</span>
+              <span className="st-preview__count">{`${String(index + 1)} sur ${String(draft.segments.length)}`}</span>
+            </span>
+            <button
+              type="button"
+              className="st-tool"
+              aria-label="Carton suivant"
+              disabled={index >= draft.segments.length - 1}
+              onClick={() => {
+                select(draft.segments[index + 1]?.key ?? selected, false);
+              }}
+            >
+              <ScIcon name="next" />
+            </button>
+          </div>
+          {current?.kind === 'stage' && current.variants.length > 0 ? (
+            <div className="st-preview__series" role="group" aria-label="Série montrée">
+              {current.variants.map((series) => (
+                <button
+                  key={series.letter}
+                  type="button"
+                  className="st-preview__chip"
+                  aria-pressed={variant === series.letter}
+                  onClick={() => {
+                    setVariant(variant === series.letter ? null : series.letter);
+                  }}
+                >
+                  {`Série ${series.letter}`}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="st-preview__card">
             {card.src === null ? (
-              <div className="sc-preview__empty ps-skeleton" />
+              <div className="st-preview__empty ps-skeleton" />
             ) : (
               <img
                 key={card.src}
-                className="sc-preview__img"
+                className="st-preview__img"
                 src={card.src}
                 alt={`Carton de ${titles.get(current?.key ?? '') ?? 'l’étape'}${variant === null ? '' : `, série ${variant}`}`}
                 width={1080}
@@ -517,7 +603,7 @@ export function Workshop({
               ? 'L’aperçu attend qu’un champ soit rempli.'
               : 'Le carton que reçoit la créatrice, tel que le serveur le dessine.'}
           </p>
-          <div className="sc-preview__thumb">
+          <div className="st-preview__thumb">
             {thumbnail.src === null ? null : (
               <img src={thumbnail.src} alt="Vignette des chatteurs" width={160} height={160} />
             )}
