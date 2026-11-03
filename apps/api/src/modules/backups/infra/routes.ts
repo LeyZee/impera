@@ -7,7 +7,7 @@ import {
   type BackupRunRequest,
   type BackupStatus,
   type RestoreTest,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { z } from 'zod';

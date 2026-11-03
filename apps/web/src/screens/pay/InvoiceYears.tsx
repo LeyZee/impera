@@ -1,4 +1,4 @@
-import type { InvoiceList, InvoiceListItem } from '@nirvana/contracts';
+import type { InvoiceList, InvoiceListItem } from '@impera/contracts';
 import type { InfiniteData, UseInfiniteQueryResult } from '@tanstack/react-query';
 import type { JSX } from 'react';
 

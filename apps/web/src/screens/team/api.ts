@@ -21,7 +21,7 @@ import {
   type TeamMemberNote,
   type TeamMemberStatus,
   type UpdateTeamMemberBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import type { TeamRefusalCode } from './model';

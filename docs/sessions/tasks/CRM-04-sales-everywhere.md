@@ -68,7 +68,7 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 **Elle voit**, en lecture seule, sur ses comptes seulement :
 - ses ventes : l'heure, le type (PPV, pourboire, abonnement…), le montant payé par le fan, sa part, et « remboursée » s'il y a lieu ;
-- le fan, mais seulement quand Nirvana le connaît déjà par sa fiche. L'API ne donne qu'un pseudo, que nous ne gardons pas (ADR 0050 § 4) ;
+- le fan, mais seulement quand Impera le connaît déjà par sa fiche. L'API ne donne qu'un pseudo, que nous ne gardons pas (ADR 0050 § 4) ;
 - ses totaux sur Aujourd'hui, la quinzaine et le mois, « estimés » tant que la période n'est pas close (ADR 0042 § 6).
 
 **Elle ne voit jamais** :

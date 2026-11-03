@@ -1,4 +1,4 @@
-import { CurrencySchema, LlmRoleSchema } from '@nirvana/contracts';
+import { CurrencySchema, LlmRoleSchema } from '@impera/contracts';
 import { bigint, boolean, char, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
 import { closedToCreator, createdAt, enumCheck, enumText, id, tenantPolicy } from './columns';

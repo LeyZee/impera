@@ -3,7 +3,7 @@ import type {
   SalesFeedCheckReport,
   SalesFeedChatterLink,
   SalesFeedModelLink,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useEffect, useId, useState, type JSX } from 'react';
 
 import { CheckReport } from './CheckReport';
@@ -156,7 +156,7 @@ export function CheckPanel({
           Vérification de fiabilité
         </h3>
         <p className="sv-muted">
-          Avant qu’un compte passe sur le net de {name}, compare au centime le registre de Nirvana avec les
+          Avant qu’un compte passe sur le net de {name}, compare au centime le registre d’Impera avec les
           statistiques de {name} et l’export de son dashboard, jour par jour puis membre par membre. Rien
           n’est écrit, aucun montant ne bouge.
         </p>

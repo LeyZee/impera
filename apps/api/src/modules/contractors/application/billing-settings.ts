@@ -4,7 +4,7 @@ import type {
   JournalAccounts,
   UpdateBillingSettingsBody,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { agencyLogoVerdict, logoSidesFit, type PngReading, type PngSize } from '../domain/agency-logo';
 import { AgencyLogoInvalid, AgencyLogoNotFound } from '../domain/errors';

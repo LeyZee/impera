@@ -15,13 +15,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --filter nirvana --filter "@nirvana/api..."
-RUN pnpm turbo run build --filter=@nirvana/api
+    pnpm install --offline --frozen-lockfile --filter impera --filter "@impera/api..."
+RUN pnpm turbo run build --filter=@impera/api
 # Then the API's production dependencies alone, from the same lockfile: the workspace packages are bundled in dist
 # (tsup.config.ts), so they are dev dependencies and stay out, with the build tools.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     rm -rf node_modules apps/*/node_modules packages/*/node_modules \
-    && pnpm install --offline --frozen-lockfile --prod --ignore-scripts --filter @nirvana/api
+    && pnpm install --offline --frozen-lockfile --prod --ignore-scripts --filter @impera/api
 
 FROM ${NODE_IMAGE} AS runtime
 # ffmpeg/ffprobe read the fans' videos and voice notes (module media); tini forwards SIGTERM and reaps them.
@@ -31,7 +31,7 @@ RUN apk add --no-cache ffmpeg rsvg-convert tini \
   && echo '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>' \
     | rsvg-convert --format png > /dev/null \
   && mkdir -p /data/training && chown node:node /data/training
-ENV NODE_ENV=production PORT=3000 NIRVANA_TRAINING_DIR=/data/training
+ENV NODE_ENV=production PORT=3000 IMPERA_TRAINING_DIR=/data/training
 # The layout mirrors the repository: the bundled code reads `../migrations` (packages/db), `../prompts`
 # (packages/llm), `../src/modules/invoicing/infra/fonts` (the invoices' fonts, EQ-06 lot 4), `../src/modules/scripts/infra/fonts`
 # (the script cards' fonts, SC-01 lot b) and `../../../personas`

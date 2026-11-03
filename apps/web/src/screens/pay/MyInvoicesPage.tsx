@@ -1,4 +1,4 @@
-import type { InvoiceListItem, TeamMemberId } from '@nirvana/contracts';
+import type { InvoiceListItem, TeamMemberId } from '@impera/contracts';
 import { useState, type JSX, type ReactNode } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';

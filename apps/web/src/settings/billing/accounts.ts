@@ -3,7 +3,7 @@ import {
   JournalAccountsSchema,
   type JournalAccountName,
   type JournalAccounts,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * The journal's accounts as Réglages › Facturation types them (EQ-06 lot 8c): eight fields, empty until the accountant

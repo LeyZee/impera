@@ -123,7 +123,7 @@ export function BackupsSection(): JSX.Element {
               diffèrent.
             </li>
             <li>
-              Tu le colles dans « Noter un essai ». Nirvana le rapproche d’une sauvegarde réussie, et refuse
+              Tu le colles dans « Noter un essai ». Impera le rapproche d’une sauvegarde réussie, et refuse
               une empreinte qu’il ne connaît pas.
             </li>
           </ol>

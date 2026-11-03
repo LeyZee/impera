@@ -29,7 +29,7 @@ x-api-env: &api-env
   LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
   LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
   S3_ENDPOINT: ${S3_ENDPOINT:-}
-  S3_BUCKET: ${S3_BUCKET:-nirvana-media}
+  S3_BUCKET: ${S3_BUCKET:-impera-media}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
   # The invoices' PDFs under compliance lock (ADR 0037): Hetzner, then the copy at OVHcloud. Required: the API refuses
@@ -46,12 +46,12 @@ x-api-env: &api-env
   INVOICES_COPY_S3_SECRET_ACCESS_KEY: ${INVOICES_COPY_S3_SECRET_ACCESS_KEY:?}
   VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
   VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-  NIRVANA_INLINE_WORKER: '0'
+  IMPERA_INLINE_WORKER: '0'
 
 # The same image for the three Node services; Docker's cache builds it once.
 x-api-image: &api-image
   build: { context: ., dockerfile: apps/api/Dockerfile }
-  image: nirvana-api:${SOURCE_COMMIT:-local}
+  image: impera-api:${SOURCE_COMMIT:-local}
 
 services:
   # Applies the pending migrations, then exits; the API and the worker start only once it succeeded.

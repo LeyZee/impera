@@ -40,7 +40,7 @@ import type {
   TeamScope,
   UpdatePayrollSettingsBody,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { Actor } from '../../contractors/pure';
 

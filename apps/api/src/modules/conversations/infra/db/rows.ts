@@ -15,8 +15,8 @@ import {
   MessageIdSchema,
   PlatformAccountIdSchema,
   UserIdSchema,
-} from '@nirvana/contracts';
-import { sql, type schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type schema } from '@impera/db';
 import { z } from 'zod';
 
 import type { Conversation, Draft, DraftFact, StoredEvent } from '../../domain/ports';

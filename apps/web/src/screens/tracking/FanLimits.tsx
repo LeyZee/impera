@@ -1,4 +1,4 @@
-import type { FanFlags, FanFlagsView, SetFanFlagBody } from '@nirvana/contracts';
+import type { FanFlags, FanFlagsView, SetFanFlagBody } from '@impera/contracts';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 

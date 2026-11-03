@@ -1,4 +1,4 @@
-import type { AiProvider, ConnectionSignal } from '@nirvana/contracts';
+import type { AiProvider, ConnectionSignal } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { VerificationOutcome } from '../../domain/verification';
@@ -19,7 +19,7 @@ const NEW_KEY = 'xai-NEWFAKENEWFAKENEWFAKE0000';
 
 const works: VerificationOutcome = {
   ok: true,
-  keyLabel: 'nirvana-prod',
+  keyLabel: 'impera-prod',
   summary: 'Grok 4.7 écrit et décide',
   facts: [],
   settings: {},
@@ -47,7 +47,7 @@ describe('connecting a key', () => {
   it('saves a key the provider accepts and shows what it found', async () => {
     const { deps, store, changes } = setup({ current: works });
     const result = await connectProvider(deps, 'xai', OLD_KEY);
-    expect(result).toMatchObject({ ok: true, value: { state: 'connected', keyLabel: 'nirvana-prod' } });
+    expect(result).toMatchObject({ ok: true, value: { state: 'connected', keyLabel: 'impera-prod' } });
     expect((await store.find('xai'))?.key).toBe(OLD_KEY);
     expect(changes).toEqual(['xai']);
   });

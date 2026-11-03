@@ -40,5 +40,5 @@ Ce dépôt est conçu pour être travaillé par des sessions d'agents codeurs (C
 
 ## Ce que ce dépôt n'est pas
 
-- Pas une copie d'Imperium ni d'OnlyScript. Leurs concepts sont reconstruits de zéro dans Nirvana (l'équipe et la paie d'Imperium par l'ADR 0023, les scripts d'OnlyScript en second temps), aucun code repris (voir `docs/reference/legacy-projects.md`).
+- Pas une copie d'Imperium ni d'OnlyScript. Leurs concepts sont reconstruits de zéro dans Impera (l'équipe et la paie d'Imperium par l'ADR 0023, les scripts d'OnlyScript en second temps), aucun code repris (voir `docs/reference/legacy-projects.md`).
 - Pas un SaaS multi-agences pour l'instant. Une créatrice (Messalina), une plateforme (Reveal), un objectif : fiabilité du connecteur, qualité du chatting, propreté de l'architecture.

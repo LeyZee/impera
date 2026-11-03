@@ -1,4 +1,4 @@
-import { DomainError, type ConnectorErrorCode } from '@nirvana/contracts';
+import { DomainError, type ConnectorErrorCode } from '@impera/contracts';
 
 export class PlatformAccountNotFound extends DomainError {
   constructor() {
@@ -89,7 +89,7 @@ export class SalesFeedWebhookUrlUnprocessable extends DomainError {
   constructor() {
     super(
       'sales_feed_webhook_url_unprocessable',
-      'L’adresse publique de Nirvana n’est pas en HTTPS : Reveal ne peut pas y envoyer les ventes',
+      'L’adresse publique d’Impera n’est pas en HTTPS : Reveal ne peut pas y envoyer les ventes',
     );
   }
 }

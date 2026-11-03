@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -33,7 +33,7 @@ describe('App before any session', () => {
       vi.fn(() => new Promise<Response>(() => undefined)),
     );
     render(<App />);
-    expect(screen.getByRole('status', { name: 'Chargement de Nirvana' })).toBeDefined();
+    expect(screen.getByRole('status', { name: 'Chargement d’Impera' })).toBeDefined();
   });
 
   it('asks to sign in only when the server says there is no session', async () => {
@@ -42,10 +42,10 @@ describe('App before any session', () => {
     expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
   });
 
-  it('forgets what the device kept of Nirvana when there is no session (a 401, a sign-out made elsewhere)', async () => {
+  it('forgets what the device kept of Impera when there is no session (a 401, a sign-out made elsewhere)', async () => {
     const deleted: string[] = [];
     vi.stubGlobal('caches', {
-      keys: () => Promise.resolve(['nirvana-shell-v1', 'nirvana-assets-v1']),
+      keys: () => Promise.resolve(['impera-shell-v1', 'impera-assets-v1']),
       delete: (key: string) => {
         deleted.push(key);
         return Promise.resolve(true);
@@ -54,7 +54,7 @@ describe('App before any session', () => {
     serveMe(401);
     render(<App />);
     await screen.findByLabelText('Mot de passe');
-    expect(deleted).toEqual(['nirvana-shell-v1', 'nirvana-assets-v1']);
+    expect(deleted).toEqual(['impera-shell-v1', 'impera-assets-v1']);
   });
 
   it('says the server does not answer instead of asking to sign in, and asks again on its own', async () => {

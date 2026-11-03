@@ -8,7 +8,7 @@ Branche : task/eq-16-recruit-practice
 Un nouveau chatteur s'exerce à la méthode de l'agence contre des fans simulés avant son premier vrai fan, et chaque message reçoit un retour précis ; le propriétaire et le manager voient sa progression.
 
 ## Contexte à lire
-`docs/adr/0024-roles-and-navigation.md` (un chatteur ne voit jamais Entraîner ni la persona), `apps/api/src/modules/playground/` (`fan-presets.ts`, fans simulés), P3-01, P3-05, `evals/` (rubriques), la méthode de chatting (`/mnt/project-files/chatting/methode-chatting.md`, hors dépôt), le plafond de dépense IA (20 € par jour, dur). Dans le playground, l'agent répond au fan simulé ; ici, c'est la recrue qui répond. On s'entraîne dans Nirvana ; en vrai, le chatteur chatte dans Reveal (ADR 0025), et ce qu'il y tape échappe aux gardes : l'entraînement est sa principale protection.
+`docs/adr/0024-roles-and-navigation.md` (un chatteur ne voit jamais Entraîner ni la persona), `apps/api/src/modules/playground/` (`fan-presets.ts`, fans simulés), P3-01, P3-05, `evals/` (rubriques), la méthode de chatting (`/mnt/project-files/chatting/methode-chatting.md`, hors dépôt), le plafond de dépense IA (20 € par jour, dur). Dans le playground, l'agent répond au fan simulé ; ici, c'est la recrue qui répond. On s'entraîne dans Impera ; en vrai, le chatteur chatte dans Reveal (ADR 0025), et ce qu'il y tape échappe aux gardes : l'entraînement est sa principale protection.
 
 ## À faire
 - [ ] **S'entraîner** (`practice_session`) dans l'espace du chatteur, depuis Aujourd'hui (mis en avant tant que le membre porte le badge « nouveau »), jamais dans l'onglet Entraîner : la recrue choisit une situation parmi les préréglages de fan (nouveau, chaud, négocie, détresse…), un fan simulé lui écrit, elle répond.

@@ -1,4 +1,4 @@
-import type { FanFlags } from '@nirvana/contracts';
+import type { FanFlags } from '@impera/contracts';
 
 /**
  * When she may offer a script (docs/sessions/tasks/PROPOSED-sales-policy.md, Charles 17/10 22h00): one script per

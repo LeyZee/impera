@@ -1,4 +1,4 @@
-import { newId, ShiftTemplateIdSchema, type ShiftTemplateId } from '@nirvana/contracts';
+import { newId, ShiftTemplateIdSchema, type ShiftTemplateId } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { PlanningAdmin, PlanningClock } from '../../domain/ports';

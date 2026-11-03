@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { FactCategorySchema, FactKindSchema, MessageIdSchema } from '@nirvana/contracts';
-import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@nirvana/db';
+import { FactCategorySchema, FactKindSchema, MessageIdSchema } from '@impera/contracts';
+import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
 
 import { FanNotFound } from '../domain/errors';
 import type { StoredFact } from '../domain/facts';

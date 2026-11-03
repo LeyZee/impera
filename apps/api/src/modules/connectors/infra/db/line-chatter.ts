@@ -1,4 +1,4 @@
-import { sql } from '@nirvana/db';
+import { sql } from '@impera/db';
 
 /**
  * A line's chatter, the one rule the reads of the register share (pay, the totals, a day's refunds; ADR 0050 § 5): a

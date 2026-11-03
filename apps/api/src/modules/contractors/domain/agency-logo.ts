@@ -4,7 +4,7 @@ import {
   AGENCY_LOGO_MAX_SIDE,
   AGENCY_LOGO_MIN_SIDE,
   type AgencyLogoRefusal,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** A PNG's size, from its header (IHDR). */
 export interface PngSize {

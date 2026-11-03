@@ -6,7 +6,7 @@ import {
   SignInAnswerSchema,
   type Me,
   type SecondFactorSetup,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * Dashboard session, through the API under `/v1` (proxied to the API in development, same origin in production

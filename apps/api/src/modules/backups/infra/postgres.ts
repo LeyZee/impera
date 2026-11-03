@@ -4,8 +4,8 @@ import {
   EventIdSchema,
   EVENT_PAYLOADS,
   newId,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { BackupAlerts, BackupRequestsStore, BackupRunsReader, RestoreTestsStore } from '../domain/ports';

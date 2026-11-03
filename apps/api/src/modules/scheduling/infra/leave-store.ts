@@ -4,7 +4,7 @@ import {
   type CreatorId,
   type LeaveRequestId,
   type TeamMemberStatus,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   enterCreator,
@@ -16,7 +16,7 @@ import {
   withMember,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import {

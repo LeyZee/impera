@@ -1,4 +1,4 @@
-import { CustomAlertIdSchema } from '@nirvana/contracts';
+import { CustomAlertIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

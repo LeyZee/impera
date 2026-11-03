@@ -6,7 +6,7 @@ import {
   type PayPeriod,
   type PayPeriodBlock,
   type PayrollPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 

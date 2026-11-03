@@ -1,4 +1,4 @@
-import type { PlaygroundAnswer, PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
 import type { JSX, ReactNode } from 'react';
 
 import { euros, needsAttention } from './logic';

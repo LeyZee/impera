@@ -6,7 +6,7 @@ import {
   type CalendarLinkCreated,
   type CalendarLinkState,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { feedWindow, icsOf, type FeedEvent } from '../domain/calendar-feed';
 import { CalendarFeedNotFound, CalendarLinkForbidden } from '../domain/errors';
@@ -22,7 +22,7 @@ export interface CalendarLinkService {
   feed(token: string): Promise<string>;
 }
 
-const FEED_NAME = 'Nirvana · mes shifts';
+const FEED_NAME = 'Impera · mes shifts';
 
 /** Stable for a shift that keeps its member, creator and start: a calendar updates it in place when its end moves. */
 const uidOf = (memberId: string, creatorId: string, startsAt: Date): string =>

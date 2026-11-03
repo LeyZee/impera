@@ -6,8 +6,8 @@ import {
   LIVE_WINDOW,
   type AgentHours,
   type DecidedDraft,
-} from '@nirvana/contracts';
-import { sql, withTenant, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, withTenant, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { unansweredSince } from '../../domain/dashboard';

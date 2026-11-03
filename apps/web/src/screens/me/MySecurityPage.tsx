@@ -1,4 +1,4 @@
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { MeNav } from './MeNav';

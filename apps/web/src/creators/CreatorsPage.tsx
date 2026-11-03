@@ -1,4 +1,4 @@
-import type { CreatorId } from '@nirvana/contracts';
+import type { CreatorId } from '@impera/contracts';
 import { useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 

@@ -5,7 +5,7 @@ Dépend de : ADR 0030 (proposée), capture Reveal (forme de `listVaultMedia` et 
 Branche : task/<id>-media-library
 
 ## Objectif
-Le propriétaire voit dans Nirvana tous les médias du coffre Reveal de chaque créatrice, rangés par dossier comme dans Reveal, chacun avec une description que l'agent peut raconter au fan, corrigée et validée par un humain, et sait pour chaque fan ce qu'il a déjà vu.
+Le propriétaire voit dans Impera tous les médias du coffre Reveal de chaque créatrice, rangés par dossier comme dans Reveal, chacun avec une description que l'agent peut raconter au fan, corrigée et validée par un humain, et sait pour chaque fan ce qu'il a déjà vu.
 
 ## Contexte à lire
 ADR 0030, ADR 0018 (§ 1 et § 5), `P6-01-sales-catalog.md` (§ Description par média, § Accès aux médias), `docs/architecture/data-model.md` (§ Médias), `apps/api/src/modules/media/` (`descriptionKey`, `keyframeRate`, `spreadFrames`), `docs/reference/media-vocabulary.md`, `docs/reference/reveal-connector-inventory.md` (L10, L15, § Vault), `docs/reference/desirely-analysis.md`.
@@ -34,6 +34,6 @@ Onglet Médias par modèle ; bouton Synchroniser : choix de la plateforme, navig
 - Aucun vrai média ni vraie description dans le dépôt (ADR 0010) : les tests utilisent des fichiers générés.
 
 ## Hors périmètre
-Téléverser vers une plateforme, créer des dossiers dans Nirvana, éditer les scripts (fiche « Atelier de scripts »), OnlyFans (même modèle, plus tard).
+Téléverser vers une plateforme, créer des dossiers dans Impera, éditer les scripts (fiche « Atelier de scripts »), OnlyFans (même modèle, plus tard).
 
 ## Notes de session

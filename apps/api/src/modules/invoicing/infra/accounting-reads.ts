@@ -1,4 +1,4 @@
-import { inArray, schema, sql, type Transaction } from '@nirvana/db';
+import { inArray, schema, sql, type Transaction } from '@impera/db';
 
 const { invoicePdfCopies, invoicePdfs, invoices } = schema;
 

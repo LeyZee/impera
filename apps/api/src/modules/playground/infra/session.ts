@@ -1,5 +1,5 @@
-import { desireBandOf, type DesireBand, type DesireSignal, type MediaDescription } from '@nirvana/contracts';
-import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from '@nirvana/llm';
+import { desireBandOf, type DesireBand, type DesireSignal, type MediaDescription } from '@impera/contracts';
+import type { Brief, ConversationTurn, LlmFailure, LlmGateway, VoiceInput } from '@impera/llm';
 
 import {
   asSent,

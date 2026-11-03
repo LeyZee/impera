@@ -4,7 +4,7 @@ import {
   type PersonaErrorCode,
   type PersonaSampleReplyFault,
   type PersonaSampleReplyUnprocessableDetails,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** Error codes of the module (`PERSONA_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 

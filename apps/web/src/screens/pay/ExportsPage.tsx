@@ -1,4 +1,4 @@
-import type { AccountingJournal, AccountingPeriodQuery, Das2Export, Me } from '@nirvana/contracts';
+import type { AccountingJournal, AccountingPeriodQuery, Das2Export, Me } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type SyntheticEvent, type JSX, type ReactNode } from 'react';
 

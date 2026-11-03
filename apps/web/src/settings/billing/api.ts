@@ -16,7 +16,7 @@ import {
   type JournalAccounts,
   type UpdateBillingSettingsBody,
   type ValidateBillingRegimeBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { z } from 'zod';

@@ -9,7 +9,7 @@ import { PublicBrand } from './PublicBrand';
 export function Unreachable(): JSX.Element {
   return (
     <main className="nv-aura grid min-h-dvh place-items-center px-4">
-      {/* The name first, as on every public page (NAV-16): this is Nirvana speaking. */}
+      {/* The name first, as on every public page (NAV-16): this is Impera speaking. */}
       <section className="nv-plate nv-plate--pad flex w-full max-w-sm flex-col gap-5">
         <PublicBrand page="Serveur injoignable" />
         <div className="flex items-start gap-4" role="status">
@@ -19,7 +19,7 @@ export function Unreachable(): JSX.Element {
               Le serveur <em className="text-[var(--nv-warning)] not-italic">ne répond pas</em>
             </h1>
             <p className="text-sm text-[var(--nv-ink-muted)]">
-              Nirvana réessaie tout seul et revient dès qu’il répond.
+              Impera réessaie tout seul et revient dès qu’il répond.
             </p>
           </div>
         </div>

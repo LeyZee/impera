@@ -1,6 +1,6 @@
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import type { BudgetEvent } from '@nirvana/llm';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { BudgetEvent } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { publishBudgetThreshold } from '../budget-events';

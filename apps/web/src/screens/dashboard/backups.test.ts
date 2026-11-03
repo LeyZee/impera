@@ -1,4 +1,4 @@
-import type { BackupStatus } from '@nirvana/contracts';
+import type { BackupStatus } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { backupBannerOf } from './backups';

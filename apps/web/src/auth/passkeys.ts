@@ -1,4 +1,4 @@
-import { ApiErrorSchema, PasskeySchema, PasskeysSchema, type Passkey } from '@nirvana/contracts';
+import { ApiErrorSchema, PasskeySchema, PasskeysSchema, type Passkey } from '@impera/contracts';
 import {
   browserSupportsWebAuthn,
   platformAuthenticatorIsAvailable,
@@ -85,7 +85,7 @@ export function gestureName(
 
 export type PasskeySignInResult =
   | 'ok'
-  /** The person closed Face ID, or the device has no key for Nirvana: nothing reached the server. */
+  /** The person closed Face ID, or the device has no key for Impera: nothing reached the server. */
   | 'cancelled'
   /** The server refused the gesture: unknown key, removed key, wrong signature. */
   | 'refused'

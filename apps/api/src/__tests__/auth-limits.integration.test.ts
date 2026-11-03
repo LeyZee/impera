@@ -1,5 +1,5 @@
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';
@@ -74,7 +74,7 @@ describe('client IP and sign-in limits (G6)', () => {
   it('records the client behind the proxy, never a header the client wrote', async () => {
     const response = await signIn(proxied, OWNER.email, OWNER.password, {
       remoteAddress: '10.0.0.2',
-      headers: { 'x-forwarded-for': '203.0.113.7', 'x-nirvana-client-ip': '198.51.100.1' },
+      headers: { 'x-forwarded-for': '203.0.113.7', 'x-impera-client-ip': '198.51.100.1' },
     });
     expect(response.statusCode).toBe(200);
     expect(await lastLoginIp()).toBe('203.0.113.7');

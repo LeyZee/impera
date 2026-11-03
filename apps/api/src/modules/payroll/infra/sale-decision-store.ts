@@ -10,7 +10,7 @@ import {
   type PayPeriod,
   type PaySaleDecision,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   enterCreator,
@@ -21,7 +21,7 @@ import {
   withMember,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import { PayrollForbidden } from '../../contractors/pure';

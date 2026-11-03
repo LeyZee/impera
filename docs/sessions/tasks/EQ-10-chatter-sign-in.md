@@ -8,7 +8,7 @@ Branche : task/eq-10-chatter-sign-in
 Chaque chatteur se connecte à son propre espace, depuis son téléphone ou son ordinateur, sans e-mail ni Telegram. Son premier accès le guide jusqu'à Aujourd'hui : mot de passe, contrat et mandat, dossier.
 
 ## Contexte à lire
-`docs/adr/0023-team-management.md`, `docs/adr/0024-roles-and-navigation.md`, `apps/api/src/auth.ts` (Better Auth : e-mail et mot de passe, inscription publique fermée), `docs/conventions/security.md`, `docs/architecture/threat-model.md`, EQ-01, EQ-06. Nirvana n'envoie pas d'e-mails aujourd'hui ; les chatteurs, souvent au Bénin ou à Madagascar, reçoivent leurs liens par WhatsApp.
+`docs/adr/0023-team-management.md`, `docs/adr/0024-roles-and-navigation.md`, `apps/api/src/auth.ts` (Better Auth : e-mail et mot de passe, inscription publique fermée), `docs/conventions/security.md`, `docs/architecture/threat-model.md`, EQ-01, EQ-06. Impera n'envoie pas d'e-mails aujourd'hui ; les chatteurs, souvent au Bénin ou à Madagascar, reçoivent leurs liens par WhatsApp.
 
 ## À faire
 - [x] **Prérequis, avant qu'un chatteur reçoive des `creator_ids`** (fait par Bilan, migration 0016 : `routed_to_user_id`, `routedCreatorIds`) : le filtre du serveur « un chatteur ne lit que les conversations qui lui sont routées » existe dans `conversations` (fait par le propriétaire de `conversations`). EQ-13 ouvre ensuite au chatteur les créatrices de son shift, pendant le shift seulement (ADR 0025). Aujourd'hui, un `operator` lit toutes les conversations de ses `creator_ids`.

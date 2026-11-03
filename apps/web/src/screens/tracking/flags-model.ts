@@ -5,7 +5,7 @@ import {
   SPENDING_LIMIT_MAX_MINOR,
   type FanFlags,
   type SalesFreezeReason,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { withFirstOfMonth } from '@/scheduling/time';
 

@@ -1,4 +1,4 @@
-import type { Calendar, CalendarAgent, PlanningMember } from '@nirvana/contracts';
+import type { Calendar, CalendarAgent, PlanningMember } from '@impera/contracts';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 

@@ -1,6 +1,6 @@
 /** Public entry point of the `providers` module (ADR 0002, ADR 0016). Other modules import this file only. */
-import type { AiProvider, ConnectionService, ConnectionSignal } from '@nirvana/contracts';
-import { parseEncryptionKeys, type Database, type EncryptionKey } from '@nirvana/db';
+import type { AiProvider, ConnectionService, ConnectionSignal } from '@impera/contracts';
+import { parseEncryptionKeys, type Database, type EncryptionKey } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import {

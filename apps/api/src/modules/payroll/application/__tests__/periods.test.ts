@@ -6,7 +6,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
   type CommissionStatementRules,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { PayReader, PeriodView, StoredStatement } from '../../domain/ports';

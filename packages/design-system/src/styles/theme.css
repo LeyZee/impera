@@ -1,5 +1,5 @@
 /*
- * Tailwind v4 bridge: exposes the Nirvana tokens as Tailwind utilities.
+ * Tailwind v4 bridge: exposes the Impera tokens as Tailwind utilities.
  * Import after `tailwindcss` and `tokens.css`. `inline` keeps the `var(--nv-*)` reference in each
  * utility, so utilities follow the active theme without needing a variant.
  *

@@ -1,4 +1,4 @@
-import type { TelegramBot, TelegramChat, TelegramTopic } from '@nirvana/contracts';
+import type { TelegramBot, TelegramChat, TelegramTopic } from '@impera/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -137,9 +137,9 @@ export function BotSheet({
 }
 
 function CreateStep({ onNext }: { onNext: () => void }): JSX.Element {
-  const [name, setName] = useState('Nirvana Alertes');
+  const [name, setName] = useState('Impera Alertes');
   // The identifier follows the name the chip offers, the default one when the field is emptied.
-  const shownName = name.trim() === '' ? 'Nirvana Alertes' : name.trim();
+  const shownName = name.trim() === '' ? 'Impera Alertes' : name.trim();
   const username = suggestedUsername(shownName);
   return (
     <>
@@ -258,7 +258,7 @@ function TokenStep({
       <h2 id="tg-sheet-title">{bot === null ? 'Colle le jeton' : `Nouveau jeton pour ${bot.displayName}`}</h2>
       <p>
         {bot === null
-          ? 'Nirvana le vérifie auprès de Telegram, puis le garde chiffré. Personne ne pourra le relire, même toi.'
+          ? 'Impera le vérifie auprès de Telegram, puis le garde chiffré. Personne ne pourra le relire, même toi.'
           : 'Demande-le à @BotFather avec /token. Les groupes et les réglages du bot restent tels quels.'}
       </p>
       {check.kind === 'reauth' ? (
@@ -388,7 +388,7 @@ function ListenStep({
   return (
     <>
       <h2 id="tg-sheet-title">Ajoute {bot.displayName} à ton groupe</h2>
-      <p>Choisis le groupe dans Telegram. Nirvana le verra arriver tout seul, rien à recopier.</p>
+      <p>Choisis le groupe dans Telegram. Impera le verra arriver tout seul, rien à recopier.</p>
       {found.length === 0 ? (
         <div className="tg-listen" aria-live="polite">
           <div className="tg-radar" aria-hidden="true">
@@ -426,7 +426,7 @@ function ListenStep({
       <div className="tg-sheet__actions">
         <a
           className="nv-btn nv-btn--soft"
-          href={`https://t.me/${encodeURIComponent(bot.username)}?startgroup=nirvana`}
+          href={`https://t.me/${encodeURIComponent(bot.username)}?startgroup=impera`}
           target="_blank"
           rel="noreferrer"
         >

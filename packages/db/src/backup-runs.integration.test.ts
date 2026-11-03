@@ -25,7 +25,7 @@ describe('backup_runs and restore_tests (ADR 0028): the daily export and its res
     // What the `backup` service writes, with the admin role.
     const { rows } = await test.admin.db.execute<{ id: string }>(sql`
       insert into backup_runs (started_at, finished_at, status, object_key, size_bytes, sha256, pg_dump_version, row_counts)
-      values (now() - interval '2 minutes', now(), 'succeeded', 'backups/nirvana.tar.age', 1024, ${SHA},
+      values (now() - interval '2 minutes', now(), 'succeeded', 'backups/impera.tar.age', 1024, ${SHA},
               'pg_dump (PostgreSQL) 16.15', '{"creators": 2}')
       returning id`);
     runId = rows[0]?.id ?? '';

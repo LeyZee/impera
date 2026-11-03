@@ -1,4 +1,4 @@
-import { CommissionStatementIdSchema } from '@nirvana/contracts';
+import { CommissionStatementIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { PayoutCertificate, PayrollPayoutCertificateStore } from '../../domain/ports';

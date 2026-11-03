@@ -16,8 +16,8 @@ import {
   type PlatformAccountId,
   type SaleStatus,
   type TeamMemberId,
-} from '@nirvana/contracts';
-import { enterCreator, eq, schema, sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { enterCreator, eq, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import {

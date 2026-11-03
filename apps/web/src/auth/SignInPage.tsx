@@ -1,4 +1,4 @@
-import { isBackupCode } from '@nirvana/contracts';
+import { isBackupCode } from '@impera/contracts';
 import { useEffect, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';
@@ -194,7 +194,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
         <p className="text-sm text-[var(--nv-ink-muted)]">
           {backup
             ? 'Un des dix codes notés à l’activation. Chacun ne sert qu’une fois.'
-            : 'Ouvre ton application d’authentification et recopie le code à 6 chiffres de Nirvana.'}
+            : 'Ouvre ton application d’authentification et recopie le code à 6 chiffres d’Impera.'}
         </p>
       </div>
       <label className="nv-field">
@@ -283,7 +283,7 @@ function PasskeyOffer({ onDone }: { onDone: () => void }): JSX.Element {
         </h1>
         <p className="text-sm text-[var(--nv-ink-muted)]">
           Un geste suffira, sans mot de passe ni code. Ton visage ou ton empreinte restent sur cet
-          appareil&nbsp;: Nirvana n’en voit rien.
+          appareil&nbsp;: Impera n’en voit rien.
         </p>
       </div>
       {error === null ? null : (

@@ -11,10 +11,10 @@ import {
   type PersonaVersionId,
   type PlatformAccountId,
   type SendResult,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import type { Brief, HealthReport, LlmGateway } from '@nirvana/llm';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { Brief, HealthReport, LlmGateway } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 

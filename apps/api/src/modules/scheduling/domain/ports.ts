@@ -27,7 +27,7 @@ import type {
   TeamMemberStatus,
   TeamScope,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { CreatorAgent } from './calendar';
 import type { Reader, RulesRow } from './reports';

@@ -1,4 +1,4 @@
-import type { ConversationState, DraftStatus } from '@nirvana/contracts';
+import type { ConversationState, DraftStatus } from '@impera/contracts';
 
 /** Default wait after the last fan message before answering, so that three messages get one answer. */
 export const DEFAULT_DEBOUNCE_SECONDS = 45;

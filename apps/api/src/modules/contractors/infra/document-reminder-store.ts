@@ -8,8 +8,8 @@ import {
   newId,
   type ContractorDocumentKind,
   type ContractorDocumentReview,
-} from '@nirvana/contracts';
-import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import { documentsToRemind, documentValidUntil, regimeOn } from '../domain/billing';
 import type { PayrollDocumentReminderStore } from '../domain/ports';

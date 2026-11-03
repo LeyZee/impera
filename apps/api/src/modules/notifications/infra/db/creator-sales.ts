@@ -1,5 +1,5 @@
-import { CreatorIdSchema, EVENT_PAYLOADS } from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { CreatorIdSchema, EVENT_PAYLOADS } from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { CreatorSaleSource } from '../../domain/ports';

@@ -1,4 +1,4 @@
-import { MessageIdSchema } from '@nirvana/contracts';
+import { MessageIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { operatorNoteFact, readProposedFacts } from '../facts';

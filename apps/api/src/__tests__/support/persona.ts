@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PersonaSchema, type CreatorId, type Persona } from '@nirvana/contracts';
+import { PersonaSchema, type CreatorId, type Persona } from '@impera/contracts';
 import { parse } from 'yaml';
 
 import type { App } from '../../composition-root';

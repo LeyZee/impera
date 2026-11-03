@@ -1,4 +1,4 @@
-import type { Brief, ConversationTurn } from '@nirvana/llm';
+import type { Brief, ConversationTurn } from '@impera/llm';
 
 import type { Destination, RatedAnswer } from '../domain/calibration';
 import type { Situation } from '../domain/situation';

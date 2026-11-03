@@ -6,7 +6,7 @@ import {
   type ConversationEventView,
   type DraftView,
   type MessageView,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { decisionError, draftsOf, isOutdated, threadOf, todoLabel, whyHuman } from './reader-model';

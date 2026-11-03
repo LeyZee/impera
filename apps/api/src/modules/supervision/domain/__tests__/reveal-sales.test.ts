@@ -6,7 +6,7 @@ import {
   type SaleSeller,
   type SalesTotals,
   type SalesTotalsRow,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { revealSalesPanel, salesDays } from '../reveal-sales';

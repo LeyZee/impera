@@ -1,4 +1,4 @@
-import { migrationStatus, sql, type Database } from '@nirvana/db';
+import { migrationStatus, sql, type Database } from '@impera/db';
 
 /** A worker that has not written its heartbeat for this long is considered gone (P0-04). */
 const HEARTBEAT_MAX_AGE_SECONDS = 90;

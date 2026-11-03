@@ -14,7 +14,7 @@ import {
   type ContractorRegime,
   type ContractText,
   type TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { vi } from 'vitest';
 
 import { MEMBERS, payId, SCHEDULING_SETTINGS, THEO } from './pay';

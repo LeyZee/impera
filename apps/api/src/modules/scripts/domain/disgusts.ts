@@ -3,7 +3,7 @@ import {
   type PersonaLimits,
   type ScriptDisgustBlock,
   type ScriptSegment,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** The persona entries a stage must not touch: what she never does, never shows, and what disgusts her (ADR 0056 § 1). */
 const stageTerms = (limits: PersonaLimits): readonly string[] => [

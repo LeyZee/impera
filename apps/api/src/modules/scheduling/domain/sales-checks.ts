@@ -6,7 +6,7 @@ import {
   type PayPeriod,
   type Platform,
   type PlatformAccountId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** An account's dated rules as the automatic sales check reads them (CRM-04 b3), pure. */
 export interface DatedAccountRules {

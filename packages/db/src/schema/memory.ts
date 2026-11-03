@@ -1,4 +1,4 @@
-import { FactCategorySchema, FactKindSchema } from '@nirvana/contracts';
+import { FactCategorySchema, FactKindSchema } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
   check,

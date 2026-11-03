@@ -8,7 +8,7 @@ import type {
   Shift,
   ShiftReport,
   ShiftSwapRequest,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type {
   NamedMember,

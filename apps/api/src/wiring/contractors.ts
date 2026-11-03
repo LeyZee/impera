@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS } from '@nirvana/contracts';
+import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { invoiceBucket, type Config } from '../config';
 import { defineTask } from '../jobs';

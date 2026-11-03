@@ -8,8 +8,8 @@ import {
   type SalesFeedReading,
   type SalesRefunds,
   type SalesTotals,
-} from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { refundsOfDay, salesTotals, type TotalsLine } from '../../domain/sales-totals';

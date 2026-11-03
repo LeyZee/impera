@@ -1,4 +1,4 @@
-import { CreatorIdSchema, FanIdSchema, type FanFlags } from '@nirvana/contracts';
+import { CreatorIdSchema, FanIdSchema, type FanFlags } from '@impera/contracts';
 
 import type { FansModule } from '../../fans';
 import type { Protection } from '../domain/hold';

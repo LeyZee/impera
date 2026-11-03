@@ -11,7 +11,7 @@ import type {
   InvoicePdfPlace,
   TeamMemberId,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { Actor } from '../../contractors/pure';
 

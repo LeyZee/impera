@@ -51,7 +51,7 @@ export function isProviderTrouble(status: number): boolean {
 
 /**
  * The `unreachable` outcome with what the provider actually did: a 429 is a quota or a rate limit; a 5xx, a timeout,
- * a network error or an answer Nirvana cannot read is a provider that is not answering normally. Neither says
+ * a network error or an answer Impera cannot read is a provider that is not answering normally. Neither says
  * anything about the key, so the text must not claim it is fine either.
  */
 export function unreachableFrom(reply: HttpReply): RefusedKey {

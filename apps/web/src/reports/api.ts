@@ -27,7 +27,7 @@ import {
   type UpdateShiftReportBody,
   type ValidateShiftReportsBody,
   type ValidateShiftReportsResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { z } from 'zod';

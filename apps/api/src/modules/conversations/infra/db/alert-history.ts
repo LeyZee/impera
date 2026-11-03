@@ -7,8 +7,8 @@ import {
   type CreatorId,
   type EventId,
   type UserId,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { AlertHistory, AlertTriggerFilter } from '../../domain/ports';

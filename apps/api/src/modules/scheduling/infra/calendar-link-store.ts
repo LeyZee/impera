@@ -6,8 +6,8 @@ import {
   newId,
   TeamMemberIdSchema,
   UserIdSchema,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { Actor, CalendarLinkStore } from '../domain/ports';
 

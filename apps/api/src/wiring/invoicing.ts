@@ -1,4 +1,4 @@
-import { JOB_MAX_ATTEMPTS, JOB_PAYLOADS } from '@nirvana/contracts';
+import { JOB_MAX_ATTEMPTS, JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import { createInvoicingModule, type InvoicingModule } from '../modules/invoicing';

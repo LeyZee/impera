@@ -1,4 +1,4 @@
-import type { NotificationOutcome, NotificationRequest } from '@nirvana/contracts';
+import type { NotificationOutcome, NotificationRequest } from '@impera/contracts';
 
 import { creatorSaleMessage } from '../domain/creator-sale';
 import type { CreatorSaleSource } from '../domain/ports';

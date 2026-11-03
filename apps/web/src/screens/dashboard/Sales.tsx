@@ -6,7 +6,7 @@ import {
   niceTicks,
   placeSegmentThumb,
   ringDash,
-} from '@nirvana/design-system';
+} from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { changePercent, chartTip, eur, leverView, sharePercent, signed, trendSeries } from './logic';

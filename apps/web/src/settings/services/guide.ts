@@ -1,4 +1,4 @@
-import type { AiProvider } from '@nirvana/contracts';
+import type { AiProvider } from '@impera/contracts';
 
 /**
  * What the sheet teaches for each service: where to create the key and with which settings. The state of a service,
@@ -44,7 +44,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     console: { label: 'Ouvrir la console xAI', url: 'https://console.x.ai' },
     where: 'Dans API Keys, crée une clé avec :',
     ticks: [
-      { label: 'Nom', value: 'nirvana-prod', copy: true },
+      { label: 'Nom', value: 'impera-prod', copy: true },
       { label: 'Modèles', value: 'grok-4.7 et grok-4.3', code: true },
       { label: 'Accès', value: 'Chat' },
     ],
@@ -62,7 +62,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     console: { label: 'Ouvrir Google AI Studio', url: 'https://aistudio.google.com/apikey' },
     where: 'Clique sur Create API key, puis :',
     ticks: [
-      { label: 'Projet', value: 'Nirvana', code: true },
+      { label: 'Projet', value: 'Impera', code: true },
       { label: 'Restriction', value: 'Restrict to Gemini API only' },
     ],
     note: 'Active la facturation du projet. En offre gratuite, Google peut garder les médias des fans.',
@@ -79,7 +79,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     console: { label: 'Ouvrir la console Mistral', url: 'https://console.mistral.ai/api-keys' },
     where: 'Dans API Keys, clique sur Create new key, puis :',
     ticks: [
-      { label: 'Nom', value: 'nirvana-prod', copy: true },
+      { label: 'Nom', value: 'impera-prod', copy: true },
       { label: 'Expiration', value: 'Aucune' },
     ],
     note: 'Active la facturation du workspace : l’offre gratuite limite fortement le nombre d’appels.',
@@ -96,7 +96,7 @@ export const GUIDES: Record<DashboardProvider, ServiceGuide> = {
     console: { label: 'Ouvrir ElevenLabs', url: 'https://elevenlabs.io/app/settings/api-keys' },
     where: 'Crée une clé avec :',
     ticks: [
-      { label: 'Nom', value: 'nirvana-prod', copy: true },
+      { label: 'Nom', value: 'impera-prod', copy: true },
       { label: 'Accès', value: 'Text to Speech, Voices et User en lecture' },
       { label: 'Limite', value: '100 000 caractères par mois', code: true },
     ],

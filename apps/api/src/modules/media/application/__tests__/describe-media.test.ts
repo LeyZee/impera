@@ -1,4 +1,4 @@
-import { err, ok, type MediaDescription } from '@nirvana/contracts';
+import { err, ok, type MediaDescription } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { createInMemoryDescriptionStore } from '../../infra/gateway-senser';

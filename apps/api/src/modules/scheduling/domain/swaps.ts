@@ -1,4 +1,4 @@
-import type { ShiftSwapStatus, TeamScope } from '@nirvana/contracts';
+import type { ShiftSwapStatus, TeamScope } from '@impera/contracts';
 
 import { ShiftNotFound, ShiftStarted, ShiftSwapAnswered, ShiftSwapNotYours, ShiftSwapSelf } from './errors';
 

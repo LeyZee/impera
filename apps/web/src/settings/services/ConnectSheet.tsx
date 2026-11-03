@@ -1,4 +1,4 @@
-import type { ProviderStatus, ProviderVoice } from '@nirvana/contracts';
+import type { ProviderStatus, ProviderVoice } from '@impera/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -334,12 +334,12 @@ export function ConnectSheet({
         <li className="sv-step" data-state={hasOpenedConsole ? 'now' : 'later'}>
           <span className="sv-num">2</span>
           <div className="sv-step__head">
-            {phase.kind === 'reauth' ? 'Confirme ton mot de passe Nirvana' : 'Colle-la ici'}
+            {phase.kind === 'reauth' ? 'Confirme ton mot de passe Impera' : 'Colle-la ici'}
           </div>
           {phase.kind === 'reauth' ? (
             <div className="sv-step__body">
               <PasswordPrompt
-                lead="Ta connexion date de plus de 10 minutes : pour toucher à une clé, Nirvana redemande ton mot de passe."
+                lead="Ta connexion date de plus de 10 minutes : pour toucher à une clé, Impera redemande ton mot de passe."
                 note="Ta clé est gardée, elle sera vérifiée juste après."
                 onBusyChange={setIsReauthBusy}
                 onConfirmed={() => {
@@ -380,7 +380,7 @@ export function ConnectSheet({
                   aria-label={`Clé ${guide.vendor}`}
                   aria-invalid={error !== null}
                   aria-describedby="sv-key-msg"
-                  placeholder="Nirvana la vérifie toute seule"
+                  placeholder="Impera la vérifie toute seule"
                   disabled={isBusy}
                   onPaste={(event) => {
                     event.preventDefault();

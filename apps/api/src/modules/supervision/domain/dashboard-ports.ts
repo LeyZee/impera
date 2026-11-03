@@ -7,7 +7,7 @@ import type {
   Platform,
   SalesTotals,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { UsdRate } from './fan-ranking';
 

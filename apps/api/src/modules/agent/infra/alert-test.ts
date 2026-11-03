@@ -1,5 +1,5 @@
-import type { AlertTestBody, AlertTestResult } from '@nirvana/contracts';
-import { brainAlertId, type LlmGateway } from '@nirvana/llm';
+import type { AlertTestBody, AlertTestResult } from '@impera/contracts';
+import { brainAlertId, type LlmGateway } from '@impera/llm';
 
 import { alertKeywordsIn } from '../domain/alerts';
 

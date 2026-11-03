@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { JOB_NAMES } from '@nirvana/contracts';
+import { JOB_NAMES } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { JOBS_WITHOUT_TASK } from '../wiring/shared';

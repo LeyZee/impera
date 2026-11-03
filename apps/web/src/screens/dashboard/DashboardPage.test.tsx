@@ -5,7 +5,7 @@ import {
   TeamMemberIdSchema,
   type AgentMode,
   type Dashboard as ApiDashboard,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -752,7 +752,7 @@ describe('DashboardPage with several creators (recette 28/10, G1)', () => {
 
   it('keeps the choice over a reload, and moves it with the arrow keys', async () => {
     serveBoth();
-    localStorage.setItem('nirvana.followed-creator', CREATOR.id);
+    localStorage.setItem('impera.followed-creator', CREATOR.id);
     renderDashboard();
     const lea = await screen.findByRole('radio', { name: 'Léa' });
     expect(lea.getAttribute('aria-checked')).toBe('true');
@@ -761,7 +761,7 @@ describe('DashboardPage with several creators (recette 28/10, G1)', () => {
     await waitFor(() => {
       expect(lastRead()).toBe(ANA.id);
     });
-    expect(localStorage.getItem('nirvana.followed-creator')).toBe(ANA.id);
+    expect(localStorage.getItem('impera.followed-creator')).toBe(ANA.id);
   });
 
   it('shows the urgencies of the others on their chip, and says when they cannot be read (DASH-03)', async () => {

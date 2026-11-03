@@ -1,5 +1,5 @@
-import type { ExchangeRate, ForeignCurrency, PayPeriod, UserId } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import type { ExchangeRate, ForeignCurrency, PayPeriod, UserId } from '@impera/contracts';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { JobLogger } from '../contractors/pure';

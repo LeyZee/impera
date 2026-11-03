@@ -1,4 +1,4 @@
-import { PushMessageSchema } from '@nirvana/contracts';
+import { PushMessageSchema } from '@impera/contracts';
 
 import type { DeliveryOutcome, PushSender } from '../domain/ports';
 

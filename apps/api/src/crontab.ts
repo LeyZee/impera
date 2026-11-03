@@ -1,5 +1,5 @@
-import { JOB_MAX_ATTEMPTS, type JobName } from '@nirvana/contracts';
-import { sql, type Database } from '@nirvana/db';
+import { JOB_MAX_ATTEMPTS, type JobName } from '@impera/contracts';
+import { sql, type Database } from '@impera/db';
 import { parseCronItems, type CronItem, type ParsedCronItem } from 'graphile-worker';
 import { z } from 'zod';
 

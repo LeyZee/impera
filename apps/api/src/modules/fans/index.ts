@@ -1,5 +1,5 @@
-import { KycSlotSchema, type CreatorId, type KycSlot } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import { KycSlotSchema, type CreatorId, type KycSlot } from '@impera/contracts';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createFansService, type FansService } from './application/fans';

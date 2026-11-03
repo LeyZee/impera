@@ -1,4 +1,4 @@
-import { DomainError, type PayRulesSourceRefusal } from '@nirvana/contracts';
+import { DomainError, type PayRulesSourceRefusal } from '@impera/contracts';
 
 /** Error codes of the module (`SCHEDULING_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 export class ShiftNotFound extends DomainError {

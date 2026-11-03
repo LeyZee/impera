@@ -5,9 +5,9 @@ import {
   SalesLineIdSchema,
   TeamMemberIdSchema,
   type PlatformAccountId,
-} from '@nirvana/contracts';
-import { schema, withAdmin } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { schema, withAdmin } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { salesFeedReadsForPay } from '../pay-reads';

@@ -5,8 +5,8 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   manifest: {
-    name: 'Nirvana',
-    description: 'Connecte Reveal à Nirvana.',
+    name: 'Impera',
+    description: 'Connecte Reveal à Impera.',
     host_permissions: ['https://*.reveal.me/*'],
   },
   // WXT's default dev port is 3000, the API's: under `pnpm dev` the extension took it first and the API never started.

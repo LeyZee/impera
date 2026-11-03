@@ -1,4 +1,4 @@
-import { BACKUP_RUN_STATUSES, type BackupRunStatus } from '@nirvana/contracts';
+import { BACKUP_RUN_STATUSES, type BackupRunStatus } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { bigint, check, index, integer, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 

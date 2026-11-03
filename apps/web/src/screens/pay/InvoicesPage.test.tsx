@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { InvoiceListItem, Me } from '@nirvana/contracts';
+import type { InvoiceListItem, Me } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,

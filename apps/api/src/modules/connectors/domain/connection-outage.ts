@@ -1,4 +1,4 @@
-import type { ConnectionService, Platform } from '@nirvana/contracts';
+import type { ConnectionService, Platform } from '@impera/contracts';
 
 /**
  * When the sales register of a platform is told down for want of an answer (Telegram P3-12): after several failed

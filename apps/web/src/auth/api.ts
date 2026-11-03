@@ -9,7 +9,7 @@ import {
   type InvitationLinkPurpose,
   type Me,
   type PasswordInvalidReason,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * Invitation links (EQ-10): a member's first access (`/bienvenue#t=…`) or a new password

@@ -1,5 +1,5 @@
 /** Public entry point of the `supervision` module (ADR 0002). Other modules import this file only. */
-import type { Database } from '@nirvana/db';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';

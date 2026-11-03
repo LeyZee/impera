@@ -7,7 +7,7 @@ import type {
   ScriptStructureId,
   ScriptStructureList,
   ScriptStructureVersion,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** A structure of a queue, with the version a request would take: the latest. */
 export interface QueuedStructure {

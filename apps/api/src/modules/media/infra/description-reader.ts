@@ -1,5 +1,5 @@
-import type { CreatorId, MediaAssetId } from '@nirvana/contracts';
-import { inArray, schema, sql, withTenant, type Database } from '@nirvana/db';
+import type { CreatorId, MediaAssetId } from '@impera/contracts';
+import { inArray, schema, sql, withTenant, type Database } from '@impera/db';
 import { z } from 'zod';
 
 /** The one line Suivi shows of a stored description: read alone, so an older vocabulary still says what it shows. */

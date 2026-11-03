@@ -1,4 +1,4 @@
-import type { ConversationId, DraftId, DraftStatus, EventBody, EventType } from '@nirvana/contracts';
+import type { ConversationId, DraftId, DraftStatus, EventBody, EventType } from '@impera/contracts';
 
 import { projectionOf } from '../domain/conversation';
 import { ConversationNotFound, DraftConflict, DraftNotFound, TransitionConflict } from '../domain/errors';

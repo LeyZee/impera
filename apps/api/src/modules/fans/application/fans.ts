@@ -8,7 +8,7 @@ import {
   type KycSlot,
   type TeamScope,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   kycSlotsToLearn,

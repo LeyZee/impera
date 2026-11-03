@@ -4,7 +4,7 @@ import {
   type FanFlags,
   type SetFanFlagBody,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { AgeDisputeForbidden, AgeDisputeReasonInvalid } from './errors';
 

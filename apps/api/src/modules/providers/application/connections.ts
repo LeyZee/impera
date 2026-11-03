@@ -10,7 +10,7 @@ import {
   type ProviderSettings,
   type ProviderStatus,
   type Result,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { DASHBOARD_PROVIDERS } from '../domain/catalog';
 import { credentialSignal, unreachableSignal } from '../domain/connection-signal';

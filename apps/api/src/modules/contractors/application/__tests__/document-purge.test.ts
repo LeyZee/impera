@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { ContractorDocumentIdSchema, TeamMemberIdSchema } from '@nirvana/contracts';
+import { ContractorDocumentIdSchema, TeamMemberIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { InvoiceStorageRefused } from '../../domain/errors';

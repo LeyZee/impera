@@ -5,7 +5,7 @@ import type {
   PeriodFigures,
   PeriodPace,
   StatementCountedSales,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { reachedBpsOf } from './commission-statements';
 

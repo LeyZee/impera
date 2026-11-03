@@ -1,4 +1,4 @@
-import type { ProviderStatus } from '@nirvana/contracts';
+import type { ProviderStatus } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { GUIDES } from './guide';
@@ -61,7 +61,7 @@ describe('Services view rules', () => {
         { ...status('xai', 'needs_reconnect'), isUnreadable: true },
         status('mistral', 'not_connected'),
       ]),
-    ).toBe('L’agent n’écrit plus : Nirvana ne peut plus lire la clé de Grok et aucun relais n’est branché.');
+    ).toBe('L’agent n’écrit plus : Impera ne peut plus lire la clé de Grok et aucun relais n’est branché.');
     // Another service's action keeps the server's words.
     const google = { ...refused, provider: 'google' as const, lead: 'Google refuse la clé.' };
     expect(leadOf(google, [status('google', 'needs_reconnect')])).toBe('Google refuse la clé.');
@@ -128,7 +128,7 @@ describe('Services view rules', () => {
     ).toBeNull();
   });
 
-  it('never blames the provider for a key Nirvana can no longer decrypt', () => {
+  it('never blames the provider for a key Impera can no longer decrypt', () => {
     const unreadable = {
       ...status('elevenlabs', 'needs_reconnect'),
       verifiedAt: '2026-10-17T19:00:00.000Z',
@@ -136,7 +136,7 @@ describe('Services view rules', () => {
     };
     const notice = verifyNotice('elevenlabs', unreadable, { ...unreadable });
     expect(notice).toBe(
-      'Nirvana ne peut plus lire la clé enregistrée : ElevenLabs n’a pas été contacté. Colle la clé à nouveau.',
+      'Impera ne peut plus lire la clé enregistrée : ElevenLabs n’a pas été contacté. Colle la clé à nouveau.',
     );
     expect(notice).not.toMatch(/n’a pas répondu/);
   });

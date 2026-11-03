@@ -1,7 +1,7 @@
-import { CreatorIdSchema, newId } from '@nirvana/contracts';
-import { schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import type { LlmCallRecord, LlmCallStore } from '@nirvana/llm';
+import { CreatorIdSchema, newId } from '@impera/contracts';
+import { schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { LlmCallRecord, LlmCallStore } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createDrizzleLlmCallStore } from '../llm-call-store';

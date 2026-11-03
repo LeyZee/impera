@@ -19,9 +19,9 @@ import {
   type PlatformAccountId,
   type ShiftReportId,
   type TeamMember,
-} from '@nirvana/contracts';
-import { and, eq, lockPayrollClose, schema, sql, type Transaction } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { and, eq, lockPayrollClose, schema, sql, type Transaction } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';

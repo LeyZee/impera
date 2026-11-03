@@ -1,4 +1,4 @@
-import type { Me, PayPeriod, PayPeriodSummary } from '@nirvana/contracts';
+import type { Me, PayPeriod, PayPeriodSummary } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, type JSX } from 'react';
 

@@ -4,8 +4,8 @@ import {
   payPeriodOfDay,
   PayPeriodSchema,
   type PayPeriod,
-} from '@nirvana/contracts';
-import { eq, lockPayrollClose, schema, withMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, lockPayrollClose, schema, withMember, type Database, type Transaction } from '@impera/db';
 
 import { PayEntryConflict, PayPeriodClosed } from '../domain/errors';
 import type { PayrollRuleStore } from '../domain/ports';

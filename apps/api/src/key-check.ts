@@ -1,4 +1,4 @@
-import { decryptSecret, schema, sql, type Database, type EncryptionKey } from '@nirvana/db';
+import { decryptSecret, schema, sql, type Database, type EncryptionKey } from '@impera/db';
 
 import { checkSalesFeedKeys } from './modules/connectors';
 import { checkProviderKeys } from './modules/providers';

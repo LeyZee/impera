@@ -1,6 +1,6 @@
-import { CreatorIdSchema, newId, PlatformAccountIdSchema, type PlatformAccountId } from '@nirvana/contracts';
-import { schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { CreatorIdSchema, newId, PlatformAccountIdSchema, type PlatformAccountId } from '@impera/contracts';
+import { schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createApp, type App } from '../composition-root';

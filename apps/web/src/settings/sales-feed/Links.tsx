@@ -5,7 +5,7 @@ import type {
   SalesFeedChatterLink,
   SalesFeedModelLink,
   SalesFeedOverview,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { linkChatter, linkModel } from './api';
@@ -64,7 +64,7 @@ function RowError({ id, rows }: { id: string; rows: RowState }): JSX.Element | n
 }
 
 /**
- * Each model of the platform and the Nirvana account its sales count for (ADR 0050 § 3). A model nobody linked keeps
+ * Each model of the platform and the Impera account its sales count for (ADR 0050 § 3). A model nobody linked keeps
  * its sales in quarantine, counted nowhere; linking it moves them into the register in the same step.
  */
 export function ModelLinks({
@@ -88,7 +88,7 @@ export function ModelLinks({
           Modèles {name}
         </h3>
         <p className="sv-muted">
-          Chaque modèle de {name} compte pour un compte de Nirvana. Tant qu’un modèle n’est relié à aucun, ses
+          Chaque modèle de {name} compte pour un compte d’Impera. Tant qu’un modèle n’est relié à aucun, ses
           ventes attendent à part et ne comptent nulle part.
         </p>
         {models.some((model) => model.linkedBy?.kind === 'auto') ? (
@@ -185,7 +185,7 @@ export function ChatterLinks({
           Équipe {name}
         </h3>
         <p className="sv-muted">
-          Chaque compte de l’équipe {name} est un membre de l’équipe Nirvana, ou l’agent. La paie lira ce lien
+          Chaque compte de l’équipe {name} est un membre de l’équipe Impera, ou l’agent. La paie lira ce lien
           ; aucune vente n’est attribuée ici.
         </p>
         {members.isError ? (

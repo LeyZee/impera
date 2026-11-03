@@ -11,7 +11,7 @@ import {
   type AlertTrigger,
   type HandoffCause,
   type JobPayload,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type {
   Clock,

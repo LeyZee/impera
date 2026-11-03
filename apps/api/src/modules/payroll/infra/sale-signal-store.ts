@@ -13,7 +13,7 @@ import {
   type PaySaleSignal,
   type SaleSignalKind,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   eq,
@@ -23,7 +23,7 @@ import {
   withMember,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import {

@@ -4,7 +4,7 @@ import {
   type ConversationState,
   type DraftStatus,
   type GuardCode,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { BlockedReason } from './ports';
 import type { ConversationCommand } from './state-machine';

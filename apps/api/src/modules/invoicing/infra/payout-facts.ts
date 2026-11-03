@@ -1,5 +1,5 @@
-import { WithholdingSchema } from '@nirvana/contracts';
-import type { Transaction } from '@nirvana/db';
+import { WithholdingSchema } from '@impera/contracts';
+import type { Transaction } from '@impera/db';
 
 import { contractorReadsForInvoicing as fileReads } from '../../contractors';
 import type { PayoutDocument, PayoutFacts } from '../domain/payouts';

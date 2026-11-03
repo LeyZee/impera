@@ -6,7 +6,7 @@ import type {
   TelegramOverview,
   TelegramRoute,
   TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
@@ -208,7 +208,7 @@ export function TelegramSection({
             <div>
               <p className="tg-cover__title">Telegram n’est pas activé sur ce serveur</p>
               <p className="tg-cover__sub">
-                C’est un réglage d’installation, fait une seule fois par la personne qui héberge Nirvana.
+                C’est un réglage d’installation, fait une seule fois par la personne qui héberge Impera.
               </p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export function TelegramSection({
   const lede = (
     <p className="tg-lede">
       Ce qui mérite ton attention arrive dans tes groupes Telegram. Les messages des fans ne quittent jamais
-      Nirvana.
+      Impera.
     </p>
   );
   const sheetView =
@@ -251,7 +251,7 @@ export function TelegramSection({
           <p className="tg-cover__title">{coverOf(overview).title}</p>
           <p className="tg-cover__sub">
             Un bot Telegram se crée en une minute avec @BotFather, puis tu le mets dans un groupe : les
-            urgences y arriveront, même à 3 h du matin. Nirvana te guide pas à pas.
+            urgences y arriveront, même à 3 h du matin. Impera te guide pas à pas.
           </p>
           <button type="button" className="nv-btn nv-btn--neon" onClick={openAdd}>
             Ajouter un bot
@@ -755,14 +755,14 @@ function AlertsTab({
           'Plusieurs alertes d’un coup sont regroupées en un message.',
         ]}
       >
-        <PreviewMessage from="Nirvana Alertes" time="02:38" edit="✓ Pris en main par Théo">
+        <PreviewMessage from="Impera Alertes" time="02:38" edit="✓ Pris en main par Théo">
           🔴 <b>URGENT · Créatrice</b>
           <br />
           Possible mineur sur une photo envoyée par un fan. L’agent n’écrit plus à ce fan et attend un humain.
           <br />
           <span className="tg-msg__link">Ouvrir la conversation</span>
         </PreviewMessage>
-        <PreviewMessage from="Nirvana Alertes" time="07:52" isSilent quote="La session Reveal a expiré">
+        <PreviewMessage from="Impera Alertes" time="07:52" isSilent quote="La session Reveal a expiré">
           ✓ Résolu : la session est revenue.
         </PreviewMessage>
       </GroupPreview>
@@ -806,7 +806,7 @@ function SalesTab({ scope, onScope, ...routing }: ScopedProps): JSX.Element {
           'Le bilan du soir donne les chiffres du jour à 23 h.',
         ]}
       >
-        <PreviewMessage from="Nirvana Ventes" time="22:47" isSilent>
+        <PreviewMessage from="Impera Ventes" time="22:47" isSilent>
           💰 <b>Vente · Créatrice</b>
           <br />
           PPV · 45,00 € · vendue par l’agent
@@ -838,7 +838,7 @@ function ValidationsTab({ scope, onScope, ...routing }: ScopedProps): JSX.Elemen
           'Une fois traité, le message se met à jour pour que personne ne le fasse deux fois.',
         ]}
       >
-        <PreviewMessage from="Nirvana Alertes" time="21:16" edit="✓ Validé par Hugo">
+        <PreviewMessage from="Impera Alertes" time="21:16" edit="✓ Validé par Hugo">
           🎙️ <b>Vocal à valider · Créatrice</b>
           <br />
           Vocal de 14 s prêt pour un fan. Il ne part pas sans toi.

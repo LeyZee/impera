@@ -9,7 +9,7 @@ import {
   type TeamMemberErrorCode,
   type TeamMemberStatus,
   type TeamRole,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { countryName } from '@/lib/country';
 import { memberOf } from '@/lib/utils';

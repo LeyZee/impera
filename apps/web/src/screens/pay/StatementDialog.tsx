@@ -5,7 +5,7 @@ import {
   type ExchangeRate,
   type PaymentMethod,
   type PayrollPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { EntryForm, type EntryAdded } from './EntryForm';

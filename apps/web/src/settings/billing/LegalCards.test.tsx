@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { BillingRegime, ContractText } from '@nirvana/contracts';
+import type { BillingRegime, ContractText } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

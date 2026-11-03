@@ -4,7 +4,7 @@ import {
   DraftIdSchema,
   PlatformAccountIdSchema,
   newId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { FAKE_TOKEN } from '../../__tests__/support/fake-telegram';
@@ -273,7 +273,7 @@ describe('reading the outbox', () => {
       lastRateDay: null,
     });
     expect(rate({ currency: 'usd<b>', lastRateDay: null, day: '2026-10-28' })).toBeUndefined();
-    // EQ-06: the period, the document and the reason; the member, the statement and the amount stay in Nirvana.
+    // EQ-06: the period, the document and the reason; the member, the statement and the amount stay in Impera.
     const notIssued = (payload: object) =>
       toScannedEvent({ ...base, type: 'invoice_not_issued', payload })?.signal;
     const invoice = {
@@ -292,7 +292,7 @@ describe('reading the outbox', () => {
     });
     expect(notIssued({ ...invoice, reason: 'something_new' })).toBeUndefined();
     expect(notIssued({ ...invoice, period: '2026-10-17' })).toBeUndefined();
-    // ADR 0037: the document's number, the place and the stage; the member and the invoice id stay in Nirvana.
+    // ADR 0037: the document's number, the place and the stage; the member and the invoice id stay in Impera.
     const pdf = {
       invoiceId: '018f3e5c-0000-7000-8000-000000000003',
       memberId: '018f3e5c-0000-7000-8000-000000000001',
@@ -320,7 +320,7 @@ describe('reading the outbox', () => {
       toScannedEvent({ ...base, type: 'invoice_pdf_missing', payload: { ...pdf, number: '<b>x</b>' } })
         ?.signal,
     ).toBeUndefined();
-    // ADR 0039: the document's number and kind; the contractor stays in Nirvana (the payload carries no reason).
+    // ADR 0039: the document's number and kind; the contractor stays in Impera (the payload carries no reason).
     const contested = (payload: object) =>
       toScannedEvent({ ...base, type: 'invoice_contested', payload })?.signal;
     const contest = {
@@ -434,7 +434,7 @@ describe('reading the outbox', () => {
       days: 2,
       accounts: 2,
     });
-    // The voice version stays in Nirvana: the signal carries only the reasons and the count.
+    // The voice version stays in Impera: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,
       type: 'automatic_closed',

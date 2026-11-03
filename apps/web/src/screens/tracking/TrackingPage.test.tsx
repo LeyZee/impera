@@ -10,7 +10,7 @@ import {
   type ConversationSummary,
   type FanFlags,
   type KycSlot,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -1072,13 +1072,13 @@ describe('his desire score in Suivi (P3-12)', () => {
     expect(screen.getByRole('radio', { name: 'Récents' }).getAttribute('aria-checked')).toBe('true');
     fireEvent.click(screen.getByRole('radio', { name: 'Chauds d’abord' }));
     expect(names(list)).toEqual(['Basile', 'Théo', 'Noé']);
-    expect(window.localStorage.getItem('nirvana.suivi.order')).toBe('hot');
+    expect(window.localStorage.getItem('impera.suivi.order')).toBe('hot');
     fireEvent.keyDown(screen.getByRole('radio', { name: 'Chauds d’abord' }), { key: 'ArrowLeft' });
     expect(names(list)).toEqual(['Noé', 'Théo', 'Basile']);
   });
 
   it('keeps « À traiter » above the list whatever the order, and says the order covers the loaded page only', async () => {
-    window.localStorage.setItem('nirvana.suivi.order', 'hot');
+    window.localStorage.setItem('impera.suivi.order', 'hot');
     serve({
       ...ONE,
       conversations: { [LEA.id]: { items: [hot, playful], nextCursor: 'next' } },

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * A touch on a notification while Nirvana is already open (public/sw.js, `notificationclick`): the service worker
+ * A touch on a notification while Impera is already open (public/sw.js, `notificationclick`): the service worker
  * hands the page the path, and the page moves there itself, without reloading. A chatter halfway through a message
  * keeps it, as with « Mettre à jour » (the update waits for them, never the other way round).
  *

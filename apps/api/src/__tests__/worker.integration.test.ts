@@ -1,6 +1,6 @@
-import { CreatorIdSchema, newId, PlatformAccountIdSchema } from '@nirvana/contracts';
-import { createDbClient, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { CreatorIdSchema, newId, PlatformAccountIdSchema } from '@impera/contracts';
+import { createDbClient, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 

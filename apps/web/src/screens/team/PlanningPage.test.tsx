@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { TeamMemberSchema, type TeamMember } from '@nirvana/contracts';
+import { TeamMemberSchema, type TeamMember } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   type AnyRouter,

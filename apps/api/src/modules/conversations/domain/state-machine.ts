@@ -1,4 +1,4 @@
-import { ConversationStateSchema, type ConversationState, type DraftStatus } from '@nirvana/contracts';
+import { ConversationStateSchema, type ConversationState, type DraftStatus } from '@impera/contracts';
 
 /**
  * What can happen to a conversation, and where it leads (message-flow.md). `drafting` is reserved for the engine

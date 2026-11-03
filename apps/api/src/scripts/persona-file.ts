@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { PersonaSchema } from '@nirvana/contracts';
+import { PersonaSchema } from '@impera/contracts';
 import { parse } from 'yaml';
 import type { z } from 'zod';
 

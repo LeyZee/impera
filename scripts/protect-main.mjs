@@ -1,6 +1,6 @@
 // Pre-push guard (lefthook): refuses to push to `main` or delete it. `main` changes only through a green, merged
 // pull request. A local guard: GitHub does not enforce it (no branch protection on the free plan), and
-// `NIRVANA_ALLOW_MAIN_PUSH=1` lets an emergency push through (docs/conventions/git-and-pr.md).
+// `IMPERA_ALLOW_MAIN_PUSH=1` lets an emergency push through (docs/conventions/git-and-pr.md).
 import { readFileSync } from 'node:fs';
 
 const PROTECTED = 'refs/heads/main';
@@ -24,10 +24,10 @@ export function refusals(stdin) {
 // Run by lefthook (not when imported by its test).
 if (process.argv[1]?.endsWith('protect-main.mjs') === true) {
   const found = refusals(readFileSync(0, 'utf8'));
-  if (found.length > 0 && process.env.NIRVANA_ALLOW_MAIN_PUSH !== '1') {
+  if (found.length > 0 && process.env.IMPERA_ALLOW_MAIN_PUSH !== '1') {
     for (const message of found) console.error(message);
     console.error(
-      'Urgence seulement : NIRVANA_ALLOW_MAIN_PUSH=1 git push … (voir docs/conventions/git-and-pr.md).',
+      'Urgence seulement : IMPERA_ALLOW_MAIN_PUSH=1 git push … (voir docs/conventions/git-and-pr.md).',
     );
     process.exit(1);
   }

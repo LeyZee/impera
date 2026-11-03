@@ -1,5 +1,5 @@
-import { JOB_MAX_ATTEMPTS } from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+import { JOB_MAX_ATTEMPTS } from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 
 /**
  * `payroll.lock_payout_certificate` for a transfer that relied on a tax residence certificate (ADR 0041 § 6), in the

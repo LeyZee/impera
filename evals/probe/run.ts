@@ -15,7 +15,7 @@ import {
   type ConversationTurn,
   type LlmConfig,
   type LlmRoleConfig,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import { inspectBubbles, type ProbeFlags } from './detect';
 import { PROBE_TURNS } from './turns';

@@ -5,8 +5,8 @@ import type {
   PlaygroundAnswer,
   PlaygroundState,
   Verdict,
-} from '@nirvana/contracts';
-import type { LlmGateway } from '@nirvana/llm';
+} from '@impera/contracts';
+import type { LlmGateway } from '@impera/llm';
 
 import {
   guardSettingsOf,

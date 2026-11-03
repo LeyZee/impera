@@ -1,5 +1,5 @@
-import type { ContractorDocumentReview } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, type Transaction } from '@nirvana/db';
+import type { ContractorDocumentReview } from '@impera/contracts';
+import { and, eq, inArray, schema, sql, type Transaction } from '@impera/db';
 
 import { documentValidUntil } from '../domain/billing';
 

@@ -31,8 +31,8 @@ import {
   type PayoutBlock,
   type PayPeriod,
   type StatementCountedSales,
-} from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, withMember, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, inArray, schema, sql, withAdmin, withMember, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import { PayrollForbidden } from '../../contractors/pure';
