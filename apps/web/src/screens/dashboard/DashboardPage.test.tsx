@@ -2,6 +2,7 @@
 import {
   AgentModeResultSchema,
   CreatorIdSchema,
+  TeamMemberIdSchema,
   type AgentMode,
   type Dashboard as ApiDashboard,
 } from '@nirvana/contracts';
@@ -152,6 +153,79 @@ describe('DashboardPage on the server’s data', () => {
     renderDashboard();
     await screen.findByText('Théo');
     expect(screen.queryByText(/taux BCE/u)).toBeNull();
+  });
+
+  it('shows the sales read in Reveal, their figures to the cent and who sold, in place of the quiet line (CRM-04 lot c)', async () => {
+    const member = TeamMemberIdSchema.parse('01a1a0ca-3c43-7624-b30f-0000000000aa');
+    const figures = {
+      sales: 1,
+      refunds: 0,
+      revenueMinor: 1200,
+      netMinor: 800,
+      agencyMinor: 300,
+      creatorMinor: 500,
+    };
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({
+        revealSales: {
+          from: '2026-11-03',
+          to: '2026-11-03',
+          totals: {
+            sales: 3,
+            refunds: 1,
+            revenueMinor: 4234,
+            netMinor: 2800,
+            agencyMinor: 1050,
+            creatorMinor: 1750,
+          },
+          bySeller: [
+            { ...figures, revenueMinor: 3000, seller: { kind: 'agent' } },
+            { ...figures, refunds: 1, seller: { kind: 'member', memberId: member, name: 'Maya' } },
+            { ...figures, revenueMinor: 34, seller: { kind: 'unlinked' } },
+          ],
+          usd: { seen: false, rate: null },
+          refundsWithoutSale: 1,
+        },
+      }),
+    });
+    renderDashboard();
+    expect(await screen.findByRole('heading', { name: /Ventes lues chez Reveal/u })).toBeDefined();
+    expect(screen.getByText('3 ventes · 1 remboursement')).toBeDefined();
+    expect(screen.getByText('28 €')).toBeDefined();
+    const sellers = screen.getByRole('list', { name: 'Qui a vendu' });
+    expect(sellers.textContent).toMatch(/L’agent.*Maya.*Chatteur non relié/u);
+    expect(screen.getByText('1 vente · à relier dans Réglages › Ventes')).toBeDefined();
+    expect(
+      screen.getByText(/1 remboursement porte sur une vente plus ancienne que le registre/u),
+    ).toBeDefined();
+    expect(screen.queryByText(/Ventes : bientôt lues depuis Reveal/u)).toBeNull();
+  });
+
+  it('gives whoever does not see the sellers the figures only (ADR 0043 § 7)', async () => {
+    serveDashboard({
+      status: 200,
+      body: apiDashboard({
+        revealSales: {
+          from: '2026-11-03',
+          to: '2026-11-03',
+          totals: {
+            sales: 2,
+            refunds: 0,
+            revenueMinor: 2400,
+            netMinor: 1600,
+            agencyMinor: 600,
+            creatorMinor: 1000,
+          },
+          bySeller: null,
+          usd: { seen: false, rate: null },
+          refundsWithoutSale: 0,
+        },
+      }),
+    });
+    renderDashboard();
+    expect(await screen.findByText('2 ventes')).toBeDefined();
+    expect(screen.queryByRole('list', { name: 'Qui a vendu' })).toBeNull();
   });
 
   it('opens a draft to validate in Suivi, on its conversation', async () => {

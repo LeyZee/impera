@@ -108,6 +108,36 @@ export interface Sales {
   readonly funnel: { readonly counts: readonly number[]; readonly before: readonly number[] };
 }
 
+/** One seller's line of the sales read in Reveal (CRM-04 lot c): the owner's and an active manager's only. */
+export interface RevealSeller {
+  readonly key: string;
+  readonly kind: 'member' | 'agent' | 'unlinked' | 'none';
+  /** « Théo », « L’agent », « Chatteur non relié », « Sans chatteur ». */
+  readonly name: string;
+  /** « 2 ventes · 1 remboursement », or what to do about it (« à relier dans Réglages › Ventes »). */
+  readonly line: string;
+  /** In euros, a refund taken off: negative when refunds outweigh sales. */
+  readonly revenue: number;
+  readonly net: number;
+  readonly agency: number;
+  readonly creator: number;
+}
+
+/** The period's sales read in the platform's register (CRM-04 lot c), amounts in euros as the server summed them. */
+export interface RevealSales {
+  /** « Chiffre d'affaires »: what the fans paid, VAT included, refunds taken off. */
+  readonly revenue: number;
+  readonly net: number;
+  readonly agency: number;
+  readonly creator: number;
+  /** « 5 ventes · 1 remboursement ». */
+  readonly counts: string;
+  /** Who sold, the largest revenue first; null for whoever does not see it (ADR 0043 § 7). */
+  readonly sellers: readonly RevealSeller[] | null;
+  /** Footnotes: where the figures come from, how dollars were counted, refunds older than the register. */
+  readonly notes: readonly string[];
+}
+
 export interface Fan {
   readonly id: string;
   readonly name: string;
@@ -125,6 +155,8 @@ export interface Dashboard {
   readonly todos: readonly Todo[];
   /** Null on the server's data until the Reveal connector observes purchases: nothing stands in for them. */
   readonly sales: Readonly<Record<Period, Sales>> | null;
+  /** The sales read in Reveal's register (CRM-04 lot c); null until one of her accounts is linked, and for her. */
+  readonly revealSales: RevealSales | null;
   /** Best fans first. */
   readonly fans: readonly Fan[];
   /**

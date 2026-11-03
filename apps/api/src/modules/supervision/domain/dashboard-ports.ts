@@ -4,6 +4,7 @@ import type {
   DecidedDraft,
   HandoffCause,
   LiveRateReading,
+  SalesTotals,
   UserId,
 } from '@nirvana/contracts';
 
@@ -116,4 +117,23 @@ export interface TelegramReading {
 
 export interface TelegramView {
   read(creatorId: CreatorId): Promise<TelegramReading>;
+}
+
+/** What the sales panel reads of the platform's register (CRM-04 lot c), in one transaction of the reader. */
+interface RevealSalesReading {
+  readonly totals: SalesTotals;
+  /** Member id to display name, for the owner and an active manager; `null` for anyone else (ADR 0043 § 7). */
+  readonly names: ReadonlyMap<string, string> | null;
+}
+
+export interface RevealSalesView {
+  /**
+   * Her sales totals from `from` to `to` (days, both included), read as `userId`; undefined while none of her accounts
+   * is linked to a platform's register (CRM-01): the panel then stays away.
+   */
+  read(
+    creatorId: CreatorId,
+    userId: UserId,
+    range: { readonly from: string; readonly to: string },
+  ): Promise<RevealSalesReading | undefined>;
 }

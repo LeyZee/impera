@@ -53,7 +53,17 @@ const dashboard = {
     },
   ],
   usdSales: { seen: true, rate: { day: '2026-10-27' } },
+  revealSales: null,
 };
+
+const figures = (revenueMinor: number) => ({
+  sales: 1,
+  refunds: 0,
+  revenueMinor,
+  netMinor: revenueMinor,
+  agencyMinor: 0,
+  creatorMinor: revenueMinor,
+});
 
 describe('dashboard contract', () => {
   it('reads a filled dashboard', () => {
@@ -80,6 +90,36 @@ describe('dashboard contract', () => {
     expect(
       DashboardSchema.safeParse({ ...dashboard, usdSales: { seen: true, rate: { day: '27/10/2026' } } })
         .success,
+    ).toBe(false);
+  });
+
+  it('reads the sales of the register by seller in four kinds, a refund as a negative amount', () => {
+    const revealSales = {
+      from: '2026-10-17',
+      to: '2026-10-17',
+      totals: figures(1500),
+      bySeller: [
+        { ...figures(1200), seller: { kind: 'agent' } },
+        {
+          ...figures(900),
+          seller: { kind: 'member', memberId: '3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f', name: 'Théo' },
+        },
+        { ...figures(-600), sales: 0, refunds: 1, seller: { kind: 'unlinked' } },
+        { ...figures(0), seller: { kind: 'none' } },
+      ],
+      usd: { seen: false, rate: null },
+      refundsWithoutSale: 0,
+    };
+    expect(DashboardSchema.parse({ ...dashboard, revealSales }).revealSales?.bySeller).toHaveLength(4);
+    expect(
+      DashboardSchema.parse({ ...dashboard, revealSales: { ...revealSales, bySeller: null } }).revealSales
+        ?.bySeller,
+    ).toBeNull();
+    expect(
+      DashboardSchema.safeParse({
+        ...dashboard,
+        revealSales: { ...revealSales, bySeller: [{ ...figures(100), seller: { kind: 'fan' } }] },
+      }).success,
     ).toBe(false);
   });
 

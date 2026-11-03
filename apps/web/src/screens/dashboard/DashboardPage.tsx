@@ -8,6 +8,7 @@ import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
 import { PaperworkBanner } from './PaperworkBanner';
+import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TopFans } from './TopFans';
 import { agentRuns, litParts } from './logic';
@@ -26,6 +27,13 @@ import { ServerSilent } from '@/shell/ServerSilent';
 /** Why the control cannot change the mode under an operator's global switch: the hero says it too (DASH-08). */
 const GLOBAL_NOTE =
   'Un arrêt général retient l’agent pour toutes les créatrices : seul un opérateur peut le lever.';
+
+/** The days of Reveal's register the panel sums, each sale on its own day (CRM-04 lot c). */
+const REVEAL_SUB: Record<Period, string> = {
+  day: 'depuis minuit, ses chiffres au centime',
+  week: 'les 7 derniers jours, ses chiffres au centime',
+  month: 'les 30 derniers jours, ses chiffres au centime',
+};
 
 const FUNNEL_SUB: Record<Period, string> = {
   day: 'les fans arrivés aujourd’hui, et combien passent chaque étape',
@@ -302,12 +310,25 @@ function Loaded({
         </>
       )}
 
+      {/* Reveal's register, read by its API (CRM-04 lot c): the period's figures as Reveal gives them, who sold for the
+        owner and an active manager. Never on her Dashboard: the server sends her none. */}
+      {data.revealSales === null ? null : (
+        <Section
+          title="Ventes lues chez Reveal"
+          sub={REVEAL_SUB[period]}
+          index={2}
+          control={sales === null ? periodControl : undefined}
+        >
+          <RevealSalesPanel sales={data.revealSales} creatorName={data.creator.name} tip={tip} />
+        </Section>
+      )}
+
       {forCreator ? null : (
         <Section
           title="Meilleurs fans"
           sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
           index={2}
-          control={sales === null ? periodControl : undefined}
+          control={sales === null && data.revealSales === null ? periodControl : undefined}
         >
           <TopFans
             fans={data.fans}
@@ -319,7 +340,7 @@ function Loaded({
       )}
 
       {/* Until Reveal's purchases are observed, one quiet line says where the sales are read, no block (DASH-02). */}
-      {sales === null ? (
+      {sales === null && data.revealSales === null ? (
         <p className="db-salesnote nv-enter" style={{ '--nv-i': 3 }}>
           Ventes : bientôt lues depuis Reveal.
         </p>

@@ -118,3 +118,4 @@ Posées à Charles le 03/11 avec ces recommandations. Aucune n'est appliquée sa
 ## Notes de session
 
 - 03/11, Équipe, lot a : règle des jours extraite de la vérification (`domain/sale-days.ts`), `salesTotals` et `salesFeedTotals.totalsOf`, `sale_detected` publié par `recordPage` dans la fenêtre de 15 minutes, contrats `SaleSellerSchema`, `SalesTotalsSchema` et payload de `sale_detected`. Reste : lots b, c et d, après les réponses de Charles.
+- 03/11, Agent, lot c : section « Ventes lues chez Reveal » du Dashboard (`revealSalesPanel`, lecteur sous `withTenantMember`, contrat `revealSales`), quatre sortes de vendeur pour le propriétaire et un manager actif, totaux seuls pour un opérateur hors équipe, rien pour la créatrice. Les alertes des questions 5 et 6 restent aux lots d et b.
