@@ -75,7 +75,7 @@ export function SegmentEditor({
     return (
       <div className="ps-block st-sheet">
         <header className="st-sheet__head">
-          <span className="st-sheet__eyebrow">{title}</span>
+          <span className="nv-eyebrow st-sheet__eyebrow">{title}</span>
           <h2 className="st-sheet__title">Le pont</h2>
           <p className="ps-muted">
             Toujours offert : il fait comprendre au fan ce qui vient ensuite, avec une photo teasing.
@@ -105,7 +105,7 @@ export function SegmentEditor({
   return (
     <div className="ps-block st-sheet">
       <header className="st-sheet__head">
-        <span className="st-sheet__eyebrow">{title}</span>
+        <span className="nv-eyebrow st-sheet__eyebrow">{title}</span>
         <h2 className="st-sheet__title">{segment.name.trim() === '' ? 'Sans nom' : segment.name}</h2>
       </header>
       <h3 className="st-group__title">L’essentiel</h3>

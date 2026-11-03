@@ -175,7 +175,8 @@ export function Workshop({
     setVariant(null);
     setNotice(null);
     if (follow && window.matchMedia(NARROW).matches) {
-      previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      previewRef.current?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
     }
   };
 
@@ -358,7 +359,13 @@ export function Workshop({
       </div>
 
       <div className="st-columns">
-        <div className="nv-plate ps-panel st-stack" style={{ '--st-accent': draft.color.primary }}>
+        <div
+          className="nv-plate ps-panel st-stack"
+          style={{
+            '--st-accent': draft.color.primary,
+            '--st-ink': inkOf(flat(draft.color.primary)) ?? '#ffffff',
+          }}
+        >
           <div className="st-stack__head">
             <p className="nv-eyebrow">Ordre de vente</p>
             <span className="st-stack__sum">{stackSummary(draft.segments)}</span>
