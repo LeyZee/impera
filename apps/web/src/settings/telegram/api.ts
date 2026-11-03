@@ -7,6 +7,7 @@ import {
   TelegramOverviewSchema,
   TelegramRefusalSchema,
   TelegramRoutesSchema,
+  TelegramSalesSettingsSchema,
   TelegramTestResultSchema,
   type TelegramBot,
   type TelegramBotId,
@@ -15,6 +16,8 @@ import {
   type TelegramOverview,
   type TelegramRefusal,
   type TelegramRoute,
+  type TelegramSaleSettingsEntry,
+  type TelegramSalesSettings,
 } from '@nirvana/contracts';
 
 import { ReauthRequired } from '../services/api';
@@ -112,6 +115,23 @@ export async function saveRoutes(
     body: JSON.stringify({ version, routes }),
   });
   return outcome(response, (body) => TelegramRoutesSchema.parse(body));
+}
+
+/** The sales topic's settings (CRM-04): the entry for every creator always comes back, then hers. */
+export async function fetchSaleSettings(): Promise<TelegramSalesSettings> {
+  return TelegramSalesSettingsSchema.parse(await (await call('/sales')).json());
+}
+
+/** Replaces the whole list; a creator removed meanwhile throws (400), the screen reloads. */
+export async function saveSaleSettings(
+  settings: readonly TelegramSaleSettingsEntry[],
+): Promise<TelegramSalesSettings> {
+  const response = await call('/sales', {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ settings }),
+  });
+  return TelegramSalesSettingsSchema.parse(await response.json());
 }
 
 export async function sendTest(chatId: TelegramChatId): Promise<Outcome<{ sentAt: string }>> {

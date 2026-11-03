@@ -1,5 +1,6 @@
 import type {
   CreatorId,
+  SalesTotals,
   TelegramBotId,
   TelegramBotState,
   TelegramChatId,
@@ -8,6 +9,7 @@ import type {
   TelegramErrorKind,
   TelegramMembership,
   TelegramRoute,
+  TelegramSaleSettingsEntry,
   TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -139,8 +141,20 @@ export interface BotsStore {
   listCreators(): Promise<readonly CreatorRecord[]>;
   /** The display name of a CRM user, for « Pris en main par … ». */
   userName(userId: string): Promise<string | null>;
+  /** The sales topic's settings (CRM-04 lot b), a row it cannot read left out (the defaults then apply). */
+  listSaleSettings(): Promise<readonly TelegramSaleSettingsEntry[]>;
+  /** Replaces the whole list, with an `audit_log` row by `userId`. */
+  replaceSaleSettings(entries: readonly TelegramSaleSettingsEntry[], userId: string): Promise<void>;
   /** The name the team shows for a member, for « vendue par … » (CRM-04 lot b); null for an unknown id. */
   memberName(memberId: string): Promise<string | null>;
+}
+
+/**
+ * One creator's sales totals of a day (CRM-04 lot b): `salesFeedTotals.totalsOf` of `connectors`, given by the
+ * composition root. The day is the sale's in the platform's zone, the rule every reader of the totals shares.
+ */
+export interface SalesTotalsReader {
+  totalsOf(creatorId: CreatorId, day: string): Promise<SalesTotals>;
 }
 
 interface ScanBatch {

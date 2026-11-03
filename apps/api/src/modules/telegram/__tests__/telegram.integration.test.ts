@@ -11,6 +11,7 @@ import {
   TeamMemberIdSchema,
   newId,
   type CreatorId,
+  type SalesTotals,
   type TelegramBot,
   type TelegramChatId,
 } from '@nirvana/contracts';
@@ -48,6 +49,9 @@ describe('telegram module on Postgres', () => {
   let uncovered: string[];
   /** Her alerts' names, as the `alerts` module gives them. */
   const names = new Map<string, ReadonlyMap<string, string>>();
+  /** Her day's sales totals, as `salesFeedTotals` gives them; the days asked, to check the digest's day. */
+  let salesTotals: SalesTotals = { from: '', to: '', rows: [], refundsWithoutSale: 0 };
+  const totalsAsked: string[] = [];
 
   function build(encryptionKeys = keys): {
     module: TelegramModule;
@@ -67,6 +71,12 @@ describe('telegram module on Postgres', () => {
         onUncovered: (event) => uncovered.push(event.id),
         resealTokens: store.resealTokens,
         alertNames: { ofCreator: (creatorId) => Promise.resolve(names.get(creatorId) ?? new Map()) },
+        salesTotals: {
+          totalsOf: (_creatorId, day) => {
+            totalsAsked.push(day);
+            return Promise.resolve({ ...salesTotals, from: day, to: day });
+          },
+        },
       }),
       resealTokens: store.resealTokens,
     };
@@ -335,16 +345,12 @@ describe('telegram module on Postgres', () => {
     expect(text).not.toContain('qui-ne-sort-pas');
   });
 
-  it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
-    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
-    const { routes, version } = await module.overview();
-    const saved = await module.saveRoutes(version, [...routes, { creatorId, topic: 'sale', chatId }]);
-    expect(saved.ok).toBe(true);
-    const userId = 'user-sale-seller';
+  /** A member who sells, named « Théo » by the team (invented). */
+  async function seller(): Promise<string> {
+    const userId = `user-seller-${String((eventSeq += 1))}`;
     await test.admin.db
       .insert(schema.user)
-      .values({ id: userId, name: 'Prénom Inventé', email: 'vendeur@example.test' })
-      .onConflictDoNothing();
+      .values({ id: userId, name: 'Prénom Inventé', email: `${userId}@example.test` });
     const memberId = newId(TeamMemberIdSchema);
     await test.admin.db.insert(schema.teamMembers).values({
       id: memberId,
@@ -357,22 +363,38 @@ describe('telegram module on Postgres', () => {
       timeZone: 'Africa/Porto-Novo',
       joinedOn: '2026-10-01',
     });
-    const saleId = newId(SalesLineIdSchema);
-    const sale = {
-      saleId,
-      platform: 'reveal',
-      platformAccountId: newId(PlatformAccountIdSchema),
-      saleType: 'ppv',
-      occurredAt: new Date(sliceStart).toISOString(),
-      currency: 'EUR',
-      grossInclVatMinor: 4500,
-      netMinor: 3000,
-      agencyMinor: 1500,
-      creatorMinor: 1500,
-      seller: { kind: 'member', memberId },
-    };
+    return memberId;
+  }
+
+  const salePayload = (seller: object, grossInclVatMinor = 4500) => ({
+    saleId: newId(SalesLineIdSchema),
+    platform: 'reveal',
+    platformAccountId: newId(PlatformAccountIdSchema),
+    saleType: 'ppv',
+    occurredAt: new Date(sliceStart).toISOString(),
+    currency: 'EUR',
+    grossInclVatMinor,
+    netMinor: 3000,
+    agencyMinor: 1500,
+    creatorMinor: 1500,
+    seller,
+  });
+
+  async function salesGroup(): Promise<TelegramChatId> {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const { routes, version } = await module.overview();
+    const saved = await module.saveRoutes(version, [...routes, { creatorId, topic: 'sale', chatId }]);
+    expect(saved.ok).toBe(true);
+    return chatId;
+  }
+
+  it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
+    await module.saveSaleSettings([], 'owner-telegram');
+    const chatId = await salesGroup();
+    const memberId = await seller();
+    const sale = salePayload({ kind: 'member', memberId });
     await publish('sale_detected', sale);
-    await publish('sale_detected', { ...sale, saleId: newId(SalesLineIdSchema), seller: { kind: 'agent' } });
+    await publish('sale_detected', salePayload({ kind: 'agent' }));
 
     expect(await module.jobs.scan()).toBe(2);
     expect(await module.jobs.scan()).toBe(2); // the window re-reads them: nothing new
@@ -384,8 +406,111 @@ describe('telegram module on Postgres', () => {
     await module.jobs.flushChat(chatId);
     const text = telegram.sent.map((sent) => sent.text).join('\n');
     expect(text).toContain('💰 <b>Vente · Démo</b>');
-    expect(text).not.toContain(saleId);
+    expect(text).not.toContain(sale.saleId);
     expect(text).not.toContain('30,00');
+  });
+
+  it('rings only what the sales settings let through: her minimum, the agent’s only (CRM-04)', async () => {
+    const chatId = await salesGroup();
+    const memberId = await seller();
+    const saved = await module.saveSaleSettings(
+      [
+        { creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: true },
+        { creatorId, minimumMinor: 2000, agentOnly: false, eveningDigest: true },
+      ],
+      'owner-telegram',
+    );
+    expect(saved.ok && saved.value.settings.map((entry) => entry.creatorId)).toEqual([null, creatorId]);
+    await publish('sale_detected', salePayload({ kind: 'member', memberId }, 1999));
+    await publish('sale_detected', salePayload({ kind: 'member', memberId }, 2000));
+    expect(await module.jobs.scan()).toBe(2);
+    expect((await deliveryRows(chatId)).map((row) => row.summary)).toEqual([
+      'PPV · 20,00\u00a0€ · vendue par Théo',
+    ]);
+    // Her own line gone, the one for all applies: the agent's sales only.
+    await module.saveSaleSettings(
+      [{ creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: true }],
+      'owner-telegram',
+    );
+    await publish('sale_detected', salePayload({ kind: 'member', memberId }));
+    await publish('sale_detected', salePayload({ kind: 'agent' }));
+    await module.jobs.scan();
+    expect((await deliveryRows(chatId)).map((row) => row.summary)).toEqual([
+      'PPV · 20,00\u00a0€ · vendue par Théo',
+      'PPV · 45,00\u00a0€ · vendue par l’agent',
+    ]);
+    const audit = await test.admin.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'telegram_settings.save'));
+    expect(audit.length).toBeGreaterThanOrEqual(2);
+    const unknown = await module.saveSaleSettings(
+      [{ creatorId: newId(CreatorIdSchema), minimumMinor: 0, agentOnly: false, eveningDigest: true }],
+      'owner-telegram',
+    );
+    expect(unknown).toEqual({ ok: false, error: 'unknown_creator' });
+    await module.saveSaleSettings([], 'owner-telegram');
+  });
+
+  it('sends her day’s sales at 23 h in her zone to the sales groups, once, unless turned off (CRM-04)', async () => {
+    const chatId = await salesGroup();
+    const memberId = await seller();
+    salesTotals = {
+      from: '',
+      to: '',
+      refundsWithoutSale: 0,
+      rows: [
+        {
+          day: '2026-11-03',
+          platform: 'reveal',
+          platformAccountId: newId(PlatformAccountIdSchema),
+          currency: 'EUR',
+          saleType: 'ppv',
+          seller: { kind: 'member', memberId: TeamMemberIdSchema.parse(memberId) },
+          sales: 2,
+          refunds: 0,
+          grossInclVatMinor: 9000,
+          grossExclVatMinor: 7500,
+          netMinor: 6000,
+          agencyMinor: 3000,
+          creatorMinor: 3000,
+        },
+      ],
+    };
+    // 22:30 UTC on 3 November is 23:30 in Paris, her zone.
+    offsetMs = Date.parse('2026-11-03T22:30:00Z') - Date.now();
+    totalsAsked.length = 0;
+    expect(await module.jobs.eveningDigest()).toBe(1);
+    expect(await module.jobs.eveningDigest()).toBe(0); // the key of her day: once
+    expect(totalsAsked[0]).toBe('2026-11-03');
+    const [row] = (await deliveryRows(chatId)).filter((delivery) =>
+      delivery.sourceKey.startsWith('evening:'),
+    );
+    expect(row).toMatchObject({
+      topic: 'sale',
+      isSilent: true,
+      sourceKey: `evening:${creatorId}:2026-11-03`,
+    });
+    expect(row?.text).toContain('💰 <b>Bilan du soir · Démo</b>');
+    expect(row?.text).toContain('Théo : 90,00\u00a0€ (2 ventes)');
+
+    // An hour earlier is not her 23 h; turned off, nothing goes the next day.
+    offsetMs = Date.parse('2026-11-04T21:30:00Z') - Date.now();
+    expect(await module.jobs.eveningDigest()).toBe(0);
+    await module.saveSaleSettings(
+      [{ creatorId, minimumMinor: 0, agentOnly: false, eveningDigest: false }],
+      'owner-telegram',
+    );
+    offsetMs = Date.parse('2026-11-04T22:30:00Z') - Date.now();
+    expect(await module.jobs.eveningDigest()).toBe(0);
+    await module.saveSaleSettings([], 'owner-telegram');
+  });
+
+  it('keeps the settings out of reach of the application role', async () => {
+    // 42501: insufficient_privilege (REVOKE ALL in 0080, like the other telegram tables).
+    await expect(test.app.db.select().from(schema.telegramSettings)).rejects.toMatchObject({
+      cause: { code: '42501' },
+    });
   });
 
   it('moves its cursor past rows it cannot read, so they never stall the scan', async () => {

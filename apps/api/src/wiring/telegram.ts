@@ -1,9 +1,11 @@
 import { JOB_PAYLOADS } from '@nirvana/contracts';
+import { withAdmin } from '@nirvana/db';
 
 import { secretOrNull } from '../config';
 import { defineTask } from '../jobs';
 import type { Logger } from '../logger';
 import type { AlertsModule } from '../modules/alerts';
+import { salesFeedTotals } from '../modules/connectors';
 import { startTelegramModule, type TelegramModule } from '../modules/telegram';
 
 import type { Routes, Shared, TasksOf } from './shared';
@@ -37,6 +39,11 @@ export async function wireTelegram(
           alertNames: {
             ofCreator: async (creatorId) =>
               new Map([...(await deps.alerts.store.names(creatorId))].map(([id, alert]) => [id, alert.name])),
+          },
+          // The evening digest reads the one rule of the totals (CRM-04), as the admin role: the job sees every creator.
+          salesTotals: {
+            totalsOf: (creatorId, day) =>
+              withAdmin(adminDb, (tx) => salesFeedTotals.totalsOf(tx, { creatorId, from: day, to: day })),
           },
         });
   if (module === null) logger.warn('Telegram notifications off: CREDENTIALS_ENCRYPTION_KEYS is not set');
@@ -89,6 +96,12 @@ export async function wireTelegram(
         JOB_PAYLOADS['telegram.morning_digest'],
         logger,
         withTelegram((telegram) => telegram.jobs.morningDigest()),
+      ),
+      'telegram.evening_digest': defineTask(
+        'telegram.evening_digest',
+        JOB_PAYLOADS['telegram.evening_digest'],
+        logger,
+        withTelegram((telegram) => telegram.jobs.eveningDigest()),
       ),
       'telegram.purge': defineTask(
         'telegram.purge',

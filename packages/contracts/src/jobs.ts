@@ -66,6 +66,7 @@ export const JOB_NAMES = [
   'telegram.dispatch_polls',
   'telegram.poll_updates',
   'telegram.morning_digest',
+  'telegram.evening_digest',
   'telegram.purge',
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
@@ -302,6 +303,7 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.dispatch_polls': 1,
   'telegram.poll_updates': 1,
   'telegram.morning_digest': 1,
+  'telegram.evening_digest': 1,
   'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 

@@ -11,6 +11,7 @@ import type {
   NewDelivery,
 } from '../domain/ports';
 import { isSilentTopic, renderNotice, renderClosedBy, renderPlain } from '../domain/render';
+import { saleRings, saleSettingsFor } from '../domain/sales';
 import { SCAN_OVERLAP_MS } from '../domain/schedule';
 import type { Closure, Notice, ScannedEvent } from '../domain/signals';
 
@@ -46,10 +47,11 @@ export async function scanEvents(deps: ScanDeps): Promise<number> {
     return 0;
   }
 
-  const [{ routes }, chats, creators] = await Promise.all([
+  const [{ routes }, chats, creators, saleSettings] = await Promise.all([
     deps.bots.listRoutes(),
     deps.bots.listChats(),
     deps.bots.listCreators(),
+    deps.bots.listSaleSettings(),
   ]);
   const reachable = new Set(
     chats.filter((chat) => chat.membership === 'member' && chat.canPost).map((chat) => chat.id),
@@ -60,6 +62,13 @@ export async function scanEvents(deps: ScanDeps): Promise<number> {
 
   let reached = cursor;
   for (const event of events) {
+    const { signal } = event;
+    // Under the minimum, or not the agent's when only his ring (CRM-04 lot b): read, and nothing sent.
+    if (signal.kind === 'sale' && !saleRings(saleSettingsFor(saleSettings, event.creatorId), signal)) {
+      if (event.createdAt > reached) reached = event.createdAt;
+      await deps.deliveries.applyScan({ deliveries: [], cursor: reached });
+      continue;
+    }
     const outcome = classify(event.signal, await nameOf(event), await memberNameOf(event));
     let deliveries: readonly NewDelivery[] = [];
     if (outcome?.kind === 'notice') {

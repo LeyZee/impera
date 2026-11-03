@@ -8,6 +8,7 @@ import {
   TelegramOverviewSchema,
   TelegramRefusalSchema,
   TelegramRoutesSchema,
+  TelegramSalesSettingsSchema,
   TelegramTestResultSchema,
   TelegramTopicSchema,
 } from '@nirvana/contracts';
@@ -21,6 +22,7 @@ import {
   TelegramChatInvalid,
   TelegramChatMemberConflict,
   TelegramChatNotFound,
+  TelegramCreatorInvalid,
 } from '../domain/errors';
 
 export interface TelegramRoutesOptions {
@@ -127,6 +129,21 @@ export function createTelegramRoutes(
         if (result === 'missing') throw new TelegramChatNotFound();
         if (result === 'refused') throw new TelegramChatMemberConflict();
         return reply.code(204).send(null);
+      },
+    );
+
+    app.get('/settings/telegram/sales', { schema: { response: { 200: TelegramSalesSettingsSchema } } }, () =>
+      telegram.saleSettings(),
+    );
+
+    app.put(
+      '/settings/telegram/sales',
+      { schema: { body: TelegramSalesSettingsSchema, response: { 200: TelegramSalesSettingsSchema } } },
+      async (request) => {
+        if (request.user === null) throw new Error('requireRole ran without a user');
+        const result = await telegram.saveSaleSettings(request.body.settings, request.user.id);
+        if (!result.ok) throw new TelegramCreatorInvalid();
+        return result.value;
       },
     );
 

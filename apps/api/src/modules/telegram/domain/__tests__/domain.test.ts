@@ -5,6 +5,7 @@ import {
   INVOICE_NOT_ISSUED_REASONS,
   PayPeriodSchema,
   PlatformAccountIdSchema,
+  SalesTotalsSchema,
   TelegramChatIdSchema,
   TeamMemberIdSchema,
   newId,
@@ -17,7 +18,8 @@ import { chatsFor, computeCoverage } from '../coverage';
 import { mayRemoveChat } from '../membership';
 import { describeTelegramError } from '../messages';
 import { MAX_TEXT, escapeHtml, joinTexts, renderClosedBy, renderNotice } from '../render';
-import { morningDigestKey, nightOf, retryDelayMs, shouldRetry } from '../schedule';
+import { eveningDigestText, saleRings, saleSettingsFor } from '../sales';
+import { eveningDigestOf, morningDigestKey, nightOf, retryDelayMs, shouldRetry } from '../schedule';
 import { botIdOfToken } from '../token';
 
 const conversationId = newId(ConversationIdSchema);
@@ -527,6 +529,117 @@ describe('classification (ADR 0020 §2)', () => {
       kind: 'closure',
       threadKey: 'kill:global:global',
     });
+  });
+});
+
+describe('sales topic (CRM-04 lot b)', () => {
+  const her = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+  const other = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c2');
+  const memberId = TeamMemberIdSchema.parse('018f3e5c-0000-7000-8000-000000000001');
+
+  it('takes her settings, else the ones for all, else every sale and the digest', () => {
+    expect(saleSettingsFor([], her)).toEqual({ minimumMinor: 0, agentOnly: false, eveningDigest: true });
+    const forAll = { creatorId: null, minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+    const hers = { creatorId: her, minimumMinor: 0, agentOnly: true, eveningDigest: false };
+    expect(saleSettingsFor([forAll, hers], her)).toEqual({
+      minimumMinor: 0,
+      agentOnly: true,
+      eveningDigest: false,
+    });
+    expect(saleSettingsFor([forAll, hers], other)).toEqual({
+      minimumMinor: 2000,
+      agentOnly: false,
+      eveningDigest: true,
+    });
+  });
+
+  it('rings a sale at or above the minimum price, and only the agent’s when asked', () => {
+    const sale = {
+      kind: 'sale',
+      saleType: 'ppv',
+      currency: 'EUR',
+      grossInclVatMinor: 2000,
+      seller: { kind: 'member', memberId },
+    } as const;
+    const settings = { minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+    expect(saleRings(settings, sale)).toBe(true);
+    expect(saleRings(settings, { ...sale, grossInclVatMinor: 1999 })).toBe(false);
+    expect(saleRings({ ...settings, agentOnly: true }, sale)).toBe(false);
+    expect(saleRings({ ...settings, agentOnly: true }, { ...sale, seller: { kind: 'agent' } })).toBe(true);
+  });
+
+  it('finds her 23 o’clock hour and keys the digest by her day', () => {
+    expect(eveningDigestOf(her, 'Europe/Paris', new Date('2026-11-03T22:10:00Z'))).toEqual({
+      day: '2026-11-03',
+      key: `evening:${her}:2026-11-03`,
+    });
+    expect(eveningDigestOf(her, 'Europe/Paris', new Date('2026-11-03T21:10:00Z'))).toBeNull();
+  });
+
+  it('says the day’s figures, then each seller by name, the agent and no chatter; never a fan', () => {
+    const row = {
+      day: '2026-11-03',
+      platform: 'reveal',
+      platformAccountId: PlatformAccountIdSchema.parse('018f3e5c-0000-7000-8000-0000000000a1'),
+      currency: 'EUR',
+      saleType: 'ppv',
+      refunds: 0,
+      grossExclVatMinor: 0,
+    } as const;
+    const totals = SalesTotalsSchema.parse({
+      from: '2026-11-03',
+      to: '2026-11-03',
+      refundsWithoutSale: 1,
+      rows: [
+        {
+          ...row,
+          seller: { kind: 'agent' },
+          sales: 7,
+          grossInclVatMinor: 90000,
+          netMinor: 60000,
+          agencyMinor: 30000,
+          creatorMinor: 30000,
+        },
+        {
+          ...row,
+          seller: { kind: 'member', memberId },
+          sales: 4,
+          refunds: 1,
+          grossInclVatMinor: 30000,
+          netMinor: 20000,
+          agencyMinor: 10000,
+          creatorMinor: 10000,
+        },
+        {
+          ...row,
+          saleType: 'tip',
+          seller: { kind: 'none' },
+          sales: 1,
+          grossInclVatMinor: 3456,
+          netMinor: 2300,
+          agencyMinor: 1150,
+          creatorMinor: 1150,
+        },
+      ],
+    });
+    const { text, summary } = eveningDigestText('Nora', totals, (id) => (id === memberId ? 'Théo' : null));
+    const nbsp = (value: string) => value.replaceAll(' ', '\u202f');
+    expect(text).toBe(
+      [
+        '💰 <b>Bilan du soir · Nora</b>',
+        `Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`,
+        'Part de l’agence 411,50\u00a0€ · part de la créatrice 411,50\u00a0€',
+        '12 ventes · 1 remboursement',
+        'Théo : 300,00\u00a0€ (4 ventes, 1 remboursement)',
+        'L’agent : 900,00\u00a0€ (7 ventes)',
+        'Sans chatteur : 34,56\u00a0€ (1 vente)',
+        '1 remboursement d’une vente plus ancienne que le registre, hors totaux.',
+      ].join('\n'),
+    );
+    expect(summary).toBe(`Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`);
+    expect(eveningDigestText('Nora', { ...totals, rows: [], refundsWithoutSale: 0 }, () => null).text).toBe(
+      '💰 <b>Bilan du soir · Nora</b>\nAucune vente aujourd’hui.',
+    );
   });
 });
 
