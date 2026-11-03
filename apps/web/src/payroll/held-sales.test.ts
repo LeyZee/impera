@@ -6,6 +6,7 @@ import {
   heldReasonText,
   outcomeLabel,
   outcomeWords,
+  ownLineText,
   saleAmount,
   saleWhen,
   signalChipText,
@@ -94,6 +95,53 @@ describe('held sales (CRM-03 lot b4b)', () => {
     );
     expect(outcomeWords('withdraw', heldSaleOf({ reason: null, decision: 'exclude' }), THEO).lead).toBe(
       'La vente suit de nouveau les règles : elle compte pour Théo.',
+    );
+  });
+
+  it('says a decision on a refund line of the refund, its sale moving with it when the register pays it', () => {
+    const refund = (patch: Parameters<typeof heldSaleOf>[0] = {}) =>
+      heldSaleOf({ event: 'refund', occurredAt: '2026-10-30T09:15:00.000Z', netMinor: -4_200, ...patch });
+    expect(decisionText(refund({ decision: 'count' }), THEO)).toBe('Compté pour Théo');
+    expect(decisionText(refund({ decision: 'count' }), null)).toBe('Compté');
+    expect(decisionText(refund({ decision: 'exclude' }), THEO)).toBe('Écarté');
+    expect(ownLineText(refund())).toBe('C’est un remboursement de ton chatteur : un autre membre en décide.');
+    expect(ownLineText(heldSaleOf())).toBe('C’est une vente de ton chatteur : un autre membre en décide.');
+
+    expect(outcomeWords('count', refund(), THEO)).toEqual({
+      title: 'Compter ce remboursement pour Théo ?',
+      lead: 'Sa vente va sur son relevé, et lui s’en déduit. Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.',
+      confirm: 'Compter pour Théo',
+    });
+    expect(outcomeWords('exclude', refund(), THEO)).toEqual({
+      title: 'Écarter ce remboursement ?',
+      lead: 'Il ne se déduira des ventes de personne, et sa vente ne comptera pour personne non plus. Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.',
+      confirm: 'Écarter',
+    });
+    // Its sale older than the register, or paid on the reports: the refund alone.
+    expect(
+      outcomeWords(
+        'exclude',
+        refund({ saleOccurredAt: null, salePeriod: null, reason: 'refund_before_register' }),
+        null,
+      ).lead,
+    ).toBe(
+      'Il ne se déduira des ventes de personne. Tu peux retirer la décision tant qu’aucune clôture ne l’a compté.',
+    );
+    expect(outcomeWords('exclude', refund({ reason: 'refund_before_base' }), THEO).lead).toBe(
+      'Il ne se déduira des ventes de personne. Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.',
+    );
+    expect(outcomeWords('withdraw', refund({ decision: 'count' }), THEO).lead).toBe(
+      'Le remboursement suit de nouveau les règles : il attend une décision et ne se déduit des ventes de personne.',
+    );
+    expect(outcomeWords('withdraw', refund({ reason: null, decision: 'exclude' }), THEO).lead).toBe(
+      'Le remboursement suit de nouveau les règles : il se déduit des ventes de Théo.',
+    );
+    const unlinked = refund({ memberId: null, reason: 'chatter_unlinked', outcomes: ['exclude'] });
+    expect(heldReasonText(unlinked, null, true)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre : relie-le dans Réglages › Ventes et le remboursement se déduit seul. Sinon, écarte-le.',
+    );
+    expect(heldReasonText(unlinked, null, false)).toBe(
+      'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-le.',
     );
   });
 

@@ -17,6 +17,7 @@ import {
   heldReasonText,
   outcomeLabel,
   outcomeWords,
+  ownLineText,
   saleAmount,
   saleWhen,
   signalChipText,
@@ -137,7 +138,7 @@ export function HeldSalesPanel({
                 {reason === null ? null : <p className="py-held__reason">{reason}</p>}
                 {signalled === null ? null : <p className="py-held__reason">{signalled}</p>}
                 {member?.own === true ? (
-                  <p className="py-held__own">C’est une vente de ton chatteur : un autre membre en décide.</p>
+                  <p className="py-held__own">{ownLineText(sale)}</p>
                 ) : sale.outcomes.length === 0 ? null : (
                   <div className="py-held__acts">
                     {sale.outcomes.map((outcome) => (
