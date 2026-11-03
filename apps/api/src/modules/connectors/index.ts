@@ -1,4 +1,4 @@
-import type { JobPayload } from '@nirvana/contracts';
+import type { ConnectionService, ConnectionSignal, JobPayload } from '@nirvana/contracts';
 import type { Database, EncryptionKey } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -11,6 +11,7 @@ import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
 import { createConnectorSessions, type ConnectorSessions } from './application/sessions';
+import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
@@ -152,6 +153,15 @@ export interface ConnectorsDeps {
    * `salesCheckReads`, read on the admin connection by the composition root. Never a write of the pay rules.
    */
   readonly detectedAccounts: SalesFeedDeps['detectedAccounts'];
+  /**
+   * `connection_state_changed` (Telegram P3-12), wired by the composition root: Reveal's register is the service
+   * `reveal_crm`; the outbox keeps the transitions only.
+   */
+  readonly publishConnectionState?: (
+    service: ConnectionService,
+    signal: ConnectionSignal,
+    correlationId: string,
+  ) => Promise<unknown>;
   readonly clock?: Clock;
   readonly random?: () => number;
 }
@@ -175,6 +185,11 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     jobs: createSalesFeedJobs(deps.adminDb),
     webhookUrl: (platform) => salesFeedWebhookUrl(deps.publicBaseUrl, platform),
     detectedAccounts: deps.detectedAccounts,
+    connectionState: async (platform, signal, correlationId) => {
+      const service = connectionServiceOf(platform);
+      if (service === null || deps.publishConnectionState === undefined) return;
+      await deps.publishConnectionState(service, signal, correlationId);
+    },
   });
   return {
     name: 'connectors',

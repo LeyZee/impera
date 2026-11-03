@@ -3,6 +3,7 @@ import {
   CalendarLinkCreatedSchema,
   CalendarLinkStateSchema,
   CalendarSchema,
+  CreatorOnDutyListSchema,
   LeaveRequestListSchema,
   LeaveRequestSchema,
   MyShiftsSchema,
@@ -22,6 +23,7 @@ import {
   type CreateShiftBody,
   type CreateShiftSwapRequestBody,
   type CreateShiftTemplateBody,
+  type CreatorOnDutyList,
   type DecideLeaveRequestBody,
   type LeaveRequest,
   type LeaveRequestList,
@@ -104,6 +106,19 @@ export function useOnDuty(enabled: boolean): UseQueryResult<OnDuty[]> {
     queryFn: () => read('/v1/scheduling/on-duty', (body) => OnDutyListSchema.parse(body).onDuty),
     enabled,
     refetchInterval: 60_000,
+  });
+}
+
+/**
+ * Who chats for the signed-in creator now and in the next 24 hours (CR-02, ADR 0042 § 8): her Aujourd'hui. Read again
+ * every minute, a shift starts or ends on the minute.
+ */
+export function useCreatorOnDuty(): UseQueryResult<CreatorOnDutyList> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'creator-on-duty'],
+    queryFn: () => read('/v1/creator-space/on-duty', (body) => CreatorOnDutyListSchema.parse(body)),
+    refetchInterval: 60_000,
+    retry: 1,
   });
 }
 

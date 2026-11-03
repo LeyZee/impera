@@ -258,3 +258,12 @@ export const inputOf = (minute: number): string =>
 /** The minute this instant falls in: the server takes instants on the minute only. */
 export const onTheMinute = (instant: Date): Date =>
   new Date(Math.floor(instant.getTime() / MINUTE_MS) * MINUTE_MS);
+
+/** « Aujourd’hui », « Demain » or « jeudi 29 octobre »: the day of an instant, in a zone, against today there. */
+export function dayWordOf(instant: string, zone: string, today: string): string {
+  const day = dayOf(instant, zone);
+  if (day === today) return 'Aujourd’hui';
+  if (day === addDays(today, 1)) return 'Demain';
+  const long = longDay(day);
+  return long.charAt(0).toUpperCase() + long.slice(1);
+}

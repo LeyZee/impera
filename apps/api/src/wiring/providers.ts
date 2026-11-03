@@ -1,6 +1,7 @@
 import { JOB_PAYLOADS } from '@nirvana/contracts';
 
 import { secretOrNull } from '../config';
+import { createConnectionStatePublisher } from '../connection-state';
 import { defineTask } from '../jobs';
 import { startProvidersModule, type ProvidersModule } from '../modules/providers';
 
@@ -31,6 +32,7 @@ export async function wireProviders(shared: Shared): Promise<WiredProviders> {
     onLoadError: (error) => {
       logger.warn({ err: error }, 'AI service keys not loaded');
     },
+    publishConnectionState: createConnectionStatePublisher(adminDb),
   });
   return {
     module,

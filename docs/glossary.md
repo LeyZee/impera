@@ -84,11 +84,12 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
-| Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript. |
+| Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript, dans la couleur du script (ADR 0064). |
+| Couleur du script | `script_color` | Les trois tons d'une structure, qui colorent tous ses cartons pour qu'on retrouve le script d'un coup d'œil (ADR 0064). |
 | Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
-| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). |
+| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
 | Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
 | Catégorie de dépôt | `drop_category` | Ce que la créatrice dit d'un dépôt, liste fermée : séance boudoir, vidéo short, script, relance, story Reveal, story Insta, Reel Insta, photo Insta, Telegram ; elle décide de la sortie (ADR 0055). |
@@ -97,6 +98,10 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Demande de contenu | `content_request` | Ce que l'agence attend d'une créatrice : catégorie, échéance, raison, structure pour un script ; une tâche de son agenda avec l'action « Déposer » (ADR 0055). Distincte de la demande de service d'un fan. |
 | Connecteur de publication | `publishing_connector` | Adaptateur qui publie sur un réseau d'acquisition (Instagram, canal Telegram), à côté des connecteurs de plateforme (ADR 0057). |
 | Mode assisté | `assisted` | Publication Instagram préparée par Nirvana et postée à la main, pour ajouter un son (ADR 0057). |
+| Signal de tendance | `trend_signal` | Un format, un son, un thème ou une date qui monte, venu d'une des six sources de l'ADR 0060 ; a une péremption (14 jours par défaut). |
+| Capture passive | `passive_capture` | Le relevé par l'extension de ce qu'une personne regarde elle-même sur instagram.com ; ne fait jamais défiler, ne clique jamais, n'envoie aucune requête (ADR 0060). |
+| Profil de contenu | `content_profile` | Ce qui marche chez une créatrice et ce qu'elle sait faire, rédigé par la vision à partir de ses propres médias et validé par l'agence ; distinct de la persona (ADR 0060). |
+| Idée de contenu | `content_idea` | Une proposition du job du matin (au plus trois par créatrice), filtrée par le code, validée par l'agence, puis suggérée dans l'agenda de la créatrice (ADR 0060). |
 | Script natif | `platform_script` | Un script de vente stocké sur la plateforme (Reveal), que l'agent lit et déroule. À ne pas confondre avec `script`, notre structure interne. |
 | Note client | `fan_note` | La note libre qu'une plateforme attache à un fan, lue et écrite par les chatteurs et l'agent. Distincte de `fan_fact`. |
 | Notes du modèle | `creator_note` | Les notes que Reveal affiche à côté de chaque conversation sur la créatrice : sa fiche persona vue par la plateforme. |
@@ -280,6 +285,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Sauvegarde | `backup_run` | L'export chiffré de la base, chaque nuit, chez un autre hébergeur que la base, gardé 30 jours (ADR 0028). Plus de 26 h sans sauvegarde réussie : avertissement ambre et alerte Telegram. |
 | Essai de restauration | `restore_test` | Une sauvegarde de production restaurée sur le PC du propriétaire dans une base jetable, puis notée dans Réglages › Sauvegardes : date, durée, tables qui diffèrent, empreinte SHA-256 de la sauvegarde. La paie réelle attend un essai réussi de moins de 90 jours (ADR 0028, EQ-17). |
 | Part de l'agence | `agency_share` | La part des revenus d'une créatrice qui revient à l'agence : le net (hors TVA, après la commission de la plateforme) multiplié par le pourcentage réglé pour cette créatrice, daté et jamais appliqué en arrière ; sans pourcentage réglé, aucune part n'est montrée (ADR 0042). |
+| Pourcentage de l'agence | `agency_rate` (`creator_agency_rates`, `agencyBps`, `agencyRateFor`) | Le réglage par créatrice de ce que l'agence prend de son net, en points de base, à partir d'un jour dans le fuseau de l'agence, jamais en arrière : demain au plus tôt, aujourd'hui seulement pour le premier. Le propriétaire seul le lit et le pose (Créatrices › Pourcentage) ; il ne change jamais, un suivant le remplace. Aucune valeur par défaut : sans lui, « à régler ». Sur Reveal, il ne fait aucun montant et sert seulement au signal d'écart du propriétaire (ADR 0042 § 6, ADR 0054 § 2, CR-04). À ne pas confondre avec la part de l'agence, le montant qu'il donne. |
 | Part de la créatrice | `creatorShare` | Ce qui part à la créatrice : le net moins la part de l'agence, montré « estimé » jusqu'à la clôture de la période, avec le parcours ligne par ligne (ADR 0042). |
 | Routine | `routine` | Les tâches quotidiennes qu'une créatrice coche dans son application : celles de l'agence comptent pour la série, les siennes non. |
 | Série | `streak` | Le nombre de jours d'affilée où la créatrice a coché ses tâches essentielles. |

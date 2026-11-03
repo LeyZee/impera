@@ -3,7 +3,10 @@ import type { CreatorId, PersonaLimits, ScriptQueue } from '@nirvana/contracts';
 import { disgustBlocks } from './disgusts';
 import type { QueuedStructure, QueueRefusal } from './ports';
 
-/** The structures her limits keep out of her queue; none without an active persona, which the view says. */
+/**
+ * The structures her limits keep out of her queue; none without an active persona, which the view says. Open for the
+ * queue only: a request (SC-02) is closed without an active persona, and checks her limits again when it freezes.
+ */
 export function queueRefusals(
   entries: readonly QueuedStructure[],
   limits: PersonaLimits | null,

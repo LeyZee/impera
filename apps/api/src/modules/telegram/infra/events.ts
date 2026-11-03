@@ -9,6 +9,7 @@ import {
   InvoiceNotIssuedReasonSchema,
   KillSwitchScopeSchema,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   SecurityAlertPayloadSchema,
 } from '@nirvana/contracts';
 import { z } from 'zod';
@@ -129,6 +130,14 @@ const SaleDetectedSchema = EVENT_PAYLOADS.sale_detected.pick({
   seller: true,
 });
 
+// The platform, the fortnight and how many days and accounts differ (CRM-04 b3): the nets and the differences stay in
+// Nirvana, since a group of alerts may hold managers and Telegram never says a figure pay rests on.
+const SalesFeedMismatchSchema = EVENT_PAYLOADS.sales_feed_mismatch
+  .pick({ platform: true, from: true })
+  .extend({
+    days: z.array(z.object({ day: z.iso.date(), platformAccountId: PlatformAccountIdSchema })).min(1),
+  });
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -247,6 +256,18 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = AutomaticClosedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'automatic_closed', ...parsed.data };
+    }
+    case 'sales_feed_mismatch': {
+      const parsed = SalesFeedMismatchSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { platform, from, days } = parsed.data;
+      return {
+        kind: 'sales_feed_mismatch',
+        platform,
+        from,
+        days: new Set(days.map((day) => day.day)).size,
+        accounts: new Set(days.map((day) => day.platformAccountId)).size,
+      };
     }
     case 'security_alert': {
       const parsed = SecurityAlertPayloadSchema.safeParse(payload);

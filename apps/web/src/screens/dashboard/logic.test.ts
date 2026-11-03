@@ -217,38 +217,21 @@ describe('foldOf', () => {
         cards: [card('relays', 'warn'), card('budget', 'warn', 'Le budget IA approche du plafond')],
       },
       false,
-      false,
     );
     expect(fold).toEqual({ tone: 'warn', title: 'Le budget IA approche du plafond', live: false });
-    expect(foldOf({ ...running, cards: [card('relays', 'warn')] }, false, false)).toMatchObject({
+    expect(foldOf({ ...running, cards: [card('relays', 'warn')] }, false)).toMatchObject({
       tone: 'ok',
       title: 'L’agent fonctionne normalement',
     });
-    expect(foldOf({ ...running, cards: [] }, true, false).title).toBe('Le reste fonctionne normalement');
+    expect(foldOf({ ...running, cards: [] }, true).title).toBe('Le reste fonctionne normalement');
   });
 
-  it('keeps the agent’s own trouble, and tells a creator the agency handles it (DASH-21)', () => {
+  it('keeps the agent’s own trouble', () => {
     const broken: AgentState = { ...agent, tone: 'bad', foldTitle: 'Quelque chose ne va pas' };
-    expect(foldOf(broken, false, false)).toEqual({
+    expect(foldOf(broken, false)).toEqual({
       tone: 'bad',
       title: 'Quelque chose ne va pas',
       live: true,
     });
-    expect(foldOf(broken, false, true).title).toBe('L’agence s’en occupe');
-  });
-});
-
-describe('heroState for a creator', () => {
-  it('names no conversation and offers no action, whatever waits', () => {
-    const hero = heroState(agent, [todo('a', 'bad')], 'copilot', { forCreator: true });
-    expect(hero).toMatchObject({ tone: 'ok', headline: 'Tout va bien. **Rien ne t’attend.**' });
-    expect(hero.action).toBeUndefined();
-    expect(hero.lead).toContain('L’agence suit les conversations');
-  });
-
-  it('leaves a stopped agent to the agency', () => {
-    const hero = heroState(agent, [], 'stop', { forCreator: true });
-    expect(hero.headline).toBe('L’agent est **arrêté**');
-    expect(hero.action).toBeUndefined();
   });
 });

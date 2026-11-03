@@ -589,6 +589,34 @@
       "when": 1793711869411,
       "tag": "0092_sales_feed_mismatch",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793713171025,
+      "tag": "0093_connection_state_changed",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1793714372769,
+      "tag": "0095_script_colour",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1793715681675,
+      "tag": "0096_creator_agency_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793717537337,
+      "tag": "0097_telegram_scan_mismatch",
+      "breakpoints": true
     }
   ]
 }

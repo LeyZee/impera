@@ -96,8 +96,10 @@ describe('railOf, with the screens of today', () => {
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
     expect(railOf(manager).more.size).toBe(0);
     expect(railOf(chatter).more.size).toBe(0);
-    // A creator never sees a conversation (ADR 0023): no Suivi. Her Créatrices is her own persona (NAV-18).
-    expect(labels(creator)).toEqual(['Dashboard', 'Persona']);
+    // A creator gets her own space (ADR 0042 § 8): Aujourd'hui and Moi, the other tabs coming with their screens; never
+    // Suivi nor the agency's Dashboard, her persona being in Moi.
+    expect(labels(creator)).toEqual(['Aujourd’hui', 'Moi']);
+    expect(railOf(creator).home).toBe('/aujourdhui');
   });
 
   it('titles Chatting and Agence, and puts what the phone bar cannot hold under « Plus »', () => {
@@ -136,14 +138,16 @@ describe('sectionOf and canOpen', () => {
       expect(canOpen(rail, section)).toBe(false);
     }
     expect(canOpen(railOf(owner), '/reglages')).toBe(true);
-    expect(canOpen(railOf(creator), '/suivi')).toBe(false);
+    for (const section of ['/', '/suivi', '/creatrices', '/planning'] as const) {
+      expect(canOpen(railOf(creator), section)).toBe(false);
+    }
   });
 });
 
 describe('documentTitle', () => {
   it('titles the install guide, which belongs to no section, for everyone', () => {
-    expect(documentTitle('/aide/installer', null, 'chatter')).toBe('Installer Nirvana · Nirvana');
-    expect(documentTitle('/aide/installer/', null, 'owner')).toBe('Installer Nirvana · Nirvana');
-    expect(documentTitle('/nulle-part', null, 'owner')).toBe('Page introuvable · Nirvana');
+    expect(documentTitle('/aide/installer', null)).toBe('Installer Nirvana · Nirvana');
+    expect(documentTitle('/aide/installer/', null)).toBe('Installer Nirvana · Nirvana');
+    expect(documentTitle('/nulle-part', null)).toBe('Page introuvable · Nirvana');
   });
 });
