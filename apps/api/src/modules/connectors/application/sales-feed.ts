@@ -346,7 +346,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         await onFailure(platform, stored, read.failure, logger, correlationId);
         return;
       }
-      const result = await ledger.recordPage(platform, position, read.value, clock.now());
+      const result = await ledger.recordPage(platform, position, read.value, clock.now(), correlationId);
       if (result.stale) {
         logger.info({ platform }, 'sales feed cursor moved by another run: stopping here');
         break;

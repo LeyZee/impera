@@ -237,11 +237,17 @@ export type ChatterLink = { readonly kind: 'member'; readonly memberId: string }
  */
 export interface SalesLedger {
   cursorOf(platform: Platform): Promise<SalesCursor>;
+  /**
+   * Records a page and moves the cursor, in one transaction. A sale recorded for the first time, less than
+   * `SALE_RING_WINDOW_MS` after it happened, publishes `sale_detected` in that transaction (CRM-04), with
+   * `correlationId`: a line read again inserts nothing, so it publishes nothing.
+   */
   recordPage(
     platform: Platform,
     from: string | null,
     page: PlatformSalesPage,
     at: Date,
+    correlationId: string,
   ): Promise<RecordedPage>;
   /** A 429: no read before `until`. */
   pause(platform: Platform, until: Date): Promise<void>;
