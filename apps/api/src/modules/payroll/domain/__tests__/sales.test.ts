@@ -20,6 +20,7 @@ import {
   saleIdOf,
   saleKeyOf,
   salesLeftHeld,
+  salesToDecide,
   saleToDecide,
   salesWaitingBefore,
   type AccountSourceForPay,
@@ -408,12 +409,47 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
     expect(at({ kind: 'none' })).toEqual([]);
     const before = refundOf(sale(linked(theo), '2025-03-10T12:00:00.000Z', 1_000), P2, 1_000);
     expect(saleDecisionsOpen(before, sales)).toEqual(['exclude']);
-    // A decision already taken is left aside: it may be taken again the other way.
+    // A decision in force can be taken the other way, or taken back: none is final before a closing counts the sale.
     const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
     expect(saleDecisionsOpen(night, { ...sales, decisions: decided(night, counts(theo)) })).toEqual([
-      'count',
+      'exclude',
+      'withdraw',
+    ]);
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    expect(saleDecisionsOpen(paid, { ...sales, decisions: decided(paid, excludes()) })).toEqual(['withdraw']);
+    expect(saleDecisionsOpen(before, { ...sales, decisions: decided(before, excludes()) })).toEqual([
+      'withdraw',
+    ]);
+    // Made on a link's version the chatter no longer has, it is not in force: the sale offers what it offers alone.
+    expect(saleDecisionsOpen(paid, { ...sales, decisions: decided(paid, excludes('v0')) })).toEqual([
       'exclude',
     ]);
+  });
+
+  it('gives a sale back to the rules once its decision is taken back, and shows every decided one', () => {
+    const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    const quiet = sale({ kind: 'agent' }, '2025-03-17T13:00:00.000Z', 700);
+    const sales = salesOf({ lines: [night, paid, quiet], shifts: [morning] });
+    const place = { period: P2, closed: false, firstOpen: P2 };
+    // A withdrawal leaves no decision in force (pay reads none): the sale is what the rules say.
+    expect(saleAttribution(paid, sales)).toEqual({ kind: 'member', memberId: theo.id, linkVersion: 'v1' });
+    expect(salesToDecide(sales, place).map((one) => [saleKeyOf(one.line), one.reason, one.decision])).toEqual(
+      [[saleKeyOf(night), 'off_shift', null]],
+    );
+    const decisions = new Map([...decided(paid, excludes()), ...decided(night, counts(theo))]);
+    expect(
+      salesToDecide({ ...sales, decisions }, place).map((one) => [
+        saleKeyOf(one.line),
+        one.reason,
+        one.decision,
+        one.outcomes,
+      ]),
+    ).toEqual([
+      [saleKeyOf(night), 'off_shift', 'count', ['exclude', 'withdraw']],
+      [saleKeyOf(paid), null, 'exclude', ['withdraw']],
+    ]);
+    expect(salesToDecide({ ...sales, decisions }, { ...place, closed: true })).toEqual([]);
   });
 
   it('finds the sale an open period takes to decide on, never one a closing counted or of a closed period', () => {
@@ -424,6 +460,7 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
     expect(saleToDecide(sales, place, night)).toEqual({
       line: night,
       reason: 'off_shift',
+      decision: null,
       outcomes: ['count', 'exclude'],
     });
     expect(saleToDecide(sales, { ...place, closed: true }, night)).toBeNull();

@@ -61,7 +61,7 @@ import {
 
 import type { AfterValidation, PayoutGate } from './ports';
 import { enqueuePayRecalculation } from './recalculation-queue';
-import { readAtOf, waitingSaleKeysUnscoped, type PayReadScope } from './sales-reads';
+import { waitingSaleKeysUnscoped, type PayReadScope } from './sales-reads';
 import {
   closingsSpan,
   readSnapshot,
@@ -233,7 +233,6 @@ async function writeClosing(
           event: one.line.event,
           period,
           platformAccountId: one.line.platformAccountId,
-          readAt: readAtOf(one.line),
           reason: one.reason,
         })),
       )

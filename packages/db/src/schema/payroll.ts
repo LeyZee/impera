@@ -701,9 +701,8 @@ export const payPeriodSales = pgTable(
 /**
  * The sales a closing left held (CRM-03 lot b3, ADR 0050 § 5, ADR 0032): a line of the platform's register that the
  * closing would have taken but that counted for nobody (`reason`, contracts `SaleHeldReason`). Written once, by the
- * first closing that left it, never changed. The team's first open period reads these lines again (`read_at`, the
- * instant `linesOfSalesBetween` finds them by: the sale's, or a refund's own when its sale is older than the register)
- * until they count or are excluded: a decision, a new link or a shift entered after the closing still brings them in.
+ * first closing that left it, never changed. The team's first open period reads these lines again, by their sale, until
+ * a closing counts them: a decision, a new link or a shift entered after the closing still brings them in.
  */
 export const payPeriodHeldSales = pgTable(
   'pay_period_held_sales',
@@ -717,7 +716,6 @@ export const payPeriodHeldSales = pgTable(
     platformAccountId: uuid('platform_account_id')
       .notNull()
       .references(() => platformAccounts.id),
-    readAt: timestampTz('read_at').notNull(),
     reason: text('reason').notNull(),
     createdAt: createdAt(),
   },
@@ -733,10 +731,11 @@ export const payPeriodHeldSales = pgTable(
 
 /**
  * The validator's decisions on sales (CRM-03 lot b3, ADR 0050 § 5): a sale counts for the member its chatter is linked
- * to (`count`), or for nobody (`exclude`), its refunds with it. Added only, numbered per sale from 1 without a gap: the
- * latest counts, while the chatter's link keeps `link_version` (`null` for a chatter not linked or none). Written by
- * the owner or an active manager, never on a sale of their own chatter (`author_member_id`, the member linked then),
- * never on a sale a closing counted. `read_at` as in `pay_period_held_sales`.
+ * to (`count`), or for nobody (`exclude`), its refunds with it; `withdraw` takes back the decision in force. Added
+ * only, numbered per sale from 1 without a gap: the latest counts, while the chatter's link keeps `link_version`
+ * (`null` for a chatter not linked or none). Written by the owner or an active manager, never on a sale of their own
+ * chatter (`author_member_id`, the member linked then), never on a sale a closing counted. The team's first open
+ * period reads every decided sale no closing counted again, so that a decision can be taken back or lapse.
  */
 export const paySaleDecisions = pgTable(
   'pay_sale_decisions',
@@ -748,7 +747,6 @@ export const paySaleDecisions = pgTable(
     platformAccountId: uuid('platform_account_id')
       .notNull()
       .references(() => platformAccounts.id),
-    readAt: timestampTz('read_at').notNull(),
     outcome: text('outcome').notNull(),
     reason: text('reason'),
     authorMemberId: uuid('author_member_id').references(() => teamMembers.id),
@@ -774,7 +772,7 @@ export const paySaleDecisions = pgTable(
     ),
     check(
       'pay_sale_decisions_count_check',
-      sql`${t.outcome} = 'exclude' or (${t.authorMemberId} is not null and ${t.linkVersion} is not null and ${t.reason} in ('off_shift', 'status_unknown'))`,
+      sql`${t.outcome} <> 'count' or (${t.authorMemberId} is not null and ${t.linkVersion} is not null and ${t.reason} in ('off_shift', 'status_unknown'))`,
     ),
     check('pay_sale_decisions_link_check', sql`(${t.authorMemberId} is null) = (${t.linkVersion} is null)`),
     pgPolicy('member_read', {

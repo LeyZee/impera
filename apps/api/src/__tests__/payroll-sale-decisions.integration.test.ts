@@ -17,6 +17,7 @@ import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 const P0 = PayPeriodSchema.parse('2025-04-16');
 const P1 = PayPeriodSchema.parse('2025-05-01');
 const P2 = PayPeriodSchema.parse('2025-05-16');
+const P3 = PayPeriodSchema.parse('2025-06-01');
 const CauseSchema = z.object({ cause: z.object({ code: z.string(), message: z.string() }) });
 const HeldListSchema = z.object({
   period: z.string(),
@@ -25,7 +26,8 @@ const HeldListSchema = z.object({
       platformSaleId: z.string(),
       event: z.string(),
       memberId: z.string().nullable(),
-      reason: z.string(),
+      reason: z.string().nullable(),
+      decision: z.string().nullable(),
       outcomes: z.array(z.string()),
     }),
   ),
@@ -91,12 +93,19 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
     return HeldListSchema.parse(response.json()).sales.map((one) => [
       one.platformSaleId,
       one.reason,
+      one.decision,
       one.outcomes,
     ]);
   };
 
   const decide = (
-    values: { period: string; sale: string; outcome: 'count' | 'exclude'; id?: string; note?: string | null },
+    values: {
+      period: string;
+      sale: string;
+      outcome: 'count' | 'exclude' | 'withdraw';
+      id?: string;
+      note?: string | null;
+    },
     cookie = team.owner,
   ) =>
     team.call('POST', '/payroll/sale-decisions', cookie, {
@@ -179,9 +188,9 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
 
   it('lists what an open period holds to the owner and an active manager, never to a chatter', async () => {
     expect(await held(P1)).toEqual([
-      ['sale_new', 'chatter_unlinked', ['exclude']],
-      ['sale_odd', 'status_unknown', ['count', 'exclude']],
-      ['sale_off', 'off_shift', ['count', 'exclude']],
+      ['sale_new', 'chatter_unlinked', null, ['exclude']],
+      ['sale_odd', 'status_unknown', null, ['count', 'exclude']],
+      ['sale_off', 'off_shift', null, ['count', 'exclude']],
     ]);
     expect(await held(P1, theoCookie)).toHaveLength(3);
     const refused = await team.call('GET', `/payroll/periods/${P1}/held-sales`, leaCookie);
@@ -238,10 +247,37 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
       ['sale_off', null],
       ['sale_on', null],
     ]);
+    // Counted, it still shows with its decision, which can be changed or taken back until a closing counts it.
     expect(await held(P1)).toEqual([
-      ['sale_new', 'chatter_unlinked', ['exclude']],
-      ['sale_odd', 'status_unknown', ['count', 'exclude']],
+      ['sale_new', 'chatter_unlinked', null, ['exclude']],
+      ['sale_odd', 'status_unknown', null, ['count', 'exclude']],
+      ['sale_off', 'off_shift', 'count', ['exclude', 'withdraw']],
     ]);
+  });
+
+  it('takes back any decision until a closing counts the sale: a paid sale excluded by mistake is paid again', async () => {
+    expect((await decide({ period: P1, sale: 'sale_on', outcome: 'exclude' })).statusCode).toBe(201);
+    await team.recalculate(P1);
+    expect(await salesOf(theo, P1)).toEqual([['sale_off', null]]);
+    expect(await held(P1)).toContainEqual(['sale_on', null, 'exclude', ['withdraw']]);
+    expect(team.refusal(await decide({ period: P1, sale: 'sale_on', outcome: 'count' }))).toEqual(
+      expect.objectContaining({ code: 'pay_sale_outcome_conflict', details: { outcomes: ['withdraw'] } }),
+    );
+
+    const back = await decide({ period: P1, sale: 'sale_on', outcome: 'withdraw', note: 'Erreur de saisie' });
+    expect(back.statusCode).toBe(201);
+    expect(DecisionSchema.parse(back.json())).toEqual(
+      expect.objectContaining({ revision: 2, outcome: 'withdraw' }),
+    );
+    await team.recalculate(P1);
+    expect(await salesOf(theo, P1)).toEqual([
+      ['sale_off', null],
+      ['sale_on', null],
+    ]);
+    expect((await held(P1)).map(([id]) => id)).not.toContain('sale_on');
+    expect(team.refusal(await decide({ period: P1, sale: 'sale_on', outcome: 'withdraw' }))).toEqual(
+      expect.objectContaining({ code: 'pay_sale_outcome_conflict', details: { outcomes: ['exclude'] } }),
+    );
   });
 
   it('keeps at its closing what it leaves held, and a decision after it counts the sale late in the first open period', async () => {
@@ -256,24 +292,45 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
     ]);
     expect(await held(P1)).toEqual([]);
     expect(await held(P2)).toEqual([
-      ['sale_new', 'chatter_unlinked', ['exclude']],
-      ['sale_odd', 'status_unknown', ['count', 'exclude']],
+      ['sale_new', 'chatter_unlinked', null, ['exclude']],
+      ['sale_odd', 'status_unknown', null, ['count', 'exclude']],
     ]);
 
     expect((await decide({ period: P2, sale: 'sale_odd', outcome: 'count' })).statusCode).toBe(201);
     expect((await decide({ period: P2, sale: 'sale_new', outcome: 'exclude' })).statusCode).toBe(201);
     await team.recalculate(P2);
     expect(await salesOf(theo, P2)).toEqual([['sale_odd', P1]]);
-    expect(await held(P2)).toEqual([]);
+    expect(await held(P2)).toEqual([
+      ['sale_new', 'chatter_unlinked', 'exclude', ['withdraw']],
+      ['sale_odd', 'status_unknown', 'count', ['exclude', 'withdraw']],
+    ]);
+  });
 
-    // Linked to Léa since: the exclusion was made on a chatter not linked, it lapses, and Léa was not on shift.
+  it('lets an exclusion lapse on a new link, even after a closing that leaves the sale held again', async () => {
+    // Linked to Léa three days ago: the exclusion was made on a chatter not linked, it lapses, and Léa was not on
+    // shift. Older than the late lines' window, the link alone would not bring the sale back after a closing.
+    const linked = new Date(Date.now() - 3 * 24 * 3_600_000);
     await team.test.admin.db.insert(schema.salesFeedChatters).values({
       platform: 'reveal',
       platformChatterId: 'chatter_new',
       kind: 'member',
       memberId: lea.id,
+      linkVersionAt: linked,
+      linkedAt: linked,
     });
-    expect(await held(P2)).toEqual([['sale_new', 'off_shift', ['count', 'exclude']]]);
+    expect(await held(P2)).toEqual([
+      ['sale_new', 'off_shift', null, ['count', 'exclude']],
+      ['sale_odd', 'status_unknown', 'count', ['exclude', 'withdraw']],
+    ]);
+
+    // P2 closes without deciding again: the sale stays, and the first open period still shows it, the old exclusion
+    // under the chatter not linked left aside.
+    expect((await team.validate(team.owner, theo, P2)).statusCode).toBe(200);
+    expect(await held(P2)).toEqual([]);
+    expect(await held(P3)).toEqual([['sale_new', 'off_shift', null, ['count', 'exclude']]]);
+    expect((await decide({ period: P3, sale: 'sale_new', outcome: 'count' })).statusCode).toBe(201);
+    await team.recalculate(P3);
+    expect(await salesOf(lea, P3)).toEqual([['sale_new', P1]]);
   });
 
   it('never decides a sale a closing counted, and keeps both tables added only', async () => {
@@ -281,14 +338,13 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
       'pay_sale_not_found',
     );
     const db = team.test.admin.db;
-    const decision = (platformSaleId: string, revision: number) => ({
+    const decision = (platformSaleId: string, revision: number, outcome = 'exclude') => ({
       id: newId(PaySaleDecisionIdSchema),
       platform: 'reveal',
       platformSaleId,
       revision,
       platformAccountId: team.annas,
-      readAt: new Date('2025-05-05T10:00:00Z'),
-      outcome: 'exclude',
+      outcome,
       decidedBy: team.ownerId,
     });
     const refused = async (write: () => PromiseLike<unknown>, message: string) => {
@@ -297,10 +353,17 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
       expect(cause.message).toContain(message);
     };
     await refused(
-      () => db.insert(schema.paySaleDecisions).values(decision('sale_on', 1)),
+      () => db.insert(schema.paySaleDecisions).values(decision('sale_on', 3)),
       'pay keeps its past',
     );
     await refused(() => db.insert(schema.paySaleDecisions).values(decision('sale_odd', 3)), 'next number');
+    await db
+      .insert(schema.platformSales)
+      .values(sale({ id: 'sale_late', at: '2025-06-02T09:00:00Z', chatter: 'chatter_theo', net: 500 }));
+    await refused(
+      () => db.insert(schema.paySaleDecisions).values(decision('sale_late', 1, 'withdraw')),
+      'takes back a decision',
+    );
     await refused(
       () =>
         db.insert(schema.payPeriodHeldSales).values({
@@ -309,7 +372,6 @@ describe('Équipe › Paie : la décision du valideur sur une vente en attente (
           event: 'sale',
           period: P1,
           platformAccountId: team.annas,
-          readAt: new Date('2025-05-05T10:00:00Z'),
           reason: 'off_shift',
         }),
       'closing of its own transaction',

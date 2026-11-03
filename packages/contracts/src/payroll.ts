@@ -954,15 +954,23 @@ export type SaleHeldReason = z.infer<typeof SaleHeldReasonSchema>;
 
 /**
  * What the validator decides on a sale (ADR 0050 § 5): it counts for the member its chatter is linked to (`count`),
- * or for nobody (`exclude`). Its refunds follow it. Never another member: the link says who made it.
+ * or for nobody (`exclude`); `withdraw` takes back the decision in force, and the sale follows the rules again. Its
+ * refunds follow it. Never another member: the link says who made it. Any decision is taken back until a closing
+ * counts the sale.
  */
-export const SaleDecisionOutcomeSchema = z.enum(['count', 'exclude']);
+export const SaleDecisionOutcomeSchema = z.enum(['count', 'exclude', 'withdraw']);
 export type SaleDecisionOutcome = z.infer<typeof SaleDecisionOutcomeSchema>;
 
+/** A decision in force on a sale: `withdraw` leaves none. */
+export const SaleDecisionInForceSchema = z.enum(['count', 'exclude']);
+export type SaleDecisionInForce = z.infer<typeof SaleDecisionInForceSchema>;
+
 /**
- * A line an open period holds (CRM-03 lot b3), as the owner and an active manager read it: the line, the member its
- * chatter is linked to (`null` for a chatter not linked), why it is held and what may be decided on its sale. A line a
- * closing left held shows in the team's first open period until it is decided, linked again, or covered by a shift.
+ * A line an open period holds, or that a decision in force settles (CRM-03 lot b3), as the owner and an active manager
+ * read it: the line, the member its chatter is linked to (`null` for a chatter not linked), why it is held without a
+ * decision, the decision in force and what may be decided on its sale. A line a closing left held, or a decided one no
+ * closing counted, shows in the team's first open period until it is settled: decided, linked again, or covered by a
+ * shift.
  */
 export const HeldSaleSchema = z.object({
   platform: PlatformSchema,
@@ -979,15 +987,19 @@ export const HeldSaleSchema = z.object({
   /** The platform's net in minor units of `currency`, signed: a refund is negative. */
   netMinor: z.number().int(),
   memberId: TeamMemberIdSchema.nullable(),
-  reason: SaleHeldReasonSchema,
+  /** Why the line is held without a decision, `null` for a line a member would be paid for. */
+  reason: SaleHeldReasonSchema.nullable(),
+  /** The decision in force on its sale, `null` for none. */
+  decision: SaleDecisionInForceSchema.nullable(),
   outcomes: z.array(SaleDecisionOutcomeSchema),
 });
 export type HeldSale = z.infer<typeof HeldSaleSchema>;
 
 /**
- * `GET /v1/payroll/periods/:period/held-sales` (owner, active manager) → 200: the lines the period holds, in the order
- * of their keys. A closed period holds none: what its closing left shows in the team's first open period, and before
- * the team's first closing a period shows the earlier ones too, which its closing would leave held.
+ * `GET /v1/payroll/periods/:period/held-sales` (owner, active manager) → 200: the lines the period holds or a decision
+ * in force settles, in the order of their keys. A closed period shows none: what its closing left shows in the team's
+ * first open period, and before the team's first closing a period shows the earlier ones too, which its closing would
+ * leave held.
  */
 export const HeldSalesSchema = z.object({
   period: PayPeriodSchema,
@@ -997,8 +1009,9 @@ export type HeldSales = z.infer<typeof HeldSalesSchema>;
 
 /**
  * A decision of the validator on a sale (CRM-03 lot b3, ADR 0050 § 5), added only: the latest one counts, while the
- * chatter's link keeps the version it was made on. `reason` is why the sale was held when it was decided, `null` for a
- * sale a member was paid for (excluded as wrongly given to them); `memberId` the member its chatter was linked to then.
+ * chatter's link keeps the version it was made on; a `withdraw` leaves none. `reason` is why the sale was held without
+ * a decision when it was decided, `null` for a sale a member would be paid for (excluded as wrongly given to them);
+ * `memberId` the member its chatter was linked to then.
  */
 export const PaySaleDecisionSchema = z.object({
   id: PaySaleDecisionIdSchema,
@@ -1017,9 +1030,10 @@ export type PaySaleDecision = z.infer<typeof PaySaleDecisionSchema>;
 
 /**
  * `POST /v1/payroll/sale-decisions` (owner, active manager, never on a sale of their own) → 201
- * `PaySaleDecisionSchema`, 200 for the same `id` and values. The sale is one of `period`'s held lines with the outcome
- * it offers, or, to `exclude` it, one a member is paid for in `period` that no closing counted yet. Counted, it goes in
- * its own period, or in the team's first open period once its own is closed (ADR 0032).
+ * `PaySaleDecisionSchema`, 200 for the same `id` and values. The sale is one `period` takes and no closing counted,
+ * with an outcome it offers: one of its held lines, one a decision in force settles (to change or `withdraw` it), or,
+ * to `exclude` it, one a member is paid for. Counted, it goes in its own period, or in the team's first open period
+ * once its own is closed (ADR 0032).
  */
 export const CreatePaySaleDecisionBodySchema = z.object({
   id: PaySaleDecisionIdSchema,

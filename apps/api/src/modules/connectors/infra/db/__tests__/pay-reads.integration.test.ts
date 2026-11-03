@@ -255,6 +255,36 @@ describe('the sales feed read by pay', () => {
     expect(later.some((one) => one.platformSaleId === 'sale_c')).toBe(false);
   });
 
+  it('reads some sales by their id, whatever their day: each with its refunds, on the accounts given only', async () => {
+    const lines = await withAdmin(test.admin.db, (tx) =>
+      salesFeedReadsForPay.linesOfSales(tx, {
+        platformAccountIds: [account],
+        sales: [
+          { platform: 'reveal', platformSaleId: 'sale_a' },
+          { platform: 'reveal', platformSaleId: 'sale_old' },
+          { platform: 'reveal', platformSaleId: 'sale_other' },
+          { platform: 'reveal', platformSaleId: 'sale_none' },
+        ],
+        timeZone: ZONE,
+      }),
+    );
+    expect(lines.map((one) => [one.platformSaleId, one.event, one.netMinor, one.saleDay])).toEqual([
+      ['sale_old', 'refund', -200, null],
+      ['sale_a', 'sale', 800, '2026-10-15'],
+      ['sale_a', 'refund', -800, '2026-10-15'],
+    ]);
+    expect(
+      lines.find((one) => one.event === 'refund' && one.platformSaleId === 'sale_a')?.author,
+    ).toMatchObject({
+      kind: 'member',
+      memberId: member,
+    });
+    const none = await withAdmin(test.admin.db, (tx) =>
+      salesFeedReadsForPay.linesOfSales(tx, { platformAccountIds: [account], sales: [], timeZone: ZONE }),
+    );
+    expect(none).toEqual([]);
+  });
+
   it('reads nothing for no account', async () => {
     const lines = await withAdmin(test.admin.db, (tx) =>
       salesFeedReadsForPay.linesOfSalesBetween(tx, {

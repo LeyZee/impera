@@ -7,6 +7,7 @@ import {
   type PayPeriod,
   type Platform,
   type PlatformAccountId,
+  type SaleDecisionInForce,
   type SaleDecisionOutcome,
   type SaleEvent,
   type SaleHeldReason,
@@ -46,7 +47,7 @@ export const saleIdOf = (key: Omit<SaleKey, 'event'>): string => `${key.platform
  * keeps the version it was made on: linked elsewhere since, the sale follows the rules again and comes back to decide.
  */
 export interface SaleDecisionForPay {
-  readonly outcome: SaleDecisionOutcome;
+  readonly outcome: SaleDecisionInForce;
   /** The link's version of the sale's chatter when it was decided, `null` for a chatter not linked or none. */
   readonly linkVersion: string | null;
   /** For `count`, the member it counts for, the one the link gave then; `null` for `exclude`. */
@@ -286,29 +287,52 @@ export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAtt
 }
 
 /**
- * What the validator may decide now on the sale of `line` in an open period (CRM-03 lot b3), the decision it holds
- * left aside: `count` and `exclude` on a line held because its member was off shift or its status is unknown,
- * `exclude` alone on any other held line (a chatter not linked, a refund never paid on this net: no deduction until
- * Charles decides, 03/11) and on a line a member is paid for but no closing counted yet (wrongly given to them).
- * Nothing on a refund whose sale a closing counted, on the agent's, on no chatter, or outside the platform's net.
+ * What the validator may decide now on the sale of `line` in an open period (CRM-03 lot b3). Without a decision in
+ * force: `count` and `exclude` on a line held because its member was off shift or its status is unknown, `exclude`
+ * alone on any other held line (a chatter not linked, a refund never paid on this net: no deduction until Charles
+ * decides, 03/11) and on a line a member is paid for but no closing counted yet (wrongly given to them). With one: the
+ * other outcome among those, and `withdraw`, which gives the sale back to the rules: no decision is final before a
+ * closing counts the sale. Nothing on a refund whose sale a closing counted, on the agent's, on no chatter, or outside
+ * the platform's net.
  */
 export function saleDecisionsOpen(line: SaleForPay, sales: SalesSnapshot): readonly SaleDecisionOutcome[] {
   const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
+  let open: readonly SaleDecisionOutcome[];
   if (undecided.kind === 'held') {
-    return undecided.reason === 'off_shift' || undecided.reason === 'status_unknown'
-      ? ['count', 'exclude']
-      : ['exclude'];
+    open =
+      undecided.reason === 'off_shift' || undecided.reason === 'status_unknown'
+        ? ['count', 'exclude']
+        : ['exclude'];
+  } else if (undecided.kind === 'member') {
+    const paid = line.event === 'refund' && sales.registered.has(saleKeyOf({ ...line, event: 'sale' }));
+    if (paid) return [];
+    open = ['exclude'];
+  } else {
+    return [];
   }
-  if (undecided.kind !== 'member') return [];
-  const paid = line.event === 'refund' && sales.registered.has(saleKeyOf({ ...line, event: 'sale' }));
-  return paid ? [] : ['exclude'];
+  const inForce = decisionOn(line, sales);
+  return inForce === null ? open : [...open.filter((one) => one !== inForce.outcome), 'withdraw'];
 }
 
-/** A sale the validator may decide on in an open period: the line shown, why it is held (`null`: paid), and the outcomes. */
+/**
+ * A sale the validator may decide on in an open period: the line shown, why it is held without a decision (`null`: a
+ * member would be paid for it), the decision in force (`null`: none), and the outcomes.
+ */
 export interface SaleToDecide {
   readonly line: SaleForPay;
   readonly reason: SaleHeldReason | null;
+  readonly decision: SaleDecisionInForce | null;
   readonly outcomes: readonly SaleDecisionOutcome[];
+}
+
+function toDecide(line: SaleForPay, sales: SalesSnapshot): SaleToDecide {
+  const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
+  return {
+    line,
+    reason: undecided.kind === 'held' ? undecided.reason : null,
+    decision: decisionOn(line, sales)?.outcome ?? null,
+    outcomes: saleDecisionsOpen(line, sales),
+  };
 }
 
 /**
@@ -328,10 +352,24 @@ export function saleToDecide(
   );
   const line = lines.find((one) => one.event === 'sale') ?? lines[0];
   if (line === undefined) return null;
-  const outcomes = saleDecisionsOpen(line, sales);
-  if (outcomes.length === 0) return null;
-  const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
-  return { line, reason: undecided.kind === 'held' ? undecided.reason : null, outcomes };
+  const found = toDecide(line, sales);
+  return found.outcomes.length === 0 ? null : found;
+}
+
+/**
+ * What an open period shows the owner and the validator (CRM-03 lot b3), in key order: the lines it takes that no
+ * closing counted and that are held without a decision or settled by a decision in force, so that every decision can
+ * be seen and taken back. A closed period shows nothing: what it did not register goes to the first open period.
+ */
+export function salesToDecide(sales: SalesSnapshot, place: PeriodPlace): SaleToDecide[] {
+  if (place.closed) return [];
+  const shown: SaleToDecide[] = [];
+  for (const line of sales.lines) {
+    if (sales.registered.has(saleKeyOf(line)) || !takes(place, line)) continue;
+    const one = toDecide(line, sales);
+    if (one.reason !== null || one.decision !== null) shown.push(one);
+  }
+  return byKey(shown, (one) => one.line);
 }
 
 /** A line a period counts, and the earlier period it comes late from. */

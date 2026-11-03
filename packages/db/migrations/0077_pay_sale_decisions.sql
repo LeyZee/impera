@@ -6,7 +6,6 @@ CREATE TABLE "pay_period_held_sales" (
 	"event" text NOT NULL,
 	"period" date NOT NULL,
 	"platform_account_id" uuid NOT NULL,
-	"read_at" timestamp with time zone NOT NULL,
 	"reason" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "pay_period_held_sales_pkey" PRIMARY KEY("platform","platform_sale_id","event"),
@@ -22,7 +21,6 @@ CREATE TABLE "pay_sale_decisions" (
 	"platform_sale_id" text NOT NULL,
 	"revision" integer NOT NULL,
 	"platform_account_id" uuid NOT NULL,
-	"read_at" timestamp with time zone NOT NULL,
 	"outcome" text NOT NULL,
 	"reason" text,
 	"author_member_id" uuid,
@@ -32,11 +30,11 @@ CREATE TABLE "pay_sale_decisions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "pay_sale_decisions_revision_unique" UNIQUE("platform","platform_sale_id","revision"),
 	CONSTRAINT "pay_sale_decisions_platform_check" CHECK ("pay_sale_decisions"."platform" in ('reveal', 'onlyfans', 'instagram', 'nirvana')),
-	CONSTRAINT "pay_sale_decisions_outcome_check" CHECK ("pay_sale_decisions"."outcome" in ('count', 'exclude')),
+	CONSTRAINT "pay_sale_decisions_outcome_check" CHECK ("pay_sale_decisions"."outcome" in ('count', 'exclude', 'withdraw')),
 	CONSTRAINT "pay_sale_decisions_reason_check" CHECK ("pay_sale_decisions"."reason" is null or "pay_sale_decisions"."reason" in ('chatter_unlinked', 'off_shift', 'status_unknown', 'refund_before_register', 'refund_before_base')),
 	CONSTRAINT "pay_sale_decisions_revision_check" CHECK ("pay_sale_decisions"."revision" >= 1),
 	CONSTRAINT "pay_sale_decisions_note_check" CHECK ("pay_sale_decisions"."note" is null or char_length("pay_sale_decisions"."note") between 1 and 500),
-	CONSTRAINT "pay_sale_decisions_count_check" CHECK ("pay_sale_decisions"."outcome" = 'exclude' or ("pay_sale_decisions"."author_member_id" is not null and "pay_sale_decisions"."link_version" is not null and "pay_sale_decisions"."reason" in ('off_shift', 'status_unknown'))),
+	CONSTRAINT "pay_sale_decisions_count_check" CHECK ("pay_sale_decisions"."outcome" <> 'count' or ("pay_sale_decisions"."author_member_id" is not null and "pay_sale_decisions"."link_version" is not null and "pay_sale_decisions"."reason" in ('off_shift', 'status_unknown'))),
 	CONSTRAINT "pay_sale_decisions_link_check" CHECK (("pay_sale_decisions"."author_member_id" is null) = ("pay_sale_decisions"."link_version" is null))
 );
 --> statement-breakpoint
@@ -85,8 +83,8 @@ CREATE TRIGGER "pay_period_held_sales_left" BEFORE INSERT ON "pay_period_held_sa
   FOR EACH ROW EXECUTE FUNCTION "keep_held_sale"();--> statement-breakpoint
 -- A decision is numbered per sale from 1 without a gap, on a sale of the register on its account (a refund's line
 -- alone when its sale is older than the register), and never on a sale a closing counted: a closed period keeps what it
--- paid, a correction goes through an adjustment (ADR 0032, ADR 0039). Read under the writer's policies, the line's
--- creator entered.
+-- paid, a correction goes through an adjustment (ADR 0032, ADR 0039). A withdrawal takes back a decision: never the
+-- first, never after another one. Read under the writer's policies, the line's creator entered.
 CREATE FUNCTION "keep_sale_decision"() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW."revision" <> coalesce((
@@ -94,6 +92,14 @@ BEGIN
     WHERE d."platform" = NEW."platform" AND d."platform_sale_id" = NEW."platform_sale_id"
   ), 0) + 1 THEN
     RAISE EXCEPTION 'a decision takes the next number of its sale (CRM-03)'
+      USING ERRCODE = 'restrict_violation';
+  END IF;
+  IF NEW."outcome" = 'withdraw' AND coalesce((
+    SELECT d."outcome" FROM "pay_sale_decisions" d
+    WHERE d."platform" = NEW."platform" AND d."platform_sale_id" = NEW."platform_sale_id"
+    ORDER BY d."revision" DESC LIMIT 1
+  ), 'withdraw') = 'withdraw' THEN
+    RAISE EXCEPTION 'a withdrawal takes back a decision (CRM-03)'
       USING ERRCODE = 'restrict_violation';
   END IF;
   IF NOT EXISTS (

@@ -7351,12 +7351,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
         "reason": {
           "name": "reason",
           "type": "text",
@@ -7800,12 +7794,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
         "outcome": {
           "name": "outcome",
           "type": "text",
@@ -7911,7 +7899,7 @@
         },
         "pay_sale_decisions_outcome_check": {
           "name": "pay_sale_decisions_outcome_check",
-          "value": "\"pay_sale_decisions\".\"outcome\" in ('count', 'exclude')"
+          "value": "\"pay_sale_decisions\".\"outcome\" in ('count', 'exclude', 'withdraw')"
         },
         "pay_sale_decisions_reason_check": {
           "name": "pay_sale_decisions_reason_check",
@@ -7927,7 +7915,7 @@
         },
         "pay_sale_decisions_count_check": {
           "name": "pay_sale_decisions_count_check",
-          "value": "\"pay_sale_decisions\".\"outcome\" = 'exclude' or (\"pay_sale_decisions\".\"author_member_id\" is not null and \"pay_sale_decisions\".\"link_version\" is not null and \"pay_sale_decisions\".\"reason\" in ('off_shift', 'status_unknown'))"
+          "value": "\"pay_sale_decisions\".\"outcome\" <> 'count' or (\"pay_sale_decisions\".\"author_member_id\" is not null and \"pay_sale_decisions\".\"link_version\" is not null and \"pay_sale_decisions\".\"reason\" in ('off_shift', 'status_unknown'))"
         },
         "pay_sale_decisions_link_check": {
           "name": "pay_sale_decisions_link_check",

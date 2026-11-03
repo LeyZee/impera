@@ -12,6 +12,7 @@ import {
   TeamMemberIdSchema,
   type Currency,
   type PayPeriod,
+  type Platform,
   type PlatformAccountId,
   type SaleStatus,
   type TeamMemberId,
@@ -68,6 +69,13 @@ interface SaleLinesRange {
 
 type ReadLines = (tx: Transaction, range: SaleLinesRange) => Promise<readonly SaleLineRead[]>;
 
+/** Which lines a read by sale takes: some accounts, and some sales with their refunds (connectors' `PaySalesOfKeys`). */
+interface SaleLinesOfKeys {
+  readonly platformAccountIds: readonly PlatformAccountId[];
+  readonly sales: readonly { readonly platform: Platform; readonly platformSaleId: string }[];
+  readonly timeZone: string;
+}
+
 /**
  * What pay reads of the planning and of the sales feed to count the platform's sales (CRM-03, ADR 0050 §§ 5, 7, 8), in
  * its own transaction and under its policies, given by the composition root from their `index.ts`: every account's
@@ -86,6 +94,7 @@ export interface PaySalesReads {
   readonly linesOfSalesBetween: ReadLines;
   readonly linesRecordedBetween: ReadLines;
   readonly linesRelinkedBetween: ReadLines;
+  readonly linesOfSales: (tx: Transaction, keys: SaleLinesOfKeys) => Promise<readonly SaleLineRead[]>;
 }
 
 /** Whose policies a read runs under: the job's admin connection, or the validating member creator by creator. */
@@ -203,9 +212,6 @@ async function registeredAmong(
   return byKeyOf(rows);
 }
 
-/** The instant `linesOfSalesBetween` finds a line by: its sale's, or a refund's own when its sale is older than the register. */
-export const readAtOf = (line: SaleForPay): Date => line.saleOccurredAt ?? line.occurredAt;
-
 const DecisionRowSchema = z.object({
   platform: PlatformSchema,
   platformSaleId: z.string(),
@@ -214,86 +220,88 @@ const DecisionRowSchema = z.object({
   linkVersion: z.string().nullable(),
 });
 
-/** The latest decision on the sale of each of `lines` (CRM-03 lot b3), by `saleIdOf`: its refunds follow it. */
+/** Sales named in one query at most: a longer list is read in several. */
+const SALES_PER_QUERY = 500;
+
+/**
+ * The decision in force on the sale of each of `lines` (CRM-03 lot b3), by `saleIdOf`: its refunds follow it. The
+ * latest decision counts, and a `withdraw` leaves none.
+ */
 async function decisionsAmong(
   tx: Transaction,
   lines: readonly SaleKey[],
 ): Promise<Map<string, SaleDecisionForPay>> {
-  if (lines.length === 0) return new Map();
   const sales = [...new Map(lines.map((line) => [saleIdOf(line), line])).values()];
-  const rows = await tx
-    .selectDistinctOn([paySaleDecisions.platform, paySaleDecisions.platformSaleId], {
-      platform: paySaleDecisions.platform,
-      platformSaleId: paySaleDecisions.platformSaleId,
-      outcome: paySaleDecisions.outcome,
-      authorMemberId: paySaleDecisions.authorMemberId,
-      linkVersion: paySaleDecisions.linkVersion,
-    })
-    .from(paySaleDecisions)
-    .where(
-      sql`(${paySaleDecisions.platform}, ${paySaleDecisions.platformSaleId}) in (${sql.join(
-        sales.map((one) => sql`(${one.platform}, ${one.platformSaleId})`),
-        sql`, `,
-      )})`,
-    )
-    .orderBy(
-      paySaleDecisions.platform,
-      paySaleDecisions.platformSaleId,
-      sql`${paySaleDecisions.revision} desc`,
-    );
-  return new Map(
-    rows.map((row) => {
+  const decisions = new Map<string, SaleDecisionForPay>();
+  for (let start = 0; start < sales.length; start += SALES_PER_QUERY) {
+    const named = sales
+      .slice(start, start + SALES_PER_QUERY)
+      .map((one) => sql`(${one.platform}, ${one.platformSaleId})`);
+    const rows = await tx
+      .selectDistinctOn([paySaleDecisions.platform, paySaleDecisions.platformSaleId], {
+        platform: paySaleDecisions.platform,
+        platformSaleId: paySaleDecisions.platformSaleId,
+        outcome: paySaleDecisions.outcome,
+        authorMemberId: paySaleDecisions.authorMemberId,
+        linkVersion: paySaleDecisions.linkVersion,
+      })
+      .from(paySaleDecisions)
+      .where(
+        sql`(${paySaleDecisions.platform}, ${paySaleDecisions.platformSaleId}) in (${sql.join(named, sql`, `)})`,
+      )
+      .orderBy(
+        paySaleDecisions.platform,
+        paySaleDecisions.platformSaleId,
+        sql`${paySaleDecisions.revision} desc`,
+      );
+    for (const row of rows) {
       const one = DecisionRowSchema.parse(row);
-      const decision: SaleDecisionForPay = {
+      if (one.outcome === 'withdraw') continue;
+      decisions.set(saleIdOf(one), {
         outcome: one.outcome,
         linkVersion: one.linkVersion,
         memberId: one.outcome === 'count' ? one.authorMemberId : null,
-      };
-      return [saleIdOf(one), decision];
-    }),
-  );
+      });
+    }
+  }
+  return decisions;
 }
 
-const PendingRowSchema = z.object({
-  platform_account_id: PlatformAccountIdSchema,
-  read_at: z.union([z.date(), z.string()]).transform((value) => new Date(value)),
-});
+const PendingRowSchema = z.object({ platform: PlatformSchema, platform_sale_id: z.string().min(1) });
 
 /**
- * The sales pay keeps reading in the team's first open period although no other read takes them (CRM-03 lot b3), on
- * some accounts: the lines a closing left held, and the sales the validator counted, that no closing counted since and
- * whose latest decision does not exclude them. Each by its account and the instant it is read at.
+ * The sales pay keeps reading in the team's first open period although no range would take them (CRM-03 lot b3), on
+ * some accounts: those with a line a closing left held, and those the validator decided, whatever the decision, until
+ * a closing counts them. The domain says what each one is now: a decision taken back, or made on a link's version the
+ * chatter no longer has, gives the sale back to the rules.
  */
 async function pendingSales(
   tx: Transaction,
   accounts: readonly PlatformAccountId[],
-): Promise<{ readonly platformAccountId: PlatformAccountId; readonly readAt: Date }[]> {
+): Promise<{ readonly platform: Platform; readonly platformSaleId: string }[]> {
   const ids = sql.join(
     accounts.map((one) => sql`${one}`),
     sql`, `,
   );
   const result = await tx.execute(sql`
-    with latest as (
-      select distinct on (platform, platform_sale_id) platform, platform_sale_id, platform_account_id, read_at, outcome
-        from pay_sale_decisions
-       order by platform, platform_sale_id, revision desc
-    ), pending as (
-      select h.platform, h.platform_sale_id, h.platform_account_id, h.read_at
-        from pay_period_held_sales h
-       where not exists (select 1 from latest d where d.platform = h.platform and d.platform_sale_id = h.platform_sale_id
-                           and d.outcome = 'exclude')
-      union
-      select d.platform, d.platform_sale_id, d.platform_account_id, d.read_at from latest d where d.outcome = 'count'
-    )
-    select distinct p.platform_account_id, p.read_at
-      from pending p
+    select p.platform, p.platform_sale_id
+      from (
+        select h.platform, h.platform_sale_id, h.platform_account_id
+          from pay_period_held_sales h
+         where not exists (select 1 from pay_period_sales r where r.platform = h.platform
+                             and r.platform_sale_id = h.platform_sale_id and r.event = h.event)
+        union
+        select d.platform, d.platform_sale_id, d.platform_account_id
+          from pay_sale_decisions d
+         where not exists (select 1 from pay_period_sales r where r.platform = d.platform
+                             and r.platform_sale_id = d.platform_sale_id)
+      ) p
      where p.platform_account_id in (${ids})
-       and not exists (select 1 from pay_period_sales r where r.platform = p.platform
-                         and r.platform_sale_id = p.platform_sale_id)
-     order by p.platform_account_id, p.read_at`);
+     group by p.platform, p.platform_sale_id
+     order by p.platform, p.platform_sale_id`);
   return result.rows.map((row) => {
     const one = PendingRowSchema.parse(row);
-    return { platformAccountId: one.platform_account_id, readAt: one.read_at };
+    return { platform: one.platform, platformSaleId: one.platform_sale_id };
   });
 }
 
@@ -318,8 +326,9 @@ async function lateSince(tx: Transaction, lastClosed: PayPeriod): Promise<Date> 
  * - open, the lines whose sale is around the period (a day on each side, `takes` keeps its own), every earlier one
  *   too before the team's first closing (a closing waits for them, ADR 0032); for the team's first open period, the
  *   late lines as well, recorded or linked again since the last closing. With the registry of every sale read, the
- *   accounts' rules, the shifts around the sales and the margin. The team's first open period also reads again the
- *   lines a closing left held and the sales counted by a decision (`pendingSales`), with the decision on every sale.
+ *   accounts' rules, the shifts around the sales and the margin. The team's first open period also reads again, by
+ *   sale, the lines a closing left held and the sales the validator decided (`pendingSales`), with the decision in
+ *   force on every sale.
  * Only the accounts the platform's net pays are read: while none is, nothing is (`NO_SALES`).
  */
 export async function readPeriodSales(
@@ -369,14 +378,10 @@ export async function readPeriodSales(
         ...(await reads.linesRecordedBetween(tx, range(late, NEVER))),
         ...(await reads.linesRelinkedBetween(tx, range(late, NEVER))),
       );
-      for (const pending of await pendingSales(tx, accounts)) {
+      const pending = await pendingSales(tx, accounts);
+      if (pending.length > 0) {
         read.push(
-          ...(await reads.linesOfSalesBetween(tx, {
-            platformAccountIds: [pending.platformAccountId],
-            from: pending.readAt,
-            to: new Date(pending.readAt.getTime() + 1),
-            timeZone,
-          })),
+          ...(await reads.linesOfSales(tx, { platformAccountIds: accounts, sales: pending, timeZone })),
         );
       }
     }

@@ -27,17 +27,10 @@ import {
   PayrollOwnForbidden,
 } from '../domain/errors';
 import type { PayrollSaleDecisionStore } from '../domain/ports';
-import {
-  saleDecisionsOpen,
-  salesHeld,
-  saleToDecide,
-  type HeldSale,
-  type PeriodPlace,
-  type SalesSnapshot,
-} from '../domain/sales';
+import { salesToDecide, saleToDecide, type PeriodPlace, type SaleToDecide } from '../domain/sales';
 
 import { enqueuePayRecalculation } from './recalculation-queue';
-import { readAtOf, readPeriodSales, type PeriodSales } from './sales-reads';
+import { readPeriodSales, type PeriodSales } from './sales-reads';
 import { closingsSpan, type PayInputReads } from './snapshot';
 import { audit } from './writes';
 
@@ -58,8 +51,8 @@ const decisionOfRow = (row: typeof paySaleDecisions.$inferSelect): PaySaleDecisi
     createdAt: row.createdAt.toISOString(),
   });
 
-/** A held line as the owner and an active manager read it, with what may be decided on its sale. */
-const heldSaleOf = (one: HeldSale, sales: SalesSnapshot): HeldSales['sales'][number] => ({
+/** A line to decide as the owner and an active manager read it, with the decision in force and what may be decided. */
+const heldSaleOf = (one: SaleToDecide): HeldSales['sales'][number] => ({
   platform: one.line.platform,
   platformSaleId: one.line.platformSaleId,
   event: one.line.event,
@@ -72,7 +65,8 @@ const heldSaleOf = (one: HeldSale, sales: SalesSnapshot): HeldSales['sales'][num
   netMinor: one.line.netMinor,
   memberId: one.line.author.kind === 'member' ? one.line.author.memberId : null,
   reason: one.reason,
-  outcomes: [...saleDecisionsOpen(one.line, sales)],
+  decision: one.decision,
+  outcomes: [...one.outcomes],
 });
 
 interface PeriodSalesRead extends PeriodSales {
@@ -121,9 +115,9 @@ async function ownMemberOf(tx: Transaction, userId: string): Promise<string | nu
 }
 
 /**
- * The held sales of an open period and the validator's decisions (CRM-03 lot b3, ADR 0050 § 5), as the member who
- * reads or decides (`withMember`): the policies keep the four eyes and the decisions added only, the triggers a sale
- * of the register never decided once a closing counted it.
+ * The sales an open period holds or a decision settles, and the validator's decisions (CRM-03 lot b3, ADR 0050 § 5),
+ * as the member who reads or decides (`withMember`): the policies keep the four eyes and the decisions added only, the
+ * triggers a sale of the register never decided once a closing counted it, and a `withdraw` only after a decision.
  */
 export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputReads): PayrollSaleDecisionStore {
   return {
@@ -131,8 +125,7 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
       withMember(db, userId, async (tx, scope) => {
         if (scope === 'self') throw new PayrollForbidden();
         const { sales, place } = await periodSalesOf(tx, reads, period);
-        const held = place.closed ? [] : salesHeld(sales, place);
-        return HeldSalesSchema.parse({ period, sales: held.map((one) => heldSaleOf(one, sales)) });
+        return HeldSalesSchema.parse({ period, sales: salesToDecide(sales, place).map(heldSaleOf) });
       }),
 
     decide: (actor, body) =>
@@ -181,7 +174,6 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
             platformSaleId: body.platformSaleId,
             revision: (latest?.revision ?? 0) + 1,
             platformAccountId: target.line.platformAccountId,
-            readAt: readAtOf(target.line),
             outcome: body.outcome,
             reason: target.reason,
             authorMemberId,
