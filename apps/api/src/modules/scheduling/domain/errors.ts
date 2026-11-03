@@ -389,3 +389,39 @@ export class PayRulesForbidden extends DomainError {
     super('role_forbidden', message);
   }
 }
+
+/** The mini feedback (ADR 0050 § 10, `SHIFT_FEEDBACK_ERROR_CODES`). */
+export class ShiftFeedbackConflict extends DomainError {
+  constructor() {
+    super('shift_feedback_conflict', 'Ce feedback a déjà été envoyé avec d’autres valeurs');
+  }
+}
+
+export class ShiftFeedbackExists extends DomainError {
+  constructor() {
+    super('shift_feedback_exists_conflict', 'Ce shift a déjà son feedback');
+  }
+}
+
+export class ShiftFeedbackEarly extends DomainError {
+  constructor(opensAt: Date) {
+    super('shift_feedback_early_conflict', 'Le feedback se fait à la fin du shift', {
+      details: { opensAt: opensAt.toISOString() },
+    });
+  }
+}
+
+export class ShiftFeedbackDeclared extends DomainError {
+  constructor() {
+    super(
+      'shift_feedback_declared_conflict',
+      'Sur cette quinzaine, la paie de ce compte lit les rapports : fais ton rapport de fin de shift',
+    );
+  }
+}
+
+export class ShiftFeedbackForbidden extends DomainError {
+  constructor() {
+    super('shift_feedback_forbidden', 'Seul le chatteur du shift fait son feedback');
+  }
+}

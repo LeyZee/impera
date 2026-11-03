@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertChanges,
   assertDeclarable,
+  assertFeedbackDue,
   assertReportOpen,
   assertReportValues,
   assertReviews,
@@ -76,6 +77,34 @@ describe('what a report declares in', () => {
     expect(codeOf(assertDeclarable, rules, period('2026-12-01'), 'EUR')).toBe(
       'shift_report_detected_conflict',
     );
+  });
+});
+
+describe('when the mini feedback replaces the report (ADR 0050 § 10)', () => {
+  const rules = [
+    { fromPeriod: period('2026-10-01'), currency: 'EUR' as const, earningsSource: 'declared' as const },
+    { fromPeriod: period('2026-12-01'), currency: 'EUR' as const, earningsSource: 'detected' as const },
+  ];
+  const shift = { startsAt: at('2026-12-02T09:00:00Z'), endsAt: at('2026-12-02T11:00:00Z') };
+  const after = at('2026-12-02T10:45:00Z');
+
+  it('is taken only on a period whose sales are read', () => {
+    expect(codeOf(assertFeedbackDue, rules, period('2026-12-01'), shift, after)).toBeNull();
+    expect(codeOf(assertFeedbackDue, rules, period('2026-10-16'), shift, after)).toBe(
+      'shift_feedback_declared_conflict',
+    );
+    expect(codeOf(assertFeedbackDue, rules, period('2026-09-16'), shift, after)).toBe(
+      'shift_feedback_declared_conflict',
+    );
+  });
+
+  it('opens with the report, 30 minutes before the end', () => {
+    expect(codeOf(assertFeedbackDue, rules, period('2026-12-01'), shift, at('2026-12-02T10:29:00Z'))).toBe(
+      'shift_feedback_early_conflict',
+    );
+    expect(
+      codeOf(assertFeedbackDue, rules, period('2026-12-01'), shift, at('2026-12-02T10:30:00Z')),
+    ).toBeNull();
   });
 });
 
