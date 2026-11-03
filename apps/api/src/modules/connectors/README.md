@@ -28,6 +28,13 @@ Deuxième port, distinct du connecteur : `PlatformSalesFeed` (`domain/sales-feed
 
 Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed_models`, `sales_feed_chatters`, `platform_sales`, `platform_sales_quarantine` (migration 0065), `sales_feed_webhooks`, `sales_feed_deliveries` (migration 0067). Tests contre le faux CRM de `__tests__/fake-reveal/crm.ts`.
 
+## Vérification de fiabilité (CRM-02, ADR 0050 § 8)
+
+- `POST /v1/settings/sales-feeds/:plateforme/check`, propriétaire seul, trois par minute et par adresse (les statistiques de Reveal sont limitées à dix appels par minute et 500 par jour pour l'agence). Corps : `from`, `to` (31 jours au plus, dans le jour de la plateforme) et `export`, le texte CSV de l'export du dashboard ou `null`. Rien n'est écrit : l'export est lu pour la réponse et gardé nulle part, aucun montant de paie ne bouge.
+- `domain/reliability-check.ts` compare, au centime et par modèle et par jour, le registre (lignes enregistrées et en quarantaine, `infra/db/sales-ledger.ts` `checkLines`) avec `/v1/stats/daily` et l'export, puis, par membre de l'équipe de la plateforme, le registre avec `/v1/stats/chatters/daily`. Une vente compte le jour de sa date dans le fuseau de la plateforme (`timeZone` de l'adaptateur, `Europe/Paris` pour Reveal), un remboursement est retranché du jour de sa vente comme le font les statistiques. Un remboursement dont la vente est plus ancienne que le registre ne se place nulle part et se compte dans une note.
+- Verdict : `match` quand les trois sources disent les chiffres du registre ; `mismatch` dès un écart ; `incomplete` quand une source manque (pas d'export, statistiques refusées) et que le reste concorde. Notes : remboursement sans vente, bot de la plateforme non relié à l'agent, modèle de l'export inconnu, lignes hors des jours, statistiques indisponibles.
+- L'export : séparateur `;`, `,` ou tabulation, guillemets RFC 4180, montants en euros écrits comme un tableur (`12,34 €`, `1 234,56`), dates `AAAA-MM-JJ`, `JJ/MM/AAAA` ou instant ISO. Colonnes reconnues par leur nom (`EXPORT_HEADERS`) : date, modèle (identifiant ou pseudo de la modèle), montant TTC, revenu agence, revenu modèle, net ; il faut la date, le modèle et le net ou ses deux parts. Une colonne du fan n'est jamais lue. **Le vrai export n'a pas encore été vu** : ses noms de colonnes s'ajoutent à `EXPORT_HEADERS` à son arrivée. Un export illisible est refusé en 422 `sales_feed_export_unprocessable`, avec la colonne et la ligne, jamais une valeur ; un refus de la plateforme répond 502 avec son genre.
+
 ## Structure
 
 - `domain/` : types, règles pures, machines d'état. Zéro I/O, zéro import de framework.

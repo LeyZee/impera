@@ -54,6 +54,11 @@ export interface FakeCrm {
   revoke(): void;
   /** The key loses an access: its routes answer 403 (`webhooks`: not opened by the support). */
   withhold(access: Access): void;
+  /**
+   * The statistics are computed from the register from now on, as Reveal does (a sale on its day in Europe/Paris, a
+   * refund taken off its sale's day), instead of the fixed day the other tests read.
+   */
+  statsFromRegister(): void;
   /** `/v1/sales` answers without `pageInfo` this many times. */
   breakShape(times: number): void;
   /** The register's position of a sale's line, `null` when none. */
@@ -107,6 +112,7 @@ export function createFakeCrm(): FakeCrm {
     rateLimited: 0,
     retryAfterSeconds: 0,
     brokenShapes: 0,
+    liveStats: false,
   };
   const calls: { method: string; path: string; status: number }[] = [];
   const webhooks = new Map<string, { url: string; secret: string }>();
@@ -230,9 +236,89 @@ export function createFakeCrm(): FakeCrm {
   }));
 
   const statsQuery = z.object({ from: z.iso.date(), to: z.iso.date() });
+  const parisDay = (at: string): string =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(at));
+
+  /** The register summed per day of each sale (a refund counted against it) and per `key` of its sale. */
+  const summed = (from: string, to: string, keyOf: (sale: FakeSale) => string) => {
+    const sums = new Map<
+      string,
+      { date: string; sale: FakeSale; count: number; ttc: number; ht: number; agency: number; model: number }
+    >();
+    for (const line of register) {
+      const date = parisDay(line.sale.createdAt);
+      if (date < from || date > to) continue;
+      const sign = line.event === 'sale_refunded' ? -1 : 1;
+      const key = `${date}|${keyOf(line.sale)}`;
+      const sum = sums.get(key) ?? { date, sale: line.sale, count: 0, ttc: 0, ht: 0, agency: 0, model: 0 };
+      sums.set(key, {
+        ...sum,
+        count: sum.count + sign,
+        ttc: sum.ttc + sign * line.sale.amountTtc,
+        ht: sum.ht + sign * line.sale.amountHt,
+        agency: sum.agency + sign * line.sale.agencyRevenue,
+        model: sum.model + sign * line.sale.modelRevenue,
+      });
+    }
+    return [...sums.values()];
+  };
+
+  const liveDaily = (from: string, to: string) =>
+    summed(from, to, (sale) => sale.modelId).map((sum) => ({
+      date: sum.date,
+      modelId: sum.sale.modelId,
+      newSubscribers: 0,
+      unsubscribes: 0,
+      activeSubscribers: 0,
+      revenueTtc: sum.ttc,
+      revenueHt: sum.ht,
+      agencyRevenue: sum.agency,
+      modelRevenue: sum.model,
+      ppvSent: null,
+      ppvPurchased: 0,
+      ppvRevenueTtc: 0,
+      tipsCount: 0,
+      tipsRevenueTtc: 0,
+      renewals: 0,
+      paymentLinksCount: 0,
+      boudoirCount: 0,
+      paidMessagesCount: 0,
+      subscriptionsNetRevenue: 0,
+      renewalsNetRevenue: 0,
+      ppvNetRevenue: 0,
+      tipsNetRevenue: 0,
+      paymentLinksNetRevenue: 0,
+      boudoirNetRevenue: 0,
+      paidMessagesNetRevenue: 0,
+      otherNetRevenue: sum.agency + sum.model,
+      messagesSent: null,
+      messagesReceived: null,
+    }));
+
+  const liveChatters = (from: string, to: string) =>
+    summed(from, to, (sale) => `${sale.modelId}|${sale.chatterId ?? ''}`).map((sum) => ({
+      date: sum.date,
+      chatterId: sum.sale.chatterId,
+      modelId: sum.sale.modelId,
+      salesCount: sum.count,
+      revenueTtc: sum.ttc,
+      revenueHt: sum.ht,
+      agencyRevenue: sum.agency,
+      modelRevenue: sum.model,
+      netRevenue: sum.agency + sum.model,
+      ppvPurchased: 0,
+      ppvNetRevenue: 0,
+      tipsCount: 0,
+      tipsNetRevenue: 0,
+      messagesSent: null,
+      ppvSent: null,
+    }));
 
   app.get('/v1/stats/daily', (request) => {
     const { from, to } = statsQuery.parse(request.query);
+    if (state.liveStats) {
+      return { from, to, timezone: 'Europe/Paris', currency: 'EUR', models: [], data: liveDaily(from, to) };
+    }
     return {
       from,
       to,
@@ -277,6 +363,16 @@ export function createFakeCrm(): FakeCrm {
 
   app.get('/v1/stats/chatters/daily', (request) => {
     const { from, to } = statsQuery.parse(request.query);
+    if (state.liveStats) {
+      return {
+        from,
+        to,
+        timezone: 'Europe/Paris',
+        currency: 'EUR',
+        chatters: [],
+        data: liveChatters(from, to),
+      };
+    }
     return {
       from,
       to,
@@ -381,6 +477,9 @@ export function createFakeCrm(): FakeCrm {
     },
     withhold(access) {
       state.withheld.add(access);
+    },
+    statsFromRegister() {
+      state.liveStats = true;
     },
     breakShape(times) {
       state.brokenShapes = times;

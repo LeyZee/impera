@@ -107,3 +107,13 @@ export class SalesFeedWebhookNotFound extends DomainError {
     super('sales_feed_webhook_not_found', 'Aucun webhook enregistré pour cette plateforme');
   }
 }
+
+/**
+ * The dashboard's export cannot be read (422): a column it needs is missing, or a cell is not a date or an amount.
+ * `details` names the column and the line, never a cell's value.
+ */
+export class SalesFeedExportUnprocessable extends DomainError {
+  constructor(problem: string, details: Readonly<Record<string, string | number>>) {
+    super('sales_feed_export_unprocessable', `Export illisible : ${problem}`, { details });
+  }
+}

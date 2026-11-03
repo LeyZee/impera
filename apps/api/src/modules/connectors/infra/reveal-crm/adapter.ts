@@ -32,6 +32,8 @@ import {
 const REVEAL_CRM_BASE_URL = 'https://api.reveal.me';
 
 /** The most `/v1/sales` gives in one page. */
+/** The zone Reveal counts its statistics' days in; an answer in another one is not read. */
+const REVEAL_TIME_ZONE = 'Europe/Paris';
 const PAGE_SIZE = 500;
 const CALL_TIMEOUT_MS = 15_000;
 /** A 429 without a readable `Retry-After`: one minute, the job's own pace. */
@@ -161,6 +163,7 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
   return {
     platform: 'reveal',
     capabilities: ['sales', 'stats', 'team'],
+    timeZone: REVEAL_TIME_ZONE,
 
     async verify() {
       // ADR 0050 § 4: `/v1/models` for the Statistiques access, `/v1/sales` for the Ventes access; both are needed.
@@ -275,6 +278,9 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
     async dailyStats(range: DateRange) {
       const stats = await get('/v1/stats/daily', { from: range.from, to: range.to }, RevealDailyStatsSchema);
       if (!stats.ok) return stats;
+      if (stats.value.timezone !== undefined && stats.value.timezone !== REVEAL_TIME_ZONE) {
+        return { ok: false, failure: { kind: 'unexpected_answer', detail: '/v1/stats/daily: timezone' } };
+      }
       return {
         ok: true,
         value: stats.value.data.map((row) => ({
@@ -301,6 +307,12 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
         RevealChatterDailyStatsSchema,
       );
       if (!stats.ok) return stats;
+      if (stats.value.timezone !== undefined && stats.value.timezone !== REVEAL_TIME_ZONE) {
+        return {
+          ok: false,
+          failure: { kind: 'unexpected_answer', detail: '/v1/stats/chatters/daily: timezone' },
+        };
+      }
       for (const row of stats.value.data) {
         if (row.netRevenue !== row.agencyRevenue + row.modelRevenue) {
           return {

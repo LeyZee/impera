@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SalesFeedAccountUnprocessable,
   SalesFeedDeliveryRefused,
+  SalesFeedExportUnprocessable,
   SalesFeedMemberUnprocessable,
   SalesFeedModelConflict,
   SalesFeedNotConnected,
@@ -26,6 +27,7 @@ describe('sales feed refusals', () => {
       new SalesFeedWebhookUrlUnprocessable(),
       new SalesFeedDeliveryRefused(),
       new SalesFeedWebhookNotFound(),
+      new SalesFeedExportUnprocessable('test', {}),
     ].map((error) => error.code);
     expect([...thrown].sort()).toEqual([...SALES_FEED_ERROR_CODES].sort());
   });

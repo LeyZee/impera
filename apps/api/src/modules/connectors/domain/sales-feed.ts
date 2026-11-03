@@ -13,6 +13,8 @@ import type {
   SalesFeedSignal,
 } from '@nirvana/contracts';
 
+import type { CheckLine } from './reliability-check';
+
 /**
  * The second port of ADR 0050 § 2, apart from `PlatformConnector`: a platform's register of sales and refunds, its
  * statistics and its team, read with an agency key and no session. An adapter maps its platform's answers onto the
@@ -50,6 +52,8 @@ export interface PlatformSalesFeed {
   readonly platform: Platform;
   /** What this adapter can do at all; a key may open less (`verify`). */
   readonly capabilities: readonly SalesFeedCapability[];
+  /** The zone the platform counts its statistics' days in (Reveal: `Europe/Paris`). */
+  readonly timeZone: string;
   /** The calls the platform asks for before a key is trusted; the capabilities this key opens. */
   verify(): Promise<SalesFeedResult<readonly SalesFeedCapability[]>>;
   /** The register after `position` (`null`: from its start), in the register's order. */
@@ -250,6 +254,11 @@ export interface SalesLedger {
   /** Further lines of the model wait in quarantine; those recorded stay. */
   unlinkModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;
   chatterLinks(platform: Platform): Promise<ReadonlyMap<string, ChatterLink>>;
+  /**
+   * For the reliability check (CRM-02): the sales recorded or quarantined between `from` (included) and `to`
+   * (excluded), and every refund read since `from`, whatever its sale. No fan data.
+   */
+  checkLines(platform: Platform, from: Date, to: Date): Promise<readonly CheckLine[]>;
   memberExists(memberId: string): Promise<boolean>;
   linkChatter(
     platform: Platform,

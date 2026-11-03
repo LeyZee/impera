@@ -5,6 +5,8 @@ import {
   type Platform,
   type Result,
   type SalesFeedChatterLink,
+  type SalesFeedCheckBody,
+  type SalesFeedCheckReport,
   type SalesFeedModelLink,
   type SalesFeedOverview,
   type SalesFeedRefusal,
@@ -23,9 +25,11 @@ import {
   SalesFeedWebhookUrlUnprocessable,
 } from '../domain/errors';
 import type { Clock, JobLogger } from '../domain/ports';
+import { buildCheckReport, readDashboardExport, type CheckSources } from '../domain/reliability-check';
 import {
   errorKindOf,
   unknownValueSignals,
+  type DateRange,
   type KeyActor,
   type PlatformSalesFeed,
   type SalesFeedFactory,
@@ -43,6 +47,8 @@ import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-fee
 const MAX_PAGES_PER_RUN = 20;
 /** The inbox only tells a second sending of a delivery, which the platform makes within hours: a week is plenty. */
 const DELIVERY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** The register is read a day wider on each side than the days checked: each line is then placed on its own day. */
+const DAY_MS = 24 * 60 * 60 * 1000;
 /** With a working webhook, the minute's reading becomes an hourly catch-up; a delivery wakes it in between. */
 const CATCH_UP_MS = 60 * 60 * 1000;
 
@@ -94,6 +100,24 @@ export interface SalesFeeds {
    * otherwise a feed whose webhook works is read once an hour, the others every minute (ADR 0050 § 3).
    */
   read(logger: JobLogger, correlationId: string, woken: boolean): Promise<void>;
+  /**
+   * The reliability check of ADR 0050 § 8 (CRM-02): the register against the platform's statistics and the
+   * dashboard's export, read for this answer only. Writes nothing; a refusal of the platform is said, not recorded
+   * (the minute's reading records it). Throws `SalesFeedExportUnprocessable` (422) for an export it cannot read.
+   */
+  check(
+    platform: Platform,
+    body: SalesFeedCheckBody,
+  ): Promise<Result<SalesFeedCheckReport, SalesFeedRefusal>>;
+}
+
+/** The two statistics of the days, one call after the other: Reveal allows ten a minute a key. */
+async function checkStats(feed: PlatformSalesFeed, range: DateRange): Promise<CheckSources['stats']> {
+  const daily = await feed.dailyStats(range);
+  if (!daily.ok) return { ok: false, errorKind: errorKindOf(daily.failure) };
+  const chatters = await feed.chatterDailyStats(range);
+  if (!chatters.ok) return { ok: false, errorKind: errorKindOf(chatters.failure) };
+  return { ok: true, daily: daily.value, chatters: chatters.value };
 }
 
 function refusal(kind: SalesFeedRefusal['kind']): SalesFeedRefusal {
@@ -440,6 +464,49 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       }
       await ledger.linkChatter(platform, platformChatterId, link.kind === 'none' ? null : link, by);
       return overview(platform);
+    },
+
+    async check(platform, body) {
+      const feed = await liveFeed(platform);
+      if (feed === null) throw new SalesFeedNotConnected();
+      const models = await feed.listModels();
+      if (!models.ok) return err(refusal(errorKindOf(models.failure)));
+      const exported =
+        body.export === null
+          ? null
+          : readDashboardExport(body.export, {
+              from: body.from,
+              to: body.to,
+              timeZone: feed.timeZone,
+              models: models.value,
+            });
+      const stats = await checkStats(feed, { from: body.from, to: body.to });
+      const platformChatters = await feed.listChatters();
+      const [lines, modelLinks, chatterLinks] = await Promise.all([
+        ledger.checkLines(
+          platform,
+          new Date(Date.parse(`${body.from}T00:00:00Z`) - DAY_MS),
+          new Date(Date.parse(`${body.to}T00:00:00Z`) + 2 * DAY_MS),
+        ),
+        ledger.modelLinks(platform),
+        ledger.chatterLinks(platform),
+      ]);
+      return ok(
+        buildCheckReport({
+          platform,
+          from: body.from,
+          to: body.to,
+          timeZone: feed.timeZone,
+          generatedAt: clock.now(),
+          lines,
+          stats,
+          exported,
+          models: models.value,
+          modelLinks: new Set(modelLinks.keys()),
+          platformChatters: platformChatters.ok ? platformChatters.value : [],
+          chatterLinks,
+        }),
+      );
     },
 
     async read(logger, correlationId, woken) {

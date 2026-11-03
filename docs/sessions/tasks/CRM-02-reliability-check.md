@@ -1,6 +1,6 @@
 # CRM-02 Prouver la fiabilité sur une quinzaine passée
 
-Statut : todo (ADR 0050, fiches acceptées par Charles le 02/11/2026)
+Statut : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01, l'export du dashboard fourni par Charles hors dépôt
 Branche : task/crm-02-reliability-check
@@ -31,3 +31,9 @@ ADR 0050 § 8, ADR 0023 (§ Une seule source), ADR 0032.
 La bascule elle-même (CRM-03).
 
 ## Notes de session
+
+03/11/2026, Bilan, PR 1 (mécanisme, sans les données de Charles, demandé par la coordination) :
+- `POST /v1/settings/sales-feeds/:plateforme/check` : registre face à `/v1/stats/daily` et à l'export, au centime, par modèle et par jour ; registre face à `/v1/stats/chatters/daily` par membre ; verdict et notes (bot non relié à l'agent, remboursement sans vente, modèle inconnu). Lecture seule, export gardé nulle part. Détail dans le README de `connectors`.
+- Le membre « bot » : le rapport montre ses ventes sous son propre `chatterId`, son drapeau `isBot` et son lien ; une note le signale tant qu'il n'est pas relié à l'agent.
+- Reste : adapter `EXPORT_HEADERS` au vrai export (Charles) ; commissions sur `netAmount` face à la chaîne de l'ADR 0023 (Équipe, module paie) ; l'écran dans Réglages › Ventes (Extension) ; lancer la vérification sur une quinzaine passée avec la clé de Charles et lui présenter le rapport.
+

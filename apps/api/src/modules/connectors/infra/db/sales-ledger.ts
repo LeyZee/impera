@@ -2,6 +2,7 @@ import {
   AuditEntryIdSchema,
   EventIdSchema,
   newId,
+  SaleEventSchema,
   SalesLineIdSchema,
   type Platform,
   type PlatformSale,
@@ -10,6 +11,7 @@ import {
 import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
+import type { CheckLine } from '../../domain/reliability-check';
 import {
   inputsHashOf,
   type ChatterLink,
@@ -322,6 +324,39 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
           return [row.platformChatterId, link];
         }),
       );
+    },
+
+    checkLines(platform, from, to) {
+      // Every creator's register and the quarantine, for the owner: through the admin role, as the agency's figures.
+      return withAdmin(adminDb, async (tx) => {
+        const read = async (
+          table: typeof sales | typeof quarantine,
+          linked: boolean,
+        ): Promise<CheckLine[]> => {
+          const rows = await tx
+            .select({
+              platformSaleId: table.platformSaleId,
+              event: table.event,
+              occurredAt: table.occurredAt,
+              platformModelId: table.platformModelId,
+              platformChatterId: table.platformChatterId,
+              grossInclVat: table.grossInclVatMinor,
+              net: table.netMinor,
+              agency: table.agencyMinor,
+              creator: table.creatorMinor,
+            })
+            .from(table)
+            .where(
+              and(
+                eq(table.platform, platform),
+                sql`${table.occurredAt} >= ${from}`,
+                sql`(${table.event} = 'refund' or ${table.occurredAt} < ${to})`,
+              ),
+            );
+          return rows.map((row) => ({ ...row, event: SaleEventSchema.parse(row.event), linked }));
+        };
+        return [...(await read(sales, true)), ...(await read(quarantine, false))];
+      });
     },
 
     memberExists(memberId) {
