@@ -1,5 +1,5 @@
 /** Public entry point of the `providers` module (ADR 0002, ADR 0016). Other modules import this file only. */
-import type { AiProvider } from '@nirvana/contracts';
+import type { AiProvider, ConnectionService, ConnectionSignal } from '@nirvana/contracts';
 import { parseEncryptionKeys, type Database, type EncryptionKey } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -15,6 +15,7 @@ import {
 } from './application/connections';
 import { createKeyCache } from './application/key-cache';
 import type { ProvidersApi } from './application/providers-api';
+import { connectionServiceOf } from './domain/connection-signal';
 import type { Clock, CredentialStore } from './domain/ports';
 import { createElevenLabsVerifier } from './infra/elevenlabs.verifier';
 import { createGoogleVerifier } from './infra/google.verifier';
@@ -44,6 +45,15 @@ export interface ProvidersDeps {
    */
   readonly reloadEveryMs?: number;
   readonly onReloadError?: (error: unknown) => void;
+  /**
+   * `connection_state_changed` (Telegram P3-12), wired by the composition root: what the module saw of a service, the
+   * outbox keeping the transitions only.
+   */
+  readonly publishConnectionState?: (
+    service: ConnectionService,
+    signal: ConnectionSignal,
+    correlationId: string,
+  ) => Promise<unknown>;
 }
 
 export interface ProvidersModule extends ProvidersApi {
@@ -74,6 +84,11 @@ export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
       deps.onChange?.(provider);
     },
     hasEnvironmentKey: (provider) => deps.environmentKeys?.(provider) !== undefined,
+    onSignal: async (provider, signal) => {
+      const service = connectionServiceOf(provider);
+      if (service === null || deps.publishConnectionState === undefined) return;
+      await deps.publishConnectionState(service, signal, `providers:${provider}`);
+    },
   };
   const reportRefusedKey = createRefusalReporter(connections, cache);
   const api: ProvidersApi = {
@@ -123,6 +138,7 @@ export interface ProvidersStartOptions {
    * no longer decrypts (`UnreadableProviderKey`), or they are kept in memory only (`ProviderKeysInMemory`).
    */
   readonly onLoadError: (error: unknown) => void;
+  readonly publishConnectionState?: ProvidersDeps['publishConnectionState'];
 }
 
 const KEY_RELOAD_MS = 30_000;
@@ -166,6 +182,9 @@ export async function startProvidersModule(options: ProvidersStartOptions): Prom
     environmentKeys: environment === null ? null : (provider) => environment[provider],
     reloadEveryMs: KEY_RELOAD_MS,
     onReloadError: options.onLoadError,
+    ...(options.publishConnectionState !== undefined && {
+      publishConnectionState: options.publishConnectionState,
+    }),
   });
   await module.start().catch(options.onLoadError);
   return module;
