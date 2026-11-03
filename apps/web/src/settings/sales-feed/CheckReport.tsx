@@ -16,7 +16,10 @@ import {
   gap,
   money,
   noteText,
+  plural,
   rangeLabel,
+  readBefore,
+  switchLine,
   verdictOf,
 } from './check';
 import { ago } from './view';
@@ -68,18 +71,28 @@ function Cell({
  */
 export function CheckReport({
   report,
+  isKept,
+  clean,
   platformName,
   models,
   chatters,
   now,
 }: {
   report: SalesFeedCheckReport;
+  /**
+   * Read back from the server rather than just run: a member named in a note would be the one linked now, maybe not
+   * the one the report saw (it keeps the kind of link, not the member), so a kept report names nobody.
+   */
+  isKept: boolean;
+  /** Whether the switch to the platform's net can rest on it (server's rule), `null` before it said. */
+  clean: boolean | null;
   platformName: string;
   models: readonly SalesFeedModelLink[];
   chatters: readonly SalesFeedChatterLink[];
   now: Date;
 }): JSX.Element {
   const verdict = verdictOf(report.verdict);
+  const toSwitch = switchLine(report, clean);
   const hasMembers = chatters.some((chatter) => chatter.link?.kind === 'member');
   const members = useMembers(hasMembers);
   const memberName = (memberId: string): string | null =>
@@ -99,9 +112,11 @@ export function CheckReport({
           <h4 className="sf-verdict__title">{verdict.title}</h4>
           <p className="sv-muted">{verdict.line}</p>
           <p className="sf-meta">
-            {rangeLabel(report).replace(/^./u, (first) => first.toUpperCase())}, jours de {platformName} (
+            Vérifié {ago(report.generatedAt, now)} · {rangeLabel(report)}, jours de {platformName} (
             {zoneName(report.timeZone)}) · registre lu{' '}
-            {report.registerReadAt === null ? 'jamais' : ago(report.registerReadAt, now)}
+            {report.registerReadAt === null
+              ? 'jamais'
+              : readBefore(report.registerReadAt, report.generatedAt)}
           </p>
         </div>
       </div>
@@ -110,11 +125,18 @@ export function CheckReport({
         <ul className="sf-notes">
           {report.notes.map((note) => (
             <li key={JSON.stringify(note)} className="sf-warn">
-              {noteText(note, platformName, chatters, memberName)}
+              {noteText(note, platformName, chatters, isKept ? () => null : memberName, report.chatters)}
             </li>
           ))}
         </ul>
       ) : null}
+
+      {toSwitch === null ? null : (
+        <p className="sf-switch" data-tone={toSwitch.tone}>
+          <span className="sv-dot" data-dot={toSwitch.tone} aria-hidden="true" />
+          {toSwitch.text}
+        </p>
+      )}
 
       <section className="sf-block" aria-labelledby="sf-check-total">
         <h5 id="sf-check-total" className="sf-block__title">
@@ -159,7 +181,7 @@ export function CheckReport({
           <p className="sv-muted sf-small">
             {report.days.length === 0
               ? 'Aucune vente sur ces jours, dans aucune source.'
-              : `Sur ${String(report.days.length)} jours de ventes par modèle, chaque source dit le chiffre du registre.`}
+              : `Sur ${plural(report.days.length, 'jour', 'jours')} de ventes par modèle, chaque source dit le chiffre du registre.`}
           </p>
         ) : (
           <ul className="sf-gaps">

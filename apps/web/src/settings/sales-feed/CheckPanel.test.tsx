@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import type { SalesFeedCheckReport, SalesFeedOverview, SalesFeedStatus } from '@nirvana/contracts';
+import type {
+  SalesFeedCheckReport,
+  SalesFeedOverview,
+  SalesFeedStatus,
+  TeamMember,
+} from '@nirvana/contracts';
+import { TeamMemberSchema } from '@nirvana/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
@@ -122,11 +128,37 @@ const ok =
   (body: unknown): Handler =>
   () => ({ status: 200, body });
 
-function page(check: Handler, overview: SalesFeedOverview = OVERVIEW): ReturnType<typeof serve> {
+const ANA = '00000000-0000-4000-8000-0000000000a1';
+const ANA_MEMBER: TeamMember = TeamMemberSchema.parse({
+  id: ANA,
+  userId: '00000000-0000-4000-8000-000000000110',
+  email: 'ana@example.test',
+  firstName: 'Ana',
+  lastName: 'Test',
+  displayName: 'Ana T.',
+  teamRole: 'chatter',
+  status: 'active',
+  country: 'BJ',
+  timeZone: 'Africa/Porto-Novo',
+  color: null,
+  joinedOn: '2026-01-01',
+  creatorIds: [],
+  commission: null,
+  invitationPending: false,
+  invitationExpiresAt: null,
+});
+
+function page(
+  check: Handler,
+  overview: SalesFeedOverview = OVERVIEW,
+  lastCheck: Handler = ok({ last: null }),
+): ReturnType<typeof serve> {
   const fetch = serve({
+    'GET /v1/team/members': ok({ members: [ANA_MEMBER] }),
     [`GET ${BASE}`]: ok({ feeds: [overview.status] }),
     [`GET ${BASE}/reveal`]: ok(overview),
     [`POST ${BASE}/reveal/check`]: check,
+    [`GET ${BASE}/reveal/check`]: lastCheck,
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -165,7 +197,9 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
     expect(await within(panel).findByText('Les chiffres concordent au centime')).toBeTruthy();
     expect(checkBody(fetch)).toEqual({ from: '2026-10-16', to: '2026-10-31', export: null });
     expect(
-      within(panel).getByText(/jours de Reveal \(heure de Paris\) · registre lu il y a 1 min/u),
+      within(panel).getByText(
+        /^Vérifié à l’instant · du 16 au 31 octobre, jours de Reveal \(heure de Paris\) · registre lu 1 min avant$/u,
+      ),
     ).toBeTruthy();
     expect(within(panel).getByText('Aucun jour en écart')).toBeTruthy();
     expect(
@@ -285,6 +319,82 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
       await within(panel).findByText(
         'La vérification n’a pas eu lieu. Export illisible : la colonne « net » manque.',
       ),
+    ).toBeTruthy();
+  });
+
+  it('shows the latest report kept on return, and that the switch can rest on it', async () => {
+    const kept = report({
+      generatedAt: '2026-11-03T06:00:00.000Z',
+      registerReadAt: '2026-11-03T05:57:00.000Z',
+      total: { ...report().total, export: totals(10_000) },
+    });
+    page(ok(report()), OVERVIEW, ok({ last: { report: kept, clean: true, checkedBy: 'u-owner' } }));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    expect(await within(panel).findByText('Les chiffres concordent au centime')).toBeTruthy();
+    expect(
+      within(panel).getByText(/^Vérifié il y a 3 h · du 16 au 31 octobre.* registre lu 3 min avant$/u),
+    ).toBeTruthy();
+    expect(
+      within(panel).getByText(
+        'Une quinzaine entière, et tout concorde : la bascule du compte pourra s’appuyer sur ce rapport.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('reads back, after a check, whether the switch can rest on it: not on days short of a fortnight', async () => {
+    const day = report({
+      from: '2026-10-20',
+      to: '2026-10-20',
+      total: { ...report().total, export: totals(10_000) },
+    });
+    let kept: unknown = { last: null };
+    const fetch = page(
+      () => {
+        kept = { last: { report: day, clean: false, checkedBy: 'u-owner' } };
+        return { status: 200, body: day };
+      },
+      OVERVIEW,
+      () => ({ status: 200, body: kept }),
+    );
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Autres jours' }));
+    fireEvent.change(within(panel).getByLabelText('Du'), { target: { value: '2026-10-20' } });
+    fireEvent.change(within(panel).getByLabelText('Au'), { target: { value: '2026-10-20' } });
+    expect(within(panel).getByText(/La bascule du compte demandera une quinzaine entière\./u)).toBeTruthy();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Vérifier ces jours' }));
+    expect(await within(panel).findByText(/mais pas sur une quinzaine entière/u)).toBeTruthy();
+    expect(
+      fetch.mock.calls.filter(([url, init]) => url === `${BASE}/reveal/check` && init?.method === undefined),
+    ).toHaveLength(2);
+  });
+
+  it('names the member a bot is linked to after a check, nobody on a kept report: the link may have moved since', async () => {
+    const toAna: SalesFeedOverview = {
+      ...OVERVIEW,
+      chatters: OVERVIEW.chatters.map((chatter) => ({ ...chatter, link: { kind: 'member', memberId: ANA } })),
+    };
+    const linked = report({
+      verdict: 'mismatch',
+      chatters: [
+        {
+          platformChatterId: 'c-bot',
+          isBot: true,
+          link: 'member',
+          register: { net: 10_000, sales: 4 },
+          stats: { net: 10_000, sales: 4 },
+          differs: false,
+        },
+      ],
+      notes: [{ kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' }],
+    });
+    page(ok(linked), toAna, ok({ last: { report: linked, clean: false, checkedBy: 'u-owner' } }));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    expect(
+      await within(panel).findByText(/^Le compte bot « Bot Agence » est relié à un membre :/u),
+    ).toBeTruthy();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Vérifier ces jours' }));
+    expect(
+      await within(panel).findByText(/^Le compte bot « Bot Agence » est relié à « Ana T\. » :/u),
     ).toBeTruthy();
   });
 

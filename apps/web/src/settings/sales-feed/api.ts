@@ -3,6 +3,7 @@ import {
   REAUTHENTICATION_ERROR_CODE,
   SalesFeedCheckReportSchema,
   SalesFeedErrorCodeSchema,
+  SalesFeedLastCheckSchema,
   SalesFeedListSchema,
   SalesFeedOverviewSchema,
   SalesFeedRefusalSchema,
@@ -11,6 +12,7 @@ import {
   type Platform,
   type SalesFeedCheckBody,
   type SalesFeedCheckReport,
+  type SalesFeedLastCheck,
   type SalesFeedOverview,
   type SalesFeedRefusal,
   type SalesFeedStatus,
@@ -191,4 +193,12 @@ export async function runCheck(platform: Platform, body: SalesFeedCheckBody): Pr
       ? { ok: true, report: SalesFeedCheckReportSchema.parse(json) }
       : { ok: false, refusal: SalesFeedRefusalSchema.parse(json) },
   );
+}
+
+/**
+ * The latest report kept (CRM-03), `last: null` before any check: the screen shows it again on return, and says
+ * whether the switch to the platform's net can rest on it (`clean`, decided by the server).
+ */
+export async function fetchLastCheck(platform: Platform): Promise<SalesFeedLastCheck> {
+  return parsed(await call(`/${platform}/check`), (body) => SalesFeedLastCheckSchema.parse(body));
 }
