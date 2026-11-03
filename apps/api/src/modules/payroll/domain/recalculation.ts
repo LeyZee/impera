@@ -37,6 +37,17 @@ import {
 import { closingPeriodOf, finalFor } from './departure';
 import { CommissionRateMissing } from './errors';
 import { assertFreshRates } from './exchange-rates';
+import {
+  saleKeyOf,
+  saleLinesOf,
+  salesCounted,
+  salesHeld,
+  salesWaitingBefore,
+  type CountedSale,
+  type HeldSale,
+  type SalesSnapshot,
+  type StatementSale,
+} from './sales';
 
 /**
  * The recalculation of a period's drafts (EQ-04, ADR 0032), pure: from what the job read in one transaction, the
@@ -46,7 +57,8 @@ import { assertFreshRates } from './exchange-rates';
  * - a closed period counts exactly what its closing registered;
  * - an open period counts the validated reports no closing registered that were made for it, and, when it is the
  *   team's first open period, those made for an earlier period too (late reports, which keep their period's rules).
- * A period before the team's first closing is never computed again.
+ * A period before the team's first closing is never computed again. The sales a platform records for an account whose
+ * rules read them are counted the same way, by their own registry (`sales.ts`, CRM-03).
  */
 
 /** A validated report as pay reads it: its amount, and its account's rules for the period it was made for. */
@@ -99,6 +111,8 @@ export interface PeriodSnapshot {
   readonly reports: readonly ReportForPay[];
   /** The period a closing counted each of those reports in, for those a closing registered. */
   readonly registered: ReadonlyMap<ShiftReportId, PayPeriod>;
+  /** The platform's sales of the accounts whose rules read them, with their registry (`NO_SALES` while none does). */
+  readonly sales: SalesSnapshot;
   readonly members: readonly MemberForPay[];
   /** The period's bonuses, the penalties over it, the carry-overs into it and its adjustments, cancelled ones too. */
   readonly bonuses: readonly Bonus[];
@@ -133,6 +147,12 @@ interface StatementLineContent {
   readonly commissionMinor: number;
   readonly shiftReportIds: readonly ShiftReportId[];
   readonly lateReports: readonly LateReport[];
+  /**
+   * `platform_net` for a line of the platform's sales (CRM-03), with the lines it counts; both absent on a line of
+   * reports, so that the content, and the `inputsHash`, of every statement made before stays the same.
+   */
+  readonly base?: 'platform_net';
+  readonly sales?: readonly StatementSale[];
 }
 
 /** What a statement counted besides its reports, as they were when it was computed. */
@@ -211,14 +231,38 @@ export function reportsCounted(snapshot: PeriodSnapshot): ReportForPay[] {
   );
 }
 
+/** Where `snapshot.period` stands for its sales: closed or not, and the team's first open period. */
+const placeOf = (snapshot: PeriodSnapshot) => ({
+  period: snapshot.period,
+  closed: snapshot.closing !== null,
+  firstOpen: firstOpenPeriod(snapshot.lastClosed),
+});
+
+/** The platform's lines `snapshot.period` counts, by the same rule as its reports (`sales.ts`). */
+export function salesCountedIn(snapshot: PeriodSnapshot): CountedSale[] {
+  return salesCounted(snapshot.sales, placeOf(snapshot));
+}
+
+/** The platform's lines an open `snapshot.period` holds for nobody, and why (CRM-03 lot b3 shows them). */
+export function salesHeldIn(snapshot: PeriodSnapshot): HeldSale[] {
+  return salesHeld(snapshot.sales, placeOf(snapshot));
+}
+
 /**
- * The rates of the period: once closed, its closing's; while open, for each currency a counted report is in, the
- * latest read on the period's last day or before, never the rate of the day the job runs. A currency without one is
- * left out, and the engine refuses it (`exchange_rate_missing_conflict`): pay never guesses a rate.
+ * The rates of the period: once closed, its closing's; while open, for each currency a counted report or sale is in,
+ * the latest read on the period's last day or before, never the rate of the day the job runs. A currency without one
+ * is left out, and the engine refuses it (`exchange_rate_missing_conflict`): pay never guesses a rate.
  */
-function periodRates(snapshot: PeriodSnapshot, counted: readonly ReportForPay[]): ExchangeRate[] {
+function periodRates(
+  snapshot: PeriodSnapshot,
+  counted: readonly ReportForPay[],
+  countedSales: readonly CountedSale[],
+): ExchangeRate[] {
   if (snapshot.closing !== null) return canonicalExchangeRates(snapshot.closing.exchangeRates);
-  const used = new Set<string>(counted.map((report) => report.currency));
+  const used = new Set<string>([
+    ...counted.map((report) => report.currency),
+    ...countedSales.map((one) => one.line.currency),
+  ]);
   return canonicalExchangeRates(snapshot.latestRates.filter((rate) => used.has(rate.currency)));
 }
 
@@ -228,6 +272,31 @@ interface LineBuilder {
   grossMinor: number;
   readonly shiftReportIds: ShiftReportId[];
   readonly lateReports: LateReport[];
+  /** The platform's lines of a line on its net, absent on a line of reports. */
+  readonly sales?: readonly StatementSale[];
+}
+
+/**
+ * A member's counted sales, one line per account and currency on the platform's net (`saleLinesOf`), after the lines
+ * of their reports: its gross is that net, without VAT or the platform's commission, which the platform took already
+ * (ADR 0050 § 8), so that only the rate applies.
+ */
+function saleLineBuilders(counted: readonly CountedSale[]): LineBuilder[] {
+  return saleLinesOf(counted).map((group) => ({
+    platformAccountId: group.platformAccountId,
+    earnings: {
+      platformAccountId: group.platformAccountId,
+      currency: group.currency,
+      grossMinor: 0,
+      vatBps: 0,
+      platformFeeBps: 0,
+      base: 'platform_net',
+    },
+    grossMinor: group.netMinor,
+    shiftReportIds: [],
+    lateReports: [],
+    sales: group.sales,
+  }));
 }
 
 /** A member's reports, line by line: an account under one set of rules is one line, in one order. */
@@ -316,19 +385,26 @@ function computePeriod(snapshot: PeriodSnapshot): {
   const { period } = snapshot;
   const lastDay = payPeriodLastDay(period);
   const counted = reportsCounted(snapshot);
-  const rates = periodRates(snapshot, counted);
+  const countedSales = salesCountedIn(snapshot);
+  const rates = periodRates(snapshot, counted, countedSales);
   const tierSet = bonusTiersFor(snapshot.bonusTierSets, period);
   const goal = collectiveGoalFor(snapshot.collectiveGoals, period);
   const memberIds = new Set(snapshot.members.map((member) => member.id));
   for (const report of counted) {
     if (!memberIds.has(report.memberId)) throw new Error(`Report ${report.id} has no member`);
   }
+  for (const one of countedSales) {
+    if (!memberIds.has(one.memberId)) throw new Error(`Sale ${saleKeyOf(one.line)} has no member`);
+  }
 
   const members = byId(snapshot.members).map((member) => {
-    const lines = linesOf(
-      period,
-      counted.filter((report) => report.memberId === member.id),
-    );
+    const lines = [
+      ...linesOf(
+        period,
+        counted.filter((report) => report.memberId === member.id),
+      ),
+      ...saleLineBuilders(countedSales.filter((one) => one.memberId === member.id)),
+    ];
     return { member, lines, entries: entriesOf(snapshot, member.id) };
   });
   const input: MemberPayInput[] = members.map(({ member, lines, entries }) => ({
@@ -389,6 +465,10 @@ function computePeriod(snapshot: PeriodSnapshot): {
           commissionMinor: line.commissionMinor,
           shiftReportIds: source.shiftReportIds,
           lateReports: source.lateReports,
+          ...(source.earnings.base !== undefined && {
+            base: source.earnings.base,
+            sales: source.sales ?? [],
+          }),
         };
       }),
       netMinor: statement.netMinor,
@@ -479,9 +559,10 @@ export function planPeriod(snapshot: PeriodSnapshot): PeriodPlan {
   return { kind: 'write', inserts, updates, unchanged, drifted };
 }
 
-/** What a period's closing freezes for the team (ADR 0032), with the reports its registry holds from then on. */
+/** What a period's closing freezes for the team (ADR 0032), with the reports and sales its registries hold from then on. */
 export interface ClosingPlan {
   readonly counted: readonly ReportForPay[];
+  readonly countedSales: readonly CountedSale[];
   readonly teamNetMinor: number;
   readonly collective: CollectiveReached;
   readonly exchangeRates: readonly ExchangeRate[];
@@ -510,22 +591,35 @@ export function closePeriod(snapshot: PeriodSnapshot): {
   ) {
     throw new Error(`An earlier period than ${period} must close first`);
   }
+  if (firstOpen === null && salesWaitingBefore(snapshot.sales, period).length > 0) {
+    throw new Error(`An earlier period than ${period} must close first`);
+  }
   const counted = reportsCounted(snapshot);
+  const countedSales = salesCountedIn(snapshot);
   const { computed } = computePeriod(snapshot);
   const frozen = {
     teamNetMinor: computed.teamNetMinor,
     collective: computed.collective,
-    exchangeRates: periodRates(snapshot, counted),
+    exchangeRates: periodRates(snapshot, counted, countedSales),
   };
   assertFreshRates(period, frozen.exchangeRates);
   const registered = new Map(snapshot.registered);
   for (const report of counted) registered.set(report.id, period);
+  const salesRegistered = new Map(snapshot.sales.registered);
+  for (const one of countedSales) {
+    salesRegistered.set(saleKeyOf(one.line), {
+      period,
+      memberId: one.memberId,
+      linkVersion: one.linkVersion,
+    });
+  }
   return {
-    closing: { ...frozen, counted },
+    closing: { ...frozen, counted, countedSales },
     closed: {
       ...snapshot,
       closing: frozen,
       registered,
+      sales: { ...snapshot.sales, registered: salesRegistered },
       firstClosed: snapshot.firstClosed ?? period,
       lastClosed: period,
     },
@@ -538,22 +632,25 @@ export function statementOf(snapshot: PeriodSnapshot, memberId: TeamMemberId): S
   return { content, inputsHash: sha256Of(content) };
 }
 
-/** Whether the period counts something for the member: a report, or a statement the engine gives them. */
+/** Whether the period counts something for the member: a report, a sale, or a statement the engine gives them. */
 export function paysMember(snapshot: PeriodSnapshot, memberId: TeamMemberId): boolean {
   return (
     reportsCounted(snapshot).some((report) => report.memberId === memberId) ||
+    salesCountedIn(snapshot).some((one) => one.memberId === memberId) ||
     computedOnClosing(snapshot).given.includes(memberId)
   );
 }
 
 /**
- * Whether the period may close on the way to a later one (ADR 0032): no statement, no report counted, nothing the
- * engine gives anyone (a bonus, an adjustment, a carry-over in). Otherwise its statements are validated first.
+ * Whether the period may close on the way to a later one (ADR 0032): no statement, no report or sale counted,
+ * nothing the engine gives anyone (a bonus, an adjustment, a carry-over in). Otherwise its statements are validated
+ * first.
  */
 export function periodIsEmpty(snapshot: PeriodSnapshot): boolean {
   return (
     snapshot.statements.length === 0 &&
     reportsCounted(snapshot).length === 0 &&
+    salesCountedIn(snapshot).length === 0 &&
     computedOnClosing(snapshot).given.length === 0
   );
 }

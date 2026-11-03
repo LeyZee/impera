@@ -33,6 +33,7 @@ import { z } from 'zod';
 
 import type { CreatorReports } from '../domain/ports';
 import type { MemberForPay, PeriodSnapshot, ReportForPay } from '../domain/recalculation';
+import { NO_SALES } from '../domain/sales';
 
 const {
   bonusTierSets,
@@ -236,6 +237,8 @@ export async function readSnapshot(
     lastClosed: span.last,
     reports,
     registered,
+    // CRM-03 lot b2 reads the platform's sales; until then no account's rules read them (`detected` is refused).
+    sales: NO_SALES,
     members: await reads.members(tx, lastDay),
     bonuses: bonusRows.map(bonusOfRow),
     penalties: penaltyRows.map(penaltyOfRow),

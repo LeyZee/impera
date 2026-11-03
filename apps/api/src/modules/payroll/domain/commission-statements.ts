@@ -41,6 +41,12 @@ export interface AccountEarnings {
   readonly grossMinor: number;
   readonly vatBps: number;
   readonly platformFeeBps: number;
+  /**
+   * `platform_net` when `grossMinor` is already the platform's net (ADR 0050 § 8, CRM-03): then `vatBps` and
+   * `platformFeeBps` are 0 and only the rate applies. Absent for the chain of ADR 0023, so that an account's two bases
+   * in one period stay two lines.
+   */
+  readonly base?: 'platform_net';
 }
 
 type PenaltyInput =
@@ -240,8 +246,8 @@ function twice<T>(items: readonly T[], key: (item: T) => string): string | null 
  * What the application must never hand the engine, since the answer would then hang on the order of the input: a
  * member twice (the team's net would count the member twice), two rates for one currency, or one account twice under
  * the same rules for a member (the account's total would be rounded in two pieces). The same account under other rules
- * (a late report from a period whose currency, VAT or platform fee differed) is a line of its own. A bug of the caller,
- * never a case of pay.
+ * (a late report from a period whose currency, VAT or platform fee differed, or its sales on the platform's net beside
+ * its reports) is a line of its own. A bug of the caller, never a case of pay.
  */
 function refuseDuplicates(input: PeriodPayInput): void {
   const member = twice(input.members, (one) => one.memberId);
@@ -252,7 +258,7 @@ function refuseDuplicates(input: PeriodPayInput): void {
     const account = twice(
       one.accounts,
       (earnings) =>
-        `${earnings.platformAccountId} ${earnings.currency} ${String(earnings.vatBps)} ${String(earnings.platformFeeBps)}`,
+        `${earnings.platformAccountId} ${earnings.currency} ${String(earnings.vatBps)} ${String(earnings.platformFeeBps)} ${earnings.base ?? 'gross_chain'}`,
     );
     if (account !== null) throw new RangeError(`Account ${account} comes twice for member ${one.memberId}`);
   }
