@@ -61,6 +61,8 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_swap_revert_conflict:
     'Cet échange ne revient plus en arrière : un des shifts a commencé ou a changé de mains.',
   shift_swap_self_invalid: 'Un échange se fait avec un collègue.',
+  calendar_link_forbidden: 'Le lien de calendrier est réservé aux membres de l’équipe.',
+  calendar_feed_not_found: 'Ce lien de calendrier n’est plus valable.',
   role_forbidden: 'Ton accès au planning a changé. Recharge la page.',
   request_invalid: 'Ces valeurs ne vont pas : vérifie les heures et le jour.',
 };

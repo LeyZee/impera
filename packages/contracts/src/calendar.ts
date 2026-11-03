@@ -123,3 +123,28 @@ export type Calendar = z.infer<typeof CalendarSchema>;
 
 /** The longest window the calendar reads, in days: the 6 weeks of a month view. */
 export const CALENDAR_MAX_DAYS = PLANNING_MAX_DAYS;
+
+/**
+ * The calendar link (CR-12, ADR 0045 § 5): a secret, read-only, revocable iCal address of the member's own shifts,
+ * to add to Apple Agenda or Google Agenda. Only its SHA-256 is kept, so the address is given once, when it is made:
+ * - `GET /v1/scheduling/calendar-link`: whether the account has a live link, and since when, never the address;
+ * - `POST /v1/scheduling/calendar-link`: a new address, which revokes the one before;
+ * - `DELETE /v1/scheduling/calendar-link`: the live address stops answering;
+ * - `GET /v1/calendar-feed/<token>.ics`, without a session: the feed, `text/calendar`, the slot, the creator and the
+ *   member's name in the team and nothing else; an unknown, revoked or departed link answers one same 404.
+ */
+export const CALENDAR_FEED_PREFIX = '/v1/calendar-feed/';
+/** 256 random bits, base64url: 43 characters. */
+export const CalendarLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+export const CalendarLinkStateSchema = z.object({
+  link: z.object({ createdAt: z.iso.datetime() }).nullable(),
+});
+export type CalendarLinkState = z.infer<typeof CalendarLinkStateSchema>;
+
+/** The new address, as a path on the dashboard's origin: the token leaves the server once, here. */
+export const CalendarLinkCreatedSchema = z.object({
+  path: z.string().regex(/^\/v1\/calendar-feed\/[A-Za-z0-9_-]{43}\.ics$/),
+  createdAt: z.iso.datetime(),
+});
+export type CalendarLinkCreated = z.infer<typeof CalendarLinkCreatedSchema>;

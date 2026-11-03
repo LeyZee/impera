@@ -491,6 +491,13 @@
       "when": 1793670874380,
       "tag": "0071_sales_feed_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1793675405504,
+      "tag": "0072_calendar_links",
+      "breakpoints": true
     }
   ]
 }

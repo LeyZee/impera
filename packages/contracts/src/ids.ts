@@ -78,6 +78,9 @@ export type MemberRoleId = z.infer<typeof MemberRoleIdSchema>;
 export const InvitationLinkIdSchema = uuid.brand<'InvitationLinkId'>();
 export type InvitationLinkId = z.infer<typeof InvitationLinkIdSchema>;
 
+export const CalendarLinkIdSchema = uuid.brand<'CalendarLinkId'>();
+export type CalendarLinkId = z.infer<typeof CalendarLinkIdSchema>;
+
 /** A member's shift on one account of a creator (EQ-02). */
 export const ShiftIdSchema = uuid.brand<'ShiftId'>();
 export type ShiftId = z.infer<typeof ShiftIdSchema>;
