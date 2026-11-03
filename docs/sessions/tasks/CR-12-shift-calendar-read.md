@@ -1,5 +1,5 @@
 # CR-12 Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier
-Statut : in_progress, lot a (serveur) fait le 03/11/2026, lot b1 (« l'équipe » du chatteur, couche IA) et lot b2 (Équipe › Planning : Mois, charge, couverture, couche IA) le même jour ; restent les liens iCal (lot c), les places d'ADR 0049 et la couche de la créatrice (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 1, § 2 et § 5, acceptée le 02/11/2026 ; ADR 0048 pour l'IA, acceptée le même jour). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
+Statut : in_progress, lot a (serveur) fait le 03/11/2026, lot b1 (« l'équipe » du chatteur, couche IA) et lot b2 (Équipe › Planning : Mois, charge, couverture, couche IA) et lot c1 (liens iCal, serveur) le même jour ; restent l'écran du lien dans Moi (lot c2), les places d'ADR 0049 et la couche de la créatrice (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 1, § 2 et § 5, acceptée le 02/11/2026 ; ADR 0048 pour l'IA, acceptée le même jour). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
 Phase : espaces (ADR 0045)
 Dépend de : EQ-02 (planning, module `scheduling`), P3-14 (heures d'activité de l'agent), CR-02 (chemin de lecture de la créatrice, pour sa couche) ; le prototype validé
 Branche : task/cr-12-shift-calendar-read
@@ -50,3 +50,11 @@ Poser, déplacer, ajouter en masse, suggérer (CR-13) ; notifications et rappels
 - Grille de la semaine : l'IA sur chaque ligne de compte et dans chaque créneau (liseré violet, étiquette, mots pour le lecteur d'écran) ; un créneau sans shift couvert par l'IA en automatique se lit « IA seule » et sort du décompte « à pourvoir », comme `slotsToFill` côté serveur.
 - Serveur : les colonnes des réglages lus par les écrans viennent d'un seul `settingsColumns` (relecture de Bilan sur #427).
 - Reste : la palette de 12 nuances des membres (fiche d'un membre, Équipe) ; une classe `nv-sr-only` du design system pour remplacer `.cal-sr`.
+
+### 03/11/2026, lot c1 (liens iCal, serveur)
+- Migration 0076 : `calendar_links` (titulaire = le compte `user_id`, SHA-256 du jeton, une seule vivante par compte), hors RLS et retirée à `nirvana_app`, lue par `withAdmin` seulement, comme `invitation_links`. Le terme « lien de calendrier » entre au glossaire.
+- Routes : `GET`, `POST`, `DELETE /v1/scheduling/calendar-link` (membres de l'équipe, pour eux-mêmes, au journal d'audit) ; `GET /v1/calendar-feed/<jeton>.ics` sans session, 60 par minute et par IP, `Cache-Control: private, no-store`, rien journalisé sous `warn`, `access_log off` dans `nginx`.
+- Le flux lit `calendar_shifts` avec les droits du titulaire puis ne garde que ses shifts (un chatteur actif n'envoie pas toute l'équipe à son téléphone), sur 14 jours en arrière et 28 devant ; RFC 5545, UTC, lignes pliées à 75 octets ; un lien inconnu, révoqué ou d'un membre parti répond le même 404. 5 tests d'intégration, 4 unitaires (fichier), 2 de contrat.
+- Le départ (EQ-14) n'a rien à faire de plus : le flux refuse dès que le membre est `left`. Il pourra révoquer la ligne pour l'audit.
+- Reste (lot c2) : « Mon agenda » dans Moi (créer, copier, « Ajouter à Apple Agenda » en `webcal://`, « Ajouter à Google Agenda », remplacer, révoquer) et la vérification à l'œil dans Apple Agenda et Google Agenda.
+

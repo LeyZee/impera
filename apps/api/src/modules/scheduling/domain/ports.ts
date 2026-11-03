@@ -571,6 +571,24 @@ export interface CalendarReads {
   }>;
 }
 
+/**
+ * Calendar links (CR-12, ADR 0045 § 5), through the admin connection (`calendar_links` is out of `nirvana_app`'s
+ * reach). The token is made, hashed and compared here, and leaves only from `replace`.
+ */
+export interface CalendarLinkStore {
+  /** The account's live link, if any: since when, never the token. */
+  live(userId: UserId): Promise<{ createdAt: Date } | null>;
+  /**
+   * A new link for a member of the team who has not left, revoking the live one, both in the audit log; `null` when
+   * the account is not such a member.
+   */
+  replace(actor: Actor): Promise<{ token: string; createdAt: Date } | null>;
+  /** Revokes the live link; whether there was one. */
+  revoke(actor: Actor): Promise<boolean>;
+  /** The holder of a live link whose member has not left, found by the token's hash; `null` otherwise. */
+  holder(token: string): Promise<{ userId: UserId; memberId: TeamMemberId } | null>;
+}
+
 /** A shift's mini feedback as stored (ADR 0050 § 10). */
 export interface StoredShiftFeedback {
   readonly id: ShiftFeedbackId;

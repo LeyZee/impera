@@ -552,6 +552,33 @@ export const shiftReports = pgTable(
 );
 
 /**
+ * Calendar links (CR-12, ADR 0045 § 5, ADR 0042 § 4): a secret, read-only, revocable iCal address per account, for a
+ * member's own shifts (and, with CR-05, the creator's agenda). The holder is the dashboard account (`user_id`), so
+ * the server reads with that account's own rights. Out of RLS and out of reach of `nirvana_app` (the migration revokes
+ * it): only `withAdmin` reads or writes it, like `invitation_links`. The token itself is never stored, only its
+ * SHA-256; an account has at most one live link, and a new one revokes the old.
+ */
+export const calendarLinks = pgTable(
+  'calendar_links',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id),
+    /** SHA-256 of the token, base64url. */
+    tokenHash: text('token_hash').notNull().unique(),
+    createdAt: createdAt(),
+    revokedAt: timestampTz('revoked_at'),
+  },
+  (t) => [
+    check('calendar_links_revoked_check', sql`${t.revokedAt} is null or ${t.revokedAt} >= ${t.createdAt}`),
+    uniqueIndex('calendar_links_live_unique')
+      .on(t.userId)
+      .where(sql`${t.revokedAt} is null`),
+  ],
+);
+
+/**
  * The mini feedback (ADR 0050 § 10, contracts `shift-feedback.ts`): on an account whose pay reads the platform's
  * sales, what the chatter adds at the end of a shift instead of a report. No amount, no review, never read by pay. One
  * per shift, on its shift's creator, account and member (composite key, as a report); made by the member alone, read by
