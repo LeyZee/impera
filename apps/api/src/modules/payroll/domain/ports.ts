@@ -9,11 +9,13 @@ import type {
   CreateBonusTierSetBody,
   CreateCollectiveGoalBody,
   CreatePayoutMinimumBody,
+  CreatePaySaleDecisionBody,
   CreatePenaltyBody,
   DomainError,
   ExchangeRate,
   ExchangeRates,
   ForeignCurrency,
+  HeldSales,
   PayAdjustment,
   PayAdjustmentId,
   PayCommissionStatementBody,
@@ -27,6 +29,7 @@ import type {
   PayoutBlockReason,
   PayoutMinimum,
   PayrollSettings,
+  PaySaleDecision,
   Penalty,
   PenaltyId,
   TeamMemberId,
@@ -131,6 +134,16 @@ export interface PayrollEntryStore {
     statementId: CommissionStatementId,
     payment: PayCommissionStatementBody,
   ): Promise<{ readonly period: PayPeriod }>;
+}
+
+/**
+ * The sales an open period holds and the validator's decisions on them (CRM-03 lot b3, ADR 0050 § 5), each in one
+ * transaction as the member who reads or decides (`withMember`): the owner and an active manager, never on a sale of
+ * their own chatter. A decision runs under `payroll.close`, so that a closing sees it or it sees the closing.
+ */
+export interface PayrollSaleDecisionStore {
+  heldSales(userId: UserId, period: PayPeriod): Promise<HeldSales>;
+  decide(actor: Actor, body: CreatePaySaleDecisionBody): Promise<Recorded<PaySaleDecision>>;
 }
 
 /**

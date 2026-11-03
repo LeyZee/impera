@@ -7,10 +7,12 @@ import {
   PayPeriodSchema,
   PlatformAccountIdSchema,
   PlatformSchema,
+  SaleDecisionOutcomeSchema,
   SaleEventSchema,
   TeamMemberIdSchema,
   type Currency,
   type PayPeriod,
+  type Platform,
   type PlatformAccountId,
   type SaleStatus,
   type TeamMemberId,
@@ -20,19 +22,22 @@ import { z } from 'zod';
 
 import {
   NO_SALES,
+  saleIdOf,
   saleKeyOf,
   salesCounted,
+  salesLeftHeld,
   salesWaitingBefore,
   type AccountSourceForPay,
   type RegisteredSale,
   type SaleAuthorForPay,
+  type SaleDecisionForPay,
   type SaleForPay,
   type SaleKey,
   type SalesSnapshot,
   type ShiftForPay,
 } from '../domain/sales';
 
-const { payPeriodClosings, payPeriodSales } = schema;
+const { payPeriodClosings, payPeriodSales, paySaleDecisions } = schema;
 
 /** A line of the platform's register as the sales feed gives it to pay (connectors' `PaySaleLine`, CRM-03). */
 interface SaleLineRead extends SaleKey {
@@ -64,6 +69,13 @@ interface SaleLinesRange {
 
 type ReadLines = (tx: Transaction, range: SaleLinesRange) => Promise<readonly SaleLineRead[]>;
 
+/** Which lines a read by sale takes: some accounts, and some sales with their refunds (connectors' `PaySalesOfKeys`). */
+interface SaleLinesOfKeys {
+  readonly platformAccountIds: readonly PlatformAccountId[];
+  readonly sales: readonly { readonly platform: Platform; readonly platformSaleId: string }[];
+  readonly timeZone: string;
+}
+
 /**
  * What pay reads of the planning and of the sales feed to count the platform's sales (CRM-03, ADR 0050 §§ 5, 7, 8), in
  * its own transaction and under its policies, given by the composition root from their `index.ts`: every account's
@@ -82,6 +94,7 @@ export interface PaySalesReads {
   readonly linesOfSalesBetween: ReadLines;
   readonly linesRecordedBetween: ReadLines;
   readonly linesRelinkedBetween: ReadLines;
+  readonly linesOfSales: (tx: Transaction, keys: SaleLinesOfKeys) => Promise<readonly SaleLineRead[]>;
 }
 
 /** Whose policies a read runs under: the job's admin connection, or the validating member creator by creator. */
@@ -132,6 +145,7 @@ function saleForPayOf(line: SaleLineRead, timeZone: string): SaleForPay {
     event: line.event,
     platformAccountId: line.platformAccountId,
     status: line.status,
+    occurredAt: line.occurredAt,
     period: payPeriodOfDay(calendarDayAt(line.occurredAt, timeZone)),
     saleOccurredAt: line.saleOccurredAt,
     salePeriod: line.saleDay === null ? null : payPeriodOfDay(line.saleDay),
@@ -198,6 +212,99 @@ async function registeredAmong(
   return byKeyOf(rows);
 }
 
+const DecisionRowSchema = z.object({
+  platform: PlatformSchema,
+  platformSaleId: z.string(),
+  outcome: SaleDecisionOutcomeSchema,
+  authorMemberId: TeamMemberIdSchema.nullable(),
+  linkVersion: z.string().nullable(),
+});
+
+/** Sales named in one query at most: a longer list is read in several. */
+const SALES_PER_QUERY = 500;
+
+/**
+ * The decision in force on the sale of each of `lines` (CRM-03 lot b3), by `saleIdOf`: its refunds follow it. The
+ * latest decision counts, and a `withdraw` leaves none.
+ */
+async function decisionsAmong(
+  tx: Transaction,
+  lines: readonly SaleKey[],
+): Promise<Map<string, SaleDecisionForPay>> {
+  const sales = [...new Map(lines.map((line) => [saleIdOf(line), line])).values()];
+  const decisions = new Map<string, SaleDecisionForPay>();
+  for (let start = 0; start < sales.length; start += SALES_PER_QUERY) {
+    const named = sales
+      .slice(start, start + SALES_PER_QUERY)
+      .map((one) => sql`(${one.platform}, ${one.platformSaleId})`);
+    const rows = await tx
+      .selectDistinctOn([paySaleDecisions.platform, paySaleDecisions.platformSaleId], {
+        platform: paySaleDecisions.platform,
+        platformSaleId: paySaleDecisions.platformSaleId,
+        outcome: paySaleDecisions.outcome,
+        authorMemberId: paySaleDecisions.authorMemberId,
+        linkVersion: paySaleDecisions.linkVersion,
+      })
+      .from(paySaleDecisions)
+      .where(
+        sql`(${paySaleDecisions.platform}, ${paySaleDecisions.platformSaleId}) in (${sql.join(named, sql`, `)})`,
+      )
+      .orderBy(
+        paySaleDecisions.platform,
+        paySaleDecisions.platformSaleId,
+        sql`${paySaleDecisions.revision} desc`,
+      );
+    for (const row of rows) {
+      const one = DecisionRowSchema.parse(row);
+      if (one.outcome === 'withdraw') continue;
+      decisions.set(saleIdOf(one), {
+        outcome: one.outcome,
+        linkVersion: one.linkVersion,
+        memberId: one.outcome === 'count' ? one.authorMemberId : null,
+      });
+    }
+  }
+  return decisions;
+}
+
+const PendingRowSchema = z.object({ platform: PlatformSchema, platform_sale_id: z.string().min(1) });
+
+/**
+ * The sales pay keeps reading in the team's first open period although no range would take them (CRM-03 lot b3), on
+ * some accounts: those with a line a closing left held, and those the validator decided, whatever the decision, until
+ * a closing counts them. The domain says what each one is now: a decision taken back, or made on a link's version the
+ * chatter no longer has, gives the sale back to the rules.
+ */
+async function pendingSales(
+  tx: Transaction,
+  accounts: readonly PlatformAccountId[],
+): Promise<{ readonly platform: Platform; readonly platformSaleId: string }[]> {
+  const ids = sql.join(
+    accounts.map((one) => sql`${one}`),
+    sql`, `,
+  );
+  const result = await tx.execute(sql`
+    select p.platform, p.platform_sale_id
+      from (
+        select h.platform, h.platform_sale_id, h.platform_account_id
+          from pay_period_held_sales h
+         where not exists (select 1 from pay_period_sales r where r.platform = h.platform
+                             and r.platform_sale_id = h.platform_sale_id and r.event = h.event)
+        union
+        select d.platform, d.platform_sale_id, d.platform_account_id
+          from pay_sale_decisions d
+         where not exists (select 1 from pay_period_sales r where r.platform = d.platform
+                             and r.platform_sale_id = d.platform_sale_id)
+      ) p
+     where p.platform_account_id in (${ids})
+     group by p.platform, p.platform_sale_id
+     order by p.platform, p.platform_sale_id`);
+  return result.rows.map((row) => {
+    const one = PendingRowSchema.parse(row);
+    return { platform: one.platform, platformSaleId: one.platform_sale_id };
+  });
+}
+
 /** What the closing of `period` registered: a closed period counts it again without reading the register. */
 async function registeredIn(tx: Transaction, period: PayPeriod): Promise<Map<string, RegisteredSale>> {
   return byKeyOf(await tx.select().from(payPeriodSales).where(eq(payPeriodSales.period, period)));
@@ -219,7 +326,9 @@ async function lateSince(tx: Transaction, lastClosed: PayPeriod): Promise<Date> 
  * - open, the lines whose sale is around the period (a day on each side, `takes` keeps its own), every earlier one
  *   too before the team's first closing (a closing waits for them, ADR 0032); for the team's first open period, the
  *   late lines as well, recorded or linked again since the last closing. With the registry of every sale read, the
- *   accounts' rules, the shifts around the sales and the margin.
+ *   accounts' rules, the shifts around the sales and the margin. The team's first open period also reads again, by
+ *   sale, the lines a closing left held and the sales the validator decided (`pendingSales`), with the decision in
+ *   force on every sale.
  * Only the accounts the platform's net pays are read: while none is, nothing is (`NO_SALES`).
  */
 export async function readPeriodSales(
@@ -269,6 +378,12 @@ export async function readPeriodSales(
         ...(await reads.linesRecordedBetween(tx, range(late, NEVER))),
         ...(await reads.linesRelinkedBetween(tx, range(late, NEVER))),
       );
+      const pending = await pendingSales(tx, accounts);
+      if (pending.length > 0) {
+        read.push(
+          ...(await reads.linesOfSales(tx, { platformAccountIds: accounts, sales: pending, timeZone })),
+        );
+      }
     }
     const instants: number[] = [];
     for (const one of read) {
@@ -295,6 +410,7 @@ export async function readPeriodSales(
     sales: {
       lines: ordered,
       registered: await registeredAmong(tx, ordered),
+      decisions: await decisionsAmong(tx, ordered),
       sources,
       shifts,
       accessMarginMinutes: await reads.accessMarginMinutes(tx),
@@ -306,8 +422,9 @@ export async function readPeriodSales(
 /**
  * The keys of the lines a member would be paid for in `periods` and no closing registered, read on the admin
  * connection: in each period on its own sales, late lines in the team's first open period, and before the team's first
- * closing the earlier periods' too (`salesWaitingBefore`). A closing compares them with what the validating member
- * read, so that a line he may not read stops it instead of being left behind (as `pay_period_reports_unread_conflict`).
+ * closing the earlier periods' too (`salesWaitingBefore`); with the lines each period's closing would leave held
+ * (`salesLeftHeld`). A closing compares them with what the validating member read, so that a line he may not read stops
+ * it instead of being left behind (as `pay_period_reports_unread_conflict`).
  */
 export async function waitingSaleKeysUnscoped(
   tx: Transaction,
@@ -329,6 +446,8 @@ export async function waitingSaleKeysUnscoped(
     );
     for (const one of salesCounted(sales, { period, closed: false, firstOpen })) keys.add(saleKeyOf(one));
     if (lastClosed === null) for (const one of salesWaitingBefore(sales, period)) keys.add(saleKeyOf(one));
+    // What its closing would leave held: kept by the closing, so it must be read by the validator too.
+    for (const one of salesLeftHeld(sales, period)) keys.add(saleKeyOf(one.line));
   }
   return keys;
 }

@@ -516,6 +516,16 @@ describe('words', () => {
         names,
       ),
     ).toBe('1 vente est sur des créatrices que tu ne suis pas : le propriétaire valide cette quinzaine.');
+    // A decision on a held sale (CRM-03 lot b3): the list it came from is read again.
+    expect(payRefusalText({ kind: 'refused', code: 'pay_sale_not_found', details: {} }, names)).toBe(
+      'Cette vente n’attend plus de décision dans cette quinzaine : la liste est relue.',
+    );
+    expect(payRefusalText({ kind: 'refused', code: 'pay_sale_outcome_conflict', details: {} }, names)).toBe(
+      'Cette décision n’est plus possible pour cette vente : la liste est relue.',
+    );
+    expect(payRefusalText({ kind: 'refused', code: 'pay_sale_decision_conflict', details: {} }, names)).toBe(
+      'Cette saisie existe déjà avec d’autres valeurs : recharge la page.',
+    );
     expect(
       payRefusalText(
         { kind: 'refused', code: 'payment_before_period_unprocessable', details: { period: '2026-10-16' } },

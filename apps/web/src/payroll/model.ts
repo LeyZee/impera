@@ -499,6 +499,8 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return 'Le taux du dollar de la BCE manque pour la fin de la quinzaine. Il arrive chaque jour ouvré vers 16 h.';
     case 'commission_rate_missing_conflict':
       return `${member ?? 'Un membre'} n’a pas de taux de commission en vigueur.`;
+    case 'pay_sale_outcome_conflict':
+      return 'Cette décision n’est plus possible pour cette vente : la liste est relue.';
     case 'payroll_own_forbidden':
       return 'Personne ne décide de sa propre paie : un autre s’en charge.';
     case 'payroll_forbidden':
@@ -509,6 +511,7 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
     case 'bonus_tier_set_conflict':
     case 'collective_goal_conflict':
     case 'payout_minimum_conflict':
+    case 'pay_sale_decision_conflict':
       return 'Cette saisie existe déjà avec d’autres valeurs : recharge la page.';
     case 'pay_rule_started_invalid':
       return period === null
@@ -545,6 +548,8 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
     case 'bonus_not_found':
     case 'penalty_not_found':
       return 'Cette saisie n’existe plus : la page est relue.';
+    case 'pay_sale_not_found':
+      return 'Cette vente n’attend plus de décision dans cette quinzaine : la liste est relue.';
     case 'cursor_invalid':
       return 'La liste a changé : elle est relue depuis le début.';
     case 'role_forbidden':
