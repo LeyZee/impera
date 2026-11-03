@@ -449,6 +449,32 @@ describe('reading the outbox', () => {
         payload: { service: 'xai', state: 'back', since },
       })?.signal,
     ).toEqual({ kind: 'connection_back', service: 'xai' });
+    const shareCreator = '018f3e5c-0000-7000-8000-0000000000c1';
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'agency_share_mismatch',
+        payload: {
+          creatorId: shareCreator,
+          platform: 'reveal',
+          platformAccountId: accountA,
+          from: '2026-11-01',
+          to: '2026-11-15',
+          currency: 'EUR',
+          sales: 3,
+          refunds: 0,
+          creatorMinor: 10_000,
+          expectedCreatorMinor: 9_000,
+          differenceMinor: 1_000,
+        },
+      })?.signal,
+    ).toEqual({
+      kind: 'agency_share_mismatch',
+      creatorId: shareCreator,
+      platform: 'reveal',
+      platformAccountId: accountA,
+      from: '2026-11-01',
+    });
     // A service or a reason the contract does not know is not read.
     expect(
       toScannedEvent({
