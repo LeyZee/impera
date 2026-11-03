@@ -390,6 +390,20 @@ export class PayRulesForbidden extends DomainError {
   }
 }
 
+/** A calendar link is a member's (ADR 0045 § 5): the owner and a departed member have no shifts to send. */
+export class CalendarLinkForbidden extends DomainError {
+  constructor() {
+    super('calendar_link_forbidden', 'Le lien de calendrier est réservé aux membres de l’équipe');
+  }
+}
+
+/** Unknown, revoked, or its member left: one answer, so it tells nothing about which (CR-12). */
+export class CalendarFeedNotFound extends DomainError {
+  constructor() {
+    super('calendar_feed_not_found', 'Ce lien de calendrier n’est plus valable');
+  }
+}
+
 /** The mini feedback (ADR 0050 § 10, `SHIFT_FEEDBACK_ERROR_CODES`). */
 export class ShiftFeedbackConflict extends DomainError {
   constructor() {
