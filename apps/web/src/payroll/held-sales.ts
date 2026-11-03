@@ -57,6 +57,27 @@ export function heldReasonText(
   }
 }
 
+/**
+ * The signal in force of the member a paid line would pay (CRM-03 lot b4c): « Signalée par Théo : ce n'est pas sa
+ * vente », « Signalé par Théo : ce n'est pas son remboursement » for a refund, with their note quoted; `null` for none.
+ */
+export function signalText(
+  sale: Pick<HeldSale, 'signal' | 'event'>,
+  member: SaleMember | null,
+): string | null {
+  if (sale.signal === null) return null;
+  const who = member === null ? 'son chatteur' : member.name;
+  const said =
+    sale.event === 'sale'
+      ? `Signalée par ${who} : ce n’est pas sa vente.`
+      : `Signalé par ${who} : ce n’est pas son remboursement.`;
+  return sale.signal.note === null ? said : `${said} «${NBSP}${sale.signal.note}${NBSP}»`;
+}
+
+/** The chip of a signalled line, agreed with its event. */
+export const signalChipText = (sale: Pick<HeldSale, 'event'>): string =>
+  sale.event === 'sale' ? 'Signalée' : 'Signalé';
+
 /** The decision in force on a line, said on its chip; `null` for none. */
 export function decisionText(sale: Pick<HeldSale, 'decision'>, member: SaleMember | null): string | null {
   switch (sale.decision) {
