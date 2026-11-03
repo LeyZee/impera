@@ -31,9 +31,9 @@ import {
 /** Reveal's CRM API (ADR 0050): `x-api-key`, an agency key, used on the server only. */
 const REVEAL_CRM_BASE_URL = 'https://api.reveal.me';
 
-/** The most `/v1/sales` gives in one page. */
 /** The zone Reveal counts its statistics' days in; an answer in another one is not read. */
 const REVEAL_TIME_ZONE = 'Europe/Paris';
+/** The most `/v1/sales` gives in one page. */
 const PAGE_SIZE = 500;
 const CALL_TIMEOUT_MS = 15_000;
 /** A 429 without a readable `Retry-After`: one minute, the job's own pace. */
