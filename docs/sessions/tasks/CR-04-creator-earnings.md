@@ -1,5 +1,5 @@
 # CR-04 Gains et ventes de la créatrice, au jour le jour
-Statut : todo (ADR 0042 § 6 et § 7, acceptée par Charles le 02/11/2026)
+Statut : todo (ADR 0042 § 6 et § 7, acceptée par Charles le 02/11/2026 ; ADR 0054 pour la source sur Reveal, acceptée le 03/11/2026)
 Phase : espaces (ADR 0042)
 Dépend de : CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme)
 Branche : task/cr-04-creator-earnings
@@ -11,9 +11,9 @@ La créatrice voit chaque vente (heure, montant, type, contenu, fan) et « ce qu
 `docs/adr/0042-creator-space.md` (§ 6, § 7), ADR 0011, 0023 (§ Paie : arrondis), 0033 (taux du jour), la lecture d'Imperium (parcours de l'argent et ses pièges, hors dépôt).
 
 ## À faire
-- [ ] Réglage par créatrice du pourcentage de l'agence, en points de base, daté, jamais appliqué en arrière, saisi par le propriétaire dans Créatrices ; aucun défaut : sans réglage, « à régler ».
+- [ ] Réglage par créatrice du pourcentage de l'agence, en points de base, daté, jamais appliqué en arrière, saisi par le propriétaire dans Créatrices ; aucun défaut : hors Reveal, sans réglage, « à régler » ; sur Reveal, sa part s'affiche même sans pourcentage, qui ne sert qu'au signal d'écart du propriétaire (ADR 0054 § 2, CRM-04 lot d).
 - [ ] Hors Reveal, fonction pure de la chaîne : brut TTC → hors TVA → net après commission → part de l'agence → part de la créatrice, par compte et par période, entiers, arrondi au centime après chaque étape, demi qui s'éloigne de zéro ; taux de change du jour de la vente. Sur Reveal, « Ta part » est `modelRevenue` (ADR 0050 § 8), sans recalcul.
-- [ ] Route de lecture pour la créatrice (Aujourd'hui, quinzaine, mois, écart au mois précédent à la même date, objectif facultatif), « estimé » tant que la période n'est pas close. Source : sur Reveal, les chiffres de Reveal dès que son modèle est relié, que la paie du compte ait basculé ou non, avec la mention « lus chez Reveal » (recommandation 4 de la fiche CRM-04, acceptée par Charles le 03/11/2026 ; ADR 0054 à venir, qui remplace la phrase de l'ADR 0042 § 6), par la vue `creator_sales` de CRM-04 lot d ; hors Reveal, les ventes saisies, comme la paie du compte.
+- [ ] Route de lecture pour la créatrice (Aujourd'hui, quinzaine, mois, écart au mois précédent à la même date, objectif facultatif), « estimé » tant que la période n'est pas close. Source : sur Reveal, les chiffres de Reveal dès que son modèle est relié, que la paie du compte ait basculé ou non, avec la mention « lus chez Reveal » (recommandation 4 de la fiche CRM-04, acceptée par Charles le 03/11/2026 ; ADR 0054, qui remplace la phrase de l'ADR 0042 § 6 sur la source des ventes), par la vue `creator_sales` de CRM-04 lot d ; hors Reveal, les ventes saisies, comme la paie du compte.
 - [ ] Écran Ventes : « Ta part » en grand, parcours ligne par ligne, liste des ventes, une unité de période par écran. Le fan n'est nommé que si Nirvana le connaît par sa fiche, sinon la vente reste sans nom.
 - [ ] L'écran n'affiche que les lignes de la chaîne rendues par le serveur (brut, TVA, plateforme, agence, sa part) : aucun calcul d'argent dans le navigateur.
 - [ ] Notification par vente, regroupées au-delà de 3 en 2 minutes, retenues pendant les heures calmes (CR-01). Elle montre sa part (`modelRevenue` sur Reveal, la chaîne ailleurs), jamais le chatteur ni l'agent.
