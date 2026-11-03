@@ -1,5 +1,5 @@
 import type { CreatorId } from '@impera/contracts';
-import { useBlocker, useRouteContext } from '@tanstack/react-router';
+import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
@@ -227,6 +227,12 @@ export function CreatorsPage({
                   </button>
                 ))}
               </div>
+            ) : null}
+            {isOwner && !showForm && query.isSuccess ? (
+              // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
+              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
+                Structures de script
+              </Link>
             ) : null}
             {isOwner && !showForm && query.isSuccess ? (
               <button

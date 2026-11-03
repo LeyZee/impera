@@ -27,6 +27,8 @@ const SEGMENTS = [
     intention: 'Elle se dévoile',
     access: 'paid',
     mood: null,
+    outfit: null,
+    place: null,
     mediaSlots: [{ kind: 'image', optional: false, hint: null }],
     variants: [],
   },

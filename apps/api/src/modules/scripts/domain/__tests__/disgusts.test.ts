@@ -18,6 +18,8 @@ const stage = (key: string, name: string, hint: string | null = null): ScriptSeg
   intention: 'Elle se dévoile',
   access: 'paid',
   mood: null,
+  outfit: null,
+  place: null,
   mediaSlots: [{ kind: 'image', optional: false, hint }],
   variants: [],
 });
@@ -40,6 +42,8 @@ describe('disgustBlocks', () => {
       intention: 'Elle se dévoile',
       access: 'paid',
       mood: null,
+      outfit: null,
+      place: null,
       mediaSlots: [{ kind: 'image', optional: false, hint: null }],
       variants: [{ letter: 'A', hint: 'une fessée' }],
     };

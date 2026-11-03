@@ -43,6 +43,8 @@ const stage = (key: string, name: string): ScriptStage => ({
   intention: 'Elle se dévoile un peu plus',
   access: 'paid',
   mood: 'Lumière tamisée',
+  outfit: null,
+  place: null,
   mediaSlots: [
     { kind: 'image', optional: false, hint: null },
     { kind: 'video', optional: false, hint: 'Face caméra', minSeconds: 60, maxSeconds: 120 },
@@ -167,6 +169,26 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
       name: 'Structure de départ',
       moment: 'both',
     });
+  });
+
+  it('previews the card of a draft for the owner, as an SVG, even when the draft breaks a rule', async () => {
+    const draft = body();
+    const preview = (headers: Record<string, string>, payload: object) =>
+      server.inject({ method: 'POST', url: '/v1/script-structures/cards/preview', headers, payload });
+    const content = { name: draft.name, moment: draft.moment, color: draft.color, segments: draft.segments };
+    expect((await preview(manager, { ...content, segmentKey: 'canape' })).statusCode).toBe(403);
+    const drawn = await preview(owner, { ...content, segmentKey: 'canape' });
+    expect(drawn.statusCode).toBe(200);
+    expect(drawn.headers['content-type']).toContain('image/svg+xml');
+    expect(drawn.headers['content-security-policy']).toBe("default-src 'none'");
+    expect(drawn.body).toContain('>Canapé</text>');
+    // A stage without a slot breaks a rule of the structure, not the preview.
+    const unfinished = { ...content, segments: [{ ...stage('a', 'Brouillon'), mediaSlots: [] }] };
+    expect((await preview(owner, { ...unfinished, segmentKey: 'a' })).statusCode).toBe(200);
+    expect(errorOf(await preview(owner, { ...content, segmentKey: 'absent' }))).toEqual([
+      404,
+      'script_card_not_found',
+    ]);
   });
 
   it('refuses what breaks a rule of the structure, with the fault at its place', async () => {

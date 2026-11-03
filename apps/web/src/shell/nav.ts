@@ -246,6 +246,7 @@ export function sectionLabel(section: Section): string {
  * « Rapports · Équipe » so that Équipe › Rapports and Équipe › Planning read apart (NAV-12).
  */
 const SCREENS = {
+  '/creatrices/structures': 'Structures',
   '/suivi': 'Conversations',
   '/suivi/alertes': 'Historique des alertes',
   '/equipe/planning': 'Planning',

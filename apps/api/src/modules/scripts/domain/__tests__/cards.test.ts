@@ -29,6 +29,8 @@ const version: ScriptStructureVersion = {
       intention: 'Elle se dévoile doucement',
       access: 'paid',
       mood: 'Lumière tamisée',
+      outfit: null,
+      place: null,
       mediaSlots: [
         { kind: 'image', optional: false, hint: 'Assise, jambes croisées' },
         { kind: 'image', optional: false, hint: null },
@@ -60,6 +62,8 @@ const version: ScriptStructureVersion = {
       intention: 'Plus près',
       access: 'free',
       mood: null,
+      outfit: null,
+      place: null,
       mediaSlots: [{ kind: 'image', optional: false, hint: null }],
       variants: [],
     },
@@ -222,6 +226,8 @@ describe('cardSvg', () => {
             'Une intention longue qui prendrait volontiers trois lignes entières sur le carton du dossier, voire plus',
           access: 'paid',
           mood: 'Lumière tamisée, bougies',
+          outfit: null,
+          place: null,
           mediaSlots: [
             { kind: 'image', optional: false, hint: 'Assise, jambes croisées' },
             { kind: 'image', optional: false, hint: 'De dos' },
