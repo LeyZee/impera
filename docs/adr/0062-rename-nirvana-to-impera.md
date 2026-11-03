@@ -1,0 +1,95 @@
+# 0062. Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel
+
+Statut : accepted (Charles, 03/11/2026, 11 h 50 : « OK, euh, 0062, je le donne », sur la version relue par Extension et Bilan ; demande de Charles du 03/11/2026, 11 h 37 : « j'aimerais bien qu'on renomme le projet, donc il faudrait renommer partout, sur toute l'extension, partout où ça apparaît […] pourquoi pas Impera, donc I-M-P-E-R-A, comme le nom de mon agence » ; fil « Renommer Nirvana en Impera »).
+Date : 2026-11-03
+Précise : aucune ADR n'est remplacée. Les ADR passées gardent le mot « Nirvana » : elles sont immuables et disent ce qui a été décidé, sous le nom de l'époque.
+
+## Contexte
+
+Le produit porte le nom « Nirvana » depuis le 16/10. Charles ne s'y reconnaît pas : le produit sert son agence, IMPERA Agency, et il veut qu'il en porte le nom (en latin, *impera* : « commande », à l'impératif). Le design system reste tel quel ; seul le logo s'adapte (§ 6).
+
+Inventaire au 03/11, sur `main` (75c5168) : **1 253 fichiers suivis, 2 456 lignes** contiennent « nirvana », toutes casses confondues.
+
+| Où | Fichiers | Nature |
+|---|---|---|
+| `apps/api` | 569 | Surtout les imports `@nirvana/*` ; puis l'en-tête `x-nirvana-client-ip`, l'émetteur TOTP, le `PRODID` du flux agenda, les variables `NIRVANA_*`, des valeurs de test |
+| `apps/web` | 280 | Imports `@nirvana/*`, textes affichés (« Chargement de Nirvana », « Installer Nirvana »), clés `localStorage` (`nirvana.appearance`, `nirvana.followed-creator`, `nirvana.suivi.order`, `nirvana.install.refusals`), caches du service worker (`nirvana-shell-*`, `nirvana-assets-*`), manifeste PWA, `nirvana-mark.svg` |
+| `packages/db` | 157 | 40 migrations appliquées citent les rôles `nirvana_app` et `nirvana_admin` ; `init.sql` ; le nom de base `nirvana` ; la valeur de plateforme `'nirvana'` dans quatorze contraintes `CHECK` ; la version de moteur de paie `nirvana-N` |
+| `packages/*` (autres) | 31 | Noms de paquets `@nirvana/contracts`, `db`, `llm`, `design-system` ; enum `PlatformSchema` (`'nirvana'`) |
+| `apps/extension` | 7 | Nom du manifeste WXT, titre et marque du popup, `mark.svg`, `package.json` |
+| `brand/` | 8 | `nirvana-mark.svg`, `nirvana-lockup*.svg`, bannière, favicon, README |
+| Racine, CI, ops | 10 | `package.json`, `turbo.json`, `pnpm-lock.yaml`, `docker-compose*.yml` (conteneur, volume, image `nirvana-api`, bucket `nirvana-media`), `.env.example`, `ci.yml`, `ops/db-export` (`nirvana.dump`, `nirvana-<date>.tar.age`), `.gitleaks.toml`, `NIRVANA_ALLOW_MAIN_PUSH` du hook `protect-main` |
+| Docs vivantes | 22 | `CLAUDE.md`, `README.md`, `00-START-HERE.md`, architecture, conventions, runbooks, référence, design, glossaire, roadmap |
+| Historique | 155 | 28 ADR, 127 fichiers de `docs/sessions/` (journal et fiches), `brainstorm/` |
+
+Le préfixe CSS `nv-` (jetons `--nv-*`, classes `nv-*`) vient aussi de « Nirvana » : **6 389 occurrences** dans `apps/` et `packages/`.
+
+Cinq PR sont ouvertes (#382, #409, #459, #463, #464) et six fils codent en parallèle. Un renommage touche presque chaque fichier de code par ses imports : fait en même temps que d'autres PR, il les met toutes en conflit.
+
+## Décision
+
+### 1. Ce qui se renomme
+
+| Avant | Après |
+|---|---|
+| « Nirvana » affiché partout (web, PWA, extension, popup, TOTP, passkeys, flux agenda, Telegram, e-mails, textes d'aide) | « Impera » |
+| `@nirvana/*` (paquets et imports) | `@impera/*` |
+| `NIRVANA_*` (variables d'environnement, dont `NIRVANA_ALLOW_MAIN_PUSH`) | `IMPERA_*` |
+| `x-nirvana-client-ip` | `x-impera-client-ip` |
+| Valeur de plateforme `'nirvana'` (notre future plateforme) | `'impera'`, par une migration nouvelle (§ 3) |
+| Clés `localStorage` `nirvana.appearance`, `nirvana.followed-creator`, `nirvana.suivi.order`, `nirvana.install.refusals` | `impera.*`, avec une lecture de l'ancienne clé une fois puis sa suppression, pour que personne ne perde son thème ni ses réglages ; la reprise se fait aussi dans `apps/web/public/appearance.js`, qui lit le thème avant React (sinon le premier chargement s'affiche dans le mauvais thème). `nv-passkey-offered` suit le préfixe `nv-` (§ 2.6) et sera reprise de la même façon lors de la passe `im-` |
+| Caches du service worker `nirvana-*` | `impera-*` ; les deux nettoyages (`activate` de `public/sw.js`, et `src/pwa/device.ts` à la déconnexion et sur un 401) suppriment les deux préfixes, et `VERSION` de `sw.js` monte |
+| Nom de base `nirvana`, conteneur `nirvana-postgres`, image `nirvana-api`, bucket `nirvana-media`, fichiers `nirvana.dump` et `nirvana-<date>.tar.age` | `impera`, `impera-postgres`, `impera-api`, `impera-media`, `impera.dump`, `impera-<date>.tar.age` ; la vérification de restauration lit les deux préfixes d'archive |
+| `brand/nirvana-*.svg`, `apps/web/public/nirvana-mark.svg` | `brand/impera-*.svg`, `impera-mark.svg` (§ 6) |
+| `PRODID` et nom du flux agenda (« Nirvana · mes shifts ») | « Impera » ; l'UID de chaque événement reste (§ 2.3) |
+| `NirvanaPlatformConnector` (cité dans les docs) | `ImperaPlatformConnector` |
+| Nom annoncé par le serveur MCP (`nirvana-mcp`, ADR 0026) | `impera-mcp` ; les agents déjà connectés n'ont rien à refaire |
+| Docs vivantes (liste ci-dessus), `CLAUDE.md`, README des modules | « Impera » |
+
+### 2. Ce qui reste, et pourquoi
+
+1. **Les rôles Postgres `nirvana_app` et `nirvana_admin`.** Quarante migrations appliquées leur donnent des droits par leur nom. Une migration appliquée ne se modifie pas, et une base neuve rejoue toutes les migrations : renommer les rôles casserait toute installation neuve. Ce sont des noms techniques que personne ne voit ; le glossaire le dit.
+2. **La version de moteur de paie `nirvana-N`.** Elle est écrite dans chaque relevé de commission, et un relevé validé doit se recalculer à l'identique (ADR 0023). Les relevés existants la gardent, et les versions suivantes gardent ce préfixe, que la contrainte de la migration 0028 impose. C'est un identifiant de version, pas une marque.
+3. **Le suffixe `@nirvana` de l'UID des événements du flux agenda** (`scheduling/application/calendar-feed.ts`). Le changer ferait voir à chaque agenda abonné tous les shifts supprimés puis recréés, avec des doublons chez certains clients. C'est un identifiant, comme `nirvana-N`.
+4. **Les migrations appliquées** : `packages/db/migrations/` (fichiers SQL, `meta/` et ses snapshots, journal) n'est jamais touché par le script. Réécrire un snapshot ferait croire à `check-drift` que le schéma est déjà en `'impera'` : drizzle-kit ne générerait rien et la base garderait `'nirvana'` ; réécrire un `.sql` modifierait une migration appliquée.
+5. **L'historique** : les ADR 0001 à 0061, `docs/sessions/log/`, les fiches terminées de `docs/sessions/tasks/`, `brainstorm/` et l'historique git. Le glossaire porte une ligne « Nirvana : ancien nom d'Impera, jusqu'au 03/11/2026 ». Les fiches encore ouvertes sont renommées.
+6. **Le préfixe CSS `nv-`.** 6 389 occurrences, invisibles pour l'utilisateur, dans les fichiers où travaillent Extension et Chantier 7. Il reste `nv-` dans la PR de renommage ; il passera à `im-` dans la passe de peaufinage du design system, qui touchera ces fichiers de toute façon. Le design system ne change pas d'un pixel.
+7. **L'URL du dépôt `github.com/LeyZee/nirvana`.** Renommer le dépôt est un geste de Charles dans les réglages GitHub (Settings → General → Repository name). GitHub redirige l'ancienne URL, les clones et les PR ouvertes continuent de marcher. Les docs citent la nouvelle URL une fois le dépôt renommé, dans une PR d'une ligne.
+8. **Le dossier local** `C:\Users\USER\Downloads\Projet Nirvana` : à renommer par Charles, Claude Code fermé, après la fusion et seulement après les étapes du § 3 (le nom du dossier fait celui du projet compose, donc celui du volume) ; les dossiers approuvés et le Remote Control se réapprouvent sur le nouveau chemin. Rien d'autre ne dépend de ce chemin. Le manifeste de l'extension n'a pas de `key` : l'ID de l'extension non empaquetée vient du chemin du dossier, donc il change ; rien n'en dépend aujourd'hui (ni `chrome.storage`, ni `externally_connectable`, ni liste d'origines côté API). Il suffit de recharger l'extension depuis le nouveau chemin (« Charger l'extension non empaquetée »). Si la capture de session se met un jour à garder quelque chose dans `chrome.storage`, une `key` se fixe avant.
+
+### 3. Base de données
+
+- Migration nouvelle **0090** (réservée le 03/11) : toutes les contraintes `CHECK` de plateforme acceptent `'impera'` au lieu de `'nirvana'`. Générée par drizzle-kit depuis `PlatformSchema` (drop puis add de chaque contrainte), puis complétée à la main dans le même fichier (`packages/db/README.md`, étape 2) par un `UPDATE … SET platform = 'impera' WHERE platform = 'nirvana'` par table, placé entre le drop et l'add. Aucune ligne ne porte `'nirvana'` aujourd'hui : notre plateforme n'existe pas.
+- Nom de base : `docker-compose.yml`, `.env.example`, `init.sql` et la CI (`ci.yml`) passent à `impera` ; le script de restauration crée toujours `nirvana_app` (§ 2.1). Rien n'est déployé : aucune base de production à toucher.
+- **Volume Docker** : le volume réel de Charles s'appelle `<projet compose>_nirvana-pgdata`, et le projet compose prend le nom du dossier (`Projet Nirvana` → `projetnirvana`). Renommer la clé du volume ou le dossier ferait démarrer Postgres sur un volume vide. Le compose déclare donc le volume avec un nom explicite, `impera-pgdata: { name: ${IMPERA_PGDATA_VOLUME:-impera-pgdata} }` : une installation neuve a `impera-pgdata`, et le `.env` de Charles pointe sur son volume existant.
+- **Variables** : `config.ts` refuse de démarrer si une variable `NIRVANA_*` est encore posée, avec un message qui donne le nouveau nom ; rien n'est ignoré en silence.
+- **Ordre sur le PC de Charles**, par la session Remote Control, avec son accord, dans un seul geste (Charles ne touche jamais au `.env`) : 1. export de la base (`pg_dump`) en filet ; 2. `ALTER DATABASE nirvana RENAME TO impera` (réversible) ; 3. `.env` mis à jour : `NIRVANA_*` → `IMPERA_*`, `DATABASE_URL` et `DATABASE_ADMIN_URL` en `/impera`, `IMPERA_PGDATA_VOLUME` = le nom lu par `docker volume ls` ; 4. arrêt de l'ancien conteneur `nirvana-postgres`, puis `docker compose up -d` et `pnpm db:migrate` (applique 0090) ; 5. vérification que les données sont là ; 6. seulement alors, Charles renomme le dossier.
+
+### 4. Comment : un script, une PR, une fenêtre de gel
+
+1. Le renommage est un **script** (rename-impera.mjs, dans le dossier des scripts), idempotent, relu dans la PR : il applique les tables du § 1, laisse ce que liste le § 2, régénère `pnpm-lock.yaml` (aucune dépendance nouvelle : pas de quarantaine) et refuse de finir si `pnpm check` ou `pnpm test` est rouge. Le remplacement de `@nirvana/` couvre tous les fichiers texte (`.ts`, `.tsx`, `.css`, `.html`, `.json`, `.md`), pas seulement le TypeScript : `apps/web/src/index.css` importe le design system par ce nom. **Élision** : « Nirvana » commence par une consonne, « Impera » par une voyelle ; le script écrit `d’Impera`, `qu’Impera` (et `jusqu’à`, `lorsqu’`, `puisqu’` s'il en trouve), avec l'apostrophe typographique ’ du dépôt, et refuse de finir s'il reste un « de Impera » ou un « que Impera » (une vingtaine de tournures de ce genre dans le code hors tests au 03/11, dont « Chargement de Nirvana », « Nouvelle version de Nirvana », « C’est ici que Nirvana te préviendra »).
+2. **Une seule PR**, pas des lots : un import `@impera/*` ne compile pas tant que le paquet s'appelle `@nirvana/*`, donc des lots laisseraient `main` dans un état mixte, et chaque lot demanderait son propre gel. Une PR, un gel.
+3. **Fenêtre de gel** convenue entre Charles et le coordinateur, environ 2 heures : les fils fusionnent ce qui est prêt ou mettent leur PR de côté ; à l'heure dite, le script tourne sur `main` à jour, la PR passe la CI, Bilan et Extension relisent, elle est fusionnée. Le gel se lève à la fusion.
+4. **Après la fusion**, chaque branche en vol lance le même script sur elle-même, commite, puis se rebase sur `main` : les conflits de nom disparaissent, il ne reste que les vrais conflits. Le script est supprimé du dépôt deux semaines après, une fois toutes les branches passées.
+5. Le logo (§ 6) est une PR à part, après, qui ne touche que `brand/`, les icônes et le design system ; elle n'a pas besoin de gel.
+
+### 5. Relectures
+
+Bilan (db, server, contrats, CI, ops), Extension (apps/web, extension, design system), Agent (textes de la persona et des prompts : le bot ne nomme jamais l'outil devant un fan, rien ne change pour eux), Équipe (paie : vérifier que `nirvana-N` reste intact).
+
+### 6. Le logo
+
+Le logo d'Impera part du logo de l'agence IMPERA, fourni par Charles, redessiné dans le design system actuel : palette Nuit et Jour (néon `#ff2a4d` / `#cc0029`, `void` `#07060a`, `ink` `#f6eef1`), lumière unique, wordmark en italique serif comme aujourd'hui. Livrés dans `brand/` : marque couleur et mono, favicon, lockups Nuit, Jour et mono, bannière README ; dans les apps : icônes de l'extension (16, 32, 48, 128), icônes PWA (192, 512, maskable), favicon et en-tête du web. Chaque variante est rendue en PNG et regardée en grand et à 16-32 px avant d'être montrée. Charles valide sur planche avant la PR.
+
+## Conséquences
+
+- Positives : le produit porte le nom de l'agence, partout où un humain le voit ; un seul gel ; le script rend le rattrapage des branches mécanique.
+- Négatives : environ deux heures sans fusion ; une PR énorme à relire (mais mécanique : la relecture porte sur le script et sur le § 2) ; les noms `nirvana_app`, `nirvana_admin`, `nirvana-N` et le suffixe `@nirvana` des UID d'agenda restent pour toujours.
+- À surveiller : les extensions déjà chargées sur un poste prennent le nouveau nom au rechargement ; les applis d'authentification gardent l'ancien libellé « Nirvana » pour un compte déjà enrôlé (le code reste valide, le libellé se change à la main ou au prochain enrôlement) ; les passkeys restent valides (elles dépendent du domaine, pas du nom) ; l'en-tête `x-impera-client-ip` est posé par le proxy devant l'API : rien dans `ops/` aujourd'hui, mais la config Traefik du déploiement devra porter le nouveau nom ; sur iPhone, une PWA déjà installée garde « Nirvana » sous son icône (`apple-mobile-web-app-title`, lu à l'installation) jusqu'à ce qu'on la réinstalle, notifications et session continuent de marcher ; sur Android, le manifeste garde `"id": "/"` et Chrome met le nom à jour sur place.
+
+## Alternatives rejetées
+
+- **Renommer par lots** (paquets, puis web, puis docs) : état mixte sur `main`, un gel par lot, cinq fois plus de rebases.
+- **Renommer aussi les rôles Postgres** : casse toute installation neuve, ou oblige à modifier des migrations appliquées.
+- **Renommer le préfixe `nv-` maintenant** : triple la taille de la PR et les conflits avec Extension et Chantier 7, pour un nom que personne ne voit.
+- **Renommer au fil de l'eau, sans gel** : chaque PR ouverte se retrouve en conflit sur des centaines de fichiers.
