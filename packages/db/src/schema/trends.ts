@@ -238,9 +238,10 @@ export const contentIdeas = pgTable(
 );
 
 /**
- * The link between one person's extension and the server (VEI-01): a token drawn by the server, shown once, kept as its
- * SHA-256, revocable, for the readings only. One live link per account; a new one revokes the one before. Out of RLS
- * and out of `nirvana_app`'s reach (migration), like `calendar_links`: read through `withAdmin` only.
+ * The link between one browser's extension and the server (VEI-01): a token drawn by the server, shown once, kept as its
+ * SHA-256, revocable, for the readings only. A few live links per account, one per browser and named by its label
+ * (Chrome, Edge), at most `EXTENSION_LINKS_LIVE_MAX` (code, under the account's lock; migration 0104). Out of RLS and
+ * out of `nirvana_app`'s reach (migration 0100), like `calendar_links`: read through `withAdmin` only.
  */
 export const extensionLinks = pgTable(
   'extension_links',
@@ -251,13 +252,16 @@ export const extensionLinks = pgTable(
       .references(() => user.id),
     /** SHA-256 of the token, base64url. */
     tokenHash: text('token_hash').notNull().unique(),
+    /** The browser it was made for, as the person named it. */
+    label: text('label').notNull().default('Navigateur'),
     createdAt: createdAt(),
     lastUsedAt: timestampTz('last_used_at'),
     revokedAt: timestampTz('revoked_at'),
   },
   (t) => [
     check('extension_links_revoked_check', sql`${t.revokedAt} is null or ${t.revokedAt} >= ${t.createdAt}`),
-    uniqueIndex('extension_links_live_unique')
+    check('extension_links_label_check', sql`char_length(${t.label}) between 1 and 40`),
+    index('extension_links_live_idx')
       .on(t.userId)
       .where(sql`${t.revokedAt} is null`),
   ],
