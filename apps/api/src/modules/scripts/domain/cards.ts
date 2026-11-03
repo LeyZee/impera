@@ -21,21 +21,18 @@ export type CardTheme = ScriptCardTheme;
 /** The theme a card takes when none is asked: the structure's moment, and « les deux » is Nuit. */
 export const defaultCardTheme = (moment: ScriptMoment): CardTheme => (moment === 'day' ? 'day' : 'night');
 
+interface CardPalette {
+  readonly background: string;
+  readonly surface: string;
+  readonly ink: string;
+  readonly muted: string;
+  readonly accent: string;
+  readonly accentInk: string;
+  readonly hairline: string;
+}
+
 /** Light for Jour, dark for Nuit (Extension's review of ADR 0056). */
-export const CARD_PALETTES: Readonly<
-  Record<
-    CardTheme,
-    {
-      readonly background: string;
-      readonly surface: string;
-      readonly ink: string;
-      readonly muted: string;
-      readonly accent: string;
-      readonly accentInk: string;
-      readonly hairline: string;
-    }
-  >
-> = {
+export const CARD_PALETTES: Readonly<Record<CardTheme, CardPalette>> = {
   // tokens.css, `:root` (Nuit): --nv-void, --nv-surface-raised, --nv-ink, --nv-ink-muted, --nv-neon, --nv-neon-ink.
   night: {
     background: '#060508',
@@ -135,7 +132,7 @@ export function shootSummary(slots: readonly MediaSlot[]): string {
   const required = sum(false).join(', ');
   const optional = sum(true);
   if (optional.length === 0) return required;
-  const extra = `${optional.join(', ')} en option`;
+  const extra = `${optional.join(', ')} en${NBSP}option`;
   return required === '' ? extra : `${required} + ${extra}`;
 }
 
@@ -211,7 +208,7 @@ const escape = (text: string): string =>
 
 /**
  * Words cut into lines of `width` characters at most, `lines` lines at most, the last one ending in « … » when the
- * text is longer. A character count, not a measure: the widths below are set for the widest letters of each face.
+ * text is longer. A character count, not a measure: the widths below hold for ordinary French text; a line of capitals or digits in Geist may run a little wide (Extension's review of SC-01 b).
  */
 export function wrap(text: string, width: number, lines: number): string[] {
   const out: string[] = [];
@@ -234,85 +231,82 @@ const PAD = 96;
 const SERIF = "'Instrument Serif', serif";
 const SANS = "'Geist', sans-serif";
 
-/**
- * The card as an SVG of 1080 × 1080 units, drawn at the format's size. Only text, rectangles and lines: no image, no
- * link, no font file named, so the rasteriser opens nothing but the SVG itself.
- */
-export function cardSvg(content: CardContent, theme: CardTheme, format: CardFormat): string {
-  const p = CARD_PALETTES[theme];
-  const px = CARD_FORMATS[format];
-  const parts: string[] = [];
-  const text = (
-    x: number,
-    y: number,
-    value: string,
-    style: { size: number; family: string; fill: string; weight?: number; spacing?: number; anchor?: 'end' },
-  ) =>
-    parts.push(
-      `<text x="${String(x)}" y="${String(y)}" font-family="${style.family}" font-size="${String(style.size)}"` +
-        ` font-weight="${String(style.weight ?? 400)}" fill="${style.fill}"` +
-        (style.spacing === undefined ? '' : ` letter-spacing="${String(style.spacing)}"`) +
-        (style.anchor === undefined ? '' : ` text-anchor="${style.anchor}"`) +
-        `>${escape(value)}</text>`,
-    );
+/** Where the hints go: three at least when she has them, the title then what to shoot cut first to make room. */
+const HINTS_KEPT = 3;
+const HINT_STEP = 44;
 
-  parts.push(`<rect width="${String(SIZE)}" height="${String(SIZE)}" fill="${p.background}"/>`);
-  parts.push(
-    `<rect x="48" y="48" width="${String(SIZE - 96)}" height="${String(SIZE - 96)}" rx="40" fill="${p.surface}"/>`,
-  );
-  parts.push(`<rect x="${String(PAD)}" y="128" width="64" height="6" rx="3" fill="${p.accent}"/>`);
-  text(PAD, 196, content.kicker.toLocaleUpperCase('fr'), {
-    size: 30,
-    family: SANS,
-    fill: p.accentInk,
-    weight: 600,
-    spacing: 4,
-  });
-  text(SIZE - PAD, 196, content.moment.toLocaleUpperCase('fr'), {
-    size: 26,
-    family: SANS,
-    fill: p.muted,
-    weight: 500,
-    spacing: 4,
-    anchor: 'end',
-  });
+type DrawText = (
+  x: number,
+  y: number,
+  value: string,
+  style: { size: number; family: string; fill: string; weight?: number; spacing?: number; anchor?: 'end' },
+) => void;
+
+/** The card's body at 1080: title, what to shoot, its sentences, the hints, the mood and the structure's name. */
+function body(content: CardContent, p: CardPalette, text: DrawText, parts: string[]): void {
+  const hintsBottom = content.mood === null ? 960 : 900;
+  // A sentence takes one line when hints follow it: they are what she reads while she shoots.
+  const sentenceLines = content.hints.length > 0 ? 1 : 2;
+  // Three hints, and a line to say how many more when they do not all fit.
+  const wanted = content.hints.length <= HINTS_KEPT ? content.hints.length : HINTS_KEPT + 1;
+  // What to shoot matters more than the title: the title is cut first.
+  const layouts = [
+    { title: content.shoot === '' ? 3 : 2, shoot: 2 },
+    { title: 1, shoot: 2 },
+    { title: 2, shoot: 1 },
+    { title: 1, shoot: 1 },
+  ];
+  const plan = (layout: { title: number; shoot: number }) => {
+    const title = wrap(content.title, 20, layout.title);
+    const shoot = content.shoot === '' ? [] : wrap(content.shoot, 46, layout.shoot);
+    const sentences = content.lines.map((sentence) => wrap(sentence, 54, sentenceLines));
+    let y = 330 + title.length * 112 + 8;
+    if (shoot.length > 0) y += shoot.length * 52 + 12;
+    for (const lines of sentences) y += lines.length * 46 + 6;
+    const rule = y + 14;
+    const first = rule + 52;
+    const room = Math.max(0, Math.floor((hintsBottom - first) / HINT_STEP) + 1);
+    return { title, shoot, sentences, rule, first, room };
+  };
+  const chosen =
+    layouts.map(plan).find((candidate) => candidate.room >= wanted) ?? plan({ title: 1, shoot: 1 });
 
   let y = 330;
-  for (const line of wrap(content.title, 20, content.shoot === '' ? 3 : 2)) {
+  for (const line of chosen.title) {
     text(PAD, y, line, { size: 112, family: SERIF, fill: p.ink });
     y += 112;
   }
   y += 8;
-  if (content.shoot !== '') {
-    for (const line of wrap(content.shoot, 46, 2)) {
+  if (chosen.shoot.length > 0) {
+    for (const line of chosen.shoot) {
       text(PAD, y, line, { size: 40, family: SANS, fill: p.accentInk, weight: 600 });
       y += 52;
     }
     y += 12;
   }
-  for (const sentence of content.lines) {
-    for (const line of wrap(sentence, 54, 2)) {
+  for (const lines of chosen.sentences) {
+    for (const line of lines) {
       text(PAD, y, line, { size: 34, family: SANS, fill: p.muted });
       y += 46;
     }
     y += 6;
   }
   if (content.hints.length > 0) {
-    y += 18;
     parts.push(
-      `<line x1="${String(PAD)}" y1="${String(y)}" x2="${String(SIZE - PAD)}" y2="${String(y)}" stroke="${p.hairline}" stroke-width="2"/>`,
+      `<line x1="${String(PAD)}" y1="${String(chosen.rule)}" x2="${String(SIZE - PAD)}" y2="${String(chosen.rule)}" stroke="${p.hairline}" stroke-width="2"/>`,
     );
-    y += 58;
-    const bottom = content.mood === null ? 960 : 900;
-    const room = Math.max(1, Math.floor((bottom - y) / 46) + 1);
-    const shown = content.hints.length > room ? content.hints.slice(0, Math.max(0, room - 1)) : content.hints;
+    // Never « + N » alone: the last line of room says how many more there are, under one hint at least.
+    const fits = content.hints.length <= chosen.room;
+    const shown = fits ? content.hints : content.hints.slice(0, Math.max(1, chosen.room - 1));
+    y = chosen.first;
     for (const hint of shown) {
       text(PAD, y, wrap(hint, 52, 1)[0] ?? '', { size: 32, family: SANS, fill: p.ink });
-      y += 46;
+      y += HINT_STEP;
     }
-    if (shown.length < content.hints.length)
-      text(PAD, y, `+ ${String(content.hints.length - shown.length)}`, {
-        size: 32,
+    const more = content.hints.length - shown.length;
+    if (more > 0)
+      text(PAD, y, `+${NBSP}${plural(more, 'indication', 'indications')}`, {
+        size: 30,
         family: SANS,
         fill: p.muted,
       });
@@ -325,6 +319,68 @@ export function cardSvg(content: CardContent, theme: CardTheme, format: CardForm
     fill: p.muted,
     anchor: 'end',
   });
+}
+
+/**
+ * The card as an SVG of 1080 × 1080 units, drawn at the format's size. Only text, rectangles and lines: no image, no
+ * link, no font file named, so the rasteriser opens nothing but the SVG itself.
+ */
+export function cardSvg(content: CardContent, theme: CardTheme, format: CardFormat): string {
+  const p = CARD_PALETTES[theme];
+  const px = CARD_FORMATS[format];
+  const parts: string[] = [];
+  const text: DrawText = (x, y, value, style) => {
+    parts.push(
+      `<text x="${String(x)}" y="${String(y)}" font-family="${style.family}" font-size="${String(style.size)}"` +
+        ` font-weight="${String(style.weight ?? 400)}" fill="${style.fill}"` +
+        (style.spacing === undefined ? '' : ` letter-spacing="${String(style.spacing)}"`) +
+        (style.anchor === undefined ? '' : ` text-anchor="${style.anchor}"`) +
+        `>${escape(value)}</text>`,
+    );
+  };
+  const thumbnail = format === 'thumbnail';
+
+  parts.push(`<rect width="${String(SIZE)}" height="${String(SIZE)}" fill="${p.background}"/>`);
+  parts.push(
+    `<rect x="48" y="48" width="${String(SIZE - 96)}" height="${String(SIZE - 96)}" rx="40" fill="${p.surface}"/>`,
+  );
+  parts.push(`<rect x="${String(PAD)}" y="128" width="64" height="6" rx="3" fill="${p.accent}"/>`);
+  text(
+    PAD,
+    thumbnail ? 220 : 196,
+    wrap(content.kicker.toLocaleUpperCase('fr'), thumbnail ? 26 : 40, 1)[0] ?? '',
+    {
+      size: thumbnail ? 52 : 30,
+      family: SANS,
+      fill: p.accentInk,
+      weight: 600,
+      spacing: 4,
+    },
+  );
+  // The thumbnail says Jour or Nuit by its colours alone: its kicker takes the whole line.
+  if (!thumbnail)
+    text(SIZE - PAD, 196, content.moment.toLocaleUpperCase('fr'), {
+      size: 26,
+      family: SANS,
+      fill: p.muted,
+      weight: 500,
+      spacing: 4,
+      anchor: 'end',
+    });
+
+  if (thumbnail) {
+    // The chatters' thumbnail keeps the stage, its title and what to shoot, large enough to read at 320 px.
+    let y = 420;
+    for (const line of wrap(content.title, 14, 2)) {
+      text(PAD, y, line, { size: 150, family: SERIF, fill: p.ink });
+      y += 150;
+    }
+    y += 30;
+    for (const line of wrap(content.shoot, 30, 3)) {
+      text(PAD, y, line, { size: 58, family: SANS, fill: p.accentInk, weight: 600 });
+      y += 72;
+    }
+  } else body(content, p, text, parts);
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${String(px)}" height="${String(px)}"` +

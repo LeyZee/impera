@@ -145,6 +145,45 @@ describe('cardSvg', () => {
     expect(cardSvg(card, 'night', 'thumbnail')).toContain('width="320" height="320" viewBox="0 0 1080 1080"');
   });
 
+  it('keeps three hints at least on a full card, and never says « + N » alone (Extension’s review)', () => {
+    const full: ScriptStructureVersion = {
+      ...version,
+      segments: [
+        {
+          kind: 'stage',
+          key: 'plein',
+          name: 'Un titre assez long pour deux lignes',
+          intention:
+            'Une intention longue qui prendrait volontiers deux lignes entières sur le carton du dossier',
+          mood: 'Lumière tamisée, bougies',
+          mediaSlots: [
+            { kind: 'image', optional: false, hint: 'Assise, jambes croisées' },
+            { kind: 'image', optional: false, hint: 'De dos' },
+            { kind: 'image', optional: false, hint: 'Gros plan' },
+            { kind: 'video', optional: false, hint: 'Face caméra', minSeconds: 45, maxSeconds: 90 },
+            { kind: 'audio', optional: true, hint: 'Un vocal', maxSeconds: 30 },
+          ],
+          variants: [{ letter: 'B', hint: 'Robe rouge, talons hauts et collier de perles assorti au rouge' }],
+        },
+      ],
+    };
+    const content = cardContent(full, 'plein', { theme: 'night', variant: 'B' });
+    if (content === null) throw new Error('no card');
+    const svg = plain(cardSvg(content, 'night', 'folder'));
+    for (const hint of ['01 · Assise, jambes croisées', '02 · De dos', '03 · Gros plan'])
+      expect(svg).toContain(hint);
+    expect(svg).toContain('+ 2 indications');
+    expect(svg).not.toMatch(/>\+ \d+<\/text>/u);
+  });
+
+  it('gives the chatters a thumbnail of the stage, its title and what to shoot only', () => {
+    const svg = cardSvg(card, 'night', 'thumbnail');
+    expect(svg).toContain('>Canapé</text>');
+    expect(svg).toContain('ÉTAPE 1 · VARIANTE A');
+    expect(svg).not.toContain('Soirée au salon');
+    expect(svg).not.toContain('Assise');
+  });
+
   it('escapes what the agency wrote, and names no file, image nor link', () => {
     const svg = cardSvg(card, 'day', 'card');
     expect(svg).toContain('Face caméra &lt;chuchote&gt; &amp; sourit');
