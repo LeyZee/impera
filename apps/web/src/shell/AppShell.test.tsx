@@ -133,16 +133,16 @@ describe('the rail of each role', () => {
     expect(tabs()).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
   });
 
-  it('sends a creator who opens Suivi to the Dashboard: she never sees a conversation', async () => {
+  it('sends a creator who opens Suivi to her Aujourd’hui: she never sees a conversation', async () => {
     const router = renderApp(
       { ...base, role: 'creator', team: null, teamScope: 'self' },
       '/suivi?conversation=c1',
     );
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/');
+      expect(router.state.location.pathname).toBe('/aujourdhui');
     });
-    // Her own persona, and no Réglages: every page of it is the owner's (NAV-18).
-    expect(tabs()).toEqual(['Dashboard', 'Persona']);
+    // Her own space (ADR 0042 § 8), and no Réglages: every page of it is the owner's (NAV-18).
+    expect(tabs()).toEqual(['Aujourd’hui', 'Moi']);
     expect(screen.getByText('Créatrice')).toBeDefined();
   });
 
@@ -186,8 +186,8 @@ describe('Réglages › Sauvegardes', () => {
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
 
-  // Réglages is the owner's alone (NAV-18): any of its addresses sends anyone else to the Dashboard, and says why.
-  it('sends an operator or a creator from any page of Réglages to the Dashboard, and says why (NAV-21)', async () => {
+  // Réglages is the owner's alone (NAV-18): any of its addresses sends anyone else to his first tab, and says why.
+  it('sends an operator or a creator from any page of Réglages to the first tab, and says why (NAV-21)', async () => {
     for (const path of [
       '/reglages/ventes',
       '/reglages/sauvegardes',
@@ -203,7 +203,7 @@ describe('Réglages › Sauvegardes', () => {
       ] satisfies Me[]) {
         const router = renderApp(user, path);
         await waitFor(() => {
-          expect(router.state.location.pathname).toBe('/');
+          expect(router.state.location.pathname).toBe(user.role === 'creator' ? '/aujourdhui' : '/');
         });
         const said = await screen.findByText('Cette page n’est pas dans ton espace.');
         expect(said.closest('[role="status"]')).not.toBeNull();
@@ -381,7 +381,7 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
   it('sends a creator home, as from all of Suivi', async () => {
     const router = renderApp({ ...base, role: 'creator', team: null, teamScope: 'self' }, '/suivi/alertes');
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/');
+      expect(router.state.location.pathname).toBe('/aujourdhui');
     });
   });
 });
@@ -534,7 +534,8 @@ describe('the account’s security, from its menu (SEC-04)', () => {
       [manager, '/moi/securite'],
       [chatter, '/moi/securite'],
       [operator, '/compte/securite'],
-      [creator, '/compte/securite'],
+      // Hers is in her Moi (ADR 0042 § 8).
+      [creator, '/moi/securite'],
     ] satisfies [Me, string][]) {
       renderApp(user, '/suivi');
       fireEvent.click(await screen.findByRole('button', { name: /Nora/u }));
@@ -557,7 +558,7 @@ describe('the account’s security, from its menu (SEC-04)', () => {
   });
 
   it('is in « Plus » on the phone', async () => {
-    renderApp(creator, '/');
+    renderApp(operator, '/');
     fireEvent.click(await screen.findByRole('button', { name: 'Plus' }));
     const sheet = screen.getByRole('dialog', { name: 'Plus' });
     expect(within(sheet).getByRole('link', { name: 'Sécurité' }).getAttribute('href')).toBe(
@@ -616,6 +617,26 @@ describe('the shell while a screen loads (review of #313)', () => {
       expect(region?.textContent).toBe('Cette page n’est pas dans ton espace.');
     });
     expect(router.state.location.pathname).toBe('/');
+  });
+
+  it('says nothing when the app opens on its own address, for a rail without the Dashboard (relecture #484)', async () => {
+    const creator: Me = { ...base, role: 'creator', creatorIds: [], team: null, teamScope: 'self' };
+    for (const [user, home] of [
+      [creator, '/aujourdhui'],
+      [chatter, '/aujourdhui'],
+    ] satisfies [Me, string][]) {
+      const router = renderApp(user, '/');
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(home);
+      });
+      await screen.findByRole('navigation', { name: 'Navigation' });
+      const region = screen
+        .getAllByRole('status')
+        .find((node) => node.classList.contains('nv-notice-region'));
+      expect(region?.textContent).toBe('');
+      expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
+      cleanup();
+    }
   });
 
   it('says it once: neither « Précédent » nor a reload says it again', async () => {

@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router';
 
 import { CreatorsPage } from './creators/CreatorsPage';
+import { MyPersonaPage } from './creators/MyPersonaPage';
 import { creatorsSearch, parseCreatorsSearch } from './creators/search';
 import { parsePaySearch } from './payroll/model';
 import { InstallPage } from './pwa/InstallPage';
@@ -46,6 +47,7 @@ import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
 import { parsePlanningSearch, parseReportsSearch, parseTeamSearch } from './screens/team/model';
+import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
 import { ChatterTrackingPage } from './screens/tracking/ChatterTrackingPage';
 import { SuiviNav } from './screens/tracking/SuiviNav';
@@ -77,6 +79,12 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
     const rail = railOf(context.user);
     const section = sectionOf(location.pathname);
     if (section !== null && !canOpen(rail, section)) {
+      // The app's own address (the manifest's `start_url`, opened at each launch) is coming home, not someone else's
+      // link: no word for it.
+      if (location.pathname === '/') {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+        throw redirect({ to: rail.home, replace: true });
+      }
       // Said once on arrival (NAV-21): a link pasted from someone else's space is not a broken app. The word rides
       // with the redirect, in the history's state: each arrival has its own, even on the address already shown.
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
@@ -195,9 +203,10 @@ const trackingAlerts = createRoute({
 const today = createRoute({
   getParentRoute: () => rootRoute,
   path: '/aujourdhui',
+  // A creator's day is who chats for her (ADR 0042 § 8); a chatter's, his own shift.
   component: function Today() {
     const { user } = rootRoute.useRouteContext();
-    return <TodayPage user={user} />;
+    return user.role === 'creator' ? <CreatorTodayPage /> : <TodayPage user={user} />;
   },
 });
 const myPlanning = createRoute({
@@ -451,14 +460,36 @@ const me = createRoute({ getParentRoute: () => rootRoute, path: '/moi' });
 const meIndex = createRoute({
   getParentRoute: () => me,
   path: '/',
-  beforeLoad: () => {
+  beforeLoad: ({ context }) => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/moi/dossier', replace: true });
+    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/dossier', replace: true });
   },
+});
+/**
+ * A creator's Moi holds her persona and her security (ADR 0042 § 8): a team member's screens (his file, his invoices,
+ * his calendar of shifts) send her to her persona, as her persona sends anyone else to his file.
+ */
+const creatorAway = ({ context }: { context: RouterContext }): void => {
+  if (context.user.role === 'creator') {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/moi/persona', replace: true });
+  }
+};
+const mePersona = createRoute({
+  getParentRoute: () => me,
+  path: '/persona',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'creator') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/moi/dossier', replace: true });
+    }
+  },
+  component: MyPersonaPage,
 });
 const meFile = createRoute({
   getParentRoute: () => me,
   path: '/dossier',
+  beforeLoad: creatorAway,
   component: function MyFile() {
     const { user } = rootRoute.useRouteContext();
     return <MyFilePage user={user} />;
@@ -469,6 +500,7 @@ const meInvoices = createRoute({
   path: '/factures',
   // A manager's: a chatter, or a manager on leave with the chatter's rail, reads his in Commissions.
   beforeLoad: ({ context }) => {
+    creatorAway({ context });
     if (context.user.teamScope !== 'agency') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({ to: '/commissions/factures', replace: true });
@@ -483,6 +515,7 @@ const meInvoices = createRoute({
 const meCalendar = createRoute({
   getParentRoute: () => me,
   path: '/calendrier',
+  beforeLoad: creatorAway,
   component: function MyCalendarLink() {
     const { user } = rootRoute.useRouteContext();
     return <MyCalendarLinkPage user={user} />;
@@ -678,7 +711,7 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, meFile, meInvoices, meCalendar, meSecurity]),
+  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,
