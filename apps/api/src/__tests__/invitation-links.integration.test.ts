@@ -1,6 +1,12 @@
 import { Writable } from 'node:stream';
 
-import { newId, SecurityAlertPayloadSchema, TeamMemberIdSchema, UserIdSchema } from '@nirvana/contracts';
+import {
+  CreatorIdSchema,
+  newId,
+  SecurityAlertPayloadSchema,
+  TeamMemberIdSchema,
+  UserIdSchema,
+} from '@nirvana/contracts';
 import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -171,6 +177,7 @@ describe('invitation links (EQ-10)', () => {
       expect(preview.statusCode).toBe(200);
       expect(preview.json()).toMatchObject({
         purpose: 'invitation',
+        account: 'member',
         email: 'preview@example.test',
         displayName: 'Théo',
         country: 'BJ',
@@ -397,6 +404,113 @@ describe('invitation links (EQ-10)', () => {
     expect(links.has(used.memberId)).toBe(false);
     expect(links.has(none.memberId)).toBe(false);
     expect((await liveInvitationLinksUnscoped(app.adminDb.db, [])).size).toBe(0);
+  });
+
+  /** An invented creator, without an account yet (CR-02). */
+  async function addCreator(name: string): Promise<string> {
+    const creatorId = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: creatorId, nameKey: creatorId, displayName: name, timezone: 'Europe/Paris' });
+    return creatorId;
+  }
+
+  const inviteCreator = (creatorId: string, body: Json) =>
+    post(`/v1/creators/${creatorId}/invitation-link`, body, { cookie: owner });
+
+  it('invites a creator into her own account, made with her e-mail, linked to her alone (CR-02)', async () => {
+    const creatorId = await addCreator('Nora');
+    // Typed with capitals: her account is written in lower case.
+    const made = await inviteCreator(creatorId, { purpose: 'invitation', email: 'Nora@Example.TEST' });
+    expect(made.statusCode, made.body).toBe(200);
+    const { url } = made.json<{ url: string }>();
+    expect(new URL(url).pathname).toBe('/bienvenue');
+    const token = new URL(url).hash.slice('#t='.length);
+    const [account] = await test.admin.db
+      .select({
+        id: schema.user.id,
+        role: schema.user.role,
+        creatorIds: schema.user.creatorIds,
+        name: schema.user.name,
+      })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'nora@example.test'));
+    expect(account).toMatchObject({ role: 'creator', creatorIds: [creatorId], name: 'Nora' });
+
+    const preview = await post('/v1/invitation-links/inspect', { token });
+    expect(preview.statusCode, preview.body).toBe(200);
+    expect(preview.json()).toMatchObject({
+      purpose: 'invitation',
+      account: 'creator',
+      email: 'nora@example.test',
+      displayName: 'Nora',
+    });
+    expect(preview.json()).not.toHaveProperty('country');
+
+    const redeemed = await post('/v1/invitation-links/redeem', { token, password: PASSWORD });
+    expect(redeemed.statusCode, redeemed.body).toBe(200);
+    expect(redeemed.json()).toMatchObject({ id: account?.id, role: 'creator', creatorIds: [creatorId] });
+    // Once only.
+    expect((await post('/v1/invitation-links/redeem', { token, password: PASSWORD })).statusCode).toBe(404);
+    await expect(signIn(server, 'nora@example.test', PASSWORD)).resolves.toContain('=');
+  });
+
+  it('keeps her one account: a new link replaces the last, another e-mail is refused', async () => {
+    const creatorId = await addCreator('Ines');
+    const first = await inviteCreator(creatorId, { purpose: 'invitation', email: 'ines@example.test' });
+    const firstToken = new URL(first.json<{ url: string }>().url).hash.slice('#t='.length);
+    const second = await inviteCreator(creatorId, { purpose: 'invitation', email: 'INES@example.test' });
+    expect(second.statusCode, second.body).toBe(200);
+    expect((await post('/v1/invitation-links/inspect', { token: firstToken })).statusCode).toBe(404);
+    const accounts = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`);
+    expect(accounts).toHaveLength(1);
+
+    const other = await inviteCreator(creatorId, { purpose: 'invitation', email: 'autre@example.test' });
+    expect(other.statusCode).toBe(409);
+    expect(codeOf(other).code).toBe('creator_account_conflict');
+    const reset = await inviteCreator(creatorId, { purpose: 'reset' });
+    expect(reset.statusCode).toBe(200);
+    expect(new URL(reset.json<{ url: string }>().url).pathname).toBe('/nouveau-mot-de-passe');
+  });
+
+  it('refuses a reset before her account exists, an e-mail another account has, an unknown creator', async () => {
+    const creatorId = await addCreator('Lina');
+    const reset = await inviteCreator(creatorId, { purpose: 'reset' });
+    expect(reset.statusCode).toBe(404);
+    expect(codeOf(reset).code).toBe('creator_account_not_found');
+    const taken = await inviteCreator(creatorId, { purpose: 'invitation', email: OWNER.email });
+    expect(taken.statusCode).toBe(409);
+    expect(codeOf(taken).code).toBe('account_email_conflict');
+    const unknown = await inviteCreator(newId(CreatorIdSchema), {
+      purpose: 'invitation',
+      email: 'x@example.test',
+    });
+    expect(unknown.statusCode).toBe(404);
+    expect(codeOf(unknown).code).toBe('creator_not_found');
+    const accounts = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`);
+    expect(accounts).toHaveLength(0);
+  });
+
+  it('refuses her expired link', async () => {
+    const creatorId = await addCreator('Maya');
+    const made = await inviteCreator(creatorId, { purpose: 'invitation', email: 'maya@example.test' });
+    const token = new URL(made.json<{ url: string }>().url).hash.slice('#t='.length);
+    await test.admin.db
+      .update(schema.invitationLinks)
+      .set({ createdAt: sql`now() - interval '4 days'`, expiresAt: sql`now() - interval '1 day'` })
+      .where(
+        sql`${schema.invitationLinks.userId} is not null and ${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null`,
+      );
+    expect((await post('/v1/invitation-links/inspect', { token })).statusCode).toBe(404);
+    const redeem = await post('/v1/invitation-links/redeem', { token, password: PASSWORD });
+    expect(redeem.statusCode).toBe(404);
+    expect(codeOf(redeem).code).toBe('invitation_link_not_found');
   });
 
   it('keeps the table out of reach of the application role', async () => {

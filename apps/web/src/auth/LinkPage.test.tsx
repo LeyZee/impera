@@ -24,6 +24,7 @@ function preview(purpose: 'invitation' | 'reset') {
   return {
     purpose,
     email: 'theo@example.test',
+    account: 'member',
     displayName: 'Théo',
     country: 'BJ',
     expiresAt: '2026-10-30T15:00:00.000Z',
@@ -154,6 +155,31 @@ describe('WelcomePage', () => {
     });
   });
 
+  it('welcomes a creator to her own space, she who has no country on file (CR-02)', async () => {
+    serve({
+      inspect: [
+        [
+          200,
+          {
+            purpose: 'invitation',
+            account: 'creator',
+            email: 'nora@example.test',
+            displayName: 'Nora',
+            expiresAt: '2026-10-30T15:00:00.000Z',
+          },
+        ],
+      ],
+      redeem: [[200, ME]],
+    });
+    open('welcome');
+
+    expect(await screen.findByRole('heading', { name: 'Bienvenue, Nora' })).toBeDefined();
+    expect(screen.getByText('Ton espace créatrice')).toBeDefined();
+    // Her note names her agency and her name only: she has no country on file, and no « responsable ».
+    expect(screen.getByText('Ton nom est faux ? Dis-le à ton agence.')).toBeDefined();
+    expect(screen.queryByText(/ton pays|ton responsable/u)).toBeNull();
+  });
+
   it('says the length before sending, and sends nothing too short', async () => {
     const fake = serve({ inspect: [[200, preview('invitation')]] });
     open('welcome');
@@ -187,7 +213,7 @@ describe('WelcomePage', () => {
     serve({ inspect: [[404, refusal('invitation_link_not_found')]] });
     const { onLeave } = open('welcome');
     expect(await screen.findByText('Ce lien ne marche plus')).toBeDefined();
-    expect(screen.getByText('Demande un nouveau lien à ton responsable.')).toBeDefined();
+    expect(screen.getByText('Demande un nouveau lien à la personne qui te l’a envoyé.')).toBeDefined();
     expect(screen.queryByLabelText('Mot de passe')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Aller à la connexion' }));
     expect(onLeave).toHaveBeenCalledOnce();
@@ -238,7 +264,7 @@ describe('an answer lost after the link was used', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByText('Ce lien a déjà servi')).toBeDefined();
     expect(screen.getByText(/connecte-toi avec lui/u)).toBeDefined();
-    expect(screen.queryByText('Demande un nouveau lien à ton responsable.')).toBeNull();
+    expect(screen.queryByText('Demande un nouveau lien à la personne qui te l’a envoyé.')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Aller à la connexion' }));
     expect(onLeave).toHaveBeenCalledOnce();
   });
