@@ -42,11 +42,11 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 ### Lot b : Telegram (`telegram` ; le fil Telegram relit, Extension pour l'onglet)
 
 - [x] Alerte de vente dans le sujet « Ventes ». Son montant est le prix payé par le fan (TTC), celui que l'équipe voit dans Reveal (question 2). Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan. Lot b1 : toutes les ventes sonnent tant que les réglages n'existent pas ; une ligne de l'outbox illisible fait avancer le curseur du scan.
-- Réglages des ventes (P3-07), par créatrice ou pour toutes, dans `telegram_settings` qui existe déjà : un montant minimum sur ce même prix (question 2), « ventes de l'agent seulement » ou « toutes », et le bilan du soir allumé ou non.
-- Bilan du soir à 23 h, dans le fuseau de la créatrice, envoyé aux groupes du sujet « Ventes ». Pour chaque créatrice : le chiffre d'affaires, le net, les deux parts, le nombre de ventes et de remboursements, puis le détail par chatteur (son nom), l'agent et « sans chatteur ». Le job `telegram.evening_digest` est branché dans le crontab par Bilan, dans ce lot.
-- L'onglet Ventes de Réglages › Telegram passe de « bientôt » aux vrais réglages.
-- Un remboursement ne sonne pas en direct : il apparaît au bilan du soir et dans les totaux (question 2).
-- Une alerte « important » au propriétaire (question 6) quand la dernière vérification CRM-02 d'une plateforme ne concorde plus alors qu'un compte y est déjà en `detected`. Elle ne change aucun montant.
+- [x] Réglages des ventes (P3-07), par créatrice ou pour toutes : un montant minimum sur ce même prix (question 2), « ventes de l'agent seulement » ou « toutes », et le bilan du soir allumé ou non. Lot b2 : `telegram_settings` n'existait pas, créée par la migration 0083 (0080 attribuée par Bilan, renumérotée après la fusion de 0082) ; `GET`/`PUT /v1/settings/telegram/sales`, propriétaire seul, `audit_log` à chaque enregistrement.
+- [x] Bilan du soir à 23 h, dans le fuseau de la créatrice, envoyé aux groupes du sujet « Ventes ». Pour chaque créatrice : le chiffre d'affaires, le net, les deux parts, le nombre de ventes et de remboursements, puis le détail par chatteur (son nom), l'agent et « sans chatteur », puis les remboursements faits ce jour de ventes d'avant (lecture `refundsOf` de Bilan, #462). Rien sans registre relié ; un registre non lu depuis plus d'une heure le dit, sans donner « Aucune vente » (`readingsOf`, ADR 0054). Le job `telegram.evening_digest` est branché dans le crontab par Bilan, dans ce lot.
+- [x] L'onglet Ventes de Réglages › Telegram passe de « bientôt » aux vrais réglages, avec la phrase « réserve-le à toi et aux managers » (ADR 0043 § 7, remarque d'Équipe). Captures Nuit et Jour, 390 et 1440 : `/mnt/project-files/reglages-ventes/crm-04/b2/`.
+- [x] Un remboursement ne sonne pas en direct : il apparaît au bilan du soir et dans les totaux (question 2).
+- Lot b3, reste à faire : une alerte « important » au propriétaire (question 6) quand la dernière vérification CRM-02 d'une plateforme ne concorde plus alors qu'un compte y est déjà en `detected`. Elle ne change aucun montant.
 
 ### Lot c : le Dashboard (`supervision` ; le fil Agent relit, Extension pour l'écran)
 
