@@ -9,7 +9,7 @@ import type { JSX } from 'react';
 
 export const CATEGORY_EMOJI: Readonly<Record<CreatorTaskCategory, string>> = {
   shoot: '🎬',
-  live: '🎥',
+  live: '📡',
   post: '🖼️',
   socials: '💬',
   appointment: '📅',

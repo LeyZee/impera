@@ -13,6 +13,7 @@ Fait :
 - Un glisser ne change jamais la nature d'une tâche (une tâche du jour reste du jour, une routine ne se glisse pas).
 - Les tâches qui se chevauchent se partagent la largeur de la colonne.
 - Les cases d'événement ont un fond plein pour que la ligne de maintenant passe dessous.
+- Live passe de 🎥 à 📡 : à petite taille, 🎥 se confondait avec 🎬 (Tournage), remarque d’Extension sur #504.
   Découvertes : aucune.
   Candidats à suppression : aucun.
   Vérifié :
