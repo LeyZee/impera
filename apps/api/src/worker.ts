@@ -7,6 +7,8 @@ import { startWorker } from './worker-runner';
 /** Worker entry point (`node dist/worker.js`): same composition root as the API, no HTTP. */
 const config = loadConfig();
 const logger = createLogger(config);
+// Before anything starts: a SIGTERM during the start is kept for the stop below (`shutdown.ts`).
+const graceful = exitGracefully(logger);
 const app = await createApp(config, logger, { withPlayground: false });
 const worker = await startWorker(app, {
   logger,
@@ -14,7 +16,7 @@ const worker = await startWorker(app, {
   release: config.RELEASE,
 });
 
-exitGracefully(logger, async () => {
+graceful.stopWith(async () => {
   await worker.stop();
   await app.shutdown();
 });

@@ -27,6 +27,22 @@ type FetchLike = (request: Request) => Promise<Response>;
 /** A bucket that hangs is a bucket that does not answer: the job retries, the download reads the copy. */
 const REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * Whether `fetch` failed because the bucket had closed the kept-alive connection the request went out on, before any
+ * answer (undici's `UND_ERR_SOCKET`, or a reset). MinIO closes it right after answering 412 to a conditional PUT,
+ * without `Connection: close`: the next request can leave on it before Node has seen the close (CI, 03/11).
+ */
+function closedByBucket(error: unknown): boolean {
+  if (!(error instanceof TypeError)) return false;
+  const cause: unknown = error.cause;
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    (cause.code === 'UND_ERR_SOCKET' || cause.code === 'ECONNRESET')
+  );
+}
+
 const base64Of = (algorithm: 'md5' | 'sha256', bytes: Uint8Array): string =>
   createHash(algorithm).update(bytes).digest('base64');
 
@@ -72,11 +88,25 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
       .split('/')
       .map(encodeURIComponent)
       .join('/')}`;
+  /**
+   * Signed and sent, with its own timeout. A read (GET, HEAD) that met a connection the bucket had closed goes again
+   * once, on a new one: it changes nothing. A write never does: a PUT sent twice could answer 412 to its own object.
+   */
+  const fetchSigned = async (url: string, init: RequestInit): Promise<Response> => {
+    const attempt = async (): Promise<Response> =>
+      send(new Request(await client.sign(url, init), { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }));
+    try {
+      return await attempt();
+    } catch (error) {
+      const method = init.method ?? 'GET';
+      if ((method === 'GET' || method === 'HEAD') && closedByBucket(error)) return attempt();
+      throw error;
+    }
+  };
   /** `query`: a subresource of the object (`retention`), signed with it. */
   const call = async (key: string, init: RequestInit, query = ''): Promise<Response> => {
     try {
-      const signed = await client.sign(query === '' ? urlOf(key) : `${urlOf(key)}?${query}`, init);
-      return await send(new Request(signed, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }));
+      return await fetchSigned(query === '' ? urlOf(key) : `${urlOf(key)}?${query}`, init);
     } catch (error) {
       throw new InvoiceStorageUnavailable(`${config.bucket}: no answer for ${key}`, { cause: error });
     }
@@ -91,8 +121,7 @@ export function createS3InvoiceStore(config: S3BucketConfig, fetchLike?: FetchLi
     const url = `${config.endpoint.replace(/\/+$/u, '')}/${encodeURIComponent(config.bucket)}?versions&prefix=${encodeURIComponent(key)}`;
     let response: Response;
     try {
-      const signed = await client.sign(url, { method: 'GET' });
-      response = await send(new Request(signed, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }));
+      response = await fetchSigned(url, { method: 'GET' });
     } catch (error) {
       throw new InvoiceStorageUnavailable(`${config.bucket}: no answer for the versions of ${key}`, {
         cause: error,
