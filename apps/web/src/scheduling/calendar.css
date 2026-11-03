@@ -51,10 +51,6 @@
 .cal-chip:hover,
 .cal-chip:active {
   transform: none;
-  background: color-mix(in srgb, var(--sc-color) 16%, var(--nv-surface-raised));
-  box-shadow:
-    inset 3px 0 0 var(--sc-color),
-    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
 }
 .cal-chip[data-mine='true'] .sc-chip__name {
   font-weight: 700;
@@ -82,7 +78,8 @@
   z-index: 1;
   padding: 1px 7px;
   border-radius: var(--nv-radius-full);
-  background: color-mix(in srgb, var(--nv-agent) 16%, var(--nv-surface-raised));
+  /* The soft violet the contrast test measures, laid on a surface so that it hides what is under it. */
+  background: linear-gradient(var(--nv-agent-soft) 0 0), var(--nv-surface-raised);
   color: var(--nv-agent);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
@@ -223,6 +220,13 @@
 .cal-month[data-loading='true'] {
   opacity: 0.55;
 }
+.cal-month__cell {
+  display: flex;
+  min-width: 0;
+}
+.cal-month__cell > .cal-day {
+  flex: 1;
+}
 .cal-month__head,
 .cal-month__week {
   display: grid;
@@ -303,12 +307,11 @@
 }
 .cal-day__creator {
   flex: none;
-  width: 2.2em;
-  font-size: 10px;
+  width: 2.4em;
+  font-size: var(--nv-text-caption);
   line-height: 1;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--nv-ink-faint);
+  color: var(--nv-ink-muted);
 }
 /* One créneau of one creator: filled in the member's colour, ringed in violet for the agent alone, hollow if free. */
 .cal-mark {
@@ -387,12 +390,16 @@
   color: var(--nv-ink-muted);
 }
 
-/* The switches above the calendar. */
+/* The switches above the calendar: two groups, a hairline between them so that they never read as one. */
 .cal-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--nv-space-3) var(--nv-space-4);
+  gap: var(--nv-space-3) var(--nv-space-6);
+}
+.cal-bar > .tm-choices + .tm-choices {
+  padding-left: var(--nv-space-6);
+  border-left: 1px solid var(--nv-hairline);
 }
 
 @media (max-width: 820px) {

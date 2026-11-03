@@ -707,18 +707,20 @@ describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
     await screen.findByRole('region', { name: 'Aujourd’hui' });
     fireEvent.click(screen.getByRole('radio', { name: 'L’équipe' }));
     fireEvent.click(await screen.findByRole('radio', { name: 'Mois' }));
-    const month = await screen.findByRole('grid', { name: 'Planning de l’équipe, octobre 2026' });
+    const month = await screen.findByRole('table', { name: 'Planning de l’équipe, octobre 2026' });
     // From Monday 28 September, 42 days of 24 h: the hour the change of time adds is cut back.
     expect(calendars.at(-1)).toBe('2026-09-27T22:00:00.000Z/2026-11-08T22:00:00.000Z');
     expect(text(screen.getByText(/^Toi :/u))).toBe('Toi : 6 h en octobre');
-    const wednesday = within(month).getByRole('gridcell', { name: /^mercredi 28 octobre/u });
+    const wednesday = within(month).getByRole('button', { name: /^mercredi 28 octobre/u });
     // Théo's night runs on into Wednesday: two shifts that day, one his.
     expect(wednesday.getAttribute('aria-label')).toBe(
       'mercredi 28 octobre : 2 shifts, dont le tien, l’IA seule sur 1 créneau',
     );
-    const tuesday = within(month).getByRole('gridcell', { name: /^mardi 27 octobre/u });
+    const tuesday = within(month).getByRole('button', { name: /^mardi 27 octobre/u });
     expect(tuesday.getAttribute('aria-label')).toContain('ton shift');
+    expect(within(month).getAllByRole('cell')).toHaveLength(42);
     fireEvent.click(wednesday);
+    expect(wednesday.getAttribute('aria-pressed')).toBe('true');
     const detail = screen.getByRole('region', { name: 'mercredi 28 octobre' });
     expect(text(detail)).toContain('Basile, 8 h – 14 h ; l’IA en automatique');
     expect(text(detail)).toContain('l’IA seule');

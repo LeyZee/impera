@@ -255,7 +255,7 @@ export function TeamMonth({
       <div
         className="cal-month nv-swap"
         key={month}
-        role="grid"
+        role="table"
         aria-label={`Planning de l’équipe, ${monthLabel(month)}`}
         aria-busy={loading}
         data-loading={loading ? 'true' : undefined}
@@ -273,50 +273,50 @@ export function TeamMonth({
               const marks = rows.map((row) => ({ row, marks: monthMarks(row.days.get(day) ?? [], now) }));
               const { said, mine } = dayWords(rows, day, me, now);
               return (
-                <button
-                  key={day}
-                  type="button"
-                  role="gridcell"
-                  className="cal-day"
-                  aria-label={`${longDay(day)} : ${said}`}
-                  aria-pressed={shown === day}
-                  data-out={inMonth(day) ? undefined : 'true'}
-                  data-today={day === today ? 'true' : undefined}
-                  data-past={day < today ? 'true' : undefined}
-                  data-mine={mine ? 'true' : undefined}
-                  onClick={() => {
-                    setOpened(shown === day ? null : day);
-                  }}
-                >
-                  <span className="cal-day__num nv-num">{dayNumber(day)}</span>
-                  <span className="cal-day__marks" aria-hidden="true">
-                    {marks.map(({ row, marks: list }) => (
-                      <span key={row.creator.id} className="cal-day__line">
-                        <span className="cal-day__creator">{initialsOf(row.creator.name)}</span>
-                        {list.map((mark, index) =>
-                          mark.kind === 'shift' ? (
-                            <i
-                              key={index}
-                              className="cal-mark"
-                              data-kind="shift"
-                              data-muted={focus !== null && mark.memberId !== focus ? 'true' : undefined}
-                              style={{
-                                '--sc-color': members.get(mark.memberId)?.color ?? 'var(--nv-ink-faint)',
-                              }}
-                            />
-                          ) : (
-                            <i
-                              key={index}
-                              className="cal-mark"
-                              data-kind={mark.kind}
-                              data-ahead={mark.kind === 'gap' && mark.ahead ? 'true' : undefined}
-                            />
-                          ),
-                        )}
-                      </span>
-                    ))}
-                  </span>
-                </button>
+                <div key={day} role="cell" className="cal-month__cell">
+                  <button
+                    type="button"
+                    className="cal-day"
+                    aria-label={`${longDay(day)} : ${said}`}
+                    aria-pressed={shown === day}
+                    data-out={inMonth(day) ? undefined : 'true'}
+                    data-today={day === today ? 'true' : undefined}
+                    data-past={day < today ? 'true' : undefined}
+                    data-mine={mine ? 'true' : undefined}
+                    onClick={() => {
+                      setOpened(shown === day ? null : day);
+                    }}
+                  >
+                    <span className="cal-day__num nv-num">{dayNumber(day)}</span>
+                    <span className="cal-day__marks" aria-hidden="true">
+                      {marks.map(({ row, marks: list }) => (
+                        <span key={row.creator.id} className="cal-day__line">
+                          <span className="cal-day__creator">{initialsOf(row.creator.name)}</span>
+                          {list.map((mark, index) =>
+                            mark.kind === 'shift' ? (
+                              <i
+                                key={index}
+                                className="cal-mark"
+                                data-kind="shift"
+                                data-muted={focus !== null && mark.memberId !== focus ? 'true' : undefined}
+                                style={{
+                                  '--sc-color': members.get(mark.memberId)?.color ?? 'var(--nv-ink-faint)',
+                                }}
+                              />
+                            ) : (
+                              <i
+                                key={index}
+                                className="cal-mark"
+                                data-kind={mark.kind}
+                                data-ahead={mark.kind === 'gap' && mark.ahead ? 'true' : undefined}
+                              />
+                            ),
+                          )}
+                        </span>
+                      ))}
+                    </span>
+                  </button>
+                </div>
               );
             })}
           </div>
