@@ -1,0 +1,115 @@
+// @vitest-environment jsdom
+import type { Me } from '@impera/contracts';
+import { describe, expect, it, vi } from 'vitest';
+
+import html from './index.html?raw';
+import { accountPathOf, greetingAt, render, type Actions, type Screen } from './view';
+
+const ME: Me = {
+  id: 'u1',
+  email: 'alex@exemple.fr',
+  name: 'Alex <b>Morel</b>',
+  role: 'owner',
+  creatorIds: [],
+  routedCreatorIds: [],
+  team: null,
+  teamScope: 'owner',
+};
+
+const frame = { origin: 'http://localhost:5173', version: '0.0.0', hour: 20 };
+
+function draw(screen: Screen): { root: HTMLElement; actions: Actions } {
+  const actions: Actions = {
+    signIn: vi.fn(),
+    open: vi.fn(),
+    retry: vi.fn(),
+    grant: vi.fn(),
+    editAddress: vi.fn(),
+    saveAddress: vi.fn(),
+    resetAddress: vi.fn(),
+    cancelAddress: vi.fn(),
+  };
+  const root = document.createElement('div');
+  render(root, screen, frame, actions);
+  return { root, actions };
+}
+
+const buttonNamed = (root: HTMLElement, name: string): HTMLButtonElement => {
+  const found = [...root.querySelectorAll('button')].find((b) => b.textContent.trim() === name);
+  if (found === undefined) throw new Error(`no button « ${name} »`);
+  return found;
+};
+
+describe('popup', () => {
+  it('mounts in #app and keeps the design system frame and the mark', () => {
+    expect(html).toContain('<div id="app"></div>');
+    const { root } = draw({ kind: 'signed_out' });
+    expect(root.querySelector('main')?.className).toContain('nv-aura nv-popup');
+    expect(root.querySelector('img')?.getAttribute('src')).toBe('/icon/mark.svg');
+    expect(root.querySelector('.nv-popup__brand')?.textContent).toBe('Impera');
+  });
+
+  it('signs in through the CRM, with no password field', () => {
+    const { root, actions } = draw({ kind: 'signed_out' });
+    expect(root.querySelector('input')).toBeNull();
+    buttonNamed(root, 'Se connecter').click();
+    expect(actions.signIn).toHaveBeenCalledOnce();
+  });
+
+  it('writes the name as text, never as markup', () => {
+    const { root } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere' });
+    expect(root.querySelector('b')).toBeNull();
+    expect(root.querySelector('.pp-account__name')?.textContent).toBe('Alex <b>Morel</b>');
+    expect(root.querySelector('.pp-whisper')?.textContent).toBe('Bonsoir, Alex.');
+  });
+
+  it('opens the shortcuts and the account page in the CRM', () => {
+    const { root, actions } = draw({ kind: 'signed_in', me: ME, place: 'elsewhere' });
+    buttonNamed(root, 'Suivi').click();
+    root.querySelector<HTMLButtonElement>('.pp-account')?.click();
+    expect(actions.open).toHaveBeenNthCalledWith(1, '/suivi');
+    expect(actions.open).toHaveBeenNthCalledWith(2, '/reglages/securite');
+  });
+
+  it('shows the Reveal card only on Reveal', () => {
+    expect(
+      draw({ kind: 'signed_in', me: ME, place: 'reveal' }).root.querySelector('[data-place="reveal"]'),
+    ).not.toBeNull();
+    expect(draw({ kind: 'signed_in', me: ME, place: 'crm' }).root.querySelector('.pp-place')).toBeNull();
+  });
+
+  it('says an unreachable CRM in amber, never in red, with its address', () => {
+    const { root, actions } = draw({ kind: 'unreachable' });
+    expect(root.querySelector('.pp-notice--amber')?.textContent).toContain('localhost:5173');
+    expect(root.querySelector('.nv-status--error')).not.toBeNull();
+    expect(root.innerHTML).not.toMatch(/destructive|neon-urgent/u);
+    buttonNamed(root, 'Réessayer').click();
+    expect(actions.retry).toHaveBeenCalledOnce();
+  });
+
+  it('saves the address the person typed', () => {
+    const { root, actions } = draw({ kind: 'address', draft: 'localhost:5173', error: null });
+    const input = root.querySelector<HTMLInputElement>('#crm-address');
+    if (input === null) throw new Error('no field');
+    input.value = 'crm.exemple.fr';
+    root.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(actions.saveAddress).toHaveBeenCalledWith('crm.exemple.fr');
+  });
+
+  it('marks a refused address', () => {
+    const { root } = draw({ kind: 'address', draft: 'x', error: 'Une adresse en https.' });
+    expect(root.querySelector('#crm-address')?.getAttribute('aria-invalid')).toBe('true');
+    expect(root.querySelector('.pp-hint--amber')?.textContent).toBe('Une adresse en https.');
+  });
+
+  it('greets by the hour', () => {
+    expect(greetingAt(9)).toBe('Bonjour');
+    expect(greetingAt(18)).toBe('Bonsoir');
+    expect(greetingAt(3)).toBe('Bonsoir');
+  });
+
+  it('sends each account to its own security page', () => {
+    expect(accountPathOf({ ...ME, role: 'creator', teamScope: 'self' })).toBe('/moi/securite');
+    expect(accountPathOf({ ...ME, role: 'operator', teamScope: 'self' })).toBe('/compte/securite');
+  });
+});

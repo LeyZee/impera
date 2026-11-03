@@ -264,7 +264,7 @@ Le bloc de couleurs généré par `shadcn init` est supprimé au profit de cette
 
 ## Extension Chrome
 
-Le popup (capture de session, enregistreur) importe `@impera/design-system/styles.css` : en-tête `nv-popup__brand`, état de la session (`platform_session` : valide, à surveiller, expirée) en `nv-status`, un bouton néon « Synchroniser la session ». Pas de verre au-dessus de Reveal : l'extension n'injecte aucun style dans la page Reveal.
+Le popup (ADR 0066) importe `@impera/design-system/styles.css` et suit `prefers-color-scheme` (Nuit ou Jour). Ordre : en-tête `nv-popup__brand` et une `nv-status` d'état (Connecté, Déconnecté, ambre pour Injoignable, Code à activer, À autoriser ; jamais de rouge), le bonjour en Instrument Serif italique avec le prénom éclairé, la carte du compte en verre (`nv-avatar--ring`), la carte de l'onglet ouvert en `nv-plate` (Reveal, Instagram), au plus quatre raccourcis en tuiles qui se soulèvent au survol, un seul bouton néon. Classes locales `pp-` dans `apps/extension/src/entrypoints/popup/popup.css`. Pas de verre au-dessus de Reveal : l'extension n'injecte aucun style dans la page Reveal.
 
 ## Ce qui reste (fiche D-01)
 
