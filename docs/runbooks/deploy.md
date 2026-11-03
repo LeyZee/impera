@@ -65,6 +65,8 @@ Le pooler de Neon (hôte en `-pooler`) est interdit : Graphile Worker a besoin d
      - '--accesslog.fields.names.RequestLine=drop'
      ```
 
+   - Désactiver l'analyse remet les `--accesslog…` faits à la main que Coolify avait gardés de côté : après une activation puis une désactivation, repasser par Proxy → Configuration.
+   - Le journal général de Traefik (`--log.level`) est autre chose que le journal d'accès : ne pas laisser `--log.level=DEBUG` après un dépannage, car ce niveau écrit les requêtes.
    - Vérifier : ouvrir une fois son propre lien de calendrier, puis, dans Coolify → Servers → le serveur → Terminal, `docker exec coolify-proxy sh -c 'grep -c calendar-feed /traefik/access.log'` doit répondre `0`, ou « No such file » s'il n'y a pas de journal.
    - Si un Cloudflare est mis un jour devant le domaine, ses journaux (Logpush) gardent aussi le chemin : ne pas les activer pour ce domaine, ou en ôter le chemin.
 
