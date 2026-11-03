@@ -138,7 +138,14 @@ if (process.argv[1]?.endsWith('rename-impera.mjs') === true) {
     run('pnpm', ['install']);
     // A shorter name can let Prettier join lines it used to wrap.
     if (changed.length > 0)
-      run('pnpm', ['exec', 'prettier', '--write', '--ignore-unknown', '--log-level=warn', ...changed]);
+      run('pnpm', [
+        'exec',
+        'prettier',
+        '--write',
+        '--ignore-unknown',
+        '--log-level=warn',
+        ...changed.map(renamePath),
+      ]);
     run('pnpm', ['check']);
     run('pnpm', ['test']);
     console.log('Renommage terminé : pnpm check et pnpm test sont verts.');
