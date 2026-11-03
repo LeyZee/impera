@@ -90,3 +90,4 @@ Date : AAAA-MM-JJ
 | 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | accepted (remplace dans 0056 § 3 la phrase sur la palette) |
 | 0066 | Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret | accepted (précise 0008 et 0062 § 8) |
 | 0067 | L'équipe installe l'extension depuis le CRM, puis depuis le Chrome Web Store en « non répertoriée » | accepted (précise 0066 et 0027) |
+| 0069 | Les créatrices s'importent depuis Reveal par une revue du propriétaire, jamais en silence | proposed (précise 0050 § 3 et 0054) |
