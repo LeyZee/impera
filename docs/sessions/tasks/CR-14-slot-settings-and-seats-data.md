@@ -22,6 +22,8 @@ La base sait ce que l'ADR 0049 décide : des créneaux aux heures libres réglé
 ### Lot b : le contrat et la lecture
 - [ ] `SchedulingSettingsSchema` porte la liste des créneaux (début, fin, nom facultatif) et les places par compte ; `refine` Zod (24 h sans trou ni chevauchement, de 1 h à 12 h, à l'heure pleine, au moins deux créneaux), revérifié par le domaine à l'écriture ; lecture d'un réglage passé par `at` ; la grille lit le réglage en vigueur jour par jour.
 - [ ] `slotsToFill` compte des places ; « IA seule » ne tient lieu que d'une place unique (ADR 0048 § 1).
+- [ ] Le rang d'une place existe dans sa version (domaine, revérifié à l'écriture ; déclencheur d'insertion si Bilan le demande), relevé de la relecture de Bilan sur #440.
+- [ ] README du module : la limite de trois tient parce que les écritures sur `shifts` tournent en READ COMMITTED (le comptage de `shifts_account_cap` lit après le verrou) ; une écriture en repeatable read la casserait.
 - [ ] Écriture d'une version (propriétaire seul) et retrait d'une version future, au journal d'audit ; le recalage de la semaine modèle et l'écran restent à CR-13.
 
 ## Critères d'acceptation
