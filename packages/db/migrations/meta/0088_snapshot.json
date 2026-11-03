@@ -1,6 +1,6 @@
 {
-  "id": "3d33369f-e83f-4f5b-8657-35af90e5c082",
-  "prevId": "2a3e0498-5725-49a9-b5df-970849682a43",
+  "id": "44f32a6b-7314-4aea-848f-93d992f9c360",
+  "prevId": "6830c7f5-d142-4b24-a616-a7d09e8d0dd2",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2320,6 +2320,13 @@
           "to": ["public"],
           "using": "\"domain_events\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"domain_events\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_select": {
+          "name": "creator_no_select",
+          "as": "RESTRICTIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -9109,6 +9116,13 @@
           "to": ["public"],
           "using": "\"platform_sales\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"platform_sales\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -9314,7 +9328,16 @@
           "columns": ["platform", "platform_sale_id", "event"]
         }
       },
-      "policies": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
       "checkConstraints": {
         "platform_sales_quarantine_platform_check": {
           "name": "platform_sales_quarantine_platform_check",
@@ -9422,7 +9445,16 @@
         }
       },
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
       "checkConstraints": {
         "sales_feed_chatters_platform_check": {
           "name": "sales_feed_chatters_platform_check",
@@ -9531,7 +9563,16 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
       "checkConstraints": {
         "sales_feed_checks_platform_check": {
           "name": "sales_feed_checks_platform_check",
@@ -11981,6 +12022,384 @@
         "shifts_template_check": {
           "name": "shifts_template_check",
           "value": "(\"shifts\".\"template_id\" is null) = (\"shifts\".\"template_starts_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.script_structure_queue": {
+      "name": "script_structure_queue",
+      "schema": "",
+      "columns": {
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "structure_id": {
+          "name": "structure_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_by": {
+          "name": "added_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "script_structure_queue_structure_idx": {
+          "name": "script_structure_queue_structure_idx",
+          "columns": [
+            {
+              "expression": "structure_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "script_structure_queue_creator_id_creators_id_fk": {
+          "name": "script_structure_queue_creator_id_creators_id_fk",
+          "tableFrom": "script_structure_queue",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_structure_queue_structure_id_script_structures_id_fk": {
+          "name": "script_structure_queue_structure_id_script_structures_id_fk",
+          "tableFrom": "script_structure_queue",
+          "tableTo": "script_structures",
+          "columnsFrom": ["structure_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_structure_queue_added_by_user_id_fk": {
+          "name": "script_structure_queue_added_by_user_id_fk",
+          "tableFrom": "script_structure_queue",
+          "tableTo": "user",
+          "columnsFrom": ["added_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "script_structure_queue_pkey": {
+          "name": "script_structure_queue_pkey",
+          "columns": ["creator_id", "position"]
+        }
+      },
+      "uniqueConstraints": {
+        "script_structure_queue_structure_unique": {
+          "name": "script_structure_queue_structure_unique",
+          "nullsNotDistinct": false,
+          "columns": ["creator_id", "structure_id"]
+        }
+      },
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_structure_queue\".\"added_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_delete": {
+          "name": "owner_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "script_structure_queue_position_check": {
+          "name": "script_structure_queue_position_check",
+          "value": "\"script_structure_queue\".\"position\" between 1 and 20"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.script_structure_versions": {
+      "name": "script_structure_versions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "structure_id": {
+          "name": "structure_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "moment": {
+          "name": "moment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "segments": {
+          "name": "segments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "script_structure_versions_structure_id_script_structures_id_fk": {
+          "name": "script_structure_versions_structure_id_script_structures_id_fk",
+          "tableFrom": "script_structure_versions",
+          "tableTo": "script_structures",
+          "columnsFrom": ["structure_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_structure_versions_updated_by_user_id_fk": {
+          "name": "script_structure_versions_updated_by_user_id_fk",
+          "tableFrom": "script_structure_versions",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "script_structure_versions_number_unique": {
+          "name": "script_structure_versions_number_unique",
+          "nullsNotDistinct": false,
+          "columns": ["structure_id", "version"]
+        }
+      },
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_structure_versions\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_update": {
+          "name": "owner_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_structure_versions\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "script_structure_versions_version_check": {
+          "name": "script_structure_versions_version_check",
+          "value": "\"script_structure_versions\".\"version\" >= 1"
+        },
+        "script_structure_versions_name_check": {
+          "name": "script_structure_versions_name_check",
+          "value": "char_length(\"script_structure_versions\".\"name\") between 1 and 60"
+        },
+        "script_structure_versions_segments_check": {
+          "name": "script_structure_versions_segments_check",
+          "value": "jsonb_typeof(\"script_structure_versions\".\"segments\") = 'array' and jsonb_array_length(\"script_structure_versions\".\"segments\") >= 1"
+        },
+        "script_structure_versions_moment_check": {
+          "name": "script_structure_versions_moment_check",
+          "value": "\"script_structure_versions\".\"moment\" in ('day', 'night', 'both')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.script_structures": {
+      "name": "script_structures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "reserved_creator_id": {
+          "name": "reserved_creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "script_structures_reserved_creator_id_creators_id_fk": {
+          "name": "script_structures_reserved_creator_id_creators_id_fk",
+          "tableFrom": "script_structures",
+          "tableTo": "creators",
+          "columnsFrom": ["reserved_creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "script_structures_created_by_user_id_fk": {
+          "name": "script_structures_created_by_user_id_fk",
+          "tableFrom": "script_structures",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_structures\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_update": {
+          "name": "owner_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "script_structures_archived_check": {
+          "name": "script_structures_archived_check",
+          "value": "\"script_structures\".\"archived_at\" is null or \"script_structures\".\"archived_at\" >= \"script_structures\".\"created_at\""
         }
       },
       "isRLSEnabled": false

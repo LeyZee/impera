@@ -165,9 +165,12 @@ async function count(tx: Transaction, table: string): Promise<number> {
 /**
  * What a creator's account may do on each table that holds a creator's rows (Bilan's review of #460): every table with
  * `tenant_isolation` has a decision here, or a new table would open to her without anyone deciding it. `readsOnly`
- * carries the three `creator_no_*` policies, `closed` carries `creator_closed`; an exception names its reason.
+ * carries the three `creator_no_*` policies, `closed` carries `creator_closed`, `hidden` carries `creator_no_select` (she
+ * never reads it, a write of hers may add to it: CRM-04 lot d); an exception names its reason.
  */
-const CREATOR_DECISIONS: Readonly<Record<string, 'readsOnly' | 'closed' | { readonly exception: string }>> = {
+const CREATOR_DECISIONS: Readonly<
+  Record<string, 'readsOnly' | 'closed' | 'hidden' | { readonly exception: string }>
+> = {
   conversations: 'readsOnly',
   messages: 'readsOnly',
   fans: 'readsOnly',
@@ -191,8 +194,10 @@ const CREATOR_DECISIONS: Readonly<Record<string, 'readsOnly' | 'closed' | { read
     exception:
       'elle écrit sa persona (Moi › Persona, ADR 0042 § 8) par la porte de l’agence : son enregistrement et son activation écrivent aussi le journal d’audit et les événements',
   },
-  domain_events: { exception: 'fermée au lot d de CRM-04, migration 0081' },
-  platform_sales: { exception: 'fermée au lot d de CRM-04, migration 0081' },
+  // She reads her sales through the view `creator_sales` (CRM-04 lot d): the register names who sold and the fan.
+  platform_sales: 'closed',
+  // `sale_detected` names who sold; an event her transaction publishes still goes in.
+  domain_events: 'hidden',
 };
 
 /**
@@ -458,6 +463,7 @@ describe('a creator’s own account (CR-02): one creator, her rows read-only, th
       if (decision === 'readsOnly')
         expect(own, table).toEqual(['creator_no_delete', 'creator_no_insert', 'creator_no_update']);
       else if (decision === 'closed') expect(own, table).toEqual(['creator_closed']);
+      else if (decision === 'hidden') expect(own, table).toEqual(['creator_no_select']);
       else expect(decision?.exception, table).toMatch(/\S/u);
     }
   });

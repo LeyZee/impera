@@ -24,8 +24,11 @@ export interface TopicMeta {
 }
 
 export const TOPICS: Record<TelegramTopic, TopicMeta> = {
-  urgent: { label: 'Urgent', sub: 'Mineur, consentement, détresse, rencontre, manipulation' },
-  important: { label: 'Important', sub: 'Plafond IA, session expirée, agent arrêté' },
+  urgent: {
+    label: 'Urgent',
+    sub: 'Mineur, consentement, détresse, rencontre, manipulation, plafond IA atteint, facture en retard, sécurité',
+  },
+  important: { label: 'Important', sub: 'Plafond IA à 80 %, session expirée, agent arrêté' },
   info: { label: 'Info', sub: 'Bilan du matin, retour à la normale, sans son' },
   sale: { label: 'Ventes', sub: 'Un message sans son à chaque vente' },
   keyword: { label: 'Mots-clés', sub: 'Un fan a écrit un mot surveillé de la Persona' },
