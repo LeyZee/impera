@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import type { SalesFeedCheckReport, SalesFeedOverview, SalesFeedStatus } from '@nirvana/contracts';
+import type {
+  SalesFeedCheckReport,
+  SalesFeedOverview,
+  SalesFeedStatus,
+  TeamMember,
+} from '@nirvana/contracts';
+import { TeamMemberSchema } from '@nirvana/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
@@ -122,12 +128,33 @@ const ok =
   (body: unknown): Handler =>
   () => ({ status: 200, body });
 
+const ANA = '00000000-0000-4000-8000-0000000000a1';
+const ANA_MEMBER: TeamMember = TeamMemberSchema.parse({
+  id: ANA,
+  userId: '00000000-0000-4000-8000-000000000110',
+  email: 'ana@example.test',
+  firstName: 'Ana',
+  lastName: 'Test',
+  displayName: 'Ana T.',
+  teamRole: 'chatter',
+  status: 'active',
+  country: 'BJ',
+  timeZone: 'Africa/Porto-Novo',
+  color: null,
+  joinedOn: '2026-01-01',
+  creatorIds: [],
+  commission: null,
+  invitationPending: false,
+  invitationExpiresAt: null,
+});
+
 function page(
   check: Handler,
   overview: SalesFeedOverview = OVERVIEW,
   lastCheck: Handler = ok({ last: null }),
 ): ReturnType<typeof serve> {
   const fetch = serve({
+    'GET /v1/team/members': ok({ members: [ANA_MEMBER] }),
     [`GET ${BASE}`]: ok({ feeds: [overview.status] }),
     [`GET ${BASE}/reveal`]: ok(overview),
     [`POST ${BASE}/reveal/check`]: check,
@@ -339,6 +366,36 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
     expect(
       fetch.mock.calls.filter(([url, init]) => url === `${BASE}/reveal/check` && init?.method === undefined),
     ).toHaveLength(2);
+  });
+
+  it('names the member a bot is linked to after a check, nobody on a kept report: the link may have moved since', async () => {
+    const toAna: SalesFeedOverview = {
+      ...OVERVIEW,
+      chatters: OVERVIEW.chatters.map((chatter) => ({ ...chatter, link: { kind: 'member', memberId: ANA } })),
+    };
+    const linked = report({
+      verdict: 'mismatch',
+      chatters: [
+        {
+          platformChatterId: 'c-bot',
+          isBot: true,
+          link: 'member',
+          register: { net: 10_000, sales: 4 },
+          stats: { net: 10_000, sales: 4 },
+          differs: false,
+        },
+      ],
+      notes: [{ kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' }],
+    });
+    page(ok(linked), toAna, ok({ last: { report: linked, clean: false, checkedBy: 'u-owner' } }));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    expect(
+      await within(panel).findByText(/^Le compte bot « Bot Agence » est relié à un membre :/u),
+    ).toBeTruthy();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Vérifier ces jours' }));
+    expect(
+      await within(panel).findByText(/^Le compte bot « Bot Agence » est relié à « Ana T\. » :/u),
+    ).toBeTruthy();
   });
 
   it('is not offered while reading has stopped: the statistics need the key', async () => {

@@ -230,7 +230,7 @@ export function readBefore(registerReadAt: string, generatedAt: string): string 
   return `le ${dayTime(registerReadAt)}`;
 }
 
-const plural = (count: number, one: string, many: string): string =>
+export const plural = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
 
 /** What the owner should know beside the figures, in the page's words; never a fan's data. */

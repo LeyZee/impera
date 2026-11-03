@@ -16,6 +16,7 @@ import {
   gap,
   money,
   noteText,
+  plural,
   rangeLabel,
   readBefore,
   switchLine,
@@ -70,6 +71,7 @@ function Cell({
  */
 export function CheckReport({
   report,
+  isKept,
   clean,
   platformName,
   models,
@@ -77,6 +79,11 @@ export function CheckReport({
   now,
 }: {
   report: SalesFeedCheckReport;
+  /**
+   * Read back from the server rather than just run: a member named in a note would be the one linked now, maybe not
+   * the one the report saw (it keeps the kind of link, not the member), so a kept report names nobody.
+   */
+  isKept: boolean;
   /** Whether the switch to the platform's net can rest on it (server's rule), `null` before it said. */
   clean: boolean | null;
   platformName: string;
@@ -118,7 +125,7 @@ export function CheckReport({
         <ul className="sf-notes">
           {report.notes.map((note) => (
             <li key={JSON.stringify(note)} className="sf-warn">
-              {noteText(note, platformName, chatters, memberName, report.chatters)}
+              {noteText(note, platformName, chatters, isKept ? () => null : memberName, report.chatters)}
             </li>
           ))}
         </ul>
@@ -174,7 +181,7 @@ export function CheckReport({
           <p className="sv-muted sf-small">
             {report.days.length === 0
               ? 'Aucune vente sur ces jours, dans aucune source.'
-              : `Sur ${String(report.days.length)} jours de ventes par modèle, chaque source dit le chiffre du registre.`}
+              : `Sur ${plural(report.days.length, 'jour', 'jours')} de ventes par modèle, chaque source dit le chiffre du registre.`}
           </p>
         ) : (
           <ul className="sf-gaps">

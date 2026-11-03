@@ -46,4 +46,4 @@ La bascule elle-même (CRM-03).
 03/11/2026, Extension, PR 3 (le dernier rapport réaffiché) :
 - Au retour sur Réglages › Ventes, le dernier rapport gardé (`GET …/check`, #426) s'affiche sous le formulaire, avec sa date (« Vérifié il y a 3 h ») et l'avance du registre sur la vérification (« registre lu 2 min avant ») ; une vérification lancée depuis le remplace.
 - Ce que le rapport dit de la bascule vient du serveur (`clean`, relu après chaque vérification) : une ligne discrète quand il pourra la porter, ambre quand tout concorde mais pas sur une quinzaine entière, ou qu'une note reste à régler. Les « Autres jours » rappellent que la bascule demandera une quinzaine entière.
-- La note d'un bot relié à un membre suit le lien que le rapport a vu (`chatters[].link`), pas celui posé depuis.
+- La note d’un bot relié à un membre suit le lien que le rapport a vu (`chatters[].link`), pas celui posé depuis ; sur un rapport gardé, elle ne nomme pas le membre, que le rapport ne garde pas.

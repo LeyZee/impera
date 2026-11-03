@@ -29,6 +29,8 @@ interface Shown {
   /** `null` until the server said whether the switch can rest on it. */
   readonly clean: boolean | null;
   readonly at: Date;
+  /** Read back on return, not run on this visit. */
+  readonly isKept: boolean;
 }
 
 interface ChosenExport {
@@ -78,7 +80,9 @@ export function CheckPanel({
     fetchLastCheck(platform).then(
       ({ last }) => {
         if (!isCurrent || last === null) return;
-        setResult((before) => before ?? { report: last.report, clean: last.clean, at: new Date() });
+        setResult(
+          (before) => before ?? { report: last.report, clean: last.clean, at: new Date(), isKept: true },
+        );
       },
       () => undefined,
     );
@@ -123,7 +127,7 @@ export function CheckPanel({
         (answer) => {
           if (answer.ok) {
             const { report } = answer;
-            setResult({ report, clean: null, at: new Date() });
+            setResult({ report, clean: null, at: new Date(), isKept: false });
             // Whether the switch can rest on it is the server's rule: read back with the report it kept.
             fetchLastCheck(platform).then(
               ({ last }) => {
@@ -318,6 +322,7 @@ export function CheckPanel({
       {result === null ? null : (
         <CheckReport
           report={result.report}
+          isKept={result.isKept}
           clean={result.clean}
           platformName={name}
           models={models}
