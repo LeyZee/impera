@@ -84,6 +84,8 @@
 }
 .cf-guide > summary,
 .cf-older > summary {
+  /* A fold is a target like any other: 44px tall to the finger, its marker kept (no flex on a summary). */
+  padding-block: var(--nv-space-3);
   cursor: pointer;
   font-size: var(--nv-text-footnote);
   font-weight: 600;
