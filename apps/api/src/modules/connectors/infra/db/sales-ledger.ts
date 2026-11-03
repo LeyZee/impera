@@ -351,11 +351,29 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
                 eq(table.platform, platform),
                 sql`${table.occurredAt} >= ${from}`,
                 sql`(${table.event} = 'refund' or ${table.occurredAt} < ${to})`,
+                // A released line moved to the register when its model was linked: counted there, once.
+                table === quarantine ? sql`${quarantine.releasedAt} is null` : undefined,
               ),
             );
           return rows.map((row) => ({ ...row, event: SaleEventSchema.parse(row.event), linked }));
         };
         return [...(await read(sales, true)), ...(await read(quarantine, false))];
+      });
+    },
+
+    firstLineAt(platform) {
+      return withAdmin(adminDb, async (tx) => {
+        const oldest = async (table: typeof sales | typeof quarantine): Promise<Date | null> => {
+          const [row] = await tx
+            .select({ at: table.occurredAt })
+            .from(table)
+            .where(eq(table.platform, platform))
+            .orderBy(table.occurredAt)
+            .limit(1);
+          return row?.at ?? null;
+        };
+        const found = [await oldest(sales), await oldest(quarantine)].filter((at): at is Date => at !== null);
+        return found.length === 0 ? null : new Date(Math.min(...found.map((at) => at.getTime())));
       });
     },
 

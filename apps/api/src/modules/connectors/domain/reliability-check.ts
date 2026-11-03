@@ -337,6 +337,10 @@ export interface CheckSources {
       }
     | { readonly ok: false; readonly errorKind: SalesFeedErrorKind };
   readonly exported: ReadExport | null;
+  /** The register's oldest line, whatever its model; `null` when it has none. */
+  readonly firstLineAt: Date | null;
+  /** When the register was last read from the platform (its cursor), `null` never. */
+  readonly registerReadAt: Date | null;
   readonly models: readonly PlatformModel[];
   readonly modelLinks: ReadonlySet<string>;
   readonly platformChatters: readonly PlatformChatter[];
@@ -437,6 +441,9 @@ export function buildCheckReport(sources: CheckSources): SalesFeedCheckReport {
   const notes: SalesFeedCheckNote[] = [...(sources.exported?.notes ?? [])];
   if (refundsWithoutSale > 0) notes.push({ kind: 'refund_without_sale', count: refundsWithoutSale });
   if (!sources.stats.ok) notes.push({ kind: 'stats_unavailable', errorKind: sources.stats.errorKind });
+  if (sources.firstLineAt === null || dayOf(sources.firstLineAt) > from) {
+    notes.push({ kind: 'register_starts_after', firstLineAt: sources.firstLineAt?.toISOString() ?? null });
+  }
   for (const chatter of sources.platformChatters) {
     if (chatter.isBot && sources.chatterLinks.get(chatter.platformChatterId)?.kind !== 'agent') {
       notes.push({ kind: 'bot_not_linked_to_agent', platformChatterId: chatter.platformChatterId });
@@ -445,9 +452,14 @@ export function buildCheckReport(sources: CheckSources): SalesFeedCheckReport {
 
   const anyDifference =
     days.some((day) => day.differs.length > 0) || chatters.some((chatter) => chatter.differs);
+  // Something left uncompared (a source missing, a model of the export unknown, days before the register) is never
+  // a match: the switch of CRM-03 needs one.
+  const uncompared = notes.some((note) =>
+    ['stats_unavailable', 'export_unknown_model', 'register_starts_after'].includes(note.kind),
+  );
   const verdict: SalesFeedCheckVerdict = anyDifference
     ? 'mismatch'
-    : sources.stats.ok && sources.exported !== null
+    : sources.stats.ok && sources.exported !== null && !uncompared
       ? 'match'
       : 'incomplete';
 
@@ -457,6 +469,7 @@ export function buildCheckReport(sources: CheckSources): SalesFeedCheckReport {
     to,
     timeZone,
     generatedAt: sources.generatedAt.toISOString(),
+    registerReadAt: sources.registerReadAt?.toISOString() ?? null,
     verdict,
     total: {
       register: sum((day) => day.register),
@@ -506,7 +519,7 @@ function chatterRows(
       link: id === null ? null : (sources.chatterLinks.get(id)?.kind ?? null),
       register,
       stats: stat,
-      differs: stat !== null && (stat.net !== register.net || stat.sales !== register.sales),
+      differs: stat !== null && stat.net !== register.net,
     });
   }
   return rows;

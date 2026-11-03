@@ -339,7 +339,10 @@ export const SalesFeedCheckTotalsSchema = z.object({
 });
 export type SalesFeedCheckTotals = z.infer<typeof SalesFeedCheckTotalsSchema>;
 
-/** `match`: every source given says the register's figures; `incomplete`: what was compared matches, a source is missing. */
+/**
+ * `match`: the three sources say the register's figures and nothing was left uncompared; `incomplete`: what was compared
+ * matches, but a source, a model of the export or days before the register were not; `mismatch`: a net differs.
+ */
 export const SalesFeedCheckVerdictSchema = z.enum(['match', 'mismatch', 'incomplete']);
 export type SalesFeedCheckVerdict = z.infer<typeof SalesFeedCheckVerdictSchema>;
 
@@ -362,7 +365,8 @@ export type SalesFeedCheckDay = z.infer<typeof SalesFeedCheckDaySchema>;
 
 /**
  * A platform team member over the days checked (all models): what the register and the per-member statistics give,
- * with the owner's link. `platformChatterId` `null` gathers the sales of nobody. `isBot` is the platform's flag:
+ * with the owner's link. `differs` compares the net only: the count is shown, as Reveal does not say whether its
+ * `salesCount` takes a refund off. `platformChatterId` `null` gathers the sales of nobody. `isBot` is the platform's flag:
  * the agent's sales must come under the bot's own id (ADR 0050 § 5).
  */
 export const SalesFeedCheckChatterSchema = z.object({
@@ -387,6 +391,11 @@ export const SalesFeedCheckNoteSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('export_rows_outside'), count: z.number().int().min(1) }),
   /** The statistics could not be read: the register is compared with the export only. */
   z.object({ kind: z.literal('stats_unavailable'), errorKind: SalesFeedErrorKindSchema }),
+  /**
+   * The register's oldest line is after the first day checked: the reading has not reached back that far (a key just
+   * connected), or nothing was sold before. The days before `firstLineAt` cannot agree; they are not a divergence.
+   */
+  z.object({ kind: z.literal('register_starts_after'), firstLineAt: z.iso.datetime().nullable() }),
 ]);
 export type SalesFeedCheckNote = z.infer<typeof SalesFeedCheckNoteSchema>;
 
@@ -401,6 +410,11 @@ export const SalesFeedCheckReportSchema = z.object({
   to: z.iso.date(),
   timeZone: z.string().min(1),
   generatedAt: z.iso.datetime(),
+  /**
+   * When the register was last read from the platform. The export, downloaded by hand, should be taken just before
+   * the check: a sale or a refund after it is in the register and the statistics, not in the file.
+   */
+  registerReadAt: z.iso.datetime().nullable(),
   verdict: SalesFeedCheckVerdictSchema,
   total: z.object({
     register: SalesFeedCheckTotalsSchema,
@@ -425,6 +439,7 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_delivery_unauthenticated',
   'sales_feed_webhook_not_found',
   'sales_feed_export_unprocessable',
+  'sales_feed_check_days_unprocessable',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;

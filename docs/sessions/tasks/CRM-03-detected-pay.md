@@ -34,3 +34,5 @@ Prototype de l'espace chatteur pour l'option 3 : https://claude.ai/artifact/Lc2y
 Le rapprochement d'un rapport déclaré (CR-09), les signaux hors shift (CRM-05).
 
 ## Notes de session
+
+03/11/2026, Bilan, après la relecture Équipe de la vérification (CRM-02, #416) : la bascule d'un compte en « détectée » exige un rapport `match` sur une quinzaine passée, sans note `bot_not_linked_to_agent` ni `export_unknown_model`.

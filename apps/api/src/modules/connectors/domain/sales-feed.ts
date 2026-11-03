@@ -259,6 +259,8 @@ export interface SalesLedger {
    * (excluded), and every refund read since `from`, whatever its sale. No fan data.
    */
   checkLines(platform: Platform, from: Date, to: Date): Promise<readonly CheckLine[]>;
+  /** The register's oldest line (recorded or quarantined), `null` when it has none: how far back the reading went. */
+  firstLineAt(platform: Platform): Promise<Date | null>;
   memberExists(memberId: string): Promise<boolean>;
   linkChatter(
     platform: Platform,

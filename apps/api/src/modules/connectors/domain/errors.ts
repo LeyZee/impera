@@ -117,3 +117,13 @@ export class SalesFeedExportUnprocessable extends DomainError {
     super('sales_feed_export_unprocessable', `Export illisible : ${problem}`, { details });
   }
 }
+
+/** The days checked must be over in the platform's zone (422): today's sales still reach the register. */
+export class SalesFeedCheckDaysUnprocessable extends DomainError {
+  constructor() {
+    super(
+      'sales_feed_check_days_unprocessable',
+      'Choisis des jours déjà terminés : la journée en cours bouge encore',
+    );
+  }
+}

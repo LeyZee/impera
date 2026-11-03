@@ -200,6 +200,29 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect(JSON.stringify(report)).not.toContain('fan_test');
   });
 
+  it('counts a quarantined sale once after its model is linked and its line released to the register', async () => {
+    const creator = newId(CreatorIdSchema);
+    const account = newId(PlatformAccountIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: creator, nameKey: 'autre_test', displayName: 'Autre test', timezone: 'Europe/Paris' });
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: account, creatorId: creator, platform: 'reveal', handle: 'autre_test' });
+    const linked = await server.inject({
+      method: 'PUT',
+      url: '/v1/settings/sales-feeds/reveal/models/model_test_02',
+      headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+      payload: { platformAccountId: account },
+    });
+    expect(linked.statusCode).toBe(200);
+    const report = SalesFeedCheckReportSchema.parse((await check({ ...DAYS, export: EXPORT })).json());
+    expect(
+      report.days.find((day) => day.date === '2026-10-21' && day.platformModelId === 'model_test_02'),
+    ).toMatchObject({ linked: true, register: { net: 800 }, differs: [] });
+    expect(report).toMatchObject({ verdict: 'match', total: { register: { net: 4000 } } });
+  });
+
   it('says where a source differs: a sale Reveal has and the register not yet, an export that is off', async () => {
     crm.sell({ id: 'sale_check_06', createdAt: '2026-10-23T08:00:00.000Z' });
     const offExport = EXPORT.replace(
@@ -234,7 +257,11 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect(unreadable.json()).toMatchObject({ error: { details: { column: 'net', line: 2 } } });
   });
 
-  it('checks a month at most, from before to', async () => {
+  it('checks days that are over, a month at most, from before to', async () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+    const inProgress = await check({ from: '2026-10-20', to: today, export: null });
+    expect(inProgress.statusCode).toBe(422);
+    expect(inProgress.json()).toMatchObject({ error: { code: 'sales_feed_check_days_unprocessable' } });
     expect((await check({ from: '2026-10-01', to: '2026-11-15', export: null })).statusCode).toBe(400);
     expect((await check({ from: '2026-10-23', to: '2026-10-20', export: null })).statusCode).toBe(400);
   });

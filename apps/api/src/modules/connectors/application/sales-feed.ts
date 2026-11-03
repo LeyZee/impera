@@ -1,4 +1,5 @@
 import {
+  calendarDayAt,
   ok,
   err,
   type LinkSalesFeedChatterBody,
@@ -15,6 +16,7 @@ import {
 
 import {
   SalesFeedAccountUnprocessable,
+  SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
   SalesFeedMemberUnprocessable,
   SalesFeedModelConflict,
@@ -469,6 +471,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     async check(platform, body) {
       const feed = await liveFeed(platform);
       if (feed === null) throw new SalesFeedNotConnected();
+      if (body.to >= calendarDayAt(clock.now(), feed.timeZone)) throw new SalesFeedCheckDaysUnprocessable();
       const models = await feed.listModels();
       if (!models.ok) return err(refusal(errorKindOf(models.failure)));
       const exported =
@@ -482,12 +485,14 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
             });
       const stats = await checkStats(feed, { from: body.from, to: body.to });
       const platformChatters = await feed.listChatters();
-      const [lines, modelLinks, chatterLinks] = await Promise.all([
+      const [lines, firstLineAt, cursor, modelLinks, chatterLinks] = await Promise.all([
         ledger.checkLines(
           platform,
           new Date(Date.parse(`${body.from}T00:00:00Z`) - DAY_MS),
           new Date(Date.parse(`${body.to}T00:00:00Z`) + 2 * DAY_MS),
         ),
+        ledger.firstLineAt(platform),
+        ledger.cursorOf(platform),
         ledger.modelLinks(platform),
         ledger.chatterLinks(platform),
       ]);
@@ -501,6 +506,8 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
           lines,
           stats,
           exported,
+          firstLineAt,
+          registerReadAt: cursor.readAt,
           models: models.value,
           modelLinks: new Set(modelLinks.keys()),
           platformChatters: platformChatters.ok ? platformChatters.value : [],

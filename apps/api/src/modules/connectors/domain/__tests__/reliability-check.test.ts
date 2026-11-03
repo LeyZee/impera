@@ -47,6 +47,8 @@ function sources(overrides: Partial<CheckSources> = {}): CheckSources {
     lines: [],
     stats: { ok: true, daily: [], chatters: [] },
     exported: null,
+    firstLineAt: new Date('2026-10-01T00:00:00Z'),
+    registerReadAt: new Date('2026-11-02T11:59:00Z'),
     models: MODELS,
     modelLinks: new Set(['model_test_01']),
     platformChatters: [],
@@ -254,5 +256,48 @@ describe('the reliability check', () => {
       }),
     );
     expect(report.days.map((day) => day.date)).toEqual(['2026-10-21']);
+  });
+
+  it('is never a match with days before the register or a model of the export left out', () => {
+    const exported = {
+      rows: [],
+      notes: [{ kind: 'export_unknown_model' as const, model: 'inconnue_test' }],
+    };
+    expect(buildCheckReport(sources({ exported })).verdict).toBe('incomplete');
+    const late = buildCheckReport(
+      sources({ exported: { rows: [], notes: [] }, firstLineAt: new Date('2026-10-21T08:00:00Z') }),
+    );
+    expect(late).toMatchObject({
+      verdict: 'incomplete',
+      notes: [{ kind: 'register_starts_after', firstLineAt: '2026-10-21T08:00:00.000Z' }],
+    });
+    expect(buildCheckReport(sources({ exported: { rows: [], notes: [] } })).verdict).toBe('match');
+  });
+
+  it('compares a member’s net, not the count Reveal may keep after a refund', () => {
+    const report = buildCheckReport(
+      sources({
+        lines: [line({ platformSaleId: 'sale_a' })],
+        stats: {
+          ok: true,
+          daily: [stat('2026-10-20', 800)],
+          chatters: [
+            {
+              date: '2026-10-20',
+              platformChatterId: 'chatter_test_01',
+              platformModelId: 'model_test_01',
+              salesCount: 2,
+              revenueInclVat: 1200,
+              agency: 300,
+              creator: 500,
+              ppvPurchased: 0,
+              ppvSent: null,
+              messagesSent: null,
+            },
+          ],
+        },
+      }),
+    );
+    expect(report.chatters[0]).toMatchObject({ register: { sales: 1 }, stats: { sales: 2 }, differs: false });
   });
 });
