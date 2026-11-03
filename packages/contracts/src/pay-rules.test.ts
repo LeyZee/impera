@@ -4,6 +4,7 @@ import { PayPeriodSchema } from './pay-periods';
 import {
   AccountPayRulesSchema,
   CreateAccountPayRulesBodySchema,
+  earningsBaseOf,
   PAY_RULES_ERROR_CODES,
   payRulesFor,
 } from './pay-rules';
@@ -63,5 +64,14 @@ describe('an account’s pay rules', () => {
     for (const code of PAY_RULES_ERROR_CODES) {
       expect(code).toMatch(/_(not_found|invalid|conflict|forbidden)$/u);
     }
+  });
+});
+
+describe('the base of an account’s sales (ADR 0050 § 8)', () => {
+  it('is the platform’s net only for a detected account of a platform that gives one', () => {
+    expect(earningsBaseOf('reveal', 'detected')).toBe('platform_net');
+    expect(earningsBaseOf('reveal', 'declared')).toBe('gross_chain');
+    expect(earningsBaseOf('onlyfans', 'detected')).toBe('gross_chain');
+    expect(earningsBaseOf('onlyfans', 'declared')).toBe('gross_chain');
   });
 });

@@ -381,7 +381,10 @@ export type SalesFeedCheckChatter = z.infer<typeof SalesFeedCheckChatterSchema>;
 
 /** What the owner should know beside the figures; never a fan's data. */
 export const SalesFeedCheckNoteSchema = z.discriminatedUnion('kind', [
-  /** Refunds in the days whose sale is older than the register: the statistics took them from a day not read. */
+  /**
+   * Refunds in the days whose sale is not among the lines read: a sale before the days checked, or older than the
+   * register. The statistics took them off that sale's day, outside the days compared.
+   */
   z.object({ kind: z.literal('refund_without_sale'), count: z.number().int().min(1) }),
   /** A bot of the platform not linked to the agent: its sales would count for nobody, or for a member. */
   z.object({ kind: z.literal('bot_not_linked_to_agent'), platformChatterId: z.string().min(1) }),
