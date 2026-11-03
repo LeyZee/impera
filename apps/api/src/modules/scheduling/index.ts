@@ -15,6 +15,7 @@ import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
+import { createCreatorOnDutyRoutes, createDrizzleCreatorOnDuty } from './infra/creator-on-duty';
 import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
@@ -170,7 +171,11 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       shifts: shiftsForPay,
       accessMarginMinutes: accessMarginMinutesForPay,
     },
-    routes: (requireRole) => createSchedulingRoutes(services, requireRole),
+    routes: (requireRole) => async (app, options) => {
+      await createSchedulingRoutes(services, requireRole)(app, options);
+      // Her « qui est en poste » (CR-02): the creator's own door, never the team's routes.
+      await createCreatorOnDutyRoutes(createDrizzleCreatorOnDuty(deps.db), requireRole, now)(app, options);
+    },
     jobs: {
       makeShifts: (logger) => makeShifts(admin, logger, now()),
       lapseSwaps: () => colleagues.lapseSwapsUnscoped(now()),
