@@ -180,7 +180,7 @@ Les principes qui tiennent tout ([`docs/architecture/overview.md`](docs/architec
 | Interface | Vite, React 19, TanStack Router et Query, Tailwind v4, PWA |
 | Extension | WXT (Chrome, Manifest V3) |
 | Qualité | Vitest, Testcontainers, évaluations maison avec juge LLM |
-| Hébergement | Docker, Coolify, Neon, export chiffré hors Neon |
+| Hébergement | Docker, Coolify, Neon, export chiffré hors Neon ([ADR 0027](docs/adr/0027-production-deployment.md)) |
 
 ### Interface
 
