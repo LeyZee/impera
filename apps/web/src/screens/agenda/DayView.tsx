@@ -1,13 +1,19 @@
 import type { CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
 import { CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
-import type { JSX, KeyboardEvent } from 'react';
+import {
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 
 import type { AddPreset } from './AddDialog';
 import { SuggestionCard } from './SuggestionCard';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { firstOf, momentOf, planOf, programOf, progressOf, type DayPlan, type DayTask } from './model';
 
-import { clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
+import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 
 const WEEKDAY_SHORT = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'] as const;
@@ -30,22 +36,29 @@ export function DayView({
   agenda,
   day,
   monday,
+  wide,
   onDay,
   ...actions
 }: {
   agenda: CreatorAgenda;
   day: string;
   monday: string;
+  /** A computer: the proportional bar of her day under the glance. */
+  wide: boolean;
   onDay: (day: string | null) => void;
 } & DayActions): JSX.Element {
   const now = useNow();
   const plan = planOf(agenda, day);
   const isToday = day === agenda.today;
   const nowMinute = isToday ? minuteOf(now, agenda.timeZone) : null;
+  const swipe = useSwipe((step) => {
+    onDay(addDays(day, step));
+  });
   return (
-    <div className="ag-day">
+    <div className="ag-day" data-slide={swipe.slide} {...swipe.handlers}>
       <DayStrip agenda={agenda} monday={monday} day={day} onDay={onDay} />
       <Glance plan={plan} agenda={agenda} nowMinute={nowMinute} />
+      {wide ? <Frieze plan={plan} nowMinute={nowMinute} onTask={actions.onTask} /> : null}
       {plan.suggestions.length === 0 ? null : (
         <section className="ag-sec" aria-label="Propositions de l’agence">
           {plan.suggestions.map((suggestion) => (
@@ -442,5 +455,131 @@ function Program({
         );
       })}
     </ol>
+  );
+}
+
+/** A horizontal swipe this long, and this much wider than tall, changes the day; anything else is a scroll. */
+const SWIPE_PX = 56;
+const SWIPE_RATIO = 1.4;
+
+/**
+ * Her finger slid sideways on her day: the next or the previous day (CR-05 b2). Only a touch, only once it is clearly
+ * sideways, so that the page still scrolls; the arrows and the strip do the same with a click or the keyboard.
+ */
+function useSwipe(onStep: (step: 1 | -1) => void): {
+  readonly slide: 'next' | 'previous' | undefined;
+  readonly handlers: {
+    onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+    onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+    onPointerCancel: () => void;
+    onClickCapture: (event: { preventDefault: () => void; stopPropagation: () => void }) => void;
+  };
+} {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(0);
+  const [slide, setSlide] = useState<'next' | 'previous' | undefined>(undefined);
+  return {
+    slide,
+    handlers: {
+      onPointerDown: (event) => {
+        start.current = event.pointerType === 'mouse' ? null : { x: event.clientX, y: event.clientY };
+      },
+      onPointerUp: (event) => {
+        const from = start.current;
+        start.current = null;
+        if (from === null) return;
+        const dx = event.clientX - from.x;
+        const dy = event.clientY - from.y;
+        if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
+        swiped.current = Date.now();
+        const step = dx < 0 ? 1 : -1;
+        setSlide(step === 1 ? 'next' : 'previous');
+        onStep(step);
+      },
+      onPointerCancel: () => {
+        start.current = null;
+      },
+      // The tap at the end of a swipe is the swipe's: no task opens under the finger.
+      onClickCapture: (event) => {
+        if (Date.now() - swiped.current < 350) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      },
+    },
+  };
+}
+
+/**
+ * Her day at a glance on a computer (CR-05: « une barre proportionnelle seulement sur ordinateur »): her timed tasks
+ * laid on the hours of her day, now marked. A task opens on a click. Hidden from a screen reader: the Programme says
+ * the same in order.
+ */
+function Frieze({
+  plan,
+  nowMinute,
+  onTask,
+}: {
+  plan: DayPlan;
+  nowMinute: number | null;
+  onTask: DayActions['onTask'];
+}): JSX.Element | null {
+  if (plan.timed.length === 0) return null;
+  const marks = [
+    ...plan.timed.flatMap((item) => [item.start, item.end]),
+    ...(nowMinute === null ? [] : [nowMinute]),
+  ];
+  let from = Math.max(7 * 60, Math.floor(Math.min(...marks) / 60) * 60 - 60);
+  let to = Math.min(24 * 60, Math.ceil(Math.max(...marks) / 60) * 60 + 60);
+  if (to - from < 6 * 60) to = Math.min(24 * 60, from + 6 * 60);
+  if (to - from < 6 * 60) from = Math.max(0, to - 6 * 60);
+  const at = (minute: number): number => ((Math.max(from, Math.min(to, minute)) - from) / (to - from)) * 100;
+  return (
+    <section className="ag-frieze nv-plate" aria-hidden="true">
+      <div className="ag-frieze__track">
+        {plan.timed.map((item, index) => {
+          const live = nowMinute !== null && item.start <= nowMinute && nowMinute < item.end;
+          const past = nowMinute !== null && item.end <= nowMinute;
+          return (
+            <button
+              key={item.task.id}
+              type="button"
+              tabIndex={-1}
+              className="ag-frieze__task"
+              data-cat={item.task.category}
+              data-live={live ? 'true' : undefined}
+              data-past={past ? 'true' : undefined}
+              data-done={item.done ? 'true' : undefined}
+              style={{
+                left: `${at(item.start).toFixed(2)}%`,
+                width: `calc(${(at(item.end) - at(item.start)).toFixed(2)}% - 3px)`,
+                animationDelay: `${String(index * 70)}ms`,
+              }}
+              title={`${item.task.title} · ${clockOf(item.start)} – ${clockOf(item.end % 1440)}`}
+              onClick={() => {
+                onTask(item.task, plan.day);
+              }}
+            >
+              <span className="ag-frieze__emoji">{CATEGORY_EMOJI[item.task.category]}</span>
+              <span className="ag-frieze__title">{item.task.title}</span>
+            </button>
+          );
+        })}
+        {nowMinute !== null && nowMinute > from && nowMinute < to ? (
+          <span className="ag-frieze__now" style={{ left: `${at(nowMinute).toFixed(2)}%` }}>
+            <em className="nv-num">{clockOf(nowMinute)}</em>
+          </span>
+        ) : null}
+      </div>
+      <div className="ag-frieze__hours">
+        {Array.from({ length: Math.floor((to - from) / 60) + 1 }, (_, index) => from + index * 60).map(
+          (minute) => (
+            <span key={minute} className="nv-num" style={{ left: `${at(minute).toFixed(2)}%` }}>
+              {clockOf(minute % 1440)}
+            </span>
+          ),
+        )}
+      </div>
+    </section>
   );
 }

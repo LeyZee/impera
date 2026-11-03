@@ -15,7 +15,7 @@ import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { AgendaPage } from './screens/agenda/AgendaPage';
-import { parseAgendaSearch, viewOf } from './screens/agenda/search';
+import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
@@ -230,8 +230,8 @@ const today = createRoute({
   },
 });
 /**
- * Agenda, the creator's alone (CR-05, ADR 0042 § 8): her day (`?jour=`), or her week as a list (`?vue=semaine`). Any
- * other account is sent home by the root, as this section is not on its rail.
+ * Agenda, the creator's alone (CR-05, ADR 0042 § 8): her day (`?jour=`), her week (`?vue=semaine`) or her month
+ * (`?vue=mois`). Any other account is sent home by the root, as this section is not on its rail.
  */
 const agenda = createRoute({
   getParentRoute: () => rootRoute,
@@ -257,7 +257,7 @@ const agenda = createRoute({
           void navigate({
             search: ({ jour }) => ({
               ...(jour === undefined ? {} : { jour }),
-              ...(view === 'week' ? { vue: 'semaine' as const } : {}),
+              ...vueOf(view),
             }),
           })
         }

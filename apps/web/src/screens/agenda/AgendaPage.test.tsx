@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgendaPage, type AgendaView } from './AgendaPage';
-import { agendaOf, post, WEDNESDAY } from './fixtures';
+import { agendaOf, post, shoot, WEDNESDAY } from './fixtures';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -29,6 +29,14 @@ function serve(online: () => boolean): Call[] {
       if (!online()) return Promise.reject(new TypeError('Failed to fetch'));
       if (url.startsWith('/v1/creator-space/agenda'))
         return Promise.resolve(new Response(JSON.stringify(agendaOf()), { status: 200 }));
+      if (method === 'PATCH' && url === `/v1/creator-space/tasks/${shoot.id}`) {
+        const change: unknown = calls.at(-1)?.body;
+        return Promise.resolve(
+          new Response(JSON.stringify({ ...shoot, ...(typeof change === 'object' ? change : {}) }), {
+            status: 200,
+          }),
+        );
+      }
       if (url === '/v1/creator-space/ticks')
         return Promise.resolve(
           new Response(JSON.stringify({ added: 1, streak: agendaOf().streak }), { status: 200 }),
@@ -51,6 +59,15 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
 });
+
+/** A computer's width: Semaine as a grid, Mois. */
+function wide(): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('min-width'),
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+}
 
 afterEach(() => {
   cleanup();
@@ -128,5 +145,34 @@ describe('Agenda, the creator’s (CR-05)', () => {
     expect(screen.getByRole('radio', { name: 'Une tâche' })).toBeDefined();
     fireEvent.click(screen.getByRole('radio', { name: 'Une dispo' }));
     expect(screen.getByText(/Le temps que tu ouvres à l’agence/u)).toBeDefined();
+  });
+
+  it('on a computer, shows her week as a grid of hours and her month', async () => {
+    wide();
+    serve(() => true);
+    show('week');
+    expect(
+      await screen.findByRole('button', { name: /^Tournage tenue rouge, 14\sh – 16\sh$/u }),
+    ).toBeDefined();
+    expect(screen.getByText(/Glisse sur une heure libre/u)).toBeDefined();
+    expect(screen.getByRole('radio', { name: 'Mois' })).toBeDefined();
+    cleanup();
+    show('month');
+    expect(await screen.findAllByRole('gridcell')).toHaveLength(42);
+  });
+
+  it('changes the moment of a task with a button, what a drag does', async () => {
+    const calls = serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    fireEvent.click(screen.getByRole('button', { name: /^Tournage tenue rouge/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Changer le moment' }));
+    fireEvent.change(screen.getByLabelText('Jour'), { target: { value: '2026-11-05' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(calls.find((call) => call.method === 'PATCH')?.body).toEqual({
+        when: { kind: 'timed', startsAt: '2026-11-05T13:00:00.000Z', endsAt: '2026-11-05T15:00:00.000Z' },
+      });
+    });
   });
 });
