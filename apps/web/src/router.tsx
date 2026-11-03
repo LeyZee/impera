@@ -60,6 +60,7 @@ import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TestsPage } from './screens/train/TestsPage';
 import { TrainLayout } from './screens/train/TrainLayout';
+import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
@@ -147,6 +148,21 @@ const creators = createRoute({
       />
     );
   },
+});
+/**
+ * Créatrices › Structures (SC-01 lot c): the agency's script structures, the owner's alone as the server writes them;
+ * anyone else lands on Créatrices.
+ */
+const scriptStructures = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/creatrices/structures',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/creatrices', replace: true });
+    }
+  },
+  component: StructuresPage,
 });
 const tracking = createRoute({
   getParentRoute: () => rootRoute,
@@ -724,6 +740,7 @@ const routeTree = rootRoute.addChildren([
   notifications,
   dashboard,
   creators,
+  scriptStructures,
   train.addChildren([trainIndex, playground, corrections, tests]),
   tracking,
   trackingAlerts,
