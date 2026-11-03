@@ -69,9 +69,17 @@ test(
   },
 );
 
-const hasGitleaks = spawnSync('gitleaks', ['version']).error === undefined;
+const probe = spawnSync('gitleaks', ['version'], { encoding: 'utf8' });
+const installed = probe.error === undefined ? versionOf(`${probe.stdout ?? ''}${probe.stderr ?? ''}`) : null;
+/** Why the end-to-end scan cannot run here, or false when it can. */
+const noScan =
+  probe.error !== undefined
+    ? 'gitleaks absent'
+    : installed === null || !recentEnough(installed)
+      ? 'gitleaks antérieur à 8.19'
+      : false;
 
-test('refuses a push that carries an invented secret', { skip: !hasGitleaks && 'gitleaks absent' }, () => {
+test('refuses a push that carries an invented secret', { skip: noScan }, () => {
   const repo = mkdtempSync(join(tmpdir(), 'nirvana-gitleaks-'));
   const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
   try {
