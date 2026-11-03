@@ -90,7 +90,8 @@ Payload minimal par famille d'événement (clés en camelCase, jamais de contenu
 | `mode_changed` | `userId?`, `reason?`, `mode?` |
 | `kill_switch_toggled` | `scope`, `scopeId`, `active`, `reason` |
 | `follow_up_scheduled`, `follow_up_cancelled` | `jobKey`, `runAt?` |
-| `offer_made`, `sale_detected` | `offerId?`, `saleId?`, `amountMinor`, `currency` |
+| `offer_made` | `offerId?`, `saleId?`, `amountMinor`, `currency` |
+| `sale_detected` (CRM-04, publié par le registre des ventes à la première lecture d'une vente de moins de 15 minutes) | `saleId` (la ligne de `platform_sales`), `platform`, `platformAccountId`, `saleType`, `occurredAt`, `currency`, `grossInclVatMinor`, `netMinor`, `agencyMinor`, `creatorMinor`, `seller` (`member` avec `memberId`, `agent`, `unlinked` ou `none`) ; jamais le fan |
 | `script_*` | `scriptRunId`, `stepIndex?` |
 | `session_state_changed` | `platformAccountId`, `from`, `to` |
 | `budget_threshold_crossed` (outbox seulement, sans créatrice) | `kind` (`alert` \| `reached`), `spentMinor`, `capMinor`, `currency`, `day` |

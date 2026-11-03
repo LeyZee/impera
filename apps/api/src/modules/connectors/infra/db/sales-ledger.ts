@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   AuditEntryIdSchema,
+  EVENT_PAYLOADS,
   EventIdSchema,
   newId,
   SaleEventSchema,
@@ -23,6 +24,9 @@ import {
   type RecordedPage,
   type SalesLedger,
 } from '../../domain/sales-feed';
+import { ringsWhenRecorded } from '../../domain/sales-totals';
+
+import { sellerOf } from './seller';
 
 const sales = schema.platformSales;
 const quarantine = schema.platformSalesQuarantine;
@@ -93,7 +97,7 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
       };
     },
 
-    recordPage(platform, from, page, at) {
+    recordPage(platform, from, page, at, correlationId) {
       return db.transaction(async (tx): Promise<RecordedPage> => {
         const current = await lockCursor(tx, platform);
         if (current !== from) {
@@ -108,6 +112,25 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
                 .from(models)
                 .where(and(eq(models.platform, platform), sql`${models.platformModelId} in ${modelIds}`));
         const links = new Map(linkRows.map((row) => [row.platformModelId, row]));
+        const chatterIds = [
+          ...new Set(
+            page.sales.flatMap((sale) => (sale.platformChatterId === null ? [] : [sale.platformChatterId])),
+          ),
+        ];
+        const chatterRows =
+          chatterIds.length === 0
+            ? []
+            : await tx
+                .select({
+                  platformChatterId: chatters.platformChatterId,
+                  kind: chatters.kind,
+                  memberId: chatters.memberId,
+                })
+                .from(chatters)
+                .where(
+                  and(eq(chatters.platform, platform), sql`${chatters.platformChatterId} in ${chatterIds}`),
+                );
+        const chatterLinks = new Map(chatterRows.map((row) => [row.platformChatterId, row]));
         let recorded = 0;
         let quarantined = 0;
         let duplicates = 0;
@@ -134,8 +157,35 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
               })
               .onConflictDoNothing()
               .returning({ id: sales.id });
-            if (inserted.length === 1) {
+            const [line] = inserted;
+            if (line !== undefined) {
               recorded += 1;
+              // A fresh sale rings once, in the transaction that records it; one read late is late (CRM-04).
+              if (ringsWhenRecorded(values, at)) {
+                await tx.insert(schema.domainEvents).values({
+                  id: newId(EventIdSchema),
+                  creatorId: link.creatorId,
+                  type: 'sale_detected',
+                  payload: EVENT_PAYLOADS.sale_detected.parse({
+                    saleId: line.id,
+                    platform,
+                    platformAccountId: link.platformAccountId,
+                    saleType: sale.type,
+                    occurredAt: values.occurredAt.toISOString(),
+                    currency: sale.currency,
+                    grossInclVatMinor: sale.amounts.grossInclVat,
+                    netMinor: sale.amounts.net,
+                    agencyMinor: sale.amounts.agency,
+                    creatorMinor: sale.amounts.creator,
+                    seller: sellerOf(
+                      sale.platformChatterId,
+                      sale.platformChatterId === null ? undefined : chatterLinks.get(sale.platformChatterId),
+                    ),
+                  }),
+                  actor: 'system',
+                  correlationId,
+                });
+              }
               continue;
             }
             duplicates += 1;
@@ -346,6 +396,7 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
               platformModelId: table.platformModelId,
               platformChatterId: table.platformChatterId,
               grossInclVat: table.grossInclVatMinor,
+              grossExclVat: table.grossExclVatMinor,
               net: table.netMinor,
               agency: table.agencyMinor,
               creator: table.creatorMinor,

@@ -25,6 +25,7 @@ import {
   MediaAssetIdSchema,
   MessageIdSchema,
   PlatformAccountIdSchema,
+  SalesLineIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
@@ -38,7 +39,7 @@ import {
 } from './invoices';
 import { CurrencySchema } from './money';
 import { PayPeriodSchema } from './pay-periods';
-import { SalesFeedSignalSchema } from './sales-feed';
+import { SaleSellerSchema, SaleTypeSchema, SalesFeedSignalSchema } from './sales-feed';
 import { SecurityAlertPayloadSchema } from './security';
 
 /**
@@ -150,6 +151,28 @@ const commercePayload = z.object({
   saleId: z.uuid().optional(),
   amountMinor: z.number().int(),
   currency: CurrencySchema,
+});
+
+const minorAmount = z.number().int().min(0);
+
+/**
+ * A sale read in a platform's register for the first time, fresh (CRM-04): published in the transaction that records
+ * it, never for a line read again, released from quarantine or older than the ring window. The amounts are the
+ * platform's, in integer cents of `currency`; the seller is the owner's link of its chatter. Never the fan, neither his
+ * id nor his pseudo, and the creator never reads it (ADR 0053).
+ */
+const saleDetectedPayload = z.object({
+  saleId: SalesLineIdSchema,
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  saleType: SaleTypeSchema,
+  occurredAt: z.iso.datetime(),
+  currency: CurrencySchema,
+  grossInclVatMinor: minorAmount,
+  netMinor: minorAmount,
+  agencyMinor: minorAmount,
+  creatorMinor: minorAmount,
+  seller: SaleSellerSchema,
 });
 
 const scriptPayload = z.object({
@@ -306,7 +329,7 @@ export const EVENT_PAYLOADS = {
   follow_up_scheduled: followUpPayload,
   follow_up_cancelled: followUpPayload,
   offer_made: commercePayload,
-  sale_detected: commercePayload,
+  sale_detected: saleDetectedPayload,
   script_started: scriptPayload,
   script_step_sent: scriptPayload,
   script_ended: scriptPayload,
