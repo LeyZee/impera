@@ -38,6 +38,8 @@ const MODULE_DEPENDENCIES = {
   trends: ['agent'],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
   'creator-tasks': ['scheduling'],
+  // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
+  'content-drops': [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);

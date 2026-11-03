@@ -57,6 +57,7 @@ import { wireAgent } from './wiring/agent';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
+import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorTasks } from './wiring/creator-tasks';
@@ -266,6 +267,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const scheduling = wireScheduling(shared, { persona: persona.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
   const trends = wireTrends(shared, options.trendVision ?? llm.gateway);
+  const contentDrops = wireContentDrops(shared);
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
@@ -416,6 +418,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scripts.routes,
       ...trends.routes,
       ...creatorTasks.routes,
+      ...contentDrops.routes,
       ...contractors.routes,
       ...payroll.routes,
       ...invoicing.routes,

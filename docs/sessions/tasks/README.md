@@ -87,7 +87,7 @@ Branche : task/<id>-<slug>
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
 | CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | in_progress | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
-| CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo (avec les catégories de l'ADR 0055) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
+| CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | in_progress (lot a fait) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
 | CR-08 | Plan de publication du feed : la semaine préparée, acceptée d'un geste, programmée dans Reveal | espaces | blocked (capture Reveal) | CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la garde d'écriture (ADR 0018) |
 | CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (total inhabituel) ; blocked (signaux par vente, rapprochement) | EQ-03 ; CR-03 pour les signaux par vente ; CRM-01 et CRM-03 pour le rapprochement |
@@ -120,6 +120,7 @@ Branche : task/<id>-<slug>
 | CRM-04 | Ventes en direct : alertes Telegram, bilan et revenus de la créatrice | API CRM | todo | CRM-01 |
 | CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | todo | CRM-01, CRM-03 pour les ventes en attente |
 | CRM-06 | CA de l'agent et achats dans la mémoire du fan | API CRM | todo | CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire |
+| CRM-07 | Importer les créatrices depuis Reveal, après revue du propriétaire | API CRM | todo | CRM-01 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
