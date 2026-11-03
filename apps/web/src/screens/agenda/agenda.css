@@ -1098,6 +1098,8 @@
 /* ── Jour: a swipe changes the day (touch only, never against the scroll) ─────────────────────────────────────── */
 .ag-day {
   touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 .ag-day[data-slide='next'] > :not(.ag-strip) {
   animation: ag-from-right var(--nv-dur-base) var(--nv-ease-out);
@@ -1381,6 +1383,8 @@
   );
   cursor: cell;
   touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1400,11 +1404,10 @@
   position: absolute;
   top: 5px;
   left: 8px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+  color: var(--nv-ink-muted);
 }
 .ag-wk__ev {
   appearance: none;
@@ -1425,6 +1428,8 @@
   text-align: left;
   cursor: grab;
   touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
   background: color-mix(in srgb, var(--ag-c) 24%, var(--nv-surface-raised));
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 38%, transparent),

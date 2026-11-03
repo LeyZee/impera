@@ -85,6 +85,12 @@ export function WeekGrid({
   const columns = useRef(new Map<string, HTMLDivElement>());
   const press = useRef<Press | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // What the pointer handlers read: the drag as it is now, not as the last render saw it.
+  const current = useRef<Drag | null>(null);
+  const put = (next: Drag | null): void => {
+    current.current = next;
+    setDrag(next);
+  };
   const dragged = useRef(0);
   const root = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -138,11 +144,11 @@ export function WeekGrid({
       // A browser without vibration.
     }
     if (held.item === null) {
-      setDrag({ kind: 'create', day: held.day, from: at, span: createdSpan(at, at, hours) });
+      put({ kind: 'create', day: held.day, from: at, span: createdSpan(at, at, hours) });
       return;
     }
     const item = { start: held.item.start, end: Math.min(held.item.end, hours.last * 60) };
-    setDrag({ kind: 'move', task: held.item.task, day: held.day, grab: at - item.start, item, span: item });
+    put({ kind: 'move', task: held.item.task, day: held.day, grab: at - item.start, item, span: item });
   };
 
   const onPointerDown = (
@@ -183,22 +189,22 @@ export function WeekGrid({
       start(held);
     }
     event.currentTarget.setPointerCapture(held.pointer);
-    setDrag((before) => {
-      if (before === null) return before;
-      if (before.kind === 'create') {
-        const column = columns.current.get(before.day);
-        if (column === undefined) return before;
-        const at = minuteAt(event.clientY, column.getBoundingClientRect(), hours);
-        return { ...before, span: createdSpan(before.from, at, hours) };
-      }
-      const under = columnAt(event.clientX);
-      if (under === null) return before;
-      const [day, rect] = under;
-      return {
-        ...before,
-        day,
-        span: movedSpan(before.item, minuteAt(event.clientY, rect, hours) - before.grab, hours),
-      };
+    const before = current.current;
+    if (before === null) return;
+    if (before.kind === 'create') {
+      const column = columns.current.get(before.day);
+      if (column === undefined) return;
+      const at = minuteAt(event.clientY, column.getBoundingClientRect(), hours);
+      put({ ...before, span: createdSpan(before.from, at, hours) });
+      return;
+    }
+    const under = columnAt(event.clientX);
+    if (under === null) return;
+    const [day, rect] = under;
+    put({
+      ...before,
+      day,
+      span: movedSpan(before.item, minuteAt(event.clientY, rect, hours) - before.grab, hours),
     });
   };
 
@@ -206,12 +212,12 @@ export function WeekGrid({
     const held = press.current;
     if (held?.timer !== null && held?.timer !== undefined) window.clearTimeout(held.timer);
     press.current = null;
-    setDrag(null);
+    put(null);
   };
 
   const onPointerUp = (): void => {
     const held = press.current;
-    const done = drag;
+    const done = current.current;
     cancel();
     if (held === null || !held.started || done === null) return;
     dragged.current = Date.now();

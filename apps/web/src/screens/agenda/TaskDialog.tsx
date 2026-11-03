@@ -169,9 +169,14 @@ function MoveForm({
   const [end, setEnd] = useState(when.kind === 'timed' ? minuteOf(when.endsAt, zone) : 11 * 60);
   const { unreadable, onUnreadable } = useUnreadableTimes();
   const [busy, setBusy] = useState(false);
+  const [badDay, setBadDay] = useState(false);
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
-    if (unreadable || !/^\d{4}-\d{2}-\d{2}$/u.test(day)) return;
+    if (unreadable) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(day)) {
+      setBadDay(true);
+      return;
+    }
     setBusy(true);
     void moveTask(
       client,
@@ -194,10 +199,18 @@ function MoveForm({
           className="nv-field__control nv-glass tm-date"
           value={day}
           data-autofocus
+          aria-invalid={badDay ? 'true' : undefined}
+          aria-describedby={badDay ? `${id}-day-error` : undefined}
           onChange={(event) => {
             setDay(event.target.value);
+            setBadDay(false);
           }}
         />
+        {badDay ? (
+          <p id={`${id}-day-error`} className="tm-hint tm-hint--error" role="alert">
+            Ce jour ne se lit pas : choisis-le dans le calendrier.
+          </p>
+        ) : null}
       </div>
       {timed ? (
         <div className="ag-hours">

@@ -529,7 +529,7 @@ function Frieze({
     ...plan.timed.flatMap((item) => [item.start, item.end]),
     ...(nowMinute === null ? [] : [nowMinute]),
   ];
-  let from = Math.max(7 * 60, Math.floor(Math.min(...marks) / 60) * 60 - 60);
+  let from = Math.max(0, Math.floor(Math.min(...marks) / 60) * 60 - 60);
   let to = Math.min(24 * 60, Math.ceil(Math.max(...marks) / 60) * 60 + 60);
   if (to - from < 6 * 60) to = Math.min(24 * 60, from + 6 * 60);
   if (to - from < 6 * 60) from = Math.max(0, to - 6 * 60);

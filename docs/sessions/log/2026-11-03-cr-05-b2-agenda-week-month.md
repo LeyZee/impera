@@ -20,3 +20,5 @@ Fait :
 - `grid.test.ts` (7 tests : heures, couloirs, minute sous le pointeur, création, déplacement, mois) ;
 - `AgendaPage.test.tsx` : grille et mois sur ordinateur, « Changer le moment » envoie le bon `PATCH` (33 tests de l'agenda au total) ;
 - captures ordinateur Nuit et Jour, glisser pour créer et pour déplacer, Mois, frise, « Changer le moment », dans les fichiers du projet (`espaces/agenda-b2/`).
+
+Après relecture d'Extension (même PR, non bloquant) : « Dispo » en caption et en encre atténuée ; la frise de Jour descend sous 7 h quand une tâche commence plus tôt ; les gestes lisent le glisser en cours par une référence (plus de lecture d'un rendu en retard) ; pas de menu d'appui long iOS sur la grille (`-webkit-touch-callout: none`) ; un jour illisible dans « Changer le moment » est dit. À essayer sur un vrai iPad : le glisser au doigt.
