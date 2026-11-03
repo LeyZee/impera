@@ -4,6 +4,7 @@ import type { JSX, KeyboardEvent } from 'react';
 
 import type { AddPreset } from './AddDialog';
 import { SuggestionCard } from './SuggestionCard';
+import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { firstOf, momentOf, planOf, programOf, progressOf, type DayPlan, type DayTask } from './model';
 
 import { clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
@@ -225,7 +226,8 @@ function Glance({
               `${String(done)} sur ${String(total)}, bravo.`
             ) : (
               <>
-                Commence par : <b>{first.title}</b>
+                Commence par : <Emoji category={first.category} />
+                <b>{first.title}</b>
               </>
             )}
           </span>
@@ -245,14 +247,18 @@ function Glance({
           {moment.kind === 'live' ? (
             <>
               <i className="ag-pulse" data-cat={moment.task.category} aria-hidden="true" />
-              En cours : <b>{moment.task.title}</b> · reste{' '}
-              <span className="nv-num">{lengthOf(moment.left * MINUTE_MS)}</span>
+              <span>
+                En cours : <Emoji category={moment.task.category} />
+                <b>{moment.task.title}</b> · reste{' '}
+                <span className="nv-num">{lengthOf(moment.left * MINUTE_MS)}</span>
+              </span>
             </>
           ) : moment.kind === 'next' ? (
-            <>
-              Ensuite : <b>{moment.task.title}</b> à <span className="nv-num">{clockOf(moment.at)}</span> ·{' '}
+            <span>
+              Ensuite : <Emoji category={moment.task.category} />
+              <b>{moment.task.title}</b> à <span className="nv-num">{clockOf(moment.at)}</span> ·{' '}
               <span className="nv-num">dans {lengthOf(moment.in * MINUTE_MS)}</span>
-            </>
+            </span>
           ) : (
             'Plus rien à heure aujourd’hui.'
           )}
@@ -262,6 +268,15 @@ function Glance({
         <p className="ag-glance__risk">Coche ta routine aujourd’hui pour garder ta série.</p>
       ) : null}
     </section>
+  );
+}
+
+/** A category's emoji inside a sentence, decoration only. */
+function Emoji({ category }: { category: CreatorTask['category'] }): JSX.Element {
+  return (
+    <span className="ag-emoji" aria-hidden="true">
+      {CATEGORY_EMOJI[category]}
+    </span>
   );
 }
 
@@ -304,7 +319,7 @@ function TaskRow({
   const { task } = item;
   return (
     <li className="ag-task" data-cat={task.category} data-done={item.done ? 'true' : undefined}>
-      <Check item={item} day={day} onTick={onTick} />
+      <CategoryMark category={task.category} />
       <button
         type="button"
         className="ag-task__body"
@@ -321,6 +336,7 @@ function TaskRow({
       <span className="ag-tag">
         {task.when.kind === 'routine' ? 'Routine' : CREATOR_TASK_CATEGORY_LABELS[task.category]}
       </span>
+      <Check item={item} day={day} onTick={onTick} />
     </li>
   );
 }
@@ -392,7 +408,7 @@ function Program({
               <span>{clockOf(item.end)}</span>
             </span>
             <div className="ag-slot" data-cat={item.task.category} data-done={item.done ? 'true' : undefined}>
-              <Check item={item} day={plan.day} onTick={actions.onTick} />
+              <CategoryMark category={item.task.category} />
               <button
                 type="button"
                 className="ag-task__body"
@@ -420,6 +436,7 @@ function Program({
                   </span>
                 )}
               </button>
+              <Check item={item} day={plan.day} onTick={actions.onTick} />
             </div>
           </li>
         );

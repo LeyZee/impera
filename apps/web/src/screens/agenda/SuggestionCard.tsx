@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
 import { acceptSuggestion, AGENDA_KEY } from './api';
+import { CategoryMark } from './category';
 import { whenWords } from './words';
 
 import { lengthOf } from '@/scheduling/time';
@@ -54,15 +55,20 @@ export function SuggestionCard({
   };
   return (
     <article className="ag-proposal nv-plate" data-cat={suggestion.category}>
-      <span className="ag-proposal__tag">Proposé par l’agence</span>
-      <b className="ag-proposal__title">
-        {suggestion.title}
-        {suggestion.essential ? <span className="ag-ess">essentielle</span> : null}
-      </b>
-      <span className="ag-proposal__meta">
-        {CREATOR_TASK_CATEGORY_LABELS[suggestion.category]} ·{' '}
-        <span className="nv-num">{suggestedWhen(suggestion, zone)}</span>
-      </span>
+      <div className="ag-proposal__head">
+        <CategoryMark category={suggestion.category} />
+        <div className="ag-proposal__heading">
+          <span className="ag-proposal__tag">Proposé par l’agence</span>
+          <b className="ag-proposal__title">
+            {suggestion.title}
+            {suggestion.essential ? <span className="ag-ess">essentielle</span> : null}
+          </b>
+          <span className="ag-proposal__meta">
+            {CREATOR_TASK_CATEGORY_LABELS[suggestion.category]} ·{' '}
+            <span className="nv-num">{suggestedWhen(suggestion, zone)}</span>
+          </span>
+        </div>
+      </div>
       {suggestion.purpose === null ? null : <p className="ag-proposal__purpose">{suggestion.purpose}</p>}
       {failed === null ? null : (
         <p className="ag-proposal__failed" role="alert">

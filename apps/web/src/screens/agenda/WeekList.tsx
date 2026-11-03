@@ -5,6 +5,7 @@ import { useState, type JSX } from 'react';
 import type { DayActions } from './DayView';
 import { SuggestionCard } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
+import { CategoryMark } from './category';
 import { planOf, undatedOf, type DayWindow } from './model';
 
 import { clockOf, dayNumber, weekOf } from '@/scheduling/time';
@@ -94,7 +95,7 @@ export function WeekList({
                       actions.onTask(item.task, day);
                     }}
                   >
-                    <i aria-hidden="true" />
+                    <CategoryMark category={item.task.category} size="sm" />
                     <b>{item.task.title}</b>
                     <span className="nv-num">
                       {clockOf(item.start)} – {clockOf(item.end)}
@@ -112,7 +113,7 @@ export function WeekList({
                       actions.onTask(item.task, day);
                     }}
                   >
-                    <i aria-hidden="true" />
+                    <CategoryMark category={item.task.category} size="sm" />
                     <b>{item.task.title}</b>
                     <span>
                       {item.task.when.kind === 'routine'

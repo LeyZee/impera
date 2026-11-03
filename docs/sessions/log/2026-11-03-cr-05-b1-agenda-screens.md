@@ -24,3 +24,8 @@ Vérifié :
 - tests du modèle, du hors ligne, du brouillon et de l'écran (21) ;
 - `nav` et `AppShell` mis à jour ;
 - captures téléphone et ordinateur, Nuit et Jour, dans les fichiers du projet (`espaces/agenda-b1/`).
+
+Après relecture (même PR) :
+- coches hors ligne : un lot refusé ne fait oublier que les coches qu'il nomme (`details.taskIds`), les autres repartent ; 401, 403, 408 et 429 sont retentés (une session expirée est dite comme telle) ; une coche faite pendant un envoi part dans l'envoi suivant (3 tests, `api.test.ts`) ;
+- retours de Charles (03/11, 18 h 25) : plus aucune barre colorée sur le bord des cartes, chaque catégorie a sa pastille emoji sur sa couleur (`category.tsx`), « Ajouter » refait (deux cartes Une tâche / Une dispo, aperçu en direct, catégories en tuiles) ;
+- passé en encre atténuée sans opacité, pastille « essentielle » non barrée, Live en doré (l'ambre est celui des avertissements). Captures v2 dans `espaces/agenda-b1/v2/`.

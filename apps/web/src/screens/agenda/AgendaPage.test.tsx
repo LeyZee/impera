@@ -64,9 +64,9 @@ describe('Agenda, the creator’s (CR-05)', () => {
     serve(() => true);
     show();
     expect(await screen.findByText('4 choses à faire')).toBeDefined();
-    expect(screen.getByText(/Commence par/u).textContent).toBe('Commence par : Story du matin');
+    expect(screen.getByText(/Commence par/u).textContent).toBe('Commence par : 🌿Story du matin');
     expect(screen.getByText(/Ensuite/u).textContent).toMatch(
-      /^Ensuite : Tournage tenue rouge à 14\sh · dans 1\sh$/u,
+      /^Ensuite : 🎬Tournage tenue rouge à 14\sh · dans 1\sh$/u,
     );
     expect(screen.getByRole('heading', { name: 'À faire' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Programme' })).toBeDefined();

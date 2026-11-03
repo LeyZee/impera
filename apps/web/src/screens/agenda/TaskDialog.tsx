@@ -40,6 +40,7 @@ export function TaskDialog({
   };
   return (
     <Dialog
+      className="ag-scope"
       title={task.title}
       lead={`${CREATOR_TASK_CATEGORY_LABELS[task.category]} · ${whenWords(task.when, agenda.timeZone)}`}
       busy={busy}

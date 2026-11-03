@@ -3,20 +3,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { AGENDA_KEY, createAvailability, createTask } from './api';
+import { CATEGORY_EMOJI, CategoryMark } from './category';
 import {
   availabilityBodiesOf,
   dispoIds,
   newTaskId,
   taskBodyOf,
   taskProblems,
+  whenOf,
   type AvailabilityDraft,
   type AvailabilityKind,
   type TaskDraft,
   type TaskWhenKind,
 } from './draft';
+import { whenWords } from './words';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
-import { clockOf, weekdayOf } from '@/scheduling/time';
+import { clockOf, longDay, weekdayOf } from '@/scheduling/time';
 import { Dialog } from '@/screens/team/Dialog';
 import '@/screens/team/team.css';
 
@@ -205,17 +208,9 @@ export function AddDialog({
   const start = preset.start ?? 10 * 60;
   const end = preset.end ?? (start + 60) % 1440;
   return (
-    <Dialog title="Ajouter" onClose={onClose}>
+    <Dialog title="Ajouter" className="ag-scope" onClose={onClose}>
       <div className="tm-dialog__body">
-        <Choices
-          label="Quoi"
-          options={[
-            ['task', 'Une tâche'],
-            ['dispo', 'Une dispo'],
-          ]}
-          value={what}
-          onPick={setWhat}
-        />
+        <KindPicker value={what} onPick={setWhat} />
         {what === 'task' ? (
           <TaskForm
             zone={zone}
@@ -241,6 +236,117 @@ export function AddDialog({
         )}
       </div>
     </Dialog>
+  );
+}
+
+const KINDS: readonly (readonly ['task' | 'dispo', string, string, string])[] = [
+  ['task', '✅', 'Une tâche', 'Ce que tu fais : un tournage, un live, un post…'],
+  ['dispo', '🕐', 'Une dispo', 'Le temps que tu ouvres à l’agence'],
+];
+
+/** « Une tâche » or « Une dispo », as two cards: what each one is, said under it. */
+function KindPicker({
+  value,
+  onPick,
+}: {
+  value: 'task' | 'dispo';
+  onPick: (value: 'task' | 'dispo') => void;
+}): JSX.Element {
+  const id = useId();
+  return (
+    <div className="ag-kinds" role="radiogroup" aria-label="Ce que tu ajoutes">
+      {KINDS.map(([kind, emoji, label, hint]) => (
+        <button
+          key={kind}
+          type="button"
+          role="radio"
+          className="ag-kind"
+          aria-checked={kind === value}
+          aria-label={label}
+          aria-describedby={`${id}-${kind}`}
+          onClick={() => {
+            onPick(kind);
+          }}
+        >
+          <span className="ag-kind__emoji" aria-hidden="true">
+            {emoji}
+          </span>
+          <b>{label}</b>
+          <span id={`${id}-${kind}`}>{hint}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** What she is adding, as her agenda will show it: it changes as she types. */
+function Preview({ mark, title, when }: { mark: JSX.Element; title: string; when: string }): JSX.Element {
+  return (
+    <div className="ag-preview" aria-hidden="true">
+      {mark}
+      <div className="ag-preview__text">
+        <b data-empty={title === '' ? 'true' : undefined}>{title === '' ? 'Ta tâche' : title}</b>
+        <span className="nv-num">{when}</span>
+      </div>
+    </div>
+  );
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
+
+/** When a draft is, in her words, or what is missing for it to be read. */
+function draftWhen(draft: TaskDraft, zone: string): string {
+  if (draft.kind === 'routine' && draft.weekdays.length === 0) return 'Choisis les jours';
+  if (draft.kind !== 'routine' && !DAY.test(draft.day)) return 'Choisis le jour';
+  return whenWords(whenOf(draft, zone), zone);
+}
+
+const WEEKDAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] as const;
+
+function dispoWhen(draft: AvailabilityDraft): string {
+  const hours = `${clockOf(draft.start)} – ${clockOf(draft.end)}`;
+  if (draft.kind === 'once')
+    return DAY.test(draft.day) ? `${longDay(draft.day)}, ${hours}` : 'Choisis le jour';
+  if (draft.weekdays.length === 0) return 'Choisis les jours';
+  const names = [...draft.weekdays].sort((a, b) => a - b).map((one) => WEEKDAY_NAMES[one - 1] ?? '');
+  return `${names.length === 7 ? 'Chaque jour' : `Chaque ${names.join(', ')}`}, ${hours}`;
+}
+
+/** Her six categories as tiles: the emoji on its colour, the name under it. */
+function Categories({
+  value,
+  onPick,
+}: {
+  value: TaskDraft['category'];
+  onPick: (category: TaskDraft['category']) => void;
+}): JSX.Element {
+  const id = useId();
+  return (
+    <div className="nv-field tm-field">
+      <span className="nv-field__label" id={id}>
+        Catégorie
+      </span>
+      <div className="ag-cats" role="radiogroup" aria-labelledby={id}>
+        {CREATOR_TASK_CATEGORIES.map((category) => (
+          <button
+            key={category}
+            type="button"
+            role="radio"
+            className="ag-cat"
+            data-cat={category}
+            aria-checked={category === value}
+            onClick={() => {
+              onPick(category);
+            }}
+          >
+            <span className="ag-cat__emoji" aria-hidden="true">
+              {CATEGORY_EMOJI[category]}
+            </span>
+            {CREATOR_TASK_CATEGORY_LABELS[category]}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -315,12 +421,17 @@ function TaskForm({
   };
   return (
     <form className="tm-dialog__body" noValidate onSubmit={submit}>
+      <Preview
+        mark={<CategoryMark category={draft.category} size="lg" />}
+        title={draft.title.trim()}
+        when={draftWhen(draft, zone)}
+      />
       <div
         className="nv-field tm-field"
         data-invalid={tried && problems.includes('title') ? 'true' : undefined}
       >
         <label className="nv-field__label" htmlFor={`${id}-title`}>
-          Titre
+          Quoi
         </label>
         <input
           id={`${id}-title`}
@@ -337,11 +448,7 @@ function TaskForm({
           <p className="tm-hint tm-hint--error">Donne-lui un titre.</p>
         ) : null}
       </div>
-      <Choices
-        label="Catégorie"
-        options={CREATOR_TASK_CATEGORIES.map(
-          (category) => [category, CREATOR_TASK_CATEGORY_LABELS[category]] as const,
-        )}
+      <Categories
         value={draft.category}
         onPick={(category) => {
           set({ category });
@@ -459,9 +566,16 @@ function DispoForm({
   };
   return (
     <form className="tm-dialog__body" noValidate onSubmit={submit}>
-      <p className="ag-explain">
-        Le temps que tu ouvres à l’agence : elle n’y propose une tâche que là, et tu choisis toujours.
-      </p>
+      <Preview
+        mark={
+          <span className="ag-mark ag-mark--dispo" data-size="lg" aria-hidden="true">
+            🕐
+          </span>
+        }
+        title="Dispo pour l’agence"
+        when={dispoWhen(draft)}
+      />
+      <p className="ag-explain">L’agence n’y propose une tâche que là, et tu choisis toujours.</p>
       <Choices
         label="Quand"
         options={DISPO_KINDS}
