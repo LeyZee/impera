@@ -23,3 +23,24 @@ export interface InvoiceRequeue {
   /** At `at`, the first minute of `day`: a regime given from a day to come is in force only then. */
   readonly requeueOn: (tx: Transaction, memberId: TeamMemberId, day: string, at: Date) => Promise<void>;
 }
+
+/**
+ * What the file reads of the invoices (ADR 0047 § 1, ARC-07): the `invoicing` module's, plugged by the composition
+ * root, in the file's transaction.
+ */
+export interface ContractorInvoiceReads {
+  /** Whether the member has a document, any kind: his first one froze his prefix (the base's trigger says it again). */
+  readonly hasDocument: (tx: Transaction, memberId: TeamMemberId) => Promise<boolean>;
+}
+
+/**
+ * What the file reads of pay (ADR 0047 § 1, ARC-07): the `payroll` module's, plugged by the composition root, in the
+ * file's transaction.
+ */
+export interface ContractorPayReads {
+  /**
+   * The day each of these statements was paid (`YYYY-MM-DD`), for those that are paid: a statement not paid, or an id
+   * that names none, is left out.
+   */
+  readonly paidOn: (tx: Transaction, statementIds: readonly string[]) => Promise<ReadonlyMap<string, string>>;
+}

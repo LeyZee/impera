@@ -18,7 +18,12 @@ import { createDrizzleDocumentReminderStore, documentReminderDaysOf } from './in
 import { createDrizzlePayrollDocumentStore } from './infra/document-store';
 import { createDrizzlePayoutCertificateStore } from './infra/payout-certificate-store';
 import { readPng } from './infra/png';
-import type { ContractorReads, InvoiceRequeue } from './infra/ports';
+import type {
+  ContractorInvoiceReads,
+  ContractorPayReads,
+  ContractorReads,
+  InvoiceRequeue,
+} from './infra/ports';
 import { createDrizzlePayrollRegimeStore } from './infra/regime-store';
 import { createContractorRoutes, type RequireRole } from './infra/routes';
 
@@ -33,7 +38,7 @@ export type { InvoiceObjectStore } from './domain/ports';
 export { lockAtLeast, readChecked, sha256Hex } from './application/locked-objects';
 /** `payroll.lock_payout_certificate`, which recording a transfer enqueues in its transaction (ADR 0041 § 6). */
 export { enqueuePayoutCertificateLock } from './infra/queue';
-export type { InvoiceRequeue } from './infra/ports';
+export type { ContractorInvoiceReads, ContractorPayReads, InvoiceRequeue } from './infra/ports';
 /**
  * How a row of this module's tables reads, for the pay stores that still read them directly to issue and render an
  * invoice. They go when those reads go through a read port of this module (ARC-07).
@@ -41,6 +46,8 @@ export type { InvoiceRequeue } from './infra/ports';
 export { reviewOf } from './infra/document-rows';
 export { regimeVatOf } from './infra/regime-store';
 
+/** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { contractorReadsForAccounting } from './infra/accounting-reads';
 /**
  * Public entry point of the `contractors` module (ADR 0047 § 1): the contractor's file (identity, company, contract and
  * mandate, regimes, documents and their check, residence certificates, reminders, purge of refused documents) and the
@@ -83,6 +90,9 @@ export interface ContractorsDeps {
   readonly reads: ContractorReads;
   /** The invoices a change of the file may unblock: `payroll`'s, plugged by the composition root (ADR 0047 § 1). */
   readonly requeue: InvoiceRequeue;
+  /** What the file reads of the invoices and of pay: `invoicing`'s and `payroll`'s, plugged by the composition root. */
+  readonly invoices: ContractorInvoiceReads;
+  readonly pay: ContractorPayReads;
   /** The two buckets the documents are kept in. */
   readonly buckets: { readonly primary: InvoiceObjectStore; readonly copy: InvoiceObjectStore };
   readonly now?: () => Date;
@@ -104,6 +114,7 @@ export function createContractorsModule(deps: ContractorsDeps): ContractorsModul
           deps.reads,
           () => withAdmin(deps.adminDb, documentReminderDaysOf),
           deps.requeue,
+          deps.invoices,
           now,
         ),
         createDrizzlePayrollRegimeStore(deps.db, deps.reads, deps.requeue, now),
@@ -124,7 +135,7 @@ export function createContractorsModule(deps: ContractorsDeps): ContractorsModul
         ),
       lockPayoutCertificates: (statementId, logger) =>
         lockPayoutCertificates(
-          { store: createDrizzlePayoutCertificateStore(deps.adminDb), primary, copy },
+          { store: createDrizzlePayoutCertificateStore(deps.adminDb, deps.pay), primary, copy },
           statementId,
           logger,
         ),

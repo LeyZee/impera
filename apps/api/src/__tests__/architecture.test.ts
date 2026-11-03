@@ -30,15 +30,6 @@ const PAY_SCHEMAS = ['payroll.ts', 'invoices.ts'];
  * shrinks: a new read fails the test, and a read closed by a port fails it too until its line is removed here.
  */
 const OPEN_CROSSINGS = [
-  'accounting/infra/accounting-store.ts: billing_settings',
-  'accounting/infra/accounting-store.ts: carry_overs',
-  'accounting/infra/accounting-store.ts: commission_statements',
-  'accounting/infra/accounting-store.ts: contractor_profiles',
-  'accounting/infra/accounting-store.ts: invoice_pdf_copies',
-  'accounting/infra/accounting-store.ts: invoice_pdfs',
-  'accounting/infra/accounting-store.ts: invoices',
-  'contractors/infra/contractor-store.ts: invoices',
-  'contractors/infra/payout-certificate-store.ts: commission_statements',
   'invoicing/infra/invoice-acceptance-store.ts: commission_statements',
   'invoicing/infra/invoice-acceptance-store.ts: pay_adjustments',
   'invoicing/infra/invoice-pdf-store.ts: agency_logos',

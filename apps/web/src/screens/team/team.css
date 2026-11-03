@@ -337,6 +337,7 @@
 /* Closing is quiet: the page's one neon stays on « Ajouter un membre ». */
 .tm-close {
   appearance: none;
+  position: relative;
   flex: none;
   width: 36px;
   height: 36px;
@@ -353,6 +354,12 @@
     background-color var(--nv-dur-fast) var(--nv-ease-out),
     color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+/* 36px seen, 44px to touch, as the design system's close (CR-01, passe téléphone). */
+.tm-close::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 .tm-close:hover:not(:disabled) {
   background: var(--nv-select-strong);
@@ -603,7 +610,9 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: var(--nv-space-4) max(var(--nv-space-4), env(safe-area-inset-right, 0px))
+  /* A panel taller than the phone stops under the status bar, never behind it (CR-01, passe téléphone). */
+  padding: calc(var(--nv-space-4) + env(safe-area-inset-top, 0px))
+    max(var(--nv-space-4), env(safe-area-inset-right, 0px))
     calc(var(--nv-space-4) + env(safe-area-inset-bottom, 0px))
     max(var(--nv-space-4), env(safe-area-inset-left, 0px));
   background: color-mix(in srgb, var(--nv-void) 62%, transparent);

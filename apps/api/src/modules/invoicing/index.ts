@@ -43,6 +43,8 @@ import { createDrizzleSettlementStore } from './infra/settlement-store';
  * it into `contractors`, which never imports this module.
  */
 export { invoiceRequeue } from './infra/invoice-queue';
+/** What the contractors' file reads of the invoices, plugged into it by the composition root (ARC-07). */
+export { invoiceReadsForContractors } from './infra/contractor-reads';
 /**
  * What pay asks of the invoices before a transfer (`PayoutGate`) and after a validation (`AfterValidation`, with the
  * contractors' certificate lock), plugged into `payroll` by the composition root: pay never imports this module.
@@ -51,6 +53,8 @@ export { invoicesAfterValidation, payoutGate } from './infra/gates';
 /** A rendered PDF read back against its fingerprint (ADR 0037 § 7), what the accountant's archive reads. */
 export type { CheckedPdf, PdfToServe } from './application/invoice-pdfs';
 
+/** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { invoiceReadsForAccounting } from './infra/accounting-reads';
 /**
  * Public entry point of the `invoicing` module (ADR 0047 § 1): the invoices and credit notes of the contractors, their
  * issue, PDF/A and copies, acceptance, contest, cancel and corrective invoice, settlement and due dates. Other modules

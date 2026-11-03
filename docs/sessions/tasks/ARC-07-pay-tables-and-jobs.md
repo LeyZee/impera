@@ -1,5 +1,5 @@
 # ARC-07 Une table lue par son seul propriétaire, un job par tâche
-Statut : in_progress (lot a)
+Statut : in_progress (lot a fusionné, #415 ; lot b)
 Phase : exploitation
 Dépend de : ADR 0047 § 1, ARC-06
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
@@ -27,8 +27,8 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 
 - [x] a. `architecture.test.ts` : chaque table de `schema/payroll.ts` et `schema/invoices.ts` a un seul propriétaire, celui dont le README la nomme dans « Tables possédées » ; le test voit chaque table qu'un propriétaire utilise dans son code (il ne lit pas à l'aveugle) ; les lectures d'une table d'un autre module de la paie sont exactement `OPEN_CROSSINGS` ; chaque job de `JOB_NAMES`, sauf `JOBS_WITHOUT_TASK`, a sa tâche écrite une seule fois, dans un seul fichier de `wiring/` ; un job de la paie n'est mis en file (`task => '…'`) que par le module qui enregistre sa tâche, et chaque mise en file des quatre modules nomme son job en clair (sinon le test échoue au lieu de passer sans rien lire, relecture de Bilan).
 - [x] a. README d'`invoicing` : en-tête des règles pures sans `domain/accounting.ts`, première puce renvoyée au dossier, migration 0045 des PDF ; renvoi à `OPEN_CROSSINGS` dans les trois README ; `modules.md`.
-- [ ] b. Lectures de `contractors` fermées.
-- [ ] c. Lectures d'`accounting` fermées.
+- [x] b. Lectures de `contractors` fermées : `ContractorInvoiceReads.hasDocument` (`invoiceReadsForContractors` d'`invoicing`) et `ContractorPayReads.paidOn` (`payReadsForContractors` de `payroll`), branchés par `wiring/contractors.ts`.
+- [x] c. Lectures d'`accounting` fermées : `payReadsForAccounting`, `invoiceReadsForAccounting` et `contractorReadsForAccounting`, lus par l'`index.ts` de chaque propriétaire dans la transaction de l'export.
 - [ ] d. Lectures d'`invoicing` fermées ; `OPEN_CROSSINGS` vide, puis retiré.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
@@ -49,3 +49,5 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 - 02/11, lot a : le test lit les sources (Drizzle par `schema`, SQL après `from`, `join`, `into`, `update` ou `table`, commentaires retirés) et les propriétaires dans les README, pour que la doc et le test ne puissent pas diverger. Vérifié à la main qu'il échoue sur une lecture nouvelle, une tâche enregistrée deux fois et un job mis en file par un autre module.
 - 02/11, lot a : le README d'`invoicing` cite encore `stateAfterCreditNote`, qui n'existe plus dans le code (hérité d'avant ARC-03) : à reprendre avec le lot d.
 - 02/11, lot a : `crontab.ts` met aussi des jobs en file, hors des modules donc hors du test ; aujourd'hui seulement des balayages (relecture de Bilan).
+- 03/11, lot b : l'attestation d'un versement lisait relevé et pièce dans une seule jointure ; elle lit maintenant le journal et la pièce, puis le jour de chaque virement encore payé par `paidOn`, dans la même transaction, et trie comme avant (jour du virement, puis id dans l'ordre des `uuid` de Postgres). Le préfixe figé garde sa requête, déplacée chez son propriétaire.
+- 03/11, lot c : `accounting` dépend déjà des trois autres, donc il importe leurs lecteurs directement, sans port branché par le composition root. Les requêtes sont déplacées telles quelles. Les deux qui changent de forme : l'union des membres d'une période (documents puis virements, sans doublon, dans le même ordre d'arrivée, que l'export ne lit pas) et le nom figé par un document, lu par Zod au lieu de `contractor ->> 'legalName'` (`null` quand la copie n'en a pas, comme avant). Le journal lit les dossiers avec le pays de la fiche, comme la DAS2 : le propriétaire voit chaque membre, donc la jointure ne retire personne.
