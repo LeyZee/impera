@@ -35,7 +35,11 @@ import { z } from 'zod';
 
 import { PayrollForbidden } from '../../contractors/pure';
 import type { Actor } from '../../contractors/pure';
-import { PayrollOwnForbidden, type ContestCorrectionWrite } from '../../payroll';
+import {
+  payReadsForInvoicing as payReads,
+  PayrollOwnForbidden,
+  type ContestCorrectionWrite,
+} from '../../payroll';
 import {
   correctionAdjustments,
   correctionReplayed,
@@ -54,16 +58,7 @@ import type { PayrollInvoiceAcceptanceStore } from '../domain/ports';
 import { enqueueInvoiceContestAnnounce, enqueueInvoiceLapse } from './invoice-queue';
 import type { InvoicingReads } from './ports';
 
-const {
-  auditLog,
-  commissionStatements,
-  domainEvents,
-  invoiceEvents,
-  invoicePdfs,
-  invoices,
-  payAdjustments,
-  teamMembers,
-} = schema;
+const { auditLog, domainEvents, invoiceEvents, invoicePdfs, invoices, teamMembers } = schema;
 
 /** What the acceptance writes in the audit log, entity `invoice`. */
 type AcceptanceAction =
@@ -168,17 +163,22 @@ const hasStep = (kinds: SQL): SQL =>
  * What the base narrows before the list's rules run (`InvoiceListQuerySchema`): the member, the quinzaine, the days of
  * issue, and for a filter on documents still waiting, those without a settlement or without a final answer, so that
  * a list without dates stays bounded. The exact filters on `due` and `acceptance` are applied after, on the computed
- * states.
+ * states. `ofPeriod` holds the statements of the quinzaine asked, as pay gives them.
  */
-function listConditions(query: InvoiceListQuery): SQL[] {
+function listConditions(query: InvoiceListQuery, ofPeriod: readonly string[]): SQL[] {
   const conditions: SQL[] = [];
   if (query.memberId !== undefined) conditions.push(eq(invoices.memberId, query.memberId));
   // A quinzaine's documents are those its statements issued: a credit note or a corrective invoice counts with the
   // statement that owed it, not with the period it corrects and prints; one without a statement, with that period.
-  if (query.period !== undefined)
+  // A document's statement is always there (its foreign key) and readable wherever the document is (the same policy).
+  if (query.period !== undefined) {
+    const withoutStatement = and(sql`${invoices.statementId} is null`, eq(invoices.period, query.period));
     conditions.push(
-      sql`coalesce((select s.period from ${commissionStatements} s where s.id = ${invoices.statementId}), ${invoices.period}) = ${query.period}`,
+      ofPeriod.length === 0
+        ? sql`(${withoutStatement})`
+        : sql`(${inArray(invoices.statementId, [...ofPeriod])} or (${withoutStatement}))`,
     );
+  }
   if (query.from !== undefined && query.to !== undefined)
     conditions.push(sql`${invoices.issuedOn} between ${query.from} and ${query.to}`);
   if (query.due !== undefined && !query.due.includes('settled'))
@@ -198,6 +198,8 @@ async function listOf(
   timeZone: string,
   today: string,
 ): Promise<InvoiceList> {
+  const ofPeriod =
+    query.period === undefined ? [] : await payReads.idsOfPeriod(tx, query.period, query.memberId);
   const rows = await tx
     .select({
       id: invoices.id,
@@ -206,11 +208,6 @@ async function listOf(
       number: invoices.number,
       period: invoices.period,
       statementId: invoices.statementId,
-      // The quinzaine of the statement that issued it, where the screens lead. Written by hand with the outer table
-      // named: Drizzle leaves a column of a one-table select unqualified, and inside the subquery it would be ambiguous.
-      statementPeriod: sql<string | null>`(
-        select s.period::text from commission_statements s where s.id = "invoices"."statement_id"
-      )`,
       creditedInvoiceId: invoices.creditedInvoiceId,
       reissuedInvoiceId: invoices.reissuedInvoiceId,
       issuedOn: invoices.issuedOn,
@@ -221,9 +218,13 @@ async function listOf(
       deadline: invoices.acceptanceDeadline,
     })
     .from(invoices)
-    .where(and(...listConditions(query)))
+    .where(and(...listConditions(query, ofPeriod)))
     .orderBy(sql`${invoices.issuedOn} desc`, sql`${invoices.number} desc`);
   const ids = rows.map((row) => row.id);
+  // The quinzaine of the statement that issued each document, where the screens lead.
+  const periods = await payReads.periodsOf(tx, [
+    ...new Set(rows.flatMap((row) => (row.statementId === null ? [] : [row.statementId]))),
+  ]);
   const steps =
     ids.length === 0
       ? []
@@ -239,15 +240,7 @@ async function listOf(
   const settlingIds = [
     ...new Set(settling.flatMap((step) => (step.statementId === null ? [] : [step.statementId]))),
   ];
-  const transfers = new Map(
-    (settlingIds.length === 0
-      ? []
-      : await tx
-          .select({ id: commissionStatements.id, paidOn: commissionStatements.paidOn })
-          .from(commissionStatements)
-          .where(inArray(commissionStatements.id, settlingIds))
-    ).map((row) => [row.id, row.paidOn]),
-  );
+  const transfers = await payReads.paidOnOf(tx, settlingIds);
   const rendered = new Set(
     (ids.length === 0
       ? []
@@ -288,7 +281,7 @@ async function listOf(
         number: row.number,
         period: row.period,
         statementId: row.statementId,
-        statementPeriod: row.statementPeriod,
+        statementPeriod: row.statementId === null ? null : (periods.get(row.statementId) ?? null),
         creditedInvoiceId: row.creditedInvoiceId,
         issuedOn: row.issuedOn,
         dueOn: row.dueOn,
@@ -365,12 +358,8 @@ async function contestedOf(
     .select({
       number: invoices.number,
       issuedOn: invoices.issuedOn,
-      // Written by hand with the outer table named: Drizzle leaves a column of a one-table select unqualified, and
-      // inside the subquery it would name the subquery's own row.
-      statementId: sql<string | null>`(
-        select s.id from commission_statements s
-        where s.member_id = invoices.member_id and s.period = invoices.period
-      )`,
+      memberId: invoices.memberId,
+      period: invoices.period,
       exclVatMinor: invoices.exclVatMinor,
       creditedMinor: sql<string>`coalesce((
         select -sum(n.excl_vat_minor) from invoices n
@@ -379,7 +368,9 @@ async function contestedOf(
     })
     .from(invoices)
     .where(eq(invoices.id, invoiceId));
-  if (cited === undefined || cited.statementId === null)
+  const statementId =
+    cited === undefined ? null : await payReads.statementIdOf(tx, cited.memberId, cited.period);
+  if (cited === undefined || statementId === null)
     throw new Error(`Invoice of ${document.number} has no statement`);
   return {
     document: {
@@ -390,17 +381,8 @@ async function contestedOf(
         leftMinor: cited.exclVatMinor - CreditedSchema.parse(cited.creditedMinor),
       },
     },
-    correctsStatementId: cited.statementId,
+    correctsStatementId: statementId,
   };
-}
-
-/** The adjustments that corrected the document's contest, negative first, as `correctionReplayed` compares them. */
-async function correctionOf(tx: Transaction, invoiceId: string) {
-  return tx
-    .select({ amountMinor: payAdjustments.amountMinor, reason: payAdjustments.reason })
-    .from(payAdjustments)
-    .where(eq(payAdjustments.contestedInvoiceId, invoiceId))
-    .orderBy(payAdjustments.amountMinor, payAdjustments.id);
 }
 
 /** Is `userId` the contractor the document is in the name of? */
@@ -471,7 +453,12 @@ export function createDrizzlePayrollInvoiceAcceptanceStore(
           acceptanceWrite(recorded(await stepsOf(tx, document.id)), step, document.open).kind === 'replay'
         ) {
           if (
-            !correctionReplayed(contested.document, correction, reason, await correctionOf(tx, document.id))
+            !correctionReplayed(
+              contested.document,
+              correction,
+              reason,
+              await payReads.correctionOf(tx, document.id),
+            )
           ) {
             throw new InvoiceAcceptanceConflict('contest_upheld');
           }
