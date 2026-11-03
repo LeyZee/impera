@@ -43,6 +43,8 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 - `linesRelinkedBetween` : les lignes dont le lien du chatteur a pris sa version actuelle dans la plage. Relier un chatteur après une clôture est une attribution, qui compte dans la première quinzaine encore ouverte (§ 5).
 - `linesOfSales` : les lignes de ventes nommées par leur identifiant, quel que soit leur jour, chacune avec ses remboursements (ou un remboursement seul quand sa vente est plus ancienne que le registre), par lots de 500. La paie relit ainsi, dans la première quinzaine ouverte, les ventes qu'une clôture a laissées en attente et celles que le valideur a décidées (CRM-03 lot b3), qu'aucune plage ne retrouverait.
 
+`salesFeedSwitchReads.switchFactsOf`, exporté par `index.ts` (`infra/db/switch-reads.ts`), donne aux règles de paie, dans leur transaction, ce sur quoi repose la bascule d'un compte en `detected` (ADR 0050 § 8, CRM-03) : la plateforme du compte, si un modèle lui est relié, et la dernière vérification de la plateforme (propre ou non, ses jours). Il ne décide rien : la garde est dans `scheduling/domain/pay-rules.ts`.
+
 Ces lectures se recouvrent exprès : un remboursement tardif sort dans la quinzaine de sa vente et dans celle où il a été enregistré. Un lecteur indexe donc les lignes par `platform`, `platformSaleId` et `event`, et compte chaque clé une seule fois.
 
 Chaque ligne porte :

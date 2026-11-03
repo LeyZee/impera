@@ -30,7 +30,7 @@ import {
   type ShiftForPay,
   type ValidatedReportForPay,
 } from './infra/pay-reads';
-import { createDrizzlePayRulesStore } from './infra/pay-rules-store';
+import { createDrizzlePayRulesStore, type SwitchFactsRead } from './infra/pay-rules-store';
 import { createDrizzlePlanningAdmin, createDrizzlePlanningStore } from './infra/planning-store';
 import { createDrizzleShiftReportStore } from './infra/report-store';
 import { createSchedulingRoutes, type RequireRole } from './infra/routes';
@@ -112,6 +112,11 @@ export interface SchedulingDeps {
   readonly creators: CreatorDirectory;
   /** Pay's `payroll.recalculate` for a period, which a validated report enqueues (the `payroll` module's, EQ-04). */
   readonly enqueuePayRecalculation: EnqueuePayRecalculation;
+  /**
+   * What the switch of an account to `detected` rests on (ADR 0050 § 8, CRM-03): the `connectors` module's
+   * `salesFeedSwitchReads.switchFactsOf`, read in the pay rules' own transaction.
+   */
+  readonly switchFactsOf: SwitchFactsRead;
   readonly now?: () => Date;
 }
 
@@ -147,7 +152,11 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       now,
     ),
     feedback: createShiftFeedbackService(createDrizzleShiftFeedbackStore(deps.db, deps.adminDb), now),
-    payRules: createPayRulesService(createDrizzlePayRulesStore(deps.db, deps.adminDb), deps.creators, now),
+    payRules: createPayRulesService(
+      createDrizzlePayRulesStore(deps.db, deps.adminDb, deps.switchFactsOf),
+      deps.creators,
+      now,
+    ),
   };
   return {
     name: 'scheduling',

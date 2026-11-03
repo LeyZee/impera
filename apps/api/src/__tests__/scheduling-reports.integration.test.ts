@@ -5,8 +5,10 @@ import {
   ApiErrorSchema,
   nextPayPeriod,
   newId,
+  payPeriodLastDay,
   payPeriodOfDay,
   PlatformAccountIdSchema,
+  SalesFeedCheckIdSchema,
   previousPayPeriod,
   ShiftIdSchema,
   ShiftReportContextSchema,
@@ -805,6 +807,7 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
         earningsSource: 'detected',
       });
       expect([detected.statusCode, codeOf(detected)]).toEqual([409, 'pay_rules_source_conflict']);
+      expect(detailsOf(detected)).toEqual({ reason: 'model_unlinked' });
       const unknown = await add(owner, rulesBody(newId(PlatformAccountIdSchema), currentPeriod()));
       expect([unknown.statusCode, codeOf(unknown)]).toEqual([404, 'platform_account_not_found']);
       const manager = await add(noraCookie, rulesBody(annaThird, nextPayPeriod(currentPeriod())));
@@ -814,6 +817,53 @@ describe('Équipe › Rapports de fin de shift (/v1/scheduling, EQ-03, ADR 0023)
         .set({ vatBps: 0 })
         .where(eq(schema.accountPayRules.platformAccountId, annaSecond));
       await expect(changed).rejects.toThrow();
+    });
+
+    it('switches an account to its platform’s net only once a linked model’s platform agreed over a past fortnight', async () => {
+      const from = nextPayPeriod(currentPeriod());
+      const checked = previousPayPeriod(currentPeriod());
+      const detected = () => add(owner, { ...rulesBody(annaSecond, from), earningsSource: 'detected' });
+      const refused = async (reason: string) => {
+        const response = await detected();
+        expect([response.statusCode, codeOf(response), detailsOf(response)]).toEqual([
+          409,
+          'pay_rules_source_conflict',
+          { reason },
+        ]);
+      };
+      const check = (clean: boolean, generatedAt: Date) =>
+        test.admin.db.insert(schema.salesFeedChecks).values({
+          id: newId(SalesFeedCheckIdSchema),
+          platform: 'reveal',
+          fromDay: checked,
+          toDay: payPeriodLastDay(checked),
+          verdict: clean ? 'match' : 'mismatch',
+          clean,
+          report: {},
+          checkedBy: null,
+          generatedAt,
+        });
+
+      await refused('model_unlinked');
+      await test.admin.db.insert(schema.salesFeedModels).values({
+        platform: 'reveal',
+        platformModelId: 'modele-invente',
+        platformAccountId: annaSecond,
+        creatorId: anna,
+      });
+      await refused('check_missing');
+      await check(true, new Date(Date.now() - 2 * 60_000));
+      await check(false, new Date(Date.now() - 60_000));
+      // The latest check alone counts: a newer one that does not agree withdraws the older agreement.
+      await refused('check_not_clean');
+      await check(true, new Date());
+      const switched = await detected();
+      expect(switched.statusCode, switched.body).toBe(201);
+      expect(AccountPayRulesSchema.parse(switched.json())).toMatchObject({
+        platformAccountId: annaSecond,
+        fromPeriod: from,
+        earningsSource: 'detected',
+      });
     });
   });
 });

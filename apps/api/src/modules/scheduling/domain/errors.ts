@@ -1,4 +1,4 @@
-import { DomainError } from '@nirvana/contracts';
+import { DomainError, type PayRulesSourceRefusal } from '@nirvana/contracts';
 
 /** Error codes of the module (`SCHEDULING_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 export class ShiftNotFound extends DomainError {
@@ -375,12 +375,20 @@ export class PayRulesPeriodInvalid extends DomainError {
   }
 }
 
+const SOURCE_REFUSALS: Record<PayRulesSourceRefusal, string> = {
+  platform_without_net:
+    'Cette plateforme ne donne pas de net : la paie de ce compte se lit dans les rapports',
+  model_unlinked: 'Aucun modèle de la plateforme n’est relié à ce compte : ses ventes ne sont pas relevées',
+  check_missing: 'Les ventes de cette plateforme n’ont jamais été vérifiées sur une quinzaine passée',
+  check_not_clean:
+    'La dernière vérification des ventes de cette plateforme ne concorde pas sur une quinzaine entière',
+  check_not_before: 'La dernière vérification doit porter sur une quinzaine qui finit avant ces règles',
+};
+
+/** `detected` on an account that cannot be paid on its platform's net yet (ADR 0050 § 8, CRM-03). */
 export class PayRulesSource extends DomainError {
-  constructor() {
-    super(
-      'pay_rules_source_conflict',
-      'Les ventes de ce compte ne sont pas encore relevées : sa paie se lit dans les rapports',
-    );
+  constructor(reason: PayRulesSourceRefusal) {
+    super('pay_rules_source_conflict', SOURCE_REFUSALS[reason], { details: { reason } });
   }
 }
 
