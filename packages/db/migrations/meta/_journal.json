@@ -589,6 +589,13 @@
       "when": 1793711869411,
       "tag": "0092_sales_feed_mismatch",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793713304688,
+      "tag": "0096_creator_agency_rates",
+      "breakpoints": true
     }
   ]
 }
