@@ -266,7 +266,8 @@ async function createCreatorLinkUnscoped(
       await tx.insert(schema.user).values({
         id: userId,
         name: creator.displayName,
-        email: body.email,
+        // Written in lower case, as Better Auth writes the members' (Bilan, #473).
+        email: body.email.toLowerCase(),
         role: 'creator',
         creatorIds: [input.creatorId],
       });
@@ -333,6 +334,7 @@ async function inspectLinkUnscoped(adminDb: Database, token: string) {
         // The member's display name; for a creator's own account, her creator's (CR-02).
         displayName: sql<string>`coalesce(${schema.teamMembers.displayName}, ${schema.creators.displayName}, ${schema.user.name})`,
         country: schema.teamMembers.country,
+        memberId: schema.teamMembers.id,
         expiresAt: schema.invitationLinks.expiresAt,
       })
       .from(schema.invitationLinks)
@@ -348,7 +350,18 @@ async function inspectLinkUnscoped(adminDb: Database, token: string) {
       .where(and(eq(schema.invitationLinks.tokenHash, hashOf(token)), usable)),
   );
   if (row === undefined) throw new InvitationLinkNotFound();
-  return InvitationLinkPreviewSchema.parse({ ...row, expiresAt: row.expiresAt.toISOString() });
+  const common = {
+    purpose: row.purpose,
+    email: row.email,
+    displayName: row.displayName,
+    expiresAt: row.expiresAt.toISOString(),
+  };
+  // A link names a member or an account, never both (`invitation_links_target_check`).
+  return InvitationLinkPreviewSchema.parse(
+    row.memberId === null
+      ? { ...common, account: 'creator' }
+      : { ...common, account: 'member', country: row.country },
+  );
 }
 
 const accountColumns = {

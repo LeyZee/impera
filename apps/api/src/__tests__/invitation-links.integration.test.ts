@@ -177,6 +177,7 @@ describe('invitation links (EQ-10)', () => {
       expect(preview.statusCode).toBe(200);
       expect(preview.json()).toMatchObject({
         purpose: 'invitation',
+        account: 'member',
         email: 'preview@example.test',
         displayName: 'Théo',
         country: 'BJ',
@@ -419,7 +420,8 @@ describe('invitation links (EQ-10)', () => {
 
   it('invites a creator into her own account, made with her e-mail, linked to her alone (CR-02)', async () => {
     const creatorId = await addCreator('Nora');
-    const made = await inviteCreator(creatorId, { purpose: 'invitation', email: 'nora@example.test' });
+    // Typed with capitals: her account is written in lower case.
+    const made = await inviteCreator(creatorId, { purpose: 'invitation', email: 'Nora@Example.TEST' });
     expect(made.statusCode, made.body).toBe(200);
     const { url } = made.json<{ url: string }>();
     expect(new URL(url).pathname).toBe('/bienvenue');
@@ -439,10 +441,11 @@ describe('invitation links (EQ-10)', () => {
     expect(preview.statusCode, preview.body).toBe(200);
     expect(preview.json()).toMatchObject({
       purpose: 'invitation',
+      account: 'creator',
       email: 'nora@example.test',
       displayName: 'Nora',
-      country: null,
     });
+    expect(preview.json()).not.toHaveProperty('country');
 
     const redeemed = await post('/v1/invitation-links/redeem', { token, password: PASSWORD });
     expect(redeemed.statusCode, redeemed.body).toBe(200);

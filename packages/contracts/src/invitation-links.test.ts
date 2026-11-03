@@ -29,13 +29,21 @@ describe('invitation links', () => {
   it('shows the invited member what the page needs, nothing more', () => {
     const preview = InvitationLinkPreviewSchema.parse({
       purpose: 'invitation',
+      account: 'member',
       email: 'theo@example.test',
       displayName: 'Théo',
       country: 'BJ',
       expiresAt: '2026-10-30T15:00:00.000Z',
       memberId: 'not part of the preview',
     });
-    expect(Object.keys(preview).sort()).toEqual(['country', 'displayName', 'email', 'expiresAt', 'purpose']);
+    expect(Object.keys(preview).sort()).toEqual([
+      'account',
+      'country',
+      'displayName',
+      'email',
+      'expiresAt',
+      'purpose',
+    ]);
   });
 
   it('names why a password is refused and what the owner meets when making a link', () => {
@@ -61,10 +69,15 @@ describe('invitation links', () => {
     const preview = {
       purpose: 'invitation',
       email: 'nora@example.test',
+      account: 'creator',
       displayName: 'Nora',
-      country: null,
       expiresAt: '2026-11-06T12:00:00.000Z',
     };
     expect(InvitationLinkPreviewSchema.safeParse(preview).success).toBe(true);
+    // A member always has his country; a creator's account says it is hers, not a member's without one.
+    expect(InvitationLinkPreviewSchema.safeParse({ ...preview, account: 'member' }).success).toBe(false);
+    expect(
+      InvitationLinkPreviewSchema.safeParse({ ...preview, account: undefined, country: null }).success,
+    ).toBe(false);
   });
 });

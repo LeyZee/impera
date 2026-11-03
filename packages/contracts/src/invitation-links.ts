@@ -55,15 +55,27 @@ export type CreateCreatorInvitationLinkBody = z.infer<typeof CreateCreatorInvita
  * answer tells nothing about which.
  */
 export const InspectInvitationLinkBodySchema = z.object({ token: InvitationLinkTokenSchema });
-export const InvitationLinkPreviewSchema = z.object({
+const previewFields = {
   purpose: InvitationLinkPurposeSchema,
   email: z.email(),
-  /** The member's display name, or the creator's for her own account (CR-02). */
-  displayName: z.string().min(1),
-  /** The member's country; `null` for a creator's own account, which has none on file (CR-02). */
-  country: CountryCodeSchema.nullable(),
   expiresAt: z.iso.datetime(),
-});
+};
+/** Whose link it is: a team member's, or a creator's own account (CR-02), which has no country on file. */
+export const InvitationLinkPreviewSchema = z.discriminatedUnion('account', [
+  z.object({
+    ...previewFields,
+    account: z.literal('member'),
+    /** The member's display name, which he checks with his country (EQ-10). */
+    displayName: z.string().min(1),
+    country: CountryCodeSchema,
+  }),
+  z.object({
+    ...previewFields,
+    account: z.literal('creator'),
+    /** Her creator's display name. */
+    displayName: z.string().min(1),
+  }),
+]);
 export type InvitationLinkPreview = z.infer<typeof InvitationLinkPreviewSchema>;
 
 /**
