@@ -183,6 +183,22 @@ describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
     expect(across('auto')).toEqual({ toFill: [], aiAlone: [] });
   });
 
+  it('says « IA seule » on what is left of a créneau under way once its shift is over', () => {
+    // 6–12 in Paris: a shift 6:00–8:00 is over at 9:00; the agent answers the rest from 8:00 in Automatique.
+    const { toFill, aiAlone } = slotsToFill({
+      settings: SETTINGS,
+      accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
+      shifts: [shift(NORA_REVEAL, '2026-11-03T05:00:00Z', '2026-11-03T07:00:00Z')],
+      agents: [agentOn(NORA, 'auto', slots([2, 480, 720]))],
+      window: { from: at('2026-11-03T05:00:00Z'), to: at('2026-11-03T11:00:00Z') },
+      now: at('2026-11-03T08:00:00Z'),
+    });
+    expect(toFill).toEqual([]);
+    expect(iso(aiAlone.flatMap((cell) => cell.open))).toEqual([
+      ['2026-11-03T08:00:00.000Z', '2026-11-03T11:00:00.000Z'],
+    ]);
+  });
+
   it('opens a créneau under way from the next minute, and holds one a shift covers whole', () => {
     const { toFill } = slotsToFill({
       settings: SETTINGS,

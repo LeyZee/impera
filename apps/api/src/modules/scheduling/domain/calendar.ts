@@ -196,7 +196,8 @@ export function slotsToFill(input: {
       .map((shift) => ({ from: shift.startsAt, to: shift.endsAt }));
     const reply = replyOf.get(account.creatorId) ?? [];
     for (const slot of slots) {
-      const open = gapsIn({ from: new Date(Math.max(ms(slot.from), ahead)), to: slot.to }, own);
+      const rest = { from: new Date(Math.max(ms(slot.from), ahead)), to: slot.to };
+      const open = gapsIn(rest, own);
       if (open.length === 0) continue;
       const cell: GridSlot = {
         platformAccountId: account.id,
@@ -208,7 +209,8 @@ export function slotsToFill(input: {
       // The agent answering every open stretch in Automatique holds the créneau: « IA seule » when no chatter is on
       // it at all, held with the chatter otherwise (ADR 0048 § 1).
       if (open.every((gap) => coversAll(reply, gap))) {
-        const touched = own.some((shift) => ms(shift.from) < ms(slot.to) && ms(shift.to) > ms(slot.from));
+        // Only what is left of a créneau under way: a shift already over leaves no chatter on it (Équipe, 03/11).
+        const touched = own.some((shift) => ms(shift.from) < ms(rest.to) && ms(shift.to) > ms(rest.from));
         if (!touched) aiAlone.push(cell);
         continue;
       }
