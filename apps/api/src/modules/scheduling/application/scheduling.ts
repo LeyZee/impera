@@ -14,6 +14,7 @@ import {
   type PlanningQuery,
   type SchedulingSettings,
   type SchedulingSettingsInput,
+  type SlotVersionInput,
   type Shift,
   type ShiftId,
   type ShiftTemplate,
@@ -34,6 +35,7 @@ import type {
   StoredTemplate,
 } from '../domain/ports';
 import { accessWindow, assertPlanningRange, conflictsOf, myShiftsOf } from '../domain/shifts';
+import { effectiveAtOf } from '../domain/slot-versions';
 import { addMinutes, calendarDayIn } from '../domain/time';
 
 import { toPlanningAccount, toPlanningMember, toShiftDto } from './dto';
@@ -43,6 +45,14 @@ export interface SchedulingService {
   /** The créneaux in force at `at` (now by default) and every version ahead of it. */
   settings(actor: UserId, at?: Date): Promise<SchedulingSettings>;
   saveSettings(actor: Actor, settings: SchedulingSettingsInput): Promise<SchedulingSettings>;
+  /**
+   * The owner's new créneaux and places (ADR 0049 § 1 and § 2), taking effect a Monday ahead or at the next start of
+   * one of them; the settings read again from now, the new version among those ahead. Shifts and templates keep their
+   * hours: nothing moves them (the « recalage » of the templates is CR-13's).
+   */
+  addSlotVersion(actor: Actor, input: SlotVersionInput): Promise<SchedulingSettings>;
+  /** The owner withdraws a version still ahead; the settings read again from now. */
+  withdrawSlotVersion(actor: Actor, id: string): Promise<SchedulingSettings>;
   planning(actor: UserId, query: PlanningQuery): Promise<Planning>;
   onDuty(actor: UserId): Promise<OnDuty[]>;
   myShifts(actor: UserId): Promise<MyShifts>;
@@ -86,6 +96,23 @@ export function createSchedulingService(
 
     saveSettings: async (actor, settings) => {
       await store.saveSettings(actor, settings);
+      return settingsOf(actor.userId);
+    },
+
+    addSlotVersion: async (actor, input) => {
+      const at = now();
+      const { timeZone } = await settingsOf(actor.userId, at);
+      await store.addSlotVersion(actor, {
+        effectiveAt: effectiveAtOf(input, at, timeZone),
+        timeZone,
+        slots: input.slots,
+        seats: input.seats,
+      });
+      return settingsOf(actor.userId);
+    },
+
+    withdrawSlotVersion: async (actor, id) => {
+      await store.withdrawSlotVersion(actor, id);
       return settingsOf(actor.userId);
     },
 

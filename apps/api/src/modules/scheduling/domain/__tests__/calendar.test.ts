@@ -103,7 +103,7 @@ describe('the créneaux of the grid', () => {
   });
 });
 
-describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
+describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1, ADR 0049 § 2)', () => {
   // Tuesday 3/11 in Paris: four créneaux, 0–6, 6–12, 12–18, 18–24.
   const day = { from: at('2026-11-02T23:00:00Z'), to: at('2026-11-03T23:00:00Z') };
   const accounts = [
@@ -232,6 +232,97 @@ describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
     });
     expect(toFill.map((cell) => iso(cell.open))).toEqual([
       [['2026-11-03T09:00:00.000Z', '2026-11-03T11:00:00.000Z']],
+    ]);
+  });
+
+  it('counts places: a créneau that wants two chatters stays to fill with one, and the agent stands for none (ADR 0049 § 2)', () => {
+    // Nora wants two chatters on 12–18 and 18–24 (ranks 2 and 3), her agent answering everything in Automatique.
+    const [version] = SETTINGS.versions;
+    if (version === undefined) throw new Error('no version');
+    const settings = {
+      ...SETTINGS,
+      versions: [
+        {
+          ...version,
+          seats: [
+            { slotRank: 2, platformAccountId: NORA_REVEAL, seats: 2 as const },
+            { slotRank: 3, platformAccountId: NORA_REVEAL, seats: 2 as const },
+          ],
+        },
+      ],
+    };
+    const fill = (shifts: ReturnType<typeof shift>[]) =>
+      slotsToFill({
+        settings,
+        accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
+        shifts,
+        agents: [agentOn(NORA, 'auto', { mode: 'always' })],
+        window: day,
+        now: at('2026-11-02T23:00:00Z'),
+      });
+    const places = (cells: readonly { startsAt: Date; seats: number; places: number }[]) =>
+      cells.map((cell) => [cell.startsAt.toISOString(), cell.seats, cell.places]);
+    // Nobody: the two single places are the agent's; the two double ones stay, two places each.
+    const empty = fill([]);
+    expect(places(empty.aiAlone)).toEqual([
+      ['2026-11-02T23:00:00.000Z', 1, 1],
+      ['2026-11-03T05:00:00.000Z', 1, 1],
+    ]);
+    expect(places(empty.toFill)).toEqual([
+      ['2026-11-03T11:00:00.000Z', 2, 2],
+      ['2026-11-03T17:00:00.000Z', 2, 2],
+    ]);
+    // One chatter on all of 12–18 leaves one place (« + 2e chatteur ») open the whole créneau; one on half of 18–24
+    // leaves two places to fill there; two at once on 18–24 hold it.
+    const one = fill([
+      shift(NORA_REVEAL, '2026-11-03T11:00:00Z', '2026-11-03T17:00:00Z'),
+      shift(NORA_REVEAL, '2026-11-03T17:00:00Z', '2026-11-03T20:00:00Z'),
+    ]);
+    expect(places(one.toFill)).toEqual([
+      ['2026-11-03T11:00:00.000Z', 2, 1],
+      ['2026-11-03T17:00:00.000Z', 2, 2],
+    ]);
+    expect(one.toFill.map((cell) => iso(cell.open))).toEqual([
+      [['2026-11-03T11:00:00.000Z', '2026-11-03T17:00:00.000Z']],
+      [['2026-11-03T17:00:00.000Z', '2026-11-03T23:00:00.000Z']],
+    ]);
+    const two = fill([
+      shift(NORA_REVEAL, '2026-11-03T17:00:00Z', '2026-11-03T23:00:00Z'),
+      shift(NORA_REVEAL, '2026-11-03T17:00:00Z', '2026-11-03T20:00:00Z'),
+      shift(NORA_REVEAL, '2026-11-03T20:00:00Z', '2026-11-03T23:00:00Z'),
+    ]);
+    expect(places(two.toFill)).toEqual([['2026-11-03T11:00:00.000Z', 2, 2]]);
+  });
+
+  it('reads the places of the version in force on each day (ADR 0049 § 1)', () => {
+    // From Wednesday 4 at midnight, Nora wants two chatters on 18–24: Tuesday's evening keeps one place.
+    const [version] = SETTINGS.versions;
+    if (version === undefined) throw new Error('no version');
+    const settings = {
+      ...SETTINGS,
+      versions: [
+        version,
+        {
+          ...version,
+          id: '0199f2a0-0000-7000-8000-000000000031',
+          effectiveAt: '2026-11-03T23:00:00.000Z',
+          seats: [{ slotRank: 3, platformAccountId: NORA_REVEAL, seats: 2 as const }],
+        },
+      ],
+    };
+    const evenings = slotsToFill({
+      settings,
+      accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
+      shifts: [
+        shift(NORA_REVEAL, '2026-11-03T17:00:00Z', '2026-11-03T23:00:00Z'),
+        shift(NORA_REVEAL, '2026-11-04T17:00:00Z', '2026-11-04T23:00:00Z'),
+      ],
+      agents: [],
+      window: { from: at('2026-11-03T17:00:00Z'), to: at('2026-11-04T23:00:00Z') },
+      now: at('2026-11-02T23:00:00Z'),
+    }).toFill.filter((cell) => cell.startsAt.getUTCHours() === 17);
+    expect(evenings.map((cell) => [cell.startsAt.toISOString(), cell.places])).toEqual([
+      ['2026-11-04T17:00:00.000Z', 1],
     ]);
   });
 

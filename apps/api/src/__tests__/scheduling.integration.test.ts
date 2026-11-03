@@ -880,4 +880,117 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     expect([eve.statusCode, codeOf(eve)]).toEqual([409, 'member_not_joined_conflict']);
     expect((await place(parisInstant(parisDay(12), 30))).statusCode).toBe(201);
   });
+
+  // Last: it leaves a version that took effect, which nothing can withdraw (ADR 0049 § 1).
+  it('writes a version of the créneaux for the owner alone, and withdraws one only while it is ahead (CR-14)', async () => {
+    const offset = 21 - (weekdayOf(parisDay(0)) - 1);
+    const monday = parisDay(offset);
+    const eight = [0, 480, 960].map((start) => ({
+      startMinute: start,
+      endMinute: (start + 480) % 1440,
+      name: null,
+    }));
+    const body = {
+      startsOn: monday,
+      slots: eight,
+      seats: [{ slotRank: 2, platformAccountId: annaAccount, seats: 2 }],
+    };
+    const post = (cookie: string, payload: object) =>
+      call('POST', '/scheduling/settings/versions', cookie, payload);
+    // The shifts ahead, made by hand or by a template: a version moves none of them (ADR 0049 § 1, Équipe on #442).
+    const shiftsAhead = async () =>
+      (await planning(owner, minutesFromNow(0), minutesFromNow(28 * 24 * 60))).shifts.map((shift) => [
+        shift.id,
+        shift.memberId,
+        shift.platformAccountId,
+        shift.startsAt,
+        shift.endsAt,
+        shift.stoppedAt,
+        shift.templateId,
+      ]);
+    const before = await shiftsAhead();
+    // The managers plan, never the créneaux; a chatter neither.
+    for (const cookie of [noraCookie, theoCookie]) {
+      const refused = await post(cookie, body);
+      expect([refused.statusCode, codeOf(refused)]).toEqual([403, 'role_forbidden']);
+    }
+    const written = await post(owner, body);
+    expect(written.statusCode).toBe(201);
+    const ahead = SchedulingSettingsSchema.parse(written.json()).versions.at(-1);
+    expect(ahead?.effectiveAt).toBe(parisInstant(monday, 0).toISOString());
+    expect(ahead?.seats).toEqual(body.seats);
+    const id = ahead?.id;
+    if (id === undefined || id === null) throw new Error('no version');
+    const [line] = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, id));
+    expect(line?.action).toBe('scheduling_slot_version.create');
+    // Another on the same instant, a day that is no Monday, a Monday gone by, a place on an unknown account, a place
+    // outside the list: each refused, nothing written.
+    const twice = await post(owner, body);
+    expect([twice.statusCode, codeOf(twice)]).toEqual([409, 'slot_version_conflict']);
+    const tuesday = await post(owner, { ...body, startsOn: parisDay(offset + 1) });
+    expect([tuesday.statusCode, codeOf(tuesday)]).toEqual([400, 'slot_version_date_invalid']);
+    const gone = await post(owner, { ...body, startsOn: parisDay(offset - 28) });
+    expect([gone.statusCode, codeOf(gone)]).toEqual([400, 'slot_version_date_invalid']);
+    const unknown = await post(owner, {
+      ...body,
+      startsOn: parisDay(offset + 7),
+      seats: [{ slotRank: 0, platformAccountId: newId(PlatformAccountIdSchema), seats: 2 }],
+    });
+    expect([unknown.statusCode, codeOf(unknown)]).toEqual([404, 'platform_account_not_found']);
+    const outside = await post(owner, {
+      ...body,
+      startsOn: parisDay(offset + 7),
+      seats: [{ slotRank: 3, platformAccountId: annaAccount, seats: 2 }],
+    });
+    expect([outside.statusCode, codeOf(outside)]).toEqual([400, 'request_invalid']);
+    // Withdrawn while ahead, with its places; a second time it is no more.
+    const withdraw = (cookie: string, version: string) =>
+      call('DELETE', `/scheduling/settings/versions/${version}`, cookie);
+    expect((await withdraw(noraCookie, id)).statusCode).toBe(403);
+    const withdrawn = await withdraw(owner, id);
+    expect(withdrawn.statusCode).toBe(200);
+    expect(
+      SchedulingSettingsSchema.parse(withdrawn.json()).versions.map((version) => version.id),
+    ).not.toContain(id);
+    const seats = await test.admin.db
+      .select({ versionId: schema.schedulingSlotSeats.versionId })
+      .from(schema.schedulingSlotSeats)
+      .where(eq(schema.schedulingSlotSeats.versionId, id));
+    expect(seats).toEqual([]);
+    const again = await withdraw(owner, id);
+    expect([again.statusCode, codeOf(again)]).toEqual([404, 'slot_version_not_found']);
+    // « Tout de suite »: from the next start of one of its créneaux, the one under way keeping its hours; once that
+    // instant has passed, the version stays.
+    const now = await post(owner, { startsOn: null, slots: eight, seats: [] });
+    expect(now.statusCode).toBe(201);
+    const next = SchedulingSettingsSchema.parse(now.json()).versions.find(
+      (version) => version.id !== null && version.slots.length === 3,
+    );
+    const at = Date.parse(next?.effectiveAt ?? '');
+    expect(at).toBeGreaterThan(Date.now());
+    expect(await shiftsAhead()).toEqual(before);
+    expect(at - Date.now()).toBeLessThanOrEqual(8 * HOUR);
+    expect(new Date(at).getUTCMinutes()).toBe(0);
+    const passed = randomUUID();
+    const [ownerRow] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, OWNER.email));
+    if (ownerRow === undefined) throw new Error('no owner');
+    await test.admin.db.insert(schema.schedulingSlotVersions).values({
+      id: passed,
+      effectiveAt: new Date(Date.now() + 1_500),
+      timeZone: PARIS,
+      slots: eight,
+      createdBy: ownerRow.id,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    const kept = await withdraw(owner, passed);
+    expect([kept.statusCode, codeOf(kept)]).toEqual([409, 'slot_version_effective_conflict']);
+    // The version written « tout de suite » is withdrawn while still ahead.
+    expect((await withdraw(owner, next?.id ?? '')).statusCode).toBe(200);
+  });
 });

@@ -25,8 +25,18 @@ import {
   type Database,
   type Transaction,
 } from '@nirvana/db';
+import { z } from 'zod';
 
-import { OwnerOnly, ShiftNotFound, ShiftTemplateNotFound } from '../domain/errors';
+import {
+  OwnerOnly,
+  PlatformAccountNotFound,
+  ShiftNotFound,
+  ShiftTemplateNotFound,
+  SlotVersionConflict,
+  SlotVersionDateInvalid,
+  SlotVersionEffective,
+  SlotVersionNotFound,
+} from '../domain/errors';
 import type {
   Actor,
   PlanningAdmin,
@@ -77,7 +87,16 @@ import {
   toTemplate,
 } from './rows';
 
-const { platformAccounts, schedulingSettings, shiftTemplates, shifts, teamMembers, user } = schema;
+const {
+  platformAccounts,
+  schedulingSettings,
+  schedulingSlotSeats,
+  schedulingSlotVersions,
+  shiftTemplates,
+  shifts,
+  teamMembers,
+  user,
+} = schema;
 
 /** A shift that changed hands between its read and its lock (a swap): `updateShift` tries again. */
 class MovedMeanwhile extends Error {}
@@ -279,6 +298,81 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
           { kind: 'scheduling_settings', id: '1' },
           settings,
         );
+      }),
+
+    addSlotVersion: (actor, version) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new OwnerOnly();
+        // A v7 uuid, as every id of the base: in the order of the writes.
+        const id = newId(z.uuid());
+        try {
+          // In savepoints: a refusal leaves the transaction usable for nothing else, but its code is read here.
+          await tx.transaction((savepoint) =>
+            savepoint.insert(schedulingSlotVersions).values({
+              id,
+              effectiveAt: version.effectiveAt,
+              timeZone: version.timeZone,
+              slots: [...version.slots],
+              createdBy: actor.userId,
+            }),
+          );
+          if (version.seats.length > 0)
+            await tx.transaction((savepoint) =>
+              savepoint
+                .insert(schedulingSlotSeats)
+                .values(version.seats.map((seat) => ({ versionId: id, ...seat }))),
+            );
+        } catch (error) {
+          const pg = pgErrorOf(error);
+          if (pg?.code === '23505') throw new SlotVersionConflict();
+          if (pg?.code === '23503') throw new PlatformAccountNotFound();
+          // The trigger on the places wants a version still ahead, the policy `effective_at >= now()`: its instant
+          // passed between the domain's check and the write. Any other refusal of the policy is not this one.
+          if (pg?.code === '23001') throw new SlotVersionDateInvalid();
+          if (pg?.code === '42501' && version.effectiveAt.getTime() <= Date.now())
+            throw new SlotVersionDateInvalid();
+          throw error;
+        }
+        await audit(
+          tx,
+          actor,
+          'scheduling_slot_version.create',
+          { kind: 'scheduling_slot_version', id },
+          {
+            effectiveAt: version.effectiveAt.toISOString(),
+            timeZone: version.timeZone,
+            slots: version.slots,
+            seats: version.seats,
+          },
+        );
+        return id;
+      }),
+
+    withdrawSlotVersion: (actor, id) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new OwnerOnly();
+        // No row lock: the application's role may not update a version. A version that takes effect between the read
+        // and the delete is refused by its trigger, one withdrawn meanwhile deletes nothing.
+        const [found] = await tx
+          .select({ ahead: sql<boolean>`${schedulingSlotVersions.effectiveAt} > now()` })
+          .from(schedulingSlotVersions)
+          .where(eq(schedulingSlotVersions.id, id));
+        if (found === undefined) throw new SlotVersionNotFound();
+        if (!found.ahead) throw new SlotVersionEffective();
+        let deleted: { id: string }[];
+        try {
+          deleted = await tx.transaction((savepoint) =>
+            savepoint
+              .delete(schedulingSlotVersions)
+              .where(eq(schedulingSlotVersions.id, id))
+              .returning({ id: schedulingSlotVersions.id }),
+          );
+        } catch (error) {
+          if (pgErrorOf(error)?.code === '23001') throw new SlotVersionEffective();
+          throw error;
+        }
+        if (deleted.length === 0) throw new SlotVersionNotFound();
+        await audit(tx, actor, 'scheduling_slot_version.withdraw', { kind: 'scheduling_slot_version', id });
       }),
 
     read: (actor, creatorIds, range) =>

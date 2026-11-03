@@ -1,4 +1,5 @@
 import {
+  seatsOf,
   slotWindowsOf,
   type AgentHours,
   type AgentMode,
@@ -107,7 +108,11 @@ export interface GridSlot {
   readonly creatorId: CreatorId;
   readonly startsAt: Date;
   readonly endsAt: Date;
-  /** The stretches ahead that no shift covers, in order: never empty. */
+  /** The chatters the account wants at once on this créneau (ADR 0049 § 2): 1, or 2 where its version says so. */
+  readonly seats: 1 | 2;
+  /** The places to fill: `seats` less the fewest shifts at once over what is left of it, at least 1. */
+  readonly places: number;
+  /** The stretches ahead with fewer shifts than `seats`, in order: never empty. */
   readonly open: readonly Span[];
 }
 
@@ -133,28 +138,37 @@ export function gridSlots(
   ).filter((slot) => ms(slot.from) < ms(window.to) && ms(slot.to) > ms(window.from));
 }
 
-/** The stretches of `span` that no span of `spans` covers, in order. */
-function gapsIn(span: Span, spans: readonly Span[]): Span[] {
-  const gaps: Span[] = [];
-  let at = ms(span.from);
-  for (const one of merged(spans)) {
-    if (at >= ms(span.to)) break;
-    if (ms(one.to) <= at) continue;
-    if (ms(one.from) > at)
-      gaps.push({ from: new Date(at), to: new Date(Math.min(ms(one.from), ms(span.to))) });
-    at = Math.max(at, ms(one.to));
+/**
+ * Over `span`, the fewest shifts of `spans` at once, and the stretches with fewer than `seats`, in order and joined.
+ * Each `spans` is one shift: two that overlap hold two places (ADR 0049 § 2).
+ */
+function depthIn(span: Span, spans: readonly Span[], seats: number): { fewest: number; short: Span[] } {
+  const inside = spans.map((one) => clip(one, span)).filter((one) => ms(one.to) > ms(one.from));
+  const cuts = [
+    ...new Set([span.from, span.to, ...inside.flatMap((one) => [one.from, one.to])].map(ms)),
+  ].toSorted((a, b) => a - b);
+  let fewest = Number.POSITIVE_INFINITY;
+  const short: Span[] = [];
+  for (let index = 0; index + 1 < cuts.length; index += 1) {
+    const from = cuts[index] ?? 0;
+    const to = cuts[index + 1] ?? 0;
+    const depth = inside.filter((one) => ms(one.from) <= from && from < ms(one.to)).length;
+    fewest = Math.min(fewest, depth);
+    if (depth < seats) short.push({ from: new Date(from), to: new Date(to) });
   }
-  if (at < ms(span.to)) gaps.push({ from: new Date(at), to: span.to });
-  return gaps;
+  return { fewest: fewest === Number.POSITIVE_INFINITY ? 0 : fewest, short: merged(short) };
 }
 
 /**
- * The créneaux to fill (ADR 0045 § 2, ADR 0048 § 1), as Équipe › Planning counts them (EQ-01): on each account, each
- * créneau with a stretch ahead that no shift covers (from now, at the minute, for the créneau under way), even when a
- * shift holds the rest of it. `open` gives those stretches. One « sans chatteur » (no shift on what is left of it)
- * whose every open stretch the agent answers in Automatique is not to fill: it goes in `aiAlone` (ADR 0048 § 1). In
- * Copilote it stays to fill: each draft waits for a human (ADR 0019, ADR 0025); so does one a shift holds in part.
- * The one count of the créneaux to fill: the calendar, Planning and EQ-14's departure alert read this function.
+ * The créneaux to fill (ADR 0045 § 2, ADR 0048 § 1, ADR 0049 § 2), as Équipe › Planning counts them (EQ-01): on each
+ * account, each créneau with a stretch ahead (from now, at the minute, for the créneau under way) that holds fewer
+ * shifts than the places the account wants on it, 1 unless its version says 2 (`scheduling_slot_seats`), even when a
+ * shift holds the rest of it. `open` gives those stretches, `places` how many places are to fill: one wanting two with
+ * a chatter on all of it counts one (« + 2e chatteur »). One « sans chatteur » (no shift on what is left of it) whose
+ * every open stretch the agent answers in Automatique is not to fill, and goes in `aiAlone` (ADR 0048 § 1), only when
+ * it wants a single place: the agent never stands for a second chatter (ADR 0049 § 2). In Copilote it stays to fill:
+ * each draft waits for a human (ADR 0019, ADR 0025); so does one a shift holds in part. The one count of the créneaux
+ * to fill: the calendar, Planning and EQ-14's departure alert read this function.
  */
 export function slotsToFill(input: {
   readonly settings: Pick<SchedulingSettings, 'timeZone' | 'versions'>;
@@ -187,20 +201,24 @@ export function slotsToFill(input: {
     const reply = replyOf.get(account.creatorId) ?? [];
     for (const slot of slots) {
       const rest = { from: new Date(Math.max(ms(slot.from), ahead)), to: slot.to };
-      const open = gapsIn(rest, own);
+      const seats = seatsOf(slot.version, slot.rank, account.id);
+      const { fewest, short: open } = depthIn(rest, own, seats);
       if (open.length === 0) continue;
       const cell: GridSlot = {
         platformAccountId: account.id,
         creatorId: account.creatorId,
         startsAt: slot.from,
         endsAt: slot.to,
+        seats,
+        places: seats - fewest,
         open,
       };
       // « IA seule » only « sans chatteur » (ADR 0048 § 1): no shift on what is left of the créneau (one already over
-      // leaves no chatter on it), and the agent answers every open stretch in Automatique. A créneau a chatter holds in
-      // part stays to fill, the agent answering the rest or not, as Planning shows it: a hole is never hidden.
+      // leaves no chatter on it), a single place wanted (ADR 0049 § 2), and the agent answers every open stretch in
+      // Automatique. A créneau a chatter holds in part stays to fill, the agent answering the rest or not, as Planning
+      // shows it: a hole is never hidden.
       const touched = own.some((shift) => ms(shift.from) < ms(rest.to) && ms(shift.to) > ms(rest.from));
-      (!touched && open.every((gap) => coversAll(reply, gap)) ? aiAlone : toFill).push(cell);
+      (seats === 1 && !touched && open.every((gap) => coversAll(reply, gap)) ? aiAlone : toFill).push(cell);
     }
   }
   return { toFill, aiAlone };

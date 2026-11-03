@@ -67,6 +67,9 @@ export const CalendarSlotSchema = z.object({
   creatorId: CreatorIdSchema,
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
+  /** The chatters the account wants at once on it (ADR 0049 § 2), and how many of those places are to fill. */
+  seats: z.union([z.literal(1), z.literal(2)]),
+  places: z.number().int().min(1).max(2),
   open: z.array(z.object({ startsAt: z.iso.datetime(), endsAt: z.iso.datetime() })).min(1),
 });
 export type CalendarSlot = z.infer<typeof CalendarSlotSchema>;
@@ -108,9 +111,10 @@ export const CalendarSchema = z.object({
     .object({
       accounts: z.array(PlanningAccountSchema),
       /**
-       * The créneaux ahead with a stretch nobody holds (`slotsToFill`, the one count Planning and EQ-14's departure
-       * alert read too). A créneau without a shift whose open stretches the agent answers in Automatique is not one of
-       * them (ADR 0048 § 1): it is in `aiAlone`.
+       * The créneaux ahead with a stretch holding fewer shifts than the places the account wants on it (`slotsToFill`,
+       * the one count Planning and EQ-14's departure alert read too; ADR 0049 § 2). A créneau of a single place without
+       * a shift whose open stretches the agent answers in Automatique is not one of them (ADR 0048 § 1): it is in
+       * `aiAlone`.
        */
       toFill: z.array(CalendarSlotSchema),
       aiAlone: z.array(CalendarSlotSchema),
