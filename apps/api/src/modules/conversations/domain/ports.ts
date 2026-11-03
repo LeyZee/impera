@@ -348,7 +348,15 @@ export interface FanDirectory {
   activeFacts(
     creatorId: CreatorId,
     fanId: FanId,
-  ): Promise<readonly { readonly category: FactCategory; readonly key: string; readonly value: string }[]>;
+  ): Promise<
+    readonly {
+      readonly category: FactCategory;
+      readonly key: string;
+      readonly value: string;
+      /** Said by him (`declared`) or deduced by the model (`inferred`): the creator reads only the former (CR-02). */
+      readonly kind: FactKind;
+    }[]
+  >;
 }
 
 /**

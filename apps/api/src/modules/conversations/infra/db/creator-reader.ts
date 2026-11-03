@@ -14,6 +14,7 @@ import {
 import { and, eq, schema, sql, withCreatorAccount, type Database, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
+import { creatorNotesOf } from '../../domain/creator-notes';
 import type { CreatorSpaceReader, FanDirectory, MediaDescriptions, PageRequest } from '../../domain/ports';
 
 import { mediaOf } from './reader';
@@ -137,7 +138,7 @@ export function createDrizzleCreatorSpaceReader(
         fan: {
           id: FanIdSchema.parse(row.fanId),
           displayName: row.displayName,
-          notes: notes.map((fact) => fact.value).filter((value) => value.length > 0),
+          notes: creatorNotesOf(notes),
         },
       };
     },

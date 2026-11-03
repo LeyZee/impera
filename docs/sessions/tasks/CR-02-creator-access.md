@@ -44,5 +44,11 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 ### 03/11/2026, lot b1 (ses lectures)
 - Routes `/v1/creator-space` (rôle `creator` seul) par `withCreatorAccount` : `fans` (pseudo, ce qu'il a payé par devise, premier et dernier passage, sa conversation), `conversations/:id` (son fan et ses notes) et `conversations/:id/messages` (sens, texte, médias, prix, jamais l'auteur ni le brouillon). Contrats `strict` dans `packages/contracts/src/creator-space.ts`.
 - Chaque ouverture d'une conversation est écrite dans `audit_log` (`conversation.open`, `details.by = 'creator'`), dans la transaction de la lecture.
+- Ses notes (relecture de Bilan) : seulement ce que le fan a dit lui-même (`declared`), jamais la note d'un chatteur (`operator_note`, elle trahirait qu'on écrit à sa place), jamais une déduction du modèle (`inferred`), et jamais son profil d'achat (`commercial`) : Charles, 03/11 11h40, « elles n'ont pas besoin d'avoir les détails exacts ». Filtré en code (`creatorNotesOf`, test unitaire et d'intégration). Ce qu'un fan a payé est le prix TTC des messages débloqués, pas ses gains (`modelRevenue`, ADR 0054) : l'écran le nommera ainsi au lot c.
 - Ses notes et les descriptions de médias passent par les modules `fans` et `media`, bornés à la créatrice que son compte nomme (lue par `withCreatorAccount`), jamais à une créatrice de la requête.
 - Restent : lot b2 (Dashboard et Persona par sa porte, décision `persona_versions`, « qui est en poste » par une vue qui ne rend que le nom affiché et le créneau, ADR 0023) ; lot b3 (invitation, migration) ; lot c (écrans).
+
+### Lot futur : les insights de sa base de fans (demande de Charles, 03/11 11h40)
+- Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines » (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.
+- Garde-fous à tenir : agrégats seulement à partir des faits `declared` (ni `inferred`, ni `operator_note`, ni `commercial`) ; un pourcentage ne s'affiche qu'au-delà d'un seuil de fans par case, sinon « trop peu de fans » (pas de réidentification) ; calcul côté serveur, l'écran ne calcule rien.
+- Où ça rentre : un lot après le lot c de CR-02, sur l'onglet Ventes › Fans. Le seuil et les tranches sont des choix de produit : une ADR courte les fixe avant le code.

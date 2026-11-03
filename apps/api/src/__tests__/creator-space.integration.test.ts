@@ -177,6 +177,25 @@ describe('/v1/creator-space', () => {
         sourceMessageId: null,
         observedAt: new Date('2026-11-01T10:00:00Z'),
       },
+      // Deduced by the model, and his buying profile: never hers to read.
+      {
+        category: 'interests',
+        key: 'hobby',
+        value: 'Aime sans doute la randonnée',
+        kind: 'inferred',
+        confidence: 0.6,
+        sourceMessageId: null,
+        observedAt: new Date('2026-11-01T10:00:00Z'),
+      },
+      {
+        category: 'commercial',
+        key: 'budget',
+        value: 'Achète les packs à 20 €',
+        kind: 'declared',
+        confidence: 0.9,
+        sourceMessageId: null,
+        observedAt: new Date('2026-11-01T10:00:00Z'),
+      },
     ]);
     ({ userId: creatorUserId, cookie: creatorCookie } = await account('nora@example.test', {
       role: 'creator',
@@ -221,7 +240,7 @@ describe('/v1/creator-space', () => {
     expect(second.nextCursor).toBeNull();
   });
 
-  it('opens her conversation with her fan’s notes, and writes each opening in the audit log', async () => {
+  it('opens her conversation with what her fan said himself, and writes each opening in the audit log', async () => {
     const julien = conversations.get('Julien');
     const response = await get(
       `/v1/creator-space/conversations/${julien?.conversationId ?? ''}`,
