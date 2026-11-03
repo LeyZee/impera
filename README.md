@@ -169,11 +169,11 @@ Les principes qui structurent tout ([`docs/architecture/overview.md`](docs/archi
 <table>
   <tr>
     <td width="50%"><img src="docs/design/images/palette.jpg" alt="Palette des thèmes Nuit et Jour"></td>
-    <td width="50%"><img src="docs/design/images/marque.png" alt="Logo : lockups Nuit et Jour, symbole couleur, favicon et symbole mono"></td>
+    <td width="50%"><img src="docs/design/images/marque.jpg" alt="Logo : lockups Nuit et Jour, symbole couleur, favicon et symbole mono"></td>
   </tr>
 </table>
 
-- **Logo** : la flamme à l'auréole dessinée par Charles, nom en Playfair Display italique éclairé par la flamme. Fichiers et règles : [`brand/`](brand/README.md).
+- **Logo** : le buste de marbre couronné de laurier du logo de l'agence IMPERA, redessiné en Liquid Glass, avec le laurier néon pour seule lumière ; nom en Playfair Display italique, à l'encre. Fichiers et règles : [`brand/`](brand/README.md).
 - **Polices** : Geist pour l'interface et les chiffres (tabulaires), Geist Mono pour les touches du clavier, Instrument Serif italique pour les états vides. Icônes Lucide.
 - **Navigation** : Dashboard, Créatrices, Entraîner (Playground, Corrections, Tests), Suivi, Réglages. Pas d'Inbox : en copilote, les brouillons se valident dans Suivi.
 - Guide complet, avec le thème Jour et la typographie : [`docs/design/README.md`](docs/design/README.md). Code : [`packages/design-system`](packages/design-system).
