@@ -199,6 +199,14 @@ describe('the script’s colour (ADR 0064)', () => {
     ).toBe(false);
   });
 
+  it('checks the blends between the tones, not only the tones', () => {
+    // Pure red then pure green: both ends read with the dark ink, their blend (#808000 and nearby) does not.
+    const ends = { primary: '#ff0000', secondary: '#00ff00', accent: '#00ff00' };
+    expect(contrastRatio('#14080e', '#ff0000')).toBeGreaterThan(4.5);
+    expect(contrastRatio('#14080e', '#00ff00')).toBeGreaterThan(4.5);
+    expect(scriptCardInk(ends)).toBeNull();
+  });
+
   it('offers named colours that all read', () => {
     for (const preset of SCRIPT_COLOR_PRESETS) expect(scriptCardInk(preset.color), preset.key).not.toBeNull();
     expect(new Set(SCRIPT_COLOR_PRESETS.map((preset) => preset.key)).size).toBe(SCRIPT_COLOR_PRESETS.length);

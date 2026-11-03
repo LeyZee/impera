@@ -4,6 +4,7 @@ import {
   AuditEntryIdSchema,
   EVENT_PAYLOADS,
   EventIdSchema,
+  JOB_MAX_ATTEMPTS,
   newId,
   SaleEventSchema,
   SalesFeedCheckIdSchema,
@@ -162,8 +163,9 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
               recorded += 1;
               // A fresh sale rings once, in the transaction that records it; one read late is late (CRM-04).
               if (ringsWhenRecorded(values, at)) {
+                const eventId = newId(EventIdSchema);
                 await tx.insert(schema.domainEvents).values({
-                  id: newId(EventIdSchema),
+                  id: eventId,
                   creatorId: link.creatorId,
                   type: 'sale_detected',
                   payload: EVENT_PAYLOADS.sale_detected.parse({
@@ -185,6 +187,18 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
                   actor: 'system',
                   correlationId,
                 });
+                // Her own accounts are told too (CRM-04 lot d2), by a job that exists only once the sale is committed.
+                await tx.execute(
+                  sql`select public.enqueue_job(
+                    task => ${'notifications.creator_sale'},
+                    payload => ${JSON.stringify({ eventId })}::jsonb,
+                    queue_name => null,
+                    run_at => null,
+                    max_attempts => ${JOB_MAX_ATTEMPTS['notifications.creator_sale']}::int,
+                    job_key => ${`notifications.creator_sale:${line.id}`},
+                    job_key_mode => ${'preserve_run_at'}
+                  )`,
+                );
               }
               continue;
             }

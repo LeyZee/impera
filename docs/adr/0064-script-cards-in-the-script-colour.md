@@ -23,7 +23,8 @@ Dans OnlyScript, chaque script avait sa couleur, un aplat ou un dégradé de tro
 
 - Chaque version de structure porte une **couleur** : trois tons (`primary`, `secondary`, `accent`) en hexadécimal. Un aplat, ce sont trois tons proches.
 - L'atelier propose des palettes nommées (une couleur unie ou un dégradé, comme dans OnlyScript) et un choix libre. La couleur est une donnée de la structure : changer de couleur suit la règle 6 (une version figée ne change pas).
-- Le carton prend le dégradé sur toute sa surface. **Le code choisit la couleur du texte**, clair ou foncé, celle qui contraste le mieux avec les trois tons. Un dégradé où aucune des deux n'atteint 4,5:1 sur chaque ton est refusé à l'enregistrement, avec un message qui le dit.
+- Le carton prend le dégradé sur toute sa surface. **Le code choisit la couleur du texte**, clair ou foncé, celle qui contraste le mieux avec le dégradé. Le texte est écrit dans cette couleur pleine, sans transparence. Un dégradé où aucune des deux n'atteint 4,5:1 sur chaque ton et sur les mélanges entre deux tons est refusé à l'enregistrement, avec un message qui le dit.
+- Une version écrite sans couleur, ou avant cette ADR, prend la palette « Rouge ».
 - Le moment (Jour ou Nuit) reste écrit sur le carton, en petit. Il ne change plus la palette.
 
 ### 2. Le dessin
@@ -44,8 +45,10 @@ Dans OnlyScript, chaque script avait sa couleur, un aplat ou un dégradé de tro
 
 ### 3. Ce que la structure gagne
 
-- **Une étape dit si elle est offerte ou payante** (`access` : `free` ou `paid`). C'est ce que le carton écrit, et rien d'autre : le prix reste à P6-01, et l'agent ne lit pas ce champ pour vendre.
-- **Un pont peut porter des emplacements** (trois au plus, souvent une photo teasing). Il reste offert : le carton d'un pont dit toujours « (GRATUIT) ».
+- **Une étape dit si elle est offerte ou payante** (`access` : `free` ou `paid`). C'est ce que le carton écrit, et rien d'autre : le prix reste à P6-01, et l'agent ne lit jamais ce champ.
+- Une étape écrite avant cette ADR est **payante** (`paid`) : la migration 0091 le lui donne si sa version n'est pas encore figée, et une version figée est lue avec cette valeur sans être réécrite (règle 6).
+- **Un pont peut porter des emplacements** (trois au plus, souvent une photo teasing). Il reste offert : le carton d'un pont dit toujours « (GRATUIT) ». Un pont écrit avant cette ADR n'en porte aucun.
+- Les indications des emplacements d'un pont sont tournées : elles passent contre ce qu'elle ne fait jamais, ne montre jamais et ce qui la dégoûte, comme celles d'une étape. Son teaser reste lu contre ce qu'elle ne dit jamais et ce qui la dégoûte.
 
 ### 4. Les structures de départ
 

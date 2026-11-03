@@ -85,7 +85,10 @@ export const ScriptVariantSchema = z.strictObject({
 });
 export type ScriptVariant = z.infer<typeof ScriptVariantSchema>;
 
-/** Offered or paid: what the card says, « (GRATUIT) » or « (PAYANT) » (ADR 0064 § 3). Never a price. */
+/**
+ * Offered or paid: what the card says, « (GRATUIT) » or « (PAYANT) » (ADR 0064 § 3). Never a price, and never read by
+ * the agent: it does not sell by it (Agent's review of SC-01 b). A stage written before ADR 0064 is « paid ».
+ */
 export const SCRIPT_STAGE_ACCESS = ['free', 'paid'] as const;
 export const ScriptStageAccessSchema = z.enum(SCRIPT_STAGE_ACCESS);
 export type ScriptStageAccess = z.infer<typeof ScriptStageAccessSchema>;
@@ -283,12 +286,36 @@ export function contrastRatio(a: string, b: string): number {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
+const mix = (a: string, b: string, share: number): string => {
+  const channel = (offset: number): string =>
+    Math.round(
+      Number.parseInt(a.slice(offset, offset + 2), 16) * (1 - share) +
+        Number.parseInt(b.slice(offset, offset + 2), 16) * share,
+    )
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(1)}${channel(3)}${channel(5)}`;
+};
+
 /**
- * The ink of a script's cards: light or dark, whichever has the better contrast on its worst tone. `null` when
- * neither reaches `SCRIPT_CARD_MIN_CONTRAST` on all three: the colour is refused (ADR 0064 § 1).
+ * The colours the card's text may sit on: its three tones and the blends between them, as the gradient draws them
+ * (in sRGB). A blend can be darker than both its ends: a dark ink is checked on it too (Extension's review of SC-01 b).
+ */
+function gradientSamples(color: ScriptColor): string[] {
+  const shares = [0, 0.25, 0.5, 0.75];
+  return [
+    ...shares.map((share) => mix(color.primary, color.secondary, share)),
+    ...shares.map((share) => mix(color.secondary, color.accent, share)),
+    color.accent,
+  ];
+}
+
+/**
+ * The ink of a script's cards: light or dark, whichever has the better contrast on its worst point of the gradient.
+ * `null` when neither reaches `SCRIPT_CARD_MIN_CONTRAST` everywhere, the text being drawn in the ink at full opacity: the colour is refused (ADR 0064 § 1).
  */
 export function scriptCardInk(color: ScriptColor): string | null {
-  const tones = [color.primary, color.secondary, color.accent];
+  const tones = gradientSamples(color);
   const worst = (ink: string): number => Math.min(...tones.map((tone) => contrastRatio(ink, tone)));
   const [ink, score] = [SCRIPT_CARD_INKS.light, SCRIPT_CARD_INKS.dark]
     .map((candidate) => [candidate, worst(candidate)] as const)

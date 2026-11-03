@@ -35,6 +35,22 @@ const structures = schema.scriptStructures;
 const versions = schema.scriptStructureVersions;
 const queue = schema.scriptStructureQueue;
 
+/**
+ * A version frozen before migration 0091 has no `access` on its stages nor `mediaSlots` on its bridges, and never
+ * changes again (rule 6): it is read with the defaults ADR 0064 § 3 names, a paid stage and a bridge without slots.
+ * What a segment already says wins.
+ */
+const withSegmentDefaults = (segments: unknown): unknown => {
+  if (!Array.isArray(segments)) return segments;
+  const listed: readonly unknown[] = segments;
+  return listed.map((segment) => {
+    if (typeof segment !== 'object' || segment === null || !('kind' in segment)) return segment;
+    if (segment.kind === 'stage') return { access: 'paid', ...segment };
+    if (segment.kind === 'bridge') return { mediaSlots: [], ...segment };
+    return segment;
+  });
+};
+
 /** A row as the contract has it, parsed: the table is written by this module only, but a row is still a boundary. */
 const toVersion = (row: VersionRow): ScriptStructureVersion =>
   ScriptStructureVersionSchema.parse({
@@ -43,7 +59,7 @@ const toVersion = (row: VersionRow): ScriptStructureVersion =>
     name: row.name,
     moment: row.moment,
     color: row.color,
-    segments: row.segments,
+    segments: withSegmentDefaults(row.segments),
     frozen: row.frozenAt !== null,
     updatedAt: row.updatedAt.toISOString(),
   });

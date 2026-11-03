@@ -1,0 +1,6 @@
+# 2026-11-03 — CRM-04 lot d2 : la notification de vente à la créatrice — done
+Fait : job `notifications.creator_sale` (`{ eventId }`), mis en file par le registre des ventes dans la transaction qui publie `sale_detected`, sous la clé `notifications.creator_sale:<ligne>` en `preserve_run_at`. Le module `notifications` relit l'événement par le rôle admin, n'en garde que la clé de la ligne, sa part et la devise (`.pick`), trouve ses comptes (rôle `creator`, `creator_ids` = sa créatrice) et le fuseau de sa créatrice, puis appelle `notify` (motif `sale`, objet = la ligne). Message : « Nouvelle vente », « 12,40 € pour toi », lien `/ventes`.
+Décisions : dessin accepté par Bilan (la ligne de mise en file, le job lit l'événement plutôt que la ligne, aucun port de `connectors`) et par Chantier 7 (la logique dans `notifications`, ses comptes lus par le rôle admin, `/ventes` comme lien). Aucune migration. Pas de `tag` : deux ventes s'affichent comme deux, la rafale garde son tag à elle.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓, `sales-totals.integration.test.ts` et `notifications.integration.test.ts` ✓ sur un Postgres 16 local (`NIRVANA_TEST_PG_URL`).

@@ -1,6 +1,6 @@
 {
-  "id": "b1502edb-2cb0-45d5-b793-a22742fb1272",
-  "prevId": "6830c7f5-d142-4b24-a616-a7d09e8d0dd2",
+  "id": "ab692469-e413-41e6-a484-378cfd7eaadf",
+  "prevId": "44f32a6b-7314-4aea-848f-93d992f9c360",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14700,7 +14700,56 @@
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
+  "views": {
+    "public.creator_on_duty": {
+      "columns": {
+        "shift_id": {
+          "name": "shift_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "definition": "select s.id as shift_id, s.creator_id, s.platform_account_id, m.display_name, s.starts_at, s.ends_at\n        from shifts s\n        join team_members m on m.id = s.member_id\n        where s.cancelled_at is null\n          and m.status = 'active'\n          and current_setting('app.account_role', true) = 'creator'\n          and s.creator_id = nullif(current_setting('app.creator_id', true), '')::uuid",
+      "name": "creator_on_duty",
+      "schema": "public",
+      "isExisting": false,
+      "with": {
+        "securityBarrier": true
+      },
+      "materialized": false
+    }
+  },
   "_meta": {
     "columns": {},
     "schemas": {},

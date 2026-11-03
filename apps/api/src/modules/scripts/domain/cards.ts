@@ -64,11 +64,12 @@ export function duration(seconds: number): string {
     : `${String(minutes)}${NBSP}min${NBSP}${String(rest).padStart(2, '0')}`;
 }
 
-/** « de 1 à 2 min », « de 45 s à 1 min 30 », « de 2 min » when both are the same. */
+/** « de 1 à 2 min » (no-break spaces: a span is never cut), « de 45 s à 1 min 30 », « de 2 min » when both are the same. */
 function span(min: number, max: number): string {
   if (min === max) return `de ${duration(min)}`;
-  if (min % 60 === 0 && max % 60 === 0 && min >= 60) return `de ${String(min / 60)}${NBSP}à ${duration(max)}`;
-  return `de ${duration(min)} à ${duration(max)}`;
+  if (min % 60 === 0 && max % 60 === 0 && min >= 60)
+    return `de ${String(min / 60)}${NBSP}à${NBSP}${duration(max)}`;
+  return `de ${duration(min)}${NBSP}à${NBSP}${duration(max)}`;
 }
 
 const slotPhrase = (
@@ -217,6 +218,25 @@ export function wrap(text: string, width: number, lines: number): string[] {
   return kept;
 }
 
+/**
+ * The quote as OnlyScript wrote it, « … » (GRATUIT): no-break spaces inside the quotes, so a quote mark never stands
+ * alone on a line, and the tag kept when the quote is cut (Extension's review of SC-01 b). `tag` null: a series card.
+ */
+export function quoteLines(quote: string, tag: string | null, width: number, lines: number): string[] {
+  const close = `${NBSP}»${tag === null ? '' : ` (${tag})`}`;
+  const whole = wrap(`«${NBSP}${quote}${close}`, width, lines);
+  if (!(whole.at(-1) ?? '').endsWith('…')) return whole;
+  const cut = wrap(`«${NBSP}${quote}`, width, lines);
+  const last = cut.at(-1) ?? '';
+  const end = last.replace(/…$/u, '');
+  if (end === last && end.length + close.length <= width) cut[cut.length - 1] = `${end}${close}`;
+  else {
+    const room = Math.max(1, width - close.length - 1);
+    cut[cut.length - 1] = `${end.length > room ? end.slice(0, room).trimEnd() : end}…${close}`;
+  }
+  return cut;
+}
+
 const SIZE = 1080;
 const MID = SIZE / 2;
 const SERIF = "'Instrument Serif', serif";
@@ -231,7 +251,6 @@ interface TextStyle {
   readonly spacing?: number;
   readonly anchor?: 'start' | 'middle' | 'end';
   readonly fill?: string;
-  readonly opacity?: number;
 }
 
 /** The ink a card is written in: the readable one of the two, dark if a stored colour somehow reads with neither. */
@@ -248,7 +267,6 @@ export function cardSvg(content: CardContent, format: CardFormat): string {
     parts.push(
       `<text x="${String(x)}" y="${String(y)}" font-family="${style.family}" font-size="${String(style.size)}"` +
         ` font-weight="${String(style.weight ?? 400)}" fill="${style.fill ?? ink}"` +
-        (style.opacity === undefined ? '' : ` fill-opacity="${String(style.opacity)}"`) +
         (style.spacing === undefined ? '' : ` letter-spacing="${String(style.spacing)}"`) +
         ` text-anchor="${style.anchor ?? 'middle'}">${escape(value)}</text>`,
     );
@@ -287,6 +305,7 @@ function thumbnail(content: CardContent, text: DrawText): void {
     text(MID, y, line, { size: 60, family: SANS, weight: 600 });
     y += 74;
   }
+  text(MID, y + 30, `(${content.access})`, { size: 52, family: SANS, weight: 700, spacing: 3 });
 }
 
 /** The card's body at 1080: OnlyScript's centred column, between the top band and the foot. */
@@ -298,13 +317,11 @@ function body(content: CardContent, ink: string, text: DrawText, parts: string[]
     weight: 600,
     spacing: 5,
     anchor: 'start',
-    opacity: 0.85,
   });
   text(SIZE - 96, 120, wrap(content.structureName, 30, 1)[0] ?? '', {
     size: 26,
     family: SANS,
     anchor: 'end',
-    opacity: 0.75,
   });
 
   // The foot: a box per series, an arch for a bridge, an arrow for a series card, or nothing.
@@ -332,8 +349,8 @@ function body(content: CardContent, ink: string, text: DrawText, parts: string[]
   ];
   const plan = (layout: { subtitle: number; quote: number; shoot: number }) => {
     const subtitle = content.subtitle === '' ? [] : wrap(content.subtitle, 20, layout.subtitle);
-    const quoteText = `« ${content.quote} »${content.kind === 'series' ? '' : ` (${content.access})`}`;
-    const quote = content.quote === '' ? [] : wrap(quoteText, 40, layout.quote);
+    const tag = content.kind === 'series' ? null : content.access;
+    const quote = content.quote === '' ? [] : quoteLines(content.quote, tag, 40, layout.quote);
     const shoot = content.shoot === '' ? [] : wrap(content.shoot, 40, layout.shoot);
     // Baselines from the top of « ÉTAPE n »: its capitals are 84 high.
     let height = 84 + subtitle.length * 108;
@@ -360,7 +377,7 @@ function body(content: CardContent, ink: string, text: DrawText, parts: string[]
   if (chosen.quote.length > 0) y += 30;
   for (const line of chosen.quote) {
     y += 54;
-    text(MID, y, line, { size: 40, family: SANS, opacity: 0.92 });
+    text(MID, y, line, { size: 40, family: SANS });
   }
   if (chosen.shoot.length > 0) y += 30;
   for (const line of chosen.shoot) {
@@ -370,20 +387,21 @@ function body(content: CardContent, ink: string, text: DrawText, parts: string[]
   if (hintLines > 0) y += 16;
   for (const hint of shown) {
     y += 44;
-    text(MID, y, wrap(hint, 50, 1)[0] ?? '', { size: 32, family: SANS, opacity: 0.9 });
+    text(MID, y, wrap(hint, 50, 1)[0] ?? '', { size: 32, family: SANS });
   }
   if (more > 0) {
     y += 44;
     text(MID, y, `+${NBSP}${plural(more, 'indication', 'indications')}`, {
       size: 30,
       family: SANS,
-      opacity: 0.75,
     });
   }
   if (mood !== null) text(MID, y + moodHeight, mood, { size: 46, family: SERIF });
 
   if (foot === 'boxes') {
-    // OnlyScript's boxes: light, with dark text, whatever the colour.
+    // OnlyScript's boxes: light with dark text, dark with light text on a light colour, so that they show.
+    const boxFill = ink === SCRIPT_CARD_INKS.light ? SCRIPT_CARD_INKS.light : SCRIPT_CARD_INKS.dark;
+    const boxInk = ink === SCRIPT_CARD_INKS.light ? SCRIPT_CARD_INKS.dark : SCRIPT_CARD_INKS.light;
     const count = content.series.length;
     const gap = 36;
     const width = Math.min(300, (SIZE - 2 * 96 - gap * (count - 1)) / count);
@@ -391,9 +409,9 @@ function body(content: CardContent, ink: string, text: DrawText, parts: string[]
     content.series.forEach((label, index) => {
       const x = left + index * (width + gap);
       parts.push(
-        `<rect x="${String(x)}" y="920" width="${String(width)}" height="100" rx="22" fill="#ffffff" fill-opacity="0.9"/>`,
+        `<rect x="${String(x)}" y="920" width="${String(width)}" height="100" rx="22" fill="${boxFill}"/>`,
       );
-      text(x + width / 2, 984, label, { size: 36, family: SANS, weight: 600, fill: SCRIPT_CARD_INKS.dark });
+      text(x + width / 2, 984, label, { size: 36, family: SANS, weight: 600, fill: boxInk });
     });
   } else if (foot === 'arch')
     parts.push(

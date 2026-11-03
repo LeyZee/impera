@@ -5,3 +5,4 @@ Décisions : pas de dépendance nouvelle (ffmpeg est déjà là pour `media`) ; 
 Découvertes : aucune.
 Après les rendus montrés à Charles : le premier dessin (palette Jour/Nuit des jetons) est remplacé par celui d'OnlyScript, dans la couleur du script (ADR 0064, en attente de son « ok »).
 Vérifié : pnpm check, pnpm test, test d'intégration `script-structures` sur un Postgres 16 local.
+Relectures du 03/11 (Agent, Bilan, Extension) : indications des emplacements d'un pont lues contre `never_do`, `never_show`, `disgusts` ; migration 0091 régénérée sur 0088, complète les versions non figées (étape `paid`, pont sans emplacement), une version figée lue avec les mêmes valeurs ; couleur par défaut verrouillée contre la palette « Rouge » ; texte en encre pleine, contraste vérifié aussi sur les mélanges du dégradé ; « (PAYANT) » gardé quand la citation est coupée ; guillemets et durées insécables ; gratuit/payant sur la vignette ; cases de séries foncées sur une couleur claire.

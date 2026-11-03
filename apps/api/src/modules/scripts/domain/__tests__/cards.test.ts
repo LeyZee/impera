@@ -7,7 +7,7 @@ import {
 } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { cardContent, cardSvg, duration, shootSummary, wrap } from '../cards';
+import { cardContent, cardSvg, duration, quoteLines, shootSummary, wrap } from '../cards';
 
 const NBSP = ' ';
 const plain = (text: string): string => text.replaceAll(NBSP, ' ');
@@ -220,13 +220,27 @@ describe('cardSvg', () => {
     for (const hint of ['01 · Assise, jambes croisées', '02 · De dos', '03 · Gros plan'])
       expect(svg).toContain(hint);
     expect(svg).toContain('+ 2 indications');
-    expect(svg).not.toMatch(/>\+ \d+<\/text>/u);
+    expect(svg).not.toMatch(/>\+ \d+<\/text>/u); // A cut quote keeps its tag, and the text is drawn in the full ink (Extension's review).
+    expect(svg).toMatch(/… » \(PAYANT\)<\/text>/u);
+    expect(svg).not.toMatch(/<text[^>]*fill-opacity/u);
+  });
+
+  it('holds the quote marks to their words, and keeps the tag when the quote is cut', () => {
+    expect(quoteLines('Elle se dévoile', 'GRATUIT', 40, 2)).toEqual([
+      `«${NBSP}Elle se dévoile${NBSP}» (GRATUIT)`,
+    ]);
+    const cut = quoteLines('un deux trois quatre cinq six sept huit neuf dix onze douze', 'PAYANT', 20, 2);
+    expect(cut).toHaveLength(2);
+    expect(cut[1]).toMatch(/…\u00a0» \(PAYANT\)$/u);
+    for (const line of cut) expect(line.length).toBeLessThanOrEqual(20);
+    expect(quoteLines('Robe noire', null, 40, 1)).toEqual([`«${NBSP}Robe noire${NBSP}»`]);
   });
 
   it('gives the chatters a thumbnail of the stage, its name and what to shoot only', () => {
     const svg = cardSvg(card, 'thumbnail');
     expect(svg).toContain('>Canapé</text>');
     expect(svg).toContain('>ÉTAPE 1</text>');
+    expect(svg).toContain('>(PAYANT)</text>');
     expect(svg).not.toContain('Soirée au salon');
     expect(svg).not.toContain('Assise');
   });

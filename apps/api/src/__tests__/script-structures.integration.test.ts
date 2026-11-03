@@ -8,7 +8,7 @@ import {
   type CreateScriptStructureBody,
   type ScriptStage,
 } from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -188,6 +188,24 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
       409,
       'script_structure_stale_conflict',
     ]);
+  });
+
+  it('reads a version written before ADR 0064 as a paid stage and a bridge without slots', async () => {
+    const first = body();
+    await post(owner, first);
+    // As migration 0091 found them: no `access` on a stage, no `mediaSlots` on a bridge.
+    await test.admin.db.execute(sql`
+      UPDATE script_structure_versions SET segments = (
+        SELECT jsonb_agg(segment - 'access' - 'mediaSlots' || CASE WHEN segment->>'kind' = 'stage'
+          THEN jsonb_build_object('mediaSlots', segment->'mediaSlots') ELSE '{}'::jsonb END ORDER BY position)
+        FROM jsonb_array_elements(segments) WITH ORDINALITY AS listed(segment, position))
+      WHERE structure_id = ${first.id}`);
+    const frozen = await app.modules.scripts.structures.freeze(first.id, await ownerId());
+    const segments = frozen?.segments ?? [];
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments)
+      if (segment.kind === 'stage') expect(segment.access).toBe('paid');
+      else expect(segment.mediaSlots).toEqual([]);
   });
 
   it('keeps out of her queue a structure whose stage touches her limits, and names the stage', async () => {
