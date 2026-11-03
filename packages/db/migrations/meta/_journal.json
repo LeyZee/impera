@@ -603,6 +603,13 @@
       "when": 1793714372769,
       "tag": "0095_script_colour",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1793715681675,
+      "tag": "0096_creator_agency_rates",
+      "breakpoints": true
     }
   ]
 }

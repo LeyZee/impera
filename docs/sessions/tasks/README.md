@@ -85,7 +85,7 @@ Branche : task/<id>-<slug>
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
-| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | todo | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
+| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | in_progress | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
 | CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo (avec les catégories de l'ADR 0055) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
@@ -105,6 +105,12 @@ Branche : task/<id>-<slug>
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | blocked (bot Telegram) | CR-06, CR-08, P3-07 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
+| VEI-01 | Signaux de tendance et idées de contenu : la base, les filtres, le lien collé | veille | todo | ADR 0060, CR-05, CR-06 |
+| VEI-02 | Capture passive dans l'extension, page « Veille » et écran « Idées du jour » | veille | todo | VEI-01 |
+| VEI-03 | Le job du matin : signaux de Grok et idées du jour | veille | blocked (clé xAI) | VEI-01, P3-01 |
+| VEI-04 | Profil de contenu : ce qui marche chez elle et ce qu'elle sait faire | veille | blocked (clé de vision) | VEI-01, CR-06 |
+| VEI-05 | Statistiques du compte de la créatrice comme signaux | veille | blocked (PUB-02) | PUB-02, VEI-04 |
+| VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |

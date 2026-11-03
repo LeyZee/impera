@@ -447,6 +447,22 @@ describe('the shell’s landmarks (design 29/10)', () => {
     });
   });
 
+  it('never shows a creator the agent’s pill, nor reads the Dashboard for her (CR-02 c2b)', async () => {
+    const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
+    const router = renderApp(creator, '/aujourdhui');
+    await screen.findByRole('heading', { name: 'Aujourd’hui', level: 1 });
+    const nav = screen.getByRole('navigation', { name: 'Navigation' });
+    expect(nav.querySelector('.nv-rail__agent')).toBeNull();
+    await router.navigate({ to: '/moi/persona' });
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/moi/persona');
+    });
+    expect(nav.querySelector('.nv-rail__agent')).toBeNull();
+    // `GET /v1/dashboard` answers her 403: nothing on her screens asks for it.
+    const urls = vi.mocked(fetch).mock.calls.map(([url]) => (typeof url === 'string' ? url : ''));
+    expect(urls.filter((url) => url.includes('/v1/dashboard'))).toEqual([]);
+  });
+
   it('opens on a link to skip the rail, and puts the keyboard on the new section (NAV-20)', async () => {
     const router = renderApp(owner, '/suivi');
     const skip = await screen.findByRole('link', { name: 'Aller au contenu' });
@@ -716,7 +732,10 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
         'Parle à la persona comme un fan, avant qu’un vrai fan ne la lise : rien n’est envoyé.',
       ],
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
-      ['/creatrices', 'La fiche de chaque créatrice : sa persona, ses heures d’activité et son accès.'],
+      [
+        '/creatrices',
+        'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.',
+      ],
     ] as const) {
       renderApp(owner, path);
       const title = await screen.findByRole('heading', { level: 1 });

@@ -73,6 +73,11 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 - Moi : **Persona** (`/moi/persona`, son onglet Persona d'avant, enregistrement compris, avec la même demande avant de perdre des changements) et **Sécurité**. Les écrans d'un membre (dossier, factures, calendrier des shifts) la renvoient à sa persona ; `/moi/persona` renvoie un membre à son dossier.
 - Reste : fermer `/v1/dashboard` à son rôle et retirer du Dashboard ce qui ne servait qu'à elle (lot c2b) ; lot c3 (Ventes › Fans, lecteur de conversation).
 
+### 03/11/2026, lot c2b (le Dashboard fermé à son rôle)
+- `GET /v1/dashboard` : propriétaire et opérateur seuls (`requireRole('owner', 'operator')`) ; sa session reçoit 403. Les masques qui ne servaient qu'à elle disparaissent du serveur : les ventes Reveal sont lues pour tout lecteur restant.
+- Web : plus de `forCreator` dans `heroState`, `foldOf`, `live.ts`, `DashboardPage`, `AgentHero` ni le routeur ; la pastille de mode (`.db-modepill`) part avec. Elle lit sa journée dans son Aujourd'hui (lot c2), jamais l'état de l'agent (ADR 0042 § 8).
+- Reste : lot c3 (Ventes › Fans, lecteur de conversation) ; textes de l'éditeur de persona qui nomment encore « l'agent » devant elle (lot à part).
+
 ### 03/11/2026, lot c3 (Ventes : ses fans, une conversation en lecture)
 - Rail de la créatrice : **Aujourd'hui · Ventes · Moi**. Ventes (`/ventes`) est à elle seule : aucun rail de l'équipe ne le porte, et le routeur renvoie tout autre compte chez lui. Ses gains et ses ventes (CR-04) viendront au-dessus de ses fans.
 - **Tes fans**, par `GET /v1/creator-space/fans` (relu chaque minute, cinquante à la fois, « Plus de fans ») : pseudo, « vu il y a 12 min », et à côté le prix des messages qu'il a débloqués, TVA comprise, par devise (« 410 € et 12 $ »), jamais ses gains. Un fan sans conversation est listé et n'ouvre rien. Aucune note.

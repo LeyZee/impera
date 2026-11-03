@@ -109,6 +109,10 @@ export type ShiftFeedbackId = z.infer<typeof ShiftFeedbackIdSchema>;
 export const AccountPayRulesIdSchema = uuid.brand<'AccountPayRulesId'>();
 export type AccountPayRulesId = z.infer<typeof AccountPayRulesIdSchema>;
 
+/** The agency's percentage of a creator's net from a day on (ADR 0042 § 6, CR-04). */
+export const CreatorAgencyRateIdSchema = uuid.brand<'CreatorAgencyRateId'>();
+export type CreatorAgencyRateId = z.infer<typeof CreatorAgencyRateIdSchema>;
+
 /** A member's commission statement for one pay period: `draft`, `validated`, `paid` (EQ-04, ADR 0023). */
 export const CommissionStatementIdSchema = uuid.brand<'CommissionStatementId'>();
 export type CommissionStatementId = z.infer<typeof CommissionStatementIdSchema>;
