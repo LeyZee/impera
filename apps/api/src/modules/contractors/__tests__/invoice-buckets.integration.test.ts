@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { connect, createServer, type Socket } from 'node:net';
 
 import { AwsClient } from 'aws4fetch';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
@@ -78,6 +79,44 @@ describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage ob
     expect(await store().writeOnce('invoices/2026/b.pdf', first, sha(first), inOneDay())).toBe('written');
     expect(await store().writeOnce('invoices/2026/b.pdf', other, sha(other), inOneDay())).toBe('exists');
     expect((await store().read('invoices/2026/b.pdf'))?.bytes).toEqual(first);
+  });
+
+  it('reads after a 412 even when the bucket’s close of the connection reaches it late (CI, 03/11)', async (context) => {
+    // MinIO closes the connection right after a 412, without `Connection: close`. Behind docker-proxy, that close can
+    // arrive after the next request has left on the same connection: a proxy that passes it on 50 ms late does so
+    // every time.
+    const target = new URL(endpoint);
+    if (target.protocol !== 'http:') context.skip();
+    const open = new Set<Socket>();
+    const proxy = createServer((client) => {
+      open.add(client);
+      const upstream = connect(Number(target.port), target.hostname);
+      client.pipe(upstream);
+      upstream.on('data', (chunk: Buffer) => client.write(chunk));
+      upstream.on('end', () => setTimeout(() => client.end(), 50));
+      client.on('error', () => upstream.destroy());
+      upstream.on('error', () => client.destroy());
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = proxy.address();
+      if (address === null || typeof address === 'string') throw new Error('the proxy has no port');
+      const { port } = address;
+      const late = createS3InvoiceStore({
+        endpoint: `http://127.0.0.1:${String(port)}`,
+        region: REGION,
+        bucket,
+        accessKeyId: USER,
+        secretAccessKey: PASSWORD,
+      });
+      const bytes = bytesOf('%PDF-1.7 tard');
+      expect(await late.writeOnce('invoices/2026/late.pdf', bytes, sha(bytes), inOneDay())).toBe('written');
+      expect(await late.writeOnce('invoices/2026/late.pdf', bytes, sha(bytes), inOneDay())).toBe('exists');
+      expect((await late.read('invoices/2026/late.pdf'))?.bytes).toEqual(bytes);
+    } finally {
+      for (const socket of open) socket.destroy();
+      await new Promise((resolve) => proxy.close(resolve));
+    }
   });
 
   it('reads nothing for a key that holds nothing', async () => {

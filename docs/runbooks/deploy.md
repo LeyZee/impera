@@ -106,7 +106,7 @@ Une PR fusionnée dans `main` déclenche le déploiement. Rien à faire à la ma
 
 - Les migrations passent avant le nouveau code (`migrate`), en expand/contract (`operations.md`) : l'ancien code tourne encore sur le nouveau schéma pendant la bascule.
 - Un `migrate` en échec arrête le déploiement : l'ancienne version reste en ligne. Lire son journal, corriger par une nouvelle PR. Ne jamais modifier une migration déjà appliquée.
-- L'arrêt du worker est propre : SIGTERM, le job en cours a 25 s pour finir.
+- L'arrêt du worker est propre : SIGTERM, le job en cours a 25 s pour finir. Le signal est écouté dès la première ligne du processus : reçu pendant le démarrage, il est gardé et l'arrêt suit la fin du démarrage (OPS-03).
 
 ## 3. Revenir en arrière
 
