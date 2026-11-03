@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { PlatformSchema } from './enums';
+import { PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
 /**
@@ -446,6 +447,57 @@ export const SalesFeedLastCheckSchema = z.object({
     .nullable(),
 });
 export type SalesFeedLastCheck = z.infer<typeof SalesFeedLastCheckSchema>;
+
+/**
+ * Who sold a line of the register, by the owner's link of its platform chatter (ADR 0050 § 5, CRM-04): a member, the
+ * agent (the platform's bot, no commission), a chatter nobody linked yet, or no chatter at all. A refund is its sale's
+ * seller's. Never the fan. The creator never sees it (ADR 0053): her screens read their own view, which has no seller.
+ */
+export const SaleSellerSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('member'), memberId: TeamMemberIdSchema }),
+  z.object({ kind: z.literal('agent') }),
+  z.object({ kind: z.literal('unlinked') }),
+  z.object({ kind: z.literal('none') }),
+]);
+export type SaleSeller = z.infer<typeof SaleSellerSchema>;
+
+/**
+ * One row of the sales totals (CRM-04): an account's sales of one kind, by one seller, on one day, in one currency. The
+ * day is the sale's in the platform's zone, and a refund is taken off its sale's day, as the platform's daily
+ * statistics do (the rule of CRM-02). Sums only: no VAT nor commission is computed again (ADR 0050 § 8), and each
+ * currency stays apart. The amounts are integer cents, a refund taken off, so they can be negative.
+ */
+export const SalesTotalsRowSchema = z.object({
+  day: z.iso.date(),
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+  saleType: SaleTypeSchema,
+  seller: SaleSellerSchema,
+  sales: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+  /** The « Chiffre d'affaires »: the price the fans paid, VAT included, refunds taken off (Reveal's `revenueTtc`). */
+  grossInclVatMinor: signedCents,
+  grossExclVatMinor: signedCents,
+  /** What the agency and the creator share (`netAmount`). */
+  netMinor: signedCents,
+  agencyMinor: signedCents,
+  /** The creator's part (`modelRevenue`, ADR 0050 § 8). */
+  creatorMinor: signedCents,
+});
+export type SalesTotalsRow = z.infer<typeof SalesTotalsRowSchema>;
+
+/**
+ * A creator's sales totals from `from` to `to`, both days included. A refund of those days whose sale is older than the
+ * register is counted in no row: `refundsWithoutSale` says how many, as CRM-02's note does.
+ */
+export const SalesTotalsSchema = z.object({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  rows: z.array(SalesTotalsRowSchema),
+  refundsWithoutSale: z.number().int().min(0),
+});
+export type SalesTotals = z.infer<typeof SalesTotalsSchema>;
 
 /** The refusals of `/v1/settings/sales-feeds`, each with its French sentence in `message`. */
 export const SALES_FEED_ERROR_CODES = [

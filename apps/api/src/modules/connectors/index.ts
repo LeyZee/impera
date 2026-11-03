@@ -35,6 +35,10 @@ export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
 export { salesFeedReadsForPay } from './infra/db/pay-reads';
 /** @public The lines pay reads, their author and the range of a read (CRM-03). */
 export type { PaySaleAuthor, PaySaleLine, PaySalesOfKeys, PaySalesRange } from './infra/db/pay-reads';
+/** @public The sales totals of CRM-04, in the caller's transaction: the Dashboard's and the evening digest's one sum. */
+export { salesFeedTotals } from './infra/db/totals-reads';
+/** @public Which totals a read gives (CRM-04). */
+export type { SalesTotalsQuery } from './infra/db/totals-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
 
 function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {

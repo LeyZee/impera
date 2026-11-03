@@ -10,6 +10,8 @@ import {
   InvoiceIdSchema,
   MessageIdSchema,
   newId,
+  PlatformAccountIdSchema,
+  SalesLineIdSchema,
   TeamMemberIdSchema,
 } from './ids';
 
@@ -158,6 +160,45 @@ describe('events', () => {
     ]) {
       expect(
         EVENT_PAYLOADS.invoice_contested.strict().safeParse({ ...payload, ...patch }).success,
+        JSON.stringify(patch),
+      ).toBe(false);
+    }
+  });
+
+  it('rings a sale with its amounts and its seller, never its fan (CRM-04)', () => {
+    const payload = {
+      saleId: newId(SalesLineIdSchema),
+      platform: 'reveal',
+      platformAccountId: newId(PlatformAccountIdSchema),
+      saleType: 'ppv',
+      occurredAt: '2026-11-03T09:58:00.000Z',
+      currency: 'EUR',
+      grossInclVatMinor: 1200,
+      netMinor: 800,
+      agencyMinor: 300,
+      creatorMinor: 500,
+      seller: { kind: 'member', memberId: newId(TeamMemberIdSchema) },
+    };
+    const event = DomainEventSchema.parse({
+      ...envelope(),
+      creatorId: newId(CreatorIdSchema),
+      type: 'sale_detected',
+      payload,
+    });
+    expect(event.type).toBe('sale_detected');
+    for (const seller of [{ kind: 'agent' }, { kind: 'unlinked' }, { kind: 'none' }]) {
+      expect(EVENT_PAYLOADS.sale_detected.safeParse({ ...payload, seller }).success).toBe(true);
+    }
+    // A member without his id, a seller kind of nowhere, a negative amount, the fan in any shape.
+    for (const patch of [
+      { seller: { kind: 'member' } },
+      { seller: { kind: 'creator' } },
+      { netMinor: -800 },
+      { platformFanId: 'fan_test_01' },
+      { fan: 'fan_test_01' },
+    ]) {
+      expect(
+        EVENT_PAYLOADS.sale_detected.strict().safeParse({ ...payload, ...patch }).success,
         JSON.stringify(patch),
       ).toBe(false);
     }

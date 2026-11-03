@@ -30,6 +30,7 @@ function line(overrides: Partial<CheckLine> & Pick<CheckLine, 'platformSaleId'>)
     platformModelId: 'model_test_01',
     platformChatterId: 'chatter_test_01',
     grossInclVat: 1200,
+    grossExclVat: 1000,
     net: 800,
     agency: 300,
     creator: 500,

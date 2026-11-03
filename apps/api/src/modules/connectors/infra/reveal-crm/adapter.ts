@@ -11,6 +11,7 @@ import {
 } from '@nirvana/contracts';
 import type { z } from 'zod';
 
+import { SALES_FEED_TIME_ZONES } from '../../domain/sale-days';
 import type {
   DateRange,
   PlatformSalesFeed,
@@ -32,7 +33,7 @@ import {
 const REVEAL_CRM_BASE_URL = 'https://api.reveal.me';
 
 /** The zone Reveal counts its statistics' days in; an answer in another one is not read. */
-const REVEAL_TIME_ZONE = 'Europe/Paris';
+const REVEAL_TIME_ZONE = SALES_FEED_TIME_ZONES.reveal;
 /** The most `/v1/sales` gives in one page. */
 const PAGE_SIZE = 500;
 const CALL_TIMEOUT_MS = 15_000;

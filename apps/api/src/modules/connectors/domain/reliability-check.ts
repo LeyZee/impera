@@ -6,7 +6,6 @@ import {
   type PlatformChatterDailyStat,
   type PlatformDailyStat,
   type PlatformModel,
-  type SaleEvent,
   type SalesFeedCheckChatter,
   type SalesFeedCheckDay,
   type SalesFeedCheckNote,
@@ -17,6 +16,7 @@ import {
 } from '@nirvana/contracts';
 
 import { SalesFeedExportUnprocessable } from './errors';
+import { onSaleDays, sumsBy, type SaleDayLine } from './sale-days';
 import type { ChatterLink } from './sales-feed';
 
 /**
@@ -26,16 +26,9 @@ import type { ChatterLink } from './sales-feed';
  */
 
 /** A line of the register (recorded or in quarantine), with no fan data. */
-export interface CheckLine {
-  readonly platformSaleId: string;
-  readonly event: SaleEvent;
-  readonly occurredAt: Date;
+export interface CheckLine extends SaleDayLine {
   readonly platformModelId: string;
   readonly platformChatterId: string | null;
-  readonly grossInclVat: number;
-  readonly net: number;
-  readonly agency: number;
-  readonly creator: number;
   /** Recorded for a linked model; `false` in quarantine. */
   readonly linked: boolean;
 }
@@ -312,16 +305,6 @@ function isZero(totals: SalesFeedCheckTotals): boolean {
   return Object.values(totals).every((value) => value === null || value === 0);
 }
 
-function signed(line: CheckLine): SalesFeedCheckTotals {
-  const sign = line.event === 'refund' ? -1 : 1;
-  return {
-    grossInclVat: sign * line.grossInclVat,
-    agency: sign * line.agency,
-    creator: sign * line.creator,
-    net: sign * line.net,
-  };
-}
-
 export interface CheckSources {
   readonly platform: SalesFeedCheckReport['platform'];
   readonly from: string;
@@ -359,31 +342,25 @@ export function buildCheckReport(sources: CheckSources): SalesFeedCheckReport {
   const inDays = (date: string): boolean => date >= from && date <= to;
   const dayOf = (at: Date): string => calendarDayAt(at, timeZone);
 
-  const sales = new Map<string, CheckLine>();
-  for (const line of sources.lines) if (line.event === 'sale') sales.set(line.platformSaleId, line);
-
-  const register = new Map<string, SalesFeedCheckTotals>();
+  // The register on its sales' days, refunds taken off their sale's (`sale-days.ts`, shared with CRM-04's totals).
+  const { placed, refundsWithoutSale } = onSaleDays(sources.lines, { from, to, timeZone });
+  const register = new Map<string, SalesFeedCheckTotals>(
+    [...sumsBy(placed, ({ line, day }) => `${day}|${line.platformModelId}`)].map(([key, sums]) => [
+      key,
+      { grossInclVat: sums.grossInclVat, agency: sums.agency, creator: sums.creator, net: sums.net },
+    ]),
+  );
   const linkedSeen = new Map<string, boolean>();
-  const chatterRegister = new Map<string | null, { net: number; sales: number }>();
-  let refundsWithoutSale = 0;
-  for (const line of sources.lines) {
-    const sale = line.event === 'sale' ? line : sales.get(line.platformSaleId);
-    if (sale === undefined) {
-      if (inDays(dayOf(line.occurredAt))) refundsWithoutSale += 1;
-      continue;
-    }
-    const date = dayOf(sale.occurredAt);
-    if (!inDays(date)) continue;
-    const key = `${date}|${line.platformModelId}`;
-    register.set(key, addTotals(register.get(key) ?? ZERO, signed(line)));
+  for (const { line } of placed) {
     linkedSeen.set(line.platformModelId, line.linked || (linkedSeen.get(line.platformModelId) ?? false));
-    const chatter = chatterRegister.get(sale.platformChatterId) ?? { net: 0, sales: 0 };
-    const refund = line.event === 'refund';
-    chatterRegister.set(sale.platformChatterId, {
-      net: chatter.net + (refund ? -line.net : line.net),
-      sales: chatter.sales + (refund ? -1 : 1),
-    });
   }
+  // A refund is its sale's chatter's, and takes one off their count of sales, as the platform's statistics do.
+  const chatterRegister = new Map<string | null, { net: number; sales: number }>(
+    [...sumsBy(placed, ({ sale }) => sale.platformChatterId)].map(([id, sums]) => [
+      id,
+      { net: sums.net, sales: sums.sales - sums.refunds },
+    ]),
+  );
 
   const stats = new Map<string, SalesFeedCheckTotals>();
   if (sources.stats.ok) {
@@ -441,7 +418,9 @@ export function buildCheckReport(sources: CheckSources): SalesFeedCheckReport {
 
   const chatters = chatterRows(sources, chatterRegister, inDays);
   const notes: SalesFeedCheckNote[] = [...(sources.exported?.notes ?? [])];
-  if (refundsWithoutSale > 0) notes.push({ kind: 'refund_without_sale', count: refundsWithoutSale });
+  if (refundsWithoutSale.length > 0) {
+    notes.push({ kind: 'refund_without_sale', count: refundsWithoutSale.length });
+  }
   if (!sources.stats.ok) notes.push({ kind: 'stats_unavailable', errorKind: sources.stats.errorKind });
   if (sources.firstLineAt === null || dayOf(sources.firstLineAt) > from) {
     notes.push({ kind: 'register_starts_after', firstLineAt: sources.firstLineAt?.toISOString() ?? null });
