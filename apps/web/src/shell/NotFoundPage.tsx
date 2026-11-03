@@ -20,7 +20,7 @@ export function NotFoundPage(): JSX.Element {
           <h2>Cette page n’existe pas</h2>
           <p>L’adresse est peut-être mal écrite, ou la page a changé de place.</p>
           <Link to={home} className="nv-btn nv-btn--soft nv-btn--sm">
-            Revenir à {sectionLabel(home, rail.kind)}
+            Revenir à {sectionLabel(home)}
           </Link>
         </div>
       </Panel>

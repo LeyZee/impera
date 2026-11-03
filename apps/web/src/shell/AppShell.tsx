@@ -76,7 +76,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
 
   // The tab's title names the screen and its section, so that several open tabs read apart (NAV-12).
   useEffect(() => {
-    document.title = documentTitle(pathname, current, rail.kind);
+    document.title = documentTitle(pathname, current);
   }, [pathname, current, rail.kind]);
 
   // Another section chosen: the keyboard starts on its title, not back at the top of the rail (NAV-20).

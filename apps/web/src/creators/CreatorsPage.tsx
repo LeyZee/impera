@@ -1,8 +1,9 @@
 import type { CreatorId } from '@nirvana/contracts';
 import { useBlocker, useRouteContext } from '@tanstack/react-router';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
+import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
@@ -153,7 +154,7 @@ export function CreatorsPage({
       <PersonaSection
         key={selected ?? 'none'}
         creatorId={selected}
-        canSave={user.role === 'owner' || user.role === 'creator'}
+        canSave={isOwner}
         isOwner={isOwner}
         creatorName={current?.displayName ?? null}
         timezone={current?.timezone ?? null}
@@ -161,23 +162,19 @@ export function CreatorsPage({
       />
     );
   };
-  // Persona · Heures d'activité · Pourcentage are the views of the sheet, in the header like every section's sub-tabs (NAV-10);
-  // they say where one is: the eyebrow then says nothing more (CREA-24).
+  // Persona · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every section's
+  // sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
   const switchShown = isOwner && current !== undefined && !showForm && query.isSuccess;
-  // A creator reads her own sheet, her tab named « Persona » (NAV-18).
-  const own = user.role === 'creator';
 
   return (
     <Page>
       <PageHeader
-        eyebrow={current === undefined || showForm || switchShown || own ? undefined : current.displayName}
-        title={own ? 'Persona' : 'Créatrices'}
+        eyebrow={current === undefined || showForm || switchShown ? undefined : current.displayName}
+        title="Créatrices"
         lead={
-          own
-            ? 'Ta fiche : ce que l’agent sait de toi et la façon dont il parle.'
-            : isOwner
-              ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.'
-              : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
+          isOwner
+            ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.'
+            : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
           <>
@@ -255,29 +252,5 @@ export function CreatorsPage({
         {body()}
       </div>
     </Page>
-  );
-}
-
-/** Asked in the page, never with `confirm()` (docs/design/README.md): drop the changes not saved, or stay. */
-function LeaveConfirm({ onLeave, onStay }: { onLeave: () => void; onStay: () => void }): JSX.Element {
-  const stayRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    stayRef.current?.focus();
-  }, []);
-  return (
-    <div className="nv-confirm ps-leave" role="alertdialog" aria-labelledby="ps-leave-text">
-      <p id="ps-leave-text">
-        <b>Tes modifications ne sont pas enregistrées.</b> Si tu quittes cette fiche, elles seront perdues.
-      </p>
-      <div className="nv-confirm__actions">
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--destructive" onClick={onLeave}>
-          Les abandonner
-        </button>
-        {/* Soft, not neon: the one neon of the screen stays on « Enregistrer » (CREA-07). */}
-        <button type="button" className="nv-btn nv-btn--soft" ref={stayRef} onClick={onStay}>
-          Rester
-        </button>
-      </div>
-    </div>
   );
 }

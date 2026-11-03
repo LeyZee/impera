@@ -1276,3 +1276,25 @@ button.sc-duty__one:active {
     transition: none;
   }
 }
+/* Her Aujourd'hui: who answers her fans, quiet lines, never a hero (CR-02, prototype validé le 02/11). */
+.sc-fans {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4) var(--nv-space-5);
+}
+.sc-fans__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+}
+.sc-fans__line {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.sc-fans__line b {
+  color: var(--nv-ink-muted);
+  font-weight: 600;
+}
