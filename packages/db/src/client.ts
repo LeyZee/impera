@@ -80,6 +80,9 @@ export function withMember<T>(
       .from(schema.teamMembers)
       .where(eq(schema.teamMembers.userId, userId));
     const role = UserRoleSchema.safeParse(account?.role);
+    // The account's role as the base holds it (CR-02): a creator who came this way by mistake stays a creator to the
+    // restrictive policies that read it, never the agency. Unset for an unknown account.
+    if (role.success) await tx.execute(sql`select set_config('app.account_role', ${role.data}, true)`);
     const scope = role.success
       ? teamScopeFor(
           role.data,
@@ -93,6 +96,42 @@ export function withMember<T>(
       : 'self';
     await tx.execute(sql`select set_config('app.team_scope', ${scope}, true)`);
     return fn(tx, scope);
+  }, config);
+}
+
+/** The creator's own account does not open a creator's reading (CR-02): not a `creator`, or not linked to exactly one. */
+export class NotACreatorAccount extends Error {
+  constructor() {
+    super('withCreatorAccount: the account is not a creator linked to one creator');
+    this.name = 'NotACreatorAccount';
+  }
+}
+
+/**
+ * Runs `fn` in a transaction as a creator's own account (CR-02, ADR 0042 § 2): the only path of every route of her
+ * space. Inside the transaction it reads `user.role` and the one creator linked to the account (a constraint holds it
+ * to exactly one), never from the caller, then sets `app.user_id`, `app.account_role` (`creator`) and
+ * `app.creator_id`, all `SET LOCAL`. The tenant policies then show her creator only, and the restrictive policies
+ * that read `app.account_role` close to her what the agency alone reads or writes. Any other account throws.
+ */
+export function withCreatorAccount<T>(
+  db: Database,
+  userId: string,
+  fn: (tx: Transaction, creatorId: string) => Promise<T>,
+  config?: TransactionConfig,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    const [account] = await tx
+      .select({ role: schema.user.role, creatorIds: schema.user.creatorIds })
+      .from(schema.user)
+      .where(eq(schema.user.id, userId));
+    const [creatorId, ...others] = account?.creatorIds ?? [];
+    if (account?.role !== 'creator' || creatorId === undefined || others.length > 0)
+      throw new NotACreatorAccount();
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`select set_config('app.account_role', 'creator', true)`);
+    await tx.execute(sql`select set_config('app.creator_id', ${creatorId}, true)`);
+    return fn(tx, creatorId);
   }, config);
 }
 

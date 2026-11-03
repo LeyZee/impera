@@ -9,7 +9,16 @@ import { sql } from 'drizzle-orm';
 import { boolean, check, index, pgTable, primaryKey, text, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz, updatedAt } from './columns';
+import {
+  closedToCreator,
+  createdAt,
+  enumCheck,
+  enumText,
+  id,
+  tenantPolicy,
+  timestampTz,
+  updatedAt,
+} from './columns';
 import { conversationEvents } from './conversations';
 import { creators } from './tenancy';
 
@@ -64,6 +73,7 @@ export const customAlerts = pgTable(
     ),
     check('custom_alerts_matcher_check', sql`${t.phrase} is not null or cardinality(${t.keywords}) > 0`),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );
 
@@ -89,6 +99,7 @@ export const alertSeen = pgTable(
   (t) => [
     primaryKey({ name: 'alert_seen_pkey', columns: [t.creatorId, t.eventId] }),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );
 
@@ -114,5 +125,6 @@ export const systemAlertSettings = pgTable(
     enumCheck('system_alert_settings', t.code, SYSTEM_ALERT_CODES),
     check('system_alert_settings_keyword_check', sql`${t.code} <> 'keyword' or ${t.enabled}`),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );
