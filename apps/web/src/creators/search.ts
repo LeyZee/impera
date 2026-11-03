@@ -5,7 +5,7 @@ import { CreatorIdSchema, type CreatorId } from '@nirvana/contracts';
  * reload or a step back lands on the same sheet of the same creator (lessons of #217 and of the recette 28/10).
  */
 export interface CreatorsSearch {
-  readonly onglet?: 'heures';
+  readonly onglet?: 'heures' | 'acces';
   readonly creatrice?: CreatorId;
 }
 
@@ -13,15 +13,18 @@ export interface CreatorsSearch {
 export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSearch {
   const creator = CreatorIdSchema.safeParse(search['creatrice']);
   return {
-    ...(search['onglet'] === 'heures' ? { onglet: 'heures' } : {}),
+    ...(search['onglet'] === 'heures' || search['onglet'] === 'acces' ? { onglet: search['onglet'] } : {}),
     ...(creator.success ? { creatrice: creator.data } : {}),
   };
 }
 
 /** The address of a sheet: the persona leaves `onglet` out, no creator leaves `creatrice` out. */
-export function creatorsSearch(tab: 'persona' | 'hours', creatorId: CreatorId | null): CreatorsSearch {
+export function creatorsSearch(
+  tab: 'persona' | 'hours' | 'access',
+  creatorId: CreatorId | null,
+): CreatorsSearch {
   return {
-    ...(tab === 'hours' ? { onglet: 'heures' } : {}),
+    ...(tab === 'hours' ? { onglet: 'heures' } : tab === 'access' ? { onglet: 'acces' } : {}),
     ...(creatorId === null ? {} : { creatrice: creatorId }),
   };
 }

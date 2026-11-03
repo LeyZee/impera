@@ -61,6 +61,12 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 - `inspect` et `redeem` servent les deux sortes de liens : le compte visé est celui du membre ou le `user_id` du lien. L'aperçu dit à qui est le lien (`account: 'member' | 'creator'`, union discriminée) : celui d'un membre porte son pays, celui d'une créatrice son nom de créatrice et aucun pays. La page Bienvenue d'une créatrice dit « Ton espace créatrice » à la place du pays et, en note, « Ton nom est faux ? Dis-le à ton agence. » (relecture d'Extension). Un lien mort dit à tous « Demande un nouveau lien à la personne qui te l’a envoyé. »
 - Reste : le bouton « Inviter » sur sa fiche (Créatrices) et l'état du lien, avec les écrans du lot c.
 
+### 03/11/2026, lot c1 (son accès, sur sa fiche)
+- `GET /v1/creators/:creatorId/account` (propriétaire seul) : `{ account: null }` tant qu'elle n'a pas de compte, sinon son e-mail, `invitationPending` (aucun mot de passe choisi) et l'échéance du lien vivant. 404 `creator_not_found` pour une créatrice inconnue ; sa propre session reçoit 403.
+- Créatrices › **Accès** (`?onglet=acces`, propriétaire seul ; tout autre rôle est ramené à Persona par le routeur) : « Son espace ». Sans compte, son e-mail et « Créer son lien » ; ensuite l'état de son lien (pas encore ouvert jusqu'à …, expiré, mot de passe choisi) et « Remplacer le lien », « Nouveau lien » ou « Lien de nouveau mot de passe ». Le message à copier dit « <nom>, ton espace t’attend. Choisis ton mot de passe ici : », jamais l'équipe. Le lien créé reste à l'écran pendant que son compte se relit. Les refus du serveur sont dits en clair ; une connexion trop ancienne redemande le mot de passe, comme pour un membre.
+- `LinkShare` sort de `ShareLink` (même rendu, message d'accueil fourni par l'appelant) pour servir les deux fiches.
+- Reste : lot c2 (rail de la créatrice, Aujourd'hui avec « qui est en poste », Moi, fermeture de `/v1/dashboard` à son rôle) ; lot c3 (Ventes › Fans, lecteur de conversation).
+
 ### Lot futur : les insights de sa base de fans (demande de Charles, 03/11 11h40)
 - Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines », à la place de toute note par fan (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.
 - Garde-fous à tenir : agrégats seulement à partir des faits `declared` (ni `inferred`, ni `operator_note`, ni `commercial`) ; un pourcentage ne s'affiche qu'au-delà d'un seuil de fans par case, sinon « trop peu de fans » (pas de réidentification) ; calcul côté serveur, l'écran ne calcule rien.

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { createInvitationLink, MEMBERS_KEY } from './api';
 import { deadline, ERROR_MESSAGES } from './model';
+import './team.css';
 
 import { CodeInput } from '@/auth/CodeInput';
 import { confirmIdentity, type ConfirmResult } from '@/settings/services/api';
@@ -19,6 +20,13 @@ const SHARE_TEXT: Record<InvitationLinkPurpose, (name: string) => string> = {
   invitation: (name) => `Bienvenue dans l’équipe, ${name} ! Choisis ton mot de passe ici :`,
   reset: (name) => `${name}, choisis ton nouveau mot de passe ici :`,
 };
+
+/** What making a link came to, said in the screen's own words: a refusal carries its sentence. */
+export type LinkOutcome =
+  | { readonly kind: 'ok'; readonly value: InvitationLinkCreated }
+  | { readonly kind: 'reauth' }
+  | { readonly kind: 'refused'; readonly message: string }
+  | { readonly kind: 'failed' };
 
 type Step =
   | { readonly kind: 'idle' }
@@ -51,33 +59,70 @@ export function ShareLink({
   primary?: boolean;
 }): JSX.Element {
   const client = useQueryClient();
+  return (
+    <LinkShare
+      label={label}
+      initial={initial}
+      primary={primary}
+      welcome={SHARE_TEXT[purpose](name)}
+      make={async () => {
+        const outcome = await createInvitationLink(memberId, purpose);
+        if (outcome.kind === 'ok') await client.invalidateQueries({ queryKey: MEMBERS_KEY });
+        return outcome.kind === 'refused'
+          ? { kind: 'refused', message: ERROR_MESSAGES[outcome.code] }
+          : outcome;
+      }}
+    />
+  );
+}
+
+/**
+ * The walk of any access link, a member's or a creator's own (CR-02): the button, the password asked again when the
+ * sign-in is not recent, then the link handed over with its message. `make` says how the link is made and what a
+ * refusal says.
+ */
+export function LinkShare({
+  make,
+  welcome,
+  label,
+  initial = null,
+  primary = false,
+  disabled = false,
+}: {
+  make: () => Promise<LinkOutcome>;
+  /** The message's words before the link: « Bienvenue dans l’équipe, Théo ! Choisis ton mot de passe ici : ». */
+  welcome: string;
+  label: string;
+  initial?: InvitationLinkCreated | null;
+  primary?: boolean;
+  /** Nothing to make the link with yet (an e-mail still to type). */
+  disabled?: boolean;
+}): JSX.Element {
   const [step, setStep] = useState<Step>(
     initial === null ? { kind: 'idle' } : { kind: 'made', link: initial },
   );
 
-  const make = async (): Promise<void> => {
+  const run = async (): Promise<void> => {
     setStep({ kind: 'busy' });
-    const outcome = await createInvitationLink(memberId, purpose);
-    if (outcome.kind === 'ok') {
-      setStep({ kind: 'made', link: outcome.value });
-      await client.invalidateQueries({ queryKey: MEMBERS_KEY });
-    } else if (outcome.kind === 'reauth') setStep({ kind: 'password' });
+    const outcome = await make();
+    if (outcome.kind === 'ok') setStep({ kind: 'made', link: outcome.value });
+    else if (outcome.kind === 'reauth') setStep({ kind: 'password' });
     else
       setStep({
         kind: 'error',
         message:
           outcome.kind === 'refused'
-            ? ERROR_MESSAGES[outcome.code]
+            ? outcome.message
             : 'Aucun lien n’a été créé : le serveur ne répond pas. Réessaie dans un instant.',
       });
   };
 
-  if (step.kind === 'made') return <Made link={step.link} name={name} purpose={purpose} primary={primary} />;
+  if (step.kind === 'made') return <Made link={step.link} welcome={welcome} primary={primary} />;
   if (step.kind === 'password') {
     return (
       <PasswordStep
         onConfirmed={() => {
-          void make();
+          void run();
         }}
         onCancel={() => {
           setStep({ kind: 'idle' });
@@ -90,10 +135,10 @@ export function ShareLink({
       <button
         type="button"
         className="nv-btn nv-btn--soft nv-btn--sm tm-self-start"
-        disabled={step.kind === 'busy'}
+        disabled={disabled || step.kind === 'busy'}
         aria-busy={step.kind === 'busy'}
         onClick={() => {
-          void make();
+          void run();
         }}
       >
         {step.kind === 'busy' ? 'Création du lien…' : label}
@@ -113,19 +158,17 @@ export function ShareLink({
  */
 function Made({
   link,
-  name,
-  purpose,
+  welcome,
   primary,
 }: {
   link: InvitationLinkCreated;
-  name: string;
-  purpose: InvitationLinkPurpose;
+  welcome: string;
   primary: boolean;
 }): JSX.Element {
   const [copied, setCopied] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const canShare = typeof navigator.share === 'function';
-  const message = `${SHARE_TEXT[purpose](name)} ${link.url}`;
+  const message = `${welcome} ${link.url}`;
 
   const copy = async (): Promise<void> => {
     try {
@@ -166,7 +209,7 @@ function Made({
             type="button"
             className={`nv-btn nv-btn--soft${primary ? '' : ' nv-btn--sm'}`}
             onClick={() => {
-              void navigator.share({ text: SHARE_TEXT[purpose](name), url: link.url }).catch(() => undefined);
+              void navigator.share({ text: welcome, url: link.url }).catch(() => undefined);
             }}
           >
             Partager
@@ -174,8 +217,8 @@ function Made({
         ) : null}
       </div>
       <p className="tm-hint">
-        Le message : « {SHARE_TEXT[purpose](name)} » suivi du lien. Valable jusqu’à{' '}
-        {deadline(new Date(link.expiresAt))}, pour un seul usage. Un nouveau lien annule celui-ci.
+        Le message : « {welcome} » suivi du lien. Valable jusqu’à {deadline(new Date(link.expiresAt))}, pour
+        un seul usage. Un nouveau lien annule celui-ci.
       </p>
     </div>
   );

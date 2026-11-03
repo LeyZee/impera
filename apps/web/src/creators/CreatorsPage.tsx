@@ -2,6 +2,7 @@ import type { CreatorId } from '@nirvana/contracts';
 import { useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
+import { AccessSection } from './AccessSection';
 import { NewCreatorForm } from './NewCreatorForm';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
@@ -10,13 +11,14 @@ import { creatorsSearch } from './search';
 
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
-export type CreatorTab = 'persona' | 'hours';
+export type CreatorTab = 'persona' | 'hours' | 'access';
 
 /**
  * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
- * not to the settings), then for the owner alone her hours (P3-14). With several creators, a row of chips picks one;
- * with one, her name is enough. The owner adds a creator here. The tab and the creator live in the address
- * (`?onglet=heures&creatrice=<id>`). Changes not saved are never lost silently: leaving asks first.
+ * not to the settings), then for the owner alone her hours (P3-14) and her access to her own space (CR-02). With
+ * several creators, a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and
+ * the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes not saved are never lost silently:
+ * leaving asks first.
  */
 export function CreatorsPage({
   tab,
@@ -126,6 +128,9 @@ export function CreatorsPage({
         </section>
       );
     }
+    if (shown === 'access' && current !== undefined) {
+      return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
+    }
     return shown === 'hours' && current !== undefined ? (
       <HoursSection
         key={current.id}
@@ -160,7 +165,7 @@ export function CreatorsPage({
           own
             ? 'Ta fiche : ce que l’agent sait de toi et la façon dont il parle.'
             : isOwner
-              ? 'La fiche de chaque créatrice : sa persona et ses heures d’activité.'
+              ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité et son accès.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
@@ -180,6 +185,12 @@ export function CreatorsPage({
                     search: creatorsSearch('hours', selected),
                     current: shown === 'hours',
                     label: 'Heures d’activité',
+                  },
+                  {
+                    to: '/creatrices',
+                    search: creatorsSearch('access', selected),
+                    current: shown === 'access',
+                    label: 'Accès',
                   },
                 ]}
               />
