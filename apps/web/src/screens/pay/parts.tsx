@@ -1,4 +1,4 @@
-import type { CollectiveTier, CommissionStatement, PayPeriod } from '@nirvana/contracts';
+import type { CollectiveTier, CommissionStatement, PayPeriod } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import type { PayNames } from './data';

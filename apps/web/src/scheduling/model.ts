@@ -14,8 +14,8 @@ import type {
   ShiftSwapRequest,
   ShiftSwapStatus,
   ShiftTemplate,
-} from '@nirvana/contracts';
-import { seatsOf, slotWindowsOf } from '@nirvana/contracts';
+} from '@impera/contracts';
+import { seatsOf, slotWindowsOf } from '@impera/contracts';
 
 import type { SchedulingRefusalCode } from './api';
 import {
@@ -309,7 +309,7 @@ const PLATFORMS: Readonly<Record<Platform, string>> = {
   reveal: 'Reveal',
   onlyfans: 'OnlyFans',
   instagram: 'Instagram',
-  nirvana: 'Nirvana',
+  impera: 'Impera',
 };
 
 export const platformName = (platform: Platform): string => PLATFORMS[platform];
@@ -636,7 +636,7 @@ export function dayStateOf(mine: MyShifts, now: Date): DayState {
     : { kind: 'later', shift: mine.next };
 }
 
-/** Whether the member's creators are open in Nirvana now (ADR 0025): what Suivi says « Tu n'es pas en poste » about. */
+/** Whether the member's creators are open in Impera now (ADR 0025): what Suivi says « Tu n'es pas en poste » about. */
 export function accessOpen(mine: MyShifts, now: Date): boolean {
   const state = dayStateOf(mine, now);
   return state.kind === 'on' || state.kind === 'ended' || state.kind === 'soon';

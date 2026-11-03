@@ -15,9 +15,9 @@ import {
   type CreatorId,
   type InvitationLinkCreated,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

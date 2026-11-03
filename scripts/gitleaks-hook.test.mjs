@@ -80,7 +80,7 @@ const noScan =
       : false;
 
 test('refuses a push that carries an invented secret', { skip: noScan }, () => {
-  const repo = mkdtempSync(join(tmpdir(), 'nirvana-gitleaks-'));
+  const repo = mkdtempSync(join(tmpdir(), 'impera-gitleaks-'));
   const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
   try {
     git('init', '-q');

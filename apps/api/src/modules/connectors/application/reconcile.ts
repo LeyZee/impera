@@ -1,4 +1,4 @@
-import type { JobPayload } from '@nirvana/contracts';
+import type { JobPayload } from '@impera/contracts';
 
 import type { JobLogger } from '../domain/ports';
 

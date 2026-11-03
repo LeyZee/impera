@@ -6,7 +6,7 @@ import {
   type TelegramBot,
   type TelegramChat,
   type TelegramOverview,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -296,15 +296,15 @@ describe('the sheet', () => {
   });
 
   it('suggests an identifier @BotFather accepts', () => {
-    expect(suggestedUsername('Nirvana Alertes')).toBe('nirvana_alertes_bot');
+    expect(suggestedUsername('Impera Alertes')).toBe('impera_alertes_bot');
     expect(suggestedUsername('Équipe nuit !')).toBe('equipe_nuit_bot');
-    expect(suggestedUsername('   ')).toBe('nirvana_bot');
+    expect(suggestedUsername('   ')).toBe('impera_bot');
     // @BotFather wants a letter first, and one « bot » at the end.
-    expect(suggestedUsername('3h Alertes')).toBe('nirvana_3h_alertes_bot');
-    expect(suggestedUsername('Nirvana Bot')).toBe('nirvana_bot');
+    expect(suggestedUsername('3h Alertes')).toBe('impera_3h_alertes_bot');
+    expect(suggestedUsername('Impera Bot')).toBe('impera_bot');
     expect(suggestedUsername('Robot')).toBe('robot');
     expect(suggestedUsername('A'.repeat(40))).toBe(`${'a'.repeat(28)}_bot`);
-    expect(suggestedUsername('Bot')).toBe('nirvana_bot');
+    expect(suggestedUsername('Bot')).toBe('impera_bot');
   });
 
   it('draws two letters for a group, an emoji as one', () => {

@@ -6,8 +6,8 @@ import {
   InvoiceIdSchema,
   PayPeriodSchema,
   type TeamMember,
-} from '@nirvana/contracts';
-import { and, eq, schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema } from '@impera/db';
 import { unzipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

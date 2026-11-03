@@ -4,7 +4,7 @@ import {
   TREND_FORMATS,
   TREND_SIGNAL_KINDS,
   TREND_SIGNAL_SOURCES,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   check,

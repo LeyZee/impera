@@ -20,8 +20,8 @@ import {
   ServiceDescriptionSchema,
   type CommissionStatementId,
   type InvoiceRegime,
-} from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { contractorReadsForInvoicing as fileReads } from '../../contractors';

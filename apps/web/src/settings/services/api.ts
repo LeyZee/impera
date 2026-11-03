@@ -9,7 +9,7 @@ import {
   type ProviderRefusal,
   type ProviderSettings,
   type ProviderStatus,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { reauthenticate, type ReauthenticateResult } from '../../auth/session';
 

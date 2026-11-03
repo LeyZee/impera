@@ -1,4 +1,4 @@
-import { CARRY_OVER_RANK_MAX, positiveCarryRankIn, type Currency } from '@nirvana/contracts';
+import { CARRY_OVER_RANK_MAX, positiveCarryRankIn, type Currency } from '@impera/contracts';
 
 import { MissingExchangeRate } from './errors';
 import { BPS, mulDivRound, RATE_SCALE } from './rounding';

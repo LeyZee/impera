@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/banner.svg" alt="Nirvana" width="100%">
+  <img src="brand/banner.svg" alt="Impera" width="100%">
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <b>Nirvana</b> est l'agent de chatting d'une créatrice de contenu.<br>
+  <b>Impera</b> est l'agent de chatting d'une créatrice de contenu.<br>
   Il fait connaissance avec chaque fan, s'en souvient, lui répond avec la voix de la créatrice, et vend ses médias privés au bon moment.<br>
   Copilote d'abord, autonome ensuite, jamais prisonnier d'une plateforme.
 </p>
@@ -56,7 +56,7 @@
 
 Une créatrice sur Reveal.me reçoit chaque jour des dizaines de conversations privées. Chaque fan attend une réponse personnelle, rapide, qui se souvient de lui. C'est ce qui fidélise, et c'est ce qui fait acheter les médias privés. Impossible à tenir seule, difficile à déléguer sans perdre sa voix.
 
-Ce que Nirvana doit faire, en incarnant la créatrice (Messalina pour commencer) :
+Ce qu’Impera doit faire, en incarnant la créatrice (Messalina pour commencer) :
 
 - **la relation d'abord** : il fait connaissance (prénom, ville, métier, passions, envies) avant de proposer quoi que ce soit, et note ce qu'il apprend dans les notes client de Reveal ;
 - **il vend comme une vraie chatteuse** : scripts Jour et Nuit, bundles préparés à prix fixe, jamais de négociation, jamais deux fois le même média au même fan, aftercare après chaque vente ;

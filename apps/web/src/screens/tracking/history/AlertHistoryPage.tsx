@@ -1,4 +1,4 @@
-import type { AlertTriggerItem, CreatorSummary } from '@nirvana/contracts';
+import type { AlertTriggerItem, CreatorSummary } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState, type JSX, type ReactNode } from 'react';
 

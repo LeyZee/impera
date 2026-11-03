@@ -1,4 +1,4 @@
-import { ExchangeRateSchema, ForeignCurrencySchema, type ForeignCurrency } from '@nirvana/contracts';
+import { ExchangeRateSchema, ForeignCurrencySchema, type ForeignCurrency } from '@impera/contracts';
 
 import type { JobLogger } from '../../contractors/pure';
 import { ECB_SOURCE, ecbDay, eurosPerUnitMicros, isRateOverdue } from '../domain/exchange-rates';

@@ -10,8 +10,8 @@ import {
   type AgencyLogo,
   type BillingSettingsView,
   type UpdateBillingSettingsBody,
-} from '@nirvana/contracts';
-import { eq, schema, withMember, type Transaction, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema, withMember, type Transaction, type Database } from '@impera/db';
 
 import { AgencyLogoNotFound, BillingSettingsMissing, PayrollForbidden } from '../domain/errors';
 import type { PayrollBillingSettingsStore } from '../domain/ports';

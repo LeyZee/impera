@@ -1,4 +1,4 @@
-import { PAY_AMOUNT_MAX_MINOR } from '@nirvana/contracts';
+import { PAY_AMOUNT_MAX_MINOR } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { correctionAdjustments, correctionReplayed, type ContestedDocument } from '../contest-correction';

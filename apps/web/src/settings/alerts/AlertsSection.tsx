@@ -16,7 +16,7 @@ import {
   type CustomAlertGroupId,
   type SystemAlertSetting,
   type TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';

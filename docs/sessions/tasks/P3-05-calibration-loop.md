@@ -16,7 +16,7 @@ Charles et Messa entraînent le bot dans le playground : ils notent chaque répo
 - [x] Mise en situation : préréglages de fan fictifs, heure de la créatrice (jour ou nuit), ancienneté de la relation, montant dépensé ; donnés au cerveau et à la voix dans une section « Le moment » écrite par le code (prompts 1.4.0).
 - [x] Horloge simulée : avancer d'une heure ou d'un jour.
 - [x] Rejouer depuis un message du fan ; comparer la dernière réponse avec un autre modèle de voix.
-- [x] Corrections gardées hors dépôt (`.scratch/training/`, ou `NIRVANA_TRAINING_DIR`), un enregistrement par note, dans le format que la base reprendra (P0-03) ; les réponses corrigées reviennent comme exemples de voix à la session suivante ; les tests se rejouent d'une commande.
+- [x] Corrections gardées hors dépôt (`.scratch/training/`, ou `IMPERA_TRAINING_DIR`), un enregistrement par note, dans le format que la base reprendra (P0-03) ; les réponses corrigées reviennent comme exemples de voix à la session suivante ; les tests se rejouent d'une commande.
 
 ## Critères d'acceptation
 - `pnpm check` et `pnpm test` verts ; tests unitaires du taux, des destinations, des raisons, de la situation (jour, nuit, fuseau), du magasin JSONL et des commandes de session (rejouer, comparer, contexte).

@@ -1,4 +1,4 @@
-import type { HeldSale, SaleDecisionOutcome, SaleHeldReason } from '@nirvana/contracts';
+import type { HeldSale, SaleDecisionOutcome, SaleHeldReason } from '@impera/contracts';
 
 import { momentAt } from './model';
 
@@ -54,7 +54,7 @@ export function heldReasonText(
     case 'off_shift':
       return `${member?.name ?? 'Son chatteur'} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.`;
     case 'status_unknown':
-      return `${platformName(sale.platform)} lui donne un statut que Nirvana ne connaît pas encore.`;
+      return `${platformName(sale.platform)} lui donne un statut qu’Impera ne connaît pas encore.`;
     case 'refund_before_register':
       return 'Remboursement d’une vente plus ancienne que le registre des ventes : il n’est retiré à personne.';
     case 'refund_before_base':

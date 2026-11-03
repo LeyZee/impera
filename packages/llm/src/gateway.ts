@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { err, MEDIA_VOCABULARY_VERSION, ok } from '@nirvana/contracts';
+import { err, MEDIA_VOCABULARY_VERSION, ok } from '@impera/contracts';
 import { generateText, transcribe as transcribeAudio } from 'ai';
 
 import { budgetStatus, type BudgetStatus } from './budget';

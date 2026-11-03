@@ -7,7 +7,7 @@ import {
   type ContractTextKind,
   type JournalAccountName,
   type JournalAccounts,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { accountsBodyOf, accountsDraftOf, type AccountsDraft } from './accounts';

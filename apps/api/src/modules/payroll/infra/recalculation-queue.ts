@@ -1,5 +1,5 @@
-import { JOB_MAX_ATTEMPTS, type PayPeriod } from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+import { JOB_MAX_ATTEMPTS, type PayPeriod } from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 
 /**
  * `payroll.recalculate` for `period`, once the transaction commits (EQ-04): one waiting job per period, replaced by the

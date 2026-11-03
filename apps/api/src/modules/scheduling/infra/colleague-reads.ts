@@ -1,5 +1,5 @@
-import { ShiftIdSchema, TeamMemberIdSchema, TeamMemberStatusSchema } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { ShiftIdSchema, TeamMemberIdSchema, TeamMemberStatusSchema } from '@impera/contracts';
+import { and, eq, inArray, schema, sql, withAdmin, type Database } from '@impera/db';
 
 import type { ColleagueReads } from '../domain/ports';
 

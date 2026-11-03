@@ -1,8 +1,8 @@
 {
-  "name": "@nirvana/api",
+  "name": "@impera/api",
   "version": "0.0.0",
   "private": true,
-  "description": "API Fastify et worker Graphile de Nirvana : même code, deux entrées (src/index.ts, src/worker.ts).",
+  "description": "API Fastify et worker Graphile d’Impera : même code, deux entrées (src/index.ts, src/worker.ts).",
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
@@ -47,9 +47,9 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@nirvana/contracts": "workspace:*",
-    "@nirvana/db": "workspace:*",
-    "@nirvana/llm": "workspace:*",
+    "@impera/contracts": "workspace:*",
+    "@impera/db": "workspace:*",
+    "@impera/llm": "workspace:*",
     "@types/fontkit": "2.0.9",
     "@types/node": "22.20.5",
     "@types/pdfkit": "0.17.6",

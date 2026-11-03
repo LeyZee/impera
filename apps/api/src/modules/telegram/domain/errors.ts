@@ -1,4 +1,4 @@
-import { DomainError, TELEGRAM_CHAT_MEMBER_CONFLICT } from '@nirvana/contracts';
+import { DomainError, TELEGRAM_CHAT_MEMBER_CONFLICT } from '@impera/contracts';
 
 /** Refusals of `/v1/settings/telegram` in the common error body (api.md § Erreurs): the suffix gives the HTTP status. */
 

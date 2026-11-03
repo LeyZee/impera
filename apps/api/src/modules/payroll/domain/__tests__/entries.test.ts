@@ -1,4 +1,4 @@
-import { DomainError, newId, PayPeriodSchema, TeamMemberIdSchema, type PayPeriod } from '@nirvana/contracts';
+import { DomainError, newId, PayPeriodSchema, TeamMemberIdSchema, type PayPeriod } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -18,7 +18,7 @@ import {
   type SystemAlertCode,
   type UserRole,
   type TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { saleAmount } from './sales';
 import type { Notice, Outcome, Signal } from './signals';
@@ -56,6 +56,9 @@ export const SCANNED_EVENT_TYPES = [
   'invoice_due_soon',
   'invoice_overdue',
   'security_alert',
+  'sales_feed_mismatch',
+  // Bilan's (P3-12 lot 2), listed ahead so that the trigger needs no new migration when it lands.
+  'connection_state_changed',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -202,6 +205,9 @@ const periodText = (period: PayPeriod): string => {
   return `la quinzaine du ${first} au ${String(Number(last.slice(8)))} ${month}`;
 };
 
+const countText = (count: number, one: string, many: string): string =>
+  `${String(count)} ${count > 1 ? many : one}`;
+
 /** Why a document was not issued, as the owner settles it; the contractor is never named in Telegram. */
 const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
   no_mandate: 'le prestataire n’a pas accepté de mandat de facturation',
@@ -332,7 +338,7 @@ const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
   reveal: 'Reveal',
   onlyfans: 'OnlyFans',
   instagram: 'Instagram',
-  nirvana: 'Nirvana',
+  impera: 'Impera',
 };
 
 // Réglages › Sécurité (SEC-04): the owner's sessions, and each account's, where he closes them.
@@ -571,7 +577,7 @@ export function classify(
             : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`,
         link: PAY_LINK,
       };
-    // Important, not urgent: only the owner settles a contest, upheld or refused (ADR 0039); the reason is read in Nirvana.
+    // Important, not urgent: only the owner settles a contest, upheld or refused (ADR 0039); the reason is read in Impera.
     case 'invoice_contested':
       return {
         kind: 'notice',
@@ -625,6 +631,17 @@ export function classify(
         title: 'Vente',
         body: `${SALE_TYPE_TEXT[signal.saleType]} · ${saleAmount(signal.grossInclVatMinor, signal.currency)} · ${sellerText(signal.seller, memberNameOf)}`,
         link: null,
+      };
+    // Important (question 6 of CRM-04, Charles 03/11/2026): pay still reads the platform's net, the owner checks before
+    // closing. No amount: the check of Réglages › Ventes has them.
+    case 'sales_feed_mismatch':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: `mismatch:${signal.platform}:${signal.from}`,
+        title: 'Important',
+        body: `Ventes ${PLATFORM_NAMES[signal.platform]} : la vérification de ${periodText(signal.from)} ne concorde plus avec les statistiques de ${PLATFORM_NAMES[signal.platform]}, sur ${countText(signal.days, 'jour', 'jours')} et ${countText(signal.accounts, 'compte', 'comptes')}. La paie lit toujours le net de ${PLATFORM_NAMES[signal.platform]} : vérifie avant de clôturer.`,
+        link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
       };
     // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     case 'security_alert':

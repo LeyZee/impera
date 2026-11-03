@@ -5,8 +5,8 @@ import {
   type TeamMemberId,
   type TeamMemberStatus,
   type TeamRole,
-} from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 /**

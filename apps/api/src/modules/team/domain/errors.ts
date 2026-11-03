@@ -1,4 +1,4 @@
-import { DomainError, type CreatorId } from '@nirvana/contracts';
+import { DomainError, type CreatorId } from '@impera/contracts';
 
 /** Error codes of the module (`TEAM_MEMBER_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 export class MemberNotFound extends DomainError {

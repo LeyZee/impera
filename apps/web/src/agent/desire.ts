@@ -1,4 +1,4 @@
-import { type DesireBand, type DesirePoint, type DesireSignal } from '@nirvana/contracts';
+import { type DesireBand, type DesirePoint, type DesireSignal } from '@impera/contracts';
 
 /*
  * The desire score in words (P3-12, glossary « Note de désir »): its bands, the signals that moved it, and what a

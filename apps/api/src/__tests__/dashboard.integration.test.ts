@@ -16,10 +16,10 @@ import {
   type ConversationId,
   type CreatorId,
   type PlatformAccountId,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import { loadPrompt } from '@nirvana/llm';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import { loadPrompt } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';
@@ -263,18 +263,11 @@ describe('GET /v1/dashboard', () => {
     expect(dashboard.fans[0]?.conversationId).toBe(conversations.get('Julien'));
   });
 
-  it('shows a creator her aggregates, never a conversation nor a fan', async () => {
+  it('is closed to the creator: she reads her own Aujourd’hui (ADR 0042 § 8, CR-02)', async () => {
     const response = await call(`/v1/dashboard?creatorId=${creatorId}&period=week`, creatorCookie);
-    expect(response.statusCode, response.body).toBe(200);
-    const dashboard = DashboardSchema.parse(response.json());
-    expect(dashboard.todos).toEqual([]);
-    expect(dashboard.fans).toEqual([]);
+    expect(response.statusCode, response.body).toBe(403);
     expect(response.body).not.toContain('Leo');
     expect(response.body).not.toContain('Julien');
-    expect(dashboard.reveal).toMatchObject({ connected: true, conversations: 3 });
-    expect(dashboard.guards.today.minor).toBe(1);
-    expect(dashboard.budget.spentToday).toBeNull();
-    expect(dashboard.jobs.dead).toBeNull();
   });
 
   it('asks a human to look at a send that failed for good', async () => {
@@ -509,8 +502,10 @@ describe('GET /v1/dashboard', () => {
     // Marc: 10 € sold by a chatter, 30 $ by the agent. Julien: 25 € by the agent.
     await sale('paid-marc-eur', 'human', 1_000, 'EUR');
     await sale('paid-marc-usd', 'ai', 3_000, 'USD');
-    const read = async (cookie = ownerCookie) =>
-      DashboardSchema.parse((await call(`/v1/dashboard?creatorId=${creatorId}&period=week`, cookie)).json());
+    const read = async () =>
+      DashboardSchema.parse(
+        (await call(`/v1/dashboard?creatorId=${creatorId}&period=week`, ownerCookie)).json(),
+      );
 
     // No rate yet: his dollars do not count, and the screen is told so.
     const without = await read();
@@ -544,9 +539,6 @@ describe('GET /v1/dashboard', () => {
     ]);
     expect(converted.fans[0]?.conversationId).toBe(marc);
     expect(converted.usdSales).toEqual({ seen: true, rate: { day: '2026-10-27' } });
-
-    // Her own Dashboard keeps no fan, and says nothing of them.
-    expect((await read(creatorCookie)).usdSales).toEqual({ seen: false, rate: null });
   });
 
   it('leaves out a paid message at a zero price, a negative one refused by the base (recette 28/10, #296)', async () => {

@@ -1,4 +1,4 @@
-import { SlotVersionInputSchema, type SlotVersionInput } from '@nirvana/contracts';
+import { SlotVersionInputSchema, type SlotVersionInput } from '@impera/contracts';
 
 import { SlotVersionDateInvalid, SlotVersionInvalid } from './errors';
 import { addDays, calendarDayIn, isoWeekday, wallClockToInstant } from './time';

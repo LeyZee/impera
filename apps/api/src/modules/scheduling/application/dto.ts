@@ -1,5 +1,6 @@
 import type {
   AccountPayRules,
+  CreatorAgencyRate,
   CreatorSummary,
   LeaveRequest,
   PlanningAccount,
@@ -7,10 +8,11 @@ import type {
   Shift,
   ShiftReport,
   ShiftSwapRequest,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type {
   NamedMember,
+  StoredAgencyRate,
   StoredAccount,
   StoredLeaveRequest,
   StoredPayRules,
@@ -107,4 +109,9 @@ export const toShiftReportDto = (report: StoredShiftReport, reader: Reader): Shi
 export const toPayRulesDto = (rules: StoredPayRules): AccountPayRules => ({
   ...rules,
   createdAt: rules.createdAt.toISOString(),
+});
+
+export const toAgencyRateDto = (rate: StoredAgencyRate): CreatorAgencyRate => ({
+  ...rate,
+  createdAt: rate.createdAt.toISOString(),
 });

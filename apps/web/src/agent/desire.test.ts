@@ -1,4 +1,4 @@
-import { DESIRE_BANDS, DESIRE_SIGNALS } from '@nirvana/contracts';
+import { DESIRE_BANDS, DESIRE_SIGNALS } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { DESIRE_BAND_LABELS, DESIRE_SIGNAL_LABELS, movementOf, signalsLine } from './desire';

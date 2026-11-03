@@ -4,7 +4,7 @@ import {
   TrendSignalIdSchema,
   type ContentIdeaDraft,
   type PersonaLimits,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { filterIdeas, tooClose, type IdeaFilterContext } from '../ideas';

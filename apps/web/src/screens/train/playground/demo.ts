@@ -7,7 +7,7 @@ import {
   type PlaygroundMedia,
   type PlaygroundState,
   type Verdict,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { PlaygroundClient } from './client';
 import type { Turn } from './model';

@@ -6,7 +6,7 @@ import type {
   ProviderSettings,
   ProviderStatus,
   ProviderVoice,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { profileOf } from './catalog';
 import { describeLowCredit, describeRefusedLine } from './messages';

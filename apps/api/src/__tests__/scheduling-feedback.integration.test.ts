@@ -14,9 +14,9 @@ import {
   type PutShiftFeedbackBody,
   type ShiftId,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

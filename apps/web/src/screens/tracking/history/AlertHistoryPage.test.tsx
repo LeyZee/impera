@@ -70,7 +70,7 @@ function serve(answer: (call: Call) => Reply | undefined): Call[] {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
-      const parsed = new URL(url, 'http://nirvana.test');
+      const parsed = new URL(url, 'http://impera.test');
       const call: Call = {
         method: init?.method ?? 'GET',
         path: parsed.pathname,
@@ -224,7 +224,7 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     await lines();
     // The new filter's pages never answer: the lines shown stay the old filter's.
     const fetch = vi.fn((url: string) =>
-      new URL(url, 'http://nirvana.test').searchParams.get('alert') === GROUP
+      new URL(url, 'http://impera.test').searchParams.get('alert') === GROUP
         ? new Promise<Response>(() => undefined)
         : Promise.resolve(new Response(null, { status: 500 })),
     );

@@ -1,4 +1,4 @@
-import type { Persona, PersonaSampleReplyFault } from '@nirvana/contracts';
+import type { Persona, PersonaSampleReplyFault } from '@impera/contracts';
 
 import { checkVoiceOutput, DEFAULT_GUARD_SETTINGS } from '../domain/guards';
 

@@ -13,7 +13,7 @@ import {
   type SalesFeedCheckTotals,
   type SalesFeedCheckVerdict,
   type SalesFeedErrorKind,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { SalesFeedExportUnprocessable } from './errors';
 import { onSaleDays, sumsBy, type SaleDayLine } from './sale-days';

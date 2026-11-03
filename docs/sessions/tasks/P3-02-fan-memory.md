@@ -35,7 +35,7 @@ Reveal tient déjà la fiche du fan, dans le panneau de droite de chaque convers
 - **Note du modèle** : la fiche de la créatrice, réécrite depuis la persona active. Données personnelles : jamais dans le dépôt ni dans un log (ADR 0010).
 - **Analytics** : total dépensé, tips, messages, dernier paiement, achat le plus élevé, abonnement. Lus pour `purchaseSummary`, pas recopiés.
 
-Ce que Nirvana ajoute, et seulement cela, parce que Reveal ne le stocke pas : les faits datés et leur historique (`fan_facts`), ce qui a été vendu ou refusé et pourquoi (`media_sends`, ventes, faits « refus »), les scripts déjà envoyés (Reveal n'a pas d'indicateur « déjà envoyé »), la phase de la relation et les drapeaux de sécurité.
+Ce qu’Impera ajoute, et seulement cela, parce que Reveal ne le stocke pas : les faits datés et leur historique (`fan_facts`), ce qui a été vendu ou refusé et pourquoi (`media_sends`, ventes, faits « refus »), les scripts déjà envoyés (Reveal n'a pas d'indicateur « déjà envoyé »), la phase de la relation et les drapeaux de sécurité.
 
 - **Lecture** : à l'ingestion, chaque ligne du canevas devient le fait de son slot (`source: platform_note`) ; le prénom du membre aussi.
 - **Écriture** : un fait confirmé d'un slot réécrit sa ligne du canevas ; un humain qui modifie une ligne dans Reveal l'emporte sur le fait plus ancien, remplacé (`superseded_by`).

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { NotificationPreferencesSchema, type NotificationPreferences } from '@nirvana/contracts';
+import { NotificationPreferencesSchema, type NotificationPreferences } from '@impera/contracts';
 import {
   and,
   decryptSecret,
@@ -13,7 +13,7 @@ import {
   withMember,
   type Database,
   type EncryptionKey,
-} from '@nirvana/db';
+} from '@impera/db';
 
 import type { PreferencesStore, ServerKey, ServerKeyStore, SubscriptionStore } from '../../domain/ports';
 import { generateVapidKeys } from '../web-push';

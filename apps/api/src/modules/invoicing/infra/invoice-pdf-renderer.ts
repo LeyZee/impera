@@ -138,8 +138,8 @@ export function createPdfkitInvoiceRenderer(
             // Only the number varies in the metadata: a name would need escaping in its XMP copy.
             info: {
               Title: content.title,
-              Creator: 'Nirvana',
-              Producer: 'Nirvana (PDFKit)',
+              Creator: 'Impera',
+              Producer: 'Impera (PDFKit)',
               CreationDate: issuedAt,
               ModDate: issuedAt,
             },

@@ -6,7 +6,7 @@ import {
   payPeriodAt,
   previousPayPeriod,
   type PayPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   eq,
@@ -16,7 +16,7 @@ import {
   withAdmin,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import type { OpenPeriodFacts, PayrollJobStore } from '../domain/ports';

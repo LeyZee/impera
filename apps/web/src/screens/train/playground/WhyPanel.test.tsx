@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { PlaygroundAnswer, PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { TeamMemberSchema, type TeamMember } from '@nirvana/contracts';
+import { TeamMemberSchema, type TeamMember } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -371,7 +371,7 @@ describe('adding a member', () => {
           : {
               status: 201,
               body: {
-                url: 'https://nirvana.example.test/bienvenue#t=lien-invente-0001',
+                url: 'https://impera.example.test/bienvenue#t=lien-invente-0001',
                 expiresAt: '2026-10-30T12:00:00.000Z',
               },
             },
@@ -390,7 +390,7 @@ describe('adding a member', () => {
 
     expect(await screen.findByRole('heading', { name: 'Kofi est dans l’équipe' })).toBeDefined();
     expect(screen.getByLabelText<HTMLInputElement>('Lien à envoyer').value).toBe(
-      'https://nirvana.example.test/bienvenue#t=lien-invente-0001',
+      'https://impera.example.test/bienvenue#t=lien-invente-0001',
     );
     expect(posted[0]).toMatchObject({
       path: '/v1/team/members',
@@ -624,7 +624,7 @@ describe('changing a member once added (EQ-10)', () => {
     expect(within(left).getByRole('link', { name: 'Voir ses shifts' }).getAttribute('href')).toBe(
       `/equipe/planning?membre=${THEO.id}`,
     );
-    // Gone, the same count sits in the confirmation, beside what Nirvana does not do yet.
+    // Gone, the same count sits in the confirmation, beside what Impera does not do yet.
     fireEvent.click(within(panel).getByRole('radio', { name: 'Parti' }));
     const confirm = within(panel).getByRole('group', { name: 'Confirmer le départ' });
     expect(await within(confirm).findByText(/2 shifts à venir restent au planning/u)).toBeDefined();
@@ -671,7 +671,7 @@ describe('a link from the sheet', () => {
           : {
               status: 201,
               body: {
-                url: 'https://nirvana.example.test/nouveau-mot-de-passe#t=lien-invente-0002',
+                url: 'https://impera.example.test/nouveau-mot-de-passe#t=lien-invente-0002',
                 expiresAt: '2026-10-30T12:00:00.000Z',
               },
             };
@@ -696,7 +696,7 @@ describe('a link from the sheet', () => {
       post: () => ({
         status: 200,
         body: {
-          url: 'https://nirvana.example.test/nouveau-mot-de-passe#t=lien-invente-0003',
+          url: 'https://impera.example.test/nouveau-mot-de-passe#t=lien-invente-0003',
           expiresAt: until,
         },
       }),

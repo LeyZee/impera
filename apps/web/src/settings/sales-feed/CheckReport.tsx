@@ -4,7 +4,7 @@ import type {
   SalesFeedCheckTotals,
   SalesFeedChatterLink,
   SalesFeedModelLink,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { JSX } from 'react';
 
 import {

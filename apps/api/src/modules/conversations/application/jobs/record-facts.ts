@@ -1,4 +1,4 @@
-import type { JobPayload } from '@nirvana/contracts';
+import type { JobPayload } from '@impera/contracts';
 
 import type { Clock, DraftFact, EventMeta, FanDirectory, JobLogger, UnitOfWork } from '../../domain/ports';
 import { operatorNoteFact } from '../facts';

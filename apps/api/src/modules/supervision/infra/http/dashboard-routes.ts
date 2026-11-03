@@ -8,8 +8,8 @@ import {
   type DashboardPeriod,
   type UserRole,
   UserIdSchema,
-} from '@nirvana/contracts';
-import { startOfLocalDay } from '@nirvana/llm';
+} from '@impera/contracts';
+import { startOfLocalDay } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -64,15 +64,15 @@ function periodStart(period: DashboardPeriod, now: Date, dayStart: Date): Date {
 }
 
 /**
- * `GET /v1/dashboard?creatorId=&period=`: everything the Dashboard shows for one creator, computed here. Read by the
- * creator herself, it leaves out « À traiter » and her best fans (ADR 0023).
+ * `GET /v1/dashboard?creatorId=&period=`: everything the Dashboard shows for one creator, computed here. The agency's
+ * screen alone: the creator reads her own Aujourd'hui (ADR 0042 § 8, CR-02), never this one.
  */
 export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
       '/dashboard',
       {
-        preValidation: deps.requireRole('owner', 'operator', 'creator'),
+        preValidation: deps.requireRole('owner', 'operator'),
         schema: { querystring: DashboardQuerySchema, response: { 200: DashboardSchema } },
       },
       async (request) => {
@@ -98,16 +98,13 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           deps.telegram?.read(creatorId),
           deps.automatic.read(creatorId),
           deps.deadJobs(creatorId),
-          // The creator reads her own screen (CRM-04 lot d), never who sold (ADR 0042 § 2): no register read for her.
-          user.role === 'creator'
-            ? undefined
-            : deps.revealSales.read(
-                creatorId,
-                UserIdSchema.parse(user.id),
-                salesDays(period, now, read.facts.creator.timezone),
-              ),
+          deps.revealSales.read(
+            creatorId,
+            UserIdSchema.parse(user.id),
+            salesDays(period, now, read.facts.creator.timezone),
+          ),
         ]);
-        const dashboard = assembleDashboard({
+        return assembleDashboard({
           creatorId,
           period,
           facts: read.facts,
@@ -119,17 +116,6 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           automatic,
           revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),
         });
-        // ADR 0023: a creator never sees a conversation nor a fan, nor the agency's figures (the day's AI spend of
-        // every creator, the jobs of no creator). Her Dashboard keeps her own aggregates only.
-        if (user.role !== 'creator') return dashboard;
-        return {
-          ...dashboard,
-          todos: [],
-          fans: [],
-          usdSales: { seen: false, rate: null },
-          budget: { ...dashboard.budget, spentToday: null },
-          jobs: { dead: null },
-        };
       },
     );
 

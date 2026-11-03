@@ -38,7 +38,7 @@ Règles :
 | `FakeReveal` (serveur HTTP mock) + `RevealApiConnector` pointé dessus | 1 | Tests de contrat et e2e, dev local |
 | `RevealApiConnector` | 2 | Production : API privée de Reveal via session capturée |
 | `RevealBrowserConnector` (Playwright) | si B échoue | Roue de secours |
-| `NirvanaPlatformConnector` (in-process) | 8 | Notre plateforme : pas de réseau, appel direct du module `platform` |
+| `ImperaPlatformConnector` (in-process) | 8 | Notre plateforme : pas de réseau, appel direct du module `platform` |
 | `OnlyFansConnector`, `InstagramConnector` | 7+ | Plus tard |
 
 ## Stratégie Reveal : B cible, A outil, C secours

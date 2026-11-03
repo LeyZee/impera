@@ -1,4 +1,4 @@
-import type { ContentIdeaDraft } from '@nirvana/contracts';
+import type { ContentIdeaDraft } from '@impera/contracts';
 
 import { touchesTerm } from '../../agent';
 import { filterIdeas, type FilteredIdeas, type IdeaFilterContext } from '../domain/ideas';

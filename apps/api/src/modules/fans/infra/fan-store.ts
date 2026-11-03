@@ -1,5 +1,5 @@
-import { CreatorIdSchema, FanIdSchema, PlatformAccountIdSchema } from '@nirvana/contracts';
-import { and, eq, schema, sql, withTenant, type Database } from '@nirvana/db';
+import { CreatorIdSchema, FanIdSchema, PlatformAccountIdSchema } from '@impera/contracts';
+import { and, eq, schema, sql, withTenant, type Database } from '@impera/db';
 
 import type { Fan, FanStore } from '../domain/fan';
 

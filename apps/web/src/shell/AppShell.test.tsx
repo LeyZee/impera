@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -394,7 +394,7 @@ describe('an address that leads nowhere (recette 28/10, M1)', () => {
     const nav = screen.getByRole('navigation', { name: 'Navigation' });
     expect(nav.querySelector('[aria-current="page"]')).toBeNull();
     expect(screen.getByRole('link', { name: 'Revenir à Dashboard' }).getAttribute('href')).toBe('/');
-    expect(document.title).toBe('Page introuvable · Nirvana');
+    expect(document.title).toBe('Page introuvable · Impera');
   });
 });
 
@@ -402,11 +402,11 @@ describe('the tab’s title (recette 28/10, M2)', () => {
   it('names the screen on show', async () => {
     const router = renderApp(owner, '/suivi');
     await waitFor(() => {
-      expect(document.title).toBe('Suivi · Nirvana');
+      expect(document.title).toBe('Suivi · Impera');
     });
     await router.navigate({ to: '/creatrices' });
     await waitFor(() => {
-      expect(document.title).toBe('Créatrices · Nirvana');
+      expect(document.title).toBe('Créatrices · Impera');
     });
   });
 });
@@ -432,7 +432,7 @@ describe('the shell’s landmarks (design 29/10)', () => {
   it('names the view and its section in the tab’s title (NAV-12)', async () => {
     renderApp(owner, '/equipe/membres');
     await waitFor(() => {
-      expect(document.title).toBe('Membres · Équipe · Nirvana');
+      expect(document.title).toBe('Membres · Équipe · Impera');
     });
   });
 
@@ -445,6 +445,22 @@ describe('the shell’s landmarks (design 29/10)', () => {
     await waitFor(() => {
       expect(nav.querySelector('.nv-rail__agent')).not.toBeNull();
     });
+  });
+
+  it('never shows a creator the agent’s pill, nor reads the Dashboard for her (CR-02 c2b)', async () => {
+    const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
+    const router = renderApp(creator, '/aujourdhui');
+    await screen.findByRole('heading', { name: 'Aujourd’hui', level: 1 });
+    const nav = screen.getByRole('navigation', { name: 'Navigation' });
+    expect(nav.querySelector('.nv-rail__agent')).toBeNull();
+    await router.navigate({ to: '/moi/persona' });
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/moi/persona');
+    });
+    expect(nav.querySelector('.nv-rail__agent')).toBeNull();
+    // `GET /v1/dashboard` answers her 403: nothing on her screens asks for it.
+    const urls = vi.mocked(fetch).mock.calls.map(([url]) => (typeof url === 'string' ? url : ''));
+    expect(urls.filter((url) => url.includes('/v1/dashboard'))).toEqual([]);
   });
 
   it('opens on a link to skip the rail, and puts the keyboard on the new section (NAV-20)', async () => {
@@ -551,7 +567,7 @@ describe('the account’s security, from its menu (SEC-04)', () => {
       const router = renderApp(user, '/compte/securite');
       expect(await screen.findByRole('heading', { level: 1, name: 'Sécurité' })).toBeDefined();
       expect(router.state.location.pathname).toBe('/compte/securite');
-      expect(document.title).toBe('Sécurité · Nirvana');
+      expect(document.title).toBe('Sécurité · Impera');
       expect(screen.queryByRole('heading', { name: 'Comptes de l’agence' })).toBeNull();
       cleanup();
     }
@@ -581,7 +597,7 @@ describe('the shell while a screen loads (review of #313)', () => {
   it('never reads « introuvable » on the way between two sub-tabs, keeps its stage, and leaves the focus alone', async () => {
     const router = renderApp(owner, '/equipe/membres');
     await waitFor(() => {
-      expect(document.title).toBe('Membres · Équipe · Nirvana');
+      expect(document.title).toBe('Membres · Équipe · Impera');
     });
     const stage = document.getElementById('contenu');
     const titles: string[] = [];
@@ -595,7 +611,7 @@ describe('the shell while a screen loads (review of #313)', () => {
     });
     await router.navigate({ to: '/equipe/rapports' });
     await waitFor(() => {
-      expect(document.title).toBe('Rapports · Équipe · Nirvana');
+      expect(document.title).toBe('Rapports · Équipe · Impera');
     });
     observer.disconnect();
     unsubscribe();
@@ -716,7 +732,10 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
         'Parle à la persona comme un fan, avant qu’un vrai fan ne la lise : rien n’est envoyé.',
       ],
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
-      ['/creatrices', 'La fiche de chaque créatrice : sa persona, ses heures d’activité et son accès.'],
+      [
+        '/creatrices',
+        'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.',
+      ],
     ] as const) {
       renderApp(owner, path);
       const title = await screen.findByRole('heading', { level: 1 });

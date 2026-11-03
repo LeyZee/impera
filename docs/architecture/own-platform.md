@@ -7,7 +7,7 @@ Charles prévoit une plateforme privée **dédiée à une seule créatrice** (Me
 ## Ce qu'elle sera (hypothèse de travail)
 
 - Un site/app fan-facing (`apps/platform`), une seule créatrice, compte fan par email/passkey, pas d'abonnement récurrent : paiement à l'unité (média, custom, pourboire) et/ou crédits prépayés, messagerie 1:1 avec la créatrice (donc avec l'agent), galerie, demandes personnalisées.
-- Un connecteur **in-process** (`NirvanaPlatformConnector`) : pas de réseau, pas de session à capturer, pas de scraping. Le cœur reçoit les messages par appel direct et envoie de même. Latence nulle, fiabilité totale, c'est là que l'architecture adaptateurs paie.
+- Un connecteur **in-process** (`ImperaPlatformConnector`) : pas de réseau, pas de session à capturer, pas de scraping. Le cœur reçoit les messages par appel direct et envoie de même. Latence nulle, fiabilité totale, c'est là que l'architecture adaptateurs paie.
 - Paiements via un prestataire qui accepte le contenu adulte (CCBill, Segpay, Epoch, Verotel ; Stripe et PayPal refusent). Le module `payments` sera nouveau et isolé.
 - Hébergement et conformité propres (vérification d'âge selon la loi applicable, mentions légales, modération des contenus, DMCA).
 
@@ -15,9 +15,9 @@ Charles prévoit une plateforme privée **dédiée à une seule créatrice** (Me
 
 1. **Pas de notion d'abonnement dans le cœur.** `fans` n'a ni `subscribed_at` ni `subscription_tier`. La relation fan ↔ créatrice est décrite par des faits et des événements (`sale_detected`, `first_seen_at`), pas par un statut d'abonné. Si Reveal expose un statut d'abonnement, il vit dans `fans.platform_meta jsonb`, pas dans une colonne du cœur.
 2. **Les ventes sont typées, pas « des PPV ».** `sales.kind ∈ {ppv_unlock, tip, custom_request, credit_purchase, chat_unlock, other}`. Le cœur raisonne sur « ce fan a payé X pour Y », jamais sur un mécanisme de plateforme.
-3. **Les médias ont des droits, pas une plateforme.** `media_assets.rights` dit où et comment un média peut être vendu ; un média peut être vendu sur Reveal et sur Nirvana. L'anti-doublon est par fan (`media_sends`), pas par plateforme.
-4. **L'identité d'un fan est par compte plateforme, avec `person_id` prévu.** Le jour où un fan de Reveal migre sur Nirvana, on relie les deux (`persons`), et la mémoire suit.
-5. **Le connecteur est une interface, pas un client HTTP.** `PlatformConnector` ne suppose ni réseau, ni session, ni polling : `NirvanaPlatformConnector` implémentera `subscribe` par événements internes et `health` retournera toujours `valid`.
+3. **Les médias ont des droits, pas une plateforme.** `media_assets.rights` dit où et comment un média peut être vendu ; un média peut être vendu sur Reveal et sur Impera. L'anti-doublon est par fan (`media_sends`), pas par plateforme.
+4. **L'identité d'un fan est par compte plateforme, avec `person_id` prévu.** Le jour où un fan de Reveal migre sur Impera, on relie les deux (`persons`), et la mémoire suit.
+5. **Le connecteur est une interface, pas un client HTTP.** `PlatformConnector` ne suppose ni réseau, ni session, ni polling : `ImperaPlatformConnector` implémentera `subscribe` par événements internes et `health` retournera toujours `valid`.
 6. **La persona et l'agent ne savent pas où ils parlent.** Le contexte contient `platform` comme information (le ton peut varier), jamais comme condition de logique dans le domaine.
 7. **Les prix sont des données de la créatrice** (`offers`), pas de la plateforme. Une plateforme peut imposer des bornes (`connector.capabilities.priceBounds`), le cœur les applique.
 8. **Authentification des fans** : rien aujourd'hui, mais `users` (dashboard) et futurs `fan_accounts` (plateforme) sont deux tables distinctes dès le départ ; on ne « réutilise » pas `users` pour les fans.

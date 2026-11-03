@@ -4,7 +4,7 @@ import {
   sirenWords,
   type AgencyLogo,
   type BillingSettings,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { BillingDialog } from './BillingDialog';

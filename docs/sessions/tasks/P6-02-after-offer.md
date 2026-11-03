@@ -7,7 +7,7 @@ Branche : task/P6-02-after-offer
 
 ## Objectif
 
-Appliquer en code ce que la méthode de chatting (document hors dépôt, tenu par Charles) demande autour d'une offre, une fois que Nirvana sait quelle offre est partie, laquelle a été refusée et laquelle a été achetée. Les règles sont reformulées ici, aucune phrase du document n'est recopiée (ADR 0010).
+Appliquer en code ce que la méthode de chatting (document hors dépôt, tenu par Charles) demande autour d'une offre, une fois qu’Impera sait quelle offre est partie, laquelle a été refusée et laquelle a été achetée. Les règles sont reformulées ici, aucune phrase du document n'est recopiée (ADR 0010).
 
 ## Contexte à lire
 

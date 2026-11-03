@@ -1,5 +1,5 @@
-import { TeamMemberIdSchema, type TeamMemberId } from '@nirvana/contracts';
-import { sql, type Database } from '@nirvana/db';
+import { TeamMemberIdSchema, type TeamMemberId } from '@impera/contracts';
+import { sql, type Database } from '@impera/db';
 import { z } from 'zod';
 
 const AppliedSchema = z.object({ id: TeamMemberIdSchema });

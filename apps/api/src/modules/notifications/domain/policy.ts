@@ -1,4 +1,4 @@
-import type { NotificationReason } from '@nirvana/contracts';
+import type { NotificationReason } from '@impera/contracts';
 
 /**
  * When a push notification may ring (ADR 0042 § 7, CR-01), pure. The rules live here, never in a setting nor in a

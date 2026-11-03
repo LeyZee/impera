@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { TeamMemberSchema } from '@nirvana/contracts';
+import { TeamMemberSchema } from '@impera/contracts';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 

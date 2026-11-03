@@ -1,4 +1,4 @@
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { canOpen, documentTitle, layoutRail, railKindOf, railOf, sectionOf, type Section } from './nav';
@@ -146,8 +146,8 @@ describe('sectionOf and canOpen', () => {
 
 describe('documentTitle', () => {
   it('titles the install guide, which belongs to no section, for everyone', () => {
-    expect(documentTitle('/aide/installer', null)).toBe('Installer Nirvana · Nirvana');
-    expect(documentTitle('/aide/installer/', null)).toBe('Installer Nirvana · Nirvana');
-    expect(documentTitle('/nulle-part', null)).toBe('Page introuvable · Nirvana');
+    expect(documentTitle('/aide/installer', null)).toBe('Installer Impera · Impera');
+    expect(documentTitle('/aide/installer/', null)).toBe('Installer Impera · Impera');
+    expect(documentTitle('/nulle-part', null)).toBe('Page introuvable · Impera');
   });
 });

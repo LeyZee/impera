@@ -1,4 +1,4 @@
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 

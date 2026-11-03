@@ -1,4 +1,4 @@
-import { PayPeriodSchema, TeamMemberIdSchema, type JournalAccounts } from '@nirvana/contracts';
+import { PayPeriodSchema, TeamMemberIdSchema, type JournalAccounts } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { fecText, journalFileName, latin9 } from '../fec';

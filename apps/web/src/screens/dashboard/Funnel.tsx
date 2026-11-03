@@ -1,4 +1,4 @@
-import { funnelSteps } from '@nirvana/design-system';
+import { funnelSteps } from '@impera/design-system';
 import type { JSX } from 'react';
 
 import { signed } from './logic';

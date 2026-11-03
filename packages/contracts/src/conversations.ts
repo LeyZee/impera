@@ -72,7 +72,7 @@ export type ConversationDetail = z.infer<typeof ConversationDetailSchema>;
 /**
  * One media of a message, as Suivi shows it (SUIVI-26): its kind and lock as the platform listed it, and what it shows
  * (`MediaDescription.factualDescription`) once the `media` module described and kept it, `null` before. No thumbnail:
- * Nirvana keeps no picture of a message's media.
+ * Impera keeps no picture of a message's media.
  */
 export const MessageMediaViewSchema = ExternalMediaSchema.pick({ kind: true, isLocked: true }).extend({
   description: z.string().min(1).nullable(),

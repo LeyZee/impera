@@ -8,14 +8,14 @@ import { extname, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 
-import type { MediaDescription } from '@nirvana/contracts';
+import type { MediaDescription } from '@impera/contracts';
 import {
   createJsonlCallLog,
   DEFAULT_LLM_CONFIG,
   loadPrompt,
   MODELS,
   readProviderCredentials,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import {
   createJsonlCalibrationStore,
@@ -93,7 +93,7 @@ const persona = readPersonaFile(readFileSync(resolve(cwd, values.persona), 'utf8
 const log = createJsonlCallLog(resolve(scratch, 'llm-calls.jsonl'));
 const gateway = createPlaygroundGateway({ credentials, log });
 // Ratings hold persona phrasing: kept out of the repository, in the shape the database will take (P0-03).
-const trainingDir = process.env['NIRVANA_TRAINING_DIR'] ?? resolve(repoRoot, '.scratch/training');
+const trainingDir = process.env['IMPERA_TRAINING_DIR'] ?? resolve(repoRoot, '.scratch/training');
 const store = createJsonlCalibrationStore(resolve(trainingDir, 'ratings.jsonl'));
 const records: CalibrationRecord[] = await store.list();
 const sessionId = `playground-${String(Date.now())}`;

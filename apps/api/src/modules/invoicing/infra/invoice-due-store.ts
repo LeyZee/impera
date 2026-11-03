@@ -6,8 +6,8 @@ import {
   INVOICE_DUE_SOON_DAYS,
   newId,
   type PayoutBlock,
-} from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import { addDays } from '../../contractors/pure';
 import { invoiceDueState } from '../domain/invoices';

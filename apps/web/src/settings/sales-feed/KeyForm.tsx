@@ -1,4 +1,4 @@
-import type { Platform, SalesFeedStatus } from '@nirvana/contracts';
+import type { Platform, SalesFeedStatus } from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { connectKey } from './api';
@@ -83,7 +83,7 @@ export function KeyForm({
         <li>
           Coche <b>Statistiques</b> et <b>Ventes une par une</b>.
         </li>
-        <li>Colle-la ici : elle commence par « rvl_ » et Nirvana la vérifie toute seule.</li>
+        <li>Colle-la ici : elle commence par « rvl_ » et Impera la vérifie toute seule.</li>
       </ol>
       <form
         className="sv-key"

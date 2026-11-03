@@ -1,4 +1,4 @@
-import { PlaygroundComparisonSchema, PlaygroundStateSchema } from '@nirvana/contracts';
+import { PlaygroundComparisonSchema, PlaygroundStateSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { createDemoClient } from './demo';

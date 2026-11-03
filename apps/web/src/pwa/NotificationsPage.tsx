@@ -1,4 +1,4 @@
-import { NotificationPreferencesSchema, type NotificationPreferences } from '@nirvana/contracts';
+import { NotificationPreferencesSchema, type NotificationPreferences } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
@@ -35,11 +35,11 @@ const preferencesQuery = {
 const DEFAULT_QUIET = { startMinute: 22 * 60, endMinute: 8 * 60 } as const;
 
 const STATE_WORDS: Readonly<Record<PushState, string>> = {
-  on: 'Cet appareil reçoit les notifications de Nirvana.',
+  on: 'Cet appareil reçoit les notifications d’Impera.',
   off: 'Les notifications sont coupées sur cet appareil.',
   denied:
-    'Les notifications de Nirvana sont refusées sur cet appareil. Pour les rouvrir : réglages du téléphone ou du navigateur, puis Nirvana, puis Notifications.',
-  needs_install: 'Sur iPhone, les notifications n’arrivent que dans Nirvana installée sur l’écran d’accueil.',
+    'Les notifications d’Impera sont refusées sur cet appareil. Pour les rouvrir : réglages du téléphone ou du navigateur, puis Impera, puis Notifications.',
+  needs_install: 'Sur iPhone, les notifications n’arrivent que dans Impera installée sur l’écran d’accueil.',
   unsupported: 'Ce navigateur ne reçoit pas de notifications.',
 };
 
@@ -142,7 +142,7 @@ function ThisDevice(): JSX.Element {
           ) : null}
           {state === 'needs_install' ? (
             <Link to="/aide/installer" className="nv-btn nv-btn--neon">
-              Installer Nirvana
+              Installer Impera
             </Link>
           ) : null}
         </div>
@@ -153,7 +153,7 @@ function ThisDevice(): JSX.Element {
         )}
         {state === 'off' && serverKey.isError ? (
           <p className="nv-notif__note" role="status">
-            Nirvana ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.
+            Impera ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.
           </p>
         ) : null}
       </PanelSection>

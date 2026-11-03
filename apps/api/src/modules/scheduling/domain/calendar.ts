@@ -8,7 +8,7 @@ import {
   type SchedulingSettings,
   type SlotWindow,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { addDays, calendarDayIn, isoWeekday, wallClockToInstant } from './time';
 

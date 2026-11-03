@@ -5,7 +5,7 @@ import { z } from 'zod';
  * `/mnt/project-files/crm-api-reference.md` outside the repository). No real answer has been seen yet: these schemas
  * follow the documentation and are to be confirmed at the first real call, by Charles's request only (ADR 0050 § 9).
  *
- * Objects are not `.strict()`: a field Reveal adds is ignored, while a field Nirvana reads that is missing or of
+ * Objects are not `.strict()`: a field Reveal adds is ignored, while a field Impera reads that is missing or of
  * another type fails the parse, and the reading stops without moving the cursor. Values Reveal says may grow (`event`,
  * `sale.type`, `sale.status`, `models[].status`) are read as strings and mapped by the adapter, never refused here.
  */
@@ -117,7 +117,7 @@ export const RevealChatterDailyStatsSchema = z.object({
 
 /**
  * `POST /v1/webhooks`: 201 with the webhook and its `secret`, shown once. The documentation does not give the rest of
- * the shape: only the two fields Nirvana keeps are read, at the top level or under `data`.
+ * the shape: only the two fields Impera keeps are read, at the top level or under `data`.
  */
 const RevealWebhookSchema = z.object({ id: text, secret: text });
 export const RevealCreatedWebhookSchema = z.union([
@@ -126,7 +126,7 @@ export const RevealCreatedWebhookSchema = z.union([
 ]);
 
 /**
- * A delivery Reveal posts to Nirvana: `{ id, event, createdAt, data }`, `data` being a line of `/v1/sales`. Only its
+ * A delivery Reveal posts to Impera: `{ id, event, createdAt, data }`, `data` being a line of `/v1/sales`. Only its
  * id and its position are read: the line itself is read again from `/v1/sales`, in the register's order, so nothing of
  * the fan in `data` is ever parsed nor kept.
  */

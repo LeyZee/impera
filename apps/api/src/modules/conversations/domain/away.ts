@@ -1,4 +1,4 @@
-import type { TeamMemberStatus } from '@nirvana/contracts';
+import type { TeamMemberStatus } from '@impera/contracts';
 
 /** A team member's status other than `active`: away, he reads no conversation and holds none (EQ-13). */
 export type AwayStatus = Exclude<TeamMemberStatus, 'active'>;

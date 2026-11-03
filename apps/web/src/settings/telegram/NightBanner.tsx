@@ -1,4 +1,4 @@
-import type { Dashboard as DashboardData } from '@nirvana/contracts';
+import type { Dashboard as DashboardData } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 

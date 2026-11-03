@@ -1,4 +1,4 @@
-import { BillingSettingsSchema, type BillingSettings } from '@nirvana/contracts';
+import { BillingSettingsSchema, type BillingSettings } from '@impera/contracts';
 
 /*
  * Réglages › Facturation as the screens of EQ-06 lot 8c read it: an invented agency (ADR 0010), 123 456 782 carrying a

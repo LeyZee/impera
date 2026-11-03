@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SubNav, type SubNavItem } from './layout';
 
 const placeTabBarLens = vi.fn();
-vi.mock('@nirvana/design-system', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@nirvana/design-system')>()),
+vi.mock('@impera/design-system', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@impera/design-system')>()),
   placeTabBarLens: (...args: unknown[]) => {
     placeTabBarLens(...args);
   },

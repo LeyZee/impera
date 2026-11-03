@@ -1,5 +1,5 @@
-import type { KycSlot } from '@nirvana/contracts';
-import { loadPrompt, type LlmGateway } from '@nirvana/llm';
+import type { KycSlot } from '@impera/contracts';
+import { loadPrompt, type LlmGateway } from '@impera/llm';
 
 import type { FansModule } from '../fans';
 

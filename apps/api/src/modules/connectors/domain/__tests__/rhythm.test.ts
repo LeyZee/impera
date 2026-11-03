@@ -1,4 +1,4 @@
-import { ConnectorConfigSchema } from '@nirvana/contracts';
+import { ConnectorConfigSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { afterFailure, isPaused, nextPollAt, type BreakerState } from '../rhythm';

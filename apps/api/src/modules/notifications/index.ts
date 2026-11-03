@@ -1,6 +1,6 @@
 /** Public entry point of the `notifications` module (CR-01, ADR 0042 § 7). Other modules import this file only. */
-import type { NotificationOutcome, NotificationRequest } from '@nirvana/contracts';
-import type { Database, EncryptionKey } from '@nirvana/db';
+import type { NotificationOutcome, NotificationRequest } from '@impera/contracts';
+import type { Database, EncryptionKey } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { notifyCreatorSale } from './application/creator-sale';

@@ -101,7 +101,7 @@ for (const f of files) {
   // The compiler's incremental state (`incremental` in tsconfig.base.json) is ignored by git and rewritten by every
   // typecheck, which runs before this script: its size says nothing about the repository. Drizzle's snapshots are
   // generated text, one per migration and the whole schema each, never edited by hand (packages/db/README.md): they grow
-  // with the schema, past 500 KB from 0098 on, and are neither media nor an export.
+  // with the schema, past 500 KB from 0100 on, and are neither media nor an export.
   const generated =
     r.endsWith('.tsbuildinfo') || /^packages\/db\/migrations\/meta\/\d{4}_snapshot\.json$/.test(r);
   if (statSync(f).size > MAX_BYTES && !generated) errors.push(`${r}: larger than 500 KB`);

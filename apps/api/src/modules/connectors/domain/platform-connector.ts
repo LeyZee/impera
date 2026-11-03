@@ -12,7 +12,7 @@ import type {
   SessionState,
   Unsubscribe,
   VerifyResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * The port every platform adapter implements (connectors.md). Each method is idempotent or carries an

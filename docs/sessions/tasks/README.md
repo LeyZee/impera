@@ -65,7 +65,7 @@ Branche : task/<id>-<slug>
 | D-02 | Recette design et navigation de l'interface web | 4 | in_progress | D-01 |
 | EQ-01 | Équipe : membres, pays, commission, paramètres de paie des plateformes | équipe | in_progress | ADR 0023, ADR 0024 ; écrans : EQ-11 |
 | EQ-02 | Planning des shifts et « qui est en poste » | équipe | in_progress | EQ-01 |
-| EQ-03 | Rapport de fin de shift dans Nirvana | équipe | in_progress | EQ-02 |
+| EQ-03 | Rapport de fin de shift dans Impera | équipe | in_progress | EQ-02 |
 | EQ-04 | Moteur de paie : calcul pur, périodes, verrou | équipe | in_progress | EQ-01, EQ-03 |
 | EQ-05 | Paie : écrans de validation, de paiement et commissions du chatteur | équipe | done | EQ-04, EQ-11 |
 | EQ-06 | Factures des prestataires : autofacturation, avoirs, export comptable | équipe | done | EQ-04, EQ-05 |
@@ -85,7 +85,7 @@ Branche : task/<id>-<slug>
 | CR-01 | Socle de l'application installable : manifeste, service worker, notifications, clés d'accès | espaces | todo | ADR 0042, EQ-11 |
 | CR-02 | Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe | espaces | todo | CR-01, ADR 0042, EQ-11 |
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
-| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | todo | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
+| CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | in_progress | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
 | CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo (avec les catégories de l'ADR 0055) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |

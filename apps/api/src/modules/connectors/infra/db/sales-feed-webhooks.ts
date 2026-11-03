@@ -5,7 +5,7 @@ import {
   PlatformSchema,
   type JobPayload,
   type Platform,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   decryptSecret,
   encryptSecret,
@@ -16,7 +16,7 @@ import {
   withAdmin,
   type Database,
   type EncryptionKey,
-} from '@nirvana/db';
+} from '@impera/db';
 
 import type { SalesFeedJobs, SalesFeedWebhookStore, StoredWebhook } from '../../domain/sales-feed';
 

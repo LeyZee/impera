@@ -1,4 +1,4 @@
-import type { TelegramMembership } from '@nirvana/contracts';
+import type { TelegramMembership } from '@impera/contracts';
 import { z } from 'zod';
 
 import type { ChannelFailure, ChannelResult, ChannelUpdate, NotificationChannel } from '../domain/ports';

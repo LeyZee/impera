@@ -1,7 +1,8 @@
-import type { CreatorId, PayPeriod, PlatformAccountId } from '@nirvana/contracts';
-import type { Database, Transaction } from '@nirvana/db';
+import type { CreatorId, PayPeriod, PlatformAccountId } from '@impera/contracts';
+import type { Database, Transaction } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { createAgencyRatesService } from './application/agency-rates';
 import { createCalendarService } from './application/calendar';
 import { createCalendarLinkService } from './application/calendar-feed';
 import { createShiftFeedbackService } from './application/feedback';
@@ -12,6 +13,7 @@ import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
 import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
+import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
@@ -47,8 +49,9 @@ export type { DetectedAccountForCheck } from './domain/sales-checks';
 export interface SchedulingModule {
   readonly name: 'scheduling';
   /**
-   * Mounted under `/v1` by the server: `/scheduling/…` (contracts `scheduling.ts`, `shift-reports.ts` and `shift-feedback.ts`), and
-   * `/team/pay-rules` (contract `pay-rules.ts`): the reports read an account's rules in their own transaction.
+   * Mounted under `/v1` by the server: `/scheduling/…` (contracts `scheduling.ts`, `shift-reports.ts` and `shift-feedback.ts`),
+   * `/team/pay-rules` (contract `pay-rules.ts`): the reports read an account's rules in their own transaction, and
+   * `/creators/:creatorId/agency-rates` (contract `agency-rates.ts`, CR-04): the agency's percentage of a creator.
    */
   routes(requireRole: RequireRole): FastifyPluginAsyncZod;
   /**
@@ -163,6 +166,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       deps.creators,
       now,
     ),
+    agencyRates: createAgencyRatesService(createDrizzleAgencyRatesStore(deps.db), deps.creators, now),
   };
   return {
     name: 'scheduling',

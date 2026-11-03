@@ -1,6 +1,6 @@
 # Module `trends` : veille et idées de contenu (ADR 0060)
 
-Les signaux de tendance (`trend_signals`), les posts que l'extension relève quand une personne regarde Instagram (`trend_readings`), les idées de contenu du matin (`content_ideas`) et la liaison de l'extension d'une personne avec le serveur (`extension_links`). Migration 0098.
+Les signaux de tendance (`trend_signals`), les posts que l'extension relève quand une personne regarde Instagram (`trend_readings`), les idées de contenu du matin (`content_ideas`) et la liaison de l'extension d'une personne avec le serveur (`extension_links`). Migration 0100.
 
 **Lot a de VEI-01** (ce qui existe) : les tables et leur RLS, les contrats (`packages/contracts`, `trends.ts`, `content-drops.ts`, `public-outputs.ts`) et les règles pures. Pas encore d'`index.ts` : le module n'a ni route, ni job, ni stockage, qui arrivent avec les lots b (coller un lien, entrée des relevés, liaison de l'extension), c (plafond de veille, captures pour la vision) et d (idée validée → suggestion de l'agenda → demande de contenu, après CR-05 et CR-06).
 

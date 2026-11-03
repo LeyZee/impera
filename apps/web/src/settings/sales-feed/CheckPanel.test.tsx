@@ -1,11 +1,6 @@
 // @vitest-environment jsdom
-import type {
-  SalesFeedCheckReport,
-  SalesFeedOverview,
-  SalesFeedStatus,
-  TeamMember,
-} from '@nirvana/contracts';
-import { TeamMemberSchema } from '@nirvana/contracts';
+import type { SalesFeedCheckReport, SalesFeedOverview, SalesFeedStatus, TeamMember } from '@impera/contracts';
+import { TeamMemberSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';

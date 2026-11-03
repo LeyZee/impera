@@ -8,7 +8,7 @@ import {
   newId,
   PersonaVersionIdSchema,
   PlatformAccountIdSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { eq, sql } from 'drizzle-orm';
 import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';

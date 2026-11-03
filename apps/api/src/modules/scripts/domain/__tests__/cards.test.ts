@@ -4,7 +4,7 @@ import {
   SCRIPT_CARD_INKS,
   type MediaSlot,
   type ScriptStructureVersion,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { cardContent, cardSvg, duration, quoteLines, shootSummary, wrap } from '../cards';

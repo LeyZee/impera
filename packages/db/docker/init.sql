@@ -3,7 +3,7 @@
 -- Tables are owned by nirvana_admin (the migration role); nirvana_app only gets grants.
 -- The migrations create the tables, the RLS policies and FORCE ROW LEVEL SECURITY.
 CREATE ROLE nirvana_app LOGIN PASSWORD 'change-me' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-GRANT CONNECT ON DATABASE nirvana TO nirvana_app;
+GRANT CONNECT ON DATABASE impera TO nirvana_app;
 GRANT USAGE ON SCHEMA public TO nirvana_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE nirvana_admin IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nirvana_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE nirvana_admin IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO nirvana_app;

@@ -1,4 +1,4 @@
-import type { BillingSettings } from '@nirvana/contracts';
+import type { BillingSettings } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

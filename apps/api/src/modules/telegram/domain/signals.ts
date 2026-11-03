@@ -11,12 +11,13 @@ import type {
   InvoicePdfPlace,
   KillSwitchScope,
   PayoutBlock,
+  Platform,
   PayPeriod,
   SaleSeller,
   SaleType,
   SecurityAlertPayload,
   TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * What the module reads out of a `domain_events` row (ADR 0020 §3), narrowed to the facts a notification needs.
@@ -169,6 +170,17 @@ export type Signal =
        */
       readonly kind: 'security_alert';
       readonly alert: SecurityAlertPayload;
+    }
+  | {
+      /**
+       * After a switch to the platform's net (CRM-04 b3): a fortnight's automatic check still finds the register and
+       * the platform's statistics apart, 24 hours later. Only how many days and accounts: never an amount.
+       */
+      readonly kind: 'sales_feed_mismatch';
+      readonly platform: Platform;
+      readonly from: PayPeriod;
+      readonly days: number;
+      readonly accounts: number;
     };
 
 export interface ScannedEvent {

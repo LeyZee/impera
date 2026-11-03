@@ -1,6 +1,6 @@
-import { newId, UserIdSchema } from '@nirvana/contracts';
-import { schema, sql, withAdmin } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { newId, UserIdSchema } from '@impera/contracts';
+import { schema, sql, withAdmin } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createLatestRateRead, latestRateOf } from '../infra/latest-rate';

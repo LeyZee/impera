@@ -1,4 +1,4 @@
-import { placeTabBarLens } from '@nirvana/design-system';
+import { placeTabBarLens } from '@impera/design-system';
 import { Link, useRouterState, type LinkProps } from '@tanstack/react-router';
 import { useEffect, useLayoutEffect, useRef, type JSX, type ReactNode } from 'react';
 

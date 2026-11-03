@@ -1,4 +1,4 @@
-import { DEFAULT_TREND_SIGNAL_LIFETIME_DAYS, type TrendMetrics } from '@nirvana/contracts';
+import { DEFAULT_TREND_SIGNAL_LIFETIME_DAYS, type TrendMetrics } from '@impera/contracts';
 
 const DAY_MS = 24 * 60 * 60_000;
 

@@ -1,4 +1,4 @@
-import type { NotificationRequest } from '@nirvana/contracts';
+import type { NotificationRequest } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { notifyCreatorSale } from '../../application/creator-sale';

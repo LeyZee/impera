@@ -12,7 +12,7 @@ import { CalendarDaySchema } from './team-members';
 
 /**
  * The trend watch (ADR 0060, VEI-01): trend signals from six sources, the posts the extension reads while a person
- * watches Instagram, and the content ideas the morning job proposes. Nirvana keeps a third party's link and public
+ * watches Instagram, and the content ideas the morning job proposes. Impera keeps a third party's link and public
  * figures, never their media (§ 1), and never asks instagram.com anything: a link is checked by its form, never fetched.
  */
 
@@ -75,7 +75,7 @@ export interface InstagramPost {
   readonly code: InstagramPostCode;
   /** `reel` for `/reel/`, `/reels/` and `/tv/`, `post` for `/p/`. */
   readonly path: 'post' | 'reel';
-  /** The address Nirvana keeps: no query string (`igsh` and the like say who shared it), no fragment. */
+  /** The address Impera keeps: no query string (`igsh` and the like say who shared it), no fragment. */
   readonly url: string;
 }
 
@@ -105,7 +105,7 @@ export function instagramPostOf(address: string): InstagramPost | null {
   };
 }
 
-/** An address `instagramPostOf` reads, turned into the one Nirvana keeps. */
+/** An address `instagramPostOf` reads, turned into the one Impera keeps. */
 export const InstagramPostUrlSchema = z
   .string()
   .max(2048)

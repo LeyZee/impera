@@ -1,4 +1,4 @@
-import { ProviderErrorKindSchema, type ProviderStatus } from '@nirvana/contracts';
+import { ProviderErrorKindSchema, type ProviderStatus } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { DASHBOARD_PROVIDERS } from '../catalog';
@@ -20,7 +20,7 @@ const NOW = new Date('2026-10-17T19:00:00Z');
 
 const verified: VerifiedKey = {
   ok: true,
-  keyLabel: 'nirvana-prod',
+  keyLabel: 'impera-prod',
   summary: 'Grok 4.7 écrit et décide',
   facts: [{ label: 'Modèle', value: 'Grok 4.7' }],
   settings: {},
@@ -149,7 +149,7 @@ describe('credential states', () => {
     );
   });
 
-  it('tells a key Nirvana can no longer decrypt from a key the provider refuses', () => {
+  it('tells a key Impera can no longer decrypt from a key the provider refuses', () => {
     const unreadable = {
       ...saved,
       key: null,
@@ -197,7 +197,7 @@ describe('next action', () => {
     });
   });
 
-  it('sends no one to the provider for a key Nirvana can no longer decrypt', () => {
+  it('sends no one to the provider for a key Impera can no longer decrypt', () => {
     const unreadable = { ...status('elevenlabs', 'needs_reconnect'), isUnreadable: true };
     expect(nextAction([status('xai', 'connected'), unreadable])).toMatchObject({
       kind: 'replace_key',

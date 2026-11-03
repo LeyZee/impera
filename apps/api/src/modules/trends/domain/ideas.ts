@@ -8,7 +8,7 @@ import {
   type ContentIdeaDraft,
   type PersonaLimits,
   type TrendSignalId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * The code's filters on the morning ideas (ADR 0060 § 4), after the generation and never left to the prompt. An idea is

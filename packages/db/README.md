@@ -1,4 +1,4 @@
-# @nirvana/db
+# @impera/db
 
 Schéma Drizzle (`src/schema/`), migrations SQL relues (`migrations/`), client et pool, `withTenant` / `withMember` / `withTenantMember` / `withCreatorAccount` / `withAdmin` (RLS, ADR 0005, 0023 et 0042) et `enterCreator` (passer d'une créatrice à l'autre dans une même transaction, ADR 0031), chiffrement des secrets (`crypto.ts`, AES-256-GCM, clés versionnées, contexte lié), helpers de tests d'intégration (`src/test/`).
 
@@ -40,7 +40,7 @@ Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DAT
 
 ## Tests d'intégration
 
-`pnpm --filter @nirvana/db test:integration` démarre un Postgres 16 avec Testcontainers (Docker requis), crée les deux rôles comme en production, puis une base migrée par fichier de test (`createTestDb`). Sans Docker, `NIRVANA_TEST_PG_URL` donne l'URL superutilisateur d'un Postgres 16 jetable à utiliser à la place.
+`pnpm --filter @impera/db test:integration` démarre un Postgres 16 avec Testcontainers (Docker requis), crée les deux rôles comme en production, puis une base migrée par fichier de test (`createTestDb`). Sans Docker, `IMPERA_TEST_PG_URL` donne l'URL superutilisateur d'un Postgres 16 jetable à utiliser à la place.
 
 ## Écarts avec `data-model.md`
 

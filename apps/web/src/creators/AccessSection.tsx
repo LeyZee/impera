@@ -1,4 +1,4 @@
-import type { CreatorId, InvitationLinkCreated } from '@nirvana/contracts';
+import type { CreatorId, InvitationLinkCreated } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
@@ -11,7 +11,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 /**
  * Accès, on her sheet, for the owner alone (CR-02, ADR 0042 § 1): her own account and its link. The first link names
- * her e-mail and makes her account; the next ones replace it, or give her a new password once she is in. Nirvana sends
+ * her e-mail and makes her account; the next ones replace it, or give her a new password once she is in. Impera sends
  * nothing: the owner hands the message over himself, as for a member (EQ-12).
  */
 export function AccessSection({

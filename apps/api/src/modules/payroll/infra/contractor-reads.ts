@@ -1,4 +1,4 @@
-import { sql } from '@nirvana/db';
+import { sql } from '@impera/db';
 import { z } from 'zod';
 
 import type { ContractorPayReads } from '../../contractors';

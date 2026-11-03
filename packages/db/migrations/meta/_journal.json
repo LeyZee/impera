@@ -607,8 +607,29 @@
     {
       "idx": 86,
       "version": "7",
-      "when": 1793718745345,
-      "tag": "0098_trend_watch",
+      "when": 1793715681675,
+      "tag": "0096_creator_agency_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793717537337,
+      "tag": "0097_telegram_scan_mismatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1793718767232,
+      "tag": "0099_platform_impera",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1793720542341,
+      "tag": "0100_trend_watch",
       "breakpoints": true
     }
   ]

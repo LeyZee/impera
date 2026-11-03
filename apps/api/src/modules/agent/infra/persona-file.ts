@@ -5,7 +5,7 @@ import {
   PersonaSchema,
   type KycSlot,
   type Persona,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { parse, stringify } from 'yaml';
 
 import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain/desire';

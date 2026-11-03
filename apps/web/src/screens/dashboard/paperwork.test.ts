@@ -1,4 +1,4 @@
-import type { TeamMember } from '@nirvana/contracts';
+import type { TeamMember } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { paperworkLines } from './paperwork';

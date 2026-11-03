@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-import type { MediaDescription } from '@nirvana/contracts';
-import type { Brief, ConversationInput, LlmGateway, VoiceInput, VoiceOutput } from '@nirvana/llm';
+import type { MediaDescription } from '@impera/contracts';
+import type { Brief, ConversationInput, LlmGateway, VoiceInput, VoiceOutput } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_GUARD_SETTINGS } from '../../../agent/index';

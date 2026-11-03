@@ -23,14 +23,14 @@ L'écran Entraîner > Playground du CRM (fil Extension) pilote le moteur de cali
   - contenu : `PUT /notes`, `POST /creator-media`.
 
   Garde `requireRole('owner')`. Réponse 503 `llm_unavailable` sans clé, 409 sur une note impossible.
-- [x] Composition root : une passerelle par processus (`apps/api/src/llm.ts`, clés par `providers.apiKeySource`, refus par `reportRefusedKey`, plafond par `onBudget`), `startPlaygroundModule` (persona `PLAYGROUND_PERSONA_PATH`, démo sinon ; notes dans `NIRVANA_TRAINING_DIR`) et ses routes sous `requireRole('owner')`.
+- [x] Composition root : une passerelle par processus (`apps/api/src/llm.ts`, clés par `providers.apiKeySource`, refus par `reportRefusedKey`, plafond par `onBudget`), `startPlaygroundModule` (persona `PLAYGROUND_PERSONA_PATH`, démo sinon ; notes dans `IMPERA_TRAINING_DIR`) et ses routes sous `requireRole('owner')`.
 - [x] Journal persistant branché sur `llm_calls` (#38).
 - [x] Composeur de brouillons sur le même cœur que le playground, monté dans `conversation.respond`.
 - [ ] Événement de plafond vers la supervision (journal du serveur d'ici là).
 
 ## Critères d'acceptation
 - `pnpm check` et `pnpm test` verts. Tests du module : service contre un faux moteur, routes avec `fastify.inject` et une fausse passerelle.
-- Rien n'est envoyé à un fan. Les notes restent hors dépôt (JSONL dans `NIRVANA_TRAINING_DIR`) tant qu'il n'y a pas de table.
+- Rien n'est envoyé à un fan. Les notes restent hors dépôt (JSONL dans `IMPERA_TRAINING_DIR`) tant qu'il n'y a pas de table.
 
 ## Hors périmètre
 L'écran (fil Extension), une table pour les notes (à demander au fil plomberie avant la prod), l'accès de Messa (rôle `creator`, plus tard), l'envoi d'un vrai média à Vision.

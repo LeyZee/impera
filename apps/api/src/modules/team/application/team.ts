@@ -21,7 +21,7 @@ import {
   type TeamRoleChange,
   type UpdateTeamMemberBody,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { CommissionPresetNotFound, MemberNotFound } from '../domain/errors';
 import {

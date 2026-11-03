@@ -1,5 +1,5 @@
-import { and, eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { and, eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -108,7 +108,7 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     const enabled = await post('/v1/auth/two-factor/enable', { password: ana.password }, cookie);
     expect(enabled.statusCode).toBe(200);
     const setup = enabled.json<{ totpURI: string; backupCodes: string[] }>();
-    expect(setup.totpURI).toMatch(/^otpauth:\/\/totp\/Nirvana:ana%40example\.test\?secret=/);
+    expect(setup.totpURI).toMatch(/^otpauth:\/\/totp\/Impera:ana%40example\.test\?secret=/);
     expect(setup.backupCodes).toHaveLength(10);
     // Encrypted with the Better Auth secret: neither the secret nor a backup code is stored in clear.
     const [row] = await test.admin.db

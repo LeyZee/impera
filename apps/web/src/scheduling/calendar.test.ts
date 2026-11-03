@@ -1,4 +1,4 @@
-import { CalendarAgentSchema, CalendarSchema, type Calendar, type CalendarAgent } from '@nirvana/contracts';
+import { CalendarAgentSchema, CalendarSchema, type Calendar, type CalendarAgent } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 

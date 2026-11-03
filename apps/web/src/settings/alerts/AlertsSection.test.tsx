@@ -3,7 +3,7 @@ import {
   CreateCustomAlertBodySchema,
   CustomAlertBodySchema,
   SetSystemAlertBodySchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,

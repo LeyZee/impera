@@ -1,6 +1,6 @@
 # Module `connectors`
 
-**Rôle.** Port `PlatformConnector` et ses adaptateurs (`RevealApiConnector`, `FakeConnector`, plus tard `NirvanaPlatformConnector`). Seul module autorisé à parler à une plateforme externe.
+**Rôle.** Port `PlatformConnector` et ses adaptateurs (`RevealApiConnector`, `FakeConnector`, plus tard `ImperaPlatformConnector`). Seul module autorisé à parler à une plateforme externe.
 
 **Peut dépendre de.** conversations (`ingestMessage` pour les messages entrants). Implémente aussi le port `OutboundSender` défini dans `conversations/domain/ports.ts` ; le composition root fait le branchement, `conversations` n'importe jamais ce module.
 

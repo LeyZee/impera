@@ -1,5 +1,6 @@
 import type {
   AccountPayRulesId,
+  CreatorAgencyRateId,
   CalendarView,
   CreatorId,
   CreatorSummary,
@@ -26,7 +27,7 @@ import type {
   TeamMemberStatus,
   TeamScope,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { CreatorAgent } from './calendar';
 import type { Reader, RulesRow } from './reports';
@@ -558,6 +559,38 @@ export interface PayRulesStore {
   }>;
   /** Owner; `created` is false when the same rules were already recorded. */
   create(actor: Actor, rules: NewPayRules, now: Date): Promise<{ rules: StoredPayRules; created: boolean }>;
+}
+
+/** A creator's agency percentage as stored (CR-04): added only, never changed. `fromDay` is `YYYY-MM-DD`. */
+export interface StoredAgencyRate {
+  readonly id: CreatorAgencyRateId;
+  readonly creatorId: CreatorId;
+  readonly fromDay: string;
+  readonly agencyBps: number;
+  readonly createdAt: Date;
+}
+
+interface NewAgencyRate {
+  readonly id: CreatorAgencyRateId;
+  readonly fromDay: string;
+  readonly agencyBps: number;
+}
+
+/**
+ * Storage of the creators' agency percentages (CR-04), through `withTenantMember` in the creator: the owner alone
+ * reads and adds them, the table refuses any change or removal. Today is read in the agency's zone, in the same
+ * transaction.
+ */
+export interface AgencyRatesStore {
+  /** Her percentages newest first, and the day it is at `now` in the agency's zone. */
+  list(actor: UserId, creatorId: CreatorId, now: Date): Promise<{ today: string; rates: StoredAgencyRate[] }>;
+  /** Owner; `created` is false when the same percentage was already recorded. */
+  create(
+    actor: Actor,
+    creatorId: CreatorId,
+    rate: NewAgencyRate,
+    now: Date,
+  ): Promise<{ rate: StoredAgencyRate; created: boolean }>;
 }
 
 /** What the job logs through; the composition root passes the job's own logger. */

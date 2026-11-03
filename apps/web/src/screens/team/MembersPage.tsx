@@ -1,5 +1,5 @@
-import type { CommissionPreset, CreatorSummary, TeamMember, TeamRole } from '@nirvana/contracts';
-import { placeSegmentThumb } from '@nirvana/design-system';
+import type { CommissionPreset, CreatorSummary, TeamMember, TeamRole } from '@impera/contracts';
+import { placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
 import { AddMemberPanel } from './AddMemberPanel';

@@ -51,7 +51,7 @@ const configSchema = z
     /** Jobs a worker runs at once; jobs of one conversation stay serial whatever this is (ADR 0006). */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
     /** Development: run the worker inside the API process (`pnpm dev`). */
-    NIRVANA_INLINE_WORKER: flag,
+    IMPERA_INLINE_WORKER: flag,
     /** AI service keys pasted in the dashboard are sealed with these (ADR 0016), `v2:<base64>,v1:<base64>`. */
     CREDENTIALS_ENCRYPTION_KEYS: z.string().min(1).optional(),
     /** Development only: AI service keys read from the environment, ignored in production (ADR 0016). Empty = unset. */
@@ -67,7 +67,7 @@ const configSchema = z
     /** Entraîner > Playground: the persona YAML to train on; the fictional demo persona when absent (ADR 0010). */
     PLAYGROUND_PERSONA_PATH: optionalValue,
     /** Where the playground ratings are kept, out of the repository; `.scratch/training` when absent. */
-    NIRVANA_TRAINING_DIR: optionalValue,
+    IMPERA_TRAINING_DIR: optionalValue,
     /**
      * The invoices' PDFs (ADR 0037 § 4): the Hetzner bucket of ADR 0028, under compliance lock, in its own project.
      * Its key can write and read, never delete. Production only: elsewhere a store in memory takes its place.
@@ -200,8 +200,19 @@ export function invoiceBucket(
     : { endpoint, region, bucket, accessKeyId, secretAccessKey };
 }
 
+/** The prefix of the variables before the rename: one still set stops the start instead of being ignored. */
+const OLD_PREFIX = 'NIRVANA_'; // ADR 0062
+
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const renamed = Object.keys(env).filter((name) => name.startsWith(OLD_PREFIX));
+  if (renamed.length > 0) {
+    throw new Error(
+      `Invalid configuration: the project is called Impera now (ADR 0062), rename ${renamed
+        .map((name) => `${name} to IMPERA_${name.slice(OLD_PREFIX.length)}`)
+        .join(', ')}.`,
+    );
+  }
   const parsed = configSchema.safeParse(env);
   if (!parsed.success) {
     throw new Error(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);

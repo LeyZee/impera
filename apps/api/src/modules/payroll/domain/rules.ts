@@ -1,4 +1,4 @@
-import { collectiveGoalWindow, payPeriodNotBegun, type PayPeriod } from '@nirvana/contracts';
+import { collectiveGoalWindow, payPeriodNotBegun, type PayPeriod } from '@impera/contracts';
 
 import { PayrollForbidden } from '../../contractors/pure';
 

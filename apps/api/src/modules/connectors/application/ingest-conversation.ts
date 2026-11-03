@@ -1,4 +1,4 @@
-import type { ConversationSnapshot, ExternalMessage } from '@nirvana/contracts';
+import type { ConversationSnapshot, ExternalMessage } from '@impera/contracts';
 
 import { ConnectorError, type PlatformConnector } from '../domain/platform-connector';
 import type { ConnectorAccount, IngestMessage } from '../domain/ports';

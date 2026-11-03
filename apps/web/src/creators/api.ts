@@ -11,7 +11,7 @@ import {
   type CreatorId,
   type CreatorSummary,
   type InvitationLinkErrorCode,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { z } from 'zod';
 

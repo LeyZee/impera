@@ -1,4 +1,4 @@
-import { DomainError, type PayRulesSourceRefusal } from '@nirvana/contracts';
+import { DomainError, type PayRulesSourceRefusal } from '@impera/contracts';
 
 /** Error codes of the module (`SCHEDULING_ERROR_CODES`, api.md § Erreurs): the suffix gives the HTTP status. */
 export class ShiftNotFound extends DomainError {
@@ -395,6 +395,36 @@ export class PayRulesSource extends DomainError {
 export class PayRulesForbidden extends DomainError {
   constructor(message: string) {
     super('role_forbidden', message);
+  }
+}
+
+/** The agency's percentage of a creator (CR-04, `AGENCY_RATE_ERROR_CODES`). */
+export class AgencyRateConflict extends DomainError {
+  constructor() {
+    super('agency_rate_conflict', 'Ce pourcentage a déjà été posé avec d’autres valeurs');
+  }
+}
+
+export class AgencyRateDayConflict extends DomainError {
+  constructor(creatorAgencyRateId: string) {
+    super('agency_rate_day_conflict', 'Cette créatrice a déjà un pourcentage à partir de ce jour', {
+      details: { creatorAgencyRateId },
+    });
+  }
+}
+
+export class AgencyRateDayInvalid extends DomainError {
+  constructor() {
+    super(
+      'agency_rate_day_invalid',
+      'Un nouveau pourcentage part de demain au plus tôt ; seul le premier d’une créatrice part d’aujourd’hui',
+    );
+  }
+}
+
+export class AgencyRateForbidden extends DomainError {
+  constructor() {
+    super('role_forbidden', 'Seul le propriétaire lit et pose le pourcentage de l’agence');
   }
 }
 

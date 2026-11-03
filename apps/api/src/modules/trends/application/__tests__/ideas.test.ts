@@ -1,4 +1,4 @@
-import { newId, TrendSignalIdSchema, type ContentIdeaDraft } from '@nirvana/contracts';
+import { newId, TrendSignalIdSchema, type ContentIdeaDraft } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { filterDayIdeas } from '../ideas';

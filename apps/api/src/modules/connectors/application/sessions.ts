@@ -1,4 +1,4 @@
-import type { CreatorId, PlatformAccountId } from '@nirvana/contracts';
+import type { CreatorId, PlatformAccountId } from '@impera/contracts';
 
 import { PlatformAccountNotFound, SessionVaultMissing } from '../domain/errors';
 import type { AccountStore, Clock, SessionVault } from '../domain/ports';

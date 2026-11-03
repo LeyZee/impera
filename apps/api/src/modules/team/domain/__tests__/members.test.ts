@@ -1,4 +1,4 @@
-import { CreatorIdSchema, DomainError, newId } from '@nirvana/contracts';
+import { CreatorIdSchema, DomainError, newId } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

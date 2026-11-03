@@ -8,7 +8,7 @@ import {
   type CollectiveGoal,
   type CollectiveTier,
   type PayPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import { addBonusTiers, addCollectiveGoal, useRefreshPayroll, type PayRefusal } from '@/payroll/api';

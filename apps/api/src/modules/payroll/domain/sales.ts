@@ -13,7 +13,7 @@ import {
   type SaleHeldReason,
   type SaleStatus,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * The sales a platform records, as pay counts them for an account whose rules read them (CRM-03; ADR 0050 §§ 5, 7, 8):

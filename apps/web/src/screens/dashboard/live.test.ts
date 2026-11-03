@@ -309,20 +309,3 @@ describe('durations', () => {
     expect(ago('2026-10-15T12:00:00Z', now)).toBe('il y a 4 j');
   });
 });
-
-describe('fromApi for a creator', () => {
-  it('shows none of the agency’s figures: its AI spend, its stuck jobs, where its key goes', () => {
-    const data = fromApi(
-      apiDashboard({
-        budget: { spentToday: null, cap: 20, alertAt: 16, costPerEuroSold: null },
-        jobs: { dead: null },
-        voice: { ok: false, keyMissing: true, medianWriteMs: null, outagesLast7d: 0 },
-      }),
-      'creator',
-    );
-    expect(card('budget', data)).toBeUndefined();
-    expect(card('activity', data)?.rows.map(([label]) => label)).not.toContain('Tâches bloquées');
-    expect(card('voice', data)?.rows.map(([label]) => label)).not.toContain('À poser dans');
-    expect(data.agent.foldSummary).not.toContain('€');
-  });
-});

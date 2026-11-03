@@ -4,7 +4,7 @@ import {
   type HeldSale,
   type PayPeriod,
   type SaleDecisionOutcome,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import type { PayNames } from './data';

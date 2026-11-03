@@ -15,7 +15,7 @@ import {
   type UserId,
   type ValidateShiftReportsBody,
   type ValidateShiftReportsResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import { ShiftReportForbidden } from '../domain/errors';

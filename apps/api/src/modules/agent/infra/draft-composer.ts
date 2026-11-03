@@ -6,7 +6,7 @@ import type {
   MediaDescription,
   MediaFlag,
   Result,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   BRAIN_ALERTS_MAX,
   brainAlertId,
@@ -14,7 +14,7 @@ import {
   type ConversationTurn,
   type LlmFailure,
   type LlmGateway,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import {
   briefAlerts,

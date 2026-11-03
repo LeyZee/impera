@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit, { type FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { DomainError, type ApiError } from '@nirvana/contracts';
+import { DomainError, type ApiError } from '@impera/contracts';
 import Fastify, {
   LogController,
   type FastifyError,

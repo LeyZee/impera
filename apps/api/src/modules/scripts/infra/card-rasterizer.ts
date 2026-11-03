@@ -63,7 +63,7 @@ export function createCardRasterizer(fontsDir: string): RasterizeCard {
   /** One fontconfig file for the process, written once in a private temporary folder. */
   const configFile = (): Promise<string> => {
     config ??= (async () => {
-      const dir = await mkdtemp(join(tmpdir(), 'nirvana-cards-'));
+      const dir = await mkdtemp(join(tmpdir(), 'impera-cards-'));
       const file = join(dir, 'fonts.conf');
       await writeFile(file, fontsConf(fontsDir, join(dir, 'cache')));
       return file;
@@ -107,7 +107,7 @@ export function createCardRasterizer(fontsDir: string): RasterizeCard {
 }
 
 async function render(tool: Tool, file: string, svg: string): Promise<Buffer> {
-  const dir = await mkdtemp(join(tmpdir(), 'nirvana-card-'));
+  const dir = await mkdtemp(join(tmpdir(), 'impera-card-'));
   const input = join(dir, 'card.svg');
   try {
     await writeFile(input, svg);

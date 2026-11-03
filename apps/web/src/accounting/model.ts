@@ -5,7 +5,7 @@ import {
   type AccountingPeriodQuery,
   type Das2Warning,
   type JournalAccountName,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { addDays } from '@/scheduling/time';
 

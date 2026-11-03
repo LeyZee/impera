@@ -39,7 +39,7 @@ const LAPTOP_KEY = {
 const OPTIONS = { challenge: 'Y2hhbGxlbmdl', userVerification: 'required' };
 const CREATION_OPTIONS = {
   challenge: 'Y2hhbGxlbmdl',
-  rp: { name: 'Nirvana' },
+  rp: { name: 'Impera' },
   user: { id: 'dXNlcg', name: 'lina@example.test', displayName: 'Lina' },
   pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
 };

@@ -1,4 +1,4 @@
-import type { AiProvider } from '@nirvana/contracts';
+import type { AiProvider } from '@impera/contracts';
 
 import type { NewCredential, StoredCredential } from './credential';
 

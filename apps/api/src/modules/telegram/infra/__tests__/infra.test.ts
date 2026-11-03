@@ -4,7 +4,7 @@ import {
   DraftIdSchema,
   PlatformAccountIdSchema,
   newId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { FAKE_TOKEN } from '../../__tests__/support/fake-telegram';
@@ -273,7 +273,7 @@ describe('reading the outbox', () => {
       lastRateDay: null,
     });
     expect(rate({ currency: 'usd<b>', lastRateDay: null, day: '2026-10-28' })).toBeUndefined();
-    // EQ-06: the period, the document and the reason; the member, the statement and the amount stay in Nirvana.
+    // EQ-06: the period, the document and the reason; the member, the statement and the amount stay in Impera.
     const notIssued = (payload: object) =>
       toScannedEvent({ ...base, type: 'invoice_not_issued', payload })?.signal;
     const invoice = {
@@ -292,7 +292,7 @@ describe('reading the outbox', () => {
     });
     expect(notIssued({ ...invoice, reason: 'something_new' })).toBeUndefined();
     expect(notIssued({ ...invoice, period: '2026-10-17' })).toBeUndefined();
-    // ADR 0037: the document's number, the place and the stage; the member and the invoice id stay in Nirvana.
+    // ADR 0037: the document's number, the place and the stage; the member and the invoice id stay in Impera.
     const pdf = {
       invoiceId: '018f3e5c-0000-7000-8000-000000000003',
       memberId: '018f3e5c-0000-7000-8000-000000000001',
@@ -320,7 +320,7 @@ describe('reading the outbox', () => {
       toScannedEvent({ ...base, type: 'invoice_pdf_missing', payload: { ...pdf, number: '<b>x</b>' } })
         ?.signal,
     ).toBeUndefined();
-    // ADR 0039: the document's number and kind; the contractor stays in Nirvana (the payload carries no reason).
+    // ADR 0039: the document's number and kind; the contractor stays in Impera (the payload carries no reason).
     const contested = (payload: object) =>
       toScannedEvent({ ...base, type: 'invoice_contested', payload })?.signal;
     const contest = {
@@ -406,7 +406,35 @@ describe('reading the outbox', () => {
     expect(saleOf({ ...detected, seller: { kind: 'agent' } })).toMatchObject({ seller: { kind: 'agent' } });
     expect(saleOf({ ...detected, grossInclVatMinor: -100 })).toBeUndefined();
     expect(saleOf({ ...detected, seller: { kind: 'fan' } })).toBeUndefined();
-    // The voice version stays in Nirvana: the signal carries only the reasons and the count.
+    // CRM-04 b3: the platform, the fortnight, how many days and accounts; never a net nor a difference.
+    const day = (on: string, account: string) => ({
+      day: on,
+      platformAccountId: account,
+      currency: 'EUR',
+      registerNetMinor: 10_000,
+      platformNetMinor: 9_000,
+      differenceMinor: 1_000,
+    });
+    const accountA = '018f3e5c-0000-7000-8000-0000000000a1';
+    const accountB = '018f3e5c-0000-7000-8000-0000000000a2';
+    const mismatch = toScannedEvent({
+      ...base,
+      type: 'sales_feed_mismatch',
+      payload: {
+        platform: 'reveal',
+        from: '2026-11-01',
+        to: '2026-11-15',
+        days: [day('2026-11-03', accountA), day('2026-11-03', accountB), day('2026-11-04', accountA)],
+      },
+    });
+    expect(mismatch?.signal).toEqual({
+      kind: 'sales_feed_mismatch',
+      platform: 'reveal',
+      from: '2026-11-01',
+      days: 2,
+      accounts: 2,
+    });
+    // The voice version stays in Impera: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,
       type: 'automatic_closed',

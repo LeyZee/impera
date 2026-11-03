@@ -109,6 +109,10 @@ export type ShiftFeedbackId = z.infer<typeof ShiftFeedbackIdSchema>;
 export const AccountPayRulesIdSchema = uuid.brand<'AccountPayRulesId'>();
 export type AccountPayRulesId = z.infer<typeof AccountPayRulesIdSchema>;
 
+/** The agency's percentage of a creator's net from a day on (ADR 0042 § 6, CR-04). */
+export const CreatorAgencyRateIdSchema = uuid.brand<'CreatorAgencyRateId'>();
+export type CreatorAgencyRateId = z.infer<typeof CreatorAgencyRateIdSchema>;
+
 /** A member's commission statement for one pay period: `draft`, `validated`, `paid` (EQ-04, ADR 0023). */
 export const CommissionStatementIdSchema = uuid.brand<'CommissionStatementId'>();
 export type CommissionStatementId = z.infer<typeof CommissionStatementIdSchema>;
@@ -177,11 +181,11 @@ export type InvoiceId = z.infer<typeof InvoiceIdSchema>;
 export const InvoiceEventIdSchema = uuid.brand<'InvoiceEventId'>();
 export type InvoiceEventId = z.infer<typeof InvoiceEventIdSchema>;
 
-/** A line of a platform's register as Nirvana keeps it (`platform_sales`, its quarantine; ADR 0050). */
+/** A line of a platform's register as Impera keeps it (`platform_sales`, its quarantine; ADR 0050). */
 export const SalesLineIdSchema = uuid.brand<'SalesLineId'>();
 export type SalesLineId = z.infer<typeof SalesLineIdSchema>;
 
-/** A reliability check's report as Nirvana keeps it (`sales_feed_checks`, CRM-02 and CRM-03). */
+/** A reliability check's report as Impera keeps it (`sales_feed_checks`, CRM-02 and CRM-03). */
 export const SalesFeedCheckIdSchema = uuid.brand<'SalesFeedCheckId'>();
 export type SalesFeedCheckId = z.infer<typeof SalesFeedCheckIdSchema>;
 

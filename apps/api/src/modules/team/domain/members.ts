@@ -1,4 +1,4 @@
-import type { CreatorId, TeamMemberStatus, TeamRole, TeamScope } from '@nirvana/contracts';
+import type { CreatorId, TeamMemberStatus, TeamRole, TeamScope } from '@impera/contracts';
 
 import {
   CommissionDateInvalid,

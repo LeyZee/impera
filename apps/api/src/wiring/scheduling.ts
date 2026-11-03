@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS } from '@nirvana/contracts';
+import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import { salesFeedSwitchReads } from '../modules/connectors';

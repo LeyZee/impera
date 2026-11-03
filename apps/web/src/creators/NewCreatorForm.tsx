@@ -1,4 +1,4 @@
-import { CreatorDisplayNameSchema, CreatorIdSchema, newId, type CreatorSummary } from '@nirvana/contracts';
+import { CreatorDisplayNameSchema, CreatorIdSchema, newId, type CreatorSummary } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useRef, useState, type SyntheticEvent, type JSX } from 'react';
 
@@ -15,7 +15,7 @@ const PROBLEMS: Record<Exclude<CreateResult['kind'], 'created'>, string> = {
   name_taken: 'Une créatrice porte déjà ce nom. Ajoute une initiale ou choisis un autre pseudo.',
   conflict: 'Cette créatrice vient d’être créée sous un autre nom. Recharge la page pour la voir.',
   expired: 'Ta session a expiré : reconnecte-toi, puis recommence. Rien n’a été créé.',
-  failed: 'Rien n’a été créé : Nirvana ne répond pas. Réessaie dans un instant.',
+  failed: 'Rien n’a été créé : Impera ne répond pas. Réessaie dans un instant.',
 };
 
 /**

@@ -18,8 +18,8 @@ import {
   type CreatorId,
   type SchedulingSettings,
   type TeamMemberId,
-} from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import {
@@ -262,7 +262,8 @@ export async function audit(
       | 'shift_swap'
       | 'shift_report'
       | 'shift_feedback'
-      | 'account_pay_rules';
+      | 'account_pay_rules'
+      | 'creator_agency_rate';
     readonly id: string;
   },
   details: Record<string, unknown> = {},

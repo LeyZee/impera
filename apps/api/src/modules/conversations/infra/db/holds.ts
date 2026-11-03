@@ -1,4 +1,4 @@
-import { schema, sql } from '@nirvana/db';
+import { schema, sql } from '@impera/db';
 
 const { conversationEvents, conversations } = schema;
 

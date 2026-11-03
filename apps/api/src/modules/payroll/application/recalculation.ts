@@ -1,4 +1,4 @@
-import { DomainError, nextPayPeriod, type PayPeriod } from '@nirvana/contracts';
+import { DomainError, nextPayPeriod, type PayPeriod } from '@impera/contracts';
 
 import type { JobLogger } from '../../contractors/pure';
 import { blockReasonOf } from '../domain/period-blocks';

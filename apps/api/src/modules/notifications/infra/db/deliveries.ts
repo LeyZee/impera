@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { JOB_MAX_ATTEMPTS, NOTIFICATION_REASONS } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withMember, type Database } from '@nirvana/db';
+import { JOB_MAX_ATTEMPTS, NOTIFICATION_REASONS } from '@impera/contracts';
+import { and, eq, inArray, schema, sql, withMember, type Database } from '@impera/db';
 
 import { isCapped } from '../../domain/policy';
 import type { DeliveryRegistry } from '../../domain/ports';

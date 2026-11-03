@@ -24,7 +24,7 @@ import {
   type TeamMemberId,
   type TeamMemberStatus,
   type TeamRole,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { canonicalJson, sha256Of } from './canonical';
 import {

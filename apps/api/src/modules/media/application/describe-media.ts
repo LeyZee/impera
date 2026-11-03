@@ -1,4 +1,4 @@
-import { err, ok, type MediaDescription, type Result } from '@nirvana/contracts';
+import { err, ok, type MediaDescription, type Result } from '@impera/contracts';
 
 import { descriptionKey, keyframeRate, mediaKindOf, needsConversion, spreadFrames } from '../domain/media';
 

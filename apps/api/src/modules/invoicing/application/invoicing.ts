@@ -1,4 +1,4 @@
-import type { CommissionStatementId, TeamMemberId } from '@nirvana/contracts';
+import type { CommissionStatementId, TeamMemberId } from '@impera/contracts';
 
 import type { JobLogger } from '../../contractors/pure';
 import { planInvoicing } from '../domain/invoicing';

@@ -16,8 +16,8 @@ import {
   PayrollSettingsSchema,
   type PayPeriod,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';

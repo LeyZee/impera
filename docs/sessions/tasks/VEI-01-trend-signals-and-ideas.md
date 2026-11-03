@@ -37,8 +37,8 @@ La génération des idées (VEI-03), l'écran « Idées du jour » (VEI-02), le 
 ## Notes de session
 
 ### Découpage (accepté par la coordination le 03/11/2026)
-- **a, fait** : contrats (`trends.ts`, `content-drops.ts`, `public-outputs.ts`), migration 0098 (quatre tables et leur RLS), domaine pur (péremption, « dépasse nettement », filtres des idées), test RLS. Pas d'`index.ts` au module tant qu'il n'a ni route ni job. Fusion après #483 (0096) et #482 (0097), hors gel du renommage, migration régénérée sur le journal de `main`.
+- **a, fait** : contrats (`trends.ts`, `content-drops.ts`, `public-outputs.ts`), migration 0100 (d’abord annoncée 0098, régénérée sur 0099 après le renommage ; quatre tables et leur RLS), domaine pur (péremption, « dépasse nettement », filtres des idées), test RLS. Pas d'`index.ts` au module tant qu'il n'a ni route ni job. Fusion après #483 (0096) et #482 (0097), hors gel du renommage, migration régénérée sur le journal de `main`.
 - **b** : route « coller un lien », route des relevés, liaison de l'extension par personne, test qui échoue sur une connexion sortante ; prévenir Extension (VEI-02) à l'ouverture.
 - **c** : plafond de veille (`purpose` dans `llm_calls`), captures d'onglet en mémoire pour la vision.
 - **d** : idée validée → suggestion de l'agenda → demande de contenu, et le lien idée → dépôt (attend CR-05 et CR-06).
-- Migrations des lots b, c, d : 0100 et suivantes (0099 réservée au renommage).
+- Migrations des lots b, c, d : numéro donné par la coordination à l’ouverture (0101 va à CRM-04 d3).

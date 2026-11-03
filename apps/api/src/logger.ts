@@ -29,7 +29,7 @@ export function createLogger(config: Pick<Config, 'LOG_LEVEL'>, destination?: De
   return pino(
     {
       level: config.LOG_LEVEL,
-      base: { service: 'nirvana-api' },
+      base: { service: 'impera-api' },
       redact: { paths: REDACTED_PATHS, censor: '[redacted]' },
     },
     destination,

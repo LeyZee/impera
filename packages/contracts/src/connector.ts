@@ -128,7 +128,7 @@ export const ConnectorConfigSchema = z.object({
   /** How long an open breaker keeps the account quiet. */
   breakerPauseMinutes: z.number().int().min(1).max(240).default(10),
   /**
-   * Write guard: whether Nirvana may send anything through this account. Off by default, so a newly registered
+   * Write guard: whether Impera may send anything through this account. Off by default, so a newly registered
    * account is only read; turned on by hand once the account is the one meant to answer (the test fan account first).
    */
   writes: z.boolean().default(false),

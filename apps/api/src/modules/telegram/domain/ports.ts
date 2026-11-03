@@ -13,7 +13,7 @@ import type {
   TelegramRoute,
   TelegramSaleSettingsEntry,
   TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { ScannedEvent } from './signals';
 

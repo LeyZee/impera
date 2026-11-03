@@ -1,4 +1,4 @@
-# @nirvana/contracts
+# @impera/contracts
 
 La vérité partagée : identifiants typés, argent, enums, schémas Zod des entités, événements, jobs, connecteurs, persona, description de médias, réglages. Importé par api, web, extension, db, llm.
 
