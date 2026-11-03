@@ -1,4 +1,4 @@
-import type { Currency, MySale, MySalesDay, Platform, SaleEvent, SaleSignalKind } from '@nirvana/contracts';
+import type { Currency, MySale, MySalesDay, Platform, SaleEvent, SaleSignalKind } from '@impera/contracts';
 
 import { amountText, signedAmountText } from '@/reports/model';
 import { platformName } from '@/scheduling/model';

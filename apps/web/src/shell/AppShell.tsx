@@ -1,5 +1,5 @@
-import type { Me } from '@nirvana/contracts';
-import { playLiquid, playOnce } from '@nirvana/design-system';
+import type { Me } from '@impera/contracts';
+import { playLiquid, playOnce } from '@impera/design-system';
 import { Link, Outlet, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   Fragment,
@@ -247,9 +247,9 @@ export function RailNav({
       aria-label="Navigation"
       data-tabs={rail.items.length + (rail.settings === null ? 0 : 1)}
     >
-      <Link to={rail.home} className="nv-rail__brand" aria-label={`Nirvana, ${home?.label ?? 'accueil'}`}>
-        <img className="nv-rail__mark" src="/nirvana-mark.svg" alt="" width={30} height={30} />
-        <span className="nv-rail__name">Nirvana</span>
+      <Link to={rail.home} className="nv-rail__brand" aria-label={`Impera, ${home?.label ?? 'accueil'}`}>
+        <img className="nv-rail__mark" src="/impera-mark.svg" alt="" width={30} height={30} />
+        <span className="nv-rail__name">Impera</span>
       </Link>
       <span className="nv-rail__lens" ref={lensRef} aria-hidden="true" />
       {rail.items.map((item, index) => {

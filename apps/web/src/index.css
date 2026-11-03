@@ -1,8 +1,8 @@
-@import '@nirvana/design-system/fonts.css';
+@import '@impera/design-system/fonts.css';
 @import 'tailwindcss';
-@import '@nirvana/design-system/tokens.css';
-@import '@nirvana/design-system/theme.css';
-@import '@nirvana/design-system/base.css';
-@import '@nirvana/design-system/components.css';
+@import '@impera/design-system/tokens.css';
+@import '@impera/design-system/theme.css';
+@import '@impera/design-system/base.css';
+@import '@impera/design-system/components.css';
 @import './shell/shell.css';
 @import './screens/train/playground/playground.css';

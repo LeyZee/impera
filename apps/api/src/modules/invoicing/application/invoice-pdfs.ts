@@ -1,4 +1,4 @@
-import type { InvoiceId, InvoicePdfCopyProvider, TeamMemberId, UserId } from '@nirvana/contracts';
+import type { InvoiceId, InvoicePdfCopyProvider, TeamMemberId, UserId } from '@impera/contracts';
 
 import type { InvoiceObjectStore } from '../../contractors';
 import { lockAtLeast, readChecked, sha256Hex } from '../../contractors';

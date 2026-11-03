@@ -1,4 +1,4 @@
-import type { PersonaLimits, ScriptSegment } from '@nirvana/contracts';
+import type { PersonaLimits, ScriptSegment } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { disgustBlocks } from '../disgusts';

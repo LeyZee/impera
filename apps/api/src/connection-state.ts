@@ -5,8 +5,8 @@ import {
   type ConnectionService,
   type ConnectionSignal,
   type EventPayload,
-} from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { schema, sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 /** What a publisher module is handed by the composition root: a signal, kept only when it is a transition. */

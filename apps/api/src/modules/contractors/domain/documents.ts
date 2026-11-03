@@ -4,7 +4,7 @@ import {
   type ContractorDocumentId,
   type ContractorDocumentMediaType,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { addMonths } from './billing';
 import { ContractorDocumentInvalid } from './errors';

@@ -1,6 +1,6 @@
-import { CreatorIdSchema, FanIdSchema, newId, PlatformAccountIdSchema } from '@nirvana/contracts';
-import { and, eq, schema, withAdmin } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { CreatorIdSchema, FanIdSchema, newId, PlatformAccountIdSchema } from '@impera/contracts';
+import { and, eq, schema, withAdmin } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createFansModule } from '../../../fans';

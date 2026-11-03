@@ -8,11 +8,11 @@ import {
   type ScriptMoment,
   type ScriptStructureVersion,
   type ScriptVariantLetter,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * The card of a segment (ADR 0056 § 3, ADR 0064, SC-01 lot b): what the creator reads before she shoots a stage, or
- * between two. OnlyScript's design in Nirvana's type: the script's colour as a gradient over the whole card, « ÉTAPE
+ * between two. OnlyScript's design in Impera's type: the script's colour as a gradient over the whole card, « ÉTAPE
  * n » and the stage's name centred, what it sells in quotes with « (GRATUIT) » or « (PAYANT) », what to shoot, the
  * series at the foot as pills, the two stages a bridge links, the series a series card is one of; a sun, a moon or both
  * for the moment, in the line icons of the design system (Charles, 03/11). Drawn as an SVG, a pure function of the version,

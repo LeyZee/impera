@@ -1,4 +1,4 @@
-import type { Database } from '@nirvana/db';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollAccounting, type ArchivePdfs } from './application/accounting';

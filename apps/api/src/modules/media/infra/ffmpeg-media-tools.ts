@@ -87,7 +87,7 @@ const ProbeSchema = z.object({
 });
 
 async function inTempDir<T>(input: Uint8Array, use: (dir: string, path: string) => Promise<T>): Promise<T> {
-  const dir = await mkdtemp(join(tmpdir(), 'nirvana-media-'));
+  const dir = await mkdtemp(join(tmpdir(), 'impera-media-'));
   try {
     const path = join(dir, 'input');
     await writeFile(path, input);

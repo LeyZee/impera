@@ -6,7 +6,7 @@ import {
   type PayPeriodBlock,
   type TeamMemberId,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { CommissionRateMissing, MissingExchangeRate } from './errors';
 

@@ -1,4 +1,4 @@
-import { AgentModeSchema, DashboardSchema, type Dashboard as ApiDashboard } from '@nirvana/contracts';
+import { AgentModeSchema, DashboardSchema, type Dashboard as ApiDashboard } from '@impera/contracts';
 import { vi } from 'vitest';
 import { z } from 'zod';
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundState } from '@impera/contracts';
 import {
   createMemoryHistory,
   createRootRoute,

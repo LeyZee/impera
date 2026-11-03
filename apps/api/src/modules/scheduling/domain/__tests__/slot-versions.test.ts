@@ -1,4 +1,4 @@
-import { PlatformAccountIdSchema, type SlotVersionInput } from '@nirvana/contracts';
+import { PlatformAccountIdSchema, type SlotVersionInput } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { effectiveAtOf } from '../slot-versions';

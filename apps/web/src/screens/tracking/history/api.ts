@@ -6,7 +6,7 @@ import {
   pageOf,
   type AlertHistoryErrorCode,
   type MarkAlertTriggersSeenBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 

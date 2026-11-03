@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SecondFactorPage, keyOf } from './SecondFactorPage';
 
 /** Invented values: a key and ten codes shaped like the server's, nothing real. */
-const URI = 'otpauth://totp/Nirvana:a%40example.test?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=Nirvana';
+const URI = 'otpauth://totp/Impera:a%40example.test?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=Impera';
 const BACKUP_CODES = Array.from({ length: 10 }, (_, i) => `code${String(i)}-inven`);
 
 afterEach(() => {
@@ -32,7 +32,7 @@ async function givePassword(): Promise<void> {
   const password = screen.getByLabelText('Mot de passe');
   fireEvent.change(password, { target: { value: 'staple battery horse' } });
   fireEvent.submit(password.closest('form') ?? document.body);
-  await screen.findByText('Ajoute Nirvana dans ton application');
+  await screen.findByText('Ajoute Impera dans ton application');
 }
 
 describe('SecondFactorPage', () => {
@@ -40,7 +40,7 @@ describe('SecondFactorPage', () => {
     expect(keyOf(URI)).toBe('JBSW Y3DP EHPK 3PXP JBSW Y3DP');
   });
 
-  it('walks password, key, first code, then the ten backup codes before opening Nirvana', async () => {
+  it('walks password, key, first code, then the ten backup codes before opening Impera', async () => {
     const calls = serve({
       '/v1/auth/two-factor/enable': () => json({ totpURI: URI, backupCodes: BACKUP_CODES }),
       '/v1/auth/two-factor/verify-totp': () => json({ token: 'x' }),
@@ -55,8 +55,8 @@ describe('SecondFactorPage', () => {
     fireEvent.submit(code.closest('form') ?? document.body);
     const list = await screen.findByLabelText('Codes de secours');
     expect(list.querySelectorAll('li')).toHaveLength(10);
-    // Nirvana opens only once the person says the codes are kept.
-    const open = screen.getByRole('button', { name: 'Ouvrir Nirvana' });
+    // Impera opens only once the person says the codes are kept.
+    const open = screen.getByRole('button', { name: 'Ouvrir Impera' });
     expect(open).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByLabelText('J’ai mis ces codes en lieu sûr.'));
     fireEvent.click(open);
@@ -117,7 +117,7 @@ describe('SecondFactorPage', () => {
     serve({ '/v1/auth/two-factor/enable': () => json({ totpURI: URI, backupCodes: BACKUP_CODES }) });
     render(<SecondFactorPage onActivated={() => undefined} onSignOut={() => undefined} />);
     await givePassword();
-    expect(document.activeElement?.textContent).toBe('Ajoute Nirvana dans ton application');
+    expect(document.activeElement?.textContent).toBe('Ajoute Impera dans ton application');
   });
 
   it('lets the person sign out before the codes are shown', async () => {

@@ -4,7 +4,7 @@ import {
   type CommissionStatementStatus,
   type PayPeriod,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { PayrollForbidden } from '../../contractors/pure';
 

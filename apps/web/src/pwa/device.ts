@@ -1,6 +1,6 @@
 /**
- * What this device keeps of Nirvana, forgotten when nobody is signed in any more (CR-01): the service worker's copies
- * of the app (`nirvana-*` caches) and the device's push subscription. Called at every sign-out and on any 401 of
+ * What this device keeps of Impera, forgotten when nobody is signed in any more (CR-01): the service worker's copies
+ * of the app (`impera-*` caches) and the device's push subscription. Called at every sign-out and on any 401 of
  * `/v1/me` (a session revoked or expired elsewhere), not only at the button. Never throws: a browser without
  * these features, or one that refuses, simply has nothing to forget.
  */
@@ -12,7 +12,7 @@ async function dropCaches(): Promise<void> {
   try {
     if (typeof caches === 'undefined') return;
     const keys = await caches.keys();
-    await Promise.all(keys.filter((key) => key.startsWith('nirvana-')).map((key) => caches.delete(key)));
+    await Promise.all(keys.filter((key) => key.startsWith('impera-')).map((key) => caches.delete(key)));
   } catch {
     // Storage blocked: nothing was kept either.
   }

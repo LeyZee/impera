@@ -957,7 +957,7 @@ export function mayValidateStatement(
  * §§ 3, 5, 7), most telling first:
  * - `chatter_unlinked`: a chatter the owner has not linked to a member yet;
  * - `off_shift`: a member neither on shift nor in their margin at the sale's instant (ADR 0025);
- * - `status_unknown`: a status the platform added that Nirvana does not know;
+ * - `status_unknown`: a status the platform added that Impera does not know;
  * - `refund_before_register`: a refund whose sale is older than the register;
  * - `refund_before_base`: a refund whose sale was in a period the account was still paid on its reports (the chain of
  *   ADR 0023): never taken off the platform's net, no deduction until Charles decides (03/11).

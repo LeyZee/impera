@@ -1,8 +1,8 @@
 {
-  "name": "@nirvana/extension",
+  "name": "@impera/extension",
   "version": "0.0.0",
   "private": true,
-  "description": "Extension Chrome Nirvana (WXT, Manifest V3) : enregistreur réseau, capture de session, relais d'actions.",
+  "description": "Extension Chrome Impera (WXT, Manifest V3) : enregistreur réseau, capture de session, relais d'actions.",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -19,6 +19,6 @@
     "wxt": "0.21.4"
   },
   "dependencies": {
-    "@nirvana/design-system": "workspace:*"
+    "@impera/design-system": "workspace:*"
   }
 }

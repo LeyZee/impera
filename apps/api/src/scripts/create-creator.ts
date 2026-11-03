@@ -4,7 +4,7 @@
  */
 import { parseArgs } from 'node:util';
 
-import { NewCreatorSchema } from '@nirvana/contracts';
+import { NewCreatorSchema } from '@impera/contracts';
 
 import { createApp } from '../composition-root';
 import { loadConfig } from '../config';

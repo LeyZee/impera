@@ -6,7 +6,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
   type InvoicePdfCopyProvider,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { InvoiceObjectStore, StoredObject } from '../../../contractors/domain/ports';

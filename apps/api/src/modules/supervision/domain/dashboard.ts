@@ -16,7 +16,7 @@ import {
   type DashboardTodo,
   type HandoffCause,
   type TodosAcrossCreators,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type {
   DashboardFacts,

@@ -1,10 +1,5 @@
-import {
-  AuditEntryIdSchema,
-  ContractorDocumentIdSchema,
-  newId,
-  TeamMemberIdSchema,
-} from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { AuditEntryIdSchema, ContractorDocumentIdSchema, newId, TeamMemberIdSchema } from '@impera/contracts';
+import { schema, sql, withAdmin, type Database } from '@impera/db';
 
 import type { PayrollDocumentPurgeStore } from '../domain/ports';
 

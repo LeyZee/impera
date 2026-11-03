@@ -1,4 +1,4 @@
-import type { Platform, SalesFeedOverview, SalesFeedStatus } from '@nirvana/contracts';
+import type { Platform, SalesFeedOverview, SalesFeedStatus } from '@impera/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { CheckPanel } from './CheckPanel';

@@ -7,7 +7,7 @@ import {
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

@@ -1,4 +1,4 @@
-import { SCRIPT_MOMENTS, SCRIPT_QUEUE_MAX, SCRIPT_STRUCTURE_NAME_MAX } from '@nirvana/contracts';
+import { SCRIPT_MOMENTS, SCRIPT_QUEUE_MAX, SCRIPT_STRUCTURE_NAME_MAX } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   check,

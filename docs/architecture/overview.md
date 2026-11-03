@@ -29,7 +29,7 @@ Un **monolithe modulaire** TypeScript, organisé en modules métier à frontièr
        │ PlatformConnector (port)
 ┌──────┴────────────────────────────────────────────────────────────┐
 │ Plateformes : Reveal (API privée via session capturée),            │
-│   FakeReveal (tests), plus tard OnlyFans, Instagram, Nirvana       │
+│   FakeReveal (tests), plus tard OnlyFans, Instagram, Impera       │
 └───────────────────────────────────────────────────────────────────┘
 ```
 

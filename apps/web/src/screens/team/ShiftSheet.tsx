@@ -5,7 +5,7 @@ import type {
   ShiftTemplate,
   TeamMember,
   UpdateShiftBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
 
@@ -368,7 +368,7 @@ export function ShiftSheet({
           <div className="nv-confirm" role="alertdialog" aria-label="Confirmer">
             <p className="sc-confirm__text">
               {arming === 'stop'
-                ? `Le shift s’arrête maintenant, et ${account?.creatorName ?? 'sa créatrice'} se ferme pour ${shown?.displayName ?? 'le membre'} dans Nirvana, sans marge.`
+                ? `Le shift s’arrête maintenant, et ${account?.creatorName ?? 'sa créatrice'} se ferme pour ${shown?.displayName ?? 'le membre'} dans Impera, sans marge.`
                 : arming === 'cancel'
                   ? 'Le shift est retiré du planning. Il reste noté au journal, et son modèle ne le refait pas.'
                   : 'Ses shifts pas encore commencés sont annulés ; les autres restent au planning.'}

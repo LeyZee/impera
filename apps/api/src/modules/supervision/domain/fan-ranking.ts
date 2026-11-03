@@ -1,4 +1,4 @@
-import { RATE_MICROS_SCALE } from '@nirvana/contracts';
+import { RATE_MICROS_SCALE } from '@impera/contracts';
 
 /**
  * The best fans of the Dashboard in euros (choix de Charles, 28/10): what each fan spent over the period, his sales in

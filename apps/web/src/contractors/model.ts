@@ -22,7 +22,7 @@ import {
   type ContractorRegime,
   type ContractText,
   type ContractTextKind,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { z } from 'zod';
 
 import { addDays, dayOf, fullDay } from '@/scheduling/time';

@@ -3,7 +3,7 @@ import {
   INVOICE_MENTION_MAX,
   INVOICE_MENTIONS_MAX,
   REGIME_NAME_MAX,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { addRegime, useRefreshPayroll } from './api';

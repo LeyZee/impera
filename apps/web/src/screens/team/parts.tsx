@@ -1,4 +1,4 @@
-import type { TeamMember } from '@nirvana/contracts';
+import type { TeamMember } from '@impera/contracts';
 import type { JSX, ReactNode } from 'react';
 
 import { STATUS_LABELS, STATUS_TONES } from './model';

@@ -9,10 +9,10 @@ import {
   PlatformAccountIdSchema,
   type ConversationId,
   type CreatorId,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import { DEFAULT_LLM_CONFIG, loadPrompt } from '@nirvana/llm';
+} from '@impera/contracts';
+import { and, eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import { DEFAULT_LLM_CONFIG, loadPrompt } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 

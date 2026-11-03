@@ -5,7 +5,7 @@ Dépend de : CR-01 (application installable, Web Push, heures calmes, registre d
 Branche : task/eq-12-team-notifications
 
 ## Objectif
-Prévenir chaque membre de l'équipe sur son téléphone, même quand il n'a pas Nirvana ouvert : ce que faisait Telegram dans Imperium, sans Telegram, et voir dès le début d'un shift qu'il n'est pas pris.
+Prévenir chaque membre de l'équipe sur son téléphone, même quand il n'a pas Impera ouvert : ce que faisait Telegram dans Imperium, sans Telegram, et voir dès le début d'un shift qu'il n'est pas pris.
 
 ## Contexte à lire
 `docs/adr/0023-team-management.md`, `docs/adr/0024-roles-and-navigation.md`, EQ-02, EQ-03, EQ-06, EQ-10, `docs/reference/legacy-projects.md` (la spécification PWA d'Imperium : Web Push, service worker), ADR 0016 (secrets posés depuis le CRM), ADR 0020 (une notification ne porte jamais de donnée de fan). Charles (27/10) ne veut plus de Telegram pour l'équipe. EQ-02 et EQ-03 mettent le rappel de shift et le rapport manquant « dans l'application », c'est-à-dire seulement quand le membre l'a ouverte ; les Annonces figurent dans Équipe (ADR 0024) et le manager peut en publier (EQ-01), mais aucune autre fiche ne les construit.

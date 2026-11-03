@@ -6,7 +6,7 @@ import {
   type PlanningMember,
   type ShiftReport,
   type ShiftReportList,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { TeamNav } from './TeamNav';
@@ -1068,7 +1068,7 @@ function Late({
 }
 
 /**
- * « Relancer » (EQ-15): copies a word ready for WhatsApp, at the member's hours; Nirvana sends nothing, and only the
+ * « Relancer » (EQ-15): copies a word ready for WhatsApp, at the member's hours; Impera sends nothing, and only the
  * member makes his report. Without a clipboard the word shows, selected, to copy by hand. A member who left cannot
  * sign in any more: « Parti », no word. A member not read: nothing, the page says why.
  */

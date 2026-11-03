@@ -14,8 +14,8 @@ import {
   TimezoneSchema,
   type AgentHours,
   type CreatorSummary,
-} from '@nirvana/contracts';
-import { eq, inArray, schema, sql, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, inArray, schema, sql, type Database } from '@impera/db';
 
 import { CreatorConflict, CreatorNameConflict } from '../../domain/errors';
 import type { CreatorDirectory } from '../../domain/ports';

@@ -18,7 +18,7 @@ const INSTALL_GUIDE = '/aide/installer';
 let dismissedThisOpening = false;
 
 /**
- * « Installe Nirvana sur ton téléphone » (CR-01): a card above the tab bar, on a phone that does not run the installed
+ * « Installe Impera sur ton téléphone » (CR-01): a card above the tab bar, on a phone that does not run the installed
  * app. Android installs from the card when Chrome allows it; an iPhone gets the steps (/aide/installer).
  */
 export function InstallNudge(): JSX.Element | null {
@@ -42,10 +42,10 @@ export function InstallNudge(): JSX.Element | null {
     setShown(false);
   };
   return (
-    <aside className="nv-float nv-install nv-glass nv-glass--thick" aria-label="Installer Nirvana">
+    <aside className="nv-float nv-install nv-glass nv-glass--thick" aria-label="Installer Impera">
       <img className="nv-float__icon" src="/icons/icon-192.png" alt="" width={44} height={44} />
       <div className="nv-float__body">
-        <p className="nv-float__title">Nirvana sur ton écran d’accueil</p>
+        <p className="nv-float__title">Impera sur ton écran d’accueil</p>
         <p className="nv-float__text">Ouverture en un geste, plein écran, et les notifications.</p>
       </div>
       <div className="nv-float__actions">

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { DomainError } from '@nirvana/contracts';
+import { DomainError } from '@impera/contracts';
 
 /**
  * Whether a password appears in a known data breach (ADR 0046 § 4), through the Pwned Passwords range API with
@@ -56,7 +56,7 @@ export function createPwnedPasswordsCheck(
       const response = await send(`${RANGE_URL}${sha1.slice(0, 5)}`, {
         signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
         // The answer is padded with fake suffixes, so its size tells nothing about the prefix.
-        headers: { 'add-padding': 'true', 'user-agent': 'Nirvana password check' },
+        headers: { 'add-padding': 'true', 'user-agent': 'Impera password check' },
       });
       if (response.status !== 200) {
         await response.body?.cancel();

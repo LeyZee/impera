@@ -42,7 +42,7 @@ import type {
   SendResult,
   UserId,
   VerifyResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { AwayStatus } from './away';
 import type { ConversationProjection } from './projection';

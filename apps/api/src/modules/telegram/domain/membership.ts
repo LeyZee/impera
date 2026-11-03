@@ -1,4 +1,4 @@
-import type { TelegramMembership } from '@nirvana/contracts';
+import type { TelegramMembership } from '@impera/contracts';
 
 /**
  * REG-28: a group leaves the list only once the bot is out of it, gone (`left`) or banned (`kicked`). A group where the

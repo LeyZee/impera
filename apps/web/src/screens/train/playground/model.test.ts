@@ -1,4 +1,4 @@
-import type { PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundState } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { filedAck, rejectedWords } from './model';

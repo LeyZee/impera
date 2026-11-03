@@ -182,7 +182,7 @@ export type SlotVersion = z.infer<typeof SlotVersionSchema>;
 export const SchedulingSettingsSchema = z.object({
   /** The agency's zone: the créneaux and the templates speak in it, and the pay periods follow it (ADR 0023, EQ-03). */
   timeZone: TimezoneSchema,
-  /** ADR 0025: how long before and after their shift a chatter keeps their creators in Nirvana. */
+  /** ADR 0025: how long before and after their shift a chatter keeps their creators in Impera. */
   accessMarginMinutes: z.number().int().min(0).max(120),
   versions: z.array(SlotVersionSchema).min(1),
 });
@@ -543,7 +543,7 @@ export type CreatorOnDutyList = z.infer<typeof CreatorOnDutyListSchema>;
 
 /**
  * A member's own shift, for Aujourd'hui: its creator's name (a chatter does not read the creators' list, ADR 0025),
- * the account to open in the platform (the chatter chats there, never in Nirvana), and the access window the server
+ * the account to open in the platform (the chatter chats there, never in Impera), and the access window the server
  * computed for it (`accessEndsAt` is `endsAt` for a stopped shift).
  */
 export const MyShiftSchema = ShiftSchema.extend({

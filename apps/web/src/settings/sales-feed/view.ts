@@ -5,7 +5,7 @@ import type {
   SalesFeedModelLink,
   SalesFeedStatus,
   TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** Small view rules of Réglages › Ventes, kept out of the components so they are tested. */
 

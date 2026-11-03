@@ -15,7 +15,7 @@ import type {
   TeamRoleChange,
   UpdateTeamMemberBody,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** Who writes, for the policies (`withMember`) and the audit line. */
 export interface Actor {

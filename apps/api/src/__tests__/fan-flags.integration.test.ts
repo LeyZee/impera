@@ -7,9 +7,9 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
   type FanId,
-} from '@nirvana/contracts';
-import { and, eq, schema, withAdmin } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { and, eq, schema, withAdmin } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

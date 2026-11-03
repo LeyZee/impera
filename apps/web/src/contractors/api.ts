@@ -19,7 +19,7 @@ import {
   type ContractTexts,
   type PendingContractorDocuments,
   type UploadContractorDocumentQuery,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useCallback } from 'react';
 

@@ -10,7 +10,7 @@ import {
   type InvoiceListQuery,
   type RefuseInvoiceContestBody,
   type UpholdInvoiceContestBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   useInfiniteQuery,
   useQuery,

@@ -1,5 +1,5 @@
-import { DesireBandSchema } from '@nirvana/contracts';
-import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema } from '@nirvana/llm';
+import { DesireBandSchema } from '@impera/contracts';
+import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema } from '@impera/llm';
 import { parse } from 'yaml';
 import { z } from 'zod';
 

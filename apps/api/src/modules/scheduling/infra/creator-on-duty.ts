@@ -4,8 +4,8 @@ import {
   UserIdSchema,
   type CreatorOnDutyList,
   type UserId,
-} from '@nirvana/contracts';
-import { and, eq, NotACreatorAccount, schema, sql, withCreatorAccount, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, NotACreatorAccount, schema, sql, withCreatorAccount, type Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { RequireRole } from './routes';

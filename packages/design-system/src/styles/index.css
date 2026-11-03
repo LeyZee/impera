@@ -1,5 +1,5 @@
 /*
- * Everything a Nirvana page needs, in order. Tailwind consumers import `theme.css` too, after `tailwindcss`.
+ * Everything a Impera page needs, in order. Tailwind consumers import `theme.css` too, after `tailwindcss`.
  */
 @import './fonts.css';
 @import './tokens.css';

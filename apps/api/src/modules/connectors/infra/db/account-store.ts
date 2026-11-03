@@ -12,8 +12,8 @@ import {
   PlatformSchema,
   SessionStateSchema,
   type JobName,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, withTenant, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, withTenant, type Database, type Transaction } from '@impera/db';
 
 import type { AccountJobs, AccountStore, ConnectorAccount, EventMeta } from '../../domain/ports';
 

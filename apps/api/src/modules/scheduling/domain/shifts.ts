@@ -6,7 +6,7 @@ import {
   type SchedulingSettings,
   type TeamMemberStatus,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   MemberCreatorConflict,

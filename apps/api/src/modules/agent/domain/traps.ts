@@ -1,4 +1,4 @@
-import type { HandoffCause, MediaDescription, MediaFlag } from '@nirvana/contracts';
+import type { HandoffCause, MediaDescription, MediaFlag } from '@impera/contracts';
 
 import { detectInjection, detectInjectionAcross, type InjectionSignal } from './injection';
 

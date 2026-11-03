@@ -1,4 +1,4 @@
-import { DomainError, type JournalAccountName } from '@nirvana/contracts';
+import { DomainError, type JournalAccountName } from '@impera/contracts';
 
 /** The export needs every account and journal the accountant gives: it never guesses one (EQ-06 lot 7b). */
 export class JournalAccountsMissing extends DomainError {

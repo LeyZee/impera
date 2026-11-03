@@ -6,7 +6,7 @@ import {
   type SalesTotals,
   type TelegramSaleSettings,
   type TelegramSaleSettingsEntry,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { MemberNameOf } from './classify';
 import type { SalesDay } from './ports';

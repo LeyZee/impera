@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 
-import { ConnectorSessionBodySchema } from '@nirvana/contracts';
+import { ConnectorSessionBodySchema } from '@impera/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 

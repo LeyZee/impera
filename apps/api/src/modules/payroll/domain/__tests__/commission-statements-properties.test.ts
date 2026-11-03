@@ -1,4 +1,4 @@
-import { CARRY_OVER_RANK_MAX, carryOverRank } from '@nirvana/contracts';
+import { CARRY_OVER_RANK_MAX, carryOverRank } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

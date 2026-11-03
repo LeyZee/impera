@@ -7,7 +7,7 @@ import {
   type AgentHours,
   type AgentSlot,
   type MinuteRange,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { cityOf, clockOf, MINUTES_PER_DAY } from '@/scheduling/time';
 

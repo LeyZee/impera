@@ -12,7 +12,7 @@ import {
   type KycSlot,
   type PersonaDetails,
   type PersonaSampleReplyFault,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
@@ -220,7 +220,7 @@ export function isPlaceholder(value: string): boolean {
 /**
  * The example as a new creator's first draft (recette 28/10): nothing in it that nobody typed. Her date of birth,
  * a safety datum, starts empty and must be filled in; the metadata name her (`meta.creator` is her id) and drop the
- * example's notes. Her first name starts from her name in Nirvana, its first word, when it is known (CREA-13).
+ * example's notes. Her first name starts from her name in Impera, its first word, when it is known (CREA-13).
  */
 export function firstDraft(example: Persona, creatorId: string, name: string | null = null): Persona {
   const first = name?.trim().split(/\s+/u)[0] ?? '';

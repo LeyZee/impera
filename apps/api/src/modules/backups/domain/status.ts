@@ -1,4 +1,4 @@
-import type { BackupRunStatus, BackupState } from '@nirvana/contracts';
+import type { BackupRunStatus, BackupState } from '@impera/contracts';
 
 /**
  * When the daily export counts as missing (ADR 0028 § 5). The export runs at 3 h, Paris time: 26 hours leave one

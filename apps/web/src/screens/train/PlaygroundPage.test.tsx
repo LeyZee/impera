@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me, PlaygroundAnswer, PlaygroundState } from '@nirvana/contracts';
+import type { Me, PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';

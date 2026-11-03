@@ -10,7 +10,7 @@ import {
   type SalesFeedCheckVerdict,
   type SalesFeedChatterLink,
   type SalesFeedModelLink,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { chatterName, dayTime, modelLabel } from './view';
 
@@ -283,7 +283,7 @@ export const daysInGap = (days: readonly SalesFeedCheckDay[]): SalesFeedCheckDay
   days.filter((day) => day.differs.length > 0);
 
 /**
- * A team member's line: the platform's name for them, and who they are in Nirvana. The line `null` gathers the sales
+ * A team member's line: the platform's name for them, and who they are in Impera. The line `null` gathers the sales
  * no chatter made, which count for nobody.
  */
 export function chatterLine(

@@ -1,4 +1,4 @@
-import { DomainError } from '@nirvana/contracts';
+import { DomainError } from '@impera/contracts';
 
 import { BACKUP_OVERDUE_HOURS, type BackupRun } from './status';
 

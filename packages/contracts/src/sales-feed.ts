@@ -204,7 +204,7 @@ export const SalesFeedStatusSchema = z.object({
   /** Lines waiting for a model the owner has not linked yet. */
   quarantined: z.number().int().min(0),
   /**
-   * The platform's webhook for Nirvana, `null` when none is registered: a sale then shows within a minute (the
+   * The platform's webhook for Impera, `null` when none is registered: a sale then shows within a minute (the
    * cursor), within seconds with it. `lastDeliveryAt` is the last delivery that passed its signature check;
    * `lastRejectedAt` the last one refused since the webhook was registered (an old secret, a forged one): the one case
    * where the owner has something to do, register it again. No delivery for hours only means no sale.
@@ -260,7 +260,7 @@ export const SalesFeedSignalSchema = z.discriminatedUnion('kind', [
     platformSaleId: z.string().min(1).max(200),
     event: SaleEventSchema,
   }),
-  /** An answer whose shape Nirvana does not read: the cursor did not move. */
+  /** An answer whose shape Impera does not read: the cursor did not move. */
   z.object({ kind: z.literal('unexpected_answer') }),
 ]);
 export type SalesFeedSignal = z.infer<typeof SalesFeedSignalSchema>;
@@ -281,7 +281,7 @@ export type SalesFeedChatterLink = z.infer<typeof SalesFeedChatterLinkSchema>;
  * owner's links. `listError` says why the live lists are missing (no key, a refusal, an outage); the links stay.
  */
 /**
- * An account of the platform in Nirvana that a model can be linked to: exactly the ones `PUT …/models/:id` accepts.
+ * An account of the platform in Impera that a model can be linked to: exactly the ones `PUT …/models/:id` accepts.
  * `linkedTo` is the model already linked to it, which refuses another (`sales_feed_model_conflict`).
  */
 export const SalesFeedAccountChoiceSchema = z.object({
@@ -587,7 +587,7 @@ export type CreatorSalesRow = z.infer<typeof CreatorSalesRowSchema>;
 
 /**
  * One line of her register in the range, a sale or a refund, on its sale's day: its own amounts as recorded (never
- * signed: `event` says a refund), and the fan's id in Nirvana only when his card is hers, else `null`. Never the
+ * signed: `event` says a refund), and the fan's id in Impera only when his card is hers, else `null`. Never the
  * seller, never the platform's fan id.
  */
 export const CreatorSaleLineSchema = z.strictObject({

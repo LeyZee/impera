@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_HOURS, SUGGESTED_REPLY_SLOTS, type AgentHours } from '@nirvana/contracts';
+import { DEFAULT_AGENT_HOURS, SUGGESTED_REPLY_SLOTS, type AgentHours } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

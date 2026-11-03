@@ -1,4 +1,4 @@
-import type { ContractorProfileBody } from '@nirvana/contracts';
+import type { ContractorProfileBody } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { profileChanges } from '../contractors';

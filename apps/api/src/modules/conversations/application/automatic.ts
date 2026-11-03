@@ -5,7 +5,7 @@ import {
   type AutomaticGate,
   type CreatorId,
   type LiveRateReading,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { DraftVoice, EventMeta, Transaction, UnitOfWork } from '../domain/ports';
 

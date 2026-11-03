@@ -16,8 +16,8 @@ import {
   type CustomAlertGroup,
   type SystemAlertCode,
   type SystemAlertSetting,
-} from '@nirvana/contracts';
-import { and, enterCreator, eq, schema, sql, withTenant, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, enterCreator, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
 
 import type { AlertStore } from '../../domain/ports';
 

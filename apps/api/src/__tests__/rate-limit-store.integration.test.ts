@@ -1,5 +1,5 @@
-import { createDbClient, sql, type DbClient } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { createDbClient, sql, type DbClient } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';

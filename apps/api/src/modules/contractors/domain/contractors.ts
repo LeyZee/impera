@@ -1,4 +1,4 @@
-import type { ContractorProfileBody } from '@nirvana/contracts';
+import type { ContractorProfileBody } from '@impera/contracts';
 
 /** What the contractor or the owner writes of a file: every field is identity, whose change clears the owner's check. */
 export const CONTRACTOR_PROFILE_FIELDS = [

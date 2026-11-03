@@ -1,4 +1,4 @@
-import type { AiProvider } from '@nirvana/contracts';
+import type { AiProvider } from '@impera/contracts';
 
 /** What the dashboard says about each service, in the order Charles reads them (fiche P3-03). */
 export interface ProviderProfile {

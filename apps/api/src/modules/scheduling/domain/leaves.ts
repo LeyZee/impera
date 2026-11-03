@@ -1,4 +1,4 @@
-import { LEAVE_QUERY_MAX_DAYS, type LeaveRequestStatus, type TeamScope } from '@nirvana/contracts';
+import { LEAVE_QUERY_MAX_DAYS, type LeaveRequestStatus, type TeamScope } from '@impera/contracts';
 
 import {
   LeaveDateInvalid,

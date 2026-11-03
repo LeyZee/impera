@@ -1,4 +1,4 @@
-import type { CreatorId } from '@nirvana/contracts';
+import type { CreatorId } from '@impera/contracts';
 
 import type { AppLlm } from '../llm';
 import { salesFeedTotals } from '../modules/connectors';

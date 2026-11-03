@@ -7,8 +7,8 @@ import {
   type FanFlags,
   type FanId,
   type TeamScope,
-} from '@nirvana/contracts';
-import { and, eq, schema, withTenant, withTenantMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, withTenant, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import { FanNotFound } from '../domain/errors';
 import type { FlagStore } from '../domain/fan';

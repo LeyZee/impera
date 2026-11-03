@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 
-import { eq, schema } from '@nirvana/db';
+import { eq, schema } from '@impera/db';
 import { run, type Runner } from 'graphile-worker';
 
 import type { App } from './composition-root';

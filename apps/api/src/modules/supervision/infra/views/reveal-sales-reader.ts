@@ -1,5 +1,5 @@
-import { PlatformSchema, type CreatorId, type SalesTotals } from '@nirvana/contracts';
-import { sql, withTenantMember, type Database, type Transaction } from '@nirvana/db';
+import { PlatformSchema, type CreatorId, type SalesTotals } from '@impera/contracts';
+import { sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { RevealSalesView } from '../../domain/dashboard-ports';

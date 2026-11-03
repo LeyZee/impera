@@ -5,7 +5,7 @@ import type {
   PersonaOverview,
   PersonaVersionId,
   PersonaVersionSummary,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** Her active version, the one the agent writes with (ADR 0010, 0022), and her name for a placeholder first name. */
 interface ActivePersonaVersion {

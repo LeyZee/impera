@@ -1,5 +1,5 @@
-import type { CommissionStatementId } from '@nirvana/contracts';
-import { withAdmin, type Database } from '@nirvana/db';
+import type { CommissionStatementId } from '@impera/contracts';
+import { withAdmin, type Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollBillingSettings } from './application/billing-settings';

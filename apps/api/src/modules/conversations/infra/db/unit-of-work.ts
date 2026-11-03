@@ -12,7 +12,7 @@ import {
   MessageDirectionSchema,
   MessageIdSchema,
   newId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   eq,
@@ -21,7 +21,7 @@ import {
   withTenant,
   type Database,
   type Transaction as DbTransaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import type { Transaction, UnitOfWork } from '../../domain/ports';

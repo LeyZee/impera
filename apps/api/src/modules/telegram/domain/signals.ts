@@ -17,7 +17,7 @@ import type {
   SaleType,
   SecurityAlertPayload,
   TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * What the module reads out of a `domain_events` row (ADR 0020 §3), narrowed to the facts a notification needs.

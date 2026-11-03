@@ -4,7 +4,7 @@ import {
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
   type PersonaLimits,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { QueuedStructure } from '../ports';

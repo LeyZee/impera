@@ -4,7 +4,7 @@ import type {
   ProviderFact,
   ProviderSettings,
   ProviderVoice,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** What a verifier learnt from the provider with a key that works. */
 export interface VerifiedKey {

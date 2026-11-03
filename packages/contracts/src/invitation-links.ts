@@ -4,7 +4,7 @@ import { REAUTHENTICATION_ERROR_CODE } from './auth';
 import { CountryCodeSchema } from './team';
 
 /**
- * Invitation links (EQ-10, glossary « Lien d’invitation »): Nirvana sends no e-mail, so the owner shares a link (WhatsApp, the phone's share
+ * Invitation links (EQ-10, glossary « Lien d’invitation »): Impera sends no e-mail, so the owner shares a link (WhatsApp, the phone's share
  * sheet) for a member's first access or for a new password. The token travels in the URL fragment, then in a POST
  * body, never in a query string: it reaches neither the server's logs nor a `Referer` header.
  */

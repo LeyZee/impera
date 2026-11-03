@@ -1,4 +1,4 @@
-import { sql, type Database } from '@nirvana/db';
+import { sql, type Database } from '@impera/db';
 import type { Task } from 'graphile-worker';
 import { z } from 'zod';
 

@@ -1,4 +1,4 @@
-import { PAYOUT_DELAY_MAX_BUSINESS_DAYS } from '@nirvana/contracts';
+import { PAYOUT_DELAY_MAX_BUSINESS_DAYS } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { setPayrollSettings, usePayrollSettings, useRefreshPayroll, type PayRefusal } from '@/payroll/api';

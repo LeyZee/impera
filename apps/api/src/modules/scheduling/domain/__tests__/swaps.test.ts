@@ -1,4 +1,4 @@
-import { DomainError } from '@nirvana/contracts';
+import { DomainError } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { assertAnswers, assertColleague, assertOffered, stillAsNoted, swapEnding } from '../swaps';

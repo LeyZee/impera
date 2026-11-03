@@ -1,4 +1,4 @@
-import type { ContractorDocumentKind, ContractorDocumentReview, RegimeVat } from '@nirvana/contracts';
+import type { ContractorDocumentKind, ContractorDocumentReview, RegimeVat } from '@impera/contracts';
 
 import { BillingRegimeBackdated } from './errors';
 

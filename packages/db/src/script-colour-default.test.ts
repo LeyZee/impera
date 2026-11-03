@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { SCRIPT_COLOR_PRESETS } from '@nirvana/contracts';
+import { SCRIPT_COLOR_PRESETS } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 /** The colour a version written before ADR 0064 took, and a version written without one: the « Rouge » preset. */

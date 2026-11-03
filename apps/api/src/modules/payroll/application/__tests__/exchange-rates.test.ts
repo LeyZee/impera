@@ -1,4 +1,4 @@
-import type { ForeignCurrency } from '@nirvana/contracts';
+import type { ForeignCurrency } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { JobLogger } from '../../../contractors/domain/ports';

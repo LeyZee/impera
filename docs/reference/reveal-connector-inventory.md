@@ -122,7 +122,7 @@ Le sélecteur s'ouvre depuis le bouton bulle de la zone de saisie. Le parcours d
 - Tuiles : **Abonnement (jours)**, **Tips**, **Messages** (€ dépensés en messages), **Boudoir** (€), **Médias entrants** (€), **Total dépensé**.
 - Lignes : Dernier paiement, Achat le plus élevé, Statut d'abonnement (ex. Expiré), Renouvellement (ex. Désactivé), Date d'abonnement.
 - **Prénom du membre** : champ dédié, source de `%NAME%`. C'est le premier slot KYC à remplir (`kyc_slot` prénom).
-- **Notes** : texte libre structuré par un **canevas modifiable** (« Modifier le canevas ») ; le canevas de l'agence est : Prénom, Localisation, Âge, Métier, Passions, Envies, Situation. Ce sont les slots KYC de Nirvana : l'agent remplit ce canevas, ligne par ligne, sans le casser.
+- **Notes** : texte libre structuré par un **canevas modifiable** (« Modifier le canevas ») ; le canevas de l'agence est : Prénom, Localisation, Âge, Métier, Passions, Envies, Situation. Ce sont les slots KYC d’Impera : l'agent remplit ce canevas, ligne par ligne, sans le casser.
 - **Note du modèle** : texte libre (fiche de la créatrice : âge, nationalité, ville, mensurations…). Contient des données personnelles de la créatrice : jamais dans le dépôt, jamais dans un log (ADR 0010).
 - Taux d'achat du fan : « x/y, n % des PPV envoyés ».
 

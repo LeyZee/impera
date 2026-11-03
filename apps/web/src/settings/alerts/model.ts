@@ -15,7 +15,7 @@ import {
   type SystemAlertSetting,
   type TelegramCoverage,
   type TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /*
  * Réglages › Alertes (P4-01) in words: what an alert of her own watches, on which creators, whether it pauses the

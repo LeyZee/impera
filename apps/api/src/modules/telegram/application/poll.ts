@@ -1,4 +1,4 @@
-import type { TelegramBotId, TelegramChatKind } from '@nirvana/contracts';
+import type { TelegramBotId, TelegramChatKind } from '@impera/contracts';
 
 import type {
   BotsStore,

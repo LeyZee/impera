@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { CreatorIdSchema, newId, TeamMemberIdSchema, UserIdSchema } from '@nirvana/contracts';
+import { CreatorIdSchema, newId, TeamMemberIdSchema, UserIdSchema } from '@impera/contracts';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

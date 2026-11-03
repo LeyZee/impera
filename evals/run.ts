@@ -35,7 +35,7 @@ if (process.env['LLM_XAI_API_KEY'] === undefined || process.env['LLM_XAI_API_KEY
 }
 const args = [
   '--filter',
-  '@nirvana/api',
+  '@impera/api',
   'run',
   'evals',
   ...process.argv.slice(2).filter((arg) => arg !== '--'),

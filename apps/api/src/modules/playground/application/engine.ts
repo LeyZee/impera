@@ -9,7 +9,7 @@ import {
   type PlaygroundSituationPatch,
   type PlaygroundState,
   type Verdict,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * One trainer's playground: the P3-05 engine seen through the API's DTOs. The infra implements it over the

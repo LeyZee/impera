@@ -1,4 +1,4 @@
-import type { SalesFeedErrorKind, SalesFeedState } from '@nirvana/contracts';
+import type { SalesFeedErrorKind, SalesFeedState } from '@impera/contracts';
 
 /**
  * The one sentence for each problem of a sales feed: the key field, the Réglages line and the log say the same thing.
@@ -14,11 +14,11 @@ export const SALES_FEED_ERROR_MESSAGES: Readonly<Record<SalesFeedErrorKind, stri
   rate_limited: 'Reveal demande d’attendre un peu avant le prochain appel. La lecture reprend toute seule.',
   unreachable: 'Reveal ne répond pas pour le moment. La lecture reprend toute seule, sans rien perdre.',
   unexpected_answer:
-    'Reveal a répondu dans une forme que Nirvana ne sait pas lire. La lecture est en pause, aucune vente n’est perdue.',
+    'Reveal a répondu dans une forme qu’Impera ne sait pas lire. La lecture est en pause, aucune vente n’est perdue.',
 };
 
 const STATE_MESSAGES: Readonly<Record<SalesFeedState, string>> = {
-  not_connected: 'Sans clé, les ventes de Reveal ne remontent pas dans Nirvana.',
+  not_connected: 'Sans clé, les ventes de Reveal ne remontent pas dans Impera.',
   connected: 'Les ventes et les remboursements de Reveal remontent chaque minute.',
   needs_reconnect: 'La lecture des ventes est arrêtée : reconnecte la clé.',
 };

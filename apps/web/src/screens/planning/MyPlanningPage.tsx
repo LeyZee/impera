@@ -8,7 +8,7 @@ import type {
   ShiftReportList,
   ShiftSwapList,
   TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { Answers, MyLeaves, MySwaps, namesOf } from './Exchanges';

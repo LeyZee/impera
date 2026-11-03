@@ -1,4 +1,4 @@
-import type { AiProvider, ConnectionService, ConnectionSignal } from '@nirvana/contracts';
+import type { AiProvider, ConnectionService, ConnectionSignal } from '@impera/contracts';
 
 import type { StoredCredential } from './credential';
 

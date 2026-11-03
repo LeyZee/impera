@@ -1,10 +1,10 @@
 /**
- * The install guide (CR-01): Nirvana on the home screen, which an iPhone needs to receive notifications. Offered on a
+ * The install guide (CR-01): Impera on the home screen, which an iPhone needs to receive notifications. Offered on a
  * phone that does not run the installed app, once per opening, and never again after three « Plus tard ». The
  * count is a convenience of this browser (localStorage); without storage, it is offered once per opening.
  */
 
-export const INSTALL_REFUSALS_KEY = 'nirvana.install.refusals';
+export const INSTALL_REFUSALS_KEY = 'impera.install.refusals';
 export const MAX_REFUSALS = 3;
 
 export type Platform = 'ios' | 'android' | 'other';

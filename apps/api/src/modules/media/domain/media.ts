@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { MEDIA_VOCABULARY_VERSION } from '@nirvana/contracts';
+import { MEDIA_VOCABULARY_VERSION } from '@impera/contracts';
 
 export type MediaKind = 'image' | 'video';
 

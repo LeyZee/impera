@@ -9,7 +9,7 @@ import {
   type PayPeriod,
   type Platform,
   type RegimeVat,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { addDays } from '../../contractors/pure';
 import { BPS, mulDivRound } from '../../payroll/pure';

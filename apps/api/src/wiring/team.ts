@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS } from '@nirvana/contracts';
+import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { liveInvitationLinksUnscoped } from '../invitation-links';
 import { defineTask } from '../jobs';

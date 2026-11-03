@@ -1,4 +1,4 @@
-import type { SalesFeedChatterLink, SalesFeedCheckChatter, SalesFeedCheckReport } from '@nirvana/contracts';
+import type { SalesFeedChatterLink, SalesFeedCheckChatter, SalesFeedCheckReport } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -139,7 +139,7 @@ const CHATTERS: SalesFeedChatterLink[] = [
   {
     platformChatterId: 'c-bot',
     firstName: 'Bot',
-    lastName: 'Nirvana',
+    lastName: 'Impera',
     isBot: true,
     isExternal: false,
     removedAt: null,
@@ -163,7 +163,7 @@ describe('the notes', () => {
     expect(
       noteText({ kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' }, 'Reveal', CHATTERS),
     ).toBe(
-      'Le compte bot « Bot Nirvana » n’est pas relié à l’agent : ses ventes ne compteraient pour personne. Relie-le dans « Équipe Reveal ».',
+      'Le compte bot « Bot Impera » n’est pas relié à l’agent : ses ventes ne compteraient pour personne. Relie-le dans « Équipe Reveal ».',
     );
   });
 
@@ -180,7 +180,7 @@ describe('the notes', () => {
     expect(
       noteText({ kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' }, 'Reveal', linked, names),
     ).toBe(
-      'Le compte bot « Bot Nirvana » est relié à « Ana T. » : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
+      'Le compte bot « Bot Impera » est relié à « Ana T. » : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
     );
   });
 
@@ -205,7 +205,7 @@ describe('the notes', () => {
         reported,
       ),
     ).toBe(
-      'Le compte bot « Bot Nirvana » est relié à un membre : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
+      'Le compte bot « Bot Impera » est relié à un membre : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
     );
   });
 

@@ -1,4 +1,4 @@
-import { EventBodySchema, UserIdSchema } from '@nirvana/contracts';
+import { EventBodySchema, UserIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { applyEvent, INITIAL_PROJECTION, rebuildProjection } from '../projection';

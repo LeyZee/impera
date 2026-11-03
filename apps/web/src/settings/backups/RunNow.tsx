@@ -1,4 +1,4 @@
-import type { BackupStatus } from '@nirvana/contracts';
+import type { BackupStatus } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type JSX, type RefObject } from 'react';
 

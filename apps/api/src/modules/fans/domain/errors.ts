@@ -1,4 +1,4 @@
-import { AGE_DISPUTE_FORBIDDEN, AGE_DISPUTE_REASON_INVALID, DomainError } from '@nirvana/contracts';
+import { AGE_DISPUTE_FORBIDDEN, AGE_DISPUTE_REASON_INVALID, DomainError } from '@impera/contracts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
 export class FanNotFound extends DomainError {

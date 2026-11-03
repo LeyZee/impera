@@ -1,4 +1,4 @@
-import { newId, PlatformAccountIdSchema, TeamMemberIdSchema } from '@nirvana/contracts';
+import { newId, PlatformAccountIdSchema, TeamMemberIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { salesFeedTimeZone } from '../sale-days';

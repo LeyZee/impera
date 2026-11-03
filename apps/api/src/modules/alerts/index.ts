@@ -1,5 +1,5 @@
 /** Public entry point of the `alerts` module (P4-01). Other modules import this file only. */
-import type { Database } from '@nirvana/db';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { AlertStore } from './domain/ports';

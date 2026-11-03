@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { ValidateShiftReportsBodySchema } from '@nirvana/contracts';
+import { ValidateShiftReportsBodySchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -456,7 +456,7 @@ describe('Équipe › Rapports', () => {
       );
     });
     expect(copied[0]).toMatch(
-      /^Basile, ton rapport du sam\. 24 oct\. · 18\sh – 0\sh \(Nora Vidal\) n’est pas encore fait\. Fais-le dans Nirvana dès que tu peux\.$/u,
+      /^Basile, ton rapport du sam\. 24 oct\. · 18\sh – 0\sh \(Nora Vidal\) n’est pas encore fait\. Fais-le dans Impera dès que tu peux\.$/u,
     );
   });
 

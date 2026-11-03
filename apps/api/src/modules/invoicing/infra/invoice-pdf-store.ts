@@ -20,8 +20,8 @@ import {
   PlatformSchema,
   TeamMemberIdSchema,
   type InvoiceId,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@impera/db';
 
 import { contractorReadsForInvoicing as fileReads } from '../../contractors';
 import { treatyNeedsResidence } from '../../contractors/pure';

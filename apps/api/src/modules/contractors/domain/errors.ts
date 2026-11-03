@@ -3,7 +3,7 @@ import {
   type AgencyLogoRefusal,
   type ContractorDocumentDecision,
   type ContractorDocumentRefusal,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** Error codes of the contractors' file (api.md § Erreurs): the suffix gives the HTTP status. */
 

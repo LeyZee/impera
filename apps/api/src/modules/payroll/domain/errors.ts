@@ -1,4 +1,4 @@
-import { DomainError, type PayPeriod, type SaleDecisionOutcome } from '@nirvana/contracts';
+import { DomainError, type PayPeriod, type SaleDecisionOutcome } from '@impera/contracts';
 
 import type { PayoutHold } from './ports';
 

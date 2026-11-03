@@ -1,6 +1,6 @@
 import { Writable } from 'node:stream';
 
-import { DomainError } from '@nirvana/contracts';
+import { DomainError } from '@impera/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -330,9 +330,9 @@ describe('loadConfig', () => {
   });
 
   it('reads the inline-worker flag', () => {
-    expect(testConfig().NIRVANA_INLINE_WORKER).toBe(false);
-    expect(testConfig({ NIRVANA_INLINE_WORKER: '1' }).NIRVANA_INLINE_WORKER).toBe(true);
-    expect(() => testConfig({ NIRVANA_INLINE_WORKER: 'yes' })).toThrow(/NIRVANA_INLINE_WORKER/);
+    expect(testConfig().IMPERA_INLINE_WORKER).toBe(false);
+    expect(testConfig({ IMPERA_INLINE_WORKER: '1' }).IMPERA_INLINE_WORKER).toBe(true);
+    expect(() => testConfig({ IMPERA_INLINE_WORKER: 'yes' })).toThrow(/IMPERA_INLINE_WORKER/);
   });
 
   describe('the invoices’ buckets (ADR 0037)', () => {
@@ -413,9 +413,9 @@ describe('loadConfig', () => {
   });
 
   it('treats an empty playground path as unset, as copied from .env.example', () => {
-    const config = testConfig({ PLAYGROUND_PERSONA_PATH: '', NIRVANA_TRAINING_DIR: '' });
+    const config = testConfig({ PLAYGROUND_PERSONA_PATH: '', IMPERA_TRAINING_DIR: '' });
     expect(config.PLAYGROUND_PERSONA_PATH).toBeUndefined();
-    expect(config.NIRVANA_TRAINING_DIR).toBeUndefined();
+    expect(config.IMPERA_TRAINING_DIR).toBeUndefined();
   });
 });
 

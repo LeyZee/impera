@@ -4,7 +4,7 @@ import {
   CUSTOM_ALERT_NAME_MAX,
   CUSTOM_ALERT_PHRASE_MAX,
   SYSTEM_ALERT_CODES,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { boolean, check, index, pgTable, primaryKey, text, unique, uuid } from 'drizzle-orm/pg-core';
 

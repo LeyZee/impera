@@ -4,12 +4,12 @@
 useDefault = true
 
 [[rules]]
-id = "nirvana-session-keys"
+id = "impera-session-keys"
 description = "Platform session encryption key"
 regex = '''SESSION_ENCRYPTION_KEYS\s*=\s*v\d+:[A-Za-z0-9+/=]{40,}'''
 
 [[rules]]
-id = "nirvana-llm-keys"
+id = "impera-llm-keys"
 description = "LLM API key"
 regex = '''LLM_[A-Z]+_API_KEY\s*=\s*[A-Za-z0-9_\-]{20,}'''
 

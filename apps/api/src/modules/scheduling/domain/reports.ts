@@ -9,7 +9,7 @@ import {
   type PayPeriod,
   type ShiftReportStatus,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   PayRulesMissing,

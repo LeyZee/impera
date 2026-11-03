@@ -1,5 +1,5 @@
-import { CommissionStatementStatusSchema } from '@nirvana/contracts';
-import { inArray, schema, sql, type Transaction } from '@nirvana/db';
+import { CommissionStatementStatusSchema } from '@impera/contracts';
+import { inArray, schema, sql, type Transaction } from '@impera/db';
 
 import { payReadsForInvoicing as payReads } from '../../payroll';
 import type { PayoutSettlementDocument } from '../domain/payouts';

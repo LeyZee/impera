@@ -1,4 +1,4 @@
-import type { GuardCode } from '@nirvana/contracts';
+import type { GuardCode } from '@impera/contracts';
 
 /*
  * The agent's guards in words (`GUARD_CODES`, docs/architecture/ai-engine.md « Les gardes »), as a sentence names what

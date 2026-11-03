@@ -7,9 +7,9 @@ import {
   PushPublicKeySchema,
   PushTestResultSchema,
   type NotificationReason,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -308,7 +308,7 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
       expect(await recap(creatorId, new Date('2026-11-04T07:00:00Z'))).toBe(2);
       expect(open(sent[1]?.body ?? Buffer.alloc(0), phone)).toMatchObject({
         title: 'Pendant tes heures calmes',
-        body: '2 notifications t’attendent dans Nirvana.',
+        body: '2 notifications t’attendent dans Impera.',
       });
       expect(await recap(creatorId, new Date('2026-11-04T07:01:00Z'))).toBe(0);
       expect(sent).toHaveLength(2);

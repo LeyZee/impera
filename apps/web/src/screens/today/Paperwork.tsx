@@ -1,4 +1,4 @@
-import type { BillingRegime, InvoiceListItem, Me } from '@nirvana/contracts';
+import type { BillingRegime, InvoiceListItem, Me } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 

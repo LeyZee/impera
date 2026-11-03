@@ -1,4 +1,4 @@
-import { PayPeriodSchema } from '@nirvana/contracts';
+import { PayPeriodSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

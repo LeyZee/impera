@@ -8,7 +8,7 @@ import {
   type SaleStatus,
   type SaleType,
   type SalesFeedCapability,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import { SALES_FEED_TIME_ZONES } from '../../domain/sale-days';

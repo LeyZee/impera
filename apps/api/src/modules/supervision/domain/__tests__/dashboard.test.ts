@@ -4,7 +4,7 @@ import {
   DashboardSchema,
   type AutomaticGate,
   type LiveRateReading,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

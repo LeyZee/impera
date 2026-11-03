@@ -5,7 +5,7 @@ Dépend de : lot 1 du MCP, déploiement, hôte MCP publié ; EQ-09 pour les acc�
 Branche : task/<id>-mcp-oauth
 
 ## Objectif
-Un connecteur grand public (ChatGPT, Claude.ai) se branche sur Nirvana par OAuth 2.1 : la personne se connecte, choisit la créatrice et les capacités, et l'accès créé est le même `mcp_grant` qu'avec un jeton d'agent.
+Un connecteur grand public (ChatGPT, Claude.ai) se branche sur Impera par OAuth 2.1 : la personne se connecte, choisit la créatrice et les capacités, et l'accès créé est le même `mcp_grant` qu'avec un jeton d'agent.
 
 ## Contexte à lire
 ADR 0026 §2 et §3 ; spécification MCP (autorisation) à sa version du moment ; RFC 9728 ; `apps/api/src/auth.ts` ; `docs/conventions/security.md` §1 et §6.

@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync, randomBytes, sign, type KeyObject } from 'node:crypto';
 
-import type { PasskeyCredential } from '@nirvana/contracts';
+import type { PasskeyCredential } from '@impera/contracts';
 import { isoBase64URL, isoCBOR } from '@simplewebauthn/server/helpers';
 import { z } from 'zod';
 

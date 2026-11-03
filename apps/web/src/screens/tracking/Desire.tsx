@@ -1,5 +1,5 @@
-import { DESIRE_BAND_FLOORS, type ConversationDesire, type DesirePoint } from '@nirvana/contracts';
-import { chartPoints, linePath, nearestIndex } from '@nirvana/design-system';
+import { DESIRE_BAND_FLOORS, type ConversationDesire, type DesirePoint } from '@impera/contracts';
+import { chartPoints, linePath, nearestIndex } from '@impera/design-system';
 import { useQuery } from '@tanstack/react-query';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 

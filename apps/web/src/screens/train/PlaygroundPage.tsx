@@ -1,4 +1,4 @@
-import type { Destination, PlaygroundComparison, PlaygroundMedia, Verdict } from '@nirvana/contracts';
+import type { Destination, PlaygroundComparison, PlaygroundMedia, Verdict } from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { Composer, Conversation, LessonCard, type LocalMode } from './playground/Conversation';

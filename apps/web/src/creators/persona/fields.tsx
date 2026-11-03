@@ -1,4 +1,4 @@
-import { placeSegmentThumb } from '@nirvana/design-system';
+import { placeSegmentThumb } from '@impera/design-system';
 import {
   createContext,
   useContext,

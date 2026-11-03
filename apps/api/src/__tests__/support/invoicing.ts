@@ -7,8 +7,8 @@ import {
   ContractTextIdSchema,
   newId,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema } from '@impera/db';
 
 import type { PayrollTeam } from './payroll-team';
 

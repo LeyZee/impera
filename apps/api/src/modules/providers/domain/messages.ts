@@ -1,4 +1,4 @@
-import type { AiProvider, ProviderErrorKind, ProviderFact, ProviderVoice } from '@nirvana/contracts';
+import type { AiProvider, ProviderErrorKind, ProviderFact, ProviderVoice } from '@impera/contracts';
 
 import { profileOf } from './catalog';
 import type { UnreachableReason } from './verification';
@@ -85,7 +85,7 @@ export function describeLowCredit(charactersLeft: number): string {
 
 /**
  * The Services line of a key that stopped working, by what the provider said: a refused key, an empty account and
- * a missing access are not fixed the same way. `isUnreadable` is a key Nirvana itself can no longer decrypt.
+ * a missing access are not fixed the same way. `isUnreadable` is a key Impera itself can no longer decrypt.
  */
 export function describeRefusedLine(
   provider: AiProvider,

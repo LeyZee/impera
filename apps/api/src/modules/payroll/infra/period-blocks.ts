@@ -1,5 +1,5 @@
-import { PayPeriodBlockSchema, type PayPeriod, type PayPeriodBlock } from '@nirvana/contracts';
-import { eq, schema, type Transaction } from '@nirvana/db';
+import { PayPeriodBlockSchema, type PayPeriod, type PayPeriodBlock } from '@impera/contracts';
+import { eq, schema, type Transaction } from '@impera/db';
 
 import { sameReason } from '../domain/period-blocks';
 import type { PeriodDecision } from '../domain/ports';

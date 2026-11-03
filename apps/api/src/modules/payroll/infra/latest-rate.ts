@@ -1,5 +1,5 @@
-import type { ExchangeRate, ForeignCurrency, UserId } from '@nirvana/contracts';
-import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+import type { ExchangeRate, ForeignCurrency, UserId } from '@impera/contracts';
+import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
 import { exchangeRateOfRow } from './snapshot';
 

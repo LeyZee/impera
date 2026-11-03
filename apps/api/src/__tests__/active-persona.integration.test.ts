@@ -11,10 +11,10 @@ import {
   PlatformAccountIdSchema,
   type CreatorId,
   type Persona,
-} from '@nirvana/contracts';
-import { and, eq, schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import type { BrainInput, Brief, HealthReport, LlmGateway, VoiceInput } from '@nirvana/llm';
+} from '@impera/contracts';
+import { and, eq, schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { BrainInput, Brief, HealthReport, LlmGateway, VoiceInput } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { parse } from 'yaml';
 
@@ -201,7 +201,7 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
   });
 
   it('keeps the Playground’s corrected answers out of her sheet: they were written on its fictional persona', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'nirvana-training-'));
+    const dir = await mkdtemp(join(tmpdir(), 'impera-training-'));
     try {
       const store = createJsonlCalibrationStore(join(dir, 'ratings.jsonl'));
       await store.append(correctedOnTheDemo('Okidoki, réponse corrigée sur la persona fictive'));

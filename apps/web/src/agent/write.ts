@@ -5,7 +5,7 @@ import {
   type AgentMode,
   type AgentModeResult,
   type Dashboard as ApiDashboard,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { z } from 'zod';

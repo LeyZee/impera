@@ -5,7 +5,7 @@ import {
   type Result,
   type TelegramSaleSettingsEntry,
   type TelegramSalesSettings,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { chatsFor } from '../domain/coverage';
 import type { BotsStore, Clock, DeliveriesStore, SalesDayReader } from '../domain/ports';

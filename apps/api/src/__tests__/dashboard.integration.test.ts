@@ -16,10 +16,10 @@ import {
   type ConversationId,
   type CreatorId,
   type PlatformAccountId,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
-import { loadPrompt } from '@nirvana/llm';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
+import { loadPrompt } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';

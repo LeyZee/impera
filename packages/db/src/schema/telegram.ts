@@ -5,7 +5,7 @@ import {
   TelegramErrorKindSchema,
   TelegramMembershipSchema,
   TelegramTopicSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   bigint,
   boolean,

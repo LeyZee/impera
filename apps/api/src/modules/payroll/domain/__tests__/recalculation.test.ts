@@ -9,7 +9,7 @@ import {
   type Bonus,
   type Penalty,
   type ShiftReportId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { periodsToRecompute } from '../../application/recalculation';

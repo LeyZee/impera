@@ -1,4 +1,4 @@
-import { normalise } from '@nirvana/contracts';
+import { normalise } from '@impera/contracts';
 
 /**
  * When she may go sexual (P3-09, méthode de chatting): she opens it herself only after a delay set in the CRM, she

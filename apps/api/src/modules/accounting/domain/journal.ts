@@ -4,7 +4,7 @@ import {
   type JournalAccounts,
   type PayPeriod,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   periodWords,
@@ -168,7 +168,7 @@ function documentLabel(document: JournalDocument): string {
  *   on the deductible account, and under reverse charge the self-assessed VAT both deducted and owed; the contractor's
  *   supplier account takes the total including VAT. A credit note is the same entry the other way round.
  * - **A transfer** (bank journal, on its day): the contractor's supplier account is debited with what was sent, the bank
- *   credited. Its fee, if any, is not in Nirvana.
+ *   credited. Its fee, if any, is not in Impera.
  * - **The lettering**: the documents of the statements a carry-over chain links, and the transfer of the statement that
  *   ends it, share its letter (`letteringCode`) and the day it ended (the transfer's, or the validation's of a zero
  *   total), when their supplier lines add up to zero. Otherwise they stay without a letter and the group is said: a

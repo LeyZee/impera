@@ -1,4 +1,4 @@
-import { INVOICE_RETENTION_YEARS } from '@nirvana/contracts';
+import { INVOICE_RETENTION_YEARS } from '@impera/contracts';
 
 /**
  * Until when the compliance lock holds a PDF: ten years after the close of the fiscal year of its issue (art. L123-22

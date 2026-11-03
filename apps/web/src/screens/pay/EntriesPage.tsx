@@ -1,4 +1,4 @@
-import type { Me, PayPeriod, PayrollPeriod, TeamMember } from '@nirvana/contracts';
+import type { Me, PayPeriod, PayrollPeriod, TeamMember } from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { EntryForm, type EntryAdded } from './EntryForm';

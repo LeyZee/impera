@@ -5,7 +5,7 @@ import {
   ok,
   type FanFlags,
   type MediaDescription,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type {
   BrainInput,
   Brief,
@@ -14,7 +14,7 @@ import type {
   LlmFailure,
   VoiceInput,
   VoiceOutput,
-} from '@nirvana/llm';
+} from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
 import type { AlertSettings } from '../../domain/alerts';

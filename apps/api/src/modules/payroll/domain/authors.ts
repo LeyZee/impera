@@ -1,4 +1,4 @@
-import type { BonusView, PayAdjustmentView, PenaltyView, TeamScope, UserId } from '@nirvana/contracts';
+import type { BonusView, PayAdjustmentView, PenaltyView, TeamScope, UserId } from '@impera/contracts';
 
 /** A period's entries as both routes give them: the period's own list, and what a statement counts. */
 export interface AuthoredEntries {
