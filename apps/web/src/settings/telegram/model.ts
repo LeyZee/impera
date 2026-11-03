@@ -1,4 +1,5 @@
 import {
+  DEFAULT_TELEGRAM_SALE_SETTINGS,
   TelegramTopicSchema,
   type CreatorId,
   type TelegramBot,
@@ -7,6 +8,8 @@ import {
   type TelegramDelivery,
   type TelegramOverview,
   type TelegramRoute,
+  type TelegramSaleSettings,
+  type TelegramSaleSettingsEntry,
   type TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -60,6 +63,60 @@ export function chatChoices(bots: readonly TelegramBot[]): ChatChoice[] {
 }
 
 const creatorOf = (scope: Scope): CreatorId | null => (scope === 'all' ? null : scope);
+
+/**
+ * The sales settings a scope shows (CRM-04): hers when she has her own (`isOwn`), else the ones for every creator, else
+ * the defaults; the same rule the server applies before sending.
+ */
+export function saleSettingsOf(
+  entries: readonly TelegramSaleSettingsEntry[],
+  scope: Scope,
+): { readonly settings: TelegramSaleSettings; readonly isOwn: boolean } {
+  const own = entries.find((entry) => entry.creatorId === creatorOf(scope));
+  const forAll = entries.find((entry) => entry.creatorId === null);
+  const chosen = own ?? forAll;
+  const settings =
+    chosen === undefined
+      ? DEFAULT_TELEGRAM_SALE_SETTINGS
+      : {
+          minimumMinor: chosen.minimumMinor,
+          agentOnly: chosen.agentOnly,
+          eveningDigest: chosen.eveningDigest,
+        };
+  return { settings, isOwn: own !== undefined || scope === 'all' };
+}
+
+/** The list with this scope's settings set (added for a creator who had none), every other line kept. */
+export function withSaleSettings(
+  entries: readonly TelegramSaleSettingsEntry[],
+  scope: Scope,
+  settings: TelegramSaleSettings,
+): TelegramSaleSettingsEntry[] {
+  const creatorId = creatorOf(scope);
+  return [...entries.filter((entry) => entry.creatorId !== creatorId), { creatorId, ...settings }];
+}
+
+/** Her own line gone: she follows the settings of every creator again. */
+export function withoutOwnSaleSettings(
+  entries: readonly TelegramSaleSettingsEntry[],
+  creatorId: CreatorId,
+): TelegramSaleSettingsEntry[] {
+  return entries.filter((entry) => entry.creatorId !== creatorId);
+}
+
+/** « 20 », « 20,5 » or « 20,50 € » typed into the minimum: its cents, 0 for an empty field, null when unreadable. */
+export function minimumFromText(text: string): number | null {
+  const cleaned = text.replace(/[\s\u00a0\u202f€]/gu, '').replace(',', '.');
+  if (cleaned === '') return 0;
+  if (!/^\d{1,4}(\.\d{1,2})?$/u.test(cleaned)) return null;
+  return Math.round(Number(cleaned) * 100);
+}
+
+/** The minimum as the field shows it: « 20 », « 20,50 », empty for none. */
+export function minimumText(minor: number): string {
+  if (minor === 0) return '';
+  return minor % 100 === 0 ? String(minor / 100) : (minor / 100).toFixed(2).replace('.', ',');
+}
 
 /**
  * `on`: this scope sends the topic to the group. `inherited`: a creator's line, already sent there by the « toutes

@@ -6,7 +6,6 @@ import {
   type AlertRef,
   type AutomaticMissing,
   type ContractorDocumentKind,
-  type Currency,
   type HandoffCause,
   type InvoiceNotIssuedReason,
   type InvoicePdfPlace,
@@ -21,6 +20,7 @@ import {
   type TelegramTopic,
 } from '@nirvana/contracts';
 
+import { saleAmount } from './sales';
 import type { Notice, Outcome, Signal } from './signals';
 
 /**
@@ -131,14 +131,6 @@ const SALE_TYPE_TEXT: Readonly<Record<SaleType, string>> = {
   paid_message: 'Message payant',
   other: 'Autre vente',
 };
-
-const SALE_AMOUNT: Readonly<Record<Currency, Intl.NumberFormat>> = {
-  EUR: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }),
-  USD: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }),
-};
-
-/** « 45,00 € », the price the fan paid, cents always shown as the platform shows them. */
-const saleAmount = (minor: number, currency: Currency): string => SALE_AMOUNT[currency].format(minor / 100);
 
 /** Who sold, in four cases (ADR 0050 § 5): a member by name, the agent, a chatter nobody linked yet, nobody. */
 function sellerText(seller: SaleSeller, memberNameOf: MemberNameOf): string {
@@ -622,7 +614,6 @@ export function classify(
         link: { label: 'Ouvrir le Dashboard', path: '/' },
       };
     }
-    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     case 'sale':
       // Silent, in its own topic (ADR 0020 §2); a refund never rings live, it is in the evening digest (CRM-04).
       return {
@@ -633,6 +624,7 @@ export function classify(
         body: `${SALE_TYPE_TEXT[signal.saleType]} · ${saleAmount(signal.grossInclVatMinor, signal.currency)} · ${sellerText(signal.seller, memberNameOf)}`,
         link: null,
       };
+    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     case 'security_alert':
       return {
         kind: 'notice',

@@ -16,8 +16,10 @@ import {
   TelegramOff,
   fetchDeliveries,
   fetchOverview,
+  fetchSaleSettings,
   removeChat,
   saveRoutes,
+  saveSaleSettings,
 } from './api';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './search';
 
@@ -27,6 +29,8 @@ vi.mock('./api', async (actual) => ({
   fetchDeliveries: vi.fn(),
   saveRoutes: vi.fn(),
   removeChat: vi.fn(),
+  fetchSaleSettings: vi.fn(),
+  saveSaleSettings: vi.fn(),
 }));
 
 function renderSection(): void {
@@ -42,6 +46,9 @@ function renderSection(): void {
 beforeEach(() => {
   vi.stubGlobal('scrollTo', vi.fn());
   vi.mocked(fetchDeliveries).mockResolvedValue([]);
+  vi.mocked(fetchSaleSettings).mockResolvedValue({
+    settings: [{ creatorId: null, minimumMinor: 0, agentOnly: false, eveningDigest: true }],
+  });
 });
 
 afterEach(() => {
@@ -396,5 +403,85 @@ describe('Réglages › Telegram with a group the bot was banned from (REG-28)',
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Le bot est revenu dans Ancien groupe : le groupe reste.',
     );
+  });
+});
+
+describe('Réglages › Telegram, the sales settings (CRM-04)', () => {
+  const creatorId = CreatorIdSchema.parse('01900000-0000-7000-8000-0000000000c1');
+
+  beforeEach(() => {
+    vi.mocked(fetchOverview).mockResolvedValue({
+      bots: [
+        {
+          id: TelegramBotIdSchema.parse('01900000-0000-7000-8000-0000000000b3'),
+          username: 'demo_bot',
+          displayName: 'Démo',
+          state: 'active',
+          lastPolledAt: null,
+          chats: [],
+        },
+      ],
+      routes: [],
+      coverage: [{ creatorId, displayName: 'Nora', urgentReachable: false, topicsWithoutGroup: [] }],
+      version: 0,
+    });
+    vi.mocked(saveSaleSettings).mockImplementation((settings) =>
+      Promise.resolve({ settings: [...settings] }),
+    );
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  async function openSales(): Promise<void> {
+    renderSection();
+    fireEvent.click(await screen.findByRole('tab', { name: /Ventes/ }));
+    await screen.findByText('Réglages des ventes');
+  }
+
+  it('saves « Celles de l’agent seulement » for every creator, and keeps the group for the owner and managers', async () => {
+    await openSales();
+    expect(screen.getByText(/réserve-le à toi et aux managers/)).toBeTruthy();
+    expect(screen.queryByText(/arrivent avec la connexion à Reveal/)).toBeNull();
+    fireEvent.click(await screen.findByRole('radio', { name: 'Celles de l’agent seulement' }));
+    await waitFor(() => {
+      expect(saveSaleSettings).toHaveBeenCalledWith([
+        { creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: true },
+      ]);
+    });
+  });
+
+  it('gives a creator her own minimum from the field, in cents, and refuses an unreadable amount', async () => {
+    await openSales();
+    fireEvent.click(screen.getByRole('radio', { name: 'Nora' }));
+    expect(await screen.findByText(/Nora suit les réglages de toutes les créatrices/)).toBeTruthy();
+    const field = screen.getByLabelText('Montant minimum');
+    fireEvent.change(field, { target: { value: 'vingt' } });
+    expect(screen.getByText(/Écris un montant en euros/)).toBeTruthy();
+    fireEvent.blur(field);
+    expect(saveSaleSettings).not.toHaveBeenCalled();
+    fireEvent.change(field, { target: { value: '19,90' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => {
+      expect(saveSaleSettings).toHaveBeenCalledWith([
+        { creatorId: null, minimumMinor: 0, agentOnly: false, eveningDigest: true },
+        { creatorId, minimumMinor: 1990, agentOnly: false, eveningDigest: true },
+      ]);
+    });
+    expect(await screen.findByText(/Nora a ses propres réglages/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Revenir aux réglages de toutes' }));
+    await waitFor(() => {
+      expect(saveSaleSettings).toHaveBeenLastCalledWith([
+        { creatorId: null, minimumMinor: 0, agentOnly: false, eveningDigest: true },
+      ]);
+    });
+  });
+
+  it('turns the evening digest off', async () => {
+    await openSales();
+    fireEvent.click(screen.getByRole('switch', { name: /Bilan du soir/ }));
+    await waitFor(() => {
+      expect(saveSaleSettings).toHaveBeenCalledWith([
+        { creatorId: null, minimumMinor: 0, agentOnly: false, eveningDigest: false },
+      ]);
+    });
   });
 });
