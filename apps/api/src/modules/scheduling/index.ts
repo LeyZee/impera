@@ -100,7 +100,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const services = {
     scheduling: createSchedulingService(planning, admin, deps.creators, now),
-    calendar: createCalendarService(createDrizzleCalendarReads(deps.db), planning, deps.creators, now),
+    calendar: createCalendarService(createDrizzleCalendarReads(deps.db), deps.creators, now),
     leaves: createLeaveService(
       createDrizzleLeaveStore(deps.db),
       async () => (await deps.creators.list()).map((creator) => creator.id),

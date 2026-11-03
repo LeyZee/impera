@@ -484,6 +484,13 @@
       "when": 1793669772880,
       "tag": "0070_sales_feed_link_version",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793670874380,
+      "tag": "0071_sales_feed_checks",
+      "breakpoints": true
     }
   ]
 }

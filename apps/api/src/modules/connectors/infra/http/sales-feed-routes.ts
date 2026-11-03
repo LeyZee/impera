@@ -4,6 +4,7 @@ import {
   PlatformSchema,
   SalesFeedCheckBodySchema,
   SalesFeedCheckReportSchema,
+  SalesFeedLastCheckSchema,
   SalesFeedListSchema,
   SalesFeedOverviewSchema,
   SalesFeedRefusalSchema,
@@ -161,9 +162,15 @@ export function createSalesFeedRoutes(
         },
       },
       async (request, reply) => {
-        const result = await feeds.check(request.params.platform, request.body);
+        const result = await feeds.check(request.params.platform, request.body, request.user?.id ?? null);
         return result.ok ? reply.send(result.value) : reply.code(502).send(result.error);
       },
+    );
+
+    app.get(
+      '/settings/sales-feeds/:platform/check',
+      { schema: { params: PlatformParamsSchema, response: { 200: SalesFeedLastCheckSchema } } },
+      (request) => feeds.lastCheck(request.params.platform),
     );
 
     return Promise.resolve();

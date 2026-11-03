@@ -12,6 +12,7 @@ import { creatorsSearch, parseCreatorsSearch } from './creators/search';
 import { parsePaySearch } from './payroll/model';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
+import { parseCalendarSearch } from './scheduling/calendar';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyFilePage } from './screens/me/MyFilePage';
@@ -25,7 +26,7 @@ import { InvoicesPage } from './screens/pay/InvoicesPage';
 import { MyInvoicesPage } from './screens/pay/MyInvoicesPage';
 import { PeriodPage } from './screens/pay/PeriodPage';
 import { PeriodsPage } from './screens/pay/PeriodsPage';
-import { MyPlanningPage } from './screens/planning/MyPlanningPage';
+import { MyPlanningPage, type MyPlanningSearch } from './screens/planning/MyPlanningPage';
 import {
   DevicesPage,
   AgentModePage,
@@ -200,9 +201,21 @@ const today = createRoute({
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
   path: '/planning',
+  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => {
+    const { semaine } = parsePlanningSearch(search);
+    return { ...(semaine === undefined ? {} : { semaine }), ...parseCalendarSearch(search) };
+  },
   component: function MyPlanning() {
     const { user } = rootRoute.useRouteContext();
-    return <MyPlanningPage userId={user.id} />;
+    const search = myPlanning.useSearch();
+    const navigate = myPlanning.useNavigate();
+    return (
+      <MyPlanningPage
+        userId={user.id}
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    );
   },
 });
 

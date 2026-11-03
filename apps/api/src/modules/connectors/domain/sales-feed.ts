@@ -9,6 +9,7 @@ import type {
   PlatformSale,
   PlatformSalesPage,
   SalesFeedCapability,
+  SalesFeedCheckReport,
   SalesFeedErrorKind,
   SalesFeedSignal,
 } from '@nirvana/contracts';
@@ -221,6 +222,13 @@ interface FeedAccount extends LinkedAccount {
   readonly creatorDisplayName: string;
 }
 
+/** A check's report as kept (`sales_feed_checks`). */
+interface StoredCheck {
+  readonly report: SalesFeedCheckReport;
+  readonly clean: boolean;
+  readonly checkedBy: string | null;
+}
+
 export type ChatterLink = { readonly kind: 'member'; readonly memberId: string } | { readonly kind: 'agent' };
 
 /**
@@ -259,6 +267,10 @@ export interface SalesLedger {
    * (excluded), and every refund read since `from`, whatever its sale. No fan data.
    */
   checkLines(platform: Platform, from: Date, to: Date): Promise<readonly CheckLine[]>;
+  /** Keeps a check's report, never rewritten (CRM-02); `clean` by `isCleanMatch`, `by` the user who ran it. */
+  recordCheck(report: SalesFeedCheckReport, clean: boolean, by: string | null): Promise<void>;
+  /** The platform's latest report, by when it was made; `null` before any check. */
+  lastCheck(platform: Platform): Promise<StoredCheck | null>;
   /** The register's oldest line (recorded or quarantined), `null` when it has none: how far back the reading went. */
   firstLineAt(platform: Platform): Promise<Date | null>;
   memberExists(memberId: string): Promise<boolean>;
