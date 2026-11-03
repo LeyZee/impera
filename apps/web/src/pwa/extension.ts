@@ -14,3 +14,9 @@ export function browserOf(userAgent: string): Browser {
   if (userAgent.includes('Chrome/')) return 'chrome';
   return 'other';
 }
+
+/** The popup's default address is localhost (ADR 0066 § 4): only a CRM elsewhere has to be told to it. */
+export function isLocalCrm(origin: string): boolean {
+  const { hostname } = new URL(origin);
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}

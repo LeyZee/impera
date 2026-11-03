@@ -1320,6 +1320,17 @@
   align-items: start;
 }
 /* The step's number in a small neon ring: the eye follows 1, 2, 3, 4 without reading. */
+.nv-help-ext__address {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.nv-help-ext__address code {
+  font-family: var(--nv-font-mono);
+  overflow-wrap: anywhere;
+}
+
 .nv-help-install__steps li::before {
   content: counter(nv-step);
   width: 26px;

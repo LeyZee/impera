@@ -1,8 +1,8 @@
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
-import { browserOf, EXTENSION_ZIP, type Browser } from './extension';
+import { browserOf, EXTENSION_ZIP, isLocalCrm, type Browser } from './extension';
 
 interface Steps {
   readonly title: string;
@@ -18,7 +18,6 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
       'Active « Mode développeur », en haut à droite.',
       'Clique « Charger l’extension non empaquetée » et choisis le dossier décompressé.',
       'Clique la pièce de puzzle à droite de la barre d’adresse, puis la punaise à côté d’Impera.',
-      'Clique l’icône Impera : connecté au CRM, tu vois ton nom.',
     ],
   },
   edge: {
@@ -29,10 +28,47 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
       'Active « Mode développeur », dans la colonne de gauche.',
       'Clique « Charger l’extension décompressée » et choisis le dossier décompressé.',
       'Clique la pièce de puzzle à droite de la barre d’adresse, puis l’œil à côté d’Impera pour l’afficher dans la barre.',
-      'Clique l’icône Impera : connecté au CRM, tu vois ton nom.',
     ],
   },
 };
+
+const LAST_STEP = 'Clique l’icône Impera : connecté au CRM, tu vois ton nom.';
+
+/** The zip carries no CRM address (ADR 0067 § 4): away from localhost, the popup is told this CRM's once (ADR 0066 § 4). */
+function AddressStep({ origin }: { readonly origin: string }): JSX.Element {
+  const [state, setState] = useState<'idle' | 'copied' | 'refused'>('idle');
+  return (
+    <li>
+      <span className="nv-help-ext__address">
+        <span>
+          Clique l’icône Impera, puis « Changer l’adresse » : colle <code>{origin}</code>, « Enregistrer », et
+          accepte l’autorisation que le navigateur demande pour ce site.
+        </span>
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm"
+          aria-live="polite"
+          onClick={() => {
+            try {
+              navigator.clipboard.writeText(origin).then(
+                () => {
+                  setState('copied');
+                },
+                () => {
+                  setState('refused');
+                },
+              );
+            } catch {
+              setState('refused');
+            }
+          }}
+        >
+          {state === 'copied' ? 'Copiée' : state === 'refused' ? 'Copie-la à la main' : 'Copier l’adresse'}
+        </button>
+      </span>
+    </li>
+  );
+}
 
 interface Offer {
   readonly title: string;
@@ -67,6 +103,7 @@ export function offersFor(watches: boolean): readonly Offer[] {
 /** /aide/extension (ADR 0067): what the extension offers, then the steps for Chrome and Edge, this browser's first. */
 export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.Element {
   const browser = browserOf(navigator.userAgent);
+  const origin = window.location.origin;
   const order: readonly Exclude<Browser, 'other'>[] =
     browser === 'edge' ? ['edge', 'chrome'] : ['chrome', 'edge'];
   return (
@@ -98,7 +135,7 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                 src="/help/extension-popup-jour.webp"
                 width={348}
                 height={415}
-                alt=""
+                alt="L’extension ouverte : le bonjour, le compte connecté, quatre raccourcis et « Ouvrir le CRM »."
               />
             </figure>
             <ul className="nv-help-ext__offers">
@@ -134,6 +171,8 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                   {STEPS[key].steps.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
+                  {isLocalCrm(origin) ? null : <AddressStep origin={origin} />}
+                  <li>{LAST_STEP}</li>
                 </ol>
               </PanelSection>
             </Panel>
@@ -152,7 +191,8 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
         </Panel>
         <p className="nv-help-install__note">
           Au démarrage, le navigateur peut rappeler qu’une extension en mode développeur est active : c’est
-          normal, garde-la. Elle ne lit rien en dehors de Reveal, d’Instagram et du CRM.
+          normal, garde-la. Elle n’a accès qu’à Reveal et au CRM ; à l’ouverture, elle regarde seulement
+          l’adresse de l’onglet.
         </p>
       </div>
     </Page>

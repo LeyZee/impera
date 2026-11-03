@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ExtensionPage } from './ExtensionPage';
-import { browserOf, EXTENSION_ZIP } from './extension';
+import { browserOf, EXTENSION_ZIP, isLocalCrm } from './extension';
 
 const CHROME =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
@@ -14,6 +14,7 @@ const IPHONE =
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('browserOf', () => {
@@ -61,5 +62,34 @@ describe('ExtensionPage', () => {
     renderAs(CHROME, false);
     expect(screen.queryByText('La veille Instagram')).toBeNull();
     expect(screen.getByText('Le fan sous les yeux')).toBeTruthy();
+  });
+
+  it('tells the popup nothing on localhost, its default address', () => {
+    renderAs(CHROME);
+    expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
+    expect(screen.getAllByText(/tu vois ton nom/u)).toHaveLength(2);
+  });
+
+  it('gives a deployed CRM its address to paste in the popup', async () => {
+    vi.stubGlobal('location', new URL('https://crm.exemple.fr/aide/extension'));
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { userAgent: CHROME, clipboard: { writeText } });
+    render(<ExtensionPage watches />);
+    expect(screen.getAllByText('https://crm.exemple.fr')).toHaveLength(2);
+    const [copy] = screen.getAllByRole('button', { name: 'Copier l’adresse' });
+    if (copy === undefined) throw new Error('no copy button');
+    fireEvent.click(copy);
+    expect(writeText).toHaveBeenCalledWith('https://crm.exemple.fr');
+    expect(await screen.findByRole('button', { name: 'Copiée' })).toBeTruthy();
+  });
+});
+
+describe('isLocalCrm', () => {
+  it.each([
+    ['http://localhost:5173', true],
+    ['http://127.0.0.1:5173', true],
+    ['https://crm.exemple.fr', false],
+  ])('knows the default address', (origin, local) => {
+    expect(isLocalCrm(origin)).toBe(local);
   });
 });
