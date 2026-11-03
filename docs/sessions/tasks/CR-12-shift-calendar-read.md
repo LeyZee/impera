@@ -1,5 +1,5 @@
 # CR-12 Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier
-Statut : in_progress, lot a (serveur) fait le 03/11/2026, lot b1 (« l'équipe » du chatteur, couche IA) le même jour ; restent Équipe › Planning (lot b2), les liens iCal (lot c), les places d'ADR 0049 et la couche de la créatrice (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 1, § 2 et § 5, acceptée le 02/11/2026 ; ADR 0048 pour l'IA, acceptée le même jour). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
+Statut : in_progress, lot a (serveur) fait le 03/11/2026, lot b1 (« l'équipe » du chatteur, couche IA) et lot b2 (Équipe › Planning : Mois, charge, couverture, couche IA) le même jour ; restent les liens iCal (lot c), les places d'ADR 0049 et la couche de la créatrice (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 1, § 2 et § 5, acceptée le 02/11/2026 ; ADR 0048 pour l'IA, acceptée le même jour). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
 Phase : espaces (ADR 0045)
 Dépend de : EQ-02 (planning, module `scheduling`), P3-14 (heures d'activité de l'agent), CR-02 (chemin de lecture de la créatrice, pour sa couche) ; le prototype validé
 Branche : task/cr-12-shift-calendar-read
@@ -43,3 +43,10 @@ Poser, déplacer, ajouter en masse, suggérer (CR-13) ; notifications et rappels
 - Jeton `--nv-agent` (design system, contraste testé) ; `answers` rendu par le serveur, lecture de l'agence dans une seule photo.
 - Planning du chatteur : « L'équipe » en Semaine (grille par créatrice, créneaux de l'agence, un jour à la fois sur téléphone) et en Mois (une marque par créneau et créatrice, un jour touché ouvert en détail), légende pour suivre un membre (44 px sur téléphone), l'IA en violet et en mots dans chaque créneau. Vue et période gardées dans l'adresse.
 - Reste pour le lot b2 : le Mois, la charge, la couverture et la couche IA dans Équipe › Planning ; la palette de 12 nuances des membres.
+
+### 03/11/2026, lot b2 (Équipe › Planning)
+- « Semaine / Mois » dans la barre d'outils, gardé dans l'adresse (`?affichage=mois&mois=…`) ; le Mois reprend la table du lot b1 avec les trous en ambre « à pourvoir » (l'agence peut les pourvoir) et suit le filtre de créatrice.
+- « Charge » (heures par membre sur la période) et « Couverture des comptes » (part des heures tenues par un chatteur, par l'IA, par les deux, par personne), barres à motifs lisibles sans la couleur, lues dans la même photo que la grille.
+- Grille de la semaine : l'IA sur chaque ligne de compte et dans chaque créneau (liseré violet, étiquette, mots pour le lecteur d'écran) ; un créneau sans shift couvert par l'IA en automatique se lit « IA seule » et sort du décompte « à pourvoir », comme `slotsToFill` côté serveur.
+- Serveur : les colonnes des réglages lus par les écrans viennent d'un seul `settingsColumns` (relecture de Bilan sur #427).
+- Reste : la palette de 12 nuances des membres (fiche d'un membre, Équipe) ; une classe `nv-sr-only` du design system pour remplacer `.cal-sr`.
