@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { refundsOfDay, salesTotals, type TotalsLine } from '../../domain/sales-totals';
 
+import { lineChatter } from './line-chatter';
 import { sellerOf } from './seller';
 
 /** Which refunds a read gives: one creator's, of `day` (each on its own day in its platform's zone). */
@@ -52,7 +53,7 @@ const RowSchema = z.object({
   member_id: z.string().nullable(),
 });
 
-const RefundRowSchema = RowSchema.extend({ sale_recorded: z.boolean() });
+const RefundRowSchema = RowSchema.extend({ sale_occurred_at: instant.nullable() });
 
 const ReadingSchema = z.object({
   platform: PlatformSchema,
@@ -99,11 +100,12 @@ export const salesFeedTotals = {
     const result = await tx.execute(sql`
       select l.platform, l.platform_sale_id, l.event, l.sale_type, l.platform_account_id, l.occurred_at, l.currency,
              l.gross_incl_vat_minor, l.gross_excl_vat_minor, l.net_minor, l.agency_minor, l.creator_minor,
-             l.platform_chatter_id, c.kind, c.member_id
+             ${lineChatter} as platform_chatter_id, c.kind, c.member_id
         from platform_sales l
         left join platform_sales s
           on l.event = 'refund' and s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
-        left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = l.platform_chatter_id
+             and s.creator_id = l.creator_id
+        left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = ${lineChatter}
        where l.creator_id = ${query.creatorId}
          and l.occurred_at >= ${start}
          and ${saleAt} >= ${start}
@@ -125,13 +127,12 @@ export const salesFeedTotals = {
     const result = await tx.execute(sql`
       select l.platform, l.platform_sale_id, l.event, l.sale_type, l.platform_account_id, l.occurred_at, l.currency,
              l.gross_incl_vat_minor, l.gross_excl_vat_minor, l.net_minor, l.agency_minor, l.creator_minor,
-             coalesce(s.platform_chatter_id, l.platform_chatter_id) as platform_chatter_id, c.kind, c.member_id,
-             s.id is not null as sale_recorded
+             ${lineChatter} as platform_chatter_id, c.kind, c.member_id, s.occurred_at as sale_occurred_at
         from platform_sales l
         left join platform_sales s
-          on s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
-        left join sales_feed_chatters c
-          on c.platform = l.platform and c.platform_chatter_id = coalesce(s.platform_chatter_id, l.platform_chatter_id)
+          on l.event = 'refund' and s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
+             and s.creator_id = l.creator_id
+        left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = ${lineChatter}
        where l.creator_id = ${query.creatorId}
          and l.event = 'refund'
          and l.occurred_at >= ${start}
@@ -139,7 +140,7 @@ export const salesFeedTotals = {
     return refundsOfDay(
       result.rows.map((row) => {
         const parsed = RefundRowSchema.parse(row);
-        return { ...lineOf(parsed), saleRecorded: parsed.sale_recorded };
+        return { ...lineOf(parsed), saleOccurredAt: parsed.sale_occurred_at };
       }),
       query.day,
     );

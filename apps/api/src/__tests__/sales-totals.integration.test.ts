@@ -312,8 +312,8 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
       platformAccountId: accountId,
       currency: 'EUR',
       saleType: 'ppv',
+      sale: 'earlier_day',
       refunds: 1,
-      olderThanRegister: 0,
       grossInclVatMinor: 1200,
     });
     expect(JSON.stringify(refunds)).not.toMatch(/fan_test_01/);
