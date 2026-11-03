@@ -6,7 +6,8 @@ import tls from 'node:tls';
 import {
   CreatorIdSchema,
   ExtensionLinkCreatedSchema,
-  ExtensionLinkStateSchema,
+  ExtensionLinkCreatorsSchema,
+  ExtensionLinkListSchema,
   newId,
   TeamMemberIdSchema,
   WatchSessionIdSchema,
@@ -60,6 +61,16 @@ describe('/v1/trends', () => {
       headers: token === null ? {} : { 'x-extension-link': token },
       payload,
     });
+  const readingsCreators = async (token: string) =>
+    ExtensionLinkCreatorsSchema.parse(
+      (
+        await server.inject({
+          method: 'GET',
+          url: '/v1/trends/readings/creators',
+          headers: { 'x-extension-link': token },
+        })
+      ).json(),
+    ).items;
   const link = (creatorId: CreatorId, code = 'Cx1AbCdEf') => ({
     url: `https://www.instagram.com/reel/${code}/?igsh=partage`,
     text: 'Transition tenue en un claquement de doigts',
@@ -108,12 +119,16 @@ describe('/v1/trends', () => {
     return signIn(server, email, PASSWORD);
   }
 
-  async function newToken(cookie: string): Promise<string> {
-    const response = await call('POST', '/v1/trends/extension-link', cookie);
+  async function newLink(cookie: string, label = 'Chrome') {
+    const response = await call('POST', '/v1/trends/extension-links', cookie, { label });
     expect(response.statusCode).toBe(201);
     expect(response.headers['cache-control']).toBe('no-store');
-    return ExtensionLinkCreatedSchema.parse(response.json()).token;
+    return ExtensionLinkCreatedSchema.parse(response.json());
   }
+  const newToken = async (cookie: string, label?: string): Promise<string> =>
+    (await newLink(cookie, label)).token;
+  const liveLinks = async (cookie: string) =>
+    ExtensionLinkListSchema.parse((await call('GET', '/v1/trends/extension-links', cookie)).json()).items;
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
@@ -174,6 +189,9 @@ describe('/v1/trends', () => {
 
     const hers = await call('POST', '/v1/trends/links', cookies.creator, link(nora, 'Cx3AbCdEf'));
     expect(hers.json()).toMatchObject({ created: true });
+    // Pasted by the agency first: to her it is taken all the same, never « already there ».
+    const afterAgency = await call('POST', '/v1/trends/links', cookies.creator, link(nora));
+    expect(afterAgency.json()).toMatchObject({ created: true });
     const elsewhere = await call('POST', '/v1/trends/links', cookies.creator, link(ines, 'Cx4AbCdEf'));
     expect([elsewhere.statusCode, codeOf(elsewhere)]).toEqual([403, 'trend_link_forbidden']);
     const unknown = await call('POST', '/v1/trends/links', cookies.manager, link(newId(CreatorIdSchema)));
@@ -193,38 +211,64 @@ describe('/v1/trends', () => {
     ]);
   });
 
-  it('links one extension per person, the token shown once and kept hashed, revoked by a new one or by her', async () => {
-    expect((await call('GET', '/v1/trends/extension-link', cookies.creator)).json()).toEqual({ link: null });
-    const token = await newToken(cookies.creator);
-    const state = ExtensionLinkStateSchema.parse(
-      (await call('GET', '/v1/trends/extension-link', cookies.creator)).json(),
-    );
-    expect(state.link).not.toBeNull();
+  it('links one extension per browser, the token shown once and kept hashed, three at most', async () => {
+    expect(await liveLinks(cookies.creator)).toEqual([]);
+    const chrome = await newLink(cookies.creator, 'Chrome');
+    const edge = await newLink(cookies.creator, 'Edge');
     const [stored] = await test.admin.db
       .select({ tokenHash: schema.extensionLinks.tokenHash })
       .from(schema.extensionLinks)
-      .where(eq(schema.extensionLinks.userId, creatorUserId));
-    expect(stored?.tokenHash).not.toBe(token);
+      .where(eq(schema.extensionLinks.id, chrome.id));
+    expect(stored?.tokenHash).not.toBe(chrome.token);
 
+    // Chrome and Edge of one person both write: neither revokes the other.
     const batch = { watchSession: newId(WatchSessionIdSchema), readings: [reading()] };
-    expect((await readings(token, batch)).json()).toEqual({ accepted: 1 });
-    const replaced = await newToken(cookies.creator);
-    const stale = await readings(token, batch);
+    expect((await readings(chrome.token, batch)).json()).toEqual({ accepted: 1 });
+    expect((await readings(edge.token, batch)).json()).toEqual({ accepted: 1 });
+    const listed = await liveLinks(cookies.creator);
+    expect(listed.map((one) => one.label)).toEqual(['Chrome', 'Edge']);
+    expect(listed.every((one) => one.lastUsedAt !== null)).toBe(true);
+
+    // The same browser linked again: its old link goes, the other stays.
+    const chromeAgain = await newLink(cookies.creator, 'Chrome');
+    const stale = await readings(chrome.token, batch);
     expect([stale.statusCode, codeOf(stale)]).toEqual([401, 'extension_link_unauthenticated']);
-    expect((await readings(replaced, batch)).statusCode).toBe(200);
-    expect((await call('DELETE', '/v1/trends/extension-link', cookies.creator)).statusCode).toBe(204);
-    expect((await readings(replaced, batch)).statusCode).toBe(401);
+    expect((await readings(edge.token, batch)).statusCode).toBe(200);
+
+    await newLink(cookies.creator, 'Portable');
+    const full = await call('POST', '/v1/trends/extension-links', cookies.creator, { label: 'Quatrième' });
+    expect([full.statusCode, codeOf(full)]).toEqual([409, 'extension_links_full_conflict']);
+
+    expect((await call('DELETE', `/v1/trends/extension-links/${edge.id}`, cookies.creator)).statusCode).toBe(
+      204,
+    );
+    expect((await readings(edge.token, batch)).statusCode).toBe(401);
+    expect((await readings(chromeAgain.token, batch)).statusCode).toBe(200);
+    // Another person's link, or one already revoked: not found.
+    expect((await call('DELETE', `/v1/trends/extension-links/${edge.id}`, cookies.creator)).statusCode).toBe(
+      404,
+    );
+    expect(
+      (await call('DELETE', `/v1/trends/extension-links/${chromeAgain.id}`, cookies.owner)).statusCode,
+    ).toBe(404);
 
     const audited = await test.admin.db
       .select({ action: schema.auditLog.action })
       .from(schema.auditLog)
       .where(and(eq(schema.auditLog.userId, creatorUserId), eq(schema.auditLog.entity, 'extension_link')));
-    expect(audited.map((row) => row.action).sort()).toEqual([
-      'extension_link.create',
-      'extension_link.create',
-      'extension_link.revoke',
-      'extension_link.revoke',
-    ]);
+    expect(audited.filter((row) => row.action === 'extension_link.create')).toHaveLength(4);
+    expect(audited.filter((row) => row.action === 'extension_link.revoke')).toHaveLength(2);
+    for (const one of await liveLinks(cookies.creator))
+      await call('DELETE', `/v1/trends/extension-links/${one.id}`, cookies.creator);
+  });
+
+  it('tells the extension which creators its person may mark a post for', async () => {
+    const hers = await readingsCreators(await newToken(cookies.creator));
+    expect(hers.map((creator) => creator.id)).toEqual([nora]);
+    const agency = await readingsCreators(await newToken(cookies.manager));
+    expect(agency.map((creator) => creator.displayName)).toEqual(['Ines', 'Nora']);
+    const without = await server.inject({ method: 'GET', url: '/v1/trends/readings/creators' });
+    expect(without.statusCode).toBe(401);
   });
 
   it('refuses a batch without a live link before reading its body', async () => {
@@ -281,6 +325,7 @@ describe('/v1/trends', () => {
       readings: [reading({ code: 'Aa1Bb2Cc3' }), reading({ code: 'Dd4Ee5Ff6', markedFor: ines })],
     });
     expect([forOther.statusCode, codeOf(forOther)]).toEqual([403, 'trend_reading_forbidden']);
+    expect(forOther.json()).toMatchObject({ error: { details: { creatorIds: [ines] } } });
     const ownerToken = await newToken(cookies.owner);
     const unknown = await readings(ownerToken, {
       watchSession,
@@ -318,5 +363,13 @@ describe('/v1/trends', () => {
     // The base's own host only, if the pool opened a connection meanwhile.
     const base = new URL(test.appUrl).hostname;
     expect(lookup.mock.calls.map(([host]) => host).filter((host) => host !== base)).toEqual([]);
+  });
+
+  it('counts a wrong token against the limit of the extension’s doors', async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 40; i += 1)
+      statuses.push((await readings('b'.repeat(43), { watchSession: 'x', readings: [] })).statusCode);
+    expect(statuses).toContain(429);
+    expect(statuses.slice(0, statuses.indexOf(429)).every((status) => status === 401)).toBe(true);
   });
 });

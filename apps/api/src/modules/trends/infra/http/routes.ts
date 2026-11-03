@@ -1,7 +1,10 @@
 import {
+  CreateExtensionLinkBodySchema,
   DomainError,
   ExtensionLinkCreatedSchema,
-  ExtensionLinkStateSchema,
+  ExtensionLinkCreatorsSchema,
+  ExtensionLinkIdSchema,
+  ExtensionLinkListSchema,
   ExtensionLinkTokenSchema,
   PastedTrendLinkSchema,
   PasteTrendLinkBodySchema,
@@ -15,7 +18,12 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { pasteLink } from '../../application/links';
-import { ExtensionLinkForbidden, ExtensionLinkUnauthenticated } from '../../domain/errors';
+import {
+  ExtensionLinkForbidden,
+  ExtensionLinkNotFound,
+  ExtensionLinksFull,
+  ExtensionLinkUnauthenticated,
+} from '../../domain/errors';
 import type {
   ExtensionLinkStore,
   LinkHolder,
@@ -27,7 +35,7 @@ import type {
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
-/** A batch a minute at most per address: the extension sends one when a watch session pauses or ends. */
+/** 30 calls a minute at most per address on the extension's doors, a wrong token counted: a batch is sent when a watch session pauses or ends. */
 const READINGS_LIMIT = { max: 30, timeWindow: '1 minute', skipOnError: false };
 
 const LinkHeadersSchema = z.looseObject({ 'x-extension-link': z.string().optional() });
@@ -39,7 +47,8 @@ function actorOf(request: FastifyRequest): TrendActor {
 
 /**
  * `/v1/trends` (VEI-01 lot b, ADR 0060 § 2). « Coller un lien » for the owner, a member and a creator; « Relier
- * l'extension » for the same; the readings, sent by the extension with its link and no dashboard session. No route
+ * l'extension », one link per browser, for the same; the readings and the creators one may mark for, asked by the
+ * extension with its link and no dashboard session. No route
  * here opens a connection outward: an address is read by its form, a reading is only received.
  */
 export function createTrendRoutes(
@@ -62,55 +71,77 @@ export function createTrendRoutes(
     );
 
     app.get(
-      '/trends/extension-link',
-      { ...person, schema: { response: { 200: ExtensionLinkStateSchema } } },
-      async (request) => {
-        const live = await stores.links.live(actorOf(request).userId);
-        return { link: live === null ? null : { createdAt: live.createdAt.toISOString() } };
-      },
+      '/trends/extension-links',
+      { ...person, schema: { response: { 200: ExtensionLinkListSchema } } },
+      async (request) => ({ items: await stores.links.live(actorOf(request).userId) }),
     );
 
     app.post(
-      '/trends/extension-link',
-      { ...person, schema: { response: { 201: ExtensionLinkCreatedSchema } } },
+      '/trends/extension-links',
+      {
+        ...person,
+        schema: { body: CreateExtensionLinkBodySchema, response: { 201: ExtensionLinkCreatedSchema } },
+      },
       async (request, reply) => {
-        const created = await stores.links.replace(actorOf(request));
+        const created = await stores.links.create(actorOf(request), request.body.label);
         if (created === null) throw new ExtensionLinkForbidden();
+        if (created === 'full') throw new ExtensionLinksFull();
         // Shown once: never kept on the way.
         return reply.code(201).header('cache-control', 'no-store').send(created);
       },
     );
 
-    app.delete('/trends/extension-link', person, async (request, reply) => {
-      await stores.links.revoke(actorOf(request));
-      return reply.code(204).send();
-    });
+    app.delete(
+      '/trends/extension-links/:id',
+      { ...person, schema: { params: z.object({ id: ExtensionLinkIdSchema }) } },
+      async (request, reply) => {
+        if (!(await stores.links.revoke(actorOf(request), request.params.id)))
+          throw new ExtensionLinkNotFound();
+        return reply.code(204).send();
+      },
+    );
 
-    // The extension's door: its link is the key, checked first on the raw request (401 before any 400 on the body), and
-    // exempt from the dashboard's Origin check, the extension having its own origin. Its secret is in a header: the
-    // route logs nothing below `warn`, and the body (what she watched) is never logged nor echoed.
+    // The extension's doors: its link is the key, exempt from the dashboard's Origin check, the extension having its own
+    // origin. The link is read in `preParsing`, after the rate limit's `onRequest` (a wrong token counts against the
+    // limit) and before the body is parsed (401 before any 400). Its secret is in a header: the routes log nothing
+    // below `warn`, and a body (what she watched) is never logged nor echoed.
+    const extensionDoor = {
+      logLevel: 'warn' as const,
+      config: { originCheck: false, rateLimit: READINGS_LIMIT },
+      preParsing: async (request: FastifyRequest, _reply: unknown, payload: unknown) => {
+        const token = ExtensionLinkTokenSchema.safeParse(request.headers['x-extension-link']);
+        const holder = token.success ? await stores.links.holder(token.data) : null;
+        if (holder === null) throw new ExtensionLinkUnauthenticated();
+        holders.set(request, holder);
+        return payload;
+      },
+    };
+    const holderOf = (request: FastifyRequest): LinkHolder => {
+      const holder = holders.get(request);
+      if (holder === undefined) throw new ExtensionLinkUnauthenticated();
+      return holder;
+    };
+
+    app.get(
+      '/trends/readings/creators',
+      {
+        ...extensionDoor,
+        schema: { headers: LinkHeadersSchema, response: { 200: ExtensionLinkCreatorsSchema } },
+      },
+      async (request) => ({ items: await stores.readings.markable(holderOf(request)) }),
+    );
+
     app.post(
       '/trends/readings',
       {
-        logLevel: 'warn',
-        config: { originCheck: false, rateLimit: READINGS_LIMIT },
-        onRequest: async (request) => {
-          const token = ExtensionLinkTokenSchema.safeParse(request.headers['x-extension-link']);
-          const holder = token.success ? await stores.links.holder(token.data) : null;
-          if (holder === null) throw new ExtensionLinkUnauthenticated();
-          holders.set(request, holder);
-        },
+        ...extensionDoor,
         schema: {
           headers: LinkHeadersSchema,
           body: TrendReadingsBatchSchema,
           response: { 200: TrendReadingsAcceptedSchema },
         },
       },
-      async (request) => {
-        const holder = holders.get(request);
-        if (holder === undefined) throw new ExtensionLinkUnauthenticated();
-        return { accepted: await stores.readings.record(holder, request.body) };
-      },
+      async (request) => ({ accepted: await stores.readings.record(holderOf(request), request.body) }),
     );
     return Promise.resolve();
   };

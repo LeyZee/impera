@@ -1,16 +1,8 @@
-import { newId, TrendReadingIdSchema, type TrendReadingsBatch } from '@impera/contracts';
-import {
-  inArray,
-  schema,
-  sql,
-  withCreatorAccount,
-  withMember,
-  type Database,
-  type Transaction,
-} from '@impera/db';
+import { CreatorIdSchema, newId, TrendReadingIdSchema, type TrendReadingsBatch } from '@impera/contracts';
+import { schema, sql, withCreatorAccount, withMember, type Database, type Transaction } from '@impera/db';
 
 import { TrendReadingForbidden } from '../../domain/errors';
-import type { LinkHolder, ReadingStore } from '../../domain/ports';
+import type { LinkHolder, MarkableCreator, ReadingStore } from '../../domain/ports';
 
 const { creators, trendReadings } = schema;
 
@@ -79,25 +71,38 @@ const marksOf = (batch: TrendReadingsBatch): string[] => [
 /**
  * The readings of the extension: a creator's account in `withCreatorAccount`, who marks a post for herself only; the
  * owner and a member in `withMember`, who mark one for a creator that exists. A batch with one refused mark is refused
- * whole, before anything is written.
+ * whole, before anything is written, with the marks refused.
  */
 export function createDrizzleReadingStore(db: Database): ReadingStore {
+  const markable = (tx: Transaction): Promise<MarkableCreator[]> =>
+    tx
+      .select({ id: creators.id, displayName: creators.displayName })
+      .from(creators)
+      .orderBy(creators.displayName)
+      .then((rows) =>
+        rows.map((row) => ({ id: CreatorIdSchema.parse(row.id), displayName: row.displayName })),
+      );
   return {
+    markable: (holder) =>
+      holder.role === 'creator'
+        ? withCreatorAccount(db, holder.userId, async (tx, creatorId) =>
+            (await markable(tx)).filter((creator) => creator.id === creatorId),
+          )
+        : withMember(db, holder.userId, (tx) => markable(tx)),
+
     record: (holder, batch) => {
       const marks = marksOf(batch);
+      const refuseOutside = (allowed: ReadonlySet<string>) => {
+        const refused = marks.filter((mark) => !allowed.has(mark));
+        if (refused.length > 0) throw new TrendReadingForbidden(refused);
+      };
       if (holder.role === 'creator')
         return withCreatorAccount(db, holder.userId, (tx, creatorId) => {
-          if (marks.some((mark) => mark !== creatorId)) throw new TrendReadingForbidden();
+          refuseOutside(new Set([creatorId]));
           return upsert(tx, holder, batch);
         });
       return withMember(db, holder.userId, async (tx) => {
-        if (marks.length > 0) {
-          const known = await tx
-            .select({ id: creators.id })
-            .from(creators)
-            .where(inArray(creators.id, marks));
-          if (known.length !== marks.length) throw new TrendReadingForbidden();
-        }
+        if (marks.length > 0) refuseOutside(new Set((await markable(tx)).map((creator) => creator.id)));
         return upsert(tx, holder, batch);
       });
     },
