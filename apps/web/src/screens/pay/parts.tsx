@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import type { PayNames } from './data';
 
 import {
+  countedSalesText,
   dayMonthText,
   flowOf,
   gaugePercent,
@@ -224,16 +225,31 @@ export function MoneyPath({
             const count = line.shiftReportIds.length;
             const rate = statement.rules.exchangeRates.find((one) => one.currency === line.currency);
             const steps = flowOf(line, statement.rules.commissionRateBps, account?.platform ?? null, you);
+            // A line on the platform's net says the sales it read, a line of reports its reports (CRM-03).
+            const counted = countedSalesText(line);
             return (
-              <li key={line.platformAccountId} className="py-account">
+              <li
+                key={[
+                  line.platformAccountId,
+                  line.currency,
+                  line.vatBps,
+                  line.platformFeeBps,
+                  line.base,
+                ].join(' ')}
+                className="py-account"
+              >
                 <p className="py-account__head">
                   <span className="py-account__name">{account?.creatorName ?? 'Un compte'}</span>
                   <span className="py-account__where">
                     {account === null ? '' : `${accountLine(account)} · `}
-                    {count} rapport{count > 1 ? 's' : ''} de fin de shift
-                    {line.lateReports.length === 0
-                      ? ''
-                      : `, dont ${String(line.lateReports.length)} validé${line.lateReports.length > 1 ? 's' : ''} après la clôture d’avant`}
+                    {counted ?? (
+                      <>
+                        {count} rapport{count > 1 ? 's' : ''} de fin de shift
+                        {line.lateReports.length === 0
+                          ? ''
+                          : `, dont ${String(line.lateReports.length)} validé${line.lateReports.length > 1 ? 's' : ''} après la clôture d’avant`}
+                      </>
+                    )}
                   </span>
                 </p>
                 <ol className="py-flow">

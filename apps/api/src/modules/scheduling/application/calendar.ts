@@ -25,7 +25,7 @@ import type {
   StoredAccount,
   StoredShift,
 } from '../domain/ports';
-import { assertPlanningRange, DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
+import { assertPlanningRange } from '../domain/shifts';
 
 import { toPlanningAccount } from './dto';
 
@@ -39,6 +39,8 @@ const toSlot = (slot: GridSlot): CalendarSlot => ({
   creatorId: slot.creatorId,
   startsAt: slot.startsAt.toISOString(),
   endsAt: slot.endsAt.toISOString(),
+  seats: slot.seats,
+  places: slot.places,
   open: slot.open.map((gap) => ({ startsAt: gap.from.toISOString(), endsAt: gap.to.toISOString() })),
 });
 
@@ -57,7 +59,7 @@ export function createCalendarService(
         window,
         directory.map((creator) => creator.id),
       );
-      const settings = read.settings ?? DEFAULT_SCHEDULING_SETTINGS;
+      const { settings } = read;
       // The filters narrow what is sent back; the database already decided what the reader may read.
       const askedCreator = (creatorId: CreatorId) =>
         query.creatorId === undefined || creatorId === query.creatorId;

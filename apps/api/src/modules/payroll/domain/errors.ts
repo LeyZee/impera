@@ -1,4 +1,4 @@
-import { DomainError, type PayPeriod } from '@nirvana/contracts';
+import { DomainError, type PayPeriod, type SaleDecisionOutcome } from '@nirvana/contracts';
 
 import type { PayoutHold } from './ports';
 
@@ -44,6 +44,42 @@ export class PayPeriodCursorInvalid extends DomainError {
 export class BonusNotFound extends DomainError {
   constructor() {
     super('bonus_not_found', 'Prime introuvable');
+  }
+}
+
+/**
+ * A sale the period neither holds nor pays a member for as the validator reads it (CRM-03 lot b3): closed, counted by
+ * a closing, the agent's, without a chatter, or of a creator they do not see.
+ */
+export class PaySaleNotFound extends DomainError {
+  constructor() {
+    super('pay_sale_not_found', 'Cette vente n’attend aucune décision dans cette quinzaine');
+  }
+}
+
+/** A line that is not on the member's own statement of the period (CRM-03 lot b4c). */
+export class PaySaleSignalNotFound extends DomainError {
+  constructor() {
+    super('pay_sale_signal_not_found', 'Cette vente n’est pas sur ton relevé de cette quinzaine');
+  }
+}
+
+/** A line already signalled, or a withdrawal without a signal in force (CRM-03 lot b4c). */
+export class PaySaleSignalStateConflict extends DomainError {
+  constructor(kind: 'signal' | 'withdraw') {
+    super(
+      'pay_sale_signal_state_conflict',
+      kind === 'signal' ? 'Cette vente est déjà signalée' : 'Cette vente n’est pas signalée',
+    );
+  }
+}
+
+/** An outcome the sale does not offer now (`saleDecisionsOpen`): `details.outcomes` says those it does. */
+export class PaySaleOutcomeConflict extends DomainError {
+  constructor(outcomes: readonly SaleDecisionOutcome[]) {
+    super('pay_sale_outcome_conflict', 'Cette décision n’est pas possible pour cette vente', {
+      details: { outcomes: [...outcomes] },
+    });
   }
 }
 
@@ -222,7 +258,9 @@ export class PayEntryConflict extends DomainError {
       | 'pay_adjustment_conflict'
       | 'bonus_tier_set_conflict'
       | 'collective_goal_conflict'
-      | 'payout_minimum_conflict',
+      | 'payout_minimum_conflict'
+      | 'pay_sale_decision_conflict'
+      | 'pay_sale_signal_conflict',
   ) {
     super(code, 'Cet identifiant est déjà pris par une autre saisie');
   }

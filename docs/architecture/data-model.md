@@ -199,6 +199,13 @@ Un lien d’invitation (EQ-10) ne garde que l’empreinte de son jeton. Il sert 
 scheduling_settings      id (= 1, une ligne au plus), time_zone (fuseau de la grille), slot_start_minute, slot_length_minutes
                          (60 à 720, divise la journée), access_margin_minutes (0 à 120), updated_by, updated_at
                          (sans ligne : les valeurs par défaut du module)
+scheduling_slot_versions id, effective_at (unique), time_zone, slots (jsonb : 2 à 24 créneaux { startMinute, endMinute,
+                         name } en minutes murales), created_by, created_at (ADR 0049 § 1, migration 0078 ; le réglage
+                         en vigueur à un instant est la dernière version passée ; une version qui a pris effet ne change
+                         ni ne s'efface, une version future se retire entière ; la 0078 recopie scheduling_settings en
+                         une version `-infinity`)
+scheduling_slot_seats    version_id (cascade), slot_rank (0 à 23), platform_account_id, seats (1 ou 2 ; sans ligne : 1)
+                         (ADR 0049 § 2 ; figées avec leur version)
 shift_templates          id, creator_id, platform_account_id, member_id, weekday (1 lundi … 7 dimanche), start_minute,
                          end_minute (minutes murales du fuseau de la grille ; une fin avant le début est le lendemain ;
                          23 h au plus), valid_from, valid_until, created_by, created_at
@@ -228,9 +235,13 @@ shift_reports            id, creator_id, platform_account_id, shift_id, member_i
 account_pay_rules        id, creator_id, platform_account_id, from_period (1er ou 16), currency, vat_bps,
                          platform_fee_bps (points de base entiers), earnings_source (declared|detected), created_by,
                          created_at (EQ-03, migration 0026 ; ajout seul, une par compte et par quinzaine)
+shift_fan_assignments    id, creator_id, platform_account_id, fan_id, member_id, shift_id (ceux du shift, clé composite),
+                         starts_at, ends_at (nul tant que l'attribution court), created_at (ADR 0049 § 3, migration 0078 ;
+                         un fan n'a qu'un membre à la fois ; seule la fermeture de ends_at, une fois ; jamais supprimé ;
+                         la créatrice ne lit rien ; personne ne l'écrit avant EQ-08)
 ```
 
-Deux contraintes d'exclusion (`btree_gist`, `tstzrange(starts_at, ends_at, '[)')`, migration 0021) tiennent un membre hors de deux shifts à la fois et un compte hors de deux membres à la fois, shifts annulés exceptés : deux personnes qui planifient au même instant ne peuvent pas gagner toutes les deux. Celle du membre est `DEFERRABLE INITIALLY IMMEDIATE` depuis la migration 0023 : vérifiée à chaque instruction, sauf dans l'échange de deux shifts aux mêmes heures, qui la reporte à la fin de ses deux écritures. Une contrainte reportable n'arbitre pas un `ON CONFLICT` : le job des modèles saute une occurrence occupée dans son propre point de sauvegarde. Une clé étrangère composite `(platform_account_id, creator_id)` vers `platform_accounts (id, creator_id)` garde chaque shift et chaque modèle sur le compte de sa créatrice. Le passé du planning est gardé, pour tous les rôles, celui du job compris (déclencheurs `refuse_planning_change`) : rien n'est supprimé, un shift ne change ni de créatrice, ni de compte, ni de modèle, un shift en cours garde son début et son membre et ne fait que finir plus tôt (la fenêtre d'accès du chatteur, ADR 0025, se lit sur ces colonnes), un shift fini ou annulé ne change plus, un modèle ne change que sa fin, une fois. Les droits par colonne tiennent en plus le rôle de l'application, qui part de `REVOKE ALL` : ni `DELETE`, ni `TRUNCATE`.
+Une contrainte d'exclusion (`btree_gist`, `tstzrange(starts_at, ends_at, '[)')`, migration 0021) tient un membre hors de deux shifts à la fois, shifts annulés exceptés : deux personnes qui planifient au même instant ne peuvent pas gagner toutes les deux. Un compte prend trois shifts à la fois au plus (ADR 0049 § 2) : la migration 0078 retire l'exclusion du compte de la 0021 et pose le déclencheur de contrainte `shifts_account_cap` (`DEFERRABLE INITIALLY DEFERRED`, `SECURITY DEFINER`), qui prend le verrou consultatif du compte avant de compter, pour tous les rôles ; l'index `shifts_account_range_idx` remplace celui de l'exclusion. Tant que le renfort n'existe pas (CR-13), le serveur refuse lui-même un second shift sur un compte (`shift_account_conflict`), sous ce verrou, pris avant ceux des membres. Celle du membre est `DEFERRABLE INITIALLY IMMEDIATE` depuis la migration 0023 : vérifiée à chaque instruction, sauf dans l'échange de deux shifts aux mêmes heures, qui la reporte à la fin de ses deux écritures. Une contrainte reportable n'arbitre pas un `ON CONFLICT` : le job des modèles saute une occurrence occupée dans son propre point de sauvegarde. Une clé étrangère composite `(platform_account_id, creator_id)` vers `platform_accounts (id, creator_id)` garde chaque shift et chaque modèle sur le compte de sa créatrice. Le passé du planning est gardé, pour tous les rôles, celui du job compris (déclencheurs `refuse_planning_change`) : rien n'est supprimé, un shift ne change ni de créatrice, ni de compte, ni de modèle, un shift en cours garde son début et son membre et ne fait que finir plus tôt (la fenêtre d'accès du chatteur, ADR 0025, se lit sur ces colonnes), un shift fini ou annulé ne change plus, un modèle ne change que sa fin, une fois. Les droits par colonne tiennent en plus le rôle de l'application, qui part de `REVOKE ALL` : ni `DELETE`, ni `TRUNCATE`.
 
 Congés et échanges (migration 0023, ADR 0031) suivent la même garde : rien n'est supprimé, et un déclencheur ne laisse avancer leur statut que dans un sens (un congé en attente est validé, refusé ou retiré ; un congé validé s'annule avant sa fin, en gardant l'instant et l'auteur de sa validation ; une proposition d'échange est acceptée, refusée, retirée ou tombée ; un échange accepté s'annule en gardant l'instant et l'auteur de l'acceptation). Deux congés en attente ou validés d'un même membre ne se chevauchent jamais (exclusion `leave_requests_member_overlap_excl`). Une proposition pointe ses shifts par une clé étrangère composite `(shift_id, creator_id)` vers `shifts (id, creator_id)`, pour qu'un shift ne soit jamais rangé sous une autre créatrice que la sienne.
 
@@ -298,6 +309,33 @@ pay_period_sales           platform, platform_sale_id, event (clé, une ligne du
                            clôture, qui l'écrit dans sa transaction et dans la créatrice du compte ; une quinzaine clôturée
                            se recalcule sur lui seul ; le déclencheur vérifie la ligne, son compte, sa devise et son net ;
                            ajout seul)
+pay_period_held_sales      platform, platform_sale_id, event (clé, une ligne du registre des ventes), period →
+                           pay_period_closings, platform_account_id, reason (chatter_unlinked | off_shift |
+                           status_unknown | refund_before_register | refund_before_base), created_at (migration 0077,
+                           CRM-03 lot b3 ; les lignes qu'une clôture laisse en attente, écrites dans sa transaction et
+                           dans la créatrice du compte ; la première quinzaine ouverte les relit par vente jusqu'à ce
+                           qu'une clôture les compte ; ajout seul)
+pay_sale_decisions         id (clé), platform, platform_sale_id, revision (unique avec la vente, ≥ 1, la plus récente fait
+                           foi), platform_account_id, outcome (count | exclude | withdraw : retire la décision en vigueur),
+                           reason (la raison de l'attente, nulle pour une vente payée à tort), author_member_id +
+                           link_version (ensemble ou nuls : le membre
+                           et la version du lien sur lesquels la décision tient), note (1 à 500), decided_by, created_at
+                           (migration 0077, CRM-03 lot b3, ADR 0050 § 5 ; la décision du valideur sur une vente et ses
+                           remboursements ; `count` exige un membre, un lien et une raison `off_shift` ou `status_unknown` ;
+                           écrite par le propriétaire ou un manager actif, jamais sur la vente de son propre chatteur ; le
+                           déclencheur exige la vente au registre des ventes de son compte, refuse un withdraw qui ne
+                           suit pas une décision et une vente qu'une clôture a comptée ; la première quinzaine ouverte
+                           relit chaque vente décidée jusqu'à ce qu'une clôture la compte ; ajout seul)
+pay_sale_signals           id (clé), platform, platform_sale_id, event, member_id → team_members, period → pay_periods,
+                           revision (unique avec la ligne, le membre et la quinzaine, ≥ 1, sans trou), kind (signal |
+                           withdraw : reprend le signalement en vigueur), platform_account_id, currency, net_minor,
+                           occurred_at (la ligne telle que le relevé la porte), note (1 à 500), created_by, created_at
+                           (migration 0079, CRM-03 lot b4c, ADR 0050 § 10 ; « ce n'est pas ma vente » d'un membre sur une
+                           ligne de son relevé, sans effet sur la paie ; politique `member_insert` : pour soi seulement ; le
+                           déclencheur, sous les politiques de l'auteur, exige le numéro suivant, un signalement en vigueur
+                           pour un retrait et aucun pour un signalement, aucune clôture de la quinzaine, aucune ligne du
+                           registre des ventes comptées, et la ligne au relevé brouillon du membre avec le même compte, la
+                           même devise, le même net et la même heure ; ajout seul)
 pay_period_blocks          period (clé) → pay_periods, code (commission_rate_missing_conflict |
                            exchange_rate_missing_conflict), member_ids uuid[] (tous les membres sans taux) | currency,
                            since (migration 0038 ; pourquoi le job n'a pas pu calculer la quinzaine à son dernier essai :

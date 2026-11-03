@@ -4,6 +4,7 @@ import type {
   PayPeriodWindow,
   PeriodFigures,
   PeriodPace,
+  StatementCountedSales,
 } from '@nirvana/contracts';
 
 import { reachedBpsOf } from './commission-statements';
@@ -41,8 +42,8 @@ export function periodFigures(statements: readonly FigureStatement[]): PeriodFig
 }
 
 /**
- * The net a period's statements count from reports of an earlier period, closed when they came (EQ-04): each line's
- * share of its gross that is late, of its net. They are not the period's own pace.
+ * The net a period's statements count from reports, or sales of the platform (CRM-03), of an earlier period, closed
+ * when they came (EQ-04): each line's share of its gross that is late, of its net. They are not the period's own pace.
  */
 interface LateLine {
   readonly grossMinor: number;
@@ -51,12 +52,15 @@ interface LateLine {
     CommissionStatement['lines'][number]['lateReports'][number],
     'grossMinor'
   >[];
+  readonly countedSales: Pick<StatementCountedSales, 'lateNetMinor'> | null;
 }
 
 export function lateNetOf(statements: readonly { readonly lines: readonly LateLine[] }[]): number {
   let late = 0;
   for (const line of statements.flatMap((statement) => statement.lines)) {
-    const lateGross = line.lateReports.reduce((total, report) => total + report.grossMinor, 0);
+    const lateGross =
+      line.lateReports.reduce((total, report) => total + report.grossMinor, 0) +
+      (line.countedSales?.lateNetMinor ?? 0);
     if (lateGross !== 0 && line.grossMinor !== 0)
       late += Math.round((line.netMinor * lateGross) / line.grossMinor);
   }

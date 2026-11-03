@@ -2,6 +2,7 @@ import {
   AccountPayRulesIdSchema,
   newId,
   PayPeriodSchema,
+  PayrollPeriodSchema,
   SalesLineIdSchema,
   ShiftIdSchema,
   type PlatformAccountId,
@@ -227,8 +228,9 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
       readiness: team.app.readiness,
     });
     try {
+      // Théo's sale on shift, and the one off shift the closing would keep held (lot b3): it must read both.
       expect(team.refusal(await team.validate(team.owner, theo, P1, blindServer))).toEqual(
-        expect.objectContaining({ code: 'pay_period_sales_unread_conflict', details: { count: 1 } }),
+        expect.objectContaining({ code: 'pay_period_sales_unread_conflict', details: { count: 2 } }),
       );
     } finally {
       await blindServer.close();
@@ -292,6 +294,19 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
     });
     // Linked to Léa since, the sale P1 counted is read again late, and is not hers: the registry has it.
     await expect(team.statementOf(lea, P2)).rejects.toThrow('no statement');
+    // The period as Paie reads it (lot b4): the line says its base and what it counted, never a sale's identifier;
+    // the late refund is no pace of P2.
+    const read = await team.call('GET', `/payroll/periods/${P2}`, team.owner);
+    expect(read.statusCode).toBe(200);
+    const period = PayrollPeriodSchema.parse(read.json());
+    const [mine] = period.statements.filter((one) => one.memberId === theo.id).flatMap((one) => one.lines);
+    expect(mine).toMatchObject({
+      base: 'platform_net',
+      grossMinor: -10_000,
+      countedSales: { sales: 0, refunds: 1, late: 1, lateNetMinor: -10_000 },
+    });
+    expect(JSON.stringify(read.json())).not.toContain('sale_p1');
+    expect(period.pace.lateNetMinor).toBe(-10_000);
   });
 
   it('keeps the registry added only, written by the closing of its own transaction, with the register’s net', async () => {

@@ -4,6 +4,7 @@ import {
   calendarDayAt,
   CommissionStatementRulesSchema,
   CurrencySchema,
+  EarningsBaseSchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   EventIdSchema,
   EVENT_PAYLOADS,
@@ -87,6 +88,7 @@ async function annexOf(
       ...row,
       platform: PlatformSchema.parse(row.platform),
       currency: CurrencySchema.parse(row.currency),
+      base: EarningsBaseSchema.parse(row.base),
       rateOn: rateOn(row.currency, row.rateMicros),
     })),
   };

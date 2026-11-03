@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   ApiErrorSchema,
   LeaveRequestIdSchema,
@@ -183,10 +185,29 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
   });
 
   it('gives every member the settings, Imperium’s grid until the owner saves theirs', async () => {
-    const defaults = { timeZone: PARIS, slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 };
+    const defaults = { timeZone: PARIS, accessMarginMinutes: 15 };
     const read = await call('GET', '/scheduling/settings', theoCookie);
     expect(read.statusCode).toBe(200);
-    expect(SchedulingSettingsSchema.parse(read.json())).toEqual(defaults);
+    // No version saved: the module's four créneaux of 6 h, without seats (ADR 0049 § 1).
+    expect(SchedulingSettingsSchema.parse(read.json())).toEqual({
+      ...defaults,
+      versions: [
+        {
+          id: null,
+          effectiveAt: null,
+          seats: [],
+          slots: [0, 360, 720, 1080].map((start) => ({
+            startMinute: start,
+            endMinute: (start + 360) % 1440,
+            name: null,
+          })),
+        },
+      ],
+    });
+    // The créneaux are versions: the old two fields are refused.
+    expect(
+      (await call('PUT', '/scheduling/settings', owner, { ...defaults, slotStartMinute: 0 })).statusCode,
+    ).toBe(400);
 
     expect((await call('PUT', '/scheduling/settings', noraCookie, defaults)).statusCode).toBe(403);
     const saved = await call('PUT', '/scheduling/settings', owner, { ...defaults, accessMarginMinutes: 20 });
@@ -196,6 +217,73 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     );
     expect(again.accessMarginMinutes).toBe(20);
     await call('PUT', '/scheduling/settings', owner, defaults);
+  });
+
+  it('reads the créneaux by dated versions, the seats for the planners alone (ADR 0049 § 1, CR-14)', async () => {
+    const [ownerRow] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, OWNER.email));
+    if (ownerRow === undefined) throw new Error('no owner');
+    // Three créneaux of 8 h from Monday in a week, with a second chatter wanted on Anna's evening.
+    const offset = 14 - (weekdayOf(parisDay(0)) - 1);
+    const effectiveAt = parisInstant(parisDay(offset), 0);
+    const versionId = randomUUID();
+    const eight = [0, 480, 960].map((start) => ({
+      startMinute: start,
+      endMinute: (start + 480) % 1440,
+      name: null,
+    }));
+    await test.admin.db.insert(schema.schedulingSlotVersions).values({
+      id: versionId,
+      effectiveAt,
+      timeZone: PARIS,
+      slots: eight,
+      createdBy: ownerRow.id,
+    });
+    await test.admin.db
+      .insert(schema.schedulingSlotSeats)
+      .values({ versionId, slotRank: 2, platformAccountId: annaAccount, seats: 2 });
+    try {
+      const read = async (cookie: string, at?: Date) => {
+        const query = at === undefined ? '' : `?at=${iso(at)}`;
+        return SchedulingSettingsSchema.parse(
+          (await call('GET', `/scheduling/settings${query}`, cookie)).json(),
+        );
+      };
+      const byOwner = await read(owner);
+      expect(byOwner.versions.map((version) => [version.id, version.effectiveAt])).toEqual([
+        [null, null],
+        [versionId, effectiveAt.toISOString()],
+      ]);
+      expect(byOwner.versions[1]?.seats).toEqual([{ slotRank: 2, platformAccountId: annaAccount, seats: 2 }]);
+      expect((await read(theoCookie)).versions[1]?.seats).toEqual([]);
+      // Read at its date, it is in force alone; the planning of the week before and after it holds both.
+      expect((await read(owner, effectiveAt)).versions.map((version) => version.id)).toEqual([versionId]);
+      const both = await planning(
+        owner,
+        parisInstant(parisDay(offset - 2), 0),
+        parisInstant(parisDay(offset + 2), 0),
+      );
+      expect(both.settings.versions.map((version) => version.id)).toEqual([null, versionId]);
+      const after = await planning(
+        owner,
+        parisInstant(parisDay(offset + 1), 0),
+        parisInstant(parisDay(offset + 3), 0),
+      );
+      expect(after.settings.versions.map((version) => version.slots.length)).toEqual([3]);
+      // The settings cover the day before the window, as its shifts do (Équipe on #442).
+      const noon = await planning(
+        owner,
+        parisInstant(parisDay(offset), 12 * 60),
+        parisInstant(parisDay(offset + 2), 0),
+      );
+      expect(noon.settings.versions.map((version) => version.id)).toEqual([null, versionId]);
+    } finally {
+      await test.admin.db
+        .delete(schema.schedulingSlotVersions)
+        .where(eq(schema.schedulingSlotVersions.id, versionId));
+    }
   });
 
   it('never lets a creator into the planning', async () => {
@@ -311,6 +399,17 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
       ),
     );
     expect(following.statusCode).toBe(201);
+    // Moved onto Théo's last hour: refused by the server under the account's lock, as before ADR 0049 (CR-14).
+    const ontoTheo = await call(
+      'PATCH',
+      `/scheduling/shifts/${ShiftSchema.parse(following.json()).id}`,
+      owner,
+      {
+        startsAt: new Date(new Date(theoTomorrow.endsAt).getTime() - HOUR).toISOString(),
+      },
+    );
+    expect([ontoTheo.statusCode, codeOf(ontoTheo)]).toEqual([409, 'shift_account_conflict']);
+    expect(detailsOf(ontoTheo)).toEqual({ shiftId: theoTomorrow.id });
   });
 
   it('shows a planner every shift and account, and a chatter their own shifts, accounts and name only', async () => {
@@ -780,5 +879,118 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     const eve = await place(parisInstant(parisDay(11), 23 * 60 + 30));
     expect([eve.statusCode, codeOf(eve)]).toEqual([409, 'member_not_joined_conflict']);
     expect((await place(parisInstant(parisDay(12), 30))).statusCode).toBe(201);
+  });
+
+  // Last: it leaves a version that took effect, which nothing can withdraw (ADR 0049 § 1).
+  it('writes a version of the créneaux for the owner alone, and withdraws one only while it is ahead (CR-14)', async () => {
+    const offset = 21 - (weekdayOf(parisDay(0)) - 1);
+    const monday = parisDay(offset);
+    const eight = [0, 480, 960].map((start) => ({
+      startMinute: start,
+      endMinute: (start + 480) % 1440,
+      name: null,
+    }));
+    const body = {
+      startsOn: monday,
+      slots: eight,
+      seats: [{ slotRank: 2, platformAccountId: annaAccount, seats: 2 }],
+    };
+    const post = (cookie: string, payload: object) =>
+      call('POST', '/scheduling/settings/versions', cookie, payload);
+    // The shifts ahead, made by hand or by a template: a version moves none of them (ADR 0049 § 1, Équipe on #442).
+    const shiftsAhead = async () =>
+      (await planning(owner, minutesFromNow(0), minutesFromNow(28 * 24 * 60))).shifts.map((shift) => [
+        shift.id,
+        shift.memberId,
+        shift.platformAccountId,
+        shift.startsAt,
+        shift.endsAt,
+        shift.stoppedAt,
+        shift.templateId,
+      ]);
+    const before = await shiftsAhead();
+    // The managers plan, never the créneaux; a chatter neither.
+    for (const cookie of [noraCookie, theoCookie]) {
+      const refused = await post(cookie, body);
+      expect([refused.statusCode, codeOf(refused)]).toEqual([403, 'role_forbidden']);
+    }
+    const written = await post(owner, body);
+    expect(written.statusCode).toBe(201);
+    const ahead = SchedulingSettingsSchema.parse(written.json()).versions.at(-1);
+    expect(ahead?.effectiveAt).toBe(parisInstant(monday, 0).toISOString());
+    expect(ahead?.seats).toEqual(body.seats);
+    const id = ahead?.id;
+    if (id === undefined || id === null) throw new Error('no version');
+    const [line] = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, id));
+    expect(line?.action).toBe('scheduling_slot_version.create');
+    // Another on the same instant, a day that is no Monday, a Monday gone by, a place on an unknown account, a place
+    // outside the list: each refused, nothing written.
+    const twice = await post(owner, body);
+    expect([twice.statusCode, codeOf(twice)]).toEqual([409, 'slot_version_conflict']);
+    const tuesday = await post(owner, { ...body, startsOn: parisDay(offset + 1) });
+    expect([tuesday.statusCode, codeOf(tuesday)]).toEqual([400, 'slot_version_date_invalid']);
+    const gone = await post(owner, { ...body, startsOn: parisDay(offset - 28) });
+    expect([gone.statusCode, codeOf(gone)]).toEqual([400, 'slot_version_date_invalid']);
+    const unknown = await post(owner, {
+      ...body,
+      startsOn: parisDay(offset + 7),
+      seats: [{ slotRank: 0, platformAccountId: newId(PlatformAccountIdSchema), seats: 2 }],
+    });
+    expect([unknown.statusCode, codeOf(unknown)]).toEqual([404, 'platform_account_not_found']);
+    const outside = await post(owner, {
+      ...body,
+      startsOn: parisDay(offset + 7),
+      seats: [{ slotRank: 3, platformAccountId: annaAccount, seats: 2 }],
+    });
+    expect([outside.statusCode, codeOf(outside)]).toEqual([400, 'request_invalid']);
+    // Withdrawn while ahead, with its places; a second time it is no more.
+    const withdraw = (cookie: string, version: string) =>
+      call('DELETE', `/scheduling/settings/versions/${version}`, cookie);
+    expect((await withdraw(noraCookie, id)).statusCode).toBe(403);
+    const withdrawn = await withdraw(owner, id);
+    expect(withdrawn.statusCode).toBe(200);
+    expect(
+      SchedulingSettingsSchema.parse(withdrawn.json()).versions.map((version) => version.id),
+    ).not.toContain(id);
+    const seats = await test.admin.db
+      .select({ versionId: schema.schedulingSlotSeats.versionId })
+      .from(schema.schedulingSlotSeats)
+      .where(eq(schema.schedulingSlotSeats.versionId, id));
+    expect(seats).toEqual([]);
+    const again = await withdraw(owner, id);
+    expect([again.statusCode, codeOf(again)]).toEqual([404, 'slot_version_not_found']);
+    // « Tout de suite »: from the next start of one of its créneaux, the one under way keeping its hours; once that
+    // instant has passed, the version stays.
+    const now = await post(owner, { startsOn: null, slots: eight, seats: [] });
+    expect(now.statusCode).toBe(201);
+    const next = SchedulingSettingsSchema.parse(now.json()).versions.find(
+      (version) => version.id !== null && version.slots.length === 3,
+    );
+    const at = Date.parse(next?.effectiveAt ?? '');
+    expect(at).toBeGreaterThan(Date.now());
+    expect(await shiftsAhead()).toEqual(before);
+    expect(at - Date.now()).toBeLessThanOrEqual(8 * HOUR);
+    expect(new Date(at).getUTCMinutes()).toBe(0);
+    const passed = randomUUID();
+    const [ownerRow] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, OWNER.email));
+    if (ownerRow === undefined) throw new Error('no owner');
+    await test.admin.db.insert(schema.schedulingSlotVersions).values({
+      id: passed,
+      effectiveAt: new Date(Date.now() + 1_500),
+      timeZone: PARIS,
+      slots: eight,
+      createdBy: ownerRow.id,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    const kept = await withdraw(owner, passed);
+    expect([kept.statusCode, codeOf(kept)]).toEqual([409, 'slot_version_effective_conflict']);
+    // The version written « tout de suite » is withdrawn while still ahead.
+    expect((await withdraw(owner, next?.id ?? '')).statusCode).toBe(200);
   });
 });

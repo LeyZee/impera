@@ -10,8 +10,11 @@ import {
   monthMarks,
   monthBounds,
   monthWindow,
+  slotLinesOf,
 } from './calendar';
 import { zonedInstant } from './time';
+
+import { settingsOf } from '@/test/settings';
 
 const PARIS = 'Europe/Paris';
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -27,7 +30,7 @@ const words = (text: string): string => text.replaceAll(NBSP, ' ');
 const calendarOf = (patch: Partial<z.input<typeof CalendarSchema>> = {}): Calendar =>
   CalendarSchema.parse({
     view: 'team',
-    settings: { timeZone: PARIS, slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+    settings: settingsOf(),
     creators: [{ id: INES, name: 'Inès' }],
     members: [
       { id: KOFI, displayName: 'Kofi', color: '#7aa2ff' },
@@ -58,14 +61,14 @@ const cellsOf = (calendar: Calendar, now: string, day = DAY) => {
 };
 
 describe('calendarRows', () => {
-  it('cuts the day into the agency créneaux and puts a shift in the one its start falls in', () => {
+  it('cuts the day into the agency créneaux and draws a shift on each créneau it touches', () => {
     const cells = cellsOf(
       calendarOf({ shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(600), endsAt: at(960) }] }),
       at(0, '2026-11-01'),
     );
     expect(cells.map((cell) => cell.from.toISOString())).toEqual([at(0), at(360), at(720), at(1080)]);
-    expect(cells.map((cell) => cell.shifts.length)).toEqual([0, 1, 0, 0]);
-    // 10 h – 16 h touches the créneau of 12 h too, without being drawn there twice.
+    // 10 h – 16 h touches the créneau of 12 h too, and is drawn there with its own hours (ADR 0049 § 1).
+    expect(cells.map((cell) => cell.shifts.length)).toEqual([0, 1, 1, 0]);
     expect(cells.map((cell) => cell.held)).toEqual([false, true, true, false]);
   });
 
@@ -125,6 +128,27 @@ describe('calendarRows', () => {
     const cells = cellsOf(calendarOf(), at(0, '2026-10-20'), day);
     const hours = cells.map((cell) => (cell.to.getTime() - cell.from.getTime()) / 3_600_000);
     expect(hours).toEqual([7, 6, 6, 6]);
+  });
+
+  it('keeps the wall-clock créneaux on the night the clocks go forward', () => {
+    // 28 March 2027 in Paris: 0 h – 6 h lasts five hours.
+    const day = '2027-03-28';
+    const cells = cellsOf(calendarOf(), at(0, '2027-03-20'), day);
+    const hours = cells.map((cell) => (cell.to.getTime() - cell.from.getTime()) / 3_600_000);
+    expect(hours).toEqual([5, 6, 6, 6]);
+  });
+});
+
+describe('slotLinesOf', () => {
+  it('takes the most créneaux of the week, a version adding one mid-week getting its line (ADR 0049 § 1)', () => {
+    const three = [0, 1, 2];
+    const four = [0, 1, 2, 3];
+    const row = new Map([
+      ['2026-10-28', three],
+      ['2026-10-29', four],
+    ]);
+    expect(slotLinesOf([null, row, new Map([['2026-10-28', three]])])).toBe(4);
+    expect(slotLinesOf([null])).toBe(0);
   });
 });
 

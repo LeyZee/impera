@@ -24,7 +24,11 @@ import {
   PlanningSchema,
   PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
+  SchedulingSettingsInputSchema,
+  SchedulingSettingsQuerySchema,
   SchedulingSettingsSchema,
+  SlotVersionInputSchema,
+  SlotVersionParamsSchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
   ShiftIdSchema,
@@ -120,17 +124,43 @@ export function createSchedulingRoutes(
   return (app) => {
     app.get(
       '/scheduling/settings',
-      { preValidation: ownerOrMember, schema: { response: { 200: SchedulingSettingsSchema } } },
-      (request) => scheduling.settings(userOf(request)),
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: SchedulingSettingsQuerySchema, response: { 200: SchedulingSettingsSchema } },
+      },
+      (request) =>
+        scheduling.settings(
+          userOf(request),
+          request.query.at === undefined ? undefined : new Date(request.query.at),
+        ),
     );
 
     app.put(
       '/scheduling/settings',
       {
         preValidation: owner,
-        schema: { body: SchedulingSettingsSchema, response: { 200: SchedulingSettingsSchema } },
+        schema: { body: SchedulingSettingsInputSchema, response: { 200: SchedulingSettingsSchema } },
       },
       (request) => scheduling.saveSettings(actorOf(request), request.body),
+    );
+
+    app.post(
+      '/scheduling/settings/versions',
+      {
+        preValidation: owner,
+        schema: { body: SlotVersionInputSchema, response: { 201: SchedulingSettingsSchema } },
+      },
+      async (request, reply) =>
+        reply.code(201).send(await scheduling.addSlotVersion(actorOf(request), request.body)),
+    );
+
+    app.delete(
+      '/scheduling/settings/versions/:id',
+      {
+        preValidation: owner,
+        schema: { params: SlotVersionParamsSchema, response: { 200: SchedulingSettingsSchema } },
+      },
+      (request) => scheduling.withdrawSlotVersion(actorOf(request), request.params.id),
     );
 
     app.get(

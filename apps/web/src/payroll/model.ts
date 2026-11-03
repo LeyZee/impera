@@ -297,34 +297,88 @@ export interface FlowStep {
   readonly amount: string;
 }
 
-/** From the sales of an account to the commission, step by step, as the engine computed them. */
+/** « de Reveal », « de la plateforme »: the platform after « de », elided before a vowel. */
+export function ofPlatform(platform: Platform | null): string {
+  const where = platform === null ? 'la plateforme' : platformName(platform);
+  return `${/^[AEIOUY]/iu.test(where) ? 'd’' : 'de '}${where}`;
+}
+
+/**
+ * « Net de Reveal »: what is left of a sale once the VAT and the platform's commission are taken. One name for one
+ * figure, whether the chain of the ADR 0023 computed it from reports or the platform gave it (CRM-03).
+ */
+export const platformNetName = (platform: Platform | null): string => `Net ${ofPlatform(platform)}`;
+
+/** « un rapport validé ou une vente lue »: what may still reach a period after its closing (CRM-03). */
+export function lateWords(statements: readonly Pick<CommissionStatement, 'lines'>[]): string {
+  return statements.some((one) => one.lines.some((line) => line.base === 'platform_net'))
+    ? 'un rapport validé ou une vente lue'
+    : 'un rapport validé';
+}
+
+/**
+ * « 12 ventes lues, 1 remboursement, dont 2 après la clôture d’avant »: what a line on the platform's net counted
+ * (CRM-03); `null` on a line of reports.
+ */
+export function countedSalesText(line: Pick<CommissionStatementLine, 'countedSales'>): string | null {
+  const counted = line.countedSales;
+  if (counted === null) return null;
+  // A count stays with its noun when the head wraps on a phone: « 1 remboursement », never « 1 » then « remboursement ».
+  const tied = (count: number, one: string, many: string): string =>
+    plural(count, one, many).replace(' ', NBSP);
+  return [
+    tied(counted.sales, 'vente lue', 'ventes lues'),
+    counted.refunds === 0 ? '' : `, ${tied(counted.refunds, 'remboursement', 'remboursements')}`,
+    counted.late === 0 ? '' : `, dont ${String(counted.late)}${NBSP}après la clôture d’avant`,
+  ].join('');
+}
+
+/**
+ * From the sales of an account to the commission, step by step, as the engine computed them. A line on the platform's
+ * net (CRM-03) starts from that net, the VAT and the platform's commission already taken, so that only the rate and
+ * the member's commission follow.
+ */
 export function flowOf(
   line: CommissionStatementLine,
   commissionBps: number,
   platform: Platform | null,
   you: boolean,
 ): FlowStep[] {
-  const reports = plural(line.shiftReportIds.length, 'rapport', 'rapports');
-  const steps: FlowStep[] = [
-    { label: 'Ventes', op: reports, amount: amountText(line.grossMinor, line.currency) },
-  ];
+  const counted = countedSalesText(line);
+  const steps: FlowStep[] =
+    counted === null
+      ? [
+          {
+            label: 'Ventes',
+            op: plural(line.shiftReportIds.length, 'rapport', 'rapports'),
+            amount: amountText(line.grossMinor, line.currency),
+          },
+        ]
+      : [
+          {
+            label: platformNetName(platform),
+            op: plural(line.countedSales?.sales ?? 0, 'vente lue', 'ventes lues'),
+            amount: amountText(line.grossMinor, line.currency),
+          },
+        ];
   if (line.currency !== 'EUR')
     steps.push({
       label: 'En euros',
       op: rateText(line.rateMicros, line.currency),
       amount: amountText(line.grossEurMinor, 'EUR'),
     });
-  steps.push({
-    label: 'Hors TVA',
-    op: line.vatBps === 0 ? 'sans TVA' : `TVA ${percentText(line.vatBps)}`,
-    amount: amountText(line.exclVatMinor, 'EUR'),
-  });
-  const where = platform === null ? 'la plateforme' : platformName(platform);
-  steps.push({
-    label: `Net ${/^[AEIOUY]/iu.test(where) ? 'd’' : 'de '}${where}`,
-    op: `${where} ${percentText(line.platformFeeBps)}`,
-    amount: amountText(line.netMinor, 'EUR'),
-  });
+  if (counted === null) {
+    steps.push({
+      label: 'Hors TVA',
+      op: line.vatBps === 0 ? 'sans TVA' : `TVA ${percentText(line.vatBps)}`,
+      amount: amountText(line.exclVatMinor, 'EUR'),
+    });
+    steps.push({
+      label: platformNetName(platform),
+      op: `${platform === null ? 'la plateforme' : platformName(platform)} ${percentText(line.platformFeeBps)}`,
+      amount: amountText(line.netMinor, 'EUR'),
+    });
+  }
   steps.push({
     label: you ? 'Ta commission' : 'Sa commission',
     op: percentText(commissionBps),
@@ -499,6 +553,8 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return 'Le taux du dollar de la BCE manque pour la fin de la quinzaine. Il arrive chaque jour ouvré vers 16 h.';
     case 'commission_rate_missing_conflict':
       return `${member ?? 'Un membre'} n’a pas de taux de commission en vigueur.`;
+    case 'pay_sale_outcome_conflict':
+      return 'Cette décision n’est plus possible pour cette vente : la liste est relue.';
     case 'payroll_own_forbidden':
       return 'Personne ne décide de sa propre paie : un autre s’en charge.';
     case 'payroll_forbidden':
@@ -509,7 +565,11 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
     case 'bonus_tier_set_conflict':
     case 'collective_goal_conflict':
     case 'payout_minimum_conflict':
+    case 'pay_sale_decision_conflict':
+    case 'pay_sale_signal_conflict':
       return 'Cette saisie existe déjà avec d’autres valeurs : recharge la page.';
+    case 'pay_sale_signal_state_conflict':
+      return 'Ce signalement a déjà changé : la liste est relue.';
     case 'pay_rule_started_invalid':
       return period === null
         ? 'Cette quinzaine a commencé : une règle de paie part d’une quinzaine qui n’a pas commencé.'
@@ -545,6 +605,10 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
     case 'bonus_not_found':
     case 'penalty_not_found':
       return 'Cette saisie n’existe plus : la page est relue.';
+    case 'pay_sale_not_found':
+      return 'Cette vente n’attend plus de décision dans cette quinzaine : la liste est relue.';
+    case 'pay_sale_signal_not_found':
+      return 'Cette vente n’est plus sur ton relevé de cette quinzaine : la liste est relue.';
     case 'cursor_invalid':
       return 'La liste a changé : elle est relue depuis le début.';
     case 'role_forbidden':
@@ -660,6 +724,7 @@ export function statementsCsv(
       'Reporté',
       'À verser',
       'Statut',
+      'Base',
     ],
   ];
   const STATUS = { draft: 'À valider', validated: 'Validé', paid: 'Payé' } as const;
@@ -683,6 +748,8 @@ export function statementsCsv(
         '',
         '',
         '',
+        // Where the line's figures come from (CRM-03): on the platform's net, « Ventes » is that net already.
+        line.base === 'platform_net' ? 'Net de la plateforme' : 'Rapports',
       ]);
     rows.push([
       name,
@@ -701,6 +768,7 @@ export function statementsCsv(
       euros(statement.carryOverOutMinor),
       euros(statement.payableMinor),
       STATUS[statement.status],
+      '',
     ]);
   }
   return `${rows.map((row) => row.map(cell).join(';')).join('\r\n')}\r\n`;
@@ -1271,23 +1339,36 @@ export function myStatementWords(
       ]),
     };
   const computed = computedText(statement.computedAt, zone, now);
+  const basis = basisWords(statement.lines);
   if (!ended)
     return {
       since: `validation par l’agence à partir du ${dayMonthText(opensOn(statement.window))}`,
       label: 'Ce que tu touches à ce jour',
       notes: withCarry([
-        `Calculé ${computed} sur tes rapports validés. ${delay ?? 'Le versement suit la validation de la quinzaine.'}`,
+        `Calculé ${computed} sur ${basis}. ${delay ?? 'Le versement suit la validation de la quinzaine.'}`,
       ]),
     };
   return {
     since: `depuis le ${dayMonthText(opensOn(statement.window))}`,
     label: 'Ce que tu vas toucher',
     notes: withCarry([
-      `Calculé ${computed} sur tes rapports validés. L’agence valide, puis le versement suit${
+      `Calculé ${computed} sur ${basis}. L’agence valide, puis le versement suit${
         payoutDelayBusinessDays === null ? '' : `, en général ${payoutDelayText(payoutDelayBusinessDays)}`
       }.`,
     ]),
   };
+}
+
+/**
+ * What a member's statement is computed on, as the member reads it: their validated reports, the sales the platform
+ * gave on its net (CRM-03), or both in a period an account changed base.
+ */
+function basisWords(lines: readonly Pick<CommissionStatementLine, 'base'>[]): string {
+  const onNet = lines.some((line) => line.base === 'platform_net');
+  if (!onNet) return 'tes rapports validés';
+  return lines.some((line) => line.base === 'gross_chain')
+    ? 'tes rapports validés et tes ventes lues'
+    : 'tes ventes lues';
 }
 
 /** A member's carry-over, said as what it is while the period runs: what would go on the next one if it ended now. */

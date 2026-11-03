@@ -15,6 +15,7 @@ import {
   jsonb,
   pgPolicy,
   pgTable,
+  primaryKey,
   smallint,
   type PgColumn,
   text,
@@ -25,6 +26,7 @@ import {
 
 import { user } from './auth';
 import { createdAt, enumCheck, id, timestampTz, updatedAt } from './columns';
+import { fans } from './fans';
 import { teamMembers } from './team';
 import { creators, platformAccounts } from './tenancy';
 
@@ -34,8 +36,9 @@ import { creators, platformAccounts } from './tenancy';
  * `owner` | `agency` of `withMember` (`withTenantMember` sets the three). Only the owner and an active manager write.
  * The settings have no creator: every member reads them, the owner alone writes them.
  *
- * Two exclusion constraints, added by hand to the migration (Drizzle does not write them), keep a member off two
- * shifts at once and an account off two members at once, cancelled shifts aside. A composite key keeps each row's
+ * An exclusion constraint, added by hand to the migration (Drizzle does not write it), keeps a member off two shifts at
+ * once; a constraint trigger keeps an account to three shifts at once (ADR 0049 § 2, migration 0078), cancelled shifts
+ * aside. A composite key keeps each row's
  * account on its creator: no row can open the wrong creator in the access window of ADR 0025.
  */
 
@@ -636,6 +639,115 @@ export const shiftFeedbacks = pgTable(
     pgPolicy('member_insert', {
       for: 'insert',
       withCheck: sql`${t.creatorId} = ${currentCreator} and ${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
+ * The créneaux of the agency's day, one row per version (ADR 0049 § 1): the version in force at an instant is the last
+ * whose `effective_at` has passed. A version that took effect never changes and is never removed (trigger); one still
+ * ahead can be withdrawn. `slots` is the ordered list of créneaux in wall-clock minutes of `time_zone`
+ * (`{ startMinute, endMinute, name }`), checked by the contract and the domain. No row means the `scheduling` module's
+ * default. No creator: every member reads it, the owner alone writes it.
+ */
+export const schedulingSlotVersions = pgTable(
+  'scheduling_slot_versions',
+  {
+    id: id(),
+    effectiveAt: timestampTz('effective_at').notNull(),
+    timeZone: text('time_zone').notNull(),
+    slots: jsonb('slots').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('scheduling_slot_versions_effective_unique').on(t.effectiveAt),
+    check(
+      'scheduling_slot_versions_slots_check',
+      sql`jsonb_typeof(${t.slots}) = 'array' and jsonb_array_length(${t.slots}) between 2 and 24`,
+    ),
+    pgPolicy('team_read', { for: 'select', using: sql`${currentScope} is not null` }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${isOwner} and ${t.createdBy} = ${currentUser} and ${t.effectiveAt} >= now()`,
+    }),
+    pgPolicy('owner_delete', { for: 'delete', using: sql`${isOwner} and ${t.effectiveAt} > now()` }),
+  ],
+);
+
+/**
+ * How many chatters an account wants at once on a créneau of a version (ADR 0049 § 2): 1 when there is no row, 2 at
+ * most. Out of the version's JSON, so that a removed or mistyped account shows. Written with its version, never after
+ * the version took effect (trigger).
+ */
+export const schedulingSlotSeats = pgTable(
+  'scheduling_slot_seats',
+  {
+    versionId: uuid('version_id')
+      .notNull()
+      .references(() => schedulingSlotVersions.id, { onDelete: 'cascade' }),
+    slotRank: smallint('slot_rank').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    seats: smallint('seats').notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'scheduling_slot_seats_pkey',
+      columns: [t.versionId, t.slotRank, t.platformAccountId],
+    }),
+    check('scheduling_slot_seats_rank_check', sql`${t.slotRank} between 0 and 23`),
+    check('scheduling_slot_seats_seats_check', sql`${t.seats} between 1 and 2`),
+    pgPolicy('team_read', { for: 'select', using: sql`${currentScope} is not null` }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${isOwner} and exists (select 1 from scheduling_slot_versions v where v.id = ${t.versionId} and v.effective_at > now())`,
+    }),
+    pgPolicy('owner_delete', {
+      for: 'delete',
+      using: sql`${isOwner} and exists (select 1 from scheduling_slot_versions v where v.id = ${t.versionId} and v.effective_at > now())`,
+    }),
+  ],
+);
+
+/**
+ * The fan a member holds while several are on shift on one account (ADR 0049 § 3): one member at a time per fan
+ * (exclusion on the range, added by hand to the migration). A row never changes but to close its `ends_at`, once, and
+ * nothing is removed (trigger): a pay recalculation weeks later finds the same holder. The creator reads nothing: who
+ * holds a fan says who writes to him (ADR 0042 § 2). Nobody writes it yet: the routing comes with the capture (EQ-08).
+ */
+export const shiftFanAssignments = pgTable(
+  'shift_fan_assignments',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    fanId: uuid('fan_id')
+      .notNull()
+      .references(() => fans.id),
+    memberId: uuid('member_id').notNull(),
+    shiftId: uuid('shift_id').notNull(),
+    startsAt: timestampTz('starts_at').notNull(),
+    endsAt: timestampTz('ends_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('shift_fan_assignments_range_check', sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
+    /** The shift that justifies it, on the same creator, account and member. */
+    foreignKey({
+      name: 'shift_fan_assignments_shift_fk',
+      columns: [t.shiftId, t.creatorId, t.platformAccountId, t.memberId],
+      foreignColumns: [shifts.id, shifts.creatorId, shifts.platformAccountId, shifts.memberId],
+    }),
+    index('shift_fan_assignments_member_idx').on(t.creatorId, t.memberId, t.startsAt),
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and (${plans} or ${isMine(t.memberId)})`,
     }),
   ],
 );

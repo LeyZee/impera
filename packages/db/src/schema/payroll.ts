@@ -13,7 +13,10 @@ import {
   PAYOUT_DELAY_MAX_BUSINESS_DAYS,
   PENALTY_KINDS,
   PlatformSchema,
+  SALE_HELD_REASONS,
+  SaleDecisionOutcomeSchema,
   SaleEventSchema,
+  SaleSignalKindSchema,
 } from '@nirvana/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -693,6 +696,158 @@ export const payPeriodSales = pgTable(
     ),
     memberRead(t.memberId),
     pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
+  ],
+);
+
+/**
+ * The sales a closing left held (CRM-03 lot b3, ADR 0050 § 5, ADR 0032): a line of the platform's register that the
+ * closing would have taken but that counted for nobody (`reason`, contracts `SaleHeldReason`). Written once, by the
+ * first closing that left it, never changed. The team's first open period reads these lines again, by their sale, until
+ * a closing counts them: a decision, a new link or a shift entered after the closing still brings them in.
+ */
+export const payPeriodHeldSales = pgTable(
+  'pay_period_held_sales',
+  {
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    event: text('event').notNull(),
+    period: date('period')
+      .notNull()
+      .references(() => payPeriodClosings.period),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    reason: text('reason').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'pay_period_held_sales_pkey', columns: [t.platform, t.platformSaleId, t.event] }),
+    enumCheck('pay_period_held_sales', t.platform, PlatformSchema.options),
+    enumCheck('pay_period_held_sales', t.event, SaleEventSchema.options),
+    enumCheck('pay_period_held_sales', t.reason, SALE_HELD_REASONS),
+    pgPolicy('agency_read', { for: 'select', using: readsTeam }),
+    pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
+  ],
+);
+
+/**
+ * The validator's decisions on sales (CRM-03 lot b3, ADR 0050 § 5): a sale counts for the member its chatter is linked
+ * to (`count`), or for nobody (`exclude`), its refunds with it; `withdraw` takes back the decision in force. Added
+ * only, numbered per sale from 1 without a gap: the latest counts, while the chatter's link keeps `link_version`
+ * (`null` for a chatter not linked or none). Written by the owner or an active manager, never on a sale of their own
+ * chatter (`author_member_id`, the member linked then), never on a sale a closing counted. The team's first open
+ * period reads every decided sale no closing counted again, so that a decision can be taken back or lapse.
+ */
+export const paySaleDecisions = pgTable(
+  'pay_sale_decisions',
+  {
+    id: id(),
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    revision: integer('revision').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    outcome: text('outcome').notNull(),
+    reason: text('reason'),
+    authorMemberId: uuid('author_member_id').references(() => teamMembers.id),
+    linkVersion: text('link_version'),
+    note: text('note'),
+    decidedBy: text('decided_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('pay_sale_decisions_revision_unique').on(t.platform, t.platformSaleId, t.revision),
+    enumCheck('pay_sale_decisions', t.platform, PlatformSchema.options),
+    enumCheck('pay_sale_decisions', t.outcome, SaleDecisionOutcomeSchema.options),
+    check(
+      'pay_sale_decisions_reason_check',
+      sql`${t.reason} is null or ${t.reason} in (${sql.raw(SALE_HELD_REASONS.map((one) => `'${one}'`).join(', '))})`,
+    ),
+    check('pay_sale_decisions_revision_check', sql`${t.revision} >= 1`),
+    check(
+      'pay_sale_decisions_note_check',
+      sql`${t.note} is null or char_length(${t.note}) between 1 and 500`,
+    ),
+    check(
+      'pay_sale_decisions_count_check',
+      sql`${t.outcome} <> 'count' or (${t.authorMemberId} is not null and ${t.linkVersion} is not null and ${t.reason} in ('off_shift', 'status_unknown'))`,
+    ),
+    check('pay_sale_decisions_link_check', sql`(${t.authorMemberId} is null) = (${t.linkVersion} is null)`),
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${readsTeam} or (${t.authorMemberId} is not null and ${isMine(t.authorMemberId)})`,
+    }),
+    pgPolicy('agency_insert', {
+      for: 'insert',
+      withCheck: sql`${readsTeam} and ${t.decidedBy} = ${currentUser} and (${t.authorMemberId} is null or not ${isMine(t.authorMemberId)})`,
+    }),
+  ],
+);
+
+/**
+ * A member's signals on lines of their own statement (CRM-03 lot b4c, ADR 0050 § 5): « ce n'est pas ma vente »
+ * (`signal`), or its withdrawal (`withdraw`). Added only, numbered per line, member and period from 1: the latest counts,
+ * a withdrawal never first nor after another. Each keeps what the line was on the member's statement then (account,
+ * currency, signed net, instant), which the trigger checks, so that the member still reads it once the line has left.
+ * Written by the member alone on their own statement of a period no closing closed, on a line no closing counted; read
+ * by the member, the owner and an active manager. A signal changes no amount: the validator decides.
+ */
+export const paySaleSignals = pgTable(
+  'pay_sale_signals',
+  {
+    id: id(),
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    event: text('event').notNull(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    period: date('period')
+      .notNull()
+      .references(() => payPeriods.period),
+    revision: integer('revision').notNull(),
+    kind: text('kind').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    currency: text('currency').notNull(),
+    netMinor: integer('net_minor').notNull(),
+    occurredAt: timestampTz('occurred_at'),
+    note: text('note'),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('pay_sale_signals_revision_unique').on(
+      t.platform,
+      t.platformSaleId,
+      t.event,
+      t.memberId,
+      t.period,
+      t.revision,
+    ),
+    index('pay_sale_signals_period_member_idx').on(t.period, t.memberId),
+    enumCheck('pay_sale_signals', t.platform, PlatformSchema.options),
+    enumCheck('pay_sale_signals', t.event, SaleEventSchema.options),
+    enumCheck('pay_sale_signals', t.kind, SaleSignalKindSchema.options),
+    enumCheck('pay_sale_signals', t.currency, CurrencySchema.options),
+    periodCheck('pay_sale_signals_period_check', t.period),
+    check('pay_sale_signals_revision_check', sql`${t.revision} >= 1`),
+    check('pay_sale_signals_note_check', sql`${t.note} is null or char_length(${t.note}) between 1 and 500`),
+    check(
+      'pay_sale_signals_net_check',
+      sql`(${t.event} = 'sale' and ${t.netMinor} >= 0) or (${t.event} = 'refund' and ${t.netMinor} <= 0)`,
+    ),
+    memberRead(t.memberId),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
+    }),
   ],
 );
 

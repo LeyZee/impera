@@ -119,6 +119,36 @@ describe('Équipe › Factures : le PDF rendu (EQ-06 lot 4, ADR 0037 § 2)', { t
     }
   });
 
+  it('prints a row on the platform’s net, its empty cells and what its net is (CRM-03)', async () => {
+    const source = sampleInvoice();
+    const annex = source.annex;
+    if (annex === null) throw new Error('no annex');
+    const [first, second] = annex.accounts;
+    if (first === undefined || second === undefined) throw new Error('two accounts');
+    const content = invoicePdfContent({
+      ...source,
+      annex: {
+        ...annex,
+        accounts: [
+          first,
+          {
+            ...second,
+            base: 'platform_net',
+            grossMinor: 41_250,
+            grossEurMinor: 41_250,
+            exclVatMinor: 41_250,
+          },
+        ],
+      },
+    });
+    const [, page = ''] = (await pagesOf(await render(content))).map(squeeze);
+    const row = content.annex?.accounts.rows[1];
+    if (row?.detail == null) throw new Error('no row on the net');
+    for (const word of [...row.cells.map((cell) => cell.text), row.detail]) {
+      expect(page, word).toContain(squeeze(word));
+    }
+  });
+
   it('prints each label as whole words a machine finds, never letter by letter', async () => {
     const pages = await itemsOf(await render(invoicePdfContent(sampleInvoice())));
     const [first = [], annex = []] = pages;

@@ -11,6 +11,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import { CloseDialog } from './CloseDialog';
+import { HeldSalesPanel } from './HeldSalesPanel';
 import { PayNav } from './PayNav';
 import { StatementDialog } from './StatementDialog';
 import {
@@ -53,6 +54,7 @@ import {
   daysLeft,
   gaugePercent,
   goalSpanBps,
+  lateWords,
   rateOverdue,
   memberFacts,
   momentAt,
@@ -417,8 +419,9 @@ function PeriodView({
             ) : ended && data.closing === null && pickable.length > 0 ? (
               <div className="rp-notice">
                 <p className="rp-notice__text">
-                  Le premier relevé validé clôt la quinzaine pour toute l’équipe. Un rapport validé ensuite
-                  ira sur la quinzaine {periodLine(followingPeriod(data.period))}.
+                  Le premier relevé validé clôt la quinzaine pour toute l’équipe.{' '}
+                  {capital(lateWords(data.statements))} ensuite ira sur la quinzaine{' '}
+                  {periodLine(followingPeriod(data.period))}.
                 </p>
               </div>
             ) : null}
@@ -500,6 +503,13 @@ function PeriodView({
             {rows.length === 0 ? null : <p className="py-quiet">{quietOf(data, now)}</p>}
           </div>
         </Panel>
+        <HeldSalesPanel
+          period={data.period}
+          names={names}
+          me={me}
+          owner={owner}
+          reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+        />
       </div>
       {openedStatement === undefined || opened === null ? null : (
         <StatementDialog
@@ -572,7 +582,7 @@ function quietOf(data: PayrollPeriod, now: Date): string {
   const at = computed === null || zone === null ? '' : `Calculé ${computedText(computed, zone, now)}. `;
   if (!data.ended) return `${at}Rien ne se valide avant la fin de la quinzaine.`;
   if (data.closing !== null)
-    return `${at}Close : un rapport validé maintenant va sur la quinzaine ${periodLine(followingPeriod(data.period))}.`;
+    return `${at}Close : ${lateWords(data.statements)} maintenant va sur la quinzaine ${periodLine(followingPeriod(data.period))}.`;
   return `${at}Un relevé s’ouvre d’un clic : le parcours de l’argent, ligne par ligne.`;
 }
 

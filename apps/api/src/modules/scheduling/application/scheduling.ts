@@ -13,6 +13,8 @@ import {
   type Planning,
   type PlanningQuery,
   type SchedulingSettings,
+  type SchedulingSettingsInput,
+  type SlotVersionInput,
   type Shift,
   type ShiftId,
   type ShiftTemplate,
@@ -32,21 +34,25 @@ import type {
   StoredShift,
   StoredTemplate,
 } from '../domain/ports';
-import {
-  accessWindow,
-  assertPlanningRange,
-  conflictsOf,
-  DEFAULT_SCHEDULING_SETTINGS,
-  myShiftsOf,
-} from '../domain/shifts';
+import { accessWindow, assertPlanningRange, conflictsOf, myShiftsOf } from '../domain/shifts';
+import { effectiveAtOf } from '../domain/slot-versions';
 import { addMinutes, calendarDayIn } from '../domain/time';
 
 import { toPlanningAccount, toPlanningMember, toShiftDto } from './dto';
 
 /** Équipe › Planning and Aujourd'hui (EQ-02, ADR 0025): reads for every member, writes for the planners. */
 export interface SchedulingService {
-  settings(actor: UserId): Promise<SchedulingSettings>;
-  saveSettings(actor: Actor, settings: SchedulingSettings): Promise<SchedulingSettings>;
+  /** The créneaux in force at `at` (now by default) and every version ahead of it. */
+  settings(actor: UserId, at?: Date): Promise<SchedulingSettings>;
+  saveSettings(actor: Actor, settings: SchedulingSettingsInput): Promise<SchedulingSettings>;
+  /**
+   * The owner's new créneaux and places (ADR 0049 § 1 and § 2), taking effect a Monday ahead or at the next start of
+   * one of them; the settings read again from now, the new version among those ahead. Shifts and templates keep their
+   * hours: nothing moves them (the « recalage » of the templates is CR-13's).
+   */
+  addSlotVersion(actor: Actor, input: SlotVersionInput): Promise<SchedulingSettings>;
+  /** The owner withdraws a version still ahead; the settings read again from now. */
+  withdrawSlotVersion(actor: Actor, id: string): Promise<SchedulingSettings>;
   planning(actor: UserId, query: PlanningQuery): Promise<Planning>;
   onDuty(actor: UserId): Promise<OnDuty[]>;
   myShifts(actor: UserId): Promise<MyShifts>;
@@ -67,8 +73,8 @@ export function createSchedulingService(
   creators: CreatorDirectory,
   now: () => Date = () => new Date(),
 ): SchedulingService {
-  const settingsOf = async (actor: UserId): Promise<SchedulingSettings> =>
-    (await store.settings(actor)) ?? DEFAULT_SCHEDULING_SETTINGS;
+  const settingsOf = (actor: UserId, at: Date = now()): Promise<SchedulingSettings> =>
+    store.settings(actor, { from: at, to: null });
 
   const clockOf = async (actor: UserId): Promise<PlanningClock> => ({
     now: now(),
@@ -90,19 +96,37 @@ export function createSchedulingService(
 
     saveSettings: async (actor, settings) => {
       await store.saveSettings(actor, settings);
-      return settings;
+      return settingsOf(actor.userId);
+    },
+
+    addSlotVersion: async (actor, input) => {
+      const at = now();
+      const { timeZone } = await settingsOf(actor.userId, at);
+      await store.addSlotVersion(actor, {
+        effectiveAt: effectiveAtOf(input, at, timeZone),
+        timeZone,
+        slots: input.slots,
+        seats: input.seats,
+      });
+      return settingsOf(actor.userId);
+    },
+
+    withdrawSlotVersion: async (actor, id) => {
+      await store.withdrawSlotVersion(actor, id);
+      return settingsOf(actor.userId);
     },
 
     planning: async (actor, query) => {
       const from = new Date(query.from);
       const to = new Date(query.to);
       assertPlanningRange(from, to);
-      const settings = await settingsOf(actor);
+      // A day on either side: a shift begun the day before stands in the way, and the grid cuts the days around the
+      // window too (Équipe on #442).
+      const around = { from: addMinutes(from, -24 * 60), to: addMinutes(to, 24 * 60) };
+      // The créneaux the grid cuts the window with, day by day: the version in force at its start, then those after.
+      const settings = await store.settings(actor, around);
       // Every creator is read even when one is asked: a member busy on another creator stands in the way too.
-      const read = await store.read(actor, await everyCreator(), {
-        from: addMinutes(from, -24 * 60),
-        to: addMinutes(to, 24 * 60),
-      });
+      const read = await store.read(actor, await everyCreator(), around);
       const asked = (creatorId: string) => query.creatorId === undefined || creatorId === query.creatorId;
       const inRange = (shift: StoredShift) =>
         shift.startsAt.getTime() < to.getTime() && from.getTime() < shift.endsAt.getTime();

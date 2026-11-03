@@ -15,10 +15,20 @@ import type {
   ShiftSwapStatus,
   ShiftTemplate,
 } from '@nirvana/contracts';
-import { shiftSlotsOf } from '@nirvana/contracts';
+import { slotWindowsOf } from '@nirvana/contracts';
 
 import type { SchedulingRefusalCode } from './api';
-import { clockOf, dayMonth, dayOf, daysFrom, minuteOf, rangeAt, shortDay, zonedInstant } from './time';
+import {
+  clockOf,
+  dayMonth,
+  dayOf,
+  daysFrom,
+  lengthOf,
+  minuteOf,
+  rangeAt,
+  shortDay,
+  zonedInstant,
+} from './time';
 
 /**
  * The planning without React (EQ-02): where each shift sits in a week, what a conflict says, and where the member is
@@ -63,6 +73,12 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_swap_self_invalid: 'Un échange se fait avec un collègue.',
   calendar_link_forbidden: 'Le lien de calendrier est réservé aux membres de l’équipe.',
   calendar_feed_not_found: 'Ce lien de calendrier n’est plus valable.',
+  slot_version_not_found: 'Ce réglage des créneaux n’existe plus : la liste est relue.',
+  slot_version_conflict:
+    'Un autre réglage des créneaux prend déjà effet à cet instant : retire-le ou choisis un autre lundi.',
+  slot_version_effective_conflict: 'Ce réglage des créneaux a déjà pris effet : il ne se retire plus.',
+  slot_version_date_invalid:
+    'Choisis un lundi à venir, ou tout de suite : un réglage des créneaux ne prend jamais effet dans le passé.',
   role_forbidden: 'Ton accès au planning a changé. Recharge la page.',
   request_invalid: 'Ces valeurs ne vont pas : vérifie les heures et le jour.',
 };
@@ -311,6 +327,10 @@ export function phaseOf(shift: Pick<Shift, 'startsAt' | 'endsAt'>, now: Date): P
   return new Date(shift.startsAt).getTime() <= at ? 'live' : 'later';
 }
 
+/** « reste 3 h 40 »: what is left of a shift under way, never less than a minute (CR-12, Charles 02/11 17h56). */
+export const leftOf = (shift: Pick<Shift, 'endsAt'>, now: Date): string =>
+  `reste ${lengthOf(Math.max(60_000, new Date(shift.endsAt).getTime() - now.getTime()))}`;
+
 /** A shift in one day of the grid. */
 export interface Chip {
   readonly shift: Shift;
@@ -361,13 +381,24 @@ export function gridOf(planning: Planning, days: readonly string[], timeZone: st
 /** Past this many créneaux a day (slots under four hours), the cells stack their shifts instead of lining them up. */
 export const LINED_SLOTS_MAX = 6;
 
-/** One créneau of one day on one account (EQ-01): the shifts that start in it, and what of it is left to fill. */
+/** A shift on one créneau, drawn on each it touches (ADR 0049 § 1). */
+export interface SlotChip extends Chip {
+  /** It began in an earlier créneau: its hours come after « … ». */
+  readonly earlier: boolean;
+  /**
+   * An earlier créneau of the same day column draws it already: this one is a copy, read and reached there. A copy
+   * whose first créneau is on another day is not one, since a phone shows a single day.
+   */
+  readonly carried: boolean;
+}
+
+/** One créneau of one day on one account (EQ-01): the shifts on it, and what of it is left to fill. */
 export interface SlotCell {
   readonly slot: ShiftSlot;
   /** Its first and last instants, read at the agency's: a créneau over a change of time is an hour shorter or longer. */
   readonly from: Date;
   readonly to: Date;
-  readonly chips: readonly Chip[];
+  readonly chips: readonly SlotChip[];
   /** A shift of the account overlaps it, whether it starts in it or earlier (a long shift covers the next one). */
   readonly covered: boolean;
   /**
@@ -379,39 +410,41 @@ export interface SlotCell {
 
 /**
  * The days of one account cut into the agency's créneaux, so that one créneau sits at the same height all week and a
- * stretch with nobody shows. A day of créneaux begins at the first one: a shift goes to the créneau that holds its
- * start, so one at 2 h belongs to the night before when the créneaux begin at 5 h. One that starts before the
- * week's first créneau (carried over, or early on Monday) goes to it. `null` when the créneaux are too many to line
- * up.
+ * stretch with nobody shows. A day of créneaux begins at the first one: a shift sits on every créneau it touches,
+ * its own hours kept (ADR 0049 § 1, a shift across two créneaux is drawn on both), so one at 2 h belongs to the night
+ * before when the créneaux begin at 5 h. One outside the week's créneaux goes to the first or the last. `null` when
+ * the créneaux are too many to line up.
  */
 export function slotRowOf(
   row: GridRow,
   shifts: readonly Pick<Shift, 'startsAt' | 'endsAt'>[],
   days: readonly string[],
-  settings: Pick<SchedulingSettings, 'timeZone' | 'slotStartMinute' | 'slotLengthMinutes'>,
+  settings: Pick<SchedulingSettings, 'timeZone' | 'versions'>,
   now: Date,
 ): ReadonlyMap<string, readonly SlotCell[]> | null {
-  const slots = shiftSlotsOf(settings);
-  if (slots.length > LINED_SLOTS_MAX) return null;
-  const length = settings.slotLengthMinutes;
+  if (settings.versions.some((version) => version.slots.length > LINED_SLOTS_MAX)) return null;
   const zone = settings.timeZone;
-  // Both ends are wall-clock minutes of the agency, so the créneaux of a week follow each other without a gap.
-  const windows = days.flatMap((day) =>
-    slots.map((slot, index) => ({
-      day,
-      slot,
-      from: zonedInstant(day, settings.slotStartMinute + index * length, zone),
-      to: zonedInstant(day, settings.slotStartMinute + (index + 1) * length, zone),
-    })),
-  );
-  const placed = windows.map((): Chip[] => []);
+  // Both ends are wall-clock minutes of the agency, each day cut by the version in force (ADR 0049 § 1), so the
+  // créneaux of a week follow each other without a gap.
+  const windows = slotWindowsOf(settings.versions, days, (day, minute) => zonedInstant(day, minute, zone));
+  const placed = windows.map((): SlotChip[] => []);
   for (const chips of row.days.values()) {
     for (const chip of chips) {
       const start = new Date(chip.shift.startsAt).getTime();
-      const at = windows.findIndex((window) => window.from.getTime() <= start && start < window.to.getTime());
-      placed[at === -1 ? (start < (windows[0]?.from.getTime() ?? 0) ? 0 : windows.length - 1) : at]?.push(
-        chip,
+      const end = new Date(chip.shift.endsAt).getTime();
+      const touched = windows.flatMap((window, index) =>
+        window.from.getTime() < end && window.to.getTime() > start ? [index] : [],
       );
+      const at =
+        touched.length > 0 ? touched : [start < (windows[0]?.from.getTime() ?? 0) ? 0 : windows.length - 1];
+      // The first créneau it is on carries its name, even for a shift begun before the week (Sunday night on Monday),
+      // and so does the first of each later day: Tuesday 23 h – Wednesday 5 h is read on Wednesday too.
+      const first = at[0] ?? 0;
+      for (const index of at) {
+        const earlier = index !== first;
+        const sameDay = windows[index]?.day === windows[first]?.day;
+        placed[index]?.push({ ...chip, earlier, carried: earlier && sameDay });
+      }
     }
   }
   const spans = shifts
@@ -430,9 +463,7 @@ export function slotRowOf(
       open: gapIn(Math.max(from, ahead), to, spans),
     };
   });
-  return new Map(
-    days.map((day, index) => [day, cells.slice(index * slots.length, (index + 1) * slots.length)]),
-  );
+  return new Map(days.map((day) => [day, cells.filter((_, index) => windows[index]?.day === day)]));
 }
 
 /** The first stretch of [from, to) that no span covers, or `null`; `spans` sorted by start. */

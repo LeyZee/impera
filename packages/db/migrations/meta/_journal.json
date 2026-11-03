@@ -519,6 +519,27 @@
       "when": 1793678707741,
       "tag": "0076_calendar_links",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793679827633,
+      "tag": "0077_pay_sale_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793683522667,
+      "tag": "0078_slot_versions_seats_fan_assignments",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1793688764075,
+      "tag": "0079_pay_sale_signals",
+      "breakpoints": true
     }
   ]
 }

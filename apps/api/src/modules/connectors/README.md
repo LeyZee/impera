@@ -41,6 +41,7 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 - `linesOfSalesBetween` : les ventes dont l'instant tombe dans la plage, et leurs remboursements quel que soit leur jour. Un remboursement compte au jour de sa vente ; celui d'une vente plus ancienne que le registre compte à son propre instant, avec `saleDay` à `null`.
 - `linesRecordedBetween` : les lignes enregistrées dans la plage, quel que soit le jour de leur vente, c'est-à-dire les lignes tardives après une clôture (ADR 0032).
 - `linesRelinkedBetween` : les lignes dont le lien du chatteur a pris sa version actuelle dans la plage. Relier un chatteur après une clôture est une attribution, qui compte dans la première quinzaine encore ouverte (§ 5).
+- `linesOfSales` : les lignes de ventes nommées par leur identifiant, quel que soit leur jour, chacune avec ses remboursements (ou un remboursement seul quand sa vente est plus ancienne que le registre), par lots de 500. La paie relit ainsi, dans la première quinzaine ouverte, les ventes qu'une clôture a laissées en attente et celles que le valideur a décidées (CRM-03 lot b3), qu'aucune plage ne retrouverait.
 
 Ces lectures se recouvrent exprès : un remboursement tardif sort dans la quinzaine de sa vente et dans celle où il a été enregistré. Un lecteur indexe donc les lignes par `platform`, `platformSaleId` et `event`, et compte chaque clé une seule fois.
 

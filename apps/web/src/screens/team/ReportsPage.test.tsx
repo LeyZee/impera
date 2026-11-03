@@ -16,6 +16,7 @@ import { ReportsPage } from './ReportsPage';
 
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
+import { settingsOf } from '@/test/settings';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -130,12 +131,7 @@ function serve(): void {
       }
       switch (url.pathname) {
         case '/v1/scheduling/settings':
-          return json({
-            timeZone: 'Europe/Paris',
-            slotStartMinute: 0,
-            slotLengthMinutes: 360,
-            accessMarginMinutes: 15,
-          });
+          return json(settingsOf());
         case '/v1/team/members':
           return json(team.body, team.status);
         case '/v1/scheduling/shift-reports':

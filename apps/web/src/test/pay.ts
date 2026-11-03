@@ -4,6 +4,7 @@ import {
   CollectiveGoalSchema,
   CommissionStatementLineSchema,
   CommissionStatementSchema,
+  HeldSaleSchema,
   InvoiceListItemSchema,
   PayAdjustmentViewSchema,
   PayrollEntriesSchema,
@@ -15,6 +16,7 @@ import {
   type CollectiveGoal,
   type CommissionStatement,
   type CommissionStatementLine,
+  type HeldSale,
   type InvoiceListItem,
   type Me,
   type PayAdjustmentView,
@@ -24,6 +26,8 @@ import {
   type PenaltyView,
   type TeamMember,
 } from '@nirvana/contracts';
+
+import { settingsOf } from '@/test/settings';
 
 /*
  * Pay's fakes, shared by Paie's and Commissions' tests (EQ-05): an invented team (ADR 0010) — Théo, Basile and Lou
@@ -154,6 +158,8 @@ export function euroLine(
     commissionMinor: 2_125,
     shiftReportIds: [payId(301), payId(302)],
     lateReports: [],
+    base: 'gross_chain',
+    countedSales: null,
     ...patch,
   });
 }
@@ -278,12 +284,7 @@ export function summaryFor(period: PayrollPeriod): PayPeriodSummary {
   };
 }
 
-export const SCHEDULING_SETTINGS = {
-  timeZone: 'Europe/Paris',
-  slotStartMinute: 0,
-  slotLengthMinutes: 360,
-  accessMarginMinutes: 15,
-};
+export const SCHEDULING_SETTINGS = settingsOf();
 
 /** A bonus of `whose` for `period`, made by the owner: `n` tells it apart. */
 export function bonusOf(
@@ -421,6 +422,31 @@ export function invoiceOf(
     settlement: null,
     due: 'open',
     pdfReady: true,
+    ...patch,
+  });
+}
+
+/**
+ * A sale the period of the 16 to 31 October holds (CRM-03 lot b4b): on Nora's Reveal account, Théo's chatter, at 22 h
+ * on the 28th, out of his shift, 42,00 € of net, no decision yet.
+ */
+export function heldSaleOf(patch: Partial<HeldSale> = {}): HeldSale {
+  return HeldSaleSchema.parse({
+    platform: 'reveal',
+    platformSaleId: 'vente-1',
+    event: 'sale',
+    platformAccountId: NORA_REVEAL.id,
+    status: 'paid',
+    occurredAt: '2026-10-28T21:00:00.000Z',
+    saleOccurredAt: '2026-10-28T21:00:00.000Z',
+    salePeriod: OCT2,
+    currency: 'EUR',
+    netMinor: 4_200,
+    memberId: THEO.id,
+    reason: 'off_shift',
+    decision: null,
+    outcomes: ['count', 'exclude'],
+    signal: null,
     ...patch,
   });
 }

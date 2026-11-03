@@ -23,6 +23,14 @@ const line = (grossMinor: number, netMinor: number, late: readonly number[] = []
   grossMinor,
   netMinor,
   lateReports: late.map(lateReport),
+  countedSales: null,
+});
+/** A line on the platform's net (CRM-03): its gross is that net, `lateNetMinor` of it from sales read late. */
+const netLine = (grossMinor: number, netMinor: number, lateNetMinor: number) => ({
+  grossMinor,
+  netMinor,
+  lateReports: [],
+  countedSales: { lateNetMinor },
 });
 const team = (reachedBps: number | null): CommissionStatement['team'] =>
   reachedBps === null ? null : { netMinor: null, collective: { reachedBps, tier: null } };
@@ -74,6 +82,13 @@ describe('the forecast at the end of a period', () => {
   it('reads the late share of each line from its gross, onto its net', () => {
     expect(lateNetOf([{ lines: [line(10_000, 8_000, [2_500]), line(10_000, 8_000)] }])).toBe(2_000);
     expect(lateNetOf([])).toBe(0);
+  });
+
+  it('counts the sales of the platform read after their closing as late, a late refund taking off (CRM-03)', () => {
+    // 100 $ of net at 0,92 €, 30 $ of it from a sale of the period before.
+    expect(lateNetOf([{ lines: [netLine(10_000, 9_200, 3_000)] }])).toBe(2_760);
+    expect(lateNetOf([{ lines: [netLine(10_000, 10_000, -1_500), line(10_000, 8_000, [2_500])] }])).toBe(500);
+    expect(lateNetOf([{ lines: [netLine(0, 0, 0)] }])).toBe(0);
   });
 
   it('floors a share of the target in integers, as the engine does', () => {

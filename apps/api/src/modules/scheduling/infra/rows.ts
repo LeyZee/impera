@@ -10,10 +10,13 @@ import {
   PlatformAccountIdSchema,
   PlatformSchema,
   ShiftIdSchema,
+  ShiftSlotsSchema,
   ShiftTemplateIdSchema,
+  SlotVersionSchema,
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
   type CreatorId,
+  type SchedulingSettings,
   type TeamMemberId,
 } from '@nirvana/contracts';
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
@@ -43,6 +46,8 @@ const {
   leaveRequests,
   platformAccounts,
   schedulingSettings,
+  schedulingSlotSeats,
+  schedulingSlotVersions,
   shiftReports,
   shiftTemplates,
   shifts,
@@ -50,13 +55,104 @@ const {
   user,
 } = schema;
 
-/** The agency's settings as the screens read them, from one place (Bilan's review of #427). */
-export const settingsColumns = {
+/**
+ * The zone and the margin of the agency's settings, from one place (Bilan's review of #427). The legacy
+ * `slot_start_minute` and `slot_length_minutes` are read no more: the créneaux are versions (ADR 0049, migration 0078).
+ */
+const settingsColumns = {
   timeZone: schedulingSettings.timeZone,
-  slotStartMinute: schedulingSettings.slotStartMinute,
-  slotLengthMinutes: schedulingSettings.slotLengthMinutes,
   accessMarginMinutes: schedulingSettings.accessMarginMinutes,
 };
+
+/** What a read of the settings covers: the version in force at `from`, then those taking effect before `to`. */
+export interface SettingsRange {
+  readonly from: Date;
+  /** `null`: every version ahead. */
+  readonly to: Date | null;
+}
+
+const VersionRowSchema = z.object({
+  id: z.uuid(),
+  // Milliseconds since the epoch, `null` for the version copied at `-infinity` by migration 0078.
+  effective: z.string().nullable(),
+  slots: ShiftSlotsSchema,
+});
+
+/**
+ * The settings as one read sees them, in `tx` (ADR 0049 § 1): the zone and the margin, and the créneaux' versions over
+ * `range`, the module's defaults where nothing is saved. The default créneaux stand first when no saved version is in
+ * force at `range.from`. `withSeats` for the owner and the agency alone: a chatter or a creator reads no account's
+ * seats.
+ */
+export async function settingsIn(
+  tx: Transaction,
+  range: SettingsRange,
+  withSeats: boolean,
+): Promise<SchedulingSettings> {
+  const [row] = await tx.select(settingsColumns).from(schedulingSettings);
+  const columns = {
+    id: schedulingSlotVersions.id,
+    effective: sql<
+      string | null
+    >`(extract(epoch from nullif(${schedulingSlotVersions.effectiveAt}, '-infinity'::timestamptz)) * 1000)::bigint::text`,
+    slots: schedulingSlotVersions.slots,
+  };
+  const inForce = await tx
+    .select(columns)
+    .from(schedulingSlotVersions)
+    .where(sql`${schedulingSlotVersions.effectiveAt} <= ${range.from}`)
+    .orderBy(sql`${schedulingSlotVersions.effectiveAt} desc`)
+    .limit(1);
+  const ahead = await tx
+    .select(columns)
+    .from(schedulingSlotVersions)
+    .where(
+      range.to === null
+        ? sql`${schedulingSlotVersions.effectiveAt} > ${range.from}`
+        : sql`${schedulingSlotVersions.effectiveAt} > ${range.from} and ${schedulingSlotVersions.effectiveAt} < ${range.to}`,
+    )
+    .orderBy(sql`${schedulingSlotVersions.effectiveAt} asc`);
+  const rows = [...inForce, ...ahead].map((one) => VersionRowSchema.parse(one));
+  const seats =
+    withSeats && rows.length > 0
+      ? await tx
+          .select({
+            versionId: schedulingSlotSeats.versionId,
+            slotRank: schedulingSlotSeats.slotRank,
+            platformAccountId: schedulingSlotSeats.platformAccountId,
+            seats: schedulingSlotSeats.seats,
+          })
+          .from(schedulingSlotSeats)
+          .where(
+            inArray(
+              schedulingSlotSeats.versionId,
+              rows.map((one) => one.id),
+            ),
+          )
+      : [];
+  const saved = rows.map((one) =>
+    SlotVersionSchema.parse({
+      id: one.id,
+      effectiveAt: one.effective === null ? null : new Date(Number(one.effective)).toISOString(),
+      slots: one.slots,
+      seats: seats
+        .filter((seat) => seat.versionId === one.id)
+        .map(({ slotRank, platformAccountId, seats: count }) => ({
+          slotRank,
+          platformAccountId,
+          seats: count,
+        }))
+        .toSorted(
+          (a, b) => a.slotRank - b.slotRank || a.platformAccountId.localeCompare(b.platformAccountId),
+        ),
+    }),
+  );
+  return {
+    timeZone: row?.timeZone ?? DEFAULT_SCHEDULING_SETTINGS.timeZone,
+    accessMarginMinutes: row?.accessMarginMinutes ?? DEFAULT_SCHEDULING_SETTINGS.accessMarginMinutes,
+    versions: inForce.length === 0 ? [...DEFAULT_SCHEDULING_SETTINGS.versions, ...saved] : saved,
+  };
+}
 
 export const shiftColumns = {
   id: shifts.id,
@@ -161,6 +257,7 @@ export async function audit(
       | 'shift'
       | 'shift_template'
       | 'scheduling_settings'
+      | 'scheduling_slot_version'
       | 'leave_request'
       | 'shift_swap'
       | 'shift_report'
@@ -179,6 +276,47 @@ export async function audit(
     details,
     ip: actor.ip,
   });
+}
+
+/**
+ * One lock per account (ADR 0049 § 2), taken before the members' by every write that puts a shift on an account or moves
+ * one, so that two writes on one account cannot both see it free. Several accounts in the order of their ids; the
+ * accounts always before the members, so that a swap (two members, one account) and a reinforcement (one member, two
+ * accounts) never wait on each other.
+ */
+export async function lockAccounts(tx: Transaction, accountIds: readonly string[]): Promise<void> {
+  for (const accountId of [...new Set(accountIds)].toSorted()) {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`scheduling.account:${accountId}`}, 0))`,
+    );
+  }
+}
+
+/**
+ * The shift of its account in the way of `shift`, cancelled ones and `shift` itself aside, read in `tx` under the lock
+ * of the account. The database allows three shifts at once on an account (ADR 0049 § 2); until a reinforcement can be
+ * placed on purpose (CR-13), the server keeps one, as the exclusion of migration 0021 did.
+ */
+export async function shiftOnAccountInTheWay(tx: Transaction, shift: Placed): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: shifts.id })
+    .from(shifts)
+    .where(
+      and(
+        eq(shifts.platformAccountId, shift.platformAccountId),
+        sql`${shifts.cancelledAt} is null`,
+        sql`${shifts.id} <> ${shift.id}`,
+        sql`tstzrange(${shifts.startsAt}, ${shifts.endsAt}, '[)') && tstzrange(${shift.startsAt}, ${shift.endsAt}, '[)')`,
+      ),
+    )
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/** Refuses `shift` when another one is on its account at the same time: `shift_account_conflict`, with that one. */
+export async function assertAccountFree(tx: Transaction, shift: Placed): Promise<void> {
+  const inTheWay = await shiftOnAccountInTheWay(tx, shift);
+  if (inTheWay !== null) throw new ShiftAccountConflict(inTheWay);
 }
 
 /**
@@ -322,35 +460,28 @@ export interface Placed {
 }
 
 /**
- * The write, with an exclusion violation (23P01) turned into the module's conflict and the shift in the way, read on
- * the admin connection: it may be on another creator, which this transaction does not see.
+ * The write, with the member's exclusion (23P01) turned into the module's conflict and the shift in the way, read on
+ * the admin connection: it may be on another creator, which this transaction does not see. The account's is checked
+ * before the write (`assertAccountFree`).
  */
 export async function placed<T>(adminDb: Database, write: Promise<T>, shift: Placed): Promise<T> {
   try {
     return await write;
   } catch (error) {
     const failure = pgErrorOf(error);
-    if (failure?.code !== '23P01') throw error;
-    const byMember = failure.constraint === 'shifts_member_overlap_excl';
-    const inTheWay = await shiftInTheWayUnscoped(adminDb, shift, byMember ? 'member' : 'account');
-    throw byMember ? new ShiftMemberConflict(inTheWay) : new ShiftAccountConflict(inTheWay);
+    if (failure?.code !== '23P01' || failure.constraint !== 'shifts_member_overlap_excl') throw error;
+    throw new ShiftMemberConflict(await memberShiftInTheWayUnscoped(adminDb, shift));
   }
 }
 
-async function shiftInTheWayUnscoped(
-  adminDb: Database,
-  shift: Placed,
-  by: 'member' | 'account',
-): Promise<string | null> {
+async function memberShiftInTheWayUnscoped(adminDb: Database, shift: Placed): Promise<string | null> {
   const [row] = await withAdmin(adminDb, (tx) =>
     tx
       .select({ id: shifts.id })
       .from(shifts)
       .where(
         and(
-          by === 'member'
-            ? eq(shifts.memberId, shift.memberId)
-            : eq(shifts.platformAccountId, shift.platformAccountId),
+          eq(shifts.memberId, shift.memberId),
           sql`${shifts.cancelledAt} is null`,
           sql`${shifts.id} <> ${shift.id}`,
           sql`tstzrange(${shifts.startsAt}, ${shifts.endsAt}, '[)') && tstzrange(${shift.startsAt}, ${shift.endsAt}, '[)')`,

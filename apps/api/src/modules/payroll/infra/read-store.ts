@@ -8,6 +8,7 @@ import {
   CommissionStatementRulesSchema,
   CommissionStatementStatusSchema,
   CurrencySchema,
+  EarningsBaseSchema,
   ExchangeRateSchema,
   LateReportSchema,
   PayAdjustmentSchema,
@@ -18,6 +19,7 @@ import {
   PayPeriodWindowSchema,
   PenaltySchema,
   PlatformAccountIdSchema,
+  SaleEventSchema,
   ShiftReportIdSchema,
   StatementPaymentSchema,
   TeamMemberIdSchema,
@@ -25,8 +27,10 @@ import {
   PayrollEntriesSchema,
   penaltyCovers,
   UserIdSchema,
+  type EarningsBase,
   type PayoutBlock,
   type PayPeriod,
+  type StatementCountedSales,
 } from '@nirvana/contracts';
 import { and, eq, inArray, schema, sql, withAdmin, withMember, type Database } from '@nirvana/db';
 import { z } from 'zod';
@@ -107,6 +111,29 @@ function decodePeriodCursor(cursor: string | undefined): PayPeriod | null {
   return parsed.data;
 }
 
+/** A sale a line on the platform's net counted, as the job stored it (CRM-03): what a reader is told of it. */
+const StoredLineSaleSchema = z.object({
+  event: SaleEventSchema,
+  netMinor: z.number().int(),
+  lateFrom: PayPeriodSchema.nullish(),
+});
+
+/**
+ * What a line counted, from the sales it stored: how many sales and refunds, how many came after the closing of their
+ * own period and their net; never an identifier. `null` on a line of reports.
+ */
+function countedSalesOf(base: EarningsBase, sales: unknown): StatementCountedSales | null {
+  if (base === 'gross_chain') return null;
+  const lines = z.array(StoredLineSaleSchema).parse(sales);
+  const late = lines.filter((one) => one.lateFrom != null);
+  return {
+    sales: lines.filter((one) => one.event === 'sale').length,
+    refunds: lines.filter((one) => one.event === 'refund').length,
+    late: late.length,
+    lateNetMinor: late.reduce((total, one) => total + one.netMinor, 0),
+  };
+}
+
 /**
  * Pay as its reader may see it (EQ-04), through `withMember`: the policies decide which statements come back (one's
  * own for a member, all of them for the owner and an active manager), never the code.
@@ -137,6 +164,8 @@ export function createDrizzlePayrollReadStore(
                   grossMinor: commissionStatementLines.grossMinor,
                   netMinor: commissionStatementLines.netMinor,
                   lateReports: commissionStatementLines.lateReports,
+                  base: commissionStatementLines.base,
+                  sales: commissionStatementLines.sales,
                 })
                 .from(commissionStatementLines)
                 .innerJoin(
@@ -155,6 +184,7 @@ export function createDrizzlePayrollReadStore(
                 grossMinor: line.grossMinor,
                 netMinor: line.netMinor,
                 lateReports: z.array(LateReportSchema).parse(line.lateReports),
+                countedSales: countedSalesOf(EarningsBaseSchema.parse(line.base), line.sales),
               })),
             },
           ]),
@@ -213,6 +243,8 @@ export function createDrizzlePayrollReadStore(
                   commissionStatementLines.currency,
                   commissionStatementLines.vatBps,
                   commissionStatementLines.platformFeeBps,
+                  // An account's two bases in one period stay two lines, its reports' first (CRM-03).
+                  commissionStatementLines.base,
                 );
         const tierRows = await tx
           .select()
@@ -259,20 +291,25 @@ export function createDrizzlePayrollReadStore(
               inputsHash: row.inputsHash,
               lines: lineRows
                 .filter(({ commission_statement_lines: line }) => line.statementId === row.id)
-                .map(({ commission_statement_lines: line }) => ({
-                  platformAccountId: PlatformAccountIdSchema.parse(line.platformAccountId),
-                  currency: CurrencySchema.parse(line.currency),
-                  vatBps: line.vatBps,
-                  platformFeeBps: line.platformFeeBps,
-                  rateMicros: line.rateMicros,
-                  grossMinor: line.grossMinor,
-                  grossEurMinor: line.grossEurMinor,
-                  exclVatMinor: line.exclVatMinor,
-                  netMinor: line.netMinor,
-                  commissionMinor: line.commissionMinor,
-                  shiftReportIds: z.array(ShiftReportIdSchema).parse(line.shiftReportIds),
-                  lateReports: z.array(LateReportSchema).parse(line.lateReports),
-                })),
+                .map(({ commission_statement_lines: line }) => {
+                  const base = EarningsBaseSchema.parse(line.base);
+                  return {
+                    platformAccountId: PlatformAccountIdSchema.parse(line.platformAccountId),
+                    currency: CurrencySchema.parse(line.currency),
+                    vatBps: line.vatBps,
+                    platformFeeBps: line.platformFeeBps,
+                    rateMicros: line.rateMicros,
+                    grossMinor: line.grossMinor,
+                    grossEurMinor: line.grossEurMinor,
+                    exclVatMinor: line.exclVatMinor,
+                    netMinor: line.netMinor,
+                    commissionMinor: line.commissionMinor,
+                    shiftReportIds: z.array(ShiftReportIdSchema).parse(line.shiftReportIds),
+                    lateReports: z.array(LateReportSchema).parse(line.lateReports),
+                    base,
+                    countedSales: countedSalesOf(base, line.sales),
+                  };
+                }),
               netMinor: row.netMinor,
               commissionMinor: row.commissionMinor,
               teamShare,

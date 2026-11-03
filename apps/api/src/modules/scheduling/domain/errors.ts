@@ -439,3 +439,41 @@ export class ShiftFeedbackForbidden extends DomainError {
     super('shift_feedback_forbidden', 'Seul le chatteur du shift fait son feedback');
   }
 }
+
+/** A version of the créneaux that does not exist, or that the reader may not see (ADR 0049 § 1). */
+export class SlotVersionNotFound extends DomainError {
+  constructor() {
+    super('slot_version_not_found', 'Ce réglage des créneaux n’existe pas');
+  }
+}
+
+/** Two versions never take effect at the same instant (`scheduling_slot_versions_effective_unique`). */
+export class SlotVersionConflict extends DomainError {
+  constructor() {
+    super('slot_version_conflict', 'Un autre réglage des créneaux prend déjà effet à cet instant');
+  }
+}
+
+/** A version that took effect is kept: the planning keeps its past (ADR 0049 § 1). */
+export class SlotVersionEffective extends DomainError {
+  constructor() {
+    super(
+      'slot_version_effective_conflict',
+      'Ce réglage des créneaux a déjà pris effet : il ne se retire plus',
+    );
+  }
+}
+
+/** A version takes effect a Monday ahead, never in the past (ADR 0049 § 1: « Rien n'est rétroactif »). */
+export class SlotVersionDateInvalid extends DomainError {
+  constructor() {
+    super('slot_version_date_invalid', 'Un réglage des créneaux prend effet un lundi à venir');
+  }
+}
+
+/** What Zod refuses in a version of the créneaux, held again by the domain at the write (ADR 0049 § 1): the same 400. */
+export class SlotVersionInvalid extends DomainError {
+  constructor(message: string) {
+    super('request_invalid', message);
+  }
+}

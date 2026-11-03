@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   closePeriod,
+  inputsHashOf,
   paysMember,
   periodIsEmpty,
   planPeriod,
@@ -16,9 +17,15 @@ import {
 import {
   NO_SALES,
   saleAttribution,
+  saleDecisionsOpen,
+  saleIdOf,
   saleKeyOf,
+  salesLeftHeld,
+  salesToDecide,
+  saleToDecide,
   salesWaitingBefore,
   type AccountSourceForPay,
+  type SaleDecisionForPay,
   type RegisteredSale,
   type SaleKey,
   type SaleAuthorForPay,
@@ -64,6 +71,7 @@ const sale = (
     event: 'sale',
     platformAccountId: ACCOUNT,
     status: 'paid',
+    occurredAt: new Date(at),
     period,
     saleOccurredAt: new Date(at),
     salePeriod: period,
@@ -311,6 +319,205 @@ describe('the sales a period counts (ADR 0032, ADR 0050 § 5)', () => {
   });
 });
 
+describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', () => {
+  const theo = member();
+  const lea = member();
+  const morning = shift(theo, '2025-03-17T10:00:00.000Z', '2025-03-17T14:00:00.000Z');
+  const decided = (line: SaleForPay, decision: SaleDecisionForPay) => new Map([[saleIdOf(line), decision]]);
+  const counts = (who: MemberForPay, linkVersion = 'v1'): SaleDecisionForPay => ({
+    outcome: 'count',
+    linkVersion,
+    memberId: who.id,
+  });
+  const excludes = (linkVersion: string | null = 'v1'): SaleDecisionForPay => ({
+    outcome: 'exclude',
+    linkVersion,
+    memberId: null,
+  });
+
+  it('counts a sale made off shift for the member its chatter is linked to, while the link keeps its version', () => {
+    const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
+    const withCount = salesOf({ shifts: [morning], decisions: decided(night, counts(theo)) });
+    expect(saleAttribution(night, withCount)).toEqual({
+      kind: 'member',
+      memberId: theo.id,
+      linkVersion: 'v1',
+    });
+    // Linked elsewhere since, or again with a new version: the decision lapses, the sale is held again.
+    expect(saleAttribution({ ...night, author: linked(lea, 'v2') }, withCount)).toEqual({
+      kind: 'held',
+      reason: 'off_shift',
+    });
+    expect(saleAttribution({ ...night, author: linked(theo, 'v2') }, withCount)).toEqual({
+      kind: 'held',
+      reason: 'off_shift',
+    });
+    // A count for another member than the link gives is never applied: the link says who made it.
+    const forLea = salesOf({ shifts: [morning], decisions: decided(night, counts(lea)) });
+    expect(saleAttribution(night, forLea)).toEqual({ kind: 'held', reason: 'off_shift' });
+  });
+
+  it('counts a sale of an unknown status, and excludes a sale and its refund together', () => {
+    const odd = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000, { status: 'other' });
+    expect(saleAttribution(odd, salesOf({ shifts: [morning] }))).toEqual({
+      kind: 'held',
+      reason: 'status_unknown',
+    });
+    expect(
+      saleAttribution(odd, salesOf({ shifts: [morning], decisions: decided(odd, counts(theo)) })).kind,
+    ).toBe('member');
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    const out = salesOf({ shifts: [morning], decisions: decided(paid, excludes()) });
+    expect(saleAttribution(paid, out)).toEqual({ kind: 'nobody' });
+    expect(saleAttribution(refundOf(paid, P2, 1_000), out)).toEqual({ kind: 'nobody' });
+  });
+
+  it('excludes a chatter not linked until it is linked, and a refund never paid on this net without a deduction', () => {
+    const unlinked = sale({ kind: 'unlinked' }, '2025-03-17T12:00:00.000Z', 1_000);
+    const out = salesOf({ shifts: [morning], decisions: decided(unlinked, excludes(null)) });
+    expect(saleAttribution(unlinked, out)).toEqual({ kind: 'nobody' });
+    expect(saleAttribution({ ...unlinked, author: linked(theo) }, out).kind).toBe('member');
+    const fromP2 = salesOf({ shifts: [morning], sources: [detectedFrom(P2)] });
+    const before = refundOf(sale(linked(theo), '2025-03-10T12:00:00.000Z', 1_000), P2, 1_000);
+    expect(saleAttribution(before, { ...fromP2, decisions: decided(before, excludes()) })).toEqual({
+      kind: 'nobody',
+    });
+  });
+
+  it('never decides again the refund of a sale a closing counted: it comes off that member', () => {
+    const counted = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    const refund = refundOf(counted, P3, 1_000);
+    const sales = salesOf({
+      registered: registryOf(registeredAs(counted, theo, P2)),
+      decisions: decided(counted, excludes()),
+    });
+    expect(saleAttribution(refund, sales)).toEqual({ kind: 'member', memberId: theo.id, linkVersion: 'v1' });
+    expect(saleDecisionsOpen(refund, sales)).toEqual([]);
+  });
+
+  it('offers to count or exclude a sale off shift or of an unknown status, to exclude anything else held or paid', () => {
+    const sales = salesOf({ shifts: [morning], sources: [detectedFrom(P2)] });
+    const at = (author: SaleAuthorForPay, patch: Partial<SaleForPay> = {}) =>
+      saleDecisionsOpen(sale(author, '2025-03-17T12:00:00.000Z', 1_000, patch), sales);
+    expect(saleDecisionsOpen(sale(linked(theo), '2025-03-17T20:00:00.000Z', 900), sales)).toEqual([
+      'count',
+      'exclude',
+    ]);
+    expect(at(linked(theo), { status: 'other' })).toEqual(['count', 'exclude']);
+    expect(at({ kind: 'unlinked' })).toEqual(['exclude']);
+    expect(at(linked(theo))).toEqual(['exclude']);
+    expect(at({ kind: 'agent' })).toEqual([]);
+    expect(at({ kind: 'none' })).toEqual([]);
+    const before = refundOf(sale(linked(theo), '2025-03-10T12:00:00.000Z', 1_000), P2, 1_000);
+    expect(saleDecisionsOpen(before, sales)).toEqual(['exclude']);
+    // A decision in force can be taken the other way, or taken back: none is final before a closing counts the sale.
+    const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
+    expect(saleDecisionsOpen(night, { ...sales, decisions: decided(night, counts(theo)) })).toEqual([
+      'exclude',
+      'withdraw',
+    ]);
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    expect(saleDecisionsOpen(paid, { ...sales, decisions: decided(paid, excludes()) })).toEqual(['withdraw']);
+    expect(saleDecisionsOpen(before, { ...sales, decisions: decided(before, excludes()) })).toEqual([
+      'withdraw',
+    ]);
+    // Made on a link's version the chatter no longer has, it is not in force: the sale offers what it offers alone.
+    expect(saleDecisionsOpen(paid, { ...sales, decisions: decided(paid, excludes('v0')) })).toEqual([
+      'exclude',
+    ]);
+  });
+
+  it('gives a sale back to the rules once its decision is taken back, and shows every decided one', () => {
+    const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    const quiet = sale({ kind: 'agent' }, '2025-03-17T13:00:00.000Z', 700);
+    const sales = salesOf({ lines: [night, paid, quiet], shifts: [morning] });
+    const place = { period: P2, closed: false, firstOpen: P2 };
+    // A withdrawal leaves no decision in force (pay reads none): the sale is what the rules say.
+    expect(saleAttribution(paid, sales)).toEqual({ kind: 'member', memberId: theo.id, linkVersion: 'v1' });
+    expect(salesToDecide(sales, place).map((one) => [saleKeyOf(one.line), one.reason, one.decision])).toEqual(
+      [[saleKeyOf(night), 'off_shift', null]],
+    );
+    const decisions = new Map([...decided(paid, excludes()), ...decided(night, counts(theo))]);
+    expect(
+      salesToDecide({ ...sales, decisions }, place).map((one) => [
+        saleKeyOf(one.line),
+        one.reason,
+        one.decision,
+        one.outcomes,
+      ]),
+    ).toEqual([
+      [saleKeyOf(night), 'off_shift', 'count', ['exclude', 'withdraw']],
+      [saleKeyOf(paid), null, 'exclude', ['withdraw']],
+    ]);
+    expect(salesToDecide({ ...sales, decisions }, { ...place, closed: true })).toEqual([]);
+  });
+
+  it('shows a paid line its member signalled, while it would pay them, and the decision that answers it', () => {
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    const quiet = sale(linked(theo), '2025-03-17T12:30:00.000Z', 600);
+    const sales = salesOf({ lines: [paid, quiet], shifts: [morning] });
+    const place = { period: P2, closed: false, firstOpen: P2 };
+    const signal = { memberId: theo.id, note: 'Vendue pendant le shift de Léa', signalledAt: new Date(0) };
+    // Léa's signal on Théo's line has no effect: only the member the line pays signals it.
+    const signals = new Map([
+      [saleKeyOf(paid), [signal]],
+      [saleKeyOf(quiet), [{ ...signal, memberId: lea.id }]],
+    ]);
+    expect(salesToDecide(sales, place)).toEqual([]);
+    expect(
+      salesToDecide(sales, place, signals).map((one) => [
+        saleKeyOf(one.line),
+        one.reason,
+        one.decision,
+        one.outcomes,
+        one.signal,
+      ]),
+    ).toEqual([[saleKeyOf(paid), null, null, ['exclude'], signal]]);
+    // Excluded, it still shows with the signal it answers, and can be taken back.
+    const excluded = { ...sales, decisions: decided(paid, excludes()) };
+    expect(
+      salesToDecide(excluded, place, signals).map((one) => [one.decision, one.outcomes, one.signal]),
+    ).toEqual([['exclude', ['withdraw'], signal]]);
+    // Linked again to Léa, the line would no longer pay Théo: his signal has no effect.
+    const relinked = salesOf({ lines: [{ ...paid, author: linked(lea, 'v2') }], shifts: [morning] });
+    expect(salesToDecide(relinked, place, signals).map((one) => one.signal)).toEqual([null]);
+  });
+
+  it('finds the sale an open period takes to decide on, never one a closing counted or of a closed period', () => {
+    const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
+    const refund = refundOf(night, P3, 900);
+    const sales = salesOf({ lines: [refund, night], shifts: [morning] });
+    const place = { period: P2, closed: false, firstOpen: P2 };
+    expect(saleToDecide(sales, place, night)).toEqual({
+      line: night,
+      reason: 'off_shift',
+      decision: null,
+      outcomes: ['count', 'exclude'],
+      signal: null,
+    });
+    expect(saleToDecide(sales, { ...place, closed: true }, night)).toBeNull();
+    expect(saleToDecide(sales, { ...place, period: P3, firstOpen: P2 }, night)).toBeNull();
+    const counted = salesOf({ ...sales, registered: registryOf(registeredAs(night, theo, P2)) });
+    expect(saleToDecide(counted, { ...place, period: P3, firstOpen: P3 }, night)).toBeNull();
+  });
+
+  it('keeps at a closing the lines it leaves held, the earlier periods’ too before the first one', () => {
+    const early = sale({ kind: 'unlinked' }, '2025-03-10T12:00:00.000Z', 400);
+    const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
+    const sales = salesOf({ lines: [early, night], shifts: [morning] });
+    expect(salesLeftHeld(sales, P2).map((one) => [saleKeyOf(one.line), one.reason])).toEqual(
+      [
+        [saleKeyOf(early), 'chatter_unlinked'],
+        [saleKeyOf(night), 'off_shift'],
+      ].sort(([a = ''], [b = '']) => (a < b ? -1 : 1)),
+    );
+    const { closing } = closePeriod(snapshot({ period: P2, members: [theo], sales }));
+    expect(closing.heldSales.map((one) => saleKeyOf(one.line)).sort()).toEqual(keysOf([early, night]));
+    expect(closing.countedSales).toEqual([]);
+  });
+});
+
 describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
   const theo = member();
   const lea = member();
@@ -344,6 +551,7 @@ describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
       [undefined, 0, 2_000, 8_000, 1_600],
       ['platform_net', 0, 0, 10_000, 2_000],
     ]);
+    // With its instant, for Théo to read it (CRM-03 lot b4c): kept out of the statement's hash.
     expect(content.lines[1]?.sales).toEqual([
       {
         platform: 'reveal',
@@ -351,6 +559,7 @@ describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
         event: 'sale',
         netMinor: 10_000,
         linkVersion: 'v1',
+        occurredAt: '2025-03-17T11:00:00.000Z',
       },
     ]);
     expect(content.lines[1]?.shiftReportIds).toEqual([]);
@@ -437,6 +646,27 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
     expect(statementOf(again, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
   });
 
+  it('keeps the instants of its sales out of a statement’s hash, never its amounts (CRM-03 lot b4c)', () => {
+    const { content } = statementOf(open, theo.id);
+    const line = content.lines[0];
+    if (line?.sales === undefined) throw new Error('a line of sales');
+    // As a statement written before CRM-03 lot b4c kept it: the same hash, never written again for it.
+    const before = line.sales.map(({ platform, platformSaleId, event, netMinor, linkVersion }) => ({
+      platform,
+      platformSaleId,
+      event,
+      netMinor,
+      linkVersion,
+    }));
+    expect(line.sales.every((one) => one.occurredAt !== undefined)).toBe(true);
+    expect(inputsHashOf({ ...content, lines: [{ ...line, sales: before }] })).toBe(inputsHashOf(content));
+    const other = {
+      ...content,
+      lines: [{ ...line, sales: line.sales.map((one) => ({ ...one, netMinor: 1 })) }],
+    };
+    expect(inputsHashOf(other)).not.toBe(inputsHashOf(content));
+  });
+
   it('takes a refund after the closing off the first open period, for the member the sale paid', () => {
     const { closed } = closePeriod(open);
     const refund = refundOf(one, P3, 10_000, linked(lea, 'v2'));
@@ -461,6 +691,7 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
         netMinor: -10_000,
         linkVersion: 'v1',
         lateFrom: P2,
+        occurredAt: refund.occurredAt.toISOString(),
       },
     ]);
     expect(paysMember(next, lea.id)).toBe(false);

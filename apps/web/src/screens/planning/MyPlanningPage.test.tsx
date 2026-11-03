@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyPlanningPage } from './MyPlanningPage';
 
 import { ReopenProvider } from '@/reports/reopen';
+import { settingsOf } from '@/test/settings';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -169,7 +170,7 @@ const calendars: string[] = [];
 /** The team's calendar (CR-12): Théo's night, Basile on Wednesday morning, the agent in Automatique day and night. */
 const teamCalendar = (from: string, to: string): Record<string, unknown> => ({
   view: 'team',
-  settings: { timeZone: 'Europe/Paris', slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+  settings: settingsOf(),
   creators: [{ id: NORA, name: 'Nora Vidal' }],
   members: people.slice(0, 2),
   shifts: [
@@ -221,12 +222,7 @@ function serve(
         reply = {
           status: 200,
           body: {
-            settings: {
-              timeZone: 'Europe/Paris',
-              slotStartMinute: 0,
-              slotLengthMinutes: 360,
-              accessMarginMinutes: 15,
-            },
+            settings: settingsOf(),
             accounts: [account],
             members: [people[0]],
             shifts: thisWeek
@@ -692,10 +688,15 @@ describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
     expect(text(screen.getByText(/^Qui chatte quand dans l’équipe/u))).toContain('Paris');
     const row = within(grid).getByRole('row', { name: /Nora Vidal/u });
     expect(text(row)).toContain('IA automatique · jour et nuit');
-    // His own shift reads « Toi », at the agency's hour; a créneau a shift only goes on into says so.
-    expect(text(row)).toContain('Toi, 23 h – 5 h ; l’IA en automatique');
-    expect(text(row)).toContain('Basile, 8 h – 14 h ; l’IA en automatique');
-    expect(text(row)).toContain('12 h – 18 h, suite d’un shift ; l’IA en automatique');
+    // His own shift reads « Toi », at the agency's hour, under way with what is left of it; a shift across two
+    // créneaux is drawn on both, its hours kept, after « … » on the second (ADR 0049 § 1).
+    expect(text(row)).toContain('Toi, 23 h – 5 h, en poste, reste 4 h ; l’IA en automatique');
+    expect(text(row)).toContain('Toi… 23 h – 5 hreste 4 h');
+    // Wednesday's first créneau reads it again, not as a copy: a phone shows that day alone, and its edge breathes.
+    const live = [...row.querySelectorAll('.cal-chip[data-phase="live"]')];
+    expect(live.map((chip) => chip.getAttribute('data-carried'))).toEqual([null, null]);
+    expect(within(row).getAllByText('Basile')).toHaveLength(2);
+    expect(text(row)).toContain('Basile… 8 h – 14 h');
     // Nobody but the agent, in Automatique: « IA seule », said in words too.
     expect(text(row)).toContain('18 h – 0 h, l’IA seule');
     expect(within(row).getAllByText('IA seule').length).toBeGreaterThan(0);

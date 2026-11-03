@@ -179,17 +179,13 @@ describe('planning tables (EQ-02): the creator and the member, through withTenan
     ).toMatch(/row-level security/u);
   });
 
-  it('keeps a member off two shifts at once, even on two creators, and an account off two members at once', async () => {
+  it('keeps a member off two shifts at once, even on two creators (an account takes three: slot-versions test)', async () => {
     const plan = (creatorId: string, row: ReturnType<typeof shiftRow>) =>
       failure(withTenantMember(test.app.db, creatorId, owner, (tx) => tx.insert(s.shifts).values(row)));
     // Chatter A is on Nora 00:00–06:00 on 2 November: Inès at 05:00 overlaps them.
     expect(
       await plan(ines.creatorId, shiftRow(ines, chatterA, '2099-11-02T05:00:00Z', '2099-11-02T09:00:00Z')),
     ).toMatch(/shifts_member_overlap_excl/u);
-    // Nora's account has chatter B from 06:00: the manager there at 08:00 overlaps the account.
-    expect(
-      await plan(nora.creatorId, shiftRow(nora, manager, '2099-11-02T08:00:00Z', '2099-11-02T10:00:00Z')),
-    ).toMatch(/shifts_account_overlap_excl/u);
     // [00:00, 06:00) and [06:00, 12:00) touch without overlapping.
     expect(
       await plan(ines.creatorId, shiftRow(ines, chatterA, '2099-11-02T06:00:00Z', '2099-11-02T08:00:00Z')),

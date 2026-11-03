@@ -81,6 +81,17 @@ export interface PaySalesRange {
   readonly timeZone: string;
 }
 
+/** Which lines a read by sale takes: some accounts, and some sales, each with its refunds (CRM-03 lot b3). */
+export interface PaySalesOfKeys {
+  readonly platformAccountIds: readonly PlatformAccountId[];
+  readonly sales: readonly { readonly platform: Platform; readonly platformSaleId: string }[];
+  /** The zone `saleDay` is read in: the agency's. */
+  readonly timeZone: string;
+}
+
+/** Sales named in one query at most: a longer list is read in several. */
+const SALES_PER_READ = 500;
+
 const instant = z.union([z.date(), z.string()]).transform((value) => new Date(value));
 
 const RowSchema = z.object({
@@ -143,7 +154,7 @@ const chatter = sql`case when l.event = 'refund' and s.platform_sale_id is not n
 /** Each line with its sale's instant and its chatter's link, for the accounts and the condition given. */
 async function read(
   tx: Transaction,
-  range: PaySalesRange,
+  range: Pick<PaySalesRange, 'platformAccountIds' | 'timeZone'>,
   condition: ReturnType<typeof sql>,
 ): Promise<PaySaleLine[]> {
   if (range.platformAccountIds.length === 0) return [];
@@ -205,4 +216,22 @@ export const salesFeedReadsForPay = {
    */
   linesRelinkedBetween: (tx: Transaction, range: PaySalesRange): Promise<PaySaleLine[]> =>
     read(tx, range, sql`c.link_version_at >= ${range.from} and c.link_version_at < ${range.to}`),
+
+  /**
+   * The lines of some sales, whatever their day: each sale with its refunds, or a refund alone when its sale is older
+   * than the register. Pay reads by them, in the first period still open, the sales a closing left held and those the
+   * validator decided (CRM-03 lot b3), which no range would find again.
+   */
+  linesOfSales: async (tx: Transaction, keys: PaySalesOfKeys): Promise<PaySaleLine[]> => {
+    const lines: PaySaleLine[] = [];
+    for (let start = 0; start < keys.sales.length; start += SALES_PER_READ) {
+      const named = keys.sales
+        .slice(start, start + SALES_PER_READ)
+        .map((one) => sql`(${one.platform}, ${one.platformSaleId})`);
+      lines.push(
+        ...(await read(tx, keys, sql`(l.platform, l.platform_sale_id) in (${sql.join(named, sql`, `)})`)),
+      );
+    }
+    return lines;
+  },
 };

@@ -12,13 +12,16 @@ import type {
   PlatformAccountId,
   ReportSignal,
   SchedulingSettings,
+  SchedulingSettingsInput,
   ShiftFeedbackId,
   ShiftId,
   ShiftReportId,
   ShiftReportStatus,
+  ShiftSlot,
   ShiftSwapRequestId,
   ShiftSwapStatus,
   ShiftTemplateId,
+  SlotSeat,
   TeamMemberId,
   TeamMemberStatus,
   TeamScope,
@@ -140,6 +143,14 @@ export interface PlanningClock {
   readonly timeZone: string;
 }
 
+/** A version of the créneaux to write: when it takes effect, in which zone, its créneaux and its places. */
+interface NewSlotVersion {
+  readonly effectiveAt: Date;
+  readonly timeZone: string;
+  readonly slots: readonly ShiftSlot[];
+  readonly seats: readonly SlotSeat[];
+}
+
 /**
  * Storage of the planning, implemented in `infra/` with `withTenantMember`: the policies decide what each scope
  * reads, and the rules that need stored rows (a member's status, a shift under way) run in the same transaction.
@@ -147,10 +158,27 @@ export interface PlanningClock {
  * shift in the way.
  */
 export interface PlanningStore {
-  /** Any team scope; `null` until the owner saves them. */
-  settings(actor: UserId): Promise<SchedulingSettings | null>;
-  /** Owner. */
-  saveSettings(actor: Actor, settings: SchedulingSettings): Promise<void>;
+  /**
+   * Any team scope: the zone, the margin and the créneaux' versions over `range` (the version in force at `from`, then
+   * those taking effect before `to`), the module's defaults where nothing is saved; seats for the owner and the agency.
+   */
+  settings(
+    actor: UserId,
+    range: { readonly from: Date; readonly to: Date | null },
+  ): Promise<SchedulingSettings>;
+  /** Owner: the zone and the margin. */
+  saveSettings(actor: Actor, settings: SchedulingSettingsInput): Promise<void>;
+  /**
+   * Owner: a version of the créneaux and its places, at `effectiveAt` (ahead), in the zone of the grid then (ADR 0049
+   * § 1); its id. `slot_version_conflict` on another version's instant, `platform_account_not_found` for a place on an
+   * account that does not exist, `slot_version_date_invalid` when its instant has passed by the write.
+   */
+  addSlotVersion(actor: Actor, version: NewSlotVersion): Promise<string>;
+  /**
+   * Owner: withdraws a version still ahead, its places with it. `slot_version_not_found`, or
+   * `slot_version_effective_conflict` once it took effect.
+   */
+  withdrawSlotVersion(actor: Actor, id: string): Promise<void>;
   read(
     actor: UserId,
     creatorIds: readonly CreatorId[],
@@ -203,8 +231,8 @@ export interface PlanningAdmin {
   } | null>;
   /** `onShift` on a creator at `at`, without the margin: her active members whose shift covers it. */
   onShiftUnscoped(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
-  /** The settings, for the job (no member behind it). */
-  settingsUnscoped(): Promise<SchedulingSettings | null>;
+  /** The settings in force now, for the job (no member behind it). */
+  settingsUnscoped(): Promise<SchedulingSettings>;
   /** The templates running on `today` (a calendar day in the grid's zone), for the job. */
   runningTemplatesUnscoped(today: string): Promise<ShiftTemplateId[]>;
   /**
@@ -564,7 +592,7 @@ export interface CalendarReads {
     creatorIds: readonly CreatorId[],
   ): Promise<{
     view: CalendarView;
-    settings: SchedulingSettings | null;
+    settings: SchedulingSettings;
     shifts: CalendarRow[];
     agents: CreatorAgent[];
     agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null;
