@@ -1,0 +1,7 @@
+# 2026-11-03 — ADR 0055 à 0058 : catégories de dépôt, scripts à cartons, publication Instagram et Telegram, agent externe — proposed
+Fait : revue du dépôt de contenu (ADR 0044) et du système de cartons d'OnlyScript (dépôt `LeyZee/onlyscript`, concepts seulement) ; ADR 0055 (catégories choisies par la créatrice, demandes, format vérifié, métadonnées retirées), 0056 (structures, cartons, parcours guidé, nomenclature, Nirvana fait foi avant Reveal), 0057 (connecteurs de publication Instagram et Telegram), 0058 (agent externe qui publie, amende 0026 § 5) ; fiches SC-01 à SC-06, PUB-01, PUB-02, MCP-PUB ; amendement de CR-06 ; notes dans CR-08, CR-11, PROPOSED-script-studio ; glossaire.
+Pas fait : aucun code ; les ADR attendent « ok 0055 » à « ok 0058 » de Charles (0058 avec les mots de la dérogation).
+Décisions : Charles, 03/11 9 h 53 et 9 h 58 : la créatrice choisit la catégorie ; séance boudoir = photos sexy du feed ; story Reveal et story Insta séparées ; cadence des scripts réglée par l'agence (14 jours par défaut) ; structures types choisies par l'agence ; connecteurs Instagram et Telegram voulus ; un agent externe doit pouvoir publier ; « go » sur l'ordre proposé.
+Découvertes : la fiche P6-01 dit que Reveal est la seule source des scripts, à amender si 0056 est acceptée ; le ton des légendes Telegram attend les exemples de Charles.
+Candidats à suppression : PROPOSED-script-studio.md, une fois l'ADR 0056 acceptée (remplacée par SC-01 à SC-06).
+Vérifié : pnpm check (voir la PR).
