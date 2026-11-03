@@ -311,6 +311,17 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
       ),
     );
     expect(following.statusCode).toBe(201);
+    // Moved onto Théo's last hour: refused by the server under the account's lock, as before ADR 0049 (CR-14).
+    const ontoTheo = await call(
+      'PATCH',
+      `/scheduling/shifts/${ShiftSchema.parse(following.json()).id}`,
+      owner,
+      {
+        startsAt: new Date(new Date(theoTomorrow.endsAt).getTime() - HOUR).toISOString(),
+      },
+    );
+    expect([ontoTheo.statusCode, codeOf(ontoTheo)]).toEqual([409, 'shift_account_conflict']);
+    expect(detailsOf(ontoTheo)).toEqual({ shiftId: theoTomorrow.id });
   });
 
   it('shows a planner every shift and account, and a chatter their own shifts, accounts and name only', async () => {
