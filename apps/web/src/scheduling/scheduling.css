@@ -457,7 +457,38 @@ button.sc-duty__one:active {
 .sc-chip[data-phase='live'] {
   box-shadow:
     inset 3px 0 0 var(--sc-color),
-    inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 55%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 60%, transparent);
+}
+/* The shift under way: its edge breathes slowly in the member's colour, the grid's only moving sign (CR-12, Charles
+   02/11 17h56). Opacity on a pseudo-element, so the compositor alone animates it; reduced motion keeps it still. */
+.sc-chip[data-phase='live']::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--sc-color);
+  border-radius: calc(var(--nv-radius-sm) + 2px);
+  opacity: 0.85;
+  pointer-events: none;
+  animation: sc-live 2.8s var(--nv-ease-in-out) infinite alternate;
+}
+/* Its copy on a later créneau keeps the edge, still: one shift, one moving sign. */
+.sc-chip[data-phase='live'][data-carried='true']::after {
+  animation: none;
+}
+@keyframes sc-live {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+.sc-chip__left {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink);
+  white-space: nowrap;
 }
 .sc-chip__who {
   display: inline-flex;
@@ -1199,7 +1230,8 @@ button.sc-duty__one:active {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sc-skeleton i {
+  .sc-skeleton i,
+  .sc-chip[data-phase='live']::after {
     animation: none;
   }
   .sc-chip,

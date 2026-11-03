@@ -38,12 +38,14 @@ import {
   conflictLines,
   conflictTitle,
   gridOf,
+  leftOf,
   phaseOf,
   slotRowOf,
   type Chip,
   type Fill,
   type GridRow,
   type SlotCell,
+  type SlotChip,
 } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import {
@@ -631,7 +633,8 @@ function OnDutyStrip({
   return (
     <section className="sc-duty" aria-labelledby="sc-duty-title">
       <h2 id="sc-duty-title" className="sc-duty__title">
-        <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok nv-dot--live'}`} />
+        {/* Fixed: the shift under way on the grid is the page's one moving sign (CR-12, Charles 02/11 17h56). */}
+        <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok'}`} />
         En poste maintenant
       </h2>
       {list.length === 0 ? (
@@ -1004,10 +1007,12 @@ function Cell({
   onAdd: (start: ShiftStart) => void;
   onShow: (shiftId: string) => void;
 }): JSX.Element {
-  const chipOf = (chip: Chip): JSX.Element => (
+  const chipOf = (chip: Chip | SlotChip): JSX.Element => (
     <ShiftChip
       key={chip.shift.id}
       chip={chip}
+      earlier={'earlier' in chip && chip.earlier}
+      carried={'carried' in chip && chip.carried}
       now={now}
       zone={zone}
       muted={focus !== null && chip.shift.memberId !== focus}
@@ -1164,6 +1169,8 @@ function IncidentIcon({ className, titled = false }: { className: string; titled
 
 function ShiftChip({
   chip,
+  earlier,
+  carried,
   now,
   zone,
   muted,
@@ -1172,6 +1179,10 @@ function ShiftChip({
   onShow,
 }: {
   chip: Chip;
+  /** Begun in an earlier créneau: its hours come after « … ». */
+  earlier: boolean;
+  /** The same shift on a later créneau of the same day: drawn there too, read and reached on the first. */
+  carried: boolean;
   now: Date;
   zone: string;
   /** Another member's, while one member's shifts stand out. */
@@ -1184,6 +1195,8 @@ function ShiftChip({
   const { shift, member } = chip;
   const phase = phaseOf(shift, now);
   const name = member?.displayName ?? 'Un membre';
+  // Read again on the next day, it ends there: no « +1 ».
+  const overnight = chip.overnight && !earlier;
   return (
     <button
       type="button"
@@ -1195,22 +1208,26 @@ function ShiftChip({
       data-repeat={shift.templateId === null ? undefined : 'true'}
       data-color={member?.color === null || member === null ? undefined : 'true'}
       style={member?.color === null || member === null ? undefined : { '--sc-color': member.color }}
-      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued ? ', commencé la veille' : ''}${chip.overnight ? ', jusqu’au lendemain' : ''}${phase === 'live' ? ', en poste' : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}`}
+      data-carried={carried ? 'true' : undefined}
+      tabIndex={carried ? -1 : undefined}
+      aria-hidden={carried ? 'true' : undefined}
+      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${phase === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}`}
       onClick={() => {
         onShow(shift.id);
       }}
     >
       <span className="sc-chip__who">
-        {phase === 'live' ? <span className="nv-dot nv-tone--ok nv-dot--live" /> : null}
         {/* A long name gives way with an ellipsis; the marks keep their place (EQ-24). */}
         <span className="sc-chip__name">{name}</span>
         {incident ? <IncidentIcon className="sc-chip__incident" titled /> : null}
       </span>
       <span className="sc-chip__hours nv-num">
-        {chip.continued ? '… ' : ''}
+        {chip.continued || earlier ? '… ' : ''}
         {rangeAt(shift.startsAt, shift.endsAt, zone)}
-        {chip.overnight ? <span className="sc-chip__night"> +1</span> : null}
+        {overnight ? <span className="sc-chip__night"> +1</span> : null}
       </span>
+      {/* The shift under way: its edge breathes in the member's colour (CSS) and says what is left. */}
+      {phase === 'live' ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
       {shift.templateId === null ? null : <RepeatIcon className="sc-chip__repeat" titled />}
     </button>
   );
