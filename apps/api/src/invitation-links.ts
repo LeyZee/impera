@@ -250,24 +250,24 @@ async function createCreatorLinkUnscoped(
         ),
       );
     const { body } = input;
+    // Written as Better Auth looks it up at sign-in, trimmed and in lower case (Bilan, #473).
+    const email = body.purpose === 'invitation' ? body.email.trim().toLowerCase() : null;
     let userId: string;
     if (existing !== undefined) {
-      if (body.purpose === 'invitation' && existing.email.toLowerCase() !== body.email.toLowerCase())
-        throw new CreatorAccountConflict();
+      if (email !== null && existing.email.trim().toLowerCase() !== email) throw new CreatorAccountConflict();
       userId = existing.id;
     } else {
-      if (body.purpose === 'reset') throw new CreatorAccountNotFound();
+      if (email === null) throw new CreatorAccountNotFound();
       const [taken] = await tx
         .select({ id: schema.user.id })
         .from(schema.user)
-        .where(sql`lower(${schema.user.email}) = lower(${body.email})`);
+        .where(sql`lower(${schema.user.email}) = ${email}`);
       if (taken !== undefined) throw new AccountEmailConflict();
       userId = newId(UserIdSchema);
       await tx.insert(schema.user).values({
         id: userId,
         name: creator.displayName,
-        // Written in lower case, as Better Auth writes the members' (Bilan, #473).
-        email: body.email.toLowerCase(),
+        email,
         role: 'creator',
         creatorIds: [input.creatorId],
       });

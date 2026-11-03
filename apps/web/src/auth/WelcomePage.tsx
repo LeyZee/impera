@@ -6,7 +6,6 @@ import { countryFlag, countryName } from '@/lib/country';
 
 const COPY: LinkPageCopy = {
   // A creator's own account has no country on file (CR-02): her space says what it is instead.
-  // A creator's own account has no country on file: she checks her name only (CR-02).
   eyebrow: (preview) =>
     preview.account === 'creator'
       ? 'Ton espace créatrice'
