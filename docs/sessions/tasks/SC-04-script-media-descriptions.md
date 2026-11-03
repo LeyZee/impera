@@ -1,5 +1,5 @@
 # SC-04 Descriptions des médias d'un script et validation rapide
-Statut : blocked (ADR 0056 à accepter ; clé de vision)
+Statut : blocked (clé de vision)
 Phase : scripts (ADR 0056)
 Dépend de : SC-02, le rôle `sense` (P3-04), ADR 0030 § 3
 Branche : task/sc-04-script-descriptions

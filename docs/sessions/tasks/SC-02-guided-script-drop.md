@@ -1,5 +1,5 @@
 # SC-02 « Ton prochain script » : la créatrice tourne et dépose carton par carton
-Statut : blocked (ADR 0055 et 0056 à accepter)
+Statut : todo (ADR 0055 et 0056 acceptées le 03/11/2026)
 Phase : scripts (ADR 0056)
 Dépend de : SC-01, CR-06 (amendée par l'ADR 0055), CR-05 (tâches de l'agenda)
 Branche : task/sc-02-guided-script-drop

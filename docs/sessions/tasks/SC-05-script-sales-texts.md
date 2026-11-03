@@ -1,5 +1,5 @@
 # SC-05 Textes de vente d'un script, proposés par le modèle et validés par l'agence
-Statut : blocked (ADR 0056 à accepter ; clé xAI ; grille de prix P6-01)
+Statut : blocked (clé xAI ; grille de prix P6-01)
 Phase : scripts (ADR 0056)
 Dépend de : SC-04, la passerelle LLM (P3-01), les gardes de voix (P3-13), P6-01
 Branche : task/sc-05-script-texts

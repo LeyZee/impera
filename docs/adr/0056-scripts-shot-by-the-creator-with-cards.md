@@ -1,6 +1,6 @@
 # 0056. Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse
 
-Statut : proposed (demande et décisions de Charles du 03/11/2026, 9 h 42, 9 h 47, 9 h 53 et 9 h 58, fil « Repenser le workflow médias et scripts de la modèle » ; « go » le 03/11 à 9 h 58)
+Statut : accepted (Charles, 03/11/2026, 10 h 14, « ok 0055 », « ok 0056 », « ok 0057 » et « ok 0058 » ; phrases des relectures Bilan, Extension et Agent acceptées à 10 h 25 (« fais ce que tu me recommanderais ») ; demande et décisions de Charles du 03/11/2026, 9 h 42, 9 h 47, 9 h 53 et 9 h 58, fil « Repenser le workflow médias et scripts de la modèle » ; « go » le 03/11 à 9 h 58)
 Date : 2026-11-03
 Remplace : dans l'ADR 0030 § 2, les mots « Nirvana ne téléverse rien vers une plateforme et n'a pas de dossier à lui », et dans l'ADR 0030 § 4, la règle « Fichiers : on garde le minimum », **pour les seuls scripts déposés par la créatrice** ; dans la fiche P6-01, la phrase qui fait de Reveal le seul lieu où l'on crée un script. L'ADR 0030 reste vraie pour tout le reste, et Reveal fait toujours foi pour ce qui a été envoyé à un fan (ADR 0018 § 5, ADR 0030 § 5).
 Précise : l'ADR 0055 (catégorie `script`), l'ADR 0030 § 3 (descriptions), la fiche PROPOSED-script-studio (question de la source des scripts, tranchée ici).

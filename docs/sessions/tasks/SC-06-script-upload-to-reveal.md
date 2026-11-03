@@ -1,5 +1,5 @@
 # SC-06 Téléverser un script dans Reveal, dans l'ordre
-Statut : blocked (ADR 0056 à accepter ; capture Reveal : coffre, dossiers, scripts natifs)
+Statut : blocked (capture Reveal : coffre, dossiers, scripts natifs)
 Phase : scripts (ADR 0056)
 Dépend de : SC-03, SC-05, la capture Reveal, la garde d'écriture (ADR 0018)
 Branche : task/sc-06-script-upload

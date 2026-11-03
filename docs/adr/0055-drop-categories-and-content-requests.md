@@ -1,6 +1,6 @@
 # 0055. Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque
 
-Statut : proposed (demande et décisions de Charles du 03/11/2026, 9 h 42, 9 h 53 et 9 h 58, fil « Repenser le workflow médias et scripts de la modèle » ; revue : `/mnt/project-files/espaces/medias-scripts/revue-medias-scripts-publication.md`, hors dépôt)
+Statut : accepted (Charles, 03/11/2026, 10 h 14, « ok 0055 », « ok 0056 », « ok 0057 » et « ok 0058 » ; phrases des relectures Bilan, Extension et Agent acceptées à 10 h 25 (« fais ce que tu me recommanderais ») ; durée de garde d'un média jamais programmé : « au bout d'un an, ça me paraît bien », 10 h 25 ; demande et décisions de Charles du 03/11/2026, 9 h 42, 9 h 53 et 9 h 58, fil « Repenser le workflow médias et scripts de la modèle » ; revue : `/mnt/project-files/espaces/medias-scripts/revue-medias-scripts-publication.md`, hors dépôt)
 Date : 2026-11-03
 Remplace : dans l'ADR 0044 § 1, l'usage à deux valeurs (`feed` | `mass_dm`) et la phrase « elle dépose depuis son téléphone, dans Contenu » en tant que seule description du dépôt ; dans l'ADR 0044 § 2, le point de départ des 30 jours (« jusqu'à leur publication ou leur envoi ») pour un média qui part sur plusieurs sorties.
 Précise : l'ADR 0042 (§ 2 droit de regard, § 5 topo, § 8 onglet Contenu) et l'ADR 0044 (§ 3 le plan de la semaine couvre aussi les stories Reveal).
@@ -69,7 +69,7 @@ La revue proposait de laisser le code répartir chaque séance sur les sorties. 
 ### 7. Conservation
 
 - La règle de l'ADR 0044 § 2 s'applique à chaque média, mais les 30 jours partent de sa **dernière sortie prévue** : un média qui part sur une seule sortie suit la règle telle quelle ; un dépôt dont un média n'est pas encore sorti garde ses originaux.
-- **Borne haute** : un média qui n'a aucune sortie prévue depuis N jours (jamais planifié, ou retiré du plan) suit la règle de l'ADR 0044 § 2 à partir de son dépôt : ses originaux sont effacés 30 jours plus tard, et l'agence en est prévenue en ambre 7 jours avant. N est un réglage d'agence ; **valeur proposée : 60 jours, à fixer par Charles avec le « ok 0055 »**.
+- **Un média jamais programmé est gardé** : un média qui n'a aucune sortie prévue (jamais planifié, ou retiré du plan) garde ses originaux, pour pouvoir resservir. Ils sont effacés automatiquement **un an après son dépôt**, avec une alerte à l'agence 7 jours avant ; un média qui reçoit une sortie avant cette date repasse sous la règle du point précédent. La réutilisation des médias anciens se décidera à part (ADR 0044 § 5).
 
 ### 8. L'onglet Contenu
 

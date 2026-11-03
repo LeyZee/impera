@@ -1,5 +1,5 @@
 # MCP-PUB Publication par un agent externe : préparer, puis publier dans un plafond
-Statut : blocked (ADR 0058 à accepter avec les mots de la dérogation ; lot 1 du MCP)
+Statut : blocked (lot 1 du MCP)
 Phase : MCP (ADR 0026, 0058)
 Dépend de : PROPOSED-mcp-read (lot 1), PUB-01, PUB-02, CR-08
 Branche : task/mcp-pub-publishing

@@ -1,6 +1,6 @@
 # 0057. Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed
 
-Statut : proposed (demande de Charles du 03/11/2026, 9 h 42 ; « ça serait bien du coup de faire les connecteurs Telegram et les connecteurs Instagram pour que ça publie automatiquement », 9 h 53 ; précisions sur Telegram, 9 h 58 ; fil « Repenser le workflow médias et scripts de la modèle »)
+Statut : accepted (Charles, 03/11/2026, 10 h 14, « ok 0055 », « ok 0056 », « ok 0057 » et « ok 0058 » ; phrases des relectures Bilan, Extension et Agent acceptées à 10 h 25 (« fais ce que tu me recommanderais ») ; demande de Charles du 03/11/2026, 9 h 42 ; « ça serait bien du coup de faire les connecteurs Telegram et les connecteurs Instagram pour que ça publie automatiquement », 9 h 53 ; précisions sur Telegram, 9 h 58 ; fil « Repenser le workflow médias et scripts de la modèle »)
 Date : 2026-11-03
 Précise : l'ADR 0003 (un connecteur de publication est un adaptateur, comme un connecteur de plateforme), l'ADR 0044 § 3 et § 4 (le plan de la semaine et la mesure couvrent ces sorties), l'ADR 0055 (catégories `instagram_story`, `instagram_reel`, `instagram_post`, `telegram_post`), l'ADR 0016 (jetons scellés), l'ADR 0042 § 2 (droit de regard, renforcé ici pour Instagram).
 

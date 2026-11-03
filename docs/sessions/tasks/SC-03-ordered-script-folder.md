@@ -1,5 +1,5 @@
 # SC-03 Dossier de script rangé dans l'ordre, et export ZIP
-Statut : blocked (ADR 0056 à accepter)
+Statut : todo (ADR 0056 acceptée le 03/11/2026)
 Phase : scripts (ADR 0056)
 Dépend de : SC-02
 Branche : task/sc-03-ordered-script-folder

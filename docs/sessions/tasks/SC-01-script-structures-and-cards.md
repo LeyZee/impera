@@ -1,5 +1,5 @@
 # SC-01 Structures de script et cartons : l'atelier de l'agence
-Statut : blocked (ADR 0056 à accepter : « ok 0056 »)
+Statut : todo (ADR 0056 acceptée le 03/11/2026)
 Phase : scripts (ADR 0056)
 Dépend de : ADR 0056, la persona (dégoûts), le design system
 Branche : task/sc-01-script-structures

@@ -18,7 +18,7 @@ La créatrice dépose une séance ou une vidéo pour le feed, ou des médias pou
 - [ ] Compartiment à part, **sans verrou d'objet** (celui des factures, ADR 0037, n'efface jamais) ; chaque original porte sa date d'effacement en base (publication ou envoi + 30 jours, ou retrait du dépôt) ; un job rejouable efface à cette date ; à la publication ou à l'envoi, l'original est copié sous le préfixe `released/` et l'objet d'origine effacé, et seule ce préfixe porte une règle de cycle de vie (35 jours), en filet : un dépôt en attente n'est jamais effacé par elle ; un effacement refusé passe en ambre ; trace au journal.
 - [ ] Écran Contenu : déposer (choix séance ou vidéo pour le feed), voir les dépôts en attente, les retirer.
 
-## Amendement de l'ADR 0055 (proposée le 03/11/2026 ; à appliquer dès « ok 0055 »)
+## Amendement de l'ADR 0055 (acceptée le 03/11/2026)
 - [ ] L'usage `feed` | `mass_dm` devient la catégorie fermée `drop_category` de l'ADR 0055 § 1, choisie par la créatrice ; correction par l'agence au journal ; catégories affichées selon les sorties branchées et les réglages.
 - [ ] Vérification du format par catégorie, par les métadonnées du fichier (`ffprobe`), refus immédiat avec une phrase claire (§ 2).
 - [ ] Retrait des métadonnées (EXIF, GPS, appareil ; équivalents vidéo) à la réception, avant tout stockage durable ; empreinte du fichier nettoyé ; nom d'origine jamais gardé (§ 3).

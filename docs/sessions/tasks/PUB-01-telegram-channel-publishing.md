@@ -1,5 +1,5 @@
 # PUB-01 Connecteur de publication Telegram : le canal d'actualité de la créatrice
-Statut : blocked (ADR 0057 à accepter ; bot Telegram de Charles ; exemples de légendes de Charles)
+Statut : blocked (bot Telegram de Charles ; exemples de légendes de Charles)
 Phase : publication (ADR 0057)
 Dépend de : CR-06 (amendée), CR-08 (plan de la semaine), P3-07 (bot Telegram)
 Branche : task/pub-01-telegram-channel

@@ -1,5 +1,5 @@
 # PUB-02 Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice
-Statut : blocked (ADR 0057 à accepter ; compte professionnel de la créatrice ; application Meta de l'agence)
+Statut : blocked (compte professionnel de la créatrice ; application Meta de l'agence)
 Phase : publication (ADR 0057)
 Dépend de : PUB-01 (port commun), CR-08, CR-06 (amendée)
 Branche : task/pub-02-instagram
