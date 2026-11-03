@@ -188,3 +188,23 @@ export type SalesLineId = z.infer<typeof SalesLineIdSchema>;
 /** A reliability check's report as Impera keeps it (`sales_feed_checks`, CRM-02 and CRM-03). */
 export const SalesFeedCheckIdSchema = uuid.brand<'SalesFeedCheckId'>();
 export type SalesFeedCheckId = z.infer<typeof SalesFeedCheckIdSchema>;
+
+/** A trend signal (`trend_signals`, ADR 0060 § 2). */
+export const TrendSignalIdSchema = uuid.brand<'TrendSignalId'>();
+export type TrendSignalId = z.infer<typeof TrendSignalIdSchema>;
+
+/** A post the extension read while someone watched Instagram (`trend_readings`, ADR 0060 § 2, source 6). */
+export const TrendReadingIdSchema = uuid.brand<'TrendReadingId'>();
+export type TrendReadingId = z.infer<typeof TrendReadingIdSchema>;
+
+/** A content idea (`content_ideas`, ADR 0060 § 4). */
+export const ContentIdeaIdSchema = uuid.brand<'ContentIdeaId'>();
+export type ContentIdeaId = z.infer<typeof ContentIdeaIdSchema>;
+
+/** The link between one person's extension and the server (`extension_links`, VEI-01). */
+export const ExtensionLinkIdSchema = uuid.brand<'ExtensionLinkId'>();
+export type ExtensionLinkId = z.infer<typeof ExtensionLinkIdSchema>;
+
+/** A watch session of the extension, drawn by the extension when someone turns « Veille » on (ADR 0060 § 2). */
+export const WatchSessionIdSchema = uuid.brand<'WatchSessionId'>();
+export type WatchSessionId = z.infer<typeof WatchSessionIdSchema>;

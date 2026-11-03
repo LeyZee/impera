@@ -1,6 +1,6 @@
 {
-  "id": "70125c9c-4e51-43dd-85ba-9d78f6330cba",
-  "prevId": "4f82812f-e32e-4056-800c-3f68f99637b8",
+  "id": "131a7efa-7378-495d-b7ea-32cef117f5f7",
+  "prevId": "604fc15f-965d-49b2-ba8f-84a5d5f6be7e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14894,6 +14894,807 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.content_ideas": {
+      "name": "content_ideas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signal_id": {
+          "name": "signal_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_shoot": {
+          "name": "to_shoot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shoot_minutes": {
+          "name": "shoot_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'proposed'"
+        },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refusal_reason": {
+          "name": "refusal_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "content_ideas_creator_day_idx": {
+          "name": "content_ideas_creator_day_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "proposed_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "content_ideas_creator_id_creators_id_fk": {
+          "name": "content_ideas_creator_id_creators_id_fk",
+          "tableFrom": "content_ideas",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "content_ideas_signal_id_trend_signals_id_fk": {
+          "name": "content_ideas_signal_id_trend_signals_id_fk",
+          "tableFrom": "content_ideas",
+          "tableTo": "trend_signals",
+          "columnsFrom": ["signal_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "content_ideas_decided_by_user_id_fk": {
+          "name": "content_ideas_decided_by_user_id_fk",
+          "tableFrom": "content_ideas",
+          "tableTo": "user",
+          "columnsFrom": ["decided_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_all": {
+          "name": "team_all",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"content_ideas\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')",
+          "withCheck": "\"content_ideas\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        }
+      },
+      "checkConstraints": {
+        "content_ideas_category_check": {
+          "name": "content_ideas_category_check",
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+        },
+        "content_ideas_state_check": {
+          "name": "content_ideas_state_check",
+          "value": "\"content_ideas\".\"state\" in ('proposed', 'validated', 'refused', 'suggested', 'declined', 'deposited')"
+        },
+        "content_ideas_texts_check": {
+          "name": "content_ideas_texts_check",
+          "value": "char_length(\"content_ideas\".\"title\") between 1 and 120 and char_length(\"content_ideas\".\"to_shoot\") between 1 and 600 and char_length(\"content_ideas\".\"reason\") between 1 and 200"
+        },
+        "content_ideas_shoot_minutes_check": {
+          "name": "content_ideas_shoot_minutes_check",
+          "value": "\"content_ideas\".\"shoot_minutes\" between 1 and 600"
+        },
+        "content_ideas_refusal_check": {
+          "name": "content_ideas_refusal_check",
+          "value": "\"content_ideas\".\"refusal_reason\" is null or (\"content_ideas\".\"state\" = 'refused' and char_length(\"content_ideas\".\"refusal_reason\") between 1 and 280)"
+        },
+        "content_ideas_decided_check": {
+          "name": "content_ideas_decided_check",
+          "value": "(\"content_ideas\".\"state\" = 'proposed') = (\"content_ideas\".\"decided_at\" is null) and (\"content_ideas\".\"decided_by\" is null or \"content_ideas\".\"decided_at\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.extension_links": {
+      "name": "extension_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "extension_links_live_unique": {
+          "name": "extension_links_live_unique",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"extension_links\".\"revoked_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "extension_links_user_id_user_id_fk": {
+          "name": "extension_links_user_id_user_id_fk",
+          "tableFrom": "extension_links",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "extension_links_token_hash_unique": {
+          "name": "extension_links_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "extension_links_revoked_check": {
+          "name": "extension_links_revoked_check",
+          "value": "\"extension_links\".\"revoked_at\" is null or \"extension_links\".\"revoked_at\" >= \"extension_links\".\"created_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.trend_readings": {
+      "name": "trend_readings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "recorded_by": {
+          "name": "recorded_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "watch_session_id": {
+          "name": "watch_session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "post_code": {
+          "name": "post_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "path": {
+          "name": "path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account": {
+          "name": "account",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "views": {
+          "name": "views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "likes": {
+          "name": "likes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comments": {
+          "name": "comments",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "caption": {
+          "name": "caption",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hashtags": {
+          "name": "hashtags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "sound": {
+          "name": "sound",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sound_id": {
+          "name": "sound_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dwell_ms": {
+          "name": "dwell_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marked_for_creator_id": {
+          "name": "marked_for_creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seen_at": {
+          "name": "seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trend_readings_account_idx": {
+          "name": "trend_readings_account_idx",
+          "columns": [
+            {
+              "expression": "account",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trend_readings_marked_idx": {
+          "name": "trend_readings_marked_idx",
+          "columns": [
+            {
+              "expression": "marked_for_creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"trend_readings\".\"marked_for_creator_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trend_readings_sound_idx": {
+          "name": "trend_readings_sound_idx",
+          "columns": [
+            {
+              "expression": "sound_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"trend_readings\".\"sound_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trend_readings_recorded_by_user_id_fk": {
+          "name": "trend_readings_recorded_by_user_id_fk",
+          "tableFrom": "trend_readings",
+          "tableTo": "user",
+          "columnsFrom": ["recorded_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "trend_readings_marked_for_creator_id_creators_id_fk": {
+          "name": "trend_readings_marked_for_creator_id_creators_id_fk",
+          "tableFrom": "trend_readings",
+          "tableTo": "creators",
+          "columnsFrom": ["marked_for_creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "trend_readings_session_post_unique": {
+          "name": "trend_readings_session_post_unique",
+          "nullsNotDistinct": false,
+          "columns": ["recorded_by", "watch_session_id", "post_code"]
+        }
+      },
+      "policies": {
+        "recorder_all": {
+          "name": "recorder_all",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"trend_readings\".\"recorded_by\" = nullif(current_setting('app.user_id', true), '')",
+          "withCheck": "\"trend_readings\".\"recorded_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "creator_marks_her_own": {
+          "name": "creator_marks_her_own",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "true",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' or \"trend_readings\".\"marked_for_creator_id\" is null or \"trend_readings\".\"marked_for_creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "trend_readings_sound_id_check": {
+          "name": "trend_readings_sound_id_check",
+          "value": "\"trend_readings\".\"sound_id\" is null or \"trend_readings\".\"sound_id\" ~ '^[0-9]{1,32}$'"
+        },
+        "trend_readings_path_check": {
+          "name": "trend_readings_path_check",
+          "value": "\"trend_readings\".\"path\" in ('post', 'reel')"
+        },
+        "trend_readings_code_check": {
+          "name": "trend_readings_code_check",
+          "value": "\"trend_readings\".\"post_code\" ~ '^[A-Za-z0-9_-]{5,64}$'"
+        },
+        "trend_readings_account_check": {
+          "name": "trend_readings_account_check",
+          "value": "\"trend_readings\".\"account\" is null or \"trend_readings\".\"account\" ~ '^[A-Za-z0-9._]{1,30}$'"
+        },
+        "trend_readings_texts_check": {
+          "name": "trend_readings_texts_check",
+          "value": "coalesce(char_length(\"trend_readings\".\"caption\"), 0) <= 2200 and coalesce(char_length(\"trend_readings\".\"sound\"), 1) between 1 and 200"
+        },
+        "trend_readings_hashtags_check": {
+          "name": "trend_readings_hashtags_check",
+          "value": "jsonb_typeof(\"trend_readings\".\"hashtags\") = 'array' and jsonb_array_length(\"trend_readings\".\"hashtags\") <= 30"
+        },
+        "trend_readings_metrics_check": {
+          "name": "trend_readings_metrics_check",
+          "value": "coalesce(\"trend_readings\".\"views\", 0) >= 0 and coalesce(\"trend_readings\".\"likes\", 0) >= 0 and coalesce(\"trend_readings\".\"comments\", 0) >= 0"
+        },
+        "trend_readings_dwell_check": {
+          "name": "trend_readings_dwell_check",
+          "value": "\"trend_readings\".\"dwell_ms\" between 0 and 2700000"
+        },
+        "trend_readings_seen_check": {
+          "name": "trend_readings_seen_check",
+          "value": "\"trend_readings\".\"seen_at\" >= \"trend_readings\".\"first_seen_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.trend_signals": {
+      "name": "trend_signals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "format": {
+          "name": "format",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "views": {
+          "name": "views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "likes": {
+          "name": "likes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comments": {
+          "name": "comments",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reading_id": {
+          "name": "reading_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trend_signals_link_unique": {
+          "name": "trend_signals_link_unique",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"trend_signals\".\"source\" in ('agency_link', 'creator_link')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trend_signals_creator_expiry_idx": {
+          "name": "trend_signals_creator_expiry_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trend_signals_creator_id_creators_id_fk": {
+          "name": "trend_signals_creator_id_creators_id_fk",
+          "tableFrom": "trend_signals",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "trend_signals_reading_id_trend_readings_id_fk": {
+          "name": "trend_signals_reading_id_trend_readings_id_fk",
+          "tableFrom": "trend_signals",
+          "tableTo": "trend_readings",
+          "columnsFrom": ["reading_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "trend_signals_created_by_user_id_fk": {
+          "name": "trend_signals_created_by_user_id_fk",
+          "tableFrom": "trend_signals",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "trend_signals_reading_unique": {
+          "name": "trend_signals_reading_unique",
+          "nullsNotDistinct": false,
+          "columns": ["reading_id"]
+        }
+      },
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and (\"trend_signals\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid or \"trend_signals\".\"creator_id\" is null)"
+        },
+        "member_link_insert": {
+          "name": "member_link_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') is not null and \"trend_signals\".\"source\" = 'agency_link' and \"trend_signals\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"trend_signals\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_link_insert": {
+          "name": "creator_link_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"trend_signals\".\"source\" = 'creator_link' and \"trend_signals\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"trend_signals\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "trend_signals_source_check": {
+          "name": "trend_signals_source_check",
+          "value": "\"trend_signals\".\"source\" in ('creator_stats', 'grok_search', 'reference_account', 'agency_link', 'creator_link', 'passive_capture')"
+        },
+        "trend_signals_kind_check": {
+          "name": "trend_signals_kind_check",
+          "value": "\"trend_signals\".\"kind\" in ('format', 'sound', 'theme', 'date')"
+        },
+        "trend_signals_format_check": {
+          "name": "trend_signals_format_check",
+          "value": "\"trend_signals\".\"format\" is null or \"trend_signals\".\"format\" in ('reel', 'photo', 'carousel', 'story')"
+        },
+        "trend_signals_text_check": {
+          "name": "trend_signals_text_check",
+          "value": "char_length(\"trend_signals\".\"text\") between 1 and 280"
+        },
+        "trend_signals_url_check": {
+          "name": "trend_signals_url_check",
+          "value": "\"trend_signals\".\"url\" is null or char_length(\"trend_signals\".\"url\") <= 2048"
+        },
+        "trend_signals_metrics_check": {
+          "name": "trend_signals_metrics_check",
+          "value": "coalesce(\"trend_signals\".\"views\", 0) >= 0 and coalesce(\"trend_signals\".\"likes\", 0) >= 0 and coalesce(\"trend_signals\".\"comments\", 0) >= 0"
+        },
+        "trend_signals_lifetime_check": {
+          "name": "trend_signals_lifetime_check",
+          "value": "\"trend_signals\".\"expires_at\" > \"trend_signals\".\"observed_at\""
+        },
+        "trend_signals_link_check": {
+          "name": "trend_signals_link_check",
+          "value": "\"trend_signals\".\"source\" not in ('agency_link', 'creator_link') or (\"trend_signals\".\"url\" is not null and \"trend_signals\".\"created_by\" is not null and \"trend_signals\".\"creator_id\" is not null and \"trend_signals\".\"format\" is not null)"
+        },
+        "trend_signals_reading_check": {
+          "name": "trend_signals_reading_check",
+          "value": "(\"trend_signals\".\"source\" = 'passive_capture') = (\"trend_signals\".\"reading_id\" is not null)"
+        }
+      },
       "isRLSEnabled": false
     }
   },

@@ -16,6 +16,7 @@ export const SECTIONS = [
   '/entrainer',
   '/planning',
   '/commissions',
+  '/ventes',
   '/equipe',
   '/paie',
   '/creatrices',
@@ -32,6 +33,7 @@ export const READY_SECTIONS = [
   '/entrainer',
   '/planning',
   '/commissions',
+  '/ventes',
   '/equipe',
   '/paie',
   '/creatrices',
@@ -58,6 +60,7 @@ const ITEMS: Readonly<Record<Section, { readonly label: string; readonly icon: N
   '/entrainer': { label: 'Entraîner', icon: 'train' },
   '/planning': { label: 'Planning', icon: 'planning' },
   '/commissions': { label: 'Commissions', icon: 'pay' },
+  '/ventes': { label: 'Ventes', icon: 'pay' },
   '/equipe': { label: 'Équipe', icon: 'team' },
   '/paie': { label: 'Paie', icon: 'pay' },
   '/creatrices': { label: 'Créatrices', icon: 'creators' },
@@ -127,14 +130,16 @@ const RAILS: Readonly<Record<RailKind, RailPlan>> = {
     settings: false,
     phone: ['/', '/suivi', '/creatrices'],
   },
-  // Agenda (CR-05), Ventes (CR-04) and Contenu (CR-06) join it with their screens; her persona lives in Moi.
+  // Agenda (CR-05) and Contenu (CR-06) join it with their screens; Ventes holds her fans first, then her earnings
+  // and her sales (CR-04); her persona lives in Moi.
   creator: {
     sections: [
       ['/aujourdhui', null],
+      ['/ventes', null],
       ['/moi', null],
     ],
     settings: false,
-    phone: ['/aujourdhui', '/moi'],
+    phone: ['/aujourdhui', '/ventes', '/moi'],
   },
 };
 
