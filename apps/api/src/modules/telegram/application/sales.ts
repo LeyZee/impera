@@ -8,7 +8,7 @@ import {
 } from '@nirvana/contracts';
 
 import { chatsFor } from '../domain/coverage';
-import type { BotsStore, Clock, DeliveriesStore, SalesTotalsReader } from '../domain/ports';
+import type { BotsStore, Clock, DeliveriesStore, SalesDayReader } from '../domain/ports';
 import { eveningDigestText, saleSettingsFor } from '../domain/sales';
 import { eveningDigestOf } from '../domain/schedule';
 
@@ -40,15 +40,15 @@ export async function saveSaleSettings(
 
 /**
  * `telegram.evening_digest`, hourly: in each creator's 23 o'clock hour, her day's sales to the groups of her sales
- * topic, unless the owner turned the digest off for her. The key of the day makes it once, whatever the cron does. A
- * creator whose totals cannot be read does not hold the others back: the run goes on, then fails naming how many were
- * missed, so the worker logs it.
+ * topic, unless the owner turned the digest off for her or none of her accounts is linked to a register. The key of
+ * the day makes it once, whatever the cron does. A creator whose day cannot be read does not hold the others back: the
+ * run goes on, then fails naming how many were missed, so the worker logs it and retries within the hour.
  */
 export async function eveningDigest(deps: {
   readonly bots: BotsStore;
   readonly deliveries: DeliveriesStore;
   readonly clock: Clock;
-  readonly salesTotals: SalesTotalsReader;
+  readonly salesDay: SalesDayReader;
 }): Promise<number> {
   const now = deps.clock.now();
   const [creators, { routes }, chats, settings] = await Promise.all([
@@ -67,25 +67,26 @@ export async function eveningDigest(deps: {
     if (evening === null || !saleSettingsFor(settings, creator.id).eveningDigest) continue;
     const targets = chatsFor(routes, creator.id, 'sale').filter((id) => reachable.has(id));
     if (targets.length === 0) continue;
-    let totals;
+    let day;
     try {
-      totals = await deps.salesTotals.totalsOf(creator.id, evening.day);
+      day = await deps.salesDay.dayOf(creator.id, evening.day);
     } catch {
       missed += 1;
       continue;
     }
     const memberIds = new Set(
-      totals.rows.flatMap((row) => (row.seller.kind === 'member' ? [row.seller.memberId] : [])),
+      day.totals.rows.flatMap((row) => (row.seller.kind === 'member' ? [row.seller.memberId] : [])),
     );
     const names = new Map<string, string | null>();
     for (const memberId of memberIds) {
       names.set(memberId, await deps.bots.memberName(memberId).catch(() => null));
     }
-    const { text, summary } = eveningDigestText(
-      creator.displayName,
-      totals,
-      (memberId) => names.get(memberId) ?? null,
-    );
+    const digest = eveningDigestText(creator.displayName, day, (memberId) => names.get(memberId) ?? null, {
+      now,
+      timeZone: creator.timezone,
+    });
+    if (digest === null) continue;
+    const { text, summary } = digest;
     for (const chatId of targets) {
       const added = await deps.deliveries.insertDelivery(
         {

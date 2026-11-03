@@ -5,6 +5,7 @@ import {
   INVOICE_NOT_ISSUED_REASONS,
   PayPeriodSchema,
   PlatformAccountIdSchema,
+  SalesRefundsSchema,
   SalesTotalsSchema,
   TelegramChatIdSchema,
   TeamMemberIdSchema,
@@ -611,7 +612,7 @@ describe('sales topic (CRM-04 lot b)', () => {
     const totals = SalesTotalsSchema.parse({
       from: '2026-11-03',
       to: '2026-11-03',
-      refundsWithoutSale: 1,
+      refundsWithoutSale: 0,
       rows: [
         {
           ...row,
@@ -644,9 +645,36 @@ describe('sales topic (CRM-04 lot b)', () => {
         },
       ],
     });
-    const { text, summary } = eveningDigestText('Nora', totals, (id) => (id === memberId ? 'Théo' : null));
+    const refundRow = {
+      platform: 'reveal',
+      platformAccountId: row.platformAccountId,
+      currency: 'EUR',
+      saleType: 'ppv',
+      seller: { kind: 'member', memberId },
+      refunds: 1,
+      grossInclVatMinor: 2000,
+      grossExclVatMinor: 1667,
+      netMinor: 1300,
+      agencyMinor: 650,
+      creatorMinor: 650,
+    } as const;
+    const refunds = SalesRefundsSchema.parse({
+      day: '2026-11-03',
+      rows: [
+        // Of today's own sale: already taken off the totals, never said again.
+        { ...refundRow, sale: 'same_day' },
+        { ...refundRow, sale: 'earlier_day', refunds: 2, grossInclVatMinor: 4500 },
+        { ...refundRow, sale: 'not_in_register', grossInclVatMinor: 1000 },
+        { ...refundRow, currency: 'USD', sale: 'earlier_day', grossInclVatMinor: 1500 },
+      ],
+    });
+    const now = new Date('2026-11-03T22:05:00Z'); // 23:05 in Paris
+    const clock = { now, timeZone: 'Europe/Paris' };
+    const readings = [{ platform: 'reveal', readAt: '2026-11-03T22:04:00.000Z', pausedUntil: null }] as const;
+    const names = (id: string) => (id === memberId ? 'Théo' : null);
+    const digest = eveningDigestText('Nora', { totals, refunds, readings }, names, clock);
     const nbsp = (value: string) => value.replaceAll(' ', '\u202f');
-    expect(text).toBe(
+    expect(digest?.text).toBe(
       [
         '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>',
         `Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`,
@@ -655,12 +683,42 @@ describe('sales topic (CRM-04 lot b)', () => {
         'Théo : 300,00\u00a0€ (4 ventes, 1 remboursement)',
         'L’agent : 900,00\u00a0€ (7 ventes)',
         'Sans chatteur : 34,56\u00a0€ (1 vente)',
-        '1 remboursement d’une vente plus ancienne que le registre, hors totaux.',
+        '3 remboursements de ventes d’avant · -55,00\u00a0€',
+        '',
+        '1 remboursement de ventes d’avant · -15,00\u00a0$US',
       ].join('\n'),
     );
-    expect(summary).toBe(`Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`);
-    expect(eveningDigestText('Nora', { ...totals, rows: [], refundsWithoutSale: 0 }, () => null).text).toBe(
+    expect(digest?.summary).toBe(`Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`);
+
+    const empty = { totals: { ...totals, rows: [] }, refunds: { day: '2026-11-03', rows: [] }, readings };
+    expect(eveningDigestText('Nora', empty, () => null, clock)?.text).toBe(
       '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>\nAucune vente aujourd’hui.',
+    );
+  });
+
+  it('says nothing for a creator with no register, and never « no sale » for a day not read (ADR 0054)', () => {
+    const totals = SalesTotalsSchema.parse({
+      from: '2026-11-03',
+      to: '2026-11-03',
+      rows: [],
+      refundsWithoutSale: 0,
+    });
+    const refunds = { day: '2026-11-03', rows: [] };
+    const clock = { now: new Date('2026-11-03T22:05:00Z'), timeZone: 'Europe/Paris' };
+    expect(eveningDigestText('Nora', { totals, refunds, readings: [] }, () => null, clock)).toBeNull();
+    const stale = [{ platform: 'reveal', readAt: '2026-11-03T19:40:00.000Z', pausedUntil: null }] as const;
+    expect(eveningDigestText('Nora', { totals, refunds, readings: stale }, () => null, clock)?.text).toBe(
+      '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>\n⚠️ Ventes Reveal non lues depuis 20:40 : chiffres incomplets.',
+    );
+    const yesterday = [
+      { platform: 'reveal', readAt: '2026-11-02T20:40:00.000Z', pausedUntil: null },
+    ] as const;
+    expect(
+      eveningDigestText('Nora', { totals, refunds, readings: yesterday }, () => null, clock)?.text,
+    ).toContain('non lues depuis 02/11 à 21:40');
+    const never = [{ platform: 'reveal', readAt: null, pausedUntil: null }] as const;
+    expect(eveningDigestText('Nora', { totals, refunds, readings: never }, () => null, clock)?.summary).toBe(
+      '⚠️ Ventes Reveal jamais lues : chiffres incomplets.',
     );
   });
 });

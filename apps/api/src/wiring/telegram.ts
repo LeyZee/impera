@@ -49,10 +49,15 @@ export async function wireTelegram(
             ofCreator: async (creatorId) =>
               new Map([...(await deps.alerts.store.names(creatorId))].map(([id, alert]) => [id, alert.name])),
           },
-          // The evening digest reads the one rule of the totals (CRM-04), as the admin role: the job sees every creator.
-          salesTotals: {
-            totalsOf: (creatorId, day) =>
-              withAdmin(adminDb, (tx) => salesFeedTotals.totalsOf(tx, { creatorId, from: day, to: day })),
+          // The evening digest reads her day in `connectors` (CRM-04) in one transaction, as the admin role: the job
+          // sees every creator. The totals, the day's refunds by their own day, how far each register was read.
+          salesDay: {
+            dayOf: (creatorId, day) =>
+              withAdmin(adminDb, async (tx) => ({
+                totals: await salesFeedTotals.totalsOf(tx, { creatorId, from: day, to: day }),
+                refunds: await salesFeedTotals.refundsOf(tx, { creatorId, day }),
+                readings: await salesFeedTotals.readingsOf(tx, creatorId),
+              })),
           },
           // A dollar sale against the minimum in euros: the newest ECB rate of its day or before (ADR 0033), the day in
           // the agency's zone, as the creator's screen and the Dashboard convert.

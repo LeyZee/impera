@@ -2,12 +2,14 @@ import {
   DEFAULT_TELEGRAM_SALE_SETTINGS,
   type CreatorId,
   type Currency,
+  PLATFORM_NAMES,
   type SalesTotals,
   type TelegramSaleSettings,
   type TelegramSaleSettingsEntry,
 } from '@nirvana/contracts';
 
 import type { MemberNameOf } from './classify';
+import type { SalesDay } from './ports';
 import { renderPlain } from './render';
 import type { Signal } from './signals';
 
@@ -111,18 +113,49 @@ function sellerRank(key: SellerKey): number {
   return 0;
 }
 
+/** A register not read for this long is said not read: the reading runs every minute (ADR 0054). */
+const SALES_UNREAD_AFTER_MS = 60 * 60_000;
+
+/** When a register was last read, in her zone: « 21:40 » today, « 02/11 à 21:40 » before. */
+function readTime(at: Date, now: Date, timeZone: string): string {
+  const day = (date: Date) =>
+    date.toLocaleDateString('fr-FR', { timeZone, day: '2-digit', month: '2-digit' });
+  const time = at.toLocaleTimeString('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit' });
+  return day(at) === day(now) ? time : `${day(at)} à ${time}`;
+}
+
 /**
- * The evening digest of one creator's day (CRM-04 lot b), in HTML: per currency, the « Chiffre d'affaires » (what the
- * fans paid, VAT included, refunds taken off), the net, the two shares, the number of sales and refunds; then each
- * seller: a member by name, the agent, the chatters nobody linked, « Sans chatteur ». Never a fan, never a sale's key.
+ * The evening digest of one creator's day (CRM-04 lot b), in HTML; `null` when none of her accounts is linked to a
+ * register (nothing read, nothing to say). Per currency: the « Chiffre d'affaires » (what the fans paid, VAT included,
+ * the refunds of the day's own sales taken off), the net, the two shares, the number of sales and refunds; then each
+ * seller: a member by name, the agent, the chatters nobody linked, « Sans chatteur »; then the refunds made today of
+ * an earlier sale (or one older than the register), which no total of today holds: said apart, never taken off twice.
+ * A register not read for an hour says so first (ADR 0054); when none was read, no figure is given, so a day not read
+ * never reads as a day without a sale. Never a fan, never a sale's key.
  */
 export function eveningDigestText(
   creatorName: string,
-  totals: SalesTotals,
+  day: SalesDay,
   memberNameOf: MemberNameOf,
-): { readonly text: string; readonly summary: string } {
+  clock: { readonly now: Date; readonly timeZone: string },
+): { readonly text: string; readonly summary: string } | null {
+  if (day.readings.length === 0) return null;
+  const unread = day.readings.filter(
+    (reading) =>
+      reading.readAt === null || clock.now.getTime() - Date.parse(reading.readAt) > SALES_UNREAD_AFTER_MS,
+  );
+  const warnings = unread.map((reading) =>
+    reading.readAt === null
+      ? `⚠️ Ventes ${PLATFORM_NAMES[reading.platform]} jamais lues : chiffres incomplets.`
+      : `⚠️ Ventes ${PLATFORM_NAMES[reading.platform]} non lues depuis ${readTime(new Date(reading.readAt), clock.now, clock.timeZone)} : chiffres incomplets.`,
+  );
+  const title = `💰 <b>Bilan du soir · ${renderPlain(creatorName)} · jusqu’à 23 h</b>`;
+  if (unread.length === day.readings.length) {
+    return { text: `${title}\n${warnings.map(renderPlain).join('\n')}`, summary: warnings[0] ?? '' };
+  }
+
   const byCurrency = new Map<Currency, { all: Sums; sellers: Map<SellerKey, Sums> }>();
-  for (const row of totals.rows) {
+  for (const row of day.totals.rows) {
     let entry = byCurrency.get(row.currency);
     if (entry === undefined) {
       entry = { all: zero(), sellers: new Map() };
@@ -137,43 +170,55 @@ export function eveningDigestText(
     }
     add(sums, row);
   }
+  // Refunds of an earlier sale, by currency: today's own sales' refunds are already in the totals above.
+  const earlier = new Map<Currency, { count: number; gross: number }>();
+  for (const row of day.refunds.rows) {
+    if (row.sale === 'same_day') continue;
+    const sums = earlier.get(row.currency) ?? { count: 0, gross: 0 };
+    sums.count += row.refunds;
+    sums.gross += row.grossInclVatMinor;
+    earlier.set(row.currency, sums);
+  }
 
   const lines: string[] = [];
-  const currencies = [...byCurrency.keys()].sort();
+  const currencies = [...new Set([...byCurrency.keys(), ...earlier.keys()])].sort();
   for (const currency of currencies) {
-    const entry = byCurrency.get(currency);
-    if (entry === undefined) continue;
     const money = (minor: number) => saleAmount(minor, currency);
-    const { all } = entry;
     if (lines.length > 0) lines.push('');
-    lines.push(`Chiffre d’affaires ${money(all.gross)} · net ${money(all.net)}`);
-    lines.push(`Part de l’agence ${money(all.agency)} · part de la créatrice ${money(all.creator)}`);
-    lines.push(
-      `${plural(all.sales, 'vente', 'ventes')} · ${plural(all.refunds, 'remboursement', 'remboursements')}`,
-    );
-    // Members first, the best seller at the top (then by name, so the text is stable), then the agent and the rest.
-    const sellers = [...entry.sellers].sort(
-      ([a, sa], [b, sb]) =>
-        sellerRank(a) - sellerRank(b) ||
-        sb.gross - sa.gross ||
-        sellerLabel(a, memberNameOf).localeCompare(sellerLabel(b, memberNameOf), 'fr'),
-    );
-    for (const [key, sums] of sellers) {
-      const refunds =
-        sums.refunds === 0 ? '' : `, ${plural(sums.refunds, 'remboursement', 'remboursements')}`;
+    const entry = byCurrency.get(currency);
+    if (entry !== undefined) {
+      const { all } = entry;
+      lines.push(`Chiffre d’affaires ${money(all.gross)} · net ${money(all.net)}`);
+      lines.push(`Part de l’agence ${money(all.agency)} · part de la créatrice ${money(all.creator)}`);
       lines.push(
-        `${sellerLabel(key, memberNameOf)} : ${money(sums.gross)} (${plural(sums.sales, 'vente', 'ventes')}${refunds})`,
+        `${plural(all.sales, 'vente', 'ventes')} · ${plural(all.refunds, 'remboursement', 'remboursements')}`,
+      );
+      // Members first, the best seller at the top (then by name, so the text is stable), then the agent and the rest.
+      const sellers = [...entry.sellers].sort(
+        ([a, sa], [b, sb]) =>
+          sellerRank(a) - sellerRank(b) ||
+          sb.gross - sa.gross ||
+          sellerLabel(a, memberNameOf).localeCompare(sellerLabel(b, memberNameOf), 'fr'),
+      );
+      for (const [key, sums] of sellers) {
+        const refunds =
+          sums.refunds === 0 ? '' : `, ${plural(sums.refunds, 'remboursement', 'remboursements')}`;
+        lines.push(
+          `${sellerLabel(key, memberNameOf)} : ${money(sums.gross)} (${plural(sums.sales, 'vente', 'ventes')}${refunds})`,
+        );
+      }
+    }
+    const refunded = earlier.get(currency);
+    if (refunded !== undefined) {
+      lines.push(
+        `${plural(refunded.count, 'remboursement', 'remboursements')} de ventes d’avant · ${money(-refunded.gross)}`,
       );
     }
   }
   if (lines.length === 0) lines.push('Aucune vente aujourd’hui.');
-  if (totals.refundsWithoutSale > 0) {
-    lines.push(
-      `${plural(totals.refundsWithoutSale, 'remboursement', 'remboursements')} d’une vente plus ancienne que le registre, hors totaux.`,
-    );
-  }
+  const all = [...warnings, ...lines];
   return {
-    text: `💰 <b>Bilan du soir · ${renderPlain(creatorName)} · jusqu’à 23 h</b>\n${lines.map(renderPlain).join('\n')}`,
-    summary: lines[0] ?? '',
+    text: `${title}\n${all.map(renderPlain).join('\n')}`,
+    summary: all[0] ?? '',
   };
 }

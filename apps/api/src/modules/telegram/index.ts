@@ -28,7 +28,7 @@ import type {
   Clock,
   DeliveriesStore,
   NotificationChannel,
-  SalesTotalsReader,
+  SalesDayReader,
   UsdRateReader,
 } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
@@ -51,8 +51,8 @@ export interface TelegramDeps {
   readonly resealTokens?: () => Promise<ResealReport>;
   /** Her alerts' names, to name the alert in its message (P4-01). */
   readonly alertNames?: AlertNames;
-  /** Her day's sales totals (`salesFeedTotals` of `connectors`), for the evening digest; without them, no digest. */
-  readonly salesTotals?: SalesTotalsReader;
+  /** Her day's sales (`salesFeedTotals` of `connectors`), for the evening digest; without them, no digest. */
+  readonly salesDay?: SalesDayReader;
   /** Pay's dollar rate (`latestRateOf` of `payroll`), for the minimum price of a dollar sale. */
   readonly usdRate?: UsdRateReader;
 }
@@ -111,9 +111,9 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
       pollUpdates: (botId, waitSeconds) => pollBot(base, botId, waitSeconds),
       morningDigest: () => morningDigest(base),
       eveningDigest: () =>
-        deps.salesTotals === undefined
+        deps.salesDay === undefined
           ? Promise.resolve(0)
-          : eveningDigest({ ...base, salesTotals: deps.salesTotals }),
+          : eveningDigest({ ...base, salesDay: deps.salesDay }),
       purge: () => purge(base),
     },
     start: () => deps.resealTokens?.() ?? Promise.resolve({ rewritten: 0, unreadable: [] }),
@@ -130,7 +130,7 @@ export interface TelegramStartOptions {
   /** Tokens no listed key opens, found at start: the caller logs them (the old key was dropped too early). */
   readonly onUnreadableTokens: (bots: readonly string[]) => void;
   readonly alertNames: AlertNames;
-  readonly salesTotals: SalesTotalsReader;
+  readonly salesDay: SalesDayReader;
   readonly usdRate: UsdRateReader;
 }
 
@@ -148,7 +148,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     onUncovered: options.onUncovered,
     resealTokens: store.resealTokens,
     alertNames: options.alertNames,
-    salesTotals: options.salesTotals,
+    salesDay: options.salesDay,
     usdRate: options.usdRate,
   });
   const report = await module.start();

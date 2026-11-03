@@ -52,6 +52,7 @@ describe('telegram module on Postgres', () => {
   /** Her day's sales totals, as `salesFeedTotals` gives them; the days asked, to check the digest's day. */
   let salesTotals: SalesTotals = { from: '', to: '', rows: [], refundsWithoutSale: 0 };
   const totalsAsked: string[] = [];
+  let registerLinked = true;
   let usdRateMicros: number | null = null;
 
   function build(encryptionKeys = keys): {
@@ -72,10 +73,16 @@ describe('telegram module on Postgres', () => {
         onUncovered: (event) => uncovered.push(event.id),
         resealTokens: store.resealTokens,
         alertNames: { ofCreator: (creatorId) => Promise.resolve(names.get(creatorId) ?? new Map()) },
-        salesTotals: {
-          totalsOf: (_creatorId, day) => {
+        salesDay: {
+          dayOf: (_creatorId, day) => {
             totalsAsked.push(day);
-            return Promise.resolve({ ...salesTotals, from: day, to: day });
+            // Read a minute ago, as the clock of the test says, unless the register is unlinked.
+            const readAt = new Date(clock.now().getTime() - 60_000).toISOString();
+            return Promise.resolve({
+              totals: { ...salesTotals, from: day, to: day },
+              refunds: { day, rows: [] },
+              readings: registerLinked ? [{ platform: 'reveal' as const, readAt, pausedUntil: null }] : [],
+            });
           },
         },
         usdRate: { onDayOf: () => Promise.resolve(usdRateMicros) },
@@ -514,6 +521,12 @@ describe('telegram module on Postgres', () => {
     });
     expect(row?.text).toContain('💰 <b>Bilan du soir · Démo · jusqu’à 23 h</b>');
     expect(row?.text).toContain('Théo : 90,00\u00a0€ (2 ventes)');
+
+    // No register linked: nothing to say, nothing sent (ADR 0054).
+    registerLinked = false;
+    offsetMs = Date.parse('2026-11-05T22:30:00Z') - Date.now();
+    expect(await module.jobs.eveningDigest()).toBe(0);
+    registerLinked = true;
 
     // An hour earlier is not her 23 h; turned off, nothing goes the next day.
     offsetMs = Date.parse('2026-11-04T21:30:00Z') - Date.now();

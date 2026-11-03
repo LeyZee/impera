@@ -1,5 +1,7 @@
 import type {
   CreatorId,
+  SalesFeedReading,
+  SalesRefunds,
   SalesTotals,
   TelegramBotId,
   TelegramBotState,
@@ -161,8 +163,19 @@ export interface UsdRateReader {
   onDayOf(occurredAt: Date): Promise<number | null>;
 }
 
-export interface SalesTotalsReader {
-  totalsOf(creatorId: CreatorId, day: string): Promise<SalesTotals>;
+/**
+ * What the evening digest reads of a creator's day in `connectors`, in one transaction (CRM-04): the totals (each line
+ * on its sale's day), the refunds made that day (each on its own day, its sale's day said), and how far each register
+ * where one of her accounts is linked was read (ADR 0054). No reading: no register linked.
+ */
+export interface SalesDay {
+  readonly totals: SalesTotals;
+  readonly refunds: SalesRefunds;
+  readonly readings: readonly SalesFeedReading[];
+}
+
+export interface SalesDayReader {
+  dayOf(creatorId: CreatorId, day: string): Promise<SalesDay>;
 }
 
 interface ScanBatch {
