@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import {
   CreatorIdSchema,
   newId,
@@ -27,6 +25,7 @@ import {
   type Database,
   type Transaction,
 } from '@nirvana/db';
+import { z } from 'zod';
 
 import {
   OwnerOnly,
@@ -304,7 +303,8 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
     addSlotVersion: (actor, version) =>
       withMember(db, actor.userId, async (tx, scope) => {
         if (scope !== 'owner') throw new OwnerOnly();
-        const id = randomUUID();
+        // A v7 uuid, as every id of the base: in the order of the writes.
+        const id = newId(z.uuid());
         try {
           // In savepoints: a refusal leaves the transaction usable for nothing else, but its code is read here.
           await tx.transaction((savepoint) =>
@@ -326,9 +326,11 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
           const pg = pgErrorOf(error);
           if (pg?.code === '23505') throw new SlotVersionConflict();
           if (pg?.code === '23503') throw new PlatformAccountNotFound();
-          // The policy wants `effective_at >= now()`, the trigger on the places a version still ahead: its instant
-          // passed between the domain's check and the write.
-          if (pg?.code === '42501' || pg?.code === '23001') throw new SlotVersionDateInvalid();
+          // The trigger on the places wants a version still ahead, the policy `effective_at >= now()`: its instant
+          // passed between the domain's check and the write. Any other refusal of the policy is not this one.
+          if (pg?.code === '23001') throw new SlotVersionDateInvalid();
+          if (pg?.code === '42501' && version.effectiveAt.getTime() <= Date.now())
+            throw new SlotVersionDateInvalid();
           throw error;
         }
         await audit(

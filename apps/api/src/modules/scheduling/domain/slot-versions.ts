@@ -9,7 +9,7 @@ import { addDays, calendarDayIn, isoWeekday, wallClockToInstant } from './time';
  * then the instant it takes effect, in the grid's zone:
  * - a Monday (`startsOn`): at its first créneau's start that day, which must be ahead;
  * - « tout de suite » (`null`): at the next start of one of its créneaux after `now`, so that the créneau under way
- *   keeps its hours and ends where the new one begins (`slotWindowsOf`). Nothing is ever back-dated.
+ *   keeps its start and ends where the new one begins (`slotWindowsOf`). Nothing is ever back-dated.
  */
 export function effectiveAtOf(input: SlotVersionInput, now: Date, timeZone: string): Date {
   const held = SlotVersionInputSchema.safeParse(input);

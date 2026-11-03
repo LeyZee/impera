@@ -901,8 +901,11 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     const shiftsAhead = async () =>
       (await planning(owner, minutesFromNow(0), minutesFromNow(28 * 24 * 60))).shifts.map((shift) => [
         shift.id,
+        shift.memberId,
+        shift.platformAccountId,
         shift.startsAt,
         shift.endsAt,
+        shift.stoppedAt,
         shift.templateId,
       ]);
     const before = await shiftsAhead();
