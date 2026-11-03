@@ -1,0 +1,446 @@
+/*
+ * The team's calendar (CR-12): the week reuses the grid of Équipe › Planning (scheduling.css), the month and the
+ * agent's marks are here. Everything the agent does is in `--nv-agent`, never in the brand's red, kept for urgencies
+ * (ADR 0048, Extension 02/11). Design-system tokens only.
+ */
+
+/* Read by a screen reader, out of sight. */
+.cal-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The agent under a creator's name: its violet dot, its mode and hours. */
+.cal-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-agent);
+}
+.cal-agent[data-mode='stop'] {
+  color: var(--nv-ink-muted);
+}
+.cal-agent__dot {
+  flex: none;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-agent);
+}
+.cal-agent[data-mode='stop'] .cal-agent__dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-faint);
+}
+
+.cal-slot {
+  position: relative;
+}
+/* A créneau read, not a button: no hover lift on a chip nobody can open here. */
+.cal-chip {
+  cursor: default;
+}
+.cal-chip:hover,
+.cal-chip:active {
+  transform: none;
+  background: color-mix(in srgb, var(--sc-color) 16%, var(--nv-surface-raised));
+  box-shadow:
+    inset 3px 0 0 var(--sc-color),
+    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
+}
+.cal-chip[data-mine='true'] .sc-chip__name {
+  font-weight: 700;
+}
+/* The agent on the whole créneau: a fixed violet edge on its right, beside whoever holds it. */
+.cal-slot[data-ai]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: -3px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-agent);
+  pointer-events: none;
+}
+/* On part of it: the edge stays, and a quiet tag says from or until when, « IA dès 9 h ». */
+.cal-slot[data-ai='part']::after {
+  background: repeating-linear-gradient(var(--nv-agent) 0 4px, transparent 4px 7px);
+}
+.cal-tag {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  z-index: 1;
+  padding: 1px 7px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-agent) 16%, var(--nv-surface-raised));
+  color: var(--nv-agent);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Nobody but the agent, in Automatique: a solid violet edge, the word said. */
+.cal-alone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 4px 8px;
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-agent-soft);
+  box-shadow: inset 3px 0 0 var(--nv-agent);
+  color: var(--nv-agent);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 650;
+}
+/* The créneau's hours, quiet, at the end of a mark that names nobody. */
+.cal-hours {
+  margin-left: auto;
+  padding-left: var(--nv-space-2);
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+.cal-free[data-past='true'] {
+  border-color: var(--nv-hairline);
+}
+.cal-free[data-past='true'] .cal-hours {
+  margin-left: 0;
+  padding-left: 0;
+  color: var(--nv-ink-faint);
+}
+.cal-alone--key {
+  flex: none;
+  min-height: 0;
+  padding: 1px 8px;
+}
+/* A créneau ahead with nobody, for a reader who cannot fill it: dashed, neutral, no amber. */
+.cal-free {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 1px dashed color-mix(in srgb, var(--nv-ink-faint) 55%, transparent);
+  border-radius: var(--nv-radius-sm);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+.cal-free--key {
+  flex: none;
+  width: 18px;
+  min-height: 12px;
+  padding: 0;
+}
+
+/* The legend: the members to follow, then the keys. */
+.cal-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3) var(--nv-space-5);
+  border-top: 1px solid var(--nv-hairline);
+}
+.cal-legend__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.cal-legend__member {
+  --sc-color: var(--nv-ink-faint);
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  color: var(--nv-ink);
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cal-legend__member:hover {
+  background: var(--nv-plate-hover);
+}
+.cal-legend__member[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--sc-color) 18%, var(--nv-surface-raised));
+  box-shadow: inset 0 0 0 1.5px var(--sc-color);
+  font-weight: 650;
+}
+.cal-legend__member:focus-visible,
+.cal-day:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.cal-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--sc-color);
+}
+.cal-legend__keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-5);
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.cal-legend__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The month: seven columns, six weeks; a day is a button that opens it below. */
+.cal-month {
+  display: grid;
+  gap: 2px;
+  padding: var(--nv-space-2) var(--nv-space-3) var(--nv-space-3);
+  transition: opacity var(--nv-dur-base) var(--nv-ease-out);
+}
+.cal-month[data-loading='true'] {
+  opacity: 0.55;
+}
+.cal-month__head,
+.cal-month__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.cal-month__dayname {
+  padding: var(--nv-space-2) 0;
+  text-align: center;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.cal-month__label {
+  min-width: 9.5em;
+  text-transform: capitalize;
+}
+.cal-day {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  min-height: 76px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  color: var(--nv-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.cal-day:hover {
+  background: var(--nv-plate-hover);
+}
+.cal-day[aria-pressed='true'] {
+  background: var(--nv-select-strong);
+}
+.cal-day[data-out='true'] {
+  opacity: 0.45;
+}
+.cal-day__num {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 5px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+.cal-day[data-past='true'] .cal-day__num {
+  color: var(--nv-ink-faint);
+}
+.cal-day[data-today='true'] .cal-day__num {
+  color: var(--nv-void);
+  background: var(--nv-ink);
+}
+/* The reader's own day: a fixed ring on the number, no motion. */
+.cal-day[data-mine='true']:not([data-today='true']) .cal-day__num {
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-muted);
+}
+.cal-day__marks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cal-day__line {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.cal-day__creator {
+  flex: none;
+  width: 2.2em;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--nv-ink-faint);
+}
+/* One créneau of one creator: filled in the member's colour, ringed in violet for the agent alone, hollow if free. */
+.cal-mark {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+}
+.cal-mark[data-kind='shift'] {
+  background: var(--sc-color);
+}
+.cal-mark[data-kind='shift'][data-muted='true'] {
+  opacity: 0.25;
+}
+.cal-mark[data-kind='ai'] {
+  background: var(--nv-agent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--nv-agent);
+}
+.cal-mark[data-kind='gap'] {
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.cal-mark[data-kind='gap'][data-ahead='true'] {
+  box-shadow: inset 0 0 0 1px var(--nv-ink-faint);
+}
+
+/* A day opened in detail. */
+.cal-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) var(--nv-space-5) var(--nv-space-5);
+  border-top: 1px solid var(--nv-hairline);
+}
+.cal-detail__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.cal-detail__title::first-letter {
+  text-transform: uppercase;
+}
+.cal-detail__creator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.cal-detail__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  margin: 0;
+  font-weight: 650;
+}
+.cal-detail__slots {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cal-detail__slot {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  gap: var(--nv-space-3);
+  padding: 6px 0;
+  border-top: 1px solid var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+}
+.cal-detail__range {
+  color: var(--nv-ink-muted);
+}
+.cal-mine {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+/* The switches above the calendar. */
+.cal-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-3) var(--nv-space-4);
+}
+
+@media (max-width: 820px) {
+  .cal-month {
+    padding: var(--nv-space-1);
+  }
+  .cal-day {
+    min-height: 64px;
+    padding: 4px 2px;
+    gap: 4px;
+  }
+  .cal-day__num {
+    align-self: center;
+  }
+  .cal-mark {
+    height: 5px;
+  }
+  .cal-day__creator {
+    display: none;
+  }
+  .cal-day__line {
+    gap: 2px;
+  }
+  /* A chip is one line on a phone, its hours at the right: the agent's tag sits on its top edge, clear of them. */
+  .cal-tag {
+    top: -9px;
+    right: 14px;
+  }
+  /* 44 px to touch on a phone (Extension 02/11). */
+  .cal-legend__member {
+    min-height: 44px;
+  }
+  .cal-legend {
+    padding: var(--nv-space-3) var(--nv-space-4);
+  }
+  .cal-detail {
+    padding: var(--nv-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-month,
+  .cal-day,
+  .cal-legend__member {
+    transition: none;
+  }
+}
+
+.cal-month__top {
+  padding: var(--nv-space-3) var(--nv-space-5) 0;
+}

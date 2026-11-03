@@ -164,6 +164,29 @@ const VALIDATED = {
 };
 
 const weeks: string[] = [];
+const calendars: string[] = [];
+
+/** The team's calendar (CR-12): Théo's night, Basile on Wednesday morning, the agent in Automatique day and night. */
+const teamCalendar = (from: string, to: string): Record<string, unknown> => ({
+  view: 'team',
+  settings: { timeZone: 'Europe/Paris', slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+  creators: [{ id: NORA, name: 'Nora Vidal' }],
+  members: people.slice(0, 2),
+  shifts: [
+    { memberId: THEO, creatorId: NORA, startsAt: '2026-10-27T22:00:00Z', endsAt: '2026-10-28T04:00:00Z' },
+    { memberId: BASILE, creatorId: NORA, startsAt: '2026-10-28T07:00:00Z', endsAt: '2026-10-28T13:00:00Z' },
+  ],
+  agent: [
+    {
+      creatorId: NORA,
+      timeZone: 'Europe/Paris',
+      mode: 'auto',
+      reply: { mode: 'always' },
+      answers: [{ startsAt: from, endsAt: to }],
+    },
+  ],
+  agency: null,
+});
 
 /** A fake `/v1/scheduling` and `/v1/team/members`: every write is kept in the list returned and answered by `write`. */
 function serve(
@@ -221,6 +244,12 @@ function serve(
                 : [],
             conflicts: [],
           },
+        };
+      } else if (url.pathname === '/v1/scheduling/calendar') {
+        calendars.push(`${url.searchParams.get('from') ?? ''}/${url.searchParams.get('to') ?? ''}`);
+        reply = {
+          status: 200,
+          body: teamCalendar(url.searchParams.get('from') ?? '', url.searchParams.get('to') ?? ''),
         };
       } else if (url.pathname === '/v1/scheduling/shift-reports') {
         state.reportsDown -= 1;
@@ -290,6 +319,7 @@ function renderPage(): void {
 
 beforeEach(() => {
   weeks.length = 0;
+  calendars.length = 0;
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
 });
@@ -648,5 +678,61 @@ describe('the chatter’s Planning', () => {
         { method: 'DELETE', path: `/v1/scheduling/leave-requests/${id(501)}`, body: null },
       ]);
     });
+  });
+});
+
+describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
+  it('shows every créneau of the week at the agency’s hour, who holds it and the agent, in words', async () => {
+    serve();
+    renderPage();
+    await screen.findByRole('region', { name: 'Aujourd’hui' });
+    fireEvent.click(screen.getByRole('radio', { name: 'L’équipe' }));
+    const grid = await screen.findByRole('table', { name: /^Planning de l’équipe/u });
+    expect(calendars[0]).toBe('2026-10-25T23:00:00.000Z/2026-11-01T23:00:00.000Z');
+    expect(text(screen.getByText(/^Qui chatte quand dans l’équipe/u))).toContain('Paris');
+    const row = within(grid).getByRole('row', { name: /Nora Vidal/u });
+    expect(text(row)).toContain('IA automatique · jour et nuit');
+    // His own shift reads « Toi », at the agency's hour; a créneau a shift only goes on into says so.
+    expect(text(row)).toContain('Toi, 23 h – 5 h ; l’IA en automatique');
+    expect(text(row)).toContain('Basile, 8 h – 14 h ; l’IA en automatique');
+    expect(text(row)).toContain('12 h – 18 h, suite d’un shift ; l’IA en automatique');
+    // Nobody but the agent, in Automatique: « IA seule », said in words too.
+    expect(text(row)).toContain('18 h – 0 h, l’IA seule');
+    expect(within(row).getAllByText('IA seule').length).toBeGreaterThan(0);
+  });
+
+  it('reads six weeks for the month, and opens a day touched in detail', async () => {
+    serve();
+    renderPage();
+    await screen.findByRole('region', { name: 'Aujourd’hui' });
+    fireEvent.click(screen.getByRole('radio', { name: 'L’équipe' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Mois' }));
+    const month = await screen.findByRole('grid', { name: 'Planning de l’équipe, octobre 2026' });
+    // From Monday 28 September, 42 days of 24 h: the hour the change of time adds is cut back.
+    expect(calendars.at(-1)).toBe('2026-09-27T22:00:00.000Z/2026-11-08T22:00:00.000Z');
+    expect(text(screen.getByText(/^Toi :/u))).toBe('Toi : 6 h en octobre');
+    const wednesday = within(month).getByRole('gridcell', { name: /^mercredi 28 octobre/u });
+    // Théo's night runs on into Wednesday: two shifts that day, one his.
+    expect(wednesday.getAttribute('aria-label')).toBe(
+      'mercredi 28 octobre : 2 shifts, dont le tien, l’IA seule sur 1 créneau',
+    );
+    const tuesday = within(month).getByRole('gridcell', { name: /^mardi 27 octobre/u });
+    expect(tuesday.getAttribute('aria-label')).toContain('ton shift');
+    fireEvent.click(wednesday);
+    const detail = screen.getByRole('region', { name: 'mercredi 28 octobre' });
+    expect(text(detail)).toContain('Basile, 8 h – 14 h ; l’IA en automatique');
+    expect(text(detail)).toContain('l’IA seule');
+  });
+
+  it('brings a member’s shifts forward from the legend', async () => {
+    serve();
+    renderPage();
+    await screen.findByRole('region', { name: 'Aujourd’hui' });
+    fireEvent.click(screen.getByRole('radio', { name: 'L’équipe' }));
+    await screen.findByRole('table', { name: /^Planning de l’équipe/u });
+    const basile = screen.getByRole('button', { name: 'Basile' });
+    fireEvent.click(basile);
+    expect(basile.getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelectorAll('.cal-chip[data-muted="true"]').length).toBeGreaterThan(0);
   });
 });

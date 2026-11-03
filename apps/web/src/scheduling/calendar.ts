@@ -39,9 +39,11 @@ export interface CalendarCell {
   readonly shifts: readonly CalendarShift[];
   /** A shift covers part of it, whatever créneau it starts in. */
   readonly held: boolean;
+  /** The shifts that cover part of it, wherever they start: the month marks the créneau with the first. */
+  readonly over: readonly CalendarShift[];
   /** `null` when he does not answer in it, or under Arrêt. */
   readonly agent: AgentInSlot | null;
-  /** No chatter on what is left of it and the agent answers all of it in Automatique (ADR 0048 § 1). */
+  /** No chatter on what is left of it (all of it, once gone by) and the agent answers that in Automatique (ADR 0048 § 1). */
   readonly aiAlone: boolean;
 }
 
@@ -109,14 +111,19 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
             const start = Date.parse(shift.startsAt);
             return start >= opening && start < cut.to;
           });
+          const over = theirs.filter(
+            (shift) => Date.parse(shift.startsAt) < cut.to && Date.parse(shift.endsAt) > cut.from,
+          );
           const part = agent === null || agent.mode === 'stop' ? null : coveredPart(answers, cut);
-          const rest = { from: Math.max(cut.from, ahead), to: cut.to };
+          // A créneau gone by is judged whole, one under way on what is left of it.
+          const rest = { from: cut.to <= ahead ? cut.from : Math.max(cut.from, ahead), to: cut.to };
           const onRest = spans.some((span) => span.from < rest.to && span.to > rest.from);
           return {
             from: new Date(cut.from),
             to: new Date(cut.to),
             shifts: starting,
-            held: spans.some((span) => span.from < cut.to && span.to > cut.from),
+            held: over.length > 0,
+            over,
             agent:
               part === null || agent === null || agent.mode === 'stop'
                 ? null
@@ -165,7 +172,7 @@ export function agentRowLabel(agent: CalendarAgent): string {
   const hours =
     only.startMinute === only.endMinute
       ? 'toute la journée'
-      : `${clockOf(only.startMinute)} – ${clockOf(only.endMinute)}`;
+      : `${clockOf(only.startMinute)}\u00a0–\u00a0${clockOf(only.endMinute)}`;
   return `IA ${mode} · ${hours}${days}`;
 }
 
@@ -208,9 +215,129 @@ export type MonthMark =
 
 export function monthMarks(cells: readonly CalendarCell[], now: Date): MonthMark[] {
   return cells.map((cell) => {
-    const [first] = cell.shifts;
+    const [first] = cell.over;
     if (first !== undefined) return { kind: 'shift', memberId: first.memberId };
     if (cell.aiAlone) return { kind: 'ai' };
-    return { kind: 'gap', ahead: !cell.held && cell.to.getTime() > now.getTime() };
+    return { kind: 'gap', ahead: cell.to.getTime() > now.getTime() };
   });
+}
+
+/** « novembre 2026 », the month a month view shows. */
+export const monthLabel = (month: string): string =>
+  new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(`${month.slice(0, 7)}-15T12:00:00Z`),
+  );
+
+/** The month `count` months after `month` (`YYYY-MM`). */
+export function addMonths(month: string, count: number): string {
+  const at = new Date(`${month.slice(0, 7)}-15T12:00:00Z`);
+  at.setUTCMonth(at.getUTCMonth() + count);
+  return at.toISOString().slice(0, 7);
+}
+
+/** How long a member is on shift in `[from, to)`, by the ends of their shifts cut to it. */
+export function minutesOn(shifts: readonly CalendarShift[], memberId: string, from: Date, to: Date): number {
+  return shifts
+    .filter((shift) => shift.memberId === memberId)
+    .reduce((sum, shift) => {
+      const start = Math.max(Date.parse(shift.startsAt), from.getTime());
+      const end = Math.min(Date.parse(shift.endsAt), to.getTime());
+      return end > start ? sum + (end - start) / MINUTE_MS : sum;
+    }, 0);
+}
+
+/** Who holds a créneau, in words, then the agent: « Kofi, 12 h – 18 h ; l’IA en automatique dès 14 h », « libre ». */
+export function cellWho(
+  cell: CalendarCell,
+  members: ReadonlyMap<string, PlanningMember>,
+  me: string | null,
+  zone: string,
+  now: Date,
+): string {
+  if (cell.aiAlone) return 'l’IA seule';
+  const who =
+    cell.shifts.length > 0
+      ? cell.shifts
+          .map(
+            (shift) =>
+              `${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}`,
+          )
+          .join(' ; ')
+      : cell.held
+        ? 'suite d’un shift'
+        : cell.to.getTime() <= now.getTime()
+          ? 'personne'
+          : 'libre';
+  return `${who}${cellAgentWords(cell.agent, cell, zone)}`;
+}
+
+/** What a créneau says out loud (CR-12, Extension 02/11): its hours when nobody's name gives them, then who. */
+export function cellWords(
+  cell: CalendarCell,
+  members: ReadonlyMap<string, PlanningMember>,
+  me: string | null,
+  zone: string,
+  now: Date,
+): string {
+  const who = cellWho(cell, members, me, zone, now);
+  return cell.shifts.length > 0 && !cell.aiAlone
+    ? who
+    : `${clockAt(cell.from, zone)} – ${clockAt(cell.to, zone)}, ${who}`;
+}
+
+/**
+ * `?vue=equipe&affichage=mois&mois=2026-11&semaine=2026-11-02`: what a Planning shows, kept in the address so that it
+ * is there on return (CR-12).
+ */
+export interface CalendarSearch {
+  readonly vue?: 'equipe' | undefined;
+  readonly affichage?: 'mois' | undefined;
+  readonly mois?: string | undefined;
+}
+
+export function parseCalendarSearch(search: Record<string, unknown>): CalendarSearch {
+  const { vue, affichage, mois } = search;
+  return {
+    ...(vue === 'equipe' ? { vue } : {}),
+    ...(affichage === 'mois' ? { affichage } : {}),
+    ...(typeof mois === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/u.test(mois) ? { mois } : {}),
+  };
+}
+
+const counted = (count: number, one: string, many: string): string =>
+  count === 1 ? one : many.replace('#', String(count));
+
+/**
+ * A day of the month in words, for its button (« mercredi 28 octobre : 2 shifts, dont le tien, l’IA seule sur 1
+ * créneau »): the shifts on it, wherever they start, the créneaux the agent holds alone, the ones still free.
+ */
+export function dayWords(
+  rows: readonly CalendarRow[],
+  day: string,
+  me: string | null,
+  now: Date,
+): { said: string; mine: boolean } {
+  const cells = rows.flatMap((row) => row.days.get(day) ?? []);
+  const shifts = new Map(
+    cells
+      .flatMap((cell) => cell.over)
+      .map((shift) => [`${shift.creatorId}|${shift.memberId}|${shift.startsAt}`, shift]),
+  );
+  const mine = me !== null && [...shifts.values()].some((shift) => shift.memberId === me);
+  const alone = cells.filter((cell) => cell.aiAlone).length;
+  const free = cells.filter(
+    (cell) => !cell.held && !cell.aiAlone && cell.to.getTime() > now.getTime(),
+  ).length;
+  const said = [
+    shifts.size === 0
+      ? 'aucun shift'
+      : mine
+        ? counted(shifts.size, 'ton shift', '# shifts, dont le tien')
+        : counted(shifts.size, '1 shift', '# shifts'),
+    alone === 0 ? null : counted(alone, 'l’IA seule sur 1 créneau', 'l’IA seule sur # créneaux'),
+    free === 0 ? null : counted(free, '1 créneau libre', '# créneaux libres'),
+  ]
+    .filter((part) => part !== null)
+    .join(', ');
+  return { said, mine };
 }
