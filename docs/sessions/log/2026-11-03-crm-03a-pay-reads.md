@@ -4,7 +4,7 @@ Fait : `salesFeedReadsForPay`, exporté par l'index de `connectors`, lit le regi
 - les lignes enregistrées dans une plage, pour les tardives ;
 - les lignes re-liées dans une plage, pour un chatteur relié après une clôture.
 
-Après la relecture d'Équipe, chaque ligne porte aussi son statut, l'auteur d'un remboursement est celui de sa vente, et la colonne `link_version_at` date chaque version. Chaque ligne porte le jour de la vente dans le fuseau donné, `recordedAt`, le net signé, la devise, et l'auteur selon le lien avec sa version. La colonne `sales_feed_chatters.link_version` (migration 0069) change quand le lien pointe ailleurs. `earningsBaseOf` (contrats) donne la base d'une vente selon la plateforme et la source.
+Après la relecture d'Équipe, chaque ligne porte aussi son statut, l'auteur d'un remboursement est celui de sa vente, et la colonne `link_version_at` date chaque version. Chaque ligne porte le jour de la vente dans le fuseau donné, `recordedAt`, le net signé, la devise, et l'auteur selon le lien avec sa version. La colonne `sales_feed_chatters.link_version` (migration 0070) change quand le lien pointe ailleurs. `earningsBaseOf` (contrats) donne la base d'une vente selon la plateforme et la source.
 Pas fait : la garde de bascule, `shift_feedback`, le calcul (Équipe).
 Décisions : le port rend des lignes, jamais des sommes, et n'attribue rien à un shift. La paie (Équipe) le fait.
 Découvertes : `tx.execute` ne passe pas un tableau JavaScript en `uuid[]` ; il faut une liste `in (…)` construite avec `sql.join`.

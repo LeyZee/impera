@@ -474,8 +474,15 @@
     {
       "idx": 67,
       "version": "7",
-      "when": 1793668976535,
-      "tag": "0069_sales_feed_link_version",
+      "when": 1793665439629,
+      "tag": "0069_shift_calendar",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1793669772880,
+      "tag": "0070_sales_feed_link_version",
       "breakpoints": true
     }
   ]

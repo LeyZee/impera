@@ -2,6 +2,8 @@ import {
   AccountPayRulesListSchema,
   AccountPayRulesSchema,
   AnswerShiftSwapRequestBodySchema,
+  CalendarQuerySchema,
+  CalendarSchema,
   CreateAccountPayRulesBodySchema,
   CreateLeaveRequestBodySchema,
   CreateShiftBodySchema,
@@ -47,6 +49,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import type { CalendarService } from '../application/calendar';
 import type { LeaveService } from '../application/leaves';
 import type { PayRulesService } from '../application/pay-rules';
 import type { ShiftReportService } from '../application/reports';
@@ -79,12 +82,14 @@ const actorOf = (request: FastifyRequest): Actor => ({ userId: userOf(request), 
 export function createSchedulingRoutes(
   {
     scheduling,
+    calendar,
     leaves,
     swaps,
     reports,
     payRules,
   }: {
     scheduling: SchedulingService;
+    calendar: CalendarService;
     leaves: LeaveService;
     swaps: SwapService;
     reports: ShiftReportService;
@@ -117,6 +122,17 @@ export function createSchedulingRoutes(
         schema: { querystring: PlanningQuerySchema, response: { 200: PlanningSchema } },
       },
       (request) => scheduling.planning(userOf(request), request.query),
+    );
+
+    // CR-12: every member of the team reads it, each with what the database gives them (`calendar_shifts`); a creator
+    // never through this route (her reading path is ADR 0042's).
+    app.get(
+      '/scheduling/calendar',
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: CalendarQuerySchema, response: { 200: CalendarSchema } },
+      },
+      (request) => calendar.calendar(userOf(request), request.query),
     );
 
     app.get(
