@@ -98,6 +98,10 @@ export type ShiftSwapRequestId = z.infer<typeof ShiftSwapRequestIdSchema>;
 export const ShiftReportIdSchema = uuid.brand<'ShiftReportId'>();
 export type ShiftReportId = z.infer<typeof ShiftReportIdSchema>;
 
+/** A chatter's mini feedback at the end of a shift on an account whose sales are read (ADR 0050 § 10). */
+export const ShiftFeedbackIdSchema = uuid.brand<'ShiftFeedbackId'>();
+export type ShiftFeedbackId = z.infer<typeof ShiftFeedbackIdSchema>;
+
 /** The pay rules of a platform account from a pay period on: currency, VAT, platform fee, earnings source (EQ-03). */
 export const AccountPayRulesIdSchema = uuid.brand<'AccountPayRulesId'>();
 export type AccountPayRulesId = z.infer<typeof AccountPayRulesIdSchema>;

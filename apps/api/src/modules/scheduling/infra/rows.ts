@@ -1,9 +1,12 @@
 import {
   AuditEntryIdSchema,
   CreatorIdSchema,
+  CurrencySchema,
+  EarningsSourceSchema,
   LeaveRequestIdSchema,
   LeaveRequestStatusSchema,
   newId,
+  PayPeriodSchema,
   PlatformAccountIdSchema,
   PlatformSchema,
   ShiftIdSchema,
@@ -161,6 +164,7 @@ export async function audit(
       | 'leave_request'
       | 'shift_swap'
       | 'shift_report'
+      | 'shift_feedback'
       | 'account_pay_rules';
     readonly id: string;
   },
@@ -402,3 +406,10 @@ export async function agencyTimeZone(tx: Transaction): Promise<string> {
   const result = await tx.execute<{ zone: string }>(sql`select ${agencyZone} as zone`);
   return result.rows[0]?.zone ?? DEFAULT_SCHEDULING_SETTINGS.timeZone;
 }
+
+/** An account's pay rules as the reports and the feedback read them (`RulesRow`). */
+export const RulesRowSchema = z.object({
+  fromPeriod: PayPeriodSchema,
+  currency: CurrencySchema,
+  earningsSource: EarningsSourceSchema,
+});

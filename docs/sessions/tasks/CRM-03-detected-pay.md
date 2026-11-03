@@ -18,7 +18,7 @@ Prototype de l'espace chatteur pour l'option 3 : https://claude.ai/artifact/Lc2y
 
 - [ ] Calcul des montants par plateforme : `netAmount` sur Reveal, chaîne de l'ADR 0023 paramétrée par plateforme ailleurs ; règle datée, posée à une frontière de période, dans les entrées et l'`inputs_hash`.
 - [ ] Attribution et vente en attente du valideur (§ 5) ; remboursement après validation en vente tardive négative (§ 7).
-- [ ] `shift_feedback` : ventes en lecture seule, commentaire, incident, remontée, ou « rien à signaler » ; rappel, sans effet sur la paie.
+- [x] `shift_feedback` (serveur) : ventes en lecture seule, commentaire, incident, remontée, ou « rien à signaler » ; rappel, sans effet sur la paie.
 - [ ] Téléphone : ventes lues, commission estimée, palier, objectif collectif, sans « + Vente ».
 - [ ] Une vente lue attribuée à tort au chatteur : il la signale au valideur, sans effet sur la paie tant que le valideur n'a pas tranché.
 - [ ] Avant la bascule, le téléphone garde le total déclaré (EQ-03) ; CR-03 n'est pas construite pour Reveal.
@@ -50,3 +50,5 @@ Le rapprochement d'un rapport déclaré (CR-09), les signaux hors shift (CRM-05)
 - **Équipe, lot b2** : lire les ventes, les shifts, la marge et les sources par `PayInputReads` ; migration du registre des ventes comptées (`pay_period_sales`) et des colonnes `base` et `sales` des lignes de relevé ; écriture du registre à la clôture ; relecture Bilan.
 - **Équipe, lot b3** : décision du valideur sur une vente en attente, côté paie.
 - **Équipe et Extension, lot b4** : « net Reveal » sur l'annexe de la facture et les écrans. La garde de bascule de Bilan attend b4.
+
+03/11/2026, Bilan, `shift_feedback` : table `shift_feedbacks` (migration 0073, ajout seul), `GET`/`PUT /v1/scheduling/shifts/:shiftId/feedback`. Le membre du shift laisse un commentaire, un incident, jusqu'à 5 remontées ou « rien à signaler », une fois, dès 30 minutes avant la fin, seulement sur une quinzaine `detected` ; aucun montant, la paie ne le lit pas. Reste : l'affichage des ventes en lecture seule et l'écran au téléphone (Extension), le rappel d'un feedback manquant, les remontées vers le manager (CRM-05).
