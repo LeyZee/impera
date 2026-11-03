@@ -59,17 +59,25 @@ async function run(
   }
 }
 
+/** Killed by its `timeout`: the binary started, it was only slow (a machine under load). */
+const isTimedOut = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'killed' in error && error.killed === true;
+
 /**
  * The media binaries that cannot be run here, empty when both answer: read once at start-up, so that a missing
- * ffmpeg is said in the log rather than found on the first video of a fan.
+ * ffmpeg is said in the log rather than found on the first video of a fan. A binary too slow to print its version is
+ * there all the same: only one that cannot start, or that fails, is missing.
  */
-export async function missingMediaBinaries(binaries = BINARIES): Promise<readonly MediaBinary[]> {
+export async function missingMediaBinaries(
+  binaries = BINARIES,
+  timeoutMs = 15_000,
+): Promise<readonly MediaBinary[]> {
   const names: readonly MediaBinary[] = ['ffmpeg', 'ffprobe'];
   const answers = await Promise.all(
     names.map((name) =>
-      execFileAsync(binaries[name], ['-version'], { timeout: 5_000 }).then(
+      execFileAsync(binaries[name], ['-version'], { timeout: timeoutMs }).then(
         () => true,
-        () => false,
+        (error: unknown) => isTimedOut(error),
       ),
     ),
   );
