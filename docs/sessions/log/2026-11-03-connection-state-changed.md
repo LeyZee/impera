@@ -10,4 +10,4 @@
 - Pas fait : le rendu Telegram (fil Telegram).
 - Décisions : pas de raison `expired` (aucune source ne la distingue de `refused`) ; Venice n'est pas surveillé ; le compte des lectures ratées vit en mémoire du worker (un redémarrage repart de zéro).
 - Découvertes : aucune.
-- Vérifié : tests unitaires `providers` et `connectors`, intégration `connection-state` sur un Postgres 16 local, `pnpm drift`.
+- Vérifié : tests unitaires `providers` et `connectors`, intégration `connection-state` et `sales-feed` sur un Postgres 16 local, `pnpm check` (dérive des migrations comprise).
