@@ -113,9 +113,10 @@ const creators = createRoute({
   getParentRoute: () => rootRoute,
   path: '/creatrices',
   validateSearch: parseCreatorsSearch,
-  // Her hours are the owner's alone (P3-14): anyone else lands on the persona, not on a page the server would refuse.
+  // Her hours (P3-14) and her access (CR-02) are the owner's alone: anyone else lands on the persona, not on a page the
+  // server would refuse.
   beforeLoad: ({ context, search }) => {
-    if (search.onglet === 'heures' && context.user.role !== 'owner') {
+    if (search.onglet !== undefined && context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
@@ -127,7 +128,7 @@ const creators = createRoute({
   component: function Creators() {
     const { onglet, creatrice } = creators.useSearch();
     const navigate = creators.useNavigate();
-    const tab = onglet === 'heures' ? 'hours' : 'persona';
+    const tab = onglet === 'heures' ? 'hours' : onglet === 'acces' ? 'access' : 'persona';
     return (
       <CreatorsPage
         tab={tab}
