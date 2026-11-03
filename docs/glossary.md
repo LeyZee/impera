@@ -98,6 +98,10 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Demande de contenu | `content_request` | Ce que l'agence attend d'une créatrice : catégorie, échéance, raison, structure pour un script ; une tâche de son agenda avec l'action « Déposer » (ADR 0055). Distincte de la demande de service d'un fan. |
 | Connecteur de publication | `publishing_connector` | Adaptateur qui publie sur un réseau d'acquisition (Instagram, canal Telegram), à côté des connecteurs de plateforme (ADR 0057). |
 | Mode assisté | `assisted` | Publication Instagram préparée par Nirvana et postée à la main, pour ajouter un son (ADR 0057). |
+| Signal de tendance | `trend_signal` | Un format, un son, un thème ou une date qui monte, venu d'une des six sources de l'ADR 0060 ; a une péremption (14 jours par défaut). |
+| Capture passive | `passive_capture` | Le relevé par l'extension de ce qu'une personne regarde elle-même sur instagram.com ; ne fait jamais défiler, ne clique jamais, n'envoie aucune requête (ADR 0060). |
+| Profil de contenu | `content_profile` | Ce qui marche chez une créatrice et ce qu'elle sait faire, rédigé par la vision à partir de ses propres médias et validé par l'agence ; distinct de la persona (ADR 0060). |
+| Idée de contenu | `content_idea` | Une proposition du job du matin (au plus trois par créatrice), filtrée par le code, validée par l'agence, puis suggérée dans l'agenda de la créatrice (ADR 0060). |
 | Script natif | `platform_script` | Un script de vente stocké sur la plateforme (Reveal), que l'agent lit et déroule. À ne pas confondre avec `script`, notre structure interne. |
 | Note client | `fan_note` | La note libre qu'une plateforme attache à un fan, lue et écrite par les chatteurs et l'agent. Distincte de `fan_fact`. |
 | Notes du modèle | `creator_note` | Les notes que Reveal affiche à côté de chaque conversation sur la créatrice : sa fiche persona vue par la plateforme. |
