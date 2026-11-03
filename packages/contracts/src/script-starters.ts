@@ -6,7 +6,8 @@ import { SCRIPT_COLOR_PRESETS, ScriptStructureBodySchema, type MediaSlot } from 
  * Starter structures (ADR 0064 § 4): what the workshop offers to duplicate. The first is the structure the agency
  * used in OnlyScript, its stage names as they were (Charles's choice, 03/11/2026, 12:51: in the public repository).
  * An agency method, neither a fan's nor a creator's data (ADR 0010). Parsed on load, and a test holds them to the
- * structure rules (`scriptStructureFaults`).
+ * structure rules (`scriptStructureFaults`). The aftercare that follows the last stage is a text (ADR 0056 § 6), not a
+ * stage; how often a fan is offered a stage is the agent's cooldown, never the structure's (Agent's review of SC-01 c1).
  */
 
 /** Three photos and a video of `minSeconds` to `maxSeconds`: what most of its stages ask. */
