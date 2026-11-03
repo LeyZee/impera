@@ -1,6 +1,8 @@
 import {
   CreatorIdSchema,
+  CreatorSalesSchema,
   EVENT_PAYLOADS,
+  FanIdSchema,
   newId,
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
@@ -8,8 +10,9 @@ import {
   type PlatformAccountId,
   type SalesTotals,
   type TeamMemberId,
+  UserIdSchema,
 } from '@nirvana/contracts';
-import { eq, schema, sql, withTenant } from '@nirvana/db';
+import { eq, schema, sql, withCreatorAccount, withTenant } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -17,7 +20,7 @@ import { z } from 'zod';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
-import { revealSalesFeed, salesFeedTotals } from '../modules/connectors';
+import { creatorSalesReads, revealSalesFeed, salesFeedTotals } from '../modules/connectors';
 import { buildServer, type Server } from '../server';
 
 import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, type FakeCrm } from './fake-reveal/crm';
@@ -115,7 +118,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
   }
 
   /** The totals summed by day over every account, kind and seller, as Reveal's statistics are. */
-  function byDay(totals: SalesTotals) {
+  function byDay(totals: { readonly rows: readonly Omit<SalesTotals['rows'][number], 'seller'>[] }) {
     const days = new Map<
       string,
       { grossInclVat: number; grossExclVat: number; agency: number; creator: number }
@@ -335,5 +338,57 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     expect(await withTenant(app.db.db, unlinked, (tx) => salesFeedTotals.readingsOf(tx, unlinked))).toEqual(
       [],
     );
+  });
+
+  it('gives the creator, through her own account, Reveal’s figures to the cent, with no seller and her fan by his card', async () => {
+    const creatorUser = newId(UserIdSchema);
+    await test.admin.db.insert(schema.user).values({
+      id: creatorUser,
+      name: 'Créatrice test',
+      email: 'creatrice@example.test',
+      role: 'creator',
+      creatorIds: [creatorId],
+    });
+    // The fan of FakeReveal's sales has a card in her creator: his id comes with her lines, never the platform's.
+    const fanId = newId(FanIdSchema);
+    await withTenant(app.db.db, creatorId, (tx) =>
+      tx.insert(schema.fans).values({
+        id: fanId,
+        creatorId,
+        platformAccountId: accountId,
+        platformFanId: 'member_test_01',
+        displayName: 'Fan test',
+      }),
+    );
+
+    const mine = await withCreatorAccount(app.db.db, creatorUser, (tx) =>
+      creatorSalesReads.salesOf(tx, OCTOBER),
+    );
+    // The strict contract of her screen: a field of who sold, or of the platform's fan, would fail it.
+    expect(CreatorSalesSchema.parse(mine)).toEqual(mine);
+    expect(byDay(mine)).toEqual(await revealStats(OCTOBER.from, OCTOBER.to));
+    const totals = await withTenant(app.db.db, creatorId, (tx) =>
+      salesFeedTotals.totalsOf(tx, { creatorId, ...OCTOBER }),
+    );
+    const part = (rows: readonly { creatorMinor: number }[]) =>
+      rows.reduce((sum, row) => sum + row.creatorMinor, 0);
+    expect(part(mine.rows)).toBe(part(totals.rows));
+    // The refund of November sits on its sale's day, the 25th of October, beside its sale.
+    expect(
+      mine.lines
+        .filter((line) => line.saleDay === '2026-10-25')
+        .map((line) => [line.event, line.creatorMinor]),
+    ).toEqual([
+      ['sale', 500],
+      ['refund', 500],
+    ]);
+    expect(new Set(mine.lines.map((line) => line.fanId))).toEqual(new Set([fanId]));
+    expect(JSON.stringify(mine)).not.toMatch(/member_test_01|fan_test_01|chatter_test_01|bot_test_01/);
+
+    // Any other door reads nothing from her view: the agency in her creator, and the job's admin role.
+    const asAgency = await withTenant(app.db.db, creatorId, (tx) => creatorSalesReads.salesOf(tx, OCTOBER));
+    expect(asAgency.rows).toEqual([]);
+    const asAdmin = await test.admin.db.transaction((tx) => creatorSalesReads.salesOf(tx, OCTOBER));
+    expect(asAdmin.lines).toEqual([]);
   });
 });
