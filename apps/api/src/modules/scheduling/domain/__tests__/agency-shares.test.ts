@@ -13,6 +13,7 @@ function row(patch: Partial<ShareTotalsRow> & Pick<ShareTotalsRow, 'day'>): Shar
     platformAccountId: ACCOUNT,
     currency: 'EUR',
     sales: 1,
+    refunds: 0,
     netMinor: 10_000,
     creatorMinor: 6_500,
     ...patch,
@@ -39,6 +40,7 @@ describe('the gap between her part on the platform and the agency’s percentage
         platformAccountId: ACCOUNT,
         currency: 'EUR',
         sales: 3,
+        refunds: 0,
         creatorMinor: 645,
         expectedCreatorMinor: 649,
         differenceMinor: -4,
@@ -57,9 +59,31 @@ describe('the gap between her part on the platform and the agency’s percentage
         platformAccountId: ACCOUNT,
         currency: 'EUR',
         sales: 2,
+        refunds: 0,
         creatorMinor: 14_000,
         expectedCreatorMinor: 13_000,
         differenceMinor: 1_000,
+      },
+    ]);
+  });
+
+  it('lets one cent per refund go as well: a sale refunded, two roundings, no gap', () => {
+    // The platform rounds the sale's part and its refund's each on its own side: up to a cent each, two in all, on a
+    // day whose net is back to nothing.
+    const refunded = [row({ day: '2026-10-20', sales: 1, refunds: 1, netMinor: 0, creatorMinor: 2 })];
+    expect(agencyShareGaps(refunded, AT_35)).toEqual([]);
+    // Three cents on one sale and its refund is more than rounding.
+    const off = [row({ day: '2026-10-20', sales: 1, refunds: 1, netMinor: 0, creatorMinor: 3 })];
+    expect(agencyShareGaps(off, AT_35)).toEqual([
+      {
+        platform: 'reveal',
+        platformAccountId: ACCOUNT,
+        currency: 'EUR',
+        sales: 1,
+        refunds: 1,
+        creatorMinor: 3,
+        expectedCreatorMinor: 0,
+        differenceMinor: 3,
       },
     ]);
   });
@@ -97,17 +121,18 @@ describe('the gap between her part on the platform and the agency’s percentage
   });
 
   it('reads a refund taken off its sale’s day as the totals give it, both sides alike', () => {
-    // A day whose only sale was refunded: no sale left, nothing on either side.
-    const refunded = [row({ day: '2026-10-20', sales: 1, netMinor: 0, creatorMinor: 0 })];
+    // A day whose only sale was refunded: nothing left on either side.
+    const refunded = [row({ day: '2026-10-20', sales: 1, refunds: 1, netMinor: 0, creatorMinor: 0 })];
     expect(agencyShareGaps(refunded, AT_35)).toEqual([]);
     // A refund of a sale whose part was off: the gap goes with the sale, negative amounts rounded the same way.
-    const negative = [row({ day: '2026-10-20', sales: 0, netMinor: -1_001, creatorMinor: -500 })];
+    const negative = [row({ day: '2026-10-20', sales: 0, refunds: 1, netMinor: -1_001, creatorMinor: -500 })];
     expect(agencyShareGaps(negative, AT_35)).toEqual([
       {
         platform: 'reveal',
         platformAccountId: ACCOUNT,
         currency: 'EUR',
         sales: 0,
+        refunds: 1,
         creatorMinor: -500,
         expectedCreatorMinor: -651,
         differenceMinor: 151,

@@ -519,9 +519,9 @@ export const EVENT_PAYLOADS = {
   }),
   /**
    * CRM-04 lot d3 (ADR 0054 § 2, question 5): on the fortnight just over, a creator's part as the platform reads it
-   * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale, on one account
-   * and in one currency. Only the days a percentage covers are compared, each with its own; `sales` counts them, and
-   * `expectedCreatorMinor` is the net less the agency's share, rounded to the cent. In signed cents (`differenceMinor` =
+   * (`modelRevenue`) differs from the agency's percentage set for her by more than one cent per sale and per refund, on
+   * one account and in one currency. Only the days a percentage covers are compared, each with its own; `sales` and
+   * `refunds` count them, and `expectedCreatorMinor` is the net less the agency's share, rounded to the cent. In signed cents (`differenceMinor` =
    * read − expected). Published once per account, fortnight and currency; never a fan, a chatter nor a seller.
    * Information for the owner: no amount changes, pay never reads it.
    */
@@ -533,6 +533,7 @@ export const EVENT_PAYLOADS = {
     to: z.iso.date(),
     currency: CurrencySchema,
     sales: z.number().int().min(0),
+    refunds: z.number().int().min(0),
     creatorMinor: z.number().int(),
     expectedCreatorMinor: z.number().int(),
     differenceMinor: z.number().int(),

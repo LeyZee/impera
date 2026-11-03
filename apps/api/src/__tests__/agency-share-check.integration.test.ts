@@ -130,6 +130,7 @@ describe('agency percentages against her part on the register (CRM-04 d3)', () =
       to,
       currency: 'EUR',
       sales: 2,
+      refunds: 0,
       creatorMinor: 1000,
       expectedCreatorMinor: 1040,
       differenceMinor: -40,
