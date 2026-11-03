@@ -6,12 +6,15 @@ import {
   type AlertRef,
   type AutomaticMissing,
   type ContractorDocumentKind,
+  type Currency,
   type HandoffCause,
   type InvoiceNotIssuedReason,
   type InvoicePdfPlace,
   type PayoutBlock,
   type PayPeriod,
   type Platform,
+  type SaleSeller,
+  type SaleType,
   type SecurityAlertPayload,
   type SystemAlertCode,
   type UserRole,
@@ -109,6 +112,48 @@ const alertTitle = (alert: AlertRef, nameOf: AlertNameOf): string =>
 function customAlertText(alert: AlertRef & { kind: 'custom' }, nameOf: AlertNameOf): string {
   const name = nameOf(alert);
   return name === null ? CAUSE_TEXT.custom_alert : `Le message du fan correspond à l’alerte « ${name} ».`;
+}
+
+/** A seller who is a member is named by the name the team shows (CRM-04 lot b); `null` when it was not read. */
+export type MemberNameOf = (memberId: string) => string | null;
+
+const noMembers: MemberNameOf = () => null;
+
+/** The kinds of sales as the team reads them; the platform's own words stay out. */
+const SALE_TYPE_TEXT: Readonly<Record<SaleType, string>> = {
+  subscription: 'Abonnement',
+  renewal: 'Renouvellement',
+  ppv: 'PPV',
+  mass_dm: 'Mass DM',
+  tip: 'Pourboire',
+  payment_link: 'Lien de paiement',
+  boudoir: 'Boudoir',
+  paid_message: 'Message payant',
+  other: 'Autre vente',
+};
+
+const SALE_AMOUNT: Readonly<Record<Currency, Intl.NumberFormat>> = {
+  EUR: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }),
+  USD: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }),
+};
+
+/** « 45,00 € », the price the fan paid, cents always shown as the platform shows them. */
+const saleAmount = (minor: number, currency: Currency): string => SALE_AMOUNT[currency].format(minor / 100);
+
+/** Who sold, in four cases (ADR 0050 § 5): a member by name, the agent, a chatter nobody linked yet, nobody. */
+function sellerText(seller: SaleSeller, memberNameOf: MemberNameOf): string {
+  switch (seller.kind) {
+    case 'member': {
+      const name = memberNameOf(seller.memberId);
+      return name === null ? 'vendue par un chatteur' : `vendue par ${name}`;
+    }
+    case 'agent':
+      return 'vendue par l’agent';
+    case 'unlinked':
+      return 'chatteur non relié';
+    case 'none':
+      return 'sans chatteur';
+  }
 }
 
 const alertTopic = (alert: AlertRef): TelegramTopic =>
@@ -353,7 +398,11 @@ function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'lin
   }
 }
 
-export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome | null {
+export function classify(
+  signal: Signal,
+  nameOf: AlertNameOf = noNames,
+  memberNameOf: MemberNameOf = noMembers,
+): Outcome | null {
   switch (signal.kind) {
     case 'handoff': {
       const isUrgent = signal.cause !== null && URGENT_CAUSES.has(signal.cause);
@@ -573,6 +622,16 @@ export function classify(signal: Signal, nameOf: AlertNameOf = noNames): Outcome
       };
     }
     // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
+    case 'sale':
+      // Silent, in its own topic (ADR 0020 §2); a refund never rings live, it is in the evening digest (CRM-04).
+      return {
+        kind: 'notice',
+        topic: 'sale',
+        threadKey: null,
+        title: 'Vente',
+        body: `${SALE_TYPE_TEXT[signal.saleType]} · ${saleAmount(signal.grossInclVatMinor, signal.currency)} · ${sellerText(signal.seller, memberNameOf)}`,
+        link: null,
+      };
     case 'security_alert':
       return {
         kind: 'notice',

@@ -11,6 +11,7 @@ import {
   type LiveRateReading,
   type CreatorId,
   type Dashboard,
+  type DashboardRevealSales,
   type DashboardPeriod,
   type DashboardTodo,
   type HandoffCause,
@@ -228,6 +229,8 @@ export function assembleDashboard(input: {
    * as is, never recomputed here.
    */
   readonly automatic: { readonly gate: AutomaticGate; readonly reading: LiveRateReading };
+  /** The sales read in the platform's register (`revealSalesPanel`), `null` before one of her accounts is linked. */
+  readonly revealSales: DashboardRevealSales | null;
 }): Dashboard {
   const { facts, window } = input;
   const { gate, reading } = input.automatic;
@@ -296,5 +299,6 @@ export function assembleDashboard(input: {
       seen: facts.usdSales.seen,
       rate: facts.usdSales.rateDay === null ? null : { day: facts.usdSales.rateDay },
     },
+    revealSales: input.revealSales,
   };
 }

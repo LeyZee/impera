@@ -26,3 +26,4 @@ Chaque semaine, le code prépare au moins une publication par jour aux heures o�
 Publication sans acceptation humaine ; Mass DM (CR-11).
 
 ## Notes de session
+- 03/11/2026 : l'ADR 0055 (proposée) ajoute la story Reveal au plan, et l'ADR 0057 (proposée) y ajoute Instagram et Telegram ; le plan devient multi-sorties, une sortie par catégorie.

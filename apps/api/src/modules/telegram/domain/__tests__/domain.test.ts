@@ -6,6 +6,7 @@ import {
   PayPeriodSchema,
   PlatformAccountIdSchema,
   TelegramChatIdSchema,
+  TeamMemberIdSchema,
   newId,
 } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
@@ -279,6 +280,44 @@ describe('classification (ADR 0020 §2)', () => {
     expect(urssaf?.kind === 'notice' ? urssaf.body : '').toBe(
       'L’attestation de vigilance URSSAF d’un prestataire a pour dernier jour le 1er mars 2027, et aucune plus récente n’est au dossier. Échue, ses factures partent avec un avertissement.',
     );
+  });
+
+  it('says a fresh sale in the silent sales topic: its kind, the price the fan paid and who sold it, never a fan', () => {
+    const memberId = TeamMemberIdSchema.parse('018f3e5c-0000-7000-8000-000000000001');
+    const sale = {
+      kind: 'sale',
+      saleType: 'ppv',
+      currency: 'EUR',
+      grossInclVatMinor: 4500,
+      seller: { kind: 'member', memberId },
+    } as const;
+    const names = (id: string) => (id === memberId ? 'Théo' : null);
+    expect(classify(sale, undefined, names)).toEqual({
+      kind: 'notice',
+      topic: 'sale',
+      threadKey: null,
+      title: 'Vente',
+      body: 'PPV · 45,00\u00a0€ · vendue par Théo',
+      link: null,
+    });
+    const bodyOf = (signal: Parameters<typeof classify>[0]): string => {
+      const outcome = classify(signal, undefined, names);
+      return outcome?.kind === 'notice' ? outcome.body : '';
+    };
+    // A name not read never holds the sale back.
+    expect(classify(sale)).toMatchObject({ body: 'PPV · 45,00\u00a0€ · vendue par un chatteur' });
+    expect(bodyOf({ ...sale, seller: { kind: 'agent' } })).toBe('PPV · 45,00\u00a0€ · vendue par l’agent');
+    expect(bodyOf({ ...sale, seller: { kind: 'unlinked' } })).toBe('PPV · 45,00\u00a0€ · chatteur non relié');
+    expect(bodyOf({ ...sale, seller: { kind: 'none' } })).toBe('PPV · 45,00\u00a0€ · sans chatteur');
+    expect(bodyOf({ ...sale, saleType: 'tip', grossInclVatMinor: 1999, currency: 'USD' })).toMatch(
+      /^Pourboire · 19,99\s\$US · vendue par Théo$/u,
+    );
+    const notice = classify(sale, undefined, names);
+    if (notice?.kind !== 'notice') throw new Error('a sale is a notice');
+    expect(renderNotice(notice, 'Nora', 'https://crm.example')).toEqual({
+      text: '💰 <b>Vente · Nora</b>\nPPV · 45,00\u00a0€ · vendue par Théo',
+      summary: 'PPV · 45,00\u00a0€ · vendue par Théo',
+    });
   });
 
   it('says an invoice’s due date, important then urgent once overdue, with what blocks its transfer, never its amount nor a name', () => {

@@ -87,7 +87,7 @@ Branche : task/<id>-<slug>
 | CR-03 | Ventes saisies par le chatteur et rapport de fin de shift qui les reprend | espaces | blocked (pas construite pour Reveal avant une autre plateforme : ADR 0050 § 10, recommandation acceptée par Charles le 02/11/2026) | EQ-03, EQ-04, CR-01 (téléphone) |
 | CR-04 | Gains et ventes de la créatrice, au jour le jour | espaces | todo | CR-02, CR-03 ou CRM-04, EQ-01 (paramètres de plateforme) |
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
-| CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
+| CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | todo (avec les catégories de l'ADR 0055) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
 | CR-08 | Plan de publication du feed : la semaine préparée, acceptée d'un geste, programmée dans Reveal | espaces | blocked (capture Reveal) | CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la garde d'écriture (ADR 0018) |
 | CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (total inhabituel) ; blocked (signaux par vente, rapprochement) | EQ-03 ; CR-03 pour les signaux par vente ; CRM-01 et CRM-03 pour le rapprochement |
@@ -96,6 +96,15 @@ Branche : task/<id>-<slug>
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
+| SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | todo | ADR 0056, la persona |
+| SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
+| SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
+| SC-04 | Descriptions des médias d'un script et validation rapide | scripts | blocked (clé de vision) | SC-02, P3-04 |
+| SC-05 | Textes de vente d'un script, proposés par le modèle et validés par l'agence | scripts | blocked (clé xAI, P6-01) | SC-04, P3-01, P3-13 |
+| SC-06 | Téléverser un script dans Reveal, dans l'ordre | scripts | blocked (capture Reveal) | SC-03, SC-05 |
+| PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | blocked (bot Telegram) | CR-06, CR-08, P3-07 |
+| PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
+| MCP-PUB | Publication par un agent externe : préparer, puis publier dans un plafond | MCP | blocked (lot 1 du MCP) | PROPOSED-mcp-read, PUB-01, PUB-02 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |

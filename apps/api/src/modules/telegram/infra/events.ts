@@ -18,8 +18,8 @@ import type { ScannedEvent, Signal } from '../domain/signals';
 /**
  * Reads a `domain_events` row into a signal (ADR 0020 §3). Local, tolerant schemas: the module reads the facts it
  * needs and nothing else, accepts rows written before a field existed, and skips a row it cannot read rather than
- * blocking the scan behind it. Types without a producer yet (sales, validations) give `null` here until their payload
- * enters the contract.
+ * blocking the scan behind it. Types without a producer yet (validations) give `null` here until their payload enters
+ * the contract.
  */
 
 const HandoffSchema = z.object({
@@ -117,6 +117,15 @@ const InvoiceDueSchema = EVENT_PAYLOADS.invoice_due_soon.pick({
   number: true,
   dueOn: true,
   payoutBlock: true,
+});
+
+// The sale's kind, the price the fan paid and its seller (CRM-04 lot b): the sale's key, the account and the shares stay
+// in Nirvana, and the payload never holds the fan.
+const SaleDetectedSchema = EVENT_PAYLOADS.sale_detected.pick({
+  saleType: true,
+  currency: true,
+  grossInclVatMinor: true,
+  seller: true,
 });
 
 function signalOf(type: string, payload: unknown): Signal | null {
@@ -227,6 +236,11 @@ function signalOf(type: string, payload: unknown): Signal | null {
       if (!parsed.success) return null;
       const { memberId, kind, lastDay } = parsed.data;
       return { kind: 'contractor_document_expiring', memberId, document: kind, lastDay };
+    }
+    case 'sale_detected': {
+      const parsed = SaleDetectedSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'sale', ...parsed.data };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);

@@ -228,6 +228,84 @@
   animation: nv-chart-fade var(--nv-dur-slow) calc(6 * var(--nv-stagger)) var(--nv-ease-out) both;
 }
 
+/* ── Level 2, read in Reveal's register (CRM-04 lot c) ── */
+.db-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--db-gap);
+}
+.db-reveal__figures {
+  --_radius: 30px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: end;
+  gap: 18px 28px;
+  padding: 22px 24px;
+}
+.db-reveal__split {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.db-reveal__part {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 1px solid var(--nv-hairline);
+}
+.db-reveal__part dt {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-reveal__part dd {
+  margin: 0;
+  font: 600 17px/22px var(--nv-font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* A period whose refunds outweigh its sales: amber, a warning; the red stays the urgencies'. */
+.db-reveal .is-negative {
+  color: var(--nv-warning);
+}
+.db-reveal__sellers {
+  list-style: none;
+  margin: 0;
+}
+.db-reveal__sellers .db-fan[data-kind='unlinked'] .db-fan__line {
+  color: var(--nv-warning);
+}
+.db-reveal > .db-fans__note {
+  margin: 0;
+}
+.db-reveal > .db-fans__note + .db-fans__note {
+  margin-top: calc(-1 * var(--db-gap) + 4px);
+}
+@media (max-width: 820px) {
+  .db-reveal__figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .db-reveal__split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .db-reveal__part {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--nv-hairline);
+  }
+}
+
 /* ── Level 2 bis: the fans' path ── */
 .db-funnel {
   --_radius: 26px;
