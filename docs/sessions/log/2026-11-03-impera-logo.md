@@ -10,6 +10,8 @@ Fait : le logo v7 (buste de marbre couronné de laurier, en Liquid Glass, laurie
 
 Décisions : aucune nouvelle (ADR 0062 acceptée, logo v7 validé par Charles).
 
-Pas fait : renommer le dépôt GitHub et le dossier local, qui suivent cette PR. Sur iPhone, l'icône de l'écran d'accueil ne change qu'en réinstallant la PWA.
+Le dépôt GitHub s'appelle maintenant `LeyZee/impera` (l'ancienne URL redirige) : `docs/runbooks/deploy.md` cite la nouvelle source Coolify ; la ligne historique de `docs/roadmap.md` reste.
+
+Pas fait : le renommage du dossier local, geste de Charles avec Claude Code fermé. Sur iPhone, l'icône de l'écran d'accueil ne change qu'en réinstallant la PWA.
 
 Découvertes : aucune.
