@@ -487,6 +487,8 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return 'La paie n’a pas encore calculé cette quinzaine : réessaie dans quelques minutes.';
     case 'pay_period_reports_unread_conflict':
       return `${countOf(details.count, 'rapport est', 'rapports sont')} sur des créatrices que tu ne suis pas : le propriétaire valide cette quinzaine.`;
+    case 'pay_period_sales_unread_conflict':
+      return `${countOf(details.count, 'vente est', 'ventes sont')} sur des créatrices que tu ne suis pas : le propriétaire valide cette quinzaine.`;
     case 'pay_period_closed_conflict':
       return period === null
         ? 'Cette quinzaine est déjà validée.'
@@ -788,6 +790,7 @@ export const rateOverdue = (lastRead: string, today: string): boolean => missedR
 const PERIOD_REFUSALS: ReadonlySet<PayRefusalCode> = new Set<PayRefusalCode>([
   'pay_period_reports_pending_conflict',
   'pay_period_reports_unread_conflict',
+  'pay_period_sales_unread_conflict',
   'pay_period_order_conflict',
   'pay_period_closed_conflict',
   'exchange_rate_missing_conflict',

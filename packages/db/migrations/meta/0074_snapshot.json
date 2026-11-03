@@ -1,5 +1,5 @@
 {
-  "id": "7866015e-fb5f-4a08-a358-fcec31c638bf",
+  "id": "90f36377-5be8-4cb9-a3fa-2537fd8d57f1",
   "prevId": "c186cc3a-755a-49c4-a462-514b37c1019a",
   "version": "7",
   "dialect": "postgresql",
@@ -6454,6 +6454,20 @@
           "primaryKey": false,
           "notNull": true
         },
+        "base": {
+          "name": "base",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'gross_chain'"
+        },
+        "sales": {
+          "name": "sales",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6494,7 +6508,8 @@
             "platform_account_id",
             "currency",
             "vat_bps",
-            "platform_fee_bps"
+            "platform_fee_bps",
+            "base"
           ]
         }
       },
@@ -6511,6 +6526,14 @@
         "commission_statement_lines_currency_check": {
           "name": "commission_statement_lines_currency_check",
           "value": "\"commission_statement_lines\".\"currency\" in ('EUR', 'USD')"
+        },
+        "commission_statement_lines_base_check": {
+          "name": "commission_statement_lines_base_check",
+          "value": "\"commission_statement_lines\".\"base\" in ('platform_net', 'gross_chain')"
+        },
+        "commission_statement_lines_sales_check": {
+          "name": "commission_statement_lines_sales_check",
+          "value": "jsonb_typeof(\"commission_statement_lines\".\"sales\") = 'array' and (\"commission_statement_lines\".\"base\" = 'platform_net' or \"commission_statement_lines\".\"sales\" = '[]'::jsonb) and (\"commission_statement_lines\".\"base\" = 'gross_chain' or (\"commission_statement_lines\".\"vat_bps\" = 0 and \"commission_statement_lines\".\"platform_fee_bps\" = 0 and cardinality(\"commission_statement_lines\".\"shift_report_ids\") = 0 and \"commission_statement_lines\".\"late_reports\" = '[]'::jsonb))"
         },
         "commission_statement_lines_rules_check": {
           "name": "commission_statement_lines_rules_check",
@@ -7379,6 +7402,177 @@
         }
       },
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pay_period_sales": {
+      "name": "pay_period_sales",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_sale_id": {
+          "name": "platform_sale_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event": {
+          "name": "event",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period": {
+          "name": "period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_version": {
+          "name": "link_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "net_minor": {
+          "name": "net_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sale_period": {
+          "name": "sale_period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pay_period_sales_period_member_idx": {
+          "name": "pay_period_sales_period_member_idx",
+          "columns": [
+            {
+              "expression": "period",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pay_period_sales_period_pay_period_closings_period_fk": {
+          "name": "pay_period_sales_period_pay_period_closings_period_fk",
+          "tableFrom": "pay_period_sales",
+          "tableTo": "pay_period_closings",
+          "columnsFrom": ["period"],
+          "columnsTo": ["period"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_period_sales_member_id_team_members_id_fk": {
+          "name": "pay_period_sales_member_id_team_members_id_fk",
+          "tableFrom": "pay_period_sales",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_period_sales_platform_account_id_platform_accounts_id_fk": {
+          "name": "pay_period_sales_platform_account_id_platform_accounts_id_fk",
+          "tableFrom": "pay_period_sales",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "pay_period_sales_pkey": {
+          "name": "pay_period_sales_pkey",
+          "columns": ["platform", "platform_sale_id", "event"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "member_read": {
+          "name": "member_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"pay_period_sales\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "agency_insert": {
+          "name": "agency_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        }
+      },
+      "checkConstraints": {
+        "pay_period_sales_platform_check": {
+          "name": "pay_period_sales_platform_check",
+          "value": "\"pay_period_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+        },
+        "pay_period_sales_event_check": {
+          "name": "pay_period_sales_event_check",
+          "value": "\"pay_period_sales\".\"event\" in ('sale', 'refund')"
+        },
+        "pay_period_sales_currency_check": {
+          "name": "pay_period_sales_currency_check",
+          "value": "\"pay_period_sales\".\"currency\" in ('EUR', 'USD')"
+        },
+        "pay_period_sales_sale_period_check": {
+          "name": "pay_period_sales_sale_period_check",
+          "value": "extract(day from \"pay_period_sales\".\"sale_period\") in (1, 16)"
+        },
+        "pay_period_sales_net_check": {
+          "name": "pay_period_sales_net_check",
+          "value": "\"pay_period_sales\".\"sale_period\" <= \"pay_period_sales\".\"period\" and ((\"pay_period_sales\".\"event\" = 'sale' and \"pay_period_sales\".\"net_minor\" >= 0) or (\"pay_period_sales\".\"event\" = 'refund' and \"pay_period_sales\".\"net_minor\" <= 0))"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.pay_periods": {
@@ -8974,88 +9168,6 @@
         "sales_feed_webhooks_platform_check": {
           "name": "sales_feed_webhooks_platform_check",
           "value": "\"sales_feed_webhooks\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.calendar_links": {
-      "name": "calendar_links",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "calendar_links_live_unique": {
-          "name": "calendar_links_live_unique",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"calendar_links\".\"revoked_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "calendar_links_user_id_user_id_fk": {
-          "name": "calendar_links_user_id_user_id_fk",
-          "tableFrom": "calendar_links",
-          "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "calendar_links_token_hash_unique": {
-          "name": "calendar_links_token_hash_unique",
-          "nullsNotDistinct": false,
-          "columns": ["token_hash"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "calendar_links_revoked_check": {
-          "name": "calendar_links_revoked_check",
-          "value": "\"calendar_links\".\"revoked_at\" is null or \"calendar_links\".\"revoked_at\" >= \"calendar_links\".\"created_at\""
         }
       },
       "isRLSEnabled": false

@@ -1,17 +1,23 @@
 import {
   CurrencySchema,
+  EarningsSourceSchema,
   PayPeriodSchema,
   PlatformAccountIdSchema,
+  PlatformSchema,
   ShiftReportIdSchema,
   TeamMemberIdSchema,
   type Currency,
+  type EarningsSource,
   type PayPeriod,
+  type Platform,
   type PlatformAccountId,
   type ShiftReportId,
   type TeamMemberId,
 } from '@nirvana/contracts';
-import { enterCreator, sql, type Transaction } from '@nirvana/db';
+import { enterCreator, schema, sql, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
+
+import { DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
 
 /**
  * What pay reads of the planning (EQ-04, ADR 0023 § Paie), in pay's own transaction: the module owns the reports and
@@ -134,3 +140,103 @@ export async function reportsAwaitingReviewScoped(
  * attempts.
  */
 export type EnqueuePayRecalculation = (tx: Transaction, period: PayPeriod) => Promise<void>;
+
+/** An account's rules as pay reads them for its sales (CRM-03): from which period, on which platform, which source. */
+export interface AccountSourceForPay {
+  readonly platformAccountId: PlatformAccountId;
+  readonly platform: Platform;
+  readonly fromPeriod: PayPeriod;
+  readonly earningsSource: EarningsSource;
+}
+
+const SourceRowSchema = z.object({
+  platform_account_id: PlatformAccountIdSchema,
+  platform: PlatformSchema,
+  from_period: PayPeriodSchema,
+  earnings_source: EarningsSourceSchema,
+});
+
+/**
+ * Every account's dated rules that the transaction reads, with its platform, oldest first: from them pay says where
+ * a sale's base comes from in each period (`earningsBaseOf`, ADR 0050 § 8). In the caller's transaction and under its
+ * policies: pay's job on the admin connection, a validation creator by creator.
+ */
+export async function accountSourcesForPay(tx: Transaction): Promise<AccountSourceForPay[]> {
+  const result = await tx.execute(sql`
+    select a.platform_account_id, p.platform, a.from_period::text as from_period, a.earnings_source
+    from account_pay_rules a
+    join platform_accounts p on p.id = a.platform_account_id
+    order by a.platform_account_id, a.from_period`);
+  return result.rows.map((raw) => {
+    const row = SourceRowSchema.parse(raw);
+    return {
+      platformAccountId: row.platform_account_id,
+      platform: row.platform,
+      fromPeriod: row.from_period,
+      earningsSource: row.earnings_source,
+    };
+  });
+}
+
+/**
+ * A shift as pay attributes a sale to it (ADR 0050 § 5, ADR 0025): its member and account, its hours as they stand,
+ * and whether it was stopped under way (no margin after its end then).
+ */
+export interface ShiftForPay {
+  readonly memberId: TeamMemberId;
+  readonly platformAccountId: PlatformAccountId;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly stopped: boolean;
+}
+
+const instant = z.union([z.date(), z.string()]).transform((value) => new Date(value));
+
+const ShiftRowSchema = z.object({
+  member_id: TeamMemberIdSchema,
+  platform_account_id: PlatformAccountIdSchema,
+  starts_at: instant,
+  ends_at: instant,
+  stopped: z.boolean(),
+});
+
+/**
+ * The shifts on `platformAccountIds` that overlap `[from, to)`, cancelled ones left out, in the caller's transaction
+ * and under its policies. The member's status is not read: a sale made on shift stays theirs once they are gone.
+ */
+export async function shiftsForPay(
+  tx: Transaction,
+  platformAccountIds: readonly PlatformAccountId[],
+  from: Date,
+  to: Date,
+): Promise<ShiftForPay[]> {
+  if (platformAccountIds.length === 0) return [];
+  const result = await tx.execute(sql`
+    select member_id, platform_account_id, starts_at, ends_at, stopped_at is not null as stopped
+    from shifts
+    where cancelled_at is null
+      and platform_account_id in (${sql.join(
+        platformAccountIds.map((one) => sql`${one}`),
+        sql`, `,
+      )})
+      and starts_at < ${to} and ends_at > ${from}
+    order by starts_at, id`);
+  return result.rows.map((raw) => {
+    const row = ShiftRowSchema.parse(raw);
+    return {
+      memberId: row.member_id,
+      platformAccountId: row.platform_account_id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      stopped: row.stopped,
+    };
+  });
+}
+
+/** The access margin around a shift (ADR 0025), the planning's or its default until the owner saves theirs. */
+export async function accessMarginMinutesForPay(tx: Transaction): Promise<number> {
+  const [row] = await tx
+    .select({ minutes: schema.schedulingSettings.accessMarginMinutes })
+    .from(schema.schedulingSettings);
+  return row?.minutes ?? DEFAULT_SCHEDULING_SETTINGS.accessMarginMinutes;
+}

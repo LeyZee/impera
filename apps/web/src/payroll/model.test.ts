@@ -512,6 +512,12 @@ describe('words', () => {
     ).toBe('2 rapports de la quinzaine attendent leur relecture.');
     expect(
       payRefusalText(
+        { kind: 'refused', code: 'pay_period_sales_unread_conflict', details: { count: 1 } },
+        names,
+      ),
+    ).toBe('1 vente est sur des créatrices que tu ne suis pas : le propriétaire valide cette quinzaine.');
+    expect(
+      payRefusalText(
         { kind: 'refused', code: 'payment_before_period_unprocessable', details: { period: '2026-10-16' } },
         names,
       ),
@@ -657,6 +663,9 @@ describe('what Quinzaine opens on, and what it lets validate', () => {
     expect(
       stopsThePeriod({ kind: 'refused', code: 'pay_period_reports_pending_conflict', details: {} }),
     ).toBe(true);
+    expect(stopsThePeriod({ kind: 'refused', code: 'pay_period_sales_unread_conflict', details: {} })).toBe(
+      true,
+    );
     expect(
       stopsThePeriod({ kind: 'refused', code: 'commission_statement_changed_conflict', details: {} }),
     ).toBe(false);

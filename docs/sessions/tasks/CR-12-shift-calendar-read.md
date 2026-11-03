@@ -52,7 +52,7 @@ Poser, déplacer, ajouter en masse, suggérer (CR-13) ; notifications et rappels
 - Reste : la palette de 12 nuances des membres (fiche d'un membre, Équipe) ; une classe `nv-sr-only` du design system pour remplacer `.cal-sr`.
 
 ### 03/11/2026, lot c1 (liens iCal, serveur)
-- Migration 0074 : `calendar_links` (titulaire = le compte `user_id`, SHA-256 du jeton, une seule vivante par compte), hors RLS et retirée à `nirvana_app`, lue par `withAdmin` seulement, comme `invitation_links`. Le terme « lien de calendrier » entre au glossaire.
+- Migration 0076 : `calendar_links` (titulaire = le compte `user_id`, SHA-256 du jeton, une seule vivante par compte), hors RLS et retirée à `nirvana_app`, lue par `withAdmin` seulement, comme `invitation_links`. Le terme « lien de calendrier » entre au glossaire.
 - Routes : `GET`, `POST`, `DELETE /v1/scheduling/calendar-link` (membres de l'équipe, pour eux-mêmes, au journal d'audit) ; `GET /v1/calendar-feed/<jeton>.ics` sans session, 60 par minute et par IP, `Cache-Control: private, no-store`, rien journalisé sous `warn`, `access_log off` dans `nginx`.
 - Le flux lit `calendar_shifts` avec les droits du titulaire puis ne garde que ses shifts (un chatteur actif n'envoie pas toute l'équipe à son téléphone), sur 14 jours en arrière et 28 devant ; RFC 5545, UTC, lignes pliées à 75 octets ; un lien inconnu, révoqué ou d'un membre parti répond le même 404. 5 tests d'intégration, 4 unitaires (fichier), 2 de contrat.
 - Le départ (EQ-14) n'a rien à faire de plus : le flux refuse dès que le membre est `left`. Il pourra révoquer la ligne pour l'audit.

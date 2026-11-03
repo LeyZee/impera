@@ -23,7 +23,7 @@ import {
 } from '../domain/archive';
 import { JournalAccountsMissing } from '../domain/errors';
 import { fecText, journalFileName, latin9 } from '../domain/fec';
-import { journalEntries, ledgerAccountsOf } from '../domain/journal';
+import { journalEntries, ledgerAccountsOf, transfersLeftOutInOrder } from '../domain/journal';
 import type { ArchiveDocument, PayrollAccountingStore } from '../domain/ports';
 
 /**
@@ -121,7 +121,7 @@ export function createPayrollAccounting(store: PayrollAccountingStore, pdfs: Arc
           content: Buffer.from(latin9(fecText(entries, ledger.accounts))).toString('base64'),
           entryCount: entries.length,
           unbalanced,
-          transfersLeftOut: [...facts.transfersLeftOut],
+          transfersLeftOut: transfersLeftOutInOrder(facts.transfersLeftOut),
         };
       }),
 

@@ -1,4 +1,4 @@
-import type { CreatorId, PayPeriod } from '@nirvana/contracts';
+import type { CreatorId, PayPeriod, PlatformAccountId } from '@nirvana/contracts';
 import type { Database, Transaction } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -18,11 +18,16 @@ import { createDrizzleColleagueReads } from './infra/colleague-reads';
 import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
+  accessMarginMinutesForPay,
+  accountSourcesForPay,
   reportsAwaitingReviewScoped,
+  shiftsForPay,
   validatedReportsScoped,
   validatedReportsUnscoped,
+  type AccountSourceForPay,
   type CreatorReportsForPay,
   type EnqueuePayRecalculation,
+  type ShiftForPay,
   type ValidatedReportForPay,
 } from './infra/pay-reads';
 import { createDrizzlePayRulesStore } from './infra/pay-rules-store';
@@ -66,6 +71,19 @@ export interface SchedulingModule {
       upTo: PayPeriod,
     ) => Promise<number>;
     readonly agencyTimeZone: (tx: Transaction) => Promise<string>;
+    /**
+     * For the sales pay counts (CRM-03, ADR 0050 §§ 5, 8), in pay's transaction and under its policies (admin for the
+     * job, creator by creator for a validation): every account's dated rules with its platform, the shifts on some
+     * accounts over a range, cancelled ones left out, and the access margin around a shift.
+     */
+    readonly accountSources: (tx: Transaction) => Promise<AccountSourceForPay[]>;
+    readonly shifts: (
+      tx: Transaction,
+      platformAccountIds: readonly PlatformAccountId[],
+      from: Date,
+      to: Date,
+    ) => Promise<ShiftForPay[]>;
+    readonly accessMarginMinutes: (tx: Transaction) => Promise<number>;
   };
   readonly jobs: {
     /**
@@ -134,7 +152,15 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   return {
     name: 'scheduling',
     onShift: (creatorId, at) => admin.onShiftUnscoped(creatorId, at),
-    pay: { validatedReportsUnscoped, validatedReportsScoped, reportsAwaitingReviewScoped, agencyTimeZone },
+    pay: {
+      validatedReportsUnscoped,
+      validatedReportsScoped,
+      reportsAwaitingReviewScoped,
+      agencyTimeZone,
+      accountSources: accountSourcesForPay,
+      shifts: shiftsForPay,
+      accessMarginMinutes: accessMarginMinutesForPay,
+    },
     routes: (requireRole) => createSchedulingRoutes(services, requireRole),
     jobs: {
       makeShifts: (logger) => makeShifts(admin, logger, now()),
