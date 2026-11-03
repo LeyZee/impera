@@ -138,16 +138,15 @@ function refundWords(
   member: SaleMember | null,
 ): OutcomeWords {
   const alone = sale.saleOccurredAt === null || sale.reason === 'refund_before_base';
-  const takenBack =
-    sale.saleOccurredAt === null
-      ? 'Tu peux retirer la décision tant qu’aucune clôture ne l’a compté.'
-      : 'Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.';
+  const takenBack = alone
+    ? 'Tu peux retirer la décision tant qu’aucune clôture ne l’a compté.'
+    : 'Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.';
   switch (outcome) {
     case 'count':
       return {
         title:
           member === null ? 'Compter ce remboursement ?' : `Compter ce remboursement pour ${member.name} ?`,
-        lead: `Sa vente va sur son relevé, et lui s’en déduit. ${takenBack}`,
+        lead: `Sa vente va sur son relevé, et le remboursement s’en déduit. ${takenBack}`,
         confirm: outcomeLabel('count', member),
       };
     case 'exclude':

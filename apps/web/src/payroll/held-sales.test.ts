@@ -109,7 +109,7 @@ describe('held sales (CRM-03 lot b4b)', () => {
 
     expect(outcomeWords('count', refund(), THEO)).toEqual({
       title: 'Compter ce remboursement pour Théo ?',
-      lead: 'Sa vente va sur son relevé, et lui s’en déduit. Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.',
+      lead: 'Sa vente va sur son relevé, et le remboursement s’en déduit. Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.',
       confirm: 'Compter pour Théo',
     });
     expect(outcomeWords('exclude', refund(), THEO)).toEqual({
@@ -128,7 +128,7 @@ describe('held sales (CRM-03 lot b4b)', () => {
       'Il ne se déduira des ventes de personne. Tu peux retirer la décision tant qu’aucune clôture ne l’a compté.',
     );
     expect(outcomeWords('exclude', refund({ reason: 'refund_before_base' }), THEO).lead).toBe(
-      'Il ne se déduira des ventes de personne. Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.',
+      'Il ne se déduira des ventes de personne. Tu peux retirer la décision tant qu’aucune clôture ne l’a compté.',
     );
     expect(outcomeWords('withdraw', refund({ decision: 'count' }), THEO).lead).toBe(
       'Le remboursement suit de nouveau les règles : il attend une décision et ne se déduit des ventes de personne.',
