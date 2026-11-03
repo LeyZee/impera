@@ -24,6 +24,8 @@ export default defineConfig({
     host_permissions: ['https://*.reveal.me/*', 'http://localhost/*', 'http://127.0.0.1/*'],
     optional_host_permissions: ['https://*/*'],
   },
+  // The file the CRM serves at /extension/impera.zip (ADR 0067, apps/web/Dockerfile): one name, whatever the version.
+  zip: { artifactTemplate: 'impera.zip' },
   // WXT's default dev port is 3000, the API's: under `pnpm dev` the extension took it first and the API never started.
   dev: { server: { port: 3100 } },
 });

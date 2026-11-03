@@ -11,6 +11,7 @@ import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { creatorsSearch, parseCreatorsSearch, sheetOf } from './creators/search';
 import { parsePaySearch } from './payroll/model';
+import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
@@ -728,6 +729,16 @@ const installHelp = createRoute({
   path: '/aide/installer',
   component: InstallPage,
 });
+/** /aide/extension (ADR 0067): the extension's guide, outside the rail like the phone's; the menu offers it to the team. */
+const extensionHelp = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/aide/extension',
+  component: function ExtensionHelp() {
+    const { user } = rootRoute.useRouteContext();
+    // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
+    return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
+  },
+});
 /** /notifications (CR-01): every role, from the account's menu; this device and the account's quiet hours. */
 const notifications = createRoute({
   getParentRoute: () => rootRoute,
@@ -737,6 +748,7 @@ const notifications = createRoute({
 
 const routeTree = rootRoute.addChildren([
   installHelp,
+  extensionHelp,
   notifications,
   dashboard,
   creators,
