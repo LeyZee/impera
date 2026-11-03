@@ -37,4 +37,23 @@ export interface CreatorAgendaStore {
 export interface AgencySuggestionStore {
   create(creatorId: string, userId: string, body: CreateSuggestionBody, now: Date): Promise<AgencySuggestion>;
   list(creatorId: string, userId: string, week: string): Promise<AgencySuggestionList>;
+  /** A shoot of hers with its sheet, in the first room of her dispos or undated (VEI-01 d). */
+  suggestShoot(
+    creatorId: string,
+    userId: string,
+    shoot: ShootSuggestion,
+    now: Date,
+  ): Promise<AgencySuggestion>;
+}
+
+/**
+ * A shoot the agency suggests with its sheet (VEI-01 d: an idea validated in « Idées du jour »): timed, `minutes` long,
+ * in her first room. Its id is the caller's, so that the same suggestion replayed answers itself.
+ */
+export interface ShootSuggestion {
+  readonly id: string;
+  readonly title: string;
+  readonly purpose: string | null;
+  readonly shootBrief: string;
+  readonly minutes: number;
 }

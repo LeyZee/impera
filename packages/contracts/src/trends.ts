@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DropCategorySchema } from './content-drops';
+import { AgencySuggestionSchema, CreatorTaskTitleSchema } from './creator-tasks';
 import {
   ContentIdeaIdSchema,
   CreatorIdSchema,
@@ -215,7 +216,8 @@ export const CONTENT_IDEAS_PER_DAY_MAX = 3;
 
 /** What an idea says, as the model writes it and the agency corrects it (ADR 0060 § 4). */
 export const ContentIdeaDraftSchema = z.strictObject({
-  title: z.string().trim().min(1).max(120),
+  /** Her agenda's title (80 at most): a validated idea becomes a suggestion under it, never cut. */
+  title: CreatorTaskTitleSchema,
   category: DropCategorySchema,
   toShoot: z.string().trim().min(1).max(600),
   signalId: TrendSignalIdSchema,
@@ -346,3 +348,50 @@ export const TREND_CAPTURE_READING_NOT_FOUND = 'trend_capture_reading_not_found'
 export const TREND_WATCH_BUDGET_LIMITED = 'trend_watch_budget_limited';
 /** No vision model answered (no key, every model failed): the captures are dropped, the reading stays. */
 export const TREND_CAPTURE_VISION_UNAVAILABLE = 'trend_capture_vision_unavailable';
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * VEI-01 lot d: « Idées du jour » (ADR 0060 § 5), for the owner and an active manager. Validated, corrected on the spot
+ * or refused; a validated idea becomes a suggestion in her agenda, its « à tourner » her shooting sheet.
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/** `GET /v1/creators/:creatorId/ideas?day=` (owner, active manager): the ideas proposed on one of her days. */
+export const ContentIdeasQuerySchema = z.strictObject({ day: CalendarDaySchema });
+export const ContentIdeaListSchema = z.strictObject({ items: z.array(ContentIdeaSchema) });
+export type ContentIdeaList = z.infer<typeof ContentIdeaListSchema>;
+
+/** What the agency may correct of an idea before validating it: never its origin signal. */
+export const ContentIdeaCorrectionSchema = ContentIdeaDraftSchema.omit({ signalId: true })
+  .partial()
+  .refine((correction) => Object.keys(correction).length > 0, { message: 'Rien à corriger' });
+export type ContentIdeaCorrection = z.infer<typeof ContentIdeaCorrectionSchema>;
+
+/**
+ * `POST /v1/creators/:creatorId/ideas/:ideaId/validate` (owner, active manager): as it is, or corrected. The code reads
+ * the idea as it leaves again (her limits, « jamais de nu » for a public output, the Instagram guard): a correction that
+ * breaks one is refused (422), never sent. Replayed, the same gesture changes nothing and its correction is not read.
+ */
+export const ValidateContentIdeaBodySchema = z.strictObject({
+  correction: ContentIdeaCorrectionSchema.nullable().default(null),
+});
+export type ValidateContentIdeaBody = z.infer<typeof ValidateContentIdeaBodySchema>;
+
+/** The answer of a validation: the idea, and the suggestion it became (undated when no dispo of hers had room). */
+export const ValidatedContentIdeaSchema = z.strictObject({
+  idea: ContentIdeaSchema,
+  suggestion: AgencySuggestionSchema,
+});
+export type ValidatedContentIdea = z.infer<typeof ValidatedContentIdeaSchema>;
+
+/** `POST /v1/creators/:creatorId/ideas/:ideaId/refuse` (owner, active manager): a reason if one is given. Never proposed again. */
+export const RefuseContentIdeaBodySchema = z.strictObject({
+  reason: z.string().trim().min(1).max(280).nullable().default(null),
+});
+export type RefuseContentIdeaBody = z.infer<typeof RefuseContentIdeaBodySchema>;
+
+/** Refusals of « Idées du jour », beside the shared ones. */
+export const CONTENT_IDEA_NOT_FOUND = 'content_idea_not_found';
+export const CONTENT_IDEA_FORBIDDEN = 'content_idea_forbidden';
+/** Validated when refused, or refused once validated: the other gesture is refused. */
+export const CONTENT_IDEA_DECIDED_CONFLICT = 'content_idea_decided_conflict';
+/** The idea, as corrected, touches one of her limits or breaks a guard of its output: corrected again, or refused. */
+export const CONTENT_IDEA_GUARD_UNPROCESSABLE = 'content_idea_guard_unprocessable';

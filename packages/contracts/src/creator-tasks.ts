@@ -40,6 +40,12 @@ export const CREATOR_TASK_CATEGORY_LABELS: Readonly<Record<CreatorTaskCategory, 
 export const CreatorTaskTitleSchema = z.string().trim().min(1).max(80);
 /** What the task is for, one sentence, never an invented figure (CR-05). */
 export const CreatorTaskPurposeSchema = z.string().trim().min(1).max(160);
+/**
+ * Her shooting sheet (ADR 0042 § 4, VEI-01 lot d): what to shoot, as the agency validated an idea. Plain text, shown as
+ * it is (never Markdown). Written by the agency on a suggestion and copied once into the task she accepts; she reads it
+ * and never edits it.
+ */
+export const ShootBriefSchema = z.string().trim().min(1).max(600);
 
 /** The longest a timed task or a dispo lasts: a day. */
 export const CREATOR_TASK_MAX_MINUTES = 24 * 60;
@@ -77,6 +83,8 @@ export const CreatorTaskSchema = z.strictObject({
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable(),
+  /** Her shooting sheet, copied from the suggestion she accepted; `null` for any other task. */
+  shootBrief: ShootBriefSchema.nullable(),
   essential: z.boolean(),
   /** Minutes before a timed task she wants a reminder, `null` for none. */
   reminderMinutes: z.number().int().min(0).max(1440).nullable(),
@@ -176,6 +184,8 @@ export const CreatorSuggestionSchema = z.strictObject({
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable(),
+  /** The shooting sheet she reads before she accepts (an idea's « à tourner »), `null` for none. */
+  shootBrief: ShootBriefSchema.nullable(),
   essential: z.boolean(),
 });
 export type CreatorSuggestion = z.infer<typeof CreatorSuggestionSchema>;

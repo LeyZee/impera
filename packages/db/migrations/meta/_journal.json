@@ -680,6 +680,13 @@
       "when": 1793733699278,
       "tag": "0108_content_drops",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1793736793930,
+      "tag": "0110_shoot_brief",
+      "breakpoints": true
     }
   ]
 }
