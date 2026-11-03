@@ -731,22 +731,6 @@ div.db-fan {
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
 }
-/* A creator's mode, read only: the pill alone, nothing that looks like a control (DASH-21). */
-.db-modepill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nv-space-2);
-  margin: 0;
-  padding: 0 var(--nv-space-3);
-  height: 36px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-}
-.db-modepill__who {
-  font-weight: 400;
-  color: var(--nv-ink-faint);
-}
 /* Another creator's urgencies, on her chip: red, they are urgencies (DASH-03). */
 .db-creators__grave {
   margin-left: var(--nv-space-2);

@@ -149,36 +149,8 @@ export interface Hero {
 
 /** What the hero knows beyond the agent and its list. */
 export interface HeroContext {
-  /** A creator's Dashboard: the agent's state only (ADR 0023), the team's chores said as the agency's. */
-  readonly forCreator?: boolean;
   /** An operator's global switch holds every creator: the hero says why the agent stops (DASH-08). */
   readonly globalStop?: boolean;
-}
-
-/**
- * The state sentence follows the « À traiter » list: how many things wait, and whether one is urgent. A stopped
- * agent says so first; an agent in trouble (`bad`) keeps its own sentence; an empty list is the calm sentence.
- *
- * A creator reads the agent's state only (ADR 0023: never a conversation nor a fan): no list, no action, and the
- * team's chores (its key, the alerts) are said as the agency's.
- */
-export function heroState(
-  agent: AgentState,
-  todos: readonly Todo[],
-  mode: AgentMode,
-  { forCreator = false, globalStop = false }: HeroContext = {},
-): Hero {
-  if (!forCreator) return teamHero(agent, todos, mode, globalStop);
-  const team = teamHero(agent, [], mode, globalStop);
-  const hero: Hero = { tone: team.tone, headline: team.headline, lead: team.lead };
-  if (team.actionTo !== undefined) {
-    return {
-      ...hero,
-      lead: 'L’agence s’en occupe. D’ici là, les conversations restent aux chatteurs dans Reveal.',
-    };
-  }
-  if (hero.tone === 'ok') return { ...hero, lead: `${modeLead(mode)}. L’agence suit les conversations.` };
-  return hero;
 }
 
 /**
@@ -198,7 +170,16 @@ const GLOBAL_STOP_LEAD =
 const withBudget = (lead: string, agent: AgentState): string =>
   agent.budgetNote === undefined ? lead : lead === '' ? agent.budgetNote : `${lead} ${agent.budgetNote}`;
 
-function teamHero(agent: AgentState, todos: readonly Todo[], mode: AgentMode, globalStop: boolean): Hero {
+/**
+ * The state sentence follows the « À traiter » list: how many things wait, and whether one is urgent. A stopped
+ * agent says so first; an agent in trouble (`bad`) keeps its own sentence; an empty list is the calm sentence.
+ */
+export function heroState(
+  agent: AgentState,
+  todos: readonly Todo[],
+  mode: AgentMode,
+  { globalStop = false }: HeroContext = {},
+): Hero {
   if (mode === 'stop') {
     // On Arrêt the list keeps the grave lines only: said in the lead, the headline stays the stop. Under a global
     // stop the lead says first why, next to the sentence it explains, not in a corner of the screen (DASH-08).
@@ -259,10 +240,9 @@ const RANK: Readonly<Record<Tone, number>> = { bad: 2, warn: 1, ok: 0, idle: 0 }
 
 /**
  * The title and dot of the « L’agent » fold: they follow the worst card that can alarm (Reveal read late, the voice,
- * waiting fans or blocked jobs, the budget), never « fonctionne normalement » over an amber card (DASH-06). A creator
- * reads that the agency handles it (DASH-21): none of it is hers to do.
+ * waiting fans or blocked jobs, the budget), never « fonctionne normalement » over an amber card (DASH-06).
  */
-export function foldOf(agent: AgentState, stopped: boolean, forCreator: boolean): Fold {
+export function foldOf(agent: AgentState, stopped: boolean): Fold {
   const own = agent.tone === 'bad' || agent.tone === 'idle' || agent.stalled === true;
   const worst = agent.cards
     .filter((card) => card.alarm !== undefined && RANK[card.tone] > 0)
@@ -271,11 +251,8 @@ export function foldOf(agent: AgentState, stopped: boolean, forCreator: boolean)
       null,
     );
   const tone = own ? agent.tone : (worst?.tone ?? 'ok');
-  const agency = forCreator && RANK[tone] > 0;
-  const title = agency
-    ? 'L’agence s’en occupe'
-    : own
-      ? agent.foldTitle
-      : (worst?.alarm ?? (stopped ? 'Le reste fonctionne normalement' : agent.foldTitle));
+  const title = own
+    ? agent.foldTitle
+    : (worst?.alarm ?? (stopped ? 'Le reste fonctionne normalement' : agent.foldTitle));
   return { tone, title, live: tone === 'bad' };
 }

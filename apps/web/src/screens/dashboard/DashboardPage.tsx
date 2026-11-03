@@ -17,7 +17,6 @@ import { Section, TONE_COLOR, useFloatingTip } from './parts';
 import { useDashboard, type DashboardView } from './useDashboard';
 import './dashboard.css';
 
-import { pillOf } from '@/agent/mode';
 import { useAgentModeWriter } from '@/agent/write';
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
@@ -140,13 +139,11 @@ function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
  * The Dashboard, read top to bottom (maquette v6, validée le 17/10) : the agent's state and what waits for a
  * human, then the sales, the fans' path, the best fans. Every detail lives in a tip, every line opens in Suivi.
  *
- * A creator's keeps her aggregates only (ADR 0023: never a conversation nor a fan): the agent's state and mode,
- * read only, its health, the sales; no « À traiter », no best fans, no way into Suivi. The server sends her neither.
+ * The agency's screen: the creator reads her own Aujourd'hui (ADR 0042 § 8), and the server refuses her this one.
  */
 export function DashboardPage({
   period,
   onPeriod,
-  forCreator = false,
   forOwner = false,
   opensTracking = false,
   canAddCreator = false,
@@ -154,7 +151,6 @@ export function DashboardPage({
   /** The period of the sales, the fans' path, the best fans and the reply delay: from the address (`?periode=`). */
   period: Period;
   onPeriod: (period: Period) => void;
-  forCreator?: boolean;
   /** The owner also reads the state of the daily export (OPS-02), the one figure that is the owner's alone. */
   forOwner?: boolean;
   /** The account's rail holds Suivi: a best fan opens his conversation there (DASH-14). */
@@ -162,7 +158,7 @@ export function DashboardPage({
   /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
   canAddCreator?: boolean;
 }): JSX.Element {
-  const view = useDashboard(period, forCreator ? 'creator' : forOwner ? 'owner' : 'team');
+  const view = useDashboard(period, forOwner ? 'owner' : 'team');
   if (view.status === 'loading') {
     return (
       <div className="db" aria-busy="true">
@@ -177,7 +173,6 @@ export function DashboardPage({
       view={view}
       period={period}
       onPeriod={onPeriod}
-      forCreator={forCreator}
       forOwner={forOwner}
       opensTracking={opensTracking}
     />
@@ -188,14 +183,12 @@ function Loaded({
   view: { creatorId, globalStop, readAt, data, mode, automatic },
   period,
   onPeriod,
-  forCreator,
   forOwner,
   opensTracking,
 }: {
   view: Extract<DashboardView, { status: 'live' }>;
   period: Period;
   onPeriod: (period: Period) => void;
-  forCreator: boolean;
   forOwner: boolean;
   opensTracking: boolean;
 }): JSX.Element {
@@ -224,7 +217,6 @@ function Loaded({
   const running = agentRuns(data.agent);
   // The global stop is said in the hero, next to the sentence it explains, not in this corner (DASH-08).
   const notice = writer.notice;
-  const pill = pillOf(mode, running);
 
   const periodControl = <PeriodControl period={period} onChange={onPeriod} />;
   return (
@@ -245,28 +237,16 @@ function Loaded({
             </span>
           </span>
         </div>
-        {forCreator ? (
-          // Hers to read, not to change: the mode alone, never a control that looks like one (DASH-21).
-          <p className="db-modepill nv-glass nv-glass--thin">
-            <span
-              className={`nv-dot${pill.tone === 'unknown' ? '' : ` nv-tone--${pill.tone}`}${pill.live ? ' nv-dot--live' : ''}`}
-              aria-hidden="true"
-            />
-            {pill.label}
-            <span className="db-modepill__who">réglé par l’agence</span>
-          </p>
-        ) : (
-          // The mode changes once the server has made the change (PUT /v1/agent/mode).
-          <ModeControl
-            mode={mode}
-            automatic={automatic}
-            creatorName={data.creator.name}
-            tip={tip}
-            readOnly={globalStop ? GLOBAL_NOTE : null}
-            running={running}
-            onChange={setMode}
-          />
-        )}
+        // The mode changes once the server has made the change (PUT /v1/agent/mode).
+        <ModeControl
+          mode={mode}
+          automatic={automatic}
+          creatorName={data.creator.name}
+          tip={tip}
+          readOnly={globalStop ? GLOBAL_NOTE : null}
+          running={running}
+          onChange={setMode}
+        />
         {writer.pending ? (
           <p className="db-notice db-notice--quiet" role="status">
             Envoi au serveur…
@@ -283,9 +263,8 @@ function Loaded({
         mode={mode}
         todos={data.todos}
         onOpen={openTodo}
-        onResume={!globalStop && !forCreator ? resume : undefined}
+        onResume={globalStop ? undefined : resume}
         tip={tip}
-        forCreator={forCreator}
         globalStop={globalStop}
         opensSettings={forOwner}
       />
@@ -296,7 +275,7 @@ function Loaded({
       <PaperworkBanner enabled={forOwner} />
 
       {/* The night's alerts and where they go are the team's (Réglages › Telegram). */}
-      {forCreator ? null : <NightBanner night={data.telegram} creatorName={data.creator.name} />}
+      <NightBanner night={data.telegram} creatorName={data.creator.name} />
 
       {sales === null ? null : (
         <>
@@ -323,21 +302,19 @@ function Loaded({
         </Section>
       )}
 
-      {forCreator ? null : (
-        <Section
-          title="Meilleurs fans"
-          sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
-          index={(sales === null ? 2 : 4) + (data.revealSales === null ? 0 : 1)}
-          control={sales === null && data.revealSales === null ? periodControl : undefined}
-        >
-          <TopFans
-            fans={data.fans}
-            tip={tip}
-            onOpen={opensTracking ? openFan : undefined}
-            usdNote={data.usdNote}
-          />
-        </Section>
-      )}
+      <Section
+        title="Meilleurs fans"
+        sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
+        index={(sales === null ? 2 : 4) + (data.revealSales === null ? 0 : 1)}
+        control={sales === null && data.revealSales === null ? periodControl : undefined}
+      >
+        <TopFans
+          fans={data.fans}
+          tip={tip}
+          onOpen={opensTracking ? openFan : undefined}
+          usdNote={data.usdNote}
+        />
+      </Section>
 
       {/* Until Reveal's purchases are observed, one quiet line says where the sales are read, no block (DASH-02). */}
       {sales === null && data.revealSales === null ? (

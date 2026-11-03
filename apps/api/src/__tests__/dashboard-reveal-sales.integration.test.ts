@@ -219,8 +219,8 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
     expect((await get('chatter', creatorId)).statusCode).toBe(403);
   });
 
-  it('shows the creator nothing of it: she reads her own screen and never who sold (ADR 0042 § 2)', async () => {
-    expect((await dashboard('creator', creatorId)).revealSales).toBeNull();
+  it('shows the creator nothing of it: the Dashboard is closed to her (ADR 0042 § 2 and § 8)', async () => {
+    expect((await get('creator', creatorId)).statusCode).toBe(403);
   });
 
   it('stays away while none of her accounts is linked to the register', async () => {

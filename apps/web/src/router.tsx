@@ -103,7 +103,6 @@ const dashboard = createRoute({
       <DashboardPage
         period={periodOf(search)}
         onPeriod={(next) => void navigate({ search: dashboardSearch(next), replace: true })}
-        forCreator={user.role === 'creator'}
         forOwner={user.role === 'owner'}
         opensTracking={canOpen(railOf(user), '/suivi')}
         canAddCreator={canOpen(railOf(user), '/creatrices')}
