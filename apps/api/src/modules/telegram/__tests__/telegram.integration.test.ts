@@ -447,6 +447,60 @@ describe('telegram module on Postgres', () => {
     expect(rows[0]?.text).not.toMatch(/123,45|120,00|3,45/);
   });
 
+  it('tells an outage once, reminds it once in red after 2 h, then answers « Rétabli » in its thread (P3-12)', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const since = new Date(sliceStart).toISOString();
+    await publish(
+      'connection_state_changed',
+      { service: 'xai', state: 'down', reason: 'refused', since },
+      null,
+    );
+    await module.jobs.scan();
+    const thread = async () =>
+      (await deliveryRows(chatId)).filter((row) => row.threadKey === 'connection:xai');
+    expect((await thread()).map((row) => [row.topic, row.action])).toEqual([['important', 'send']]);
+    expect((await thread())[0]?.summary).toContain('la clé est refusée');
+
+    expect(await module.jobs.connectionReminders()).toBe(0); // not 2 hours yet
+    offsetMs = 2 * 60 * 60_000 + 60_000;
+    expect(await module.jobs.connectionReminders()).toBe(1);
+    expect(await module.jobs.connectionReminders()).toBe(0); // a single reminder, whatever the cron does
+    offsetMs = 6 * 60 * 60_000;
+    expect(await module.jobs.connectionReminders()).toBe(0);
+    const reminder = (await thread()).find((row) => row.topic === 'urgent');
+    expect(reminder?.summary).toContain('toujours en panne après 2 h');
+
+    await publish('connection_state_changed', { service: 'xai', state: 'back', since }, null);
+    await module.jobs.scan();
+    // The test's clock runs ahead of Postgres' own: the rows are compared by kind, not by their order.
+    const rows = await thread();
+    expect(rows.map((row) => `${row.topic}:${row.action}`).sort()).toEqual([
+      'important:send',
+      'info:reply',
+      'urgent:send',
+    ]);
+    const back = rows.find((row) => row.action === 'reply');
+    expect(back?.parentId).toBe(reminder?.id);
+    expect(back?.summary).toBe('Rétabli : la connexion xAI fonctionne de nouveau.');
+    expect(await module.jobs.connectionReminders()).toBe(0);
+  });
+
+  it('sends no reminder when the service came back before 2 h (P3-12)', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const since = new Date(sliceStart).toISOString();
+    await publish(
+      'connection_state_changed',
+      { service: 'reveal_crm', state: 'down', reason: 'unreachable', since },
+      null,
+    );
+    await publish('connection_state_changed', { service: 'reveal_crm', state: 'back', since }, null);
+    await module.jobs.scan();
+    offsetMs = 3 * 60 * 60_000;
+    expect(await module.jobs.connectionReminders()).toBe(0);
+    const rows = (await deliveryRows(chatId)).filter((row) => row.threadKey === 'connection:reveal_crm');
+    expect(rows.map((row) => row.action)).toEqual(['send', 'reply']);
+  });
+
   it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
     await module.saveSaleSettings([], 'owner-telegram');
     const chatId = await salesGroup();
