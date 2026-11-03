@@ -8,11 +8,18 @@ export async function forgetDevice(): Promise<void> {
   await Promise.all([dropCaches(), dropPushSubscription()]);
 }
 
+/** The prefixes of the app's copies, the one from before the rename included (`public/sw.js` keeps the same list). */
+const PREFIXES = ['impera-', 'nirvana-']; // ADR 0062
+
 async function dropCaches(): Promise<void> {
   try {
     if (typeof caches === 'undefined') return;
     const keys = await caches.keys();
-    await Promise.all(keys.filter((key) => key.startsWith('impera-')).map((key) => caches.delete(key)));
+    await Promise.all(
+      keys
+        .filter((key) => PREFIXES.some((prefix) => key.startsWith(prefix)))
+        .map((key) => caches.delete(key)),
+    );
   } catch {
     // Storage blocked: nothing was kept either.
   }

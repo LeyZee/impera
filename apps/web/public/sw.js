@@ -11,11 +11,13 @@
 // Served from the root with `Cache-Control: no-cache` (nginx.conf.template, `location /`), never under /assets/,
 // so the browser always sees a new version. Hand-written, no build dependency: bump VERSION when this file changes.
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL = `impera-shell-${VERSION}`;
 const ASSETS = `impera-assets-${VERSION}`;
 /** Hashed files kept at most: each deployment adds new ones, the oldest go first. */
 const MAX_ASSETS = 120;
+/** The prefixes of this app's copies: before the rename they were `nirvana-*`, still dropped (ADR 0062). */
+const PREFIXES = ['impera-', 'nirvana-']; // ADR 0062
 const SHELL_FILES = ['/', '/appearance.js', '/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -28,7 +30,9 @@ self.addEventListener('activate', (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => key.startsWith('impera-') && key !== SHELL && key !== ASSETS)
+          .filter(
+            (key) => PREFIXES.some((prefix) => key.startsWith(prefix)) && key !== SHELL && key !== ASSETS,
+          )
           .map((key) => caches.delete(key)),
       );
       await self.clients.claim();

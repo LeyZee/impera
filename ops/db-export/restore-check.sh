@@ -30,8 +30,11 @@ end $$;
 SQL
 
 started=$(date +%s)
-pg_restore --no-owner --exit-on-error --single-transaction --dbname="$target" "$work/impera.dump"
-rm -f "$work/impera.dump"
+# An export made before the rename holds nirvana.dump (ADR 0062).
+dump="$work/impera.dump"
+[ -f "$dump" ] || dump="$work/nirvana.dump" # ADR 0062
+pg_restore --no-owner --exit-on-error --single-transaction --dbname="$target" "$dump"
+rm -f "$dump"
 
 # Every queued or scheduled job of production goes: a worker on this copy must have nothing to send.
 sql <<'SQL'

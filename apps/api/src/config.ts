@@ -200,8 +200,19 @@ export function invoiceBucket(
     : { endpoint, region, bucket, accessKeyId, secretAccessKey };
 }
 
+/** The prefix of the variables before the rename: one still set stops the start instead of being ignored. */
+const OLD_PREFIX = 'NIRVANA_'; // ADR 0062
+
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const renamed = Object.keys(env).filter((name) => name.startsWith(OLD_PREFIX));
+  if (renamed.length > 0) {
+    throw new Error(
+      `Invalid configuration: the project is called Impera now (ADR 0062), rename ${renamed
+        .map((name) => `${name} to IMPERA_${name.slice(OLD_PREFIX.length)}`)
+        .join(', ')}.`,
+    );
+  }
   const parsed = configSchema.safeParse(env);
   if (!parsed.success) {
     throw new Error(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);
