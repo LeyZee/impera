@@ -518,6 +518,30 @@ export type OnDuty = z.infer<typeof OnDutySchema>;
 export const OnDutyListSchema = z.object({ onDuty: z.array(OnDutySchema) });
 
 /**
+ * One shift on her accounts, as the creator reads it (`GET /v1/creator-space/on-duty`, CR-02, ADR 0023): the member's
+ * display name and the range only, never `team_members` (rate, country, status). `strict`, so no field of the team
+ * reaches her by mistake.
+ */
+export const CreatorOnDutySchema = z.strictObject({
+  displayName: z.string().min(1),
+  /** Her account on the platform, by its handle. */
+  handle: z.string().min(1),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+});
+export type CreatorOnDuty = z.infer<typeof CreatorOnDutySchema>;
+
+/**
+ * Who chats for her now (`current`: `startsAt ≤ now < endsAt`, « En poste ») and who will in the next 24 hours
+ * (`next`, « Bientôt »), each by start; computed by the server, the screen computes nothing.
+ */
+export const CreatorOnDutyListSchema = z.strictObject({
+  current: z.array(CreatorOnDutySchema),
+  next: z.array(CreatorOnDutySchema),
+});
+export type CreatorOnDutyList = z.infer<typeof CreatorOnDutyListSchema>;
+
+/**
  * A member's own shift, for Aujourd'hui: its creator's name (a chatter does not read the creators' list, ADR 0025),
  * the account to open in the platform (the chatter chats there, never in Nirvana), and the access window the server
  * computed for it (`accessEndsAt` is `endsAt` for a stopped shift).

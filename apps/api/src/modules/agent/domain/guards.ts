@@ -514,9 +514,45 @@ function againstHistory(bubbles: readonly string[], turns: readonly (readonly st
   return violations;
 }
 
+/**
+ * One word of an entry with its plural folded: a final « s » or « x » is dropped when four letters at least remain,
+ * then either is allowed back. « pied » and « pieds » both read « pieds » and « pied » ; « cheveu » reads « cheveux » ;
+ * « bras » stays « bras » and never reads « bra ». An irregular plural (« œil », « yeux ») is a variant of the persona.
+ */
+function foldedWord(word: string): string {
+  const stem = /^(\p{L}{4,})[sx]$/u.exec(word)?.[1] ?? word;
+  return /^\p{L}+$/u.test(stem) ? `${escapeRegExp(stem)}[sx]?` : escapeRegExp(stem);
+}
+
+const TERM_PATTERNS = new Map<string, RegExp>();
+
+/** The pattern of a normalised entry: whole words only, each word's plural folded, any separator for any other. */
+function termPattern(term: string): RegExp {
+  const known = TERM_PATTERNS.get(term);
+  if (known !== undefined) return known;
+  const body = term
+    .split(/([^\p{L}\p{N}]+)/u)
+    // Any separator of the entry reads any other: « crème chantilly » reads « crème-chantilly » and « crème, chantilly ».
+    .map((part, index) => (index % 2 === 0 ? foldedWord(part) : '[^\\p{L}\\p{N}]+'))
+    .join('');
+  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${body}($|[^\\p{L}\\p{N}])`, 'u');
+  TERM_PATTERNS.set(term, pattern);
+  return pattern;
+}
+
 function forbiddenMatch(text: string, term: string): boolean {
   // Whole words only: the disgust « anal » must not block « banal » or « canal ».
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(term)}($|[^\\p{L}\\p{N}])`, 'u').test(text);
+  return termPattern(term).test(text);
+}
+
+/**
+ * Whether `text` touches one of her entries (`never_say`, `disgusts`, `never_do`, `never_show`) as the guards read it:
+ * both normalised, whole words, plurals folded. The one reading of a persona's limits, for the agent and for any
+ * module that checks a text against them (ADR 0052 § 2, ADR 0056 § 1).
+ */
+export function touchesTerm(text: string, term: string): boolean {
+  const needle = normalise(term);
+  return needle !== '' && forbiddenMatch(normalise(text), needle);
 }
 
 /**

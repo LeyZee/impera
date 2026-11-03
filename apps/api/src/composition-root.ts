@@ -42,6 +42,7 @@ import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
 import type { ProvidersModule } from './modules/providers';
 import type { SchedulingModule } from './modules/scheduling';
+import type { ScriptsModule } from './modules/scripts';
 import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
@@ -65,6 +66,7 @@ import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
 import { wireScheduling } from './wiring/scheduling';
+import { wireScripts } from './wiring/scripts';
 import type { JobWithTask, Shared } from './wiring/shared';
 import { wireSupervision } from './wiring/supervision';
 import { wireTeam } from './wiring/team';
@@ -85,6 +87,7 @@ interface Modules {
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
   readonly scheduling: SchedulingModule;
+  readonly scripts: ScriptsModule;
   readonly contractors: ContractorsModule;
   readonly payroll: PayrollModule;
   readonly invoicing: InvoicingModule;
@@ -245,6 +248,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
+  const scripts = wireScripts(shared, { persona: persona.module });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
@@ -314,6 +318,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
     team: team.module,
     scheduling: scheduling.module,
+    scripts: scripts.module,
     contractors: contractors.module,
     payroll: payroll.module,
     invoicing: invoicing.module,
@@ -387,6 +392,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       fans.routes(agent.kycSlotsOf),
       ...team.routes,
       ...scheduling.routes,
+      ...scripts.routes,
       ...contractors.routes,
       ...payroll.routes,
       ...invoicing.routes,

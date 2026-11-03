@@ -397,6 +397,24 @@ describe('telegram module on Postgres', () => {
     return chatId;
   }
 
+  it('sends the AI cap reached to Important while no Urgent group is chosen', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const { routes, version } = await module.overview();
+    const saved = await module.saveRoutes(version, [
+      ...routes.filter((route) => route.topic !== 'urgent'),
+      { creatorId: null, topic: 'important', chatId },
+    ]);
+    expect(saved.ok).toBe(true);
+    await publish(
+      'budget_threshold_crossed',
+      { kind: 'reached', spentMinor: 2000, capMinor: 2000, currency: 'EUR', day: '2026-11-03' },
+      null,
+    );
+    await module.jobs.scan();
+    const rows = (await deliveryRows(chatId)).filter((row) => row.summary.includes('Plafond IA atteint'));
+    expect(rows.map((row) => row.topic)).toEqual(['important']);
+  });
+
   it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
     await module.saveSaleSettings([], 'owner-telegram');
     const chatId = await salesGroup();

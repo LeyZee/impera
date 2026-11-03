@@ -219,8 +219,8 @@ async function closureDeliveries(
 }
 
 /**
- * The rate of a dollar sale's day, read once a day a scan and only for a dollar sale under a minimum; unreadable, it is
- * `null` and the sale rings.
+ * The rate of a dollar sale's day, read only for a dollar sale under a minimum and kept per UTC hour within a scan (the
+ * reader turns the instant into the agency's day); unreadable, it is `null` and the sale rings.
  */
 function usdRater(reader: UsdRateReader | undefined): (occurredAt: Date) => Promise<number | null> {
   const byDay = new Map<string, Promise<number | null>>();

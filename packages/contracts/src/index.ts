@@ -1,4 +1,4 @@
-/** Shared Zod schemas and types: the agent's hours, alerts, auth, the Automatique rule, backups, the brain's intents, conversations, the creator's own space, creators, dashboard, the desire score, fans (KYC slots, flags), the agent's guard codes, ids, invitation links, money, text normalisation, enums, errors, events, jobs, connector port data, media, pay periods and an account's pay rules, payroll (commission statements, bonuses, penalties, adjustments, carry-overs, tiers, goals, exchange rates), contractors' invoices (regimes, contractor files, contract texts, invoices and credit notes), settings, persona and its API, the sales feed of a platform's register (ADR 0050), scheduling, the shift calendar, the end-of-shift reports and the mini feedback, the security alerts, team and its members, telegram. */
+/** Shared Zod schemas and types: the agent's hours, alerts, auth, the Automatique rule, backups, the brain's intents, conversations, the creator's own space, creators, dashboard, the desire score, fans (KYC slots, flags), the agent's guard codes, ids, invitation links, money, text normalisation, enums, errors, events, jobs, connector port data, media, pay periods and an account's pay rules, payroll (commission statements, bonuses, penalties, adjustments, carry-overs, tiers, goals, exchange rates), contractors' invoices (regimes, contractor files, contract texts, invoices and credit notes), settings, persona and its API, the sales feed of a platform's register (ADR 0050), scheduling, the shift calendar, the end-of-shift reports and the mini feedback, script structures (ADR 0056), the security alerts, team and its members, telegram. */
 export const CONTRACTS_PACKAGE = '@nirvana/contracts';
 
 export * from './agent-hours';
@@ -37,6 +37,7 @@ export * from './playground';
 export * from './providers';
 export * from './result';
 export * from './sales-feed';
+export * from './scripts';
 export * from './scheduling';
 export * from './passkeys';
 export * from './security';
