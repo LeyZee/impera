@@ -122,6 +122,29 @@ describe('the notes', () => {
     );
   });
 
+  it('says loudest a bot linked to a member: the agent’s sales would count for that member', () => {
+    const toAna: SalesFeedChatterLink['link'] = {
+      kind: 'member',
+      memberId: '00000000-0000-4000-8000-00000000000a',
+    };
+    const linked = CHATTERS.map((chatter) =>
+      chatter.platformChatterId === 'c-bot' ? { ...chatter, link: toAna } : chatter,
+    );
+    const names = (id: string): string | null =>
+      id === '00000000-0000-4000-8000-00000000000a' ? 'Ana T.' : null;
+    expect(
+      noteText({ kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' }, 'Reveal', linked, names),
+    ).toBe(
+      'Le compte bot « Bot Nirvana » est relié à « Ana T. » : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
+    );
+  });
+
+  it('places a refund of a sale before the days outside the period, compared nowhere', () => {
+    expect(noteText({ kind: 'refund_without_sale', count: 2 }, 'Reveal', CHATTERS)).toBe(
+      '2 remboursements portent sur des ventes d’avant ces jours : Reveal les retire du jour de leur vente, hors de la période, et ils ne sont comparés nulle part.',
+    );
+  });
+
   it('says a register that starts late is not a gap', () => {
     expect(noteText({ kind: 'register_starts_after', firstLineAt: null }, 'Reveal', CHATTERS)).toMatch(
       /Ce n’est pas un écart/u,
@@ -162,8 +185,11 @@ describe('chatterLine', () => {
     expect(chatterLine(row({}), CHATTERS, names)).toEqual({ name: 'Ana Test', link: 'Ana T.' });
   });
 
-  it('says the sales of nobody for the line without a member', () => {
-    expect(chatterLine(row({ platformChatterId: null, link: null }), CHATTERS, names).name).toBe('Personne');
+  it('says the sales without a chatter count for nobody, without guessing what they are', () => {
+    expect(chatterLine(row({ platformChatterId: null, link: null }), CHATTERS, names)).toEqual({
+      name: 'Sans chatteur',
+      link: 'Ne compte pour personne',
+    });
   });
 
   it('says an unlinked member, and the agent', () => {

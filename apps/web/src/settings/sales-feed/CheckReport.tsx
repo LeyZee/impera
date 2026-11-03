@@ -110,7 +110,7 @@ export function CheckReport({
         <ul className="sf-notes">
           {report.notes.map((note) => (
             <li key={JSON.stringify(note)} className="sf-warn">
-              {noteText(note, platformName, chatters)}
+              {noteText(note, platformName, chatters, memberName)}
             </li>
           ))}
         </ul>

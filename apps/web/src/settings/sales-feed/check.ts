@@ -167,7 +167,7 @@ export function verdictOf(verdict: SalesFeedCheckVerdict): VerdictView {
       return {
         dot: 'ok',
         title: 'Les chiffres concordent au centime',
-        line: 'Le registre, les statistiques et l’export disent la même chose, jour par jour et membre par membre.',
+        line: 'Le registre, les statistiques et l’export disent la même chose, jour par jour, et membre par membre face aux statistiques.',
       };
     case 'mismatch':
       return {
@@ -192,13 +192,19 @@ export function noteText(
   note: SalesFeedCheckNote,
   platform: string,
   chatters: readonly SalesFeedChatterLink[],
+  memberName: (memberId: string) => string | null = () => null,
 ): string {
   switch (note.kind) {
     case 'refund_without_sale':
-      return `${plural(note.count, 'remboursement porte', 'remboursements portent')} sur des ventes plus anciennes que le registre : ${platform} les retire de jours que Nirvana n’a pas lus.`;
+      return `${plural(note.count, 'remboursement porte', 'remboursements portent')} sur des ventes d’avant ces jours : ${platform} les retire du jour de leur vente, hors de la période, et ils ne sont comparés nulle part.`;
     case 'bot_not_linked_to_agent': {
       const chatter = chatters.find((one) => one.platformChatterId === note.platformChatterId);
       const name = chatter === undefined ? note.platformChatterId : chatterName(chatter);
+      // A bot linked to a member is the worse case: the agent's sales would pay that member a commission.
+      if (chatter?.link?.kind === 'member') {
+        const member = memberName(chatter.link.memberId) ?? 'un membre';
+        return `Le compte bot « ${name} » est relié à « ${member} » : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe ${platform} ».`;
+      }
       return `Le compte bot « ${name} » n’est pas relié à l’agent : ses ventes ne compteraient pour personne. Relie-le dans « Équipe ${platform} ».`;
     }
     case 'export_unknown_model':
@@ -227,7 +233,7 @@ export const daysInGap = (days: readonly SalesFeedCheckDay[]): SalesFeedCheckDay
 
 /**
  * A team member's line: the platform's name for them, and who they are in Nirvana. The line `null` gathers the sales
- * of nobody: subscriptions, Mass DM, the model's own sales.
+ * no chatter made, which count for nobody.
  */
 export function chatterLine(
   row: SalesFeedCheckChatter,
@@ -235,7 +241,8 @@ export function chatterLine(
   memberName: (memberId: string) => string | null,
 ): { name: string; link: string } {
   if (row.platformChatterId === null) {
-    return { name: 'Personne', link: 'Abonnements, Mass DM, ventes de la modèle' };
+    // What these sales are (subscriptions, Mass DM…) is said once seen on a real export, not before.
+    return { name: 'Sans chatteur', link: 'Ne compte pour personne' };
   }
   const chatter = chatters.find((one) => one.platformChatterId === row.platformChatterId);
   const name = chatter === undefined ? row.platformChatterId : chatterName(chatter);

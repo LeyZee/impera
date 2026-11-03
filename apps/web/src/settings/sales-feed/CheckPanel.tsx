@@ -259,7 +259,7 @@ export function CheckPanel({
           <p id={`${id}-file-hint`} className="sv-muted sf-small">
             Le fichier CSV des ventes de {name}, téléchargé juste avant de lancer : une vente arrivée après
             n’y serait pas. Il est lu pour la réponse et gardé nulle part. Sans lui, le registre n’est comparé
-            qu’aux statistiques.
+            qu’aux statistiques, et le verdict reste « incomplet » : la bascule demande les trois sources.
           </p>
         </div>
 
