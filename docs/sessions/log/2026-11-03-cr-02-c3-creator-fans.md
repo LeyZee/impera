@@ -2,4 +2,4 @@
 Fait : onglet Ventes de la créatrice (`/ventes`, rail Aujourd'hui · Ventes · Moi) ; « Tes fans » avec le prix des messages débloqués TTC par devise et « vu il y a … » ; lecteur de conversation en lecture seule (sens du message, jamais l'auteur, regroupé par jour, médias, messages payants, « Messages plus anciens ») ; `screens/sales/` (api, view, page, lecteur, CSS) ; tests (view, page, rail) ; fiche CR-02.
 Décisions : l'ouverture d'une conversation, écrite au journal d'audit par le serveur, n'est lue qu'une fois par ouverture ; Ventes est un seul écran sans sous-onglet tant que CR-04 n'y met pas ses gains ; le lecteur reprend `bringIntoView` de Suivi pour s'ouvrir sur le dernier message.
 Pas fait : gains et ventes (CR-04) ; textes de l'éditeur de persona qui nomment « l'agent » devant elle ; insights agrégés de sa base.
-Découvertes : aucune.
+Découvertes : seule `GET /v1/creator-space/conversations/:id` écrit au journal d'audit ; un appel direct à `…/messages` lit le fil sans trace (relevé par Extension, pour Bilan, propriétaire de `creator-routes.ts`).

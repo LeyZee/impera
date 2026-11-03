@@ -110,6 +110,8 @@ export function CreatorReader({
               <div className="nv-thread">
                 {day.bubbles.map((bubble) => (
                   <div key={bubble.id} className={`nv-bubble nv-bubble--${bubble.from} vt-bubble`}>
+                    {/* The side of a bubble is only seen: a screen reader hears who speaks. */}
+                    <span className="sr-only">{bubble.from === 'fan' ? `${name} : ` : 'Toi : '}</span>
                     {bubble.text === '' ? null : <span>{bubble.text}</span>}
                     {bubble.media.map((media, index) => (
                       <span key={index} className="vt-media">

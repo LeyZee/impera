@@ -156,12 +156,15 @@
   flex-direction: column;
   gap: 2px;
 }
+/* Set back by their size alone: on the neon bubble, no opacity keeps 4.5:1 (relecture d'Extension). */
 .vt-media,
 .vt-paid,
 .vt-time {
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
-  opacity: 0.8;
+}
+.nv-bubble--fan :is(.vt-media, .vt-paid, .vt-time) {
+  color: var(--nv-ink-muted);
 }
 .vt-time {
   align-self: flex-end;

@@ -138,6 +138,11 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     expect(bubbles.map((bubble) => bubble.className.includes('nv-bubble--fan'))).toEqual([true, false]);
     expect(screen.getByText('Média payant · 15 € · débloqué')).toBeDefined();
     expect(screen.getByText('Lecture seule')).toBeDefined();
+    // A screen reader hears who speaks, the side of a bubble being only seen.
+    expect(bubbles.map((bubble) => bubble.querySelector('.sr-only')?.textContent)).toEqual([
+      'loup_bleu : ',
+      'Toi : ',
+    ]);
     expect(reader.textContent).not.toMatch(/agent|humain|brouillon|IA/u);
     // Only the way back is a button: no field, no send, no take over.
     expect([...reader.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
