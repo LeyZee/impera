@@ -173,7 +173,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Départ | `offboarding` | Le parcours qui fait partir un membre : accès coupé à l'heure dite, planning libéré, passations rendues, relevé final sans minimum de versement, dernière facture (EQ-14). |
 | Shift | `shift` | Une plage où un membre chatte sur un compte d'une créatrice, début et fin en UTC. |
 | Créneau | `shift_slot`, `ShiftSlot` | Une des plages de la journée de l'agence (4 × 6 h par défaut) sur lesquelles se posent les shifts ; chacun a ses heures et un nom facultatif, réglés par un réglage daté (ADR 0049). Jamais `slot` seul, réservé aux slots KYC (`KycSlot`). |
-| Place | `shift_slot_seats` | Le nombre de chatteurs qu'un compte veut en même temps sur un créneau (1 par défaut, 2 au plus) ; « à pourvoir » compte les places manquantes (ADR 0049). |
+| Place | `scheduling_slot_seats` | Le nombre de chatteurs qu'un compte veut en même temps sur un créneau (1 par défaut, 2 au plus) ; « à pourvoir » compte les places manquantes (ADR 0049). |
 | Renfort | `reinforcement` | Un shift posé sur un compte qui a déjà un chatteur à cette heure, pour tout le créneau ou une partie ; trois chatteurs au plus en même temps sur un compte (ADR 0049). |
 | Fan confié | `shift_fan_assignment` | Quand plusieurs membres sont en poste sur un compte, le fan que le code confie à l'un d'eux : il le voit en tête, en reçoit la passation, et la vente lui revient (ADR 0049). |
 | En poste | `onShift` | Le membre dont le shift couvre cet instant sur cette créatrice ; il reçoit en premier les passages à l'humain pour vendre (à plusieurs, ceux de ses fans confiés, ADR 0049). Un chatteur ne traite les conversations d'une créatrice qu'en poste, plus une marge (ADR 0025). |

@@ -182,6 +182,47 @@ export async function audit(
 }
 
 /**
+ * One lock per account (ADR 0049 § 2), taken before the members' by every write that puts a shift on an account or moves
+ * one, so that two writes on one account cannot both see it free. Several accounts in the order of their ids; the
+ * accounts always before the members, so that a swap (two members, one account) and a reinforcement (one member, two
+ * accounts) never wait on each other.
+ */
+export async function lockAccounts(tx: Transaction, accountIds: readonly string[]): Promise<void> {
+  for (const accountId of [...new Set(accountIds)].toSorted()) {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`scheduling.account:${accountId}`}, 0))`,
+    );
+  }
+}
+
+/**
+ * The shift of its account in the way of `shift`, cancelled ones and `shift` itself aside, read in `tx` under the lock
+ * of the account. The database allows three shifts at once on an account (ADR 0049 § 2); until a reinforcement can be
+ * placed on purpose (CR-13), the server keeps one, as the exclusion of migration 0021 did.
+ */
+export async function shiftOnAccountInTheWay(tx: Transaction, shift: Placed): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: shifts.id })
+    .from(shifts)
+    .where(
+      and(
+        eq(shifts.platformAccountId, shift.platformAccountId),
+        sql`${shifts.cancelledAt} is null`,
+        sql`${shifts.id} <> ${shift.id}`,
+        sql`tstzrange(${shifts.startsAt}, ${shifts.endsAt}, '[)') && tstzrange(${shift.startsAt}, ${shift.endsAt}, '[)')`,
+      ),
+    )
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/** Refuses `shift` when another one is on its account at the same time: `shift_account_conflict`, with that one. */
+export async function assertAccountFree(tx: Transaction, shift: Placed): Promise<void> {
+  const inTheWay = await shiftOnAccountInTheWay(tx, shift);
+  if (inTheWay !== null) throw new ShiftAccountConflict(inTheWay);
+}
+
+/**
  * One lock per member (ADR 0031), taken by every write that puts a shift on a member and by a leave's approval, so
  * that an approval and a new shift at the same moment cannot both win. A transaction-scoped advisory lock, which the
  * policies do not hide; several members in the order of their ids. Every path takes it before locking any row.
@@ -322,35 +363,28 @@ export interface Placed {
 }
 
 /**
- * The write, with an exclusion violation (23P01) turned into the module's conflict and the shift in the way, read on
- * the admin connection: it may be on another creator, which this transaction does not see.
+ * The write, with the member's exclusion (23P01) turned into the module's conflict and the shift in the way, read on
+ * the admin connection: it may be on another creator, which this transaction does not see. The account's is checked
+ * before the write (`assertAccountFree`).
  */
 export async function placed<T>(adminDb: Database, write: Promise<T>, shift: Placed): Promise<T> {
   try {
     return await write;
   } catch (error) {
     const failure = pgErrorOf(error);
-    if (failure?.code !== '23P01') throw error;
-    const byMember = failure.constraint === 'shifts_member_overlap_excl';
-    const inTheWay = await shiftInTheWayUnscoped(adminDb, shift, byMember ? 'member' : 'account');
-    throw byMember ? new ShiftMemberConflict(inTheWay) : new ShiftAccountConflict(inTheWay);
+    if (failure?.code !== '23P01' || failure.constraint !== 'shifts_member_overlap_excl') throw error;
+    throw new ShiftMemberConflict(await memberShiftInTheWayUnscoped(adminDb, shift));
   }
 }
 
-async function shiftInTheWayUnscoped(
-  adminDb: Database,
-  shift: Placed,
-  by: 'member' | 'account',
-): Promise<string | null> {
+async function memberShiftInTheWayUnscoped(adminDb: Database, shift: Placed): Promise<string | null> {
   const [row] = await withAdmin(adminDb, (tx) =>
     tx
       .select({ id: shifts.id })
       .from(shifts)
       .where(
         and(
-          by === 'member'
-            ? eq(shifts.memberId, shift.memberId)
-            : eq(shifts.platformAccountId, shift.platformAccountId),
+          eq(shifts.memberId, shift.memberId),
           sql`${shifts.cancelledAt} is null`,
           sql`${shifts.id} <> ${shift.id}`,
           sql`tstzrange(${shifts.startsAt}, ${shifts.endsAt}, '[)') && tstzrange(${shift.startsAt}, ${shift.endsAt}, '[)')`,
