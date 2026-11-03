@@ -14,6 +14,8 @@ ADR 0060 § 2 (source 2), § 4, § 6 et § 7, ADR 0009, ADR 0042 § 5 (aucun chi
 ## À faire
 - [ ] Job quotidien des signaux (recherche X et web de Grok), une fois pour l'agence, schéma Zod, sources gardées, péremption.
 - [ ] Job du matin par créatrice (7 h dans son fuseau), rejouable : signaux vivants, profil validé, persona, idées des 30 jours, résultats des idées passées ; prompt versionné ; au plus 3 idées.
+- [ ] Description par la vision des captures d'un post marqué (ADR 0060 § 2, source 6) : schéma Zod (accroche, angles, texte à l'écran, montage estimé, compréhensible sans le son), captures effacées dès la réponse, test qui le vérifie.
+- [ ] Sortie « Post du jour + hack » : les 12 points de la grille remplis par le modèle (le point fort vient du profil validé), deux rendus : agence et créatrice.
 - [ ] Filtres de VEI-01 appliqués après la génération ; aucune idée plutôt qu'une mauvaise.
 - [ ] Une notification par jour au plus pour la créatrice, dans ses heures.
 - [ ] Plafond de veille respecté ; ambre au plafond.
