@@ -221,15 +221,16 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect(report.total.export).toEqual({ grossInclVat: 6000, agency: 1500, creator: 2500, net: 4000 });
     expect(report.notes).toEqual([{ kind: 'export_rows_outside', count: 1 }]);
     expect(JSON.stringify(report)).not.toContain('fan_test');
-    // A clean match, kept without the export; a kept report is never rewritten, whoever asks.
-    expect((await lastCheck()).body?.last).toMatchObject({ clean: true, report });
+    // Kept without the export, and not clean: a few days that agree are not a whole fortnight (ADR 0050 § 8). A kept
+    // report is never rewritten, whoever asks.
+    expect((await lastCheck()).body?.last).toMatchObject({ clean: false, report });
     const rows = await test.admin.db.select().from(schema.salesFeedChecks);
     expect(JSON.stringify(rows)).not.toContain('fan_test');
     await expect(
       test.admin.db
         .update(schema.salesFeedChecks)
-        .set({ clean: false })
-        .where(eq(schema.salesFeedChecks.clean, true)),
+        .set({ checkedBy: null })
+        .where(eq(schema.salesFeedChecks.platform, 'reveal')),
     ).rejects.toThrow();
   });
 

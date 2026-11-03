@@ -429,10 +429,11 @@ export const SalesFeedCheckReportSchema = z.object({
   notes: z.array(SalesFeedCheckNoteSchema),
 });
 export type SalesFeedCheckReport = z.infer<typeof SalesFeedCheckReportSchema>;
+// Reports are kept (`sales_feed_checks`) and read back with this schema: add fields, optional, never remove one.
 
 /**
  * `GET /v1/settings/sales-feeds/:platform/check`: the latest report kept, `null` before any check. `clean` is a match
- * with no bot outside the agent nor model of the export unknown, the one a switch to the platform's net can rest on
+ * over one whole fortnight with no bot outside the agent nor model of the export unknown, the one a switch to the platform's net can rest on
  * (CRM-03); `checkedBy` the user who ran it.
  */
 export const SalesFeedLastCheckSchema = z.object({
