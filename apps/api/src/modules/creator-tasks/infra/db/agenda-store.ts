@@ -24,6 +24,7 @@ import {
   CreatorTaskChanged,
   CreatorTaskNotFound,
   CreatorTickDayUnprocessable,
+  SuggestionKindChanged,
   SuggestionNotFound,
   SuggestionUndated,
 } from '../../domain/errors';
@@ -309,6 +310,8 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
         const proposed = creatorSuggestionOf(row);
         const when = body.when ?? proposed.when;
         if (when === null) throw new SuggestionUndated();
+        // Moved, never changed in kind: what is essential is what the agency proposed as her routine.
+        if (when.kind !== row.kind) throw new SuggestionKindChanged();
         const zone = await zoneOf(tx, creatorId);
         const [task] = await tx
           .insert(tasks)
@@ -320,7 +323,7 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             title: row.title,
             purpose: row.purpose,
             // The agency's routine, once hers, counts for her streak (glossary « Routine »).
-            essential: when.kind === 'routine',
+            essential: row.kind === 'routine',
             suggestionId: row.id,
             createdBy: userId,
           })

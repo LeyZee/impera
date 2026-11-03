@@ -151,6 +151,42 @@ describe('her agenda’s tables (CR-05): hers to write, the agency’s to read a
     ).toMatch(/permission denied/u);
   });
 
+  it('never makes an essential task out of an invented suggestion, nor out of one that is not her routine', async () => {
+    const routine = { kind: 'routine', day: null, weekdays: [1], essential: true };
+    // An id she would make up: no such suggestion of hers.
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx
+            .insert(s.creatorTasks)
+            .values(task(nora, noraUser, { ...routine, suggestionId: newId(SuggestionIdSchema) })),
+        ),
+      ),
+    ).toMatch(/row-level security|creator_tasks_suggestion_fk/u);
+    // A suggestion of a day, not of her routine.
+    const ofADay = newId(SuggestionIdSchema);
+    await withTenantMember(test.app.db, nora, owner, (tx) =>
+      tx.insert(s.creatorSuggestions).values(suggestion(owner, { id: ofADay })),
+    );
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.insert(s.creatorTasks).values(task(nora, noraUser, { ...routine, suggestionId: ofADay })),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
+    // A routine suggestion of hers, still to decide: the acceptance's own write.
+    const ofHerRoutine = newId(SuggestionIdSchema);
+    await withTenantMember(test.app.db, nora, owner, (tx) =>
+      tx
+        .insert(s.creatorSuggestions)
+        .values(suggestion(owner, { id: ofHerRoutine, kind: 'routine', day: null, weekdays: [1] })),
+    );
+    await asNora((tx) =>
+      tx.insert(s.creatorTasks).values(task(nora, noraUser, { ...routine, suggestionId: ofHerRoutine })),
+    );
+  });
+
   it('ticks once per task and day, only on a task of hers, and takes a tick back', async () => {
     const tick = {
       taskId: noraTask,
@@ -200,7 +236,8 @@ describe('her agenda’s tables (CR-05): hers to write, the agency’s to read a
       const rows = await withTenantMember(test.app.db, nora, reader, (tx) =>
         tx.select({ id: s.creatorTasks.id }).from(s.creatorTasks),
       );
-      expect(rows.map((row) => row.id)).toEqual([noraTask]);
+      expect(rows.map((row) => row.id)).toContain(noraTask);
+      expect(rows.map((row) => row.id)).not.toContain(inesTask);
     }
     expect(
       await withTenantMember(test.app.db, nora, chatter, (tx) => tx.select().from(s.creatorTasks)),

@@ -18,6 +18,7 @@ import {
   unique,
   uuid,
   type PgColumn,
+  type PgTableExtraConfigValue,
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
@@ -77,7 +78,7 @@ export const creatorTasks = pgTable(
     weekdays: integer('weekdays').array(),
     essential: boolean('essential').notNull().default(false),
     reminderMinutes: integer('reminder_minutes'),
-    /** The suggestion she accepted, written with it in one transaction; the link that the database holds is `creator_suggestions.task_id`. */
+    /** The suggestion she accepted, of her own creator (`creator_tasks_suggestion_fk`), written with it in one transaction. */
     suggestionId: uuid('suggestion_id'),
     createdBy: text('created_by')
       .notNull()
@@ -86,7 +87,8 @@ export const creatorTasks = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [
+  // Typed by hand: the two tables point to each other, which Drizzle cannot infer.
+  (t): PgTableExtraConfigValue[] => [
     enumCheck('creator_tasks', t.kind, CREATOR_TASK_KINDS),
     enumCheck('creator_tasks', t.category, CREATOR_TASK_CATEGORIES),
     check('creator_tasks_when_check', whenShape(t)),
@@ -106,12 +108,22 @@ export const creatorTasks = pgTable(
     unique('creator_tasks_suggestion_unique').on(t.suggestionId),
     // The pair a tick and a suggestion point to, so that neither names a task of another creator.
     unique('creator_tasks_creator_unique').on(t.id, t.creatorId),
+    // An essential task comes from a suggestion of her own creator, never from an id she would make up (Bilan, #497).
+    foreignKey({
+      name: 'creator_tasks_suggestion_fk',
+      columns: [t.suggestionId, t.creatorId],
+      foreignColumns: [creatorSuggestions.id, creatorSuggestions.creatorId],
+    }),
     index('creator_tasks_creator_starts_idx').on(t.creatorId, t.startsAt),
     index('creator_tasks_creator_day_idx').on(t.creatorId, t.day),
     pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
+    // An essential task only from a routine suggestion of hers still to decide: the acceptance writes both.
     pgPolicy('creator_insert', {
       for: 'insert',
-      withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser}`,
+      withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser} and (not ${t.essential} or exists (
+        select 1 from creator_suggestions s
+         where s.id = ${t.suggestionId} and s.creator_id = ${t.creatorId} and s.kind = 'routine' and s.state = 'suggested'
+      ))`,
     }),
     pgPolicy('creator_update', { for: 'update', using: hers(t.creatorId), withCheck: hers(t.creatorId) }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
@@ -227,7 +239,7 @@ export const creatorSuggestions = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [
+  (t): PgTableExtraConfigValue[] => [
     enumCheck('creator_suggestions', t.origin, SUGGESTION_ORIGINS),
     enumCheck('creator_suggestions', t.kind, CREATOR_TASK_KINDS),
     enumCheck('creator_suggestions', t.category, CREATOR_TASK_CATEGORIES),

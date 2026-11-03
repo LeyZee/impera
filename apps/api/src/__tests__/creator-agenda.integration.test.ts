@@ -285,6 +285,44 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
     );
   });
 
+  it('keeps a suggestion’s kind when she moves it, and answers a used id with a conflict', async () => {
+    const suggest = async (when: object, title: string) =>
+      AgencySuggestionSchema.parse(
+        (
+          await call('POST', `/v1/creators/${nora}/suggestions`, 'owner', {
+            id: newId(SuggestionIdSchema),
+            when,
+            category: 'post',
+            title,
+          })
+        ).json(),
+      );
+    const dated = await suggest({ kind: 'day', day: nextWednesday }, 'Publication du mercredi');
+    const routine = await suggest({ kind: 'routine', weekdays: [1, 3] }, 'Story du lundi');
+    // A dated suggestion never becomes her routine, which would make it essential; her routine never becomes a day.
+    const toRoutine = await call('POST', `/v1/creator-space/suggestions/${dated.id}/accept`, 'nora', {
+      when: { kind: 'routine', weekdays: [1, 2, 3, 4, 5, 6, 7] },
+    });
+    expect(toRoutine.statusCode).toBe(422);
+    const toDay = await call('POST', `/v1/creator-space/suggestions/${routine.id}/accept`, 'nora', {
+      when: { kind: 'day', day: today },
+    });
+    expect(toDay.statusCode).toBe(422);
+    // Moved within its kind, it is accepted.
+    const moved = await call('POST', `/v1/creator-space/suggestions/${dated.id}/accept`, 'nora', {
+      when: { kind: 'day', day: addDays(nextWednesday, 1) },
+    });
+    expect(CreatorTaskSchema.parse(moved.json())).toMatchObject({ essential: false });
+    // The id of Nora's suggestion, sent again for Ines: hidden from her RLS, refused as a conflict.
+    const taken = await call('POST', `/v1/creators/${ines}/suggestions`, 'owner', {
+      id: routine.id,
+      when: { kind: 'day', day: nextWednesday },
+      category: 'post',
+      title: 'Autre chose',
+    });
+    expect(taken.statusCode, taken.body).toBe(409);
+  });
+
   it('counts the agency’s routine she accepted for her streak, once ticked today', async () => {
     const created = AgencySuggestionSchema.parse(
       (

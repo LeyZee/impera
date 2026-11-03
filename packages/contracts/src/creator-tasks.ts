@@ -179,7 +179,10 @@ export const CreatorSuggestionSchema = z.strictObject({
 });
 export type CreatorSuggestion = z.infer<typeof CreatorSuggestionSchema>;
 
-/** `POST /v1/creator-space/suggestions/:id/accept` (creator): as it is, or moved (`when`, required when undated). */
+/**
+ * `POST /v1/creator-space/suggestions/:id/accept` (creator): as it is, or moved (`when`, required when undated). Moved, it
+ * keeps its kind: a timed suggestion stays timed, a routine stays a routine (422 `creator_suggestion_kind_unprocessable`).
+ */
 export const AcceptSuggestionBodySchema = z.strictObject({ when: CreatorTaskWhenSchema.optional() });
 export type AcceptSuggestionBody = z.infer<typeof AcceptSuggestionBodySchema>;
 
@@ -271,6 +274,8 @@ export const AVAILABILITY_NOT_FOUND = 'availability_not_found';
 export const SUGGESTION_NOT_FOUND = 'creator_suggestion_not_found';
 export const SUGGESTION_DECIDED_CONFLICT = 'creator_suggestion_decided_conflict';
 export const SUGGESTION_UNDATED_UNPROCESSABLE = 'creator_suggestion_undated_unprocessable';
+export const SUGGESTION_KIND_UNPROCESSABLE = 'creator_suggestion_kind_unprocessable';
+export const SUGGESTION_ID_CONFLICT = 'creator_suggestion_id_conflict';
 export const SUGGESTION_DECLINED_RECENTLY_CONFLICT = 'creator_suggestion_declined_recently_conflict';
 
 /** The answer of `POST /v1/creator-space/ticks`: how many ticks were new, and her streak now. */

@@ -3,7 +3,7 @@ import { and, eq, schema, sql, withTenantMember, type Database, type Transaction
 
 import { addDays, calendarDayIn } from '../../../scheduling/pure';
 import { availabilityWindows, type Interval } from '../../domain/availability';
-import { CreatorTaskChanged, SuggestionDeclinedRecently, SuggestionForbidden } from '../../domain/errors';
+import { SuggestionDeclinedRecently, SuggestionForbidden, SuggestionIdTaken } from '../../domain/errors';
 import { placementOf } from '../../domain/placement';
 import type { AgencySuggestionStore } from '../../domain/ports';
 import { maySuggest, weekOf } from '../../domain/suggestions';
@@ -77,7 +77,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
             stored.category !== body.category ||
             stored.purpose !== body.purpose
           )
-            throw new CreatorTaskChanged();
+            throw new SuggestionIdTaken();
           return stored;
         }
         const week = weekOfSuggestion(body.when, now, zone);
@@ -117,8 +117,10 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
             purpose: body.purpose,
             createdBy: userId,
           })
+          // An id already used for another creator, which her RLS hides: a conflict, never a 500.
+          .onConflictDoNothing()
           .returning();
-        if (row === undefined) throw new Error('creator_suggestions insert returned nothing');
+        if (row === undefined) throw new SuggestionIdTaken();
         return agencySuggestionOf(row);
       }),
 

@@ -17,4 +17,4 @@ Décisions :
 - L'identifiant d'une tâche ou d'une dispo est tiré par son téléphone : une création rejouée ne double rien.
 Découvertes : la migration 0100 (`trend_*`) n'a pas `FORCE ROW LEVEL SECURITY`, que `data-model.md` § RLS demande à chaque table avec `creator_id` (pour Bilan).
 Candidats à suppression : aucun.
-Vérifié : 27 tests unitaires du module ; intégration `creator-tasks-rls` (6) et `creator-agenda` (6) sur Postgres 16 local ; `check-drift` vert sur 0103.
+Vérifié : 27 tests unitaires du module ; intégration `creator-tasks-rls` (7) et `creator-agenda` (7) sur Postgres 16 local ; `check-drift` vert sur 0103.

@@ -8,7 +8,7 @@ Ses **tâches** (avec une heure de début et de fin, ou juste un jour, à cocher
 
 ## Qui lit, qui écrit (migration 0103)
 
-- **Elle** (`withCreatorAccount`, rôle `creator`) lit et écrit ses tâches, ses coches et ses dispos, toujours à son nom. Elle décide une suggestion, sans jamais réécrire ce qu'elle propose (`GRANT UPDATE` limité à `state`, `reason`, `decided_at`, `decided_on`, `task_id`). Elle ne rend jamais une tâche essentielle : la colonne n'est pas dans son `GRANT UPDATE`.
+- **Elle** (`withCreatorAccount`, rôle `creator`) lit et écrit ses tâches, ses coches et ses dispos, toujours à son nom. Elle décide une suggestion, sans jamais réécrire ce qu'elle propose (`GRANT UPDATE` limité à `state`, `reason`, `decided_at`, `decided_on`, `task_id`). Elle ne rend jamais une tâche essentielle : la colonne n'est pas dans son `GRANT UPDATE`, et une tâche n'est créée essentielle que depuis une suggestion de routine d'elle encore ouverte (clé `(suggestion_id, creator_id)` et `exists` de la politique `creator_insert`).
 - **Le propriétaire et un manager actif** (`withTenantMember`, portée `owner` ou `agency`) lisent tout son agenda et écrivent les suggestions, à leur nom et d'origine `agency`. Un chatteur ne lit ni n'écrit rien. Une suggestion de l'IA (`ai`, sans auteur) viendra d'un job (CR-07).
 - On ne supprime rien, sauf une coche qu'elle retire : une tâche ou une dispo retirée est archivée. Une coche et une suggestion acceptée pointent la paire (tâche, créatrice), jamais une tâche d'une autre créatrice.
 
@@ -18,8 +18,8 @@ Ses **tâches** (avec une heure de début et de fin, ou juste un jour, à cocher
 - `POST /v1/creator-space/tasks`, `PATCH` et `DELETE /v1/creator-space/tasks/:id` : l'identifiant est tiré par son téléphone. Une création rejouée avec le même contenu répond la même tâche ; un autre contenu sous le même identifiant répond 409 `creator_task_changed_conflict`. Une tâche essentielle reste dans sa routine : elle en change les jours, jamais la sorte.
 - `POST /v1/creator-space/ticks` (de 1 à 200 coches, celles gardées hors ligne comprises) ; `DELETE /v1/creator-space/tasks/:id/ticks/:day`. Une coche pour un jour où la tâche n'est pas prévue répond 422 `creator_tick_day_unprocessable`.
 - `POST /v1/creator-space/availabilities`, `DELETE /v1/creator-space/availabilities/:id`.
-- `POST /v1/creator-space/suggestions/:id/accept` (telle quelle, ou déplacée par `when`, qui est obligatoire si elle est sans date : sinon 422) et `…/decline` (motif facultatif). Le même geste rejoué ne change rien ; l'autre geste répond 409.
-- `POST` et `GET /v1/creators/:creatorId/suggestions` (propriétaire, manager actif ; un chatteur reçoit 403 `creator_suggestion_forbidden`). Une tâche qu'elle a refusée la semaine visée ou celle d'avant répond 409 `creator_suggestion_declined_recently_conflict`. Une suggestion à heures ne garde son heure que si elle tombe dans une dispo, sur aucune de ses tâches à heures ni sur une autre suggestion encore ouverte.
+- `POST /v1/creator-space/suggestions/:id/accept` (telle quelle, ou déplacée par `when`, qui est obligatoire si elle est sans date : sinon 422 ; déplacée, elle garde sa sorte, sinon 422 `creator_suggestion_kind_unprocessable` : seule une routine proposée devient essentielle) et `…/decline` (motif facultatif). Le même geste rejoué ne change rien ; l'autre geste répond 409.
+- `POST` et `GET /v1/creators/:creatorId/suggestions` (propriétaire, manager actif ; un chatteur reçoit 403 `creator_suggestion_forbidden`). Une tâche qu'elle a refusée la semaine visée ou celle d'avant répond 409 `creator_suggestion_declined_recently_conflict` ; un identifiant déjà pris, chez elle ou chez une autre créatrice, 409 `creator_suggestion_id_conflict`. Une suggestion à heures ne garde son heure que si elle tombe dans une dispo, sur aucune de ses tâches à heures ni sur une autre suggestion encore ouverte.
 
 ## Règles pures (`domain/`)
 

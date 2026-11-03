@@ -5,6 +5,8 @@ import {
   CREATOR_TICK_DAY_UNPROCESSABLE,
   DomainError,
   SUGGESTION_DECLINED_RECENTLY_CONFLICT,
+  SUGGESTION_ID_CONFLICT,
+  SUGGESTION_KIND_UNPROCESSABLE,
   SUGGESTION_NOT_FOUND,
   SUGGESTION_UNDATED_UNPROCESSABLE,
 } from '@impera/contracts';
@@ -68,5 +70,19 @@ export class SuggestionDeclinedRecently extends DomainError {
 export class SuggestionForbidden extends DomainError {
   constructor() {
     super('creator_suggestion_forbidden', 'Seuls le propriétaire et un manager actif suggèrent une tâche');
+  }
+}
+
+/** Moved to another kind of task: a dated suggestion never becomes her routine, nor her routine a day (Bilan, #497). */
+export class SuggestionKindChanged extends DomainError {
+  constructor() {
+    super(SUGGESTION_KIND_UNPROCESSABLE, 'Tu peux la déplacer, pas en changer la sorte');
+  }
+}
+
+/** The id of a suggestion already used, for her or for another creator. */
+export class SuggestionIdTaken extends DomainError {
+  constructor() {
+    super(SUGGESTION_ID_CONFLICT, 'Cet identifiant de suggestion sert déjà : recharge la page');
   }
 }
