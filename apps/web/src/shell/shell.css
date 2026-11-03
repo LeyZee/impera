@@ -621,6 +621,12 @@
   height: 32px;
   padding: 0 var(--nv-space-2);
 }
+/* 32px seen, 44px to touch: up and down only, the three choices touch side by side (CR-01, passe téléphone). */
+.nv-appearance__seg .nv-seg__opt::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
 .nv-appearance__hint {
   margin: 0;
   max-width: 34ch;
@@ -643,7 +649,8 @@
   font-weight: 600;
   text-decoration: none;
   box-shadow: var(--nv-shadow-focus);
-  transform: translateY(calc(-100% - 24px));
+  /* Out of sight above the status bar too: an iPhone's safe area would otherwise leave it half on the screen. */
+  transform: translateY(calc(-100% - 24px - env(safe-area-inset-top, 0px)));
 }
 .nv-skip:focus-visible {
   outline: none;
@@ -884,6 +891,12 @@
     color var(--nv-dur-fast),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
+/* 34px seen, 44px to touch: the pill's padding and the gap between tabs take the rest (CR-01, passe téléphone). */
+.nv-subnav__item::after {
+  content: '';
+  position: absolute;
+  inset: -5px -1px;
+}
 .nv-subnav__item:hover {
   color: var(--nv-ink);
 }
@@ -1021,6 +1034,12 @@
   .nv-stage {
     overflow: visible;
     padding: var(--nv-stage-top) 16px var(--nv-tabbar-room);
+  }
+  /* The page scrolls under the clock and the tab bar: a field brought into view (focus, keyboard) stops clear of
+     both, never behind them (CR-01, passe téléphone). The same room as --nv-stage-top and --nv-tabbar-room. */
+  :root:has(.nv-app) {
+    scroll-padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   }
   /* A fill page takes exactly the screen above the tab bar: its own column scrolls, never the composer away. */
   .nv-page--fill {

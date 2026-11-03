@@ -77,6 +77,7 @@
 }
 .sc-arrow {
   appearance: none;
+  position: relative;
   flex: none;
   width: 36px;
   height: 36px;
@@ -105,6 +106,12 @@
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+/* 36px seen, 44px to touch (CR-01, passe téléphone). */
+.sc-arrow::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 .sc-arrow:hover {
   background: var(--nv-select-strong);
