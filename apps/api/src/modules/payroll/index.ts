@@ -46,6 +46,8 @@ export { PayrollOwnForbidden } from './domain/errors';
  */
 export { CountedSchema } from './infra/read-store';
 
+/** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { payReadsForAccounting } from './infra/accounting-reads';
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
   readonly name: 'payroll';
