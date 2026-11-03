@@ -1,12 +1,16 @@
-import type {
-  Currency,
-  Platform,
-  PlatformAccountId,
-  SaleEvent,
-  SaleSeller,
-  SaleType,
-  SalesTotals,
-  SalesTotalsRow,
+import {
+  calendarDayAt,
+  type Currency,
+  type Platform,
+  type PlatformAccountId,
+  type RefundedSale,
+  type SaleEvent,
+  type SaleSeller,
+  type SaleType,
+  type SalesRefunds,
+  type SalesRefundsRow,
+  type SalesTotals,
+  type SalesTotalsRow,
 } from '@nirvana/contracts';
 
 import { onSaleDays, salesFeedTimeZone, sumsBy, type SaleDayLine } from './sale-days';
@@ -101,6 +105,58 @@ export function salesTotals(lines: readonly TotalsLine[], range: TotalsRange): S
   }
   rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { from: range.from, to: range.to, rows: rows.map(({ row }) => row), refundsWithoutSale };
+}
+
+/** A refund of a creator's register as `refundsOfDay` reads it: its seller is its sale's when the sale is recorded. */
+export interface RefundLine extends TotalsLine {
+  /** Its sale's instant; `null` when the sale is not in the register (older than it, or not read yet). */
+  readonly saleOccurredAt: Date | null;
+}
+
+function refundedSale(saleOccurredAt: Date | null, day: string, timeZone: string): RefundedSale {
+  if (saleOccurredAt === null) return 'not_in_register';
+  return calendarDayAt(saleOccurredAt, timeZone) === day ? 'same_day' : 'earlier_day';
+}
+
+/**
+ * The refunds of `day` by their own day in their platform's zone (CRM-04, the evening digest), whatever their sale's
+ * day: a row per account, currency, kind, seller and where the sale is (`RefundedSale`), the amounts as refunded (positive). Lines that are not refunds,
+ * or of another day, are left out. The rows come in the order of `salesTotals`. Pure.
+ */
+export function refundsOfDay(lines: readonly RefundLine[], day: string): SalesRefunds {
+  const rows = new Map<string, SalesRefundsRow>();
+  for (const line of lines) {
+    if (line.event !== 'refund') continue;
+    const timeZone = salesFeedTimeZone(line.platform);
+    if (timeZone === null) throw new Error(`sales refunds: no zone for the platform ${line.platform}`);
+    if (calendarDayAt(line.occurredAt, timeZone) !== day) continue;
+    const sale = refundedSale(line.saleOccurredAt, day, timeZone);
+    const key = [
+      line.platform,
+      line.platformAccountId,
+      line.currency,
+      line.saleType,
+      sellerKey(line.seller),
+      sale,
+    ].join('|');
+    const row = rows.get(key);
+    rows.set(key, {
+      platform: line.platform,
+      platformAccountId: line.platformAccountId,
+      currency: line.currency,
+      saleType: line.saleType,
+      seller: line.seller,
+      sale,
+      refunds: (row?.refunds ?? 0) + 1,
+      grossInclVatMinor: (row?.grossInclVatMinor ?? 0) + line.grossInclVat,
+      grossExclVatMinor: (row?.grossExclVatMinor ?? 0) + line.grossExclVat,
+      netMinor: (row?.netMinor ?? 0) + line.net,
+      agencyMinor: (row?.agencyMinor ?? 0) + line.agency,
+      creatorMinor: (row?.creatorMinor ?? 0) + line.creator,
+    });
+  }
+  const sorted = [...rows].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return { day, rows: sorted.map(([, row]) => row) };
 }
 
 /**

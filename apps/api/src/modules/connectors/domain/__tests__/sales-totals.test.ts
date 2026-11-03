@@ -2,7 +2,13 @@ import { newId, PlatformAccountIdSchema, TeamMemberIdSchema } from '@nirvana/con
 import { describe, expect, it } from 'vitest';
 
 import { salesFeedTimeZone } from '../sale-days';
-import { ringsWhenRecorded, SALE_RING_WINDOW_MS, salesTotals, type TotalsLine } from '../sales-totals';
+import {
+  refundsOfDay,
+  ringsWhenRecorded,
+  SALE_RING_WINDOW_MS,
+  salesTotals,
+  type TotalsLine,
+} from '../sales-totals';
 
 // Everything below is invented (ADR 0010).
 const ACCOUNT = newId(PlatformAccountIdSchema);
@@ -145,5 +151,53 @@ describe('the ring of a sale (CRM-04)', () => {
     expect(ringsWhenRecorded({ event: 'refund', occurredAt: ago(1000) }, at)).toBe(false);
     // A platform's clock a little ahead: still fresh.
     expect(ringsWhenRecorded({ event: 'sale', occurredAt: new Date(at.getTime() + 5000) }, at)).toBe(true);
+  });
+});
+
+describe('a day’s refunds by their own day (CRM-04, evening digest)', () => {
+  it('keeps the refunds of the day in Paris, whatever their sale’s day, with the sale’s seller, amounts positive', () => {
+    const refund = (id: string, at: string, saleAt: string | null, seller: TotalsLine['seller']) => ({
+      ...line({ platformSaleId: id, event: 'refund', occurredAt: new Date(at), seller }),
+      saleOccurredAt: saleAt === null ? null : new Date(saleAt),
+    });
+    const refunds = refundsOfDay(
+      [
+        { ...line({ platformSaleId: 'sale_1' }), saleOccurredAt: null },
+        // 23:30 UTC on the 1st is the 2nd in Paris; 22:30 UTC on the 2nd is the 3rd.
+        refund('sale_1', '2026-11-01T23:30:00Z', '2026-10-20T10:00:00Z', { kind: 'member', memberId: THEO }),
+        refund('sale_2', '2026-11-02T08:00:00Z', '2026-10-25T10:00:00Z', { kind: 'member', memberId: THEO }),
+        refund('sale_old', '2026-11-02T09:00:00Z', null, { kind: 'member', memberId: THEO }),
+        // Sold at 23:10 UTC on the 1st, the 2nd in Paris: a sale of the day, already off the day's totals.
+        refund('sale_bot', '2026-11-02T10:00:00Z', '2026-11-01T23:10:00Z', { kind: 'agent' }),
+        refund('sale_late', '2026-11-02T23:30:00Z', '2026-11-02T20:00:00Z', { kind: 'agent' }),
+      ],
+      '2026-11-02',
+    );
+    expect(refunds).toEqual({
+      day: '2026-11-02',
+      rows: [
+        expect.objectContaining({
+          seller: { kind: 'agent' },
+          sale: 'same_day',
+          refunds: 1,
+          grossInclVatMinor: 1200,
+        }),
+        expect.objectContaining({
+          seller: { kind: 'member', memberId: THEO },
+          sale: 'earlier_day',
+          refunds: 2,
+          grossInclVatMinor: 2400,
+          netMinor: 1600,
+          agencyMinor: 600,
+          creatorMinor: 1000,
+        }),
+        expect.objectContaining({
+          seller: { kind: 'member', memberId: THEO },
+          sale: 'not_in_register',
+          refunds: 1,
+          grossInclVatMinor: 1200,
+        }),
+      ],
+    });
   });
 });

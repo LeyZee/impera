@@ -18,6 +18,8 @@ import {
 import { sql, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
+import { lineChatter } from './line-chatter';
+
 /**
  * @public
  * Whose a line of the register is, by the owner's link of its platform chatter (ADR 0050 § 5): a member, the agent
@@ -144,13 +146,6 @@ function lineOf(row: Row, timeZone: string): PaySaleLine {
   };
 }
 
-/**
- * A line's chatter: a refund's is its sale's, should the platform ever name another chatter on it, and nobody when the
- * sale had none; the refund's own only when its sale is older than the register.
- */
-const chatter = sql`case when l.event = 'refund' and s.platform_sale_id is not null
-  then s.platform_chatter_id else l.platform_chatter_id end`;
-
 /** Each line with its sale's instant and its chatter's link, for the accounts and the condition given. */
 async function read(
   tx: Transaction,
@@ -162,12 +157,12 @@ async function read(
     select l.platform, l.platform_sale_id, l.event, l.sale_type, l.status, l.platform_account_id, l.occurred_at,
            case when l.event = 'sale' then l.occurred_at else s.occurred_at end as sale_occurred_at,
            l.recorded_at, l.currency, l.net_minor,
-           ${chatter} as platform_chatter_id,
+           ${lineChatter} as platform_chatter_id,
            c.kind, c.member_id, c.link_version, c.link_version_at
       from platform_sales l
       left join platform_sales s
         on l.event = 'refund' and s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
-      left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = ${chatter}
+      left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = ${lineChatter}
      where l.platform_account_id in (${sql.join(
        range.platformAccountIds.map((one) => sql`${one}`),
        sql`, `,
