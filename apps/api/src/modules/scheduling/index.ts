@@ -2,6 +2,7 @@ import type { CreatorId, PayPeriod } from '@nirvana/contracts';
 import type { Database, Transaction } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { createCalendarService } from './application/calendar';
 import { createLeaveService } from './application/leaves';
 import { makeShifts } from './application/make-shifts';
 import { createPayRulesService } from './application/pay-rules';
@@ -9,6 +10,7 @@ import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
 import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
+import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
@@ -95,13 +97,10 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const now = deps.now ?? (() => new Date());
   const admin = createDrizzlePlanningAdmin(deps.adminDb);
   const colleagues = createDrizzleColleagueReads(deps.adminDb);
+  const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const services = {
-    scheduling: createSchedulingService(
-      createDrizzlePlanningStore(deps.db, deps.adminDb),
-      admin,
-      deps.creators,
-      now,
-    ),
+    scheduling: createSchedulingService(planning, admin, deps.creators, now),
+    calendar: createCalendarService(createDrizzleCalendarReads(deps.db), planning, deps.creators, now),
     leaves: createLeaveService(
       createDrizzleLeaveStore(deps.db),
       async () => (await deps.creators.list()).map((creator) => creator.id),
