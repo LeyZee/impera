@@ -2,7 +2,7 @@
 
 **Rôle.** Les notifications push de l'application installée (CR-01, ADR 0042 § 7), pour tous les rôles. Le module fait trois choses. Il garde la clé du serveur. Il enregistre les appareils de chaque compte et ses réglages. Il chiffre et livre un message à chacun d'eux. Ce qui doit sonner, et quand, se décide dans `domain/policy.ts` : heures calmes, plafond quotidien, ventes groupées en rafale. Un message ne porte jamais le nom d'un fan ni ce qu'il a écrit (ADR 0020).
 
-**Peut dépendre de.** aucun module métier (feuille). Les modules qui notifient (EQ-12, CR-04, CR-13) reçoivent `deliver` par le composition root.
+**Peut dépendre de.** aucun module métier (feuille). Les modules qui notifient (EQ-12, CR-04, CR-13, et les rappels de son agenda, CR-05) reçoivent `deliver` ou `notify` par le composition root.
 
 **Vente de la créatrice** (CRM-04 lot d2, ADR 0042 § 7). Le registre des ventes met en file `notifications.creator_sale` dans la transaction qui publie `sale_detected`, une fois par vente fraîche. Le job relit l'événement par le rôle admin et n'en garde que la clé de la ligne, sa part (`creatorMinor`, le `modelRevenue` de Reveal) et sa devise ; le vendeur n'en sort jamais. Il prévient chacun de ses comptes (rôle `creator`, lié à sa seule créatrice) dans le fuseau de sa créatrice, sous les règles d'une vente : « Nouvelle vente », « 12,40 € pour toi », qui ouvre `/ventes`. Jamais le fan, le chatteur, l'agent ni le prix payé. Un remboursement ou une vente lue tard ne publient rien, donc ne préviennent personne. Lu, jamais écrit : `domain_events`, `creators`, `user`.
 

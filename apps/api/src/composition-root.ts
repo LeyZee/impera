@@ -33,6 +33,7 @@ import type { BackupsModule } from './modules/backups';
 import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './modules/connectors';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
+import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { FansModule } from './modules/fans';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
@@ -86,6 +87,7 @@ interface Modules {
   readonly agent: AgentModule;
   readonly media: MediaModule;
   readonly notifications: NotificationsModule;
+  readonly creatorTasks: CreatorTasksModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -264,7 +266,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const scheduling = wireScheduling(shared, { persona: persona.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
   const trends = wireTrends(shared, options.trendVision ?? llm.gateway);
-  const creatorTasks = wireCreatorTasks(shared);
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
@@ -315,6 +316,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const backups = wireBackups(shared);
   const notifications = wireNotifications(shared);
+  const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
   const supervision = wireSupervision(shared, {
     llm,
     activeVoice: agent.activeVoice,
@@ -343,6 +345,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     agent: agent.module,
     media: media.module,
     notifications: notifications.module,
+    creatorTasks: creatorTasks.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -363,6 +366,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...payroll.tasks,
     ...invoicing.tasks,
     ...notifications.tasks,
+    ...creatorTasks.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],
