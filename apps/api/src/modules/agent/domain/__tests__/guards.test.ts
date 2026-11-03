@@ -124,6 +124,8 @@ describe('voice guards', () => {
     expect(touchesTerm('PIED-DE-BICHE', 'pied')).toBe(true);
     expect(touchesTerm('Un trépied et une lampe', 'pieds')).toBe(false);
     expect(touchesTerm('Avec de la CREME', 'crème')).toBe(true);
+    expect(touchesTerm('De la crème-chantilly, de la crème, chantilly', 'crème chantilly')).toBe(true);
+    expect(touchesTerm('Une crème au chocolat', 'crème chantilly')).toBe(false);
     expect(touchesTerm('Tout ce qu’on veut', '  ')).toBe(false);
   });
 

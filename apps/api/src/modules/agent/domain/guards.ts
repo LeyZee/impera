@@ -526,13 +526,14 @@ function foldedWord(word: string): string {
 
 const TERM_PATTERNS = new Map<string, RegExp>();
 
-/** The pattern of a normalised entry: whole words only, each word's plural folded, the rest as written. */
+/** The pattern of a normalised entry: whole words only, each word's plural folded, any separator for any other. */
 function termPattern(term: string): RegExp {
   const known = TERM_PATTERNS.get(term);
   if (known !== undefined) return known;
   const body = term
     .split(/([^\p{L}\p{N}]+)/u)
-    .map((part, index) => (index % 2 === 0 ? foldedWord(part) : escapeRegExp(part)))
+    // Any separator of the entry reads any other: « crème chantilly » reads « crème-chantilly » and « crème, chantilly ».
+    .map((part, index) => (index % 2 === 0 ? foldedWord(part) : '[^\\p{L}\\p{N}]+'))
     .join('');
   const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${body}($|[^\\p{L}\\p{N}])`, 'u');
   TERM_PATTERNS.set(term, pattern);
