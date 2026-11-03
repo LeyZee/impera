@@ -39,8 +39,8 @@ import '@/contractors/contractors.css';
 import type { InvoiceOutcome, InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryName } from '@/lib/country';
-import { Dialog } from '@/screens/team/Dialog';
 import { weightText } from '@/settings/billing/model';
+import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
 /**

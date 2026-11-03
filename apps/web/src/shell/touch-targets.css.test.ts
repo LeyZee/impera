@@ -45,7 +45,7 @@ const COMPACT = [
       selector: '.nv-seg__opt',
     },
   },
-  { file: '../screens/team/team.css', selector: '.tm-close', what: 'the close of a panel' },
+  { file: './dialog.css', selector: '.tm-close', what: 'the close of a panel' },
 ] as const satisfies readonly {
   file: string;
   selector: string;
@@ -88,7 +88,7 @@ describe('touch targets on a phone (CR-01)', () => {
 
   it.each([
     {
-      file: '../screens/team/team.css',
+      file: './dialog.css',
       selector: '.tm-scrim',
       what: 'a panel (congé, échange, rapport, relevé)',
     },

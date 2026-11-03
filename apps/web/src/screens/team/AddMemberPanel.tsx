@@ -36,6 +36,7 @@ import {
 import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { cityOf } from '@/scheduling/time';
+import '@/shell/dialog.css';
 
 const ZONES: readonly string[] = Intl.supportedValuesOf('timeZone');
 const ROLES: readonly TeamRole[] = ['chatter', 'manager'];

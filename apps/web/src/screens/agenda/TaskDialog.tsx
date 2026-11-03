@@ -8,7 +8,7 @@ import { whenWords } from './words';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, dayOf, minuteOf } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 const OFFLINE = 'Pas de réseau : réessaie dans un moment.';

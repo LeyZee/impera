@@ -7,7 +7,7 @@ import { spanOf } from './draft';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, clockOf, weekOf } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 const REFUSED = 'Cette proposition n’est plus là. Ton agenda est relu.';
