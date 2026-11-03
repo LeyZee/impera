@@ -1,14 +1,21 @@
 import {
   ApiErrorSchema,
+  CreatorAccountSchema,
   CreatorListSchema,
   CreatorSummarySchema,
   REAUTHENTICATION_ERROR_CODE,
+  InvitationLinkCreatedSchema,
+  type CreateCreatorInvitationLinkBody,
+  type CreatorAccount,
   type CreatorErrorCode,
   type CreatorId,
   type CreatorSummary,
+  type InvitationLinkErrorCode,
 } from '@nirvana/contracts';
 import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { z } from 'zod';
+
+import type { LinkOutcome } from '@/screens/team/ShareLink';
 
 /** `GET /v1/creators`: the creators the signed-in user may open, parsed with the contract. */
 export async function fetchCreators(): Promise<CreatorSummary[]> {
@@ -125,4 +132,55 @@ export async function moveCreator(creatorId: string, timezone: string): Promise<
       : { kind: 'forbidden' };
   }
   return { kind: 'failed' };
+}
+
+/** Her own account, for the Accès tab of her sheet (CR-02): the owner's alone. */
+export const creatorAccountKey = (creatorId: CreatorId) => ['creators', creatorId, 'account'] as const;
+
+/** `GET /v1/creators/:creatorId/account` (owner): her account, `null` before her first invitation. */
+export function useCreatorAccount(creatorId: CreatorId): UseQueryResult<CreatorAccount['account']> {
+  return useQuery({
+    queryKey: creatorAccountKey(creatorId),
+    queryFn: async () => {
+      const response = await fetch(`/v1/creators/${creatorId}/account`, { credentials: 'include' });
+      if (!response.ok) throw new Error(`GET /v1/creators/:id/account: ${String(response.status)}`);
+      return CreatorAccountSchema.parse(await response.json()).account;
+    },
+    retry: 1,
+  });
+}
+
+/** What the owner reads when her link is refused, in the sheet's words. */
+const LINK_REFUSALS: Partial<Record<InvitationLinkErrorCode, string>> = {
+  creator_not_found: 'Cette créatrice n’existe plus. Recharge la page.',
+  creator_account_not_found: 'Elle n’a pas encore de compte : crée d’abord son lien d’invitation.',
+  creator_account_conflict: 'Son compte existe déjà avec un autre e-mail : son lien garde celui-là.',
+  account_email_conflict: 'Un autre compte utilise déjà cet e-mail.',
+};
+
+/**
+ * `POST /v1/creators/:creatorId/invitation-link` (owner, recent sign-in): her own account made with her e-mail the
+ * first time, then a link of 72 h; a new one cancels the one before.
+ */
+export async function createCreatorLink(
+  creatorId: CreatorId,
+  body: CreateCreatorInvitationLinkBody,
+): Promise<LinkOutcome> {
+  try {
+    const response = await fetch(`/v1/creators/${creatorId}/invitation-link`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (response.ok) return { kind: 'ok', value: InvitationLinkCreatedSchema.parse(await response.json()) };
+    const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+    if (!error.success) return { kind: 'failed' };
+    const { code } = error.data.error;
+    if (code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
+    const message = Object.entries(LINK_REFUSALS).find(([known]) => known === code)?.[1];
+    return message === undefined ? { kind: 'failed' } : { kind: 'refused', message };
+  } catch {
+    return { kind: 'failed' };
+  }
 }

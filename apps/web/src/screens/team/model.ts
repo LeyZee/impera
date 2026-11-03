@@ -208,7 +208,7 @@ const ZONES: Readonly<Record<string, string>> = {
 
 export const suggestedZone = (country: string): string | null => ZONES[country] ?? null;
 
-/** Where a member's first access stands, read from his record and the clock. */
+/** Where a member's first access stands, read from his record and the clock; a creator's own account too (CR-02). */
 export type InvitationState =
   | { readonly kind: 'signed-in' }
   /** His password is chosen and a link to choose a new one is out: a second one would cancel it. */
@@ -217,7 +217,10 @@ export type InvitationState =
   | { readonly kind: 'valid'; readonly until: Date }
   | { readonly kind: 'expired' };
 
-export function invitationState(member: TeamMember, now: Date): InvitationState {
+export function invitationState(
+  member: Pick<TeamMember, 'invitationPending' | 'invitationExpiresAt'>,
+  now: Date,
+): InvitationState {
   const until = member.invitationExpiresAt === null ? null : new Date(member.invitationExpiresAt);
   const live = until !== null && until.getTime() > now.getTime();
   if (!member.invitationPending) {
