@@ -167,6 +167,11 @@ export const salesFeedChatters = pgTable(
      * pay freezes it in a statement's inputs (CRM-03), so a link changed after a statement shows in its `inputs_hash`.
      */
     linkVersion: uuid('link_version').notNull().defaultRandom(),
+    /**
+     * When `link_version` last changed (not `linked_at`, which moves each time the same link is posed): a link posed
+     * after a period's closing is an attribution that counts in the first period still open (ADR 0050 § 5, ADR 0032).
+     */
+    linkVersionAt: timestampTz('link_version_at').notNull().defaultNow(),
     linkedBy: text('linked_by'),
     linkedAt: timestampTz('linked_at').notNull().defaultNow(),
   },

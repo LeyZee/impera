@@ -40,12 +40,15 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 `salesFeedReadsForPay`, exporté par `index.ts` (`infra/db/pay-reads.ts`), lit le registre dans la transaction de l'appelant, ligne par ligne, jamais une somme :
 - `linesOfSalesBetween` : les ventes dont l'instant tombe dans la plage, et leurs remboursements quel que soit leur jour. Un remboursement compte au jour de sa vente ; celui d'une vente plus ancienne que le registre compte à son propre instant, avec `saleDay` à `null`.
 - `linesRecordedBetween` : les lignes enregistrées dans la plage, quel que soit le jour de leur vente, c'est-à-dire les lignes tardives après une clôture (ADR 0032).
+- `linesRelinkedBetween` : les lignes dont le lien du chatteur a pris sa version actuelle dans la plage. Relier un chatteur après une clôture est une attribution, qui compte dans la première quinzaine encore ouverte (§ 5).
+
+Ces lectures se recouvrent exprès : un remboursement tardif sort dans la quinzaine de sa vente et dans celle où il a été enregistré. Un lecteur indexe donc les lignes par `platform`, `platformSaleId` et `event`, et compte chaque clé une seule fois.
 
 Chaque ligne porte :
 - l'id de la plateforme et l'événement, le compte, le type de vente ;
 - l'instant de la ligne et celui de sa vente, avec son jour dans le fuseau que donne l'appelant (celui de l'agence) ;
-- `recordedAt`, la devise et le net signé (négatif pour un remboursement) ;
-- son auteur selon le lien du propriétaire : membre, agent, chatteur non relié, ou personne. Pour un membre ou l'agent, la ligne porte aussi la version du lien (`sales_feed_chatters.link_version`).
+- `recordedAt`, la devise, le net signé (négatif pour un remboursement) et le statut à la première lecture (`other` inconnu, `refund_asked` à signaler) ;
+- son auteur selon le lien du propriétaire : membre, agent, chatteur non relié, ou personne. Pour un membre ou l'agent, la ligne porte aussi la version du lien (`sales_feed_chatters.link_version`) et l'instant où elle a été posée (`link_version_at`). L'auteur d'un remboursement est celui de sa vente.
 
 La version du lien change dès qu'il pointe ailleurs, jamais quand le même lien est reposé : la paie la fige dans les entrées d'un relevé. La base d'une vente (`earningsBaseOf` des contrats : le net de la plateforme pour un compte Reveal en source « détectée », la chaîne de l'ADR 0023 partout ailleurs) suit les règles de paie datées du compte. Rien ici ne somme, n'attribue à un shift ni n'applique de taux : c'est le travail de la paie.
 

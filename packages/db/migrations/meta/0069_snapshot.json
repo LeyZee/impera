@@ -1,5 +1,5 @@
 {
-  "id": "bec5b88b-3829-43c2-8622-c6555292783e",
+  "id": "fef45cfb-3aa2-4511-8922-901d1c798dab",
   "prevId": "448089fd-5e86-486e-9cf1-5ee989f845c0",
   "version": "7",
   "dialect": "postgresql",
@@ -8454,6 +8454,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "link_version_at": {
+          "name": "link_version_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "linked_by": {
           "name": "linked_by",

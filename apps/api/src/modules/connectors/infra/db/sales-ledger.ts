@@ -408,7 +408,7 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
             linkedBy: by,
             linkedAt: new Date(),
             // A new version only when the link points elsewhere: pay compares it with the one a statement froze.
-            ...(same ? {} : { linkVersion: randomUUID() }),
+            ...(same ? {} : { linkVersion: randomUUID(), linkVersionAt: new Date() }),
           };
           await tx
             .insert(chatters)

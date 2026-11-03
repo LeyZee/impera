@@ -34,6 +34,7 @@ describe('the sales feed read by pay', () => {
       chatter: string | null;
       net: number;
       recorded?: string;
+      status?: 'paid' | 'refund_asked' | 'refunded' | 'other';
     },
   ) => ({
     id: newId(SalesLineIdSchema),
@@ -43,7 +44,7 @@ describe('the sales feed read by pay', () => {
     platformSaleId: values.id,
     event: values.event ?? 'sale',
     saleType: 'ppv',
-    status: values.event === 'refund' ? 'refunded' : 'paid',
+    status: values.status ?? (values.event === 'refund' ? 'refunded' : 'paid'),
     occurredAt: new Date(values.at),
     platformModelId: 'model_test_01',
     platformChatterId: values.chatter,
@@ -101,14 +102,27 @@ describe('the sales feed read by pay', () => {
       // 23:30 in Paris on the 15th is still the first fortnight of October.
       line(account, { id: 'sale_a', at: '2026-10-15T21:30:00Z', chatter: 'chatter_member', net: 800 }),
       line(account, { id: 'sale_b', at: '2026-10-15T22:30:00Z', chatter: 'chatter_bot', net: 500 }),
-      line(account, { id: 'sale_c', at: '2026-10-10T10:00:00Z', chatter: 'chatter_new', net: 300 }),
-      line(account, { id: 'sale_d', at: '2026-10-11T10:00:00Z', chatter: null, net: 1000 }),
-      // Refunded after the period closed: counts on its sale's day, recorded late.
+      line(account, {
+        id: 'sale_c',
+        at: '2026-10-10T10:00:00Z',
+        chatter: 'chatter_new',
+        net: 300,
+        status: 'other',
+      }),
+      line(account, {
+        id: 'sale_d',
+        at: '2026-10-11T10:00:00Z',
+        chatter: null,
+        net: 1000,
+        status: 'refund_asked',
+      }),
+      // Refunded after the period closed: counts on its sale's day, recorded late, and stays its sale's author's
+      // although the platform names another chatter on it.
       line(account, {
         id: 'sale_a',
         event: 'refund',
         at: '2026-10-20T09:00:00Z',
-        chatter: 'chatter_member',
+        chatter: 'chatter_bot',
         net: 800,
       }),
       // A refund whose sale is older than the register.
@@ -142,7 +156,12 @@ describe('the sales feed read by pay', () => {
       recordedAt: new Date('2026-10-20T09:00:00Z'),
       currency: 'EUR',
       platformAccountId: account,
+      status: 'refunded',
+      author: { kind: 'member', memberId: member, platformChatterId: 'chatter_member' },
     });
+    // The status the line had when first read: an unknown one and an asked refund, which pay keeps aside or signals.
+    expect(lines.find((one) => one.platformSaleId === 'sale_c')?.status).toBe('other');
+    expect(lines.find((one) => one.platformSaleId === 'sale_d')?.status).toBe('refund_asked');
   });
 
   it('names each line’s author by the owner’s link, and nobody for a chatter not linked or no chatter', async () => {
@@ -191,6 +210,37 @@ describe('the sales feed read by pay', () => {
     expect(lines.map((one) => [one.platformSaleId, one.event, one.saleDay])).toEqual([
       ['sale_a', 'refund', '2026-10-15'],
     ]);
+  });
+
+  it('gives the lines of a chatter linked in a range whatever their sale’s day, dated by the link’s version', async () => {
+    const before = new Date();
+    const ledger = createDrizzleSalesLedger(test.admin.db, test.admin.db);
+    await ledger.linkChatter('reveal', 'chatter_new', { kind: 'member', memberId: member }, owner);
+    const after = new Date(Date.now() + 1000);
+    const lines = await withAdmin(test.admin.db, (tx) =>
+      salesFeedReadsForPay.linesRelinkedBetween(tx, {
+        platformAccountIds: [account],
+        from: before,
+        to: after,
+        timeZone: ZONE,
+      }),
+    );
+    const relinked = lines.find((one) => one.platformSaleId === 'sale_c');
+    expect(relinked).toMatchObject({ saleDay: '2026-10-10', author: { kind: 'member', memberId: member } });
+    const at = relinked?.author.kind === 'member' ? relinked.author.linkVersionAt.getTime() : 0;
+    expect(at).toBeGreaterThanOrEqual(before.getTime());
+    expect(lines.some((one) => one.platformSaleId === 'sale_d')).toBe(false);
+    // Posing the same link again moves neither the version nor its instant.
+    await ledger.linkChatter('reveal', 'chatter_new', { kind: 'member', memberId: member }, owner);
+    const later = await withAdmin(test.admin.db, (tx) =>
+      salesFeedReadsForPay.linesRelinkedBetween(tx, {
+        platformAccountIds: [account],
+        from: after,
+        to: new Date(Date.now() + 60_000),
+        timeZone: ZONE,
+      }),
+    );
+    expect(later.some((one) => one.platformSaleId === 'sale_c')).toBe(false);
   });
 
   it('reads nothing for no account', async () => {
