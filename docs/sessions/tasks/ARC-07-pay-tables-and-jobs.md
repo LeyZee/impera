@@ -25,7 +25,7 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 
 ## À faire (liste vérifiable)
 
-- [x] a. `architecture.test.ts` : chaque table de `schema/payroll.ts` et `schema/invoices.ts` a un seul propriétaire, celui dont le README la nomme dans « Tables possédées » ; le test voit chaque table qu'un propriétaire utilise dans son code (il ne lit pas à l'aveugle) ; les lectures d'une table d'un autre module de la paie sont exactement `OPEN_CROSSINGS` ; chaque job de `JOB_NAMES`, sauf `JOBS_WITHOUT_TASK`, a sa tâche écrite une seule fois, dans un seul fichier de `wiring/` ; un job de la paie n'est mis en file (`task => '…'`) que par le module qui enregistre sa tâche.
+- [x] a. `architecture.test.ts` : chaque table de `schema/payroll.ts` et `schema/invoices.ts` a un seul propriétaire, celui dont le README la nomme dans « Tables possédées » ; le test voit chaque table qu'un propriétaire utilise dans son code (il ne lit pas à l'aveugle) ; les lectures d'une table d'un autre module de la paie sont exactement `OPEN_CROSSINGS` ; chaque job de `JOB_NAMES`, sauf `JOBS_WITHOUT_TASK`, a sa tâche écrite une seule fois, dans un seul fichier de `wiring/` ; un job de la paie n'est mis en file (`task => '…'`) que par le module qui enregistre sa tâche, et chaque mise en file des quatre modules nomme son job en clair (sinon le test échoue au lieu de passer sans rien lire, relecture de Bilan).
 - [x] a. README d'`invoicing` : en-tête des règles pures sans `domain/accounting.ts`, première puce renvoyée au dossier, migration 0045 des PDF ; renvoi à `OPEN_CROSSINGS` dans les trois README ; `modules.md`.
 - [ ] b. Lectures de `contractors` fermées.
 - [ ] c. Lectures d'`accounting` fermées.
@@ -48,3 +48,4 @@ Une PR par lot, dans cet ordre ; chaque lot retire ses lignes de `OPEN_CROSSINGS
 
 - 02/11, lot a : le test lit les sources (Drizzle par `schema`, SQL après `from`, `join`, `into`, `update` ou `table`, commentaires retirés) et les propriétaires dans les README, pour que la doc et le test ne puissent pas diverger. Vérifié à la main qu'il échoue sur une lecture nouvelle, une tâche enregistrée deux fois et un job mis en file par un autre module.
 - 02/11, lot a : le README d'`invoicing` cite encore `stateAfterCreditNote`, qui n'existe plus dans le code (hérité d'avant ARC-03) : à reprendre avec le lot d.
+- 02/11, lot a : `crontab.ts` met aussi des jobs en file, hors des modules donc hors du test ; aujourd'hui seulement des balayages (relecture de Bilan).

@@ -196,15 +196,24 @@ describe('architecture of pay (ADR 0047 § 1)', () => {
   it('enqueues a pay job only from the module that registers its task', () => {
     const wiringOf = new Map(registrations.map(({ job, wiring }) => [job, wiring]));
     const elsewhere: string[] = [];
+    const unread: string[] = [];
+    let enqueued = 0;
     for (const module of PAY) {
       for (const file of sourcesOf(path.join(modulesDir, module))) {
-        for (const [, job] of withoutComments(read(file)).matchAll(/task\s*=>\s*'([a-z_]+\.[a-z_]+)'/gu)) {
-          if (job !== undefined && wiringOf.get(job) !== module) {
+        const code = withoutComments(read(file));
+        const jobs = [...code.matchAll(/task\s*=>\s*'([a-z_]+\.[a-z_]+)'/gu)].map(([, job]) => job ?? '');
+        // Every enqueue names its job in plain text, or the test could not read it: not blind.
+        const enqueues = code.match(/enqueue_job\(|jobs\.enqueue\(/gu)?.length ?? 0;
+        if (enqueues !== jobs.length) unread.push(path.relative(modulesDir, file));
+        enqueued += jobs.length;
+        for (const job of jobs) {
+          if (wiringOf.get(job) !== module)
             elsewhere.push(`${module}: ${job} (${wiringOf.get(job) ?? 'no task'})`);
-          }
         }
       }
     }
+    expect(unread).toEqual([]);
+    expect(enqueued).toBeGreaterThan(0);
     expect(elsewhere).toEqual([]);
   });
 });
