@@ -6,6 +6,7 @@ import {
   type CreatorId,
   type CreatorSummary,
   type SchedulingSettings,
+  type TeamMemberId,
   type UserId,
 } from '@nirvana/contracts';
 
@@ -77,7 +78,7 @@ export function createCalendarService(
         agent: agents.map((agent) => ({ ...agent })),
         agency:
           read.view === 'agency'
-            ? await agencyOf(actor, window, shifts, agents, settings, directory, askedCreator)
+            ? await agencyOf(actor, window, query.memberId, agents, settings, directory, askedCreator)
             : null,
       };
     },
@@ -91,7 +92,7 @@ export function createCalendarService(
   async function agencyOf(
     actor: UserId,
     window: { readonly from: Date; readonly to: Date },
-    shifts: readonly CalendarRow[],
+    memberId: TeamMemberId | undefined,
     agents: readonly CreatorAgent[],
     settings: SchedulingSettings,
     directory: readonly CreatorSummary[],
@@ -117,7 +118,13 @@ export function createCalendarService(
       accounts: accounts.map((account) => toPlanningAccount(account, names)),
       toFill: toFill.map(toSlot),
       aiAlone: aiAlone.map(toSlot),
-      workload: workloadOf(shifts, window),
+      // From the same read as the créneaux and the coverage, so that the three agree.
+      workload: workloadOf(
+        planned.shifts.filter(
+          (shift) => askedCreator(shift.creatorId) && (memberId === undefined || shift.memberId === memberId),
+        ),
+        window,
+      ),
       coverage: accounts.map((account) => ({
         platformAccountId: account.id,
         ...coverageOf(

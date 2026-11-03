@@ -294,13 +294,10 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     const auto = await calendar(owner);
     await expectSameModeAsDashboard(auto);
     expect(auto.agent.find((agent) => agent.creatorId === ines)?.mode).toBe('auto');
-    // 0–6, 6–12, 12–18 on Inès are the agent's alone; 18–24, where Basile chats 20–23, stays to fill.
+    // 0–6, 6–12, 12–18 on Inès are the agent's alone; 18–24, where Basile chats 20–23 and the agent answers the
+    // rest, is held with him (Équipe): neither « IA seule » nor to fill.
     expect(auto.agency?.aiAlone.filter((slot) => slot.platformAccountId === inesAccount)).toHaveLength(3);
-    expect(
-      auto.agency?.toFill
-        .filter((slot) => slot.platformAccountId === inesAccount)
-        .map((slot) => slot.startsAt),
-    ).toEqual([parisInstant(day, 1080).toISOString()]);
+    expect(auto.agency?.toFill.filter((slot) => slot.platformAccountId === inesAccount)).toEqual([]);
     const inesCoverage = auto.agency?.coverage.find((one) => one.platformAccountId === inesAccount);
     expect(inesCoverage).toEqual({
       platformAccountId: inesAccount,

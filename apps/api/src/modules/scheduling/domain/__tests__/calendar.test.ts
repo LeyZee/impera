@@ -163,22 +163,24 @@ describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
   });
 
   it('keeps to fill a créneau a shift holds in part, with its open stretches, as Planning counts it (EQ-01)', () => {
-    // Créneaux from 8:00: a shift 10:00–16:00 leaves 8–10 open in 8–14, and 16–20 in 14–20.
-    const fromEight = { ...SETTINGS, slotStartMinute: 480 };
-    const { toFill, aiAlone } = slotsToFill({
-      settings: fromEight,
-      accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
-      shifts: [shift(NORA_REVEAL, '2026-11-03T09:00:00Z', '2026-11-03T15:00:00Z')],
-      // The agent answers all day in Automatique: a créneau a shift touches stays to fill all the same.
-      agents: [agentOn(NORA, 'auto', { mode: 'always' })],
-      window: { from: at('2026-11-03T07:00:00Z'), to: at('2026-11-03T19:00:00Z') },
-      now: at('2026-11-02T12:00:00Z'),
-    });
-    expect(toFill.map((cell) => iso(cell.open))).toEqual([
+    // Créneaux from 8:00: a shift 10:00–16:00, across two créneaux, leaves 8–10 open in 8–14 and 16–20 in 14–20.
+    const across = (mode: AgentMode) =>
+      slotsToFill({
+        settings: { ...SETTINGS, slotStartMinute: 480 },
+        accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
+        shifts: [shift(NORA_REVEAL, '2026-11-03T09:00:00Z', '2026-11-03T15:00:00Z')],
+        agents: [agentOn(NORA, mode, { mode: 'always' })],
+        window: { from: at('2026-11-03T07:00:00Z'), to: at('2026-11-03T19:00:00Z') },
+        now: at('2026-11-02T12:00:00Z'),
+      });
+    const copilot = across('copilot');
+    expect(copilot.toFill.map((cell) => iso(cell.open))).toEqual([
       [['2026-11-03T07:00:00.000Z', '2026-11-03T09:00:00.000Z']],
       [['2026-11-03T15:00:00.000Z', '2026-11-03T19:00:00.000Z']],
     ]);
-    expect(aiAlone).toEqual([]);
+    expect(copilot.aiAlone).toEqual([]);
+    // In Automatique the agent answers the open stretches: each créneau is held with its chatter, never « IA seule ».
+    expect(across('auto')).toEqual({ toFill: [], aiAlone: [] });
   });
 
   it('opens a créneau under way from the next minute, and holds one a shift covers whole', () => {
