@@ -1,10 +1,11 @@
 # Git hooks, installed by `pnpm install` (root `prepare` script). Never bypass them with --no-verify (CLAUDE.md).
-# Requires the `gitleaks` binary on the PATH (brew install gitleaks / apt install gitleaks).
+# Requires the `gitleaks` binary on the PATH (winget install Gitleaks.Gitleaks / brew install gitleaks); without it the
+# secret scans stop the commit and the push with the way to install it (scripts/gitleaks-hook.mjs).
 pre-commit:
   parallel: true
   commands:
     gitleaks:
-      run: gitleaks git --pre-commit --staged --redact --verbose
+      run: node scripts/gitleaks-hook.mjs staged
     # The staged files are read by the scripts, never passed as arguments: a merge that stages thousands of them would
     # go over the command-line limit of Windows.
     format:
@@ -21,11 +22,14 @@ pre-push:
       priority: 1
       use_stdin: true
       run: node scripts/protect-main.mjs
-    check:
+    gitleaks:
       priority: 2
+      run: node scripts/gitleaks-hook.mjs push
+    check:
+      priority: 3
       run: pnpm check
     test:
-      priority: 3
+      priority: 4
       run: pnpm test
 
 commit-msg:
