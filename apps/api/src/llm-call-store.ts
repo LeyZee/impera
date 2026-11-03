@@ -1,4 +1,4 @@
-import { LlmCallIdSchema, newId } from '@impera/contracts';
+import { LlmCallIdSchema, LlmPurposeSchema, newId } from '@impera/contracts';
 import { schema, sql, type Database } from '@impera/db';
 import { CALL_OUTCOMES, type LlmCallRecord, type LlmCallStore } from '@impera/llm';
 import { z } from 'zod';
@@ -7,6 +7,7 @@ const RowSchema = z.object({
   created_at: z.coerce.date(),
   creator_id: z.string().nullable(),
   role: z.enum(['voice', 'brain', 'sense', 'judge']),
+  purpose: LlmPurposeSchema,
   provider: z.enum(['xai', 'mistral', 'venice', 'google']),
   model: z.string(),
   prompt_hash: z.string(),
@@ -25,6 +26,8 @@ function toRecord(row: z.infer<typeof RowSchema>): LlmCallRecord {
   return {
     at: row.created_at,
     role: row.role,
+    // `chatting` stays implicit, as the gateway writes it.
+    ...(row.purpose === 'chatting' ? {} : { purpose: row.purpose }),
     provider: row.provider,
     model: row.model,
     promptHash: row.prompt_hash,
@@ -51,6 +54,7 @@ export function createDrizzleLlmCallStore(adminDb: Database): LlmCallStore {
         id: newId(LlmCallIdSchema),
         creatorId: record.creatorId ?? null,
         role: record.role,
+        purpose: record.purpose ?? 'chatting',
         provider: record.provider,
         model: record.model,
         promptHash: record.promptHash,
@@ -68,7 +72,7 @@ export function createDrizzleLlmCallStore(adminDb: Database): LlmCallStore {
     },
     async listSince(from) {
       const result = await adminDb.execute(sql`
-        select created_at, creator_id, role, provider, model, prompt_hash, status, latency_ms, is_fallback,
+        select created_at, creator_id, role, purpose, provider, model, prompt_hash, status, latency_ms, is_fallback,
                input_tokens, output_tokens, cost_micro_usd, conversation_id, draft_id
         from llm_calls where created_at >= ${from.toISOString()}::timestamptz order by created_at`);
       return z.array(RowSchema).parse(result.rows).map(toRecord);

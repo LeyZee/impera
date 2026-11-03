@@ -24,6 +24,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Repli | `fallback` | Le modèle de secours d'un rôle LLM, utilisé quand le modèle actif refuse, ne répond pas ou n'a pas de clé. |
 | Santé (des modèles) | `health` | État des rôles LLM (`ok`, `degraded`, `down`), latences, erreurs, coût du jour face au budget ; alimente le panneau « Modèles IA ». |
 | Plafond du jour | `dailyBudget`, `budget_reached` | Dépense IA maximale sur une journée, heure de Paris (20 € par défaut) : alerte à 80 %, au-delà plus aucune génération et les chatteurs reprennent. |
+| Plafond de veille | `trendWatchCapEur`, `trend_watch_budget_reached`, `llm_calls.purpose = trend_watch` | Part du plafond du jour réservée à la veille (1 € par défaut, ADR 0060 § 7) : au-delà, seuls les appels de la veille sont refusés jusqu'à minuit ; une réponse à un fan ne l'est jamais. |
 | Playground | `playground` | Conversation d'essai avec la persona par le même chemin que la production (cerveau, voix, gardes), sans aucun envoi possible. |
 | Taux au playground | `playgroundRate` | Part des réponses du playground validées sans retouche parmi les 50 dernières notées, par version de la voix. Sert à calibrer ; n'ouvre jamais le mode Automatique (ADR 0019). |
 | Taux en réel | `liveRate` | Part des brouillons des vrais fans approuvés sans modification parmi les 200 derniers décidés, par créatrice, version de la voix et persona active (ADR 0022). 80 % sur au moins 100 brouillons, avec le test à l'aveugle, ouvrent le mode Automatique (ADR 0019). |

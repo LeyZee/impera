@@ -1,3 +1,5 @@
+import type { LlmPurpose } from '@impera/contracts';
+
 import type { CallOutcome, LlmCallLog, LlmCallRecord } from './call-log';
 import type { DailyBudget } from './config';
 
@@ -75,8 +77,18 @@ function billedUsd(record: LlmCallRecord): number {
  * process until its journal is reloaded (30 s), are not counted yet. Going a few cents past the cap is possible
  * when several calls run at once; accepted, the cap protects against a runaway day, not against one cent.
  */
-export function budgetStatus(budget: DailyBudget, capEur: number, log: LlmCallLog, now: Date): BudgetStatus {
-  const spentUsd = log.since(startOfLocalDay(now, budget.timeZone)).reduce((sum, r) => sum + billedUsd(r), 0);
+export function budgetStatus(
+  budget: DailyBudget,
+  capEur: number,
+  log: LlmCallLog,
+  now: Date,
+  /** Only the calls made for this; every call when absent (the daily cap counts the trend watch too). */
+  purpose?: LlmPurpose,
+): BudgetStatus {
+  const spentUsd = log
+    .since(startOfLocalDay(now, budget.timeZone))
+    .filter((record) => purpose === undefined || (record.purpose ?? 'chatting') === purpose)
+    .reduce((sum, r) => sum + billedUsd(r), 0);
   const spentEur = spentUsd / budget.usdPerEur;
   const alertAtEur = capEur * budget.alertRatio;
   return {

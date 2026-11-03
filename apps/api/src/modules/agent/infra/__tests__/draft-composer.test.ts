@@ -87,6 +87,7 @@ function health(hasKey: boolean): HealthReport {
     providers: [],
     costTodayUsd: 0,
     budget: { day: '2026-10-17', spentEur: 0, capEur: 20, alertAtEur: 16, state: 'ok' },
+    trendWatchBudget: { day: '2026-10-17', spentEur: 0, capEur: 1, alertAtEur: 0.8, state: 'ok' },
   };
 }
 

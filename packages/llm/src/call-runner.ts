@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '@impera/contracts';
+import { err, ok, type LlmPurpose, type Result } from '@impera/contracts';
 import {
   APICallError,
   generateText,
@@ -121,8 +121,11 @@ export interface CallRunnerDeps {
   readonly now: () => Date;
   readonly canary: string;
   readonly reportRefusal: (provider: ProviderId, status: 401 | 403) => void;
-  /** True once today's spend reaches the cap: no model is called at all. */
-  readonly isOverBudget: () => boolean;
+  /**
+   * The cap that refuses a call for this purpose, once today's spend reaches it: no model is called at all.
+   * `undefined` while it may go on.
+   */
+  readonly overBudget: (purpose: LlmPurpose | undefined) => LlmFailure['code'] | undefined;
   /** Waits before a transient retry; a real timer unless a test passes its own. */
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -174,7 +177,8 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
 
     for (const { ref, isFallback } of targets) {
       // Checked before each model: a costly failure can spend the last euros before the fallback.
-      if (deps.isOverBudget()) return err({ code: 'budget_reached', attempts });
+      const refusedBy = deps.overBudget(trace.purpose);
+      if (refusedBy !== undefined) return err({ code: refusedBy, attempts });
       const record = (outcome: CallOutcome, latencyMs: number, extra: object = {}): void => {
         attempts.push({ provider: ref.provider, model: ref.model, outcome });
         deps.log.append({
@@ -291,7 +295,8 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             const delay = retryDelayMs(deps.config.maxTransientRetries - transientLeft, asked);
             if (delay === undefined) break;
             transientLeft -= 1;
-            if (deps.isOverBudget()) return err({ code: 'budget_reached', attempts });
+            const stopped = deps.overBudget(trace.purpose);
+            if (stopped !== undefined) return err({ code: stopped, attempts });
             await sleep(delay);
             continue;
           }
