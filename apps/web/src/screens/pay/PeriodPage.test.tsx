@@ -55,8 +55,8 @@ const AN_ID: unknown = expect.any(String);
 
 let periods: Record<string, PayrollPeriod | 'down'>;
 let reports: unknown[];
-/** The sales each period holds or a decision settles (CRM-03 lot b4b). */
-let held: Record<string, HeldSale[]>;
+/** The sales each period holds or a decision settles (CRM-03 lot b4b); `'down'` answers a server error. */
+let held: Record<string, HeldSale[] | 'down'>;
 let rules: unknown;
 /** The latest dollar rate the daily job read. */
 let usd: unknown;
@@ -80,7 +80,11 @@ function serve(): void {
         return json(answered.body, answered.status);
       }
       const holding = /^\/v1\/payroll\/periods\/([^/]+)\/held-sales$/u.exec(url.pathname)?.[1];
-      if (holding !== undefined) return json({ period: holding, sales: held[holding] ?? [] });
+      if (holding !== undefined) {
+        const sales = held[holding] ?? [];
+        if (sales === 'down') return json({ error: { code: 'internal', message: 'down' } }, 500);
+        return json({ period: holding, sales });
+      }
       const period = /^\/v1\/payroll\/periods\/(.+)$/u.exec(url.pathname)?.[1];
       if (period !== undefined) {
         const reply = () => {
@@ -1092,6 +1096,53 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     const [first, second] = writes.map((one) => JSON.stringify(one.body));
     expect(second).toBe(first);
     expect(writes[0]?.body).toMatchObject({ outcome: 'exclude', note: null });
+  });
+
+  it('says a list it could not read, never an empty one, and reads it again on « Réessayer »', async () => {
+    held[OCT2] = 'down';
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    expect(
+      await within(list).findByText(
+        'Le serveur ne répond pas : la liste des ventes en attente n’a pas pu être lue.',
+      ),
+    ).toBeTruthy();
+    held[OCT2] = [heldSaleOf()];
+    fireEvent.click(within(list).getByRole('button', { name: 'Réessayer' }));
+    expect(await within(await panel()).findByText('1 attend une décision')).toBeTruthy();
+  });
+
+  it('never asks for the list for a member the server would refuse, a manager on leave', async () => {
+    held[OCT2] = [heldSaleOf()];
+    renderPage(
+      { ...IRIS_ME, team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' },
+      `/paie/quinzaine?quinzaine=${OCT2}`,
+    );
+    await screen.findByRole('button', { name: 'Théo' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    const asked = vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) =>
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      );
+    expect(asked.some((one) => one.endsWith('/held-sales'))).toBe(false);
+    expect(screen.queryByText('Ventes en attente')).toBeNull();
+  });
+
+  it('names its sale to each gesture, for a screen reader out of the list', async () => {
+    held[OCT2] = [heldSaleOf()];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const count = within(await panel()).getByRole('button', { name: 'Compter pour Théo' });
+    const described = (count.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => text(document.getElementById(id)));
+    expect(described).toEqual([
+      'Nora Vidal · @nora sur Reveal',
+      'Vente du mercredi 28 octobre à 22 h · chatteur Théo',
+      '+42,00 €',
+    ]);
   });
 
   it('leaves a sale of the reader’s own chatter to another member', async () => {

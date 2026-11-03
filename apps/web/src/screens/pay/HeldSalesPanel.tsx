@@ -8,6 +8,7 @@ import {
 import { useId, useState, type JSX } from 'react';
 
 import type { PayNames } from './data';
+import { Unreachable } from './parts';
 
 import { decideSale, useHeldSales, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
@@ -36,27 +37,44 @@ const MOVED: ReadonlySet<string> = new Set(['pay_sale_not_found', 'pay_sale_outc
  * Paie › Quinzaine, for the owner and an active manager (CRM-03 lot b4b, ADR 0050 §§ 3, 5, 7): the sales read on the
  * platform that the period holds without a decision, and those a decision settles, so that each can be decided and
  * taken back. They never stop a closing; a sale decided after it goes on the team's first open period. Nothing shows
- * while there is none.
+ * while there is none, nor to a reader the server would refuse (`reads`); a read that fails says so, since an empty
+ * panel would read as « nothing waits » before a closing.
  */
 export function HeldSalesPanel({
   period,
   names,
   me,
   owner,
+  reads,
 }: {
   period: PayPeriod;
   names: PayNames;
   me: { readonly id: string };
   owner: boolean;
+  /** The owner or an active manager: the only readers of the list. */
+  reads: boolean;
 }): JSX.Element | null {
-  const held = useHeldSales(period, true);
+  const uid = useId();
+  const held = useHeldSales(period, reads);
   const settings = useSchedulingSettings();
   const [asked, setAsked] = useState<{
     readonly sale: HeldSale;
     readonly outcome: SaleDecisionOutcome;
   } | null>(null);
-  const sales = held.data?.period === period ? held.data.sales : [];
+  const read = held.data?.period === period ? held.data : undefined;
+  const sales = read?.sales ?? [];
   const zone = settings.data?.timeZone ?? null;
+  if (reads && read === undefined && held.isError)
+    return (
+      <Panel className="nv-enter py-held" eyebrow="Ventes en attente">
+        <Unreachable
+          what="la liste des ventes en attente"
+          onRetry={() => {
+            void held.refetch();
+          }}
+        />
+      </Panel>
+    );
   if (sales.length === 0 || zone === null) return null;
 
   const memberOf = (sale: HeldSale): SaleMember | null => {
@@ -77,27 +95,31 @@ export function HeldSalesPanel({
           pas la clôture : une vente décidée après elle va sur la première quinzaine ouverte.
         </p>
         <ul className="py-held__rows">
-          {sales.map((sale) => {
+          {sales.map((sale, index) => {
             const member = memberOf(sale);
+            // Each gesture names its sale to a screen reader, out of the list too.
+            const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
             const reason = heldReasonText(sale, member, owner);
             const decided = decisionText(sale, member);
             return (
               <li key={`${sale.platform}:${sale.platformSaleId}:${sale.event}`} className="py-held__row">
                 <div className="py-held__main">
-                  <p className="py-held__who">
+                  <p className="py-held__who" id={about('who')}>
                     {account === null ? 'Un compte' : account.creatorName}
                     <span className="py-held__account">
                       {account === null ? '' : ` · ${accountLine(account)}`}
                     </span>
                   </p>
-                  <p className="py-member__line nv-num">
+                  <p className="py-member__line nv-num" id={about('when')}>
                     {saleWhen(sale, zone)} · chatteur{'\u00a0'}
                     <b>{member === null ? 'non relié' : member.name}</b>
                   </p>
                 </div>
                 <div className="py-held__side">
-                  <p className="py-held__amount nv-num">{saleAmount(sale)}</p>
+                  <p className="py-held__amount nv-num" id={about('amount')}>
+                    {saleAmount(sale)}
+                  </p>
                   {decided === null ? (
                     <span className="rp-chip rp-chip--warn">En attente</span>
                   ) : (
@@ -113,6 +135,7 @@ export function HeldSalesPanel({
                       <button
                         key={outcome}
                         type="button"
+                        aria-describedby={`${about('who')} ${about('when')} ${about('amount')}`}
                         className={
                           outcome === 'count'
                             ? 'nv-btn nv-btn--neon nv-btn--sm'

@@ -1242,6 +1242,13 @@
   gap: var(--nv-space-2);
   margin-top: var(--nv-space-1);
 }
+/* A narrow phone: the count goes under the head, which keeps « Ventes en attente » on one line. */
+@media (max-width: 480px) {
+  .py-held .nv-panel__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 /* On a phone, one column: the net and its state on one line under who and when, the text keeps the width. */
 @media (max-width: 640px) {
   .py-held__row {

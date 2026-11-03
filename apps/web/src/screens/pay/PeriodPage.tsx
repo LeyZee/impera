@@ -503,7 +503,13 @@ function PeriodView({
             {rows.length === 0 ? null : <p className="py-quiet">{quietOf(data, now)}</p>}
           </div>
         </Panel>
-        <HeldSalesPanel period={data.period} names={names} me={me} owner={owner} />
+        <HeldSalesPanel
+          period={data.period}
+          names={names}
+          me={me}
+          owner={owner}
+          reads={user.teamScope === 'owner' || user.teamScope === 'agency'}
+        />
       </div>
       {openedStatement === undefined || opened === null ? null : (
         <StatementDialog
