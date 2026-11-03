@@ -526,6 +526,13 @@
       "when": 1793679827633,
       "tag": "0077_pay_sale_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793683522667,
+      "tag": "0078_slot_versions_seats_fan_assignments",
+      "breakpoints": true
     }
   ]
 }

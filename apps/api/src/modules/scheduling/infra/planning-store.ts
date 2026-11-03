@@ -54,6 +54,7 @@ import { addDays, calendarDayIn } from '../domain/time';
 
 import {
   settingsColumns,
+  assertAccountFree,
   assertAccountOf,
   assertMemberJoined,
   assertMemberWorks,
@@ -63,11 +64,13 @@ import {
   creatorOfUnscoped,
   leaveCovering,
   leavesOf,
+  lockAccounts,
   lockMembers,
   memberColumns,
   pgErrorOf,
   placed,
   shiftColumns,
+  shiftOnAccountInTheWay,
   StoredAccountSchema,
   templateColumns,
   toMember,
@@ -83,7 +86,7 @@ class MovedMeanwhile extends Error {}
 /**
  * The shifts a template makes ahead, each once, under its member's lock: the occurrence key skips those already
  * made, an occurrence during the member's leave is not made (the planning shows it in `conflicts`, ADR 0031), and one
- * that overlaps another shift of its member or its account is skipped in its own savepoint. The member exclusion is
+ * that overlaps another shift of its account (read under the account's lock) or of its member (in its own savepoint) is skipped. The member exclusion is
  * deferrable since 0023 (a swap of two shifts at the same hours), and a deferrable constraint is no arbiter of
  * `ON CONFLICT`: only the occurrence key is.
  */
@@ -96,18 +99,29 @@ async function makeShifts(
   const ahead = occurrencesAhead(template, clock.now, clock.timeZone);
   const last = ahead.at(-1);
   if (last === undefined) return 0;
+  await lockAccounts(tx, [template.platformAccountId]);
   await lockMembers(tx, [template.memberId]);
   const leaves = await leavesOf(tx, [template.memberId], clock.now, last.endsAt);
   let made = 0;
   for (const occurrence of ahead) {
     if (leaveCovering(leaves, template.memberId, occurrence.startsAt, occurrence.endsAt) !== undefined)
       continue;
+    const id = newId(ShiftIdSchema);
+    // An occurrence the account already has someone for is skipped, as one in its member's way (ADR 0049 § 2).
+    const onAccount = await shiftOnAccountInTheWay(tx, {
+      id,
+      memberId: template.memberId,
+      platformAccountId: template.platformAccountId,
+      startsAt: occurrence.startsAt,
+      endsAt: occurrence.endsAt,
+    });
+    if (onAccount !== null) continue;
     try {
       const rows = await tx.transaction((savepoint) =>
         savepoint
           .insert(shifts)
           .values({
-            id: newId(ShiftIdSchema),
+            id,
             creatorId: template.creatorId,
             platformAccountId: template.platformAccountId,
             memberId: template.memberId,
@@ -172,10 +186,12 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
       () => new ShiftNotFound(),
       async (tx, creatorId) => {
         const [current] = await tx
-          .select({ memberId: shifts.memberId })
+          .select({ memberId: shifts.memberId, platformAccountId: shifts.platformAccountId })
           .from(shifts)
           .where(eq(shifts.id, id));
         if (current === undefined) throw new ShiftNotFound();
+        // A shift never changes its account: its lock first, then the member's (ADR 0049 § 2).
+        await lockAccounts(tx, [current.platformAccountId]);
         await lockMembers(tx, [change.memberId ?? current.memberId]);
         const shift = await lockShift(tx, id);
         if (shift === null) throw new ShiftNotFound();
@@ -197,6 +213,7 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
             }
             await assertNotOnLeave(tx, update.memberId, update.startsAt, update.endsAt);
             const times = { memberId: update.memberId, startsAt: update.startsAt, endsAt: update.endsAt };
+            await assertAccountFree(tx, { ...shift, ...times });
             await placed(
               adminDb,
               tx
@@ -370,10 +387,12 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         assertPlans(scope);
         assertShiftRange(shift.startsAt, shift.endsAt);
         assertEndsAhead(shift.endsAt, clock.now);
+        await lockAccounts(tx, [shift.platformAccountId]);
         await lockMembers(tx, [shift.memberId]);
         await assertMemberWorks(tx, shift.memberId, shift.creatorId, shift.startsAt);
         await assertAccountOf(tx, shift.platformAccountId);
         await assertNotOnLeave(tx, shift.memberId, shift.startsAt, shift.endsAt);
+        await assertAccountFree(tx, shift);
         await placed(
           adminDb,
           tx.insert(shifts).values({ ...shift, createdBy: actor.userId, updatedBy: actor.userId }),
