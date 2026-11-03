@@ -1,10 +1,10 @@
-import type { InvoiceId, JournalAccounts, PayPeriod, TeamMemberId } from '@nirvana/contracts';
+import type { InvoiceId, JournalAccounts, TeamMemberId } from '@nirvana/contracts';
 
 import type { Actor } from '../../contractors/pure';
 import type { StoredInvoicePdf } from '../../invoicing/pure';
 
 import type { Das2Contractor } from './accounting';
-import type { JournalContractor } from './journal';
+import type { JournalContractor, TransferLeftOut } from './journal';
 
 /** What the journal export reads (EQ-06 lot 7b): the accounts, and each contractor with a line in the range. */
 export interface JournalFacts {
@@ -12,7 +12,7 @@ export interface JournalFacts {
   /** Each contractor with a document issued or a transfer made in the range, all their facts for the lettering. */
   readonly contractors: readonly JournalContractor[];
   /** The transfers in the range of a contractor with no document, hence no supplier account: left out of the file. */
-  readonly transfersLeftOut: readonly { readonly memberId: TeamMemberId; readonly period: PayPeriod }[];
+  readonly transfersLeftOut: readonly TransferLeftOut[];
 }
 
 /** A document of the archive's range (EQ-06 lot 7d): what the manifest says of it, and its PDF once rendered. */

@@ -498,6 +498,13 @@
       "when": 1793674102299,
       "tag": "0073_shift_feedbacks",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1793676133499,
+      "tag": "0075_invoice_not_issued_index",
+      "breakpoints": true
     }
   ]
 }
