@@ -6,17 +6,19 @@ import { NewCreatorForm } from './NewCreatorForm';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
 import { PersonaSection } from './persona/PersonaSection';
-import { creatorsSearch } from './search';
+import { AgencyRateSection } from './rate/AgencyRateSection';
+import { creatorsSearch, type CreatorSheet } from './search';
 
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
-export type CreatorTab = 'persona' | 'hours';
+export type CreatorTab = CreatorSheet;
 
 /**
  * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
- * not to the settings), then for the owner alone her hours (P3-14). With several creators, a row of chips picks one;
- * with one, her name is enough. The owner adds a creator here. The tab and the creator live in the address
- * (`?onglet=heures&creatrice=<id>`). Changes not saved are never lost silently: leaving asks first.
+ * not to the settings), then for the owner alone her hours (P3-14) and the agency's percentage (CR-04). With several
+ * creators, a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and the
+ * creator live in the address (`?onglet=heures&creatrice=<id>`). Changes not saved are never lost silently: leaving
+ * asks first.
  */
 export function CreatorsPage({
   tab,
@@ -49,7 +51,7 @@ export function CreatorsPage({
   const showForm = isOwner && (adding || (query.isSuccess && creators.length === 0));
   const current = creators.find((creator) => creator.id === creatorId) ?? creators[0];
   const selected = current?.id ?? null;
-  // The router keeps anyone but the owner off the hours; here they also need a creator to read them for.
+  // The router keeps anyone but the owner off the hours and the percentage; here they also need a creator for them.
   const shown: CreatorTab = isOwner && current !== undefined ? tab : 'persona';
 
   const leaving = blocker.status === 'blocked' || pending !== null;
@@ -126,6 +128,16 @@ export function CreatorsPage({
         </section>
       );
     }
+    if (shown === 'rate' && current !== undefined) {
+      return (
+        <AgencyRateSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          onDirty={setDirty}
+        />
+      );
+    }
     return shown === 'hours' && current !== undefined ? (
       <HoursSection
         key={current.id}
@@ -145,7 +157,7 @@ export function CreatorsPage({
       />
     );
   };
-  // Persona · Heures d'activité are the views of the sheet, in the header like every section's sub-tabs (NAV-10);
+  // Persona · Heures d'activité · Pourcentage are the views of the sheet, in the header like every section's sub-tabs (NAV-10);
   // they say where one is: the eyebrow then says nothing more (CREA-24).
   const switchShown = isOwner && current !== undefined && !showForm && query.isSuccess;
   // A creator reads her own sheet, her tab named « Persona » (NAV-18).
@@ -160,7 +172,7 @@ export function CreatorsPage({
           own
             ? 'Ta fiche : ce que l’agent sait de toi et la façon dont il parle.'
             : isOwner
-              ? 'La fiche de chaque créatrice : sa persona et ses heures d’activité.'
+              ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité et le pourcentage de l’agence.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
@@ -180,6 +192,12 @@ export function CreatorsPage({
                     search: creatorsSearch('hours', selected),
                     current: shown === 'hours',
                     label: 'Heures d’activité',
+                  },
+                  {
+                    to: '/creatrices',
+                    search: creatorsSearch('rate', selected),
+                    current: shown === 'rate',
+                    label: 'Pourcentage',
                   },
                 ]}
               />

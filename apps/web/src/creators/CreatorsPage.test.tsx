@@ -44,6 +44,10 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
         const latest = { summary: summary(index), persona };
         return json({ creatorId: creator.id, latest, versions: [summary(index)] });
       }
+      // Her agency percentage (CR-04): none set yet.
+      if ((creators ?? []).some((c) => url === `/v1/creators/${c.id}/agency-rates`)) {
+        return json({ today: '2026-11-03', current: null, rates: [] });
+      }
       return json({}, 404);
     }),
   );
@@ -159,6 +163,34 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     });
     expect(screen.queryByText('Tes modifications ne sont pas enregistrées.')).toBeNull();
     expect(router.state.location.search).toEqual({ creatrice: CLEO.id });
+  });
+});
+
+describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
+  it('opens from its tab in the header, the creator kept in the address', async () => {
+    await serve([ANNA, BEA]);
+    const router = renderAt(owner, `/creatrices?creatrice=${BEA.id}`);
+    await picked('Bea');
+    const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
+    fireEvent.click(within(views).getByRole('link', { name: 'Pourcentage' }));
+    expect(
+      await screen.findByText(
+        'À régler : aucun pourcentage pour Bea, aucune part de l’agence n’est montrée.',
+      ),
+    ).toBeDefined();
+    expect(router.state.location.search).toEqual({ onglet: 'pourcentage', creatrice: BEA.id });
+    expect(within(views).getByRole('link', { name: 'Pourcentage' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+  });
+
+  it('takes anyone else back to the persona, never to a page the server would refuse', async () => {
+    await serve([ANNA]);
+    const router = renderAt(operator, `/creatrices?onglet=pourcentage&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+    expect(screen.queryByText(/^À régler/u)).toBeNull();
   });
 });
 

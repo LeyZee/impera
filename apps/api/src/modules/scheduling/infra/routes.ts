@@ -1,6 +1,10 @@
 import {
   AccountPayRulesListSchema,
   AccountPayRulesSchema,
+  CreateCreatorAgencyRateBodySchema,
+  CreatorAgencyRateListSchema,
+  CreatorAgencyRateSchema,
+  CreatorIdSchema,
   AnswerShiftSwapRequestBodySchema,
   CalendarLinkCreatedSchema,
   CalendarLinkStateSchema,
@@ -58,6 +62,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import type { AgencyRatesService } from '../application/agency-rates';
 import type { CalendarService } from '../application/calendar';
 import type { CalendarLinkService } from '../application/calendar-feed';
 import type { ShiftFeedbackService } from '../application/feedback';
@@ -76,6 +81,7 @@ const TemplateParamsSchema = z.object({ templateId: ShiftTemplateIdSchema });
 const LeaveParamsSchema = z.object({ leaveRequestId: LeaveRequestIdSchema });
 const SwapParamsSchema = z.object({ shiftSwapRequestId: ShiftSwapRequestIdSchema });
 const ReportParamsSchema = z.object({ shiftReportId: ShiftReportIdSchema });
+const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
 /** `<token>.ics`: the token is checked by the service, which answers one same 404 for anything else. */
 const FeedParamsSchema = z.object({ file: z.string().max(64) });
 /**
@@ -107,6 +113,7 @@ export function createSchedulingRoutes(
     reports,
     feedback,
     payRules,
+    agencyRates,
   }: {
     scheduling: SchedulingService;
     calendar: CalendarService;
@@ -116,6 +123,7 @@ export function createSchedulingRoutes(
     reports: ShiftReportService;
     feedback: ShiftFeedbackService;
     payRules: PayRulesService;
+    agencyRates: AgencyRatesService;
   },
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
@@ -511,6 +519,37 @@ export function createSchedulingRoutes(
       async (request, reply) => {
         const { rules, created } = await payRules.create(actorOf(request), request.body);
         return reply.code(created ? 201 : 200).send(rules);
+      },
+    );
+
+    // The agency's percentage of a creator (CR-04): the owner's alone, read and added from her card in Créatrices.
+    app.get(
+      '/creators/:creatorId/agency-rates',
+      {
+        preValidation: owner,
+        schema: { params: CreatorParamsSchema, response: { 200: CreatorAgencyRateListSchema } },
+      },
+      (request) => agencyRates.list(userOf(request), request.params.creatorId),
+    );
+
+    // 200 when the same percentage was already recorded: a retry of the form records it once.
+    app.post(
+      '/creators/:creatorId/agency-rates',
+      {
+        preValidation: owner,
+        schema: {
+          params: CreatorParamsSchema,
+          body: CreateCreatorAgencyRateBodySchema,
+          response: { 200: CreatorAgencyRateSchema, 201: CreatorAgencyRateSchema },
+        },
+      },
+      async (request, reply) => {
+        const { rate, created } = await agencyRates.create(
+          actorOf(request),
+          request.params.creatorId,
+          request.body,
+        );
+        return reply.code(created ? 201 : 200).send(rate);
       },
     );
     return Promise.resolve();
