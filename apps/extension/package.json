@@ -1,6 +1,7 @@
 {
   "name": "@impera/extension",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "description": "Extension Chrome Impera (WXT, Manifest V3) : enregistreur réseau, capture de session, relais d'actions.",
   "type": "module",

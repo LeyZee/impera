@@ -447,6 +447,58 @@ describe('telegram module on Postgres', () => {
     expect(rows[0]?.text).not.toMatch(/123,45|120,00|3,45/);
   });
 
+  it('tells the groups for all of her share straying from the percentage, once per account and fortnight, no amount (CRM-04 d3)', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const platformAccountId = newId(PlatformAccountIdSchema);
+    const share = (currency: 'EUR' | 'USD', account = platformAccountId) => ({
+      creatorId,
+      platform: 'reveal',
+      platformAccountId: account,
+      from: '2026-10-16',
+      to: '2026-10-31',
+      currency,
+      sales: 12,
+      refunds: 1,
+      creatorMinor: 54_321,
+      expectedCreatorMinor: 50_000,
+      differenceMinor: 4_321,
+    });
+    const thread = async () =>
+      (await deliveryRows(chatId)).filter(
+        (row) => row.threadKey === `agency_share:${platformAccountId}:2026-10-16`,
+      );
+
+    // Her own Important group does not get it: only the groups for all.
+    const { routes, version } = await module.overview();
+    const own = await module.saveRoutes(version, [
+      ...routes.filter((route) => route.topic !== 'important'),
+      { creatorId, topic: 'important', chatId },
+    ]);
+    expect(own.ok).toBe(true);
+    const otherAccount = newId(PlatformAccountIdSchema);
+    await publish('agency_share_mismatch', share('EUR', otherAccount));
+    await module.jobs.scan();
+    expect((await deliveryRows(chatId)).filter((row) => row.threadKey?.startsWith('agency_share:'))).toEqual(
+      [],
+    );
+
+    const back = await module.overview();
+    const forAll = await module.saveRoutes(back.version, [
+      ...back.routes.filter((route) => route.topic !== 'important'),
+      { creatorId: null, topic: 'important', chatId },
+    ]);
+    expect(forAll.ok).toBe(true);
+    // One account selling in two currencies gives two events: one message.
+    await publish('agency_share_mismatch', share('USD'));
+    await publish('agency_share_mismatch', share('EUR'));
+    await module.jobs.scan();
+    const rows = await thread();
+    expect(rows.map((row) => row.topic)).toEqual(['important']);
+    expect(rows[0]?.text).toContain('la quinzaine du 16 au 31 oct.');
+    expect(rows[0]?.text).toContain(`onglet=pourcentage&amp;creatrice=${creatorId}`);
+    expect(rows[0]?.text).not.toMatch(/543,21|500,00|43,21|\b12\b/);
+  });
+
   it('tells an outage once, reminds it once in red after 2 h, then answers « Rétabli » in its thread (P3-12)', async () => {
     const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
     const since = new Date(sliceStart).toISOString();

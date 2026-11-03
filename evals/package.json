@@ -1,6 +1,7 @@
 {
   "name": "@impera/evals",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "description": "Évaluations Promptfoo de la qualité conversationnelle (scénarios, rubriques, adversarial, régression).",
   "type": "module",

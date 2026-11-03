@@ -60,6 +60,7 @@ export const SCANNED_EVENT_TYPES = [
   'security_alert',
   'sales_feed_mismatch',
   'connection_state_changed',
+  'agency_share_mismatch',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -695,6 +696,22 @@ export function classify(
         link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
       };
     // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
+    // Important to the groups for all (CRM-04 d3, ADR 0054 § 2): a group may hold managers, so no amount, no
+    // percentage; one message per account and fortnight, whatever its currencies.
+    case 'agency_share_mismatch':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        allCreatorsOnly: true,
+        oncePerThread: true,
+        threadKey: `agency_share:${signal.platformAccountId}:${signal.from}`,
+        title: 'Important',
+        body: `Part créatrice chez ${PLATFORM_NAMES[signal.platform]} : sur ${periodText(signal.from)}, elle s’écarte du pourcentage de l’agence réglé pour elle. À titre d’information.`,
+        link: {
+          label: 'Ouvrir le pourcentage',
+          path: `/creatrices?onglet=pourcentage&creatrice=${signal.creatorId}`,
+        },
+      };
     case 'connection_down':
       return {
         kind: 'notice',

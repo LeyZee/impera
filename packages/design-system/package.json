@@ -1,6 +1,7 @@
 {
   "name": "@impera/design-system",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "description": "Design system Impera (verre liquide, néon rouge) : tokens, pont Tailwind v4, classes de composants, aides d'animation. Consommé par apps/web et apps/extension.",
   "type": "module",
