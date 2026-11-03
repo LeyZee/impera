@@ -25,16 +25,20 @@ async function errorCodeOf(response: Response): Promise<string> {
   return /<Code>([^<]{1,64})<\/Code>/u.exec(body)?.[1] ?? 'no code';
 }
 
-/** The text of the first `<name>` of an XML fragment, its five entities read back; `null` when absent. */
-function xmlText(fragment: string, name: string): string | null {
+/**
+ * The text of the first `<name>` of an XML fragment, its entities read back, named or numeric (MinIO writes the quotes
+ * of an ETag as `&#34;`, CI 03/11); `null` when absent.
+ */
+export function xmlText(fragment: string, name: string): string | null {
   const found = new RegExp(`<${name}>([^<]*)</${name}>`, 'u').exec(fragment)?.[1];
   if (found === undefined) return null;
-  return found
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&apos;', "'")
-    .replaceAll('&amp;', '&');
+  const named: Readonly<Record<string, string>> = { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' };
+  return found.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/giu, (entity, body: string) => {
+    if (body.startsWith('#x') || body.startsWith('#X'))
+      return String.fromCodePoint(Number.parseInt(body.slice(2), 16));
+    if (body.startsWith('#')) return String.fromCodePoint(Number.parseInt(body.slice(1), 10));
+    return named[body] ?? entity;
+  });
 }
 
 const xmlEscape = (text: string): string =>
