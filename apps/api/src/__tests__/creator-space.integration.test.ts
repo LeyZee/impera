@@ -4,6 +4,7 @@ import {
   CreatorIdSchema,
   CreatorMessagePageSchema,
   FanIdSchema,
+  AuditEntryIdSchema,
   newId,
   PlatformAccountIdSchema,
   type ConversationId,
@@ -280,6 +281,49 @@ describe('/v1/creator-space', () => {
       ['inbound', 'Salut', null, false],
     ]);
     expect(response.body).not.toMatch(/"author"|"draftId"/u);
+  });
+
+  it('never reads a thread without a trace: a read of its messages with no recent opening is written as one', async () => {
+    const marc = conversations.get('Marc');
+    const messagesOf = () =>
+      get(`/v1/creator-space/conversations/${marc?.conversationId ?? ''}/messages`, creatorCookie);
+    const openings = () =>
+      test.admin.db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, 'conversation.open'),
+            eq(schema.auditLog.entityId, marc?.conversationId ?? ''),
+          ),
+        );
+    // An opening of hers older than the window covers nothing.
+    await test.admin.db.insert(schema.auditLog).values({
+      id: newId(AuditEntryIdSchema),
+      userId: creatorUserId,
+      action: 'conversation.open',
+      entity: 'conversation',
+      entityId: marc?.conversationId ?? '',
+      details: { creatorId: nora, by: 'creator' },
+      createdAt: new Date(Date.now() - 16 * 60_000),
+    });
+    // A direct call, no recent opening before it: written at once.
+    expect((await messagesOf()).statusCode).toBe(200);
+    const written = await openings();
+    expect(written).toHaveLength(2);
+    expect(written).toContainEqual(
+      expect.objectContaining({
+        userId: creatorUserId,
+        entity: 'conversation',
+        details: { creatorId: nora, by: 'creator', via: 'messages' },
+      }),
+    );
+    // The screen reads again every 30 s: covered by that trace, nothing more.
+    expect((await messagesOf()).statusCode).toBe(200);
+    expect(await openings()).toHaveLength(2);
+    // Her opening is always written.
+    await get(`/v1/creator-space/conversations/${marc?.conversationId ?? ''}`, creatorCookie);
+    expect(await openings()).toHaveLength(3);
   });
 
   it('answers 404 for another creator’s conversation, on the conversation and on its messages, and writes nothing', async () => {

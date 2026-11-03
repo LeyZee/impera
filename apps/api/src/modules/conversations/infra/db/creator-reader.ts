@@ -61,6 +61,46 @@ async function conversationOf(tx: Transaction, id: ConversationId) {
 }
 
 /**
+ * How long an opening of hers covers her reads of the same conversation's messages: past it, a read is written as an
+ * opening again. The screen reads the messages every 30 s while it is open; a direct call to the messages, with no
+ * opening, is written at once (ADR 0042 § 2).
+ */
+const CREATOR_READ_TRACE_MINUTES = 15;
+
+/** Her opening of a conversation, in the audit log, in the transaction of the read (ADR 0042 § 2, as a chatter's). */
+async function writeOpening(
+  tx: Transaction,
+  entry: { userId: string; id: ConversationId; ip: string; creatorId: string; via?: 'messages' },
+): Promise<void> {
+  const { via, ...rest } = entry;
+  await tx.insert(schema.auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId: rest.userId,
+    action: 'conversation.open',
+    entity: 'conversation',
+    entityId: rest.id,
+    ip: rest.ip,
+    details:
+      via === undefined
+        ? { creatorId: rest.creatorId, by: 'creator' }
+        : { creatorId: rest.creatorId, by: 'creator', via },
+  });
+}
+
+/** Whether she opened that conversation, by either route, in the last `CREATOR_READ_TRACE_MINUTES`. */
+async function openedLately(tx: Transaction, userId: string, id: ConversationId): Promise<boolean> {
+  const result = await tx.execute(sql`
+    select exists (
+      select 1 from ${schema.auditLog}
+       where ${schema.auditLog.userId} = ${userId}
+         and ${schema.auditLog.action} = 'conversation.open'
+         and ${schema.auditLog.entityId} = ${id}
+         and ${schema.auditLog.createdAt} > now() - make_interval(mins => ${CREATOR_READ_TRACE_MINUTES})
+    ) as opened`);
+  return z.array(z.object({ opened: z.boolean() })).parse(result.rows)[0]?.opened === true;
+}
+
+/**
  * The creator's reads of her own account (CR-02), each in her own transaction (`withCreatorAccount`): her role and her
  * creator come from her account, and the restrictive policies close to her what only the agency reads. The columns are
  * named one by one: `messages.author` and `messages.draft_id` are never selected (ADR 0021), and the contracts are
@@ -116,15 +156,7 @@ export function createDrizzleCreatorSpaceReader(
         const row = await conversationOf(tx, id);
         if (row === undefined) return null;
         // Each opening, as a chatter's (ADR 0042 § 2): in the same transaction as the read.
-        await tx.insert(schema.auditLog).values({
-          id: newId(AuditEntryIdSchema),
-          userId,
-          action: 'conversation.open',
-          entity: 'conversation',
-          entityId: id,
-          ip,
-          details: { creatorId, by: 'creator' },
-        });
+        await writeOpening(tx, { userId, id, ip, creatorId });
         return { row };
       });
       if (opened === null) return null;
@@ -136,9 +168,12 @@ export function createDrizzleCreatorSpaceReader(
       };
     },
 
-    messages: async (userId, id, page) => {
+    messages: async (userId, id, page, ip) => {
       const read = await withCreatorAccount(db, userId, async (tx, creatorId) => {
         if ((await conversationOf(tx, id)) === undefined) return null;
+        // No read of the thread without a trace: one not covered by a recent opening is written as one.
+        if (!(await openedLately(tx, userId, id)))
+          await writeOpening(tx, { userId, id, ip, creatorId, via: 'messages' });
         const after = decodeCursor(page.cursor);
         const rows = await tx
           .select({

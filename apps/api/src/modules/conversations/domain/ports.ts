@@ -546,8 +546,17 @@ export interface CreatorSpaceReader {
   fans(userId: UserId, page: PageRequest): Promise<CreatorFanPage>;
   /** The conversation she opens and its fan, `null` when she has none of that id; each opening is in the audit log. */
   openConversation(userId: UserId, id: ConversationId, ip: string): Promise<CreatorConversation | null>;
-  /** `null` when she has no conversation of that id. */
-  messages(userId: UserId, id: ConversationId, page: PageRequest): Promise<CreatorMessagePage | null>;
+  /**
+   * `null` when she has no conversation of that id. A read with no opening of hers of that conversation in the last
+   * `CREATOR_READ_TRACE_MINUTES` is written in the audit log as one (`details.via = 'messages'`): a direct call never
+   * reads the thread without a trace, and the screen's reading every 30 s adds nothing.
+   */
+  messages(
+    userId: UserId,
+    id: ConversationId,
+    page: PageRequest,
+    ip: string,
+  ): Promise<CreatorMessagePage | null>;
 }
 
 export interface PageRequest {
