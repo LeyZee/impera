@@ -1,5 +1,5 @@
 import { JOB_PAYLOADS } from '@nirvana/contracts';
-import { parseEncryptionKeys } from '@nirvana/db';
+import { parseEncryptionKeys, withAdmin } from '@nirvana/db';
 
 import { secretOrNull } from '../config';
 import { defineTask } from '../jobs';
@@ -11,6 +11,7 @@ import {
   type ConnectorsModule,
   type SalesFeedRegistry,
 } from '../modules/connectors';
+import { salesCheckReads } from '../modules/scheduling';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -48,6 +49,8 @@ export function wireConnectors(
     salesFeeds: deps.salesFeeds ?? { reveal: revealSalesFeed(fetch) },
     // Deliveries come to the address the owner signs in at; over plain HTTP (development) no webhook is registered.
     publicBaseUrl: config.AUTH_BASE_URL,
+    // The automatic sales check compares the accounts the pay rules put on the platform's net (CRM-04 b3).
+    detectedAccounts: (period) => withAdmin(adminDb, (tx) => salesCheckReads.detectedAccounts(tx, period)),
   });
   return {
     module,
@@ -76,6 +79,12 @@ export function wireConnectors(
         logger,
         (payload, context) =>
           module.jobs.readSales(context.logger, `job:${context.jobId}`, payload.woken === true),
+      ),
+      'connector.check_sales': defineTask(
+        'connector.check_sales',
+        JOB_PAYLOADS['connector.check_sales'],
+        logger,
+        (payload, context) => module.jobs.checkSales(payload, context.logger, `job:${context.jobId}`),
       ),
     },
     routes: [

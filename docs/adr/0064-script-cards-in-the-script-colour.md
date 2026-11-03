@@ -1,6 +1,6 @@
 # 0064. Cartons de script : la couleur du script et le dessin d'OnlyScript
 
-Statut : proposed (demande de Charles du 03/11/2026, 12 h 42 et 12 h 43, fil « Médias et scripts » : « Il faut vraiment que tu reprennes les cartons de OnlyScript. Ils étaient bien parce qu'ils étaient colorés […] chaque script a son code couleur. Ça permettait de les retrouver facilement et de ne pas se perdre » ; « le choix des couleurs […] le choix des étapes, d'ajouter des étapes ou non, […] de modifier ce qu'il y a sur les cartons […] il faut absolument l'avoir »)
+Statut : accepted (« et ok 0064 » de Charles, 03/11/2026, 13 h 38, fil « Médias et scripts » ; demande de Charles du 03/11/2026, 12 h 42 et 12 h 43, fil « Médias et scripts » : « Il faut vraiment que tu reprennes les cartons de OnlyScript. Ils étaient bien parce qu'ils étaient colorés […] chaque script a son code couleur. Ça permettait de les retrouver facilement et de ne pas se perdre » ; « le choix des couleurs […] le choix des étapes, d'ajouter des étapes ou non, […] de modifier ce qu'il y a sur les cartons […] il faut absolument l'avoir »)
 Date : 2026-11-03
 Remplace : dans l'ADR 0056 § 3, la phrase « La palette vient des jetons du design system, pas d'une couleur libre ; la typographie est celle de Nirvana. »
 Précise : l'ADR 0056 § 1 (un pont peut porter des emplacements ; une étape dit si elle est offerte ou payante) et § 3 (ce que dit un carton).
