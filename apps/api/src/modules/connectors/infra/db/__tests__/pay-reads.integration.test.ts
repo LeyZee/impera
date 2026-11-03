@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { salesFeedReadsForPay } from '../pay-reads';
 import { createDrizzleSalesLedger } from '../sales-ledger';
+import { salesFeedTotals } from '../totals-reads';
 
 // Everything below is invented (ADR 0010).
 const ZONE = 'Europe/Paris';
@@ -283,6 +284,42 @@ describe('the sales feed read by pay', () => {
       salesFeedReadsForPay.linesOfSales(tx, { platformAccountIds: [account], sales: [], timeZone: ZONE }),
     );
     expect(none).toEqual([]);
+  });
+
+  it('gives a refund the same seller in the totals as in pay: its sale’s, nobody when the sale had none', async () => {
+    const totals = await withAdmin(test.admin.db, (tx) =>
+      salesFeedTotals.totalsOf(tx, {
+        creatorId: CreatorIdSchema.parse(creator),
+        from: '2026-10-01',
+        to: '2026-10-31',
+      }),
+    );
+    const onDay = (day: string) =>
+      totals.rows
+        .filter((row) => row.day === day)
+        .map((row) => [row.seller.kind, row.sales, row.refunds, row.netMinor]);
+    // `sale_a`'s refund names the bot: it is still taken off the member's sale. `sale_d`'s names the bot too: nobody's.
+    expect(onDay('2026-10-15')).toEqual([['member', 1, 1, 0]]);
+    expect(onDay('2026-10-11')).toEqual([['none', 1, 1, 0]]);
+  });
+
+  it('gives a day’s refunds the seller pay gives them, and says whether their sale is of the day', async () => {
+    const creatorId = CreatorIdSchema.parse(creator);
+    const refundsOf = (day: string) =>
+      withAdmin(test.admin.db, (tx) => salesFeedTotals.refundsOf(tx, { creatorId, day }));
+    const rowsOf = async (day: string) =>
+      (await refundsOf(day)).rows.map((row) => [row.seller.kind, row.sale, row.refunds, row.netMinor]);
+    expect(await rowsOf('2026-10-20')).toEqual([['member', 'earlier_day', 1, 800]]);
+    expect(await rowsOf('2026-10-21')).toEqual([['none', 'earlier_day', 1, 1000]]);
+    expect(await rowsOf('2026-10-12')).toEqual([['none', 'not_in_register', 1, 200]]);
+    // Sold and refunded on the 5th of November in Paris: a sale of the day, already off that day's totals.
+    await test.admin.db
+      .insert(schema.platformSales)
+      .values([
+        line(account, { id: 'sale_e', at: '2026-11-05T08:00:00Z', chatter: 'chatter_member', net: 400 }),
+        line(account, { id: 'sale_e', event: 'refund', at: '2026-11-05T22:30:00Z', chatter: null, net: 400 }),
+      ]);
+    expect(await rowsOf('2026-11-05')).toEqual([['member', 'same_day', 1, 400]]);
   });
 
   it('reads nothing for no account', async () => {
