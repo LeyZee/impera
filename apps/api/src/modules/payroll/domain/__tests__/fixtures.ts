@@ -9,6 +9,7 @@ import {
 } from '@nirvana/contracts';
 
 import type { MemberForPay, PeriodSnapshot, ReportForPay } from '../recalculation';
+import { NO_SALES } from '../sales';
 
 /** Invented members and amounts only (ADR 0010). */
 export const P1 = PayPeriodSchema.parse('2025-03-01');
@@ -58,6 +59,7 @@ export const snapshot = (patch: Partial<PeriodSnapshot>): PeriodSnapshot => ({
   lastClosed: null,
   reports: [],
   registered: new Map(),
+  sales: NO_SALES,
   members: [],
   bonuses: [],
   penalties: [],
