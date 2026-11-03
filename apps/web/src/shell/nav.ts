@@ -260,7 +260,7 @@ const SCREENS = {
   '/commissions/factures': 'Factures',
   '/moi/dossier': 'Dossier',
   '/moi/factures': 'Factures',
-  '/moi/agenda': 'Agenda',
+  '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Ventes',

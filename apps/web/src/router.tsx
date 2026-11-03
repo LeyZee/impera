@@ -481,7 +481,7 @@ const meInvoices = createRoute({
 
 const meCalendar = createRoute({
   getParentRoute: () => me,
-  path: '/agenda',
+  path: '/calendrier',
   component: function MyCalendarLink() {
     const { user } = rootRoute.useRouteContext();
     return <MyCalendarLinkPage user={user} />;

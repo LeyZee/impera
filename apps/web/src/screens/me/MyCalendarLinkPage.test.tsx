@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyCalendarLinkPage } from './MyCalendarLinkPage';
@@ -46,7 +46,7 @@ function renderPage(): void {
   const root = createRootRoute();
   const page = createRoute({
     getParentRoute: () => root,
-    path: '/moi/agenda',
+    path: '/moi/calendrier',
     component: () => <MyCalendarLinkPage user={THEO_ME} />,
   });
   const others = ['/moi/dossier', '/moi/securite'].map((path) =>
@@ -54,7 +54,7 @@ function renderPage(): void {
   );
   const router = createRouter({
     routeTree: root.addChildren([page, ...others]),
-    history: createMemoryHistory({ initialEntries: ['/moi/agenda'] }),
+    history: createMemoryHistory({ initialEntries: ['/moi/calendrier'] }),
   });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -87,13 +87,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Moi › Agenda (CR-12)', () => {
+describe('Moi › Calendrier (CR-12)', () => {
   it('makes the link once, with Apple’s webcal address, Google’s subscription and the address to copy', async () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Créer mon lien' }));
     const shown = await screen.findByLabelText('Ton lien de calendrier');
     expect(shown.textContent).toBe(`${window.location.origin}${PATH}`);
-    expect(screen.getByRole('link', { name: 'Ajouter à Apple Agenda' }).getAttribute('href')).toBe(
+    // Shown once, so it takes the focus and is read out.
+    expect(document.activeElement).toBe(shown);
+    expect(screen.getByRole('link', { name: 'Ajouter au Calendrier d’Apple' }).getAttribute('href')).toBe(
       `webcal://${window.location.host}${PATH}`,
     );
     const google = screen.getByRole('link', { name: 'Ajouter à Google Agenda' });
@@ -104,7 +106,10 @@ describe('Moi › Agenda (CR-12)', () => {
     expect(screen.getByRole('button', { name: 'Copier le lien' })).toBeTruthy();
     // Once put away, the address is not shown again: only since when it works.
     fireEvent.click(screen.getByRole('button', { name: 'C’est fait' }));
-    expect(await screen.findByText('Ton lien marche depuis le 3 novembre 2026.')).toBeTruthy();
+    const since = await screen.findByText('Ton lien marche depuis le 3 novembre 2026.');
+    await waitFor(() => {
+      expect(document.activeElement).toBe(since);
+    });
     expect(screen.queryByText(new RegExp(TOKEN, 'u'))).toBeNull();
     expect(writes).toEqual(['POST']);
   });
@@ -113,7 +118,9 @@ describe('Moi › Agenda (CR-12)', () => {
     live = { createdAt: '2026-11-01T08:00:00.000Z' };
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Couper le lien' }));
-    expect(screen.getByText('L’agenda où tu l’as ajouté ne recevra plus tes shifts.')).toBeTruthy();
+    expect(screen.getByText('Le calendrier où tu l’as ajouté ne recevra plus tes shifts.')).toBeTruthy();
+    // The safe choice has the focus.
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Annuler' }));
     fireEvent.click(screen.getByRole('button', { name: 'Couper' }));
     expect(await screen.findByRole('button', { name: 'Créer mon lien' })).toBeTruthy();
     expect(writes).toEqual(['DELETE']);
