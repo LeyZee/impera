@@ -1,4 +1,4 @@
-import { PayPeriodSchema, type JournalAccounts } from '@nirvana/contracts';
+import { PayPeriodSchema, TeamMemberIdSchema, type JournalAccounts } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { fecText, journalFileName, latin9 } from '../fec';
@@ -7,6 +7,7 @@ import {
   journalEntries,
   ledgerAccountsOf,
   letteringCode,
+  transfersLeftOutInOrder,
   type JournalContractor,
   type JournalDocument,
   type JournalStatement,
@@ -375,5 +376,26 @@ describe('Équipe › Factures : le fichier du journal (EQ-06 lot 7b)', () => {
     // A space of any width is a plain space; a letter it lacks loses its accent (« ź »); anything else is « ? ».
     expect(new TextDecoder('latin1').decode(latin9('1 234 Łódź ă 😀'))).toBe('1 234 ?ódz a ?');
     expect([...latin9('\t\r\n')]).toEqual([0x09, 0x0d, 0x0a]);
+  });
+});
+
+describe('the transfers left out of the journal', () => {
+  it('lists them by member then period, whatever order the members were read in', () => {
+    const first = TeamMemberIdSchema.parse('0195f0c0-0000-7000-8000-000000000001');
+    const second = TeamMemberIdSchema.parse('0195f0c0-0000-7000-8000-000000000002');
+    const [p1, p2] = [PayPeriodSchema.parse('2026-10-01'), PayPeriodSchema.parse('2026-10-16')];
+    const read = [
+      { memberId: second, period: p2 },
+      { memberId: first, period: p2 },
+      { memberId: second, period: p1 },
+      { memberId: first, period: p1 },
+    ];
+    expect(transfersLeftOutInOrder(read)).toEqual([
+      { memberId: first, period: p1 },
+      { memberId: first, period: p2 },
+      { memberId: second, period: p1 },
+      { memberId: second, period: p2 },
+    ]);
+    expect(read[0]).toEqual({ memberId: second, period: p2 });
   });
 });
