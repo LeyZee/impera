@@ -3,7 +3,6 @@ import {
   ScriptStructureIdSchema,
   SCRIPT_CARD_INKS,
   scriptCardInk,
-  type ScriptColor,
   type ScriptMoment,
   type ScriptStarter,
   type ScriptStructure,
@@ -11,19 +10,19 @@ import {
 import { useBlocker } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
+import { Queues } from './Queues';
 import { Workshop, type WorkshopStart } from './Workshop';
 import { useStarters, useStructures } from './api';
-import { emptyDraft, slotsSummary } from './model';
+import { emptyDraft, scriptGradient, slotsSummary } from './model';
 import './structures.css';
 
 import { LeaveConfirm } from '@/creators/LeaveConfirm';
+import { useCreators } from '@/creators/api';
+import { Segment } from '@/creators/persona/fields';
 import '@/creators/persona/persona.css';
 import { Page, PageHeader } from '@/shell/layout';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
-
-const gradient = (color: ScriptColor): string =>
-  `linear-gradient(135deg, ${color.primary}, ${color.secondary} 55%, ${color.accent})`;
 
 const stagesOf = (segments: ScriptStructure['current']['segments']): string => {
   const stages = segments.filter((segment) => segment.kind === 'stage');
@@ -39,6 +38,8 @@ const stagesOf = (segments: ScriptStructure['current']['segments']): string => {
 export function StructuresPage(): JSX.Element {
   const structures = useStructures();
   const starters = useStarters();
+  const creators = useCreators();
+  const [tab, setTab] = useState<'library' | 'queues'>('library');
   const [open, setOpen] = useState<WorkshopStart | null>(null);
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
@@ -108,8 +109,38 @@ export function StructuresPage(): JSX.Element {
         </section>
       );
     }
+    const tabs = (
+      <div className="st-tabs">
+        <Segment
+          label="Vue"
+          value={tab}
+          options={[
+            { value: 'library', label: 'Bibliothèque' },
+            { value: 'queues', label: 'Files des créatrices' },
+          ]}
+          onChange={setTab}
+        />
+      </div>
+    );
+    if (tab === 'queues') {
+      return (
+        <section className="ps-page">
+          {tabs}
+          {creators.isError ? (
+            <div className="nv-plate ps-panel">
+              <p className="ps-muted">Les créatrices ne se chargent pas. Réessaie dans un instant.</p>
+            </div>
+          ) : creators.data === undefined ? (
+            <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />
+          ) : (
+            <Queues creators={creators.data} structures={structures.data} />
+          )}
+        </section>
+      );
+    }
     return (
       <section className="ps-page">
+        {tabs}
         {structures.data.length === 0 ? (
           <p className="ps-muted">
             Aucune structure encore. Pars de la structure de départ, ou commence une structure vide.
@@ -128,7 +159,7 @@ export function StructuresPage(): JSX.Element {
                 <span
                   className="st-tile__cover"
                   style={{
-                    background: gradient(structure.current.color),
+                    background: scriptGradient(structure.current.color),
                     color: scriptCardInk(structure.current.color) ?? SCRIPT_CARD_INKS.dark,
                   }}
                 >
@@ -150,7 +181,7 @@ export function StructuresPage(): JSX.Element {
             <p className="nv-eyebrow">Pour démarrer</p>
             {(starters.data ?? []).map((starter) => (
               <div key={starter.key} className="st-starter">
-                <span className="st-tile__color" style={{ background: gradient(starter.body.color) }} />
+                <span className="st-tile__color" style={{ background: scriptGradient(starter.body.color) }} />
                 <span className="st-starter__text">
                   <span className="st-tile__name">{starter.body.name}</span>
                   <span className="st-tile__sub">{starter.summary}</span>

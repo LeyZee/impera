@@ -3,7 +3,6 @@ import {
   SCRIPT_SEGMENTS_MAX,
   SCRIPT_STRUCTURE_NAME_MAX,
   type ScriptCardPreviewBody,
-  type ScriptColor,
   type ScriptMoment,
   type ScriptSegment,
   type ScriptStructure,
@@ -30,7 +29,9 @@ import {
   segmentTitles,
   stackSummary,
   type Draft,
+  scriptGradient,
 } from './model';
+import { useDragSort } from './useDragSort';
 import { useFlip } from './useFlip';
 import { usePreview } from './usePreview';
 
@@ -62,9 +63,6 @@ const SAVE_PROBLEMS: Record<Exclude<SaveResult['kind'], 'saved' | 'invalid'>, st
 /** Where the stack, the card and the sheet stand one under the other (`structures.css`). */
 const NARROW = '(max-width: 860px)';
 
-const gradient = (color: ScriptColor): string =>
-  `linear-gradient(135deg, ${color.primary}, ${color.secondary} 55%, ${color.accent})`;
-
 /**
  * The workshop of one structure (SC-01 lot c, ADR 0056 and 0064): its name, its moment, its colour, its stack of stages
  * and bridges, and beside it the card of the segment being written, drawn by the server as the creator will get it.
@@ -82,6 +80,8 @@ export function Workshop({
   const id = useId();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(start.draft);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [saved, setSaved] = useState<Draft>(start.draft);
   const [basedOn, setBasedOn] = useState(start.basedOnVersion);
   const [frozen, setFrozen] = useState(start.frozen);
@@ -108,6 +108,13 @@ export function Workshop({
 
   const issues = useMemo(() => issuesOf(draft), [draft]);
   useFlip(flowRef, draft.segments.map((segment) => segment.key).join(' '));
+  const sort = useDragSort(flowRef, (key, delta) => {
+    const at = draftRef.current.segments.findIndex((segment) => segment.key === key);
+    if (at === -1) return;
+    const next = move(draftRef.current.segments, at, delta);
+    draftRef.current = { ...draftRef.current, segments: next };
+    segments(next, key);
+  });
   const titles = useMemo(() => segmentTitles(draft.segments), [draft.segments]);
   const index = Math.max(
     0,
@@ -214,7 +221,11 @@ export function Workshop({
         <button type="button" className="nv-btn nv-btn--plain nv-btn--sm st-bar__back" onClick={onClose}>
           ← Structures
         </button>
-        <span className="st-bar__chip" style={{ background: gradient(draft.color) }} aria-hidden="true" />
+        <span
+          className="st-bar__chip"
+          style={{ background: scriptGradient(draft.color) }}
+          aria-hidden="true"
+        />
         <label className="sr-only" htmlFor={`${id}-name`}>
           Nom de la structure
         </label>
@@ -303,7 +314,7 @@ export function Workshop({
                 aria-checked={!customColor && presetOf(draft.color) === preset.key}
                 title={preset.name}
                 aria-label={preset.name}
-                style={{ background: gradient(preset.color) }}
+                style={{ background: scriptGradient(preset.color) }}
                 onClick={() => {
                   setCustomColor(false);
                   edit({ color: preset.color });
@@ -315,7 +326,7 @@ export function Workshop({
             <div className="st-free">
               <span
                 className="st-free__bar"
-                style={{ background: gradient(draft.color) }}
+                style={{ background: scriptGradient(draft.color) }}
                 aria-hidden="true"
               />
               <div className="st-free__tones">
@@ -381,11 +392,19 @@ export function Workshop({
                   <li
                     className="st-flow__item nv-enter"
                     data-flip={segment.key}
+                    data-sort={segment.key}
+                    data-dragging={sort.dragging === segment.key}
                     data-kind={segment.kind}
                     data-current={here}
-                    style={{ '--nv-i': Math.min(at, 12) }}
+                    style={{ '--nv-i': Math.min(at, 12), ...sort.styleOf(segment.key) }}
+                    {...sort.press(segment.key)}
                   >
-                    <span className="st-flow__rail" aria-hidden="true">
+                    <span
+                      className="st-flow__rail"
+                      aria-hidden="true"
+                      title="Glisser pour déplacer"
+                      data-sort-handle=""
+                    >
                       <span className="st-flow__node">{segment.kind === 'stage' ? number : null}</span>
                     </span>
                     <div className="st-step">

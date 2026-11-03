@@ -479,6 +479,17 @@ export const ScriptQueueSchema = z.object({
 });
 export type ScriptQueue = z.infer<typeof ScriptQueueSchema>;
 
+/** `details` of `script_queue_disgust_unprocessable`: by structure, the stages that touch her limits. */
+export const ScriptQueueRefusalsSchema = z.object({
+  refusals: z.array(
+    z.object({ structureId: ScriptStructureIdSchema, blocks: z.array(ScriptDisgustBlockSchema) }),
+  ),
+});
+export type ScriptQueueRefusals = z.infer<typeof ScriptQueueRefusalsSchema>;
+
+/** `details` of `script_queue_structure_unprocessable`: unknown, archived or reserved for another creator. */
+export const ScriptQueueUnprocessableSchema = z.object({ structureIds: z.array(ScriptStructureIdSchema) });
+
 /** Codes of the `scripts` module's `DomainError`s. */
 export const SCRIPT_ERROR_CODES = [
   'script_structure_not_found',

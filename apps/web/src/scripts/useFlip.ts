@@ -11,7 +11,7 @@ export function useFlip(list: RefObject<HTMLElement | null>, order: string): voi
     const root = list.current;
     if (root === null) return;
     const items = [...root.querySelectorAll<HTMLElement>('[data-flip]')];
-    const now = new Map(items.map((item) => [item.dataset['flip'] ?? '', item.getBoundingClientRect().top]));
+    const now = new Map(items.map((item) => [item.dataset['flip'] ?? '', item.offsetTop]));
     const still =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -19,6 +19,8 @@ export function useFlip(list: RefObject<HTMLElement | null>, order: string): voi
       for (const item of items) {
         const was = before.current.get(item.dataset['flip'] ?? '');
         const is = now.get(item.dataset['flip'] ?? '');
+        // The row being dragged follows the pointer, it does not glide.
+        if (item.dataset['dragging'] === 'true') continue;
         if (was === undefined || is === undefined || Math.abs(was - is) < 1) continue;
         item.animate([{ transform: `translateY(${String(was - is)}px)` }, { transform: 'translateY(0)' }], {
           duration: 280,

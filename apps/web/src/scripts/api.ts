@@ -1,9 +1,15 @@
 import {
   ApiErrorSchema,
+  ScriptQueueRefusalsSchema,
+  ScriptQueueSchema,
+  ScriptQueueUnprocessableSchema,
   ScriptStarterListSchema,
   ScriptStructureListSchema,
   ScriptStructureSchema,
+  type CreatorId,
   type ScriptCardPreviewBody,
+  type ScriptQueue,
+  type ScriptQueueRefusals,
   type ScriptStarter,
   type ScriptStructure,
   type ScriptStructureBody,
@@ -110,4 +116,61 @@ export async function previewCard(body: ScriptCardPreviewBody, signal: AbortSign
   } catch {
     return null;
   }
+}
+
+export const queueKey = (creatorId: CreatorId): readonly unknown[] => [...structuresKey, 'queue', creatorId];
+
+/** Her queue as the server reads it today, each entry with what blocks it. */
+export function useQueue(creatorId: CreatorId): UseQueryResult<ScriptQueue> {
+  return useQuery({
+    queryKey: queueKey(creatorId),
+    queryFn: () =>
+      read(`/v1/creators/${encodeURIComponent(creatorId)}/script-queue`, (body) =>
+        ScriptQueueSchema.parse(body),
+      ),
+    retry: 1,
+  });
+}
+
+export type QueueSaveResult =
+  | { readonly kind: 'saved'; readonly queue: ScriptQueue }
+  /** A stage of these structures touches her limits: nothing written. */
+  | { readonly kind: 'blocked'; readonly refusals: ScriptQueueRefusals['refusals'] }
+  /** Unknown, archived, or kept for another creator: nothing written. */
+  | { readonly kind: 'unprocessable'; readonly structureIds: readonly ScriptStructureId[] }
+  | { readonly kind: 'expired' }
+  | { readonly kind: 'failed' };
+
+/** Her whole queue, in order, replaces the one stored; the same list sent again answers the same. */
+export async function saveQueue(
+  creatorId: CreatorId,
+  structureIds: readonly ScriptStructureId[],
+): Promise<QueueSaveResult> {
+  let response: Response;
+  try {
+    response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/script-queue`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ structureIds }),
+    });
+  } catch {
+    return { kind: 'failed' };
+  }
+  const body: unknown = await response.json().catch(() => null);
+  if (response.ok) {
+    const queue = ScriptQueueSchema.safeParse(body);
+    return queue.success ? { kind: 'saved', queue: queue.data } : { kind: 'failed' };
+  }
+  if (response.status === 401) return { kind: 'expired' };
+  const error = ApiErrorSchema.safeParse(body);
+  if (error.data?.error.code === 'script_queue_disgust_unprocessable') {
+    const details = ScriptQueueRefusalsSchema.safeParse(error.data.error.details);
+    if (details.success) return { kind: 'blocked', refusals: details.data.refusals };
+  }
+  if (error.data?.error.code === 'script_queue_structure_unprocessable') {
+    const details = ScriptQueueUnprocessableSchema.safeParse(error.data.error.details);
+    if (details.success) return { kind: 'unprocessable', structureIds: details.data.structureIds };
+  }
+  return { kind: 'failed' };
 }
