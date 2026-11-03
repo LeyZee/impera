@@ -13,10 +13,10 @@ export const MEMBER_PALETTE = [
   { hex: '#058f41', name: 'Émeraude' },
   { hex: '#0a775a', name: 'Menthe' },
   { hex: '#028b81', name: 'Sarcelle' },
-  { hex: '#09747c', name: 'Cyan' },
+  { hex: '#09747c', name: 'Pétrole' },
   { hex: '#0987a6', name: 'Azur' },
-  { hex: '#0a6fa3', name: 'Bleu' },
-  { hex: '#227ae4', name: 'Indigo' },
+  { hex: '#0a6fa3', name: 'Acier' },
+  { hex: '#227ae4', name: 'Bleu' },
   { hex: '#ae4ab0', name: 'Orchidée' },
   { hex: '#b33787', name: 'Framboise' },
 ] as const;

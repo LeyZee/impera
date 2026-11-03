@@ -98,7 +98,7 @@ describe('MEMBER_PALETTE', () => {
   );
 
   it('names a palette colour, whatever its case, and nothing for one saved before the palette', () => {
-    expect(shadeOf('#0A6FA3')?.name).toBe('Bleu');
+    expect(shadeOf('#0A6FA3')?.name).toBe('Acier');
     expect(shadeOf('#c2410c')).toBeNull();
     expect(shadeOf(null)).toBeNull();
   });

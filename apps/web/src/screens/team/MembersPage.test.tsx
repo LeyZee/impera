@@ -486,9 +486,9 @@ describe('changing a member once added (EQ-10)', () => {
     expect(shades).toHaveLength(12);
     expect(shades.some((shade) => isChecked(shade))).toBe(false);
     expect(within(group).getByText('Aucune pour l’instant.')).toBeDefined();
-    fireEvent.click(within(group).getByRole('radio', { name: 'Bleu' }));
-    expect(isChecked(within(group).getByRole('radio', { name: 'Bleu' }))).toBe(true);
-    expect(within(group).getByText('Bleu')).toBeDefined();
+    fireEvent.click(within(group).getByRole('radio', { name: 'Acier' }));
+    expect(isChecked(within(group).getByRole('radio', { name: 'Acier' }))).toBe(true);
+    expect(within(group).getByText('Acier')).toBeDefined();
     fireEvent.click(within(panel).getByRole('button', { name: 'Enregistrer' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
