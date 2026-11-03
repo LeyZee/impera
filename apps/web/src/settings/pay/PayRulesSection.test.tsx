@@ -327,4 +327,48 @@ describe('Réglages › Règles de paie', () => {
       'Ce compte a déjà des règles à partir de cette quinzaine.',
     );
   });
+
+  it('says why « Ventes relevées » is refused, by the reason the server gives', async () => {
+    answer = {
+      status: 409,
+      body: {
+        error: {
+          code: 'pay_rules_source_conflict',
+          message: 'x',
+          details: { reason: 'check_not_clean' },
+          requestId: 'r',
+        },
+      },
+    };
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Nouvelles règles' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nouvelles règles de paie' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toBe(
+      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, avec l’export, où tout concorde et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+    );
+  });
+
+  it('says the refusal by its code when the reason is one the screen does not know', async () => {
+    answer = {
+      status: 409,
+      body: {
+        error: {
+          code: 'pay_rules_source_conflict',
+          message: 'x',
+          details: { reason: 'something_new' },
+          requestId: 'r',
+        },
+      },
+    };
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Nouvelles règles' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nouvelles règles de paie' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toBe(
+      'Ce compte ne peut pas encore être payé sur le net de sa plateforme : sa paie se lit dans les rapports validés.',
+    );
+  });
 });

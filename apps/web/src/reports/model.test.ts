@@ -1,4 +1,5 @@
 import {
+  PAY_RULES_SOURCE_REFUSALS,
   PayPeriodSchema,
   ShiftReportSchema,
   ShiftSchema,
@@ -21,7 +22,10 @@ import {
   periodLine,
   periodSums,
   periodTitle,
+  refusalText,
+  REPORT_ERRORS,
   signedAmountText,
+  SOURCE_REFUSAL_TEXTS,
   startablePeriods,
   toDoOf,
   validatedTotal,
@@ -228,5 +232,34 @@ describe('a late report (EQ-14, EQ-21)', () => {
 
   it('calls a report sent and not yet read « En attente », as the figure above it does', () => {
     expect(MEMBER_STATUS.submitted).toBe('En attente');
+  });
+});
+
+describe('a refused « Ventes relevées » (CRM-03, ADR 0050 § 8)', () => {
+  const refused = (code: 'pay_rules_source_conflict' | 'pay_rules_conflict', sourceReason: string | null) => {
+    const reason = PAY_RULES_SOURCE_REFUSALS.find((known) => known === sourceReason) ?? null;
+    return { kind: 'refused', code, shiftReportId: null, opensAt: null, sourceReason: reason } as const;
+  };
+
+  it('says the exact reason the server gives, and where it is set', () => {
+    expect(refusalText(refused('pay_rules_source_conflict', 'model_unlinked'))).toBe(
+      SOURCE_REFUSAL_TEXTS.model_unlinked,
+    );
+    expect(SOURCE_REFUSAL_TEXTS.model_unlinked).toMatch(/Réglages › Ventes/u);
+    expect(SOURCE_REFUSAL_TEXTS.check_missing).toMatch(/vérification de fiabilité/u);
+  });
+
+  it('falls back on the code when the server gives no reason', () => {
+    expect(refusalText(refused('pay_rules_source_conflict', null))).toBe(
+      REPORT_ERRORS.pay_rules_source_conflict,
+    );
+    expect(refusalText(refused('pay_rules_conflict', null))).toBe(REPORT_ERRORS.pay_rules_conflict);
+  });
+
+  it('names no platform, no amount and no key, and no longer says the sales are not read', () => {
+    for (const text of [...Object.values(SOURCE_REFUSAL_TEXTS), REPORT_ERRORS.pay_rules_source_conflict]) {
+      expect(text).not.toMatch(/reveal|€|\$|\d|clé/iu);
+      expect(text).not.toMatch(/pas encore relevées/u);
+    }
   });
 });
