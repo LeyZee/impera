@@ -3,6 +3,13 @@ import { useEffect, useId, useRef, useState, type JSX } from 'react';
 import { confirmIdentity, type ConfirmResult } from './api';
 
 import { CodeInput } from '@/auth/CodeInput';
+import {
+  canUsePasskeys,
+  confirmWithPasskey,
+  fetchPasskeys,
+  gestureName,
+  type PasskeyConfirmResult,
+} from '@/auth/passkeys';
 import './services.css';
 
 const MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
@@ -10,6 +17,12 @@ const MESSAGES: Record<Exclude<ConfirmResult, 'ok'>, string> = {
   too_many_attempts: 'Trop d’essais. Attends une minute avant de réessayer.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   session_expired: 'Ta session a expiré. Reconnecte-toi.',
+};
+
+const PASSKEY_MESSAGES: Partial<Record<PasskeyConfirmResult, string>> = {
+  refused: 'Ce geste n’a pas été reconnu. Réessaie, ou donne ton mot de passe et ton code.',
+  too_many_attempts: MESSAGES.too_many_attempts,
+  unavailable: MESSAGES.unavailable,
 };
 
 /** The way out of an expired session: reloading the page lands on the sign-in. */
@@ -31,7 +44,8 @@ export function SignInAgain(): JSX.Element {
  * Asks for the password and a code again before a key is connected, replaced or removed (ADR 0016, ADR 0046 § 3: they
  * were not given in the last 10 minutes on this session). Confirmed, the caller runs its action again; « Annuler » or
  * Escape gives up the action, except while they are being checked. The page shows one prompt at a time: the Services
- * section closes a row's prompt before it opens a sheet.
+ * section closes a row's prompt before it opens a sheet. An account that holds a passkey may confirm with a fresh
+ * gesture instead (ADR 0053 § 4), except where `passkey` is false: adding a key asks for the password and the code.
  */
 export function PasswordPrompt({
   onConfirmed,
@@ -39,6 +53,7 @@ export function PasswordPrompt({
   onBusyChange,
   lead = 'Pour toucher à une clé, confirme ton mot de passe et ton code.',
   note,
+  passkey = true,
 }: {
   onConfirmed: () => void;
   onCancel: () => void;
@@ -48,6 +63,11 @@ export function PasswordPrompt({
   lead?: string;
   /** One more line under the lead (« Ta clé est gardée… »). */
   note?: string;
+  /**
+   * Whether a passkey gesture may confirm too: false where only the password and the code count (adding a key), or
+   * the key being removed, which only another key may confirm.
+   */
+  passkey?: boolean | { readonly excluding: string };
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
   const codeInput = useRef<HTMLInputElement>(null);
@@ -56,9 +76,43 @@ export function PasswordPrompt({
   const [isBusy, setIsBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<ConfirmResult, 'ok'> | null>(null);
 
+  const [hasPasskey, setHasPasskey] = useState(false);
+  const excluding = typeof passkey === 'object' ? passkey.excluding : undefined;
+  const allowsPasskey = passkey !== false;
+  const [passkeyNote, setPasskeyNote] = useState<string | null>(null);
+
   useEffect(() => {
     input.current?.focus();
   }, []);
+
+  // The gesture is offered only to an account that holds a key, on a browser that can make it.
+  useEffect(() => {
+    if (!allowsPasskey || !canUsePasskeys()) return;
+    let isCurrent = true;
+    void fetchPasskeys().then((keys) => {
+      if (isCurrent) setHasPasskey(keys?.some((key) => key.id !== excluding) === true);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [allowsPasskey, excluding]);
+
+  async function confirmByGesture(): Promise<void> {
+    setIsBusy(true);
+    onBusyChange?.(true);
+    setFailure(null);
+    setPasskeyNote(null);
+    const result = await confirmWithPasskey(excluding).catch((): PasskeyConfirmResult => 'unavailable');
+    setIsBusy(false);
+    onBusyChange?.(false);
+    if (result === 'ok') {
+      onConfirmed();
+      return;
+    }
+    if (result === 'session_expired') setFailure('session_expired');
+    else if (result === 'no_passkey') setHasPasskey(false);
+    else setPasskeyNote(PASSKEY_MESSAGES[result] ?? null);
+  }
 
   async function confirm(password: string, code: string): Promise<void> {
     if (password === '') return;
@@ -68,6 +122,7 @@ export function PasswordPrompt({
     }
     setIsBusy(true);
     onBusyChange?.(true);
+    setPasskeyNote(null);
     const result = await confirmIdentity(password, code).catch(() => 'unavailable' as const);
     setIsBusy(false);
     onBusyChange?.(false);
@@ -128,13 +183,23 @@ export function PasswordPrompt({
           Annuler
         </button>
       </form>
+      {hasPasskey && !isExpired ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm sv-self-start"
+          disabled={isBusy}
+          onClick={() => void confirmByGesture()}
+        >
+          Confirmer avec {gestureName()}
+        </button>
+      ) : null}
       <p
         id="sv-reauth-msg"
         className="sv-msg"
-        data-kind={failure === null ? 'none' : 'error'}
+        data-kind={failure === null && passkeyNote === null ? 'none' : 'error'}
         aria-live="polite"
       >
-        {failure === null ? null : MESSAGES[failure]}
+        {failure === null ? passkeyNote : MESSAGES[failure]}
       </p>
       {isExpired ? <SignInAgain /> : null}
     </div>

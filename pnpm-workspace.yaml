@@ -7,6 +7,19 @@ packages:
 overrides:
   # eslint-plugin-boundaries pins handlebars 4.7.9 (GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f, ...). 4.7.10 is a patch release.
   handlebars: 4.7.10
+  # Quarantine (14 days) for the passkey plugin's tree (ADR 0053): @simplewebauthn/server takes ^2.6 of these, whose
+  # 2.11.1 is from 25/10/2026; 2.11.0 (12/10) has passed it. Remove once 2.11.1 is 14 days old.
+  '@peculiar/asn1-android': 2.11.0
+  '@peculiar/asn1-cms': 2.11.0
+  '@peculiar/asn1-csr': 2.11.0
+  '@peculiar/asn1-ecc': 2.11.0
+  '@peculiar/asn1-pfx': 2.11.0
+  '@peculiar/asn1-pkcs8': 2.11.0
+  '@peculiar/asn1-pkcs9': 2.11.0
+  '@peculiar/asn1-rsa': 2.11.0
+  '@peculiar/asn1-schema': 2.11.0
+  '@peculiar/asn1-x509': 2.11.0
+  '@peculiar/asn1-x509-attr': 2.11.0
 
 auditConfig:
   ignoreGhsas:

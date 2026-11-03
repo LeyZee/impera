@@ -266,6 +266,7 @@ async function redeemLinkUnscoped(
         purpose: InvitationLinkPurposeSchema.parse(link.purpose),
         sessionsEnded: reset.sessions,
         trustedDevicesEnded: reset.trustedDevices,
+        passkeysRemoved: reset.passkeys,
         secondFactorReset: reset.hadSecondFactor,
       },
     });

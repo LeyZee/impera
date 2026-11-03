@@ -63,10 +63,14 @@ export function alertOwnerSignIn(adminDb: Database, userId: string, ip: string |
   });
 }
 
-/** The refusals counted for an alert: a password at sign-in, a code, a confirmation before a sensitive action. */
+/**
+ * The refusals counted for an alert: a password at sign-in, a code, a passkey the server refused at sign-in (ADR 0053
+ * § 6), a confirmation before a sensitive action (password and code, or a gesture).
+ */
 const REFUSAL_ACTIONS = [
   'auth.sign_in_refused',
   'auth.code_refused',
+  'auth.passkey_refused',
   'auth.reauthentication_refused',
 ] as const;
 export type RefusalAction = (typeof REFUSAL_ACTIONS)[number];

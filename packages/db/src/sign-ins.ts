@@ -1,7 +1,7 @@
 import { and, eq, like, ne } from 'drizzle-orm';
 
 import type { Transaction } from './client';
-import { session, twoFactor, user, verification } from './schema/auth';
+import { passkey, session, twoFactor, user, verification } from './schema/auth';
 
 /**
  * Better Auth's `two-factor` plugin keeps each trusted device (ADR 0046 § 3) as a `verification` row whose identifier
@@ -37,9 +37,20 @@ export async function revokeSignIns(
 }
 
 /**
+ * Removes every passkey of an account (ADR 0053 § 5): a reset of its second factor, a reset link (EQ-10), a departure
+ * (EQ-14), the owner's « Retirer ses clés ». Never closing sessions: that is another gesture, a stolen session is
+ * closed without losing Face ID on one's own phone. In the caller's transaction; returns how many went.
+ */
+export async function removePasskeys(tx: Transaction, userId: string): Promise<number> {
+  const removed = await tx.delete(passkey).where(eq(passkey.userId, userId)).returning({ id: passkey.id });
+  return removed.length;
+}
+
+/**
  * Puts an account's second factor back to zero (ADR 0046 § 2): its secret and backup codes are erased and it signs in
- * again with its password alone, straight onto the activation of a new code. Signs it out everywhere first. Run by a
- * reset link (EQ-10) and by `ops:reset-second-factor`, in the caller's transaction.
+ * again with its password alone, straight onto the activation of a new code. Signs it out everywhere first, and its
+ * passkeys go too (ADR 0053 § 5): a key is never older than the code it was added under. Run by a reset link (EQ-10)
+ * and by `ops:reset-second-factor`, in the caller's transaction.
  */
 export async function resetSecondFactor(
   tx: Transaction,
@@ -48,12 +59,14 @@ export async function resetSecondFactor(
   readonly sessions: number;
   readonly trustedDevices: number;
   readonly hadSecondFactor: boolean;
+  readonly passkeys: number;
 }> {
   const revoked = await revokeSignIns(tx, userId);
+  const passkeys = await removePasskeys(tx, userId);
   const erased = await tx
     .delete(twoFactor)
     .where(eq(twoFactor.userId, userId))
     .returning({ id: twoFactor.id });
   await tx.update(user).set({ twoFactorEnabled: false }).where(eq(user.id, userId));
-  return { ...revoked, hadSecondFactor: erased.length > 0 };
+  return { ...revoked, hadSecondFactor: erased.length > 0, passkeys };
 }

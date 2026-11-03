@@ -31,3 +31,16 @@ export function closedText(sessions: number, trustedDevices: number): string {
   if (trustedDevices === 0) return `${closed}.`;
   return `${closed}, et ${String(trustedDevices)} appareil${trustedDevices === 1 ? '' : 's'} de confiance oublié${trustedDevices === 1 ? '' : 's'}.`;
 }
+
+/** « 1 clé d’accès », « 2 clés d’accès », « Aucune clé d’accès ». */
+export function passkeysText(count: number): string {
+  if (count === 0) return 'Aucune clé d’accès';
+  return `${String(count)}\u00a0clé${count === 1 ? '' : 's'} d’accès`;
+}
+
+/** « 2 nov. 2026 », « 1er nov. 2026 »: the day a key was added. */
+export function dayText(at: string): string {
+  const text = new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  // « 1er nov. 2026 », never « 1 nov. »
+  return text.replace(/^1 /u, '1er ');
+}

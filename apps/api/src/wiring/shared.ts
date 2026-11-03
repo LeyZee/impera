@@ -11,9 +11,14 @@ import type { Logger } from '../logger';
 /**
  * Jobs of the contracts that no worker task takes yet (operations.md: Graphile keeps them queued, the Dashboard counts
  * them as stuck). Every other job must have its task: `composition-root.ts` types the merged list on the rest, so a
- * task forgotten for a job added to `JOB_NAMES` does not compile.
+ * task forgotten for a job added to `JOB_NAMES` does not compile, and `__tests__/architecture.test.ts` finds each other
+ * job's task written once, in one wiring file.
  */
-type JobWithoutTask = Extract<JobName, 'fans.refresh_summary' | 'media.describe'>;
+export const JOBS_WITHOUT_TASK = [
+  'fans.refresh_summary',
+  'media.describe',
+] as const satisfies readonly JobName[];
+type JobWithoutTask = (typeof JOBS_WITHOUT_TASK)[number];
 export type JobWithTask = Exclude<JobName, JobWithoutTask>;
 
 /** The tasks a wiring file registers: the jobs named after its module, each exactly once (ADR 0047 § 3). */
