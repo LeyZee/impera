@@ -11,6 +11,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   botLine,
+  minimumFromText,
+  minimumText,
+  saleSettingsOf,
+  withSaleSettings,
+  withoutOwnSaleSettings,
   chatChoices,
   chatLine,
   coverOf,
@@ -308,5 +313,40 @@ describe('the sheet', () => {
     expect(initials('🔥 Ventes')).toBe('🔥');
     expect(initials('💰 Ventes')).toBe('💰');
     expect(initials('')).toBe('?');
+  });
+});
+
+describe('sales settings (CRM-04)', () => {
+  const her = CreatorIdSchema.parse('01900000-0000-7000-8000-0000000000c1');
+  const forAll = { creatorId: null, minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+
+  it('shows hers, else the ones for all, else every sale', () => {
+    expect(saleSettingsOf([], 'all')).toEqual({
+      settings: { minimumMinor: 0, agentOnly: false, eveningDigest: true },
+      isOwn: true,
+    });
+    expect(saleSettingsOf([forAll], her)).toEqual({
+      settings: { minimumMinor: 2000, agentOnly: false, eveningDigest: true },
+      isOwn: false,
+    });
+    const hers = { creatorId: her, minimumMinor: 0, agentOnly: true, eveningDigest: false };
+    expect(saleSettingsOf([forAll, hers], her)).toMatchObject({ isOwn: true, settings: { agentOnly: true } });
+    expect(withoutOwnSaleSettings([forAll, hers], her)).toEqual([forAll]);
+    expect(
+      withSaleSettings([forAll], her, { minimumMinor: 500, agentOnly: false, eveningDigest: true }),
+    ).toEqual([forAll, { creatorId: her, minimumMinor: 500, agentOnly: false, eveningDigest: true }]);
+  });
+
+  it('reads the minimum typed in euros, and writes it back', () => {
+    expect(minimumFromText('')).toBe(0);
+    expect(minimumFromText('20')).toBe(2000);
+    expect(minimumFromText(' 19,9 € ')).toBe(1990);
+    expect(minimumFromText('1 234,56')).toBe(123456);
+    expect(minimumFromText('vingt')).toBeNull();
+    expect(minimumFromText('10000')).toBeNull();
+    expect(minimumFromText('1,234')).toBeNull();
+    expect(minimumText(0)).toBe('');
+    expect(minimumText(2000)).toBe('20');
+    expect(minimumText(1990)).toBe('19,90');
   });
 });

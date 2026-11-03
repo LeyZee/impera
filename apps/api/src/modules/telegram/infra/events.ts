@@ -123,6 +123,7 @@ const InvoiceDueSchema = EVENT_PAYLOADS.invoice_due_soon.pick({
 // in Nirvana, and the payload never holds the fan.
 const SaleDetectedSchema = EVENT_PAYLOADS.sale_detected.pick({
   saleType: true,
+  occurredAt: true,
   currency: true,
   grossInclVatMinor: true,
   seller: true,
@@ -240,7 +241,7 @@ function signalOf(type: string, payload: unknown): Signal | null {
     case 'sale_detected': {
       const parsed = SaleDetectedSchema.safeParse(payload);
       if (!parsed.success) return null;
-      return { kind: 'sale', ...parsed.data };
+      return { kind: 'sale', ...parsed.data, occurredAt: new Date(parsed.data.occurredAt) };
     }
     case 'automatic_closed': {
       const parsed = AutomaticClosedSchema.safeParse(payload);

@@ -145,10 +145,12 @@ export type Signal =
   | {
       /**
        * A fresh sale read in a platform's register (CRM-04 lot b): its kind, the price the fan paid (VAT included, the
-       * figure the team sees in the platform) and who sold it. Never the fan, never the sale's key.
+       * figure the team sees in the platform), when it happened (its day picks the rate of a dollar sale against the
+       * minimum) and who sold it. Never the fan, never the sale's key.
        */
       readonly kind: 'sale';
       readonly saleType: SaleType;
+      readonly occurredAt: Date;
       readonly currency: Currency;
       readonly grossInclVatMinor: number;
       readonly seller: SaleSeller;

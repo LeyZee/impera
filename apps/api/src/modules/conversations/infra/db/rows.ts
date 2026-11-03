@@ -150,7 +150,10 @@ const KeyCursorSchema = z.tuple([z.iso.datetime(), z.uuid()]);
 
 /** A timestamptz column as the exact ISO instant, microseconds included (a `Date` keeps only milliseconds). */
 export function cursorInstant(
-  column: typeof schema.conversations.updatedAt | typeof schema.messages.platformCreatedAt,
+  column:
+    | typeof schema.conversations.updatedAt
+    | typeof schema.messages.platformCreatedAt
+    | typeof schema.fans.lastSeenAt,
 ): ReturnType<typeof sql<string>> {
   return sql<string>`to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 }

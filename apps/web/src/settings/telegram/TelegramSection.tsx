@@ -16,6 +16,7 @@ import { ReauthRequired } from '../services/api';
 import { BotSheet, type SheetMode } from './BotSheet';
 import { GroupPreview, PreviewMessage } from './Preview';
 import { Reauth } from './Reauth';
+import { SalesSettings } from './SalesSettings';
 import {
   TelegramForbidden,
   TelegramOff,
@@ -782,32 +783,33 @@ function Coming({ children }: { children: string }): JSX.Element {
 function SalesTab({ scope, onScope, ...routing }: ScopedProps): JSX.Element {
   return (
     <>
-      <Coming>
-        Les ventes arrivent avec la connexion à Reveal : Nirvana annoncera chaque vente dès que Reveal
-        confirme le paiement. Tu peux déjà choisir le groupe.
-      </Coming>
       <section>
         <p className="tg-eyebrow">Annoncer les ventes</p>
         <ScopePicker overview={routing.overview} scope={scope} onScope={onScope} />
         <RoutingList {...routing} topics={['sale']} scope={scope} />
+        <p className="tg-sales__who">
+          Ce groupe montre ce que vend chaque chatteur : réserve-le à toi et aux managers.
+        </p>
+      </section>
+      <section>
+        <p className="tg-eyebrow">Réglages des ventes</p>
+        <SalesSettings overview={routing.overview} scope={scope} />
       </section>
       <GroupPreview
         isOpen={routing.isExampleOpen}
         group="Ventes"
         heading="Sans son, sans le fan"
         points={[
-          'Le montant, le pack, qui a vendu. Jamais le pseudo du fan.',
-          'Une vente n’est annoncée qu’une fois le paiement confirmé par Reveal.',
+          'Le type de vente, le prix payé par le fan et qui a vendu. Jamais le pseudo du fan.',
+          'Une vente est annoncée dès que la plateforme l’enregistre, une seule fois.',
           'Les ventes arrivent sans son : elles ne réveillent personne la nuit.',
-          'Un groupe à part évite de noyer les alertes.',
+          'Le bilan du soir donne les chiffres du jour à 23 h.',
         ]}
       >
         <PreviewMessage from="Nirvana Ventes" time="22:47" isSilent>
-          💰 <b>Vente · Créatrice · 45,00 €</b>
+          💰 <b>Vente · Créatrice</b>
           <br />
-          Pack « Soirée » payé, vendu par l’agent.
-          <br />
-          <span className="tg-msg__link">Voir la conversation</span>
+          PPV · 45,00 € · vendue par l’agent
         </PreviewMessage>
       </GroupPreview>
     </>
