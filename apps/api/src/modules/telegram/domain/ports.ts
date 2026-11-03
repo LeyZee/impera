@@ -1,5 +1,8 @@
 import type {
   CreatorId,
+  SalesFeedReading,
+  SalesRefunds,
+  SalesTotals,
   TelegramBotId,
   TelegramBotState,
   TelegramChatId,
@@ -8,6 +11,7 @@ import type {
   TelegramErrorKind,
   TelegramMembership,
   TelegramRoute,
+  TelegramSaleSettingsEntry,
   TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -139,8 +143,39 @@ export interface BotsStore {
   listCreators(): Promise<readonly CreatorRecord[]>;
   /** The display name of a CRM user, for « Pris en main par … ». */
   userName(userId: string): Promise<string | null>;
+  /** The sales topic's settings (CRM-04 lot b), a row it cannot read left out (the defaults then apply). */
+  listSaleSettings(): Promise<readonly TelegramSaleSettingsEntry[]>;
+  /** Replaces the whole list, with an `audit_log` row by `userId`. */
+  replaceSaleSettings(entries: readonly TelegramSaleSettingsEntry[], userId: string): Promise<void>;
   /** The name the team shows for a member, for « vendue par … » (CRM-04 lot b); null for an unknown id. */
   memberName(memberId: string): Promise<string | null>;
+}
+
+/**
+ * One creator's sales totals of a day (CRM-04 lot b): `salesFeedTotals.totalsOf` of `connectors`, given by the
+ * composition root. The day is the sale's in the platform's zone, the rule every reader of the totals shares.
+ */
+/**
+ * The dollar rate of a sale (ADR 0033, `exchange_rates`): the newest of its day or before, the day read in the
+ * agency's zone, in euros per million dollars; `null` when there is none.
+ */
+export interface UsdRateReader {
+  onDayOf(occurredAt: Date): Promise<number | null>;
+}
+
+/**
+ * What the evening digest reads of a creator's day in `connectors`, in one transaction (CRM-04): the totals (each line
+ * on its sale's day), the refunds made that day (each on its own day, its sale's day said), and how far each register
+ * where one of her accounts is linked was read (ADR 0054). No reading: no register linked.
+ */
+export interface SalesDay {
+  readonly totals: SalesTotals;
+  readonly refunds: SalesRefunds;
+  readonly readings: readonly SalesFeedReading[];
+}
+
+export interface SalesDayReader {
+  dayOf(creatorId: CreatorId, day: string): Promise<SalesDay>;
 }
 
 interface ScanBatch {

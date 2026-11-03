@@ -1,5 +1,5 @@
 # CR-02 Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe
-Statut : in_progress, lot a (base) le 03/11/2026 ; restent l'invitation, les lectures et les écrans (ADR 0042 § 1 et § 2, acceptée par Charles le 02/11/2026)
+Statut : in_progress, lot a (base) et lot b1 (ses lectures) le 03/11/2026 ; restent Dashboard et Persona par sa porte, « qui est en poste », l'invitation et les écrans (ADR 0042 § 1 et § 2, acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0042)
 Dépend de : CR-01, ADR 0042, EQ-11
 Branche : task/cr-02-creator-access
@@ -13,7 +13,7 @@ La créatrice se connecte par une invitation et voit tout son compte (ventes, fa
 ## À faire
 - [ ] Invitation de la créatrice par le propriétaire depuis Créatrices : lien à usage unique, 72 h, rôle `creator` lié à sa fiche ; réutiliser le mécanisme d'invitation existant.
 - [ ] Rail de la créatrice (ADR 0042 § 8) : Aujourd'hui · Agenda · Ventes · Contenu · Moi, chaque onglet n'apparaissant qu'avec son écran (ADR 0024).
-- [ ] Lectures ouvertes au rôle `creator`, bornées à sa créatrice : fans (pseudo, dépenses, notes), conversations en lecture seule, qui est en poste (nom affiché et créneau). Aucune route d'écriture vers un fan.
+- [ ] Lectures ouvertes au rôle `creator`, bornées à sa créatrice : fans (pseudo, dépenses ; plus aucune note par fan, décision de Charles du 03/11, ADR à venir), conversations en lecture seule, qui est en poste (nom affiché et créneau). Aucune route d'écriture vers un fan.
 - [ ] Fermetures prouvées : `team_members`, relevés, factures, avoirs, versements, dossiers, retours de chatting (CR-10) restent illisibles pour elle.
 - [ ] Journal : chaque ouverture de conversation par la créatrice, comme pour un chatteur.
 - [ ] Moi : profil, préférences de notifications (CR-01), déconnexion de ses appareils.
@@ -41,8 +41,20 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 - Classement : toute table à `tenant_isolation` a une décision dans `CREATOR_DECISIONS` (`creator-account-rls.integration.test.ts`). Lecture seule : conversations, messages, fans, fan_facts, fan_summaries, media_descriptions, media_assets, media_sends, platform_accounts. Fermées : drafts, conversation_events, llm_calls, calibration_ratings, blind_tests, notifications, kill_switches, custom_alerts, alert_seen, system_alert_settings. Exceptions : persona_versions (elle y écrit aujourd'hui par `withTenant` ; décision au lot b avec Moi › Persona, ADR 0042 § 8), domain_events et platform_sales (fermées au lot d de CRM-04, migration 0081). Une table nouvelle sans décision fait échouer le test. Limite notée par Bilan : le test ne lit que les tables dont la politique s'appelle `tenant_isolation` ; une table sous `tenantOrGlobalPolicy` (`global_read`) ou sous une politique propre d'équipe y échappe (les tables d'équipe restent fermées par `app.team_scope`, jamais posé pour elle). Le jour où une table « tenant ou globale » porte quelque chose de sensible, élargir le filtre à toute politique qui lit `app.creator_id`.
 - Restent : ses trois écritures permises (avec CR-06) ; les routes existantes ouvertes à la créatrice (Dashboard, Persona) passent encore par `withTenant`, sans `app.account_role` : elles passent à `withCreatorAccount` au lot b, avec l'invitation, les lectures et la réponse `strict` sans auteur.
 
+### 03/11/2026, lot b1 (ses lectures)
+- Routes `/v1/creator-space` (rôle `creator` seul) par `withCreatorAccount` : `fans` (pseudo, ce qu'il a payé par devise, premier et dernier passage, sa conversation), `conversations/:id` (son fan, par son pseudo) et `conversations/:id/messages` (sens, texte, médias, prix, jamais l'auteur ni le brouillon). Contrats `strict` dans `packages/contracts/src/creator-space.ts`.
+- Chaque ouverture d'une conversation est écrite dans `audit_log` (`conversation.open`, `details.by = 'creator'`), dans la transaction de la lecture.
+- Notes par fan : **aucune**. Bilan avait demandé de ne rendre que les faits `declared` (ni `operator_note`, ni `inferred`, ni `commercial`) ; Charles a tranché plus loin le 03/11 (11h40 et 11h50) : elle ne voit aucune note de ses fans, « c'est des secrets d'agence, c'est les méthodes des agences », seulement des chiffres agrégés sur sa base (lot futur ci-dessous). L'ADR 0042 § 2 disait « ses fans (pseudo, dépenses, notes) » : une ADR d'amendement le change (phrases soumises à Charles avant fusion). La réponse ne porte plus de champ `notes`, et un `notes` ajouté fait échouer le contrat `strict`. Ce qu'un fan a payé est le prix TTC des messages débloqués, pas ses gains (`modelRevenue`, ADR 0054) : l'écran le nommera ainsi au lot c.
+- Les descriptions de médias passent par le module `media`, borné à la créatrice que son compte nomme (lue par `withCreatorAccount`), jamais à une créatrice de la requête.
+- Restent : lot b2 (Dashboard et Persona par sa porte, décision `persona_versions`, « qui est en poste » par une vue qui ne rend que le nom affiché et le créneau, ADR 0023) ; lot b3 (invitation, migration) ; lot c (écrans).
+
 ### 03/11/2026, lot b3 (invitation)
 - Migration 0089 : `invitation_links.member_id` devient facultatif et `user_id` (compte visé directement) arrive, avec `invitation_links_target_check` (exactement l'un des deux) et un index unique du lien vivant par compte. Rien n'est supprimé (expand).
 - `POST /v1/creators/:creatorId/invitation-link` (propriétaire, connexion récente) : `invitation` avec son e-mail crée son compte la première fois (rôle `creator`, cette créatrice seule, son nom de créatrice), puis un lien de 72 h qui remplace le précédent ; un compte déjà fait garde son e-mail (un autre répond 409 `creator_account_conflict`) ; un e-mail d'un autre compte répond 409 `account_email_conflict` ; `reset` exige son compte (404 `creator_account_not_found`). Création du compte et liens au journal d'audit.
 - `inspect` et `redeem` servent les deux sortes de liens : le compte visé est celui du membre ou le `user_id` du lien. L'aperçu d'une créatrice porte son nom de créatrice et `country: null` ; la page Bienvenue dit « Ton espace créatrice » à la place du pays.
 - Reste : le bouton « Inviter » sur sa fiche (Créatrices) et l'état du lien, avec les écrans du lot c.
+
+### Lot futur : les insights de sa base de fans (demande de Charles, 03/11 11h40)
+- Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines », à la place de toute note par fan (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.
+- Garde-fous à tenir : agrégats seulement à partir des faits `declared` (ni `inferred`, ni `operator_note`, ni `commercial`) ; un pourcentage ne s'affiche qu'au-delà d'un seuil de fans par case, sinon « trop peu de fans » (pas de réidentification) ; calcul côté serveur, l'écran ne calcule rien.
+- Où ça rentre : un lot après le lot c de CR-02, sur l'onglet Ventes › Fans. Le seuil et les tranches sont des choix de produit : une ADR courte les fixe avant le code.

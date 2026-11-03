@@ -12,6 +12,7 @@ import {
   customType,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   unique,
@@ -156,3 +157,22 @@ export const telegramState = pgTable('telegram_state', {
   scanCursor: timestampTz('scan_cursor').notNull(),
   routesVersion: integer('routes_version').notNull().default(0),
 });
+
+/**
+ * A topic's settings (ADR 0020 §6), for one creator or for all of them (`creator_id` null), hers winning. Today only
+ * the sales topic (CRM-04 lot b): `settings` is `TelegramSaleSettingsSchema`, validated by the module on read and write.
+ */
+export const telegramSettings = pgTable(
+  'telegram_settings',
+  {
+    id: id(),
+    creatorId: uuid('creator_id').references(() => creators.id, { onDelete: 'cascade' }),
+    topic: enumText('topic').notNull(),
+    settings: jsonb('settings').notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('telegram_settings_unique').on(t.creatorId, t.topic).nullsNotDistinct(),
+    enumCheck('telegram_settings', t.topic, ['sale']),
+  ],
+);
