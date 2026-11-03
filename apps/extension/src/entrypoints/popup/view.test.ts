@@ -16,7 +16,7 @@ const ME: Me = {
   teamScope: 'owner',
 };
 
-const frame = { origin: 'http://localhost:5173', version: '0.0.0', hour: 20 };
+const frame = { origin: 'http://localhost:5173', version: '0.1.0', hour: 20 };
 
 function draw(screen: Screen): { root: HTMLElement; actions: Actions } {
   const actions: Actions = {

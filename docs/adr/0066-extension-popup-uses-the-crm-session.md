@@ -1,6 +1,6 @@
 # 0066. Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret
 
-Statut : accepted (Charles, 03/11/2026, 17 h 37, « ok 0066 » ; § 7 amendé pour l'aligner sur la liaison de VEI-01 : « ok phrases 0066 », 17 h 38 ; demande de Charles du 03/11/2026, 17 h 11 : « quand on clique dessus, […] il faut que ça fasse un joli design avec se connecter, etc. Enfin, vraiment que l'extension soit fonctionnelle »)
+Statut : accepted (Charles, 03/11/2026, 17 h 37, « ok 0066 » ; § 7 amendé pour l'aligner sur la liaison de VEI-01 : « ok phrases 0066 », 17 h 38 ; raccourcis du § 6 alignés sur le menu du CRM après la relecture d'Extension, à confirmer ; demande de Charles du 03/11/2026, 17 h 11 : « quand on clique dessus, […] il faut que ça fasse un joli design avec se connecter, etc. Enfin, vraiment que l'extension soit fonctionnelle »)
 Date : 2026-11-03
 Précise : l'ADR 0008 (rôle de l'extension) et l'ADR 0062 § 8 (identifiant de l'extension non empaquetée). Ne remplace rien.
 
@@ -24,7 +24,7 @@ Trois contraintes existent déjà :
 6. **Ce que montre le popup**, dans cet ordre :
    - en tête, le logo et « Impera », puis la personne connectée (initiales, nom, rôle : Propriétaire, Manager, Chatteur, Créatrice) ;
    - l'onglet ouvert : sur Reveal, une carte « Reveal » qui dit l'état de la capture de session ; sur Instagram, la place de la Veille (VEI-02, qui la remplira) ; ailleurs, rien ;
-   - des raccourcis vers le CRM selon le rôle (Aujourd'hui, Suivi, Créatrices, Planning, Réglages pour le propriétaire ; Aujourd'hui et Planning pour un chatteur ; l'espace créatrice pour une créatrice) ;
+   - au plus quatre raccourcis vers le CRM, pris dans le menu du CRM pour ce rôle, pour qu'un raccourci n'ouvre jamais un écran qui refuse (propriétaire : Dashboard, Suivi, Équipe, Créatrices ; manager : Dashboard, Suivi, Équipe, Paie ; chatteur : Aujourd'hui, Suivi, Planning, Commissions ; créatrice : Aujourd'hui, Ventes, Moi) ;
    - en pied, l'adresse du CRM et la version.
    Un CRM injoignable s'affiche en ambre avec l'adresse essayée et « Réessayer ». Rien n'est en rouge : le popup n'a pas d'urgence à montrer.
 7. **Lire n'est pas écrire.** La session du CRM ne sert qu'à savoir qui est là et ce que le popup propose. Ce que l'extension enverra à l'API (relevés de veille, capture Reveal) passe par la liaison par personne de VEI-01 (« Relier l'extension » dans le CRM : jeton haché, révocable, limité à ces envois), jamais par le cookie du CRM. Le popup montrera l'état de cette liaison quand elle existera. La capture Reveal n'est pas dans ce lot : sa carte dit « Bientôt » tant que P2 n'est pas livrée, et « Synchroniser » ne sera proposé qu'au propriétaire.
