@@ -34,6 +34,8 @@ const MODULE_DEPENDENCIES = {
   invoicing: ['payroll', 'contractors'],
   accounting: ['payroll', 'invoicing', 'contractors'],
   notifications: [],
+  // ADR 0060: the trend watch reads her limits as the agent's guards do (`touchesTerm`).
+  trends: ['agent'],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);
