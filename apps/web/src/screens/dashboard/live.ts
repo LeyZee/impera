@@ -104,7 +104,6 @@ const REPLY_SPAN: Readonly<Record<ApiDashboard['period'], string>> = {
 };
 
 function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): AgentState {
-  const forCreator = reader === 'creator';
   const { reveal, voice, jobs, replies, guards, budget, liveRate, todos } = api;
   // Never read once and not connected: no account was ever linked. A step to come, not an outage.
   const unlinked = !reveal.connected && reveal.lastReadAt === null;
@@ -143,7 +142,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         };
   const lastRead = reveal.lastReadAt === null ? null : ago(reveal.lastReadAt, now);
   const waitingLong = replies.fansWaitingOver10Min;
-  const dead = forCreator ? 0 : (jobs.dead ?? 0);
+  const dead = jobs.dead ?? 0;
   const cards: AgentState['cards'] = [
     {
       id: 'reveal',
@@ -170,16 +169,15 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       title: 'IA qui écrit les messages',
       value: voice.ok ? 'En service' : voice.keyMissing ? 'Clé manquante' : 'Ne répond plus',
       // Réglages is the owner's alone: anyone else of the team reads who sets the key, as the hero says it.
-      sub:
-        voice.keyMissing && !forCreator
-          ? reader === 'owner'
-            ? 'à poser dans Réglages › Modèles IA'
-            : 'posée par le propriétaire dans Réglages › Modèles IA'
-          : voice.medianWriteMs === null
-            ? 'temps pour écrire pas encore mesuré'
-            : `écrit en ${(voice.medianWriteMs / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} s`,
+      sub: voice.keyMissing
+        ? reader === 'owner'
+          ? 'à poser dans Réglages › Modèles IA'
+          : 'posée par le propriétaire dans Réglages › Modèles IA'
+        : voice.medianWriteMs === null
+          ? 'temps pour écrire pas encore mesuré'
+          : `écrit en ${(voice.medianWriteMs / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} s`,
       rows: [
-        ...(voice.keyMissing && !forCreator
+        ...(voice.keyMissing
           ? [
               reader === 'owner'
                 ? (['À poser dans', 'Réglages › Modèles IA'] as const)
@@ -218,19 +216,10 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       rows: [
         ['Conversations en cours', String(replies.conversationsOpen)],
         ['Fans qui attendent plus de 10 min', String(waitingLong)],
-        // The agency's work queue: a creator does not read it (ADR 0023).
-        ...(forCreator
-          ? []
-          : [
-              [
-                'Tâches bloquées',
-                jobs.dead === null
-                  ? 'pas lu'
-                  : jobs.dead === 0
-                    ? 'aucune'
-                    : `${String(jobs.dead)}, à regarder`,
-              ] as const,
-            ]),
+        [
+          'Tâches bloquées',
+          jobs.dead === null ? 'pas lu' : jobs.dead === 0 ? 'aucune' : `${String(jobs.dead)}, à regarder`,
+        ],
       ],
       alarm:
         waitingLong > 0
@@ -280,8 +269,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
   const summary = [
     `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : unlinked ? 'pas encore relié' : 'déconnecté'}`,
     plural(reveal.conversations, 'conversation', 'conversations'),
-    // The handoffs are the team's work: a creator reads the agent's state, not its relays (DASH-21).
-    ...(forCreator ? [] : [plural(relays, 'passage à l’humain', 'passages à l’humain')]),
+    plural(relays, 'passage à l’humain', 'passages à l’humain'),
     ...(dead > 0 ? [plural(dead, 'tâche bloquée', 'tâches bloquées')] : []),
     ...(spent === null ? [] : [`${euroCents(spent)} sur ${eur(budget.cap)}`]),
     // Said with what it measures and what it aims at: « pas encore mesuré » alone names nothing (DASH-16).
@@ -490,10 +478,10 @@ export function revealSalesOf(sales: ApiRevealSales): RevealSales {
 }
 
 /**
- * Who reads the Dashboard: the owner, who holds Réglages; the rest of the team; or the creator, who reads her agent's
- * state only (ADR 0023).
+ * Who reads the Dashboard: the owner, who holds Réglages, or the rest of the team. Never the creator, who has her own
+ * Aujourd'hui (ADR 0042 § 8).
  */
-export type DashboardReader = 'owner' | 'team' | 'creator';
+export type DashboardReader = 'owner' | 'team';
 
 /** The server's Dashboard as the screen draws it. `sales` is null: nothing is invented in its place. */
 export function fromApi(

@@ -20,4 +20,7 @@ services:
       retries: 10
 
 volumes:
+  # Named explicitly: a database created before the rename keeps its volume through IMPERA_PGDATA_VOLUME in .env
+  # (`docker volume ls` gives its name), a new install gets impera-pgdata (ADR 0062 § 3).
   impera-pgdata:
+    name: ${IMPERA_PGDATA_VOLUME:-impera-pgdata}

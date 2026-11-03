@@ -406,6 +406,34 @@ describe('reading the outbox', () => {
     expect(saleOf({ ...detected, seller: { kind: 'agent' } })).toMatchObject({ seller: { kind: 'agent' } });
     expect(saleOf({ ...detected, grossInclVatMinor: -100 })).toBeUndefined();
     expect(saleOf({ ...detected, seller: { kind: 'fan' } })).toBeUndefined();
+    // CRM-04 b3: the platform, the fortnight, how many days and accounts; never a net nor a difference.
+    const day = (on: string, account: string) => ({
+      day: on,
+      platformAccountId: account,
+      currency: 'EUR',
+      registerNetMinor: 10_000,
+      platformNetMinor: 9_000,
+      differenceMinor: 1_000,
+    });
+    const accountA = '018f3e5c-0000-7000-8000-0000000000a1';
+    const accountB = '018f3e5c-0000-7000-8000-0000000000a2';
+    const mismatch = toScannedEvent({
+      ...base,
+      type: 'sales_feed_mismatch',
+      payload: {
+        platform: 'reveal',
+        from: '2026-11-01',
+        to: '2026-11-15',
+        days: [day('2026-11-03', accountA), day('2026-11-03', accountB), day('2026-11-04', accountA)],
+      },
+    });
+    expect(mismatch?.signal).toEqual({
+      kind: 'sales_feed_mismatch',
+      platform: 'reveal',
+      from: '2026-11-01',
+      days: 2,
+      accounts: 2,
+    });
     // The voice version stays in Impera: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

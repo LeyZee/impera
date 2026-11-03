@@ -32,11 +32,11 @@ describe('forgetDevice', () => {
   });
 
   it('drops the copies of the app and the push subscription, and nothing that is not Impera’s', async () => {
-    const { deleted } = fakeCaches(['impera-shell-v1', 'impera-assets-v1', 'other-site']);
+    const { deleted } = fakeCaches(['impera-shell-v1', 'impera-assets-v1', 'nirvana-shell-v2', 'other-site']); // ADR 0062
     const unsubscribe = vi.fn(() => Promise.resolve(true));
     fakePush({ unsubscribe });
     await forgetDevice();
-    expect(deleted).toEqual(['impera-shell-v1', 'impera-assets-v1']);
+    expect(deleted).toEqual(['impera-shell-v1', 'impera-assets-v1', 'nirvana-shell-v2']); // ADR 0062
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 

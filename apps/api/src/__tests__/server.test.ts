@@ -305,6 +305,12 @@ describe('loadConfig', () => {
     expect(() => testConfig({ PORT: 'not-a-port' })).toThrow(/PORT/);
   });
 
+  it('stops on a variable still under the old name, and gives its new name', () => {
+    const old = 'NIRVANA_INLINE_WORKER'; // ADR 0062
+    expect(() => testConfig({ [old]: '1' })).toThrow(`${old} to IMPERA_INLINE_WORKER`);
+    expect(testConfig({ IMPERA_INLINE_WORKER: '1' }).IMPERA_INLINE_WORKER).toBe(true);
+  });
+
   it('names every missing required variable', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL[\s\S]*DATABASE_ADMIN_URL[\s\S]*WEB_ORIGIN/);
   });

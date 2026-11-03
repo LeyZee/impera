@@ -7,6 +7,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Créatrice, modèle | `creator` | Le tenant. Une personne dont on gère les comptes et les conversations. « Modèle » dans Imperium ; ici on dit créatrice. |
 | Compte plateforme | `platform_account` | Le compte d'une créatrice sur une plateforme (Reveal, OnlyFans, Impera). |
 | Plateforme | `platform` | Reveal, OnlyFans, Instagram, Impera (la nôtre). Valeur d'enum, jamais une logique dans le cœur. |
+| Impera | `impera` (paquets `@impera/*`, variables `IMPERA_*`, plateforme `'impera'`) | Le nom du produit, celui de l'agence IMPERA. « Nirvana » est son ancien nom, jusqu'au 03/11/2026 (ADR 0062) : il reste dans l'historique et dans quelques identifiants techniques que personne ne voit, les rôles Postgres `nirvana_app` et `nirvana_admin`, la version de moteur de paie `nirvana-N` et le suffixe des UID de l'agenda. |
 | Fan | `fan` | Une personne qui écrit à la créatrice sur un compte plateforme. Identifié par `platform_fan_id`. |
 | Personne | `person` | (Plus tard) un même humain reconnu sur plusieurs plateformes. `fans.person_id` nullable. |
 | Conversation | `conversation` | Le fil 1:1 entre un fan et un compte plateforme. |
@@ -318,5 +319,6 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 - `model` pour désigner une créatrice (confusion avec modèle LLM) → `creator`.
 - `user` pour un fan → `fan`. `user` désigne un utilisateur du dashboard.
 - `bot` dans le code → `agent` ou le rôle précis.
+- « Nirvana » pour le produit (ADR 0062) → Impera.
 - `client` pour un fan (vocabulaire Imperium « relation client ») → `fan`.
 - « fiche de paie », « salaire », « sanction » pour un chatteur → relevé de commissions, commission, malus. Un chatteur est un prestataire.

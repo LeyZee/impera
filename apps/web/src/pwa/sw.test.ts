@@ -180,10 +180,11 @@ describe('service worker', () => {
   it('drops the copies of an older version when it takes over, and only on « Mettre à jour »', async () => {
     const worker = loadWorker((url) => Promise.resolve(ok(url)));
     worker.stored.set('impera-shell-v0', new Map());
+    worker.stored.set('nirvana-assets-v2', new Map()); // ADR 0062: a copy from before the rename goes too
     worker.stored.set('someone-else', new Map());
     await Promise.all(worker.fire('install', {}).work);
     await Promise.all(worker.fire('activate', {}).work);
-    expect([...worker.stored.keys()].sort()).toEqual(['impera-shell-v2', 'someone-else']);
+    expect([...worker.stored.keys()].sort()).toEqual(['impera-shell-v3', 'someone-else']);
     worker.fire('message', { data: { type: 'something' } });
     expect(worker.skipWaiting).not.toHaveBeenCalled();
     worker.fire('message', { data: { type: 'apply-update' } });
