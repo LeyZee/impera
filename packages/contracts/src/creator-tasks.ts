@@ -135,12 +135,11 @@ export const AvailabilityWhenSchema = z
       kind: z.literal('weekly'),
       weekday: IsoDaySchema,
       startMinute: MinuteOfDaySchema,
-      /** After `startMinute`, at most a day later: 22 h – 2 h ends at 26 × 60. */
-      endMinute: z
-        .number()
-        .int()
-        .min(1)
-        .max(2 * CREATOR_TASK_MAX_MINUTES - 1),
+      /**
+       * The convention of `scheduling` (`calendar.ts`): an end at or before the start is the next day's, 22 h – 2 h is
+       * `{ 1320, 120 }`, and an end equal to its start is a whole day.
+       */
+      endMinute: MinuteOfDaySchema,
     }),
     z.strictObject({ kind: z.literal('once'), startsAt: z.iso.datetime(), endsAt: z.iso.datetime() }),
   ])
