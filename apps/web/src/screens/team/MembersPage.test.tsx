@@ -51,6 +51,9 @@ function member(n: number, patch: Partial<TeamMember> = {}): TeamMember {
 }
 
 const THEO = member(11);
+
+const isChecked = (element: Element | undefined): boolean =>
+  element instanceof HTMLInputElement && element.checked;
 const BASILE = member(12, {
   displayName: 'Basile',
   firstName: 'Basile',
@@ -472,6 +475,43 @@ describe('changing a member once added (EQ-10)', () => {
     expect(posted).toEqual([
       { path: `/v1/team/members/${THEO.id}`, body: { displayName: 'Théo M.', creatorIds: [] } },
     ]);
+  });
+
+  it('picks the planning colour among the palette’s twelve shades, keeping one saved before it until another is chosen', async () => {
+    const posted = serve({ post: () => ({ status: 200, body: { ...THEO, color: '#0a6fa3' } }) });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));
+    const panel = await screen.findByRole('dialog', { name: 'Modifier Théo' });
+    const group = within(panel).getByRole('group', { name: 'Couleur du planning' });
+    const shades = within(group).getAllByRole('radio');
+    expect(shades).toHaveLength(12);
+    expect(shades.some((shade) => isChecked(shade))).toBe(false);
+    expect(within(group).getByText('Aucune pour l’instant.')).toBeDefined();
+    fireEvent.click(within(group).getByRole('radio', { name: 'Bleu' }));
+    expect(isChecked(within(group).getByRole('radio', { name: 'Bleu' }))).toBe(true);
+    expect(within(group).getByText('Bleu')).toBeDefined();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(posted).toEqual([{ path: `/v1/team/members/${THEO.id}`, body: { color: '#0a6fa3' } }]);
+  });
+
+  it('keeps a colour saved before the palette, first and chosen, sending nothing while it stays', async () => {
+    serve({
+      members: {
+        status: 200,
+        body: { members: TEAM.map((one) => (one.id === THEO.id ? { ...one, color: '#c2410c' } : one)) },
+      },
+    });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));
+    const panel = await screen.findByRole('dialog', { name: 'Modifier Théo' });
+    const group = within(panel).getByRole('group', { name: 'Couleur du planning' });
+    const shades = within(group).getAllByRole('radio');
+    expect(shades).toHaveLength(13);
+    expect(shades[0]?.getAttribute('aria-label')).toBe('Couleur actuelle');
+    expect(isChecked(shades[0])).toBe(true);
+    expect(within(group).getByText(/^Couleur d’avant la palette/u)).toBeDefined();
+    expect(within(panel).getByRole('button', { name: 'Enregistrer' }).hasAttribute('disabled')).toBe(true);
   });
 
   it('gives a new rate from the 1st or the 16th ahead of the agency’s day, chosen by hand, and words a refusal', async () => {
