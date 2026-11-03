@@ -3,6 +3,7 @@ import {
   JOB_MAX_ATTEMPTS,
   newId,
   PlatformSchema,
+  type JobPayload,
   type Platform,
 } from '@nirvana/contracts';
 import {
@@ -190,6 +191,20 @@ export function createSalesFeedJobs(adminDb: Database): SalesFeedJobs {
           run_at => null,
           max_attempts => ${JOB_MAX_ATTEMPTS['connector.read_sales']}::int,
           job_key => ${'connector.read_sales:delivery'},
+          job_key_mode => ${'preserve_run_at'}
+        )`,
+      );
+    },
+    async recheckLater(platform, from, runAt) {
+      const payload: JobPayload<'connector.check_sales'> = { recheck: { platform, from } };
+      await adminDb.execute(
+        sql`select public.enqueue_job(
+          task => ${'connector.check_sales'},
+          payload => ${JSON.stringify(payload)}::jsonb,
+          queue_name => null,
+          run_at => ${runAt.toISOString()}::timestamptz,
+          max_attempts => ${JOB_MAX_ATTEMPTS['connector.check_sales']}::int,
+          job_key => ${`connector.check_sales:${platform}:${from}`},
           job_key_mode => ${'preserve_run_at'}
         )`,
       );

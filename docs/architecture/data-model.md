@@ -73,7 +73,7 @@ blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_
 
 `conversations.last_inbound_at` est l'heure où Nirvana a lu le dernier message du fan (ordre d'arrivée : debounce, brouillon périmé, relances). Ce que l'écran montre (« A écrit il y a… », `ConversationSummary.lastInboundAt`) est l'heure du message sur la plateforme, `max(messages.platform_created_at)` des messages entrants : une capture qui relit l'historique ne fait pas dire « à l'instant » d'un message de cinq heures.
 
-Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
+Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `connection_state_changed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
 
 Payload minimal par famille d'événement (clés en camelCase, jamais de contenu média, jamais de secret) :
 
@@ -95,6 +95,7 @@ Payload minimal par famille d'événement (clés en camelCase, jamais de contenu
 | `script_*` | `scriptRunId`, `stepIndex?` |
 | `session_state_changed` | `platformAccountId`, `from`, `to` |
 | `budget_threshold_crossed` (outbox seulement, sans créatrice) | `kind` (`alert` \| `reached`), `spentMinor`, `capMinor`, `currency`, `day` |
+| `connection_state_changed` (outbox seulement, sans créatrice, à la bascule seulement ; Telegram P3-12) | `service` (`xai`, `mistral`, `google`, `elevenlabs`, `reveal_crm`), `state` (`down` avec `reason` : `refused`, `low_credit`, `unreachable` ; ou `back`), `since` ; jamais la clé |
 | `error` | `code`, `jobName?`, `retryable` |
 
 Les schémas Zod exacts vivent dans `packages/contracts/src/events.ts` (P0-02) ; ce tableau fixe l'intention.
@@ -465,6 +466,7 @@ script_structures         id, reserved_creator_id? → creators, created_by, cre
                           (bibliothèque de l'agence, hors RLS des créatrices ; politiques de l'équipe : le propriétaire
                           écrit, le propriétaire et les managers actifs lisent)
 script_structure_versions id, structure_id, version ≥ 1 (unique par structure), name ≤ 60, moment (day|night|both),
+                          color jsonb (ScriptColor : trois tons, ADR 0064, migration 0095),
                           segments jsonb (ScriptSegment[], au moins un), frozen_at?, updated_by, created_at, updated_at
                           (mêmes politiques ; déclencheur : une version figée ne change plus, aucune n'est supprimée,
                           le numéro ne change pas)

@@ -25,6 +25,7 @@ const SEGMENTS = [
     key: 'salon',
     name: 'Salon',
     intention: 'Elle se dévoile',
+    access: 'paid',
     mood: null,
     mediaSlots: [{ kind: 'image', optional: false, hint: null }],
     variants: [],
@@ -48,6 +49,7 @@ describe('script structures (SC-01)', () => {
     version,
     name: 'Soirée au salon',
     moment: 'night',
+    color: { primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' },
     segments: SEGMENTS,
     updatedBy: by,
   });

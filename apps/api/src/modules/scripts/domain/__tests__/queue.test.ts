@@ -19,6 +19,7 @@ const queued = (name: string, stageName: string): QueuedStructure => ({
     version: 2,
     name,
     moment: 'day',
+    color: { primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' },
     frozen: false,
     updatedAt: '2026-11-03T10:00:00.000Z',
     segments: [
@@ -27,6 +28,7 @@ const queued = (name: string, stageName: string): QueuedStructure => ({
         key: 'a',
         name: stageName,
         intention: 'Elle se dévoile',
+        access: 'paid',
         mood: null,
         mediaSlots: [{ kind: 'image', optional: false, hint: null }],
         variants: [],

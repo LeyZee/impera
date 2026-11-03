@@ -15,6 +15,7 @@ import {
   jsonb,
   pgPolicy,
   pgTable,
+  pgView,
   primaryKey,
   smallint,
   type PgColumn,
@@ -265,6 +266,32 @@ export const shifts = pgTable(
     }),
   ],
 );
+
+/**
+ * « Qui est en poste », as the creator reads it (CR-02, ADR 0023, ADR 0042 § 2): the display name of the member and the
+ * shift's range on her accounts, never `team_members` (rate, country, status) nor who else. Owned by the migration role,
+ * so it reads the team's tables past their policies, and it opens only to a creator's own account (`withCreatorAccount`
+ * sets both settings it reads); for anyone else it is empty. `security_barrier`: no predicate of a caller runs before
+ * its own. A join, so it takes no write.
+ */
+export const creatorOnDuty = pgView('creator_on_duty', {
+  shiftId: uuid('shift_id').notNull(),
+  creatorId: uuid('creator_id').notNull(),
+  platformAccountId: uuid('platform_account_id').notNull(),
+  displayName: text('display_name').notNull(),
+  startsAt: timestampTz('starts_at').notNull(),
+  endsAt: timestampTz('ends_at').notNull(),
+})
+  .with({ securityBarrier: true })
+  .as(
+    sql`select s.id as shift_id, s.creator_id, s.platform_account_id, m.display_name, s.starts_at, s.ends_at
+        from shifts s
+        join team_members m on m.id = s.member_id
+        where s.cancelled_at is null
+          and m.status = 'active'
+          and current_setting('app.account_role', true) = 'creator'
+          and s.creator_id = nullif(current_setting('app.creator_id', true), '')::uuid`,
+  );
 
 export const LEAVE_REQUEST_STATUSES = ['pending', 'approved', 'refused', 'withdrawn', 'cancelled'] as const;
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { PlatformSchema } from './enums';
-import { PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
+import { FanIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
 /**
@@ -500,13 +500,6 @@ export const SalesTotalsSchema = z.object({
 export type SalesTotals = z.infer<typeof SalesTotalsSchema>;
 
 /**
- * A day's refunds by their own day (CRM-04, the evening digest), whatever the day of their sale: the totals take a
- * refund off its sale's day, so a refund of an older sale is in no day's totals of today. One row per account,
- * currency, kind of sale, seller (the sale's, as in the totals) and where the sale is. The amounts are what was refunded, in integer
- * cents of `currency`, never negative. Never the fan.
- */
-
-/**
  * Where a refund's sale is, read on the platform's day (CRM-04): of the refund's own day (already taken off that day's
  * totals, so a digest adding the day's totals and its refunds counts it once), of an earlier day, or not in the
  * register (older than it, or not read yet).
@@ -514,6 +507,12 @@ export type SalesTotals = z.infer<typeof SalesTotalsSchema>;
 export const RefundedSaleSchema = z.enum(['same_day', 'earlier_day', 'not_in_register']);
 export type RefundedSale = z.infer<typeof RefundedSaleSchema>;
 
+/**
+ * A day's refunds by their own day (CRM-04, the evening digest), whatever the day of their sale: the totals take a
+ * refund off its sale's day, so a refund of an older sale is in no day's totals of today. One row per account,
+ * currency, kind of sale, seller (the sale's, as in the totals) and where the sale is. The amounts are what was refunded, in integer
+ * cents of `currency`, never negative. Never the fan.
+ */
 export const SalesRefundsRowSchema = z.object({
   platform: PlatformSchema,
   platformAccountId: PlatformAccountIdSchema,
@@ -562,3 +561,58 @@ export const SALES_FEED_ERROR_CODES = [
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;
+
+/**
+ * A creator's own sales as her account reads them (CRM-04 lot d, ADR 0042 § 2, ADR 0054), from the view
+ * `creator_sales`: the same rule as `SalesTotals` (a sale on its day in the platform's zone, a refund taken off its
+ * sale's day, no VAT nor commission computed again, each currency apart), without the seller. Strict: a field of who
+ * sold (member, agent, unlinked chatter) or of the platform's fan fails the contract.
+ */
+export const CreatorSalesRowSchema = z.strictObject({
+  day: z.iso.date(),
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+  saleType: SaleTypeSchema,
+  sales: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+  grossInclVatMinor: signedCents,
+  grossExclVatMinor: signedCents,
+  netMinor: signedCents,
+  agencyMinor: signedCents,
+  /** Her part (`modelRevenue`, ADR 0050 § 8, ADR 0054). */
+  creatorMinor: signedCents,
+});
+export type CreatorSalesRow = z.infer<typeof CreatorSalesRowSchema>;
+
+/**
+ * One line of her register in the range, a sale or a refund, on its sale's day: its own amounts as recorded (never
+ * signed: `event` says a refund), and the fan's id in Nirvana only when his card is hers, else `null`. Never the
+ * seller, never the platform's fan id.
+ */
+export const CreatorSaleLineSchema = z.strictObject({
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  event: SaleEventSchema,
+  saleType: SaleTypeSchema,
+  occurredAt: z.iso.datetime(),
+  saleDay: z.iso.date(),
+  currency: CurrencySchema,
+  grossInclVatMinor: cents.min(0),
+  grossExclVatMinor: cents.min(0),
+  netMinor: cents.min(0),
+  agencyMinor: cents.min(0),
+  creatorMinor: cents.min(0),
+  fanId: FanIdSchema.nullable(),
+});
+export type CreatorSaleLine = z.infer<typeof CreatorSaleLineSchema>;
+
+/** Her sales from `from` to `to`, both days included; a refund whose sale is older than the register is only counted. */
+export const CreatorSalesSchema = z.strictObject({
+  from: z.iso.date(),
+  to: z.iso.date(),
+  rows: z.array(CreatorSalesRowSchema),
+  lines: z.array(CreatorSaleLineSchema),
+  refundsWithoutSale: z.number().int().min(0),
+});
+export type CreatorSales = z.infer<typeof CreatorSalesSchema>;

@@ -1,4 +1,4 @@
-import type { JobPayload } from '@nirvana/contracts';
+import type { ConnectionService, ConnectionSignal, JobPayload } from '@nirvana/contracts';
 import type { Database, EncryptionKey } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -9,8 +9,9 @@ import { createOutboundSender } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
-import { createSalesFeeds } from './application/sales-feed';
+import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
 import { createConnectorSessions, type ConnectorSessions } from './application/sessions';
+import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
@@ -31,6 +32,8 @@ import { createSessionVault } from './infra/session-vault';
 export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
+/** @public A creator's own sales, read from her view inside `withCreatorAccount` (CRM-04 lot d): her Ventes screen's. */
+export { creatorSalesReads } from './infra/db/creator-sales-reads';
 /** @public What pay reads of the sales feed, in its transaction (ADR 0050 §§ 5, 7, 8; CRM-03): Équipe's recalculation. */
 export { salesFeedReadsForPay } from './infra/db/pay-reads';
 /** @public The lines pay reads, their author and the range of a read (CRM-03). */
@@ -107,6 +110,12 @@ export interface ConnectorsModule {
     reconcile(payload: JobPayload<'connector.reconcile'>, logger: JobLogger): Promise<void>;
     /** Every connected sales feed, from its cursor (ADR 0050 § 3); `woken` by a webhook delivery: now. */
     readSales(logger: JobLogger, correlationId: string, woken?: boolean): Promise<void>;
+    /** The automatic check of the fortnight just over, or its second look a day later (CRM-04 b3). */
+    checkSales(
+      payload: JobPayload<'connector.check_sales'>,
+      logger: JobLogger,
+      correlationId: string,
+    ): Promise<void>;
   };
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
@@ -139,6 +148,20 @@ export interface ConnectorsDeps {
    * HTTP) and no webhook can be registered: the minute's reading alone brings the sales.
    */
   readonly publicBaseUrl: string | null;
+  /**
+   * The accounts paid on the platform's net over the whole of a fortnight (CRM-04 b3): the `scheduling` module's
+   * `salesCheckReads`, read on the admin connection by the composition root. Never a write of the pay rules.
+   */
+  readonly detectedAccounts: SalesFeedDeps['detectedAccounts'];
+  /**
+   * `connection_state_changed` (Telegram P3-12), wired by the composition root: Reveal's register is the service
+   * `reveal_crm`; the outbox keeps the transitions only.
+   */
+  readonly publishConnectionState?: (
+    service: ConnectionService,
+    signal: ConnectionSignal,
+    correlationId: string,
+  ) => Promise<unknown>;
   readonly clock?: Clock;
   readonly random?: () => number;
 }
@@ -161,6 +184,12 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       deps.credentialKeys === null ? null : createSalesFeedWebhookStore(deps.adminDb, deps.credentialKeys),
     jobs: createSalesFeedJobs(deps.adminDb),
     webhookUrl: (platform) => salesFeedWebhookUrl(deps.publicBaseUrl, platform),
+    detectedAccounts: deps.detectedAccounts,
+    connectionState: async (platform, signal, correlationId) => {
+      const service = connectionServiceOf(platform);
+      if (service === null || deps.publishConnectionState === undefined) return;
+      await deps.publishConnectionState(service, signal, correlationId);
+    },
   });
   return {
     name: 'connectors',
@@ -178,6 +207,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       poll: createPollJob(accountJobs),
       reconcile: createReconcileJob(accountJobs),
       readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),
+      checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
     },
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),

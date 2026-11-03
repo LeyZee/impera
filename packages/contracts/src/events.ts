@@ -235,11 +235,38 @@ export const EVENT_TYPES = [
   'fan_flag_set',
   'fan_flag_cleared',
   'sales_feed_signal',
+  'sales_feed_mismatch',
+  'connection_state_changed',
   'security_alert',
   'error',
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
 export type EventType = z.infer<typeof EventTypeSchema>;
+
+/**
+ * At most this many days in one `sales_feed_mismatch` (CRM-04 b3): sixteen days for some thirty accounts. The check
+ * keeps the first ones by day and account; the rest is in the check of Réglages.
+ */
+export const SALES_FEED_MISMATCH_DAYS_MAX = 500;
+
+/**
+ * The services whose outage `connection_state_changed` tells (Telegram P3-12): the AI providers of Réglages › Modèles
+ * IA and the sales register of Reveal. Venice, a fallback, is not watched; `meta` enters with its publisher (PUB-02).
+ */
+export const CONNECTION_SERVICES = ['xai', 'mistral', 'google', 'elevenlabs', 'reveal_crm'] as const;
+export const ConnectionServiceSchema = z.enum(CONNECTION_SERVICES);
+export type ConnectionService = z.infer<typeof ConnectionServiceSchema>;
+
+/**
+ * Why a service is down: its key refused (401/403, a permission or a model withdrawn), its credit low or spent, or no
+ * answer for long enough (`unreachable`). No source tells an expired key from a refused one: both are `refused`.
+ */
+export const ConnectionDownReasonSchema = z.enum(['refused', 'low_credit', 'unreachable']);
+export type ConnectionDownReason = z.infer<typeof ConnectionDownReasonSchema>;
+
+/** What a publisher saw of a service; the outbox keeps only the transitions (`publishConnectionState`). */
+export type ConnectionSignal =
+  { readonly state: 'down'; readonly reason: ConnectionDownReason } | { readonly state: 'back' };
 
 /**
  * What the due date's alert says of an invoice (EQ-06 lot 8): its number, its due date and its total including VAT,
@@ -465,6 +492,45 @@ export const EVENT_PAYLOADS = {
    */
   sales_feed_signal: z.object({ platform: PlatformSchema, signal: SalesFeedSignalSchema }),
   /**
+   * After a switch to the platform's net (ADR 0050 § 8, CRM-04 lot b3): the fortnight's automatic check found the
+   * register and the platform's daily statistics apart on a net, and still apart 24 hours later. Only the accounts paid
+   * on the platform's net for the whole fortnight; per day, account and currency, in signed cents (`differenceMinor` =
+   * platform − register: positive when the register lacks money). Published with no creator, once per platform and fortnight; never a fan, never a chatter.
+   * Information for the owner: pay never reads it.
+   */
+  sales_feed_mismatch: z.object({
+    platform: PlatformSchema,
+    from: PayPeriodSchema,
+    to: z.iso.date(),
+    days: z
+      .array(
+        z.object({
+          day: z.iso.date(),
+          platformAccountId: PlatformAccountIdSchema,
+          currency: CurrencySchema,
+          registerNetMinor: z.number().int(),
+          platformNetMinor: z.number().int(),
+          differenceMinor: z.number().int(),
+        }),
+      )
+      .min(1)
+      .max(SALES_FEED_MISMATCH_DAYS_MAX),
+  }),
+  /**
+   * A service went down, or came back after a published `down` (Telegram P3-12). Published with no creator, at the
+   * transition only, never at each check; `since` is when the publisher saw it. The rule of each service lives in its
+   * publisher (`providers`, `connectors`). Never the key, never a word of the service's answer.
+   */
+  connection_state_changed: z.discriminatedUnion('state', [
+    z.object({
+      service: ConnectionServiceSchema,
+      state: z.literal('down'),
+      reason: ConnectionDownReasonSchema,
+      since: z.iso.datetime(),
+    }),
+    z.object({ service: ConnectionServiceSchema, state: z.literal('back'), since: z.iso.datetime() }),
+  ]),
+  /**
    * A security alert (ADR 0046 § 8), written in the same transaction as the line of `audit_log` it tells, or right
    * after it. For the urgent Telegram groups: an account by id and role, a network, never a name nor a full address.
    */
@@ -529,6 +595,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),
   typedEvent('sales_feed_signal'),
+  typedEvent('sales_feed_mismatch'),
+  typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('error'),
 ]);

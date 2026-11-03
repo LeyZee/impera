@@ -162,6 +162,7 @@ async function read(
       from platform_sales l
       left join platform_sales s
         on l.event = 'refund' and s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
+       and s.creator_id = l.creator_id
       left join sales_feed_chatters c on c.platform = l.platform and c.platform_chatter_id = ${lineChatter}
      where l.platform_account_id in (${sql.join(
        range.platformAccountIds.map((one) => sql`${one}`),

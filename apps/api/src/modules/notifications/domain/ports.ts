@@ -1,4 +1,5 @@
 import type {
+  Currency,
   NotificationPreferences,
   NotificationRequest,
   PushMessage,
@@ -74,4 +75,21 @@ export interface DeliveryRegistry {
   ): Promise<RecordedDecision>;
   /** Marks the account's notifications held until `at` or before as recapped; how many there were. */
   takeHeld(userId: string, at: Date): Promise<number>;
+}
+
+/** A fresh sale to tell her (CRM-04 lot d2): her part and its currency, never who sold nor the fan. */
+export interface CreatorSale {
+  /** The register's line: the object of each account's notification, once per sale. */
+  readonly saleId: string;
+  readonly creatorMinor: number;
+  readonly currency: Currency;
+  /** Her creator's zone: her quiet hours and her day. */
+  readonly timeZone: string;
+  /** Her own accounts (role `creator`, linked to her creator alone); none yet is fine. */
+  readonly accounts: readonly string[];
+}
+
+export interface CreatorSaleSource {
+  /** The `sale_detected` of that id, read by the job's role; null when there is none. */
+  saleOf(eventId: string): Promise<CreatorSale | null>;
 }

@@ -84,11 +84,12 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Vente | `sale` | Une transaction détectée sur la plateforme. Montant en centimes + devise. |
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
-| Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript. |
+| Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript, dans la couleur du script (ADR 0064). |
+| Couleur du script | `script_color` | Les trois tons d'une structure, qui colorent tous ses cartons pour qu'on retrouve le script d'un coup d'œil (ADR 0064). |
 | Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
-| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). |
+| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
 | Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
 | Catégorie de dépôt | `drop_category` | Ce que la créatrice dit d'un dépôt, liste fermée : séance boudoir, vidéo short, script, relance, story Reveal, story Insta, Reel Insta, photo Insta, Telegram ; elle décide de la sortie (ADR 0055). |
@@ -189,7 +190,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Clé d'accès | `passkey` | Face ID, empreinte ou code du téléphone à la place du mot de passe et du code : une clé liée au domaine de Nirvana, dont le serveur ne garde que la partie publique ; ajoutée seulement après le mot de passe et le code (ADR 0053). |
 | Confirmation (d'identité) | `reauthenticate`, `reauthenticated_at` | Mot de passe et code redemandés avant une action sensible ; valable 10 minutes sur la session (ADR 0046 § 3). |
 | Lien de calendrier | `calendar_link`, `calendar_links` | Adresse iCal secrète, en lecture seule et révocable, qu'un membre ajoute à Apple Agenda ou Google Agenda pour y voir ses propres shifts (ADR 0045 § 5) ; le serveur n'en garde que l'empreinte, l'adresse se montre une seule fois et une nouvelle remplace l'ancienne. La créatrice y branchera son agenda (ADR 0042 § 4). |
-| Lien d'invitation | `invitation_link` | Lien à usage unique et de courte durée que le propriétaire partage (par exemple sur WhatsApp) pour qu'un membre choisisse son mot de passe ; même mécanisme pour un mot de passe oublié. |
+| Lien d'invitation | `invitation_link` | Lien à usage unique et de courte durée que le propriétaire partage (par exemple sur WhatsApp) pour qu'un membre, ou une créatrice pour son propre compte (CR-02, depuis sa fiche), choisisse son mot de passe ; même mécanisme pour un mot de passe oublié. |
 | Double authentification | `two_factor` | Un code à usage unique d'une application d'authentification, en plus du mot de passe : obligatoire pour le propriétaire et les managers, redemandé pour les gestes d'argent (EQ-15). |
 | Voir comme | `view_as` | Le propriétaire ou un manager actif voit l'écran exact d'un chatteur, en lecture seule, avec sa propre session ; ouverture et fermeture au journal (EQ-19). |
 | Journal d'audit | `audit_log` | Qui a fait quoi dans le CRM (taux, paies, factures, accès), en ajout seul ; lu par le propriétaire dans Réglages › Journal (EQ-18). Distinct du journal d'événements d'une conversation. |

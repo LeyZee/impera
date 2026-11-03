@@ -26,6 +26,14 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_sales'] },
   },
+  // The automatic check of the sales feed (CRM-04 b3): on the 2nd and the 17th, the fortnight just over, in the
+  // platform's zone; a mismatch is looked at again a day later. No backfill: a missed run waits for the next fortnight,
+  // the manual check of Réglages stays.
+  {
+    task: 'connector.check_sales',
+    match: '0 6 2,17 * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.check_sales'] },
+  },
   // What a member no longer `active` still held (a takeover, a routed conversation) is handed back within the minute
   // (EQ-13): he already reads none of it. No backfill: the next run finds them all anyway.
   {

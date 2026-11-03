@@ -15,6 +15,7 @@ import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
+import { createCreatorOnDutyRoutes, createDrizzleCreatorOnDuty } from './infra/creator-on-duty';
 import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
@@ -36,6 +37,11 @@ import { createDrizzleShiftReportStore } from './infra/report-store';
 import { createSchedulingRoutes, type RequireRole } from './infra/routes';
 import { agencyTimeZone } from './infra/rows';
 import { createDrizzleSwapStore } from './infra/swap-store';
+
+/** @public The accounts the automatic sales check compares (CRM-04 b3), read on the job's admin connection. */
+export { salesCheckReads } from './infra/sales-check-reads';
+/** @public An account the automatic sales check compares: its platform and its rules' currency. */
+export type { DetectedAccountForCheck } from './domain/sales-checks';
 
 /** Public entry point of the `scheduling` module (EQ-02, ADR 0002). Other modules import this file only. */
 export interface SchedulingModule {
@@ -170,7 +176,11 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       shifts: shiftsForPay,
       accessMarginMinutes: accessMarginMinutesForPay,
     },
-    routes: (requireRole) => createSchedulingRoutes(services, requireRole),
+    routes: (requireRole) => async (app, options) => {
+      await createSchedulingRoutes(services, requireRole)(app, options);
+      // Her « qui est en poste » (CR-02): the creator's own door, never the team's routes.
+      await createCreatorOnDutyRoutes(createDrizzleCreatorOnDuty(deps.db), requireRole, now)(app, options);
+    },
     jobs: {
       makeShifts: (logger) => makeShifts(admin, logger, now()),
       lapseSwaps: () => colleagues.lapseSwapsUnscoped(now()),

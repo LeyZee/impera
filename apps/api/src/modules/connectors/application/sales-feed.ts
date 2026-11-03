@@ -2,6 +2,11 @@ import {
   calendarDayAt,
   ok,
   err,
+  payPeriodLastDay,
+  SALES_FEED_MISMATCH_DAYS_MAX,
+  type ConnectionSignal,
+  type JobPayload,
+  type PayPeriod,
   type LinkSalesFeedChatterBody,
   type Platform,
   type Result,
@@ -15,6 +20,8 @@ import {
   type SalesFeedStatus,
 } from '@nirvana/contracts';
 
+import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/auto-check';
+import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
   SalesFeedAccountUnprocessable,
   SalesFeedCheckDaysUnprocessable,
@@ -59,6 +66,13 @@ const DELIVERY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** With a working webhook, the minute's reading becomes an hourly catch-up; a delivery wakes it in between. */
 const CATCH_UP_MS = 60 * 60 * 1000;
+/** A mismatch of the automatic check is looked at again a day later: a late line or refund may have come since. */
+const RECHECK_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/** An account the automatic check compares, as the pay rules say it (the `scheduling` module's read). */
+interface AutoCheckedAccount extends CheckedAccount {
+  readonly platform: Platform;
+}
 
 export interface SalesFeedDeps {
   /** `null` without CREDENTIALS_ENCRYPTION_KEYS: no key can be kept, nothing is read. */
@@ -71,6 +85,20 @@ export interface SalesFeedDeps {
   readonly jobs: SalesFeedJobs;
   /** Nirvana's public address for a platform's deliveries; `null` when it is not HTTPS (development). */
   readonly webhookUrl: (platform: Platform) => string | null;
+  /**
+   * The accounts paid on the platform's net over the whole of a fortnight (CRM-04 b3): the pay rules' `detected`, read
+   * by the `scheduling` module and given by the composition root.
+   */
+  readonly detectedAccounts: (period: PayPeriod) => Promise<readonly AutoCheckedAccount[]>;
+  /**
+   * What the reading saw of the platform's register (Telegram P3-12): the outbox keeps the transitions only
+   * (`connection_state_changed`). Absent in tests that do not look at it.
+   */
+  readonly connectionState?: (
+    platform: Platform,
+    signal: ConnectionSignal,
+    correlationId: string,
+  ) => Promise<unknown>;
 }
 
 export interface SalesFeeds {
@@ -121,6 +149,18 @@ export interface SalesFeeds {
   ): Promise<Result<SalesFeedCheckReport, SalesFeedRefusal>>;
   /** The latest report kept, `null` before any check. */
   lastCheck(platform: Platform): Promise<SalesFeedLastCheck>;
+  /**
+   * The `connector.check_sales` job (CRM-04 b3). On the 2nd and the 17th, without `recheck`: every connected feed,
+   * the fortnight just over, the register's net against the platform's statistics for the accounts paid on that net
+   * over the whole fortnight; a mismatch is looked at again a day later. With `recheck`: that look, which publishes
+   * `sales_feed_mismatch` once if the mismatch is still there. No export, nothing kept in `sales_feed_checks`, never
+   * a switch; pay never reads it. Throws when a platform refused, so the job is tried again.
+   */
+  autoCheck(
+    payload: JobPayload<'connector.check_sales'>,
+    logger: JobLogger,
+    correlationId: string,
+  ): Promise<void>;
 }
 
 /** The two statistics of the days, one call after the other: Reveal allows ten a minute a key. */
@@ -138,6 +178,12 @@ function refusal(kind: SalesFeedRefusal['kind']): SalesFeedRefusal {
 
 export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
   const { ledger, registry, clock } = deps;
+  /** The failed reads in a row of each platform, in the worker that reads; a restart starts the count again. */
+  const unreachable = new Map<Platform, UnreachableRun>();
+
+  async function tell(platform: Platform, signal: ConnectionSignal, correlationId: string): Promise<void> {
+    await deps.connectionState?.(platform, signal, correlationId);
+  }
 
   function factoryOf(platform: Platform): SalesFeedFactory {
     const factory = registry[platform];
@@ -302,8 +348,16 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       if (before?.state !== 'needs_reconnect') {
         await ledger.signal(platform, { kind: 'needs_reconnect', errorKind: kind }, false, correlationId);
       }
+      await tell(platform, { state: 'down', reason: 'refused' }, correlationId);
       logger.warn({ platform, kind }, 'sales feed key refused: reading stopped until it is connected again');
       return;
+    }
+    if (failure.kind === 'unreachable') {
+      const now = clock.now();
+      const run = nextUnreachableRun(unreachable.get(platform) ?? null, now);
+      unreachable.set(platform, run);
+      if (isLastingOutage(run, now))
+        await tell(platform, { state: 'down', reason: 'unreachable' }, correlationId);
     }
     if (failure.kind === 'rate_limited') {
       await ledger.pause(platform, new Date(clock.now().getTime() + failure.retryAfterMs));
@@ -367,10 +421,136 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       position = read.value.endPosition ?? position;
       if (!read.value.hasMore) break;
     }
-    if (stored.lastErrorKind !== null) await keysOrThrow().markState(platform, 'connected', null);
+    unreachable.delete(platform);
+    if (stored.lastErrorKind !== null) {
+      await keysOrThrow().markState(platform, 'connected', null);
+      // An answer after a failure: back, if a `down` was published.
+      await tell(platform, { state: 'back' }, correlationId);
+    }
     await deps.webhooks?.prune(new Date(now.getTime() - DELIVERY_RETENTION_MS));
     // Counts only: never a sale's id, a fan's id or pseudo.
     logger.info({ platform, ...totals }, 'sales feed read');
+  }
+
+  /**
+   * The reliability check's report over `range` (ADR 0050 § 8, CRM-02), with the export when one is given, and the
+   * owner's model links it was built with. Shared by the check of Réglages and the automatic one (CRM-04 b3).
+   */
+  async function buildReport(
+    platform: Platform,
+    feed: PlatformSalesFeed,
+    range: DateRange,
+    exportText: string | null,
+  ): Promise<
+    Result<
+      {
+        readonly report: SalesFeedCheckReport;
+        readonly modelLinks: Awaited<ReturnType<SalesLedger['modelLinks']>>;
+      },
+      SalesFeedRefusal
+    >
+  > {
+    const models = await feed.listModels();
+    if (!models.ok) return err(refusal(errorKindOf(models.failure)));
+    const exported =
+      exportText === null
+        ? null
+        : readDashboardExport(exportText, {
+            from: range.from,
+            to: range.to,
+            timeZone: feed.timeZone,
+            models: models.value,
+          });
+    const stats = await checkStats(feed, range);
+    const platformChatters = await feed.listChatters();
+    const [lines, firstLineAt, cursor, modelLinks, chatterLinks] = await Promise.all([
+      ledger.checkLines(
+        platform,
+        new Date(Date.parse(`${range.from}T00:00:00Z`) - DAY_MS),
+        new Date(Date.parse(`${range.to}T00:00:00Z`) + 2 * DAY_MS),
+      ),
+      ledger.firstLineAt(platform),
+      ledger.cursorOf(platform),
+      ledger.modelLinks(platform),
+      ledger.chatterLinks(platform),
+    ]);
+    const report = buildCheckReport({
+      platform,
+      from: range.from,
+      to: range.to,
+      timeZone: feed.timeZone,
+      generatedAt: clock.now(),
+      lines,
+      stats,
+      exported,
+      firstLineAt,
+      registerReadAt: cursor.readAt,
+      models: models.value,
+      modelLinks: new Set(modelLinks.keys()),
+      platformChatters: platformChatters.ok ? platformChatters.value : [],
+      chatterLinks,
+    });
+    return ok({ report, modelLinks });
+  }
+
+  /**
+   * One platform's automatic check (CRM-04 b3): `refused` when the platform did not answer, so the job is tried again.
+   */
+  async function autoCheckOne(
+    platform: Platform,
+    recheckOf: PayPeriod | null,
+    logger: JobLogger,
+    correlationId: string,
+  ): Promise<'done' | 'refused'> {
+    const feed = await liveFeed(platform);
+    if (feed === null) return 'done';
+    const from = recheckOf ?? fortnightBefore(clock.now(), feed.timeZone).from;
+    const to = payPeriodLastDay(from);
+    // A recheck of a fortnight not over yet cannot happen from the crontab; refused here all the same.
+    if (to >= calendarDayAt(clock.now(), feed.timeZone)) return 'done';
+    const accounts = (await deps.detectedAccounts(from)).filter((account) => account.platform === platform);
+    if (accounts.length === 0) return 'done';
+    const built = await buildReport(platform, feed, { from, to }, null);
+    if (!built.ok) {
+      logger.warn({ platform, from, kind: built.error.kind }, 'sales feed automatic check refused');
+      return 'refused';
+    }
+    // Without the platform's statistics nothing was compared: not an agreement, the job is tried again (Équipe, #476).
+    const statsNote = built.value.report.notes.find((note) => note.kind === 'stats_unavailable');
+    if (statsNote !== undefined) {
+      logger.warn({ platform, from, kind: statsNote.errorKind }, 'sales feed automatic check: no statistics');
+      return 'refused';
+    }
+    const modelAccounts = new Map(
+      [...built.value.modelLinks].map(
+        ([platformModelId, link]) => [platformModelId, link.platformAccountId] as const,
+      ),
+    );
+    const days = mismatchDays(built.value.report, modelAccounts, accounts);
+    if (days.length === 0) {
+      logger.info(
+        { platform, from, recheck: recheckOf !== null },
+        'sales feed automatic check: the nets agree',
+      );
+      return 'done';
+    }
+    if (recheckOf === null) {
+      await deps.jobs.recheckLater(platform, from, new Date(clock.now().getTime() + RECHECK_AFTER_MS));
+      logger.info(
+        { platform, from, days: days.length },
+        'sales feed automatic check: mismatch, looked at again tomorrow',
+      );
+      return 'done';
+    }
+    const published = await ledger.publishMismatch(
+      { platform, from, to, days: days.slice(0, SALES_FEED_MISMATCH_DAYS_MAX) },
+      correlationId,
+    );
+    logger.info(
+      { platform, from, days: days.length, published },
+      'sales feed automatic check: mismatch confirmed',
+    );
+    return 'done';
   }
 
   return {
@@ -390,6 +570,8 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       // Refused, rate-limited or unreachable: nothing is kept, a key already saved stays as it was.
       if (!verified.ok) return err(refusal(errorKindOf(verified.failure)));
       await keys.save(platform, key, verified.value, clock.now(), by);
+      unreachable.delete(platform);
+      await tell(platform, { state: 'back' }, `sales_feed_key:${platform}`);
       await linkByHandle(platform, feed);
       return ok(await statusOf(platform));
     },
@@ -482,53 +664,30 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       const feed = await liveFeed(platform);
       if (feed === null) throw new SalesFeedNotConnected();
       if (body.to >= calendarDayAt(clock.now(), feed.timeZone)) throw new SalesFeedCheckDaysUnprocessable();
-      const models = await feed.listModels();
-      if (!models.ok) return err(refusal(errorKindOf(models.failure)));
-      const exported =
-        body.export === null
-          ? null
-          : readDashboardExport(body.export, {
-              from: body.from,
-              to: body.to,
-              timeZone: feed.timeZone,
-              models: models.value,
-            });
-      const stats = await checkStats(feed, { from: body.from, to: body.to });
-      const platformChatters = await feed.listChatters();
-      const [lines, firstLineAt, cursor, modelLinks, chatterLinks] = await Promise.all([
-        ledger.checkLines(
-          platform,
-          new Date(Date.parse(`${body.from}T00:00:00Z`) - DAY_MS),
-          new Date(Date.parse(`${body.to}T00:00:00Z`) + 2 * DAY_MS),
-        ),
-        ledger.firstLineAt(platform),
-        ledger.cursorOf(platform),
-        ledger.modelLinks(platform),
-        ledger.chatterLinks(platform),
-      ]);
-      const report = buildCheckReport({
-        platform,
-        from: body.from,
-        to: body.to,
-        timeZone: feed.timeZone,
-        generatedAt: clock.now(),
-        lines,
-        stats,
-        exported,
-        firstLineAt,
-        registerReadAt: cursor.readAt,
-        models: models.value,
-        modelLinks: new Set(modelLinks.keys()),
-        platformChatters: platformChatters.ok ? platformChatters.value : [],
-        chatterLinks,
-      });
-      await ledger.recordCheck(report, isCleanMatch(report), by);
-      return ok(report);
+      const built = await buildReport(platform, feed, { from: body.from, to: body.to }, body.export);
+      if (!built.ok) return built;
+      await ledger.recordCheck(built.value.report, isCleanMatch(built.value.report), by);
+      return ok(built.value.report);
     },
 
     async lastCheck(platform) {
       factoryOf(platform);
       return { last: await ledger.lastCheck(platform) };
+    },
+
+    async autoCheck(payload, logger, correlationId) {
+      if (deps.keys === null) return;
+      const platforms =
+        payload.recheck === undefined
+          ? (await deps.keys.list()).map((stored) => stored.platform)
+          : [payload.recheck.platform];
+      const refused: Platform[] = [];
+      for (const platform of platforms) {
+        if (registry[platform] === undefined) continue;
+        const outcome = await autoCheckOne(platform, payload.recheck?.from ?? null, logger, correlationId);
+        if (outcome === 'refused') refused.push(platform);
+      }
+      if (refused.length > 0) throw new Error(`sales feed automatic check refused by ${refused.join(', ')}`);
     },
 
     async read(logger, correlationId, woken) {

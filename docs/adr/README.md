@@ -66,7 +66,7 @@ Date : AAAA-MM-JJ
 | 0039 | Factures : une contestation fondée se corrige par la paie, jamais par un avoir écrit à la main | accepted (remplace dans 0036 la phrase sur l'état « créditée » ; précise 0023 § Factures ; au § 3, la ligne refacturée sur la facture du jour et sa conséquence sur le régime remplacées par 0040) |
 | 0040 | Factures : « annuler et refacturer » émet une facture rectificative, sous le régime de la facture annulée | accepted (remplace dans 0039 § 3 la ligne refacturée sur la facture du jour) |
 | 0041 | Factures : l'attestation de résidence fiscale conditionne le versement, pas la facture | accepted (remplace dans 0023 § Factures la phrase sur l'attestation, et les choix (a) et « ok année civile » du lot 5c) |
-| 0042 | Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche | accepted (remplace dans 0023 la phrase de § Rôles sur la créatrice, dans 0024 sa ligne du rail, dans 0030 § 3 la référence de `validated_by` ; au § 6 la phrase sur la source des ventes remplacée par 0054) |
+| 0042 | Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche | accepted (remplace dans 0023 la phrase de § Rôles sur la créatrice, dans 0024 sa ligne du rail, dans 0030 § 3 la référence de `validated_by` ; au § 6 la phrase sur la source des ventes remplacée par 0054 ; au § 2 la phrase « Elle voit tout son compte » remplacée par 0063) |
 | 0043 | Chatteur : ventes saisies une à une, rapport de fin de shift contrôlé par le code, retours de l'IA sans effet sur la paie | accepted (précise 0023 et EQ-03 ; au § 4 la vente sans attribution et au § 5 le rapport d'un compte détecté remplacés par 0050) |
 | 0044 | Feed et Mass DM : la créatrice dépose son contenu dans Nirvana, l'agent le téléverse et le planifie à la semaine | accepted (remplace 0030 § 2 et § 4 pour le seul contenu déposé ; § 1 usage et § 2 départ des 30 jours remplacés par 0055) |
 | 0045 | Calendrier des shifts : toute l'équipe et la créatrice voient qui chatte quand, l'agence pose et déplace au doigt | accepted (remplace dans 0031 la phrase « la seule porte ») |
@@ -80,8 +80,11 @@ Date : AAAA-MM-JJ
 | 0053 | Clé d'accès (Face ID, empreinte) : un geste vaut mot de passe et code | accepted (précise 0046 § 1, 3, 5 à 8) |
 | 0054 | Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule | accepted (remplace dans 0042 § 6 la phrase sur la source des ventes ; précise 0042 § 6 et 0050 § 8) |
 | 0055 | Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque | accepted (remplace dans 0044 § 1 l'usage à deux valeurs, et § 2 le départ des 30 jours) |
-| 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés) |
+| 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés ; § 3, phrase sur la palette, remplacée par 0064) |
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted |
 | 0058 | Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui | accepted (amende 0026 § 5 pour la seule publication) |
 | 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |
 | 0060 | Veille et idées de contenu : signaux de sources propres, capture passive par l'extension, idées filtrées par le code et validées par l'agence | accepted |
+| 0062 | Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel | accepted |
+| 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte ») |
+| 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | accepted (remplace dans 0056 § 3 la phrase sur la palette) |

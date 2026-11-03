@@ -561,6 +561,48 @@
       "when": 1793706893945,
       "tag": "0084_script_structures",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1793708788993,
+      "tag": "0085_creator_sales",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1793710154097,
+      "tag": "0088_creator_on_duty",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793710996397,
+      "tag": "0089_creator_invitation",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1793711869411,
+      "tag": "0092_sales_feed_mismatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793713171025,
+      "tag": "0093_connection_state_changed",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1793714372769,
+      "tag": "0095_script_colour",
+      "breakpoints": true
     }
   ]
 }

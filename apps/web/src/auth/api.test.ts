@@ -7,6 +7,7 @@ const TOKEN = 'lien-invente-pour-les-tests';
 const PREVIEW = {
   purpose: 'invitation',
   email: 'theo@example.test',
+  account: 'member',
   displayName: 'Théo',
   country: 'BJ',
   expiresAt: '2026-10-30T15:00:00.000Z',

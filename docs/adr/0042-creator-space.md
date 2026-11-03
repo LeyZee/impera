@@ -1,6 +1,6 @@
 # 0042. Espace de la créatrice : elle voit tout son compte, rien de l'équipe, et personne ne lui impose une tâche
 
-Statut : accepted (Charles, 02/11/2026 16h17, « ok 0042 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles ») ; § 6, la phrase sur la source des ventes remplacée par l'ADR 0054
+Statut : accepted (Charles, 02/11/2026 16h17, « ok 0042 » ; cadrage du même jour, fil « Concevoir les espaces modèle et chatteur mobiles ») ; § 6, la phrase sur la source des ventes remplacée par l'ADR 0054 ; § 2, la phrase « Elle voit tout son compte » remplacée par l'ADR 0063
 Date : 2026-11-02
 Remplace :
 - dans l'ADR 0023 § Rôles, la phrase « La `creator` voit sa routine, ses revenus, ses factures et qui est en poste, jamais une conversation ni un fan » ;

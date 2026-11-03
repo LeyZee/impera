@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
+import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
+  EventIdSchema,
   FanIdSchema,
   InvoiceIdSchema,
   MediaAssetIdSchema,
@@ -40,6 +42,7 @@ export const JOB_NAMES = [
   'rate_limit.purge',
   'backups.check',
   'notifications.recap',
+  'notifications.creator_sale',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'team.apply_roles',
@@ -61,6 +64,7 @@ export const JOB_NAMES = [
   'media.describe',
   'providers.check_credentials',
   'connector.read_sales',
+  'connector.check_sales',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -127,6 +131,12 @@ export const JOB_PAYLOADS = {
   'backups.check': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
+  /**
+   * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
+   * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
+   * part and its currency from the event, never its seller.
+   */
+  'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
@@ -233,6 +243,14 @@ export const JOB_PAYLOADS = {
      * for its hourly catch-up (ADR 0050 § 3). */
     woken: z.boolean().optional(),
   }),
+  /**
+   * The automatic check of a fortnight after a switch to the platform's net (CRM-04 lot b3): the crontab's, on the 2nd
+   * and the 17th, checks the fortnight just over; a mismatch enqueues `recheck` 24 hours later, which alone publishes
+   * `sales_feed_mismatch` when the register and the statistics still differ. Nothing is kept in `sales_feed_checks`.
+   */
+  'connector.check_sales': z.object({
+    recheck: z.object({ platform: PlatformSchema, from: PayPeriodSchema }).optional(),
+  }),
   ...TELEGRAM_JOB_PAYLOADS,
 } as const satisfies Record<JobName, z.ZodType>;
 
@@ -259,6 +277,8 @@ export const JOB_MAX_ATTEMPTS = {
   'rate_limit.purge': 1,
   'backups.check': 1,
   'notifications.recap': 3,
+  // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
+  'notifications.creator_sale': 5,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   'team.apply_roles': 1,
@@ -296,6 +316,9 @@ export const JOB_MAX_ATTEMPTS = {
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
+  // Twice a month and its recheck: a refusal of the platform (429, outage) is worth a retry, and a mismatch is
+  // published once per platform and fortnight whatever the attempts.
+  'connector.check_sales': 3,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,
