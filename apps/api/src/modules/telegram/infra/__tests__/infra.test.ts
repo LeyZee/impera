@@ -1,4 +1,10 @@
-import { ConversationIdSchema, CustomAlertIdSchema, DraftIdSchema, newId } from '@nirvana/contracts';
+import {
+  ConversationIdSchema,
+  CustomAlertIdSchema,
+  DraftIdSchema,
+  PlatformAccountIdSchema,
+  newId,
+} from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { FAKE_TOKEN } from '../../__tests__/support/fake-telegram';
@@ -374,6 +380,31 @@ describe('reading the outbox', () => {
         payoutBlock: { reason: 'documents_not_issued', year: '2027' },
       }),
     ).toBeUndefined();
+    // CRM-04 lot b: the sale's kind, the price the fan paid and its seller; the key, the account and the shares stay out.
+    const saleOf = (payload: object) => toScannedEvent({ ...base, type: 'sale_detected', payload })?.signal;
+    const detected = {
+      saleId: '018f3e5c-0000-7000-8000-000000000006',
+      platform: 'reveal',
+      platformAccountId: newId(PlatformAccountIdSchema),
+      saleType: 'ppv',
+      occurredAt: '2026-11-03T20:00:00.000Z',
+      currency: 'EUR',
+      grossInclVatMinor: 4500,
+      netMinor: 3000,
+      agencyMinor: 1500,
+      creatorMinor: 1500,
+      seller: { kind: 'member', memberId: '018f3e5c-0000-7000-8000-000000000001' },
+    };
+    expect(saleOf({ ...detected, platformFanId: 'fan-inventé', fanName: 'Inventé' })).toEqual({
+      kind: 'sale',
+      saleType: 'ppv',
+      currency: 'EUR',
+      grossInclVatMinor: 4500,
+      seller: { kind: 'member', memberId: '018f3e5c-0000-7000-8000-000000000001' },
+    });
+    expect(saleOf({ ...detected, seller: { kind: 'agent' } })).toMatchObject({ seller: { kind: 'agent' } });
+    expect(saleOf({ ...detected, grossInclVatMinor: -100 })).toBeUndefined();
+    expect(saleOf({ ...detected, seller: { kind: 'fan' } })).toBeUndefined();
     // The voice version stays in Nirvana: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

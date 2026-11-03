@@ -1,6 +1,6 @@
 import type { CreatorId, TelegramChatId, TelegramTopic } from '@nirvana/contracts';
 
-import { classify, type AlertNameOf } from '../domain/classify';
+import { classify, type AlertNameOf, type MemberNameOf } from '../domain/classify';
 import { chatsFor } from '../domain/coverage';
 import type {
   AlertNames,
@@ -35,8 +35,16 @@ const SCAN_LIMIT = 500;
  */
 export async function scanEvents(deps: ScanDeps): Promise<number> {
   const cursor = await deps.deliveries.getCursor();
-  const events = await deps.deliveries.readEvents(new Date(cursor.getTime() - SCAN_OVERLAP_MS), SCAN_LIMIT);
-  if (events.length === 0) return 0;
+  const { events, lastReadAt } = await deps.deliveries.readEvents(
+    new Date(cursor.getTime() - SCAN_OVERLAP_MS),
+    SCAN_LIMIT,
+  );
+  if (events.length === 0) {
+    // Rows it cannot read (a payload it does not know): the cursor goes past them, the scan never stalls behind them.
+    if (lastReadAt !== null && lastReadAt > cursor)
+      await deps.deliveries.applyScan({ deliveries: [], cursor: lastReadAt });
+    return 0;
+  }
 
   const [{ routes }, chats, creators] = await Promise.all([
     deps.bots.listRoutes(),
@@ -48,10 +56,11 @@ export async function scanEvents(deps: ScanDeps): Promise<number> {
   );
   const creatorById = new Map<CreatorId, CreatorRecord>(creators.map((creator) => [creator.id, creator]));
   const nameOf = alertNamer(deps.alertNames);
+  const memberNameOf = memberNamer(deps.bots);
 
   let reached = cursor;
   for (const event of events) {
-    const outcome = classify(event.signal, await nameOf(event));
+    const outcome = classify(event.signal, await nameOf(event), await memberNameOf(event));
     let deliveries: readonly NewDelivery[] = [];
     if (outcome?.kind === 'notice') {
       const reach = (topic: TelegramTopic) =>
@@ -72,6 +81,10 @@ export async function scanEvents(deps: ScanDeps): Promise<number> {
     if (event.createdAt > reached) reached = event.createdAt;
     await deps.deliveries.applyScan({ deliveries, cursor: reached });
   }
+  // Unreadable rows after the last readable one: the cursor goes past them too.
+  if (lastReadAt !== null && lastReadAt > reached) {
+    await deps.deliveries.applyScan({ deliveries: [], cursor: lastReadAt });
+  }
   return events.length;
 }
 
@@ -90,6 +103,24 @@ function alertNamer(names: AlertNames | undefined): (event: ScannedEvent) => Pro
     }
     const byId = await hers;
     return (one) => byId.get(one.id) ?? null;
+  };
+}
+
+/** A seller's name, read once a scan per member and only for a sale a member made (CRM-04 lot b). */
+function memberNamer(bots: BotsStore): (event: ScannedEvent) => Promise<MemberNameOf> {
+  const read = new Map<string, Promise<string | null>>();
+  return async (event) => {
+    const { signal } = event;
+    if (signal.kind !== 'sale' || signal.seller.kind !== 'member') return () => null;
+    const { memberId } = signal.seller;
+    let name = read.get(memberId);
+    if (name === undefined) {
+      // A name not read leaves « vendue par un chatteur »: the sale still rings, never held behind a name.
+      name = bots.memberName(memberId).catch(() => null);
+      read.set(memberId, name);
+    }
+    const known = await name;
+    return (id) => (id === memberId ? known : null);
   };
 }
 
