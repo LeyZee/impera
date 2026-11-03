@@ -1,6 +1,7 @@
 import {
   newId,
   ScriptQueueSchema,
+  ScriptStarterListSchema,
   ScriptStructureIdSchema,
   ScriptStructureListSchema,
   ScriptStructureSchema,
@@ -151,6 +152,21 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     expect(await list(owner)).toContain(first.id);
     expect(await list(manager)).toContain(first.id);
     expect(await list(chatter)).toEqual([]);
+  });
+
+  it('offers the starter structures to the agency, and one is duplicated by an ordinary POST', async () => {
+    const starters = async (headers: Record<string, string>) =>
+      server.inject({ method: 'GET', url: '/v1/script-structures/starters', headers });
+    expect((await starters({})).statusCode).toBe(401);
+    const listed = ScriptStarterListSchema.parse((await starters(manager)).json()).starters;
+    const onlyscript = listed.find((starter) => starter.key === 'onlyscript');
+    if (onlyscript === undefined) throw new Error('no OnlyScript starter');
+    const created = await post(owner, { ...onlyscript.body, id: newId(ScriptStructureIdSchema) });
+    expect(created.statusCode).toBe(201);
+    expect(ScriptStructureSchema.parse(created.json()).current).toMatchObject({
+      name: 'Structure de départ',
+      moment: 'both',
+    });
   });
 
   it('refuses what breaks a rule of the structure, with the fault at its place', async () => {

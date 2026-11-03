@@ -184,7 +184,7 @@ describe('service worker', () => {
     worker.stored.set('someone-else', new Map());
     await Promise.all(worker.fire('install', {}).work);
     await Promise.all(worker.fire('activate', {}).work);
-    expect([...worker.stored.keys()].sort()).toEqual(['impera-shell-v3', 'someone-else']);
+    expect([...worker.stored.keys()].sort()).toEqual(['impera-shell-v4', 'someone-else']);
     worker.fire('message', { data: { type: 'something' } });
     expect(worker.skipWaiting).not.toHaveBeenCalled();
     worker.fire('message', { data: { type: 'apply-update' } });
