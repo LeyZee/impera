@@ -34,18 +34,23 @@ export const saleAmount = (sale: HeldSale): string => signedAmountText(sale.netM
 
 /** Why a line waits for a decision, as the validator reads it; `null` for a line a member would be paid for. */
 export function heldReasonText(
-  sale: Pick<HeldSale, 'platform' | 'reason'>,
+  sale: Pick<HeldSale, 'platform' | 'reason' | 'event'>,
   member: SaleMember | null,
   owner: boolean,
 ): string | null {
   const reason: SaleHeldReason | null = sale.reason;
+  const refund = sale.event === 'refund';
   switch (reason) {
     case null:
       return null;
-    case 'chatter_unlinked':
-      return owner
-        ? `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre : relie-le dans Réglages › Ventes et la vente compte seule. Sinon, écarte-la.`
-        : `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-la.`;
+    case 'chatter_unlinked': {
+      const unlinked = `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre`;
+      const otherwise = refund ? 'Sinon, écarte-le.' : 'Sinon, écarte-la.';
+      if (!owner) return `${unlinked} : le propriétaire le relie dans Réglages › Ventes. ${otherwise}`;
+      return refund
+        ? `${unlinked} : relie-le dans Réglages › Ventes et le remboursement se déduit seul. ${otherwise}`
+        : `${unlinked} : relie-le dans Réglages › Ventes et la vente compte seule. ${otherwise}`;
+    }
     case 'off_shift':
       return `${member?.name ?? 'Son chatteur'} n’était ni en poste ni dans sa marge d’accès à l’heure de la vente.`;
     case 'status_unknown':
@@ -78,19 +83,29 @@ export function signalText(
 export const signalChipText = (sale: Pick<HeldSale, 'event'>): string =>
   sale.event === 'sale' ? 'Signalée' : 'Signalé';
 
-/** The decision in force on a line, said on its chip; `null` for none. */
-export function decisionText(sale: Pick<HeldSale, 'decision'>, member: SaleMember | null): string | null {
+/** The decision in force on a line, said on its chip and agreed with its event; `null` for none. */
+export function decisionText(
+  sale: Pick<HeldSale, 'decision' | 'event'>,
+  member: SaleMember | null,
+): string | null {
+  const counted = sale.event === 'sale' ? 'Comptée' : 'Compté';
   switch (sale.decision) {
     case null:
       return null;
     case 'count':
-      return member === null ? 'Comptée' : `Comptée pour ${member.name}`;
+      return member === null ? counted : `${counted} pour ${member.name}`;
     case 'exclude':
-      return 'Écartée';
+      return sale.event === 'sale' ? 'Écartée' : 'Écarté';
   }
 }
 
-/** A gesture's button on the line. */
+/** Why the reader may not decide on a line of their own chatter, agreed with its event. */
+export const ownLineText = (sale: Pick<HeldSale, 'event'>): string =>
+  sale.event === 'sale'
+    ? 'C’est une vente de ton chatteur : un autre membre en décide.'
+    : 'C’est un remboursement de ton chatteur : un autre membre en décide.';
+
+/** A gesture's button on the line: a verb, which says the same of a sale and a refund. */
 export function outcomeLabel(outcome: SaleDecisionOutcome, member: SaleMember | null): string {
   switch (outcome) {
     case 'count':
@@ -111,12 +126,59 @@ export interface OutcomeWords {
 
 const TAKEN_BACK = 'Tu peux retirer la décision tant qu’aucune clôture n’a compté la vente.';
 
-/** The confirmation of a gesture: what it does to the sale, its refunds with it, and that it can be taken back. */
-export function outcomeWords(
+type DecidedLine = Pick<HeldSale, 'reason' | 'memberId' | 'event' | 'saleOccurredAt'>;
+
+/**
+ * The confirmation of a gesture on a refund line. The decision is taken on its sale (CRM-03 lot b3), so it moves the
+ * sale with it, when the register has one and pays it on this net; never an amount.
+ */
+function refundWords(
   outcome: SaleDecisionOutcome,
-  sale: Pick<HeldSale, 'reason' | 'memberId'>,
+  sale: DecidedLine,
   member: SaleMember | null,
 ): OutcomeWords {
+  const alone = sale.saleOccurredAt === null || sale.reason === 'refund_before_base';
+  const takenBack = alone
+    ? 'Tu peux retirer la décision tant qu’aucune clôture ne l’a compté.'
+    : 'Tu peux retirer la décision tant qu’aucune clôture n’a compté sa vente.';
+  switch (outcome) {
+    case 'count':
+      return {
+        title:
+          member === null ? 'Compter ce remboursement ?' : `Compter ce remboursement pour ${member.name} ?`,
+        lead: `Sa vente va sur son relevé, et le remboursement s’en déduit. ${takenBack}`,
+        confirm: outcomeLabel('count', member),
+      };
+    case 'exclude':
+      return {
+        title: 'Écarter ce remboursement ?',
+        lead: alone
+          ? `Il ne se déduira des ventes de personne. ${takenBack}`
+          : `Il ne se déduira des ventes de personne, et sa vente ne comptera pour personne non plus. ${takenBack}`,
+        confirm: 'Écarter',
+      };
+    case 'withdraw':
+      return {
+        title: 'Retirer la décision ?',
+        lead:
+          sale.reason === null
+            ? `Le remboursement suit de nouveau les règles : il se déduit des ventes de ${member?.name ?? 'son membre'}.`
+            : 'Le remboursement suit de nouveau les règles : il attend une décision et ne se déduit des ventes de personne.',
+        confirm: 'Retirer la décision',
+      };
+  }
+}
+
+/**
+ * The confirmation of a gesture: what it does to the sale, its refunds with it, and that it can be taken back; on a
+ * refund line, said of the refund (`refundWords`).
+ */
+export function outcomeWords(
+  outcome: SaleDecisionOutcome,
+  sale: DecidedLine,
+  member: SaleMember | null,
+): OutcomeWords {
+  if (sale.event === 'refund') return refundWords(outcome, sale, member);
   switch (outcome) {
     case 'count':
       return {
