@@ -50,9 +50,9 @@ Vérifié le 03/11 (documentation de Meta et d'outils qui publient par son API) 
 
 ### 6. Les légendes
 
-- Le modèle de langage écrit les légendes dans la voix de la créatrice, avec les gardes de voix existantes, un prompt versionné par sortie et un schéma de sortie. Il ne choisit ni le média, ni l'heure, ni la sortie.
+- Le modèle de langage écrit les légendes dans la voix de la créatrice, avec les gardes de voix, un prompt versionné par sortie et un schéma de sortie. Les gardes bloquantes de la réponse à un fan (au moins `ai_disclosure`, `discount`, `fake_emergency`, `payment_lie`, `love_declaration`, `meeting_promise`, `guilt_trip`) s'appliquent aux légendes, à la génération et à chaque correction. Il ne choisit ni le média, ni l'heure, ni la sortie.
 - **Garde Instagram, dans le code** : aucune mention d'une plateforme adulte, d'un lien, d'un prix ou d'un « lien en bio », cinq mots-clés au plus, longueur bornée. Une légende qui ne passe pas est refusée et réécrite une fois, puis passe en ambre ; elle ne part jamais telle quelle.
-- **Telegram** : la légende vise à faire venir sur Reveal ; le lien vers sa page Reveal est permis. Elle ne dit rien de faux sur le prix (l'abonnement gratuit est vrai), ne promet ni amour ni rencontre, ne montre rien de nu (méthode de chatting). Le ton et les ressorts viendront des exemples de Charles, dans un prompt versionné, avant le code de ce lot.
+- **Telegram** : la légende vise à faire venir sur Reveal ; le lien vers sa page Reveal n'est jamais écrit par le modèle : le code ajoute l'adresse enregistrée dans Réglages, et la garde `contact_info` refuse toute autre adresse dans la légende. Elle ne dit rien de faux sur le prix (l'abonnement gratuit est vrai), ne promet ni amour ni rencontre, ne montre rien de nu (méthode de chatting). Le ton et les ressorts viendront des exemples de Charles, dans un prompt versionné, avant le code de ce lot.
 
 ### 7. Le mot de la créatrice
 
