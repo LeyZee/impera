@@ -1,5 +1,5 @@
 # CR-06 Dépôt de contenu : feed et Mass DM, depuis le téléphone
-Statut : todo (ADR 0044 § 1 et § 2, acceptée par Charles le 02/11/2026)
+Statut : in_progress (lot a fait ; ADR 0044 § 1 et § 2, acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0044)
 Dépend de : CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037)
 Branche : task/cr-06-content-drops
@@ -40,3 +40,5 @@ La créatrice dépose une séance ou une vidéo pour le feed, ou des médias pou
 Le plan de publication et l'envoi vers Reveal (CR-08, CR-11).
 
 ## Notes de session
+- 03/11, lot a (migration 0106) : contrats (`content-drops.ts` : catégories, règles de format par catégorie, dépôts, fichiers déclarés, demandes, erreurs), tables `content_requests`, `content_drops`, `content_drop_files` avec FORCE RLS, politiques étroites et deux déclencheurs (elle dépose, retire un dépôt que rien n'a programmé, refuse une demande ; l'agence dépose pour elle, corrige une catégorie au journal, retire, demande, annule ; un dépôt retiré et une demande close ne reviennent jamais), module `content-drops` et ses routes. Le découpage : b envoi direct, nettoyage (ffprobe, EXIF, GPS, atomes QuickTime), empreinte, doublons, CSP, MinIO ; c effacement daté et `released/` ; d écran Contenu et captures.
+- Reste après le lot a : la tâche d'Agenda d'une demande et ses deux rappels (avec le fil de l'Agenda, CR-05 b), les demandes nées du stock et de la cadence (jobs), les seuils de stock et le réglage des règles de format par l'agence (avec l'écran), la description par `sense` (clé de vision).
