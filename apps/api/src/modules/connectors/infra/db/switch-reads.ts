@@ -1,5 +1,5 @@
 import { CalendarDaySchema, PlatformSchema, type Platform, type PlatformAccountId } from '@nirvana/contracts';
-import { eq, schema, sql, type Transaction } from '@nirvana/db';
+import { and, eq, schema, sql, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
 const { platformAccounts, salesFeedChecks, salesFeedModels } = schema;
@@ -42,7 +42,9 @@ async function switchFactsOf(
   const [model] = await tx
     .select({ platformModelId: salesFeedModels.platformModelId })
     .from(salesFeedModels)
-    .where(eq(salesFeedModels.platformAccountId, platformAccountId));
+    .where(
+      and(eq(salesFeedModels.platformAccountId, platformAccountId), eq(salesFeedModels.platform, platform)),
+    );
   const [check] = await tx
     .select({ clean: salesFeedChecks.clean, fromDay: salesFeedChecks.fromDay, toDay: salesFeedChecks.toDay })
     .from(salesFeedChecks)
