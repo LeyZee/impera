@@ -86,6 +86,7 @@ function health(): HealthReport {
     providers: [],
     costTodayUsd: 0,
     budget: { day: '2026-10-29', spentEur: 0, capEur: 20, alertAtEur: 16, state: 'ok' },
+    trendWatchBudget: { day: '2026-10-29', spentEur: 0, capEur: 1, alertAtEur: 0.8, state: 'ok' },
   };
 }
 

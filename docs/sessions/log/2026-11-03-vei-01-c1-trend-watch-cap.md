@@ -1,0 +1,7 @@
+# 2026-11-03 — VEI-01 lot c1 : plafond de veille — done
+Fait : `LlmPurposeSchema` (`chatting`, `trend_watch`) dans les contrats ; `llm_calls.purpose` (migration 0105, `chatting` par défaut pour tout le journal existant) ; `CallTrace.purpose` dans `packages/llm`, porté jusqu'au journal ; `budgetStatus` somme un usage à part ; un appel de veille est refusé au plafond de veille (`trend_watch_budget_reached`) ou au plafond du jour (`budget_reached`), un appel `chatting` seulement au plafond du jour ; `dailyBudget.trendWatchCapEur` (1 €) et `deps.trendWatchCapEur` ; `health().trendWatchBudget` ; le journal `llm_calls` écrit et relit l'usage.
+Pas fait : lot c2 (captures pour la vision), lot d.
+Décisions : `chatting` reste implicite dans le journal en mémoire (absent = `chatting`), comme la passerelle l'écrit ; le plafond de veille n'est pas annoncé sur Telegram : l'agence le lit en ambre sur l'écran de la veille (ADR 0060 § 7), l'alerte reste celle du plafond du jour ; un code d'échec distinct, pour que les jobs de veille s'arrêtent jusqu'à minuit sans confondre avec le plafond du jour.
+Découvertes : le réglage du plafond par le propriétaire n'existe pas encore, ni pour le plafond du jour (`dailyCapEur` n'est câblé nulle part dans l'API) ni pour celui de la veille ; à faire avec l'écran de Réglages.
+Candidats à suppression : rien.
+Vérifié : `packages/llm` 57/57 ✓, `llm-call-store` en intégration 3/3 ✓, `pnpm drift` ✓.
