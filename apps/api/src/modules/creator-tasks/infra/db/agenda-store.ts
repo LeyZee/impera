@@ -18,12 +18,13 @@ import {
 } from '@impera/db';
 
 import { addDays, calendarDayIn, isoWeekday, wallClockToInstant } from '../../../scheduling/pure';
-import { applyTicks, type Tick } from '../../domain/completion';
+import { applyTicks, tickTimely, type Tick } from '../../domain/completion';
 import {
   AvailabilityNotFound,
   CreatorTaskChanged,
   CreatorTaskNotFound,
   CreatorTickDayUnprocessable,
+  CreatorTickLateUnprocessable,
   SuggestionKindChanged,
   SuggestionNotFound,
   SuggestionUndated,
@@ -236,6 +237,22 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
           ),
         ];
         if (offDay.length > 0) throw new CreatorTickDayUnprocessable(offDay);
+        const late = [
+          ...new Set(
+            body.ticks
+              .filter(
+                (tick) =>
+                  !tickTimely(
+                    { taskId: tick.taskId, day: tick.day, doneAt: new Date(tick.doneAt) },
+                    byId.get(tick.taskId)?.kind === 'routine',
+                    now,
+                    zone,
+                  ),
+              )
+              .map((tick) => tick.taskId),
+          ),
+        ];
+        if (late.length > 0) throw new CreatorTickLateUnprocessable(late);
         const existing = await tx.select().from(ticks).where(inArray(ticks.taskId, ids));
         const { added } = applyTicks(
           existing.map((row) => ({ taskId: row.taskId, day: row.day, doneAt: row.doneAt })),

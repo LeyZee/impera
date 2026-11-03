@@ -1,3 +1,5 @@
+import { calendarDayIn } from '../../scheduling/pure';
+
 /**
  * Her ticks (ADR 0042 § 8): a task is done once on a given day, whatever the number of taps or of replays from her
  * phone back online. A tick is named by its task and its day, never by when it reached the server.
@@ -30,4 +32,21 @@ export function applyTicks(
     if (earlier === undefined || tick.doneAt < earlier.doneAt) added.set(key, tick);
   }
   return { ticks: [...existing, ...added.values()], added: [...added.values()] };
+}
+
+/** How old a tick may be when it reaches the server, kept offline on her phone (ADR 0042 § 8). */
+const TICK_MAX_AGE_HOURS = 48;
+
+/** How far ahead of the server's clock her phone's may be. */
+const TICK_CLOCK_SKEW_MS = 5 * 60_000;
+
+/**
+ * Whether a tick may count (ADR 0042 § 8): made at most 48 h before it arrives and not later than now, give or take her
+ * phone's clock. A routine tick is for the day she ticked it in her zone, the server's reading of it, never another:
+ * her streak is not mended afterwards. A dated task may be ticked ahead or late within the 48 h, on its own day.
+ */
+export function tickTimely(tick: Tick, routine: boolean, now: Date, timeZone: string): boolean {
+  const age = now.getTime() - tick.doneAt.getTime();
+  if (age > TICK_MAX_AGE_HOURS * 3_600_000 || age < -TICK_CLOCK_SKEW_MS) return false;
+  return !routine || calendarDayIn(tick.doneAt, timeZone) === tick.day;
 }

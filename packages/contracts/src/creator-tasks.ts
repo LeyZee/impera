@@ -120,7 +120,9 @@ export type CreatorTick = z.infer<typeof CreatorTickSchema>;
 
 /**
  * `POST /v1/creator-space/ticks` (creator): her ticks, one or the ones her phone kept offline. Replayed any number of
- * times, in any order, they add nothing twice (`applyTicks`). A tick for a day the task does not have is refused.
+ * times, in any order, they add nothing twice (`applyTicks`). A tick for a day the task does not have is refused, and
+ * so is one made more than 48 h ago, or a routine tick for another day than the one she ticked it in her zone
+ * (422 `creator_tick_late_unprocessable`, ADR 0042 § 8).
  */
 export const CreatorTicksBodySchema = z.strictObject({ ticks: z.array(CreatorTickSchema).min(1).max(200) });
 export type CreatorTicksBody = z.infer<typeof CreatorTicksBodySchema>;
@@ -135,12 +137,11 @@ export const AvailabilityWhenSchema = z
       kind: z.literal('weekly'),
       weekday: IsoDaySchema,
       startMinute: MinuteOfDaySchema,
-      /** After `startMinute`, at most a day later: 22 h – 2 h ends at 26 × 60. */
-      endMinute: z
-        .number()
-        .int()
-        .min(1)
-        .max(2 * CREATOR_TASK_MAX_MINUTES - 1),
+      /**
+       * The convention of `scheduling` (`calendar.ts`): an end at or before the start is the next day's, 22 h – 2 h is
+       * `{ 1320, 120 }`, and an end equal to its start is a whole day.
+       */
+      endMinute: MinuteOfDaySchema,
     }),
     z.strictObject({ kind: z.literal('once'), startsAt: z.iso.datetime(), endsAt: z.iso.datetime() }),
   ])
@@ -270,6 +271,7 @@ export type AgencySuggestionList = z.infer<typeof AgencySuggestionListSchema>;
 export const CREATOR_TASK_NOT_FOUND = 'creator_task_not_found';
 export const CREATOR_TASK_CHANGED_CONFLICT = 'creator_task_changed_conflict';
 export const CREATOR_TICK_DAY_UNPROCESSABLE = 'creator_tick_day_unprocessable';
+export const CREATOR_TICK_LATE_UNPROCESSABLE = 'creator_tick_late_unprocessable';
 export const AVAILABILITY_NOT_FOUND = 'availability_not_found';
 export const SUGGESTION_NOT_FOUND = 'creator_suggestion_not_found';
 export const SUGGESTION_DECIDED_CONFLICT = 'creator_suggestion_decided_conflict';

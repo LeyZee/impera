@@ -3,6 +3,7 @@ import {
   CREATOR_TASK_CHANGED_CONFLICT,
   CREATOR_TASK_NOT_FOUND,
   CREATOR_TICK_DAY_UNPROCESSABLE,
+  CREATOR_TICK_LATE_UNPROCESSABLE,
   DomainError,
   SUGGESTION_DECLINED_RECENTLY_CONFLICT,
   SUGGESTION_ID_CONFLICT,
@@ -35,6 +36,17 @@ export class CreatorTickDayUnprocessable extends DomainError {
     super(CREATOR_TICK_DAY_UNPROCESSABLE, 'Cette tâche n’est pas prévue ce jour-là', {
       details: { taskIds },
     });
+  }
+}
+
+/** A tick too old, or a routine tick for another day than the one she ticked it (ADR 0042 § 8). */
+export class CreatorTickLateUnprocessable extends DomainError {
+  constructor(taskIds: readonly string[]) {
+    super(
+      CREATOR_TICK_LATE_UNPROCESSABLE,
+      'Une coche compte le jour où tu la fais, et au plus 48 heures après',
+      { details: { taskIds } },
+    );
   }
 }
 

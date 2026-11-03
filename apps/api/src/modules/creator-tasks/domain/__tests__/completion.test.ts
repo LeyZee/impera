@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyTicks, type Tick } from '../completion';
+import { applyTicks, tickTimely, type Tick } from '../completion';
 import { dayRecordOf, dayOutcome } from '../streak';
 
 const tick = (taskId: string, day: string, doneAt: string): Tick => ({
@@ -33,6 +33,33 @@ describe('her ticks (ADR 0042 § 8)', () => {
   it('keeps the same task on two days apart: a routine task is ticked each day', () => {
     const tomorrow = tick('shoot', '2026-11-04', '2026-11-03T23:30:00.000Z');
     expect(applyTicks([first], [tomorrow]).added).toEqual([tomorrow]);
+  });
+});
+
+describe('a tick that may count (ADR 0042 § 8)', () => {
+  // Paris is UTC+1 after 25/10: 23:30Z on the 3rd is 0 h 30 on the 4th.
+  const now = new Date('2026-11-04T10:00:00.000Z');
+  const zone = 'Europe/Paris';
+
+  it('takes a tick kept offline up to 48 h, never older nor ahead of the clock', () => {
+    expect(tickTimely(tick('post', '2026-11-02', '2026-11-02T10:00:00.000Z'), false, now, zone)).toBe(true);
+    expect(tickTimely(tick('post', '2026-11-02', '2026-11-02T09:59:00.000Z'), false, now, zone)).toBe(false);
+    expect(tickTimely(tick('post', '2026-11-04', '2026-11-04T10:04:00.000Z'), false, now, zone)).toBe(true);
+    expect(tickTimely(tick('post', '2026-11-04', '2026-11-04T10:06:00.000Z'), false, now, zone)).toBe(false);
+  });
+
+  it('reads a routine tick on her day when she ticked it, never another one', () => {
+    expect(tickTimely(tick('stretch', '2026-11-04', '2026-11-03T23:30:00.000Z'), true, now, zone)).toBe(true);
+    expect(tickTimely(tick('stretch', '2026-11-03', '2026-11-03T23:30:00.000Z'), true, now, zone)).toBe(
+      false,
+    );
+    expect(tickTimely(tick('stretch', '2026-11-03', '2026-11-04T09:00:00.000Z'), true, now, zone)).toBe(
+      false,
+    );
+  });
+
+  it('lets a dated task be ticked ahead of its day', () => {
+    expect(tickTimely(tick('post', '2026-11-05', '2026-11-04T09:00:00.000Z'), false, now, zone)).toBe(true);
   });
 });
 
