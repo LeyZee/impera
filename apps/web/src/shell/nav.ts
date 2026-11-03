@@ -67,7 +67,7 @@ const ITEMS: Readonly<Record<Section, { readonly label: string; readonly icon: N
 
 /**
  * Which rail an account gets. `operator` is today's operator: no team row, so no team tab. `creator` is a creator in
- * the CRM until her own app (EQ-09): never Suivi, since she never sees a conversation (ADR 0023).
+ * her own space (ADR 0042 § 8): Aujourd'hui · Agenda · Ventes · Contenu · Moi, each once its screen exists.
  */
 export type RailKind = 'owner' | 'manager' | 'chatter' | 'operator' | 'creator';
 
@@ -127,20 +127,21 @@ const RAILS: Readonly<Record<RailKind, RailPlan>> = {
     settings: false,
     phone: ['/', '/suivi', '/creatrices'],
   },
+  // Agenda (CR-05), Ventes (CR-04) and Contenu (CR-06) join it with their screens; her persona lives in Moi.
   creator: {
     sections: [
-      ['/', null],
-      ['/creatrices', 'agency'],
+      ['/aujourdhui', null],
+      ['/moi', null],
     ],
     settings: false,
-    phone: ['/', '/creatrices'],
+    phone: ['/aujourdhui', '/moi'],
   },
 };
 
 /**
  * The owner gets his rail; a manager gets his while his scope is `agency`; any other team member, a manager on leave
- * included, gets the chatter's, as his scope does. An operator without a team row keeps today's rail; a creator, until
- * her own app (EQ-09), keeps it without Suivi.
+ * included, gets the chatter's, as his scope does. An operator without a team row keeps today's rail; a creator gets
+ * her own space's.
  */
 export function railKindOf(me: Me): RailKind {
   if (me.role === 'owner') return 'owner';
@@ -202,11 +203,6 @@ export interface Rail {
   readonly more: ReadonlySet<ReadySection>;
 }
 
-/** A creator's Créatrices is her own persona alone: her tab says so (NAV-18). */
-function labelOf(kind: RailKind, section: Section): string {
-  return kind === 'creator' && section === '/creatrices' ? 'Persona' : ITEMS[section].label;
-}
-
 /** The rail of the signed-in account, with the screens that exist today. */
 export function railOf(me: Me): Rail {
   const kind = railKindOf(me);
@@ -215,7 +211,6 @@ export function railOf(me: Me): Rail {
     to,
     family,
     ...ITEMS[to],
-    label: labelOf(kind, to),
   });
   const items: NavItem[] = [];
   for (const [to, family] of layout.sections) if (isReady(to)) items.push(item(to, family));
@@ -236,9 +231,9 @@ export function sectionOf(pathname: string): Section | null {
   return SECTIONS.find((section) => section === first) ?? null;
 }
 
-/** What a section is called, in the rail and in the tab's title: as the account's own rail names it. */
-export function sectionLabel(section: Section, kind?: RailKind): string {
-  return kind === undefined ? ITEMS[section].label : labelOf(kind, section);
+/** What a section is called, in the rail and in the tab's title. */
+export function sectionLabel(section: Section): string {
+  return ITEMS[section].label;
 }
 
 /**
@@ -259,6 +254,7 @@ const SCREENS = {
   '/paie/exports': 'Exports',
   '/commissions/factures': 'Factures',
   '/moi/dossier': 'Dossier',
+  '/moi/persona': 'Persona',
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
@@ -275,7 +271,7 @@ export type ScreenPath = keyof typeof SCREENS;
 
 /**
  * Where an account finds its own sessions and backup codes (SEC-04), from its menu: the owner in Réglages, a manager or
- * a chatter in Moi, anyone else (an operator, a creator) on a page outside the rail.
+ * a chatter or a creator in Moi, an operator on a page outside the rail.
  */
 export const ACCOUNT_SECURITY = '/compte/securite';
 export function securityPathOf(me: Me): '/reglages/securite' | '/moi/securite' | typeof ACCOUNT_SECURITY {
@@ -296,14 +292,14 @@ const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
 ]);
 
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
-export function documentTitle(pathname: string, section: Section | null, kind: RailKind): string {
+export function documentTitle(pathname: string, section: Section | null): string {
   const offRail = OFF_RAIL_TITLES.get(pathname.replace(/\/+$/u, ''));
   if (offRail !== undefined) return `${offRail} · Nirvana`;
   if (section === null) return 'Page introuvable · Nirvana';
   const path = pathname.replace(/\/+$/u, '');
   // A section's own page is no screen of its own: « Suivi · Nirvana », not « Conversations · Suivi ».
   const screen = path === section ? undefined : SCREEN_TITLES.get(path);
-  const label = sectionLabel(section, kind);
+  const label = sectionLabel(section);
   return `${screen === undefined ? '' : `${screen} · `}${label} · Nirvana`;
 }
 

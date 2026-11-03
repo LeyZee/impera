@@ -30,11 +30,26 @@ function stageWords(stage: Extract<ScriptSegment, { kind: 'stage' }>): string {
   return ` ${normaliseWords(texts.join(' '))} `;
 }
 
+/** What a segment is read as, against which entries: a bridge twice, its teaser said and its slots shot. */
+function readings(
+  segment: ScriptSegment,
+  forStage: ReturnType<typeof prepared>,
+  forBridge: ReturnType<typeof prepared>,
+): { readonly words: string; readonly terms: ReturnType<typeof prepared> }[] {
+  if (segment.kind === 'stage') return [{ words: stageWords(segment), terms: forStage }];
+  const shot = segment.mediaSlots.map((slot) => slot.hint ?? '').join(' ');
+  return [
+    { words: ` ${normaliseWords(segment.teaser)} `, terms: forBridge },
+    { words: ` ${normaliseWords(shot)} `, terms: forStage },
+  ];
+}
+
 /**
  * The segments of a structure that touch one of her limits, read in code (never by a model): a stage against what she
- * never does, never shows and is disgusted by; a bridge's teaser against what she never says and is disgusted by. An
- * entry matches as whole words, case, accents and look-alike letters set aside (`normaliseWords`), so « pieds » blocks
- * « Pieds nus » and not « trépied ». One block per segment and entry. Empty: the structure can be asked of her.
+ * never does, never shows and is disgusted by; a bridge's teaser against what she never says and is disgusted by, and
+ * the hints of its media slots, which she shoots, as a stage's (Agent's review of SC-01 b). An entry matches as whole
+ * words, case, accents and look-alike letters set aside (`normaliseWords`), so « pieds » blocks « Pieds nus » and not
+ * « trépied ». One block per segment and entry. Empty: the structure can be asked of her.
  */
 export function disgustBlocks(
   segments: readonly ScriptSegment[],
@@ -44,14 +59,14 @@ export function disgustBlocks(
   const forBridge = prepared(bridgeTerms(limits));
   const blocks: ScriptDisgustBlock[] = [];
   for (const segment of segments) {
-    const stage = segment.kind === 'stage';
-    const words = stage ? stageWords(segment) : ` ${normaliseWords(segment.teaser)} `;
+    const stageName = segment.kind === 'stage' ? segment.name : segment.teaser;
     const found = new Set<string>();
-    for (const { term, words: needle } of stage ? forStage : forBridge) {
-      if (found.has(needle) || !words.includes(` ${needle} `)) continue;
-      found.add(needle);
-      blocks.push({ key: segment.key, stageName: stage ? segment.name : segment.teaser, term });
-    }
+    for (const { words, terms } of readings(segment, forStage, forBridge))
+      for (const { term, words: needle } of terms) {
+        if (found.has(needle) || !words.includes(` ${needle} `)) continue;
+        found.add(needle);
+        blocks.push({ key: segment.key, stageName, term });
+      }
   }
   return blocks;
 }

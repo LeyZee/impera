@@ -56,6 +56,19 @@ Le pooler de Neon (hôte en `-pooler`) est interdit : Graphile Worker a besoin d
 2. Domaine : sur le service **`web` seulement**, port 8080 (ex. `https://app.<domaine>`). Aucun domaine sur `api`, `worker`, `migrate`.
 3. Cocher « Include Source Commit in Build » : `SOURCE_COMMIT` devient le tag de l'image et `RELEASE` (Sentry, battement du worker).
 4. Déploiement automatique sur push de `main` : oui. `main` ne change que par une PR verte.
+5. **Journal d'accès du proxy.** Le jeton d'un lien de calendrier est dans le chemin (`/v1/calendar-feed/<jeton>.ics`), et quiconque lit ce chemin lit les shifts de son titulaire. L'API ne le journalise pas, et le `nginx` de `web` non plus ; le Traefik de Coolify ne doit pas le garder non plus.
+   - Coolify → Servers → le serveur : **laisser « Traffic analytics » désactivé**. Activé, Coolify écrit un journal d'accès JSON (`/traefik/access.log`, chemin, User-Agent et Referer gardés). Tant qu'il est actif, Coolify retire aussi toute option `--accesslog…` ajoutée à la main : on ne peut alors pas en ôter le chemin.
+   - Proxy → Configuration : par défaut, la commande de `traefik` n'a aucun `--accesslog`, et rien n'est à faire. Si quelqu'un en a ajouté un pour un dépannage, ajouter sous `command:` les deux lignes suivantes, puis « Save » et « Restart Proxy » (Traefik n'a pas de filtre par chemin : on retire le chemin de toutes les lignes) :
+
+     ```yaml
+     - '--accesslog.fields.names.RequestPath=drop'
+     - '--accesslog.fields.names.RequestLine=drop'
+     ```
+
+   - Désactiver l'analyse remet les `--accesslog…` faits à la main que Coolify avait gardés de côté : après une activation puis une désactivation, repasser par Proxy → Configuration.
+   - Le journal général de Traefik (`--log.level`) est autre chose que le journal d'accès : ne pas laisser `--log.level=DEBUG` après un dépannage, car ce niveau écrit les requêtes.
+   - Vérifier : ouvrir une fois son propre lien de calendrier, puis, dans Coolify → Servers → le serveur → Terminal, `docker exec coolify-proxy sh -c 'grep -c calendar-feed /traefik/access.log'` doit répondre `0`, ou « No such file » s'il n'y a pas de journal.
+   - Si un Cloudflare est mis un jour devant le domaine, ses journaux (Logpush) gardent aussi le chemin : ne pas les activer pour ce domaine, ou en ôter le chemin.
 
 ### 1.3 Variables
 

@@ -262,7 +262,8 @@ export async function audit(
       | 'shift_swap'
       | 'shift_report'
       | 'shift_feedback'
-      | 'account_pay_rules';
+      | 'account_pay_rules'
+      | 'creator_agency_rate';
     readonly id: string;
   },
   details: Record<string, unknown> = {},

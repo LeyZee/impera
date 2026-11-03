@@ -80,9 +80,11 @@ Date : AAAA-MM-JJ
 | 0053 | Clé d'accès (Face ID, empreinte) : un geste vaut mot de passe et code | accepted (précise 0046 § 1, 3, 5 à 8) |
 | 0054 | Gains de la créatrice : les chiffres de Reveal dès que son modèle est relié, sans attendre la bascule | accepted (remplace dans 0042 § 6 la phrase sur la source des ventes ; précise 0042 § 6 et 0050 § 8) |
 | 0055 | Dépôt de contenu : la créatrice range chaque dépôt dans sa catégorie, l'agence lui demande ce qui manque | accepted (remplace dans 0044 § 1 l'usage à deux valeurs, et § 2 le départ des 30 jours) |
-| 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés) |
+| 0056 | Scripts : l'agence écrit ses structures, la créatrice tourne carton par carton, Nirvana range dans l'ordre et téléverse | accepted (remplace 0030 § 2 et § 4 pour les scripts déposés ; § 3, phrase sur la palette, remplacée par 0064) |
 | 0057 | Instagram et Telegram : deux connecteurs de publication, par les API officielles, dans le même plan que le feed | accepted |
 | 0058 | Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui | accepted (amende 0026 § 5 pour la seule publication) |
 | 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |
+| 0060 | Veille et idées de contenu : signaux de sources propres, capture passive par l'extension, idées filtrées par le code et validées par l'agence | accepted |
 | 0062 | Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel | accepted |
 | 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte ») |
+| 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | accepted (remplace dans 0056 § 3 la phrase sur la palette) |

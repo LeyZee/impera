@@ -1,6 +1,6 @@
 {
-  "id": "42c8a00c-bde6-4a07-8ba7-ede05a235cd9",
-  "prevId": "36af16ad-5817-4401-b60f-24003102c6b6",
+  "id": "5d2626bb-f623-4fe3-baf5-05cb4500b00b",
+  "prevId": "a67fc897-649d-479e-a55d-0fa8cd21e82c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7191,6 +7191,101 @@
       },
       "isRLSEnabled": false
     },
+    "public.creator_agency_rates": {
+      "name": "creator_agency_rates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_day": {
+          "name": "from_day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agency_bps": {
+          "name": "agency_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "creator_agency_rates_creator_id_creators_id_fk": {
+          "name": "creator_agency_rates_creator_id_creators_id_fk",
+          "tableFrom": "creator_agency_rates",
+          "columnsFrom": ["creator_id"],
+          "tableTo": "creators",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "creator_agency_rates_created_by_user_id_fk": {
+          "name": "creator_agency_rates_created_by_user_id_fk",
+          "tableFrom": "creator_agency_rates",
+          "columnsFrom": ["created_by"],
+          "tableTo": "user",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "creator_agency_rates_creator_day_unique": {
+          "name": "creator_agency_rates_creator_day_unique",
+          "columns": ["creator_id", "from_day"],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "owner_read": {
+          "name": "owner_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"creator_agency_rates\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"creator_agency_rates\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_agency_rates\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "creator_agency_rates_bps_check": {
+          "name": "creator_agency_rates_bps_check",
+          "value": "\"creator_agency_rates\".\"agency_bps\" between 0 and 10000"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.exchange_rates": {
       "name": "exchange_rates",
       "schema": "",
@@ -12243,6 +12338,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "color": {
+          "name": "color",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"primary\":\"#b0213a\",\"secondary\":\"#c8283f\",\"accent\":\"#d8324b\"}'::jsonb"
+        },
         "frozen_at": {
           "name": "frozen_at",
           "type": "timestamp with time zone",
@@ -12342,6 +12444,10 @@
         "script_structure_versions_segments_check": {
           "name": "script_structure_versions_segments_check",
           "value": "jsonb_typeof(\"script_structure_versions\".\"segments\") = 'array' and jsonb_array_length(\"script_structure_versions\".\"segments\") >= 1"
+        },
+        "script_structure_versions_color_check": {
+          "name": "script_structure_versions_color_check",
+          "value": "jsonb_typeof(\"script_structure_versions\".\"color\") = 'object'"
         },
         "script_structure_versions_moment_check": {
           "name": "script_structure_versions_moment_check",
