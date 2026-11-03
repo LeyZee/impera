@@ -354,9 +354,18 @@ export const TREND_CAPTURE_VISION_UNAVAILABLE = 'trend_capture_vision_unavailabl
  * or refused; a validated idea becomes a suggestion in her agenda, its « à tourner » her shooting sheet.
  * ---------------------------------------------------------------------------------------------------------------- */
 
-/** `GET /v1/creators/:creatorId/ideas?day=` (owner, active manager): the ideas proposed on one of her days. */
-export const ContentIdeasQuerySchema = z.strictObject({ day: CalendarDaySchema });
-export const ContentIdeaListSchema = z.strictObject({ items: z.array(ContentIdeaSchema) });
+/**
+ * `GET /v1/creators/:creatorId/ideas?day=` (owner, active manager): the ideas proposed on one of her days, today in her
+ * zone when `day` is left out. Each with the signal it cites, which the agency reads and she never does.
+ */
+export const ContentIdeasQuerySchema = z.strictObject({ day: CalendarDaySchema.optional() });
+export const ContentIdeaOfDaySchema = ContentIdeaSchema.extend({ signal: TrendSignalSchema });
+export type ContentIdeaOfDay = z.infer<typeof ContentIdeaOfDaySchema>;
+export const ContentIdeaListSchema = z.strictObject({
+  /** The day read, in her zone. */
+  day: CalendarDaySchema,
+  items: z.array(ContentIdeaOfDaySchema),
+});
 export type ContentIdeaList = z.infer<typeof ContentIdeaListSchema>;
 
 /** What the agency may correct of an idea before validating it: never its origin signal. */

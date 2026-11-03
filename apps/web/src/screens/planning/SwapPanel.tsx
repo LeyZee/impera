@@ -3,7 +3,7 @@ import { useId, useState, type JSX } from 'react';
 
 import { proposeSwap, useRefreshPlanning, useSwapCandidates, type Refusal } from '@/scheduling/api';
 import { READ_AGAIN, swapRefusalText, swapShiftLine } from '@/scheduling/model';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 type Candidate = SwapCandidates['candidates'][number];
 

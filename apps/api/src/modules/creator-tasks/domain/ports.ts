@@ -57,3 +57,13 @@ export interface ShootSuggestion {
   readonly shootBrief: string;
   readonly minutes: number;
 }
+
+/** A task of her reminder, read by the job (CR-05 lot b3): null once removed. */
+export interface ReminderSource {
+  reminderOf(taskId: string): Promise<{
+    readonly task: CreatorTask;
+    readonly timeZone: string;
+    /** Her own accounts: told each on its devices, under its quiet hours and its daily cap. */
+    readonly accounts: readonly string[];
+  } | null>;
+}

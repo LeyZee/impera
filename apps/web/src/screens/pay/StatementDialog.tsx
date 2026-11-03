@@ -39,7 +39,7 @@ import {
 } from '@/reports/model';
 import { dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 type Mode = 'read' | 'pay' | 'check' | 'adjust';
 

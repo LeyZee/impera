@@ -4,7 +4,7 @@ import { useId, useState, type JSX } from 'react';
 import { askLeave, useRefreshPlanning, type Refusal } from '@/scheduling/api';
 import { ERROR_MESSAGES, leaveDaysLine, leaveLength, READ_AGAIN } from '@/scheduling/model';
 import { cityOf, daysFrom } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 

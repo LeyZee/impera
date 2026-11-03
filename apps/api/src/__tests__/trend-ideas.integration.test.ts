@@ -168,12 +168,28 @@ describe('/v1/creators/:creatorId/ideas', () => {
     const ideaId = await seedIdea(nora, { title: 'Idée de la liste' });
     const list = await call('GET', `/v1/creators/${nora}/ideas?day=${TODAY}`, cookies.manager);
     expect(list.statusCode, list.body).toBe(200);
-    expect(ContentIdeaListSchema.parse(list.json()).items.map((idea) => idea.id)).toContain(ideaId);
+    const listed = ContentIdeaListSchema.parse(list.json());
+    expect(listed.day).toBe(TODAY);
+    const one = listed.items.find((idea) => idea.id === ideaId);
+    // The signal it cites comes with it, for the agency only.
+    expect(one?.signal).toMatchObject({ source: 'agency_link', text: 'Une transition tenue inventée' });
     const chatter = await call('GET', `/v1/creators/${nora}/ideas?day=${TODAY}`, cookies.chatter);
     expect([chatter.statusCode, codeOf(chatter)]).toEqual([403, 'content_idea_forbidden']);
     expect((await call('GET', `/v1/creators/${nora}/ideas?day=${TODAY}`, cookies.nora)).statusCode).toBe(403);
     const otherDay = await call('GET', `/v1/creators/${nora}/ideas?day=2026-11-04`, cookies.owner);
-    expect(ContentIdeaListSchema.parse(otherDay.json()).items).toEqual([]);
+    expect(ContentIdeaListSchema.parse(otherDay.json())).toEqual({ day: '2026-11-04', items: [] });
+    // Without a day: today in her zone.
+    const today = ContentIdeaListSchema.parse(
+      (await call('GET', `/v1/creators/${nora}/ideas`, cookies.owner)).json(),
+    );
+    expect(today.day).toBe(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()),
+    );
   });
 
   it('turns a corrected idea into a suggestion in her first room, its « à tourner » her sheet; replayed, nothing more', async () => {

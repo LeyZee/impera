@@ -1,5 +1,6 @@
 import {
   CreatorTaskWhenSchema,
+  JOB_MAX_ATTEMPTS,
   newId,
   CreatorTaskIdSchema,
   type CreatorStreak,
@@ -30,6 +31,7 @@ import {
   SuggestionUndated,
 } from '../../domain/errors';
 import type { CreatorAgendaStore } from '../../domain/ports';
+import { reminderAt } from '../../domain/reminder';
 import { dayRecordOf, streakOf, type DueTask } from '../../domain/streak';
 import { decide, weekOf } from '../../domain/suggestions';
 
@@ -51,6 +53,28 @@ const suggestions = schema.creatorSuggestions;
 const STREAK_LOOKBACK_DAYS = 400;
 
 type TaskRow = typeof tasks.$inferSelect;
+
+/**
+ * Her reminder, with the task's write (CR-05 lot b3): one job per task, replaced on each write, so a move puts it at
+ * the new time. A task without a reminder enqueues nothing; a job left from before finds its start changed and rings
+ * nothing (`reminderMessage`). A write after the reminder rang (a title changed, same start) puts the job back at a
+ * time already past: it runs at once, and `notify` answers `duplicate` for the same task and start.
+ */
+async function scheduleReminder(tx: Transaction, task: CreatorTask): Promise<void> {
+  const at = reminderAt(task);
+  if (at === null || task.when.kind !== 'timed') return;
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => ${'creator_tasks.remind'},
+      payload => ${JSON.stringify({ taskId: task.id, startsAt: task.when.startsAt })}::jsonb,
+      queue_name => null,
+      run_at => ${at.toISOString()}::timestamptz,
+      max_attempts => ${JOB_MAX_ATTEMPTS['creator_tasks.remind']}::int,
+      job_key => ${`creator_tasks.remind:${task.id}`},
+      job_key_mode => ${'replace'}
+    )`,
+  );
+}
 
 async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
@@ -170,7 +194,11 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
           createdBy: userId,
         };
         const [inserted] = await tx.insert(tasks).values(values).onConflictDoNothing().returning();
-        if (inserted !== undefined) return taskOf(inserted);
+        if (inserted !== undefined) {
+          const task = taskOf(inserted);
+          await scheduleReminder(tx, task);
+          return task;
+        }
         // Replayed from her phone: the same task answers itself, anything else was another use of the id.
         const [stored] = await tx.select().from(tasks).where(eq(tasks.id, body.id));
         if (stored?.archivedAt !== null) throw new CreatorTaskChanged();
@@ -202,7 +230,9 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
           .where(eq(tasks.id, taskId))
           .returning();
         if (updated === undefined) throw new CreatorTaskNotFound();
-        return taskOf(updated);
+        const task = taskOf(updated);
+        await scheduleReminder(tx, task);
+        return task;
       }),
 
     archiveTask: (userId, taskId) =>

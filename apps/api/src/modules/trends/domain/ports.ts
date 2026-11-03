@@ -1,6 +1,7 @@
 import type {
   ContentIdea,
   ContentIdeaCorrection,
+  ContentIdeaList,
   CreatorId,
   ExtensionLink,
   ExtensionLinkCreated,
@@ -97,8 +98,8 @@ export interface CaptureVision {
 
 /** The ideas of « Idées du jour » (`content_ideas`), under the owner's or an active manager's account. */
 export interface IdeaStore {
-  /** Her ideas proposed on her `day`, the first proposed first. */
-  ofDay(creatorId: CreatorId, userId: UserId, day: string): Promise<readonly ContentIdea[]>;
+  /** Her ideas proposed on her `day` (today in her zone when absent), the first proposed first, each with its signal. */
+  ofDay(creatorId: CreatorId, userId: UserId, day: string | undefined, now: Date): Promise<ContentIdeaList>;
   /**
    * Validated, with its correction applied when it is still `proposed`; `check` reads the idea as it leaves and throws
    * to refuse it. Answers the idea as it stands: a validated or suggested idea comes back unchanged.

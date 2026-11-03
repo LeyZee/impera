@@ -20,7 +20,7 @@ import { whenWords } from './words';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, longDay, weekdayOf } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 /** Where « Ajouter » opens: the day shown, and the free time touched when it was one. */

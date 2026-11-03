@@ -28,7 +28,7 @@ import {
 import '@/reports/reports.css';
 import { accountLine } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 type Entry = AccountPayRulesList['accounts'][number];

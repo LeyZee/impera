@@ -3,7 +3,9 @@ import {
   ContentIdeaSchema,
   CreatorIdSchema,
   TrendSignalIdSchema,
+  TrendSignalSchema,
   type ContentIdea,
+  type TrendSignal,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 
@@ -11,8 +13,36 @@ import { ContentIdeaDecided, ContentIdeaForbidden, ContentIdeaNotFound } from '.
 import type { IdeaStore } from '../../domain/ports';
 
 const ideas = schema.contentIdeas;
+const signals = schema.trendSignals;
 
 type IdeaRow = typeof ideas.$inferSelect;
+type SignalRow = typeof signals.$inferSelect;
+
+function signalOf(row: SignalRow): TrendSignal {
+  const figures = row.views === null && row.likes === null && row.comments === null;
+  return TrendSignalSchema.parse({
+    id: row.id,
+    creatorId: row.creatorId,
+    source: row.source,
+    kind: row.kind,
+    text: row.text,
+    url: row.url,
+    format: row.format,
+    metrics: figures ? null : { views: row.views, likes: row.likes, comments: row.comments },
+    observedAt: row.observedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+  });
+}
+
+/** Her day (`YYYY-MM-DD`) at `now`, in her zone. */
+function dayIn(now: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
 
 function ideaOf(row: IdeaRow): ContentIdea {
   return ContentIdeaSchema.parse({
@@ -50,14 +80,25 @@ export function createDrizzleIdeaStore(db: Database): IdeaStore {
     });
 
   return {
-    ofDay: (creatorId, userId, day) =>
+    ofDay: (creatorId, userId, wanted, now) =>
       asAgency(creatorId, userId, async (tx) => {
+        let day = wanted;
+        if (day === undefined) {
+          const [creator] = await tx
+            .select({ timeZone: schema.creators.timezone })
+            .from(schema.creators)
+            .where(eq(schema.creators.id, creatorId));
+          if (creator === undefined) throw new ContentIdeaForbidden();
+          day = dayIn(now, creator.timeZone);
+        }
+        // Her signal, or the agency's: `team_read` lets the owner and a manager read both.
         const rows = await tx
-          .select()
+          .select({ idea: ideas, signal: signals })
           .from(ideas)
+          .innerJoin(signals, eq(signals.id, ideas.signalId))
           .where(eq(ideas.proposedOn, day))
           .orderBy(ideas.createdAt, ideas.id);
-        return rows.map(ideaOf);
+        return { day, items: rows.map((row) => ({ ...ideaOf(row.idea), signal: signalOf(row.signal) })) };
       }),
 
     validate: (creatorId, userId, ideaId, correction, check, now) =>

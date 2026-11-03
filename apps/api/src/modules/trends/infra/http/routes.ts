@@ -214,11 +214,8 @@ export function createTrendRoutes(
           response: { 200: ContentIdeaListSchema },
         },
       },
-      async (request) => ({
-        items: [
-          ...(await decide.ideas.ofDay(request.params.creatorId, actorOf(request).userId, request.query.day)),
-        ],
-      }),
+      (request) =>
+        decide.ideas.ofDay(request.params.creatorId, actorOf(request).userId, request.query.day, new Date()),
     );
 
     app.post(

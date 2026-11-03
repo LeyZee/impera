@@ -57,7 +57,7 @@ import { platformName } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 

@@ -6,7 +6,7 @@ import { payRefusalText, rulePeriods } from '@/payroll/model';
 import '@/payroll/pay.css';
 import { amountInput, amountText, parseAmount, periodLine, periodTitle } from '@/reports/model';
 import { useAgencyToday } from '@/screens/pay/data';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 const STEPS = ['Remplir', 'Relire'] as const;
 
