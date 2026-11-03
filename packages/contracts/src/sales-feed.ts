@@ -499,6 +499,53 @@ export const SalesTotalsSchema = z.object({
 });
 export type SalesTotals = z.infer<typeof SalesTotalsSchema>;
 
+/**
+ * A day's refunds by their own day (CRM-04, the evening digest), whatever the day of their sale: the totals take a
+ * refund off its sale's day, so a refund of an older sale is in no day's totals of today. One row per account,
+ * currency, kind of sale, seller (the sale's, as in the totals) and where the sale is. The amounts are what was refunded, in integer
+ * cents of `currency`, never negative. Never the fan.
+ */
+
+/**
+ * Where a refund's sale is, read on the platform's day (CRM-04): of the refund's own day (already taken off that day's
+ * totals, so a digest adding the day's totals and its refunds counts it once), of an earlier day, or not in the
+ * register (older than it, or not read yet).
+ */
+export const RefundedSaleSchema = z.enum(['same_day', 'earlier_day', 'not_in_register']);
+export type RefundedSale = z.infer<typeof RefundedSaleSchema>;
+
+export const SalesRefundsRowSchema = z.object({
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+  saleType: SaleTypeSchema,
+  seller: SaleSellerSchema,
+  sale: RefundedSaleSchema,
+  refunds: z.number().int().min(1),
+  grossInclVatMinor: cents.min(0),
+  grossExclVatMinor: cents.min(0),
+  netMinor: cents.min(0),
+  agencyMinor: cents.min(0),
+  creatorMinor: cents.min(0),
+});
+export type SalesRefundsRow = z.infer<typeof SalesRefundsRowSchema>;
+
+/** A creator's refunds of `day`, each on its own day in its platform's zone. */
+export const SalesRefundsSchema = z.object({ day: z.iso.date(), rows: z.array(SalesRefundsRowSchema) });
+export type SalesRefunds = z.infer<typeof SalesRefundsSchema>;
+
+/**
+ * How far the register of a platform where one of her accounts is linked has been read (ADR 0054: a day not read is
+ * never a day without a sale). `readAt`: the last read that went through, `null` before any; `pausedUntil`: a 429
+ * holds the reading until then. Nothing secret, no state of the key.
+ */
+export const SalesFeedReadingSchema = z.object({
+  platform: PlatformSchema,
+  readAt: z.iso.datetime().nullable(),
+  pausedUntil: z.iso.datetime().nullable(),
+});
+export type SalesFeedReading = z.infer<typeof SalesFeedReadingSchema>;
+
 /** The refusals of `/v1/settings/sales-feeds`, each with its French sentence in `message`. */
 export const SALES_FEED_ERROR_CODES = [
   'sales_feed_not_found',

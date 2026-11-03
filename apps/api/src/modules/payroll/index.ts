@@ -54,6 +54,7 @@ export { CountedSchema } from './infra/read-store';
 export { payReadsForAccounting } from './infra/accounting-reads';
 /** What the invoices read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
 export { payReadsForInvoicing } from './infra/invoicing-reads';
+export { latestRateOf } from './infra/latest-rate';
 export type { StatementForInvoicing } from './infra/invoicing-reads';
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {

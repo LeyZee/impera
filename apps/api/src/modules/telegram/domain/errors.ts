@@ -29,3 +29,10 @@ export class TelegramChatInvalid extends DomainError {
     super('telegram_chat_invalid', 'Un groupe choisi n’existe plus : recharge la page');
   }
 }
+
+/** A sales setting names a creator who does not exist (400): nothing is saved. */
+export class TelegramCreatorInvalid extends DomainError {
+  constructor() {
+    super('telegram_creator_invalid', 'Une créatrice choisie n’existe plus : recharge la page');
+  }
+}

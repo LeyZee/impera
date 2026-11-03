@@ -551,7 +551,14 @@
     {
       "idx": 78,
       "version": "7",
-      "when": 1793705567353,
+      "when": 1793705089141,
+      "tag": "0083_telegram_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1793707718495,
       "tag": "0088_creator_on_duty",
       "breakpoints": true
     }

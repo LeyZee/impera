@@ -157,6 +157,46 @@ export const TelegramNightCountsSchema = z.object({
 });
 export type TelegramNightCounts = z.infer<typeof TelegramNightCountsSchema>;
 
+/**
+ * The sales topic's settings (CRM-04 lot b, ADR 0020 §6), for every creator (`creatorId: null`) or one of them, hers
+ * winning. `minimumMinor`: a sale under this price (VAT included, what the fan paid, in the sale's currency's cents)
+ * does not ring; `agentOnly`: only the agent's sales ring; `eveningDigest`: the 23 h digest goes to the sales groups.
+ * A refund never rings live, whatever the settings: it is in the digest.
+ */
+export const TelegramSaleSettingsSchema = z.object({
+  minimumMinor: z.number().int().min(0).max(1_000_000),
+  agentOnly: z.boolean(),
+  eveningDigest: z.boolean(),
+});
+export type TelegramSaleSettings = z.infer<typeof TelegramSaleSettingsSchema>;
+
+/** Every sale rings, and the digest goes, until the owner says otherwise. */
+export const DEFAULT_TELEGRAM_SALE_SETTINGS: TelegramSaleSettings = {
+  minimumMinor: 0,
+  agentOnly: false,
+  eveningDigest: true,
+};
+
+export const TelegramSaleSettingsEntrySchema = TelegramSaleSettingsSchema.extend({
+  creatorId: CreatorIdSchema.nullable(),
+});
+export type TelegramSaleSettingsEntry = z.infer<typeof TelegramSaleSettingsEntrySchema>;
+
+/**
+ * `GET` and `PUT /settings/telegram/sales`: the whole list, at most one entry per creator and one for all; the entry for
+ * all always comes back (the defaults when none was saved). `PUT` replaces the list.
+ */
+export const TelegramSalesSettingsSchema = z.object({
+  settings: z
+    .array(TelegramSaleSettingsEntrySchema)
+    .max(500)
+    .refine(
+      (entries) => new Set(entries.map((entry) => entry.creatorId)).size === entries.length,
+      'Une seule ligne par créatrice',
+    ),
+});
+export type TelegramSalesSettings = z.infer<typeof TelegramSalesSettingsSchema>;
+
 /** Jobs of the module (ADR 0006), part of `JOB_NAMES` and `JOB_PAYLOADS` (jobs.ts). */
 export const TELEGRAM_JOB_PAYLOADS = {
   'telegram.scan': z.object({}),
@@ -168,5 +208,6 @@ export const TELEGRAM_JOB_PAYLOADS = {
     waitSeconds: z.number().int().min(0).max(25),
   }),
   'telegram.morning_digest': z.object({}),
+  'telegram.evening_digest': z.object({}),
   'telegram.purge': z.object({}),
 } as const;
