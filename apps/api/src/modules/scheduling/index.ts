@@ -3,6 +3,7 @@ import type { Database, Transaction } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createCalendarService } from './application/calendar';
+import { createShiftFeedbackService } from './application/feedback';
 import { createLeaveService } from './application/leaves';
 import { makeShifts } from './application/make-shifts';
 import { createPayRulesService } from './application/pay-rules';
@@ -12,6 +13,7 @@ import { createSwapService } from './application/swaps';
 import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
+import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
   accessMarginMinutesForPay,
@@ -37,7 +39,7 @@ import { createDrizzleSwapStore } from './infra/swap-store';
 export interface SchedulingModule {
   readonly name: 'scheduling';
   /**
-   * Mounted under `/v1` by the server: `/scheduling/…` (contracts `scheduling.ts` and `shift-reports.ts`), and
+   * Mounted under `/v1` by the server: `/scheduling/…` (contracts `scheduling.ts`, `shift-reports.ts` and `shift-feedback.ts`), and
    * `/team/pay-rules` (contract `pay-rules.ts`): the reports read an account's rules in their own transaction.
    */
   routes(requireRole: RequireRole): FastifyPluginAsyncZod;
@@ -135,6 +137,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       deps.creators,
       now,
     ),
+    feedback: createShiftFeedbackService(createDrizzleShiftFeedbackStore(deps.db, deps.adminDb), now),
     payRules: createPayRulesService(createDrizzlePayRulesStore(deps.db, deps.adminDb), deps.creators, now),
   };
   return {

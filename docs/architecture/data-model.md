@@ -275,7 +275,7 @@ commission_statement_lines id, statement_id, revision, platform_account_id, curr
                            rate_micros, gross, gross_eur, excl_vat, net, commission (unités mineures), shift_report_ids,
                            late_reports (jsonb), base (gross_chain | platform_net), sales (jsonb : les ventes comptées
                            d'une ligne `platform_net`, sans TVA, sans commission de plateforme ni rapport ; migration
-                           0072, CRM-03), created_at (ajout seul ; une par compte, règles et base d'une révision)
+                           0074, CRM-03), created_at (ajout seul ; une par compte, règles et base d'une révision)
 pay_adjustments            id, member_id, period (première quinzaine ouverte du membre), amount_minor (≠ 0), reason,
                            corrects_statement_id (un relevé validé ou payé du même membre, d'une quinzaine antérieure :
                            la quinzaine qu'il corrige, migration 0041), contested_invoice_id (le document dont la
@@ -293,7 +293,7 @@ pay_period_reports         shift_report_id (clé) → shift_reports, period → 
                            écrit par la clôture dans sa transaction ; ajout seul)
 pay_period_sales           platform, platform_sale_id, event (clé, une ligne du registre des ventes), period →
                            pay_period_closings, member_id, link_version, platform_account_id, currency, net_minor (signé :
-                           un remboursement est négatif), sale_period, created_at (migration 0072, CRM-03 ; le registre des
+                           un remboursement est négatif), sale_period, created_at (migration 0074, CRM-03 ; le registre des
                            ventes comptées : une ligne l'est une fois, pour le membre et la version du lien vus par la
                            clôture, qui l'écrit dans sa transaction et dans la créatrice du compte ; une quinzaine clôturée
                            se recalcule sur lui seul ; le déclencheur vérifie la ligne, son compte, sa devise et son net ;

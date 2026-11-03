@@ -1,4 +1,9 @@
-import { CurrencySchema, SHIFT_REPORT_MAX_MINOR, SHIFT_REPORT_STATUSES } from '@nirvana/contracts';
+import {
+  CurrencySchema,
+  SHIFT_FEEDBACK_SIGNALS_MAX,
+  SHIFT_REPORT_MAX_MINOR,
+  SHIFT_REPORT_STATUSES,
+} from '@nirvana/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
@@ -7,6 +12,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgPolicy,
   pgTable,
   smallint,
@@ -541,6 +547,68 @@ export const shiftReports = pgTable(
       for: 'update',
       using: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.status} = 'submitted'`,
       withCheck: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.status} in ('validated', 'rejected') and ${t.reviewedBy} = ${currentUser} and not ${isMine(t.memberId)} and (${isOwner} or ${t.submittedBy} <> ${currentUser})`,
+    }),
+  ],
+);
+
+/**
+ * The mini feedback (ADR 0050 § 10, contracts `shift-feedback.ts`): on an account whose pay reads the platform's
+ * sales, what the chatter adds at the end of a shift instead of a report. No amount, no review, never read by pay. One
+ * per shift, on its shift's creator, account and member (composite key, as a report); made by the member alone, read by
+ * them and by the owner or an active manager, never by the creator. Never rewritten nor deleted (trigger of the
+ * migration). `signals` is the list of `ReportSignalSchema`, checked by the contract at the boundary.
+ */
+export const shiftFeedbacks = pgTable(
+  'shift_feedbacks',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    shiftId: uuid('shift_id').notNull(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    /** The pay period its shift starts in, in the agency's zone, as read when it was made. */
+    period: date('period').notNull(),
+    nothingToReport: boolean('nothing_to_report').notNull(),
+    comment: text('comment'),
+    incident: text('incident'),
+    signals: jsonb('signals').notNull().default([]),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'shift_feedbacks_shift_fk',
+      columns: [t.shiftId, t.creatorId, t.platformAccountId, t.memberId],
+      foreignColumns: [shifts.id, shifts.creatorId, shifts.platformAccountId, shifts.memberId],
+    }),
+    uniqueIndex('shift_feedbacks_shift_unique').on(t.shiftId),
+    index('shift_feedbacks_member_period_idx').on(t.memberId, t.period),
+    check('shift_feedbacks_period_check', sql`extract(day from ${t.period}) in (1, 16)`),
+    check(
+      'shift_feedbacks_texts_check',
+      sql`coalesce(char_length(${t.comment}), 1) between 1 and 1000 and coalesce(char_length(${t.incident}), 1) between 1 and 1000`,
+    ),
+    check(
+      'shift_feedbacks_signals_check',
+      sql`jsonb_typeof(${t.signals}) = 'array' and jsonb_array_length(${t.signals}) <= ${sql.raw(String(SHIFT_FEEDBACK_SIGNALS_MAX))}`,
+    ),
+    check(
+      'shift_feedbacks_said_check',
+      sql`${t.nothingToReport} = (${t.comment} is null and ${t.incident} is null and jsonb_array_length(${t.signals}) = 0)`,
+    ),
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and (${plans} or ${isMine(t.memberId)})`,
+    }),
+    pgPolicy('member_insert', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
     }),
   ],
 );
