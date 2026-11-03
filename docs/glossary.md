@@ -85,7 +85,18 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Script | `script` | Séquence d'étapes de vente (structure). Phase 6. |
 | Étape | `script_step` | Une étape d'un script (message, médias, prix, pacing). |
 | Carton | `card` | Séparateur visuel d'étape (PNG), hérité d'OnlyScript. |
-| Structure | `script_structure` | Ossature d'un script (ordre des étapes, médias attendus, intention). |
+| Structure | `script_structure` | Ossature d'un script, tenue par l'agence : segments ordonnés (étapes et ponts), emplacements attendus, intention, moment ; versionnée, figée dès qu'elle est demandée (ADR 0056). |
+| Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
+| Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
+| Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). |
+| File de structures | `structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
+| Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
+| Catégorie de dépôt | `drop_category` | Ce que la créatrice dit d'un dépôt, liste fermée : séance boudoir, vidéo short, script, relance, story Reveal, story Insta, Reel Insta, photo Insta, Telegram ; elle décide de la sortie (ADR 0055). |
+| Séance boudoir | `feed_shoot` | Chez nous, quelques photos sexy (et de courtes vidéos) d'une même séance pour le feed ; sans rapport avec la section Boudoir de Reveal (ADR 0055). |
+| Relance | `mass_dm` | La catégorie des petits médias (photo, vidéo, vocal) envoyés en Mass DM pour relancer les fans (ADR 0055). |
+| Demande de contenu | `content_request` | Ce que l'agence attend d'une créatrice : catégorie, échéance, raison, structure pour un script ; une tâche de son agenda avec l'action « Déposer » (ADR 0055). Distincte de la demande de service d'un fan. |
+| Connecteur de publication | `publishing_connector` | Adaptateur qui publie sur un réseau d'acquisition (Instagram, canal Telegram), à côté des connecteurs de plateforme (ADR 0057). |
+| Mode assisté | `assisted` | Publication Instagram préparée par Nirvana et postée à la main, pour ajouter un son (ADR 0057). |
 | Script natif | `platform_script` | Un script de vente stocké sur la plateforme (Reveal), que l'agent lit et déroule. À ne pas confondre avec `script`, notre structure interne. |
 | Note client | `fan_note` | La note libre qu'une plateforme attache à un fan, lue et écrite par les chatteurs et l'agent. Distincte de `fan_fact`. |
 | Notes du modèle | `creator_note` | Les notes que Reveal affiche à côté de chaque conversation sur la créatrice : sa fiche persona vue par la plateforme. |

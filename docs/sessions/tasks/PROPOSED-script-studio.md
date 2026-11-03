@@ -23,3 +23,4 @@ P6-01, validée le 17/10, fait de Reveal la source des scripts : on les crée da
 Génération de médias, envoi de masse.
 
 ## Notes de session
+- 03/11/2026 : la question de la source est tranchée par l'ADR 0056 (proposée) : Nirvana fait foi tant qu'un script n'est pas dans Reveal, Reveal ensuite. Le travail passe dans les fiches SC-01 à SC-06 ; cette fiche sera retirée quand l'ADR 0056 sera acceptée.
