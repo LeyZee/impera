@@ -540,6 +540,13 @@
       "when": 1793688764075,
       "tag": "0079_pay_sale_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793701969326,
+      "tag": "0082_creator_account",
+      "breakpoints": true
     }
   ]
 }

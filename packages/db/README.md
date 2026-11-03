@@ -1,6 +1,6 @@
 # @nirvana/db
 
-Schéma Drizzle (`src/schema/`), migrations SQL relues (`migrations/`), client et pool, `withTenant` / `withMember` / `withTenantMember` / `withAdmin` (RLS, ADR 0005 et 0023) et `enterCreator` (passer d'une créatrice à l'autre dans une même transaction, ADR 0031), chiffrement des secrets (`crypto.ts`, AES-256-GCM, clés versionnées, contexte lié), helpers de tests d'intégration (`src/test/`).
+Schéma Drizzle (`src/schema/`), migrations SQL relues (`migrations/`), client et pool, `withTenant` / `withMember` / `withTenantMember` / `withCreatorAccount` / `withAdmin` (RLS, ADR 0005, 0023 et 0042) et `enterCreator` (passer d'une créatrice à l'autre dans une même transaction, ADR 0031), chiffrement des secrets (`crypto.ts`, AES-256-GCM, clés versionnées, contexte lié), helpers de tests d'intégration (`src/test/`).
 
 Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DATABASE_ADMIN_URL`), `pnpm db:studio` (dev).
 
@@ -8,6 +8,14 @@ Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DAT
 
 - `nirvana_admin` possède les tables et lance les migrations. En production : `NOSUPERUSER BYPASSRLS` (les jobs `*Unscoped` passent par `withAdmin`). Le test d'intégration le vérifie.
 - `nirvana_app` : `NOSUPERUSER NOBYPASSRLS`, droits DML seulement (accordés par la migration). Toute requête de l'application passe par `withTenant(db, creatorId, fn)` ; hors de lui, les tables à `creator_id` renvoient zéro ligne.
+
+## Le compte de la créatrice (CR-02, ADR 0042 § 2)
+
+- `withCreatorAccount(db, userId, fn)` est la seule porte des routes de son espace. Dans la transaction, il lit `user.role` et l'unique créatrice liée au compte, jamais d'après l'appelant, puis pose en `SET LOCAL` `app.user_id`, `app.account_role` (`creator`) et `app.creator_id`. Tout autre compte lève `NotACreatorAccount`.
+- La base tient un compte `creator` à exactement une créatrice (`user_creator_link_check`).
+- Des politiques **restrictives** lisent `app.account_role` : aucune politique permissive ne les rouvre. `creatorReadsOnly()` refuse ses écritures sur `conversations`, `messages`, `fans` et `media_descriptions` (elle les lit) ; `closedToCreator()` lui ferme `drafts` (traces des gardes comprises), `llm_calls`, `calibration_ratings` et `conversation_events` (l'auteur d'un envoi y figure). Ses écritures permises (CR-06) viendront chacune avec sa politique.
+- `withMember` pose aussi `app.account_role` avec le rôle lu en base : une créatrice qui passerait par lui reste une créatrice. Les jobs (`withAdmin`, `withTenant`) ne le posent pas et ne sont pas concernés.
+- L'auteur d'un message est une colonne : la RLS ne le cache pas. La lecture de la créatrice ne le sélectionne pas et son contrat de réponse est `strict` (CR-02 lot b).
 
 ## Écrire une migration
 

@@ -1,5 +1,5 @@
 # CR-02 Accès de la créatrice : invitation, son compte en lecture, rien de l'équipe
-Statut : todo (ADR 0042 § 1 et § 2, acceptée par Charles le 02/11/2026)
+Statut : in_progress, lot a (base) le 03/11/2026 ; restent l'invitation, les lectures et les écrans (ADR 0042 § 1 et § 2, acceptée par Charles le 02/11/2026)
 Phase : espaces (ADR 0042)
 Dépend de : CR-01, ADR 0042, EQ-11
 Branche : task/cr-02-creator-access
@@ -31,3 +31,10 @@ La créatrice se connecte par une invitation et voit tout son compte (ventes, fa
 Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 
 ## Notes de session
+
+### 03/11/2026, lot a (base, migration 0082)
+- `withCreatorAccount(db, userId, fn)` dans `packages/db`, exportée par l'index : lit `user.role` et l'unique créatrice liée dans la transaction, pose `app.user_id`, `app.account_role` et `app.creator_id` en `SET LOCAL` ; tout autre compte lève `NotACreatorAccount`. Noms accordés avec Bilan et Équipe (CRM-04 lot d lit `app.account_role` et `app.creator_id`, migration 0081).
+- `withMember` pose aussi `app.account_role` (demande de Bilan) : une créatrice passée par `withMember` ou `withTenantMember` reste une créatrice pour les politiques restrictives.
+- Migration 0082 : `user_creator_link_check` (un compte `creator` porte exactement une créatrice) ; politiques restrictives `creator_no_insert`, `creator_no_update`, `creator_no_delete` sur `conversations`, `messages`, `fans`, `media_descriptions`, et `creator_closed` sur `drafts`, `llm_calls`, `calibration_ratings`, `conversation_events`.
+- Tests d'intégration (`creator-account-rls`) : contrainte d'un seul lien, porte réservée au compte créatrice, ses lectures bornées à sa créatrice, lectures fermées, écritures refusées (insertion en erreur, mise à jour et suppression sans ligne), aucune ligne d'équipe, `withMember` et `withTenantMember` qui la gardent créatrice. Deux tests existants qui créaient un compte `creator` sans créatrice le lient à une créatrice.
+- Restent : ses trois écritures permises (avec CR-06) ; les routes existantes ouvertes à la créatrice (Dashboard, Persona) passent encore par `withTenant`, sans `app.account_role` : elles passent à `withCreatorAccount` au lot b, avec l'invitation, les lectures et la réponse `strict` sans auteur.

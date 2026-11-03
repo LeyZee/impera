@@ -43,3 +43,26 @@ export function tenantOrGlobalPolicy(creatorId: PgColumn) {
     pgPolicy('global_read', { for: 'select', using: sql`${creatorId} is null` }),
   ];
 }
+
+/**
+ * True unless the transaction runs as a creator's own account (`withCreatorAccount`, CR-02): unset for the agency, the
+ * jobs and the tests, so the restrictive policies below change nothing for them.
+ */
+const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
+
+/**
+ * A creator reads these rows of her own creator, never writes them (ADR 0042 § 2): restrictive, so no permissive
+ * policy can reopen them. Her few permitted writes come each with a policy of its own, written with the screen.
+ */
+export function creatorReadsOnly() {
+  return [
+    pgPolicy('creator_no_insert', { as: 'restrictive', for: 'insert', withCheck: notCreatorAccount }),
+    pgPolicy('creator_no_update', { as: 'restrictive', for: 'update', using: notCreatorAccount }),
+    pgPolicy('creator_no_delete', { as: 'restrictive', for: 'delete', using: notCreatorAccount }),
+  ];
+}
+
+/** What only the agency reads, even of her own creator (ADR 0042 § 2): drafts, guard traces, model calls. */
+export function closedToCreator() {
+  return pgPolicy('creator_closed', { as: 'restrictive', for: 'all', using: notCreatorAccount });
+}

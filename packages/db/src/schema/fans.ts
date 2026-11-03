@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
-import { id, tenantPolicy, timestampTz } from './columns';
+import { creatorReadsOnly, id, tenantPolicy, timestampTz } from './columns';
 import { creators, platformAccounts } from './tenancy';
 
 export const fans = pgTable(
@@ -33,5 +33,6 @@ export const fans = pgTable(
     unique('fans_platform_fan_unique').on(t.platformAccountId, t.platformFanId),
     index('fans_creator_idx').on(t.creatorId),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );

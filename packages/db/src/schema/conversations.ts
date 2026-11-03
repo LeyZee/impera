@@ -28,7 +28,17 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz, updatedAt } from './columns';
+import {
+  closedToCreator,
+  createdAt,
+  creatorReadsOnly,
+  enumCheck,
+  enumText,
+  id,
+  tenantPolicy,
+  timestampTz,
+  updatedAt,
+} from './columns';
 import { fans } from './fans';
 import { personaVersions } from './persona';
 import { creators, platformAccounts } from './tenancy';
@@ -92,6 +102,7 @@ export const conversations = pgTable(
       .on(t.routedToUserId, t.updatedAt.desc())
       .where(sql`${t.routedToUserId} is not null`),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );
 
@@ -128,6 +139,7 @@ export const drafts = pgTable(
     unique('drafts_idempotency_key_unique').on(t.idempotencyKey),
     index('drafts_conversation_idx').on(t.conversationId, t.createdAt.desc()),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );
 
@@ -174,6 +186,7 @@ export const messages = pgTable(
     unique('messages_platform_message_unique').on(t.platformAccountId, t.platformMessageId),
     index('messages_conversation_created_idx').on(t.conversationId, t.platformCreatedAt.desc()),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );
 
@@ -201,6 +214,7 @@ export const conversationEvents = pgTable(
     unique('conversation_events_seq_unique').on(t.conversationId, t.seq),
     index('conversation_events_type_created_idx').on(t.type, t.createdAt),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );
 
