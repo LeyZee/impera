@@ -16,6 +16,9 @@ ADR 0057, ADR 0055, ADR 0044 § 3 et § 4, `docs/architecture/connectors.md`, P3
 - [ ] Compression sous 50 Mo, envoi, clé d'idempotence, échec en ambre.
 - [ ] Prompt de légende versionné, à partir des exemples de Charles (à recueillir avant le code) ; gardes de voix ; rien de faux sur le prix, ni amour ni rencontre.
 - [ ] Vues lues à 48 h.
+- [ ] Idempotence (relecture Bilan) : `sendVideo` n'en a pas ; une réponse perdue (délai dépassé) passe en ambre, seul un refus explicite est repris.
+- [ ] Le jeton du bot est lu par l'`index.ts` du module `telegram` (ou un port des secrets), jamais par sa table.
+- [ ] Statistiques : des nombres seulement.
 
 ## Critères d'acceptation
 - Tests contre le faux : double acceptation sans double message, bot non administrateur = ambre lisible.

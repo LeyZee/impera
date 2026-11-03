@@ -18,6 +18,11 @@ ADR 0057 (tout), ADR 0016, ADR 0055, la documentation officielle de l'API Instag
 - [ ] Accord de la créatrice : notification la veille, écran d'accord, attente sans réponse à H-2.
 - [ ] Mode assisté des Reels : notification avec la vidéo et la légende copiée, « Publié » marqué à la main.
 - [ ] Statistiques à 48 h.
+- [ ] Idempotence (relecture Bilan) : l'API n'a pas de clé ; l'identifiant du conteneur est écrit en base dans sa propre transaction avant `media_publish` ; une reprise relit l'état (`PUBLISHED`) et ne republie jamais.
+- [ ] Quota lu chez Meta (`content_publishing_limit`) avant chaque publication, en plus de notre compteur (une publication faite à la main le consomme aussi).
+- [ ] Jeton long (environ 60 jours) renouvelé par un job ; ambre seulement si le renouvellement échoue.
+- [ ] Adresse signée effacée seulement après l'état `FINISHED` ou `PUBLISHED` du conteneur ; ni le proxy ni le stockage ne journalisent la signature des URL (même contrôle que `/v1/calendar-feed/`).
+- [ ] Statistiques : des nombres seulement, jamais le texte ni le nom d'un commentateur (ADR 0010).
 
 ## Critères d'acceptation
 - Tests contre le faux : quota jamais dépassé, reprise qui relit l'état du conteneur, légende refusée par la garde, publication qui attend sans accord.

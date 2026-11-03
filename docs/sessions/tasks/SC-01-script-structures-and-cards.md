@@ -16,6 +16,7 @@ L'agence crée, duplique, réordonne et versionne ses structures de script, voit
 - [ ] Domaine pur et testé : les six règles de l'ADR 0056 § 1 (clé stable, numéro dérivé, ponts par clé, étape sans emplacement refusée, trois variantes au plus, version figée dès qu'elle est demandée) ; filtre des dégoûts de la persona.
 - [ ] Rendu des cartons côté serveur : palette tirée des jetons, typographie Nirvana ; trois formats (carte, PNG du dossier, vignette) ; même entrée = même image (test d'instantané).
 - [ ] Écran Créatrices › Structures (Extension) : pile à réordonner au glisser, aperçu du carton en direct, duplication, structures de départ, refus lisible d'une étape qui touche un dégoût ; file de structures par créatrice.
+- [ ] Relecture Extension : pile réordonnable aussi au clavier ; un pont ne relie que deux étapes voisines ; carton PNG à plat (sans effet de verre), thème selon le moment (Jour clair, Nuit sombre).
 
 ## Critères d'acceptation
 - Tests du domaine pour chaque règle ; une version demandée ne se modifie plus (nouvelle version créée).

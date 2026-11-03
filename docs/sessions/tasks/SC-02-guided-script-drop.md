@@ -15,6 +15,7 @@ ADR 0056 (§ 2 et § 4), ADR 0055 (§ 2 à 4), CR-06, CR-05, prototype créatric
 - [ ] Parcours dans la PWA : pile de cartons, un écran par carton avec ses cadres, vérification du format au fil de l'eau, enregistrement à chaque fichier, reprise sur un autre appareil, progression, aperçu final, « Envoyer le script » seulement quand tout emplacement obligatoire est rempli.
 - [ ] Un fichier remplacé garde sa position ; un dépôt garde la version de structure de son début.
 - [ ] Rappels de l'ADR 0055 § 4.
+- [ ] Relecture Extension : reprise depuis le serveur, jamais d'un brouillon local (ADR 0053, rien de sensible hors ligne) ; le parcours dit si elle tourne chaque variante ou une seule.
 
 ## Critères d'acceptation
 - Tests : reprise après coupure, envoi refusé avec un emplacement vide, version figée, cadence sans double demande (rejouable).

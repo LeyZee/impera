@@ -26,6 +26,8 @@ Le risque n'est pas le même que pour un fan. Une publication ratée est publiqu
 | `write:publication_plan` | `publishable_drops_list`, `publication_plan_get`, `publication_upsert`, `publication_remove` | Lister les dépôts publiables d'une créatrice (catégorie, description validée, date, état ; jamais le fichier ni son adresse, ADR 0026 § 4) ; ajouter ou modifier une publication du plan (quel dépôt, légende, heure, visibilité) ; retirer une publication pas encore partie. Un humain accepte la semaine comme pour toute publication (ADR 0044 § 3). |
 | `publish` | `publication_publish` | Publier une publication du plan sans attendre l'acceptation de la semaine, dans le plafond. Exige `write:publication_plan`. |
 
+- **Une modification par un agent fait revenir la publication à « à accepter »**, même si sa semaine avait été acceptée : rien ne part avec un texte ou un média d'agent qu'un humain n'a pas vu, sauf si l'accès a aussi `publish` et que le plafond du jour le permet.
+- **La visibilité** qu'un agent peut régler est une liste fermée qui ne contient **aucune valeur payante** (une publication à débloquer est un prix) ; le schéma Zod de l'outil refuse toute autre valeur.
 - Les deux sont accordées accès par accès par le propriétaire, jamais cochées d'office, comme `read:conversation_content` (ADR 0026 § 4). L'écran dit en une phrase ce qu'elles ouvrent.
 - **Plafond** : un nombre de publications par jour et par sortie, fixé par le propriétaire sur l'accès ; au-delà, l'outil refuse. Par défaut : zéro (rien ne part tant qu'il n'est pas fixé).
 - **Interrupteurs** : un par accès et un global, « Publication par agent », dans Réglages ; le global est coupé par défaut et le couper arrête aussitôt toute publication par agent.

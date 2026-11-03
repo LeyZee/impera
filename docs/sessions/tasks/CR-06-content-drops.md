@@ -25,6 +25,10 @@ La créatrice dépose une séance ou une vidéo pour le feed, ou des médias pou
 - [ ] Demandes de contenu (`content_request`) : catégorie, échéance, raison ; tâche dans l'Agenda ; sources code (stock), cadence (SC-02), agence ; rappels la veille et le jour même (§ 4).
 - [ ] Stock par catégorie et seuil réglable (§ 5) ; états Reçu, Prêt, Programmé, Publié, ambre (§ 6) ; 30 jours après la dernière sortie (§ 7).
 - [ ] Onglet Contenu dans l'ordre de l'ADR 0055 § 8 : À tourner, Déposer (grille de catégories), En route, Ton stock, Publié.
+- [ ] `ffprobe` dans le worker, avec délai et poids maximaux vérifiés avant l'appel ; test qui dépose un fichier inventé portant du GPS et prouve qu'il n'en reste rien après nettoyage, ni dans l'EXIF ni dans les atomes QuickTime ; le brut sous son préfixe, effacé après nettoyage, expiration 24 h (relecture Bilan).
+- [ ] Écritures de la créatrice (déposer, refuser une demande) par des politiques RLS étroites : sa créatrice seulement, et pour une demande la seule transition vers « refusée » ; aucune politique générale d'écriture (CR-02 la garde en lecture seule).
+- [ ] Numéros de migration attribués par Bilan au moment du lot.
+- [ ] Écran (relecture Extension) : sections vides cachées ; stock lu en temps (« Prêt jusqu'à dimanche »), seules les catégories sous seuil mises en avant ; grille « Déposer » groupée par sortie (Reveal, Instagram, Telegram) ; la tuile Script ne s'ouvre que depuis une demande ; ambre seulement quand elle a quelque chose à faire ; format vérifié avant l'envoi ; un dépôt Programmé porte « corriger la légende » et « retirer ».
 
 ## Critères d'acceptation
 - Tests : empreinte en double, sorte obligatoire pour le feed, effacement à J+30 seulement après publication, lecture refusée à une autre créatrice ; intégration avec MinIO comme pour les factures.

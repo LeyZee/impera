@@ -15,6 +15,8 @@ ADR 0058, ADR 0026 (§ 4 et § 5), ADR 0057, ADR 0055.
 - [ ] Plafond par accès et par sortie (zéro par défaut), interrupteur par accès et global (coupé par défaut).
 - [ ] Mêmes commandes, mêmes gardes, catégorie respectée, accord Instagram jamais contourné, `idempotencyKey` obligatoire, journal avec `grantId`.
 - [ ] Nom de l'agent visible dans le plan et dans Publié (jamais chez la créatrice).
+- [ ] Plafond vérifié dans la transaction qui crée la publication, sous un verrou sur l'accès ; unique (accès, `idempotencyKey`) ; interrupteur global relu dans la même transaction (relecture Bilan).
+- [ ] Une modification par un agent remet la publication à « à accepter » (sauf `publish` dans le plafond) ; visibilité en liste fermée sans valeur payante, refusée par le schéma Zod (ADR 0058 § 1).
 
 ## Critères d'acceptation
 - Tests : aucun outil ne touche un fan, un Mass DM, un script, un prix ; plafond atteint = refus ; interrupteur global coupé = refus ; légende refusée par la garde.

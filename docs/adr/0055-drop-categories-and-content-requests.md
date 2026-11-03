@@ -44,7 +44,8 @@ La revue proposait de laisser le code répartir chaque séance sur les sorties. 
 
 ### 3. Le fichier reçu
 
-- À la réception, avant tout stockage durable et avant tout envoi vers une plateforme, le serveur **retire les métadonnées** du fichier : EXIF, position GPS, modèle de l'appareil, et les métadonnées équivalentes d'une vidéo. Le fichier gardé est le fichier nettoyé ; l'empreinte `sha256` (ADR 0044 § 1) est celle du fichier nettoyé.
+- Le téléphone envoie le fichier directement au stockage (ADR 0044 § 1) : le **brut** arrive donc sous un préfixe de dépôt à part, que seul le nettoyage lit. Le serveur en **retire les métadonnées** (EXIF, position GPS, modèle de l'appareil, et les métadonnées équivalentes d'une vidéo, atomes QuickTime compris), écrit le fichier nettoyé, puis efface le brut. Une règle d'expiration du stockage efface tout brut au bout de 24 h, même si le nettoyage n'a pas eu lieu.
+- Aucune lecture, aucun aperçu, aucune description par la vision ne porte sur le brut. Le fichier gardé est le fichier nettoyé ; l'empreinte `sha256` (ADR 0044 § 1) est celle du fichier nettoyé.
 - Le nom d'origine du fichier n'est jamais gardé ni montré à une plateforme.
 - Les conversions qu'une sortie exige (HEIC vers JPEG pour Instagram, compression pour Telegram) se font au moment de la publication, sur une copie.
 
@@ -68,10 +69,11 @@ La revue proposait de laisser le code répartir chaque séance sur les sorties. 
 ### 7. Conservation
 
 - La règle de l'ADR 0044 § 2 s'applique à chaque média, mais les 30 jours partent de sa **dernière sortie prévue** : un média qui part sur une seule sortie suit la règle telle quelle ; un dépôt dont un média n'est pas encore sorti garde ses originaux.
+- **Borne haute** : un média qui n'a aucune sortie prévue depuis N jours (jamais planifié, ou retiré du plan) suit la règle de l'ADR 0044 § 2 à partir de son dépôt : ses originaux sont effacés 30 jours plus tard, et l'agence en est prévenue en ambre 7 jours avant. N est un réglage d'agence ; **valeur proposée : 60 jours, à fixer par Charles avec le « ok 0055 »**.
 
 ### 8. L'onglet Contenu
 
-Dans l'ordre de ce qui compte pour elle : **À tourner** (ses demandes ouvertes, la plus proche en premier), **Déposer** (une grille de catégories, une tuile par catégorie avec une ligne d'explication), **En route** (ses dépôts récents et leur état), **Ton stock** (les jauges), **Publié** (avec « à refaire » quand une publication a bien marché, ADR 0044 § 4, jamais rien sur ce qui n'a pas marché). La feuille de dépôt tient en trois gestes : la catégorie (déjà choisie si elle vient d'une demande), les fichiers depuis la galerie, une phrase facultative sur ce qu'elle a fait.
+Dans l'ordre de ce qui compte pour elle : **À tourner** (ses demandes ouvertes, la plus proche en premier), **Déposer** (une grille de catégories, une tuile par catégorie avec une ligne d'explication), **En route** (ses dépôts récents et leur état ; un dépôt **Programmé** porte son droit de regard, ADR 0042 § 2 : voir et corriger la légende, retirer la publication, comme « Publications prévues » dans le prototype validé), **Ton stock** (les jauges), **Publié** (avec « à refaire » quand une publication a bien marché, ADR 0044 § 4, jamais rien sur ce qui n'a pas marché). La feuille de dépôt tient en trois gestes : la catégorie (déjà choisie si elle vient d'une demande), les fichiers depuis la galerie, une phrase facultative sur ce qu'elle a fait.
 
 ## Conséquences
 
