@@ -375,8 +375,14 @@ export function gridOf(planning: Planning, days: readonly string[], timeZone: st
 /** Past this many créneaux a day (slots under four hours), the cells stack their shifts instead of lining them up. */
 export const LINED_SLOTS_MAX = 6;
 
-/** A shift on one créneau: `carried` when it began in an earlier one, so that it is drawn on each it touches. */
+/** A shift on one créneau, drawn on each it touches (ADR 0049 § 1). */
 export interface SlotChip extends Chip {
+  /** It began in an earlier créneau: its hours come after « … ». */
+  readonly earlier: boolean;
+  /**
+   * An earlier créneau of the same day column draws it already: this one is a copy, read and reached there. A copy
+   * whose first créneau is on another day is not one, since a phone shows a single day.
+   */
   readonly carried: boolean;
 }
 
@@ -433,8 +439,14 @@ export function slotRowOf(
       );
       const at =
         touched.length > 0 ? touched : [start < (windows[0]?.from.getTime() ?? 0) ? 0 : windows.length - 1];
-      // The first créneau it is on carries its name, even for a shift begun before the week (Sunday night on Monday).
-      for (const index of at) placed[index]?.push({ ...chip, carried: index !== at[0] });
+      // The first créneau it is on carries its name, even for a shift begun before the week (Sunday night on Monday),
+      // and so does the first of each later day: Tuesday 23 h – Wednesday 5 h is read on Wednesday too.
+      const first = at[0] ?? 0;
+      for (const index of at) {
+        const earlier = index !== first;
+        const sameDay = windows[index]?.day === windows[first]?.day;
+        placed[index]?.push({ ...chip, earlier, carried: earlier && sameDay });
+      }
     }
   }
   const spans = shifts

@@ -72,6 +72,7 @@ export function AgentLabel({ agent }: { agent: CalendarAgent }): JSX.Element {
 
 function Slot({
   cell,
+  dayFrom,
   members,
   me,
   focus,
@@ -79,6 +80,8 @@ function Slot({
   now,
 }: {
   cell: CalendarCell;
+  /** Where the day column's first créneau begins. */
+  dayFrom: number;
   members: ReadonlyMap<string, PlanningMember>;
   me: string | null;
   focus: string | null;
@@ -97,8 +100,11 @@ function Slot({
       {cell.shifts.map((shift) => {
         const member = members.get(shift.memberId);
         const phase = phaseOf(shift, now);
-        // Begun in an earlier créneau: drawn here too, its hours after « … » (ADR 0049 § 1).
-        const carried = Date.parse(shift.startsAt) < cell.from.getTime();
+        // Begun in an earlier créneau: drawn here too, its hours after « … » (ADR 0049 § 1). A copy, still, only when
+        // that créneau is in the same day column: a phone shows one day, and Tuesday 23 h – Wednesday 5 h lives there.
+        const start = Date.parse(shift.startsAt);
+        const earlier = start < cell.from.getTime();
+        const carried = earlier && start >= dayFrom;
         return (
           <div
             key={`${shift.memberId}-${shift.startsAt}`}
@@ -114,7 +120,7 @@ function Slot({
               <span className="sc-chip__name">{nameFor(member, me)}</span>
             </span>
             <span className="sc-chip__hours nv-num">
-              {carried ? '… ' : ''}
+              {earlier ? '… ' : ''}
               {rangeAt(shift.startsAt, shift.endsAt, zone)}
             </span>
             {phase === 'live' ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
@@ -224,10 +230,11 @@ export function TeamWeek({ calendar, days, today, now, me, focus, loading }: Cal
                 data-picked={index === pickedIndex ? 'true' : undefined}
                 data-past={day < today ? 'true' : undefined}
               >
-                {(row.days.get(day) ?? []).map((cell) => (
+                {(row.days.get(day) ?? []).map((cell, _, cells) => (
                   <Slot
                     key={cell.from.getTime()}
                     cell={cell}
+                    dayFrom={cells[0]?.from.getTime() ?? cell.from.getTime()}
                     members={members}
                     me={me}
                     focus={focus}

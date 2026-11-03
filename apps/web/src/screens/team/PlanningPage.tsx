@@ -1011,6 +1011,7 @@ function Cell({
     <ShiftChip
       key={chip.shift.id}
       chip={chip}
+      earlier={'earlier' in chip && chip.earlier}
       carried={'carried' in chip && chip.carried}
       now={now}
       zone={zone}
@@ -1168,6 +1169,7 @@ function IncidentIcon({ className, titled = false }: { className: string; titled
 
 function ShiftChip({
   chip,
+  earlier,
   carried,
   now,
   zone,
@@ -1177,7 +1179,9 @@ function ShiftChip({
   onShow,
 }: {
   chip: Chip;
-  /** The same shift on a later créneau it runs into: drawn there too, read and reached once, on the first. */
+  /** Begun in an earlier créneau: its hours come after « … ». */
+  earlier: boolean;
+  /** The same shift on a later créneau of the same day: drawn there too, read and reached on the first. */
   carried: boolean;
   now: Date;
   zone: string;
@@ -1191,6 +1195,8 @@ function ShiftChip({
   const { shift, member } = chip;
   const phase = phaseOf(shift, now);
   const name = member?.displayName ?? 'Un membre';
+  // Read again on the next day, it ends there: no « +1 ».
+  const overnight = chip.overnight && !earlier;
   return (
     <button
       type="button"
@@ -1205,7 +1211,7 @@ function ShiftChip({
       data-carried={carried ? 'true' : undefined}
       tabIndex={carried ? -1 : undefined}
       aria-hidden={carried ? 'true' : undefined}
-      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued ? ', commencé la veille' : ''}${chip.overnight ? ', jusqu’au lendemain' : ''}${phase === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}`}
+      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${phase === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}`}
       onClick={() => {
         onShow(shift.id);
       }}
@@ -1216,9 +1222,9 @@ function ShiftChip({
         {incident ? <IncidentIcon className="sc-chip__incident" titled /> : null}
       </span>
       <span className="sc-chip__hours nv-num">
-        {chip.continued || carried ? '… ' : ''}
+        {chip.continued || earlier ? '… ' : ''}
         {rangeAt(shift.startsAt, shift.endsAt, zone)}
-        {chip.overnight ? <span className="sc-chip__night"> +1</span> : null}
+        {overnight ? <span className="sc-chip__night"> +1</span> : null}
       </span>
       {/* The shift under way: its edge breathes in the member's colour (CSS) and says what is left. */}
       {phase === 'live' ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}

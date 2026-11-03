@@ -696,6 +696,9 @@ describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
     // créneaux is drawn on both, its hours kept, after « … » on the second (ADR 0049 § 1).
     expect(text(row)).toContain('Toi, 23 h – 5 h, en poste, reste 4 h ; l’IA en automatique');
     expect(text(row)).toContain('Toi… 23 h – 5 hreste 4 h');
+    // Wednesday's first créneau reads it again, not as a copy: a phone shows that day alone, and its edge breathes.
+    const live = [...row.querySelectorAll('.cal-chip[data-phase="live"]')];
+    expect(live.map((chip) => chip.getAttribute('data-carried'))).toEqual([null, null]);
     expect(within(row).getAllByText('Basile')).toHaveLength(2);
     expect(text(row)).toContain('Basile… 8 h – 14 h');
     // Nobody but the agent, in Automatique: « IA seule », said in words too.

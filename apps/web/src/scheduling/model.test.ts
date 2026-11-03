@@ -31,6 +31,7 @@ import {
   swapRefusalText,
   swapViewOf,
   templateLine,
+  type SlotChip,
 } from './model';
 import { weekOf } from './time';
 
@@ -152,7 +153,9 @@ describe('the créneaux of a row (EQ-01)', () => {
     const across = shift(1, { startsAt: '2026-10-27T09:00:00Z', endsAt: '2026-10-27T13:00:00Z' });
     const tuesday = cellsOf([across], BEFORE)?.get('2026-10-27');
     expect(tuesday?.[1]?.chips.map((chip) => [chip.shift.id, chip.carried])).toEqual([[across.id, false]]);
-    expect(tuesday?.[2]?.chips.map((chip) => [chip.shift.id, chip.carried])).toEqual([[across.id, true]]);
+    expect(tuesday?.[2]?.chips.map((chip) => [chip.shift.id, chip.earlier, chip.carried])).toEqual([
+      [across.id, true, true],
+    ]);
     expect(tuesday?.[0]?.chips).toEqual([]);
     expect(tuesday?.[3]?.chips).toEqual([]);
   });
@@ -162,6 +165,16 @@ describe('the créneaux of a row (EQ-01)', () => {
     const sunday = shift(1, { startsAt: '2026-10-25T21:00:00Z', endsAt: '2026-10-26T03:00:00Z' });
     const monday = cellsOf([sunday], BEFORE)?.get('2026-10-26');
     expect(monday?.[0]?.chips.map((chip) => [chip.shift.id, chip.carried])).toEqual([[sunday.id, false]]);
+  });
+
+  it('reads a night shift again on the next day, where a phone shows that day alone', () => {
+    // Tuesday 27 at 23 h – Wednesday 28 at 5 h in Paris: on Tuesday's last créneau, and on Wednesday's first, not as a
+    // copy, since no earlier créneau of Wednesday draws it.
+    const night = shift(1, { startsAt: '2026-10-27T22:00:00Z', endsAt: '2026-10-28T04:00:00Z' });
+    const week = cellsOf([night], BEFORE);
+    const pair = (chip: SlotChip): [string, boolean, boolean] => [chip.shift.id, chip.earlier, chip.carried];
+    expect(week?.get('2026-10-27')?.[3]?.chips.map(pair)).toEqual([[night.id, false, false]]);
+    expect(week?.get('2026-10-28')?.[0]?.chips.map(pair)).toEqual([[night.id, true, false]]);
   });
 
   it('cuts the créneaux at the agency’s hours over a change of time', () => {
