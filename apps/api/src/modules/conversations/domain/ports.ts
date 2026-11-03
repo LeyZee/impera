@@ -12,7 +12,10 @@ import type {
   ConversationMode,
   ConversationState,
   ConversationSummary,
+  CreatorConversation,
+  CreatorFanPage,
   CreatorId,
+  CreatorMessagePage,
   Currency,
   DecidedDraft,
   DesireCurve,
@@ -533,6 +536,18 @@ export interface JobLogger {
 interface Page<T> {
   readonly items: readonly T[];
   readonly nextCursor: string | null;
+}
+
+/**
+ * What a creator reads of her own account (CR-02, ADR 0042 § 2), through her own door (`withCreatorAccount`): her
+ * creator is read in her account, never given by the caller. No author of a message is ever read (ADR 0021).
+ */
+export interface CreatorSpaceReader {
+  fans(userId: UserId, page: PageRequest): Promise<CreatorFanPage>;
+  /** The conversation she opens, `null` when she has none of that id; each opening is written in the audit log. */
+  openConversation(userId: UserId, id: ConversationId, ip: string): Promise<CreatorConversation | null>;
+  /** `null` when she has no conversation of that id. */
+  messages(userId: UserId, id: ConversationId, page: PageRequest): Promise<CreatorMessagePage | null>;
 }
 
 export interface PageRequest {

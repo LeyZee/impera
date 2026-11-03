@@ -25,9 +25,11 @@ import type {
 } from './domain/ports';
 import { createDrizzleAlertHistory } from './infra/db/alert-history';
 import { createDrizzleAwayHolds } from './infra/db/away-holds';
+import { createDrizzleCreatorSpaceReader } from './infra/db/creator-reader';
 import { createDrizzleConversationReader } from './infra/db/reader';
 import { createDrizzleUnitOfWork } from './infra/db/unit-of-work';
 import { createAlertHistoryRoutes } from './infra/http/alert-history-routes';
+import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
@@ -117,6 +119,10 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
       await createAlertHistoryRoutes(
         createDrizzleAlertHistory(deps.db),
         deps.alertNames ?? noAlertNames,
+        deps.requireRole,
+      )(app, options);
+      await createCreatorSpaceRoutes(
+        createDrizzleCreatorSpaceReader(deps.db, deps.fans, deps.mediaDescriptions ?? noMediaDescriptions),
         deps.requireRole,
       )(app, options);
     },
