@@ -1,4 +1,4 @@
-import { type EarningsSource, type PayPeriod } from '@nirvana/contracts';
+import { earningsBaseOf, type EarningsSource, type PayPeriod, type Platform } from '@nirvana/contracts';
 
 import { PayRulesPeriodInvalid, PayRulesSource } from './errors';
 
@@ -14,7 +14,32 @@ export function assertRulesStart(fromPeriod: PayPeriod, currentPeriod: PayPeriod
   throw new PayRulesPeriodInvalid();
 }
 
-/** `detected` waits for the connector to record the sales (P6-01): an account in it would be paid nothing. */
-export function assertSourceRecorded(source: EarningsSource): void {
-  if (source === 'detected') throw new PayRulesSource();
+/** What the switch of an account rests on, as the sales feed knows it (the `connectors` module's facts). */
+export interface SwitchFacts {
+  readonly platform: Platform;
+  readonly modelLinked: boolean;
+  readonly lastCheck: { readonly clean: boolean; readonly fromDay: string; readonly toDay: string } | null;
+}
+
+/**
+ * The switch guard (ADR 0050 § 8, CRM-03): `declared` always; `detected` only for an account that pay can read on its
+ * platform's net, so that it is never paid nothing nor paid twice. Its platform gives a net (`earningsBaseOf`), one of
+ * the platform's models is linked to it (its sales are recorded), and the platform's latest reliability check is a
+ * clean match (CRM-02: one whole fortnight, no bot outside the agent, no model of the export unknown) over a
+ * fortnight that ends before `fromPeriod`: Charles saw the net agree before it pays. The latest check alone counts: a
+ * newer one that does not agree withdraws the agreement of an older one.
+ */
+export function assertSourceSwitchable(
+  source: EarningsSource,
+  fromPeriod: PayPeriod,
+  facts: SwitchFacts,
+): void {
+  if (source === 'declared') return;
+  if (earningsBaseOf(facts.platform, source) !== 'platform_net')
+    throw new PayRulesSource('platform_without_net');
+  if (!facts.modelLinked) throw new PayRulesSource('model_unlinked');
+  if (facts.lastCheck === null) throw new PayRulesSource('check_missing');
+  if (!facts.lastCheck.clean) throw new PayRulesSource('check_not_clean');
+  // A period is its first day (`YYYY-MM-DD`): the checked fortnight ends the day before it at the latest.
+  if (facts.lastCheck.toDay >= fromPeriod) throw new PayRulesSource('check_not_before');
 }

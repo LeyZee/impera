@@ -7,6 +7,7 @@ import {
   payPeriodOfDay,
   PlatformAccountIdSchema,
   type PayPeriod,
+  type PlatformAccountId,
 } from '@nirvana/contracts';
 import {
   and,
@@ -27,7 +28,7 @@ import {
   PayRulesPeriodConflict,
   PlatformAccountNotFound,
 } from '../domain/errors';
-import { assertRulesStart, assertSourceRecorded } from '../domain/pay-rules';
+import { assertRulesStart, assertSourceSwitchable, type SwitchFacts } from '../domain/pay-rules';
 import type { PayRulesStore, StoredAccount, StoredPayRules } from '../domain/ports';
 import { calendarDayIn } from '../domain/time';
 
@@ -69,11 +70,25 @@ const currentPeriodIn = async (tx: Transaction, now: Date): Promise<PayPeriod> =
   payPeriodOfDay(calendarDayIn(now, await agencyTimeZone(tx)));
 
 /**
+ * What the switch guard reads of the sales feed for an account, in the caller's transaction and under its policies
+ * (the `connectors` module's `salesFeedSwitchReads`, given by the composition root): `null` for an account the caller
+ * does not read.
+ */
+export type SwitchFactsRead = (
+  tx: Transaction,
+  platformAccountId: PlatformAccountId,
+) => Promise<SwitchFacts | null>;
+
+/**
  * The accounts' pay rules through `withTenantMember` in the account's creator (EQ-03): `team_read` lets the owner and
  * an active manager read them, `owner_insert` lets the owner alone add them, and the table refuses any change or
  * deletion. The period running now is read in the agency's zone, in the same transaction.
  */
-export function createDrizzlePayRulesStore(db: Database, adminDb: Database): PayRulesStore {
+export function createDrizzlePayRulesStore(
+  db: Database,
+  adminDb: Database,
+  switchFactsOf: SwitchFactsRead,
+): PayRulesStore {
   return {
     list: (actor, creatorIds, now) =>
       withMember(
@@ -131,7 +146,12 @@ export function createDrizzlePayRulesStore(db: Database, adminDb: Database): Pay
           if (!same) throw new PayRulesConflict();
           return { rules: toPayRules(existing), created: false };
         }
-        assertSourceRecorded(rules.earningsSource);
+        if (rules.earningsSource === 'detected') {
+          // The switch guard (ADR 0050 § 8, CRM-03), read in this transaction: the account was found in its creator.
+          const facts = await switchFactsOf(tx, rules.platformAccountId);
+          if (facts === null) throw new PlatformAccountNotFound();
+          assertSourceSwitchable(rules.earningsSource, rules.fromPeriod, facts);
+        }
         const sameAccount = await tx
           .select({ id: accountPayRules.id, fromPeriod: accountPayRules.fromPeriod })
           .from(accountPayRules)

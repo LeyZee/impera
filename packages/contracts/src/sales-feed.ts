@@ -433,7 +433,7 @@ export type SalesFeedCheckReport = z.infer<typeof SalesFeedCheckReportSchema>;
 
 /**
  * `GET /v1/settings/sales-feeds/:platform/check`: the latest report kept, `null` before any check. `clean` is a match
- * over one whole fortnight with no bot outside the agent nor model of the export unknown, the one a switch to the platform's net can rest on
+ * over one whole fortnight, made once it was over, with no bot outside the agent nor model of the export unknown, the one a switch to the platform's net can rest on
  * (CRM-03); `checkedBy` the user who ran it.
  */
 export const SalesFeedLastCheckSchema = z.object({

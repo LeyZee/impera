@@ -1,6 +1,7 @@
 import { JOB_PAYLOADS } from '@nirvana/contracts';
 
 import { defineTask } from '../jobs';
+import { salesFeedSwitchReads } from '../modules/connectors';
 import { enqueuePayRecalculation } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import { createSchedulingModule, type SchedulingModule } from '../modules/scheduling';
@@ -21,6 +22,8 @@ export function wireScheduling(shared: Shared, deps: { readonly persona: Persona
     creators: { list: () => deps.persona.creators.list('all') },
     // Pay owns `payroll.recalculate`: a validated report enqueues it through pay's own function (EQ-04).
     enqueuePayRecalculation,
+    // The switch guard of the pay rules reads the sales feed's links and checks (ADR 0050 § 8, CRM-03).
+    switchFactsOf: salesFeedSwitchReads.switchFactsOf,
   });
   return {
     module,
