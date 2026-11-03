@@ -6,7 +6,7 @@
 
 **Tables possédées.** Aucune : il n'écrit que `audit_log` (une ligne par export). Les comptes et les journaux du comptable s'enregistrent avec les réglages de facturation (`contractors`).
 
-**Lectures croisées qui restent** (fiche ARC-07) : `infra/accounting-store.ts` lit directement, sous `withMember`, les documents et leurs règlements (`invoicing`), les relevés et les reports (`payroll`), les dossiers et les réglages de facturation (`contractors`). Elles passeront par des ports de lecture qui reçoivent la transaction de l'export. La liste exacte est `OPEN_CROSSINGS` dans `apps/api/src/__tests__/architecture.test.ts`, qui refuse toute lecture nouvelle et toute ligne qu'un port a fermée.
+**Ce qu'il lit des autres** (ARC-07 lot c) : les exports ne lisent aucune table d'un autre module de la paie. Ils lisent, dans leur transaction (`withMember`, le propriétaire), les relevés, leurs virements et les reports par `payReadsForAccounting` de `payroll`, les documents, ce qu'ils ont figé et leurs PDF par `invoiceReadsForAccounting` d'`invoicing`, et les comptes du journal et les dossiers par `contractorReadsForAccounting` de `contractors`, chacun depuis l'`index.ts` de son propriétaire. `apps/api/src/__tests__/architecture.test.ts` refuse toute lecture directe nouvelle.
 
 **L'export du journal pour le comptable** (EQ-06 lot 7b ; ADR 0023 « journal des achats, comptes paramétrables, validés par le comptable » ; `domain/journal.ts` et `domain/fec.ts`, purs ; `application/accounting.ts` ; `infra/accounting-store.ts`, sous `withMember`) :
 

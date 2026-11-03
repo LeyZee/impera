@@ -46,6 +46,8 @@ export type { ContractorInvoiceReads, ContractorPayReads, InvoiceRequeue } from 
 export { reviewOf } from './infra/document-rows';
 export { regimeVatOf } from './infra/regime-store';
 
+/** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { contractorReadsForAccounting } from './infra/accounting-reads';
 /**
  * Public entry point of the `contractors` module (ADR 0047 § 1): the contractor's file (identity, company, contract and
  * mandate, regimes, documents and their check, residence certificates, reminders, purge of refused documents) and the
