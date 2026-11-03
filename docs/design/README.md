@@ -18,7 +18,7 @@ Captures du CRM refait (23/10), prises dans Chromium à 2×, mouvement réduit, 
 
 ![Typographie](images/typographie.jpg)
 
-![Logo et déclinaisons](images/marque.png)
+![Logo et déclinaisons](images/marque.jpg)
 
 ## Refonte du 19/10 : le Liquid Glass d'Apple
 
@@ -40,7 +40,7 @@ Réponses aux questions ouvertes de `brief.md` :
 
 - **Identité propre à Impera**, pas les tokens IMPERA. Direction : le Liquid Glass d'iOS 26/27 sur une nuit chaude, avec **un seul accent, un néon rouge**. L'ancienne bannière violette du README n'est plus la référence de couleur ; la bannière actuelle est `brand/banner.svg`.
 - **En code, sans Figma.** La référence visuelle vivante est l'artifact « Impera » (design system publié par Claude, privé au compte de Charles : https://claude.ai/artifact/Aw5XKd8jae4xSNevjge2Ci). Le dépôt fait foi : si l'artifact et `packages/design-system` divergent, c'est le dépôt qui a raison.
-- Nom et logo : la flamme à l'auréole dessinée par Charles (16/10), déclinée dans `brand/` (règles d'usage dans `brand/README.md`). Le nom s'écrit en Playfair Display italique 600 (`.nv-wordmark`), la police du logo, choisie par Charles le 16/10 parce que ses pleins et ses pointes reprennent la flamme ; les lockups de `brand/` en portent le tracé vectorisé.
+- Nom et logo : le buste de marbre couronné de laurier du logo de l'agence IMPERA, redessiné dans le design system (Liquid Glass, laurier néon, seule lumière ; version 7 et wordmark validés par Charles le 03/11, ADR 0062 § 6), décliné dans `brand/` (règles d'usage dans `brand/README.md`). Le nom s'écrit en Playfair Display italique 600 (`.nv-wordmark`), à l'encre, jamais éclairé ; les lockups de `brand/` en portent le tracé vectorisé.
 
 ## Retours de Charles sur le prototype (2026-10-17)
 

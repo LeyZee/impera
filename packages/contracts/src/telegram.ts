@@ -209,5 +209,6 @@ export const TELEGRAM_JOB_PAYLOADS = {
   }),
   'telegram.morning_digest': z.object({}),
   'telegram.evening_digest': z.object({}),
+  'telegram.connection_reminders': z.object({}),
   'telegram.purge': z.object({}),
 } as const;

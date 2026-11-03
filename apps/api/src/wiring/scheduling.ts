@@ -1,7 +1,7 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
-import { salesFeedSwitchReads } from '../modules/connectors';
+import { salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
 import { enqueuePayRecalculation } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import { createSchedulingModule, type SchedulingModule } from '../modules/scheduling';
@@ -24,6 +24,8 @@ export function wireScheduling(shared: Shared, deps: { readonly persona: Persona
     enqueuePayRecalculation,
     // The switch guard of the pay rules reads the sales feed's links and checks (ADR 0050 § 8, CRM-03).
     switchFactsOf: salesFeedSwitchReads.switchFactsOf,
+    // The agency percentages' check reads the register's totals, the one rule of CRM-04 (lot d3).
+    salesTotalsOf: salesFeedTotals.totalsOf,
   });
   return {
     module,
@@ -47,6 +49,17 @@ export function wireScheduling(shared: Shared, deps: { readonly persona: Persona
           context.logger.info(
             { lapsed: await module.jobs.lapseSwaps() },
             'scheduling: swap proposals lapsed',
+          );
+        },
+      ),
+      'scheduling.check_agency_shares': defineTask(
+        'scheduling.check_agency_shares',
+        JOB_PAYLOADS['scheduling.check_agency_shares'],
+        logger,
+        async (_payload, context) => {
+          context.logger.info(
+            { published: await module.jobs.checkAgencyShares(`job:${context.jobId}`) },
+            'scheduling: agency percentages checked against the register',
           );
         },
       ),

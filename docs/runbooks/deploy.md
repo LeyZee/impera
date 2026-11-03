@@ -52,7 +52,7 @@ Le pooler de Neon (hôte en `-pooler`) est interdit : Graphile Worker a besoin d
 
 ### 1.2 Coolify
 
-1. Coolify → Projet « Impera » → Ressource → **Docker Compose**, depuis le dépôt GitHub `LeyZee/nirvana`, branche `main`, fichier `docker-compose.prod.yml`.
+1. Coolify → Projet « Impera » → Ressource → **Docker Compose**, depuis le dépôt GitHub `LeyZee/impera`, branche `main`, fichier `docker-compose.prod.yml`.
 2. Domaine : sur le service **`web` seulement**, port 8080 (ex. `https://app.<domaine>`). Aucun domaine sur `api`, `worker`, `migrate`.
 3. Cocher « Include Source Commit in Build » : `SOURCE_COMMIT` devient le tag de l'image et `RELEASE` (Sentry, battement du worker).
 4. Déploiement automatique sur push de `main` : oui. `main` ne change que par une PR verte.

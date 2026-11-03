@@ -34,6 +34,14 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '0 6 2,17 * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.check_sales'] },
   },
+  // The agency's percentage of each creator against her part read on the register (CRM-04 lot d3): the same days,
+  // half an hour later, the fortnight just over in the agency's zone. No backfill: a missed run waits for the next
+  // fortnight, and the event is published once per account and fortnight anyway.
+  {
+    task: 'scheduling.check_agency_shares',
+    match: '30 6 2,17 * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_agency_shares'] },
+  },
   // What a member no longer `active` still held (a takeover, a routed conversation) is handed back within the minute
   // (EQ-13): he already reads none of it. No backfill: the next run finds them all anyway.
   {
@@ -59,6 +67,12 @@ const CRON_JOBS: readonly CronJob[] = [
   { task: 'telegram.morning_digest', match: '0 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
   // Each hour, acting only in a creator's 23 o'clock hour (CRM-04 lot b); the key of her day makes it once.
   { task: 'telegram.evening_digest', match: '0 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  // An outage still open 2 hours after its alert gets its single reminder in red (P3-12).
+  {
+    task: 'telegram.connection_reminders',
+    match: '*/10 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: 1 },
+  },
   { task: 'telegram.purge', match: '30 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   { task: 'fans.purge_facts', match: '45 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },

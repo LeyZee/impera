@@ -45,6 +45,7 @@ export const JOB_NAMES = [
   'notifications.creator_sale',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
+  'scheduling.check_agency_shares',
   'team.apply_roles',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -71,6 +72,7 @@ export const JOB_NAMES = [
   'telegram.poll_updates',
   'telegram.morning_digest',
   'telegram.evening_digest',
+  'telegram.connection_reminders',
   'telegram.purge',
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
@@ -139,6 +141,13 @@ export const JOB_PAYLOADS = {
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
+  /**
+   * On the 2nd and the 17th (CRM-04 lot d3): the fortnight just over, in the agency's zone, for each creator with an
+   * agency percentage on it. Her part read on the platform is compared with the percentage, and
+   * `agency_share_mismatch` is published once per account, fortnight and currency when they differ by more than
+   * rounding explains. It writes nothing else.
+   */
+  'scheduling.check_agency_shares': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -281,6 +290,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.creator_sale': 5,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
+  // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
+  'scheduling.check_agency_shares': 3,
   'team.apply_roles': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
   'payroll.recalculate': 5,
@@ -328,6 +339,8 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.morning_digest': 1,
   // Its hour is 23 o'clock only: a failed run is retried within it, the key of her day keeps it once.
   'telegram.evening_digest': 3,
+  // Every 10 minutes: the next run is the retry, the reminder's key keeps it once (P3-12).
+  'telegram.connection_reminders': 1,
   'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 

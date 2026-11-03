@@ -434,6 +434,29 @@ describe('reading the outbox', () => {
       days: 2,
       accounts: 2,
     });
+    const since = '2026-11-03T10:00:00.000Z';
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'connection_state_changed',
+        payload: { service: 'mistral', state: 'down', reason: 'low_credit', since },
+      })?.signal,
+    ).toEqual({ kind: 'connection_down', service: 'mistral', reason: 'low_credit' });
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'connection_state_changed',
+        payload: { service: 'xai', state: 'back', since },
+      })?.signal,
+    ).toEqual({ kind: 'connection_back', service: 'xai' });
+    // A service or a reason the contract does not know is not read.
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'connection_state_changed',
+        payload: { service: 'meta', state: 'down', reason: 'refused', since },
+      }),
+    ).toBeNull();
     // The voice version stays in Impera: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,
