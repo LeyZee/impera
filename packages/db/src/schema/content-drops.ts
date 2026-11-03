@@ -97,7 +97,13 @@ export const contentRequests = pgTable(
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('team_insert', {
       for: 'insert',
-      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}`,
+      // A script asked of her is one of the library's, kept for no one else and not archived (Bilan, #506).
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}
+        and (${t.structureId} is null or exists (
+          select 1 from script_structures s
+           where s.id = ${t.structureId} and s.archived_at is null
+             and (s.reserved_creator_id is null or s.reserved_creator_id = ${t.creatorId})
+        ))`,
     }),
     // The agency cancels an open request; her refusal stays hers.
     pgPolicy('team_update', {
@@ -188,7 +194,11 @@ export const contentDrops = pgTable(
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('team_insert', {
       for: 'insert',
-      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.state} = 'uploading'`,
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.state} = 'uploading'
+        and ${t.correctedFrom} is null and (${t.requestId} is null or exists (
+          select 1 from content_requests r
+           where r.id = ${t.requestId} and r.creator_id = ${t.creatorId} and r.state = 'open' and r.category = ${t.category}
+        ))`,
     }),
     // The agency corrects a category or withdraws a drop not yet out; the job moves the rest (`withAdmin`).
     pgPolicy('team_update', {
@@ -226,7 +236,11 @@ export const contentDropFiles = pgTable(
     enumCheck('content_drop_files', t.mime, DROP_MIME_TYPES),
     enumCheck('content_drop_files', t.state, DROP_FILE_STATES),
     check('content_drop_files_position_check', sql`${t.position} between 0 and 59`),
-    check('content_drop_files_bytes_check', sql`${t.bytes} > 0`),
+    // The heaviest file of each kind (`DROP_MAX_BYTES`): 500 Mo for a video, 30 Mo for a photo or a vocal.
+    check(
+      'content_drop_files_bytes_check',
+      sql`${t.bytes} > 0 and ${t.bytes} <= case when ${t.kind} = 'video' then 524288000 else 31457280 end`,
+    ),
     check(
       'content_drop_files_refusal_check',
       sql`(${t.state} = 'refused') = (${t.refusal} is not null) and coalesce(char_length(${t.refusal}), 1) between 1 and 200`,

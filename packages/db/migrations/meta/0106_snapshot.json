@@ -1,5 +1,5 @@
 {
-  "id": "d71ddd7d-1f24-4e73-934e-e9a7170552ac",
+  "id": "99f37857-8e16-4f2a-b389-44d6bb88e231",
   "prevId": "996bc225-fdcf-47c9-b2d2-a8bd4601b729",
   "version": "7",
   "dialect": "postgresql",
@@ -1279,7 +1279,7 @@
         },
         "content_drop_files_bytes_check": {
           "name": "content_drop_files_bytes_check",
-          "value": "\"content_drop_files\".\"bytes\" > 0"
+          "value": "\"content_drop_files\".\"bytes\" > 0 and \"content_drop_files\".\"bytes\" <= case when \"content_drop_files\".\"kind\" = 'video' then 524288000 else 31457280 end"
         },
         "content_drop_files_refusal_check": {
           "name": "content_drop_files_refusal_check",
@@ -1519,7 +1519,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'"
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
         },
         "team_update": {
           "name": "team_update",
@@ -1740,7 +1740,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_requests\".\"origin\" = 'agency' and \"content_requests\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_requests\".\"origin\" = 'agency' and \"content_requests\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_requests\".\"structure_id\" is null or exists (\n          select 1 from script_structures s\n           where s.id = \"content_requests\".\"structure_id\" and s.archived_at is null\n             and (s.reserved_creator_id is null or s.reserved_creator_id = \"content_requests\".\"creator_id\")\n        ))"
         },
         "team_update": {
           "name": "team_update",

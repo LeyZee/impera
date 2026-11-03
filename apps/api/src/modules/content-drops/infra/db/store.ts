@@ -38,6 +38,7 @@ import {
   ContentRequestClosed,
   ContentRequestIdConflict,
   ContentRequestNotFound,
+  ContentRequestStructureUnprocessable,
 } from '../../domain/errors';
 import type { AgencyContentStore, CreatorContentStore } from '../../domain/ports';
 
@@ -382,6 +383,19 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
           if (!same) throw new ContentRequestIdConflict();
           return requestOf(known, null);
         }
+        if (body.structureId !== null) {
+          // The library's structure, read by the team's policy: not archived, kept for no other creator.
+          const [structure] = await tx
+            .select({
+              reservedCreatorId: schema.scriptStructures.reservedCreatorId,
+              archivedAt: schema.scriptStructures.archivedAt,
+            })
+            .from(schema.scriptStructures)
+            .where(eq(schema.scriptStructures.id, body.structureId));
+          const usable =
+            structure?.archivedAt === null && (structure.reservedCreatorId ?? creatorId) === creatorId;
+          if (!usable) throw new ContentRequestStructureUnprocessable();
+        }
         try {
           await tx.insert(contentRequests).values({
             id: body.id,
@@ -396,8 +410,6 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         } catch (error) {
           const failure = pgErrorOf(error);
           if (failure?.code === '23505') throw new ContentRequestIdConflict();
-          // 23503: a structure that does not exist.
-          if (failure?.code === '23503') throw new ContentRequestNotFound();
           throw error;
         }
         const [row] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));

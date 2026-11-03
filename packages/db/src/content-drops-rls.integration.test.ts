@@ -158,6 +158,18 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
     expect(await asTeam(manager, (tx) => tx.select().from(s.contentDropFiles))).toHaveLength(2);
   });
 
+  it('bounds a file’s weight by its kind in the base too', async () => {
+    const mine = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(mine));
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.insert(s.contentDropFiles).values({ ...file(nora, mine.id), bytes: 31 * 1024 * 1024 }),
+        ),
+      ),
+    ).toMatch(/content_drop_files_bytes_check/u);
+  });
+
   it('she withdraws a drop nothing has scheduled, and changes nothing else of it', async () => {
     const mine = drop(nora, noraUser, { sentence: 'Séance au bord de la piscine' });
     await asNora((tx) => tx.insert(s.contentDrops).values(mine));
@@ -278,6 +290,18 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
           tx
             .insert(s.contentDrops)
             .values(drop(nora, noraUser, { category: 'mass_dm', requestId: asked.id })),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
+    // A structure kept for Inès is never asked of Nora, even past the server's own check.
+    const kept = randomUUID();
+    await withAdmin(test.admin.db, (tx) =>
+      tx.insert(s.scriptStructures).values({ id: kept, createdBy: owner, reservedCreatorId: ines }),
+    );
+    expect(
+      await failure(
+        asTeam(owner, (tx) =>
+          tx.insert(s.contentRequests).values(request(owner, { category: 'script', structureId: kept })),
         ),
       ),
     ).toMatch(/row-level security/u);

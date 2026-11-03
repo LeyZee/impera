@@ -9,6 +9,7 @@ import {
   CONTENT_REQUEST_CLOSED_CONFLICT,
   CONTENT_REQUEST_ID_CONFLICT,
   CONTENT_REQUEST_NOT_FOUND,
+  CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
   DomainError,
 } from '@impera/contracts';
 
@@ -88,5 +89,15 @@ export class ContentRequestIdConflict extends DomainError {
 export class ContentRequestClosed extends DomainError {
   constructor() {
     super(CONTENT_REQUEST_CLOSED_CONFLICT, 'Cette demande est déjà close');
+  }
+}
+
+/** A script structure that does not exist, is archived, or is kept for another creator. */
+export class ContentRequestStructureUnprocessable extends DomainError {
+  constructor() {
+    super(
+      CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
+      'Cette structure n’est pas disponible pour cette créatrice',
+    );
   }
 }

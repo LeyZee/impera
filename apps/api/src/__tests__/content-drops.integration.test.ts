@@ -232,6 +232,22 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
         })
       ).statusCode,
     ).toBe(400);
+    // A structure kept for Inès, or archived, is never asked of Nora.
+    const kept = randomUUID();
+    const archived = randomUUID();
+    await test.admin.db.insert(schema.scriptStructures).values([
+      { id: kept, createdBy: owner?.id ?? '', reservedCreatorId: ines },
+      { id: archived, createdBy: owner?.id ?? '', archivedAt: new Date(Date.now() + 60_000) },
+    ]);
+    for (const other of [kept, archived, randomUUID()]) {
+      const refused = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
+        ...asked,
+        id: newId(ContentRequestIdSchema),
+        structureId: other,
+      });
+      expect(refused.statusCode, refused.body).toBe(422);
+      expect(refused.json()).toMatchObject({ error: { code: 'content_request_structure_unprocessable' } });
+    }
     const answer = {
       id: newId(ContentDropIdSchema),
       category: 'script',
