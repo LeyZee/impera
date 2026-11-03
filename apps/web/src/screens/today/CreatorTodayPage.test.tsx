@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe('Aujourd’hui, the creator’s (CR-02)', () => {
-  it('says who chats for her now, until when, and who takes over', async () => {
+  it('says in one quiet card who answers her fans now, and who takes over', async () => {
     serve({
       current: [shift('Iris', '2026-10-28T11:00:00.000Z', '2026-10-28T17:00:00.000Z')],
       next: [
@@ -64,30 +64,39 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
       ],
     });
     show();
-    expect(await screen.findByRole('heading', { level: 2, name: 'Iris' })).toBeDefined();
-    expect(screen.getByText('En poste')).toBeDefined();
-    expect(screen.getByText('encore 5 h')).toBeDefined();
-    expect(screen.getByText('12 h – 18 h')).toBeDefined();
-    expect(screen.getByRole('progressbar', { name: 'Avancée du shift de Iris' })).toBeDefined();
-
-    const rows = screen.getAllByRole('listitem').map((row) => row.textContent);
-    expect(rows).toEqual([
-      nb('Théo@noraAujourd’hui · 18 h – 0 hdans 5 h'),
-      nb('Iris@noraDemain · 0 h – 6 hdans 11 h'),
+    expect(await screen.findByRole('heading', { level: 2, name: 'Qui répond à tes fans' })).toBeDefined();
+    const lines = [...document.querySelectorAll('.sc-fans__line')].map((line) => line.textContent);
+    expect(lines).toEqual([
+      nb('En ce moment : Iris jusqu’à 18 h.'),
+      nb('Ensuite : Théo aujourd’hui 18 h – 0 h, Iris demain 0 h – 6 h.'),
     ]);
+    // One account goes without saying; no gauge, no hero: the chatter is never the point of her day.
+    expect(screen.queryByText(/@nora/u)).toBeNull();
+    expect(screen.queryByRole('progressbar')).toBeNull();
   });
 
-  it('says nobody is on shift, and when the next one starts', async () => {
+  it('names her account when several are on shift for her', async () => {
+    serve({
+      current: [shift('Iris', '2026-10-28T11:00:00.000Z', '2026-10-28T17:00:00.000Z')],
+      next: [
+        { ...shift('Théo', '2026-10-28T17:00:00.000Z', '2026-10-28T23:00:00.000Z'), handle: 'nora_vip' },
+      ],
+    });
+    show();
+    expect(await screen.findByText(/sur @nora_vip/u)).toBeDefined();
+    expect(screen.getByText(/sur @nora$/u)).toBeDefined();
+  });
+
+  it('says nobody answers now, and when the next one starts', async () => {
     serve({ current: [], next: [shift('Théo', '2026-10-28T14:30:00.000Z', '2026-10-28T20:00:00.000Z')] });
     show();
-    expect(await screen.findByText('Pas de shift en ce moment')).toBeDefined();
-    expect(screen.getByText('Le prochain commence dans 2 h 30.')).toBeDefined();
+    expect(await screen.findByText('Personne en ce moment. Le prochain commence dans 2 h 30.')).toBeDefined();
 
     cleanup();
     serve({ current: [], next: [] });
     show();
-    expect(await screen.findByText('Aucun shift n’est prévu dans les prochaines 24 heures.')).toBeDefined();
-    expect(screen.queryByText('Ensuite')).toBeNull();
+    expect(await screen.findByText('Personne n’est prévu dans les prochaines 24 heures.')).toBeDefined();
+    expect(screen.queryByText(/Ensuite/u)).toBeNull();
   });
 
   it('says the planning does not load, with a way to try again', async () => {

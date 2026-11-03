@@ -2,17 +2,17 @@ import type { CreatorOnDuty } from '@nirvana/contracts';
 import type { JSX } from 'react';
 
 import { useCreatorOnDuty } from '@/scheduling/api';
-import { progressOf } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { dayOf, dayWordOf, lengthOf, longDay, rangeAt, readerZone, untilOf } from '@/scheduling/time';
+import { clockAt, dayOf, dayWordOf, longDay, rangeAt, readerZone, untilOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /**
- * Aujourd'hui, the creator's (CR-02, ADR 0042 § 8): who chats for her now, and who takes over in the next 24 hours,
- * by their display name and her account (ADR 0023: nothing else of the team). Read in her own time, the browser's. Her
- * last sales join it with Ventes (CR-04).
+ * Aujourd'hui, the creator's (CR-02, ADR 0042 § 8): her day. Who answers her fans is one quiet card, as on the
+ * prototype Charles validated on 02/11 (« pas sur la frise : une seule ligne discrète »), by their display name alone
+ * (ADR 0023: nothing else of the team). Her tasks (CR-05) and her last sales (CR-04) come first once they exist. Read
+ * in her own time, the browser's.
  */
 export function CreatorTodayPage(): JSX.Element {
   const onDuty = useCreatorOnDuty();
@@ -22,11 +22,7 @@ export function CreatorTodayPage(): JSX.Element {
 
   return (
     <Page>
-      <PageHeader
-        eyebrow={longDay(today)}
-        title="Aujourd’hui"
-        lead="Qui chatte pour toi en ce moment, et qui prend la suite."
-      />
+      <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée, et qui répond à tes fans." />
       {onDuty.isError ? (
         <ServerSilent
           text="Le planning n’a pas pu être lu. Rien ici n’est à jour en attendant."
@@ -36,9 +32,8 @@ export function CreatorTodayPage(): JSX.Element {
         />
       ) : onDuty.data === undefined ? (
         <div className="sc-today">
-          <Panel className="sc-hero">
+          <Panel className="sc-fans">
             <div className="sc-skeleton" aria-hidden="true">
-              <i />
               <i />
               <i />
             </div>
@@ -46,81 +41,70 @@ export function CreatorTodayPage(): JSX.Element {
         </div>
       ) : (
         <div className="sc-today">
-          {onDuty.data.current.length === 0 ? (
-            <Panel className="sc-hero sc-hero--none nv-enter">
-              <p className="sc-hero__kicker">Personne en poste</p>
-              <h2 className="sc-hero__title">Pas de shift en ce moment</h2>
-              <p className="sc-hero__note">
-                {onDuty.data.next[0] === undefined
-                  ? 'Aucun shift n’est prévu dans les prochaines 24 heures.'
-                  : `Le prochain commence ${untilOf(new Date(onDuty.data.next[0].startsAt).getTime() - now.getTime())}.`}
+          <Panel className="sc-fans nv-enter">
+            <h2 className="sc-fans__title">Qui répond à tes fans</h2>
+            <p className="sc-fans__line">
+              {onDuty.data.current.length === 0 ? (
+                onDuty.data.next[0] === undefined ? (
+                  'Personne n’est prévu dans les prochaines 24 heures.'
+                ) : (
+                  `Personne en ce moment. Le prochain commence ${untilOf(new Date(onDuty.data.next[0].startsAt).getTime() - now.getTime())}.`
+                )
+              ) : (
+                <>
+                  En ce moment :{' '}
+                  <Names
+                    shifts={onDuty.data.current}
+                    say={(shift) => `jusqu’à ${clockAt(shift.endsAt, zone)}`}
+                    handles={handlesShown(onDuty.data)}
+                  />
+                  .
+                </>
+              )}
+            </p>
+            {onDuty.data.next.length === 0 ? null : (
+              <p className="sc-fans__line">
+                Ensuite :{' '}
+                <Names
+                  shifts={onDuty.data.next}
+                  say={(shift) =>
+                    `${dayWordOf(shift.startsAt, zone, today).toLowerCase()} ${rangeAt(shift.startsAt, shift.endsAt, zone)}`
+                  }
+                  handles={handlesShown(onDuty.data)}
+                />
+                .
               </p>
-            </Panel>
-          ) : (
-            onDuty.data.current.map((shift) => (
-              <OnShift key={`${shift.handle}-${shift.startsAt}`} shift={shift} now={now} zone={zone} />
-            ))
-          )}
-          {onDuty.data.next.length === 0 ? null : (
-            <Panel className="sc-next nv-enter">
-              <p className="nv-eyebrow">Ensuite</p>
-              <ul className="sc-next__list">
-                {onDuty.data.next.map((shift) => (
-                  <li key={`${shift.handle}-${shift.startsAt}`} className="sc-next__row">
-                    <div className="sc-next__main">
-                      <p className="sc-next__who">{shift.displayName}</p>
-                      <p className="sc-next__where">@{shift.handle}</p>
-                    </div>
-                    <div className="sc-next__side">
-                      <p className="sc-next__hours nv-num">
-                        {dayWordOf(shift.startsAt, zone, today)} ·{' '}
-                        {rangeAt(shift.startsAt, shift.endsAt, zone)}
-                      </p>
-                      <p className="sc-next__in">
-                        {untilOf(new Date(shift.startsAt).getTime() - now.getTime())}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          )}
+            )}
+          </Panel>
         </div>
       )}
     </Page>
   );
 }
 
-/** One member on shift for her: his name, her account, his hours and what is left of them. */
-function OnShift({ shift, now, zone }: { shift: CreatorOnDuty; now: Date; zone: string }): JSX.Element {
-  const progress = progressOf(shift, now);
+/** Her account is named only when several are on shift for her: one account goes without saying. */
+const handlesShown = (list: { current: readonly CreatorOnDuty[]; next: readonly CreatorOnDuty[] }): boolean =>
+  new Set([...list.current, ...list.next].map((shift) => shift.handle)).size > 1;
+
+/** « **Iris** jusqu’à 18 h, **Théo** aujourd’hui 18 h – 0 h »: each name, then when. */
+function Names({
+  shifts,
+  say,
+  handles,
+}: {
+  shifts: readonly CreatorOnDuty[];
+  say: (shift: CreatorOnDuty) => string;
+  handles: boolean;
+}): JSX.Element {
   return (
-    <Panel className="sc-hero sc-hero--on nv-enter">
-      <div className="sc-hero__top">
-        <span className="nv-status sc-state sc-state--on">
-          <span className="nv-dot nv-tone--ok nv-dot--live" />
-          En poste
+    <>
+      {shifts.map((shift, index) => (
+        <span key={`${shift.handle}-${shift.startsAt}`}>
+          {index === 0 ? null : ', '}
+          <b>{shift.displayName}</b> <span className="nv-num">{say(shift)}</span>
+          {handles ? ` sur @${shift.handle}` : null}
         </span>
-        <span className="sc-hero__when nv-num">
-          encore {lengthOf(new Date(shift.endsAt).getTime() - now.getTime())}
-        </span>
-      </div>
-      <div className="sc-hero__who">
-        <h2 className="sc-hero__title">{shift.displayName}</h2>
-        <p className="sc-hero__where">@{shift.handle}</p>
-      </div>
-      <p className="sc-hero__hours nv-num">{rangeAt(shift.startsAt, shift.endsAt, zone)}</p>
-      <div
-        className="nv-gauge sc-hero__gauge"
-        role="progressbar"
-        aria-label={`Avancée du shift de ${shift.displayName}`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
-        style={{ '--nv-gauge-value': `${String(Math.round(progress * 1000) / 10)}%` }}
-      >
-        <span className="nv-gauge__fill" />
-      </div>
-    </Panel>
+      ))}
+    </>
   );
 }
