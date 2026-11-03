@@ -122,6 +122,10 @@ export type PenaltyId = z.infer<typeof PenaltyIdSchema>;
 export const PayAdjustmentIdSchema = uuid.brand<'PayAdjustmentId'>();
 export type PayAdjustmentId = z.infer<typeof PayAdjustmentIdSchema>;
 
+/** A decision of the validator on a sale held or wrongly given to a member (CRM-03, ADR 0050 § 5). */
+export const PaySaleDecisionIdSchema = uuid.brand<'PaySaleDecisionId'>();
+export type PaySaleDecisionId = z.infer<typeof PaySaleDecisionIdSchema>;
+
 /** What a validated statement carries to the next pay period instead of paying it (EQ-04). */
 export const CarryOverIdSchema = uuid.brand<'CarryOverId'>();
 export type CarryOverId = z.infer<typeof CarryOverIdSchema>;

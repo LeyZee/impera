@@ -51,7 +51,7 @@ import {
   type PeriodSnapshot,
   type ReportForPay,
 } from '../domain/recalculation';
-import { saleKeyOf, salesWaitingBefore, type CountedSale } from '../domain/sales';
+import { saleKeyOf, salesLeftHeld, salesWaitingBefore, type HeldSale, type SaleKey } from '../domain/sales';
 import {
   assertValidates,
   periodBeforeFirstClosing,
@@ -61,7 +61,7 @@ import {
 
 import type { AfterValidation, PayoutGate } from './ports';
 import { enqueuePayRecalculation } from './recalculation-queue';
-import { waitingSaleKeysUnscoped, type PayReadScope } from './sales-reads';
+import { readAtOf, waitingSaleKeysUnscoped, type PayReadScope } from './sales-reads';
 import {
   closingsSpan,
   readSnapshot,
@@ -75,6 +75,7 @@ const {
   carryOvers,
   commissionStatements,
   payPeriodClosings,
+  payPeriodHeldSales,
   payPeriodReports,
   payPeriodSales,
   payPeriods,
@@ -120,8 +121,13 @@ function waitingSalesUnscoped(
   });
 }
 
-/** The sales the admin read waiting that the member's read neither counts nor leaves waiting before: refused. */
-function assertSalesRead(waiting: ReadonlySet<string>, read: readonly CountedSale[]): void {
+const linesOf = (held: readonly HeldSale[]): SaleKey[] => held.map((one) => one.line);
+
+/**
+ * The sales the admin read waiting that the member's read neither counts, leaves waiting before nor leaves held:
+ * refused.
+ */
+function assertSalesRead(waiting: ReadonlySet<string>, read: readonly SaleKey[]): void {
   const seen = new Set(read.map((one) => saleKeyOf(one)));
   const unread = [...waiting].filter((key) => !seen.has(key)).length;
   if (unread > 0) throw new PayPeriodSalesUnread(unread);
@@ -141,10 +147,27 @@ async function earliestEntriesBefore(tx: Transaction, period: PayPeriod): Promis
   return first === null ? null : PayPeriodSchema.parse(first);
 }
 
+/** Some of a closing's items grouped by the creator of their account, in the creators' order. */
+function byCreatorOf<T>(
+  items: readonly T[],
+  accountOf: (item: T) => PlatformAccountId,
+  creatorOfAccount: ReadonlyMap<PlatformAccountId, string>,
+): [string, T[]][] {
+  const grouped = new Map<string, T[]>();
+  for (const one of items) {
+    const account = accountOf(one);
+    const creatorId = creatorOfAccount.get(account);
+    if (creatorId === undefined) throw new Error(`Account ${account} was not read in a creator`);
+    grouped.set(creatorId, [...(grouped.get(creatorId) ?? []), one]);
+  }
+  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
 /**
- * Writes `period`'s closing and its registries (ADR 0032): the reports counted, and the platform's sales counted
- * (CRM-03). Each report and each sale is registered in its own creator, the creator of its account for a sale: the
- * registries' triggers read it under the writer's policies. The rates go in their one order (`canonicalExchangeRates`).
+ * Writes `period`'s closing and its registries (ADR 0032): the reports counted, the platform's sales counted (CRM-03),
+ * and the sales it leaves held (lot b3), each once: a sale an earlier closing left held keeps that one. Each report and
+ * each sale is registered in its own creator, the creator of its account for a sale: the registries' triggers read it
+ * under the writer's policies. The rates go in their one order (`canonicalExchangeRates`).
  */
 async function writeClosing(
   tx: Transaction,
@@ -180,14 +203,8 @@ async function writeClosing(
       .insert(payPeriodReports)
       .values(reports.map((report) => ({ shiftReportId: report.id, period, memberId: report.memberId })));
   }
-  const salesByCreator = new Map<string, CountedSale[]>();
-  for (const one of closing.countedSales) {
-    const creatorId = creatorOfAccount.get(one.platformAccountId);
-    if (creatorId === undefined)
-      throw new Error(`Account ${one.platformAccountId} was not read in a creator`);
-    salesByCreator.set(creatorId, [...(salesByCreator.get(creatorId) ?? []), one]);
-  }
-  for (const [creatorId, sales] of [...salesByCreator.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+  const salesByCreator = byCreatorOf(closing.countedSales, (one) => one.platformAccountId, creatorOfAccount);
+  for (const [creatorId, sales] of salesByCreator) {
     await enterCreator(tx, creatorId, creatorIds);
     await tx.insert(payPeriodSales).values(
       sales.map((one) => ({
@@ -204,12 +221,30 @@ async function writeClosing(
       })),
     );
   }
+  const heldByCreator = byCreatorOf(closing.heldSales, (one) => one.line.platformAccountId, creatorOfAccount);
+  for (const [creatorId, held] of heldByCreator) {
+    await enterCreator(tx, creatorId, creatorIds);
+    await tx
+      .insert(payPeriodHeldSales)
+      .values(
+        held.map((one) => ({
+          platform: one.line.platform,
+          platformSaleId: one.line.platformSaleId,
+          event: one.line.event,
+          period,
+          platformAccountId: one.line.platformAccountId,
+          readAt: readAtOf(one.line),
+          reason: one.reason,
+        })),
+      )
+      .onConflictDoNothing();
+  }
   await audit(
     tx,
     actor,
     'pay_period.close',
     { kind: 'pay_period', id: period },
-    { reports: closing.counted.length, sales: closing.countedSales.length },
+    { reports: closing.counted.length, sales: closing.countedSales.length, held: closing.heldSales.length },
   );
 }
 
@@ -263,7 +298,11 @@ async function closeUpTo(
   if (last === null) {
     target = await readSnapshot(tx, reads, period, reports, scope);
     const before = salesWaitingBefore(target.snapshot.sales, period);
-    assertSalesRead(waitingSales, [...salesCountedIn(target.snapshot), ...before]);
+    assertSalesRead(waitingSales, [
+      ...salesCountedIn(target.snapshot),
+      ...before,
+      ...linesOf(salesLeftHeld(target.snapshot.sales, period)),
+    ]);
     const blocking = periodBeforeFirstClosing(period, [
       await earliestEntriesBefore(tx, period),
       ...reports.map((report) => report.period),
@@ -271,15 +310,21 @@ async function closeUpTo(
     ]);
     if (blocking !== null) throw new PayPeriodOrder(blocking);
   } else {
+    // An empty period before counts no sale, but may leave some held: what the admin read waiting is in one of them.
+    const seen: SaleKey[] = [];
     for (let between = nextPayPeriod(last); between < period; between = nextPayPeriod(between)) {
       const read = await readSnapshot(tx, reads, between, upTo(reports, between), scope);
       if (!periodIsEmpty(read.snapshot)) throw new PayPeriodOrder(between);
       const { closing } = closePeriod(read.snapshot);
+      seen.push(...linesOf(closing.heldSales));
       await writeClosing(tx, actor, between, closing, creatorOf, read.creatorOfAccount, creatorIds);
     }
     target = await readSnapshot(tx, reads, period, reports, scope);
-    // An empty period before counts no sale: what the admin read waiting is all in `period` now.
-    assertSalesRead(waitingSales, salesCountedIn(target.snapshot));
+    assertSalesRead(waitingSales, [
+      ...seen,
+      ...salesCountedIn(target.snapshot),
+      ...linesOf(salesLeftHeld(target.snapshot.sales, period)),
+    ]);
   }
   const { closing, closed } = closePeriod(target.snapshot);
   await writeClosing(tx, actor, period, closing, creatorOf, target.creatorOfAccount, creatorIds);

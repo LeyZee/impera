@@ -13,6 +13,8 @@ import {
   PAYOUT_DELAY_MAX_BUSINESS_DAYS,
   PENALTY_KINDS,
   PlatformSchema,
+  SALE_HELD_REASONS,
+  SaleDecisionOutcomeSchema,
   SaleEventSchema,
 } from '@nirvana/contracts';
 import { sql, type SQL } from 'drizzle-orm';
@@ -693,6 +695,96 @@ export const payPeriodSales = pgTable(
     ),
     memberRead(t.memberId),
     pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
+  ],
+);
+
+/**
+ * The sales a closing left held (CRM-03 lot b3, ADR 0050 § 5, ADR 0032): a line of the platform's register that the
+ * closing would have taken but that counted for nobody (`reason`, contracts `SaleHeldReason`). Written once, by the
+ * first closing that left it, never changed. The team's first open period reads these lines again (`read_at`, the
+ * instant `linesOfSalesBetween` finds them by: the sale's, or a refund's own when its sale is older than the register)
+ * until they count or are excluded: a decision, a new link or a shift entered after the closing still brings them in.
+ */
+export const payPeriodHeldSales = pgTable(
+  'pay_period_held_sales',
+  {
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    event: text('event').notNull(),
+    period: date('period')
+      .notNull()
+      .references(() => payPeriodClosings.period),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    readAt: timestampTz('read_at').notNull(),
+    reason: text('reason').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'pay_period_held_sales_pkey', columns: [t.platform, t.platformSaleId, t.event] }),
+    enumCheck('pay_period_held_sales', t.platform, PlatformSchema.options),
+    enumCheck('pay_period_held_sales', t.event, SaleEventSchema.options),
+    enumCheck('pay_period_held_sales', t.reason, SALE_HELD_REASONS),
+    pgPolicy('agency_read', { for: 'select', using: readsTeam }),
+    pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
+  ],
+);
+
+/**
+ * The validator's decisions on sales (CRM-03 lot b3, ADR 0050 § 5): a sale counts for the member its chatter is linked
+ * to (`count`), or for nobody (`exclude`), its refunds with it. Added only, numbered per sale from 1 without a gap: the
+ * latest counts, while the chatter's link keeps `link_version` (`null` for a chatter not linked or none). Written by
+ * the owner or an active manager, never on a sale of their own chatter (`author_member_id`, the member linked then),
+ * never on a sale a closing counted. `read_at` as in `pay_period_held_sales`.
+ */
+export const paySaleDecisions = pgTable(
+  'pay_sale_decisions',
+  {
+    id: id(),
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    revision: integer('revision').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    readAt: timestampTz('read_at').notNull(),
+    outcome: text('outcome').notNull(),
+    reason: text('reason'),
+    authorMemberId: uuid('author_member_id').references(() => teamMembers.id),
+    linkVersion: text('link_version'),
+    note: text('note'),
+    decidedBy: text('decided_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('pay_sale_decisions_revision_unique').on(t.platform, t.platformSaleId, t.revision),
+    enumCheck('pay_sale_decisions', t.platform, PlatformSchema.options),
+    enumCheck('pay_sale_decisions', t.outcome, SaleDecisionOutcomeSchema.options),
+    check(
+      'pay_sale_decisions_reason_check',
+      sql`${t.reason} is null or ${t.reason} in (${sql.raw(SALE_HELD_REASONS.map((one) => `'${one}'`).join(', '))})`,
+    ),
+    check('pay_sale_decisions_revision_check', sql`${t.revision} >= 1`),
+    check(
+      'pay_sale_decisions_note_check',
+      sql`${t.note} is null or char_length(${t.note}) between 1 and 500`,
+    ),
+    check(
+      'pay_sale_decisions_count_check',
+      sql`${t.outcome} = 'exclude' or (${t.authorMemberId} is not null and ${t.linkVersion} is not null and ${t.reason} in ('off_shift', 'status_unknown'))`,
+    ),
+    check('pay_sale_decisions_link_check', sql`(${t.authorMemberId} is null) = (${t.linkVersion} is null)`),
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${readsTeam} or (${t.authorMemberId} is not null and ${isMine(t.authorMemberId)})`,
+    }),
+    pgPolicy('agency_insert', {
+      for: 'insert',
+      withCheck: sql`${readsTeam} and ${t.decidedBy} = ${currentUser} and (${t.authorMemberId} is null or not ${isMine(t.authorMemberId)})`,
+    }),
   ],
 );
 

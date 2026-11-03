@@ -505,6 +505,13 @@
       "when": 1793676576786,
       "tag": "0074_pay_period_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793678289022,
+      "tag": "0077_pay_sale_decisions",
+      "breakpoints": true
     }
   ]
 }

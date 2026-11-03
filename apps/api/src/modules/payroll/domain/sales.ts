@@ -7,7 +7,9 @@ import {
   type PayPeriod,
   type Platform,
   type PlatformAccountId,
+  type SaleDecisionOutcome,
   type SaleEvent,
+  type SaleHeldReason,
   type SaleStatus,
   type TeamMemberId,
 } from '@nirvana/contracts';
@@ -35,6 +37,22 @@ export interface SaleKey {
 /** One text for one key, the registry's and the order's. */
 export const saleKeyOf = (key: SaleKey): string => `${key.platform} ${key.platformSaleId} ${key.event}`;
 
+/** One text for a sale, its own line and its refunds alike: what a decision is on. */
+export const saleIdOf = (key: Omit<SaleKey, 'event'>): string => `${key.platform} ${key.platformSaleId}`;
+
+/**
+ * What the validator decided on a sale (CRM-03 lot b3, ADR 0050 § 5), for its own line and its refunds: it counts for
+ * the member its chatter is linked to (`count`), or for nobody (`exclude`). A decision holds while the chatter's link
+ * keeps the version it was made on: linked elsewhere since, the sale follows the rules again and comes back to decide.
+ */
+export interface SaleDecisionForPay {
+  readonly outcome: SaleDecisionOutcome;
+  /** The link's version of the sale's chatter when it was decided, `null` for a chatter not linked or none. */
+  readonly linkVersion: string | null;
+  /** For `count`, the member it counts for, the one the link gave then; `null` for `exclude`. */
+  readonly memberId: TeamMemberId | null;
+}
+
 /** Whose a line is by the owner's link of its platform chatter (a refund is its sale's): only a member is paid. */
 export type SaleAuthorForPay =
   | { readonly kind: 'member'; readonly memberId: TeamMemberId; readonly linkVersion: string }
@@ -47,6 +65,8 @@ export interface SaleForPay extends SaleKey {
   readonly platformAccountId: PlatformAccountId;
   /** Its status when first read, which it keeps. */
   readonly status: SaleStatus;
+  /** When the line happened: a sale's instant, or the refund's own. */
+  readonly occurredAt: Date;
   /** The period of the line's own day in the agency's zone: a refund's own, not its sale's. */
   readonly period: PayPeriod;
   /** The sale's instant and its period; `null` for a refund whose sale is older than the register. */
@@ -129,6 +149,10 @@ export interface SalesSnapshot {
    * closing registered.
    */
   readonly registered: ReadonlyMap<string, RegisteredSale>;
+  /**
+   * By `saleIdOf`: the validator's latest decision on each sale read (CRM-03 lot b3), which its refunds follow.
+   */
+  readonly decisions: ReadonlyMap<string, SaleDecisionForPay>;
   /** Every account's dated sources, from its first rules on. */
   readonly sources: readonly AccountSourceForPay[];
   /** The shifts covering the sales' instants, with the margin around them. */
@@ -140,22 +164,11 @@ export interface SalesSnapshot {
 export const NO_SALES: SalesSnapshot = {
   lines: [],
   registered: new Map(),
+  decisions: new Map(),
   sources: [],
   shifts: [],
   accessMarginMinutes: 0,
 };
-
-/**
- * Why a line that the account's base would pay counts for nobody until someone acts (CRM-03 lot b3 shows them):
- * - `refund_before_register`: a refund whose sale is older than the register;
- * - `refund_before_base`: a refund whose sale was in a period the account was still paid on its reports (ADR 0023's
- *   chain): it is never taken off the platform's net, whose sale it never was (held until Charles decides, 03/11);
- * - `status_unknown`: a status the platform added that Nirvana does not know (ADR 0050 § 3);
- * - `chatter_unlinked`: a chatter the owner has not linked yet (ADR 0050 § 5);
- * - `off_shift`: a member neither on shift nor in their margin at the sale's instant (ADR 0050 § 5, ADR 0025).
- */
-type SaleHeldReason =
-  'refund_before_register' | 'refund_before_base' | 'status_unknown' | 'chatter_unlinked' | 'off_shift';
 
 /** What a line is for pay. */
 export type SaleAttribution =
@@ -207,12 +220,30 @@ function onShiftAt(
 }
 
 /**
- * Whose `line` is (ADR 0050 §§ 5, 7, 8), from the account's base at its sale's period, its status, its author and the
- * shifts: a line under the chain of ADR 0023 is the reports' (`outside`), a refund whose sale was never paid on the
- * platform's net is held, an unknown status is held, the agent's or no chatter is nobody's, a chatter not linked is
- * held, a member off shift is held, and a member on shift is paid. A refund follows its sale's author and instant,
- * and once a closing counted its sale, the member and the link's version it was counted for: the refund comes off the
- * commission that sale paid, whatever the link says since (ADR 0050 § 7).
+ * The validator's decision on `line`'s sale, while it holds: made on the link's version the chatter has now (`null`
+ * for a chatter not linked, the agent or none). A refund follows its sale's decision.
+ */
+function decisionOn(line: SaleForPay, sales: SalesSnapshot): SaleDecisionForPay | null {
+  const decision = sales.decisions.get(saleIdOf(line));
+  if (decision === undefined) return null;
+  const linkVersion = line.author.kind === 'member' ? line.author.linkVersion : null;
+  return decision.linkVersion === linkVersion ? decision : null;
+}
+
+/**
+ * Whose `line` is (ADR 0050 §§ 5, 7, 8), from the account's base at its sale's period, its status, its author, the
+ * shifts and the validator's decision:
+ * - a line under the chain of ADR 0023 is the reports' (`outside`);
+ * - a refund whose sale was never paid on the platform's net is held, or nobody's once the validator excludes it (no
+ *   deduction, until Charles decides, 03/11);
+ * - once a closing counted a sale, its refund comes off the member and the link's version it was counted for, whatever
+ *   the link says since and whatever is decided (ADR 0050 § 7);
+ * - the agent's or no chatter is nobody's;
+ * - the validator's decision comes next: excluded, nobody's; counted, the member it was counted for, while the link
+ *   still gives that member;
+ * - then a chatter not linked is held, a member off shift is held, an unknown status is held, and a member on shift
+ *   is paid.
+ * A refund follows its sale's author, instant and decision.
  */
 export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAttribution {
   const atSale =
@@ -222,18 +253,23 @@ export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAtt
     if (accountBaseOf(sales.sources, line.platformAccountId, line.period) !== 'platform_net') {
       return { kind: 'outside' };
     }
+    if (decisionOn(line, sales)?.outcome === 'exclude') return { kind: 'nobody' };
     return {
       kind: 'held',
       reason: line.salePeriod === null ? 'refund_before_register' : 'refund_before_base',
     };
   }
-  if (line.status === 'other') return { kind: 'held', reason: 'status_unknown' };
   const paid =
     line.event === 'refund' ? sales.registered.get(saleKeyOf({ ...line, event: 'sale' })) : undefined;
   if (paid !== undefined) return { kind: 'member', memberId: paid.memberId, linkVersion: paid.linkVersion };
   const { author } = line;
   if (author.kind === 'agent' || author.kind === 'none') return { kind: 'nobody' };
+  const decision = decisionOn(line, sales);
+  if (decision?.outcome === 'exclude') return { kind: 'nobody' };
   if (author.kind === 'unlinked') return { kind: 'held', reason: 'chatter_unlinked' };
+  if (decision?.outcome === 'count' && decision.memberId === author.memberId) {
+    return { kind: 'member', memberId: author.memberId, linkVersion: author.linkVersion };
+  }
   if (
     !onShiftAt(
       sales.shifts,
@@ -245,7 +281,57 @@ export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAtt
   ) {
     return { kind: 'held', reason: 'off_shift' };
   }
+  if (line.status === 'other') return { kind: 'held', reason: 'status_unknown' };
   return { kind: 'member', memberId: author.memberId, linkVersion: author.linkVersion };
+}
+
+/**
+ * What the validator may decide now on the sale of `line` in an open period (CRM-03 lot b3), the decision it holds
+ * left aside: `count` and `exclude` on a line held because its member was off shift or its status is unknown,
+ * `exclude` alone on any other held line (a chatter not linked, a refund never paid on this net: no deduction until
+ * Charles decides, 03/11) and on a line a member is paid for but no closing counted yet (wrongly given to them).
+ * Nothing on a refund whose sale a closing counted, on the agent's, on no chatter, or outside the platform's net.
+ */
+export function saleDecisionsOpen(line: SaleForPay, sales: SalesSnapshot): readonly SaleDecisionOutcome[] {
+  const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
+  if (undecided.kind === 'held') {
+    return undecided.reason === 'off_shift' || undecided.reason === 'status_unknown'
+      ? ['count', 'exclude']
+      : ['exclude'];
+  }
+  if (undecided.kind !== 'member') return [];
+  const paid = line.event === 'refund' && sales.registered.has(saleKeyOf({ ...line, event: 'sale' }));
+  return paid ? [] : ['exclude'];
+}
+
+/** A sale the validator may decide on in an open period: the line shown, why it is held (`null`: paid), and the outcomes. */
+export interface SaleToDecide {
+  readonly line: SaleForPay;
+  readonly reason: SaleHeldReason | null;
+  readonly outcomes: readonly SaleDecisionOutcome[];
+}
+
+/**
+ * The sale `sale` names as an open period's decision reads it (CRM-03 lot b3): its own line if the period takes it,
+ * a refund's otherwise (a refund older than the register), no closing having counted it, with what may be decided now
+ * (`saleDecisionsOpen`). `null` when the period does not take it or nothing may be decided on it.
+ */
+export function saleToDecide(
+  sales: SalesSnapshot,
+  place: PeriodPlace,
+  sale: Omit<SaleKey, 'event'>,
+): SaleToDecide | null {
+  if (place.closed) return null;
+  const lines = sales.lines.filter(
+    (line) =>
+      saleIdOf(line) === saleIdOf(sale) && !sales.registered.has(saleKeyOf(line)) && takes(place, line),
+  );
+  const line = lines.find((one) => one.event === 'sale') ?? lines[0];
+  if (line === undefined) return null;
+  const outcomes = saleDecisionsOpen(line, sales);
+  if (outcomes.length === 0) return null;
+  const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
+  return { line, reason: undecided.kind === 'held' ? undecided.reason : null, outcomes };
 }
 
 /** A line a period counts, and the earlier period it comes late from. */
@@ -268,7 +354,7 @@ const byKey = <T>(items: readonly T[], keyOf: (item: T) => SaleKey): T[] =>
   });
 
 /** Where the sales of `period` stand: closed or not, and the team's first open period. */
-interface PeriodPlace {
+export interface PeriodPlace {
   readonly period: PayPeriod;
   readonly closed: boolean;
   readonly firstOpen: PayPeriod | null;
@@ -346,6 +432,15 @@ export function salesWaitingBefore(sales: SalesSnapshot, period: PayPeriod): Cou
   return salesCounted(sales, { period, closed: false, firstOpen: period }).filter(
     (one) => one.lateFrom !== null,
   );
+}
+
+/**
+ * The lines the closing of `period` leaves held (CRM-03 lot b3): those it would take and holds, the earlier periods'
+ * too before the team's first closing. The closing keeps them (`pay_period_held_sales`): a decision, a new link or a
+ * shift entered after it still brings them into the first open period, where they show until decided.
+ */
+export function salesLeftHeld(sales: SalesSnapshot, period: PayPeriod): HeldSale[] {
+  return salesHeld(sales, { period, closed: false, firstOpen: period });
 }
 
 /** A counted line as a statement keeps it: its key, its net, the link's version, and where it comes late from. */

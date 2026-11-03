@@ -298,6 +298,21 @@ pay_period_sales           platform, platform_sale_id, event (clé, une ligne du
                            clôture, qui l'écrit dans sa transaction et dans la créatrice du compte ; une quinzaine clôturée
                            se recalcule sur lui seul ; le déclencheur vérifie la ligne, son compte, sa devise et son net ;
                            ajout seul)
+pay_period_held_sales      platform, platform_sale_id, event (clé, une ligne du registre des ventes), period →
+                           pay_period_closings, platform_account_id, read_at (l'instant où la ligne se relit), reason
+                           (chatter_unlinked | off_shift | status_unknown | refund_before_register | refund_before_base),
+                           created_at (migration 0077, CRM-03 lot b3 ; les lignes qu'une clôture laisse en attente, écrites
+                           dans sa transaction et dans la créatrice du compte ; la première quinzaine ouverte les relit
+                           jusqu'à ce qu'une décision, un lien ou un shift les règle ; ajout seul)
+pay_sale_decisions         id (clé), platform, platform_sale_id, revision (unique avec la vente, ≥ 1, la plus récente fait
+                           foi), platform_account_id, read_at, outcome (count | exclude), reason (la raison de l'attente,
+                           nulle pour une vente payée à tort), author_member_id + link_version (ensemble ou nuls : le membre
+                           et la version du lien sur lesquels la décision tient), note (1 à 500), decided_by, created_at
+                           (migration 0077, CRM-03 lot b3, ADR 0050 § 5 ; la décision du valideur sur une vente et ses
+                           remboursements ; `count` exige un membre, un lien et une raison `off_shift` ou `status_unknown` ;
+                           écrite par le propriétaire ou un manager actif, jamais sur la vente de son propre chatteur ; le
+                           déclencheur exige la vente au registre des ventes de son compte et refuse une vente qu'une
+                           clôture a comptée ; ajout seul)
 pay_period_blocks          period (clé) → pay_periods, code (commission_rate_missing_conflict |
                            exchange_rate_missing_conflict), member_ids uuid[] (tous les membres sans taux) | currency,
                            since (migration 0038 ; pourquoi le job n'a pas pu calculer la quinzaine à son dernier essai :
