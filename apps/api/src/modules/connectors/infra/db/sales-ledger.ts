@@ -5,6 +5,8 @@ import {
   EventIdSchema,
   newId,
   SaleEventSchema,
+  SalesFeedCheckIdSchema,
+  SalesFeedCheckReportSchema,
   SalesLineIdSchema,
   type Platform,
   type PlatformSale,
@@ -27,6 +29,7 @@ const quarantine = schema.platformSalesQuarantine;
 const cursors = schema.salesFeedCursors;
 const models = schema.salesFeedModels;
 const chatters = schema.salesFeedChatters;
+const checks = schema.salesFeedChecks;
 
 /** The columns of a line, shared by the register and the quarantine. */
 function lineValues(platform: Platform, sale: PlatformSale) {
@@ -361,6 +364,35 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
         };
         return [...(await read(sales, true)), ...(await read(quarantine, false))];
       });
+    },
+
+    async recordCheck(report, clean, by) {
+      await db.insert(checks).values({
+        id: newId(SalesFeedCheckIdSchema),
+        platform: report.platform,
+        fromDay: report.from,
+        toDay: report.to,
+        verdict: report.verdict,
+        clean,
+        report,
+        checkedBy: by,
+        generatedAt: new Date(report.generatedAt),
+      });
+    },
+
+    async lastCheck(platform) {
+      const [row] = await db
+        .select({ report: checks.report, clean: checks.clean, checkedBy: checks.checkedBy })
+        .from(checks)
+        .where(eq(checks.platform, platform))
+        .orderBy(sql`${checks.generatedAt} desc, ${checks.createdAt} desc`)
+        .limit(1);
+      if (row === undefined) return null;
+      return {
+        report: SalesFeedCheckReportSchema.parse(row.report),
+        clean: row.clean,
+        checkedBy: row.checkedBy,
+      };
     },
 
     firstLineAt(platform) {
