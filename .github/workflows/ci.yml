@@ -24,8 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      # Pinned to the commit of v3.0.0 (30/05/2026) and to the gitleaks of the hooks, not to a moving tag or `latest`:
-      # a new version enters after its 14 days of quarantine. No licence: the repository belongs to a personal account.
+      # Pinned to the commit of v3.0.0 (30/05/2026) and to gitleaks 8.24.2, not to a moving tag or `latest`: a new
+      # version enters after its 14 days of quarantine. The hooks take the contributor's own binary, 8.19 or later
+      # (scripts/gitleaks-hook.mjs); docs/conventions/security.md advises this one. No licence: the repository belongs to a personal account.
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
