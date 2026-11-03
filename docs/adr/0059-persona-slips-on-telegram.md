@@ -42,7 +42,7 @@ Une seule alerte par conversation, par règle et par shift : le même interdit r
 
 - `persona_slip_flagged` { `slipId`, `conversationId`, `rule`, `notify` } est publié à chaque rouge, avec sa créatrice, au commit qui enregistre l'écart, et décrit dans `EVENT_PAYLOADS` (Zod). `rule` prend les valeurs des codes de garde du contrat. `notify` vaut `urgent`, `important` ou `null` (règle non grave, ou doublon de la même conversation, règle et shift) : Telegram rend ce que l'événement lui dit.
 - L'événement ne porte **aucun identifiant de membre** : `slipId` suffit au Suivi pour retrouver le chatteur.
-- Le bilan du soir des écarts est produit par le module `telegram`, comme celui des ventes. Il lit les comptes par une fonction publiée par l'index de `supervision`, qui prend une créatrice et une fenêtre et ne rend que des nombres : les rouges par règle et le nombre de faux signaux.
+- Le bilan du soir des écarts est produit par le module `telegram`, comme celui des ventes. Il lit les comptes par une fonction publiée par l'index de `supervision`, lue dans la transaction de l'appelant comme `salesFeedTotals.totalsOf` (`(tx, { creatorId, from, to })`, le job du soir tournant en admin), qui ne rend que des nombres : les rouges par règle et le nombre de faux signaux.
 
 ## Conséquences
 
