@@ -1,5 +1,6 @@
 import type {
   AccountPayRulesId,
+  CalendarView,
   CreatorId,
   CreatorSummary,
   Currency,
@@ -22,6 +23,7 @@ import type {
   UserId,
 } from '@nirvana/contracts';
 
+import type { CreatorAgent } from './calendar';
 import type { Reader, RulesRow } from './reports';
 import type { WorkingMember } from './shifts';
 
@@ -531,4 +533,26 @@ export interface PayRulesStore {
 /** What the job logs through; the composition root passes the job's own logger. */
 export interface JobLogger {
   warn(object: object, message: string): void;
+}
+
+/** A shift as the calendar reads it (`calendar_shifts`): who, with their name and colour, on which creator, and when. */
+export interface CalendarRow {
+  readonly memberId: TeamMemberId;
+  readonly memberName: string;
+  readonly memberColor: string | null;
+  readonly creatorId: CreatorId;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+}
+
+/**
+ * The calendar's reads (CR-12, ADR 0045 § 1), through `withMember` and the two functions of migration 0069, which
+ * apply the boundary from the account the transaction names: `agency` for the owner or an active manager, `team` for
+ * an active chatter (every shift of the team and the agent), `own` for anyone else (their own shifts, no agent).
+ */
+export interface CalendarReads {
+  read(
+    actor: UserId,
+    window: { readonly from: Date; readonly to: Date },
+  ): Promise<{ view: CalendarView; shifts: CalendarRow[]; agents: CreatorAgent[] }>;
 }
