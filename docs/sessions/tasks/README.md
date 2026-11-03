@@ -96,7 +96,7 @@ Branche : task/<id>-<slug>
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
-| CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | todo | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
+| CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01, l'export du dashboard fourni par Charles hors dépôt |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
 | CRM-04 | Ventes en direct : alertes Telegram, bilan et revenus de la créatrice | API CRM | todo | CRM-01 |
 | CRM-05 | Ventes hors shift, écarts d'assignation et performance des chatteurs | API CRM | todo | CRM-01, CRM-03 pour les ventes en attente |

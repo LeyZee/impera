@@ -1,6 +1,7 @@
 import type { Platform, SalesFeedOverview, SalesFeedStatus } from '@nirvana/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
+import { CheckPanel } from './CheckPanel';
 import { KeyForm } from './KeyForm';
 import { ChatterLinks, ModelLinks } from './Links';
 import {
@@ -28,8 +29,9 @@ type Load<T> =
   | { kind: 'ready'; value: T };
 
 /**
- * Réglages › Ventes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, and the owner's
- * links of its models and its team. Nothing on this page ever shows the key, even masked.
+ * Réglages › Ventes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the owner's
+ * links of its models and its team, and the reliability check (CRM-02, § 8). Nothing on this page ever shows the
+ * key, even masked.
  */
 export function SalesFeedSection(): JSX.Element {
   const [load, setLoad] = useState<Load<SalesFeedStatus[]>>({ kind: 'loading' });
@@ -422,6 +424,10 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
           )}
           <ModelLinks platform={platform} models={models} accounts={accounts} onChanged={land} />
           <ChatterLinks platform={platform} chatters={chatters} onChanged={land} />
+          {/* The check reads the platform's statistics: only while the key is read (CRM-02). */}
+          {status.state === 'connected' ? (
+            <CheckPanel platform={platform} models={models} chatters={chatters} />
+          ) : null}
         </>
       ) : null}
     </div>
