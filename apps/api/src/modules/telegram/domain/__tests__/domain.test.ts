@@ -129,6 +129,24 @@ describe('classification (ADR 0020 §2)', () => {
     expect(classify({ kind: 'release', conversationId: null, userId: 'u1' })).toBeNull();
   });
 
+  it('says a fortnight whose check no longer matches, in Important, with no amount (CRM-04 b3)', () => {
+    const notice = classify({
+      kind: 'sales_feed_mismatch',
+      platform: 'reveal',
+      from: PayPeriodSchema.parse('2026-11-01'),
+      days: 3,
+      accounts: 1,
+    });
+    expect(notice).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: 'mismatch:reveal:2026-11-01',
+      title: 'Important',
+      body: 'Ventes Reveal : la vérification de la quinzaine du 1er au 15 nov. ne concorde plus avec les statistiques de Reveal, sur 3 jours et 1 compte. La paie lit toujours le net de Reveal : vérifie avant de clôturer.',
+      link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
+    });
+  });
+
   it('says the budget alert in amber and the cap reached in red', () => {
     expect(classify({ kind: 'budget', threshold: 'alert', spentMinor: 1600, capMinor: 2000 })).toMatchObject({
       topic: 'important',
