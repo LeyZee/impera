@@ -1,8 +1,8 @@
 {
-  "name": "@nirvana/web",
+  "name": "@impera/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Dashboard de supervision Nirvana (Vite, React 19, Tailwind v4, shadcn/ui), PWA en phase 5.",
+  "description": "Dashboard de supervision Impera (Vite, React 19, Tailwind v4, shadcn/ui), PWA en phase 5.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,8 +13,8 @@
     "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "dependencies": {
-    "@nirvana/contracts": "workspace:*",
-    "@nirvana/design-system": "workspace:*",
+    "@impera/contracts": "workspace:*",
+    "@impera/design-system": "workspace:*",
     "@simplewebauthn/browser": "13.3.0",
     "@tanstack/react-query": "5.104.4",
     "@tanstack/react-router": "1.170.45",

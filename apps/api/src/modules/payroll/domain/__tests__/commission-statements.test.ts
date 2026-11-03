@@ -1,4 +1,4 @@
-import { carryOverRank, DomainError } from '@nirvana/contracts';
+import { carryOverRank, DomainError } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

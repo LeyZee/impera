@@ -9,7 +9,7 @@ import {
   type PayPeriodSummary,
   type PayrollPeriod,
   type PlanningAccount,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';

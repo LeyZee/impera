@@ -1,4 +1,4 @@
-import type { NotificationOutcome, NotificationRequest, PushMessage } from '@nirvana/contracts';
+import type { NotificationOutcome, NotificationRequest, PushMessage } from '@impera/contracts';
 
 import { decideNotification, localClock } from '../domain/policy';
 import type { DeliveryRegistry } from '../domain/ports';
@@ -20,7 +20,7 @@ const OUTCOMES = {
 /** The grouped notification of a burst of sales: one tag, so each new one replaces the last on the device. */
 const SALES_BURST: Omit<PushMessage, 'url'> = {
   title: 'Les ventes s’enchaînent',
-  body: 'Plusieurs ventes en quelques minutes : le détail est dans Nirvana.',
+  body: 'Plusieurs ventes en quelques minutes : le détail est dans Impera.',
   tag: 'sales-burst',
 };
 
@@ -60,8 +60,8 @@ export async function recap(deps: NotifyDeps, userId: string, at: Date): Promise
     title: 'Pendant tes heures calmes',
     body:
       held === 1
-        ? 'Une notification t’attend dans Nirvana.'
-        : `${String(held)} notifications t’attendent dans Nirvana.`,
+        ? 'Une notification t’attend dans Impera.'
+        : `${String(held)} notifications t’attendent dans Impera.`,
     url: '/',
     tag: 'quiet-recap',
   });

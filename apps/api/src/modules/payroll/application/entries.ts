@@ -2,7 +2,7 @@ import type {
   CommissionStatement,
   CommissionStatementId,
   PayCommissionStatementBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { Actor } from '../../contractors/pure';
 import type { PayrollEntryStore } from '../domain/ports';

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { CreatorIdSchema, newId, PlatformAccountIdSchema, TelegramBotIdSchema } from '@nirvana/contracts';
+import { CreatorIdSchema, newId, PlatformAccountIdSchema, TelegramBotIdSchema } from '@impera/contracts';
 import {
   createDbClient,
   encryptSecret,
@@ -9,8 +9,8 @@ import {
   sql,
   withAdmin,
   type DbClient,
-} from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { checkEncryptionKeys, READ_ONLY_POOL_OPTIONS } from '../key-check';
@@ -61,7 +61,7 @@ describe('ops:check-keys', () => {
     await createPostgresTelegramStore({ adminDb: test.admin.db, keys: credentials }).bots.insertBot({
       id: newId(TelegramBotIdSchema),
       telegramBotId: '100000001',
-      username: 'nirvana_demo_bot',
+      username: 'impera_demo_bot',
       displayName: 'Démo',
       token: '100000001:FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAK',
       state: 'active',
@@ -94,7 +94,7 @@ describe('ops:check-keys', () => {
     expect(families.map((family) => family.unreadable)).toEqual([
       [accountId],
       ['xai'],
-      ['nirvana_demo_bot'],
+      ['impera_demo_bot'],
       ['reveal'],
     ]);
     expect(JSON.stringify(families)).not.toContain('FAKE');

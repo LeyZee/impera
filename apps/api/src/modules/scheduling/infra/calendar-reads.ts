@@ -5,8 +5,8 @@ import {
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
   type CalendarView,
-} from '@nirvana/contracts';
-import { and, enterCreator, eq, schema, sql, SNAPSHOT_READ, withMember, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, enterCreator, eq, schema, sql, SNAPSHOT_READ, withMember, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { CalendarReads, StoredAccount, StoredShift } from '../domain/ports';

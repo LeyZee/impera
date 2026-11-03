@@ -1,4 +1,4 @@
-import { KYC_SLOT_LABELS, type KycSlot } from '@nirvana/contracts';
+import { KYC_SLOT_LABELS, type KycSlot } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { JSX } from 'react';
 

@@ -1,4 +1,4 @@
-import { schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { schema, sql, withAdmin, type Database } from '@impera/db';
 
 import type { FactPurge } from '../domain/fan';
 

@@ -4,7 +4,7 @@ import type {
   NotificationRequest,
   PushMessage,
   PushSubscriptionInput,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { NotificationDecision } from './policy';
 

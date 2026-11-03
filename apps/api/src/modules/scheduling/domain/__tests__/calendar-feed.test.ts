@@ -22,7 +22,7 @@ describe('calendar feed (CR-12, RFC 5545)', () => {
 
   it('writes one event per shift in UTC, with CRLF ends, and nothing but the slot, the creator and the name', () => {
     const ics = icsOf({
-      name: 'Nirvana · mes shifts',
+      name: 'Impera · mes shifts',
       stamp: new Date('2026-11-03T08:00:00Z'),
       events: [
         {
@@ -37,11 +37,11 @@ describe('calendar feed (CR-12, RFC 5545)', () => {
     expect(ics.split('\r\n')).toEqual([
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Nirvana//Shifts//FR',
+      'PRODID:-//Impera//Shifts//FR',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      'NAME:Nirvana · mes shifts',
-      'X-WR-CALNAME:Nirvana · mes shifts',
+      'NAME:Impera · mes shifts',
+      'X-WR-CALNAME:Impera · mes shifts',
       'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
       'X-PUBLISHED-TTL:PT1H',
       'BEGIN:VEVENT',

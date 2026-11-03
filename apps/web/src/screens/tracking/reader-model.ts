@@ -9,7 +9,7 @@ import {
   type DashboardTodo,
   type DraftView,
   type MessageView,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { z } from 'zod';
 
 import { euros } from './flags-model';

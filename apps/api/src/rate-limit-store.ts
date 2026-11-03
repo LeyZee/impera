@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { FastifyRateLimitStore, FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { sql } from '@nirvana/db';
+import { sql } from '@impera/db';
 import { z } from 'zod';
 
 import type { Logger } from './logger';

@@ -1,4 +1,4 @@
-import { BriefIntentSchema, DESIRE_BRAIN_SIGNALS, MediaDescriptionSchema } from '@nirvana/contracts';
+import { BriefIntentSchema, DESIRE_BRAIN_SIGNALS, MediaDescriptionSchema } from '@impera/contracts';
 import { z } from 'zod';
 
 /** Her alerts the brain reads at most, and how it names them (`a1`, `a2`…): short ids, never her alert's own. */

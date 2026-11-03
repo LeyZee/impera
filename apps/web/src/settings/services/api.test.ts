@@ -17,7 +17,7 @@ const status = {
   provider: 'xai',
   state: 'connected',
   source: 'dashboard',
-  keyLabel: 'nirvana-prod',
+  keyLabel: 'impera-prod',
   verifiedAt: '2026-10-17T20:00:00.000Z',
   isUnreadable: false,
   message: 'Grok 4.7 écrit et décide',

@@ -10,7 +10,7 @@ import {
   type KycSlot,
   type UserId,
   type UserRole,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';

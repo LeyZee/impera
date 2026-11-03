@@ -1,4 +1,4 @@
-import type { ConnectorConfig } from '@nirvana/contracts';
+import type { ConnectorConfig } from '@impera/contracts';
 
 /**
  * When the next poll of an account may run: its interval after the last one, plus a random jitter so the rhythm

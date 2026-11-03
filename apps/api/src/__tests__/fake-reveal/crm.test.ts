@@ -170,7 +170,7 @@ describe('Reveal sales feed adapter', () => {
 
   it('registers a webhook, gets its secret once, removes it; a webhook Reveal no longer knows counts as removed', async () => {
     const { crm, feed } = setup();
-    const created = await feed.createWebhook('https://nirvana.example.test/v1/webhooks/sales-feeds/reveal');
+    const created = await feed.createWebhook('https://impera.example.test/v1/webhooks/sales-feeds/reveal');
     if (!created.ok) throw new Error('webhook refused');
     expect(crm.webhooks.get(created.value.platformWebhookId)?.secret).toBe(created.value.secret);
     expect(await feed.deleteWebhook(created.value.platformWebhookId)).toEqual({ ok: true, value: null });
@@ -178,13 +178,13 @@ describe('Reveal sales feed adapter', () => {
     expect(await feed.deleteWebhook(created.value.platformWebhookId)).toEqual({ ok: true, value: null });
 
     crm.withhold('webhooks');
-    const refused = await feed.createWebhook('https://nirvana.example.test/v1/webhooks/sales-feeds/reveal');
+    const refused = await feed.createWebhook('https://impera.example.test/v1/webhooks/sales-feeds/reveal');
     expect(refused).toMatchObject({ ok: false, failure: { kind: 'refused', errorKind: 'missing_access' } });
   });
 
   it('reads a delivery only when signed with the secret, within five minutes, over its raw bytes', async () => {
     const { crm, feed } = setup();
-    const created = await feed.createWebhook('https://nirvana.example.test/v1/webhooks/sales-feeds/reveal');
+    const created = await feed.createWebhook('https://impera.example.test/v1/webhooks/sales-feeds/reveal');
     if (!created.ok) throw new Error('webhook refused');
     const { secret } = created.value;
     const position = crm.sell({ id: 'sale_a' });

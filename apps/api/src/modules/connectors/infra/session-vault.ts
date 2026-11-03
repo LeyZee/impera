@@ -1,4 +1,4 @@
-import { decryptSecret, encryptSecret, type EncryptionKey } from '@nirvana/db';
+import { decryptSecret, encryptSecret, type EncryptionKey } from '@impera/db';
 
 import type { SessionVault } from '../domain/ports';
 

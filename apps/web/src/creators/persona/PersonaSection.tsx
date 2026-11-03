@@ -3,8 +3,8 @@ import {
   type Persona,
   type PersonaCompletion,
   type PersonaVersionSummary,
-} from '@nirvana/contracts';
-import { placeTabBarLens } from '@nirvana/design-system';
+} from '@impera/contracts';
+import { placeTabBarLens } from '@impera/design-system';
 import {
   useCallback,
   useEffect,
@@ -88,7 +88,7 @@ export function PersonaSection({
   /** Only the owner reaches Heures d'activité and Réglages: the others read where a setting lives, without a link. */
   isOwner?: boolean;
   timezone: string | null;
-  /** Her name in Nirvana, which a persona not written yet takes as its first name. */
+  /** Her name in Impera, which a persona not written yet takes as its first name. */
   creatorName?: string | null;
   /** Told whether the draft holds changes not saved, so that leaving the page can ask first. Must be stable. */
   onDirty?: (dirty: boolean) => void;
@@ -306,7 +306,7 @@ function Editor({
   };
 
   /**
-   * « Importer un fichier »: a persona file written outside Nirvana (ADR 0010: never in the repository) replaces the
+   * « Importer un fichier »: a persona file written outside Impera (ADR 0010: never in the repository) replaces the
    * draft, field by field, as if typed. Nothing is stored until « Enregistrer une version », and a version saved is
    * never active until it is activated: her active version and what the agent writes stay as they are.
    */
@@ -346,7 +346,7 @@ function Editor({
         text:
           result === 'forbidden'
             ? 'Seuls le propriétaire et la créatrice peuvent activer sa persona.'
-            : 'Rien n’a été activé : Nirvana ne répond pas. Réessaie dans un instant.',
+            : 'Rien n’a été activé : Impera ne répond pas. Réessaie dans un instant.',
         reload: false,
       });
     }

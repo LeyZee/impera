@@ -7,7 +7,7 @@ import type {
   Platform,
   PlatformAccountId,
   SaleType,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { onSaleDays, salesFeedTimeZone, sumsBy, type SaleDayLine } from './sale-days';
 import type { TotalsRange } from './sales-totals';

@@ -3,7 +3,7 @@ import {
   type Dashboard as ApiDashboard,
   type DashboardFan,
   type DashboardTodo,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { eur } from './logic';
 import type { AgentCard, AgentState, Dashboard, Fan, RevealSales, RevealSeller, Todo } from './model';

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { ConversationSummarySchema } from '@nirvana/contracts';
+import { ConversationSummarySchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,

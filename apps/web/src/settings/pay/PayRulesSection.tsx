@@ -9,7 +9,7 @@ import {
   type EarningsSource,
   type PayPeriod,
   type PlanningAccount,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { MinimumPayout } from './MinimumPayout';
@@ -119,7 +119,7 @@ export function PayRulesSection(): JSX.Element {
           {/* No screen creates an account yet (recette du 28/10): the text asks for nothing the page cannot do. */}
           <p className="rp-notice__text">
             Les règles de paie se posent sur le compte plateforme d’une créatrice, son compte Reveal par
-            exemple. Aucun n’est encore relié à Nirvana : chaque compte relié apparaîtra ici.
+            exemple. Aucun n’est encore relié à Impera : chaque compte relié apparaîtra ici.
           </p>
         </div>
       ) : (

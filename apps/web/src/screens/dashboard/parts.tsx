@@ -1,4 +1,4 @@
-import { attachGlassLight, countUp, tipPlacement } from '@nirvana/design-system';
+import { attachGlassLight, countUp, tipPlacement } from '@impera/design-system';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 

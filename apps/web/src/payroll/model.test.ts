@@ -18,7 +18,7 @@ import {
   type PayPeriodSummary,
   type PayrollPeriod,
   type Platform,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

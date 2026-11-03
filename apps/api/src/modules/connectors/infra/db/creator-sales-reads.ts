@@ -6,8 +6,8 @@ import {
   SaleEventSchema,
   SaleTypeSchema,
   type CreatorSales,
-} from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { creatorSales } from '../../domain/creator-sales';

@@ -4,7 +4,7 @@ import {
   type BackupErrorCode,
   type BackupStatus,
   type RecordRestoreTestBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { withFirstOfMonth } from '@/scheduling/time';
 import { backupBannerOf } from '@/screens/dashboard/backups';

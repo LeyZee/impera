@@ -9,7 +9,7 @@ import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { desireBandOf } from '@nirvana/contracts';
+import { desireBandOf } from '@impera/contracts';
 import {
   brainAlertId,
   createInMemoryCallLog,
@@ -19,7 +19,7 @@ import {
   JudgeCriterionSchema,
   readProviderCredentials,
   type ConversationTurn,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import {
   composeTurn,

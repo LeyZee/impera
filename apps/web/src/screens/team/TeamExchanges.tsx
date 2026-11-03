@@ -1,4 +1,4 @@
-import type { LeaveRequest, LeaveRequestList, ShiftSwapList, ShiftSwapRequest } from '@nirvana/contracts';
+import type { LeaveRequest, LeaveRequestList, ShiftSwapList, ShiftSwapRequest } from '@impera/contracts';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import {

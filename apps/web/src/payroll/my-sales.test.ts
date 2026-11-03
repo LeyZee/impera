@@ -1,4 +1,4 @@
-import { MySaleSchema, MySalesDaySchema, type MySale } from '@nirvana/contracts';
+import { MySaleSchema, MySalesDaySchema, type MySale } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

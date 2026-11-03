@@ -1,4 +1,4 @@
-import type { JobPayload, SessionState } from '@nirvana/contracts';
+import type { JobPayload, SessionState } from '@impera/contracts';
 
 import { ConnectorError } from '../domain/platform-connector';
 import type { AccountStore, Clock, ConnectorAccount, IngestMessage, JobLogger } from '../domain/ports';

@@ -7,7 +7,7 @@ import {
   type AccountingPeriodQuery,
   type Das2Export,
   type Das2Query,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Zip, ZipPassThrough } from 'fflate';
 
 import type { Actor, JobLogger } from '../../contractors/pure';

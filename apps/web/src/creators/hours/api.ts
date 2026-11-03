@@ -4,7 +4,7 @@ import {
   REAUTHENTICATION_ERROR_CODE,
   type AgentHours,
   type AgentHoursView,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { ReauthRequired } from '@/settings/services/api';

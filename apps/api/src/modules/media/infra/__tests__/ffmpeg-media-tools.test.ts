@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createFfmpegMediaTools, missingMediaBinaries } from '../ffmpeg-media-tools';
 
-const dir = mkdtempSync(join(tmpdir(), 'nirvana-ffmpeg-test-'));
+const dir = mkdtempSync(join(tmpdir(), 'impera-ffmpeg-test-'));
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });

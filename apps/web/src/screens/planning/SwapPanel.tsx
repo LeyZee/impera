@@ -1,4 +1,4 @@
-import { newId, ShiftSwapRequestIdSchema, type Shift, type SwapCandidates } from '@nirvana/contracts';
+import { newId, ShiftSwapRequestIdSchema, type Shift, type SwapCandidates } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { proposeSwap, useRefreshPlanning, useSwapCandidates, type Refusal } from '@/scheduling/api';

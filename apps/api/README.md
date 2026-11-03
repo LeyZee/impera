@@ -4,7 +4,7 @@ Le backend : un serveur Fastify (HTTP, SSE) et un worker Graphile (jobs), constr
 
 ```
 src/
-├── index.ts              démarre l'API (et le worker si NIRVANA_INLINE_WORKER=1)
+├── index.ts              démarre l'API (et le worker si IMPERA_INLINE_WORKER=1)
 ├── worker.ts             démarre le worker seul (prod)
 ├── worker-runner.ts      Graphile Worker : tâches, heartbeat, arrêt borné
 ├── server.ts             Fastify : plugins, erreurs, /health, /ready, /v1
@@ -24,4 +24,4 @@ test/
 └── e2e/                  bout en bout (API + worker + FakeConnector)
 ```
 
-Règles : routes sans logique métier ; chaque accès base dans `withTenant` ; chaque transition d'état écrit son événement ; aucun SDK LLM importé ici (passer par `@nirvana/llm`).
+Règles : routes sans logique métier ; chaque accès base dans `withTenant` ; chaque transition d'état écrit son événement ; aucun SDK LLM importé ici (passer par `@impera/llm`).

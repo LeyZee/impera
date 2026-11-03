@@ -28,8 +28,8 @@ import {
   type PlatformAccountId,
   type Penalty,
   type ShiftReportId,
-} from '@nirvana/contracts';
-import { eq, schema, sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { CreatorReports } from '../domain/ports';

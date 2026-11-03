@@ -6,8 +6,8 @@ import {
   Das2ExportSchema,
   PayPeriodSchema,
   type TeamMember,
-} from '@nirvana/contracts';
-import { and, eq, schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';

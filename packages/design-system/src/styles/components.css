@@ -1,5 +1,5 @@
 /*
- * Nirvana component classes (`nv-*`). Framework-free: shadcn/ui components in apps/web apply them
+ * Impera component classes (`nv-*`). Framework-free: shadcn/ui components in apps/web apply them
  * through className, the extension popup uses them directly. No color literal lives here: every
  * value comes from tokens.css. Rules for where glass goes: docs/design/README.md.
  */

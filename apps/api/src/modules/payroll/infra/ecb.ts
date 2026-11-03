@@ -1,4 +1,4 @@
-import { CalendarDaySchema, ForeignCurrencySchema } from '@nirvana/contracts';
+import { CalendarDaySchema, ForeignCurrencySchema } from '@impera/contracts';
 import { z } from 'zod';
 
 import type { EcbRate, RateSource } from '../domain/ports';

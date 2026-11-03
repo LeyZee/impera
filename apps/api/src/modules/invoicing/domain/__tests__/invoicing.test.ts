@@ -1,4 +1,4 @@
-import { BillingRegimeIdSchema, newId, PayPeriodSchema, type InvoiceRegime } from '@nirvana/contracts';
+import { BillingRegimeIdSchema, newId, PayPeriodSchema, type InvoiceRegime } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { invoiceLines, invoiceTotals, paymentTermsMention, type InvoiceSource } from '../invoices';

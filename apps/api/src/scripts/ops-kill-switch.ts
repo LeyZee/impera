@@ -4,7 +4,7 @@
  */
 import { parseArgs } from 'node:util';
 
-import { createDbClient } from '@nirvana/db';
+import { createDbClient } from '@impera/db';
 
 import { loadConfig } from '../config';
 import { KillSwitchInputSchema, setKillSwitch } from '../ops';

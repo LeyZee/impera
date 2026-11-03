@@ -1,4 +1,4 @@
-import { earningsBaseOf, type EarningsSource, type PayPeriod, type Platform } from '@nirvana/contracts';
+import { earningsBaseOf, type EarningsSource, type PayPeriod, type Platform } from '@impera/contracts';
 
 import { PayRulesPeriodInvalid, PayRulesSource } from './errors';
 

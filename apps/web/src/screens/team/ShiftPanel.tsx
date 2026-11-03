@@ -6,7 +6,7 @@ import {
   type Planning,
   type ShiftSlot,
   type TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { Dialog } from './Dialog';

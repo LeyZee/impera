@@ -7,7 +7,7 @@ import type {
   RefuseInvoiceContestBody,
   UpholdInvoiceContestBody,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { Actor, JobLogger } from '../../contractors/pure';
 import { InvoiceNotFound } from '../domain/errors';

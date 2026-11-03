@@ -6,7 +6,7 @@ import {
   type CreatorSummary,
   type TeamMember,
   type TeamMemberStatus,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
@@ -384,11 +384,11 @@ export function RatePanel({
 }
 
 /**
- * What « Parti » does, said before it is done: it cannot be undone from Nirvana. His closing fortnight, the one after
+ * What « Parti » does, said before it is done: it cannot be undone from Impera. His closing fortnight, the one after
  * the fortnight that holds the day he leaves, gives him a final statement (EQ-14 lot 1, ADR 0039 § 6).
  */
 const LEAVING = (name: string): string =>
-  `${name} n’aura plus accès à Nirvana : ses créatrices lui sont retirées et ses sessions fermées. Sa fiche, ses rapports et ses relevés restent. Son relevé final, celui de la quinzaine qui suit celle de son départ, lui verse tout ce qui lui reste dû, même sous le minimum de versement. Ce changement est définitif.`;
+  `${name} n’aura plus accès à Impera : ses créatrices lui sont retirées et ses sessions fermées. Sa fiche, ses rapports et ses relevés restent. Son relevé final, celui de la quinzaine qui suit celle de son départ, lui verse tout ce qui lui reste dû, même sous le minimum de versement. Ce changement est définitif.`;
 
 /** What a departure leaves to do by hand until the departure itself is built (EQ-14): nothing reads as settled. */
 const LEFT_TO_DO: readonly string[] = ['Son compte membre sur Reveal est à retirer à la main.'];
@@ -485,7 +485,7 @@ export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: 
           <div className="nv-confirm nv-swap" role="group" aria-label="Confirmer le départ">
             <div id={`${id}-leaving`} className="sc-confirm__text">
               <p>{LEAVING(member.displayName)}</p>
-              <p>Nirvana ne le fait pas encore :</p>
+              <p>Impera ne le fait pas encore :</p>
               <ul className="tm-todo">
                 {LEFT_TO_DO.map((line) => (
                   <li key={line}>{line}</li>

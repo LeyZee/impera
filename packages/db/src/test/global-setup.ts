@@ -11,12 +11,12 @@ declare module 'vitest' {
 
 /**
  * One Postgres per run (testing.md): a Testcontainers Postgres 16, or the server named by
- * `NIRVANA_TEST_PG_URL` (a superuser URL) where Docker is not available. Creates the two roles the way production
+ * `IMPERA_TEST_PG_URL` (a superuser URL) where Docker is not available. Creates the two roles the way production
  * has them: the owner with BYPASSRLS but not superuser, the app role with neither.
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   let container: StartedPostgreSqlContainer | undefined;
-  let url = process.env['NIRVANA_TEST_PG_URL'];
+  let url = process.env['IMPERA_TEST_PG_URL'];
   if (url === undefined || url === '') {
     container = await new PostgreSqlContainer('postgres:16-alpine')
       .withUsername('postgres')

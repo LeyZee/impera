@@ -5,7 +5,7 @@ import {
   type PayPeriod,
   type PlatformAccountId,
   type SaleSignalKind,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { saleIdOf, saleKeyOf, type SaleKey } from './sales';
 

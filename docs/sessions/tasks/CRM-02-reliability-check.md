@@ -40,7 +40,7 @@ La bascule elle-même (CRM-03).
 
 03/11/2026, Extension, PR 2 (l'écran) :
 - Réglages › Ventes, bloc « Vérification de fiabilité » sous les liens, tant que la clé est lue (`connected`) : les deux dernières quinzaines terminées (1er–15, 16–fin du mois, heure de Paris) ou d'autres jours, refusés avant l'appel s'ils comptent aujourd'hui ou plus de 31 jours ; l'export choisi sur l'appareil, lu en UTF-8 puis en Windows-1252 (CSV d'un tableur français), 2 000 000 caractères au plus, envoyé en texte et gardé nulle part.
-- Le rapport : verdict (ambre pour un écart ou une comparaison incomplète, jamais rouge), jours de la plateforme et `registerReadAt`, notes en phrases, totaux des trois sources avec l'écart au registre, jours en écart détaillés par figure, tous les jours repliés, puis chaque membre de l'équipe (nom chez la plateforme, lien Nirvana, net et nombre de ventes, l'écart sur le net seul).
+- Le rapport : verdict (ambre pour un écart ou une comparaison incomplète, jamais rouge), jours de la plateforme et `registerReadAt`, notes en phrases, totaux des trois sources avec l'écart au registre, jours en écart détaillés par figure, tous les jours repliés, puis chaque membre de l'équipe (nom chez la plateforme, lien Impera, net et nombre de ventes, l'écart sur le net seul).
 - Reste : inchangé pour Bilan et Équipe (vrai export, devise, commissions) ; lancer la vérification avec la clé de Charles.
 
 03/11/2026, Extension, PR 3 (le dernier rapport réaffiché) :

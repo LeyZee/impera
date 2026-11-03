@@ -9,8 +9,9 @@ import {
   InvoiceNotIssuedReasonSchema,
   KillSwitchScopeSchema,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   SecurityAlertPayloadSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { z } from 'zod';
 
 import type { ScannedEvent, Signal } from '../domain/signals';
@@ -84,7 +85,7 @@ const ExchangeRateOverdueSchema = z.object({
   lastRateDay: z.iso.date().nullable(),
 });
 
-// The period, the document and the reason only: the member and the amount stay in Nirvana (no figure of the pay goes to
+// The period, the document and the reason only: the member and the amount stay in Impera (no figure of the pay goes to
 // Telegram, ADR 0033).
 const InvoiceNotIssuedSchema = z.object({
   period: PayPeriodSchema,
@@ -92,7 +93,7 @@ const InvoiceNotIssuedSchema = z.object({
   reason: InvoiceNotIssuedReasonSchema,
 });
 
-// The document's number, where and, for a conflict, at which stage (ADR 0037): the member stays in Nirvana.
+// The document's number, where and, for a conflict, at which stage (ADR 0037): the member stays in Impera.
 const InvoicePdfMissingSchema = EVENT_PAYLOADS.invoice_pdf_missing.pick({ number: true, place: true });
 const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
   number: true,
@@ -100,7 +101,7 @@ const InvoicePdfConflictSchema = EVENT_PAYLOADS.invoice_pdf_conflict.pick({
   stage: true,
 });
 
-// The document's number and kind (ADR 0039): the contractor and the reason stay in Nirvana.
+// The document's number and kind (ADR 0039): the contractor and the reason stay in Impera.
 const InvoiceContestedSchema = EVENT_PAYLOADS.invoice_contested.pick({ number: true, document: true });
 
 // The document's kind and last day, and the member's id for the link (EQ-06 lot 5c-2): never a name.
@@ -120,7 +121,7 @@ const InvoiceDueSchema = EVENT_PAYLOADS.invoice_due_soon.pick({
 });
 
 // The sale's kind, the price the fan paid and its seller (CRM-04 lot b): the sale's key, the account and the shares stay
-// in Nirvana, and the payload never holds the fan.
+// in Impera, and the payload never holds the fan.
 const SaleDetectedSchema = EVENT_PAYLOADS.sale_detected.pick({
   saleType: true,
   occurredAt: true,
@@ -128,6 +129,14 @@ const SaleDetectedSchema = EVENT_PAYLOADS.sale_detected.pick({
   grossInclVatMinor: true,
   seller: true,
 });
+
+// The platform, the fortnight and how many days and accounts differ (CRM-04 b3): the nets and the differences stay in
+// Impera, since a group of alerts may hold managers and Telegram never says a figure pay rests on.
+const SalesFeedMismatchSchema = EVENT_PAYLOADS.sales_feed_mismatch
+  .pick({ platform: true, from: true })
+  .extend({
+    days: z.array(z.object({ day: z.iso.date(), platformAccountId: PlatformAccountIdSchema })).min(1),
+  });
 
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
@@ -247,6 +256,18 @@ function signalOf(type: string, payload: unknown): Signal | null {
       const parsed = AutomaticClosedSchema.safeParse(payload);
       if (!parsed.success) return null;
       return { kind: 'automatic_closed', ...parsed.data };
+    }
+    case 'sales_feed_mismatch': {
+      const parsed = SalesFeedMismatchSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      const { platform, from, days } = parsed.data;
+      return {
+        kind: 'sales_feed_mismatch',
+        platform,
+        from,
+        days: new Set(days.map((day) => day.day)).size,
+        accounts: new Set(days.map((day) => day.platformAccountId)).size,
+      };
     }
     case 'security_alert': {
       const parsed = SecurityAlertPayloadSchema.safeParse(payload);

@@ -14,7 +14,7 @@ import {
   type TelegramBotId,
   type TelegramChatId,
   type TelegramRoute,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   decryptSecret,
@@ -28,7 +28,7 @@ import {
   type Database,
   type EncryptionKey,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import { SCANNED_EVENT_TYPES } from '../domain/classify';

@@ -1,4 +1,4 @@
-import type { Transaction } from '@nirvana/db';
+import type { Transaction } from '@impera/db';
 
 /** What the exports read from another module, in their own transaction: the agency's time zone (`scheduling`). */
 export interface AccountingReads {

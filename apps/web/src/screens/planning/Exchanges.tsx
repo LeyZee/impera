@@ -1,4 +1,4 @@
-import type { LeaveRequest, ShiftSwapList, ShiftSwapRequest } from '@nirvana/contracts';
+import type { LeaveRequest, ShiftSwapList, ShiftSwapRequest } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { answerSwap, endLeave, endSwap, useRefreshPlanning } from '@/scheduling/api';

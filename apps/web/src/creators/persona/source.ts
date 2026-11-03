@@ -8,7 +8,7 @@ import {
   type Persona,
   type PersonaSampleReplyFault,
   type PersonaVersionSummary,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { firstDraft, schemaIssues, type FieldIssue } from './model';
@@ -102,7 +102,7 @@ async function loadPersona(creatorId: string | null, name: string | null): Promi
 /** The one hook the screen reads the persona through; `reload` fetches it again (after a save, for instance). */
 export function usePersona(
   creatorId: string | null,
-  /** Her name in Nirvana: the first name of a persona she has not written yet starts from it (CREA-13). */
+  /** Her name in Impera: the first name of a persona she has not written yet starts from it (CREA-13). */
   name: string | null = null,
 ): { load: PersonaLoad; reload: () => void } {
   const [load, setLoad] = useState<PersonaLoad>({ kind: 'loading' });

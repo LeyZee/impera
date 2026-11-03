@@ -8,8 +8,8 @@ import {
   DomainError,
   UserIdSchema,
   type UserId,
-} from '@nirvana/contracts';
-import { NotACreatorAccount } from '@nirvana/db';
+} from '@impera/contracts';
+import { NotACreatorAccount } from '@impera/db';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';

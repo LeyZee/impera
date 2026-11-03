@@ -1,4 +1,4 @@
-import type { LlmConfig, ModelRef, ProviderCredentials } from '@nirvana/llm';
+import type { LlmConfig, ModelRef, ProviderCredentials } from '@impera/llm';
 
 /** A run of the evals never spends more than this, on top of and apart from the agent's daily cap. */
 export const EVALS_CAP_EUR = 3;

@@ -1,6 +1,6 @@
-import { EVENT_PAYLOADS } from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { EVENT_PAYLOADS } from '@impera/contracts';
+import { eq, schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';

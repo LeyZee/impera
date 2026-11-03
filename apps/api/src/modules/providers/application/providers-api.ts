@@ -4,7 +4,7 @@ import type {
   ProviderSettings,
   ProviderStatus,
   Result,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { KeyActor } from '../domain/ports';
 

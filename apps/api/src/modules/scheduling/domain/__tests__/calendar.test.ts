@@ -4,7 +4,7 @@ import {
   TeamMemberIdSchema,
   type AgentHours,
   type AgentMode,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -11,7 +11,7 @@ import {
   type PenaltyId,
   type TeamMember,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { useCurrentPeriod, useFirstOpenPeriod } from './data';

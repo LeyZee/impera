@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
-import { eq, parseEncryptionKeys, schema, withAdmin } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { eq, parseEncryptionKeys, schema, withAdmin } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createSalesFeedKeyStore, resealSalesFeedKeys } from '../sales-feed-keys';
@@ -85,7 +85,7 @@ describe('sales feed key store', () => {
     await createSalesFeedWebhookStore(test.admin.db, v1).save(
       'reveal',
       created,
-      'https://nirvana.example.test/v1/webhooks/sales-feeds/reveal',
+      'https://impera.example.test/v1/webhooks/sales-feeds/reveal',
       new Date(),
       by,
     );

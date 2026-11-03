@@ -1,4 +1,4 @@
-import type { ProviderNextAction, ProviderOverview, ProviderStatus } from '@nirvana/contracts';
+import type { ProviderNextAction, ProviderOverview, ProviderStatus } from '@impera/contracts';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { ConnectSheet } from './ConnectSheet';
@@ -25,7 +25,7 @@ type Load =
   | { kind: 'failed'; error: ShownError; isForbidden: boolean }
   | { kind: 'ready'; overview: ProviderOverview };
 type Sheet = { provider: DashboardProvider; isReplace: boolean } | null;
-/** `warning`: nothing failed in Nirvana, the provider did not answer and the last verification stands. */
+/** `warning`: nothing failed in Impera, the provider did not answer and the last verification stands. */
 type Notice = ShownError & { tone: 'error' | 'warning' };
 
 /**
@@ -306,8 +306,8 @@ export function ServicesSection(): JSX.Element {
               {confirming === provider ? (
                 <div className="nv-confirm sv-confirm">
                   <p>
-                    <b>Déconnecter {guide.name} ?</b> {guide.offConsequence} La clé est effacée de Nirvana.
-                    Chez {guide.vendor}, elle reste valide tant que tu ne la supprimes pas.
+                    <b>Déconnecter {guide.name} ?</b> {guide.offConsequence} La clé est effacée d’Impera. Chez{' '}
+                    {guide.vendor}, elle reste valide tant que tu ne la supprimes pas.
                   </p>
                   {/* As every confirmation of Réglages: « Garder » first, the destructive action on the right. */}
                   <div className="nv-confirm__actions">

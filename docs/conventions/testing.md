@@ -16,7 +16,7 @@ Six couches, chacune avec un outil et un but. Une PR touche la couche qui corres
 ## Règles
 
 - Les tests du domaine ne touchent ni base, ni réseau, ni horloge réelle (horloge injectée : `clock.now()`).
-- Les tests d'intégration créent leur schéma via les migrations réelles (pas de `sync`) : un conteneur Postgres par exécution (Testcontainers), une base par fichier de test, une transaction annulée à la fin de chaque test. Le Postgres de dev (`docker compose up -d`) sert au `pnpm dev`, pas aux tests. Sans Docker (session cloud), `NIRVANA_TEST_PG_URL` désigne un Postgres 16 jetable (URL superutilisateur) à la place du conteneur ; le reste ne change pas (`packages/db/README.md`).
+- Les tests d'intégration créent leur schéma via les migrations réelles (pas de `sync`) : un conteneur Postgres par exécution (Testcontainers), une base par fichier de test, une transaction annulée à la fin de chaque test. Le Postgres de dev (`docker compose up -d`) sert au `pnpm dev`, pas aux tests. Sans Docker (session cloud), `IMPERA_TEST_PG_URL` désigne un Postgres 16 jetable (URL superutilisateur) à la place du conteneur ; le reste ne change pas (`packages/db/README.md`).
 - Chaque bug corrigé commence par un test qui le reproduit.
 - Les fixtures sont inventées, courtes, nommées (`fixtures/fans.ts: theQuietFan`), avec des fabriques (`makeFan(overrides)`) plutôt que des objets copiés. Jamais de donnée réelle.
 - Les tests de politique et de gardes couvrent systématiquement : le cas nominal, le cas limite, le cas adversarial.

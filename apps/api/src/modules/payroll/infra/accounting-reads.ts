@@ -1,4 +1,4 @@
-import { and, eq, inArray, schema, sql, type Transaction } from '@nirvana/db';
+import { and, eq, inArray, schema, sql, type Transaction } from '@impera/db';
 
 const { carryOvers, commissionStatements } = schema;
 

@@ -1,4 +1,4 @@
-import type { TelegramTopic } from '@nirvana/contracts';
+import type { TelegramTopic } from '@impera/contracts';
 
 import { TOPIC_RANK, isSilentTopic, joinTexts } from './render';
 

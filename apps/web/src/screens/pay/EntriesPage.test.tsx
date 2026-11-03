@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me, PayrollEntries, PayrollPeriod } from '@nirvana/contracts';
+import type { Me, PayrollEntries, PayrollPeriod } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,

@@ -12,7 +12,7 @@ import {
   type CreateContractTextBody,
   type RegimeVat,
   type Withholding,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { countryName } from '@/lib/country';
 

@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_HOURS, type AgentHours } from '@nirvana/contracts';
+import { DEFAULT_AGENT_HOURS, type AgentHours } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { followUpDecision, type FollowUpMoment } from '../follow-up';

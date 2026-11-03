@@ -1,4 +1,4 @@
-import type { InvoiceId, JournalAccounts, TeamMemberId } from '@nirvana/contracts';
+import type { InvoiceId, JournalAccounts, TeamMemberId } from '@impera/contracts';
 
 import type { Actor } from '../../contractors/pure';
 import type { StoredInvoicePdf } from '../../invoicing/pure';

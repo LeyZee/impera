@@ -19,17 +19,8 @@ import {
   type ConversationSummary,
   type DraftView,
   type MessageMediaView,
-} from '@nirvana/contracts';
-import {
-  and,
-  eq,
-  schema,
-  SNAPSHOT_READ,
-  sql,
-  withTenant,
-  type Database,
-  type Transaction,
-} from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, SNAPSHOT_READ, sql, withTenant, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '../../domain/ports';
@@ -79,7 +70,7 @@ async function summaries(
       fanDisplayName: schema.fans.displayName,
       state: schema.conversations.state,
       mode: schema.conversations.mode,
-      // When he wrote, on the platform's clock: `conversations.last_inbound_at` is when Nirvana read it, which a capture
+      // When he wrote, on the platform's clock: `conversations.last_inbound_at` is when Impera read it, which a capture
       // reading back his history puts hours late. The column keeps its own use, the order of arrival (message-flow.md).
       lastInboundAt: lastInboundOnPlatform,
       lastOutboundAt: schema.conversations.lastOutboundAt,

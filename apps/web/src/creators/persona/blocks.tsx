@@ -6,7 +6,7 @@ import {
   type Persona,
   type PersonaCompletion,
   type PersonaWritingStyle,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, type JSX, type ReactNode } from 'react';
 
 import { Choice, Entries, Field, Fold, TextArea, TextInput } from './fields';

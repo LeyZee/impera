@@ -7,18 +7,18 @@ import { useEffect, type JSX } from 'react';
  */
 export function PublicBrand({ page }: { page: string }): JSX.Element {
   useEffect(() => {
-    document.title = `${page} · Nirvana`;
+    document.title = `${page} · Impera`;
   }, [page]);
   return (
     <p className="nv-wordmark flex items-center gap-2 text-4xl">
       <img
-        src="/nirvana-mark.svg"
+        src="/impera-mark.svg"
         alt=""
         width={34}
         height={34}
         className="drop-shadow-[0_0_10px_color-mix(in_srgb,var(--nv-neon)_45%,transparent)]"
       />
-      Nirvana
+      Impera
     </p>
   );
 }

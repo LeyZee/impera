@@ -13,8 +13,8 @@ import {
   type PlatformAccountId,
   type ShiftReportId,
   type TeamMemberId,
-} from '@nirvana/contracts';
-import { enterCreator, schema, sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { enterCreator, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';

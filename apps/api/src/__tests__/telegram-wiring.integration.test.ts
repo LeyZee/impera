@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
-import { JOB_NAMES } from '@nirvana/contracts';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { JOB_NAMES } from '@impera/contracts';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createApp, type App } from '../composition-root';

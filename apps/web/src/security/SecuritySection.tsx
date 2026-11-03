@@ -1,4 +1,4 @@
-import type { AccountSecurity, OpenSession, Passkey } from '@nirvana/contracts';
+import type { AccountSecurity, OpenSession, Passkey } from '@impera/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import {

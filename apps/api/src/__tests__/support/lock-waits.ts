@@ -1,4 +1,4 @@
-import { sql, type Database } from '@nirvana/db';
+import { sql, type Database } from '@impera/db';
 import { z } from 'zod';
 
 const WaitsSchema = z.object({ waiting: z.number().int().min(0) });

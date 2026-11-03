@@ -6,7 +6,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { redactAuthors, type AuthoredEntries } from '../authors';

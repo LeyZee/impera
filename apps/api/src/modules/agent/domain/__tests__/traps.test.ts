@@ -1,4 +1,4 @@
-import type { MediaDescription } from '@nirvana/contracts';
+import type { MediaDescription } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { assessTrap, handoffCauseOf, screenMedia } from '../traps';

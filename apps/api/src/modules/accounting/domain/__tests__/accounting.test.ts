@@ -3,7 +3,7 @@ import {
   TeamMemberIdSchema,
   type Das2Beneficiary,
   type InvoiceContractor,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { ContractorIdentity } from '../../../contractors/domain/billing';

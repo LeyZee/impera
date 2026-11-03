@@ -4,7 +4,7 @@ import {
   teamScopeFor,
   UserRoleSchema,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolConfig } from 'pg';

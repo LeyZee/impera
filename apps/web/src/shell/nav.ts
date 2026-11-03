@@ -1,4 +1,4 @@
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 
 import type { NavIconName } from './NavIcon';
 
@@ -291,7 +291,7 @@ const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREEN
 
 /** Pages open to every role outside the rail: help and the account's notifications (CR-01), its security (SEC-04). */
 const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
-  ['/aide/installer', 'Installer Nirvana'],
+  ['/aide/installer', 'Installer Impera'],
   ['/notifications', 'Notifications'],
   [ACCOUNT_SECURITY, 'Sécurité'],
 ]);
@@ -299,13 +299,13 @@ const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
 /** The browser tab's title: the screen, its section, then the app; « Page introuvable » outside every screen. */
 export function documentTitle(pathname: string, section: Section | null): string {
   const offRail = OFF_RAIL_TITLES.get(pathname.replace(/\/+$/u, ''));
-  if (offRail !== undefined) return `${offRail} · Nirvana`;
-  if (section === null) return 'Page introuvable · Nirvana';
+  if (offRail !== undefined) return `${offRail} · Impera`;
+  if (section === null) return 'Page introuvable · Impera';
   const path = pathname.replace(/\/+$/u, '');
-  // A section's own page is no screen of its own: « Suivi · Nirvana », not « Conversations · Suivi ».
+  // A section's own page is no screen of its own: « Suivi · Impera », not « Conversations · Suivi ».
   const screen = path === section ? undefined : SCREEN_TITLES.get(path);
   const label = sectionLabel(section);
-  return `${screen === undefined ? '' : `${screen} · `}${label} · Nirvana`;
+  return `${screen === undefined ? '' : `${screen} · `}${label} · Impera`;
 }
 
 /** Whether the rail holds the section: what the route guard asks before every screen. */

@@ -1,4 +1,4 @@
-import { CurrencySchema } from '@nirvana/contracts';
+import { CurrencySchema } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { bigint, char, check, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 

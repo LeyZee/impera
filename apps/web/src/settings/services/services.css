@@ -575,7 +575,7 @@
   margin: 0;
   font-size: var(--nv-text-footnote);
 }
-/* Not a failure of Nirvana: the provider did not answer, the last verification still stands. */
+/* Not a failure of Impera: the provider did not answer, the last verification still stands. */
 .sv-notice[data-tone='warning'] {
   color: var(--nv-warning);
 }

@@ -1,4 +1,4 @@
-import { sql, type Database } from '@nirvana/db';
+import { sql, type Database } from '@impera/db';
 import { z } from 'zod';
 
 const RoleSchema = z.object({ name: z.string(), superuser: z.boolean(), bypassRls: z.boolean() });
@@ -13,7 +13,7 @@ async function connectedRole(db: Database): Promise<Role> {
   return RoleSchema.parse(result.rows[0]);
 }
 
-/** Why the two connections cannot run Nirvana as they are; empty when they can. */
+/** Why the two connections cannot run Impera as they are; empty when they can. */
 export function databaseRoleProblems(app: Role, admin: Role): string[] {
   const problems: string[] = [];
   // FORCE ROW LEVEL SECURITY binds the table owner too: without BYPASSRLS, every `*Unscoped` read and `withAdmin`

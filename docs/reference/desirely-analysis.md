@@ -7,7 +7,7 @@ Sources, lues en entier le 27/10/2026 : le centre d'aide public de Desirely en f
 - Une médiathèque par créatrice, remplie seulement par synchronisation depuis la plateforme (choix des dossiers, sans doublon à la relance), jamais par téléversement. Un média logique porte une liaison par plateforme. Dossiers, filtres par dossier, plateforme et type.
 - Descriptions générées à la demande, payantes au média, dans la langue de la créatrice, modifiables ; une vidéo longue est décrite à partir de quelques images. Les médias envoyés par les fans sont décrits d'office.
 - Flou des médias à l'écran réglable (non, oui, oui sauf au survol).
-- **Nirvana** : `media_assets`, `media_descriptions` et `media_sends` existent ; aucune liaison à la plateforme, aucune validation humaine, pas d'écran. Repris par l'ADR 0030 et `PROPOSED-media-library.md` ; nous décrivons par un modèle de vision au vocabulaire structuré, ce qu'ils ne font pas.
+- **Impera** : `media_assets`, `media_descriptions` et `media_sends` existent ; aucune liaison à la plateforme, aucune validation humaine, pas d'écran. Repris par l'ADR 0030 et `PROPOSED-media-library.md` ; nous décrivons par un modèle de vision au vocabulaire structuré, ce qu'ils ne font pas.
 
 ## Scripts et ventes
 
@@ -16,44 +16,44 @@ Sources, lues en entier le 27/10/2026 : le centre d'aide public de Desirely en f
 - Un seul PPV verrouillé à la fois ; un achat compte seulement s'il est confirmé par la plateforme ; un repos d'une heure entre scripts ; une vente qui s'enlise trois heures revient au relationnel.
 - Alerte « plus de script » qui arrête la conversation ; quatre à cinq scripts conseillés par créatrice.
 - Remise progressive après quelques messages sans achat.
-- **Nirvana** : `offerDecision` (un script par délai, jamais après un manque d'argent avoué), P6-01 (catalogue lu dans Reveal, qui fait foi, ADR 0018), P6-02 (après une offre). Repris dans `PROPOSED-sale-steps-rules.md` : rythme d'étape, un seul PPV, achat confirmé, vente qui s'enlise, description de scène, choix du script, catalogue court. **Non repris** : prix réduit et remise progressive (méthode : on ne négocie jamais, garde `discount`), arrêt de la conversation faute de script (l'agent garde la relation), scripts écrits dans Nirvana comme source (atelier de scripts en second temps, `PROPOSED-script-studio.md`).
+- **Impera** : `offerDecision` (un script par délai, jamais après un manque d'argent avoué), P6-01 (catalogue lu dans Reveal, qui fait foi, ADR 0018), P6-02 (après une offre). Repris dans `PROPOSED-sale-steps-rules.md` : rythme d'étape, un seul PPV, achat confirmé, vente qui s'enlise, description de scène, choix du script, catalogue court. **Non repris** : prix réduit et remise progressive (méthode : on ne négocie jamais, garde `discount`), arrêt de la conversation faute de script (l'agent garde la relation), scripts écrits dans Impera comme source (atelier de scripts en second temps, `PROPOSED-script-studio.md`).
 
 ## Alertes
 
 - Alertes système (plus de script, vente, services demandés, fonds du compte) et alertes à soi : une phrase évaluée sur chaque message du fan, avec prudence, des mots-clés sans IA, et une option qui arrête la conversation. Activation et sourdine par créatrice, diffusion choisie alerte par alerte (message direct ou canal Telegram).
 - Page Notifications : alerte, créatrice, fan, raison, date, lien vers la conversation, filtres lues / non lues, type, créatrice, « marquer comme vu ».
-- **Nirvana** : mots-clés d'alerte dans la persona, risques du Brief, Telegram par sujet (ADR 0020). Manquent les alertes personnalisées, la demande de service, l'alerte sur `asks_if_bot` et un historique des alertes, sous-vue du Suivi ; ce qui demande une main reste dans « À traiter » : `P4-01-custom-alerts.md`.
+- **Impera** : mots-clés d'alerte dans la persona, risques du Brief, Telegram par sujet (ADR 0020). Manquent les alertes personnalisées, la demande de service, l'alerte sur `asks_if_bot` et un historique des alertes, sous-vue du Suivi ; ce qui demande une main reste dans « À traiter » : `P4-01-custom-alerts.md`.
 
 ## Horaires
 
 - Par créatrice : fuseau, 24/7 par défaut ou créneaux jour par jour activables ; hors créneau, ni réponse ni relance, reprise des messages en attente. Raison : une créatrice qui répond toujours à 4 h éveille les soupçons, et des plages restent aux humains.
-- **Nirvana** : heures calmes des relances et bascule Jour / Nuit en dur, aucune heure d'activité de l'agent. `P3-14-agent-hours.md`, avec un défaut qui n'est pas 24/7.
+- **Impera** : heures calmes des relances et bascule Jour / Nuit en dur, aucune heure d'activité de l'agent. `P3-14-agent-hours.md`, avec un défaut qui n'est pas 24/7.
 
 ## Relances
 
 - Trois types : après la bienvenue sans réponse, après un silence, à la connexion du fan (Reveal seulement). Jusqu'à trois par type, aperçu de l'heure prévue, jamais la même approche, choix d'un bon moment, registre respecté.
-- **Nirvana** : P3-10 (relance après silence, en brouillon, heures calmes). Le reste : `PROPOSED-follow-ups-extended.md`, avec la relance sur événement (anniversaire, « à demain ») tirée du playbook.
+- **Impera** : P3-10 (relance après silence, en brouillon, heures calmes). Le reste : `PROPOSED-follow-ups-extended.md`, avec la relance sur événement (anniversaire, « à demain ») tirée du playbook.
 
 ## Voix
 
 - Défauts documentés comme à corriger : didascalies (« *sourit* »), répétitions, annonce d'un média qui ne part pas ; délai de réponse d'au moins 30 secondes, souvent une à trois minutes, bulles décalées.
 - Le playbook ajoute : ne jamais écrire les mots que la plateforme repère autour d'une rencontre, même pour refuser ; jamais de fausse urgence (maladie, accident) pour vendre ; rebondir plutôt qu'enchaîner les questions fermées.
-- **Nirvana** : seize gardes, dont `ai_disclosure`, `meeting_promise`, `discount`, `guilt_trip` ; délai de réponse de 45 s par défaut. Manquent les six gardes de `P3-13-voice-guards.md`.
+- **Impera** : seize gardes, dont `ai_disclosure`, `meeting_promise`, `discount`, `guilt_trip` ; délai de réponse de 45 s par défaut. Manquent les six gardes de `P3-13-voice-guards.md`.
 
 ## Persona
 
 - Profil en sections (identité, apparence, mode de vie, goûts, personnalité, limites, style d'écriture, exemples de réponses) avec un pourcentage de complétion. Notes du fan : liste « à collecter » réglable, recopiée dans la note de la plateforme ; panneau Mémoire éditable.
-- **Nirvana** : `PersonaSchema` riche mais un `additional_info` libre ; KYC par `strategies.kyc.targets` ; notes recopiées dans la note Reveal (ADR 0018). `P5-01-persona-blocks.md`.
+- **Impera** : `PersonaSchema` riche mais un `additional_info` libre ; KYC par `strategies.kyc.targets` ; notes recopiées dans la note Reveal (ADR 0018). `P5-01-persona-blocks.md`.
 
 ## Conversations
 
 - Liste des conversations avec désir (neutre, joueur, acheteur), scripts « x / y », état de l'IA, fiche du fan, actions en masse ; phases accroche, montée, vente, après-vente ; prénom et âge obtenus avant l'érotique.
-- **Nirvana** : Suivi (file « À traiter », lecteur, décisions), curseur de sexualisation qui exige un âge déclaré par le fan et le KYC minimum (P3-09). Manquent la note de désir, que Charles retient en premier (27/10 : plus elle est haute, plus on peut vendre), calculée par le code et qui ne fait que retenir les offres (`P3-12-desire-score.md`), puis phase, scripts x / y, actions en masse, mémoire corrigible (`PROPOSED-tracking-sales.md`).
+- **Impera** : Suivi (file « À traiter », lecteur, décisions), curseur de sexualisation qui exige un âge déclaré par le fan et le KYC minimum (P3-09). Manquent la note de désir, que Charles retient en premier (27/10 : plus elle est haute, plus on peut vendre), calculée par le code et qui ne fait que retenir les offres (`P3-12-desire-score.md`), puis phase, scripts x / y, actions en masse, mémoire corrigible (`PROPOSED-tracking-sales.md`).
 
 ## Transactions
 
 - Page des ventes : date, fan, montant, script, étape, vendue par l'IA ou non. Calcul du net Reveal : TVA déduite, puis la part de la créatrice sur le hors taxe.
-- **Nirvana** : `sales` prévue par P6-01, aucune page. `PROPOSED-tracking-sales.md`.
+- **Impera** : `sales` prévue par P6-01, aucune page. `PROPOSED-tracking-sales.md`.
 
 ## Playbook
 
@@ -68,7 +68,7 @@ Sources, lues en entier le 27/10/2026 : le centre d'aide public de Desirely en f
 
 ## Organisation et prix (pour mémoire)
 
-Organisation à membres et permissions, serveur MCP, 33 langues, tarif à la commission dégressive sur les ventes de l'IA. Rien à reprendre : Nirvana a ses rôles (ADR 0023), son serveur MCP (ADR 0026), et n'est pas vendu.
+Organisation à membres et permissions, serveur MCP, 33 langues, tarif à la commission dégressive sur les ventes de l'IA. Rien à reprendre : Impera a ses rôles (ADR 0023), son serveur MCP (ADR 0026), et n'est pas vendu.
 
 ## Ce qu'on fait mieux
 

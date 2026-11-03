@@ -6,7 +6,7 @@ import {
   UserIdSchema,
   type PayPeriod,
   type TeamRoleChange,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { TeamStore } from '../../domain/ports';

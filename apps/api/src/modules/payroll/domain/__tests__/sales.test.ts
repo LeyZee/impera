@@ -1,4 +1,4 @@
-import { DomainError, newId, PlatformAccountIdSchema, type PayPeriod } from '@nirvana/contracts';
+import { DomainError, newId, PlatformAccountIdSchema, type PayPeriod } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -185,7 +185,7 @@ describe('whose a sale is (ADR 0050 §§ 5, 8)', () => {
     );
   });
 
-  it('is held for a chatter not linked yet or a status Nirvana does not know, and nobody’s for the agent or none', () => {
+  it('is held for a chatter not linked yet or a status Impera does not know, and nobody’s for the agent or none', () => {
     expect(at('2025-03-17T12:00:00.000Z', { kind: 'unlinked' })).toEqual({
       kind: 'held',
       reason: 'chatter_unlinked',

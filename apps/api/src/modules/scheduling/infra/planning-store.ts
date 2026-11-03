@@ -10,7 +10,7 @@ import {
   type CreatorId,
   type ShiftId,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   enterCreator,
@@ -24,7 +24,7 @@ import {
   withTenantMember,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import {

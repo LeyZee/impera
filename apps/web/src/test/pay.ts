@@ -25,7 +25,7 @@ import {
   type PayrollPeriod,
   type PenaltyView,
   type TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { settingsOf } from '@/test/settings';
 

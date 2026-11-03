@@ -17,7 +17,7 @@ import {
   SaleDecisionOutcomeSchema,
   SaleEventSchema,
   SaleSignalKindSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   bigint,

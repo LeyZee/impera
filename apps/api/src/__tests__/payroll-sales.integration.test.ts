@@ -7,8 +7,8 @@ import {
   ShiftIdSchema,
   type PlatformAccountId,
   type TeamMember,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 

@@ -1,4 +1,4 @@
-import { PayPeriodSchema, PlatformAccountIdSchema, newId } from '@nirvana/contracts';
+import { PayPeriodSchema, PlatformAccountIdSchema, newId } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { detectedForCheck, type DatedAccountRules } from '../sales-checks';

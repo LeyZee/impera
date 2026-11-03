@@ -1,5 +1,5 @@
 /**
- * Motion helpers for the Nirvana design system. Framework-free: React components call them from
+ * Motion helpers for the Impera design system. Framework-free: React components call them from
  * effects, the extension popup calls them directly. State (selected tab, checked option) stays with
  * the caller; these helpers only move matter and light.
  */

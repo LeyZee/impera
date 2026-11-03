@@ -4,7 +4,7 @@ import {
   type InvoiceEvent,
   type InvoiceEventKind,
   type InvoiceListItem,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { InvoiceRefusal } from './api';
 

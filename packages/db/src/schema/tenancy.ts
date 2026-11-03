@@ -1,4 +1,4 @@
-import { PlatformSchema, SessionStateSchema } from '@nirvana/contracts';
+import { PlatformSchema, SessionStateSchema } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
   check,

@@ -1,4 +1,4 @@
-import { GUARD_CODES } from '@nirvana/contracts';
+import { GUARD_CODES } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { GUARD_LABELS } from './guards';

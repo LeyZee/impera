@@ -10,8 +10,8 @@ import {
   AuditEntryIdSchema,
   type ConversationId,
   type CreatorFan,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withCreatorAccount, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withCreatorAccount, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { CreatorSpaceReader, MediaDescriptions, PageRequest } from '../../domain/ports';

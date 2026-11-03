@@ -1,4 +1,4 @@
-// Nirvana's service worker (CR-01, ADR 0042 § 8): the app opens without a network, and nothing else.
+// Impera's service worker (CR-01, ADR 0042 § 8): the app opens without a network, and nothing else.
 //
 // What it keeps: the page itself (index.html, under '/') and Vite's hashed files under /assets/, nothing more.
 // What it never keeps: anything under /v1/ (conversations, fans, sales, money, the session), which goes to the
@@ -11,11 +11,13 @@
 // Served from the root with `Cache-Control: no-cache` (nginx.conf.template, `location /`), never under /assets/,
 // so the browser always sees a new version. Hand-written, no build dependency: bump VERSION when this file changes.
 
-const VERSION = 'v2';
-const SHELL = `nirvana-shell-${VERSION}`;
-const ASSETS = `nirvana-assets-${VERSION}`;
+const VERSION = 'v3';
+const SHELL = `impera-shell-${VERSION}`;
+const ASSETS = `impera-assets-${VERSION}`;
 /** Hashed files kept at most: each deployment adds new ones, the oldest go first. */
 const MAX_ASSETS = 120;
+/** The prefixes of this app's copies: before the rename they were `nirvana-*`, still dropped (ADR 0062). */
+const PREFIXES = ['impera-', 'nirvana-']; // ADR 0062
 const SHELL_FILES = ['/', '/appearance.js', '/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -28,7 +30,9 @@ self.addEventListener('activate', (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => key.startsWith('nirvana-') && key !== SHELL && key !== ASSETS)
+          .filter(
+            (key) => PREFIXES.some((prefix) => key.startsWith(prefix)) && key !== SHELL && key !== ASSETS,
+          )
           .map((key) => caches.delete(key)),
       );
       await self.clients.claim();
@@ -56,7 +60,7 @@ self.addEventListener('push', (event) => {
   );
 });
 
-/** A message as the server sends it; anything else still rings, as plain « Nirvana ». */
+/** A message as the server sends it; anything else still rings, as plain « Impera ». */
 function readPush(data) {
   let value = {};
   try {
@@ -66,7 +70,7 @@ function readPush(data) {
   }
   const text = (field, max) => (typeof value[field] === 'string' ? value[field].slice(0, max) : undefined);
   return {
-    title: text('title', 80) || 'Nirvana',
+    title: text('title', 80) || 'Impera',
     body: text('body', 180),
     tag: text('tag', 64),
     url: safePath(value.url),

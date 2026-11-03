@@ -7,7 +7,7 @@ import {
   SalesFeedCapabilitySchema,
   SalesFeedErrorKindSchema,
   type Platform,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   decryptSecret,
   encryptSecret,
@@ -17,7 +17,7 @@ import {
   withAdmin,
   type Database,
   type EncryptionKey,
-} from '@nirvana/db';
+} from '@impera/db';
 import { z } from 'zod';
 
 import type { SalesFeedKeyStore, StoredSalesFeedKey } from '../../domain/sales-feed';

@@ -3,7 +3,7 @@ import {
   TelegramBotIdSchema,
   TelegramChatIdSchema,
   newId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReauthRequired } from '../services/api';

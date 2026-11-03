@@ -9,8 +9,8 @@ import {
   PersonaVersionIdSchema,
   type Persona,
   type PersonaVersionSummary,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
 
 import { canonicalJson } from '../../domain/canonical';
 import { PersonaVersionConflict, PersonaVersionNotFound } from '../../domain/errors';

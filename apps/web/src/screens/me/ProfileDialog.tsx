@@ -6,7 +6,7 @@ import {
   RCS_CITY_MAX,
   TAX_ID_MAX,
   type ContractorFile,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { Refusal, useFileSend } from './FileParts';

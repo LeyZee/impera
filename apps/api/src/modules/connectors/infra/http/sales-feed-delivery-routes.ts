@@ -1,4 +1,4 @@
-import { PlatformSchema } from '@nirvana/contracts';
+import { PlatformSchema } from '@impera/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 

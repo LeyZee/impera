@@ -1,4 +1,4 @@
-import type { InvoiceListItem, PendingContractorDocuments } from '@nirvana/contracts';
+import type { InvoiceListItem, PendingContractorDocuments } from '@impera/contracts';
 
 /**
  * What waits for the owner on the invoices, in lines for the Dashboard (EQ-06 lot 8d, ADR 0024 « factures

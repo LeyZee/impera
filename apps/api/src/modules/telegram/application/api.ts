@@ -12,7 +12,7 @@ import type {
   TelegramSaleSettingsEntry,
   TelegramSalesSettings,
   TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** What the routes and other modules (the Dashboard) use; the jobs are separate (index.ts). */
 export interface TelegramApi {

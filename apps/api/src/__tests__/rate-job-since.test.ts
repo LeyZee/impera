@@ -1,4 +1,4 @@
-import { createDbClient } from '@nirvana/db';
+import { createDbClient } from '@impera/db';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { rateJobSince } from '../composition-root';

@@ -1,5 +1,5 @@
-import { CommissionStatementIdSchema } from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { CommissionStatementIdSchema } from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, type Database } from '@impera/db';
 
 import { payReadsForInvoicing as payReads } from '../../payroll';
 import type { PayrollRequeueStore } from '../domain/ports';

@@ -1,4 +1,4 @@
-import type { ExternalRef } from '@nirvana/contracts';
+import type { ExternalRef } from '@impera/contracts';
 
 import { SendRefused, type OutboundSender } from '../../conversations';
 import { ConnectorFailed, ConnectorUnavailable, PlatformAccountNotFound } from '../domain/errors';

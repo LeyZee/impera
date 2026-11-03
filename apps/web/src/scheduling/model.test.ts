@@ -10,7 +10,7 @@ import {
   type SchedulingSettings,
   type Shift,
   type ShiftSwapRequest,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 

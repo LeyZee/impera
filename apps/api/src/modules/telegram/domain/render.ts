@@ -1,4 +1,4 @@
-import type { TelegramTopic } from '@nirvana/contracts';
+import type { TelegramTopic } from '@impera/contracts';
 
 import type { Notice } from './signals';
 
@@ -51,7 +51,7 @@ export interface RenderedNotice {
 }
 
 export function renderNotice(notice: Notice, creatorName: string | null, webOrigin: string): RenderedNotice {
-  const who = creatorName ?? 'Nirvana';
+  const who = creatorName ?? 'Impera';
   const lines = [
     `${TOPIC_MARK[notice.topic]} <b>${escapeHtml(notice.title)} · ${escapeHtml(who)}</b>`,
     escapeHtml(notice.body),

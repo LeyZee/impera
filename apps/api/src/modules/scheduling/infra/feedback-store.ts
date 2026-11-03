@@ -7,8 +7,8 @@ import {
   ShiftIdSchema,
   TeamMemberIdSchema,
   type ShiftId,
-} from '@nirvana/contracts';
-import { eq, schema, withTenantMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema, withTenantMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import {

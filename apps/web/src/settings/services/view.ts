@@ -1,4 +1,4 @@
-import type { ProviderNextAction, ProviderStatus } from '@nirvana/contracts';
+import type { ProviderNextAction, ProviderStatus } from '@impera/contracts';
 
 import { GUIDES, isDashboardProvider, type DashboardProvider } from './guide';
 
@@ -36,7 +36,7 @@ export function leadOf(next: ProviderNextAction, services: readonly ProviderStat
   const relay = RELAYS.find((provider) => services.some((s) => s.provider === provider && isWorking(s)));
   if (relay === undefined) {
     const why =
-      grok?.isUnreadable === true ? 'Nirvana ne peut plus lire la clé de Grok' : 'xAI refuse la clé de Grok';
+      grok?.isUnreadable === true ? 'Impera ne peut plus lire la clé de Grok' : 'xAI refuse la clé de Grok';
     return `L’agent n’écrit plus : ${why} et aucun relais n’est branché.`;
   }
   return grok?.isUnreadable === true
@@ -98,7 +98,7 @@ export function dotOfNext(next: ProviderNextAction): Dot {
 
 /**
  * « Vérifier maintenant » answers with the status as it stands. When the provider could not be reached, the
- * server keeps the last verification: same `verifiedAt`. The page says so instead of saying nothing. A key Nirvana
+ * server keeps the last verification: same `verifiedAt`. The page says so instead of saying nothing. A key Impera
  * can no longer decrypt is never sent: the provider was not called, and the notice says what to do instead.
  */
 export function verifyNotice(
@@ -107,7 +107,7 @@ export function verifyNotice(
   after: ProviderStatus,
 ): string | null {
   if (after.isUnreadable)
-    return `Nirvana ne peut plus lire la clé enregistrée : ${GUIDES[provider].vendor} n’a pas été contacté. Colle la clé à nouveau.`;
+    return `Impera ne peut plus lire la clé enregistrée : ${GUIDES[provider].vendor} n’a pas été contacté. Colle la clé à nouveau.`;
   // Every answer of the provider, a refusal included, moves `verifiedAt` (domain/credential.ts on the API).
   if (before.verifiedAt !== after.verifiedAt) return null;
   return `${GUIDES[provider].vendor} n’a pas répondu. L’état affiché est celui de la dernière vérification.`;

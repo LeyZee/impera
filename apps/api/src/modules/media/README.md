@@ -1,6 +1,6 @@
 # Module `media`
 
-**Rôle.** Catalogue de médias, descriptions au vocabulaire Nirvana (hérité d'OnlyScript), extraction de frames et transcription (ffmpeg, fourni par l'image Docker, voir `operations.md`), historique d'envoi par fan.
+**Rôle.** Catalogue de médias, descriptions au vocabulaire Impera (hérité d'OnlyScript), extraction de frames et transcription (ffmpeg, fourni par l'image Docker, voir `operations.md`), historique d'envoi par fan.
 
 **Peut dépendre de.** packages/llm (rôle sense)
 

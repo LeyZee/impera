@@ -9,7 +9,7 @@ import type {
   SendResult,
   SessionState,
   VerifyResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { ConnectorError, type PlatformConnector } from '../../domain/platform-connector';
 

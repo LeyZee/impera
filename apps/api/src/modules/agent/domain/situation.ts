@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_HOURS, inMinuteRange, type MinuteRange } from '@nirvana/contracts';
+import { DEFAULT_AGENT_HOURS, inMinuteRange, type MinuteRange } from '@impera/contracts';
 
 /**
  * The moment of the conversation, written by code for the brain and the voice: her local time, day or

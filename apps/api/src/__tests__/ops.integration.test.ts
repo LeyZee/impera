@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 
-import { CreatorIdSchema, newId, PlatformAccountIdSchema } from '@nirvana/contracts';
-import { decryptSecret, encryptSecret, eq, keyVersionOf, parseEncryptionKeys, schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { CreatorIdSchema, newId, PlatformAccountIdSchema } from '@impera/contracts';
+import { decryptSecret, encryptSecret, eq, keyVersionOf, parseEncryptionKeys, schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createOwner } from '../auth';

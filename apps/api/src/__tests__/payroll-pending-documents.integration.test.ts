@@ -8,8 +8,8 @@ import {
   TeamMemberIdSchema,
   type ContractorDocument,
   type TeamMember,
-} from '@nirvana/contracts';
-import { schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { schema } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';

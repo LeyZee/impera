@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS, JobNameSchema } from '@nirvana/contracts';
+import { JOB_PAYLOADS, JobNameSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { parsedCronJobs } from '../crontab';

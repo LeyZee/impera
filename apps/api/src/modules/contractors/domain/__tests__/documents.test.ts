@@ -2,7 +2,7 @@ import {
   CONTRACTOR_DOCUMENT_MAX_BYTES,
   ContractorDocumentIdSchema,
   TeamMemberIdSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

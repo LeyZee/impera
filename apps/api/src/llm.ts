@@ -10,7 +10,7 @@ import {
   type LlmGateway,
   type LlmGatewayDeps,
   type ProviderId,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import type { Logger } from './logger';
 

@@ -1,4 +1,4 @@
-# Guide design : Nirvana « Liquid Glass »
+# Guide design : Impera « Liquid Glass »
 
 Dernière revue : 2026-10-25 (images refaites depuis le CRM). Fiche : D-01. Code : `packages/design-system` (ADR 0015).
 
@@ -38,8 +38,8 @@ Demandée par Charles le 19/10 : le CRM faisait « cheap » et « daté ». La r
 
 Réponses aux questions ouvertes de `brief.md` :
 
-- **Identité propre à Nirvana**, pas les tokens IMPERA. Direction : le Liquid Glass d'iOS 26/27 sur une nuit chaude, avec **un seul accent, un néon rouge**. L'ancienne bannière violette du README n'est plus la référence de couleur ; la bannière actuelle est `brand/banner.svg`.
-- **En code, sans Figma.** La référence visuelle vivante est l'artifact « Nirvana » (design system publié par Claude, privé au compte de Charles : https://claude.ai/artifact/Aw5XKd8jae4xSNevjge2Ci). Le dépôt fait foi : si l'artifact et `packages/design-system` divergent, c'est le dépôt qui a raison.
+- **Identité propre à Impera**, pas les tokens IMPERA. Direction : le Liquid Glass d'iOS 26/27 sur une nuit chaude, avec **un seul accent, un néon rouge**. L'ancienne bannière violette du README n'est plus la référence de couleur ; la bannière actuelle est `brand/banner.svg`.
+- **En code, sans Figma.** La référence visuelle vivante est l'artifact « Impera » (design system publié par Claude, privé au compte de Charles : https://claude.ai/artifact/Aw5XKd8jae4xSNevjge2Ci). Le dépôt fait foi : si l'artifact et `packages/design-system` divergent, c'est le dépôt qui a raison.
 - Nom et logo : la flamme à l'auréole dessinée par Charles (16/10), déclinée dans `brand/` (règles d'usage dans `brand/README.md`). Le nom s'écrit en Playfair Display italique 600 (`.nv-wordmark`), la police du logo, choisie par Charles le 16/10 parce que ses pleins et ses pointes reprennent la flamme ; les lockups de `brand/` en portent le tracé vectorisé.
 
 ## Retours de Charles sur le prototype (2026-10-17)
@@ -70,7 +70,7 @@ Donnés sur la maquette du Dashboard (fil de revue 08), valables pour tout le CR
 
 ## Finition d'un écran (Charles, 2026-10-27)
 
-« Il faut que tout soit très joli… cohérent avec le design système de Nirvana… que ça respire, qu'il y ait des hovers partout, que ça interagisse avec l'utilisateur, que la navigation soit fluide, agréable, intuitive, avec une belle hiérarchie des informations partout. C'est très, très important. » Valable pour chaque écran nouveau, à commencer par ceux de l'équipe (fiches EQ). Un écran est prêt quand :
+« Il faut que tout soit très joli… cohérent avec le design système d’Impera… que ça respire, qu'il y ait des hovers partout, que ça interagisse avec l'utilisateur, que la navigation soit fluide, agréable, intuitive, avec une belle hiérarchie des informations partout. C'est très, très important. » Valable pour chaque écran nouveau, à commencer par ceux de l'équipe (fiches EQ). Un écran est prêt quand :
 
 - **Hiérarchie** : il se lit en deux secondes ; un seul chiffre ou une seule action domine, le secondaire est replié ou au survol (section « Hiérarchie »).
 - **Ça respire** : espacements des jetons, contenu sur plaques, au plus trois chiffres secondaires côte à côte, jamais un mur de champs ; un formulaire long se fait par étapes.
@@ -120,7 +120,7 @@ Règles pratiques :
 
 ## Clarté
 
-Chaque écran se relit à la place d'un nouvel utilisateur, qui connaît le chatting mais pas Nirvana. Il ne doit jamais se demander « ça veut dire quoi ? » ni « c'est à moi de faire quelque chose ? ».
+Chaque écran se relit à la place d'un nouvel utilisateur, qui connaît le chatting mais pas Impera. Il ne doit jamais se demander « ça veut dire quoi ? » ni « c'est à moi de faire quelque chose ? ».
 
 - **Dire qui agit.** Un état dit qui a la main : « L'agent écrit », « À valider », « Un humain répond ». Jamais un état abstrait (« En attente » : de qui ?).
 - **Les mots du métier, pas ceux du code.** Pas de `brief`, `handoff`, `KYC`, `pending`, `prompt` ni de nom de modèle à l'écran principal : « ce qu'elle sait de lui », « relais à un humain », « la voix ». Le terme technique peut vivre dans les détails repliés.
@@ -199,7 +199,7 @@ Pastilles d'état (`nv-status--<état>`) : une par valeur de `conversations.stat
 
 ## Dashboard (statistiques)
 
-Inspiré du tableau de bord de Reveal, sur le verre Nirvana :
+Inspiré du tableau de bord de Reveal, sur le verre Impera :
 
 - En tête : période (Jour, Semaine, Mois) en segment, sélecteur de période à flèches.
 - Quatre cartes `nv-stat` : la plus importante en `nv-stat--hero` (une seule par écran, comme le bouton néon), chacune avec sa valeur, une `nv-delta` comparée à la période précédente et une courbe collée au bas de la carte.
@@ -229,7 +229,7 @@ Ordre de lecture de l'écran (maquette validée par Charles le 17/10) : phrase d
 
 ## Graphiques
 
-Un seul composant, `nv-chart` : un SVG dessiné avec les aides de `@nirvana/design-system` (`chartPoints`, `linePath` monotone qui ne dépasse jamais les vraies valeurs, `areaPath`, `niceTicks`, `nearestIndex`) et animé par les classes.
+Un seul composant, `nv-chart` : un SVG dessiné avec les aides de `@impera/design-system` (`chartPoints`, `linePath` monotone qui ne dépasse jamais les vraies valeurs, `areaPath`, `niceTicks`, `nearestIndex`) et animé par les classes.
 
 - **Apparition** : la courbe se dessine (`nv-chart__line`, `pathLength="1"`), l'aire apparaît en fondu juste après (`__area`), les barres poussent depuis leur base à 40ms d'intervalle (`__bar`, `--nv-i`). La période précédente est en pointillés discrets (`__line--past`).
 - **Survol** : `is-hovering` sur le conteneur montre un curseur vertical (`__cursor`), un point sur la courbe (`__dot`) et une bulle de verre avec la valeur et sa date (`__tip`, placée par `--nv-tip-x` / `--nv-tip-y` d'après `nearestIndex`). Survoler une barre l'éclaire et met les autres en retrait. Au doigt, toucher et glisser fait de même.
@@ -248,7 +248,7 @@ Un seul composant, `nv-chart` : un SVG dessiné avec les aides de `@nirvana/desi
 
 Quand D-01 initialisera shadcn/ui dans `apps/web`, ses variables sémantiques pointent vers les tokens (et non l'inverse) :
 
-| shadcn                               | Nirvana                                                        |
+| shadcn                               | Impera                                                        |
 | ------------------------------------ | -------------------------------------------------------------- |
 | `--background` / `--foreground`      | `--nv-void` / `--nv-ink`                                       |
 | `--card`, `--popover`                | `--nv-surface-raised` (les cartes vitrées ajoutent `nv-glass`) |
@@ -264,7 +264,7 @@ Le bloc de couleurs généré par `shadcn init` est supprimé au profit de cette
 
 ## Extension Chrome
 
-Le popup (capture de session, enregistreur) importe `@nirvana/design-system/styles.css` : en-tête `nv-popup__brand`, état de la session (`platform_session` : valide, à surveiller, expirée) en `nv-status`, un bouton néon « Synchroniser la session ». Pas de verre au-dessus de Reveal : l'extension n'injecte aucun style dans la page Reveal.
+Le popup (capture de session, enregistreur) importe `@impera/design-system/styles.css` : en-tête `nv-popup__brand`, état de la session (`platform_session` : valide, à surveiller, expirée) en `nv-status`, un bouton néon « Synchroniser la session ». Pas de verre au-dessus de Reveal : l'extension n'injecte aucun style dans la page Reveal.
 
 ## Ce qui reste (fiche D-01)
 

@@ -8,7 +8,7 @@
 export const APPEARANCES = ['night', 'day', 'device'] as const;
 export type Appearance = (typeof APPEARANCES)[number];
 
-export const APPEARANCE_KEY = 'nirvana.appearance';
+export const APPEARANCE_KEY = 'impera.appearance';
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
 
 /** What a stored value means: anything unknown (nothing stored, an old value) is the default, Nuit. */

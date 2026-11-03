@@ -3,8 +3,8 @@ import {
   CreatorIdSchema,
   TeamMemberStatusSchema,
   UserIdSchema,
-} from '@nirvana/contracts';
-import { and, inArray, schema, sql, withAdmin, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, inArray, schema, sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { AwayHolds } from '../../domain/ports';

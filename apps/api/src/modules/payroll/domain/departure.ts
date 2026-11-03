@@ -1,4 +1,4 @@
-import { nextPayPeriod, payPeriodOfDay, type PayPeriod } from '@nirvana/contracts';
+import { nextPayPeriod, payPeriodOfDay, type PayPeriod } from '@impera/contracts';
 
 import { CommissionStatementDocumentsOpen } from './errors';
 

@@ -5,7 +5,7 @@ import {
   ProviderSettingsSchema,
   ProviderStatusSchema,
   SaveProviderKeyBodySchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -19,7 +19,7 @@ const ProviderParamsSchema = z.object({ provider: AiProviderSchema });
 
 /**
  * Each paste and each « Vérifier maintenant » calls the provider: per address, far below what a person does and
- * far below what would get Nirvana's own keys rate-limited by xAI or Google.
+ * far below what would get Impera's own keys rate-limited by xAI or Google.
  */
 const PROVIDER_CALLS_PER_MINUTE = 10;
 const providerCallLimit = { rateLimit: { max: PROVIDER_CALLS_PER_MINUTE, timeWindow: '1 minute' } };

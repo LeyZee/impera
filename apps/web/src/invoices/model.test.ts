@@ -1,4 +1,4 @@
-import { INVOICE_ERROR_CODES, PayPeriodSchema } from '@nirvana/contracts';
+import { INVOICE_ERROR_CODES, PayPeriodSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
