@@ -25,6 +25,7 @@ const toSlot = (slot: GridSlot): CalendarSlot => ({
   creatorId: slot.creatorId,
   startsAt: slot.startsAt.toISOString(),
   endsAt: slot.endsAt.toISOString(),
+  open: slot.open.map((gap) => ({ startsAt: gap.from.toISOString(), endsAt: gap.to.toISOString() })),
 });
 
 export function createCalendarService(

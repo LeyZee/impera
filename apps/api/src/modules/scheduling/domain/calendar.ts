@@ -106,6 +106,8 @@ export interface GridSlot {
   readonly creatorId: CreatorId;
   readonly startsAt: Date;
   readonly endsAt: Date;
+  /** The stretches ahead that no shift covers, in order: never empty. */
+  readonly open: readonly Span[];
 }
 
 /**
@@ -140,11 +142,28 @@ export function gridSlots(
   return out;
 }
 
+/** The stretches of `span` that no span of `spans` covers, in order. */
+function gapsIn(span: Span, spans: readonly Span[]): Span[] {
+  const gaps: Span[] = [];
+  let at = ms(span.from);
+  for (const one of merged(spans)) {
+    if (at >= ms(span.to)) break;
+    if (ms(one.to) <= at) continue;
+    if (ms(one.from) > at)
+      gaps.push({ from: new Date(at), to: new Date(Math.min(ms(one.from), ms(span.to))) });
+    at = Math.max(at, ms(one.to));
+  }
+  if (at < ms(span.to)) gaps.push({ from: new Date(at), to: span.to });
+  return gaps;
+}
+
 /**
- * The créneaux to fill (ADR 0045 § 2, ADR 0048 § 1): on each account, each créneau of the window not yet over that
- * no shift touches. One the agent holds alone (his whole remaining créneau, in Automatique) is not to fill: it goes in
- * `aiAlone`. In Copilote a créneau stays to fill: each draft waits for a human (ADR 0019, ADR 0025). The one count of
- * the créneaux to fill: the calendar's head and EQ-14's departure alert read this function.
+ * The créneaux to fill (ADR 0045 § 2, ADR 0048 § 1), as Équipe › Planning counts them (EQ-01): on each account, each
+ * créneau with a stretch ahead that no shift covers (from now, at the minute, for the créneau under way), even when a
+ * shift holds the rest of it. `open` gives those stretches. One with no shift at all, whose every open stretch the agent
+ * answers in Automatique, is not to fill: it goes in `aiAlone`. In Copilote a créneau stays to fill: each draft waits
+ * for a human (ADR 0019, ADR 0025); so does one a shift touches, the agent covering the rest or not (Équipe, 03/11).
+ * The one count of the créneaux to fill: the calendar, Planning and EQ-14's departure alert read this function.
  */
 export function slotsToFill(input: {
   readonly settings: Pick<SchedulingSettings, 'timeZone' | 'slotStartMinute' | 'slotLengthMinutes'>;
@@ -154,7 +173,9 @@ export function slotsToFill(input: {
   readonly window: Span;
   readonly now: Date;
 }): { readonly toFill: GridSlot[]; readonly aiAlone: GridSlot[] } {
-  const slots = gridSlots(input.settings, input.window).filter((slot) => ms(slot.to) > ms(input.now));
+  // Planning reads « now » at the next minute, so that the stretch under way starts on a minute.
+  const ahead = Math.ceil(ms(input.now) / 60_000) * 60_000;
+  const slots = gridSlots(input.settings, input.window).filter((slot) => ms(slot.to) > ahead);
   const toFill: GridSlot[] = [];
   const aiAlone: GridSlot[] = [];
   const replyOf = new Map(
@@ -169,20 +190,23 @@ export function slotsToFill(input: {
     ]),
   );
   for (const account of input.accounts) {
-    const own = input.shifts.filter((shift) => shift.platformAccountId === account.id);
+    const own = input.shifts
+      .filter((shift) => shift.platformAccountId === account.id)
+      .map((shift) => ({ from: shift.startsAt, to: shift.endsAt }));
     const reply = replyOf.get(account.creatorId) ?? [];
     for (const slot of slots) {
-      const taken = own.some((shift) => ms(shift.startsAt) < ms(slot.to) && ms(shift.endsAt) > ms(slot.from));
-      if (taken) continue;
+      const open = gapsIn({ from: new Date(Math.max(ms(slot.from), ahead)), to: slot.to }, own);
+      if (open.length === 0) continue;
       const cell: GridSlot = {
         platformAccountId: account.id,
         creatorId: account.creatorId,
         startsAt: slot.from,
         endsAt: slot.to,
+        open,
       };
-      // What is left of a créneau under way is what the agent must hold.
-      const ahead = { from: new Date(Math.max(ms(slot.from), ms(input.now))), to: slot.to };
-      (coversAll(reply, ahead) ? aiAlone : toFill).push(cell);
+      const touched = own.some((shift) => ms(shift.from) < ms(slot.to) && ms(shift.to) > ms(slot.from));
+      const agentHolds = !touched && open.every((gap) => coversAll(reply, gap));
+      (agentHolds ? aiAlone : toFill).push(cell);
     }
   }
   return { toFill, aiAlone };

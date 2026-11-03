@@ -203,14 +203,22 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
         'anna-invente',
         'ines-inventee',
       ]);
-      // In Copilote the agent holds nothing alone: 2 créneaux free on Anna, 3 on Inès.
+      // In Copilote the agent holds nothing alone. A créneau a shift holds in part keeps its open stretches to fill
+      // (EQ-01): all four on each account, Théo's 10–14 leaving 6–10 and 14–18 open.
       expect(agency.aiAlone).toEqual([]);
       const free = (account: string) => agency.toFill.filter((slot) => slot.platformAccountId === account);
-      expect(free(annaAccount).map((slot) => slot.startsAt)).toEqual([
-        parisInstant(day, 0).toISOString(),
-        parisInstant(day, 1080).toISOString(),
+      const stretch = (start: number, end: number) => ({
+        startsAt: parisInstant(day, start).toISOString(),
+        endsAt: parisInstant(day, end).toISOString(),
+      });
+      expect(free(annaAccount).map((slot) => slot.open)).toEqual([
+        [stretch(0, 360)],
+        [stretch(360, 600)],
+        [stretch(840, 1080)],
+        [stretch(1080, 1440)],
       ]);
-      expect(free(inesAccount)).toHaveLength(3);
+      expect(free(inesAccount).at(-1)?.open).toEqual([stretch(1080, 1200), stretch(1380, 1440)]);
+      expect(free(inesAccount)).toHaveLength(4);
       expect(agency.workload).toEqual([
         { memberId: theo.id, minutes: 240 },
         { memberId: basile.id, minutes: 180 },
@@ -286,8 +294,13 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     const auto = await calendar(owner);
     await expectSameModeAsDashboard(auto);
     expect(auto.agent.find((agent) => agent.creatorId === ines)?.mode).toBe('auto');
+    // 0–6, 6–12, 12–18 on Inès are the agent's alone; 18–24, where Basile chats 20–23, stays to fill.
     expect(auto.agency?.aiAlone.filter((slot) => slot.platformAccountId === inesAccount)).toHaveLength(3);
-    expect(auto.agency?.toFill.filter((slot) => slot.platformAccountId === inesAccount)).toEqual([]);
+    expect(
+      auto.agency?.toFill
+        .filter((slot) => slot.platformAccountId === inesAccount)
+        .map((slot) => slot.startsAt),
+    ).toEqual([parisInstant(day, 1080).toISOString()]);
     const inesCoverage = auto.agency?.coverage.find((one) => one.platformAccountId === inesAccount);
     expect(inesCoverage).toEqual({
       platformAccountId: inesAccount,
@@ -308,7 +321,7 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     expect(stopped.agent.map((agent) => agent.mode)).toEqual(['stop', 'stop']);
     await expectSameModeAsDashboard(stopped);
     expect(stopped.agency?.aiAlone).toEqual([]);
-    expect(stopped.agency?.toFill).toHaveLength(5);
+    expect(stopped.agency?.toFill).toHaveLength(8);
   });
 
   it('refuses a window over six weeks, and a creator', async () => {

@@ -55,12 +55,16 @@ export const CalendarAgentSchema = z.object({
 });
 export type CalendarAgent = z.infer<typeof CalendarAgentSchema>;
 
-/** A créneau of the grid on one account, at the agency's hours (`scheduling_settings`). */
+/**
+ * A créneau of the grid on one account, at the agency's hours (`scheduling_settings`), with its stretches ahead that
+ * no shift covers (`open`, in order, never empty): a créneau a shift holds in part is still to fill (EQ-01).
+ */
 export const CalendarSlotSchema = z.object({
   platformAccountId: PlatformAccountIdSchema,
   creatorId: CreatorIdSchema,
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
+  open: z.array(z.object({ startsAt: z.iso.datetime(), endsAt: z.iso.datetime() })).min(1),
 });
 export type CalendarSlot = z.infer<typeof CalendarSlotSchema>;
 
@@ -101,8 +105,9 @@ export const CalendarSchema = z.object({
     .object({
       accounts: z.array(PlanningAccountSchema),
       /**
-       * The créneaux ahead with nobody on them (`slotsToFill`, the one count EQ-14's departure alert reads too). A
-       * créneau the agent holds alone in Automatique is not one of them (ADR 0048 § 1): it is in `aiAlone`.
+       * The créneaux ahead with a stretch nobody holds (`slotsToFill`, the one count Planning and EQ-14's departure
+       * alert read too). A créneau without a shift whose open stretches the agent answers in Automatique is not one of
+       * them (ADR 0048 § 1): it is in `aiAlone`.
        */
       toFill: z.array(CalendarSlotSchema),
       aiAlone: z.array(CalendarSlotSchema),

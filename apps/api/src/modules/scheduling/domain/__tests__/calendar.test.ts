@@ -162,6 +162,45 @@ describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
     expect(stopped.toFill).toHaveLength(8);
   });
 
+  it('keeps to fill a créneau a shift holds in part, with its open stretches, as Planning counts it (EQ-01)', () => {
+    // Créneaux from 8:00: a shift 10:00–16:00 leaves 8–10 open in 8–14, and 16–20 in 14–20.
+    const fromEight = { ...SETTINGS, slotStartMinute: 480 };
+    const { toFill, aiAlone } = slotsToFill({
+      settings: fromEight,
+      accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
+      shifts: [shift(NORA_REVEAL, '2026-11-03T09:00:00Z', '2026-11-03T15:00:00Z')],
+      // The agent answers all day in Automatique: a créneau a shift touches stays to fill all the same.
+      agents: [agentOn(NORA, 'auto', { mode: 'always' })],
+      window: { from: at('2026-11-03T07:00:00Z'), to: at('2026-11-03T19:00:00Z') },
+      now: at('2026-11-02T12:00:00Z'),
+    });
+    expect(toFill.map((cell) => iso(cell.open))).toEqual([
+      [['2026-11-03T07:00:00.000Z', '2026-11-03T09:00:00.000Z']],
+      [['2026-11-03T15:00:00.000Z', '2026-11-03T19:00:00.000Z']],
+    ]);
+    expect(aiAlone).toEqual([]);
+  });
+
+  it('opens a créneau under way from the next minute, and holds one a shift covers whole', () => {
+    const { toFill } = slotsToFill({
+      settings: SETTINGS,
+      accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
+      // 6–12 (Paris) covered until 10:00 only; 12–18 covered whole by two shifts end to end.
+      shifts: [
+        shift(NORA_REVEAL, '2026-11-03T05:00:00Z', '2026-11-03T09:00:00Z'),
+        shift(NORA_REVEAL, '2026-11-03T11:00:00Z', '2026-11-03T14:00:00Z'),
+        shift(NORA_REVEAL, '2026-11-03T14:00:00Z', '2026-11-03T17:00:00Z'),
+      ],
+      agents: [],
+      window: { from: at('2026-11-03T05:00:00Z'), to: at('2026-11-03T17:00:00Z') },
+      // 8:30:20 in Paris: the open stretch of 6–12 starts at 10:00, after the shift.
+      now: at('2026-11-03T07:30:20Z'),
+    });
+    expect(toFill.map((cell) => iso(cell.open))).toEqual([
+      [['2026-11-03T09:00:00.000Z', '2026-11-03T11:00:00.000Z']],
+    ]);
+  });
+
   it('asks the agent for what is left of a créneau under way only', () => {
     // 10:00 in Paris; the agent answers from 9:00: the rest of 6–12 is his.
     const { aiAlone } = slotsToFill({
