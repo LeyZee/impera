@@ -38,6 +38,7 @@ import { closingPeriodOf, finalFor } from './departure';
 import { CommissionRateMissing } from './errors';
 import { assertFreshRates } from './exchange-rates';
 import {
+  registeredIn,
   saleKeyOf,
   saleLinesOf,
   salesCounted,
@@ -261,7 +262,7 @@ function periodRates(
   if (snapshot.closing !== null) return canonicalExchangeRates(snapshot.closing.exchangeRates);
   const used = new Set<string>([
     ...counted.map((report) => report.currency),
-    ...countedSales.map((one) => one.line.currency),
+    ...countedSales.map((one) => one.currency),
   ]);
   return canonicalExchangeRates(snapshot.latestRates.filter((rate) => used.has(rate.currency)));
 }
@@ -394,7 +395,7 @@ function computePeriod(snapshot: PeriodSnapshot): {
     if (!memberIds.has(report.memberId)) throw new Error(`Report ${report.id} has no member`);
   }
   for (const one of countedSales) {
-    if (!memberIds.has(one.memberId)) throw new Error(`Sale ${saleKeyOf(one.line)} has no member`);
+    if (!memberIds.has(one.memberId)) throw new Error(`Sale ${saleKeyOf(one)} has no member`);
   }
 
   const members = byId(snapshot.members).map((member) => {
@@ -606,13 +607,7 @@ export function closePeriod(snapshot: PeriodSnapshot): {
   const registered = new Map(snapshot.registered);
   for (const report of counted) registered.set(report.id, period);
   const salesRegistered = new Map(snapshot.sales.registered);
-  for (const one of countedSales) {
-    salesRegistered.set(saleKeyOf(one.line), {
-      period,
-      memberId: one.memberId,
-      linkVersion: one.linkVersion,
-    });
-  }
+  for (const one of countedSales) salesRegistered.set(saleKeyOf(one), registeredIn(period, one));
   return {
     closing: { ...frozen, counted, countedSales },
     closed: {

@@ -19,6 +19,8 @@ import {
   saleKeyOf,
   salesWaitingBefore,
   type AccountSourceForPay,
+  type RegisteredSale,
+  type SaleKey,
   type SaleAuthorForPay,
   type SaleForPay,
   type SalesSnapshot,
@@ -107,7 +109,30 @@ const contentOf = (plan: PeriodPlan, who: MemberForPay) => {
   if (found === undefined) throw new Error('no draft');
   return found.content;
 };
-const keys = (lines: readonly { readonly line: SaleForPay }[]) => lines.map((one) => saleKeyOf(one.line));
+const keys = (lines: readonly SaleKey[]) => lines.map((one) => saleKeyOf(one));
+/** What a closing of `period` registered of `line`, counted for `who` under `linkVersion`. */
+const registeredAs = (
+  line: SaleForPay,
+  who: MemberForPay,
+  period: PayPeriod,
+  linkVersion = 'v1',
+): RegisteredSale => {
+  if (line.salePeriod === null) throw new Error('a counted sale has its period');
+  return {
+    platform: line.platform,
+    platformSaleId: line.platformSaleId,
+    event: line.event,
+    platformAccountId: line.platformAccountId,
+    currency: line.currency,
+    netMinor: line.netMinor,
+    salePeriod: line.salePeriod,
+    memberId: who.id,
+    linkVersion,
+    period,
+  };
+};
+const registryOf = (...entries: RegisteredSale[]) =>
+  new Map(entries.map((entry) => [saleKeyOf(entry), entry]));
 /** The keys of some lines, in the order pay keeps them. */
 const keysOf = (lines: readonly SaleForPay[]) => lines.map((line) => saleKeyOf(line)).sort();
 
@@ -203,7 +228,7 @@ describe('whose a sale is (ADR 0050 §§ 5, 8)', () => {
 
   it('takes a refund off the member its sale was counted for, whatever the link says since', () => {
     const counted = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
-    const registered = new Map([[saleKeyOf(counted), { period: P2, memberId: theo.id, linkVersion: 'v1' }]]);
+    const registered = registryOf(registeredAs(counted, theo, P2));
     const refund = refundOf(counted, P3, 1_000, linked(lea, 'v2'));
     expect(saleAttribution(refund, salesOf({ registered }))).toEqual({
       kind: 'member',
@@ -227,14 +252,16 @@ describe('the sales a period counts (ADR 0032, ADR 0050 § 5)', () => {
   const later = sale(linked(theo), '2025-04-02T11:00:00.000Z', 7_000);
   const offShift = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
   const lines = [counted, late, own, later, offShift];
-  const registered = new Map([[saleKeyOf(counted), { period: P1, memberId: theo.id, linkVersion: 'v1' }]]);
+  const registered = registryOf(registeredAs(counted, theo, P1));
   const sales = salesOf({ lines, registered, shifts });
 
   it('counts in the team’s first open period its own sales and the late ones no closing registered', () => {
     const open = snapshot({ period: P2, firstClosed: P1, lastClosed: P1, sales });
     expect(keys(salesCountedIn(open))).toEqual(keysOf([late, own]));
-    expect(salesCountedIn(open).find((one) => one.line === late)?.lateFrom).toBe(P1);
-    expect(salesCountedIn(open).find((one) => one.line === own)?.lateFrom).toBeNull();
+    const byKey = new Map(salesCountedIn(open).map((one) => [saleKeyOf(one), one]));
+    expect(byKey.get(saleKeyOf(late))?.lateFrom).toBe(P1);
+    expect(byKey.get(saleKeyOf(own))?.lateFrom).toBeNull();
+    expect(byKey.get(saleKeyOf(own))).toMatchObject({ netMinor: 5_000, salePeriod: P2, memberId: theo.id });
     expect(salesHeldIn(open)).toEqual([{ line: offShift, reason: 'off_shift' }]);
   });
 
@@ -243,23 +270,31 @@ describe('the sales a period counts (ADR 0032, ADR 0050 § 5)', () => {
     expect(keys(salesCountedIn(open))).toEqual(keysOf([later]));
   });
 
-  it('counts in a closed period exactly what its closing registered, for the member it registered', () => {
-    const relinked = salesOf({
-      lines: lines.map((line) => ({ ...line, author: linked(lea, 'v2') })),
-      registered,
-      shifts,
-    });
+  it('counts in a closed period exactly what its closing registered, for the member it registered, unread', () => {
+    // The register is not read for a closed period: its lines, and their links since, change nothing.
     const closed = snapshot({
       period: P1,
       closing: { teamNetMinor: 0, collective: null, exchangeRates: [] },
       firstClosed: P1,
       lastClosed: P1,
-      sales: relinked,
+      sales: salesOf({ registered, shifts }),
     });
-    expect(salesCountedIn(closed).map((one) => [saleKeyOf(one.line), one.memberId, one.linkVersion])).toEqual(
-      [[saleKeyOf(counted), theo.id, 'v1']],
-    );
+    expect(
+      salesCountedIn(closed).map((one) => [saleKeyOf(one), one.memberId, one.linkVersion, one.netMinor]),
+    ).toEqual([[saleKeyOf(counted), theo.id, 'v1', 3_000]]);
     expect(salesHeldIn(closed)).toEqual([]);
+    // A late line its closing registered says where it came from.
+    const lateOne = registeredAs(late, theo, P2);
+    const closedP2 = snapshot({
+      period: P2,
+      closing: { teamNetMinor: 0, collective: null, exchangeRates: [] },
+      firstClosed: P1,
+      lastClosed: P2,
+      sales: salesOf({ registered: registryOf(registeredAs(counted, theo, P1), lateOne) }),
+    });
+    expect(salesCountedIn(closedP2).map((one) => [saleKeyOf(one), one.lateFrom])).toEqual([
+      [saleKeyOf(late), P1],
+    ]);
   });
 
   it('never counts a registered sale again after its chatter is linked to someone else', () => {
@@ -395,18 +430,11 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
     const { closing, closed } = closePeriod(open);
     expect(keys(closing.countedSales)).toEqual(keysOf([one]));
     expect(closing.teamNetMinor).toBe(10_000);
-    expect(closed.sales.registered.get(saleKeyOf(one))).toEqual({
-      period: P2,
-      memberId: theo.id,
-      linkVersion: 'v1',
-    });
+    expect(closed.sales.registered.get(saleKeyOf(one))).toEqual(registeredAs(one, theo, P2));
     expect(statementOf(closed, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
-    // Linked to Léa after the closing: the closed period still gives Théo’s statement, the same.
-    const relinked: PeriodSnapshot = {
-      ...closed,
-      sales: { ...closed.sales, lines: [{ ...one, author: linked(lea, 'v2') }] },
-    };
-    expect(statementOf(relinked, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
+    // Read again from its registry alone, its lines and their links left unread: the same statement.
+    const again: PeriodSnapshot = { ...closed, sales: { ...closed.sales, lines: [] } };
+    expect(statementOf(again, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
   });
 
   it('takes a refund after the closing off the first open period, for the member the sale paid', () => {
@@ -420,7 +448,7 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
       sales: { ...closed.sales, lines: [{ ...one, author: linked(lea, 'v2') }, refund] },
     });
     const counted = salesCountedIn(next);
-    expect(counted.map((line) => [line.line.event, line.memberId, line.lateFrom])).toEqual([
+    expect(counted.map((line) => [line.event, line.memberId, line.lateFrom])).toEqual([
       ['refund', theo.id, P2],
     ]);
     const content = contentOf(planPeriod(next), theo);

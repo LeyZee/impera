@@ -942,6 +942,8 @@ export function mayValidateStatement(
  * `pay_period_order_conflict` 409, an earlier period of the team must be validated first (`details.period`) ;
  * `pay_period_reports_pending_conflict` 409, reports of the period still wait for review (`details.count`) ;
  * `pay_period_reports_unread_conflict` 409, reports the validator may not read would be left out (`details.count`) ;
+ * `pay_period_sales_unread_conflict` 409, sales of the platform the validator may not read would be left out (CRM-03,
+ * `details.count`) ;
  * `pay_period_not_computed_conflict` 409, a period to close that pay has not written yet (`details.period`) ;
  * `pay_period_closed_conflict` 409, a bonus, a penalty, tiers or a goal for a period already validated, or for a
  * member before they joined (`details.period`) ;
@@ -977,6 +979,7 @@ export const PAYROLL_ERROR_CODES = [
   'pay_period_order_conflict',
   'pay_period_reports_pending_conflict',
   'pay_period_reports_unread_conflict',
+  'pay_period_sales_unread_conflict',
   'pay_period_not_computed_conflict',
   'pay_period_closed_conflict',
   'penalty_cancel_conflict',

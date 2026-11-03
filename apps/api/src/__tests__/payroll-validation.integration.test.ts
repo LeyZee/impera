@@ -20,6 +20,7 @@ import { enqueuePayoutCertificateLock } from '../modules/contractors';
 import { invoicesAfterValidation, payoutGate } from '../modules/invoicing';
 import { createPayrollModule } from '../modules/payroll';
 import { buildServer } from '../server';
+import { payInputReadsOf } from '../wiring/payroll';
 
 import { testConfig } from './support/config';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -294,14 +295,7 @@ describe('Équipe › Paie : la validation qui clôture la quinzaine (EQ-04, ADR
     const blind = createPayrollModule({
       db: app.db.db,
       adminDb: app.adminDb.db,
-      reads: {
-        validatedReportsUnscoped: app.modules.scheduling.pay.validatedReportsUnscoped,
-        validatedReportsScoped: app.modules.scheduling.pay.validatedReportsScoped,
-        reportsAwaitingReviewScoped: app.modules.scheduling.pay.reportsAwaitingReviewScoped,
-        agencyTimeZone: app.modules.scheduling.pay.agencyTimeZone,
-        members: app.modules.team.pay.members,
-        creatorIds: () => Promise.resolve([anna]),
-      },
+      reads: { ...payInputReadsOf(app.modules), creatorIds: () => Promise.resolve([anna]) },
       rateJobSince: null,
       payouts: payoutGate,
       afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },

@@ -25,6 +25,7 @@ import {
   type PayPeriod,
   type PayoutMinimum,
   type PayrollSettings,
+  type PlatformAccountId,
   type Penalty,
   type ShiftReportId,
 } from '@nirvana/contracts';
@@ -33,7 +34,8 @@ import { z } from 'zod';
 
 import type { CreatorReports } from '../domain/ports';
 import type { MemberForPay, PeriodSnapshot, ReportForPay } from '../domain/recalculation';
-import { NO_SALES } from '../domain/sales';
+
+import { readPeriodSales, type PayReadScope, type PaySalesReads } from './sales-reads';
 
 const {
   bonusTierSets,
@@ -54,7 +56,7 @@ const {
  * What pay reads of the other modules, in its own transaction (given by the composition root from their `index.ts`):
  * the planning's validated reports, on every creator for the job (admin connection) or creator by creator as the
  * validating member reads them, the reports still waiting for review, the agency's zone, the team's members and rates,
- * and the creators that exist.
+ * the creators that exist, and what the platform's sales are counted from (CRM-03).
  */
 export interface PayInputReads {
   readonly validatedReportsUnscoped: (tx: Transaction, upTo: PayPeriod) => Promise<readonly ReportForPay[]>;
@@ -72,6 +74,7 @@ export interface PayInputReads {
   readonly agencyTimeZone: (tx: Transaction) => Promise<string>;
   readonly members: (tx: Transaction, day: string) => Promise<readonly MemberForPay[]>;
   readonly creatorIds: () => Promise<readonly string[]>;
+  readonly sales: PaySalesReads;
 }
 
 const iso = (at: Date): string => at.toISOString();
@@ -170,16 +173,24 @@ export async function closingsSpan(
   };
 }
 
+/** A period's snapshot, and the creator of each account whose sales it read (the sales registry is written in it). */
+export interface ReadSnapshot {
+  readonly snapshot: PeriodSnapshot;
+  readonly creatorOfAccount: ReadonlyMap<PlatformAccountId, string>;
+}
+
 /**
  * Everything `period`'s statements are made of, in the caller's transaction, with the validated reports made for it or
- * an earlier one that the caller read (`reports`): the job on every creator, a validation creator by creator.
+ * an earlier one that the caller read (`reports`): the job on every creator, a validation creator by creator. The
+ * platform's sales are read under the same `scope` (`readPeriodSales`).
  */
 export async function readSnapshot(
   tx: Transaction,
   reads: PayInputReads,
   period: PayPeriod,
   reports: readonly ReportForPay[],
-): Promise<PeriodSnapshot> {
+  scope: PayReadScope,
+): Promise<ReadSnapshot> {
   const lastDay = payPeriodLastDay(period);
   const [closing] = await tx.select().from(payPeriodClosings).where(eq(payPeriodClosings.period, period));
   const span = await closingsSpan(tx);
@@ -222,8 +233,16 @@ export async function readSnapshot(
     .from(commissionStatements)
     .where(sql`${commissionStatements.status} <> 'draft'`)
     .groupBy(commissionStatements.memberId);
+  const read = await readPeriodSales(
+    tx,
+    reads.sales,
+    period,
+    { closed: closing !== undefined, lastClosed: span.last },
+    scope,
+    await reads.agencyTimeZone(tx),
+  );
 
-  return {
+  const snapshot: PeriodSnapshot = {
     period,
     closing:
       closing === undefined
@@ -237,8 +256,7 @@ export async function readSnapshot(
     lastClosed: span.last,
     reports,
     registered,
-    // CRM-03 lot b2 reads the platform's sales; until then no account's rules read them (`detected` is refused).
-    sales: NO_SALES,
+    sales: read.sales,
     members: await reads.members(tx, lastDay),
     bonuses: bonusRows.map(bonusOfRow),
     penalties: penaltyRows.map(penaltyOfRow),
@@ -259,4 +277,5 @@ export async function readSnapshot(
       validatedRows.map((row) => [TeamMemberIdSchema.parse(row.memberId), PayPeriodSchema.parse(row.period)]),
     ),
   };
+  return { snapshot, creatorOfAccount: read.creatorOfAccount };
 }

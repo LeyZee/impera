@@ -273,7 +273,9 @@ commission_statements      id, member_id, period → pay_periods, status (draft|
                            jamais supprimé)
 commission_statement_lines id, statement_id, revision, platform_account_id, currency, vat_bps, platform_fee_bps,
                            rate_micros, gross, gross_eur, excl_vat, net, commission (unités mineures), shift_report_ids,
-                           late_reports (jsonb), created_at (ajout seul ; une par compte et règles d'une révision)
+                           late_reports (jsonb), base (gross_chain | platform_net), sales (jsonb : les ventes comptées
+                           d'une ligne `platform_net`, sans TVA, sans commission de plateforme ni rapport ; migration
+                           0072, CRM-03), created_at (ajout seul ; une par compte, règles et base d'une révision)
 pay_adjustments            id, member_id, period (première quinzaine ouverte du membre), amount_minor (≠ 0), reason,
                            corrects_statement_id (un relevé validé ou payé du même membre, d'une quinzaine antérieure :
                            la quinzaine qu'il corrige, migration 0041), contested_invoice_id (le document dont la
@@ -289,6 +291,13 @@ pay_period_closings        period (clé) → pay_periods, team_net_minor bigint,
 pay_period_reports         shift_report_id (clé) → shift_reports, period → pay_period_closings, member_id, created_at
                            (le registre des rapports comptés : un rapport l'est une fois, dans une seule quinzaine ;
                            écrit par la clôture dans sa transaction ; ajout seul)
+pay_period_sales           platform, platform_sale_id, event (clé, une ligne du registre des ventes), period →
+                           pay_period_closings, member_id, link_version, platform_account_id, currency, net_minor (signé :
+                           un remboursement est négatif), sale_period, created_at (migration 0072, CRM-03 ; le registre des
+                           ventes comptées : une ligne l'est une fois, pour le membre et la version du lien vus par la
+                           clôture, qui l'écrit dans sa transaction et dans la créatrice du compte ; une quinzaine clôturée
+                           se recalcule sur lui seul ; le déclencheur vérifie la ligne, son compte, sa devise et son net ;
+                           ajout seul)
 pay_period_blocks          period (clé) → pay_periods, code (commission_rate_missing_conflict |
                            exchange_rate_missing_conflict), member_ids uuid[] (tous les membres sans taux) | currency,
                            since (migration 0038 ; pourquoi le job n'a pas pu calculer la quinzaine à son dernier essai :

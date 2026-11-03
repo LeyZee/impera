@@ -1,9 +1,10 @@
 import { JOB_PAYLOADS } from '@nirvana/contracts';
 
 import { defineTask } from '../jobs';
+import { salesFeedReadsForPay } from '../modules/connectors';
 import { enqueuePayoutCertificateLock } from '../modules/contractors';
 import { invoicesAfterValidation, payoutGate } from '../modules/invoicing';
-import { createPayrollModule, type PayrollModule } from '../modules/payroll';
+import { createPayrollModule, type PayInputReads, type PayrollModule } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { TeamModule } from '../modules/team';
@@ -21,7 +22,35 @@ export interface WiredPayroll {
 }
 
 /**
- * Pay reads the planning's reports and the team's rates in its own transaction, through their `index.ts` (EQ-04). It
+ * What pay reads of the other modules, in its own transaction, through their `index.ts` (EQ-04, CRM-03): the
+ * planning's reports, shifts and accounts' rules, the team's members and rates, the creators, and the sales feed's
+ * lines. Tests take it to build a pay module that reads less, as a validator who may not read everything would.
+ */
+export function payInputReadsOf(modules: {
+  readonly persona: PersonaModule;
+  readonly scheduling: SchedulingModule;
+  readonly team: TeamModule;
+}): PayInputReads {
+  const { scheduling, team, persona } = modules;
+  return {
+    validatedReportsUnscoped: scheduling.pay.validatedReportsUnscoped,
+    validatedReportsScoped: scheduling.pay.validatedReportsScoped,
+    reportsAwaitingReviewScoped: scheduling.pay.reportsAwaitingReviewScoped,
+    agencyTimeZone: scheduling.pay.agencyTimeZone,
+    members: team.pay.members,
+    creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
+    sales: {
+      accountSources: scheduling.pay.accountSources,
+      shifts: scheduling.pay.shifts,
+      accessMarginMinutes: scheduling.pay.accessMarginMinutes,
+      ...salesFeedReadsForPay,
+    },
+  };
+}
+
+/**
+ * Pay reads the planning's reports and shifts, the team's rates and the sales feed's lines in its own transaction,
+ * through their `index.ts` (EQ-04, CRM-03). It
  * asks the invoices whether a transfer may go, and enqueues their jobs and the contractors' certificate lock, through
  * the ports plugged here (ADR 0047 § 1): pay never imports `invoicing`.
  */
@@ -42,14 +71,7 @@ export function wirePayroll(
   const module = createPayrollModule({
     db,
     adminDb,
-    reads: {
-      validatedReportsUnscoped: scheduling.pay.validatedReportsUnscoped,
-      validatedReportsScoped: scheduling.pay.validatedReportsScoped,
-      reportsAwaitingReviewScoped: scheduling.pay.reportsAwaitingReviewScoped,
-      agencyTimeZone: scheduling.pay.agencyTimeZone,
-      members: team.pay.members,
-      creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
-    },
+    reads: payInputReadsOf({ scheduling, team, persona }),
     rateJobSince: deps.rateJobSince,
     payouts: payoutGate,
     afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },
