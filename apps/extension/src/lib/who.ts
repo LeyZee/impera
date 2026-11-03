@@ -1,19 +1,21 @@
-import type { Me } from '@impera/contracts';
+import {
+  CRM_RAILS,
+  CRM_SECTION_LABELS,
+  railKindOf,
+  type CrmSection,
+  type Me,
+  type RailKind,
+} from '@impera/contracts';
 
 /**
- * Who is signed in, in the popup's words, and where the CRM shortcuts lead for that person: the same places as the
- * CRM's own rail (apps/web/src/shell/nav.ts, ADR 0024), four at most, so a shortcut never opens a screen that refuses.
+ * Who is signed in, in the popup's words, and where the CRM shortcuts lead for that person: read in the table of the
+ * CRM's menus (`@impera/contracts`, ADR 0066 § 6), four at most and each in that person's menu, so a shortcut never
+ * opens a screen that refuses and a screen added to a menu is offered here in the same PR.
  */
 
-export type Kind = 'owner' | 'manager' | 'chatter' | 'operator' | 'creator';
+export type Kind = RailKind;
 
-export function kindOf(me: Me): Kind {
-  if (me.role === 'owner') return 'owner';
-  if (me.role === 'creator') return 'creator';
-  if (me.teamScope === 'agency') return 'manager';
-  if (me.team !== null) return 'chatter';
-  return 'operator';
-}
+export const kindOf = (me: Me): Kind => railKindOf(me);
 
 const LABELS: Readonly<Record<Kind, string>> = {
   owner: 'Propriétaire',
@@ -53,27 +55,27 @@ export interface Shortcut {
   readonly icon: ShortcutIcon;
 }
 
-const S = {
-  dashboard: { path: '/', label: 'Dashboard', icon: 'dashboard' },
-  today: { path: '/aujourdhui', label: 'Aujourd’hui', icon: 'today' },
-  tracking: { path: '/suivi', label: 'Suivi', icon: 'tracking' },
-  team: { path: '/equipe', label: 'Équipe', icon: 'team' },
-  creators: { path: '/creatrices', label: 'Créatrices', icon: 'creators' },
-  planning: { path: '/planning', label: 'Planning', icon: 'planning' },
-  commissions: { path: '/commissions', label: 'Commissions', icon: 'pay' },
-  pay: { path: '/paie', label: 'Paie', icon: 'pay' },
-  sales: { path: '/ventes', label: 'Ventes', icon: 'pay' },
-  me: { path: '/moi', label: 'Moi', icon: 'me' },
-} as const satisfies Record<string, Shortcut>;
-
-const SHORTCUTS: Readonly<Record<Kind, readonly Shortcut[]>> = {
-  owner: [S.dashboard, S.tracking, S.team, S.creators],
-  manager: [S.dashboard, S.tracking, S.team, S.pay],
-  chatter: [S.today, S.tracking, S.planning, S.commissions],
-  operator: [S.dashboard, S.tracking, S.creators],
-  creator: [S.today, S.sales, S.me],
+/** The icon of each section, so that a shortcut added to the table has one; Entraîner and Réglages are no role's shortcut. */
+const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
+  '/': 'dashboard',
+  '/aujourdhui': 'today',
+  '/agenda': 'planning',
+  '/suivi': 'tracking',
+  '/entrainer': 'tracking',
+  '/planning': 'planning',
+  '/commissions': 'pay',
+  '/ventes': 'pay',
+  '/equipe': 'team',
+  '/paie': 'pay',
+  '/creatrices': 'creators',
+  '/moi': 'me',
+  '/reglages': 'me',
 };
 
 export function shortcutsFor(kind: Kind): readonly Shortcut[] {
-  return SHORTCUTS[kind];
+  return CRM_RAILS[kind].shortcuts.map((section) => ({
+    path: section,
+    label: CRM_SECTION_LABELS[section],
+    icon: ICONS[section],
+  }));
 }
