@@ -14,7 +14,8 @@ import {
  * The card of a segment (ADR 0056 § 3, ADR 0064, SC-01 lot b): what the creator reads before she shoots a stage, or
  * between two. OnlyScript's design in Nirvana's type: the script's colour as a gradient over the whole card, « ÉTAPE
  * n » and the stage's name centred, what it sells in quotes with « (GRATUIT) » or « (PAYANT) », what to shoot, the
- * series at the foot, an arch for a bridge, an arrow for a series. Drawn as an SVG, a pure function of the version,
+ * series at the foot as pills, the two stages a bridge links, the series a series card is one of; a sun, a moon or both
+ * for the moment, in the line icons of the design system (Charles, 03/11). Drawn as an SVG, a pure function of the version,
  * the segment and the variant: the same input gives the same bytes.
  */
 
@@ -34,8 +35,14 @@ export interface CardContent {
   /** The slots' hints, in order (« 01 · Face caméra »). */
   readonly hints: readonly string[];
   readonly mood: string | null;
-  /** A stage's series, for its foot: « Série A », « Série B ». */
+  /** The stage's series, for its foot: « Série A », « Série B ». A series card has them too, its own lit. */
   readonly series: readonly string[];
+  /** On a series card, its own series (« Série A »); `null` otherwise. */
+  readonly currentSeries: string | null;
+  /** On a bridge, the names of the two stages it links (« Seins », « Chatte »); `null` otherwise. */
+  readonly link: { readonly from: string; readonly to: string } | null;
+  /** The moment, for its icon: a sun, a moon, or both for a script that goes anywhere. */
+  readonly momentKey: ScriptMoment;
   /** « JOUR », « NUIT », « JOUR ET NUIT ». */
   readonly moment: string;
   readonly structureName: string;
@@ -125,7 +132,16 @@ export function cardContent(
   const segment = version.segments.find((candidate) => candidate.key === key);
   if (segment === undefined) return null;
   const number = (stageKey: string): string => (codes.get(stageKey) ?? 'E?').slice(1);
-  const common = { moment: MOMENT_LABELS[version.moment], structureName: version.name, color: version.color };
+  const nameOf = (stageKey: string): string => {
+    const stage = version.segments.find((candidate) => candidate.key === stageKey);
+    return stage?.kind === 'stage' ? stage.name : `Étape ${number(stageKey)}`;
+  };
+  const common = {
+    moment: MOMENT_LABELS[version.moment],
+    momentKey: version.moment,
+    structureName: version.name,
+    color: version.color,
+  };
 
   if (segment.kind === 'bridge') {
     if (options.variant !== undefined) return null;
@@ -140,8 +156,11 @@ export function cardContent(
       hints: hintsOf(segment.mediaSlots),
       mood: null,
       series: [],
+      currentSeries: null,
+      link: { from: nameOf(segment.from), to: nameOf(segment.to) },
     };
   }
+  const series = segment.variants.map((variant) => `Série ${variant.letter}`);
   const access = segment.access === 'free' ? 'GRATUIT' : 'PAYANT';
   if (options.variant !== undefined) {
     const variant = segment.variants.find((candidate) => candidate.letter === options.variant);
@@ -156,7 +175,9 @@ export function cardContent(
       shoot: shootSummary(segment.mediaSlots),
       hints: [],
       mood: null,
-      series: [],
+      series,
+      currentSeries: `Série ${variant.letter}`,
+      link: null,
     };
   }
   return {
@@ -170,7 +191,9 @@ export function cardContent(
     shoot: `${shootSummary(segment.mediaSlots)}${segment.variants.length > 1 ? `, par${NBSP}série` : ''}`,
     hints: hintsOf(segment.mediaSlots),
     mood: segment.mood,
-    series: segment.variants.map((variant) => `Série ${variant.letter}`),
+    series,
+    currentSeries: null,
+    link: null,
   };
 }
 
@@ -235,6 +258,34 @@ export function quoteLines(quote: string, tag: string | null, width: number, lin
     cut[cut.length - 1] = `${end.length > room ? end.slice(0, room).trimEnd() : end}…${close}`;
   }
   return cut;
+}
+
+const otherInk = (ink: string): string =>
+  ink === SCRIPT_CARD_INKS.light ? SCRIPT_CARD_INKS.dark : SCRIPT_CARD_INKS.light;
+
+/** A pill in the line style of the design system: an outline in the ink, or filled when it is lit. */
+const pill = (x: number, y: number, width: number, ink: string, lit: boolean): string =>
+  `<rect x="${String(x)}" y="${String(y)}" width="${String(width)}" height="84" rx="42"` +
+  (lit ? ` fill="${ink}"/>` : ` fill="none" stroke="${ink}" stroke-width="4"/>`);
+
+/**
+ * The moment's icon, drawn on the 24-unit grid of the design system's line icons (Lucide's sun, moon and sun-moon,
+ * ISC licence) at `size` units, stroke 2, round ends: a sun for the day, a moon for the night, both for a script that
+ * goes anywhere.
+ */
+function momentIcon(moment: ScriptMoment, x: number, y: number, size: number, ink: string): string {
+  const rays =
+    '<path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>' +
+    '<path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>';
+  const shape = {
+    day: `<circle cx="12" cy="12" r="4"/>${rays}`,
+    night: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+    both: `<path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4"/>${rays}`,
+  }[moment];
+  return (
+    `<g transform="translate(${String(x)} ${String(y)}) scale(${String(size / 24)})" fill="none" stroke="${ink}"` +
+    ` stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${shape}</g>`
+  );
 }
 
 const SIZE = 1080;
@@ -310,31 +361,19 @@ function thumbnail(content: CardContent, text: DrawText): void {
 
 /** The card's body at 1080: OnlyScript's centred column, between the top band and the foot. */
 function body(content: CardContent, ink: string, text: DrawText, parts: string[]): void {
-  // The top band: the moment on the left, the structure's name on the right, small.
-  text(96, 120, content.moment, {
-    size: 28,
-    family: SANS,
-    weight: 600,
-    spacing: 5,
-    anchor: 'start',
-  });
+  // The top band: the moment's icon and its name on the left, the structure's name on the right, small.
+  parts.push(momentIcon(content.momentKey, 96, 78, 56, ink));
+  text(170, 120, content.moment, { size: 28, family: SANS, weight: 600, spacing: 5, anchor: 'start' });
   text(SIZE - 96, 120, wrap(content.structureName, 30, 1)[0] ?? '', {
     size: 26,
     family: SANS,
     anchor: 'end',
   });
 
-  // The foot: a box per series, an arch for a bridge, an arrow for a series card, or nothing.
-  const foot =
-    content.kind === 'bridge'
-      ? 'arch'
-      : content.kind === 'series'
-        ? 'arrow'
-        : content.series.length > 0
-          ? 'boxes'
-          : 'none';
+  // The foot: the series as pills (a series card lights its own), the two stages a bridge links, or nothing.
+  const foot = content.link !== null ? 'link' : content.series.length > 0 ? 'pills' : 'none';
   const top = 170;
-  const footTop = { arch: 850, arrow: 820, boxes: 890, none: 1010 }[foot];
+  const footTop = { link: 860, pills: 890, none: 1010 }[foot];
   const avail = footTop - top - 30;
   const mood = content.mood === null ? null : (wrap(content.mood, 40, 1)[0] ?? '');
   const moodHeight = mood === null ? 0 : 70;
@@ -398,28 +437,34 @@ function body(content: CardContent, ink: string, text: DrawText, parts: string[]
   }
   if (mood !== null) text(MID, y + moodHeight, mood, { size: 46, family: SERIF });
 
-  if (foot === 'boxes') {
-    // OnlyScript's boxes: light with dark text, dark with light text on a light colour, so that they show.
-    const boxFill = ink === SCRIPT_CARD_INKS.light ? SCRIPT_CARD_INKS.light : SCRIPT_CARD_INKS.dark;
-    const boxInk = ink === SCRIPT_CARD_INKS.light ? SCRIPT_CARD_INKS.dark : SCRIPT_CARD_INKS.light;
+  if (foot === 'pills') {
     const count = content.series.length;
-    const gap = 36;
-    const width = Math.min(300, (SIZE - 2 * 96 - gap * (count - 1)) / count);
+    const gap = 32;
+    const width = Math.min(260, (SIZE - 2 * 96 - gap * (count - 1)) / count);
     const left = MID - (count * width + gap * (count - 1)) / 2;
     content.series.forEach((label, index) => {
-      const x = left + index * (width + gap);
-      parts.push(
-        `<rect x="${String(x)}" y="920" width="${String(width)}" height="100" rx="22" fill="${boxFill}"/>`,
-      );
-      text(x + width / 2, 984, label, { size: 36, family: SANS, weight: 600, fill: boxInk });
+      const lit = label === content.currentSeries;
+      parts.push(pill(left + index * (width + gap), 924, width, ink, lit));
+      text(left + index * (width + gap) + width / 2, 980, label, {
+        size: 34,
+        family: SANS,
+        weight: 600,
+        fill: lit ? otherInk(ink) : ink,
+      });
     });
-  } else if (foot === 'arch')
+  } else if (foot === 'link' && content.link !== null) {
+    // Two stages, and the bridge between them: a dotted arch from one pill to the other.
+    const width = 300;
+    for (const [x, label] of [
+      [150, content.link.from],
+      [SIZE - 150 - width, content.link.to],
+    ] as const) {
+      parts.push(pill(x, 924, width, ink, false));
+      text(x + width / 2, 980, wrap(label, 14, 1)[0] ?? '', { size: 34, family: SANS, weight: 600 });
+    }
     parts.push(
-      `<path d="M 290 990 A 250 120 0 0 1 790 990" fill="none" stroke="${ink}" stroke-opacity="0.85"` +
-        ` stroke-width="18" stroke-linecap="round"/>`,
+      `<path d="M 300 912 Q 540 740 780 912" fill="none" stroke="${ink}" stroke-width="7"` +
+        ` stroke-linecap="round" stroke-dasharray="0.1 22"/>`,
     );
-  else if (foot === 'arrow')
-    parts.push(
-      `<path d="M 380 900 H 600 V 850 L 720 935 L 600 1020 V 970 H 380 Z" fill="${ink}" fill-opacity="0.9"/>`,
-    );
+  }
 }

@@ -123,7 +123,12 @@ describe('cardContent', () => {
     });
     expect(plain(card?.shoot ?? '')).toBe('2 photos, 1 vidéo de 1 à 2 min, par série');
     expect(card?.hints).toEqual(['01 · Assise, jambes croisées', '03 · Face caméra <chuchote> & sourit']);
-    expect(cardContent(version, 'lit')).toMatchObject({ title: 'ÉTAPE 2', access: 'GRATUIT', series: [] });
+    expect(cardContent(version, 'lit')).toMatchObject({
+      title: 'ÉTAPE 2',
+      access: 'GRATUIT',
+      series: [],
+      link: null,
+    });
   });
 
   it('gives a variant its series card, and nothing for a letter the stage does not have', () => {
@@ -182,9 +187,27 @@ describe('cardSvg', () => {
     const bridge = cardContent(version, 'canape-lit');
     const series = cardContent(version, 'canape', { variant: 'A' });
     if (bridge === null || series === null) throw new Error('no card');
-    expect(cardSvg(bridge, 'card')).toMatch(/<path d="M 290 990 A/u);
-    expect(cardSvg(bridge, 'card')).toContain('(GRATUIT)');
-    expect(cardSvg(series, 'card')).toMatch(/<path d="M 380 900/u);
+    // A bridge names the two stages it links; a series card lights its own series among the stage's.
+    const bridgeSvg = cardSvg(bridge, 'card');
+    expect(bridgeSvg).toContain('>Canapé</text>');
+    expect(bridgeSvg).toContain('>Lit</text>');
+    expect(bridgeSvg).toContain('stroke-dasharray');
+    expect(bridgeSvg).toContain('(GRATUIT)');
+    const seriesSvg = cardSvg(series, 'card');
+    expect(seriesSvg).toContain('>Série B</text>');
+    expect(seriesSvg.match(/<rect [^>]*rx="42" fill="#/gu)).toHaveLength(1);
+  });
+
+  it('draws a sun for the day, a moon for the night, both for a script that goes anywhere', () => {
+    const icon = (moment: 'day' | 'night' | 'both') => {
+      const content = cardContent({ ...version, moment }, 'canape');
+      if (content === null) throw new Error('no card');
+      return cardSvg(content, 'card');
+    };
+    expect(icon('day')).toContain('<circle cx="12" cy="12" r="4"/>');
+    expect(icon('night')).toContain('<path d="M12 3a6 6 0 0 0 9 9');
+    expect(icon('both')).toContain('<path d="M12 8a2.83');
+    expect(icon('both')).toContain('>JOUR ET NUIT</text>');
   });
 
   it('keeps three hints at least on a full card, and never says « + N » alone (Extension’s review)', () => {

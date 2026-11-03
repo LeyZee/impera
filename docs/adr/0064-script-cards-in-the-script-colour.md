@@ -25,7 +25,7 @@ Dans OnlyScript, chaque script avait sa couleur, un aplat ou un dégradé de tro
 - L'atelier propose des palettes nommées (une couleur unie ou un dégradé, comme dans OnlyScript) et un choix libre. La couleur est une donnée de la structure : changer de couleur suit la règle 6 (une version figée ne change pas).
 - Le carton prend le dégradé sur toute sa surface. **Le code choisit la couleur du texte**, clair ou foncé, celle qui contraste le mieux avec le dégradé. Le texte est écrit dans cette couleur pleine, sans transparence. Un dégradé où aucune des deux n'atteint 4,5:1 sur chaque ton et sur les mélanges entre deux tons est refusé à l'enregistrement, avec un message qui le dit.
 - Une version écrite sans couleur, ou avant cette ADR, prend la palette « Rouge ».
-- Le moment (Jour ou Nuit) reste écrit sur le carton, en petit. Il ne change plus la palette.
+- Le moment reste écrit sur le carton, en petit, avec son icône : un soleil pour Jour, une lune pour Nuit, un soleil et une lune pour un script qui passe partout (Jour et Nuit). Il ne change plus la palette.
 
 ### 2. Le dessin
 
@@ -37,9 +37,10 @@ Dans OnlyScript, chaque script avait sa couleur, un aplat ou un dégradé de tro
   - ce qu'il faut tourner ;
   - les indications par emplacement (trois au moins quand il y en a) ;
   - l'ambiance ;
-  - avec des variantes, une case par série en pied (« Série A », « Série B »…).
-- **Série** (le carton d'une variante) : « ÉTAPE n », « Série A », sa consigne, et une flèche.
-- **Pont** : « Pont n & m », son teaser entre guillemets avec « (GRATUIT) », ce qu'il faut tourner, et une arche.
+  - avec des variantes, une pastille par série en pied (« Série A », « Série B »…).
+- **Série** (le carton d'une variante) : « ÉTAPE n », « Série A », sa consigne, et en pied les pastilles des séries de l'étape, la sienne pleine.
+- **Pont** : « Pont n & m », son teaser entre guillemets avec « (GRATUIT) », ce qu'il faut tourner, et en pied les noms des deux étapes qu'il relie, dans deux pastilles jointes par une arche en pointillé.
+- Les icônes et les pastilles suivent les icônes au trait du design system (grille de 24, trait de 2, bouts ronds). La flèche et l'arche pleines d'OnlyScript ne sont pas reprises (Charles, 03/11/2026, 13 h 15).
 - Sur un carton, une variante s'appelle « Série », comme dans OnlyScript. Le code garde `variant` (glossaire).
 - Aucun bruit à l'écran ni dans le fichier : pas d'empreinte visible, pas de filigrane. Un nom de fichier (ADR 0056 § 5) et la médiathèque suffisent à reconnaître un carton.
 
