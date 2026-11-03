@@ -1,0 +1,301 @@
+import type { CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState, type JSX } from 'react';
+
+import { AddDialog, type AddPreset } from './AddDialog';
+import { DayView } from './DayView';
+import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
+import { TaskDialog } from './TaskDialog';
+import { WeekList } from './WeekList';
+import { tickTask, useAgenda, useFlushOnReconnect, useWithPending } from './api';
+import './agenda.css';
+
+import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
+import { ServerSilent } from '@/shell/ServerSilent';
+import { Page, PageHeader } from '@/shell/layout';
+
+export type AgendaView = 'day' | 'week';
+
+const VIEWS: readonly (readonly [AgendaView, string])[] = [
+  ['day', 'Jour'],
+  ['week', 'Ma semaine'],
+];
+
+/** What is open over the agenda: one dialog at a time. */
+type Open =
+  | { readonly kind: 'add'; readonly preset: AddPreset }
+  | { readonly kind: 'task'; readonly task: CreatorTask; readonly day: string }
+  | { readonly kind: 'decline'; readonly suggestion: CreatorSuggestion }
+  | { readonly kind: 'place'; readonly suggestion: CreatorSuggestion }
+  | null;
+
+/**
+ * Agenda, the creator's (CR-05, ADR 0042 § 3 and § 8): her day, tasks first, and her week as a list. Only two words:
+ * a tâche and a dispo. She ticks offline; her phone sends it back online. The agency only suggests: she accepts or
+ * says « Non merci ». Read in her zone, the one the server answers with.
+ */
+export function AgendaPage({
+  day,
+  view,
+  onDay,
+  onView,
+}: {
+  /** The day shown, `null` for today. */
+  day: string | null;
+  view: AgendaView;
+  onDay: (day: string | null) => void;
+  onView: (view: AgendaView) => void;
+}): JSX.Element {
+  const client = useQueryClient();
+  const [open, setOpen] = useState<Open>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const today = dayOf(new Date(), readerZone());
+  const shown = day ?? today;
+  const monday = mondayOf(shown);
+  const read = useAgenda(monday, addDays(monday, 6));
+  const { agenda, waiting } = useWithPending(read.data);
+
+  const onRefused = useCallback((count: number) => {
+    setNotice(
+      count === 1
+        ? 'Une coche faite hors ligne n’a pas pu compter : la tâche a changé, ou elle date de plus de 48 heures.'
+        : `${String(count)} coches faites hors ligne n’ont pas pu compter : les tâches ont changé, ou elles datent de plus de 48 heures.`,
+    );
+  }, []);
+  useFlushOnReconnect(onRefused);
+
+  const tick = (task: CreatorTask, on: boolean, onDayOf: string): void => {
+    void tickTask(client, task, onDayOf, on).then(({ refused }) => {
+      if (refused > 0) onRefused(refused);
+    });
+  };
+
+  const herToday = agenda?.today ?? today;
+  const offline = read.isError || (read.isFetched && read.fetchStatus === 'paused');
+
+  return (
+    <Page className="ag-page">
+      <PageHeader
+        eyebrow={view === 'day' ? longDay(shown) : weekLabel(monday)}
+        title="Agenda"
+        actions={
+          <button
+            type="button"
+            className="nv-btn nv-btn--neon"
+            disabled={agenda === undefined}
+            onClick={() => {
+              setOpen({ kind: 'add', preset: { day: shown } });
+            }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true" className="ag-icon">
+              <path d="M8 3v10M3 8h10" />
+            </svg>
+            Ajouter
+          </button>
+        }
+      />
+      <div className="ag-bar">
+        <div
+          className="nv-seg nv-glass nv-glass--thin ag-views"
+          role="radiogroup"
+          aria-label="Affichage"
+          style={{
+            '--nv-seg-count': VIEWS.length,
+            '--nv-seg-index': VIEWS.findIndex(([one]) => one === view),
+          }}
+        >
+          <span className="nv-seg__thumb nv-glass nv-glass--thin" aria-hidden="true" />
+          {VIEWS.map(([one, label]) => (
+            <button
+              key={one}
+              type="button"
+              role="radio"
+              className="nv-seg__opt"
+              aria-checked={one === view}
+              onClick={() => {
+                onView(one);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="ag-nav">
+          <button
+            type="button"
+            className="ag-arrow"
+            aria-label={view === 'day' ? 'Jour précédent' : 'Semaine précédente'}
+            onClick={() => {
+              onDay(addDays(shown, view === 'day' ? -1 : -7));
+            }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true" className="ag-icon">
+              <path d="m10 3-5 5 5 5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="ag-arrow"
+            aria-label={view === 'day' ? 'Jour suivant' : 'Semaine suivante'}
+            onClick={() => {
+              onDay(addDays(shown, view === 'day' ? 1 : 7));
+            }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true" className="ag-icon">
+              <path d="m6 3 5 5-5 5" />
+            </svg>
+          </button>
+          {shown === herToday ? null : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              onClick={() => {
+                onDay(null);
+              }}
+            >
+              Aujourd’hui
+            </button>
+          )}
+        </div>
+      </div>
+      {offline && agenda !== undefined ? (
+        <p className="ag-offline" role="status">
+          Hors ligne : tu vois ta dernière lecture.
+          {waiting > 0
+            ? ` ${String(waiting)} ${waiting > 1 ? 'coches partiront' : 'coche partira'} au retour du réseau.`
+            : ' Tes coches partiront au retour du réseau.'}
+        </p>
+      ) : null}
+      {notice === null ? null : (
+        <p className="ag-notice" role="status">
+          {notice}
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            onClick={() => {
+              setNotice(null);
+            }}
+          >
+            OK
+          </button>
+        </p>
+      )}
+      {agenda === undefined ? (
+        read.isError ? (
+          <ServerSilent
+            text="Ton agenda n’a pas pu être lu, et ce téléphone n’en a pas encore de copie."
+            onRetry={() => {
+              void read.refetch();
+            }}
+          />
+        ) : (
+          <div className="ag-skeleton nv-plate" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </div>
+        )
+      ) : (
+        <Views
+          agenda={agenda}
+          view={view}
+          day={shown}
+          monday={monday}
+          onDay={onDay}
+          onView={onView}
+          onTick={tick}
+          onOpen={setOpen}
+        />
+      )}
+      {agenda === undefined || open === null ? null : (
+        <Dialogs
+          agenda={agenda}
+          open={open}
+          onClose={() => {
+            setOpen(null);
+          }}
+          onNotice={setNotice}
+        />
+      )}
+    </Page>
+  );
+}
+
+function Views({
+  agenda,
+  view,
+  day,
+  monday,
+  onDay,
+  onView,
+  onTick,
+  onOpen,
+}: {
+  agenda: CreatorAgenda;
+  view: AgendaView;
+  day: string;
+  monday: string;
+  onDay: (day: string | null) => void;
+  onView: (view: AgendaView) => void;
+  onTick: (task: CreatorTask, on: boolean, day: string) => void;
+  onOpen: (open: Open) => void;
+}): JSX.Element {
+  const actions = {
+    onTick,
+    onTask: (task: CreatorTask, onDayOf: string) => {
+      onOpen({ kind: 'task', task, day: onDayOf });
+    },
+    onAdd: (preset: AddPreset) => {
+      onOpen({ kind: 'add', preset });
+    },
+    onDecline: (suggestion: CreatorSuggestion) => {
+      onOpen({ kind: 'decline', suggestion });
+    },
+    onPlace: (suggestion: CreatorSuggestion) => {
+      onOpen({ kind: 'place', suggestion });
+    },
+  };
+  return view === 'day' ? (
+    <DayView agenda={agenda} day={day} monday={monday} onDay={onDay} {...actions} />
+  ) : (
+    <WeekList
+      agenda={agenda}
+      monday={monday}
+      onOpenDay={(one) => {
+        onDay(one);
+        onView('day');
+      }}
+      {...actions}
+    />
+  );
+}
+
+function Dialogs({
+  agenda,
+  open,
+  onClose,
+  onNotice,
+}: {
+  agenda: CreatorAgenda;
+  open: NonNullable<Open>;
+  onClose: () => void;
+  onNotice: (notice: string) => void;
+}): JSX.Element {
+  switch (open.kind) {
+    case 'add':
+      return <AddDialog zone={agenda.timeZone} preset={open.preset} onClose={onClose} />;
+    case 'task':
+      return <TaskDialog agenda={agenda} task={open.task} day={open.day} onClose={onClose} />;
+    case 'decline':
+      return <DeclineDialog suggestion={open.suggestion} onClose={onClose} onNotice={onNotice} />;
+    case 'place':
+      return (
+        <PlaceDialog
+          zone={agenda.timeZone}
+          suggestion={open.suggestion}
+          onClose={onClose}
+          onNotice={onNotice}
+        />
+      );
+  }
+}

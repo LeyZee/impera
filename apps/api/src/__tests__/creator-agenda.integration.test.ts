@@ -193,10 +193,17 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ticks: [{ ...tick, doneAt: new Date(Date.now() - 49 * 3_600_000).toISOString() }],
     });
     expect(stale.json()).toMatchObject({ error: { code: 'creator_tick_late_unprocessable' } });
-    const mended = await call('POST', '/v1/creator-space/ticks', 'nora', {
-      ticks: [{ ...tick, day: addDays(today, -7) }],
+    // A routine of every day, ticked now for tomorrow: due that day, but not the day she ticked it.
+    const daily = {
+      ...routine,
+      id: newId(CreatorTaskIdSchema),
+      when: { kind: 'routine', weekdays: [1, 2, 3, 4, 5, 6, 7] },
+    };
+    expect((await call('POST', '/v1/creator-space/tasks', 'nora', daily)).statusCode).toBe(200);
+    const ahead = await call('POST', '/v1/creator-space/ticks', 'nora', {
+      ticks: [{ ...tick, taskId: daily.id, day: addDays(today, 1) }],
     });
-    expect(mended.statusCode).toBe(422);
+    expect(ahead.json()).toMatchObject({ error: { code: 'creator_tick_late_unprocessable' } });
     const back = await call('DELETE', `/v1/creator-space/tasks/${id}/ticks/${today}`, 'nora');
     expect(back.statusCode, back.body).toBe(200);
     CreatorStreakResultSchema.parse(back.json());

@@ -96,9 +96,9 @@ describe('railOf, with the screens of today', () => {
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
     expect(railOf(manager).more.size).toBe(0);
     expect(railOf(chatter).more.size).toBe(0);
-    // A creator gets her own space (ADR 0042 § 8): Aujourd'hui, Ventes (her fans first) and Moi, Agenda and Contenu
-    // coming with their screens; never Suivi nor the agency's Dashboard, her persona being in Moi.
-    expect(labels(creator)).toEqual(['Aujourd’hui', 'Ventes', 'Moi']);
+    // A creator gets her own space (ADR 0042 § 8): Aujourd'hui, Agenda, Ventes (her fans first) and Moi, Contenu
+    // coming with its screen; never Suivi nor the agency's Dashboard, her persona being in Moi.
+    expect(labels(creator)).toEqual(['Aujourd’hui', 'Agenda', 'Ventes', 'Moi']);
     expect(railOf(creator).home).toBe('/aujourdhui');
   });
 
@@ -141,9 +141,11 @@ describe('sectionOf and canOpen', () => {
     for (const section of ['/', '/suivi', '/creatrices', '/planning'] as const) {
       expect(canOpen(railOf(creator), section)).toBe(false);
     }
-    // Ventes is hers alone: no team rail holds it.
-    expect(canOpen(railOf(creator), '/ventes')).toBe(true);
-    for (const user of [owner, chatter]) expect(canOpen(railOf(user), '/ventes')).toBe(false);
+    // Ventes and Agenda are hers alone: no team rail holds them.
+    for (const section of ['/ventes', '/agenda'] as const) {
+      expect(canOpen(railOf(creator), section)).toBe(true);
+      for (const user of [owner, chatter]) expect(canOpen(railOf(user), section)).toBe(false);
+    }
   });
 });
 
