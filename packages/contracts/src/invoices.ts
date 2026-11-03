@@ -4,14 +4,15 @@ import {
   BillingRegimeIdSchema,
   CommissionStatementIdSchema,
   ContractAcceptanceIdSchema,
+  ContractTextIdSchema,
   ContractorDocumentIdSchema,
   ContractorRegimeIdSchema,
-  ContractTextIdSchema,
   InvoiceEventIdSchema,
   InvoiceIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
+import { dayNumber, trimmed } from './invoices-internal';
 import { PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema } from './pay-periods';
 import { BasisPointsSchema, CountryCodeSchema } from './team';
@@ -254,8 +255,6 @@ export type InvoicePdfPlace = z.infer<typeof InvoicePdfPlaceSchema>;
 /** How long before a document's end the reminder goes out (a setting). */
 export const DEFAULT_DOCUMENT_REMINDER_DAYS = 30;
 export const DOCUMENT_REMINDER_MAX_DAYS = 120;
-
-const trimmed = (max: number) => z.string().trim().min(1).max(max);
 
 /** A contest's reason, or the reason of its end: the contractor's or the owner's words, 1 to 500 characters. */
 export const InvoiceReasonSchema = trimmed(INVOICE_REASON_MAX);
@@ -648,8 +647,6 @@ export type JournalAccountName = z.infer<typeof JournalAccountNameSchema>;
 
 /** The longest range one export reads: two years, a first fiscal year lasting up to 24 months. */
 export const ACCOUNTING_PERIOD_MAX_DAYS = 731;
-
-const dayNumber = (day: string): number => Date.parse(`${day}T00:00:00Z`) / 86_400_000;
 
 /**
  * The range of an export, the owner only, from `from` to `to`, both included: the contractors' journal of the
