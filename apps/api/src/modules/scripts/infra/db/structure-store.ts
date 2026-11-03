@@ -7,6 +7,7 @@ import {
   ScriptStructureVersionIdSchema,
   ScriptStructureVersionSchema,
   type CreatorId,
+  type ScriptColor,
   type ScriptStructure,
   type ScriptStructureBody,
   type ScriptStructureVersion,
@@ -41,6 +42,7 @@ const toVersion = (row: VersionRow): ScriptStructureVersion =>
     version: row.version,
     name: row.name,
     moment: row.moment,
+    color: row.color,
     segments: row.segments,
     frozen: row.frozenAt !== null,
     updatedAt: row.updatedAt.toISOString(),
@@ -58,8 +60,15 @@ const toStructure = (row: StructureRow, latest: VersionRow): ScriptStructure =>
 const contentOf = (value: {
   readonly name: string;
   readonly moment: string;
+  readonly color: ScriptColor;
   readonly segments: unknown;
-}): string => JSON.stringify([value.name, value.moment, value.segments]);
+}): string =>
+  JSON.stringify([
+    value.name,
+    value.moment,
+    [value.color.primary, value.color.secondary, value.color.accent],
+    value.segments,
+  ]);
 
 const sameBody = (stored: ScriptStructure, body: ScriptStructureBody): boolean =>
   stored.reservedCreatorId === body.reservedCreatorId && contentOf(stored.current) === contentOf(body);
@@ -194,6 +203,7 @@ export function createDrizzleScriptStructureStore(db: Database): ScriptStructure
           version: 1,
           name: body.name,
           moment: body.moment,
+          color: body.color,
           segments: body.segments,
           updatedBy: userId,
         });
@@ -218,7 +228,13 @@ export function createDrizzleScriptStructureStore(db: Database): ScriptStructure
           const holders = await queuedOn(tx, id, creators);
           if (holders.some((creatorId) => creatorId !== body.reservedCreatorId)) return 'creator_invalid';
         }
-        const content = { name: body.name, moment: body.moment, segments: body.segments, updatedBy: userId };
+        const content = {
+          name: body.name,
+          moment: body.moment,
+          color: body.color,
+          segments: body.segments,
+          updatedBy: userId,
+        };
         if (decision === 'update')
           await tx
             .update(versions)

@@ -19,7 +19,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { cardContent, cardSvg, defaultCardTheme } from '../../domain/cards';
+import { cardContent, cardSvg } from '../../domain/cards';
 import type { QueueRefusal, RasterizeCard, ScriptStructureStore } from '../../domain/ports';
 import { queueRefusals, queueView } from '../../domain/queue';
 
@@ -150,13 +150,13 @@ export function createScriptRoutes(
         const found = await store.get(request.params.structureId, signedIn(request.user));
         if (found === null) throw new ScriptStructureNotFound();
         const { format, variant } = request.query;
-        const theme = request.query.theme ?? defaultCardTheme(found.current.moment);
-        const content = cardContent(found.current, request.params.segmentKey, {
-          theme,
-          ...(variant !== undefined && { variant }),
-        });
+        const content = cardContent(
+          found.current,
+          request.params.segmentKey,
+          variant === undefined ? {} : { variant },
+        );
         if (content === null) throw new ScriptCardNotFound();
-        const svg = cardSvg(content, theme, format);
+        const svg = cardSvg(content, format);
         void reply.header('cache-control', 'private, no-cache').header('x-content-type-options', 'nosniff');
         if (format === 'card')
           return reply

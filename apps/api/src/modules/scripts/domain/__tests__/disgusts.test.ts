@@ -16,6 +16,7 @@ const stage = (key: string, name: string, hint: string | null = null): ScriptSeg
   key,
   name,
   intention: 'Elle se dévoile',
+  access: 'paid',
   mood: null,
   mediaSlots: [{ kind: 'image', optional: false, hint }],
   variants: [],
@@ -37,6 +38,7 @@ describe('disgustBlocks', () => {
       key: 'v',
       name: 'Lit',
       intention: 'Elle se dévoile',
+      access: 'paid',
       mood: null,
       mediaSlots: [{ kind: 'image', optional: false, hint: null }],
       variants: [{ letter: 'A', hint: 'une fessée' }],
@@ -59,6 +61,7 @@ describe('disgustBlocks', () => {
       from: 'a',
       to: 'b',
       teaser,
+      mediaSlots: [],
     });
     const around = (teaser: string) =>
       disgustBlocks([stage('a', 'Salon'), bridge(teaser), stage('b', 'Lit')], limits);

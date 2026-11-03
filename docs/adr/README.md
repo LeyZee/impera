@@ -85,3 +85,4 @@ Date : AAAA-MM-JJ
 | 0058 | Un agent externe peut préparer et publier le contenu public de la créatrice, et seulement lui | accepted (amende 0026 § 5 pour la seule publication) |
 | 0059 | Écarts de persona sur Telegram : les interdits graves tout de suite, les autres au bilan du soir, jamais un nom | accepted (remplace dans 0052 § 5 la phrase sur Telegram ; précise 0020) |
 | 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte ») |
+| 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | proposed (remplacerait dans 0056 § 3 la phrase sur la palette) |

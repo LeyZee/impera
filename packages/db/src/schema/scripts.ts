@@ -60,7 +60,7 @@ export const scriptStructures = pgTable(
 );
 
 /**
- * One version of a structure: its name, its moment and its segments (`ScriptSegment[]`, read back through the
+ * One version of a structure: its name, its moment, its colour and its segments (`ScriptSegment[]`, read back through the
  * contract). The latest is changed in place until it is frozen (`frozen_at`); then a change is the next version.
  */
 export const scriptStructureVersions = pgTable(
@@ -74,6 +74,10 @@ export const scriptStructureVersions = pgTable(
     name: text('name').notNull(),
     moment: enumText('moment').notNull(),
     segments: jsonb('segments').notNull(),
+    /** Its colour, three tones (`ScriptColor`, ADR 0064): the versions written before it took the « Rouge » preset. */
+    color: jsonb('color')
+      .notNull()
+      .default(sql`'{"primary":"#b0213a","secondary":"#c8283f","accent":"#d8324b"}'::jsonb`),
     /** Asked of a creator, or being shot (SC-02): never changed nor removed again. */
     frozenAt: timestampTz('frozen_at'),
     updatedBy: text('updated_by')
@@ -93,6 +97,7 @@ export const scriptStructureVersions = pgTable(
       'script_structure_versions_segments_check',
       sql`jsonb_typeof(${t.segments}) = 'array' and jsonb_array_length(${t.segments}) >= 1`,
     ),
+    check('script_structure_versions_color_check', sql`jsonb_typeof(${t.color}) = 'object'`),
     enumCheck('script_structure_versions', t.moment, SCRIPT_MOMENTS),
     pgPolicy('team_read', { for: 'select', using: readsTeam }),
     pgPolicy('owner_insert', {

@@ -465,6 +465,7 @@ script_structures         id, reserved_creator_id? → creators, created_by, cre
                           (bibliothèque de l'agence, hors RLS des créatrices ; politiques de l'équipe : le propriétaire
                           écrit, le propriétaire et les managers actifs lisent)
 script_structure_versions id, structure_id, version ≥ 1 (unique par structure), name ≤ 60, moment (day|night|both),
+                          color jsonb (ScriptColor : trois tons, ADR 0064, migration 0091),
                           segments jsonb (ScriptSegment[], au moins un), frozen_at?, updated_by, created_at, updated_at
                           (mêmes politiques ; déclencheur : une version figée ne change plus, aucune n'est supprimée,
                           le numéro ne change pas)

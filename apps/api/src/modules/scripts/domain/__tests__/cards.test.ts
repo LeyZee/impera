@@ -1,15 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import {
   ScriptStructureVersionIdSchema,
   newId,
+  SCRIPT_CARD_INKS,
   type MediaSlot,
   type ScriptStructureVersion,
 } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { CARD_PALETTES, cardContent, cardSvg, duration, shootSummary, wrap } from '../cards';
+import { cardContent, cardSvg, duration, shootSummary, wrap } from '../cards';
 
 const NBSP = ' ';
 const plain = (text: string): string => text.replaceAll(NBSP, ' ');
@@ -20,6 +18,7 @@ const version: ScriptStructureVersion = {
   version: 1,
   name: 'Soirée au salon',
   moment: 'night',
+  color: { primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' },
   frozen: false,
   updatedAt: '2026-11-03T10:00:00.000Z',
   segments: [
@@ -28,6 +27,7 @@ const version: ScriptStructureVersion = {
       key: 'canape',
       name: 'Canapé',
       intention: 'Elle se dévoile doucement',
+      access: 'paid',
       mood: 'Lumière tamisée',
       mediaSlots: [
         { kind: 'image', optional: false, hint: 'Assise, jambes croisées' },
@@ -45,12 +45,20 @@ const version: ScriptStructureVersion = {
         { letter: 'B', hint: 'Robe rouge' },
       ],
     },
-    { kind: 'bridge', key: 'canape-lit', from: 'canape', to: 'lit', teaser: 'On passe à côté ?' },
+    {
+      kind: 'bridge',
+      key: 'canape-lit',
+      from: 'canape',
+      to: 'lit',
+      teaser: 'On passe à côté ?',
+      mediaSlots: [{ kind: 'image', optional: false, hint: null }],
+    },
     {
       kind: 'stage',
       key: 'lit',
       name: 'Lit',
       intention: 'Plus près',
+      access: 'free',
       mood: null,
       mediaSlots: [{ kind: 'image', optional: false, hint: null }],
       variants: [],
@@ -101,48 +109,82 @@ describe('wrap', () => {
 });
 
 describe('cardContent', () => {
-  it('says a stage’s number, what to shoot, its sentence and its hints', () => {
-    const card = cardContent(version, 'canape', { theme: 'night' });
+  it('says a stage’s number and name, what it sells, offered or paid, what to shoot and its series', () => {
+    const card = cardContent(version, 'canape');
     expect(card).toMatchObject({
-      kicker: 'Étape 1',
-      moment: 'Nuit',
-      title: 'Canapé',
+      kind: 'stage',
+      title: 'ÉTAPE 1',
+      subtitle: 'Canapé',
+      quote: 'Elle se dévoile doucement',
+      access: 'PAYANT',
+      moment: 'NUIT',
       mood: 'Lumière tamisée',
+      series: ['Série A', 'Série B'],
     });
-    expect(plain(card?.shoot ?? '')).toBe('2 photos, 1 vidéo de 1 à 2 min');
+    expect(plain(card?.shoot ?? '')).toBe('2 photos, 1 vidéo de 1 à 2 min, par série');
     expect(card?.hints).toEqual(['01 · Assise, jambes croisées', '03 · Face caméra <chuchote> & sourit']);
+    expect(cardContent(version, 'lit')).toMatchObject({ title: 'ÉTAPE 2', access: 'GRATUIT', series: [] });
   });
 
-  it('gives a variant its own card, and nothing for a letter the stage does not have', () => {
-    expect(cardContent(version, 'canape', { theme: 'day', variant: 'B' })).toMatchObject({
-      kicker: 'Étape 1 · Variante B',
-      moment: 'Jour',
-      lines: ['Elle se dévoile doucement', 'Robe rouge'],
+  it('gives a variant its series card, and nothing for a letter the stage does not have', () => {
+    expect(cardContent(version, 'canape', { variant: 'B' })).toMatchObject({
+      kind: 'series',
+      title: 'ÉTAPE 1',
+      subtitle: 'Série B',
+      quote: 'Robe rouge',
     });
-    expect(cardContent(version, 'canape', { theme: 'day', variant: 'C' })).toBeNull();
-    expect(cardContent(version, 'lit', { theme: 'day', variant: 'A' })).toBeNull();
+    expect(cardContent(version, 'canape', { variant: 'C' })).toBeNull();
+    expect(cardContent(version, 'lit', { variant: 'A' })).toBeNull();
   });
 
-  it('names the two stages of a bridge by their numbers and names', () => {
-    expect(cardContent(version, 'canape-lit', { theme: 'night' })).toMatchObject({
-      kicker: 'Pont · Étape 1 → Étape 2',
-      title: 'On passe à côté ?',
-      lines: ['Entre « Canapé » et « Lit »'],
-      shoot: '',
+  it('names a bridge by its two stages, always offered, with its teaser photo', () => {
+    const card = cardContent(version, 'canape-lit');
+    expect(card).toMatchObject({
+      kind: 'bridge',
+      title: 'PONT 1 & 2',
+      quote: 'On passe à côté ?',
+      access: 'GRATUIT',
     });
-    expect(cardContent(version, 'absente', { theme: 'night' })).toBeNull();
+    expect(plain(card?.shoot ?? '')).toBe('1 photo');
+    expect(cardContent(version, 'canape-lit', { variant: 'A' })).toBeNull();
+    expect(cardContent(version, 'absente')).toBeNull();
   });
 });
 
 describe('cardSvg', () => {
-  const card = cardContent(version, 'canape', { theme: 'night', variant: 'A' });
+  const card = cardContent(version, 'canape');
   if (card === null) throw new Error('no card');
 
   it('gives the same SVG for the same input, in each format', async () => {
-    const svg = cardSvg(card, 'night', 'folder');
-    expect(cardSvg(card, 'night', 'folder')).toBe(svg);
-    await expect(svg).toMatchFileSnapshot('./__snapshots__/card-night-folder.svg');
-    expect(cardSvg(card, 'night', 'thumbnail')).toContain('width="320" height="320" viewBox="0 0 1080 1080"');
+    const svg = cardSvg(card, 'folder');
+    expect(cardSvg(card, 'folder')).toBe(svg);
+    await expect(svg).toMatchFileSnapshot('./__snapshots__/card-stage-folder.svg');
+    expect(cardSvg(card, 'thumbnail')).toContain('width="320" height="320" viewBox="0 0 1080 1080"');
+  });
+
+  it('fills the card with the script’s colour, written in the ink that reads on it (ADR 0064)', () => {
+    const svg = cardSvg(card, 'card');
+    for (const tone of ['#5c1029', '#911e42', '#b03a78']) expect(svg).toContain(`stop-color="${tone}"`);
+    expect(svg).toContain(`fill="${SCRIPT_CARD_INKS.light}"`);
+    const pale = cardContent(
+      { ...version, color: { primary: '#ffcad4', secondary: '#c7ceea', accent: '#b5ead7' } },
+      'lit',
+    );
+    if (pale === null) throw new Error('no card');
+    expect(cardSvg(pale, 'card')).toContain(`fill="${SCRIPT_CARD_INKS.dark}"`);
+  });
+
+  it('writes the series at the foot of a stage, an arch for a bridge, an arrow for a series', () => {
+    const stage = cardSvg(card, 'card');
+    expect(stage).toContain('>Série A</text>');
+    expect(stage).toContain('>Série B</text>');
+    expect(stage).toContain('(PAYANT)');
+    const bridge = cardContent(version, 'canape-lit');
+    const series = cardContent(version, 'canape', { variant: 'A' });
+    if (bridge === null || series === null) throw new Error('no card');
+    expect(cardSvg(bridge, 'card')).toMatch(/<path d="M 290 990 A/u);
+    expect(cardSvg(bridge, 'card')).toContain('(GRATUIT)');
+    expect(cardSvg(series, 'card')).toMatch(/<path d="M 380 900/u);
   });
 
   it('keeps three hints at least on a full card, and never says « + N » alone (Extension’s review)', () => {
@@ -152,9 +194,10 @@ describe('cardSvg', () => {
         {
           kind: 'stage',
           key: 'plein',
-          name: 'Un titre assez long pour deux lignes',
+          name: 'Un nom d’étape assez long pour deux lignes',
           intention:
-            'Une intention longue qui prendrait volontiers deux lignes entières sur le carton du dossier',
+            'Une intention longue qui prendrait volontiers trois lignes entières sur le carton du dossier, voire plus',
+          access: 'paid',
           mood: 'Lumière tamisée, bougies',
           mediaSlots: [
             { kind: 'image', optional: false, hint: 'Assise, jambes croisées' },
@@ -163,66 +206,34 @@ describe('cardSvg', () => {
             { kind: 'video', optional: false, hint: 'Face caméra', minSeconds: 45, maxSeconds: 90 },
             { kind: 'audio', optional: true, hint: 'Un vocal', maxSeconds: 30 },
           ],
-          variants: [{ letter: 'B', hint: 'Robe rouge, talons hauts et collier de perles assorti au rouge' }],
+          variants: [
+            { letter: 'A', hint: 'Robe noire' },
+            { letter: 'B', hint: 'Robe rouge' },
+            { letter: 'C', hint: 'Lingerie' },
+          ],
         },
       ],
     };
-    const content = cardContent(full, 'plein', { theme: 'night', variant: 'B' });
+    const content = cardContent(full, 'plein');
     if (content === null) throw new Error('no card');
-    const svg = plain(cardSvg(content, 'night', 'folder'));
+    const svg = plain(cardSvg(content, 'folder'));
     for (const hint of ['01 · Assise, jambes croisées', '02 · De dos', '03 · Gros plan'])
       expect(svg).toContain(hint);
     expect(svg).toContain('+ 2 indications');
     expect(svg).not.toMatch(/>\+ \d+<\/text>/u);
   });
 
-  it('gives the chatters a thumbnail of the stage, its title and what to shoot only', () => {
-    const svg = cardSvg(card, 'night', 'thumbnail');
+  it('gives the chatters a thumbnail of the stage, its name and what to shoot only', () => {
+    const svg = cardSvg(card, 'thumbnail');
     expect(svg).toContain('>Canapé</text>');
-    expect(svg).toContain('ÉTAPE 1 · VARIANTE A');
+    expect(svg).toContain('>ÉTAPE 1</text>');
     expect(svg).not.toContain('Soirée au salon');
     expect(svg).not.toContain('Assise');
   });
 
   it('escapes what the agency wrote, and names no file, image nor link', () => {
-    const svg = cardSvg(card, 'day', 'card');
+    const svg = cardSvg(card, 'card');
     expect(svg).toContain('Face caméra &lt;chuchote&gt; &amp; sourit');
-    expect(svg).not.toMatch(/<image|href=|url\(|@import|<script/iu);
-  });
-});
-
-describe('CARD_PALETTES', () => {
-  /** The design system's tokens, read from its stylesheet: a card never drifts from the app. */
-  const tokens = readFileSync(
-    fileURLToPath(
-      new URL('../../../../../../../packages/design-system/src/styles/tokens.css', import.meta.url),
-    ),
-    'utf8',
-  );
-  const block = (selector: string): string => {
-    const start = tokens.indexOf(`${selector} {`);
-    return tokens.slice(start, tokens.indexOf('\n}', start));
-  };
-  const token = (css: string, name: string): string | undefined =>
-    new RegExp(`--nv-${name}:\\s*(#[0-9a-f]{6})`, 'u').exec(css)?.[1];
-
-  it('takes its colours from tokens.css, Nuit from the dark theme and Jour from the light one', () => {
-    for (const [theme, selector] of [
-      ['night', "[data-theme='dark']"],
-      ['day', "[data-theme='light']"],
-    ] as const) {
-      const css = block(selector);
-      const palette = CARD_PALETTES[theme];
-      expect([
-        palette.background,
-        palette.surface,
-        palette.ink,
-        palette.muted,
-        palette.accent,
-        palette.accentInk,
-      ]).toEqual(
-        ['void', 'surface-raised', 'ink', 'ink-muted', 'neon', 'neon-ink'].map((name) => token(css, name)),
-      );
-    }
+    expect(svg).not.toMatch(/<image|href=|@import|<script/iu);
   });
 });

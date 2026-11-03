@@ -40,6 +40,7 @@ const stage = (key: string, name: string): ScriptStage => ({
   key,
   name,
   intention: 'Elle se dévoile un peu plus',
+  access: 'paid',
   mood: 'Lumière tamisée',
   mediaSlots: [
     { kind: 'image', optional: false, hint: null },
@@ -100,10 +101,18 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     id: newId(ScriptStructureIdSchema),
     name: 'Soirée au salon',
     moment: 'night',
+    color: { primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' },
     reservedCreatorId: null,
     segments: [
       stage('canape', 'Canapé'),
-      { kind: 'bridge', key: 'canape-lit', from: 'canape', to: 'lit', teaser: 'On passe à côté ?' },
+      {
+        kind: 'bridge',
+        key: 'canape-lit',
+        from: 'canape',
+        to: 'lit',
+        teaser: 'On passe à côté ?',
+        mediaSlots: [],
+      },
       stage('lit', 'Lit'),
     ],
     ...extra,
@@ -262,10 +271,10 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     expect(svg.statusCode).toBe(200);
     expect(svg.headers['content-type']).toBe('image/svg+xml; charset=utf-8');
     expect(svg.headers['content-security-policy']).toBe("default-src 'none'");
-    // Nuit by the structure's moment, Jour when asked.
+    // The script's colour, over the whole card (ADR 0064); no theme to ask any more.
     expect(svg.body).toContain('>Canapé</text>');
-    expect(svg.body).toContain('#060508');
-    expect((await card(manager, 'canape?theme=day')).body).toContain('#f6f1f3');
+    expect(svg.body).toContain('stop-color="#911e42"');
+    expect((await card(manager, 'canape?theme=day')).statusCode).toBe(400);
 
     const png = await card(owner, 'canape-lit?format=folder');
     expect(png.statusCode).toBe(200);

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  contrastRatio,
   MediaSlotSchema,
+  ReadableScriptColorSchema,
+  SCRIPT_CARD_INKS,
+  SCRIPT_COLOR_PRESETS,
+  scriptCardInk,
+  ScriptColorSchema,
   ScriptQueueBodySchema,
   scriptSegmentCodes,
   ScriptSegmentsSchema,
@@ -17,6 +23,7 @@ function stage(key: string, extra: Partial<ScriptStage> = {}): ScriptStage {
     key,
     name: `Étape ${key}`,
     intention: 'Elle se dévoile un peu',
+    access: 'paid',
     mood: null,
     mediaSlots: [{ kind: 'image', optional: false, hint: null }],
     variants: [],
@@ -30,6 +37,7 @@ const bridge = (key: string, from: string, to: string): ScriptSegment => ({
   from,
   to,
   teaser: 'La suite arrive',
+  mediaSlots: [],
 });
 
 const codes = (segments: readonly ScriptSegment[]) =>
@@ -166,5 +174,33 @@ describe('schemas', () => {
   it('refuses a structure twice in a queue', () => {
     const id = '0196f3a4-0000-7000-8000-000000000001';
     expect(ScriptQueueBodySchema.safeParse({ structureIds: [id, id] }).success).toBe(false);
+  });
+});
+
+describe('the script’s colour (ADR 0064)', () => {
+  it('measures the WCAG contrast of two colours', () => {
+    expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 5);
+    expect(contrastRatio('#777777', '#777777')).toBe(1);
+  });
+
+  it('writes a card in the ink that reads best, and refuses a colour where neither reads', () => {
+    expect(scriptCardInk({ primary: '#5c1029', secondary: '#911e42', accent: '#b03a78' })).toBe(
+      SCRIPT_CARD_INKS.light,
+    );
+    expect(scriptCardInk({ primary: '#ffcad4', secondary: '#c7ceea', accent: '#b5ead7' })).toBe(
+      SCRIPT_CARD_INKS.dark,
+    );
+    // Black to white: no ink reads on both ends.
+    const split = { primary: '#000000', secondary: '#808080', accent: '#ffffff' };
+    expect(scriptCardInk(split)).toBeNull();
+    expect(ReadableScriptColorSchema.safeParse(split).success).toBe(false);
+    expect(
+      ScriptColorSchema.safeParse({ primary: '#FFF', secondary: '#ffffff', accent: '#ffffff' }).success,
+    ).toBe(false);
+  });
+
+  it('offers named colours that all read', () => {
+    for (const preset of SCRIPT_COLOR_PRESETS) expect(scriptCardInk(preset.color), preset.key).not.toBeNull();
+    expect(new Set(SCRIPT_COLOR_PRESETS.map((preset) => preset.key)).size).toBe(SCRIPT_COLOR_PRESETS.length);
   });
 });
