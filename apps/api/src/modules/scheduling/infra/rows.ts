@@ -50,6 +50,14 @@ const {
   user,
 } = schema;
 
+/** The agency's settings as the screens read them, from one place (Bilan's review of #427). */
+export const settingsColumns = {
+  timeZone: schedulingSettings.timeZone,
+  slotStartMinute: schedulingSettings.slotStartMinute,
+  slotLengthMinutes: schedulingSettings.slotLengthMinutes,
+  accessMarginMinutes: schedulingSettings.accessMarginMinutes,
+};
+
 export const shiftColumns = {
   id: shifts.id,
   creatorId: shifts.creatorId,

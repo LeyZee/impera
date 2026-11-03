@@ -231,9 +231,12 @@ const teamIndex = createRoute({
 const teamPlanning = createRoute({
   getParentRoute: () => team,
   path: '/planning',
-  validateSearch: parsePlanningSearch,
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...parsePlanningSearch(search),
+    ...parseCalendarSearch(search),
+  }),
   component: function TeamPlanning() {
-    const { semaine, membre } = teamPlanning.useSearch();
+    const { semaine, membre, affichage, mois } = teamPlanning.useSearch();
     const navigate = teamPlanning.useNavigate();
     const { user } = rootRoute.useRouteContext();
     return (
@@ -245,6 +248,8 @@ const teamPlanning = createRoute({
           void navigate({ search: (before) => ({ ...before, semaine: monday ?? undefined }) })
         }
         onMember={(id) => void navigate({ search: (before) => ({ ...before, membre: id ?? undefined }) })}
+        view={{ affichage, mois }}
+        onView={(patch) => void navigate({ search: (before) => ({ ...before, ...patch }) })}
       />
     );
   },
