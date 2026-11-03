@@ -1,4 +1,4 @@
-import type { AiProvider } from '@nirvana/contracts';
+import type { AiProvider, ConnectionSignal } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { VerificationOutcome } from '../../domain/verification';
@@ -121,6 +121,82 @@ describe('after the connection', () => {
     const status = await disconnectProvider(deps, 'xai');
     expect(status.state).toBe('not_connected');
     expect(await store.find('xai')).toBeNull();
+  });
+});
+
+describe('what the Telegram alert hears (P3-12)', () => {
+  /** The same fake xAI, a clock the test moves, and every signal the module gives. */
+  function watched(answer: { current: VerificationOutcome }) {
+    const clock = { at: new Date('2026-11-03T08:00:00Z') };
+    const signals: { readonly provider: AiProvider; readonly signal: ConnectionSignal }[] = [];
+    const { deps, store } = setup(answer);
+    const watchedDeps: ConnectionsDeps = {
+      ...deps,
+      clock: { now: () => clock.at },
+      onSignal: (provider, signal) => {
+        signals.push({ provider, signal });
+        return Promise.resolve();
+      },
+    };
+    const later = (minutes: number) => {
+      clock.at = new Date(clock.at.getTime() + minutes * 60_000);
+    };
+    return { deps: watchedDeps, store, signals, later };
+  }
+
+  it('says back at each answer, down at once on a refusal or a spent credit', async () => {
+    const answer: { current: VerificationOutcome } = { current: works };
+    const { deps, signals, store } = watched(answer);
+    await connectProvider(deps, 'xai', OLD_KEY);
+    answer.current = { ok: false, kind: 'unauthorized' };
+    await reverifyProvider(deps, 'xai');
+    answer.current = { ok: false, kind: 'no_credit' };
+    const stored = await store.find('xai');
+    if (stored === null) throw new Error('saved above');
+    // A line already red is checked again: the provider says why now.
+    await store.update({ ...stored, state: 'connected' });
+    await reverifyProvider(deps, 'xai');
+    expect(signals.map((s) => s.signal)).toEqual([
+      { state: 'back' },
+      { state: 'down', reason: 'refused' },
+      { state: 'down', reason: 'low_credit' },
+    ]);
+  });
+
+  it('says down on silence only after 45 minutes, never on a quota', async () => {
+    const answer: { current: VerificationOutcome } = { current: works };
+    const { deps, signals, later } = watched(answer);
+    await connectProvider(deps, 'xai', OLD_KEY);
+    answer.current = { ok: false, kind: 'unreachable', reason: 'outage' };
+    for (const minutes of [15, 15]) {
+      later(minutes);
+      await reverifyProvider(deps, 'xai');
+    }
+    expect(signals).toHaveLength(1);
+    later(15);
+    answer.current = { ok: false, kind: 'unreachable', reason: 'rate_limited' };
+    await reverifyProvider(deps, 'xai');
+    expect(signals).toHaveLength(1);
+    answer.current = { ok: false, kind: 'unreachable', reason: 'outage' };
+    await reverifyProvider(deps, 'xai');
+    answer.current = works;
+    later(15);
+    await reverifyProvider(deps, 'xai');
+    expect(signals.map((s) => s.signal)).toEqual([
+      { state: 'back' },
+      { state: 'down', reason: 'unreachable' },
+      { state: 'back' },
+    ]);
+  });
+
+  it('says down when a production call is refused', async () => {
+    const { deps, store, signals, later } = watched({ current: works });
+    const cache = createKeyCache(store, null);
+    await connectProvider(deps, 'xai', OLD_KEY);
+    await cache.reload();
+    later(10);
+    await createRefusalReporter(deps, cache)('xai', 'unauthorized');
+    expect(signals.at(-1)).toEqual({ provider: 'xai', signal: { state: 'down', reason: 'refused' } });
   });
 });
 

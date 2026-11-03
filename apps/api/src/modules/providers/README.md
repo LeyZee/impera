@@ -17,6 +17,7 @@
 - Une seule table de textes (`domain/messages.ts`) : la feuille, la ligne, le bandeau et le journal disent la même chose pour le même problème. Jamais de code HTTP à l'écran.
 - Un fournisseur injoignable ne dit rien de la clé : l'état ne change pas.
 - Un refus sur un vrai appel (401, 403) passe le service à « à reconnecter » tout de suite (`reportRefusedKey`).
+- Alerte « connexion en panne » (Telegram P3-12, `domain/connection-signal.ts`) : après chaque écriture d'une ligne, le module dit `down` (`refused`, ou `low_credit` pour un crédit bas ou épuisé) ou `back` ; un fournisseur injoignable ne passe `down` (`unreachable`) qu'après 45 minutes sans réponse, soit trois vérifications, et jamais sur un quota (429). La composition branche `publishConnectionState` (`src/connection-state.ts`), qui n'écrit `connection_state_changed` qu'à la bascule. Venice, en secours, n'est pas surveillé.
 
 ## Structure
 
