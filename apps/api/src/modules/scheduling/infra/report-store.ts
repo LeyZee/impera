@@ -2,7 +2,6 @@ import {
   CreatorIdSchema,
   CurrencySchema,
   SHIFT_REPORT_OPENS_BEFORE_END_MINUTES,
-  EarningsSourceSchema,
   nextPayPeriod,
   PayPeriodSchema,
   payRulesFor,
@@ -67,6 +66,7 @@ import {
   memberColumns,
   ownMemberId,
   pgErrorOf,
+  RulesRowSchema,
   shiftColumns,
   StoredAccountSchema,
   toMember,
@@ -120,12 +120,6 @@ const StoredShiftReportSchema = z.object({
 });
 
 const toReport = (row: unknown): StoredShiftReport => StoredShiftReportSchema.parse(row);
-
-const RulesRowSchema = z.object({
-  fromPeriod: PayPeriodSchema,
-  currency: CurrencySchema,
-  earningsSource: EarningsSourceSchema,
-});
 
 const accountColumns = {
   id: platformAccounts.id,

@@ -22,8 +22,11 @@ import {
   OnDutyListSchema,
   PlanningQuerySchema,
   PlanningSchema,
+  PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
   SchedulingSettingsSchema,
+  ShiftFeedbackReadSchema,
+  ShiftFeedbackSchema,
   ShiftIdSchema,
   ShiftReportContextSchema,
   ShiftReportIdSchema,
@@ -53,6 +56,7 @@ import { z } from 'zod';
 
 import type { CalendarService } from '../application/calendar';
 import type { CalendarLinkService } from '../application/calendar-feed';
+import type { ShiftFeedbackService } from '../application/feedback';
 import type { LeaveService } from '../application/leaves';
 import type { PayRulesService } from '../application/pay-rules';
 import type { ShiftReportService } from '../application/reports';
@@ -97,6 +101,7 @@ export function createSchedulingRoutes(
     leaves,
     swaps,
     reports,
+    feedback,
     payRules,
   }: {
     scheduling: SchedulingService;
@@ -105,6 +110,7 @@ export function createSchedulingRoutes(
     leaves: LeaveService;
     swaps: SwapService;
     reports: ShiftReportService;
+    feedback: ShiftFeedbackService;
     payRules: PayRulesService;
   },
   requireRole: RequireRole,
@@ -367,6 +373,32 @@ export function createSchedulingRoutes(
         schema: { params: ShiftParamsSchema, response: { 200: ShiftReportContextSchema } },
       },
       (request) => reports.context(userOf(request), request.params.shiftId),
+    );
+
+    // The mini feedback (ADR 0050 § 10): 200 when the same feedback was already recorded, a retry of the panel.
+    app.get(
+      '/scheduling/shifts/:shiftId/feedback',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: ShiftParamsSchema, response: { 200: ShiftFeedbackReadSchema } },
+      },
+      (request) => feedback.read(userOf(request), request.params.shiftId),
+    );
+
+    app.put(
+      '/scheduling/shifts/:shiftId/feedback',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: ShiftParamsSchema,
+          body: PutShiftFeedbackBodySchema,
+          response: { 200: ShiftFeedbackSchema, 201: ShiftFeedbackSchema },
+        },
+      },
+      async (request, reply) => {
+        const made = await feedback.put(actorOf(request), request.params.shiftId, request.body);
+        return reply.code(made.created ? 201 : 200).send(made.feedback);
+      },
     );
 
     app.get(

@@ -48,7 +48,7 @@ async function revokeLive(tx: Transaction, actor: Actor): Promise<number> {
   return revoked.length;
 }
 
-/** `calendar_links` through `withAdmin` (migration 0072): the application role cannot reach it. */
+/** `calendar_links` through `withAdmin` (migration 0074): the application role cannot reach it. */
 export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkStore {
   return {
     live: async (userId) => {

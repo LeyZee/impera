@@ -10,7 +10,9 @@ import type {
   PayPeriod,
   Platform,
   PlatformAccountId,
+  ReportSignal,
   SchedulingSettings,
+  ShiftFeedbackId,
   ShiftId,
   ShiftReportId,
   ShiftReportStatus,
@@ -585,4 +587,41 @@ export interface CalendarLinkStore {
   revoke(actor: Actor): Promise<boolean>;
   /** The holder of a live link whose member has not left, found by the token's hash; `null` otherwise. */
   holder(token: string): Promise<{ userId: UserId; memberId: TeamMemberId } | null>;
+}
+
+/** A shift's mini feedback as stored (ADR 0050 § 10). */
+export interface StoredShiftFeedback {
+  readonly id: ShiftFeedbackId;
+  readonly shiftId: ShiftId;
+  readonly creatorId: CreatorId;
+  readonly platformAccountId: PlatformAccountId;
+  readonly memberId: TeamMemberId;
+  readonly period: PayPeriod;
+  readonly nothingToReport: boolean;
+  readonly comment: string | null;
+  readonly incident: string | null;
+  readonly signals: readonly ReportSignal[];
+  readonly createdAt: Date;
+}
+
+/** What the member says at the end of the shift: the contract's body, checked. */
+export interface ShiftFeedbackInput {
+  readonly id: ShiftFeedbackId;
+  readonly nothingToReport: boolean;
+  readonly comment: string | null;
+  readonly incident: string | null;
+  readonly signals: readonly ReportSignal[];
+}
+
+/** The mini feedback through `withTenantMember` in the shift's creator: the policies decide who reads and writes. */
+export interface ShiftFeedbackStore {
+  /** The shift's member, the owner or an active manager: its feedback, `null` before it is made. */
+  read(actor: UserId, shiftId: ShiftId): Promise<StoredShiftFeedback | null>;
+  /** The shift's member alone; `created` is false when the same feedback was already recorded. */
+  create(
+    actor: Actor,
+    shiftId: ShiftId,
+    feedback: ShiftFeedbackInput,
+    now: Date,
+  ): Promise<{ feedback: StoredShiftFeedback; created: boolean }>;
 }

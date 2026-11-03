@@ -13,6 +13,8 @@ import {
 
 import {
   PayRulesMissing,
+  ShiftFeedbackDeclared,
+  ShiftFeedbackEarly,
   ShiftReportChanged,
   ShiftReportCurrency,
   ShiftReportDetected,
@@ -160,4 +162,20 @@ export function makerOf(shiftMemberId: string, correcting: boolean, reader: Read
   if (shiftMemberId === reader.memberId) return { byAgency: false };
   if (correcting && isAgency(reader)) return { byAgency: true };
   throw new ShiftReportForbidden();
+}
+
+/**
+ * Whether a shift takes the mini feedback rather than a report (ADR 0050 § 10): its account's pay reads the platform's
+ * sales for the shift's period (source `detected`), from the time its report would open. Without rules, or under
+ * `declared`, the report is due instead.
+ */
+export function assertFeedbackDue(
+  rules: readonly RulesRow[],
+  period: PayPeriod,
+  shift: { readonly startsAt: Date; readonly endsAt: Date },
+  now: Date,
+): void {
+  if (payRulesFor(rules, period)?.earningsSource !== 'detected') throw new ShiftFeedbackDeclared();
+  const opensAt = reportOpensAt(shift);
+  if (now.getTime() < opensAt.getTime()) throw new ShiftFeedbackEarly(opensAt);
 }
