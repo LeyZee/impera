@@ -7,6 +7,7 @@ import {
   CommissionStatementSchema,
   ExchangeRatesSchema,
   HeldSalesSchema,
+  MySalesSchema,
   PayAdjustmentSchema,
   PayPeriodPageSchema,
   PAYROLL_ERROR_CODES,
@@ -15,6 +16,7 @@ import {
   PayrollSettingsSchema,
   PayoutMinimumSchema,
   PaySaleDecisionSchema,
+  PaySaleSignalSchema,
   PenaltySchema,
   type Bonus,
   type BonusTierSet,
@@ -26,9 +28,11 @@ import {
   type CreatePayAdjustmentBody,
   type CreatePayoutMinimumBody,
   type CreatePaySaleDecisionBody,
+  type CreatePaySaleSignalBody,
   type CreatePenaltyBody,
   type ExchangeRates,
   type HeldSales,
+  type MySales,
   type PayAdjustment,
   type PayCommissionStatementBody,
   type PayPeriod,
@@ -39,6 +43,7 @@ import {
   type PayrollSettings,
   type PayoutMinimum,
   type PaySaleDecision,
+  type PaySaleSignal,
   type Penalty,
   type UpdatePayrollSettingsBody,
 } from '@nirvana/contracts';
@@ -143,6 +148,32 @@ export function useHeldSales(period: PayPeriod | null, enabled: boolean): UseQue
 
 /** The first page of a list: no cursor. */
 const FIRST_PAGE: string | null = null;
+
+/**
+ * The member's own lines of a period (CRM-03 lot b4c): their statement's, and those they signalled that left it, the
+ * most recent first, a page at a time; every page carries the period's days whole.
+ */
+export function useMySales(period: PayPeriod | null): UseInfiniteQueryResult<InfiniteData<MySales>> {
+  return useInfiniteQuery({
+    queryKey: [...PAYROLL_KEY, 'my-sales', period],
+    queryFn: ({ pageParam }) =>
+      period === null
+        ? Promise.reject(new Error('No period'))
+        : read(
+            pageParam === null
+              ? `/v1/payroll/my-sales?period=${period}`
+              : `/v1/payroll/my-sales?period=${period}&cursor=${pageParam}`,
+            (body) => MySalesSchema.parse(body),
+          ),
+    enabled: period !== null,
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (last) => last.nextCursor,
+    // A recalculation lands without a write here (a sale read, a decision): read again every minute.
+    refetchInterval: 60_000,
+    retry: (count, error) => !(error instanceof PeriodCursorInvalid) && count < READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
+}
 
 /** The periods the reader has statements in, the most recent first, a page at a time. */
 export function usePayPeriods(): UseInfiniteQueryResult<InfiniteData<PayPeriodPage>> {
@@ -304,6 +335,10 @@ export const addPayoutMinimum = (body: CreatePayoutMinimumBody): Promise<PayOutc
 /** The validator's decision on a sale (CRM-03 lot b4b): count, exclude, or withdraw; the same `id` sent twice is one. */
 export const decideSale = (body: CreatePaySaleDecisionBody): Promise<PayOutcome<PaySaleDecision>> =>
   send('POST', '/v1/payroll/sale-decisions', body, (json) => PaySaleDecisionSchema.parse(json));
+
+/** A member's signal on a line of their own statement (CRM-03 lot b4c), or its withdrawal; the same `id` sent twice is one. */
+export const signalSale = (body: CreatePaySaleSignalBody): Promise<PayOutcome<PaySaleSignal>> =>
+  send('POST', '/v1/payroll/sale-signals', body, (json) => PaySaleSignalSchema.parse(json));
 
 /** After a write, and after a refusal that says the period changed: everything pay shows reads again. */
 export function useRefreshPayroll(): () => Promise<void> {

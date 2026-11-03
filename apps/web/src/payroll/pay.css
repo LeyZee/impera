@@ -1261,3 +1261,72 @@
     justify-content: space-between;
   }
 }
+
+/* Commissions › « Mes ventes lues » (CRM-03 lot b4c): the member's own lines, a fold a day, today's open. The lines
+   take the cards of « Ventes en attente ». */
+.py-mine .py-quiet {
+  max-width: 68ch;
+}
+.py-mine__days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.py-mine__day > .py-held__rows {
+  margin-top: var(--nv-space-2);
+}
+.py-mine__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  padding: var(--nv-space-2) 0;
+  border-bottom: 1px solid var(--nv-hairline);
+  cursor: pointer;
+  list-style: none;
+}
+.py-mine__head::-webkit-details-marker {
+  display: none;
+}
+.py-mine__head::before {
+  content: '';
+  flex: none;
+  width: 0.45em;
+  height: 0.45em;
+  margin-right: var(--nv-space-1);
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-mine__day[open] > .py-mine__head::before {
+  transform: rotate(45deg);
+}
+/* The day's name never wraps: on a phone its sum goes under it. */
+.py-mine__title {
+  flex: 1 0 auto;
+  font-weight: 600;
+}
+.py-mine__sum {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.py-mine__gone {
+  color: var(--nv-ink-muted);
+  text-decoration: line-through;
+}
+.py-mine__note {
+  color: var(--nv-ink);
+}
+@media (max-width: 480px) {
+  .py-mine .nv-panel__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .py-mine__head::before {
+    transition: none;
+  }
+}
