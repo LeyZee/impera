@@ -129,6 +129,8 @@ describe('DashboardPage on the server’s data', () => {
     expect(screen.getByText(/d’abord la part de l’agent, puis celle des chatteurs/u)).toBeDefined();
     // A todo of the server leaves the list when its conversation is handled, not on a tick here.
     expect(screen.queryByRole('button', { name: 'Marquer comme traité' })).toBeNull();
+    // A code comment never reaches the screen as text (relecture d'Extension, CR-02 c2b).
+    expect(document.body.textContent).not.toMatch(/\/\/ |PUT \/v1/u);
   });
 
   it('says under the best fans that the dollars are not counted for want of a rate, or at which one', async () => {

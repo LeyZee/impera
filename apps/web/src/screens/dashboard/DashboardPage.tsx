@@ -237,7 +237,7 @@ function Loaded({
             </span>
           </span>
         </div>
-        // The mode changes once the server has made the change (PUT /v1/agent/mode).
+        {/* The mode changes once the server has made the change (PUT /v1/agent/mode). */}
         <ModeControl
           mode={mode}
           automatic={automatic}
