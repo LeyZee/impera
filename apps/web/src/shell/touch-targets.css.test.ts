@@ -116,4 +116,14 @@ describe('touch targets on a phone (CR-01)', () => {
       '--nv-tabbar-room: calc(110px + env(safe-area-inset-bottom, 0px))',
     );
   });
+
+  it('keeps the tabs’ hit area inside their scrolling pill on a phone', () => {
+    const css = sheet('./shell.css');
+    const phone = css.slice(css.indexOf('@media (max-width: 820px) {'));
+    const pill = rule(phone, '.nv-subnav');
+    // The pill scrolls (overflow-x, hence overflow-y too) and would cut whatever passes its padding.
+    expect(pill).toContain('overflow-x: auto');
+    const reachOfTab = reach(rule(css, '.nv-subnav__item::after'))?.block ?? Infinity;
+    expect(px(pill, 'padding-block')).toBeGreaterThanOrEqual(reachOfTab);
+  });
 });

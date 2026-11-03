@@ -1118,6 +1118,9 @@
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
+    /* overflow-x makes overflow-y scroll too: 5 px above and below keep each tab's 44 px hit area inside the pill,
+       uncut and without a 1 px vertical scroll (relecture d'Extension, #417). */
+    padding-block: 5px;
   }
   /* More tabs past an edge: that edge fades out instead of cutting a tab in two. */
   .nv-subnav[data-more='end'] {
