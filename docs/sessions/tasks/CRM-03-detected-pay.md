@@ -1,6 +1,6 @@
 # CRM-03 Paie sur les ventes lues, téléphone du chatteur et mini feedback
 
-Statut : todo (ADR 0050, fiches acceptées par Charles le 02/11/2026)
+Statut : in-progress (ADR 0050, fiches acceptées par Charles le 02/11/2026)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone)
 Branche : task/crm-03-detected-pay
@@ -36,3 +36,10 @@ Le rapprochement d'un rapport déclaré (CR-09), les signaux hors shift (CRM-05)
 ## Notes de session
 
 03/11/2026, Bilan, après la relecture Équipe de la vérification (CRM-02, #416) : la bascule d'un compte en « détectée » exige un rapport `match` sur une quinzaine passée, sans note `bot_not_linked_to_agent` ni `export_unknown_model`.
+
+03/11/2026, coordinateur : partage du travail. Équipe fait le calcul (base par plateforme, attribution aux shifts, remboursements tardifs, `inputs_hash`). Bilan fait le serveur hors calcul : le port de lecture, la garde de bascule au moment où la règle est posée, puis `shift_feedback`. Extension fait les écrans.
+
+03/11/2026, Bilan, lot a : `salesFeedReadsForPay` (index de `connectors`) lit une ligne par vente ou par remboursement, avec son auteur selon le lien et la version de ce lien (migration `link_version`). `earningsBaseOf` (contrats) dit la base d'une vente selon la plateforme et la source des règles du compte. Reste :
+- **Équipe** : brancher le port dans le recalcul.
+- **Bilan** : la garde de bascule. Elle lève `pay_rules_source_conflict` pour un compte Reveal relié à un modèle quand le dernier rapport de vérification est `match` propre, sur une quinzaine passée, et seulement une fois le calcul d'Équipe fusionné. Il faut pour cela garder les rapports, ce qui demande une migration.
+- **Bilan** : `shift_feedback`, puis le téléphone (Extension).

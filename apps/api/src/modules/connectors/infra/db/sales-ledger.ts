@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   AuditEntryIdSchema,
   EventIdSchema,
@@ -398,11 +400,15 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
           .for('update');
         if (link === null) await tx.delete(chatters).where(key);
         else {
+          const memberId = link.kind === 'member' ? link.memberId : null;
+          const same = before?.kind === link.kind && before.memberId === memberId;
           const values = {
             kind: link.kind,
-            memberId: link.kind === 'member' ? link.memberId : null,
+            memberId,
             linkedBy: by,
             linkedAt: new Date(),
+            // A new version only when the link points elsewhere: pay compares it with the one a statement froze.
+            ...(same ? {} : { linkVersion: randomUUID() }),
           };
           await tx
             .insert(chatters)

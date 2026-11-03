@@ -153,7 +153,7 @@ export const salesFeedModels = pgTable(
 
 /**
  * The owner's link of a platform's team member (ADR 0050 § 5): one of the team, or the agent (the platform's bot,
- * whose sales earn no commission). Pay reads it later (CRM-03); nothing is attributed here.
+ * whose sales earn no commission). Pay reads it through `salesFeedReadsForPay` (CRM-03), with its version.
  */
 export const salesFeedChatters = pgTable(
   'sales_feed_chatters',
@@ -162,6 +162,11 @@ export const salesFeedChatters = pgTable(
     platformChatterId: text('platform_chatter_id').notNull(),
     kind: enumText('kind').notNull(),
     memberId: uuid('member_id').references(() => teamMembers.id),
+    /**
+     * Changes whenever the link points elsewhere (another member, the agent), never when the same link is posed again:
+     * pay freezes it in a statement's inputs (CRM-03), so a link changed after a statement shows in its `inputs_hash`.
+     */
+    linkVersion: uuid('link_version').notNull().defaultRandom(),
     linkedBy: text('linked_by'),
     linkedAt: timestampTz('linked_at').notNull().defaultNow(),
   },

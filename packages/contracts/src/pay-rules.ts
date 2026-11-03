@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { Platform } from './enums';
 import { AccountPayRulesIdSchema, CreatorIdSchema, PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
@@ -19,6 +20,28 @@ import { BasisPointsSchema } from './team';
 export const EARNINGS_SOURCES = ['declared', 'detected'] as const;
 export const EarningsSourceSchema = z.enum(EARNINGS_SOURCES);
 export type EarningsSource = z.infer<typeof EarningsSourceSchema>;
+
+/**
+ * Where a sale's base comes from (ADR 0050 § 8, a calculation per platform): `platform_net`, the net the platform gives
+ * once its VAT, commission and payment fees are taken off (Reveal's `netAmount`); `gross_chain`, the chain of ADR 0023
+ * (gross, euros, excl. VAT, net of the platform's commission) with the account's `vatBps` and `platformFeeBps`.
+ */
+export const EARNINGS_BASES = ['platform_net', 'gross_chain'] as const;
+export const EarningsBaseSchema = z.enum(EARNINGS_BASES);
+export type EarningsBase = z.infer<typeof EarningsBaseSchema>;
+
+/** The platforms whose sales feed gives a net pay can take as it is (ADR 0050 § 8): Reveal alone today. */
+const PLATFORM_NET_PLATFORMS: readonly Platform[] = ['reveal'];
+
+/**
+ * The base of an account's sales under its rules of a period (ADR 0050 § 8): the platform's net only for a `detected`
+ * account of a platform that gives one; the chain of ADR 0023 everywhere else, `declared` accounts included, since the
+ * platform then gives no net. Read from the rules in force, so it follows them period by period and is never
+ * retroactive; a statement freezes it in its inputs with the rules.
+ */
+export function earningsBaseOf(platform: Platform, source: EarningsSource): EarningsBase {
+  return source === 'detected' && PLATFORM_NET_PLATFORMS.includes(platform) ? 'platform_net' : 'gross_chain';
+}
 
 /**
  * An account's pay rules from `fromPeriod` on, until its next rules. Added only: never changed nor deleted, and one per
