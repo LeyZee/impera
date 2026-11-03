@@ -12,7 +12,7 @@ Ce qu'on protège, par ordre d'importance : (1) les médias et conversations int
 
 ## 2. Secrets
 
-- Jamais dans le dépôt, jamais dans les logs, jamais dans une réponse d'API. `gitleaks` en pré-commit et en CI, secret scanning GitHub activé.
+- Jamais dans le dépôt, jamais dans les logs, jamais dans une réponse d'API. `gitleaks` avant chaque commit (les changements indexés), avant chaque push (tout commit local qu'aucune branche d'`origin` ne porte encore, `scripts/gitleaks-hook.mjs`) et en CI (version figée, entrée après sa quarantaine de 14 jours), secret scanning GitHub activé. Sans le binaire, le commit et le push s'arrêtent et disent comment l'installer.
 - Un secret par usage, par environnement (dev / staging / prod). Une clé LLM par rôle et par environnement, avec plafond de dépense côté fournisseur.
 - Rotation : procédure dans `docs/runbooks/rotate-secrets.md`. Toute suspicion de fuite = rotation immédiate, pas d'enquête avant.
 - Les **sessions plateforme** (cookies/jetons Reveal) sont chiffrées en base (AES-256-GCM, clé hors base, dans l'env chiffré de Coolify), déchiffrées uniquement dans le processus connecteur, jamais renvoyées par l'API, jamais loguées (redaction pino sur `session`, `cookie`, `token`, `authorization`).
