@@ -9,7 +9,8 @@ Pas fait :
 - Alerte quand une vérification CRM-02 ne correspond plus après la bascule (question 6) : lot b.
 Décisions :
 - La créatrice reçoit `revealSales: null` : elle aura son propre écran au lot d, sans vendeur (ADR 0042 § 2).
-- Un opérateur hors équipe lit les totaux sans vendeur ; un chatteur de l'équipe reste refusé au Dashboard (ADR 0024).
+- Une lecture de portée « soi » (opérateur hors équipe) ne reçoit rien du panneau, pas même les totaux : en retranchant ses ventes, il déduirait celles des autres (relecture Bilan, ADR 0043 § 7). Un chatteur de l'équipe reste refusé au Dashboard (ADR 0024).
+- La plateforme n'est jamais écrite à l'écran : le contrat porte `platforms` (les plateformes de ses comptes reliés au registre) et l'écran les nomme par `platformName` (relecture Extension).
 - Aucun montant recalculé : les montants de Reveal tels quels (ADR 0050 § 8).
 Découvertes : aucune.
 Candidats à suppression : aucun.

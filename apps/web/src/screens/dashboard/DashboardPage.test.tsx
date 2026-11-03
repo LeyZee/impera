@@ -169,6 +169,7 @@ describe('DashboardPage on the server’s data', () => {
       status: 200,
       body: apiDashboard({
         revealSales: {
+          platforms: ['reveal'],
           from: '2026-11-03',
           to: '2026-11-03',
           totals: {
@@ -207,6 +208,7 @@ describe('DashboardPage on the server’s data', () => {
       status: 200,
       body: apiDashboard({
         revealSales: {
+          platforms: ['reveal', 'onlyfans'],
           from: '2026-11-03',
           to: '2026-11-03',
           totals: {
@@ -226,6 +228,8 @@ describe('DashboardPage on the server’s data', () => {
     renderDashboard();
     expect(await screen.findByText('2 ventes')).toBeDefined();
     expect(screen.queryByRole('list', { name: 'Qui a vendu' })).toBeNull();
+    // The platforms come from the server, never written in the screen.
+    expect(screen.getByRole('heading', { name: /Ventes lues chez Reveal et OnlyFans/u })).toBeDefined();
   });
 
   it('opens a draft to validate in Suivi, on its conversation', async () => {

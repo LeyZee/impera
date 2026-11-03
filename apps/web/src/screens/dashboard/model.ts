@@ -125,6 +125,8 @@ export interface RevealSeller {
 
 /** The period's sales read in the platform's register (CRM-04 lot c), amounts in euros as the server summed them. */
 export interface RevealSales {
+  /** Where the figures are read: « Reveal », or « Reveal et OnlyFans » once a second platform is linked. */
+  readonly where: string;
   /** « Chiffre d'affaires »: what the fans paid, VAT included, refunds taken off. */
   readonly revenue: number;
   readonly net: number;

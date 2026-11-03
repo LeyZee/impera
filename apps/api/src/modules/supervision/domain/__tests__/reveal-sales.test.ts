@@ -49,6 +49,7 @@ const totals = (rows: SalesTotalsRow[], refundsWithoutSale = 0): SalesTotals => 
 describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
   it('sums the platform’s amounts as they are, by seller in four kinds, the largest revenue first', () => {
     const panel = revealSalesPanel({
+      platforms: ['reveal'],
       totals: totals([
         row({ kind: 'member', memberId: THEO }),
         row({ kind: 'member', memberId: THEO }, { day: '2026-11-01', saleType: 'tip' }),
@@ -96,6 +97,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
 
   it('takes a refund off, so a seller’s period can be negative, and counts the refunds older than the register apart', () => {
     const panel = revealSalesPanel({
+      platforms: ['reveal'],
       totals: totals(
         [
           row(
@@ -123,6 +125,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
 
   it('gives a chatter the totals and never who sold (ADR 0043 § 7)', () => {
     const panel = revealSalesPanel({
+      platforms: ['reveal'],
       totals: totals([row({ kind: 'member', memberId: THEO }), row({ kind: 'agent' })]),
       rate: null,
       names: null,
@@ -134,6 +137,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
 
   it('names a member it cannot read « Membre inconnu », never an empty label', () => {
     const panel = revealSalesPanel({
+      platforms: ['reveal'],
       totals: totals([row({ kind: 'member', memberId: THEO })]),
       rate: null,
       names: new Map([[THEO, '  ']]),
@@ -170,6 +174,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
     ];
     // 0,925 € for a dollar: 10,01 $ is 9,259 €, rounded to 9,26 €, the refund to −9,26 €.
     const rated = revealSalesPanel({
+      platforms: ['reveal'],
       totals: totals([row({ kind: 'agent' }), ...usd]),
       rate: { day: '2026-10-31', rateMicros: 925_000 },
       names: NAMES,
@@ -182,6 +187,7 @@ describe('the sales panel of the Dashboard (CRM-04 lot c)', () => {
     expect(rated.usd).toEqual({ seen: true, rate: { day: '2026-10-31' } });
 
     const unrated = revealSalesPanel({
+      platforms: ['reveal'],
       totals: totals([row({ kind: 'agent' }), ...usd]),
       rate: null,
       names: NAMES,

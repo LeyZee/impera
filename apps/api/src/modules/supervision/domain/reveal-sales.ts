@@ -4,6 +4,7 @@ import {
   type DashboardRevealSales,
   type DashboardSalesFigures,
   type DashboardSalesSeller,
+  type Platform,
   type SaleSeller,
   type SalesTotals,
   type SalesTotalsRow,
@@ -106,11 +107,12 @@ function totalOf(rows: readonly DashboardSalesFigures[]): DashboardSalesFigures 
  * two never disagree by a cent of conversion. A seller with neither a sale nor a refund in the period is left out.
  */
 export function revealSalesPanel(input: {
+  readonly platforms: readonly [Platform, ...Platform[]];
   readonly totals: SalesTotals;
   readonly rate: UsdRate | null;
   readonly names: ReadonlyMap<string, string> | null;
 }): DashboardRevealSales {
-  const { totals, rate, names } = input;
+  const { platforms, totals, rate, names } = input;
   const bySeller = new Map<string, { seller: SaleSeller; eur: Sums; usd: Sums }>();
   for (const row of totals.rows) {
     const key = sellerKey(row.seller);
@@ -139,6 +141,7 @@ export function revealSalesPanel(input: {
           : 0),
     );
   return {
+    platforms: [...platforms],
     from: totals.from,
     to: totals.to,
     totals: totalOf(sellers.map(({ figures }) => figures)),

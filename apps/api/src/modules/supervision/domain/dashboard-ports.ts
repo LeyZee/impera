@@ -4,6 +4,7 @@ import type {
   DecidedDraft,
   HandoffCause,
   LiveRateReading,
+  Platform,
   SalesTotals,
   UserId,
 } from '@nirvana/contracts';
@@ -121,6 +122,8 @@ export interface TelegramView {
 
 /** What the sales panel reads of the platform's register (CRM-04 lot c), in one transaction of the reader. */
 interface RevealSalesReading {
+  /** The platforms of her accounts linked to the register, at least one. */
+  readonly platforms: readonly [Platform, ...Platform[]];
   readonly totals: SalesTotals;
   /** Member id to display name, for the owner and an active manager; `null` for anyone else (ADR 0043 § 7). */
   readonly names: ReadonlyMap<string, string> | null;

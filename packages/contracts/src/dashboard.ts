@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { AutomaticGateSchema } from './automatic';
+import { PlatformSchema } from './enums';
 import { HandoffCauseSchema } from './events';
 import { ConversationIdSchema, CreatorIdSchema, FanIdSchema, TeamMemberIdSchema } from './ids';
 
@@ -148,6 +149,8 @@ export type DashboardSalesSeller = z.infer<typeof DashboardSalesSellerSchema>;
  * without one. Each day is the sale's, a refund taken off its sale's day.
  */
 export const DashboardRevealSalesSchema = z.object({
+  /** The platforms of her accounts linked to the register, in order: the screen names them, never one written in the code. */
+  platforms: z.array(PlatformSchema).min(1),
   from: z.iso.date(),
   to: z.iso.date(),
   totals: DashboardSalesFiguresSchema,

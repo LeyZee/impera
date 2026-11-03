@@ -10,6 +10,7 @@ import type { AgentCard, AgentState, Dashboard, Fan, RevealSales, RevealSeller, 
 
 import { CAUSE_LABELS } from '@/agent/causes';
 import { percent } from '@/agent/mode';
+import { platformName } from '@/scheduling/model';
 import { cityOf, clockAt, lengthOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
 import { telegramNightOf } from '@/settings/telegram/NightBanner';
 
@@ -448,7 +449,7 @@ function sellerOf(line: ApiSellerLine): RevealSeller {
     key: seller.kind === 'member' ? `member-${seller.memberId}` : seller.kind,
     kind: seller.kind,
     name: seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind],
-    // A chatter of Reveal nobody linked yet: his sales count for no one until the owner links him (ADR 0050 § 5).
+    // A chatter of the platform nobody linked yet: his sales count for no one until the owner links him (ADR 0050 § 5).
     line: seller.kind === 'unlinked' ? `${counts} · à relier dans Réglages › Ventes` : counts,
     revenue: euros(line.revenueMinor),
     net: euros(line.netMinor),
@@ -457,10 +458,19 @@ function sellerOf(line: ApiSellerLine): RevealSeller {
   };
 }
 
-/** The sales read in Reveal's register, in the screen's words (CRM-04 lot c). */
+/** « Reveal », « Reveal et OnlyFans », « Reveal, OnlyFans et Instagram »: never a platform written in the code. */
+function platformsText(platforms: ApiRevealSales['platforms']): string {
+  const names = platforms.map(platformName);
+  const last = names.at(-1) ?? 'la plateforme';
+  return names.length <= 1 ? last : `${names.slice(0, -1).join(', ')} et ${last}`;
+}
+
+/** The sales read in the platforms' registers, in the screen's words (CRM-04 lot c). */
 export function revealSalesOf(sales: ApiRevealSales): RevealSales {
   const dollars = usdNote(sales.usd);
+  const where = platformsText(sales.platforms);
   return {
+    where,
     revenue: euros(sales.totals.revenueMinor),
     net: euros(sales.totals.netMinor),
     agency: euros(sales.totals.agencyMinor),
@@ -468,7 +478,7 @@ export function revealSalesOf(sales: ApiRevealSales): RevealSales {
     counts: countsOf(sales.totals),
     sellers: sales.bySeller?.map(sellerOf) ?? null,
     notes: [
-      'Lus chez Reveal : ses montants au centime, chaque remboursement retiré du jour de sa vente.',
+      `Lus chez ${where} : les montants au centime, chaque remboursement retiré du jour de sa vente.`,
       ...(dollars === undefined ? [] : [dollars]),
       ...(sales.refundsWithoutSale === 0
         ? []

@@ -16,8 +16,8 @@ const MARK: Readonly<Record<Exclude<RevealSeller['kind'], 'member'>, string>> = 
 };
 
 /**
- * Level 2, once Reveal's register is read (CRM-04 lot c): the period's chiffre d'affaires and how it splits, as Reveal
- * gives it, then who sold for the owner and an active manager. Data colours, never the neon: a sale is no urgency.
+ * Level 2, once a platform's register is read (CRM-04 lot c): the period's chiffre d'affaires and how it splits, as the
+ * platform gives it, then who sold for the owner and an active manager. Data colours, never the neon: a sale is no urgency.
  */
 export function RevealSalesPanel({
   sales,
@@ -41,8 +41,8 @@ export function RevealSalesPanel({
           {(
             [
               ['Net', sales.net, 'ce que l’agence et la créatrice se partagent'],
-              ['Part de l’agence', sales.agency, 'chiffre de Reveal'],
-              [`Part de ${creatorName}`, sales.creator, 'chiffre de Reveal'],
+              ['Part de l’agence', sales.agency, `chiffre de ${sales.where}`],
+              [`Part de ${creatorName}`, sales.creator, `chiffre de ${sales.where}`],
             ] as const
           ).map(([label, value, hint]) => (
             <div key={label} className="db-reveal__part" title={hint}>
@@ -54,7 +54,7 @@ export function RevealSalesPanel({
       </div>
 
       {sales.sellers === null ? null : sales.sellers.length === 0 ? (
-        <p className="db-pending nv-plate">Aucune vente lue chez Reveal sur la période.</p>
+        <p className="db-pending nv-plate">Aucune vente lue chez {sales.where} sur la période.</p>
       ) : (
         <ul className="nv-plate db-fans db-reveal__sellers" aria-label="Qui a vendu">
           {sales.sellers.map((seller) => (

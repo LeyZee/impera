@@ -30,9 +30,9 @@ const GLOBAL_NOTE =
 
 /** The days of Reveal's register the panel sums, each sale on its own day (CRM-04 lot c). */
 const REVEAL_SUB: Record<Period, string> = {
-  day: 'depuis minuit, ses chiffres au centime',
-  week: 'les 7 derniers jours, ses chiffres au centime',
-  month: 'les 30 derniers jours, ses chiffres au centime',
+  day: 'depuis minuit, au centime près',
+  week: 'les 7 derniers jours, au centime près',
+  month: 'les 30 derniers jours, au centime près',
 };
 
 const FUNNEL_SUB: Record<Period, string> = {
@@ -310,13 +310,13 @@ function Loaded({
         </>
       )}
 
-      {/* Reveal's register, read by its API (CRM-04 lot c): the period's figures as Reveal gives them, who sold for the
+      {/* The platform's register, read by its API (CRM-04 lot c): the period's figures as it gives them, who sold for the
         owner and an active manager. Never on her Dashboard: the server sends her none. */}
       {data.revealSales === null ? null : (
         <Section
-          title="Ventes lues chez Reveal"
+          title={`Ventes lues chez ${data.revealSales.where}`}
           sub={REVEAL_SUB[period]}
-          index={2}
+          index={sales === null ? 2 : 4}
           control={sales === null ? periodControl : undefined}
         >
           <RevealSalesPanel sales={data.revealSales} creatorName={data.creator.name} tip={tip} />
@@ -327,7 +327,7 @@ function Loaded({
         <Section
           title="Meilleurs fans"
           sub="ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs"
-          index={2}
+          index={(sales === null ? 2 : 4) + (data.revealSales === null ? 0 : 1)}
           control={sales === null && data.revealSales === null ? periodControl : undefined}
         >
           <TopFans

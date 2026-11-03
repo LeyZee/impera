@@ -152,7 +152,7 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
     cookies.set('owner', await signIn(server, 'owner@example.test', PASSWORD));
     await member(await person('manager', 'operator', [creatorId, unlinkedCreatorId]), 'manager', 'Maya');
     theo = await member(await person('chatter', 'operator', [creatorId]), 'chatter', 'Théo');
-    // An operator of the dashboard with no record in the team: his scope is his own, he reads no one's figures.
+    // An operator of the dashboard with no record in the team: his scope is his own, he reads none of the panel.
     await person('operator', 'operator', [creatorId]);
     await person('creator', 'creator', [creatorId]);
     await test.admin.db.insert(schema.salesFeedChatters).values([
@@ -181,6 +181,7 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
   it('gives the owner the period’s figures and who sold, in four kinds, the register’s amounts as they are', async () => {
     const { revealSales } = await dashboard('owner', creatorId);
     expect(revealSales).not.toBeNull();
+    expect(revealSales?.platforms).toEqual(['reveal']);
     expect(revealSales?.totals).toEqual({
       sales: 5,
       refunds: 1,
@@ -204,7 +205,7 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
     expect(month.revealSales?.totals.revenueMinor).toBe(6000 + 2400);
   });
 
-  it('gives an active manager who sold, an operator outside the team the totals only (ADR 0043 § 7)', async () => {
+  it('gives an active manager who sold, and nothing to a reader whose scope is his own (ADR 0043 § 7)', async () => {
     const manager = await dashboard('manager', creatorId);
     expect(manager.revealSales?.bySeller?.map((one) => one.seller.kind)).toEqual([
       'agent',
@@ -212,9 +213,8 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
       'unlinked',
       'none',
     ]);
-    const operator = await dashboard('operator', creatorId);
-    expect(operator.revealSales?.totals.revenueMinor).toBe(6000);
-    expect(operator.revealSales?.bySeller).toBeNull();
+    // Not even the totals: taking his own sales off them would give him the others'.
+    expect((await dashboard('operator', creatorId)).revealSales).toBeNull();
     // A chatter of the team reads the conversations routed to him, never the Dashboard (ADR 0024).
     expect((await get('chatter', creatorId)).statusCode).toBe(403);
   });

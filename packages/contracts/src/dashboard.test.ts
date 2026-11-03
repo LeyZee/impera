@@ -95,6 +95,7 @@ describe('dashboard contract', () => {
 
   it('reads the sales of the register by seller in four kinds, a refund as a negative amount', () => {
     const revealSales = {
+      platforms: ['reveal'],
       from: '2026-10-17',
       to: '2026-10-17',
       totals: figures(1500),
