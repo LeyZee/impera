@@ -21,6 +21,7 @@ import { createDrizzlePayrollReadStore } from './infra/read-store';
 import { createPayrollRoutes, type RequireRole } from './infra/routes';
 import { createDrizzlePayrollRuleStore } from './infra/rule-store';
 import { createDrizzleSaleDecisionStore } from './infra/sale-decision-store';
+import { createDrizzleSaleSignalStore } from './infra/sale-signal-store';
 import type { PayInputReads } from './infra/snapshot';
 import { createDrizzlePayrollValidationStore } from './infra/validation-store';
 
@@ -132,6 +133,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   );
   const rules = createDrizzlePayrollRuleStore(deps.db, deps.reads, now);
   const decisions = createDrizzleSaleDecisionStore(deps.db, deps.reads);
+  const signals = createDrizzleSaleSignalStore(deps.db, deps.reads);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),
@@ -141,7 +143,8 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   };
   return {
     name: 'payroll',
-    routes: (requireRole) => createPayrollRoutes(reads, validation, entries, rules, decisions, requireRole),
+    routes: (requireRole) =>
+      createPayrollRoutes(reads, validation, entries, rules, decisions, signals, requireRole),
     latestRate: createLatestRateRead(deps.db),
     correctContest: (tx, actor, correction) => writeContestCorrection(tx, deps.reads, now, actor, correction),
     jobs: {

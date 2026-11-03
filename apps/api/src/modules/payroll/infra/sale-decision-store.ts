@@ -2,10 +2,14 @@ import {
   HeldSalesSchema,
   nextPayPeriod,
   PaySaleDecisionSchema,
+  PlatformSchema,
+  SaleEventSchema,
+  SaleSignalKindSchema,
   TeamMemberIdSchema,
   type HeldSales,
   type PayPeriod,
   type PaySaleDecision,
+  type TeamMemberId,
 } from '@nirvana/contracts';
 import {
   and,
@@ -18,6 +22,7 @@ import {
   type Database,
   type Transaction,
 } from '@nirvana/db';
+import { z } from 'zod';
 
 import { PayrollForbidden } from '../../contractors/pure';
 import {
@@ -27,14 +32,22 @@ import {
   PayrollOwnForbidden,
 } from '../domain/errors';
 import type { PayrollSaleDecisionStore } from '../domain/ports';
-import { salesToDecide, saleToDecide, type PeriodPlace, type SaleToDecide } from '../domain/sales';
+import {
+  saleKeyOf,
+  salesToDecide,
+  saleToDecide,
+  type PeriodPlace,
+  type SaleSignalForPay,
+  type SaleSignals,
+  type SaleToDecide,
+} from '../domain/sales';
 
 import { enqueuePayRecalculation } from './recalculation-queue';
 import { readPeriodSales, type PeriodSales } from './sales-reads';
 import { closingsSpan, type PayInputReads } from './snapshot';
 import { audit } from './writes';
 
-const { payPeriodClosings, paySaleDecisions, teamMembers } = schema;
+const { payPeriodClosings, paySaleDecisions, paySaleSignals, teamMembers } = schema;
 
 const decisionOfRow = (row: typeof paySaleDecisions.$inferSelect): PaySaleDecision =>
   PaySaleDecisionSchema.parse({
@@ -67,7 +80,65 @@ const heldSaleOf = (one: SaleToDecide): HeldSales['sales'][number] => ({
   reason: one.reason,
   decision: one.decision,
   outcomes: [...one.outcomes],
+  signal:
+    one.signal === null
+      ? null
+      : {
+          memberId: one.signal.memberId,
+          note: one.signal.note,
+          signalledAt: one.signal.signalledAt.toISOString(),
+        },
 });
+
+const SignalRowSchema = z.object({
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1),
+  event: SaleEventSchema,
+  memberId: TeamMemberIdSchema,
+  kind: SaleSignalKindSchema,
+  note: z.string().nullable(),
+  createdAt: z.date(),
+});
+
+/**
+ * The members' signals in force on `period`'s lines (CRM-03 lot b4c), by line: the latest of each line and member, when
+ * it is a `signal`. Read as the validator: the domain keeps the one of the member the line would pay.
+ */
+async function signalsIn(tx: Transaction, period: PayPeriod): Promise<SaleSignals> {
+  const rows = await tx
+    .selectDistinctOn(
+      [paySaleSignals.platform, paySaleSignals.platformSaleId, paySaleSignals.event, paySaleSignals.memberId],
+      {
+        platform: paySaleSignals.platform,
+        platformSaleId: paySaleSignals.platformSaleId,
+        event: paySaleSignals.event,
+        memberId: paySaleSignals.memberId,
+        kind: paySaleSignals.kind,
+        note: paySaleSignals.note,
+        createdAt: paySaleSignals.createdAt,
+      },
+    )
+    .from(paySaleSignals)
+    .where(eq(paySaleSignals.period, period))
+    .orderBy(
+      paySaleSignals.platform,
+      paySaleSignals.platformSaleId,
+      paySaleSignals.event,
+      paySaleSignals.memberId,
+      sql`${paySaleSignals.revision} desc`,
+    );
+  const signals = new Map<string, SaleSignalForPay[]>();
+  for (const row of rows) {
+    const one = SignalRowSchema.parse(row);
+    if (one.kind !== 'signal') continue;
+    const key = saleKeyOf(one);
+    signals.set(key, [
+      ...(signals.get(key) ?? []),
+      { memberId: one.memberId, note: one.note, signalledAt: one.createdAt },
+    ]);
+  }
+  return signals;
+}
 
 interface PeriodSalesRead extends PeriodSales {
   readonly place: PeriodPlace;
@@ -106,7 +177,7 @@ async function periodSalesOf(
 }
 
 /** The signed-in account's member, `null` for the owner outside the team. */
-async function ownMemberOf(tx: Transaction, userId: string): Promise<string | null> {
+export async function ownMemberOf(tx: Transaction, userId: string): Promise<TeamMemberId | null> {
   const [own] = await tx
     .select({ id: teamMembers.id })
     .from(teamMembers)
@@ -125,7 +196,11 @@ export function createDrizzleSaleDecisionStore(db: Database, reads: PayInputRead
       withMember(db, userId, async (tx, scope) => {
         if (scope === 'self') throw new PayrollForbidden();
         const { sales, place } = await periodSalesOf(tx, reads, period);
-        return HeldSalesSchema.parse({ period, sales: salesToDecide(sales, place).map(heldSaleOf) });
+        const signals = place.closed ? new Map() : await signalsIn(tx, period);
+        return HeldSalesSchema.parse({
+          period,
+          sales: salesToDecide(sales, place, signals).map(heldSaleOf),
+        });
       }),
 
     decide: (actor, body) =>

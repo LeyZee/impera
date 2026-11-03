@@ -315,23 +315,44 @@ export function saleDecisionsOpen(line: SaleForPay, sales: SalesSnapshot): reado
 }
 
 /**
+ * A member's signal in force on a line of their statement (CRM-03 lot b4c): « ce n'est pas ma vente », with their
+ * note. It changes no amount; the validator sees it while the line would pay that member.
+ */
+export interface SaleSignalForPay {
+  readonly memberId: TeamMemberId;
+  readonly note: string | null;
+  readonly signalledAt: Date;
+}
+
+/** The signals in force of a period, by `saleKeyOf` and member: a line is signalled by the member it pays. */
+export type SaleSignals = ReadonlyMap<string, readonly SaleSignalForPay[]>;
+
+/**
  * A sale the validator may decide on in an open period: the line shown, why it is held without a decision (`null`: a
- * member would be paid for it), the decision in force (`null`: none), and the outcomes.
+ * member would be paid for it), the decision in force (`null`: none), the outcomes, and the signal in force of the
+ * member the line would pay without a decision (`null`: none).
  */
 export interface SaleToDecide {
   readonly line: SaleForPay;
   readonly reason: SaleHeldReason | null;
   readonly decision: SaleDecisionInForce | null;
   readonly outcomes: readonly SaleDecisionOutcome[];
+  readonly signal: SaleSignalForPay | null;
 }
 
-function toDecide(line: SaleForPay, sales: SalesSnapshot): SaleToDecide {
+function toDecide(line: SaleForPay, sales: SalesSnapshot, signals: SaleSignals): SaleToDecide {
   const undecided = saleAttribution(line, { ...sales, decisions: new Map() });
+  // A signal counts while the line would pay the member who made it: linked again elsewhere, it has no effect.
+  const signal =
+    undecided.kind === 'member'
+      ? (signals.get(saleKeyOf(line))?.find((one) => one.memberId === undecided.memberId) ?? null)
+      : null;
   return {
     line,
     reason: undecided.kind === 'held' ? undecided.reason : null,
     decision: decisionOn(line, sales)?.outcome ?? null,
     outcomes: saleDecisionsOpen(line, sales),
+    signal,
   };
 }
 
@@ -352,22 +373,27 @@ export function saleToDecide(
   );
   const line = lines.find((one) => one.event === 'sale') ?? lines[0];
   if (line === undefined) return null;
-  const found = toDecide(line, sales);
+  const found = toDecide(line, sales, new Map());
   return found.outcomes.length === 0 ? null : found;
 }
 
 /**
- * What an open period shows the owner and the validator (CRM-03 lot b3), in key order: the lines it takes that no
- * closing counted and that are held without a decision or settled by a decision in force, so that every decision can
- * be seen and taken back. A closed period shows nothing: what it did not register goes to the first open period.
+ * What an open period shows the owner and the validator (CRM-03 lots b3, b4c), in key order: the lines it takes that
+ * no closing counted and that are held without a decision, settled by a decision in force, or signalled by the member
+ * they would pay (`signals`), so that every decision can be seen and taken back, and every signal answered. A closed
+ * period shows nothing: what it did not register goes to the first open period.
  */
-export function salesToDecide(sales: SalesSnapshot, place: PeriodPlace): SaleToDecide[] {
+export function salesToDecide(
+  sales: SalesSnapshot,
+  place: PeriodPlace,
+  signals: SaleSignals = new Map(),
+): SaleToDecide[] {
   if (place.closed) return [];
   const shown: SaleToDecide[] = [];
   for (const line of sales.lines) {
     if (sales.registered.has(saleKeyOf(line)) || !takes(place, line)) continue;
-    const one = toDecide(line, sales);
-    if (one.reason !== null || one.decision !== null) shown.push(one);
+    const one = toDecide(line, sales, signals);
+    if (one.reason !== null || one.decision !== null || one.signal !== null) shown.push(one);
   }
   return byKey(shown, (one) => one.line);
 }
@@ -376,6 +402,8 @@ export function salesToDecide(sales: SalesSnapshot, place: PeriodPlace): SaleToD
 export interface CountedSale extends CountedSaleLine {
   /** The sale's period when it is earlier than the period counting the line, `null` otherwise. */
   readonly lateFrom: PayPeriod | null;
+  /** The line's own instant, for its member to read (CRM-03 lot b4c); `null` from a closing's registry. */
+  readonly occurredAt: Date | null;
 }
 
 /** A line the period would count but holds, and why. */
@@ -422,7 +450,11 @@ export function salesCounted(sales: SalesSnapshot, place: PeriodPlace): CountedS
   if (place.closed) {
     for (const registered of sales.registered.values()) {
       if (registered.period !== place.period) continue;
-      counted.push({ ...countedLineOf(registered), lateFrom: lateFrom(registered.salePeriod, place.period) });
+      counted.push({
+        ...countedLineOf(registered),
+        lateFrom: lateFrom(registered.salePeriod, place.period),
+        occurredAt: null,
+      });
     }
     return byKey(counted, (one) => one);
   }
@@ -442,6 +474,7 @@ export function salesCounted(sales: SalesSnapshot, place: PeriodPlace): CountedS
       memberId: attribution.memberId,
       linkVersion: attribution.linkVersion,
       lateFrom: lateFrom(line.salePeriod, place.period),
+      occurredAt: line.occurredAt,
     });
   }
   return byKey(counted, (one) => one);
@@ -486,6 +519,11 @@ export interface StatementSale extends SaleKey {
   readonly netMinor: number;
   readonly linkVersion: string;
   readonly lateFrom?: PayPeriod;
+  /**
+   * The line's own instant, in ISO, for its member to read and signal it (CRM-03 lot b4c): kept on the statement, out
+   * of its `inputsHash` (`inputsHashOf`), absent on a statement written before it and on a closed period's.
+   */
+  readonly occurredAt?: string;
 }
 
 /** The counted lines of one account and currency for one member: one line of the statement, on the platform's net. */
@@ -528,6 +566,7 @@ export function saleLinesOf(counted: readonly CountedSale[]): SaleLineGroup[] {
         netMinor: one.netMinor,
         linkVersion: one.linkVersion,
         ...(one.lateFrom !== null && { lateFrom: one.lateFrom }),
+        ...(one.occurredAt !== null && { occurredAt: one.occurredAt.toISOString() }),
       })),
     }));
 }

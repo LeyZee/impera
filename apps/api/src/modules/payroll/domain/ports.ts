@@ -10,12 +10,15 @@ import type {
   CreateCollectiveGoalBody,
   CreatePayoutMinimumBody,
   CreatePaySaleDecisionBody,
+  CreatePaySaleSignalBody,
   CreatePenaltyBody,
   DomainError,
   ExchangeRate,
   ExchangeRates,
   ForeignCurrency,
   HeldSales,
+  MySales,
+  MySalesQuery,
   PayAdjustment,
   PayAdjustmentId,
   PayCommissionStatementBody,
@@ -30,6 +33,7 @@ import type {
   PayoutMinimum,
   PayrollSettings,
   PaySaleDecision,
+  PaySaleSignal,
   Penalty,
   PenaltyId,
   TeamMemberId,
@@ -144,6 +148,16 @@ export interface PayrollEntryStore {
 export interface PayrollSaleDecisionStore {
   heldSales(userId: UserId, period: PayPeriod): Promise<HeldSales>;
   decide(actor: Actor, body: CreatePaySaleDecisionBody): Promise<Recorded<PaySaleDecision>>;
+}
+
+/**
+ * A member's own lines on the platform's net and their signals (CRM-03 lot b4c, ADR 0050 §§ 5, 10), as the member
+ * (`withMember`): read from their own statement and signals, never from the register; a signal or its withdrawal on a
+ * line of their statement of a period no closing closed, under `payroll.close`. Throws the module's errors.
+ */
+export interface PayrollSaleSignalStore {
+  mySales(userId: UserId, query: MySalesQuery): Promise<MySales>;
+  signal(actor: Actor, body: CreatePaySaleSignalBody): Promise<Recorded<PaySaleSignal>>;
 }
 
 /**

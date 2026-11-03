@@ -566,7 +566,10 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
     case 'collective_goal_conflict':
     case 'payout_minimum_conflict':
     case 'pay_sale_decision_conflict':
+    case 'pay_sale_signal_conflict':
       return 'Cette saisie existe déjà avec d’autres valeurs : recharge la page.';
+    case 'pay_sale_signal_state_conflict':
+      return 'Ce signalement a déjà changé : la liste est relue.';
     case 'pay_rule_started_invalid':
       return period === null
         ? 'Cette quinzaine a commencé : une règle de paie part d’une quinzaine qui n’a pas commencé.'
@@ -604,6 +607,8 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return 'Cette saisie n’existe plus : la page est relue.';
     case 'pay_sale_not_found':
       return 'Cette vente n’attend plus de décision dans cette quinzaine : la liste est relue.';
+    case 'pay_sale_signal_not_found':
+      return 'Cette vente n’est plus sur ton relevé de cette quinzaine : la liste est relue.';
     case 'cursor_invalid':
       return 'La liste a changé : elle est relue depuis le début.';
     case 'role_forbidden':

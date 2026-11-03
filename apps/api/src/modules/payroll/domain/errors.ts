@@ -57,6 +57,23 @@ export class PaySaleNotFound extends DomainError {
   }
 }
 
+/** A line that is not on the member's own statement of the period (CRM-03 lot b4c). */
+export class PaySaleSignalNotFound extends DomainError {
+  constructor() {
+    super('pay_sale_signal_not_found', 'Cette vente n’est pas sur ton relevé de cette quinzaine');
+  }
+}
+
+/** A line already signalled, or a withdrawal without a signal in force (CRM-03 lot b4c). */
+export class PaySaleSignalStateConflict extends DomainError {
+  constructor(kind: 'signal' | 'withdraw') {
+    super(
+      'pay_sale_signal_state_conflict',
+      kind === 'signal' ? 'Cette vente est déjà signalée' : 'Cette vente n’est pas signalée',
+    );
+  }
+}
+
 /** An outcome the sale does not offer now (`saleDecisionsOpen`): `details.outcomes` says those it does. */
 export class PaySaleOutcomeConflict extends DomainError {
   constructor(outcomes: readonly SaleDecisionOutcome[]) {
@@ -242,7 +259,8 @@ export class PayEntryConflict extends DomainError {
       | 'bonus_tier_set_conflict'
       | 'collective_goal_conflict'
       | 'payout_minimum_conflict'
-      | 'pay_sale_decision_conflict',
+      | 'pay_sale_decision_conflict'
+      | 'pay_sale_signal_conflict',
   ) {
     super(code, 'Cet identifiant est déjà pris par une autre saisie');
   }

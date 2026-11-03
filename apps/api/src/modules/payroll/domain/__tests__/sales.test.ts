@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   closePeriod,
+  inputsHashOf,
   paysMember,
   periodIsEmpty,
   planPeriod,
@@ -452,6 +453,37 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
     expect(salesToDecide({ ...sales, decisions }, { ...place, closed: true })).toEqual([]);
   });
 
+  it('shows a paid line its member signalled, while it would pay them, and the decision that answers it', () => {
+    const paid = sale(linked(theo), '2025-03-17T12:00:00.000Z', 1_000);
+    const quiet = sale(linked(theo), '2025-03-17T12:30:00.000Z', 600);
+    const sales = salesOf({ lines: [paid, quiet], shifts: [morning] });
+    const place = { period: P2, closed: false, firstOpen: P2 };
+    const signal = { memberId: theo.id, note: 'Vendue pendant le shift de Léa', signalledAt: new Date(0) };
+    // Léa's signal on Théo's line has no effect: only the member the line pays signals it.
+    const signals = new Map([
+      [saleKeyOf(paid), [signal]],
+      [saleKeyOf(quiet), [{ ...signal, memberId: lea.id }]],
+    ]);
+    expect(salesToDecide(sales, place)).toEqual([]);
+    expect(
+      salesToDecide(sales, place, signals).map((one) => [
+        saleKeyOf(one.line),
+        one.reason,
+        one.decision,
+        one.outcomes,
+        one.signal,
+      ]),
+    ).toEqual([[saleKeyOf(paid), null, null, ['exclude'], signal]]);
+    // Excluded, it still shows with the signal it answers, and can be taken back.
+    const excluded = { ...sales, decisions: decided(paid, excludes()) };
+    expect(
+      salesToDecide(excluded, place, signals).map((one) => [one.decision, one.outcomes, one.signal]),
+    ).toEqual([['exclude', ['withdraw'], signal]]);
+    // Linked again to Léa, the line would no longer pay Théo: his signal has no effect.
+    const relinked = salesOf({ lines: [{ ...paid, author: linked(lea, 'v2') }], shifts: [morning] });
+    expect(salesToDecide(relinked, place, signals).map((one) => one.signal)).toEqual([null]);
+  });
+
   it('finds the sale an open period takes to decide on, never one a closing counted or of a closed period', () => {
     const night = sale(linked(theo), '2025-03-17T20:00:00.000Z', 900);
     const refund = refundOf(night, P3, 900);
@@ -462,6 +494,7 @@ describe('the validator’s decision on a sale (CRM-03 lot b3, ADR 0050 § 5)', 
       reason: 'off_shift',
       decision: null,
       outcomes: ['count', 'exclude'],
+      signal: null,
     });
     expect(saleToDecide(sales, { ...place, closed: true }, night)).toBeNull();
     expect(saleToDecide(sales, { ...place, period: P3, firstOpen: P2 }, night)).toBeNull();
@@ -518,6 +551,7 @@ describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
       [undefined, 0, 2_000, 8_000, 1_600],
       ['platform_net', 0, 0, 10_000, 2_000],
     ]);
+    // With its instant, for Théo to read it (CRM-03 lot b4c): kept out of the statement's hash.
     expect(content.lines[1]?.sales).toEqual([
       {
         platform: 'reveal',
@@ -525,6 +559,7 @@ describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
         event: 'sale',
         netMinor: 10_000,
         linkVersion: 'v1',
+        occurredAt: '2025-03-17T11:00:00.000Z',
       },
     ]);
     expect(content.lines[1]?.shiftReportIds).toEqual([]);
@@ -611,6 +646,27 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
     expect(statementOf(again, theo.id).inputsHash).toBe(statementOf(open, theo.id).inputsHash);
   });
 
+  it('keeps the instants of its sales out of a statement’s hash, never its amounts (CRM-03 lot b4c)', () => {
+    const { content } = statementOf(open, theo.id);
+    const line = content.lines[0];
+    if (line?.sales === undefined) throw new Error('a line of sales');
+    // As a statement written before CRM-03 lot b4c kept it: the same hash, never written again for it.
+    const before = line.sales.map(({ platform, platformSaleId, event, netMinor, linkVersion }) => ({
+      platform,
+      platformSaleId,
+      event,
+      netMinor,
+      linkVersion,
+    }));
+    expect(line.sales.every((one) => one.occurredAt !== undefined)).toBe(true);
+    expect(inputsHashOf({ ...content, lines: [{ ...line, sales: before }] })).toBe(inputsHashOf(content));
+    const other = {
+      ...content,
+      lines: [{ ...line, sales: line.sales.map((one) => ({ ...one, netMinor: 1 })) }],
+    };
+    expect(inputsHashOf(other)).not.toBe(inputsHashOf(content));
+  });
+
   it('takes a refund after the closing off the first open period, for the member the sale paid', () => {
     const { closed } = closePeriod(open);
     const refund = refundOf(one, P3, 10_000, linked(lea, 'v2'));
@@ -635,6 +691,7 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
         netMinor: -10_000,
         linkVersion: 'v1',
         lateFrom: P2,
+        occurredAt: refund.occurredAt.toISOString(),
       },
     ]);
     expect(paysMember(next, lea.id)).toBe(false);

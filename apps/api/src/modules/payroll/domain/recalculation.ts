@@ -165,7 +165,10 @@ interface CountedEntries {
   readonly adjustments: readonly PayAdjustment[];
 }
 
-/** A statement's whole content, which `inputsHash` covers: everything but its id, status, revision and dates. */
+/**
+ * A statement's whole content, which `inputsHash` covers (`inputsHashOf`): everything but its id, status, revision
+ * and dates, and the instants of its sales, which only show.
+ */
 export interface StatementContent {
   readonly memberId: TeamMemberId;
   readonly engineVersion: string;
@@ -192,6 +195,30 @@ export interface StatementContent {
 export interface StatementDraft {
   readonly content: StatementContent;
   readonly inputsHash: string;
+}
+
+/** A sale as `inputsHash` covers it: without its instant, which only shows (CRM-03 lot b4c). */
+const counted = (sale: StatementSale): StatementSale => ({
+  platform: sale.platform,
+  platformSaleId: sale.platformSaleId,
+  event: sale.event,
+  netMinor: sale.netMinor,
+  linkVersion: sale.linkVersion,
+  ...(sale.lateFrom !== undefined && { lateFrom: sale.lateFrom }),
+});
+
+/**
+ * A statement's `inputsHash`: the SHA-256 of its content, the instants of its sales left out (CRM-03 lot b4c). They
+ * are kept for the member to read and signal a line, and change no amount: a statement written before them, or
+ * computed again from a closing's registry, keeps its hash, and is never written again nor seen as drifted for them.
+ */
+export function inputsHashOf(content: StatementContent): string {
+  return sha256Of({
+    ...content,
+    lines: content.lines.map((line) =>
+      line.sales === undefined ? line : { ...line, sales: line.sales.map(counted) },
+    ),
+  });
 }
 
 export type PeriodPlan =
@@ -550,7 +577,7 @@ export function planPeriod(snapshot: PeriodSnapshot): PeriodPlan {
   let unchanged = 0;
   for (const memberId of [...memberIds].sort(ascending)) {
     const content = contentOf(memberId);
-    const draft = { content, inputsHash: sha256Of(content) };
+    const draft = { content, inputsHash: inputsHashOf(content) };
     const statement = stored.get(memberId);
     if (statement === undefined) inserts.push(draft);
     else if (statement.inputsHash === draft.inputsHash) unchanged += 1;
@@ -628,7 +655,7 @@ export function closePeriod(snapshot: PeriodSnapshot): {
 /** A member's statement of the period as it computes now, with its `inputsHash`: what a validation compares. */
 export function statementOf(snapshot: PeriodSnapshot, memberId: TeamMemberId): StatementDraft {
   const content = computedOnClosing(snapshot).contentOf(memberId);
-  return { content, inputsHash: sha256Of(content) };
+  return { content, inputsHash: inputsHashOf(content) };
 }
 
 /** Whether the period counts something for the member: a report, a sale, or a statement the engine gives them. */

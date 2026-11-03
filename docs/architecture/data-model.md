@@ -326,6 +326,16 @@ pay_sale_decisions         id (clé), platform, platform_sale_id, revision (uniq
                            déclencheur exige la vente au registre des ventes de son compte, refuse un withdraw qui ne
                            suit pas une décision et une vente qu'une clôture a comptée ; la première quinzaine ouverte
                            relit chaque vente décidée jusqu'à ce qu'une clôture la compte ; ajout seul)
+pay_sale_signals           id (clé), platform, platform_sale_id, event, member_id → team_members, period → pay_periods,
+                           revision (unique avec la ligne, le membre et la quinzaine, ≥ 1, sans trou), kind (signal |
+                           withdraw : reprend le signalement en vigueur), platform_account_id, currency, net_minor,
+                           occurred_at (la ligne telle que le relevé la porte), note (1 à 500), created_by, created_at
+                           (migration 0079, CRM-03 lot b4c, ADR 0050 § 10 ; « ce n'est pas ma vente » d'un membre sur une
+                           ligne de son relevé, sans effet sur la paie ; politique `member_insert` : pour soi seulement ; le
+                           déclencheur, sous les politiques de l'auteur, exige le numéro suivant, un signalement en vigueur
+                           pour un retrait et aucun pour un signalement, aucune clôture de la quinzaine, aucune ligne du
+                           registre des ventes comptées, et la ligne au relevé brouillon du membre avec le même compte, la
+                           même devise, le même net et la même heure ; ajout seul)
 pay_period_blocks          period (clé) → pay_periods, code (commission_rate_missing_conflict |
                            exchange_rate_missing_conflict), member_ids uuid[] (tous les membres sans taux) | currency,
                            since (migration 0038 ; pourquoi le job n'a pas pu calculer la quinzaine à son dernier essai :
