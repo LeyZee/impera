@@ -41,6 +41,19 @@ export function wireNotifications(shared: Shared): WiredNotifications {
           );
         },
       ),
+      'notifications.creator_sale': defineTask(
+        'notifications.creator_sale',
+        JOB_PAYLOADS['notifications.creator_sale'],
+        shared.logger,
+        async (payload, context) => {
+          if (module.creatorSale === null) {
+            context.logger.warn('notifications: push is off, the sale is not told to her accounts');
+            return;
+          }
+          const outcomes = await module.creatorSale(payload.eventId, new Date());
+          context.logger.info({ accounts: outcomes.length, outcomes }, 'notifications: creator sale');
+        },
+      ),
     },
     routes: [module.routes],
   };

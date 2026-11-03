@@ -3,7 +3,9 @@ import type { NotificationOutcome, NotificationRequest } from '@nirvana/contract
 import type { Database, EncryptionKey } from '@nirvana/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { notifyCreatorSale } from './application/creator-sale';
 import { notify, recap, type NotifyDeps } from './application/notify';
+import { createCreatorSaleSource } from './infra/db/creator-sales';
 import { createDeliveryRegistry } from './infra/db/deliveries';
 import { createPreferencesStore, createServerKeyStore, createSubscriptionStore } from './infra/db/stores';
 import { createNotificationRoutes, type RequireRole } from './infra/http/routes';
@@ -33,6 +35,11 @@ export interface NotificationsModule {
   readonly notify: ((request: NotificationRequest, at: Date) => Promise<NotificationOutcome>) | null;
   /** The task of `notifications.recap`; null when push is off (the held ones then wait, nothing rings). */
   readonly recap: ((userId: string, at: Date) => Promise<number>) | null;
+  /**
+   * The task of `notifications.creator_sale` (CRM-04 lot d2): her own accounts told of a fresh sale, her part only;
+   * null when push is off.
+   */
+  readonly creatorSale: ((eventId: string, at: Date) => Promise<readonly NotificationOutcome[]>) | null;
 }
 
 export function createNotificationsModule(deps: NotificationsDeps): NotificationsModule {
@@ -46,10 +53,20 @@ export function createNotificationsModule(deps: NotificationsDeps): Notification
           sender: createPushSender(deps.webOrigin, deps.fetch),
           registry: createDeliveryRegistry(deps.db),
         };
+  const sales = createCreatorSaleSource(deps.adminDb);
   return {
     name: 'notifications',
     routes: createNotificationRoutes(devices, deps.requireRole),
     notify: devices === null ? null : (request, at) => notify(devices, request, at),
     recap: devices === null ? null : (userId, at) => recap(devices, userId, at),
+    creatorSale:
+      devices === null
+        ? null
+        : (eventId, at) =>
+            notifyCreatorSale(
+              { sales, notify: (request, when) => notify(devices, request, when) },
+              eventId,
+              at,
+            ),
   };
 }
