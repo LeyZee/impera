@@ -1,37 +1,48 @@
 import { CREATOR_TASK_CATEGORY_LABELS, type CreatorAgenda, type CreatorTask } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX } from 'react';
+import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
-import { AGENDA_KEY, archiveTask } from './api';
+import { AGENDA_KEY, archiveTask, moveTask } from './api';
+import { spanOf } from './draft';
 import { whenWords } from './words';
 
+import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
+import { clockOf, dayOf, minuteOf } from '@/scheduling/time';
 import { Dialog } from '@/screens/team/Dialog';
 import '@/screens/team/team.css';
 
-/** One of her tasks, opened: what it is, what it is for, and « Retirer » (archived, never deleted). */
+const OFFLINE = 'Pas de réseau : réessaie dans un moment.';
+
+/**
+ * One of her tasks, opened: what it is, what it is for, « Changer le moment » (what a drag does in Semaine, by the
+ * keyboard or a touch) and « Retirer » (archived, never deleted).
+ */
 export function TaskDialog({
   agenda,
   task,
   day,
   onClose,
+  onNotice,
 }: {
   agenda: CreatorAgenda;
   task: CreatorTask;
   day: string;
   onClose: () => void;
+  onNotice: (notice: string) => void;
 }): JSX.Element {
   const client = useQueryClient();
-  const [confirm, setConfirm] = useState(false);
+  const [mode, setMode] = useState<'read' | 'move' | 'remove'>('read');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const done = agenda.ticks.some((tick) => tick.taskId === task.id && tick.day === day);
+  const movable = task.when.kind !== 'routine';
   const remove = (): void => {
     setBusy(true);
     setFailed(null);
     void archiveTask(task.id).then(async (outcome) => {
       setBusy(false);
       if (outcome.kind === 'failed') {
-        setFailed('Pas de réseau : réessaie dans un moment.');
+        setFailed(OFFLINE);
         return;
       }
       await client.invalidateQueries({ queryKey: AGENDA_KEY });
@@ -46,62 +57,182 @@ export function TaskDialog({
       busy={busy}
       onClose={onClose}
     >
-      <div className="tm-dialog__body">
-        {task.purpose === null ? null : <p className="ag-explain">{task.purpose}</p>}
-        {task.essential ? (
-          <p className="ag-explain">
-            <span className="ag-ess">essentielle</span> Elle compte pour ta série : coche-la chaque jour
-            prévu.
+      {mode === 'move' ? (
+        <MoveForm
+          agenda={agenda}
+          task={task}
+          onBack={() => {
+            setMode('read');
+          }}
+          onMoved={(moved) => {
+            if (!moved)
+              onNotice(
+                'Le changement n’a pas pu se faire : pas de réseau, ou la tâche a changé. Ton agenda est relu.',
+              );
+            onClose();
+          }}
+        />
+      ) : (
+        <div className="tm-dialog__body">
+          {task.purpose === null ? null : <p className="ag-explain">{task.purpose}</p>}
+          {task.essential ? (
+            <p className="ag-explain">
+              <span className="ag-ess">essentielle</span> Elle compte pour ta série : coche-la chaque jour
+              prévu.
+            </p>
+          ) : null}
+          <p className="tm-hint">{done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.'}</p>
+          {failed === null ? null : (
+            <p className="tm-hint tm-hint--error" role="alert">
+              {failed}
+            </p>
+          )}
+          <div className="tm-dialog__foot ag-task-foot">
+            {mode === 'remove' ? (
+              <>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--plain"
+                  disabled={busy}
+                  onClick={() => {
+                    setMode('read');
+                  }}
+                >
+                  Garder
+                </button>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--destructive"
+                  disabled={busy}
+                  aria-busy={busy}
+                  data-autofocus
+                  onClick={remove}
+                >
+                  Retirer pour de bon
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--plain"
+                  onClick={() => {
+                    setMode('remove');
+                  }}
+                >
+                  Retirer de mon agenda
+                </button>
+                {movable ? (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain"
+                    onClick={() => {
+                      setMode('move');
+                    }}
+                  >
+                    Changer le moment
+                  </button>
+                ) : null}
+                <button type="button" className="nv-btn nv-btn--neon" onClick={onClose}>
+                  OK
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+/** Another day, and other hours for a task at an hour; its kind stays (a task of a day stays one). */
+function MoveForm({
+  agenda,
+  task,
+  onBack,
+  onMoved,
+}: {
+  agenda: CreatorAgenda;
+  task: CreatorTask;
+  onBack: () => void;
+  onMoved: (moved: boolean) => void;
+}): JSX.Element {
+  const id = useId();
+  const client = useQueryClient();
+  const zone = agenda.timeZone;
+  const { when } = task;
+  const timed = when.kind === 'timed';
+  const [day, setDay] = useState(
+    when.kind === 'timed' ? dayOf(when.startsAt, zone) : when.kind === 'day' ? when.day : agenda.today,
+  );
+  const [start, setStart] = useState(when.kind === 'timed' ? minuteOf(when.startsAt, zone) : 10 * 60);
+  const [end, setEnd] = useState(when.kind === 'timed' ? minuteOf(when.endsAt, zone) : 11 * 60);
+  const { unreadable, onUnreadable } = useUnreadableTimes();
+  const [busy, setBusy] = useState(false);
+  const [badDay, setBadDay] = useState(false);
+  const submit = (event: SyntheticEvent): void => {
+    event.preventDefault();
+    if (unreadable) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(day)) {
+      setBadDay(true);
+      return;
+    }
+    setBusy(true);
+    void moveTask(
+      client,
+      task,
+      timed ? { kind: 'timed', ...spanOf(day, start, end, zone) } : { kind: 'day', day },
+    ).then((moved) => {
+      setBusy(false);
+      onMoved(moved);
+    });
+  };
+  return (
+    <form className="tm-dialog__body" noValidate onSubmit={submit}>
+      <div className="nv-field tm-field">
+        <label className="nv-field__label" htmlFor={`${id}-day`}>
+          Jour
+        </label>
+        <input
+          id={`${id}-day`}
+          type="date"
+          className="nv-field__control nv-glass tm-date"
+          value={day}
+          data-autofocus
+          aria-invalid={badDay ? 'true' : undefined}
+          aria-describedby={badDay ? `${id}-day-error` : undefined}
+          onChange={(event) => {
+            setDay(event.target.value);
+            setBadDay(false);
+          }}
+        />
+        {badDay ? (
+          <p id={`${id}-day-error`} className="tm-hint tm-hint--error" role="alert">
+            Ce jour ne se lit pas : choisis-le dans le calendrier.
           </p>
         ) : null}
-        <p className="tm-hint">{done ? 'Faite ce jour-là.' : 'Pas encore faite ce jour-là.'}</p>
-        {failed === null ? null : (
-          <p className="tm-hint tm-hint--error" role="alert">
-            {failed}
-          </p>
-        )}
-        <div className="tm-dialog__foot">
-          {confirm ? (
-            <>
-              <button
-                type="button"
-                className="nv-btn nv-btn--plain"
-                disabled={busy}
-                onClick={() => {
-                  setConfirm(false);
-                }}
-              >
-                Garder
-              </button>
-              <button
-                type="button"
-                className="nv-btn nv-btn--destructive"
-                disabled={busy}
-                aria-busy={busy}
-                data-autofocus
-                onClick={remove}
-              >
-                Retirer pour de bon
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="nv-btn nv-btn--plain"
-                onClick={() => {
-                  setConfirm(true);
-                }}
-              >
-                Retirer de mon agenda
-              </button>
-              <button type="button" className="nv-btn nv-btn--neon" onClick={onClose}>
-                OK
-              </button>
-            </>
-          )}
-        </div>
       </div>
-    </Dialog>
+      {timed ? (
+        <div className="ag-hours">
+          <div className="nv-field tm-field">
+            <span className="nv-field__label">Début</span>
+            <TimeField value={start} label="Début" onChange={setStart} onUnreadable={onUnreadable} />
+          </div>
+          <div className="nv-field tm-field">
+            <span className="nv-field__label">Fin</span>
+            <TimeField value={end} label="Fin" onChange={setEnd} onUnreadable={onUnreadable} />
+            {end <= start ? <p className="tm-hint nv-num">Jusqu’à {clockOf(end)} le lendemain.</p> : null}
+          </div>
+        </div>
+      ) : null}
+      <div className="tm-dialog__foot">
+        <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onBack}>
+          Retour
+        </button>
+        <button type="submit" className="nv-btn nv-btn--neon" disabled={busy || unreadable} aria-busy={busy}>
+          Enregistrer
+        </button>
+      </div>
+    </form>
   );
 }
