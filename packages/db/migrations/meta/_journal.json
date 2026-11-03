@@ -624,6 +624,13 @@
       "when": 1793718767232,
       "tag": "0099_platform_impera",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1793720542341,
+      "tag": "0100_trend_watch",
+      "breakpoints": true
     }
   ]
 }
