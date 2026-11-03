@@ -19,6 +19,7 @@ import {
   outcomeWords,
   saleAmount,
   saleWhen,
+  signalText,
   type SaleMember,
 } from '@/payroll/held-sales';
 import { payRefusalText } from '@/payroll/model';
@@ -93,6 +94,9 @@ export function HeldSalesPanel({
         <p className="py-quiet">
           Lues sur la plateforme, elles ne comptent pour personne tant qu’elles attendent. Elles n’empêchent
           pas la clôture : une vente décidée après elle va sur la première quinzaine ouverte.
+          {sales.some((sale) => sale.signal !== null)
+            ? ' Une vente signalée par son chatteur compte pour lui tant qu’elle n’est pas écartée.'
+            : null}
         </p>
         <ul className="py-held__rows">
           {sales.map((sale, index) => {
@@ -101,6 +105,7 @@ export function HeldSalesPanel({
             const about = (part: string): string => `${uid}-${String(index)}-${part}`;
             const account = names.account(sale.platformAccountId);
             const reason = heldReasonText(sale, member, owner);
+            const signalled = signalText(sale, member);
             const decided = decisionText(sale, member);
             return (
               <li key={`${sale.platform}:${sale.platformSaleId}:${sale.event}`} className="py-held__row">
@@ -121,12 +126,15 @@ export function HeldSalesPanel({
                     {saleAmount(sale)}
                   </p>
                   {decided === null ? (
-                    <span className="rp-chip rp-chip--warn">En attente</span>
+                    <span className="rp-chip rp-chip--warn">
+                      {signalled === null ? 'En attente' : 'Signalée'}
+                    </span>
                   ) : (
                     <span className="rp-chip">{decided}</span>
                   )}
                 </div>
                 {reason === null ? null : <p className="py-held__reason">{reason}</p>}
+                {signalled === null ? null : <p className="py-held__reason">{signalled}</p>}
                 {member?.own === true ? (
                   <p className="py-held__own">C’est une vente de ton chatteur : un autre membre en décide.</p>
                 ) : sale.outcomes.length === 0 ? null : (

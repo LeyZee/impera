@@ -1145,6 +1145,31 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     ]);
   });
 
+  it('shows a paid line its chatter signalled, with their note, and only « Écarter » (CRM-03 lot b4c)', async () => {
+    held[OCT2] = [
+      heldSaleOf({
+        reason: null,
+        outcomes: ['exclude'],
+        signal: {
+          memberId: THEO.id,
+          note: 'Vendue pendant le shift de Lou',
+          signalledAt: '2026-10-29T08:00:00.000Z',
+        },
+      }),
+    ];
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    const list = await panel();
+    expect(text(list)).toContain(
+      'Une vente signalée par son chatteur compte pour lui tant qu’elle n’est pas écartée.',
+    );
+    const signalled = card(list, /^Signalée par Théo/u);
+    expect(text(signalled)).toContain(
+      'Signalée par Théo : ce n’est pas sa vente. « Vendue pendant le shift de Lou »',
+    );
+    expect(within(signalled).getByText('Signalée').className).toContain('rp-chip--warn');
+    expect(within(signalled).getAllByRole('button').map(text)).toEqual(['Écarter']);
+  });
+
   it('leaves a sale of the reader’s own chatter to another member', async () => {
     held[OCT2] = [heldSaleOf({ memberId: IRIS.id })];
     renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${OCT2}`);

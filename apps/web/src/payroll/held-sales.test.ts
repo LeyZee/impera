@@ -8,9 +8,10 @@ import {
   outcomeWords,
   saleAmount,
   saleWhen,
+  signalText,
 } from './held-sales';
 
-import { heldSaleOf } from '@/test/pay';
+import { heldSaleOf, THEO as THEO_MEMBER } from '@/test/pay';
 
 const NBSP = /[\u00a0\u202f]/gu;
 const plain = (text: string | null): string | null => (text === null ? null : text.replace(NBSP, ' '));
@@ -103,5 +104,20 @@ describe('held sales (CRM-03 lot b4b)', () => {
     expect(
       plain(heldCountText([heldSaleOf({ decision: 'count' }), heldSaleOf({ decision: 'exclude' })])),
     ).toBe('2 décidées');
+  });
+
+  it('says a paid line its chatter signalled, by name and with their note (CRM-03 lot b4c)', () => {
+    const signal = {
+      memberId: THEO_MEMBER.id,
+      note: 'Vendue pendant le shift de Lou',
+      signalledAt: '2026-10-29T08:00:00.000Z',
+    };
+    expect(signalText(heldSaleOf(), THEO)).toBeNull();
+    expect(plain(signalText(heldSaleOf({ reason: null, signal }), THEO))).toBe(
+      'Signalée par Théo : ce n’est pas sa vente. « Vendue pendant le shift de Lou »',
+    );
+    expect(signalText(heldSaleOf({ reason: null, signal: { ...signal, note: null } }), null)).toBe(
+      'Signalée par son chatteur : ce n’est pas sa vente.',
+    );
   });
 });
