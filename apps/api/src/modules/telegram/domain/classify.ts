@@ -138,8 +138,7 @@ const SALE_AMOUNT: Readonly<Record<Currency, Intl.NumberFormat>> = {
 };
 
 /** « 45,00 € », the price the fan paid, cents always shown as the platform shows them. */
-export const saleAmount = (minor: number, currency: Currency): string =>
-  SALE_AMOUNT[currency].format(minor / 100);
+const saleAmount = (minor: number, currency: Currency): string => SALE_AMOUNT[currency].format(minor / 100);
 
 /** Who sold, in four cases (ADR 0050 § 5): a member by name, the agent, a chatter nobody linked yet, nobody. */
 function sellerText(seller: SaleSeller, memberNameOf: MemberNameOf): string {
