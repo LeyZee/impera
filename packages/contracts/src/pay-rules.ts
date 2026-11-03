@@ -93,7 +93,10 @@ export type AccountPayRulesList = z.infer<typeof AccountPayRulesListSchema>;
  * otherwise). A second rule for the same account and period answers `pay_rules_period_conflict` with
  * `details.accountPayRulesId`: the screen has the owner confirm the rules before sending them, and a mistake is put
  * right by the next rules, and in the periods it touched by an adjustment (EQ-04). `detected` answers
- * `pay_rules_source_conflict` until the connector records the sales (P6-01): an account in it would be paid nothing.
+ * `pay_rules_source_conflict` (`details.reason`, `PayRulesSourceRefusal`) unless the account can be paid on its
+ * platform's net (ADR 0050 § 8): a platform that gives one, a model of it linked to the account, and the platform's
+ * latest reliability check clean over a fortnight that ends before the rules start (CRM-02, CRM-03). The switch is the
+ * owner's own act: nothing switches an account by itself.
  */
 export const CreateAccountPayRulesBodySchema = z.object({
   id: AccountPayRulesIdSchema,
@@ -107,11 +110,30 @@ export const CreateAccountPayRulesBodySchema = z.object({
 export type CreateAccountPayRulesBody = z.input<typeof CreateAccountPayRulesBodySchema>;
 
 /**
+ * Why `detected` is refused (`pay_rules_source_conflict`, `details.reason`; ADR 0050 § 8, CRM-03):
+ * - `platform_without_net`: the account's platform gives no net pay can take as it is (Reveal alone today);
+ * - `model_unlinked`: no model of the platform is linked to the account, so none of its sales is recorded;
+ * - `check_missing`: the platform's sales were never checked against its statistics and export (CRM-02);
+ * - `check_not_clean`: the platform's latest check is not a clean match over one whole fortnight;
+ * - `check_not_before`: the latest clean check does not end before the period the rules start with.
+ */
+export const PAY_RULES_SOURCE_REFUSALS = [
+  'platform_without_net',
+  'model_unlinked',
+  'check_missing',
+  'check_not_clean',
+  'check_not_before',
+] as const;
+export const PayRulesSourceRefusalSchema = z.enum(PAY_RULES_SOURCE_REFUSALS);
+export type PayRulesSourceRefusal = z.infer<typeof PayRulesSourceRefusalSchema>;
+
+/**
  * The error codes of `/v1/team/pay-rules`, for the screen to say them in French (the suffix gives the status, api.md):
  * `platform_account_not_found` 404 ; `pay_rules_conflict` 409, the same `id` with other values ;
  * `pay_rules_period_conflict` 409, this account already has rules from that period (`details.accountPayRulesId`) ;
  * `pay_rules_period_invalid` 400, a period that has begun, other than the current one for the account's first rules ;
- * `pay_rules_source_conflict` 409, `detected` before the connector records the sales.
+ * `pay_rules_source_conflict` 409, `detected` on an account that cannot be paid on its platform's net yet
+ * (`details.reason`, `PayRulesSourceRefusal`).
  */
 export const PAY_RULES_ERROR_CODES = [
   'platform_account_not_found',

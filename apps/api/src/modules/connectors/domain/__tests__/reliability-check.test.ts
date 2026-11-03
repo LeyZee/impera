@@ -311,7 +311,14 @@ describe('the report a switch can rest on (CRM-03)', () => {
   it('is a match over a whole fortnight, with no bot outside the agent nor model of the export unknown', () => {
     expect(matching().verdict).toBe('match');
     expect(isCleanMatch(matching())).toBe(true);
-    expect(isCleanMatch({ ...matching(), from: '2026-11-01', to: '2026-11-15' })).toBe(true);
+    expect(
+      isCleanMatch({
+        ...matching(),
+        from: '2026-11-01',
+        to: '2026-11-15',
+        generatedAt: '2026-11-16T09:00:00.000Z',
+      }),
+    ).toBe(true);
     expect(isCleanMatch({ ...matching(), notes: [{ kind: 'export_rows_outside', count: 2 }] })).toBe(true);
     expect(
       isCleanMatch({
@@ -329,6 +336,22 @@ describe('the report a switch can rest on (CRM-03)', () => {
     expect(isCleanMatch({ ...matching(), to: '2026-10-30' })).toBe(false);
     expect(isCleanMatch({ ...matching(), from: '2026-10-01', to: '2026-10-31' })).toBe(false);
     expect(isCleanMatch({ ...matching(), from: '2026-10-10', to: '2026-10-25' })).toBe(false);
+  });
+
+  it('is never a fortnight checked before it was over in the platform’s zone', () => {
+    // 5 November: the 1st to the 15th compares five days only.
+    expect(
+      isCleanMatch({
+        ...matching(),
+        from: '2026-11-01',
+        to: '2026-11-15',
+        generatedAt: '2026-11-05T12:00:00.000Z',
+      }),
+    ).toBe(false);
+    // 31 October at 23:30 in Paris (22:30 UTC): the fortnight's last day is not over there.
+    expect(isCleanMatch({ ...matching(), generatedAt: '2026-10-31T22:30:00.000Z' })).toBe(false);
+    // 1 November at 00:30 in Paris (23:30 UTC on the 31st): the fortnight is over there.
+    expect(isCleanMatch({ ...matching(), generatedAt: '2026-10-31T23:30:00.000Z' })).toBe(true);
   });
 
   it('is never an incomplete or differing report', () => {
