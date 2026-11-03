@@ -304,6 +304,129 @@ export type SalesFeedOverview = z.infer<typeof SalesFeedOverviewSchema>;
 export const SalesFeedListSchema = z.object({ feeds: z.array(SalesFeedStatusSchema) });
 export type SalesFeedList = z.infer<typeof SalesFeedListSchema>;
 
+/** Reveal's statistics stop at 31 days a call: a check covers a fortnight, a month at most. */
+export const SALES_FEED_CHECK_MAX_DAYS = 31;
+
+/**
+ * `POST /v1/settings/sales-feeds/:platform/check` (CRM-02, ADR 0050 § 8): the days to compare, in the platform's own
+ * day, and the dashboard's export as the owner downloaded it (CSV text), or `null` to compare the register with the
+ * statistics only. The export is read for this answer and kept nowhere.
+ */
+export const SalesFeedCheckBodySchema = z
+  .object({
+    from: z.iso.date(),
+    to: z.iso.date(),
+    export: z.string().max(2_000_000).nullable(),
+  })
+  .refine((body) => body.from <= body.to, { message: 'from after to', path: ['to'] })
+  .refine((body) => (Date.parse(body.to) - Date.parse(body.from)) / 86_400_000 < SALES_FEED_CHECK_MAX_DAYS, {
+    message: `${String(SALES_FEED_CHECK_MAX_DAYS)} days at most`,
+    path: ['to'],
+  });
+export type SalesFeedCheckBody = z.infer<typeof SalesFeedCheckBodySchema>;
+
+const signedCents = z.number().int();
+
+/**
+ * Amounts of one source, in integer cents of the platform's currency. A figure the source does not give (a column the
+ * export lacks) is `null` and is not compared; the register and the statistics give all four.
+ */
+export const SalesFeedCheckTotalsSchema = z.object({
+  grossInclVat: signedCents.nullable(),
+  agency: signedCents.nullable(),
+  creator: signedCents.nullable(),
+  net: signedCents.nullable(),
+});
+export type SalesFeedCheckTotals = z.infer<typeof SalesFeedCheckTotalsSchema>;
+
+/**
+ * `match`: the three sources say the register's figures and nothing was left uncompared; `incomplete`: what was compared
+ * matches, but a source, a model of the export or days before the register were not; `mismatch`: a net differs.
+ */
+export const SalesFeedCheckVerdictSchema = z.enum(['match', 'mismatch', 'incomplete']);
+export type SalesFeedCheckVerdict = z.infer<typeof SalesFeedCheckVerdictSchema>;
+
+/**
+ * One model's day, as the register (`netAmount` and its parts, a refund taken from its sale's day as the platform
+ * does), the statistics and the export say it. `differs` names the sources that do not say the register's figures.
+ */
+export const SalesFeedCheckDaySchema = z.object({
+  date: z.iso.date(),
+  platformModelId: z.string().min(1),
+  handle: z.string().nullable(),
+  /** Linked to a creator account; the lines of an unlinked model wait in quarantine and are counted here too. */
+  linked: z.boolean(),
+  register: SalesFeedCheckTotalsSchema,
+  stats: SalesFeedCheckTotalsSchema.nullable(),
+  export: SalesFeedCheckTotalsSchema.nullable(),
+  differs: z.array(z.enum(['stats', 'export'])),
+});
+export type SalesFeedCheckDay = z.infer<typeof SalesFeedCheckDaySchema>;
+
+/**
+ * A platform team member over the days checked (all models): what the register and the per-member statistics give,
+ * with the owner's link. `differs` compares the net only: the count is shown, as Reveal does not say whether its
+ * `salesCount` takes a refund off. `platformChatterId` `null` gathers the sales of nobody. `isBot` is the platform's flag:
+ * the agent's sales must come under the bot's own id (ADR 0050 § 5).
+ */
+export const SalesFeedCheckChatterSchema = z.object({
+  platformChatterId: z.string().min(1).nullable(),
+  isBot: z.boolean().nullable(),
+  link: z.enum(['member', 'agent']).nullable(),
+  register: z.object({ net: signedCents, sales: z.number().int() }),
+  stats: z.object({ net: signedCents, sales: z.number().int() }).nullable(),
+  differs: z.boolean(),
+});
+export type SalesFeedCheckChatter = z.infer<typeof SalesFeedCheckChatterSchema>;
+
+/** What the owner should know beside the figures; never a fan's data. */
+export const SalesFeedCheckNoteSchema = z.discriminatedUnion('kind', [
+  /** Refunds in the days whose sale is older than the register: the statistics took them from a day not read. */
+  z.object({ kind: z.literal('refund_without_sale'), count: z.number().int().min(1) }),
+  /** A bot of the platform not linked to the agent: its sales would count for nobody, or for a member. */
+  z.object({ kind: z.literal('bot_not_linked_to_agent'), platformChatterId: z.string().min(1) }),
+  /** A model of the export that is neither a model id nor a handle of the platform's: its rows are left out. */
+  z.object({ kind: z.literal('export_unknown_model'), model: z.string().min(1).max(100) }),
+  /** Rows of the export outside the days checked, left out. */
+  z.object({ kind: z.literal('export_rows_outside'), count: z.number().int().min(1) }),
+  /** The statistics could not be read: the register is compared with the export only. */
+  z.object({ kind: z.literal('stats_unavailable'), errorKind: SalesFeedErrorKindSchema }),
+  /**
+   * The register's oldest line is after the first day checked: the reading has not reached back that far (a key just
+   * connected), or nothing was sold before. The days before `firstLineAt` cannot agree; they are not a divergence.
+   */
+  z.object({ kind: z.literal('register_starts_after'), firstLineAt: z.iso.datetime().nullable() }),
+]);
+export type SalesFeedCheckNote = z.infer<typeof SalesFeedCheckNoteSchema>;
+
+/**
+ * The reliability check of ADR 0050 § 8 (CRM-02): the register's `netAmount` against the statistics and the
+ * dashboard's export, to the cent, per model and day, then per team member. Read-only: it writes nothing and changes
+ * no amount; no account switches on it (CRM-03).
+ */
+export const SalesFeedCheckReportSchema = z.object({
+  platform: PlatformSchema,
+  from: z.iso.date(),
+  to: z.iso.date(),
+  timeZone: z.string().min(1),
+  generatedAt: z.iso.datetime(),
+  /**
+   * When the register was last read from the platform. The export, downloaded by hand, should be taken just before
+   * the check: a sale or a refund after it is in the register and the statistics, not in the file.
+   */
+  registerReadAt: z.iso.datetime().nullable(),
+  verdict: SalesFeedCheckVerdictSchema,
+  total: z.object({
+    register: SalesFeedCheckTotalsSchema,
+    stats: SalesFeedCheckTotalsSchema.nullable(),
+    export: SalesFeedCheckTotalsSchema.nullable(),
+  }),
+  days: z.array(SalesFeedCheckDaySchema),
+  chatters: z.array(SalesFeedCheckChatterSchema),
+  notes: z.array(SalesFeedCheckNoteSchema),
+});
+export type SalesFeedCheckReport = z.infer<typeof SalesFeedCheckReportSchema>;
+
 /** The refusals of `/v1/settings/sales-feeds`, each with its French sentence in `message`. */
 export const SALES_FEED_ERROR_CODES = [
   'sales_feed_not_found',
@@ -315,6 +438,8 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_webhook_url_unprocessable',
   'sales_feed_delivery_unauthenticated',
   'sales_feed_webhook_not_found',
+  'sales_feed_export_unprocessable',
+  'sales_feed_check_days_unprocessable',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;

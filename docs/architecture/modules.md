@@ -43,6 +43,8 @@ Ce graphe est **sans cycle**, et `import-x/no-cycle` le vérifie. Deux inversion
 - **Envoi** : `conversations` ne dépend pas de `connectors`. Il définit le port `OutboundSender` (`sendText`, `sendMedia`, `verifySent`) dans `conversations/domain/ports.ts` ; `connectors` l'implémente et le composition root l'injecte dans `createConversationsModule(deps)`.
 - **Supervision** : `conversations` ne dépend pas de `supervision`. `supervision` apprend qu'un draft existe par l'événement `draft_created` (outbox), et agit sur les conversations par leur `index.ts` (`approveDraft`, `takeover`, …).
 
+**Tables et jobs de la paie** (ADR 0047 § 1) : `apps/api/src/__tests__/architecture.test.ts` lit les sources et vérifie que chaque table de `packages/db/src/schema/payroll.ts` et `invoices.ts` a un seul propriétaire, celui dont le README la nomme dans « Tables possédées » ; qu'entre `payroll`, `invoicing`, `contractors` et `accounting` une table n'est lue que par son propriétaire, hors des lectures encore ouvertes (`OPEN_CROSSINGS`, qui ne fait que rétrécir, fiche ARC-07) ; que chaque job a une seule tâche, écrite dans un seul fichier de `wiring/` ; et qu'un job de la paie n'est mis en file que par le module qui enregistre sa tâche.
+
 Un cycle est une erreur de conception, pas un cas à autoriser. Si `fans` a besoin de `conversations`, c'est que la responsabilité est au mauvais endroit, ou qu'il faut un événement.
 
 ## Communication entre modules
