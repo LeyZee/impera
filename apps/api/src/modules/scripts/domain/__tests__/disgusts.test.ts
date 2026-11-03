@@ -16,6 +16,7 @@ const stage = (key: string, name: string, hint: string | null = null): ScriptSeg
   key,
   name,
   intention: 'Elle se dévoile',
+  access: 'paid',
   mood: null,
   mediaSlots: [{ kind: 'image', optional: false, hint }],
   variants: [],
@@ -37,6 +38,7 @@ describe('disgustBlocks', () => {
       key: 'v',
       name: 'Lit',
       intention: 'Elle se dévoile',
+      access: 'paid',
       mood: null,
       mediaSlots: [{ kind: 'image', optional: false, hint: null }],
       variants: [{ letter: 'A', hint: 'une fessée' }],
@@ -59,6 +61,7 @@ describe('disgustBlocks', () => {
       from: 'a',
       to: 'b',
       teaser,
+      mediaSlots: [],
     });
     const around = (teaser: string) =>
       disgustBlocks([stage('a', 'Salon'), bridge(teaser), stage('b', 'Lit')], limits);
@@ -70,5 +73,29 @@ describe('disgustBlocks', () => {
     ]);
     // Not what she never shows: a teaser is said, not shot.
     expect(around('Mes pieds')).toEqual([]);
+  });
+
+  it('reads the hints of a bridge’s media slots as what she shoots: never does, never shows, disgusts', () => {
+    const bridge: ScriptSegment = {
+      kind: 'bridge',
+      key: 'ab',
+      from: 'a',
+      to: 'b',
+      teaser: 'La suite ?',
+      mediaSlots: [
+        { kind: 'image', optional: false, hint: 'Photo teasing, pieds en avant' },
+        { kind: 'image', optional: true, hint: 'Une fessée' },
+      ],
+    };
+    expect(disgustBlocks([stage('a', 'Salon'), bridge, stage('b', 'Lit')], limits)).toEqual([
+      { key: 'ab', stageName: 'La suite ?', term: 'Fessée' },
+      { key: 'ab', stageName: 'La suite ?', term: 'pieds' },
+    ]);
+    // What she never says is a teaser's matter, not a photo's.
+    const said: ScriptSegment = {
+      ...bridge,
+      mediaSlots: [{ kind: 'image', optional: false, hint: 'chéri' }],
+    };
+    expect(disgustBlocks([said], limits)).toEqual([]);
   });
 });

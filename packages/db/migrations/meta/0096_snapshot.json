@@ -1,6 +1,6 @@
 {
-  "id": "79519fd9-0bd0-42be-a6e9-c0b4b32d1d8a",
-  "prevId": "36af16ad-5817-4401-b60f-24003102c6b6",
+  "id": "a67fc897-649d-479e-a55d-0fa8cd21e82c",
+  "prevId": "9a20d8b7-3efc-4509-8a5a-0b0f2c74b631",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -12338,6 +12338,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "color": {
+          "name": "color",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"primary\":\"#b0213a\",\"secondary\":\"#c8283f\",\"accent\":\"#d8324b\"}'::jsonb"
+        },
         "frozen_at": {
           "name": "frozen_at",
           "type": "timestamp with time zone",
@@ -12437,6 +12444,10 @@
         "script_structure_versions_segments_check": {
           "name": "script_structure_versions_segments_check",
           "value": "jsonb_typeof(\"script_structure_versions\".\"segments\") = 'array' and jsonb_array_length(\"script_structure_versions\".\"segments\") >= 1"
+        },
+        "script_structure_versions_color_check": {
+          "name": "script_structure_versions_color_check",
+          "value": "jsonb_typeof(\"script_structure_versions\".\"color\") = 'object'"
         },
         "script_structure_versions_moment_check": {
           "name": "script_structure_versions_moment_check",

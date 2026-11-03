@@ -9,10 +9,14 @@ export interface WiredScripts {
 }
 
 /** After the persona: a structure is checked against her active persona's limits (ADR 0056 § 1). */
-export function wireScripts(shared: Shared, deps: { readonly persona: PersonaModule }): WiredScripts {
+export function wireScripts(
+  shared: Shared,
+  deps: { readonly persona: PersonaModule; readonly cardFontsDir: string },
+): WiredScripts {
   const module = createScriptsModule({
     db: shared.db,
     requireRole: shared.requireRole,
+    cardFontsDir: deps.cardFontsDir,
     limitsOf: async (creatorId) => (await deps.persona.versions.active(creatorId))?.persona.limits ?? null,
   });
   return { module, routes: [module.routes] };

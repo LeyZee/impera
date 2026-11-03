@@ -1,10 +1,10 @@
 # Module `scripts`
 
-**Rôle.** Les scripts que la créatrice tourne carton par carton (ADR 0056). Pour l'instant (SC-01 lot a) : l'atelier des **structures** de l'agence, leurs versions, et la **file de structures** de chaque créatrice. Viendront le rendu des cartons (SC-01 lot b), la demande de script et son parcours (SC-02), la nomenclature et l'export (SC-03).
+**Rôle.** Les scripts que la créatrice tourne carton par carton (ADR 0056). Pour l'instant (SC-01 lots a et b) : l'atelier des **structures** de l'agence, leurs versions, la **file de structures** de chaque créatrice et le rendu des **cartons**. Viendront la demande de script et son parcours (SC-02), la nomenclature et l'export (SC-03).
 
 **Peut dépendre de.** aucun module métier (feuille). Les limites de la persona lui viennent de `persona` par le composition root (`limitsOf`, sa version active).
 
-**Tables possédées.** `script_structures`, `script_structure_versions` et `script_structure_queue` (migration 0084).
+**Tables possédées.** `script_structures`, `script_structure_versions` et `script_structure_queue` (migrations 0084 et 0095).
 
 - La bibliothèque (`script_structures`, `script_structure_versions`) appartient à l'agence : hors RLS des créatrices, sous les politiques de l'équipe (`withMember`). Le propriétaire écrit, le propriétaire et les managers actifs lisent, personne d'autre (un chatteur, un compte de créatrice : rien).
 - Une version porte le nom, le moment et les segments (`ScriptSegment[]`, relus par le contrat). La dernière version change sur place tant qu'elle n'est pas figée ; une fois figée (`frozen_at`, posée par `structures.freeze` quand une demande la prend, SC-02), un enregistrement écrit la version suivante (règle 6). Un déclencheur refuse toute modification d'une version figée, tout changement de numéro et toute suppression, pour tous les rôles.
@@ -22,10 +22,15 @@
 - `GET /creators/:creatorId/script-queue` : la file, chaque entrée avec ce qui la bloque aujourd'hui (`blocks`) ; `personaChecked` vaut `false` sans persona active ;
 - `PUT /creators/:creatorId/script-queue` (propriétaire) : remplace la file ; 422 `script_queue_structure_unprocessable` (inconnue, archivée, réservée à une autre) ou 422 `script_queue_disgust_unprocessable` avec, par structure, l'étape et l'entrée de sa persona qui bloquent.
 
+- `GET /script-structures/:structureId/cards/:segmentKey?format=card|folder|thumbnail&variant=A|B|C` : le carton d'un segment de la version courante, ou d'une de ses séries. `card` (défaut) rend le SVG pour l'application, `folder` un PNG de 1080 × 1080 pour le dossier, `thumbnail` un PNG de 320 × 320 pour les chatteurs. 404 `script_card_not_found` pour une clé ou une variante absente.
+
+**Cartons** (`domain/cards.ts`, ADR 0056 § 3 et ADR 0064). Le dessin d'OnlyScript dans la typographie de Nirvana : la **couleur du script** (trois tons, `color` de la version) en dégradé sur tout le carton, « ÉTAPE n » et le nom de l'étape au centre, l'intention entre guillemets avec « (GRATUIT) » ou « (PAYANT) » (`access` de l'étape), ce qu'il faut tourner, les indications (trois au moins quand il y en a), l'ambiance, et en pied une pastille par série. En haut, le moment et son icône au trait (soleil, lune, ou les deux pour un script qui passe partout). Une variante a son carton de série (« Série A », sa consigne, les pastilles des séries de l'étape, la sienne pleine) ; un pont dit « PONT n & m », son teaser, toujours « (GRATUIT) », sa photo teasing, et en pied les noms des deux étapes qu'il relie, jointes par une arche en pointillé. La vignette des chatteurs ne garde que l'étape, son nom, ce qu'il faut tourner et « (GRATUIT) » ou « (PAYANT) ». Le code choisit l'encre (claire ou foncée) qui se lit sur les trois tons et leurs mélanges, et le texte est écrit en encre pleine ; une couleur où aucune n'atteint 4,5:1 est refusée à l'enregistrement (`ReadableScriptColorSchema`). Fonction pure : les mêmes octets pour la même entrée. Le texte de l'agence est échappé ; le SVG ne nomme ni fichier, ni image, ni lien, et la route l'envoie avec `Content-Security-Policy: default-src 'none'`. Le PNG est tiré par librsvg (`infra/card-rasterizer.ts`, aucune dépendance npm) : `rsvg-convert` dans l'image Docker, où l'ffmpeg d'Alpine n'a pas de décodeur librsvg, sinon le décodeur librsvg d'ffmpeg (poste de dev et CI), choisi une fois par processus, avec une configuration de polices qui ne nomme que `infra/fonts/` (Geist et Instrument Serif en TTF, SIL OFL 1.1, licences à côté) : le même SVG donne le même PNG dans une même image Docker (une autre version de librsvg, pango ou freetype peut changer l'anticrénelage, on ne compare donc jamais un PNG d'une machine à l'autre). Deux rendus au plus tournent en même temps. L'image Docker copie ce dossier comme celui des factures, et sa construction échoue si `rsvg-convert` n'y tire pas un SVG.
+
 Chaque écriture ajoute une ligne `script_structure.create`, `.update`, `.archive`, `.freeze` ou `script_queue.update` dans `audit_log`.
 
 ## Structure
 
-- `domain/` : limites de la persona, décision d'enregistrement, vue de la file, port `ScriptStructureStore`. Zéro I/O.
+- `domain/` : limites de la persona, décision d'enregistrement, vue de la file, cartons, ports `ScriptStructureStore` et `RasterizeCard`. Zéro I/O.
 - `infra/db/` : les tables, chaque ligne relue par le contrat.
 - `infra/http/` : les routes.
+- `infra/card-rasterizer.ts` et `infra/fonts/` : le PNG d'un carton.
