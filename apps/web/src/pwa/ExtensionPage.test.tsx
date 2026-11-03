@@ -81,6 +81,7 @@ describe('ExtensionPage', () => {
     fireEvent.click(copy);
     expect(writeText).toHaveBeenCalledWith('https://crm.exemple.fr');
     expect(await screen.findByRole('button', { name: 'Copiée' })).toBeTruthy();
+    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
   });
 });
 

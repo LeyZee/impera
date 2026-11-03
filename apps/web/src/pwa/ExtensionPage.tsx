@@ -33,6 +33,7 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
 };
 
 const LAST_STEP = 'Clique l’icône Impera : connecté au CRM, tu vois ton nom.';
+const LAST_STEP_AFTER_ADDRESS = 'Connecté au CRM, l’extension affiche alors ton nom.';
 
 /** The zip carries no CRM address (ADR 0067 § 4): away from localhost, the popup is told this CRM's once (ADR 0066 § 4). */
 function AddressStep({ origin }: { readonly origin: string }): JSX.Element {
@@ -171,8 +172,14 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                   {STEPS[key].steps.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
-                  {isLocalCrm(origin) ? null : <AddressStep origin={origin} />}
-                  <li>{LAST_STEP}</li>
+                  {isLocalCrm(origin) ? (
+                    <li>{LAST_STEP}</li>
+                  ) : (
+                    <>
+                      <AddressStep origin={origin} />
+                      <li>{LAST_STEP_AFTER_ADDRESS}</li>
+                    </>
+                  )}
                 </ol>
               </PanelSection>
             </Panel>
