@@ -1,6 +1,6 @@
 # 0069. Les créatrices s'importent depuis Reveal par une revue du propriétaire, jamais en silence
 
-Statut : proposed (demande de Charles du 03/11/2026, 19 h 34 : « dès qu'on branche la clé Reveal […] ça intègre directement tous les modèles qu'on a […] avec toutes leurs données » ; « go import », 19 h 45, sur la proposition d'une revue avant création)
+Statut : accepted (Charles, 03/11/2026, 19 h 58, « ok 0069 » ; demande de Charles du 03/11/2026, 19 h 34 : « dès qu'on branche la clé Reveal […] ça intègre directement tous les modèles qu'on a […] avec toutes leurs données » ; « go import », 19 h 45, sur la proposition d'une revue avant création)
 Date : 2026-11-03
 Précise : l'ADR 0050 § 3 (lien d'un modèle à un compte) et l'ADR 0054. Ne remplace rien.
 
