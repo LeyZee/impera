@@ -75,8 +75,9 @@ const planning = (
   conflicts: unknown[] = [],
   shifts: unknown[] = [night],
   accounts: unknown[] = ACCOUNTS,
+  slotStartMinute = 0,
 ): unknown => ({
-  settings: { timeZone: 'Europe/Paris', slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+  settings: { timeZone: 'Europe/Paris', slotStartMinute, slotLengthMinutes: 360, accessMarginMinutes: 15 },
   accounts,
   members: [{ id: THEO, displayName: 'Théo', color: '#c2410c' }],
   shifts,
@@ -295,12 +296,12 @@ const calendarReads: string[] = [];
 
 /** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048). */
 const agencyCalendar =
-  (mode: 'auto' | 'copilot') =>
+  (mode: 'auto' | 'copilot', slotStartMinute = 0) =>
   (from: string, to: string): unknown => ({
     view: 'agency',
     settings: {
       timeZone: 'Europe/Paris',
-      slotStartMinute: 0,
+      slotStartMinute,
       slotLengthMinutes: 360,
       accessMarginMinutes: 15,
     },
@@ -1126,6 +1127,23 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     const fill = within(row).getAllByRole('button', { name: /^À pourvoir/u })[0];
     expect(text(fill ?? null).length).toBeGreaterThan(0);
     expect(fill?.getAttribute('aria-label')).toMatch(/ ; l’IA en copilote$/u);
+  });
+
+  it('reads the week on the agency’s créneaux when they start after midnight, Sunday’s last one whole', async () => {
+    serve({ planning: planning([], [night], ACCOUNTS, 120), calendar: agencyCalendar('auto', 120) });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    await waitFor(() => {
+      expect(calendarReads).toContain('2026-10-26T01:00:00.000Z/2026-11-02T01:00:00.000Z');
+    });
+    await waitFor(() => {
+      expect(
+        within(row).queryAllByRole('button', { name: /^À pourvoir : 20\s?h\s?–\s?2\s?h, le dimanche/u }),
+      ).toHaveLength(0);
+    });
+    expect(
+      within(row).getAllByRole('img', { name: /^20\s?h\s?–\s?2\s?h, l’IA seule$/u }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('opens the month, with the créneaux to fill said and each one’s hours beside it', async () => {

@@ -179,14 +179,17 @@ export function PlanningPage({
   const month = view.mois ?? thisMonth;
   const byMonth = view.affichage === 'mois';
   const window = agency === null || !byMonth ? null : monthWindow(month, agency);
+  const startMinute = data?.settings.slotStartMinute ?? 0;
   const calendar = useCalendar(
     agency === null
       ? null
       : window !== null
         ? { from: window.from.toISOString(), to: window.to.toISOString() }
         : {
-            from: zonedInstant(monday, 0, agency).toISOString(),
-            to: zonedInstant(addDays(monday, 7), 0, agency).toISOString(),
+            // The week on the agency's créneaux, as its grid: Sunday's last one whole, the one before Monday's first
+            // left to the week before (Équipe on #431).
+            from: zonedInstant(monday, startMinute, agency).toISOString(),
+            to: zonedInstant(addDays(monday, 7), startMinute, agency).toISOString(),
           },
   );
   // The panels under the month sum the month itself, not the six weeks its table shows (Extension on #431).
