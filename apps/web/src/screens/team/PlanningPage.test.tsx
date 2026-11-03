@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlanningPage } from './PlanningPage';
 import { parsePlanningSearch } from './model';
 
+import { parseCalendarSearch } from '@/scheduling/calendar';
+
 const reader = vi.hoisted(() => ({ zone: 'Europe/Paris' }));
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -165,6 +167,8 @@ function serve(
     swaps?: unknown[];
     /** The reports of every period asked. */
     reports?: unknown[];
+    /** The team's calendar (CR-12) for a window; unanswered (404) when left out. */
+    calendar?: (from: string, to: string) => unknown;
     write?: (method: string, path: string, body: unknown) => Reply;
   } = {},
 ): Written[] {
@@ -185,7 +189,13 @@ function serve(
           status: 200,
           body: routes.planningOf?.(url.searchParams.get('from') ?? '') ?? routes.planning ?? planning(),
         };
-      else if (path === '/v1/scheduling/shift-templates')
+      else if (path === '/v1/scheduling/calendar' && routes.calendar !== undefined) {
+        calendarReads.push(`${url.searchParams.get('from') ?? ''}/${url.searchParams.get('to') ?? ''}`);
+        reply = {
+          status: 200,
+          body: routes.calendar(url.searchParams.get('from') ?? '', url.searchParams.get('to') ?? ''),
+        };
+      } else if (path === '/v1/scheduling/shift-templates')
         reply = { status: 200, body: { templates: [template] } };
       else if (path === '/v1/scheduling/on-duty')
         reply = {
@@ -247,9 +257,12 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
   const page = createRoute({
     getParentRoute: () => root,
     path: '/equipe/planning',
-    validateSearch: parsePlanningSearch,
+    validateSearch: (search: Record<string, unknown>) => ({
+      ...parsePlanningSearch(search),
+      ...parseCalendarSearch(search),
+    }),
     component: function Page() {
-      const { semaine, membre } = page.useSearch();
+      const { semaine, membre, affichage, mois } = page.useSearch();
       const navigate = page.useNavigate();
       return (
         <PlanningPage
@@ -260,6 +273,8 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
             void navigate({ search: (before) => ({ ...before, semaine: monday ?? undefined }) })
           }
           onMember={(id) => void navigate({ search: (before) => ({ ...before, membre: id ?? undefined }) })}
+          view={{ affichage, mois }}
+          onView={(patch) => void navigate({ search: (before) => ({ ...before, ...patch }) })}
         />
       );
     },
@@ -276,7 +291,44 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
   return router;
 }
 
+const calendarReads: string[] = [];
+
+/** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048). */
+const agencyCalendar =
+  (mode: 'auto' | 'copilot') =>
+  (from: string, to: string): unknown => ({
+    view: 'agency',
+    settings: {
+      timeZone: 'Europe/Paris',
+      slotStartMinute: 0,
+      slotLengthMinutes: 360,
+      accessMarginMinutes: 15,
+    },
+    creators: [{ id: NORA, name: 'Nora Vidal' }],
+    members: [{ id: THEO, displayName: 'Théo', color: '#c2410c' }],
+    shifts: [{ memberId: THEO, creatorId: NORA, startsAt: night.startsAt, endsAt: night.endsAt }],
+    agent: [
+      {
+        creatorId: NORA,
+        timeZone: 'Europe/Paris',
+        mode,
+        reply: { mode: 'always' },
+        answers: [{ startsAt: from, endsAt: to }],
+      },
+    ],
+    agency: {
+      accounts: ACCOUNTS,
+      toFill: [],
+      aiAlone: [],
+      workload: [{ memberId: THEO, minutes: 360 }],
+      coverage: [
+        { platformAccountId: NORA_REVEAL, withAgent: 360, chatterAlone: 0, agentAlone: 9720, nobody: 0 },
+      ],
+    },
+  });
+
 beforeEach(() => {
+  calendarReads.length = 0;
   // Équipe's tabs watch their own width.
   vi.stubGlobal(
     'ResizeObserver',
@@ -1041,5 +1093,54 @@ describe('Équipe › Planning', () => {
       'Ajouter un shift le mercredi 28 octobre sur Nora Vidal, @nora sur Reveal',
       'Ajouter un shift le mercredi 28 octobre sur Nora Vidal, @nora-2 sur Reveal',
     ]);
+  });
+});
+
+describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
+  it('says the agent on each créneau, and does not count one he holds alone in Automatique as one to fill', async () => {
+    serve({ calendar: agencyCalendar('auto') });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    await waitFor(() => {
+      expect(text(row)).toContain('IA automatique · jour et nuit');
+    });
+    // Wednesday's night still has an hour with nobody after Théo (5 h – 6 h): the only one left to fill; the agent
+    // holds the 19 others alone (ADR 0048 § 1), as the server's count does.
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 1 créneau à pourvoir');
+    expect(within(row).getAllByRole('button', { name: /^À pourvoir/u })).toHaveLength(1);
+    expect(within(row).getAllByRole('img', { name: /, l’IA seule$/u })).toHaveLength(19);
+    expect(screen.getByRole('region', { name: 'Charge de la semaine' }).textContent).toContain('Théo');
+    const cover = screen.getByRole('region', { name: 'Couverture des comptes de la semaine' });
+    expect(text(cover)).toContain('Nora Vidal, @nora sur Reveal');
+    expect(text(cover)).toContain('IA seule 162 h');
+  });
+
+  it('leaves a créneau to fill in Copilote, the agent said in its name', async () => {
+    serve({ calendar: agencyCalendar('copilot') });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    await waitFor(() => {
+      expect(text(row)).toContain('IA copilote · jour et nuit');
+    });
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 créneaux à pourvoir');
+    const fill = within(row).getAllByRole('button', { name: /^À pourvoir/u })[0];
+    expect(text(fill ?? null).length).toBeGreaterThan(0);
+    expect(fill?.getAttribute('aria-label')).toMatch(/ ; l’IA en copilote$/u);
+  });
+
+  it('opens the month, with the créneaux to fill said and each one’s hours beside it', async () => {
+    serve({ calendar: agencyCalendar('copilot') });
+    renderPage('/equipe/planning?affichage=mois');
+    const month = await screen.findByRole(
+      'table',
+      { name: 'Planning de l’équipe, octobre 2026' },
+      { timeout: 4_000 },
+    );
+    expect(calendarReads.at(-1)).toBe('2026-09-27T22:00:00.000Z/2026-11-08T22:00:00.000Z');
+    const thursday = within(month).getByRole('button', { name: /^jeudi 29 octobre/u });
+    expect(thursday.getAttribute('aria-label')).toBe('jeudi 29 octobre : aucun shift, 4 créneaux à pourvoir');
+    expect(screen.getByRole('region', { name: 'Charge sur octobre 2026' }).textContent).toContain('6');
+    fireEvent.click(screen.getByRole('radio', { name: 'Semaine' }));
+    expect(await screen.findByRole('row', { name: /Nora Vidal/u })).toBeTruthy();
   });
 });

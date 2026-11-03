@@ -1,4 +1,11 @@
-import type { OnDuty, Planning, ShiftReportList, ShiftTemplate, TeamMember } from '@nirvana/contracts';
+import type {
+  CalendarAgent,
+  OnDuty,
+  Planning,
+  ShiftReportList,
+  ShiftTemplate,
+  TeamMember,
+} from '@nirvana/contracts';
 import { useMemo, useRef, useState, type JSX } from 'react';
 
 import { ShiftPanel, type ShiftStart } from './ShiftPanel';
@@ -11,8 +18,19 @@ import './team.css';
 
 import { useReportsOf } from '@/reports/api';
 import { incidentsOf, periodAt } from '@/reports/model';
+import { AgencyLoad, AgentLabel, MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
-import { useLeaves, usePlanning, useOnDuty, useSwaps, useTemplates } from '@/scheduling/api';
+import { useCalendar, useLeaves, usePlanning, useOnDuty, useSwaps, useTemplates } from '@/scheduling/api';
+import {
+  agentOnSlot,
+  agentSlotLabel,
+  agentWords,
+  cellAgentWords,
+  monthLabel,
+  monthWindow,
+  type AgentInSlot,
+  type CalendarSearch,
+} from '@/scheduling/calendar';
 import '@/scheduling/exchanges.css';
 import {
   accountLine,
@@ -83,6 +101,8 @@ export function PlanningPage({
   member = null,
   onWeek,
   onMember = () => undefined,
+  view = {},
+  onView = () => undefined,
 }: {
   userId: string;
   /** The Monday of the week in the address (`?semaine=`), `null` for this week. */
@@ -92,6 +112,9 @@ export function PlanningPage({
   /** Writes the week shown into the address, `null` for this week. */
   onWeek: (monday: string | null) => void;
   onMember?: (memberId: string | null) => void;
+  /** Week or month (`?affichage=mois&mois=…`), kept in the address (CR-12). */
+  view?: CalendarSearch;
+  onView?: (patch: CalendarSearch) => void;
 }): JSX.Element {
   const now = useNow();
   const mine = readerZone();
@@ -148,6 +171,29 @@ export function PlanningPage({
     [reports],
   );
   const pickedIndex = picked ?? Math.max(0, days.indexOf(today));
+  // The team's calendar (CR-12): the agent's hours on the week's grid, the month, each one's hours and the coverage,
+  // read at the agency's hour once it is known.
+  const agencyToday = agency === null ? today : dayOf(now, agency);
+  const thisMonth = agencyToday.slice(0, 7);
+  const month = view.mois ?? thisMonth;
+  const byMonth = view.affichage === 'mois';
+  const window = agency === null || !byMonth ? null : monthWindow(month, agency);
+  const calendar = useCalendar(
+    agency === null
+      ? null
+      : window !== null
+        ? { from: window.from.toISOString(), to: window.to.toISOString() }
+        : {
+            from: zonedInstant(monday, 0, agency).toISOString(),
+            to: zonedInstant(addDays(monday, 7), 0, agency).toISOString(),
+          },
+  );
+  const weekCalendar = byMonth ? undefined : calendar.data;
+  const agents = useMemo(
+    () =>
+      weekCalendar === undefined ? null : new Map(weekCalendar.agent.map((one) => [one.creatorId, one])),
+    [weekCalendar],
+  );
 
   const add = (
     <button
@@ -198,14 +244,48 @@ export function PlanningPage({
       ) : (
         <div className="sc-board">
           <div className="sc-toolbar" ref={toolbar}>
-            <WeekNav
-              monday={monday}
-              thisMonday={thisMonday}
-              onMonday={(next) => {
-                setMonday(next);
-                setPicked(next === thisMonday ? null : 0);
-              }}
-            />
+            {byMonth ? (
+              <MonthNav
+                month={month}
+                thisMonth={thisMonth}
+                onMonth={(next) => {
+                  onView({ mois: next === thisMonth ? undefined : next });
+                }}
+              />
+            ) : (
+              <WeekNav
+                monday={monday}
+                thisMonday={thisMonday}
+                onMonday={(next) => {
+                  setMonday(next);
+                  setPicked(next === thisMonday ? null : 0);
+                }}
+              />
+            )}
+            <div className="tm-choices" role="radiogroup" aria-label="Période">
+              <button
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={!byMonth}
+                onClick={() => {
+                  onView({ affichage: undefined });
+                }}
+              >
+                Semaine
+              </button>
+              <button
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={byMonth}
+                onClick={() => {
+                  onView({ affichage: 'mois' });
+                }}
+              >
+                Mois
+              </button>
+            </div>
             {member === null ? null : (
               <Focus
                 planning={data}
@@ -269,28 +349,55 @@ export function PlanningPage({
               setOpen({ kind: 'add', start: { accountId: fill.accountId, day: fill.day, fill } });
             }}
           />
-          <Grid
-            planning={data}
-            rows={gridOf(data, days, zone).filter(
-              (row) => creatorId === null || row.account.creatorId === creatorId,
-            )}
-            days={days}
-            today={today}
-            picked={pickedIndex}
-            onPick={setPicked}
-            now={now}
-            zone={zone}
-            loading={shown.isFetching && shown.isPlaceholderData}
-            focus={member}
-            flagged={flagged}
-            incidents={incidents}
-            onAdd={(start) => {
-              setOpen({ kind: 'add', start });
-            }}
-            onShow={(id) => {
-              setOpen({ kind: 'shift', id });
-            }}
-          />
+          {byMonth ? (
+            <TeamPanel
+              calendar={calendar}
+              failed={false}
+              onRetry={() => {
+                void calendar.refetch();
+              }}
+              days={window?.days ?? []}
+              month={month}
+              today={agencyToday}
+              now={now}
+              me={ownMemberId}
+              focus={member}
+              onFocus={onMember}
+              fill
+              creatorId={creatorId}
+            />
+          ) : (
+            <Grid
+              planning={data}
+              agents={agents}
+              rows={gridOf(data, days, zone).filter(
+                (row) => creatorId === null || row.account.creatorId === creatorId,
+              )}
+              days={days}
+              today={today}
+              picked={pickedIndex}
+              onPick={setPicked}
+              now={now}
+              zone={zone}
+              loading={shown.isFetching && shown.isPlaceholderData}
+              focus={member}
+              flagged={flagged}
+              incidents={incidents}
+              onAdd={(start) => {
+                setOpen({ kind: 'add', start });
+              }}
+              onShow={(id) => {
+                setOpen({ kind: 'shift', id });
+              }}
+            />
+          )}
+          {calendar.data === undefined ? null : (
+            <AgencyLoad
+              calendar={calendar.data}
+              period={byMonth ? `sur ${monthLabel(month)}` : 'de la semaine'}
+              focus={member}
+            />
+          )}
           {swaps.data === undefined ? null : <TeamSwaps list={swaps.data} now={now} zone={zone} />}
         </div>
       )}
@@ -625,6 +732,7 @@ function Conflicts({
 
 function Grid({
   planning,
+  agents,
   rows,
   days,
   today,
@@ -640,6 +748,8 @@ function Grid({
   onShow,
 }: {
   planning: Planning;
+  /** Each creator's agent (ADR 0048), from the team's calendar; `null` until it is read. */
+  agents: ReadonlyMap<string, CalendarAgent> | null;
   rows: readonly GridRow[];
   days: readonly string[];
   today: string;
@@ -691,9 +801,36 @@ function Grid({
         )
       : null,
   );
+  // The agent in each créneau of each account, on the account's own shifts (the rule of `slotsToFill`).
+  const ai = rows.map((row, index) => {
+    const cells = slotted[index];
+    const agent = agents?.get(row.account.creatorId) ?? null;
+    if (cells === null || cells === undefined || agent === null) return null;
+    const spans = planning.shifts
+      .filter((shift) => shift.platformAccountId === row.account.id)
+      .map((shift) => ({ from: Date.parse(shift.startsAt), to: Date.parse(shift.endsAt) }));
+    return new Map(
+      [...cells].map(([day, slots]) => [
+        day,
+        slots.map((slot) =>
+          agentOnSlot(agent, { from: slot.from.getTime(), to: slot.to.getTime() }, spans, now),
+        ),
+      ]),
+    );
+  });
+  // A créneau the agent holds alone in Automatique is not one to fill (ADR 0048 § 1): the server's count.
   const toFill = slotted.reduce(
-    (sum, cells) =>
-      sum + [...(cells?.values() ?? [])].reduce((inDay, slots) => inDay + slots.filter(isOpen).length, 0),
+    (sum, cells, index) =>
+      sum +
+      [...(cells?.values() ?? [])].reduce(
+        (inDay, slots, dayIndex) =>
+          inDay +
+          slots.filter(
+            (slot, slotIndex) =>
+              isOpen(slot) && !(ai[index]?.get(days[dayIndex] ?? '')?.[slotIndex]?.aiAlone ?? false),
+          ).length,
+        0,
+      ),
     0,
   );
   const slotCount = slotted.find((cells) => cells !== null)?.get(days[0] ?? today)?.length ?? 0;
@@ -765,6 +902,7 @@ function Grid({
             <span className="sc-grid__account" role="rowheader">
               <span className="sc-grid__creator">{row.account.creatorName}</span>
               <span className="sc-grid__handle">{accountLine(row.account)}</span>
+              <RowAgent agents={agents} creatorId={row.account.creatorId} />
             </span>
             {days.map((day, index) => (
               <Cell
@@ -772,6 +910,7 @@ function Grid({
                 day={day}
                 chips={row.days.get(day) ?? []}
                 slots={slotted[rowIndex]?.get(day) ?? null}
+                ai={ai[rowIndex]?.get(day) ?? null}
                 agency={planning.settings.timeZone}
                 accountId={row.account.id}
                 where={`${row.account.creatorName}, ${accountLine(row.account)}`}
@@ -818,6 +957,7 @@ function Cell({
   day,
   chips,
   slots,
+  ai,
   agency,
   accountId,
   where,
@@ -836,6 +976,8 @@ function Cell({
   chips: readonly Chip[];
   /** The day cut into the agency's créneaux, `null` when they do not line up (another hour, too many créneaux). */
   slots: readonly SlotCell[] | null;
+  /** The agent in each créneau, in the same order; `null` when there is none or it is not read yet. */
+  ai: readonly { readonly agent: AgentInSlot | null; readonly aiAlone: boolean }[] | null;
   /** The agency's zone: the hours a new shift is made in. */
   agency: string;
   accountId: string;
@@ -874,25 +1016,53 @@ function Cell({
     >
       {slots === null
         ? chips.map(chipOf)
-        : slots.map((slot) => (
-            <div key={slot.slot.startMinute} className="sc-slot">
-              {slot.chips.map(chipOf)}
-              {slot.open !== null ? (
-                <OpenStretch
-                  open={slot.open}
-                  agency={agency}
-                  zone={zone}
-                  where={where}
-                  onAdd={(hours) => {
-                    onAdd({ accountId, ...hours });
-                  }}
-                />
-              ) : slot.chips.length === 0 && !slot.covered && slot.to.getTime() <= now.getTime() ? (
-                // A créneau gone by with nobody: left grey, nothing to do about it now.
-                <span className="sc-slot__gone" aria-hidden="true" />
-              ) : null}
-            </div>
-          ))}
+        : slots.map((slot, index) => {
+            const agent = ai?.[index]?.agent ?? null;
+            const alone = ai?.[index]?.aiAlone ?? false;
+            const hours = rangeAt(slot.from.toISOString(), slot.to.toISOString(), zone);
+            return (
+              <div
+                key={slot.slot.startMinute}
+                className="sc-slot cal-slot"
+                data-ai={agent === null || alone ? undefined : agent.full ? 'full' : 'part'}
+              >
+                {slot.chips.map(chipOf)}
+                {slot.open !== null && alone ? (
+                  // Nobody but the agent, in Automatique: nothing to fill (ADR 0048 § 1).
+                  <span className="cal-alone" role="img" aria-label={`${hours}, l’IA seule`}>
+                    IA seule
+                    <span className="cal-hours nv-num">{hours}</span>
+                  </span>
+                ) : slot.open !== null ? (
+                  <OpenStretch
+                    open={slot.open}
+                    agency={agency}
+                    zone={zone}
+                    where={where}
+                    agentWords={cellAgentWords(agent, slot, zone)}
+                    onAdd={(start) => {
+                      onAdd({ accountId, ...start });
+                    }}
+                  />
+                ) : slot.chips.length === 0 && !slot.covered && slot.to.getTime() <= now.getTime() ? (
+                  // A créneau gone by with nobody: left grey, nothing to do about it now.
+                  <span className="sc-slot__gone" aria-hidden="true" />
+                ) : null}
+                {agent === null || alone ? null : (
+                  <>
+                    {agent.full ? null : (
+                      <span className="cal-tag nv-num" aria-hidden="true">
+                        {agentSlotLabel(agent, slot, zone)}
+                      </span>
+                    )}
+                    {slot.open === null ? (
+                      <span className="cal-sr">{agentWords(agent, slot, zone)}</span>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            );
+          })}
       {past ? null : (
         <button
           type="button"
@@ -920,12 +1090,15 @@ function OpenStretch({
   agency,
   zone,
   where,
+  agentWords = '',
   onAdd,
 }: {
   open: { readonly from: Date; readonly to: Date };
   agency: string;
   zone: string;
   where: string;
+  /** The agent on that créneau, said after it (« ; l’IA en copilote »), empty when he is not there. */
+  agentWords?: string;
   onAdd: (hours: Pick<ShiftStart, 'day' | 'hours'>) => void;
 }): JSX.Element {
   const hours = rangeAt(open.from.toISOString(), open.to.toISOString(), zone);
@@ -933,7 +1106,7 @@ function OpenStretch({
     <button
       type="button"
       className="sc-slot__fill"
-      aria-label={`À pourvoir : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}`}
+      aria-label={`À pourvoir : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}${agentWords}`}
       onClick={() => {
         onAdd({
           day: dayOf(open.from, agency),
@@ -945,6 +1118,18 @@ function OpenStretch({
       <span className="sc-slot__hours nv-num">{hours}</span>
     </button>
   );
+}
+
+/** The agent of the creator of a row, under its account (ADR 0048 § 2). */
+function RowAgent({
+  agents,
+  creatorId,
+}: {
+  agents: ReadonlyMap<string, CalendarAgent> | null;
+  creatorId: string;
+}): JSX.Element | null {
+  const agent = agents?.get(creatorId);
+  return agent === undefined ? null : <AgentLabel agent={agent} />;
 }
 
 /** The mark of a weekly shift; `titled` on a chip, where its tip says it (the legend says it in words). */

@@ -53,6 +53,7 @@ import {
 import { addDays, calendarDayIn } from '../domain/time';
 
 import {
+  settingsColumns,
   assertAccountOf,
   assertMemberJoined,
   assertMemberWorks,
@@ -245,14 +246,7 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
   return {
     settings: (actor) =>
       withMember(db, actor, async (tx) => {
-        const [row] = await tx
-          .select({
-            timeZone: schedulingSettings.timeZone,
-            slotStartMinute: schedulingSettings.slotStartMinute,
-            slotLengthMinutes: schedulingSettings.slotLengthMinutes,
-            accessMarginMinutes: schedulingSettings.accessMarginMinutes,
-          })
-          .from(schedulingSettings);
+        const [row] = await tx.select(settingsColumns).from(schedulingSettings);
         return row === undefined ? null : SchedulingSettingsSchema.parse(row);
       }),
 
@@ -574,14 +568,7 @@ export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
 
     settingsUnscoped: () =>
       withAdmin(adminDb, async (tx) => {
-        const [row] = await tx
-          .select({
-            timeZone: schedulingSettings.timeZone,
-            slotStartMinute: schedulingSettings.slotStartMinute,
-            slotLengthMinutes: schedulingSettings.slotLengthMinutes,
-            accessMarginMinutes: schedulingSettings.accessMarginMinutes,
-          })
-          .from(schedulingSettings);
+        const [row] = await tx.select(settingsColumns).from(schedulingSettings);
         return row === undefined ? null : SchedulingSettingsSchema.parse(row);
       }),
 

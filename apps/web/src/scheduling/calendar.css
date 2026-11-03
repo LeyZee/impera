@@ -402,6 +402,145 @@
   border-left: 1px solid var(--nv-hairline);
 }
 
+/* On « À pourvoir », label and hours fill a narrow column: the tag sits on its top edge, as on a phone, clear of both. */
+.cal-slot:has(> .sc-slot__fill) > .cal-tag {
+  top: -9px;
+  right: 14px;
+}
+
+/* A créneau ahead the agency can fill: amber dashes, as « À pourvoir » on the week. */
+.cal-mark[data-kind='gap'][data-fill='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 70%, transparent);
+}
+
+/* The agency's panels beside the calendar: each member's hours, each account's coverage. */
+.cal-agency {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--nv-space-4);
+}
+.cal-load,
+.cal-cover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4) var(--nv-space-5);
+}
+.cal-agency__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.cal-agency__empty {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.cal-load__list,
+.cal-cover__list {
+  display: grid;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cal-load__one {
+  --sc-color: var(--nv-ink-faint);
+  display: grid;
+  grid-template-columns: minmax(6em, 9em) minmax(0, 1fr) 4.5em;
+  align-items: center;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+}
+.cal-load__one[data-muted='true'] {
+  opacity: 0.4;
+}
+.cal-load__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-load__bar {
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-plate);
+  overflow: hidden;
+}
+.cal-load__bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sc-color);
+}
+.cal-load__hours {
+  text-align: right;
+  color: var(--nv-ink-muted);
+}
+.cal-cover__one {
+  display: grid;
+  gap: 6px;
+}
+.cal-cover__name {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+.cal-cover__bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+}
+.cal-cover__bar > i,
+.cal-cover__word > i {
+  border-radius: var(--nv-radius-full);
+}
+.cal-cover__bar > i {
+  display: block;
+  height: 100%;
+}
+/* Four kinds, told apart by a pattern as well as a colour (CR-12): ink, ink striped with violet, violet, dashes. */
+[data-kind='chatter'] > i,
+.cal-cover__bar > i[data-kind='chatter'] {
+  background: var(--nv-ink-muted);
+}
+[data-kind='both'] > i,
+.cal-cover__bar > i[data-kind='both'] {
+  background: repeating-linear-gradient(135deg, var(--nv-ink-muted) 0 4px, var(--nv-agent) 4px 8px);
+}
+[data-kind='agent'] > i,
+.cal-cover__bar > i[data-kind='agent'] {
+  background: var(--nv-agent);
+}
+[data-kind='nobody'] > i,
+.cal-cover__bar > i[data-kind='nobody'] {
+  box-shadow: inset 0 0 0 1px var(--nv-ink-faint);
+  background: transparent;
+}
+.cal-cover__words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--nv-space-4);
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.cal-cover__word {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-cover__word > i {
+  display: inline-block;
+  width: 14px;
+  height: 8px;
+}
+
 @media (max-width: 820px) {
   .cal-month {
     padding: var(--nv-space-1);
@@ -424,8 +563,10 @@
     gap: 2px;
   }
   /* A chip is one line on a phone, its hours at the right: the agent's tag sits on its top edge, clear of them. */
-  .cal-tag {
+  .cal-tag,
+  .cal-slot:has(> .sc-slot__fill) > .cal-tag {
     top: -9px;
+    bottom: auto;
     right: 14px;
   }
   /* 44 px to touch on a phone (Extension 02/11). */

@@ -1,4 +1,4 @@
-import type { Calendar, PlanningMember } from '@nirvana/contracts';
+import type { Calendar, CalendarAgent, PlanningMember } from '@nirvana/contracts';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
@@ -18,7 +18,7 @@ import {
   type CalendarRow,
 } from './calendar';
 import './calendar.css';
-import { phaseOf } from './model';
+import { accountLine, phaseOf } from './model';
 import { dayNumber, lengthOf, longDay, rangeAt, shortDay, zonedInstant } from './time';
 
 import { Panel } from '@/shell/layout';
@@ -40,6 +40,8 @@ export interface CalendarProps {
   /** The member whose shifts stand out, picked in the legend. */
   readonly focus: string | null;
   readonly loading: boolean;
+  /** The reader can fill a créneau (the agency): one ahead with nobody reads « à pourvoir », in amber. */
+  readonly fill?: boolean;
 }
 
 /** « NV » for Nora Vidal: which line of a day is whose, on a screen wide enough to say it. */
@@ -55,11 +57,15 @@ const membersOf = (calendar: Calendar): Map<string, PlanningMember> =>
 
 /** The agent's line under a creator's name, in its violet: what mode, what hours. */
 function AgentLine({ row }: { row: CalendarRow }): JSX.Element | null {
-  if (row.agent === null) return null;
+  return row.agent === null ? null : <AgentLabel agent={row.agent} />;
+}
+
+/** The agent of a creator in its violet, by mode and hours: « IA automatique · 9 h – 1 h » (ADR 0048 § 2). */
+export function AgentLabel({ agent }: { agent: CalendarAgent }): JSX.Element {
   return (
-    <span className="cal-agent" data-mode={row.agent.mode}>
+    <span className="cal-agent" data-mode={agent.mode}>
       <span className="cal-agent__dot" aria-hidden="true" />
-      {agentRowLabel(row.agent)}
+      {agentRowLabel(agent)}
     </span>
   );
 }
@@ -243,6 +249,7 @@ export function TeamMonth({
   me,
   focus,
   loading,
+  fill = false,
 }: CalendarProps & { readonly month: string }): JSX.Element {
   const zone = calendar.settings.timeZone;
   const rows = calendarRows(calendar, days, now);
@@ -271,7 +278,7 @@ export function TeamMonth({
           <div key={week} className="cal-month__week" role="row">
             {days.slice(week * 7, week * 7 + 7).map((day) => {
               const marks = rows.map((row) => ({ row, marks: monthMarks(row.days.get(day) ?? [], now) }));
-              const { said, mine } = dayWords(rows, day, me, now);
+              const { said, mine } = dayWords(rows, day, me, now, fill);
               return (
                 <div key={day} role="cell" className="cal-month__cell">
                   <button
@@ -309,6 +316,7 @@ export function TeamMonth({
                                 className="cal-mark"
                                 data-kind={mark.kind}
                                 data-ahead={mark.kind === 'gap' && mark.ahead ? 'true' : undefined}
+                                data-fill={fill && mark.kind === 'gap' && mark.ahead ? 'true' : undefined}
                               />
                             ),
                           )}
@@ -530,6 +538,8 @@ export function TeamPanel({
   me,
   focus,
   onFocus,
+  fill = false,
+  creatorId = null,
 }: {
   calendar: UseQueryResult<Calendar>;
   /** What the calendar waits on could not be read (the agency's hour, with the planning). */
@@ -543,8 +553,16 @@ export function TeamPanel({
   me: string | null;
   focus: string | null;
   onFocus: (memberId: string | null) => void;
+  /** The agency reads « à pourvoir » where a chatter reads « Libre ». */
+  fill?: boolean;
+  /** The one creator shown, picked in the filters; `null` for all. */
+  creatorId?: string | null;
 }): JSX.Element {
-  const data = calendar.data;
+  const read = calendar.data;
+  const data =
+    read === undefined || creatorId === null
+      ? read
+      : { ...read, creators: read.creators.filter((creator) => creator.id === creatorId) };
   if ((calendar.isError && data === undefined) || failed) {
     return (
       <Panel className="nv-coming">
@@ -577,6 +595,7 @@ export function TeamPanel({
     now,
     me,
     focus,
+    fill,
     loading: calendar.isFetching && calendar.isPlaceholderData,
   };
   return (
@@ -593,5 +612,111 @@ export function TeamPanel({
       )}
       <CalendarLegend calendar={data} me={me} focus={focus} onFocus={onFocus} />
     </Panel>
+  );
+}
+
+/** Minutes as the panels say them: « 12 h », « 7 h 30 », « 0 h ». */
+const hoursOf = (minutes: number): string => (minutes === 0 ? '0\u00a0h' : lengthOf(minutes * 60_000));
+
+/**
+ * What the agency reads beside the calendar (ADR 0045 § 2, ADR 0048 § 3): each member's planned hours over the
+ * period shown, and how each account is covered, by a chatter with the agent, a chatter alone, the agent alone or
+ * nobody. Every figure is said in words; the bars only repeat them.
+ */
+export function AgencyLoad({
+  calendar,
+  period,
+  focus,
+}: {
+  calendar: Calendar;
+  /** « cette semaine », « en novembre ». */
+  period: string;
+  focus: string | null;
+}): JSX.Element | null {
+  const agency = calendar.agency;
+  if (agency === null) return null;
+  const members = membersOf(calendar);
+  const load = agency.workload.toSorted((a, b) => b.minutes - a.minutes);
+  const most = Math.max(1, ...load.map((one) => one.minutes));
+  const accounts = new Map(agency.accounts.map((account) => [account.id, account]));
+  return (
+    <div className="cal-agency">
+      <section className="nv-plate cal-load" aria-labelledby="cal-load-title">
+        <h2 id="cal-load-title" className="cal-agency__title">
+          Charge {period}
+        </h2>
+        {load.length === 0 ? (
+          <p className="cal-agency__empty">Aucun shift planifié.</p>
+        ) : (
+          <ul className="cal-load__list">
+            {load.map((one) => {
+              const member = members.get(one.memberId);
+              return (
+                <li
+                  key={one.memberId}
+                  className="cal-load__one"
+                  data-muted={focus !== null && one.memberId !== focus ? 'true' : undefined}
+                  style={
+                    member === undefined || member.color === null ? undefined : { '--sc-color': member.color }
+                  }
+                >
+                  <span className="cal-load__name">
+                    <span className="cal-legend__swatch" aria-hidden="true" />
+                    {member?.displayName ?? 'Un membre'}
+                  </span>
+                  <span className="cal-load__bar" aria-hidden="true">
+                    <i style={{ width: `${String((one.minutes / most) * 100)}%` }} />
+                  </span>
+                  <span className="cal-load__hours nv-num">{hoursOf(one.minutes)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+      <section className="nv-plate cal-cover" aria-labelledby="cal-cover-title">
+        <h2 id="cal-cover-title" className="cal-agency__title">
+          Couverture des comptes {period}
+        </h2>
+        <ul className="cal-cover__list">
+          {agency.coverage.map((one) => {
+            const account = accounts.get(one.platformAccountId);
+            const total = Math.max(1, one.withAgent + one.chatterAlone + one.agentAlone + one.nobody);
+            const parts = [
+              { kind: 'both', minutes: one.withAgent, label: 'Chatteur et IA' },
+              { kind: 'chatter', minutes: one.chatterAlone, label: 'Chatteur seul' },
+              { kind: 'agent', minutes: one.agentAlone, label: 'IA seule' },
+              { kind: 'nobody', minutes: one.nobody, label: 'Personne' },
+            ];
+            return (
+              <li key={one.platformAccountId} className="cal-cover__one">
+                <p className="cal-cover__name">
+                  {account === undefined ? 'Un compte' : `${account.creatorName}, ${accountLine(account)}`}
+                </p>
+                <span className="cal-cover__bar" aria-hidden="true">
+                  {parts.map((part) =>
+                    part.minutes === 0 ? null : (
+                      <i
+                        key={part.kind}
+                        data-kind={part.kind}
+                        style={{ width: `${String((part.minutes / total) * 100)}%` }}
+                      />
+                    ),
+                  )}
+                </span>
+                <p className="cal-cover__words">
+                  {parts.map((part) => (
+                    <span key={part.kind} className="cal-cover__word" data-kind={part.kind}>
+                      <i aria-hidden="true" />
+                      {part.label} <span className="nv-num">{hoursOf(part.minutes)}</span>
+                    </span>
+                  ))}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </div>
   );
 }
