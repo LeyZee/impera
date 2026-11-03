@@ -21,7 +21,6 @@ export function AgentHero({
   onOpen,
   onResume,
   tip,
-  forCreator = false,
   globalStop = false,
   opensSettings = false,
 }: {
@@ -33,8 +32,6 @@ export function AgentHero({
   onResume: (() => void) | undefined;
   /** The screen's one floating tip: a card's detail lives there, its value and one sentence on the card (DASH-17). */
   tip: FloatingTip;
-  /** A creator's Dashboard: the agent's state, never the list of conversations waiting for a human (ADR 0023). */
-  forCreator?: boolean;
   /** An operator's global switch holds every creator: the hero says it (DASH-08). */
   globalStop?: boolean;
   /** The account holds Réglages, the owner alone: an action that leads there is offered to no one else. */
@@ -43,8 +40,8 @@ export function AgentHero({
   const stopped = mode === 'stop';
   // A stopped agent keeps the grave lines only (minor, consent, distress: choix de Charles, 28/10); the server sends
   // no other, and the filter holds while the mode has just changed and the list is not read again yet.
-  const todos = forCreator ? [] : stopped ? waiting.filter((todo) => todo.tone === 'bad') : waiting;
-  const state = heroState(agent, todos, mode, { forCreator, globalStop });
+  const todos = stopped ? waiting.filter((todo) => todo.tone === 'bad') : waiting;
+  const state = heroState(agent, todos, mode, { globalStop });
   const hero =
     state.actionTo === undefined || opensSettings
       ? state
@@ -52,7 +49,7 @@ export function AgentHero({
   const first = todos[0];
   const shown = todos.slice(0, SHOWN);
   const more = todos.length - shown.length;
-  const fold = foldOf(agent, stopped, forCreator);
+  const fold = foldOf(agent, stopped);
   return (
     <section
       className="db-hero nv-enter"
@@ -94,13 +91,13 @@ export function AgentHero({
 
       {/* An empty list says nothing more than a calm headline (« Rien ne t’attend. ») does: no plate under it (DASH-10).
         It is said only while the agent writes nothing, whose headline is its trouble. */}
-      {forCreator || stopped || (todos.length === 0 && hero.tone === 'ok') ? null : todos.length === 0 ? (
+      {stopped || (todos.length === 0 && hero.tone === 'ok') ? null : todos.length === 0 ? (
         <div className="nv-calm nv-swap">
           <span className="nv-dot nv-tone--ok" aria-hidden="true" />
           Rien à traiter pour l’instant.
         </div>
       ) : null}
-      {forCreator || todos.length === 0 ? null : (
+      {todos.length === 0 ? null : (
         <div className="nv-todos">
           {shown.map((todo, i) => (
             <div
