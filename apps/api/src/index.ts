@@ -7,6 +7,8 @@ import { startWorker } from './worker-runner';
 
 const config = loadConfig();
 const logger = createLogger(config);
+// Before anything starts: a SIGTERM during the start is kept for the stop below (`shutdown.ts`).
+const graceful = exitGracefully(logger);
 const app = await createApp(config, logger);
 const server = await buildServer({
   config,
@@ -20,7 +22,7 @@ const worker = config.NIRVANA_INLINE_WORKER
   ? await startWorker(app, { logger, concurrency: config.WORKER_CONCURRENCY, release: config.RELEASE })
   : undefined;
 
-exitGracefully(logger, async () => {
+graceful.stopWith(async () => {
   await server.close();
   await worker?.stop();
   await app.shutdown();

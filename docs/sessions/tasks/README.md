@@ -103,6 +103,7 @@ Branche : task/<id>-<slug>
 | CRM-06 | CA de l'agent et achats dans la mémoire du fan | API CRM | todo | CRM-01, CRM-02 pour le CA de l'agent ; la capture Reveal pour la mémoire |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
+| OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
