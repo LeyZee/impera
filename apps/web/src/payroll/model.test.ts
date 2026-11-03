@@ -419,9 +419,12 @@ describe('the money of a statement', () => {
       countedSalesText(
         line({ base: 'platform_net', countedSales: { sales, refunds, late, lateNetMinor: 0 } }),
       );
-    expect(counted(1, 0, 0)).toBe('1 vente lue');
-    expect(counted(12, 1, 2)).toBe('12 ventes lues, 1 remboursement, dont 2 après la clôture d’avant');
-    expect(counted(0, 2, 0)).toBe('0 vente lue, 2 remboursements');
+    // A count and its noun never part on a phone: a no-break space ties them.
+    expect(counted(1, 0, 0)).toBe('1\u00a0vente lue');
+    expect(counted(12, 1, 2)).toBe(
+      '12\u00a0ventes lues, 1\u00a0remboursement, dont 2\u00a0après la clôture d’avant',
+    );
+    expect(counted(0, 2, 0)).toBe('0\u00a0vente lue, 2\u00a0remboursements');
     expect(countedSalesText(line())).toBeNull();
   });
 

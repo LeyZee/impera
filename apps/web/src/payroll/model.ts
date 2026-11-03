@@ -323,10 +323,13 @@ export function lateWords(statements: readonly Pick<CommissionStatement, 'lines'
 export function countedSalesText(line: Pick<CommissionStatementLine, 'countedSales'>): string | null {
   const counted = line.countedSales;
   if (counted === null) return null;
+  // A count stays with its noun when the head wraps on a phone: « 1 remboursement », never « 1 » then « remboursement ».
+  const tied = (count: number, one: string, many: string): string =>
+    plural(count, one, many).replace(' ', NBSP);
   return [
-    plural(counted.sales, 'vente lue', 'ventes lues'),
-    counted.refunds === 0 ? '' : `, ${plural(counted.refunds, 'remboursement', 'remboursements')}`,
-    counted.late === 0 ? '' : `, dont ${String(counted.late)} après la clôture d’avant`,
+    tied(counted.sales, 'vente lue', 'ventes lues'),
+    counted.refunds === 0 ? '' : `, ${tied(counted.refunds, 'remboursement', 'remboursements')}`,
+    counted.late === 0 ? '' : `, dont ${String(counted.late)}${NBSP}après la clôture d’avant`,
   ].join('');
 }
 

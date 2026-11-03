@@ -65,3 +65,7 @@ Le rapprochement d'un rapport déclaré (CR-09), les signaux hors shift (CRM-05)
 - **Équipe, lot b4b** : l'écran du valideur (liste des ventes en attente et décidées, compter, écarter, retirer), Extension relit.
 - **Équipe, lot b4c** : le signalement par le chatteur d'une vente attribuée à tort, sans effet sur la paie tant que le valideur n'a pas décidé.
 - **Téléphone** (Extension) : ventes lues, commission estimée et palier sans « + Vente » pour un compte en net de la plateforme ; le parcours de l'argent et le palier de Commissions disent déjà le net.
+
+03/11/2026, Équipe, lot b4b : Paie › Quinzaine a un panneau « Ventes en attente » pour le propriétaire et un manager actif (`HeldSalesPanel`, `payroll/held-sales.ts`) : chaque vente que la quinzaine garde ou qu'une décision règle, pourquoi elle attend, la décision en vigueur, et les gestes que le serveur ouvre (« Compter pour … », « Écarter », « Retirer la décision »), relus dans une fenêtre avec une note facultative avant l'envoi. Aucun geste sur une vente de son propre chatteur. Reste :
+- **Équipe, lot b4c** : le signalement par le chatteur d'une vente attribuée à tort (migration 0079), qui fait venir la ligne payée dans ce panneau pour qu'un valideur l'écarte ou non ; sans effet sur la paie tant que le valideur n'a pas décidé.
+- **Téléphone** (Extension) : inchangé.

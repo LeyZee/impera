@@ -6,6 +6,7 @@ import {
   CollectiveGoalSchema,
   CommissionStatementSchema,
   ExchangeRatesSchema,
+  HeldSalesSchema,
   PayAdjustmentSchema,
   PayPeriodPageSchema,
   PAYROLL_ERROR_CODES,
@@ -13,6 +14,7 @@ import {
   PayrollPeriodSchema,
   PayrollSettingsSchema,
   PayoutMinimumSchema,
+  PaySaleDecisionSchema,
   PenaltySchema,
   type Bonus,
   type BonusTierSet,
@@ -23,8 +25,10 @@ import {
   type CreateCollectiveGoalBody,
   type CreatePayAdjustmentBody,
   type CreatePayoutMinimumBody,
+  type CreatePaySaleDecisionBody,
   type CreatePenaltyBody,
   type ExchangeRates,
+  type HeldSales,
   type PayAdjustment,
   type PayCommissionStatementBody,
   type PayPeriod,
@@ -34,6 +38,7 @@ import {
   type PayrollPeriod,
   type PayrollSettings,
   type PayoutMinimum,
+  type PaySaleDecision,
   type Penalty,
   type UpdatePayrollSettingsBody,
 } from '@nirvana/contracts';
@@ -115,6 +120,25 @@ export function usePayPeriodReads(
     })),
   });
   return (period) => reads[periods.indexOf(period)]?.data;
+}
+
+/**
+ * The sales a period holds or a decision settles (CRM-03 lot b4b), for the owner and an active manager; a closed period
+ * has none, what its closing left shows in the team's first open period.
+ */
+export function useHeldSales(period: PayPeriod | null, enabled: boolean): UseQueryResult<HeldSales> {
+  return useQuery({
+    queryKey: [...PAYROLL_KEY, 'held-sales', period],
+    queryFn: () =>
+      period === null
+        ? Promise.reject(new Error('No period'))
+        : read(`/v1/payroll/periods/${period}/held-sales`, (body) => HeldSalesSchema.parse(body)),
+    enabled: enabled && period !== null,
+    // A sale read, a chatter linked or a shift added lands without a write here: read again every minute.
+    refetchInterval: 60_000,
+    retry: READ_RETRY,
+    retryDelay: READ_RETRY_DELAY_MS,
+  });
 }
 
 /** The first page of a list: no cursor. */
@@ -276,6 +300,10 @@ export const setPayrollSettings = (body: UpdatePayrollSettingsBody): Promise<Pay
 /** PAIE-22: a payout minimum from a period that has not begun; the same `id` sent twice is one. */
 export const addPayoutMinimum = (body: CreatePayoutMinimumBody): Promise<PayOutcome<PayoutMinimum>> =>
   send('POST', '/v1/payroll/payout-minimums', body, (json) => PayoutMinimumSchema.parse(json));
+
+/** The validator's decision on a sale (CRM-03 lot b4b): count, exclude, or withdraw; the same `id` sent twice is one. */
+export const decideSale = (body: CreatePaySaleDecisionBody): Promise<PayOutcome<PaySaleDecision>> =>
+  send('POST', '/v1/payroll/sale-decisions', body, (json) => PaySaleDecisionSchema.parse(json));
 
 /** After a write, and after a refusal that says the period changed: everything pay shows reads again. */
 export function useRefreshPayroll(): () => Promise<void> {
