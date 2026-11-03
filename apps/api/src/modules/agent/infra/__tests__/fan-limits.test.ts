@@ -1,4 +1,4 @@
-import { CreatorIdSchema, FanIdSchema, newId, type FanFlags } from '@nirvana/contracts';
+import { CreatorIdSchema, FanIdSchema, newId, type FanFlags } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { protectionFor } from '../../domain/hold';

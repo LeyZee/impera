@@ -1,4 +1,4 @@
-import type { ContractorDocumentKind, InvoiceAgency, InvoiceNotIssuedReason } from '@nirvana/contracts';
+import type { ContractorDocumentKind, InvoiceAgency, InvoiceNotIssuedReason } from '@impera/contracts';
 
 import {
   documentState,

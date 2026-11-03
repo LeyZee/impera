@@ -1,4 +1,4 @@
-import { newId, PayoutMinimumIdSchema, type PayPeriod } from '@nirvana/contracts';
+import { newId, PayoutMinimumIdSchema, type PayPeriod } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { addPayoutMinimum, usePayrollSettings, useRefreshPayroll, type PayRefusal } from '@/payroll/api';

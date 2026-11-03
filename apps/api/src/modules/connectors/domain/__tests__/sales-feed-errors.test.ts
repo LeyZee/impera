@@ -1,4 +1,4 @@
-import { SALES_FEED_ERROR_CODES } from '@nirvana/contracts';
+import { SALES_FEED_ERROR_CODES } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

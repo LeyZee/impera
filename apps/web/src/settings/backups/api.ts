@@ -10,7 +10,7 @@ import {
   type BackupStatus,
   type RecordRestoreTestBody,
   type RestoreTest,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { watchIntervalOf, type REFUSALS } from './model';

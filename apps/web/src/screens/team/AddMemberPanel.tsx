@@ -6,7 +6,7 @@ import {
   type InvitationLinkCreated,
   type TeamMember,
   type TeamRole,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useId,
@@ -458,7 +458,7 @@ function Who({ id, draft, problems, onChange }: StepProps): JSX.Element {
       <Field
         id={`${id}-email`}
         label="E-mail"
-        hint="Son identifiant pour se connecter. Nirvana ne lui écrit pas."
+        hint="Son identifiant pour se connecter. Impera ne lui écrit pas."
         problem={problems.email}
       >
         <input

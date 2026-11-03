@@ -10,7 +10,7 @@ import {
   type ShiftSwapRequestId,
   type SwapCandidates,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import type { Actor, ColleagueReads, SwapStore } from '../domain/ports';

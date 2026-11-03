@@ -9,8 +9,8 @@ import {
   PasskeyGestureBodySchema,
   type Passkey,
   type PasskeyCredential,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, type Database } from '@impera/db';
 import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,

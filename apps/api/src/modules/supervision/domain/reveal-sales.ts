@@ -8,7 +8,7 @@ import {
   type SaleSeller,
   type SalesTotals,
   type SalesTotalsRow,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { usdToEurMinor, type UsdRate } from './fan-ranking';
 

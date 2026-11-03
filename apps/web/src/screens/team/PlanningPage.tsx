@@ -5,8 +5,8 @@ import type {
   ShiftReportList,
   ShiftTemplate,
   TeamMember,
-} from '@nirvana/contracts';
-import { slotVersionAt } from '@nirvana/contracts';
+} from '@impera/contracts';
+import { slotVersionAt } from '@impera/contracts';
 import { useMemo, useRef, useState, type JSX } from 'react';
 
 import { ShiftPanel, type ShiftStart } from './ShiftPanel';

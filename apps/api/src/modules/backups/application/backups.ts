@@ -3,7 +3,7 @@ import type {
   BackupStatus,
   RecordRestoreTestBodySchema,
   RestoreTest,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import type {

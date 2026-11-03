@@ -1,4 +1,4 @@
-import { calendarDayAt, type Platform, type SaleEvent } from '@nirvana/contracts';
+import { calendarDayAt, type Platform, type SaleEvent } from '@impera/contracts';
 
 /**
  * The register's lines summed by their sale's day (ADR 0050 § 7), the one rule the reliability check (CRM-02) and the

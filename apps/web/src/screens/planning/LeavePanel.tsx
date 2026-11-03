@@ -1,4 +1,4 @@
-import { LEAVE_MAX_DAYS, LeaveRequestIdSchema, newId } from '@nirvana/contracts';
+import { LEAVE_MAX_DAYS, LeaveRequestIdSchema, newId } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { askLeave, useRefreshPlanning, type Refusal } from '@/scheduling/api';

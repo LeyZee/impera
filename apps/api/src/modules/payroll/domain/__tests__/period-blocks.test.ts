@@ -1,4 +1,4 @@
-import { DomainError, type PayPeriodBlock } from '@nirvana/contracts';
+import { DomainError, type PayPeriodBlock } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { CommissionRateMissing, MissingExchangeRate, PayPeriodOrder } from '../errors';

@@ -46,7 +46,7 @@ import {
   type PaySaleSignal,
   type Penalty,
   type UpdatePayrollSettingsBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   useInfiniteQuery,
   useQueries,

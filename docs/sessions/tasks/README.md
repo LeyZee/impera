@@ -65,7 +65,7 @@ Branche : task/<id>-<slug>
 | D-02 | Recette design et navigation de l'interface web | 4 | in_progress | D-01 |
 | EQ-01 | Équipe : membres, pays, commission, paramètres de paie des plateformes | équipe | in_progress | ADR 0023, ADR 0024 ; écrans : EQ-11 |
 | EQ-02 | Planning des shifts et « qui est en poste » | équipe | in_progress | EQ-01 |
-| EQ-03 | Rapport de fin de shift dans Nirvana | équipe | in_progress | EQ-02 |
+| EQ-03 | Rapport de fin de shift dans Impera | équipe | in_progress | EQ-02 |
 | EQ-04 | Moteur de paie : calcul pur, périodes, verrou | équipe | in_progress | EQ-01, EQ-03 |
 | EQ-05 | Paie : écrans de validation, de paiement et commissions du chatteur | équipe | done | EQ-04, EQ-11 |
 | EQ-06 | Factures des prestataires : autofacturation, avoirs, export comptable | équipe | done | EQ-04, EQ-05 |

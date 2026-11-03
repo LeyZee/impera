@@ -1,4 +1,4 @@
-import type { CreatorOnDuty } from '@nirvana/contracts';
+import type { CreatorOnDuty } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { useCreatorOnDuty } from '@/scheduling/api';

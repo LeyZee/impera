@@ -10,7 +10,7 @@ import {
   MessageAuthorSchema,
   MessageDirectionSchema,
   type ExternalMedia,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
   bigint,

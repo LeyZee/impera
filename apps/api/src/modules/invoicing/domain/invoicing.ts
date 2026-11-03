@@ -4,7 +4,7 @@ import type {
   InvoiceNotIssuedReason,
   InvoiceRegime,
   PayPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   identityComplete,

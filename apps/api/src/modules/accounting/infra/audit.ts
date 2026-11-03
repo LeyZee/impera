@@ -1,5 +1,5 @@
-import { AuditEntryIdSchema, newId } from '@nirvana/contracts';
-import { schema, type Transaction } from '@nirvana/db';
+import { AuditEntryIdSchema, newId } from '@impera/contracts';
+import { schema, type Transaction } from '@impera/db';
 
 import type { Actor } from '../../contractors/pure';
 

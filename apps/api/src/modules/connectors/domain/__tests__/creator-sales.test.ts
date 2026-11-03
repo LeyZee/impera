@@ -1,4 +1,4 @@
-import { CreatorSalesSchema, FanIdSchema, newId, PlatformAccountIdSchema } from '@nirvana/contracts';
+import { CreatorSalesSchema, FanIdSchema, newId, PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { creatorSales, type CreatorLine } from '../creator-sales';

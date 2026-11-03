@@ -5,7 +5,7 @@ Dépend de : ADR 0024 et 0025 (hybride), EQ-02 (planning), EQ-13 (passations), P
 Branche : task/<id>-hybrid-routing-by-value
 
 ## Objectif
-Quand un chatteur est en poste, l'agent garde le volume et passe la main sur les fans chauds ou de valeur ; au début de chaque shift, le chatteur reçoit dans Nirvana la liste des fans à reprendre dans Reveal, dans l'ordre.
+Quand un chatteur est en poste, l'agent garde le volume et passe la main sur les fans chauds ou de valeur ; au début de chaque shift, le chatteur reçoit dans Impera la liste des fans à reprendre dans Reveal, dans l'ordre.
 
 ## Contexte à lire
 ADR 0024, ADR 0025 (le chatteur chatte dans Reveal), EQ-02, EQ-13, `apps/api/src/modules/agent/domain/hold.ts`, `docs/reference/desirely-analysis.md` (§ Playbook, hybride).

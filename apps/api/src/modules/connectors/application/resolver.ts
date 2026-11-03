@@ -1,4 +1,4 @@
-import { PlatformSchema, type Platform } from '@nirvana/contracts';
+import { PlatformSchema, type Platform } from '@impera/contracts';
 
 import { SessionVaultMissing } from '../domain/errors';
 import type { PlatformConnector } from '../domain/platform-connector';

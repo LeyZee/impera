@@ -6,10 +6,10 @@ import type {
   PlaygroundState,
   RejectReason,
   Verdict,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
- * Screen-side vocabulary of the playground. The data shapes live in `@nirvana/contracts` (playground.ts, P3-06);
+ * Screen-side vocabulary of the playground. The data shapes live in `@impera/contracts` (playground.ts, P3-06);
  * this file only adds what the screen needs on top: names for parts of them, and French labels.
  */
 

@@ -1,4 +1,4 @@
-import { PAY_AMOUNT_MAX_MINOR, type ContestCorrection, type InvoiceKind } from '@nirvana/contracts';
+import { PAY_AMOUNT_MAX_MINOR, type ContestCorrection, type InvoiceKind } from '@impera/contracts';
 
 import { CreditNoteExceedsInvoice, InvoiceCorrectionUnprocessable } from './errors';
 import { longDay } from './invoices';

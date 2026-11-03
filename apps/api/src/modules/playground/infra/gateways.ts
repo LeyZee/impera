@@ -6,7 +6,7 @@ import {
   MODELS,
   type LlmGateway,
   type LlmGatewayDeps,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 /** What the playground gateways share: keys, the call journal (so the daily cap counts them all), listeners. */
 export type PlaygroundGatewayDeps = Pick<

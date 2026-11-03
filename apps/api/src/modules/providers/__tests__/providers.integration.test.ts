@@ -1,5 +1,5 @@
-import { eq, schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { eq, schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { testConfig } from '../../../__tests__/support/config';

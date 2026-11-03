@@ -16,7 +16,7 @@ import {
   type SalesFeedOverview,
   type SalesFeedRefusal,
   type SalesFeedStatus,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { ReauthRequired, ServicesError } from '@/settings/services/api';
 

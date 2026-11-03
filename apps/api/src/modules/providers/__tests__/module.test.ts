@@ -9,7 +9,7 @@ const XAI_KEY = 'xai-FAKEFAKEFAKEFAKEFAKEFAKE0000';
 function fakeXai(state: { revoked: boolean }): FetchLike {
   return (url) => {
     const status = url.endsWith('/v1/api-key') && !state.revoked ? 200 : 401;
-    const body = status === 200 ? { name: 'nirvana', acls: ['api-key:model:*'] } : { error: 'bad key' };
+    const body = status === 200 ? { name: 'impera', acls: ['api-key:model:*'] } : { error: 'bad key' };
     return Promise.resolve({ status, text: () => Promise.resolve(JSON.stringify(body)) });
   };
 }

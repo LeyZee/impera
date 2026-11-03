@@ -3,8 +3,8 @@ import {
   CommissionStatementIdSchema,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   newId,
-} from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { schema, sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { PayoutCertificate, PayrollPayoutCertificateStore } from '../domain/ports';

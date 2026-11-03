@@ -1,4 +1,4 @@
-import { ConversationStateSchema, DraftStatusSchema } from '@nirvana/contracts';
+import { ConversationStateSchema, DraftStatusSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { canDraftBecome, nextState, statesAllowing } from '../state-machine';

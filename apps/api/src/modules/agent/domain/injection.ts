@@ -1,4 +1,4 @@
-import { unmask } from '@nirvana/contracts';
+import { unmask } from '@impera/contracts';
 
 /**
  * Traps a fan sets to catch a machine (docs/architecture/ai-engine.md, « Les pièges »). Pure code, run on

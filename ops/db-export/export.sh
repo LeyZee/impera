@@ -81,7 +81,7 @@ step="dump"
 mkdir "$work/export"
 # shellcheck disable=SC2086 # exclude_args is a list of flags.
 pg_dump "$BACKUP_DATABASE_URL" --format=custom --no-owner --snapshot="$snapshot" $exclude_args \
-  --file="$work/export/nirvana.dump"
+  --file="$work/export/impera.dump"
 
 step="count"
 echo "$counts_sql" >&3
@@ -93,13 +93,13 @@ counts=$(sed -n 2p "$work/out")
 [ -n "$counts" ] || exit 1
 
 step="verify"
-pg_restore --list "$work/export/nirvana.dump" >/dev/null
+pg_restore --list "$work/export/impera.dump" >/dev/null
 dump_version=$(pg_dump --version)
 printf '{"pg_dump":"%s","row_counts":%s}\n' "$dump_version" "$counts" >"$work/export/manifest.json"
 
 step="encrypt"
-name="nirvana-$(date -u +%Y%m%dT%H%M%SZ).tar.age"
-tar -C "$work/export" -cf - nirvana.dump manifest.json | age -r "$BACKUP_AGE_RECIPIENT" -o "$work/$name"
+name="impera-$(date -u +%Y%m%dT%H%M%SZ).tar.age"
+tar -C "$work/export" -cf - impera.dump manifest.json | age -r "$BACKUP_AGE_RECIPIENT" -o "$work/$name"
 rm -rf "$work/export"
 size=$(wc -c <"$work/$name" | tr -d ' ')
 sha256=$(sha256sum "$work/$name" | cut -d ' ' -f 1)

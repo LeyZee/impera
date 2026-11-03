@@ -2,7 +2,7 @@ import type {
   CommissionStatement,
   CommissionStatementId,
   ValidateCommissionStatementBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { Actor } from '../../contractors/pure';
 import { CommissionStatementChanged } from '../domain/errors';

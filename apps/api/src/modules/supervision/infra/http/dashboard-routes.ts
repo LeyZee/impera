@@ -8,8 +8,8 @@ import {
   type DashboardPeriod,
   type UserRole,
   UserIdSchema,
-} from '@nirvana/contracts';
-import { startOfLocalDay } from '@nirvana/llm';
+} from '@impera/contracts';
+import { startOfLocalDay } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 

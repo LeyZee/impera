@@ -1,5 +1,5 @@
-import { and, eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { and, eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 
 import { testConfig } from '../../../__tests__/support/config';
@@ -24,7 +24,7 @@ describe('/v1/backups/status and the 26-hour check', () => {
     startedAt: new Date(finishedAt.getTime() - 60_000),
     finishedAt,
     status: 'succeeded' as const,
-    objectKey: `backups/nirvana-${sha.slice(0, 8)}.tar.age`,
+    objectKey: `backups/impera-${sha.slice(0, 8)}.tar.age`,
     sizeBytes: 4096,
     sha256: sha.repeat(64 / sha.length),
     pgDumpVersion: '16.15',
@@ -104,7 +104,7 @@ describe('/v1/backups/status and the 26-hour check', () => {
       lastSucceededAt: finishedAt.toISOString(),
       lastRun: { status: 'failed', error: 'failed at step upload', sizeBytes: null },
     });
-    expect(response.body).not.toContain('backups/nirvana-');
+    expect(response.body).not.toContain('backups/impera-');
     expect(response.body).not.toContain('aaaa');
   });
 

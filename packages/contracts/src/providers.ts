@@ -56,7 +56,7 @@ export const ProviderStatusSchema = z.object({
   keyLabel: z.string().nullable(),
   verifiedAt: z.iso.datetime().nullable(),
   /**
-   * The saved key no longer decrypts (its encryption key was dropped too early): Nirvana cannot check it, the
+   * The saved key no longer decrypts (its encryption key was dropped too early): Impera cannot check it, the
    * provider is never called, and only pasting it again fixes it.
    */
   isUnreadable: z.boolean(),

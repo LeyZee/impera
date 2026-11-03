@@ -4,7 +4,7 @@ import {
   CustomAlertGroupSchema,
   SystemAlertSettingSchema,
   type CustomAlertGroup,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

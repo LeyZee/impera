@@ -1,4 +1,4 @@
-import { desireNow, type MediaDescription } from '@nirvana/contracts';
+import { desireNow, type MediaDescription } from '@impera/contracts';
 import type {
   BrainAlert,
   Brief,
@@ -7,7 +7,7 @@ import type {
   LlmFailure,
   LlmGateway,
   VoiceInput,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import {
   desireMoved,

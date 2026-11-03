@@ -2,9 +2,9 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { JOB_PAYLOADS } from '@nirvana/contracts';
-import { createDbClient, type Database, type DbClient } from '@nirvana/db';
-import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore } from '@nirvana/llm';
+import { JOB_PAYLOADS } from '@impera/contracts';
+import { createDbClient, type Database, type DbClient } from '@impera/db';
+import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Task, TaskList } from 'graphile-worker';
 import type { Pool } from 'pg';
@@ -285,7 +285,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
     activePersona: persona.activePersona,
     personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.2.0.yaml'),
-    trainingDir: fromRepoRoot(config.NIRVANA_TRAINING_DIR ?? '.scratch/training'),
+    trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
   });
   const agent = wireAgent(shared, {

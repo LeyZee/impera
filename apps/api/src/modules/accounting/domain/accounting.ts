@@ -5,7 +5,7 @@ import type {
   PayPeriod,
   TeamMemberId,
   Withholding,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { ContractorIdentity } from '../../contractors/pure';
 import { settlementsDue, type SettlementCarryOver, type SettlementStatement } from '../../invoicing/pure';

@@ -1,4 +1,4 @@
-import type { RestoreTest } from '@nirvana/contracts';
+import type { RestoreTest } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';

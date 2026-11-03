@@ -14,8 +14,8 @@ import {
   type SaleStatus,
   type SaleType,
   type TeamMemberId,
-} from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { lineChatter } from './line-chatter';
@@ -53,7 +53,7 @@ export interface PaySaleLine {
   readonly saleType: SaleType;
   /**
    * The line's status when it was first read, which it keeps (a line never changes once recorded): `other` is a value
-   * the platform added that Nirvana does not know (ADR 0050 § 3), `refund_asked` still counts and is signalled (§ 7).
+   * the platform added that Impera does not know (ADR 0050 § 3), `refund_asked` still counts and is signalled (§ 7).
    */
   readonly status: SaleStatus;
   readonly platformAccountId: PlatformAccountId;
@@ -63,7 +63,7 @@ export interface PaySaleLine {
   readonly saleOccurredAt: Date | null;
   /** `saleOccurredAt`'s day in the time zone the caller gives (the agency's), `null` with it. */
   readonly saleDay: string | null;
-  /** When Nirvana recorded the line: after a period's closing, the line is late (ADR 0032, ADR 0050 § 7). */
+  /** When Impera recorded the line: after a period's closing, the line is late (ADR 0032, ADR 0050 § 7). */
   readonly recordedAt: Date;
   readonly currency: Currency;
   /**
@@ -199,7 +199,7 @@ export const salesFeedReadsForPay = {
     ),
 
   /**
-   * The lines Nirvana recorded in `[from, to)`, whatever their sale's day: after a period's closing, its late sales
+   * The lines Impera recorded in `[from, to)`, whatever their sale's day: after a period's closing, its late sales
    * and refunds, which count in the first period still open (ADR 0032, ADR 0050 §§ 5 and 7).
    */
   linesRecordedBetween: (tx: Transaction, range: PaySalesRange): Promise<PaySaleLine[]> =>

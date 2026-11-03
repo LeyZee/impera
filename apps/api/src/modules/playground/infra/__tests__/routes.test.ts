@@ -4,14 +4,14 @@ import {
   PlaygroundAnswerSchema,
   PlaygroundRatingResultSchema,
   PlaygroundStateSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   DEFAULT_LLM_CONFIG,
   type Brief,
   type HealthReport,
   type LlmGateway,
   type VoiceOutput,
-} from '@nirvana/llm';
+} from '@impera/llm';
 import type { LightMyRequestResponse, preValidationAsyncHookHandler } from 'fastify';
 import { describe, expect, it } from 'vitest';
 

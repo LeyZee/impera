@@ -1,4 +1,4 @@
-import type { AiProvider } from '@nirvana/contracts';
+import type { AiProvider } from '@impera/contracts';
 
 import type { CredentialStore } from '../domain/ports';
 

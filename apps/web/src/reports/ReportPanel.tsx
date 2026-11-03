@@ -4,7 +4,7 @@ import {
   type ShiftReport,
   type ShiftReportContext,
   type ShiftReportId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX, type ReactNode } from 'react';
 

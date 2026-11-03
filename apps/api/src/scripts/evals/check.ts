@@ -1,5 +1,5 @@
-import type { DesireBand } from '@nirvana/contracts';
-import type { Brief } from '@nirvana/llm';
+import type { DesireBand } from '@impera/contracts';
+import type { Brief } from '@impera/llm';
 
 import type { Scenario } from './scenario';
 

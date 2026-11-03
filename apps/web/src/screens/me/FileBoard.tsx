@@ -3,7 +3,7 @@ import type {
   ContractorFile,
   ContractorFileDocument,
   ContractText,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import {

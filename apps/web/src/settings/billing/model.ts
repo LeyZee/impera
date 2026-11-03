@@ -23,7 +23,7 @@ import {
   type AgencyLogoRefusal,
   type BillingSettings,
   type UpdateBillingSettingsBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * Réglages › Facturation, the pure part: the form as the owner types it, what is wrong with it, the body it sends, and

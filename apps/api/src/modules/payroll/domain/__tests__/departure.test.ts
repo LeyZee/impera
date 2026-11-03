@@ -1,4 +1,4 @@
-import { DomainError, PayPeriodSchema } from '@nirvana/contracts';
+import { DomainError, PayPeriodSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { assertDocumentsSettled, closingPeriodOf, finalFor } from '../departure';

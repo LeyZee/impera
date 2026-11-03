@@ -1,5 +1,5 @@
-import { DESIRE_BRAIN_SIGNALS, DESIRE_SIGNALS } from '@nirvana/contracts';
-import { BriefSchema } from '@nirvana/llm';
+import { DESIRE_BRAIN_SIGNALS, DESIRE_SIGNALS } from '@impera/contracts';
+import { BriefSchema } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
 import { desireScore, NO_MEASURE, type DesireTurn } from '../../domain/desire';

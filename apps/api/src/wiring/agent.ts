@@ -1,5 +1,5 @@
-import { CreatorIdSchema } from '@nirvana/contracts';
-import { DEFAULT_LLM_CONFIG, loadPrompt } from '@nirvana/llm';
+import { CreatorIdSchema } from '@impera/contracts';
+import { DEFAULT_LLM_CONFIG, loadPrompt } from '@impera/llm';
 
 import type { AppLlm } from '../llm';
 import {

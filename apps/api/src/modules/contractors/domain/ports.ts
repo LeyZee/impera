@@ -29,7 +29,7 @@ import type {
   ValidateBillingRegimeBody,
   VerifyContractorProfileBody,
   ContractorDocumentMediaType,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { PngSize } from './agency-logo';
 

@@ -7,7 +7,7 @@ import {
   ShiftReportIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

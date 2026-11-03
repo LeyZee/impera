@@ -14,9 +14,9 @@ import {
   type SalesTotals,
   type TelegramBot,
   type TelegramChatId,
-} from '@nirvana/contracts';
-import { eq, parseEncryptionKeys, schema, sql, withTenant } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, parseEncryptionKeys, schema, sql, withTenant } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';

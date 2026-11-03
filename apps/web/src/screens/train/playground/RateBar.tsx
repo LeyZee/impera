@@ -1,5 +1,5 @@
-import type { PlaygroundState } from '@nirvana/contracts';
-import { countUp } from '@nirvana/design-system';
+import type { PlaygroundState } from '@impera/contracts';
+import { countUp } from '@impera/design-system';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, type JSX } from 'react';
 

@@ -9,8 +9,8 @@ import {
   UserRoleSchema,
   type SecurityAlertPayload,
   type UserRole,
-} from '@nirvana/contracts';
-import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 /**
  * The security alerts of the server's own files (ADR 0046 § 8): sign-ins, refusals, second factor resets. Each is

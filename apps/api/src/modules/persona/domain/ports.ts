@@ -1,4 +1,4 @@
-import type { AgentHours, AgentHoursView, CreatorId, CreatorSummary, NewCreator } from '@nirvana/contracts';
+import type { AgentHours, AgentHoursView, CreatorId, CreatorSummary, NewCreator } from '@impera/contracts';
 
 /** The creators table, the tenant root: no RLS of its own, read and written by the application role. */
 export interface CreatorDirectory {

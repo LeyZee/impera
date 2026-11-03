@@ -5,7 +5,7 @@ Dépend de : coquille `apps/web`, design system (`packages/design-system`)
 Branche : task/<id>-first-steps
 
 ## Objectif
-Un propriétaire qui ouvre Nirvana pour la première fois sait quoi faire dans l'ordre, et un habitué va partout au clavier.
+Un propriétaire qui ouvre Impera pour la première fois sait quoi faire dans l'ordre, et un habitué va partout au clavier.
 
 ## Contexte à lire
 `docs/design/README.md`, `apps/web/src/` (rail par rôle), `docs/reference/desirely-analysis.md` (§ Interface).

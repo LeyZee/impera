@@ -7,7 +7,7 @@ import {
   type CustomAlertGroupId,
   type EventId,
   type SystemAlertCode,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { lastMessageAgo } from '../view';
 

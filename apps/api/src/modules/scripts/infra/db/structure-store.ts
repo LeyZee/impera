@@ -11,7 +11,7 @@ import {
   type ScriptStructure,
   type ScriptStructureBody,
   type ScriptStructureVersion,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   enterCreator,
@@ -23,7 +23,7 @@ import {
   withTenantMember,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 
 import type { QueuedStructure, ScriptStructureStore } from '../../domain/ports';
 import { saveDecision } from '../../domain/versions';

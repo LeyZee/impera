@@ -6,7 +6,7 @@ import {
   type Me,
   type PayPeriod,
   type PayrollPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { GoalDialog, TiersDialog } from './GoalForms';

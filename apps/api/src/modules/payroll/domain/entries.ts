@@ -4,7 +4,7 @@ import {
   previousPayPeriod,
   type PayPeriod,
   type TeamMemberId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { PayrollForbidden } from '../../contractors/pure';
 
@@ -144,7 +144,7 @@ export function periodsChanged(from: PayPeriod, to: PayPeriod, current: PayPerio
 /**
  * A payment as the owner records it (ADR 0023 § Factures): a transfer made, so never dated after `today` (the agency's
  * zone), nor before the first day of the statement's period (a slip of the year, which a paid statement would keep
- * forever; money may leave before the validation in Nirvana, so the bound is the period, not `validated_at`), and of
+ * forever; money may leave before the validation in Impera, so the bound is the period, not `validated_at`), and of
  * what the statement pays. Days compare as `YYYY-MM-DD` text, and a period is its first day.
  */
 export function assertPayment(

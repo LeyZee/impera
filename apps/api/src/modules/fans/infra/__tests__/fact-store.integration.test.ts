@@ -5,9 +5,9 @@ import {
   PlatformAccountIdSchema,
   type CreatorId,
   type FanId,
-} from '@nirvana/contracts';
-import { eq, schema, withAdmin } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema, withAdmin } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { FanNotFound } from '../../domain/errors';

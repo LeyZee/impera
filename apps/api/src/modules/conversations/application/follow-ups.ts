@@ -1,4 +1,4 @@
-import { jobKeyFor, queueNameFor } from '@nirvana/contracts';
+import { jobKeyFor, queueNameFor } from '@impera/contracts';
 
 import type { Conversation, EventMeta, Transaction } from '../domain/ports';
 import { nextFollowUp } from '../domain/rules';

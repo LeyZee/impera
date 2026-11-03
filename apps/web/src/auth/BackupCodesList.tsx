@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type JSX, type RefObject } from 'react';
  */
 export function BackupCodesList({ codes }: { codes: readonly string[] }): JSX.Element {
   const listRef = useRef<HTMLUListElement>(null);
-  const text = `Nirvana : codes de secours (chacun ne sert qu’une fois)\n\n${codes.join('\n')}\n`;
+  const text = `Impera : codes de secours (chacun ne sert qu’une fois)\n\n${codes.join('\n')}\n`;
   return (
     <>
       <ul
@@ -27,7 +27,7 @@ export function BackupCodesList({ codes }: { codes: readonly string[] }): JSX.El
             const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'nirvana-codes-de-secours.txt';
+            link.download = 'impera-codes-de-secours.txt';
             // In the document for Firefox, and the URL kept a moment: revoked at once, Safari cancels the download.
             document.body.append(link);
             link.click();

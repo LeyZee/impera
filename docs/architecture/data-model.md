@@ -18,7 +18,7 @@ Dernière revue : 2026-10-16. Le schéma Drizzle (`packages/db/src/schema/`, P0-
 creators            id, display_name, name_key (creatorNameKey, unique : jamais deux créatrices du même nom,
                     migration 0035), timezone, settings jsonb (schéma Zod CreatorSettings),
                     agent_hours jsonb (AgentHoursSchema, null = DEFAULT_AGENT_HOURS, P3-14), created_at
-platform_accounts   id, creator_id, platform (reveal|onlyfans|instagram|nirvana), handle,
+platform_accounts   id, creator_id, platform (reveal|onlyfans|instagram|impera), handle,
                     session_state (none|valid|warning|expired), session_ciphertext bytea, session_updated_at,
                     last_poll_at, consecutive_errors, paused_until (coupe-circuit), connector_config jsonb (ConnectorConfigSchema)
 audit_log           id, user_id, action, entity, entity_id, details jsonb, ip, created_at   (append-only)
@@ -71,7 +71,7 @@ blind_tests          id, creator_id, voice_prompt, voice_model, persona_version_
                      de la version décide.
 ```
 
-`conversations.last_inbound_at` est l'heure où Nirvana a lu le dernier message du fan (ordre d'arrivée : debounce, brouillon périmé, relances). Ce que l'écran montre (« A écrit il y a… », `ConversationSummary.lastInboundAt`) est l'heure du message sur la plateforme, `max(messages.platform_created_at)` des messages entrants : une capture qui relit l'historique ne fait pas dire « à l'instant » d'un message de cinq heures.
+`conversations.last_inbound_at` est l'heure où Impera a lu le dernier message du fan (ordre d'arrivée : debounce, brouillon périmé, relances). Ce que l'écran montre (« A écrit il y a… », `ConversationSummary.lastInboundAt`) est l'heure du message sur la plateforme, `max(messages.platform_created_at)` des messages entrants : une capture qui relit l'historique ne fait pas dire « à l'instant » d'un message de cinq heures.
 
 Types d'événements (liste fermée dans `packages/contracts/src/events.ts`) : `message_received`, `message_sent`, `send_attempted`, `send_failed`, `send_verified`, `media_described`, `draft_created`, `draft_approved`, `draft_edited`, `draft_rejected`, `draft_expired`, `fact_proposed`, `fact_confirmed`, `fact_rejected`, `summary_refreshed`, `handoff_requested`, `alert_triggered`, `takeover_started`, `takeover_ended`, `mode_changed`, `kill_switch_toggled`, `follow_up_scheduled`, `follow_up_cancelled`, `offer_made`, `sale_detected`, `script_started`, `script_step_sent`, `script_ended`, `session_state_changed`, `budget_threshold_crossed`, `connection_state_changed`, `automatic_closed`, `security_alert` (ADR 0046 § 8), `error`.
 

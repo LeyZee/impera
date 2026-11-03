@@ -1,4 +1,4 @@
-import type { PayPeriod, ShiftReportList, ShiftReportStatus } from '@nirvana/contracts';
+import type { PayPeriod, ShiftReportList, ShiftReportStatus } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { useReports, useSchedulingSettings } from './api';

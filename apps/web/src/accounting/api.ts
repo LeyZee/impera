@@ -8,7 +8,7 @@ import {
   type AccountingPeriodQuery,
   type Das2Export,
   type JournalAccountName,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { z } from 'zod';
 
 import { archiveName } from './model';

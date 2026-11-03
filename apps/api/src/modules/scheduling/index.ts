@@ -1,5 +1,5 @@
-import type { CreatorId, PayPeriod, PlatformAccountId } from '@nirvana/contracts';
-import type { Database, Transaction } from '@nirvana/db';
+import type { CreatorId, PayPeriod, PlatformAccountId } from '@impera/contracts';
+import type { Database, Transaction } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createAgencyRatesService } from './application/agency-rates';

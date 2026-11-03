@@ -1,4 +1,4 @@
-import type { CommissionStatement } from '@nirvana/contracts';
+import type { CommissionStatement } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { reachedBpsOf } from '../commission-statements';

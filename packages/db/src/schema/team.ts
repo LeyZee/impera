@@ -1,4 +1,4 @@
-import { INVITATION_LINK_PURPOSES, TEAM_MEMBER_STATUSES, TEAM_ROLES } from '@nirvana/contracts';
+import { INVITATION_LINK_PURPOSES, TEAM_MEMBER_STATUSES, TEAM_ROLES } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   check,

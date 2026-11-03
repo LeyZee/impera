@@ -7,8 +7,8 @@ import {
   type ContractorDocumentId,
   type TeamMemberId,
   type UploadContractorDocumentQuery,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
 import { documentRetainUntil, documentStorageKey, documentUploadLockUntil } from '../domain/documents';
 import {

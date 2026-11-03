@@ -1,4 +1,4 @@
-import type { ShiftReportId } from '@nirvana/contracts';
+import type { ShiftReportId } from '@impera/contracts';
 import { useNavigate } from '@tanstack/react-router';
 import {
   createContext,

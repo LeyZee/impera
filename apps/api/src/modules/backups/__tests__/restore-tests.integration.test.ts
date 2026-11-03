@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { and, eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+import { and, eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -62,7 +62,7 @@ describe('/v1/backups/restore-tests', () => {
         startedAt: new Date(finishedAt.getTime() - 60_000),
         finishedAt,
         status: 'succeeded',
-        objectKey: 'backups/nirvana-test.tar.age',
+        objectKey: 'backups/impera-test.tar.age',
         sizeBytes: 4096,
         sha256: SUCCEEDED_SHA,
         pgDumpVersion: '16.15',

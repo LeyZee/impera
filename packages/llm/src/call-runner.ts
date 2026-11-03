@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '@nirvana/contracts';
+import { err, ok, type Result } from '@impera/contracts';
 import {
   APICallError,
   generateText,

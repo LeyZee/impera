@@ -16,8 +16,8 @@ import {
   type ContractorProfileBody,
   type ContractText,
   type TeamMemberId,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
 import { documentReminderFrom, documentsFollowed, regimeOn } from '../domain/billing';
 import { profileChanges } from '../domain/contractors';

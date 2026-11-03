@@ -1,4 +1,4 @@
-import type { TelegramTopic } from '@nirvana/contracts';
+import type { TelegramTopic } from '@impera/contracts';
 
 /**
  * The tabs of Réglages › Telegram, one per kind of message, plus the bots. The keywords are a line of the alerts

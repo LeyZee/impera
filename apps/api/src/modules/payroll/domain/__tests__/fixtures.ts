@@ -6,7 +6,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
   type ExchangeRate,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { MemberForPay, PeriodSnapshot, ReportForPay } from '../recalculation';
 import { NO_SALES } from '../sales';

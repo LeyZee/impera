@@ -90,7 +90,7 @@ En tête : l'état (tout fonctionne, nombre de bots et de groupes, dernier envoi
 Création d'un bot en quatre étapes :
 1. **Crée le bot.** Bouton « Ouvrir @BotFather » (`https://t.me/BotFather`), puis `/newbot`, un nom et un identifiant qui finit par `bot`, chacun avec un bouton pour copier. @BotFather répond avec un jeton.
 2. **Colle le jeton.** Vérification au collage. Le bot apparaît avec son nom, ou un texte dit quoi corriger.
-3. **Ajoute-le au groupe.** Bouton « Ouvrir dans Telegram » (`https://t.me/<bot>?startgroup=nirvana`). L'écran écoute et affiche le groupe dès que le bot y entre.
+3. **Ajoute-le au groupe.** Bouton « Ouvrir dans Telegram » (`https://t.me/<bot>?startgroup=impera`). L'écran écoute et affiche le groupe dès que le bot y entre.
 4. **Choisis ce qu'il reçoit**, puis « Envoyer un test ».
 
 Un onglet dont l'événement n'existe pas encore dit « bientôt » et pourquoi, sans faux contenu.

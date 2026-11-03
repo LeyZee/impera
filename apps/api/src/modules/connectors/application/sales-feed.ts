@@ -18,7 +18,7 @@ import {
   type SalesFeedOverview,
   type SalesFeedRefusal,
   type SalesFeedStatus,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/auto-check';
 import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
@@ -83,7 +83,7 @@ export interface SalesFeedDeps {
   /** `null` without CREDENTIALS_ENCRYPTION_KEYS, like `keys`. */
   readonly webhooks: SalesFeedWebhookStore | null;
   readonly jobs: SalesFeedJobs;
-  /** Nirvana's public address for a platform's deliveries; `null` when it is not HTTPS (development). */
+  /** Impera's public address for a platform's deliveries; `null` when it is not HTTPS (development). */
   readonly webhookUrl: (platform: Platform) => string | null;
   /**
    * The accounts paid on the platform's net over the whole of a fortnight (CRM-04 b3): the pay rules' `detected`, read
@@ -118,7 +118,7 @@ export interface SalesFeeds {
     link: LinkSalesFeedChatterBody,
     by: string | null,
   ): Promise<SalesFeedOverview>;
-  /** Registers Nirvana's webhook at the platform (replacing one already there) and keeps its secret sealed. */
+  /** Registers Impera's webhook at the platform (replacing one already there) and keeps its secret sealed. */
   connectWebhook(platform: Platform, by: KeyActor): Promise<Result<SalesFeedStatus, SalesFeedRefusal>>;
   disconnectWebhook(platform: Platform, by: KeyActor): Promise<SalesFeedStatus>;
   /**

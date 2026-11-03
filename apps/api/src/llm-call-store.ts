@@ -1,6 +1,6 @@
-import { LlmCallIdSchema, newId } from '@nirvana/contracts';
-import { schema, sql, type Database } from '@nirvana/db';
-import { CALL_OUTCOMES, type LlmCallRecord, type LlmCallStore } from '@nirvana/llm';
+import { LlmCallIdSchema, newId } from '@impera/contracts';
+import { schema, sql, type Database } from '@impera/db';
+import { CALL_OUTCOMES, type LlmCallRecord, type LlmCallStore } from '@impera/llm';
 import { z } from 'zod';
 
 const RowSchema = z.object({

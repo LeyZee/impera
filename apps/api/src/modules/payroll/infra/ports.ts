@@ -1,5 +1,5 @@
-import type { CommissionStatementId, PayPeriod, TeamMemberId } from '@nirvana/contracts';
-import type { Transaction } from '@nirvana/db';
+import type { CommissionStatementId, PayPeriod, TeamMemberId } from '@impera/contracts';
+import type { Transaction } from '@impera/db';
 
 import type { Actor } from '../../contractors/pure';
 import type { PayoutVerdict } from '../domain/ports';

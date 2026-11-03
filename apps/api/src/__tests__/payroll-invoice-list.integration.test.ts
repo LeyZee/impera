@@ -8,8 +8,8 @@ import {
   PayAdjustmentIdSchema,
   PayPeriodSchema,
   type TeamMember,
-} from '@nirvana/contracts';
-import { and, eq, schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';

@@ -4,7 +4,7 @@ import {
   type AgentHoursView,
   type AgentSlot,
   type MinuteRange,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 

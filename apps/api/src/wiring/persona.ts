@@ -1,4 +1,4 @@
-import { CreatorIdSchema, type CreatorId } from '@nirvana/contracts';
+import { CreatorIdSchema, type CreatorId } from '@impera/contracts';
 
 import { sampleReplyFaults } from '../modules/agent';
 import { createPersonaModule, type PersonaModule } from '../modules/persona';

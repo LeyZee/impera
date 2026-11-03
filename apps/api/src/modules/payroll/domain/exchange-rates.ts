@@ -1,4 +1,4 @@
-import { payPeriodLastDay, type ExchangeRate, type PayPeriod } from '@nirvana/contracts';
+import { payPeriodLastDay, type ExchangeRate, type PayPeriod } from '@impera/contracts';
 
 import { MissingExchangeRate } from './errors';
 import { mulDivRound, RATE_SCALE } from './rounding';

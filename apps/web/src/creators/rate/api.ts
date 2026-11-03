@@ -7,7 +7,7 @@ import {
   type CreatorAgencyRate,
   type CreatorAgencyRateList,
   type CreatorId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 /**

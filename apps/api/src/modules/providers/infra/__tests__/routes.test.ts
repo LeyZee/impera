@@ -13,7 +13,7 @@ const MISTRAL_KEY = 'FAKEmistralFAKEmistralFAKEmistral0';
 /** xAI accepts XAI_KEY and nothing else. */
 const fakeXai: FetchLike = (_url, init) => {
   const status = init.headers['authorization'] === `Bearer ${XAI_KEY}` ? 200 : 401;
-  return Promise.resolve({ status, text: () => Promise.resolve(JSON.stringify({ name: 'nirvana' })) });
+  return Promise.resolve({ status, text: () => Promise.resolve(JSON.stringify({ name: 'impera' })) });
 };
 
 /** Stands in for `requireRole('owner')` (auth.ts): the header says who asks. */
@@ -101,7 +101,7 @@ describe('/v1/settings/providers', () => {
       payload: { key: `  ${XAI_KEY}  ` },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ provider: 'xai', state: 'connected', keyLabel: 'nirvana' });
+    expect(response.json()).toMatchObject({ provider: 'xai', state: 'connected', keyLabel: 'impera' });
     expect(response.body).not.toContain(XAI_KEY);
     expect(providers.apiKeySource('xai')).toBe(XAI_KEY);
   });

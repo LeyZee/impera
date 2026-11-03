@@ -9,9 +9,9 @@ import {
   type PayPeriod,
   type ShiftReportId,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import type { TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import type { TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import type { App } from '../composition-root';

@@ -7,8 +7,8 @@ import {
   type ContractorDocumentMediaType,
   type ContractorDocumentReview,
   type ContractorDocumentReviewed,
-} from '@nirvana/contracts';
-import type { schema } from '@nirvana/db';
+} from '@impera/contracts';
+import type { schema } from '@impera/db';
 
 import { documentValidUntil } from '../domain/billing';
 import { documentMediaTypeOfKey } from '../domain/documents';

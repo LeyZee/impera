@@ -3,21 +3,21 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: nirvana-postgres
+    container_name: impera-postgres
     environment:
-      POSTGRES_DB: nirvana
+      POSTGRES_DB: impera
       POSTGRES_USER: nirvana_admin
       POSTGRES_PASSWORD: change-me
     ports:
       - '5432:5432'
     volumes:
-      - nirvana-pgdata:/var/lib/postgresql/data
+      - impera-pgdata:/var/lib/postgresql/data
       - ./packages/db/docker/init.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U nirvana_admin -d nirvana']
+      test: ['CMD-SHELL', 'pg_isready -U nirvana_admin -d impera']
       interval: 5s
       timeout: 3s
       retries: 10
 
 volumes:
-  nirvana-pgdata:
+  impera-pgdata:

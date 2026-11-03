@@ -10,7 +10,7 @@ import {
   TelegramChatIdSchema,
   TeamMemberIdSchema,
   newId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { nextBatch, type Pending } from '../batch';
@@ -759,9 +759,9 @@ describe('rendering (ADR 0020 §10)', () => {
 
   it('says identical messages of one send once, with their count on the first line', () => {
     const notice =
-      '🟠 <b>Important · Nirvana</b>\nLa facture n’a pas été émise.\n<a href="https://x.test/">Ouvrir</a>';
+      '🟠 <b>Important · Impera</b>\nLa facture n’a pas été émise.\n<a href="https://x.test/">Ouvrir</a>';
     expect(joinTexts(['autre', notice, notice, 'autre', notice])).toBe(
-      `autre (×2)\n\n🟠 <b>Important · Nirvana</b> (×3)\nLa facture n’a pas été émise.\n<a href="https://x.test/">Ouvrir</a>`,
+      `autre (×2)\n\n🟠 <b>Important · Impera</b> (×3)\nLa facture n’a pas été émise.\n<a href="https://x.test/">Ouvrir</a>`,
     );
     expect(joinTexts(['a', 'b'])).toBe('a\n\nb');
     // Cut to the limit, the count left out is of messages, not of distinct texts.

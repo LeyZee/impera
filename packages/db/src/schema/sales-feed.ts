@@ -7,7 +7,7 @@ import {
   SalesFeedCheckVerdictSchema,
   SalesFeedErrorKindSchema,
   SalesFeedStateSchema,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -77,7 +77,7 @@ export const salesFeedCredentials = pgTable(
 );
 
 /**
- * The platform's webhook for Nirvana (ADR 0050 § 3), registered from Réglages once the key is connected: its id at the
+ * The platform's webhook for Impera (ADR 0050 § 3), registered from Réglages once the key is connected: its id at the
  * platform and the secret it signs deliveries with, sealed like the key (context `sales_feed_webhook:<platform>`), out
  * of RLS and revoked from `nirvana_app`.
  */
@@ -108,7 +108,7 @@ export const salesFeedDeliveries = pgTable(
   {
     platform: enumText('platform').notNull(),
     deliveryId: text('delivery_id').notNull(),
-    /** The platform's event, as it named it (`sale_created`, `sale_refunded`, or one Nirvana does not know yet). */
+    /** The platform's event, as it named it (`sale_created`, `sale_refunded`, or one Impera does not know yet). */
     event: text('event').notNull(),
     /** The register's position the delivery announced. */
     position: text('position').notNull(),

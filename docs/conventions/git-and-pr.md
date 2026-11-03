@@ -4,7 +4,7 @@
 
 - `main` : toujours déployable. Elle ne change que par une PR à la CI verte, fusionnée (squash). Jamais de push direct.
   - Le dépôt est privé sur un compte gratuit, donc GitHub n'applique aucune protection de branche. Le garde-fou est local : le hook pre-push `protect-main` (`scripts/protect-main.mjs`, installé par `pnpm install` via lefthook) refuse tout push vers `main` et sa suppression.
-  - Il se contourne et ne remplace pas une protection côté serveur. En urgence seulement, et en le disant dans le journal : `NIRVANA_ALLOW_MAIN_PUSH=1 git push …`. `--no-verify` reste interdit.
+  - Il se contourne et ne remplace pas une protection côté serveur. En urgence seulement, et en le disant dans le journal : `IMPERA_ALLOW_MAIN_PUSH=1 git push …`. `--no-verify` reste interdit.
 - `task/<id>-<slug>` en minuscules (`task/p0-03-database`) : une branche par fiche de tâche. Supprimée après fusion (squash).
 - Pas de branche longue durée. Une fiche qui dure plus d'une semaine est trop grosse : on la découpe.
 

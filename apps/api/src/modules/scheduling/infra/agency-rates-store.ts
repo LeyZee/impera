@@ -3,8 +3,8 @@ import {
   CalendarDaySchema,
   CreatorAgencyRateIdSchema,
   CreatorIdSchema,
-} from '@nirvana/contracts';
-import { and, eq, schema, SNAPSHOT_READ, sql, withTenantMember, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, SNAPSHOT_READ, sql, withTenantMember, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import { assertRateStart } from '../domain/agency-rates';

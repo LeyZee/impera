@@ -4,7 +4,7 @@ import type {
   CreateAccountPayRulesBodySchema,
   CreatorSummary,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import type { Actor, PayRulesStore } from '../domain/ports';

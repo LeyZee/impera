@@ -4,7 +4,7 @@ import {
   CustomAlertIdSchema,
   type AlertTriggerItem,
   type CustomAlertGroupId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -1,4 +1,4 @@
-import { BackupStatusSchema, RESTORE_TEST_FRESH_DAYS, type BackupStatus } from '@nirvana/contracts';
+import { BackupStatusSchema, RESTORE_TEST_FRESH_DAYS, type BackupStatus } from '@impera/contracts';
 import { queryOptions, useQuery } from '@tanstack/react-query';
 
 import { withFirstOfMonth } from '@/scheduling/time';

@@ -1,17 +1,17 @@
-# Atelier de scripts : OnlyScript refait de zéro dans Nirvana
+# Atelier de scripts : OnlyScript refait de zéro dans Impera
 Statut : proposed (second temps ; Charles, 27/10/2026, 15h11 : « les scripts (OnlyScript) avec le système des cartons en mieux travaillé… revoir tout le système pour que ça soit mieux construit, plus robuste et fiable et mieux codé »)
 Phase : 6 (commerce avancé), après la capture Reveal et P6-01
 Dépend de : P6-01 (catalogue tarifé), le rôle `sense` (médias décrits), la persona (dégoûts), une ADR à écrire avant le code
 Branche : task/<id>-script-studio
 
 ## Objectif
-Construire et tenir les scripts de vente de l'agence dans Nirvana : une structure en étapes séparées par des cartons, des médias décrits, des prix tenus par le code, des statistiques par étape, dans le même design que le reste.
+Construire et tenir les scripts de vente de l'agence dans Impera : une structure en étapes séparées par des cartons, des médias décrits, des prix tenus par le code, des statistiques par étape, dans le même design que le reste.
 
 ## Contexte à lire
 `docs/reference/legacy-projects.md` (§ OnlyScript : la vision du sexting, les cartons, l'identité de script, « le modèle décrit, le code décide »), `docs/reference/media-vocabulary.md`, `docs/glossary.md` (Carton), `docs/architecture/modules.md` (module `scripts`, non créé), P6-01, ADR 0018 (les scripts natifs de Reveal), la persona (`personas/`), la méthode de chatting (hors dépôt). Le dépôt `LeyZee/onlyscript` se lit pour ses concepts seulement, jamais son code (décision de Charles).
 
 ## Question à trancher d'abord (ADR)
-P6-01, validée le 17/10, fait de Reveal la source des scripts : on les crée dans Reveal, Nirvana les indexe. Un atelier fait de Nirvana l'endroit où l'on écrit les scripts. Il faut choisir comment ils arrivent dans Reveal (écriture par le connecteur derrière la garde d'écriture de l'ADR 0018, ou fiche guidée que l'équipe recopie) et lequel des deux fait foi ensuite, sans casser la règle « Reveal fait foi pour ce qui a déjà été envoyé à un fan ».
+P6-01, validée le 17/10, fait de Reveal la source des scripts : on les crée dans Reveal, Impera les indexe. Un atelier fait d’Impera l'endroit où l'on écrit les scripts. Il faut choisir comment ils arrivent dans Reveal (écriture par le connecteur derrière la garde d'écriture de l'ADR 0018, ou fiche guidée que l'équipe recopie) et lequel des deux fait foi ensuite, sans casser la règle « Reveal fait foi pour ce qui a déjà été envoyé à un fan ».
 
 ## Pistes (à préciser après l'ADR)
 - Un script : identité (nom, thème, moment jour ou nuit), étapes dans l'ordre d'intensité, un carton entre deux étapes, chaque étape avec ses médias décrits et son prix.
@@ -23,4 +23,4 @@ P6-01, validée le 17/10, fait de Reveal la source des scripts : on les crée da
 Génération de médias, envoi de masse.
 
 ## Notes de session
-- 03/11/2026 : la question de la source est tranchée par l'ADR 0056 (proposée) : Nirvana fait foi tant qu'un script n'est pas dans Reveal, Reveal ensuite. Le travail passe dans les fiches SC-01 à SC-06 ; cette fiche sera retirée quand l'ADR 0056 sera acceptée.
+- 03/11/2026 : la question de la source est tranchée par l'ADR 0056 (proposée) : Impera fait foi tant qu'un script n'est pas dans Reveal, Reveal ensuite. Le travail passe dans les fiches SC-01 à SC-06 ; cette fiche sera retirée quand l'ADR 0056 sera acceptée.

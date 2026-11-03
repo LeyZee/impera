@@ -5,7 +5,7 @@ import {
   replyOpenAt,
   type AgentHours,
   type FanFlags,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** A follow-up the worker asks for (P3-10): which delay of the persona, after which silence of his. */
 export interface FollowUpMoment {

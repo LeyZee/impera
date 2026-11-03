@@ -1,4 +1,4 @@
-import type { PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundState } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 

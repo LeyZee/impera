@@ -1,4 +1,4 @@
-import type { Currency, PushMessage } from '@nirvana/contracts';
+import type { Currency, PushMessage } from '@impera/contracts';
 
 /**
  * What a creator's phone says of a fresh sale (CRM-04 lot d2, ADR 0042 § 7), pure: her part (`modelRevenue` on Reveal)

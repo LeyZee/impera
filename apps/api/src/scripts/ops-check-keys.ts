@@ -4,7 +4,7 @@
  * without echo, never taken from the environment: the point is to test the kept copy, not the server's.
  * Usage: `pnpm ops:check-keys` (image: `node dist/scripts/ops-check-keys.js`), against DATABASE_ADMIN_URL.
  */
-import { createDbClient, parseEncryptionKeys } from '@nirvana/db';
+import { createDbClient, parseEncryptionKeys } from '@impera/db';
 import { z } from 'zod';
 
 import { checkEncryptionKeys, READ_ONLY_POOL_OPTIONS } from '../key-check';

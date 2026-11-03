@@ -1,6 +1,6 @@
-# Nirvana — instructions pour les agents codeurs
+# Impera — instructions pour les agents codeurs
 
-Nirvana est une plateforme d'exploitation pour créatrices de contenu. Premier module : un agent de chatting IA qui incarne la créatrice sur Reveal.me (puis d'autres plateformes, puis notre propre plateforme). Le cœur ne sait rien des plateformes : elles sont des adaptateurs.
+Impera est une plateforme d'exploitation pour créatrices de contenu. Premier module : un agent de chatting IA qui incarne la créatrice sur Reveal.me (puis d'autres plateformes, puis notre propre plateforme). Le cœur ne sait rien des plateformes : elles sont des adaptateurs.
 
 **Avant tout : lis `docs/00-START-HERE.md`.** Il donne l'ordre de lecture selon ta tâche. Ne commence pas à coder sans avoir lu la fiche de tâche qui t'est assignée (`docs/sessions/tasks/`).
 

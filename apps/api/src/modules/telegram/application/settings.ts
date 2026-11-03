@@ -15,7 +15,7 @@ import {
   type TelegramRefusal,
   type TelegramRoute,
   type TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { computeCoverage } from '../domain/coverage';
 import { mayRemoveChat } from '../domain/membership';
@@ -195,7 +195,7 @@ export async function saveRoutes(
   return ok({ routes: [...saved.routes], version: saved.version });
 }
 
-const TEST_TEXT = '✅ <b>Test Nirvana</b>\nCe groupe reçoit bien les notifications.';
+const TEST_TEXT = '✅ <b>Test Impera</b>\nCe groupe reçoit bien les notifications.';
 
 /** « Envoyer un test »: sent now, outside the queue, so the screen knows at once. */
 export async function sendTest(

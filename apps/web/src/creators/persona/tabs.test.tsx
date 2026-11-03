@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Persona } from '@nirvana/contracts';
+import type { Persona } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState, type JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

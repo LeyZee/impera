@@ -3,7 +3,7 @@ import {
   type CommissionStatement,
   type ExchangeRate,
   type PayrollPeriod,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { rateText } from '@/payroll/model';

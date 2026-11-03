@@ -1,5 +1,5 @@
-import { err, ok, type MediaDescription } from '@nirvana/contracts';
-import type { LlmGateway } from '@nirvana/llm';
+import { err, ok, type MediaDescription } from '@impera/contracts';
+import type { LlmGateway } from '@impera/llm';
 
 import type { MediaDescriptionStore, Senser, Transcriber } from '../application/describe-media';
 

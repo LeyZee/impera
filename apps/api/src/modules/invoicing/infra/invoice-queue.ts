@@ -3,8 +3,8 @@ import {
   type CommissionStatementId,
   type InvoiceId,
   type TeamMemberId,
-} from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 
 import type { InvoiceRequeue } from '../../contractors';
 

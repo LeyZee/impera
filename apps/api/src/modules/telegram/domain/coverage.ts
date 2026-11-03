@@ -4,8 +4,8 @@ import type {
   TelegramCoverage,
   TelegramRoute,
   TelegramTopic,
-} from '@nirvana/contracts';
-import { TelegramTopicSchema } from '@nirvana/contracts';
+} from '@impera/contracts';
+import { TelegramTopicSchema } from '@impera/contracts';
 
 /**
  * Who is warned (ADR 0020 §12): for each creator, the groups each topic reaches. A route for all creators

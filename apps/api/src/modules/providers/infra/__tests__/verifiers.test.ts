@@ -59,7 +59,7 @@ describe('xAI', () => {
     replies.set('/v1/api-key', {
       status: 200,
       body: {
-        name: 'nirvana-prod',
+        name: 'impera-prod',
         acls: ['api-key:model:grok-4.7', 'api-key:endpoint:chat'],
         api_key_blocked: false,
       },
@@ -67,7 +67,7 @@ describe('xAI', () => {
     const outcome = await verifier().verify('xai-FAKE', {});
     expect(outcome).toMatchObject({
       ok: true,
-      keyLabel: 'nirvana-prod',
+      keyLabel: 'impera-prod',
       summary: 'Grok 4.7 écrit et décide',
     });
     expect(seenHeaders[0]?.authorization).toBe('Bearer xai-FAKE');

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { AgentMode } from '@nirvana/contracts';
+import type { AgentMode } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -154,7 +154,7 @@ describe('AgentPill', () => {
 
   it('follows the creator chosen on the Dashboard, and names her among several (recette 28/10, G1; DASH-03)', async () => {
     const ana = { id: '0192f3a0-0000-7000-8000-0000000000c2', displayName: 'Ana', timezone: 'Europe/Paris' };
-    localStorage.setItem('nirvana.followed-creator', CREATOR.id);
+    localStorage.setItem('impera.followed-creator', CREATOR.id);
     try {
       // Ana, first of the list, is stopped; Léa, the one chosen, runs.
       serveDashboard(

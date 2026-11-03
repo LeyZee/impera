@@ -1,4 +1,4 @@
-import type { ConversationDesire } from '@nirvana/contracts';
+import type { ConversationDesire } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { DesireSheet } from './Desire';

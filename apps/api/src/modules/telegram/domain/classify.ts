@@ -18,7 +18,7 @@ import {
   type SystemAlertCode,
   type UserRole,
   type TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { saleAmount } from './sales';
 import type { Notice, Outcome, Signal } from './signals';
@@ -332,7 +332,7 @@ const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
   reveal: 'Reveal',
   onlyfans: 'OnlyFans',
   instagram: 'Instagram',
-  nirvana: 'Nirvana',
+  impera: 'Impera',
 };
 
 // Réglages › Sécurité (SEC-04): the owner's sessions, and each account's, where he closes them.
@@ -571,7 +571,7 @@ export function classify(
             : `Le PDF du document ${signal.number} n’a pas pu être copié chez ${PDF_PLACE_NAMES[signal.place]} après plusieurs essais. Le PDF chez ${PDF_PLACE_NAMES.primary} n’a pas été touché. À vérifier.`,
         link: PAY_LINK,
       };
-    // Important, not urgent: only the owner settles a contest, upheld or refused (ADR 0039); the reason is read in Nirvana.
+    // Important, not urgent: only the owner settles a contest, upheld or refused (ADR 0039); the reason is read in Impera.
     case 'invoice_contested':
       return {
         kind: 'notice',

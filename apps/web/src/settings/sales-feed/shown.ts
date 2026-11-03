@@ -1,4 +1,4 @@
-import type { Platform } from '@nirvana/contracts';
+import type { Platform } from '@impera/contracts';
 
 import { SalesFeedRefused } from './api';
 
@@ -11,7 +11,7 @@ const NAMES: Record<Platform, string> = {
   reveal: 'Reveal',
   onlyfans: 'OnlyFans',
   instagram: 'Instagram',
-  nirvana: 'Nirvana',
+  impera: 'Impera',
 };
 export const platformName = (platform: Platform): string => NAMES[platform];
 

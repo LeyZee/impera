@@ -10,7 +10,7 @@ import type {
   SetSystemAlertBody,
   SystemAlertCode,
   SystemAlertSetting,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * Her alerts (P4-01), one row per creator under RLS. The store crosses creators for the owner, one creator at a time

@@ -8,7 +8,7 @@ Branche : task/eq-15-two-factor
 Un compte qui valide de l'argent (propriétaire, manager) ne s'ouvre pas avec un mot de passe seul : il demande aussi un code à usage unique, et les gestes les plus lourds le redemandent.
 
 ## Contexte à lire
-`apps/api/src/auth.ts` (Better Auth 1.7, sessions de 12 h), `docs/conventions/security.md`, `docs/architecture/threat-model.md`, ADR 0024 (§ Rôles et scopes), EQ-05 (« payé »), EQ-06 (avoirs), EQ-10 (lien de réinitialisation), EQ-14 (départ). Better Auth fournit un module de double authentification (`two-factor` : codes TOTP d'une application d'authentification, codes de secours) ; Nirvana n'envoie ni e-mail ni SMS, donc pas de code par e-mail.
+`apps/api/src/auth.ts` (Better Auth 1.7, sessions de 12 h), `docs/conventions/security.md`, `docs/architecture/threat-model.md`, ADR 0024 (§ Rôles et scopes), EQ-05 (« payé »), EQ-06 (avoirs), EQ-10 (lien de réinitialisation), EQ-14 (départ). Better Auth fournit un module de double authentification (`two-factor` : codes TOTP d'une application d'authentification, codes de secours) ; Impera n'envoie ni e-mail ni SMS, donc pas de code par e-mail.
 
 ## À faire
 - [ ] Module `two-factor` de Better Auth branché, tables par le propriétaire de `packages/db` (migration à part). Le secret TOTP est chiffré par Better Auth avec `AUTH_SECRET`, jamais en clair ni dans un log ; changer ce secret oblige chacun à réactiver sa double authentification, et le runbook le dit.

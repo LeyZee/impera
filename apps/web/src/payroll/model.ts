@@ -29,7 +29,7 @@ import {
   type PayrollPeriod,
   type Platform,
   type TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { PayRefusal, PayRefusalCode } from './api';
 
@@ -702,7 +702,7 @@ export function statementsCsv(
   accountName: (platformAccountId: string) => string,
 ): string {
   const euros = (minor: number): string => (minor / 100).toFixed(2).replace('.', ',');
-  // A name typed in Nirvana is never read as a formula by the spreadsheet that opens the file: a leading `=`, `+`, `-`,
+  // A name typed in Impera is never read as a formula by the spreadsheet that opens the file: a leading `=`, `+`, `-`,
   // `@`, tab or carriage return gets a `'` (OWASP, CSV injection). Amounts are written here, their minus sign kept.
   const words = (text: string): string => (/^[=+\-@\t\r]/u.test(text) ? `'${text}` : text);
   const cell = (text: string): string => (/[";\r\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text);

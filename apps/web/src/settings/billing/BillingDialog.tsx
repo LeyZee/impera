@@ -10,7 +10,7 @@ import {
   SERVICE_DESCRIPTION_MAX,
   type AgencyLogo,
   type BillingSettingsView,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { addLogo, logoUrl, saveBillingSettings, useKeepBillingSettings, type BillingRefusal } from './api';

@@ -30,12 +30,12 @@ Le côté serveur (brouillon en attente, verdict idempotent, note de calibrage `
 - **Qui valide** : la session `operator` ou `owner` du chatteur, comme dans le CRM (`requireRole`) ; la note de calibrage porte donc le membre. Pas de jeton d'appareil sur les routes `copilot` : il reste réservé à la capture de session. L'origine `chrome-extension://<id>` entre dans les origines de confiance de Better Auth et dans le CORS, avec les routes (fil Bilan). Le panneau demande la connexion une fois.
 - **Placer le texte dans Reveal** : le script de contenu écrit dans le champ de saisie, sans style ni clic simulé sur Envoyer, à confirmer par la capture. Repli accepté : copie dans le presse-papiers et « Colle dans Reveal ». Le rapprochement avec le message sortant se fait côté API.
 - **Mise à jour du panneau** : interrogation de la route brouillon toutes les 5 s tant que le panneau est visible ; pas de flux SSE pour l'instant.
-- **Raisons de refus** : la liste fermée du playground, déjà dans `@nirvana/contracts`.
+- **Raisons de refus** : la liste fermée du playground, déjà dans `@impera/contracts`.
 - **« Envoyé »** : le panneau ne le dit qu'une fois le rapprochement lu sur la route brouillon, jamais au clic.
 
 ## À faire (liste vérifiable)
 
-1. Panneau latéral WXT (`entrypoints/sidepanel`, `chrome.sidePanel`), design system importé (`@nirvana/design-system/styles.css`).
+1. Panneau latéral WXT (`entrypoints/sidepanel`, `chrome.sidePanel`), design system importé (`@impera/design-system/styles.css`).
 2. Connexion du chatteur dans le panneau, puis détection de la conversation Reveal ouverte (URL ou requête observée, d'après la capture) et appel de la route brouillon.
 3. Brouillon affiché bulle par bulle, avec ce que l'agent sait du fan en une ligne ; trois gestes et leurs raccourcis, communs au playground.
 4. États, en mots de chatteur : aucun brouillon, l'agent écrit, à valider, envoyé, un humain doit répondre (raison en mots), session Reveal expirée.

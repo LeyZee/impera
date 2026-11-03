@@ -30,8 +30,8 @@ end $$;
 SQL
 
 started=$(date +%s)
-pg_restore --no-owner --exit-on-error --single-transaction --dbname="$target" "$work/nirvana.dump"
-rm -f "$work/nirvana.dump"
+pg_restore --no-owner --exit-on-error --single-transaction --dbname="$target" "$work/impera.dump"
+rm -f "$work/impera.dump"
 
 # Every queued or scheduled job of production goes: a worker on this copy must have nothing to send.
 sql <<'SQL'

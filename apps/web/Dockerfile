@@ -14,8 +14,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --filter nirvana --filter "@nirvana/web..."
-RUN pnpm turbo run build --filter=@nirvana/web
+    pnpm install --offline --frozen-lockfile --filter impera --filter "@impera/web..."
+RUN pnpm turbo run build --filter=@impera/web
 
 FROM ${NGINX_IMAGE} AS runtime
 # Where nginx forwards /v1: the API service on the deployment's private network.

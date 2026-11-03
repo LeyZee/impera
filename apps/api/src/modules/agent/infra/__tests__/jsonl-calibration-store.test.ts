@@ -37,7 +37,7 @@ function record(id: string, verdict: CalibrationRecord['verdict']): CalibrationR
 
 describe('JSONL calibration store', () => {
   it('keeps every rating and reads them back, skipping a damaged line', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'nirvana-training-'));
+    const dir = await mkdtemp(join(tmpdir(), 'impera-training-'));
     dirs.push(dir);
     const path = join(dir, 'sub', 'ratings.jsonl');
     const store = createJsonlCalibrationStore(path);

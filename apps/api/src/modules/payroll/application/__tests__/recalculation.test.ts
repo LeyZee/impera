@@ -1,4 +1,4 @@
-import { PayPeriodSchema, type PayPeriod } from '@nirvana/contracts';
+import { PayPeriodSchema, type PayPeriod } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { PayrollJobStore } from '../../domain/ports';

@@ -7,7 +7,7 @@ import {
   type PayPeriod,
   type PlatformAccountId,
   type SalesFeedCheckReport,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * The automatic check of the sales feed (CRM-04 b3): on the 2nd and the 17th, the fortnight just over, the register's

@@ -9,6 +9,6 @@ describe('popup', () => {
 
   it('shows the mark beside the name', () => {
     expect(html).toContain('src="/icon/mark.svg"');
-    expect(html).toContain('<span class="nv-popup__brand">Nirvana</span>');
+    expect(html).toContain('<span class="nv-popup__brand">Impera</span>');
   });
 });

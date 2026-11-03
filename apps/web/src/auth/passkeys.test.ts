@@ -32,7 +32,7 @@ interface Call {
 const REQUEST_OPTIONS = { challenge: 'Y2hhbGxlbmdl', userVerification: 'required', allowCredentials: [] };
 const CREATION_OPTIONS = {
   challenge: 'Y2hhbGxlbmdl',
-  rp: { name: 'Nirvana', id: 'localhost' },
+  rp: { name: 'Impera', id: 'localhost' },
   user: { id: 'dXNlcg', name: 'lina@example.test', displayName: 'Lina' },
   pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
 };

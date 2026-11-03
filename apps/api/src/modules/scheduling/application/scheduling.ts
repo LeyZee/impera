@@ -21,7 +21,7 @@ import {
   type ShiftTemplateId,
   type UpdateShiftBody,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { CreatorNotFound } from '../domain/errors';
 import { leaveCover } from '../domain/leaves';

@@ -8,7 +8,7 @@ import {
   type Destination,
   type RejectReason,
   type Verdict,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 export { REJECT_REASONS };
 export type { AnswerVersion, Destination, RejectReason, Verdict };

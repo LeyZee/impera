@@ -1,4 +1,4 @@
-import type { CommissionPreset, CreatorSummary, TeamMember } from '@nirvana/contracts';
+import type { CommissionPreset, CreatorSummary, TeamMember } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';

@@ -1,6 +1,6 @@
 /** Public entry point of the `telegram` module (ADR 0002, ADR 0020). Other modules import this file only. */
-import type { TelegramBotId, TelegramChatId } from '@nirvana/contracts';
-import { parseEncryptionKeys, type Database, type EncryptionKey } from '@nirvana/db';
+import type { TelegramBotId, TelegramChatId } from '@impera/contracts';
+import { parseEncryptionKeys, type Database, type EncryptionKey } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { TelegramApi } from './application/api';

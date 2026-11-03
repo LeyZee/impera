@@ -6,7 +6,7 @@ import type {
   PlatformAccountId,
   TeamScope,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { FactWrite, StoredFact } from './facts';
 import type { FlagAuthor } from './flags';

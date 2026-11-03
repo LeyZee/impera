@@ -13,8 +13,8 @@ import {
   type Platform,
   type PlatformSale,
   type SalesFeedSignal,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { CheckLine } from '../../domain/reliability-check';

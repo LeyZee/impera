@@ -6,8 +6,8 @@ import {
   type ContractorRegime,
   type CreateBillingRegimeBody,
   type RegimeVat,
-} from '@nirvana/contracts';
-import { eq, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
 import { assertRegimeChange } from '../domain/billing';
 import {

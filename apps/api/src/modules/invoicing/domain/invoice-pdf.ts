@@ -13,7 +13,7 @@ import {
   type PayPeriod,
   type Platform,
   type RegimeVat,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { longDay, periodWords } from './invoices';
 

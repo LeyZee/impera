@@ -291,8 +291,8 @@ describe('another account signed in on this browser', () => {
     // The page's title in the body's face, the name in the rail's (NAV-14), and the tab named after the page (NAV-12).
     const title = await screen.findByRole('heading', { level: 1, name: 'Bienvenue, Théo' });
     expect(title.className).not.toContain('font-serif');
-    expect(screen.getByText('Nirvana').className).toContain('nv-wordmark');
-    expect(document.title).toBe('Bienvenue · Nirvana');
+    expect(screen.getByText('Impera').className).toContain('nv-wordmark');
+    expect(document.title).toBe('Bienvenue · Impera');
     expect(await screen.findByText(WARNING)).toBeDefined();
   });
 

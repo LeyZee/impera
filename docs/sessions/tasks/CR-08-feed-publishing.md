@@ -5,7 +5,7 @@ Dépend de : CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la g
 Branche : task/cr-08-feed-publishing
 
 ## Objectif
-Chaque semaine, le code prépare au moins une publication par jour aux heures où les fans sont actifs, le LLM écrit les légendes, l'agence accepte d'un geste, et Nirvana téléverse et programme dans Reveal.
+Chaque semaine, le code prépare au moins une publication par jour aux heures où les fans sont actifs, le LLM écrit les légendes, l'agence accepte d'un geste, et Impera téléverse et programme dans Reveal.
 
 ## Contexte à lire
 `docs/adr/0044-content-drops-feed-and-mass-dm.md`, ADR 0018, 0003, `docs/architecture/connectors.md`, `docs/reference/fake-reveal.md`, les gardes de voix, `docs/reference/reveal-api-observed.md` après la capture.

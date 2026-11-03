@@ -4,7 +4,7 @@ import {
   REAUTHENTICATION_ERROR_CODE,
   SetAgentHoursBodySchema,
   type AgentHours,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

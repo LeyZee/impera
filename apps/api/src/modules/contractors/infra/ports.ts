@@ -1,5 +1,5 @@
-import type { TeamMemberId } from '@nirvana/contracts';
-import type { Transaction } from '@nirvana/db';
+import type { TeamMemberId } from '@impera/contracts';
+import type { Transaction } from '@impera/db';
 
 /**
  * The ports of the contractors' file that take the transaction under way (ADR 0047 § 1): the composition root plugs

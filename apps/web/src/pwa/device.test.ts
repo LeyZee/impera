@@ -31,12 +31,12 @@ describe('forgetDevice', () => {
     Reflect.deleteProperty(navigator, 'serviceWorker');
   });
 
-  it('drops the copies of the app and the push subscription, and nothing that is not Nirvana’s', async () => {
-    const { deleted } = fakeCaches(['nirvana-shell-v1', 'nirvana-assets-v1', 'other-site']);
+  it('drops the copies of the app and the push subscription, and nothing that is not Impera’s', async () => {
+    const { deleted } = fakeCaches(['impera-shell-v1', 'impera-assets-v1', 'other-site']);
     const unsubscribe = vi.fn(() => Promise.resolve(true));
     fakePush({ unsubscribe });
     await forgetDevice();
-    expect(deleted).toEqual(['nirvana-shell-v1', 'nirvana-assets-v1']);
+    expect(deleted).toEqual(['impera-shell-v1', 'impera-assets-v1']);
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 

@@ -1,4 +1,4 @@
-import { calendarDayAt, type CreateBillingRegimeBody } from '@nirvana/contracts';
+import { calendarDayAt, type CreateBillingRegimeBody } from '@impera/contracts';
 
 import { BillingRegimeCountryMismatch } from './errors';
 

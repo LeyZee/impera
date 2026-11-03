@@ -16,7 +16,7 @@ import {
   type PersonaLimits,
   type ScriptErrorCode,
   type UserRole,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema, TelegramBotIdSchema, TelegramChatIdSchema } from '@nirvana/contracts';
+import { CreatorIdSchema, TelegramBotIdSchema, TelegramChatIdSchema } from '@impera/contracts';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe('Réglages › Telegram when the page cannot load', () => {
-  it('blames the server, not Telegram, when Nirvana itself does not answer', async () => {
+  it('blames the server, not Telegram, when Impera itself does not answer', async () => {
     vi.mocked(fetchOverview).mockRejectedValue(new TypeError('Failed to fetch'));
     renderSection();
     expect(await screen.findByText('Le serveur ne répond pas')).toBeTruthy();

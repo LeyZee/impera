@@ -1,4 +1,4 @@
-import type { CreatorAgencyRate, CreatorAgencyRateList } from '@nirvana/contracts';
+import type { CreatorAgencyRate, CreatorAgencyRateList } from '@impera/contracts';
 
 /**
  * Créatrices › Pourcentage (CR-04), pure: what the owner types read as whole basis points, and how a percentage and its

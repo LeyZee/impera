@@ -8,7 +8,7 @@ import {
   TeamMemberIdSchema,
   type Bonus,
   type CollectiveGoal,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { PayReader } from '../ports';
