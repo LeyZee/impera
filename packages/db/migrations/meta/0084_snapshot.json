@@ -1,6 +1,6 @@
 {
-  "id": "96ff8151-6400-4b98-9d1c-262599a72e28",
-  "prevId": "f0276b1a-5015-474b-9942-31a8a609abb4",
+  "id": "0d9645ca-98c6-4d7a-95ad-61c0acb1fb6c",
+  "prevId": "2a3e0498-5725-49a9-b5df-970849682a43",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14541,6 +14541,71 @@
         "telegram_routes_topic_check": {
           "name": "telegram_routes_topic_check",
           "value": "\"telegram_routes\".\"topic\" in ('urgent', 'important', 'info', 'sale', 'keyword', 'validation', 'custom')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.telegram_settings": {
+      "name": "telegram_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "topic": {
+          "name": "topic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settings": {
+          "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "telegram_settings_creator_id_creators_id_fk": {
+          "name": "telegram_settings_creator_id_creators_id_fk",
+          "tableFrom": "telegram_settings",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "telegram_settings_unique": {
+          "name": "telegram_settings_unique",
+          "nullsNotDistinct": true,
+          "columns": ["creator_id", "topic"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "telegram_settings_topic_check": {
+          "name": "telegram_settings_topic_check",
+          "value": "\"telegram_settings\".\"topic\" in ('sale')"
         }
       },
       "isRLSEnabled": false

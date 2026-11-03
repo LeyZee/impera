@@ -9,6 +9,8 @@ import type {
   TelegramOverview,
   TelegramRefusal,
   TelegramRoute,
+  TelegramSaleSettingsEntry,
+  TelegramSalesSettings,
   TelegramTopic,
 } from '@nirvana/contracts';
 
@@ -29,4 +31,10 @@ export interface TelegramApi {
   sendTest(chatId: TelegramChatId): Promise<Result<{ sentAt: string }, TelegramRefusal> | null>;
   listDeliveries(topic: TelegramTopic | null, limit: number): Promise<TelegramDelivery[]>;
   nightCounts(creatorId: CreatorId): Promise<TelegramNightCounts>;
+  /** The sales topic's settings (CRM-04 lot b). */
+  saleSettings(): Promise<TelegramSalesSettings>;
+  saveSaleSettings(
+    entries: readonly TelegramSaleSettingsEntry[],
+    userId: string,
+  ): Promise<Result<TelegramSalesSettings, 'unknown_creator'>>;
 }

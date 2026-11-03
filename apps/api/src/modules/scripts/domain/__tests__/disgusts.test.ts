@@ -52,8 +52,23 @@ describe('disgustBlocks', () => {
     expect(disgustBlocks([stage('a', 'Chéri, regarde')], limits)).toEqual([]);
   });
 
-  it('never reads a bridge', () => {
-    const bridge: ScriptSegment = { kind: 'bridge', key: 'ab', from: 'a', to: 'b', teaser: 'Mes pieds' };
-    expect(disgustBlocks([stage('a', 'Salon'), bridge, stage('b', 'Lit')], limits)).toEqual([]);
+  it('reads a bridge’s teaser as a sentence she says: what she never says and what disgusts her', () => {
+    const bridge = (teaser: string): ScriptSegment => ({
+      kind: 'bridge',
+      key: 'ab',
+      from: 'a',
+      to: 'b',
+      teaser,
+    });
+    const around = (teaser: string) =>
+      disgustBlocks([stage('a', 'Salon'), bridge(teaser), stage('b', 'Lit')], limits);
+    expect(around('Tu viens, chéri ?')).toEqual([
+      { key: 'ab', stageName: 'Tu viens, chéri ?', term: 'chéri' },
+    ]);
+    expect(around('Et la crème chantilly ?')).toEqual([
+      { key: 'ab', stageName: 'Et la crème chantilly ?', term: 'crème chantilly' },
+    ]);
+    // Not what she never shows: a teaser is said, not shot.
+    expect(around('Mes pieds')).toEqual([]);
   });
 });

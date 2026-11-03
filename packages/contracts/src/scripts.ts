@@ -292,6 +292,7 @@ export type ScriptStructureList = z.infer<typeof ScriptStructureListSchema>;
 /** A stage that touches what she never does, never shows, or is disgusted by: the structure cannot be asked of her. */
 export const ScriptDisgustBlockSchema = z.object({
   key: ScriptSegmentKeySchema,
+  /** The stage's name, or a bridge's teaser: what the screen shows of the segment. */
   stageName: z.string(),
   /** Her persona's entry, as written there. */
   term: z.string(),

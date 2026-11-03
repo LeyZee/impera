@@ -5,6 +5,8 @@ import {
   INVOICE_NOT_ISSUED_REASONS,
   PayPeriodSchema,
   PlatformAccountIdSchema,
+  SalesRefundsSchema,
+  SalesTotalsSchema,
   TelegramChatIdSchema,
   TeamMemberIdSchema,
   newId,
@@ -17,7 +19,8 @@ import { chatsFor, computeCoverage } from '../coverage';
 import { mayRemoveChat } from '../membership';
 import { describeTelegramError } from '../messages';
 import { MAX_TEXT, escapeHtml, joinTexts, renderClosedBy, renderNotice } from '../render';
-import { morningDigestKey, nightOf, retryDelayMs, shouldRetry } from '../schedule';
+import { eveningDigestText, saleRings, saleSettingsFor } from '../sales';
+import { eveningDigestOf, morningDigestKey, nightOf, retryDelayMs, shouldRetry } from '../schedule';
 import { botIdOfToken } from '../token';
 
 const conversationId = newId(ConversationIdSchema);
@@ -287,6 +290,7 @@ describe('classification (ADR 0020 §2)', () => {
     const sale = {
       kind: 'sale',
       saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00Z'),
       currency: 'EUR',
       grossInclVatMinor: 4500,
       seller: { kind: 'member', memberId },
@@ -527,6 +531,195 @@ describe('classification (ADR 0020 §2)', () => {
       kind: 'closure',
       threadKey: 'kill:global:global',
     });
+  });
+});
+
+describe('sales topic (CRM-04 lot b)', () => {
+  const her = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+  const other = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c2');
+  const memberId = TeamMemberIdSchema.parse('018f3e5c-0000-7000-8000-000000000001');
+
+  it('takes her settings, else the ones for all, else every sale and the digest', () => {
+    expect(saleSettingsFor([], her)).toEqual({ minimumMinor: 0, agentOnly: false, eveningDigest: true });
+    const forAll = { creatorId: null, minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+    const hers = { creatorId: her, minimumMinor: 0, agentOnly: true, eveningDigest: false };
+    expect(saleSettingsFor([forAll, hers], her)).toEqual({
+      minimumMinor: 0,
+      agentOnly: true,
+      eveningDigest: false,
+    });
+    expect(saleSettingsFor([forAll, hers], other)).toEqual({
+      minimumMinor: 2000,
+      agentOnly: false,
+      eveningDigest: true,
+    });
+  });
+
+  it('rings a sale at or above the minimum price, and only the agent’s when asked', () => {
+    const sale = {
+      kind: 'sale',
+      saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00Z'),
+      currency: 'EUR',
+      grossInclVatMinor: 2000,
+      seller: { kind: 'member', memberId },
+    } as const;
+    const settings = { minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+    expect(saleRings(settings, sale, null)).toBe(true);
+    expect(saleRings(settings, { ...sale, grossInclVatMinor: 1999 }, null)).toBe(false);
+    expect(saleRings({ ...settings, agentOnly: true }, sale, null)).toBe(false);
+    expect(saleRings({ ...settings, agentOnly: true }, { ...sale, seller: { kind: 'agent' } }, null)).toBe(
+      true,
+    );
+  });
+
+  it('weighs a dollar sale in euros at pay’s rate, and rings it while pay has no rate', () => {
+    const sale = {
+      kind: 'sale',
+      saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00Z'),
+      currency: 'USD',
+      grossInclVatMinor: 2000,
+      seller: { kind: 'member', memberId },
+    } as const;
+    const settings = { minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+    // 20,00 $ at 0,92 € the dollar: 18,40 €, under a minimum of 20 €.
+    expect(saleRings(settings, sale, 920_000)).toBe(false);
+    // 22,00 $ at 0,92: 20,24 €.
+    expect(saleRings(settings, { ...sale, grossInclVatMinor: 2200 }, 920_000)).toBe(true);
+    expect(saleRings(settings, sale, null)).toBe(true);
+    expect(saleRings({ ...settings, minimumMinor: 0 }, sale, 920_000)).toBe(true);
+  });
+
+  it('finds her 23 o’clock hour and keys the digest by her day', () => {
+    expect(eveningDigestOf(her, 'Europe/Paris', new Date('2026-11-03T22:10:00Z'))).toEqual({
+      day: '2026-11-03',
+      key: `evening:${her}:2026-11-03`,
+    });
+    expect(eveningDigestOf(her, 'Europe/Paris', new Date('2026-11-03T21:10:00Z'))).toBeNull();
+  });
+
+  it('says the day’s figures, then each seller by name, the agent and no chatter; never a fan', () => {
+    const row = {
+      day: '2026-11-03',
+      platform: 'reveal',
+      platformAccountId: PlatformAccountIdSchema.parse('018f3e5c-0000-7000-8000-0000000000a1'),
+      currency: 'EUR',
+      saleType: 'ppv',
+      refunds: 0,
+      grossExclVatMinor: 0,
+    } as const;
+    const totals = SalesTotalsSchema.parse({
+      from: '2026-11-03',
+      to: '2026-11-03',
+      refundsWithoutSale: 0,
+      rows: [
+        {
+          ...row,
+          seller: { kind: 'agent' },
+          sales: 7,
+          grossInclVatMinor: 90000,
+          netMinor: 60000,
+          agencyMinor: 30000,
+          creatorMinor: 30000,
+        },
+        {
+          ...row,
+          seller: { kind: 'member', memberId },
+          sales: 4,
+          refunds: 1,
+          grossInclVatMinor: 30000,
+          netMinor: 20000,
+          agencyMinor: 10000,
+          creatorMinor: 10000,
+        },
+        {
+          ...row,
+          saleType: 'tip',
+          seller: { kind: 'none' },
+          sales: 1,
+          grossInclVatMinor: 3456,
+          netMinor: 2300,
+          agencyMinor: 1150,
+          creatorMinor: 1150,
+        },
+      ],
+    });
+    const refundRow = {
+      platform: 'reveal',
+      platformAccountId: row.platformAccountId,
+      currency: 'EUR',
+      saleType: 'ppv',
+      seller: { kind: 'member', memberId },
+      refunds: 1,
+      grossInclVatMinor: 2000,
+      grossExclVatMinor: 1667,
+      netMinor: 1300,
+      agencyMinor: 650,
+      creatorMinor: 650,
+    } as const;
+    const refunds = SalesRefundsSchema.parse({
+      day: '2026-11-03',
+      rows: [
+        // Of today's own sale: already taken off the totals, never said again.
+        { ...refundRow, sale: 'same_day' },
+        { ...refundRow, sale: 'earlier_day', refunds: 2, grossInclVatMinor: 4500 },
+        { ...refundRow, sale: 'not_in_register', grossInclVatMinor: 1000 },
+        { ...refundRow, currency: 'USD', sale: 'earlier_day', grossInclVatMinor: 1500 },
+      ],
+    });
+    const now = new Date('2026-11-03T22:05:00Z'); // 23:05 in Paris
+    const clock = { now, timeZone: 'Europe/Paris' };
+    const readings = [{ platform: 'reveal', readAt: '2026-11-03T22:04:00.000Z', pausedUntil: null }] as const;
+    const names = (id: string) => (id === memberId ? 'Théo' : null);
+    const digest = eveningDigestText('Nora', { totals, refunds, readings }, names, clock);
+    const nbsp = (value: string) => value.replaceAll(' ', '\u202f');
+    expect(digest?.text).toBe(
+      [
+        '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>',
+        `Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`,
+        'Part de l’agence 411,50\u00a0€ · part de la créatrice 411,50\u00a0€',
+        '12 ventes · 1 remboursement',
+        'Théo : 300,00\u00a0€ (4 ventes, 1 remboursement)',
+        'L’agent : 900,00\u00a0€ (7 ventes)',
+        'Sans chatteur : 34,56\u00a0€ (1 vente)',
+        '3 remboursements de ventes d’avant · -55,00\u00a0€',
+        '',
+        '1 remboursement de ventes d’avant · -15,00\u00a0$US',
+      ].join('\n'),
+    );
+    expect(digest?.summary).toBe(`Chiffre d’affaires ${nbsp('1 234,56')}\u00a0€ · net 823,00\u00a0€`);
+
+    const empty = { totals: { ...totals, rows: [] }, refunds: { day: '2026-11-03', rows: [] }, readings };
+    expect(eveningDigestText('Nora', empty, () => null, clock)?.text).toBe(
+      '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>\nAucune vente aujourd’hui.',
+    );
+  });
+
+  it('says nothing for a creator with no register, and never « no sale » for a day not read (ADR 0054)', () => {
+    const totals = SalesTotalsSchema.parse({
+      from: '2026-11-03',
+      to: '2026-11-03',
+      rows: [],
+      refundsWithoutSale: 0,
+    });
+    const refunds = { day: '2026-11-03', rows: [] };
+    const clock = { now: new Date('2026-11-03T22:05:00Z'), timeZone: 'Europe/Paris' };
+    expect(eveningDigestText('Nora', { totals, refunds, readings: [] }, () => null, clock)).toBeNull();
+    const stale = [{ platform: 'reveal', readAt: '2026-11-03T19:40:00.000Z', pausedUntil: null }] as const;
+    expect(eveningDigestText('Nora', { totals, refunds, readings: stale }, () => null, clock)?.text).toBe(
+      '💰 <b>Bilan du soir · Nora · jusqu’à 23 h</b>\n⚠️ Ventes Reveal non lues depuis 20:40 : chiffres incomplets.',
+    );
+    const yesterday = [
+      { platform: 'reveal', readAt: '2026-11-02T20:40:00.000Z', pausedUntil: null },
+    ] as const;
+    expect(
+      eveningDigestText('Nora', { totals, refunds, readings: yesterday }, () => null, clock)?.text,
+    ).toContain('non lues depuis 02/11 à 21:40');
+    const never = [{ platform: 'reveal', readAt: null, pausedUntil: null }] as const;
+    expect(eveningDigestText('Nora', { totals, refunds, readings: never }, () => null, clock)?.summary).toBe(
+      '⚠️ Ventes Reveal jamais lues : chiffres incomplets.',
+    );
   });
 });
 

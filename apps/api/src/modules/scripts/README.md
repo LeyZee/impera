@@ -11,7 +11,7 @@
 - Une structure retirée est archivée (`archived_at`), jamais supprimée ; l'archivage la sort de toutes les files.
 - La file (`script_structure_queue`) est par créatrice, sous sa RLS et les mêmes portées (`withTenantMember`) : un compte de la créatrice n'en lit rien. Elle se remplace en entier, sous un verrou par créatrice.
 
-**Règles** (contrat `packages/contracts/src/scripts.ts`, partagé avec l'écran) : `scriptStructureFaults` (au moins une étape ; clés uniques ; une étape a un emplacement ; lettres de variantes uniques, trois au plus ; un pont relie par leurs clés l'étape juste avant lui et celle juste après, un seul pont entre deux étapes) et `scriptSegmentCodes` (numéros dérivés de l'ordre, `E<n>` et `P<n><m>`). Dans le domaine : `disgustBlocks` (une étape qui touche `never_do`, `never_show` ou `disgusts` de sa persona, en mots entiers, lu en code), `saveDecision` (règle 6), `queueView`.
+**Règles** (contrat `packages/contracts/src/scripts.ts`, partagé avec l'écran) : `scriptStructureFaults` (au moins une étape ; clés uniques ; une étape a un emplacement ; lettres de variantes uniques, trois au plus ; un pont relie par leurs clés l'étape juste avant lui et celle juste après, un seul pont entre deux étapes) et `scriptSegmentCodes` (numéros dérivés de l'ordre, `E<n>` et `P<n><m>`). Dans le domaine : `disgustBlocks` (une étape qui touche `never_do`, `never_show` ou `disgusts` de sa persona, un pont dont l'accroche touche `never_say` ou `disgusts`, en mots entiers, lu en code), `saveDecision` (règle 6), `queueView`.
 
 **Routes** (montées sous `/v1`, codes d'erreur `SCRIPT_ERROR_CODES`) :
 
