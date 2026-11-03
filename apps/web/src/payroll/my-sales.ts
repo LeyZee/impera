@@ -1,6 +1,7 @@
-import type { Currency, MySale, MySalesDay, SaleSignalKind } from '@nirvana/contracts';
+import type { Currency, MySale, MySalesDay, Platform, SaleEvent, SaleSignalKind } from '@nirvana/contracts';
 
 import { amountText, signedAmountText } from '@/reports/model';
+import { platformName } from '@/scheduling/model';
 import { clockAt, longDay } from '@/scheduling/time';
 
 /**
@@ -27,17 +28,18 @@ export function mySaleWhen(sale: Pick<MySale, 'event' | 'occurredAt'>, timeZone:
 export const mySaleAmount = (sale: Pick<MySale, 'netMinor' | 'currency'>): string =>
   signedAmountText(sale.netMinor, sale.currency);
 
-/** Where a line stands, on its chip. */
-export function mySaleStateText(state: MySale['state']): string {
-  switch (state) {
+/** Where a line stands, on its chip, agreed with its event: « Signalée » for a sale, « Signalé » for a refund. */
+export function mySaleStateText(sale: Pick<MySale, 'state' | 'event'>): string {
+  const ofSale = sale.event === 'sale';
+  switch (sale.state) {
     case 'counted':
-      return 'Comptée';
+      return ofSale ? 'Comptée' : 'Compté';
     case 'signalled':
-      return 'Signalée';
+      return ofSale ? 'Signalée' : 'Signalé';
     case 'excluded':
-      return 'Écartée';
+      return ofSale ? 'Écartée' : 'Écarté';
     case 'removed':
-      return 'Retirée du relevé';
+      return ofSale ? 'Retirée du relevé' : 'Retiré du relevé';
   }
 }
 
@@ -45,8 +47,18 @@ export function mySaleStateText(state: MySale['state']): string {
 export const mySaleWaits = (sale: Pick<MySale, 'state' | 'open'>): boolean =>
   sale.state === 'signalled' && sale.open;
 
-/** What the line says under it, `null` for a line counted with nothing more to say. */
-export function mySaleNote(sale: Pick<MySale, 'state' | 'open' | 'signal'>, closed: boolean): string | null {
+/**
+ * What the line says under it, `null` for a line counted with nothing more to say. A sale counts for the member; a
+ * refund is taken off their sales.
+ */
+export function mySaleNote(
+  sale: Pick<MySale, 'state' | 'open' | 'signal' | 'event'>,
+  closed: boolean,
+): string | null {
+  return sale.event === 'sale' ? saleNote(sale, closed) : refundNote(sale, closed);
+}
+
+function saleNote(sale: Pick<MySale, 'state' | 'open'>, closed: boolean): string | null {
   switch (sale.state) {
     case 'counted':
       return closed || sale.open ? null : 'Comptée par une clôture : elle ne change plus.';
@@ -58,6 +70,21 @@ export function mySaleNote(sale: Pick<MySale, 'state' | 'open' | 'signal'>, clos
       return 'Tu l’as signalée et un valideur l’a écartée : elle ne compte pas pour toi.';
     case 'removed':
       return 'Tu l’avais signalée : elle n’est plus sur ton relevé.';
+  }
+}
+
+function refundNote(sale: Pick<MySale, 'state' | 'open'>, closed: boolean): string | null {
+  switch (sale.state) {
+    case 'counted':
+      return closed || sale.open ? null : 'Compté par une clôture : il ne change plus.';
+    case 'signalled':
+      return sale.open
+        ? 'Tu l’as signalé : il se déduit de tes ventes tant qu’un valideur ne l’a pas écarté.'
+        : 'Tu l’avais signalé, la clôture l’a déduit de tes ventes.';
+    case 'excluded':
+      return 'Tu l’as signalé et un valideur l’a écarté : il ne se déduit pas de tes ventes.';
+    case 'removed':
+      return 'Tu l’avais signalé : il n’est plus sur ton relevé.';
   }
 }
 
@@ -105,9 +132,23 @@ export function mySalesNets(
   return [...nets.entries()].map(([currency, netMinor]) => ({ currency, netMinor }));
 }
 
-/** A gesture's button on the line. */
-export const signalLabel = (kind: SaleSignalKind): string =>
-  kind === 'signal' ? 'Ce n’est pas ma vente' : 'Retirer le signalement';
+/**
+ * The panel's first words, naming where its lines were read: the platform's name when they all come from one, « la
+ * plateforme » otherwise, never a platform written in.
+ */
+export function mySalesIntro(platforms: readonly Platform[], closed: boolean): string {
+  const [only, ...others] = [...new Set(platforms)];
+  const where = only !== undefined && others.length === 0 ? platformName(only) : 'la plateforme';
+  return closed
+    ? `Les ventes de ${where} que ta quinzaine a comptées pour toi, et celles que tu as signalées.`
+    : `Les ventes de ${where} que ta quinzaine compte pour toi. Si l’une n’est pas à toi, signale-la : un valideur la verra et pourra l’écarter.`;
+}
+
+/** A gesture's button on the line, after its event: a refund is not « ma vente ». */
+export function signalLabel(kind: SaleSignalKind, event: SaleEvent): string {
+  if (kind === 'withdraw') return 'Retirer le signalement';
+  return event === 'sale' ? 'Ce n’est pas ma vente' : 'Ce remboursement n’est pas à moi';
+}
 
 /** What the sheet asks and says before a gesture is sent. */
 export interface SignalWords {
@@ -116,17 +157,28 @@ export interface SignalWords {
   readonly confirm: string;
 }
 
-/** The sheet of a gesture: what it does to the line, and that it changes no amount by itself. */
-export function signalWords(kind: SaleSignalKind): SignalWords {
-  return kind === 'signal'
+const WITHDRAW_UNTIL = 'Tu peux retirer ton signalement jusqu’à la clôture.';
+
+/** The sheet of a gesture, after the line's event: what it does to the line, and that it changes no amount by itself. */
+export function signalWords(kind: SaleSignalKind, event: SaleEvent): SignalWords {
+  if (kind === 'withdraw')
+    return {
+      title: 'Retirer ton signalement ?',
+      lead:
+        event === 'sale'
+          ? 'La vente reste comptée pour toi et le valideur ne la voit plus comme signalée.'
+          : 'Le remboursement reste déduit de tes ventes et le valideur ne le voit plus comme signalé.',
+      confirm: 'Retirer le signalement',
+    };
+  return event === 'sale'
     ? {
         title: 'Ce n’est pas ta vente ?',
-        lead: 'Un valideur la verra. Elle reste sur ton relevé et compte pour toi tant qu’il ne l’a pas écartée. Tu peux retirer ton signalement jusqu’à la clôture.',
+        lead: `Un valideur la verra. Elle reste sur ton relevé et compte pour toi tant qu’il ne l’a pas écartée. ${WITHDRAW_UNTIL}`,
         confirm: 'Signaler la vente',
       }
     : {
-        title: 'Retirer ton signalement ?',
-        lead: 'La vente reste comptée pour toi et le valideur ne la voit plus comme signalée.',
-        confirm: 'Retirer le signalement',
+        title: 'Ce n’est pas ton remboursement ?',
+        lead: `Un valideur le verra. Le remboursement reste sur ton relevé et se déduit de tes ventes tant que le valideur ne l’a pas écarté. ${WITHDRAW_UNTIL}`,
+        confirm: 'Signaler le remboursement',
       };
 }

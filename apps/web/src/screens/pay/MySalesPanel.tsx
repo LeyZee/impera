@@ -19,6 +19,7 @@ import {
   mySaleAmount,
   mySaleNote,
   mySalesCountText,
+  mySalesIntro,
   mySalesNets,
   mySaleStateText,
   mySaleWaits,
@@ -117,12 +118,13 @@ export function MySalesPanel({
     >
       <div className="rp-sec">
         <p className="py-quiet">
-          {first.closed
-            ? 'Les ventes de Reveal que ta quinzaine a comptées pour toi, et celles que tu as signalées.'
-            : 'Les ventes de Reveal que ta quinzaine compte pour toi. Si l’une n’est pas à toi, signale-la : un valideur la verra et pourra l’écarter.'}
+          {mySalesIntro(
+            items.map((sale) => sale.platform),
+            first.closed,
+          )}
         </p>
         <div className="py-mine__days">
-          {groups.map((group) => (
+          {groups.map((group, groupIndex) => (
             <details
               key={group.day ?? 'none'}
               className="py-mine__day"
@@ -133,10 +135,10 @@ export function MySalesPanel({
                 <span className="py-mine__sum nv-num">{myDayLine(sums.get(group.day))}</span>
               </summary>
               <ul className="py-held__rows">
-                {group.sales.map((sale) => {
-                  const key = keyOf(sale);
-                  // Each gesture names its line to a screen reader, out of the list too.
-                  const about = (part: string): string => `${uid}-${key}-${part}`;
+                {group.sales.map((sale, index) => {
+                  // Each gesture names its line to a screen reader, out of the list too; by its place, never its key.
+                  const about = (part: string): string =>
+                    `${uid}-${String(groupIndex)}-${String(index)}-${part}`;
                   const account = names.account(sale.platformAccountId);
                   const note = mySaleNote(sale, first.closed);
                   const signal = mySignalNote(sale);
@@ -148,7 +150,7 @@ export function MySalesPanel({
                         ? 'withdraw'
                         : null;
                   return (
-                    <li key={key} className="py-held__row">
+                    <li key={keyOf(sale)} className="py-held__row">
                       <div className="py-held__main">
                         <p className="py-held__who" id={about('who')}>
                           {account === null ? 'Un compte' : account.creatorName}
@@ -172,7 +174,7 @@ export function MySalesPanel({
                           {mySaleAmount(sale)}
                         </p>
                         <span className={mySaleWaits(sale) ? 'rp-chip rp-chip--warn' : 'rp-chip'}>
-                          {mySaleStateText(sale.state)}
+                          {mySaleStateText(sale)}
                         </span>
                       </div>
                       {note === null ? null : (
@@ -191,7 +193,7 @@ export function MySalesPanel({
                               setAsked({ sale, kind });
                             }}
                           >
-                            {signalLabel(kind)}
+                            {signalLabel(kind, sale.event)}
                           </button>
                         </div>
                       )}
@@ -263,7 +265,7 @@ function SignalDialog({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
-  const words = signalWords(kind);
+  const words = signalWords(kind, sale.event);
   const account = names.account(sale.platformAccountId);
 
   const send = async () => {

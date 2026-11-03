@@ -19,6 +19,7 @@ import {
   outcomeWords,
   saleAmount,
   saleWhen,
+  signalChipText,
   signalText,
   type SaleMember,
 } from '@/payroll/held-sales';
@@ -127,7 +128,7 @@ export function HeldSalesPanel({
                   </p>
                   {decided === null ? (
                     <span className="rp-chip rp-chip--warn">
-                      {signalled === null ? 'En attente' : 'Signalée'}
+                      {signalled === null ? 'En attente' : signalChipText(sale)}
                     </span>
                   ) : (
                     <span className="rp-chip">{decided}</span>

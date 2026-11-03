@@ -8,6 +8,7 @@ import {
   outcomeWords,
   saleAmount,
   saleWhen,
+  signalChipText,
   signalText,
 } from './held-sales';
 
@@ -119,5 +120,14 @@ describe('held sales (CRM-03 lot b4b)', () => {
     expect(signalText(heldSaleOf({ reason: null, signal: { ...signal, note: null } }), null)).toBe(
       'Signalée par son chatteur : ce n’est pas sa vente.',
     );
+    expect(signalChipText(heldSaleOf())).toBe('Signalée');
+    const refund = heldSaleOf({
+      event: 'refund',
+      netMinor: -1_000,
+      reason: null,
+      signal: { ...signal, note: null },
+    });
+    expect(signalText(refund, THEO)).toBe('Signalé par Théo : ce n’est pas son remboursement.');
+    expect(signalChipText(refund)).toBe('Signalé');
   });
 });

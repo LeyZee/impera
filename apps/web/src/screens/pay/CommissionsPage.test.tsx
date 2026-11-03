@@ -509,6 +509,7 @@ describe('CommissionsPage', () => {
       renderPage();
       const mine = await waitFor(() => panel('Mes ventes lues'));
       expect(text(mine)).toContain('2 ventes lues · 1 remboursement · 91,00 €');
+      expect(text(mine)).toContain('Les ventes de Reveal que ta quinzaine compte pour toi.');
       expect(days(mine).map((day) => text(day.querySelector('summary')))).toEqual([
         'Vendredi 30 octobre1 remboursement · −10,00 €',
         'Jeudi 29 octobreRien de compté ce jour',
@@ -528,7 +529,28 @@ describe('CommissionsPage', () => {
       if (excluded === null) throw new Error('No line');
       expect(text(excluded)).toContain('« Vendue pendant le shift de Lou »');
       expect(within(excluded).queryByRole('button')).toBeNull();
-      expect(text(mine)).not.toMatch(/vente-\d/u);
+      // Not on the page, nor in the ids that name a gesture to a screen reader.
+      expect(mine.innerHTML).not.toMatch(/vente-\d/u);
+    });
+
+    it('says a refund line as a refund: its chip, its gesture and its sheet', async () => {
+      onNet(OCT2);
+      mySales[OCT2] = { '': pageOf(OCT2, october) };
+      renderPage();
+      const mine = await waitFor(() => panel('Mes ventes lues'));
+      const refund = within(mine).getByText('Remboursement de 10 h 15').closest('li');
+      if (refund === null) throw new Error('No line');
+      expect(text(refund)).toContain('−10,00 €');
+      expect(text(refund)).toContain('Compté');
+      expect(within(refund).queryByRole('button', { name: 'Ce n’est pas ma vente' })).toBeNull();
+      fireEvent.click(within(refund).getByRole('button', { name: 'Ce remboursement n’est pas à moi' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(text(dialog)).toContain('Ce n’est pas ton remboursement ?');
+      expect(text(dialog)).toContain(
+        'Le remboursement reste sur ton relevé et se déduit de tes ventes tant que le valideur ne l’a pas écarté.',
+      );
+      expect(within(dialog).getByRole('button', { name: 'Signaler le remboursement' })).toBeTruthy();
+      expect(writes).toEqual([]);
     });
 
     it('signals a line after reading it again, with a note, then reads the list again', async () => {

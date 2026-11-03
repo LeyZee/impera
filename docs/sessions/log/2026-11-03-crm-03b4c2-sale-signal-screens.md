@@ -9,7 +9,8 @@ Pas fait : « En attente d'une décision » chez le chatteur (précision 2 d'Ext
 Décisions :
 - un remboursement de son relevé se signale aussi : c'est une ligne qu'il paie, le valideur tranche ;
 - jamais la clé de la vente, ni à l'écran ni dans un texte lu par un lecteur d'écran ;
-- la tête du panneau somme toute la quinzaine (les `days` du serveur), même quand toutes les pages ne sont pas lues.
+- la tête du panneau somme toute la quinzaine (les `days` du serveur), même quand toutes les pages ne sont pas lues ;
+- après la relecture d'Extension : l'introduction nomme la plateforme des lignes (« la plateforme » s'il y en a plusieurs), jamais « Reveal » écrit en dur ; une ligne de remboursement dit « Ce remboursement n'est pas à moi », sa feuille, son état et sa note au masculin, et le valideur lit « Signalé par … : ce n'est pas son remboursement » ; les ids qui nomment un geste au lecteur d'écran prennent la place de la ligne, jamais sa clé.
 Découvertes : aucune nouvelle.
 Candidats à suppression : aucun.
-Vérifié : `my-sales.test.ts` (4) ; `held-sales.test.ts` (1 nouveau) ; `CommissionsPage.test.tsx` (6 nouveaux : jours et états, signaler avec une note, refus et même identifiant, aujourd'hui ouvert et quinzaine clôturée, pages et lecture qui échoue, rien sur rapports) ; `PeriodPage.test.tsx` (1 nouveau : ligne signalée chez le valideur) ; captures dans `/mnt/project-files/reglages-ventes/crm-03/b4c/` ; pnpm check ✓.
+Vérifié : `my-sales.test.ts` (6) ; `held-sales.test.ts` (1 nouveau) ; `CommissionsPage.test.tsx` (7 nouveaux : jours et états, ligne de remboursement, signaler avec une note, refus et même identifiant, aujourd'hui ouvert et quinzaine clôturée, pages et lecture qui échoue, rien sur rapports) ; `PeriodPage.test.tsx` (1 nouveau : ligne signalée chez le valideur) ; captures dans `/mnt/project-files/reglages-ventes/crm-03/b4c/` ; pnpm check ✓.

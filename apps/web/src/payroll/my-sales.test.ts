@@ -7,6 +7,7 @@ import {
   mySaleAmount,
   mySaleNote,
   mySalesCountText,
+  mySalesIntro,
   mySalesNets,
   mySaleStateText,
   mySaleWaits,
@@ -49,11 +50,21 @@ describe('my sales read (CRM-03 lot b4c)', () => {
   });
 
   it('says where each line stands, amber only while a signal waits on an open period', () => {
-    expect(
-      ['counted', 'signalled', 'excluded', 'removed'].map((state) =>
-        mySaleStateText(MySaleSchema.shape.state.parse(state)),
-      ),
-    ).toEqual(['Comptée', 'Signalée', 'Écartée', 'Retirée du relevé']);
+    const states = ['counted', 'signalled', 'excluded', 'removed'].map((state) =>
+      MySaleSchema.shape.state.parse(state),
+    );
+    expect(states.map((state) => mySaleStateText({ state, event: 'sale' }))).toEqual([
+      'Comptée',
+      'Signalée',
+      'Écartée',
+      'Retirée du relevé',
+    ]);
+    expect(states.map((state) => mySaleStateText({ state, event: 'refund' }))).toEqual([
+      'Compté',
+      'Signalé',
+      'Écarté',
+      'Retiré du relevé',
+    ]);
     const signal = { note: 'Vendue pendant le shift de Lou', signalledAt: '2026-10-29T08:00:00.000Z' };
     expect(mySaleWaits(mineOf({ state: 'signalled', signal }))).toBe(true);
     expect(mySaleWaits(mineOf({ state: 'signalled', signal, open: false }))).toBe(false);
@@ -77,6 +88,47 @@ describe('my sales read (CRM-03 lot b4c)', () => {
       '« Vendue pendant le shift de Lou »',
     );
     expect(mySignalNote(mineOf({ state: 'signalled', signal: { ...signal, note: null } }))).toBeNull();
+  });
+
+  it('says a refund as a refund: taken off the member’s sales, never « ma vente »', () => {
+    const signal = { note: null, signalledAt: '2026-10-29T08:00:00.000Z' };
+    const refund = (patch: Partial<MySale>): MySale =>
+      mineOf({ event: 'refund', netMinor: -1_000, ...patch });
+    expect(mySaleNote(refund({}), false)).toBeNull();
+    expect(mySaleNote(refund({ open: false }), false)).toBe('Compté par une clôture : il ne change plus.');
+    expect(mySaleNote(refund({ state: 'signalled', signal }), false)).toBe(
+      'Tu l’as signalé : il se déduit de tes ventes tant qu’un valideur ne l’a pas écarté.',
+    );
+    expect(mySaleNote(refund({ state: 'signalled', signal, open: false }), true)).toBe(
+      'Tu l’avais signalé, la clôture l’a déduit de tes ventes.',
+    );
+    expect(mySaleNote(refund({ state: 'excluded', signal, open: false }), false)).toBe(
+      'Tu l’as signalé et un valideur l’a écarté : il ne se déduit pas de tes ventes.',
+    );
+    expect(mySaleNote(refund({ state: 'removed', signal, open: false }), false)).toBe(
+      'Tu l’avais signalé : il n’est plus sur ton relevé.',
+    );
+    expect(signalLabel('signal', 'refund')).toBe('Ce remboursement n’est pas à moi');
+    expect(signalLabel('withdraw', 'refund')).toBe('Retirer le signalement');
+    expect(signalWords('signal', 'refund')).toEqual({
+      title: 'Ce n’est pas ton remboursement ?',
+      lead: 'Un valideur le verra. Le remboursement reste sur ton relevé et se déduit de tes ventes tant que le valideur ne l’a pas écarté. Tu peux retirer ton signalement jusqu’à la clôture.',
+      confirm: 'Signaler le remboursement',
+    });
+    expect(signalWords('withdraw', 'refund').lead).toBe(
+      'Le remboursement reste déduit de tes ventes et le valideur ne le voit plus comme signalé.',
+    );
+  });
+
+  it('names the platform its lines were read on, never one written in', () => {
+    expect(mySalesIntro(['reveal', 'reveal'], false)).toBe(
+      'Les ventes de Reveal que ta quinzaine compte pour toi. Si l’une n’est pas à toi, signale-la : un valideur la verra et pourra l’écarter.',
+    );
+    expect(mySalesIntro(['onlyfans'], true)).toBe(
+      'Les ventes de OnlyFans que ta quinzaine a comptées pour toi, et celles que tu as signalées.',
+    );
+    expect(mySalesIntro(['reveal', 'onlyfans'], false)).toMatch(/^Les ventes de la plateforme que/u);
+    expect(mySalesIntro([], true)).toMatch(/^Les ventes de la plateforme que/u);
   });
 
   it('heads each day with its sales, refunds and net, and the panel with the period’s', () => {
@@ -105,13 +157,13 @@ describe('my sales read (CRM-03 lot b4c)', () => {
   });
 
   it('names each gesture and what it does, a signal changing no amount by itself', () => {
-    expect(signalLabel('signal')).toBe('Ce n’est pas ma vente');
-    expect(signalLabel('withdraw')).toBe('Retirer le signalement');
-    expect(signalWords('signal')).toEqual({
+    expect(signalLabel('signal', 'sale')).toBe('Ce n’est pas ma vente');
+    expect(signalLabel('withdraw', 'sale')).toBe('Retirer le signalement');
+    expect(signalWords('signal', 'sale')).toEqual({
       title: 'Ce n’est pas ta vente ?',
       lead: 'Un valideur la verra. Elle reste sur ton relevé et compte pour toi tant qu’il ne l’a pas écartée. Tu peux retirer ton signalement jusqu’à la clôture.',
       confirm: 'Signaler la vente',
     });
-    expect(signalWords('withdraw').confirm).toBe('Retirer le signalement');
+    expect(signalWords('withdraw', 'sale').confirm).toBe('Retirer le signalement');
   });
 });
