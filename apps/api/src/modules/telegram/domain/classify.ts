@@ -613,7 +613,6 @@ export function classify(
         link: { label: 'Ouvrir le Dashboard', path: '/' },
       };
     }
-    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     case 'sale':
       // Silent, in its own topic (ADR 0020 §2); a refund never rings live, it is in the evening digest (CRM-04).
       return {
@@ -624,6 +623,7 @@ export function classify(
         body: `${SALE_TYPE_TEXT[signal.saleType]} · ${saleAmount(signal.grossInclVatMinor, signal.currency)} · ${sellerText(signal.seller, memberNameOf)}`,
         link: null,
       };
+    // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     case 'security_alert':
       return {
         kind: 'notice',
