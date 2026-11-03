@@ -11,7 +11,7 @@
 // Served from the root with `Cache-Control: no-cache` (nginx.conf.template, `location /`), never under /assets/,
 // so the browser always sees a new version. Hand-written, no build dependency: bump VERSION when this file changes.
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const SHELL = `impera-shell-${VERSION}`;
 const ASSETS = `impera-assets-${VERSION}`;
 /** Hashed files kept at most: each deployment adds new ones, the oldest go first. */
