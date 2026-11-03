@@ -35,6 +35,8 @@ import {
 } from './model';
 import { weekOf } from './time';
 
+import { settingsOf } from '@/test/settings';
+
 const PARIS = 'Europe/Paris';
 const id = (n: number): string => `0199f2a0-0000-7000-8000-${String(n).padStart(12, '0')}`;
 const NORA = id(1);
@@ -59,7 +61,7 @@ const shift = (n: number, patch: Partial<z.input<typeof ShiftSchema>>): Shift =>
 
 const planning = (shifts: Shift[], conflicts: unknown[] = []) =>
   PlanningSchema.parse({
-    settings: { timeZone: PARIS, slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+    settings: settingsOf(),
     accounts: [
       { id: NORA_REVEAL, creatorId: NORA, creatorName: 'Nora Vidal', platform: 'reveal', handle: 'nora' },
       { id: LEA_REVEAL, creatorId: LEA, creatorName: 'Léa', platform: 'reveal', handle: 'lea' },
@@ -95,13 +97,11 @@ describe('the week grid', () => {
   });
 });
 
+const ID_OF_VERSION = '0199f2a0-0000-7000-8000-0000000000ab';
+
 describe('the créneaux of a row (EQ-01)', () => {
   const week = weekOf('2026-10-26');
-  const SIX_HOURS: Pick<SchedulingSettings, 'timeZone' | 'slotStartMinute' | 'slotLengthMinutes'> = {
-    timeZone: PARIS,
-    slotStartMinute: 0,
-    slotLengthMinutes: 360,
-  };
+  const SIX_HOURS: Pick<SchedulingSettings, 'timeZone' | 'versions'> = settingsOf();
   const BEFORE = new Date('2026-10-20T00:00:00Z');
   const cellsOf = (
     shifts: Shift[],
@@ -118,7 +118,7 @@ describe('the créneaux of a row (EQ-01)', () => {
   it('puts a shift that starts before the day’s first créneau in the night before', () => {
     // Créneaux from 5 h; Tuesday 2 h – 4 h in Paris belongs to Monday's 23 h – 5 h.
     const early = shift(1, { startsAt: '2026-10-27T01:00:00Z', endsAt: '2026-10-27T03:00:00Z' });
-    const cells = cellsOf([early], BEFORE, { ...SIX_HOURS, slotStartMinute: 300 });
+    const cells = cellsOf([early], BEFORE, settingsOf({ start: 300 }));
     expect(cells?.get('2026-10-26')?.[3]?.chips.map((chip) => chip.shift.id)).toEqual([early.id]);
     expect(cells?.get('2026-10-27')?.[3]?.chips).toEqual([]);
     // Tuesday's own night stays to fill.
@@ -175,6 +175,28 @@ describe('the créneaux of a row (EQ-01)', () => {
     const pair = (chip: SlotChip): [string, boolean, boolean] => [chip.shift.id, chip.earlier, chip.carried];
     expect(week?.get('2026-10-27')?.[3]?.chips.map(pair)).toEqual([[night.id, false, false]]);
     expect(week?.get('2026-10-28')?.[0]?.chips.map(pair)).toEqual([[night.id, true, false]]);
+  });
+
+  it('cuts each day by the créneaux in force, a new version taking effect mid-week (ADR 0049 § 1)', () => {
+    // Three créneaux of 8 h from Thursday 29 at midnight in Paris: Wednesday keeps four, Thursday has three.
+    const eight = settingsOf({ length: 480 }).versions[0];
+    if (eight === undefined) throw new Error('no version');
+    const settings = {
+      ...SIX_HOURS,
+      versions: [
+        ...SIX_HOURS.versions,
+        { ...eight, id: ID_OF_VERSION, effectiveAt: '2026-10-28T23:00:00.000Z' },
+      ],
+    };
+    const late = shift(1, { startsAt: '2026-10-29T15:00:00Z', endsAt: '2026-10-29T17:00:00Z' });
+    const cells = cellsOf([late], BEFORE, settings);
+    expect(cells?.get('2026-10-28')).toHaveLength(4);
+    expect(cells?.get('2026-10-29')?.map((cell) => cell.from.toISOString())).toEqual([
+      '2026-10-28T23:00:00.000Z',
+      '2026-10-29T07:00:00.000Z',
+      '2026-10-29T15:00:00.000Z',
+    ]);
+    expect(cells?.get('2026-10-29')?.[2]?.chips.map((chip) => chip.shift.id)).toEqual([late.id]);
   });
 
   it('cuts the créneaux at the agency’s hours over a change of time', () => {

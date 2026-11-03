@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyPlanningPage } from './MyPlanningPage';
 
 import { ReopenProvider } from '@/reports/reopen';
+import { settingsOf } from '@/test/settings';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
@@ -169,7 +170,7 @@ const calendars: string[] = [];
 /** The team's calendar (CR-12): Théo's night, Basile on Wednesday morning, the agent in Automatique day and night. */
 const teamCalendar = (from: string, to: string): Record<string, unknown> => ({
   view: 'team',
-  settings: { timeZone: 'Europe/Paris', slotStartMinute: 0, slotLengthMinutes: 360, accessMarginMinutes: 15 },
+  settings: settingsOf(),
   creators: [{ id: NORA, name: 'Nora Vidal' }],
   members: people.slice(0, 2),
   shifts: [
@@ -221,12 +222,7 @@ function serve(
         reply = {
           status: 200,
           body: {
-            settings: {
-              timeZone: 'Europe/Paris',
-              slotStartMinute: 0,
-              slotLengthMinutes: 360,
-              accessMarginMinutes: 15,
-            },
+            settings: settingsOf(),
             accounts: [account],
             members: [people[0]],
             shifts: thisWeek

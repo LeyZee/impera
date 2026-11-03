@@ -24,6 +24,8 @@ import {
   PlanningSchema,
   PutShiftFeedbackBodySchema,
   RejectShiftReportBodySchema,
+  SchedulingSettingsInputSchema,
+  SchedulingSettingsQuerySchema,
   SchedulingSettingsSchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
@@ -120,15 +122,22 @@ export function createSchedulingRoutes(
   return (app) => {
     app.get(
       '/scheduling/settings',
-      { preValidation: ownerOrMember, schema: { response: { 200: SchedulingSettingsSchema } } },
-      (request) => scheduling.settings(userOf(request)),
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: SchedulingSettingsQuerySchema, response: { 200: SchedulingSettingsSchema } },
+      },
+      (request) =>
+        scheduling.settings(
+          userOf(request),
+          request.query.at === undefined ? undefined : new Date(request.query.at),
+        ),
     );
 
     app.put(
       '/scheduling/settings',
       {
         preValidation: owner,
-        schema: { body: SchedulingSettingsSchema, response: { 200: SchedulingSettingsSchema } },
+        schema: { body: SchedulingSettingsInputSchema, response: { 200: SchedulingSettingsSchema } },
       },
       (request) => scheduling.saveSettings(actorOf(request), request.body),
     );

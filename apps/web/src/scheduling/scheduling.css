@@ -551,6 +551,10 @@ button.sc-duty__one:active {
   grid-template-rows: subgrid;
   row-gap: 4px;
 }
+/* The + on the last line, under the most créneaux of the week, whatever a day with fewer holds (ADR 0049 § 1). */
+.sc-grid__row--slots > .sc-grid__cell > .sc-add {
+  grid-row: -2 / -1;
+}
 .sc-slot {
   display: flex;
   flex-direction: column;

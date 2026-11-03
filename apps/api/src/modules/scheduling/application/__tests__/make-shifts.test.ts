@@ -2,6 +2,7 @@ import { newId, ShiftTemplateIdSchema, type ShiftTemplateId } from '@nirvana/con
 import { describe, expect, it } from 'vitest';
 
 import type { PlanningAdmin, PlanningClock } from '../../domain/ports';
+import { DEFAULT_SCHEDULING_SETTINGS } from '../../domain/shifts';
 import { makeShifts } from '../make-shifts';
 
 const now = new Date('2026-10-27T12:00:00Z');
@@ -16,13 +17,7 @@ function admin(failure: Error, days: string[] = [], clocks: PlanningClock[] = []
   return {
     memberShiftsUnscoped: () => Promise.reject(new Error('not used by the job')),
     onShiftUnscoped: () => Promise.reject(new Error('not used by the job')),
-    settingsUnscoped: () =>
-      Promise.resolve({
-        timeZone: 'Pacific/Auckland',
-        slotStartMinute: 0,
-        slotLengthMinutes: 360,
-        accessMarginMinutes: 15,
-      }),
+    settingsUnscoped: () => Promise.resolve({ ...DEFAULT_SCHEDULING_SETTINGS, timeZone: 'Pacific/Auckland' }),
     runningTemplatesUnscoped: (today) => {
       days.push(today);
       return Promise.resolve([first, faulty, last]);

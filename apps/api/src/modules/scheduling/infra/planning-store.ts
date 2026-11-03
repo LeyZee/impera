@@ -3,7 +3,6 @@ import {
   newId,
   PlatformAccountIdSchema,
   PlatformSchema,
-  SchedulingSettingsSchema,
   ShiftIdSchema,
   ShiftTemplateIdSchema,
   TeamMemberIdSchema,
@@ -53,7 +52,7 @@ import {
 import { addDays, calendarDayIn } from '../domain/time';
 
 import {
-  settingsColumns,
+  settingsIn,
   assertAccountFree,
   assertAccountOf,
   assertMemberJoined,
@@ -261,19 +260,17 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
     );
 
   return {
-    settings: (actor) =>
-      withMember(db, actor, async (tx) => {
-        const [row] = await tx.select(settingsColumns).from(schedulingSettings);
-        return row === undefined ? null : SchedulingSettingsSchema.parse(row);
-      }),
+    settings: (actor, range) =>
+      withMember(db, actor, (tx, scope) => settingsIn(tx, range, scope === 'owner' || scope === 'agency')),
 
     saveSettings: (actor, settings) =>
       withMember(db, actor.userId, async (tx, scope) => {
         if (scope !== 'owner') throw new OwnerOnly();
         const values = { ...settings, updatedBy: actor.userId, updatedAt: new Date() };
+        // The legacy créneau columns keep their value, or the old default on a first save: nothing reads them any more.
         await tx
           .insert(schedulingSettings)
-          .values({ id: 1, ...values })
+          .values({ id: 1, slotStartMinute: 0, slotLengthMinutes: 360, ...values })
           .onConflictDoUpdate({ target: schedulingSettings.id, set: values });
         await audit(
           tx,
@@ -586,9 +583,9 @@ export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
       }),
 
     settingsUnscoped: () =>
-      withAdmin(adminDb, async (tx) => {
-        const [row] = await tx.select(settingsColumns).from(schedulingSettings);
-        return row === undefined ? null : SchedulingSettingsSchema.parse(row);
+      withAdmin(adminDb, (tx) => {
+        const now = new Date();
+        return settingsIn(tx, { from: now, to: now }, false);
       }),
 
     runningTemplatesUnscoped: (today) =>

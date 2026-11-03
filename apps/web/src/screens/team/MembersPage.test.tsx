@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MembersPage } from './MembersPage';
 import { parseTeamSearch } from './model';
 
+import { settingsOf } from '@/test/settings';
+
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', () => ({
   confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
@@ -60,12 +62,7 @@ const INES = member(14, { displayName: 'Inès', firstName: 'Inès', teamRole: 'm
 const TEAM = [THEO, BASILE, JULES, INES];
 
 /** An agency far ahead of the browser: its day is the one the server checks a rate's start against (#290). */
-const SETTINGS = {
-  timeZone: 'Pacific/Kiritimati',
-  slotStartMinute: 0,
-  slotLengthMinutes: 360,
-  accessMarginMinutes: 15,
-};
+const SETTINGS = settingsOf({ timeZone: 'Pacific/Kiritimati' });
 
 interface Reply {
   readonly status: number;

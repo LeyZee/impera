@@ -24,7 +24,23 @@ const NORA_REVEAL = PlatformAccountIdSchema.parse('0199f2a0-0000-7000-8000-00000
 const LEA_REVEAL = PlatformAccountIdSchema.parse('0199f2a0-0000-7000-8000-000000000012');
 const KOFI = TeamMemberIdSchema.parse('0199f2a0-0000-7000-8000-000000000021');
 const AMA = TeamMemberIdSchema.parse('0199f2a0-0000-7000-8000-000000000022');
-const SETTINGS = { timeZone: 'Europe/Paris', slotStartMinute: 0, slotLengthMinutes: 360 } as const;
+/** Four créneaux of 6 h from `start` minutes after midnight, Paris. */
+const settingsFrom = (start: number) => ({
+  timeZone: 'Europe/Paris',
+  versions: [
+    {
+      id: null,
+      effectiveAt: null,
+      seats: [],
+      slots: [0, 1, 2, 3].map((index) => ({
+        startMinute: (start + index * 360) % 1440,
+        endMinute: (start + (index + 1) * 360) % 1440,
+        name: null,
+      })),
+    },
+  ],
+});
+const SETTINGS = settingsFrom(0);
 
 const slots = (...ranges: [day: number, start: number, end: number][]): AgentHours['reply'] => ({
   mode: 'slots',
@@ -166,7 +182,7 @@ describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
     // Créneaux from 8:00: a shift 10:00–16:00, across two créneaux, leaves 8–10 open in 8–14 and 16–20 in 14–20.
     const across = (mode: AgentMode) =>
       slotsToFill({
-        settings: { ...SETTINGS, slotStartMinute: 480 },
+        settings: settingsFrom(480),
         accounts: [{ id: NORA_REVEAL, creatorId: NORA }],
         shifts: [shift(NORA_REVEAL, '2026-11-03T09:00:00Z', '2026-11-03T15:00:00Z')],
         agents: [agentOn(NORA, mode, { mode: 'always' })],

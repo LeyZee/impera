@@ -15,7 +15,7 @@ import type {
   ShiftSwapStatus,
   ShiftTemplate,
 } from '@nirvana/contracts';
-import { shiftSlotsOf } from '@nirvana/contracts';
+import { slotWindowsOf } from '@nirvana/contracts';
 
 import type { SchedulingRefusalCode } from './api';
 import {
@@ -413,22 +413,14 @@ export function slotRowOf(
   row: GridRow,
   shifts: readonly Pick<Shift, 'startsAt' | 'endsAt'>[],
   days: readonly string[],
-  settings: Pick<SchedulingSettings, 'timeZone' | 'slotStartMinute' | 'slotLengthMinutes'>,
+  settings: Pick<SchedulingSettings, 'timeZone' | 'versions'>,
   now: Date,
 ): ReadonlyMap<string, readonly SlotCell[]> | null {
-  const slots = shiftSlotsOf(settings);
-  if (slots.length > LINED_SLOTS_MAX) return null;
-  const length = settings.slotLengthMinutes;
+  if (settings.versions.some((version) => version.slots.length > LINED_SLOTS_MAX)) return null;
   const zone = settings.timeZone;
-  // Both ends are wall-clock minutes of the agency, so the créneaux of a week follow each other without a gap.
-  const windows = days.flatMap((day) =>
-    slots.map((slot, index) => ({
-      day,
-      slot,
-      from: zonedInstant(day, settings.slotStartMinute + index * length, zone),
-      to: zonedInstant(day, settings.slotStartMinute + (index + 1) * length, zone),
-    })),
-  );
+  // Both ends are wall-clock minutes of the agency, each day cut by the version in force (ADR 0049 § 1), so the
+  // créneaux of a week follow each other without a gap.
+  const windows = slotWindowsOf(settings.versions, days, (day, minute) => zonedInstant(day, minute, zone));
   const placed = windows.map((): SlotChip[] => []);
   for (const chips of row.days.values()) {
     for (const chip of chips) {
@@ -465,9 +457,7 @@ export function slotRowOf(
       open: gapIn(Math.max(from, ahead), to, spans),
     };
   });
-  return new Map(
-    days.map((day, index) => [day, cells.slice(index * slots.length, (index + 1) * slots.length)]),
-  );
+  return new Map(days.map((day) => [day, cells.filter((_, index) => windows[index]?.day === day)]));
 }
 
 /** The first stretch of [from, to) that no span covers, or `null`; `spans` sorted by start. */

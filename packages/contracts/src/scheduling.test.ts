@@ -13,6 +13,10 @@ import {
   PlanningSchema,
   SCHEDULING_ERROR_CODES,
   SchedulingSettingsSchema,
+  ShiftSlotsSchema,
+  slotVersionAt,
+  SlotVersionSchema,
+  slotWindowsOf,
   SHIFT_TEMPLATE_MAX_MINUTES,
   ShiftSwapListSchema,
   ShiftSwapRequestSchema,
@@ -40,33 +44,160 @@ const shift = {
   templateId: null,
 };
 
+const four = (start = 0) =>
+  [0, 1, 2, 3].map((index) => ({
+    startMinute: (start + index * 360) % 1440,
+    endMinute: (start + (index + 1) * 360) % 1440,
+    name: null,
+  }));
+
 const settings = {
   timeZone: 'Europe/Paris',
-  slotStartMinute: 0,
-  slotLengthMinutes: 360,
   accessMarginMinutes: 15,
+  versions: [{ id: null, effectiveAt: null, slots: four(), seats: [] }],
 };
 
+/** Wall-clock minutes read as UTC: enough for the cuts, the zones are the apps' (their tests cover the changes of time). */
+const utc = (day: string, minute: number): Date => new Date(Date.parse(`${day}T00:00:00Z`) + minute * 60_000);
+const hours = (windows: readonly { from: Date; to: Date }[]) =>
+  windows.map(
+    (window) => `${window.from.toISOString().slice(5, 16)}→${window.to.toISOString().slice(11, 16)}`,
+  );
+
 describe('planning settings', () => {
-  it('tiles the day with Imperium’s four 6-hour slots by default', () => {
-    expect(shiftSlotsOf(SchedulingSettingsSchema.parse(settings))).toEqual([
-      { startMinute: 0, endMinute: 360 },
-      { startMinute: 360, endMinute: 720 },
-      { startMinute: 720, endMinute: 1080 },
-      { startMinute: 1080, endMinute: 0 },
+  it('reads the créneaux of the version in force', () => {
+    expect(shiftSlotsOf(SchedulingSettingsSchema.parse(settings))).toEqual(four());
+    const later = {
+      id: '0199f2a0-0000-7000-8000-0000000000aa',
+      effectiveAt: '2026-11-09T00:00:00Z',
+      slots: four(120),
+      seats: [],
+    };
+    const both = SchedulingSettingsSchema.parse({ ...settings, versions: [...settings.versions, later] });
+    expect(slotVersionAt(both.versions, new Date('2026-11-08T23:59:00Z')).id).toBe(null);
+    expect(shiftSlotsOf(both, new Date('2026-11-09T00:00:00Z'))[0]).toEqual({
+      startMinute: 120,
+      endMinute: 480,
+      name: null,
+    });
+  });
+
+  it('takes créneaux of 1 h to 12 h, on the hour, that cover the day once, two at least (ADR 0049 § 1)', () => {
+    const ok = (slots: unknown) => ShiftSlotsSchema.safeParse(slots).success;
+    expect(ok(four(120))).toBe(true);
+    expect(
+      ok([
+        { startMinute: 1260, endMinute: 360, name: 'Nuit' },
+        { startMinute: 360, endMinute: 1080, name: null },
+        { startMinute: 1080, endMinute: 1260, name: 'Live' },
+      ]),
+    ).toBe(true);
+    // Half past, a gap, an overlap, thirteen hours, a single créneau.
+    expect(ok(four(30))).toBe(false);
+    expect(ok([four()[0], four()[2], four()[3]])).toBe(false);
+    expect(
+      ok([
+        { startMinute: 0, endMinute: 720, name: null },
+        { startMinute: 600, endMinute: 0, name: null },
+      ]),
+    ).toBe(false);
+    expect(
+      ok([
+        { startMinute: 0, endMinute: 780, name: null },
+        { startMinute: 780, endMinute: 0, name: null },
+      ]),
+    ).toBe(false);
+    expect(ok([{ startMinute: 0, endMinute: 0, name: null }])).toBe(false);
+  });
+
+  it('keeps a seat on a créneau of its version, one or two chatters', () => {
+    const seat = { slotRank: 3, platformAccountId: ACCOUNT, seats: 2 };
+    const version = { id: null, effectiveAt: null, slots: four(), seats: [seat] };
+    expect(SlotVersionSchema.safeParse(version).success).toBe(true);
+    expect(SlotVersionSchema.safeParse({ ...version, seats: [{ ...seat, slotRank: 4 }] }).success).toBe(
+      false,
+    );
+    expect(SlotVersionSchema.safeParse({ ...version, seats: [{ ...seat, seats: 3 }] }).success).toBe(false);
+  });
+
+  it('cuts each day at its first créneau, the night after midnight on the day before', () => {
+    const [version] = SchedulingSettingsSchema.parse({
+      ...settings,
+      versions: [{ ...settings.versions[0], slots: four(300) }],
+    }).versions;
+    const windows = slotWindowsOf(version === undefined ? [] : [version], ['2026-11-04'], utc);
+    expect(hours(windows)).toEqual([
+      '11-04T05:00→11:00',
+      '11-04T11:00→17:00',
+      '11-04T17:00→23:00',
+      '11-04T23:00→05:00',
+    ]);
+    expect(windows.map((window) => [window.day, window.rank])).toEqual([
+      ['2026-11-04', 0],
+      ['2026-11-04', 1],
+      ['2026-11-04', 2],
+      ['2026-11-04', 3],
     ]);
   });
 
-  it('lets the last slot run past midnight when the day starts later', () => {
-    const slots = shiftSlotsOf({ slotStartMinute: 120, slotLengthMinutes: 360 });
-    expect(slots.at(0)).toEqual({ startMinute: 120, endMinute: 480 });
-    expect(slots.at(-1)).toEqual({ startMinute: 1200, endMinute: 120 });
+  it('cuts a day that changes version where the new one takes effect, the créneau before giving way or stretching', () => {
+    const eight = [0, 1, 2].map((index) => ({
+      startMinute: index * 480,
+      endMinute: ((index + 1) * 480) % 1440,
+      name: null,
+    }));
+    const versions = SchedulingSettingsSchema.parse({
+      ...settings,
+      versions: [
+        ...settings.versions,
+        {
+          id: '0199f2a0-0000-7000-8000-0000000000aa',
+          effectiveAt: '2026-11-04T10:00:00Z',
+          slots: eight,
+          seats: [],
+        },
+      ],
+    }).versions;
+    // 0–6 and 6–12 began under the old créneaux; the first new one to begin is 16 h: 6–12 stretches to it.
+    expect(hours(slotWindowsOf(versions, ['2026-11-04'], utc))).toEqual([
+      '11-04T00:00→06:00',
+      '11-04T06:00→16:00',
+      '11-04T16:00→00:00',
+    ]);
+    expect(hours(slotWindowsOf(versions, ['2026-11-05'], utc))).toEqual([
+      '11-05T00:00→08:00',
+      '11-05T08:00→16:00',
+      '11-05T16:00→00:00',
+    ]);
+    // Before its date, the first version holds every day.
+    expect(hours(slotWindowsOf(versions, ['2026-11-03'], utc))).toHaveLength(4);
   });
 
-  it('refuses a length that does not divide the day, and a first slot that starts after its own end', () => {
-    expect(SchedulingSettingsSchema.safeParse({ ...settings, slotLengthMinutes: 300 }).success).toBe(false);
-    expect(SchedulingSettingsSchema.safeParse({ ...settings, slotStartMinute: 360 }).success).toBe(false);
-    expect(SchedulingSettingsSchema.safeParse({ ...settings, slotStartMinute: 359 }).success).toBe(true);
+  it('keeps the old créneau that began before a version taking effect later in the day, cut where the new one begins', () => {
+    const versions = SchedulingSettingsSchema.parse({
+      ...settings,
+      versions: [
+        ...settings.versions,
+        {
+          id: '0199f2a0-0000-7000-8000-0000000000aa',
+          effectiveAt: '2026-11-09T05:00:00Z',
+          slots: four(300),
+          seats: [],
+        },
+      ],
+    }).versions;
+    // Monday 0 h began under the old créneaux: it runs to 5 h, where the new ones begin, with no hole and no overlap.
+    expect(hours(slotWindowsOf(versions, ['2026-11-08', '2026-11-09'], utc))).toEqual([
+      '11-08T00:00→06:00',
+      '11-08T06:00→12:00',
+      '11-08T12:00→18:00',
+      '11-08T18:00→00:00',
+      '11-09T00:00→05:00',
+      '11-09T05:00→11:00',
+      '11-09T11:00→17:00',
+      '11-09T17:00→23:00',
+      '11-09T23:00→05:00',
+    ]);
   });
 
   it('keeps the chatter’s margin short: two hours at most (ADR 0025)', () => {
