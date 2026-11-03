@@ -36,6 +36,8 @@ const MODULE_DEPENDENCIES = {
   notifications: [],
   // ADR 0060: the trend watch reads her limits as the agent's guards do (`touchesTerm`).
   trends: ['agent'],
+  // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
+  'creator-tasks': ['scheduling'],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);

@@ -502,6 +502,29 @@ extension_links   id, user_id → user, token_hash (unique), created_at, revoked
                   personne ; hors de portée de `nirvana_app`, lue par `withAdmin`, comme `calendar_links`)
 ```
 
+## Agenda de la créatrice (module `creator-tasks`, CR-05, migration 0103)
+
+```
+creator_tasks           id, creator_id → creators, kind (timed|day|routine), category, title 1–80, purpose? 1–160,
+                        starts_at? ends_at? (timed, au plus un jour), day? (day), weekdays? int[] 1–7 (routine),
+                        essential (routine de l'agence acceptée seulement), reminder_minutes? (timed), suggestion_id? (unique),
+                        created_by → user, archived_at?, created_at, updated_at
+                        (elle lit, crée et modifie les siennes, sans toucher à `essential` ; le propriétaire et un
+                        manager actif lisent ; on archive, on ne supprime pas)
+creator_task_ticks      (task_id, creator_id) → creator_tasks, day, done_at, created_by → user
+                        (unique : task_id, day ; elle coche et retire sa coche ; l'équipe lit)
+creator_availabilities  id, creator_id → creators, kind (weekly|once), weekday? start_minute? end_minute? (0–1439 ; une fin
+                        au plus égale au début est celle du lendemain, comme un créneau), starts_at? ends_at? (once, au
+                        plus un jour), created_by → user, archived_at?
+creator_suggestions     id, creator_id → creators, origin (agency|ai ; agency ⇔ created_by), kind, category, title, purpose?,
+                        starts_at? ends_at? (timed placée ; nulles si elle n'a pas trouvé de dispo), day?, weekdays?,
+                        minutes (timed seulement), week (son lundi), state (suggested|accepted|declined), reason? (refus),
+                        decided_at? decided_on? (son jour), (task_id, creator_id)? → creator_tasks (acceptée)
+                        (l'équipe écrit et lit ; elle lit et décide, sans réécrire ce qui est proposé)
+```
+
+Les quatre tables ont `FORCE ROW LEVEL SECURITY`, et `nirvana_app` n'a sur elles que les droits ci-dessus (`GRANT` par colonne pour les mises à jour).
+
 ## Commercial (phase 6, réservé)
 
 ```

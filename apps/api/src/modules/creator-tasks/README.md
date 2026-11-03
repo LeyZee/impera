@@ -1,0 +1,30 @@
+# Module `creator-tasks` : l'agenda de la créatrice (CR-05, ADR 0042 § 3 et § 4)
+
+Ses **tâches** (avec une heure de début et de fin, ou juste un jour, à cocher), sa **routine** (les tâches de chaque jour), ses **dispos** (le temps qu'elle ouvre à l'agence) et les **suggestions** de l'agence ou de l'IA, qu'elle accepte ou refuse. Le mot « créneau » n'existe pas ici : il est celui des shifts (ADR 0049).
+
+**Peut dépendre de.** `scheduling`, par son `pure.ts` seulement (ADR 0051) : les jours et l'heure de son fuseau (`addDays`, `calendarDayIn`, `isoWeekday`, `wallClockToInstant`).
+
+**État.** Lot a : règles pures, contrats (`packages/contracts`, `creator-tasks.ts`), tables et RLS (migration 0103), routes. Les écrans viennent au lot b ; l'écran de suggestion de l'agence, son lien iCal et la couche des shifts au lot c.
+
+## Qui lit, qui écrit (migration 0103)
+
+- **Elle** (`withCreatorAccount`, rôle `creator`) lit et écrit ses tâches, ses coches et ses dispos, toujours à son nom. Elle décide une suggestion, sans jamais réécrire ce qu'elle propose (`GRANT UPDATE` limité à `state`, `reason`, `decided_at`, `decided_on`, `task_id`). Elle ne rend jamais une tâche essentielle : la colonne n'est pas dans son `GRANT UPDATE`, et une tâche n'est créée essentielle que depuis une suggestion de routine d'elle encore ouverte (clé `(suggestion_id, creator_id)` et `exists` de la politique `creator_insert`).
+- **Le propriétaire et un manager actif** (`withTenantMember`, portée `owner` ou `agency`) lisent tout son agenda et écrivent les suggestions, à leur nom et d'origine `agency`. Un chatteur ne lit ni n'écrit rien. Une suggestion de l'IA (`ai`, sans auteur) viendra d'un job (CR-07).
+- On ne supprime rien, sauf une coche qu'elle retire : une tâche ou une dispo retirée est archivée. Une coche et une suggestion acceptée pointent la paire (tâche, créatrice), jamais une tâche d'une autre créatrice.
+
+## Routes
+
+- `GET /v1/creator-space/agenda?from=&to=` (créatrice, 42 jours au plus) : ses tâches, ses coches, ses dispos et ses suggestions encore ouvertes, avec sa série du jour. Une suggestion ne dit jamais d'où elle vient.
+- `POST /v1/creator-space/tasks`, `PATCH` et `DELETE /v1/creator-space/tasks/:id` : l'identifiant est tiré par son téléphone. Une création rejouée avec le même contenu répond la même tâche ; un autre contenu sous le même identifiant répond 409 `creator_task_changed_conflict`. Une tâche essentielle reste dans sa routine : elle en change les jours, jamais la sorte.
+- `POST /v1/creator-space/ticks` (de 1 à 200 coches, celles gardées hors ligne comprises) ; `DELETE /v1/creator-space/tasks/:id/ticks/:day`. Une coche pour un jour où la tâche n'est pas prévue répond 422 `creator_tick_day_unprocessable`.
+- `POST /v1/creator-space/availabilities`, `DELETE /v1/creator-space/availabilities/:id`.
+- `POST /v1/creator-space/suggestions/:id/accept` (telle quelle, ou déplacée par `when`, qui est obligatoire si elle est sans date : sinon 422 ; déplacée, elle garde sa sorte, sinon 422 `creator_suggestion_kind_unprocessable` : seule une routine proposée devient essentielle) et `…/decline` (motif facultatif). Le même geste rejoué ne change rien ; l'autre geste répond 409.
+- `POST` et `GET /v1/creators/:creatorId/suggestions` (propriétaire, manager actif ; un chatteur reçoit 403 `creator_suggestion_forbidden`). Une tâche qu'elle a refusée la semaine visée ou celle d'avant répond 409 `creator_suggestion_declined_recently_conflict` ; un identifiant déjà pris, chez elle ou chez une autre créatrice, 409 `creator_suggestion_id_conflict`. Une suggestion à heures ne garde son heure que si elle tombe dans une dispo, sur aucune de ses tâches à heures ni sur une autre suggestion encore ouverte.
+
+## Règles pures (`domain/`)
+
+- **Série** (`streak.ts`) : une journée est « réussie » quand toutes ses tâches essentielles sont cochées (la routine de l'agence qu'elle a acceptée), « parfaite » quand toutes ses tâches du jour le sont (les siennes comprises). La série compte les journées réussies d'affilée dans **son** fuseau ; aujourd'hui compte dès qu'il est réussi et ne casse jamais tant qu'il dure (« série en danger » seulement). Une journée sans essentielle ne compte ni ne casse. Un joker pardonne une journée manquée dans la série, la deuxième la casse ; un joker n'est dépensé que s'il sauve une journée réussie d'avant. Paliers 7, 14, 30, 50, 100.
+- **Dispos** (`availability.ts`) : récurrentes (un jour de la semaine, en heure de son fuseau, minutes de 0 à 1439 comme les créneaux de `scheduling` : une fin au plus égale au début est celle du lendemain, 22 h – 2 h s'écrit `{1320, 120}`, et une fin égale au début vaut 24 h) ou ponctuelles. Une dispo de 18 h à 22 h reste de 18 h à 22 h après un changement d'heure ; la nuit du passage à l'heure d'été, une heure qui n'existe pas devient la première qui existe.
+- **Placement** (`placement.ts`) : une suggestion datée ne tombe qu'entièrement dans une dispo, et sur aucune de ses tâches à heures (deux bornes qui se touchent ne se chevauchent pas). Sinon elle reste sans date, dans « Ma semaine » ; elle n'est jamais déplacée pour elle.
+- **Suggestions** (`suggestions.ts`) : suggérée, puis acceptée ou refusée, une fois. Le même geste rejoué ne change rien ; l'autre geste sur une suggestion décidée est refusé (`creator_suggestion_decided_conflict`). Une tâche refusée n'est pas resuggérée la semaine du refus ni la suivante (même catégorie et même titre, sans casse, accents ni espaces en trop).
+- **Coches** (`completion.ts`) : une coche par tâche et par jour, quel que soit le nombre d'appuis ou de rejeux de son téléphone revenu en ligne ; une coche déjà là ne change pas, et de deux coches nouvelles la plus ancienne reste. Une coche compte pour le jour qu'elle nomme, pas pour l'heure où elle arrive.
