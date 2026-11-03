@@ -150,6 +150,14 @@ export const TrendReadingInputSchema = z.strictObject({
   caption: z.string().max(TREND_CAPTION_MAX).nullable(),
   hashtags: z.array(z.string().min(1).max(100)).max(TREND_HASHTAGS_MAX),
   sound: z.string().min(1).max(200).nullable(),
+  /**
+   * The sound's number in its address (`/reels/audio/<id>/`), when the page showed it: the one key of a sound, since two
+   * sounds can share a name and one sound changes name with the language (VEI-02, VEI-03 grid point 6).
+   */
+  soundId: z
+    .string()
+    .regex(/^\d{1,32}$/u)
+    .nullable(),
   /** Time the post stayed on screen, in this session, in milliseconds. */
   dwellMs: z
     .number()
@@ -185,8 +193,19 @@ export const PasteTrendLinkBodySchema = z.strictObject({
 });
 export type PasteTrendLinkBody = z.infer<typeof PasteTrendLinkBodySchema>;
 
-/** Where an idea stands (ADR 0060 §§ 4 and 5): validated by the agency, suggested in her agenda, then a drop. */
-export const CONTENT_IDEA_STATES = ['proposed', 'validated', 'refused', 'suggested', 'deposited'] as const;
+/**
+ * Where an idea stands (ADR 0060 §§ 4 and 5): validated by the agency, suggested in her agenda, then a drop. `refused`
+ * is the agency's no in « Idées du jour »; `declined` is hers, when she turns the suggestion down in her agenda (CR-05),
+ * set by the agenda's event and never by the agenda writing here. Neither is ever proposed again.
+ */
+export const CONTENT_IDEA_STATES = [
+  'proposed',
+  'validated',
+  'refused',
+  'suggested',
+  'declined',
+  'deposited',
+] as const;
 export const ContentIdeaStateSchema = z.enum(CONTENT_IDEA_STATES);
 export type ContentIdeaState = z.infer<typeof ContentIdeaStateSchema>;
 

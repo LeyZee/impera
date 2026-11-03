@@ -259,6 +259,20 @@ describe('the trend watch’s tables (VEI-01): the agency’s, never the creator
         ),
       ),
     ).toMatch(/content_ideas_refusal_check/u);
+    // Her « no » in her agenda reaches the idea by the agenda's event, written by a job; it carries no agency reason.
+    const hersDeclined = idea();
+    await withAdmin(test.admin.db, (tx) =>
+      tx.insert(s.contentIdeas).values({ ...hersDeclined, state: 'declined', decidedAt: new Date() }),
+    );
+    expect(
+      await failure(
+        withAdmin(test.admin.db, (tx) =>
+          tx
+            .insert(s.contentIdeas)
+            .values(idea({ state: 'declined', decidedAt: new Date(), refusalReason: 'Non' })),
+        ),
+      ),
+    ).toMatch(/content_ideas_refusal_check/u);
   });
 
   it('a reading is its watcher’s, read by the owner and an active manager; the creator marks for herself only', async () => {
@@ -279,6 +293,14 @@ describe('the trend watch’s tables (VEI-01): the agency’s, never the creator
       tx.select({ views: s.trendReadings.views }).from(s.trendReadings),
     );
     expect(all).toEqual([{ views: 1_500 }]);
+    // A sound is kept by its number only.
+    expect(
+      await failure(
+        withTenantMember(test.app.db, nora, chatter, (tx) =>
+          tx.insert(s.trendReadings).values(reading(chatter, { soundId: 'son-invente' })),
+        ),
+      ),
+    ).toMatch(/trend_readings_sound_id_check/u);
     expect(
       await failure(
         withTenantMember(test.app.db, nora, chatter, (tx) =>

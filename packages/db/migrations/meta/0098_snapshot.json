@@ -1,5 +1,5 @@
 {
-  "id": "edc69e23-0002-41e5-aabe-eccd14b90f7b",
+  "id": "9e396015-d843-4852-a18b-6a1cd27a4091",
   "prevId": "9a20d8b7-3efc-4509-8a5a-0b0f2c74b631",
   "version": "7",
   "dialect": "postgresql",
@@ -14942,7 +14942,7 @@
         },
         "content_ideas_state_check": {
           "name": "content_ideas_state_check",
-          "value": "\"content_ideas\".\"state\" in ('proposed', 'validated', 'refused', 'suggested', 'deposited')"
+          "value": "\"content_ideas\".\"state\" in ('proposed', 'validated', 'refused', 'suggested', 'declined', 'deposited')"
         },
         "content_ideas_texts_check": {
           "name": "content_ideas_texts_check",
@@ -15128,6 +15128,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sound_id": {
+          "name": "sound_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "dwell_ms": {
           "name": "dwell_ms",
           "type": "integer",
@@ -15210,6 +15216,28 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "trend_readings_sound_idx": {
+          "name": "trend_readings_sound_idx",
+          "columns": [
+            {
+              "expression": "sound_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"trend_readings\".\"sound_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -15266,6 +15294,10 @@
         }
       },
       "checkConstraints": {
+        "trend_readings_sound_id_check": {
+          "name": "trend_readings_sound_id_check",
+          "value": "\"trend_readings\".\"sound_id\" is null or \"trend_readings\".\"sound_id\" ~ '^[0-9]{1,32}$'"
+        },
         "trend_readings_path_check": {
           "name": "trend_readings_path_check",
           "value": "\"trend_readings\".\"path\" in ('post', 'reel')"

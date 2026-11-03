@@ -487,13 +487,13 @@ trend_signals     id, creator_id? → creators (nul : pour toute l'agence), sour
                   lu par le propriétaire et un manager actif ; un membre colle un lien `agency_link`, la créatrice
                   un lien `creator_link`, tous deux à leur nom ; jamais changé ni retiré par l'application)
 trend_readings    id, recorded_by → user, watch_session_id, post_code, path (post|reel), account?, views?, likes?,
-                  comments?, caption?, hashtags text[], sound?, dwell_ms, marked_for? → creators,
+                  comments?, caption?, hashtags jsonb, sound?, sound_id? (numéro du son, chiffres seuls), dwell_ms, marked_for? → creators,
                   first_seen_at, seen_at
                   (unique : recorded_by, watch_session_id, post_code ; chacun lit et met à jour les siens, le
                   propriétaire et un manager actif lisent tout ; la créatrice ne marque que pour elle)
 content_ideas     id, creator_id → creators, signal_id → trend_signals, title ≤ 120, category (catégorie de dépôt),
                   to_shoot ≤ 600, reason ≤ 200, shoot_minutes 1–600, state (proposed|validated|refused|suggested|
-                  deposited), proposed_on, refusal_reason? (refus seulement), decided_by?, decided_at?
+                  declined|deposited ; refused = l'agence, declined = elle dans son agenda), proposed_on, refusal_reason? (refus seulement), decided_by?, decided_at?
                   (propriétaire et manager actif ; ni le chatteur ni la créatrice)
 extension_links   id, user_id → user, token_hash (unique), created_at, revoked_at? (une liaison vivante par
                   personne ; hors de portée de `nirvana_app`, lue par `withAdmin`, comme `calendar_links`)

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { instagramPostOf, InstagramPostUrlSchema, PasteTrendLinkBodySchema } from './trends';
+import {
+  instagramPostOf,
+  InstagramPostUrlSchema,
+  PasteTrendLinkBodySchema,
+  TrendReadingInputSchema,
+} from './trends';
 
 // Invented codes and names only (ADR 0010).
 describe('an Instagram post read from its address alone (VEI-01)', () => {
@@ -45,5 +50,27 @@ describe('an Instagram post read from its address alone (VEI-01)', () => {
         creatorId: '01900000-0000-7000-8000-000000000001',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('a reading of the extension (VEI-02)', () => {
+  const reading = {
+    code: 'AbC123xyz',
+    path: 'reel',
+    account: 'compte.invente',
+    metrics: { views: 1_000, likes: null, comments: null },
+    caption: null,
+    hashtags: [],
+    sound: 'Son inventé',
+    soundId: '123456789',
+    dwellMs: 4_000,
+    markedFor: null,
+    seenAt: '2026-11-03T08:00:00.000Z',
+  };
+
+  it('keeps the sound by its number, the one key of a sound', () => {
+    expect(TrendReadingInputSchema.parse(reading).soundId).toBe('123456789');
+    expect(TrendReadingInputSchema.safeParse({ ...reading, soundId: null }).success).toBe(true);
+    expect(TrendReadingInputSchema.safeParse({ ...reading, soundId: 'son-invente' }).success).toBe(false);
   });
 });

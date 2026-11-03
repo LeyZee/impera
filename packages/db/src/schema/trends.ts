@@ -129,6 +129,8 @@ export const trendReadings = pgTable(
     /** The hashtags the page showed, a JSON list of strings (contracts `TrendReadingInputSchema`). */
     hashtags: jsonb('hashtags').notNull().default([]),
     sound: text('sound'),
+    /** The sound's number in its address (`/reels/audio/<id>/`): the one key of a sound, whose name can repeat or change. */
+    soundId: text('sound_id'),
     dwellMs: integer('dwell_ms').notNull(),
     markedFor: uuid('marked_for_creator_id').references(() => creators.id),
     firstSeenAt: timestampTz('first_seen_at').notNull(),
@@ -142,6 +144,10 @@ export const trendReadings = pgTable(
     index('trend_readings_marked_idx')
       .on(t.markedFor, t.seenAt)
       .where(sql`${t.markedFor} is not null`),
+    index('trend_readings_sound_idx')
+      .on(t.soundId, t.seenAt)
+      .where(sql`${t.soundId} is not null`),
+    check('trend_readings_sound_id_check', sql`${t.soundId} is null or ${t.soundId} ~ '^[0-9]{1,32}$'`),
     check('trend_readings_path_check', sql`${t.path} in ('post', 'reel')`),
     check('trend_readings_code_check', sql`${t.postCode} ~ '^[A-Za-z0-9_-]{5,64}$'`),
     check(

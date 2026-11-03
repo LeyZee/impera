@@ -115,4 +115,16 @@ describe('« trop proche »', () => {
       ),
     ).toBe(false);
   });
+
+  it('reads a word and its plural as one, and never folds a short word', () => {
+    const apart = { category: 'instagram_post', signalId: other } as const;
+    const singular = idea({ ...apart, title: 'Pied nu plage', toShoot: 'Sable mouillé' });
+    expect(tooClose(singular, idea({ title: 'Pieds nus plages', toShoot: 'Sables mouillés' }))).toBe(true);
+    expect(
+      tooClose(
+        idea({ ...apart, title: 'Bras levés', toShoot: 'Miroir' }),
+        idea({ title: 'Bra levé', toShoot: 'Fenêtre' }),
+      ),
+    ).toBe(false);
+  });
 });

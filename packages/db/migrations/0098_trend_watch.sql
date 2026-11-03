@@ -16,7 +16,7 @@ CREATE TABLE "content_ideas" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "content_ideas_category_check" CHECK ("content_ideas"."category" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')),
-	CONSTRAINT "content_ideas_state_check" CHECK ("content_ideas"."state" in ('proposed', 'validated', 'refused', 'suggested', 'deposited')),
+	CONSTRAINT "content_ideas_state_check" CHECK ("content_ideas"."state" in ('proposed', 'validated', 'refused', 'suggested', 'declined', 'deposited')),
 	CONSTRAINT "content_ideas_texts_check" CHECK (char_length("content_ideas"."title") between 1 and 120 and char_length("content_ideas"."to_shoot") between 1 and 600 and char_length("content_ideas"."reason") between 1 and 200),
 	CONSTRAINT "content_ideas_shoot_minutes_check" CHECK ("content_ideas"."shoot_minutes" between 1 and 600),
 	CONSTRAINT "content_ideas_refusal_check" CHECK ("content_ideas"."refusal_reason" is null or ("content_ideas"."state" = 'refused' and char_length("content_ideas"."refusal_reason") between 1 and 280)),
@@ -48,6 +48,7 @@ CREATE TABLE "trend_readings" (
 	"caption" text,
 	"hashtags" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"sound" text,
+	"sound_id" text,
 	"dwell_ms" integer NOT NULL,
 	"marked_for_creator_id" uuid,
 	"first_seen_at" timestamp with time zone NOT NULL,
@@ -55,6 +56,7 @@ CREATE TABLE "trend_readings" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "trend_readings_session_post_unique" UNIQUE("recorded_by","watch_session_id","post_code"),
+	CONSTRAINT "trend_readings_sound_id_check" CHECK ("trend_readings"."sound_id" is null or "trend_readings"."sound_id" ~ '^[0-9]{1,32}$'),
 	CONSTRAINT "trend_readings_path_check" CHECK ("trend_readings"."path" in ('post', 'reel')),
 	CONSTRAINT "trend_readings_code_check" CHECK ("trend_readings"."post_code" ~ '^[A-Za-z0-9_-]{5,64}$'),
 	CONSTRAINT "trend_readings_account_check" CHECK ("trend_readings"."account" is null or "trend_readings"."account" ~ '^[A-Za-z0-9._]{1,30}$'),
@@ -108,6 +110,7 @@ CREATE INDEX "content_ideas_creator_day_idx" ON "content_ideas" USING btree ("cr
 CREATE UNIQUE INDEX "extension_links_live_unique" ON "extension_links" USING btree ("user_id") WHERE "extension_links"."revoked_at" is null;--> statement-breakpoint
 CREATE INDEX "trend_readings_account_idx" ON "trend_readings" USING btree ("account","seen_at");--> statement-breakpoint
 CREATE INDEX "trend_readings_marked_idx" ON "trend_readings" USING btree ("marked_for_creator_id","seen_at") WHERE "trend_readings"."marked_for_creator_id" is not null;--> statement-breakpoint
+CREATE INDEX "trend_readings_sound_idx" ON "trend_readings" USING btree ("sound_id","seen_at") WHERE "trend_readings"."sound_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "trend_signals_link_unique" ON "trend_signals" USING btree ("creator_id","url") WHERE "trend_signals"."source" in ('agency_link', 'creator_link');--> statement-breakpoint
 CREATE INDEX "trend_signals_creator_expiry_idx" ON "trend_signals" USING btree ("creator_id","expires_at");--> statement-breakpoint
 CREATE POLICY "team_all" ON "content_ideas" AS PERMISSIVE FOR ALL TO public USING ("content_ideas"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')) WITH CHECK ("content_ideas"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency'));--> statement-breakpoint

@@ -41,7 +41,7 @@ export interface IdeaFilterContext {
   readonly touches: (text: string, term: string) => boolean;
   /** Her ideas proposed in the last 30 days, whatever became of them. */
   readonly recent: readonly KnownIdea[];
-  /** Every idea of hers ever refused. */
+  /** Every idea of hers ever refused by the agency (`refused`) or declined by her in her agenda (`declined`). */
   readonly refused: readonly KnownIdea[];
   /** The signals live now that she may read (hers and the agency's). */
   readonly liveSignals: ReadonlySet<TrendSignalId>;
@@ -77,11 +77,21 @@ const SMALL_WORDS = new Set([
   'and',
 ]);
 
+/**
+ * A word with its plural folded, by the rule of the agent's guards: a final « s » or « x » is dropped when four letters
+ * at least remain (« pieds » reads « pied », « bras » stays « bras »). The guards turn it into a pattern; here it is a
+ * stem, since « trop proche » compares sets of words and never searches a term.
+ */
+function stemOf(word: string): string {
+  return /^(\p{L}{4,})[sx]$/u.exec(word)?.[1] ?? word;
+}
+
 function wordsOf(idea: KnownIdea): ReadonlySet<string> {
   return new Set(
     normaliseWords(`${idea.title} ${idea.toShoot}`)
       .split(' ')
-      .filter((word) => word.length >= 3 && !SMALL_WORDS.has(word)),
+      .filter((word) => word.length >= 3 && !SMALL_WORDS.has(word))
+      .map(stemOf),
   );
 }
 
