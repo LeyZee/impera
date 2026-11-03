@@ -3,6 +3,7 @@ import {
   type JournalAccountName,
   type JournalAccounts,
   type PayPeriod,
+  type TeamMemberId,
 } from '@nirvana/contracts';
 
 import {
@@ -332,4 +333,20 @@ export function journalEntries(
       .flatMap((one) => one.unbalanced)
       .toSorted((a, b) => a.prefix.localeCompare(b.prefix) || a.period.localeCompare(b.period)),
   };
+}
+
+/** A transfer left out of the journal: its contractor has no document yet, so no supplier account (ADR 0041). */
+export interface TransferLeftOut {
+  readonly memberId: TeamMemberId;
+  readonly period: PayPeriod;
+}
+
+/**
+ * The transfers left out, by member then period, whatever order the members were read in: two exports of the same
+ * range list them the same way.
+ */
+export function transfersLeftOutInOrder(transfers: readonly TransferLeftOut[]): TransferLeftOut[] {
+  return transfers.toSorted(
+    (a, b) => a.memberId.localeCompare(b.memberId) || a.period.localeCompare(b.period),
+  );
 }

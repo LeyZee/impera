@@ -2,6 +2,8 @@ import {
   AccountPayRulesListSchema,
   AccountPayRulesSchema,
   AnswerShiftSwapRequestBodySchema,
+  CalendarLinkCreatedSchema,
+  CalendarLinkStateSchema,
   CalendarQuerySchema,
   CalendarSchema,
   CreateAccountPayRulesBodySchema,
@@ -53,6 +55,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { CalendarService } from '../application/calendar';
+import type { CalendarLinkService } from '../application/calendar-feed';
 import type { ShiftFeedbackService } from '../application/feedback';
 import type { LeaveService } from '../application/leaves';
 import type { PayRulesService } from '../application/pay-rules';
@@ -69,6 +72,13 @@ const TemplateParamsSchema = z.object({ templateId: ShiftTemplateIdSchema });
 const LeaveParamsSchema = z.object({ leaveRequestId: LeaveRequestIdSchema });
 const SwapParamsSchema = z.object({ shiftSwapRequestId: ShiftSwapRequestIdSchema });
 const ReportParamsSchema = z.object({ shiftReportId: ShiftReportIdSchema });
+/** `<token>.ics`: the token is checked by the service, which answers one same 404 for anything else. */
+const FeedParamsSchema = z.object({ file: z.string().max(64) });
+/**
+ * Per IP (security.md §6). Calendar apps poll about once an hour, Google's from shared addresses: 60 a minute leaves
+ * room for every member of the team behind one of them, and still stops a burst of guesses. Fails closed.
+ */
+const FEED_LIMIT = { max: 60, timeWindow: '1 minute', skipOnError: false };
 
 function userOf(request: FastifyRequest): UserId {
   if (request.user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
@@ -87,6 +97,7 @@ export function createSchedulingRoutes(
   {
     scheduling,
     calendar,
+    calendarLinks,
     leaves,
     swaps,
     reports,
@@ -95,6 +106,7 @@ export function createSchedulingRoutes(
   }: {
     scheduling: SchedulingService;
     calendar: CalendarService;
+    calendarLinks: CalendarLinkService;
     leaves: LeaveService;
     swaps: SwapService;
     reports: ShiftReportService;
@@ -139,6 +151,46 @@ export function createSchedulingRoutes(
         schema: { querystring: CalendarQuerySchema, response: { 200: CalendarSchema } },
       },
       (request) => calendar.calendar(userOf(request), request.query),
+    );
+
+    // CR-12, ADR 0045 § 5: a member's own calendar link. Only the team's accounts have shifts; the service refuses
+    // an account that is not a member, or who left.
+    const member = requireRole('operator');
+    app.get(
+      '/scheduling/calendar-link',
+      { preValidation: member, schema: { response: { 200: CalendarLinkStateSchema } } },
+      (request) => calendarLinks.state(userOf(request)),
+    );
+
+    app.post(
+      '/scheduling/calendar-link',
+      { preValidation: member, schema: { response: { 201: CalendarLinkCreatedSchema } } },
+      async (request, reply) => reply.code(201).send(await calendarLinks.create(actorOf(request))),
+    );
+
+    app.delete('/scheduling/calendar-link', { preValidation: member }, async (request, reply) => {
+      await calendarLinks.revoke(actorOf(request));
+      return reply.code(204).send();
+    });
+
+    // The feed itself, without a session: the token is the key. Its secret is in the path, so the route logs nothing
+    // below `warn` (no request line), and the answer is never cached on the way.
+    app.get(
+      '/calendar-feed/:file',
+      {
+        logLevel: 'warn',
+        config: { rateLimit: FEED_LIMIT },
+        schema: { params: FeedParamsSchema },
+      },
+      async (request, reply) => {
+        const token = request.params.file.endsWith('.ics') ? request.params.file.slice(0, -4) : '';
+        const body = await calendarLinks.feed(token);
+        return reply
+          .header('content-type', 'text/calendar; charset=utf-8')
+          .header('cache-control', 'private, no-store')
+          .header('x-robots-tag', 'noindex')
+          .send(body);
+      },
     );
 
     app.get(
