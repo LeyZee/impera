@@ -33,7 +33,7 @@ Commandes : `pnpm db:generate` (depuis le schéma), `pnpm db:migrate` (avec `DAT
   - corriger le `tag` du journal.
 - Quand une autre migration fusionne avant la sienne, la seconde PR se remet sur `main` et **régénère** :
   - supprimer sa migration, son snapshot et son entrée de journal ;
-  - relancer `pnpm generate` (dans `packages/db`) ;
+  - relancer `pnpm db:generate` ;
   - compléter de nouveau le SQL à la main si besoin, puis renommer comme ci-dessus.
 - Un numéro plus petit que le plus grand déjà dans `main` ne peut plus servir : `check-drift` lirait l'ancien snapshot. La PR prend alors le prochain numéro libre, et l'ancien reste un trou (0086 et 0087 en sont, 03/11).
 - On n'édite jamais le journal à la main pour réordonner. `check-drift` compare au plus grand snapshot par nom, et Drizzle saute en silence une entrée dont le `when` est plus ancien que la dernière appliquée.
