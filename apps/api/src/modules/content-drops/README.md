@@ -4,9 +4,9 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 **Peut dépendre de.** Rien pour l'instant. Au lot b, `media` (la médiathèque, où chaque fichier nettoyé entre par son empreinte).
 
-**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0106), règles de format, routes. L'envoi des fichiers et leur nettoyage viennent au lot b, l'effacement daté au lot c, l'écran Contenu au lot d.
+**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. L'envoi des fichiers et leur nettoyage viennent au lot b, l'effacement daté au lot c, l'écran Contenu au lot d.
 
-## Qui lit, qui écrit (migration 0106)
+## Qui lit, qui écrit (migration 0108)
 
 - **Elle** (`withCreatorAccount`, rôle `creator`) lit ses dépôts, leurs fichiers et ses demandes (sauf celles que l'agence a annulées). Elle n'écrit que trois choses : un dépôt avec ses fichiers, à son nom, à l'état « en cours d'envoi » ; le retrait d'un dépôt que rien n'a encore programmé ; le refus d'une demande ouverte, avec un motif si elle veut. Le déclencheur `guard_content_drop_change` lui refuse toute autre colonne, `guard_content_request_change` aussi.
 - **Le propriétaire et un manager actif** (`withTenantMember`, portée `owner` ou `agency`) lisent tout, déposent pour elle, corrigent une catégorie (son choix reste dans `corrected_from`, et la correction entre au journal), retirent un dépôt pas encore publié, demandent et annulent. Ils ne changent jamais l'état d'un dépôt, sauf pour le retirer : ce sont les jobs qui le font avancer. Un chatteur ne lit ni n'écrit rien.

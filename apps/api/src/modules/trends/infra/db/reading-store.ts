@@ -1,5 +1,14 @@
 import { CreatorIdSchema, newId, TrendReadingIdSchema, type TrendReadingsBatch } from '@impera/contracts';
-import { schema, sql, withCreatorAccount, withMember, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  eq,
+  schema,
+  sql,
+  withCreatorAccount,
+  withMember,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 
 import { TrendReadingForbidden } from '../../domain/errors';
 import type { LinkHolder, MarkableCreator, ReadingStore } from '../../domain/ports';
@@ -73,7 +82,20 @@ const marksOf = (batch: TrendReadingsBatch): string[] => [
  * owner and a member in `withMember`, who mark one for a creator that exists. A batch with one refused mark is refused
  * whole, before anything is written, with the marks refused.
  */
+/** The holder's reading of that post in that session: the holder's own only (`recorder_all`). */
+const readingOf = (holder: LinkHolder, watchSession: string, code: string) =>
+  and(
+    eq(trendReadings.recordedBy, holder.userId),
+    eq(trendReadings.watchSessionId, watchSession),
+    eq(trendReadings.postCode, code),
+  );
+
 export function createDrizzleReadingStore(db: Database): ReadingStore {
+  /** A creator's account in its own transaction, the owner and a member in theirs, as `record` writes. */
+  const asHolder = <T>(holder: LinkHolder, work: (tx: Transaction) => Promise<T>): Promise<T> =>
+    holder.role === 'creator'
+      ? withCreatorAccount(db, holder.userId, (tx) => work(tx))
+      : withMember(db, holder.userId, work);
   const markable = (tx: Transaction): Promise<MarkableCreator[]> =>
     tx
       .select({ id: creators.id, displayName: creators.displayName })
@@ -106,5 +128,23 @@ export function createDrizzleReadingStore(db: Database): ReadingStore {
         return upsert(tx, holder, batch);
       });
     },
+
+    markedFor: (holder, watchSession, code) =>
+      asHolder(holder, async (tx) => {
+        const [row] = await tx
+          .select({ markedFor: trendReadings.markedFor })
+          .from(trendReadings)
+          .where(readingOf(holder, watchSession, code));
+        return row?.markedFor == null ? null : CreatorIdSchema.parse(row.markedFor);
+      }),
+
+    describe: (holder, watchSession, code, description) =>
+      asHolder(holder, async (tx) => {
+        const result = await tx
+          .update(trendReadings)
+          .set({ captureDescription: description, updatedAt: sql`now()` })
+          .where(and(readingOf(holder, watchSession, code), sql`${trendReadings.markedFor} is not null`));
+        return (result.rowCount ?? 0) > 0;
+      }),
   };
 }

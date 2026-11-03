@@ -28,7 +28,7 @@ async function failure(promise: Promise<unknown>): Promise<string> {
 }
 
 /**
- * Her drops and the agency's requests (CR-06, migration 0106): she drops, withdraws what nothing has scheduled yet and
+ * Her drops and the agency's requests (CR-06, migration 0108): she drops, withdraws what nothing has scheduled yet and
  * refuses a request, nothing else; the owner and an active manager read, drop for her, correct, withdraw, ask and
  * cancel; a chatter reads none of it. Invented people and creators only (ADR 0010).
  */

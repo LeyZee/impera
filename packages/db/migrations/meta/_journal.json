@@ -670,8 +670,15 @@
     {
       "idx": 95,
       "version": "7",
-      "when": 1793732253551,
-      "tag": "0106_content_drops",
+      "when": 1793730587166,
+      "tag": "0107_trend_capture_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1793733699278,
+      "tag": "0108_content_drops",
       "breakpoints": true
     }
   ]

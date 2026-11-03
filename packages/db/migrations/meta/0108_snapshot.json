@@ -1,6 +1,6 @@
 {
-  "id": "aaf1bd88-b6f3-44aa-b461-249e4959fa11",
-  "prevId": "64521240-155e-43e3-b529-901215bf4a3a",
+  "id": "dbdf818f-981e-44d2-82f5-16921ca148a8",
+  "prevId": "260dc3a8-d248-44fb-86fb-e25d1ef2c6f9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -16803,6 +16803,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "capture_description": {
+          "name": "capture_description",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "first_seen_at": {
           "name": "first_seen_at",
           "type": "timestamp with time zone",
@@ -16958,6 +16964,10 @@
         "trend_readings_path_check": {
           "name": "trend_readings_path_check",
           "value": "\"trend_readings\".\"path\" in ('post', 'reel')"
+        },
+        "trend_readings_capture_marked_check": {
+          "name": "trend_readings_capture_marked_check",
+          "value": "\"trend_readings\".\"capture_description\" is null or (\"trend_readings\".\"marked_for_creator_id\" is not null and jsonb_typeof(\"trend_readings\".\"capture_description\") = 'object')"
         },
         "trend_readings_code_check": {
           "name": "trend_readings_code_check",

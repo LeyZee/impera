@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
 import { JOB_PAYLOADS } from '@impera/contracts';
 import { createDbClient, type Database, type DbClient } from '@impera/db';
-import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore } from '@impera/llm';
+import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Task, TaskList } from 'graphile-worker';
 import type { Pool } from 'pg';
@@ -167,6 +167,8 @@ export interface AppOptions {
   readonly salesFeeds?: SalesFeedRegistry;
   /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
   readonly composer?: DraftComposer;
+  /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
+  readonly trendVision?: Pick<LlmGateway, 'describeTrendCaptures'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -262,7 +264,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
-  const trends = wireTrends(shared);
+  const trends = wireTrends(shared, options.trendVision ?? llm.gateway);
   const creatorTasks = wireCreatorTasks(shared);
   const contentDrops = wireContentDrops(shared);
   const contractors = wireContractors(shared, {
