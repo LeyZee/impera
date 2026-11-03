@@ -551,9 +551,14 @@ button.sc-duty__one:active {
   grid-template-rows: subgrid;
   row-gap: 4px;
 }
-/* The + on the last line, under the most créneaux of the week, whatever a day with fewer holds (ADR 0049 § 1). */
-.sc-grid__row--slots > .sc-grid__cell > .sc-add {
-  grid-row: -2 / -1;
+/*
+ * The + on the last line, under the most créneaux of the week, whatever a day with fewer holds (ADR 0049 § 1). Only
+ * where the row is a grid: on a phone a day stands alone and its + follows its créneaux.
+ */
+@media (min-width: 821px) {
+  .sc-grid__row--slots > .sc-grid__cell > .sc-add {
+    grid-row: -2 / -1;
+  }
 }
 .sc-slot {
   display: flex;
@@ -561,6 +566,14 @@ button.sc-duty__one:active {
   gap: 4px;
   min-width: 0;
   min-height: 40px;
+}
+/* A créneau that wants two chatters (ADR 0049 § 2): each one a half card, the free place dashed under them. */
+.sc-slot[data-seats='2'] > .sc-chip {
+  padding-block: 3px;
+}
+.sc-slot[data-seats='2'] > .sc-chip ~ .sc-slot__fill {
+  flex: 0 0 auto;
+  min-height: 32px;
 }
 /* An empty créneau ahead: dashed amber, a thing to do and no damage done yet. */
 .sc-slot__fill {
@@ -758,6 +771,12 @@ button.sc-duty__one:active {
     min-height: 0;
     padding: var(--nv-space-2) var(--nv-space-4) var(--nv-space-3);
     border-left: 0;
+  }
+  /* A day alone: its créneaux one under the other, each as tall as the chatters it holds. */
+  .sc-grid__row--slots > .sc-grid__cell[data-picked='true'] {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
   .sc-grid__cell[data-today='true'],
   .sc-grid__cell:hover,

@@ -378,7 +378,7 @@ describe('Équipe › Planning', () => {
     const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
     // Wednesday 28, 1 h in Paris: Théo's night ends at 5 h, so Wednesday's night is left to fill from 5 h to 6 h;
     // 4 + 4 × 4 are ahead.
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 créneaux à pourvoir');
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 places à pourvoir');
     const cells = within(row).getAllByRole('cell');
     const fills = (index: number): HTMLElement[] =>
       within(cells[index] ?? row).queryAllByRole('button', { name: /^À pourvoir/u });
@@ -1112,13 +1112,34 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     });
     // Wednesday's night still has an hour with nobody after Théo (5 h – 6 h): the only one left to fill; the agent
     // holds the 19 others alone (ADR 0048 § 1), as the server's count does.
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 1 créneau à pourvoir');
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 1 place à pourvoir');
     expect(within(row).getAllByRole('button', { name: /^À pourvoir/u })).toHaveLength(1);
     expect(within(row).getAllByRole('img', { name: /, l’IA seule$/u })).toHaveLength(19);
     expect(screen.getByRole('region', { name: 'Charge de la semaine' }).textContent).toContain('Théo');
     const cover = screen.getByRole('region', { name: 'Couverture des comptes de la semaine' });
     expect(text(cover)).toContain('Nora Vidal, @nora sur Reveal');
     expect(text(cover)).toContain('IA seule 162 h');
+  });
+
+  it('never says « IA seule » on a créneau that wants two chatters: the agent stands for none (ADR 0049 § 2)', async () => {
+    const base = settingsOf();
+    const [version] = base.versions;
+    if (version === undefined) throw new Error('no version');
+    const settings = {
+      ...base,
+      versions: [{ ...version, seats: [{ slotRank: 2, platformAccountId: NORA_REVEAL, seats: 2 }] }],
+    };
+    const served = planning();
+    if (typeof served !== 'object' || served === null) throw new Error('no planning');
+    serve({ planning: { ...served, settings }, calendar: agencyCalendar('auto') });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    await waitFor(() => {
+      expect(text(row)).toContain('IA automatique · jour et nuit');
+    });
+    // Wednesday's hour after Théo, and two places on each noon from Wednesday to Sunday; the agent holds the rest.
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 11 places à pourvoir');
+    expect(within(row).getAllByRole('img', { name: /, l’IA seule$/u })).toHaveLength(14);
   });
 
   it('leaves a créneau to fill in Copilote, the agent said in its name', async () => {
@@ -1128,7 +1149,7 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     await waitFor(() => {
       expect(text(row)).toContain('IA copilote · jour et nuit');
     });
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 créneaux à pourvoir');
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 places à pourvoir');
     const fill = within(row).getAllByRole('button', { name: /^À pourvoir/u })[0];
     expect(text(fill ?? null).length).toBeGreaterThan(0);
     expect(fill?.getAttribute('aria-label')).toMatch(/ ; l’IA en copilote$/u);
@@ -1149,6 +1170,45 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     expect(
       within(row).getAllByRole('img', { name: /^20\s?h\s?–\s?2\s?h, l’IA seule$/u }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('counts places: « + 2e chatteur » on a créneau that wants two with one chatter, two places with none (ADR 0049 § 2)', async () => {
+    // Nora wants two chatters on 12 h – 18 h (rank 2); Théo holds Thursday's.
+    const base = settingsOf();
+    const [version] = base.versions;
+    if (version === undefined) throw new Error('no version');
+    const settings = {
+      ...base,
+      versions: [{ ...version, seats: [{ slotRank: 2, platformAccountId: NORA_REVEAL, seats: 2 }] }],
+    };
+    const noon = {
+      ...night,
+      id: id(102),
+      templateId: null,
+      startsAt: '2026-10-29T11:00:00Z',
+      endsAt: '2026-10-29T17:00:00Z',
+    };
+    const served = planning([], [night, noon]);
+    if (typeof served !== 'object' || served === null) throw new Error('no planning');
+    serve({ planning: { ...served, settings } });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    // 19 single places as before (Thursday's noon held), and one more on each noon from Wednesday to Sunday.
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('2 shifts · 12 h · 24 places à pourvoir');
+    const cells = within(row).getAllByRole('cell');
+    const thursday = cells[3]?.querySelectorAll('.sc-slot')[2];
+    if (!(thursday instanceof HTMLElement)) throw new Error('no créneau');
+    expect(thursday.dataset['seats']).toBe('2');
+    expect(text(thursday)).toContain('Théo');
+    expect(
+      within(thursday).getByRole('button', { name: /^2e chatteur à pourvoir : 12\sh – 18\sh, le jeudi 29/u })
+        .textContent,
+    ).toContain('+ 2e chatteur');
+    expect(
+      within(cells[4] ?? row).getByRole('button', {
+        name: /^À pourvoir, 2 places : 12\sh – 18\sh, le vendredi 30/u,
+      }).textContent,
+    ).toContain('À pourvoir · 2 places');
   });
 
   it('gives the week the lines of its most créneaux when a version adds one mid-week, the + under them', async () => {
