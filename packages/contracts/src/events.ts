@@ -243,6 +243,12 @@ export const EventTypeSchema = z.enum(EVENT_TYPES);
 export type EventType = z.infer<typeof EventTypeSchema>;
 
 /**
+ * At most this many days in one `sales_feed_mismatch` (CRM-04 b3): sixteen days for some thirty accounts. The check
+ * keeps the first ones by day and account; the rest is in the check of Réglages.
+ */
+export const SALES_FEED_MISMATCH_DAYS_MAX = 500;
+
+/**
  * What the due date's alert says of an invoice (EQ-06 lot 8): its number, its due date and its total including VAT,
  * and, when the transfer that will pay it cannot be recorded today (ADR 0041, `payout_blocked_conflict`), why
  * (`payoutBlock`): a blocked transfer may pass the due date, and the late-payment penalties and the 40 € indemnity
@@ -469,7 +475,7 @@ export const EVENT_PAYLOADS = {
    * After a switch to the platform's net (ADR 0050 § 8, CRM-04 lot b3): the fortnight's automatic check found the
    * register and the platform's daily statistics apart on a net, and still apart 24 hours later. Only the accounts paid
    * on the platform's net for the whole fortnight; per day, account and currency, in signed cents (`differenceMinor` =
-   * register − platform). Published with no creator, once per platform and fortnight; never a fan, never a chatter.
+   * platform − register: positive when the register lacks money). Published with no creator, once per platform and fortnight; never a fan, never a chatter.
    * Information for the owner: pay never reads it.
    */
   sales_feed_mismatch: z.object({
@@ -487,7 +493,8 @@ export const EVENT_PAYLOADS = {
           differenceMinor: z.number().int(),
         }),
       )
-      .min(1),
+      .min(1)
+      .max(SALES_FEED_MISMATCH_DAYS_MAX),
   }),
   /**
    * A security alert (ADR 0046 § 8), written in the same transaction as the line of `audit_log` it tells, or right

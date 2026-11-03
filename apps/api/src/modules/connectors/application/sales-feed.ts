@@ -3,6 +3,7 @@ import {
   ok,
   err,
   payPeriodLastDay,
+  SALES_FEED_MISMATCH_DAYS_MAX,
   type JobPayload,
   type PayPeriod,
   type LinkSalesFeedChatterBody,
@@ -505,7 +506,10 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       );
       return 'done';
     }
-    const published = await ledger.publishMismatch({ platform, from, to, days }, correlationId);
+    const published = await ledger.publishMismatch(
+      { platform, from, to, days: days.slice(0, SALES_FEED_MISMATCH_DAYS_MAX) },
+      correlationId,
+    );
     logger.info(
       { platform, from, days: days.length, published },
       'sales feed automatic check: mismatch confirmed',
