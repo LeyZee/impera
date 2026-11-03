@@ -8,6 +8,7 @@ import {
   calendarRows,
   cellAgentWords,
   monthMarks,
+  monthBounds,
   monthWindow,
 } from './calendar';
 import { zonedInstant } from './time';
@@ -164,6 +165,19 @@ describe('monthWindow', () => {
     expect(window.days[0]).toBe('2026-09-28');
     expect(window.to.getTime() - window.from.getTime()).toBe(42 * 24 * 3_600_000);
     expect(window.from.toISOString()).toBe(at(0, '2026-09-28'));
+  });
+});
+
+describe('monthBounds', () => {
+  it('reads the month itself, 1st to 1st at midnight, the autumn hour included', () => {
+    const bounds = monthBounds('2026-10', PARIS);
+    expect(bounds.from.toISOString()).toBe('2026-09-30T22:00:00.000Z');
+    expect(bounds.to.toISOString()).toBe('2026-10-31T23:00:00.000Z');
+    expect(bounds.to.getTime() - bounds.from.getTime()).toBe((31 * 24 + 1) * 3_600_000);
+  });
+
+  it('crosses the year', () => {
+    expect(monthBounds('2026-12', PARIS).to.toISOString()).toBe('2026-12-31T23:00:00.000Z');
   });
 });
 

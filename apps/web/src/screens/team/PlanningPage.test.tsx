@@ -1136,7 +1136,9 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
       { name: 'Planning de l’équipe, octobre 2026' },
       { timeout: 4_000 },
     );
-    expect(calendarReads.at(-1)).toBe('2026-09-27T22:00:00.000Z/2026-11-08T22:00:00.000Z');
+    // The table reads six weeks; the panels under it read October itself, 1st to 1st at midnight in Paris.
+    expect(calendarReads).toContain('2026-09-27T22:00:00.000Z/2026-11-08T22:00:00.000Z');
+    expect(calendarReads).toContain('2026-09-30T22:00:00.000Z/2026-10-31T23:00:00.000Z');
     const thursday = within(month).getByRole('button', { name: /^jeudi 29 octobre/u });
     expect(thursday.getAttribute('aria-label')).toBe('jeudi 29 octobre : aucun shift, 4 créneaux à pourvoir');
     expect(screen.getByRole('region', { name: 'Charge sur octobre 2026' }).textContent).toContain('6');

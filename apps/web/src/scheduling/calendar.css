@@ -416,7 +416,7 @@
 /* The agency's panels beside the calendar: each member's hours, each account's coverage. */
 .cal-agency {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: var(--nv-space-4);
 }
 .cal-load,
@@ -504,19 +504,19 @@
   height: 100%;
 }
 /* Four kinds, told apart by a pattern as well as a colour (CR-12): ink, ink striped with violet, violet, dashes. */
-[data-kind='chatter'] > i,
+.cal-cover__word[data-kind='chatter'] > i,
 .cal-cover__bar > i[data-kind='chatter'] {
   background: var(--nv-ink-muted);
 }
-[data-kind='both'] > i,
+.cal-cover__word[data-kind='both'] > i,
 .cal-cover__bar > i[data-kind='both'] {
   background: repeating-linear-gradient(135deg, var(--nv-ink-muted) 0 4px, var(--nv-agent) 4px 8px);
 }
-[data-kind='agent'] > i,
+.cal-cover__word[data-kind='agent'] > i,
 .cal-cover__bar > i[data-kind='agent'] {
   background: var(--nv-agent);
 }
-[data-kind='nobody'] > i,
+.cal-cover__word[data-kind='nobody'] > i,
 .cal-cover__bar > i[data-kind='nobody'] {
   box-shadow: inset 0 0 0 1px var(--nv-ink-faint);
   background: transparent;

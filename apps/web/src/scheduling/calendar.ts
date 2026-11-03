@@ -231,6 +231,12 @@ export function monthWindow(month: string, zone: string): { days: string[]; from
   return { days, from, to: new Date(Math.min(end.getTime(), from.getTime() + CALENDAR_MAX_DAYS * DAY_MS)) };
 }
 
+/** The month itself, from its 1st to the next 1st at midnight in `zone`: what « sur novembre » sums (Extension on #431). */
+export function monthBounds(month: string, zone: string): { from: Date; to: Date } {
+  const first = `${month.slice(0, 7)}-01`;
+  return { from: zonedInstant(first, 0, zone), to: zonedInstant(`${addMonths(month, 1)}-01`, 0, zone) };
+}
+
 /** What one day of the month says per creator: one mark per créneau, in the member's colour, the agent's, or a gap. */
 export type MonthMark =
   | { readonly kind: 'shift'; readonly memberId: string }

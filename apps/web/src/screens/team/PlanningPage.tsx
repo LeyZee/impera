@@ -27,6 +27,7 @@ import {
   agentWords,
   cellAgentWords,
   monthLabel,
+  monthBounds,
   monthWindow,
   type AgentInSlot,
   type CalendarSearch,
@@ -188,6 +189,12 @@ export function PlanningPage({
             to: zonedInstant(addDays(monday, 7), 0, agency).toISOString(),
           },
   );
+  // The panels under the month sum the month itself, not the six weeks its table shows (Extension on #431).
+  const bounds = agency === null || !byMonth ? null : monthBounds(month, agency);
+  const monthTotals = useCalendar(
+    bounds === null ? null : { from: bounds.from.toISOString(), to: bounds.to.toISOString() },
+  );
+  const totals = byMonth ? monthTotals.data : calendar.data;
   const weekCalendar = byMonth ? undefined : calendar.data;
   const agents = useMemo(
     () =>
@@ -391,9 +398,9 @@ export function PlanningPage({
               }}
             />
           )}
-          {calendar.data === undefined ? null : (
+          {totals === undefined ? null : (
             <AgencyLoad
-              calendar={calendar.data}
+              calendar={totals}
               period={byMonth ? `sur ${monthLabel(month)}` : 'de la semaine'}
               focus={member}
             />
