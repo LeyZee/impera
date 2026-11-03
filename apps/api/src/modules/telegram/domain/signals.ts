@@ -1,6 +1,8 @@
 import type {
   AlertRef,
   AutomaticMissing,
+  ConnectionDownReason,
+  ConnectionService,
   Currency,
   ConversationId,
   ContractorDocumentKind,
@@ -181,7 +183,17 @@ export type Signal =
       readonly from: PayPeriod;
       readonly days: number;
       readonly accounts: number;
-    };
+    }
+  | {
+      /**
+       * A service the agent needs went down (P3-12): which one and why, never the key nor a word of its answer.
+       * Published at the transition only (Bilan's `connection_state_changed`).
+       */
+      readonly kind: 'connection_down';
+      readonly service: ConnectionService;
+      readonly reason: ConnectionDownReason;
+    }
+  | { readonly kind: 'connection_back'; readonly service: ConnectionService };
 
 export interface ScannedEvent {
   /** `domain_events.id`: the source key of every delivery it produces. */

@@ -1,0 +1,5 @@
+# 2026-11-03 — Alertes Telegram de connexion en panne (P3-12 lot 2) — done
+Fait : `connection_state_changed` lu par le scan et rendu : `down` en « Important », fil `connection:<service>`, texte par service et raison, lien Réglages › Modèles IA ou Ventes ; `back` répond « Rétabli » dans le fil. Nouveau job `telegram.connection_reminders` (toutes les 10 minutes) : une seule relance en « Urgent » (repli « Important ») d'un fil qui finit encore sur son alerte 2 h après elle, lue dans les envois du module (`latestOfThread`), clé `reminder:<alerte>`. Sous-titres Urgent et Important de Réglages › Telegram, ADR 0020 § 3, README, glossaire (« Relance de panne »), fiche P3-12. Vérifié : tests domaine, infra et intégration (une alerte, la relance unique à 2 h, rien si le retour arrive avant, jamais la clé).
+Décisions : la relance ne redit pas la raison (elle a pu changer, le publieur ne republie pas un `down` déjà dit) ; job toutes les 10 minutes plutôt qu'horaire, pour ne pas retarder la relance d'une heure.
+Pas fait : rien pour ce lot.
+Découvertes : aucune.

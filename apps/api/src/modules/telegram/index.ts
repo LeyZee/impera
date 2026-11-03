@@ -4,6 +4,7 @@ import { parseEncryptionKeys, type Database, type EncryptionKey } from '@nirvana
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { TelegramApi } from './application/api';
+import { connectionReminders } from './application/connections';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
 import { eveningDigest, saleSettings, saveSaleSettings } from './application/sales';
@@ -65,6 +66,7 @@ interface TelegramJobs {
   pollUpdates(botId: TelegramBotId, waitSeconds: number): Promise<void>;
   morningDigest(): Promise<number>;
   eveningDigest(): Promise<number>;
+  connectionReminders(): Promise<number>;
   purge(): Promise<number>;
 }
 
@@ -114,6 +116,7 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
         deps.salesDay === undefined
           ? Promise.resolve(0)
           : eveningDigest({ ...base, salesDay: deps.salesDay }),
+      connectionReminders: () => connectionReminders({ ...base, webOrigin: deps.webOrigin }),
       purge: () => purge(base),
     },
     start: () => deps.resealTokens?.() ?? Promise.resolve({ rewritten: 0, unreadable: [] }),

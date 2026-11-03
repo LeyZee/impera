@@ -125,6 +125,12 @@ export async function wireTelegram(
         logger,
         withTelegram((telegram) => telegram.jobs.eveningDigest()),
       ),
+      'telegram.connection_reminders': defineTask(
+        'telegram.connection_reminders',
+        JOB_PAYLOADS['telegram.connection_reminders'],
+        logger,
+        withTelegram((telegram) => telegram.jobs.connectionReminders()),
+      ),
       'telegram.purge': defineTask(
         'telegram.purge',
         JOB_PAYLOADS['telegram.purge'],

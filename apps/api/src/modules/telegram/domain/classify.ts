@@ -5,6 +5,8 @@ import {
   SYSTEM_ALERT_TOPICS,
   type AlertRef,
   type AutomaticMissing,
+  type ConnectionDownReason,
+  type ConnectionService,
   type ContractorDocumentKind,
   type HandoffCause,
   type InvoiceNotIssuedReason,
@@ -57,7 +59,6 @@ export const SCANNED_EVENT_TYPES = [
   'invoice_overdue',
   'security_alert',
   'sales_feed_mismatch',
-  // Bilan's (P3-12 lot 2), listed ahead so that the trigger needs no new migration when it lands.
   'connection_state_changed',
 ] as const;
 
@@ -396,6 +397,56 @@ function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'lin
   }
 }
 
+/** Each service as the team names it, in a sentence (P3-12). */
+const CONNECTION_NAMES: Readonly<Record<ConnectionService, string>> = {
+  xai: 'la connexion xAI',
+  mistral: 'la connexion Mistral',
+  google: 'la connexion Google',
+  elevenlabs: 'la connexion ElevenLabs',
+  reveal_crm: 'la connexion à l’API CRM de Reveal',
+};
+
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** What stops while the service is down: the agent's own words for each role it plays. */
+const CONNECTION_EFFECT: Readonly<Record<ConnectionService, string>> = {
+  xai: 'L’agent passe sur le modèle de secours, s’il est connecté.',
+  mistral: 'L’agent n’a plus de modèle de secours si xAI tombe.',
+  google: 'Les médias ne sont plus décrits.',
+  elevenlabs: 'Les vocaux ne sont plus générés.',
+  reveal_crm: 'Les ventes ne sont plus relevées.',
+};
+
+const CONNECTION_REASON: Readonly<Record<ConnectionDownReason, string>> = {
+  refused: 'la clé est refusée. Reconnecte-la.',
+  low_credit: 'le crédit est bas ou épuisé. Recharge-le.',
+  unreachable: 'le service ne répond plus.',
+};
+
+const connectionLink = (service: ConnectionService): { label: string; path: string } =>
+  service === 'reveal_crm'
+    ? { label: 'Ouvrir les ventes', path: '/reglages/ventes' }
+    : { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' };
+
+/** One thread per service: its outage, its single reminder and « Rétabli » (P3-12). */
+export const connectionThreadKey = (service: ConnectionService): string => `connection:${service}`;
+
+/**
+ * The single reminder of an outage still open 2 hours after its alert (P3-12): urgent, the important groups for a
+ * fallback. It names no reason: the outage may have changed its cause since, the gesture stays the same.
+ */
+export function connectionReminder(service: ConnectionService): Notice {
+  return {
+    kind: 'notice',
+    topic: 'urgent',
+    fallbackTopic: 'important',
+    threadKey: connectionThreadKey(service),
+    title: 'URGENT',
+    body: `${capitalized(CONNECTION_NAMES[service])} est toujours en panne après 2 h. ${CONNECTION_EFFECT[service]}`,
+    link: connectionLink(service),
+  };
+}
+
 export function classify(
   signal: Signal,
   nameOf: AlertNameOf = noNames,
@@ -644,6 +695,23 @@ export function classify(
         link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
       };
     // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
+    case 'connection_down':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: connectionThreadKey(signal.service),
+        title: 'Important',
+        body: `${capitalized(CONNECTION_NAMES[signal.service])} est en panne : ${CONNECTION_REASON[signal.reason]} ${CONNECTION_EFFECT[signal.service]}`,
+        link: connectionLink(signal.service),
+      };
+    case 'connection_back':
+      return {
+        kind: 'closure',
+        threadKey: connectionThreadKey(signal.service),
+        mode: 'reply',
+        text: `Rétabli : ${CONNECTION_NAMES[signal.service]} fonctionne de nouveau.`,
+        userId: null,
+      };
     case 'security_alert':
       return {
         kind: 'notice',

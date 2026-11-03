@@ -297,7 +297,9 @@ describe('Réglages › Telegram, her own alerts (P4-01)', () => {
     const hint = 'Sans groupe choisi ici, un mot-clé ne prévient personne sur Telegram.';
     expect(await screen.findByText(hint)).toBeTruthy();
     // The keywords are not « Important »: that line no longer claims them.
-    expect(screen.getByText('Plafond IA à 80 %, session expirée, agent arrêté')).toBeTruthy();
+    expect(
+      screen.getByText('Plafond IA à 80 %, connexion en panne, session expirée, agent arrêté'),
+    ).toBeTruthy();
     const row = screen.getByRole('group', { name: 'Groupes pour Mots-clés' });
     fireEvent.click(within(row).getByRole('checkbox', { name: /Équipe/ }));
     await waitFor(() => {
