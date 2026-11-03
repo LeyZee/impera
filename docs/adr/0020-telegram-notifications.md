@@ -30,7 +30,7 @@ Faits Telegram qui contraignent le choix :
    | Onglet | Sujet | Ce qui le déclenche | Son |
    |---|---|---|---|
    | Alertes | `urgent` | relais humain pour mineur possible, non-consentement, détresse, demande de rencontre, manipulation ; facture en retard de paiement (`invoice_overdue`, « rouge facture » de Charles, 02/11/2026) | oui |
-   | Alertes | `important` | plafond du jour à 80 % ou atteint, session plateforme expirée, interrupteur d'arrêt activé, autre relais humain | oui |
+   | Alertes | `important` | plafond du jour à 80 % (atteint : `urgent`, 03/11/2026), session plateforme expirée, interrupteur d'arrêt activé, autre relais humain | oui |
    | Alertes | `info` | bilan du matin, retour à la normale | non |
    | Ventes | `sale` | vente payée, bilan du soir | non |
    | Mots-clés | `keyword` | un mot surveillé dans un message de fan | oui |
@@ -41,7 +41,7 @@ Faits Telegram qui contraignent le choix :
    | Événement (`domain_events`) | Sujet | Producteur | Existe ? |
    |---|---|---|---|
    | `handoff_requested` { `conversationId`, `cause` } | urgent si `cause` ∈ minor, non_consent, distress, meeting, manipulation ; important pour guard, budget, llm_unavailable, other, persona_inactive (#304 : elle n'a pas de persona active, l'agent n'écrit rien) ; `keyword`, `custom_alert`, `identity_doubt` : voir `alert_triggered` | contrat : Bilan ; `cause` remplie par l'agent (composeur, vision) | oui (#54, `keyword` par #56) |
-   | `budget_threshold_crossed` { `kind` : alert \| reached, `spentMinor`, `capMinor`, `currency`, `day` }, sans créatrice | important (les deux) | contrat : Bilan ; publié dans `onBudget` (`apps/api/src/llm.ts`) | oui (#54) |
+   | `budget_threshold_crossed` { `kind` : alert \| reached, `spentMinor`, `capMinor`, `currency`, `day` }, sans créatrice | important à 80 % ; urgent au plafond atteint (Charles, 03/11/2026 : toute génération s'arrête jusqu'à minuit) | contrat : Bilan ; publié dans `onBudget` (`apps/api/src/llm.ts`) | oui (#54) |
    | `backup_overdue` { `lastSucceededAt` (null si aucun export n'a jamais réussi), `day` }, sans créatrice | important, une fois par jour tant qu'aucun export n'a réussi depuis 26 h | contrat : Bilan ; publié par le job `backups.check` (module `backups`, ADR 0028 § 5, OPS-02) | oui (migration 0020 pour le déclencheur) |
    | `exchange_rate_overdue` { `currency`, `lastRateDay` (null si aucun taux n'est jamais arrivé), `day` }, sans créatrice ; seuls la devise et le jour du dernier taux sont lus | important, une fois par jour et par devise tant qu'aucun taux de la BCE n'est arrivé depuis plus de deux jours ouvrés | contrat : Bilan ; publié par le job `payroll.fetch_exchange_rates` (ADR 0033) | oui (migration 0032 pour le déclencheur) |
    | `invoice_not_issued` { `memberId`, `statementId`, `period`, `document`, `reason`, `amountMinor` }, sans créatrice ; seuls la quinzaine, le document et le motif sont lus, jamais le prestataire ni le montant | important, une fois par relevé, document, motif et montant (le job de facturation ne republie pas un refus déjà dit) | contrat : Équipe ; publié par le job `payroll.issue_invoices` (EQ-06 lot 3, ADR 0036) | oui (migration 0044 pour le déclencheur) |
@@ -66,7 +66,7 @@ Faits Telegram qui contraignent le choix :
    - `telegram_bots` : un bot, son jeton scellé, son identité Telegram, son état, son curseur `getUpdates`.
    - `telegram_chats` : un groupe où un bot se trouve, découvert, jamais saisi à la main.
    - `telegram_routes` : quel sujet va dans quel groupe, pour une créatrice ou pour toutes.
-   - `telegram_settings` : les réglages d'un sujet (montant minimum d'une vente, ventes de l'agent seulement), ajoutée avec l'onglet Ventes.
+   - `telegram_settings` : les réglages d'un sujet (montant minimum d'une vente, en euros, une vente en dollars convertie au taux de son jour et qui sonne sans taux, ventes de l'agent seulement, bilan du soir), ajoutée avec l'onglet Ventes (migration 0083, CRM-04 lot b) : une ligne par créatrice ou pour toutes, la sienne l'emporte ; sans ligne, toutes les ventes sonnent et le bilan du soir part.
    - `telegram_deliveries` : un message à livrer dans un groupe, unique par (source, groupe).
    - `telegram_state` : une ligne, le curseur du scan et la version du routage.
 

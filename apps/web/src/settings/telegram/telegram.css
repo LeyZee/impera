@@ -279,6 +279,44 @@
   color: var(--nv-ink-muted);
 }
 
+/* Sales settings (CRM-04) */
+.tg-sales {
+  min-height: 48px;
+}
+.tg-sales__inherit,
+.tg-sales__notice {
+  margin: 0;
+  padding: 14px 18px 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.tg-sales__notice {
+  padding-bottom: 14px;
+  color: var(--nv-warning);
+}
+.tg-sales__who {
+  margin: 8px 4px 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+.tg-sales__switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.tg-sales__amount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+}
+.tg-sales__amount input {
+  width: 110px;
+}
+
 /* Routing */
 .tg-scope {
   display: flex;

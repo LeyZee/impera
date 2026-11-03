@@ -46,6 +46,19 @@ export function morningDigestKey(creatorId: string, timeZone: string, now: Date)
   return hour === MORNING_DIGEST_HOUR ? `digest:${creatorId}:${day}` : null;
 }
 
+/** The evening digest of the sales goes out in the creator's 23 o'clock hour (CRM-04 lot b), once a day by its key. */
+const EVENING_DIGEST_HOUR = 23;
+
+/** Her day and the key of its evening digest, or null outside her 23 o'clock hour. */
+export function eveningDigestOf(
+  creatorId: string,
+  timeZone: string,
+  now: Date,
+): { readonly day: string; readonly key: string } | null {
+  const { day, hour } = localParts(now, timeZone);
+  return hour === EVENING_DIGEST_HOUR ? { day, key: `evening:${creatorId}:${day}` } : null;
+}
+
 const NIGHT_START_HOUR = 20;
 
 /** A night runs from 20:00 to 08:00 in the creator's time zone: the current one, or the last one during the day. */

@@ -547,6 +547,20 @@
       "when": 1793703155743,
       "tag": "0082_creator_account",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793705089141,
+      "tag": "0083_telegram_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1793706893945,
+      "tag": "0084_script_structures",
+      "breakpoints": true
     }
   ]
 }

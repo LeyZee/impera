@@ -6,6 +6,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { TelegramApi } from './application/api';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
+import { eveningDigest, saleSettings, saveSaleSettings } from './application/sales';
 import { scanEvents } from './application/scan';
 import {
   addBot,
@@ -21,7 +22,15 @@ import {
   saveRoutes,
   sendTest,
 } from './application/settings';
-import type { AlertNames, BotsStore, Clock, DeliveriesStore, NotificationChannel } from './domain/ports';
+import type {
+  AlertNames,
+  BotsStore,
+  Clock,
+  DeliveriesStore,
+  NotificationChannel,
+  SalesDayReader,
+  UsdRateReader,
+} from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
 import { createTelegramRoutes, type TelegramRoutesOptions } from './infra/routes';
@@ -42,6 +51,10 @@ export interface TelegramDeps {
   readonly resealTokens?: () => Promise<ResealReport>;
   /** Her alerts' names, to name the alert in its message (P4-01). */
   readonly alertNames?: AlertNames;
+  /** Her day's sales (`salesFeedTotals` of `connectors`), for the evening digest; without them, no digest. */
+  readonly salesDay?: SalesDayReader;
+  /** Pay's dollar rate (`latestRateOf` of `payroll`), for the minimum price of a dollar sale. */
+  readonly usdRate?: UsdRateReader;
 }
 
 /** The job handlers, one per `telegram.*` job (TELEGRAM_JOB_PAYLOADS); the worker wires them. */
@@ -51,6 +64,7 @@ interface TelegramJobs {
   dispatchPolls(): Promise<number>;
   pollUpdates(botId: TelegramBotId, waitSeconds: number): Promise<void>;
   morningDigest(): Promise<number>;
+  eveningDigest(): Promise<number>;
   purge(): Promise<number>;
 }
 
@@ -77,6 +91,8 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     sendTest: (chatId) => sendTest(base, chatId),
     listDeliveries: (topic, limit) => listDeliveries(base, topic, limit),
     nightCounts: (creatorId) => nightCounts(base, creatorId),
+    saleSettings: () => saleSettings(base),
+    saveSaleSettings: (entries, userId) => saveSaleSettings(base, entries, userId),
   };
   return {
     ...api,
@@ -88,11 +104,16 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
           webOrigin: deps.webOrigin,
           onUncovered: deps.onUncovered ?? (() => undefined),
           ...(deps.alertNames !== undefined && { alertNames: deps.alertNames }),
+          ...(deps.usdRate !== undefined && { usdRate: deps.usdRate }),
         }),
       flushChat: (chatId) => flushChat(base, chatId),
       dispatchPolls: () => dispatchPolls(base),
       pollUpdates: (botId, waitSeconds) => pollBot(base, botId, waitSeconds),
       morningDigest: () => morningDigest(base),
+      eveningDigest: () =>
+        deps.salesDay === undefined
+          ? Promise.resolve(0)
+          : eveningDigest({ ...base, salesDay: deps.salesDay }),
       purge: () => purge(base),
     },
     start: () => deps.resealTokens?.() ?? Promise.resolve({ rewritten: 0, unreadable: [] }),
@@ -109,6 +130,8 @@ export interface TelegramStartOptions {
   /** Tokens no listed key opens, found at start: the caller logs them (the old key was dropped too early). */
   readonly onUnreadableTokens: (bots: readonly string[]) => void;
   readonly alertNames: AlertNames;
+  readonly salesDay: SalesDayReader;
+  readonly usdRate: UsdRateReader;
 }
 
 /** Builds the module on Postgres and the Telegram Bot API, and re-seals the tokens of a past rotation. */
@@ -125,6 +148,8 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     onUncovered: options.onUncovered,
     resealTokens: store.resealTokens,
     alertNames: options.alertNames,
+    salesDay: options.salesDay,
+    usdRate: options.usdRate,
   });
   const report = await module.start();
   if (report.unreadable.length > 0) options.onUnreadableTokens(report.unreadable);

@@ -137,7 +137,7 @@ const PlatformMediaSchema = z.array(ExternalMediaSchema);
  * A message's media for Suivi (SUIVI-26): kind and lock from the platform's list, the description from the media the
  * `media` module stored for it (`media_ids`, in the platform's order), only when both lists match one to one.
  */
-function mediaOf(
+export function mediaOf(
   platformMedia: unknown,
   mediaIds: readonly string[],
   descriptions: ReadonlyMap<string, string>,

@@ -1,9 +1,32 @@
 import type { ExchangeRate, ForeignCurrency, UserId } from '@nirvana/contracts';
-import { eq, schema, sql, withMember, type Database } from '@nirvana/db';
+import { and, eq, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
 
 import { exchangeRateOfRow } from './snapshot';
 
 const { exchangeRates } = schema;
+
+/**
+ * The newest rate written for a currency (ADR 0033), `null` before the first, in the caller's transaction; with
+ * `onOrBefore`, the newest of that day or before it (a sale's day, as the creator's screen and the Dashboard convert).
+ * Another module's job reads it this way on its own connection (Telegram's minimum price, CRM-04 lot b).
+ */
+export async function latestRateOf(
+  tx: Transaction,
+  currency: ForeignCurrency,
+  onOrBefore?: string,
+): Promise<ExchangeRate | null> {
+  const [row] = await tx
+    .select()
+    .from(exchangeRates)
+    .where(
+      onOrBefore === undefined
+        ? eq(exchangeRates.currency, currency)
+        : and(eq(exchangeRates.currency, currency), sql`${exchangeRates.day} <= ${onOrBefore}::date`),
+    )
+    .orderBy(sql`${exchangeRates.day} desc`)
+    .limit(1);
+  return row === undefined ? null : exchangeRateOfRow(row);
+}
 
 /**
  * The newest rate written for a currency (ADR 0033), `null` before the first: the « dernier taux connu » that a draft
@@ -16,14 +39,5 @@ const { exchangeRates } = schema;
 export function createLatestRateRead(
   db: Database,
 ): (userId: UserId, currency: ForeignCurrency) => Promise<ExchangeRate | null> {
-  return (userId, currency) =>
-    withMember(db, userId, async (tx) => {
-      const [row] = await tx
-        .select()
-        .from(exchangeRates)
-        .where(eq(exchangeRates.currency, currency))
-        .orderBy(sql`${exchangeRates.day} desc`)
-        .limit(1);
-      return row === undefined ? null : exchangeRateOfRow(row);
-    });
+  return (userId, currency) => withMember(db, userId, (tx) => latestRateOf(tx, currency));
 }

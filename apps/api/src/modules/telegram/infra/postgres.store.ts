@@ -8,6 +8,7 @@ import {
   TelegramDeliveryStatusSchema,
   TelegramErrorKindSchema,
   TelegramMembershipSchema,
+  TelegramSaleSettingsSchema,
   TelegramTopicSchema,
   newId,
   type TelegramBotId,
@@ -427,6 +428,48 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
         tx.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, userId)),
       );
       return row?.name ?? null;
+    },
+    async listSaleSettings() {
+      const rows = await admin((tx) =>
+        tx
+          .select({
+            creatorId: schema.telegramSettings.creatorId,
+            settings: schema.telegramSettings.settings,
+          })
+          .from(schema.telegramSettings)
+          .where(eq(schema.telegramSettings.topic, 'sale')),
+      );
+      return rows.flatMap((row) => {
+        const settings = TelegramSaleSettingsSchema.safeParse(row.settings);
+        const creatorId = row.creatorId === null ? null : CreatorIdSchema.safeParse(row.creatorId).data;
+        return settings.success && creatorId !== undefined ? [{ creatorId, ...settings.data }] : [];
+      });
+    },
+    async replaceSaleSettings(entries, userId) {
+      await admin(async (tx) => {
+        const table = schema.telegramSettings;
+        // Two saves at once queue here: the second replaces the first whole, never a 500 on the unique key.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext('telegram_settings.sale'))`);
+        await tx.delete(table).where(eq(table.topic, 'sale'));
+        if (entries.length > 0) {
+          await tx.insert(table).values(
+            entries.map(({ creatorId, ...settings }) => ({
+              id: newId(z.uuid()),
+              creatorId,
+              topic: 'sale',
+              settings: TelegramSaleSettingsSchema.parse(settings),
+            })),
+          );
+        }
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'telegram_settings.save',
+          entity: 'telegram_settings',
+          entityId: 'sale',
+          details: { entries: entries.length },
+        });
+      });
     },
     async memberName(memberId) {
       const [row] = await admin((tx) =>
