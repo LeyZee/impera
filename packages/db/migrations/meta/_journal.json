@@ -554,6 +554,13 @@
       "when": 1793705089141,
       "tag": "0083_telegram_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1793708118621,
+      "tag": "0086_sales_feed_mismatch",
+      "breakpoints": true
     }
   ]
 }

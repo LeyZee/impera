@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
   ConversationIdSchema,
@@ -61,6 +62,7 @@ export const JOB_NAMES = [
   'media.describe',
   'providers.check_credentials',
   'connector.read_sales',
+  'connector.check_sales',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -233,6 +235,14 @@ export const JOB_PAYLOADS = {
      * for its hourly catch-up (ADR 0050 § 3). */
     woken: z.boolean().optional(),
   }),
+  /**
+   * The automatic check of a fortnight after a switch to the platform's net (CRM-04 lot b3): the crontab's, on the 2nd
+   * and the 17th, checks the fortnight just over; a mismatch enqueues `recheck` 24 hours later, which alone publishes
+   * `sales_feed_mismatch` when the register and the statistics still differ. Nothing is kept in `sales_feed_checks`.
+   */
+  'connector.check_sales': z.object({
+    recheck: z.object({ platform: PlatformSchema, from: PayPeriodSchema }).optional(),
+  }),
   ...TELEGRAM_JOB_PAYLOADS,
 } as const satisfies Record<JobName, z.ZodType>;
 
@@ -296,6 +306,9 @@ export const JOB_MAX_ATTEMPTS = {
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
+  // Twice a month and its recheck: a refusal of the platform (429, outage) is worth a retry, and a mismatch is
+  // published once per platform and fortnight whatever the attempts.
+  'connector.check_sales': 3,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,

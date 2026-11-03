@@ -235,6 +235,7 @@ export const EVENT_TYPES = [
   'fan_flag_set',
   'fan_flag_cleared',
   'sales_feed_signal',
+  'sales_feed_mismatch',
   'security_alert',
   'error',
 ] as const;
@@ -465,6 +466,30 @@ export const EVENT_PAYLOADS = {
    */
   sales_feed_signal: z.object({ platform: PlatformSchema, signal: SalesFeedSignalSchema }),
   /**
+   * After a switch to the platform's net (ADR 0050 § 8, CRM-04 lot b3): the fortnight's automatic check found the
+   * register and the platform's daily statistics apart on a net, and still apart 24 hours later. Only the accounts paid
+   * on the platform's net for the whole fortnight; per day, account and currency, in signed cents (`differenceMinor` =
+   * register − platform). Published with no creator, once per platform and fortnight; never a fan, never a chatter.
+   * Information for the owner: pay never reads it.
+   */
+  sales_feed_mismatch: z.object({
+    platform: PlatformSchema,
+    from: PayPeriodSchema,
+    to: z.iso.date(),
+    days: z
+      .array(
+        z.object({
+          day: z.iso.date(),
+          platformAccountId: PlatformAccountIdSchema,
+          currency: CurrencySchema,
+          registerNetMinor: z.number().int(),
+          platformNetMinor: z.number().int(),
+          differenceMinor: z.number().int(),
+        }),
+      )
+      .min(1),
+  }),
+  /**
    * A security alert (ADR 0046 § 8), written in the same transaction as the line of `audit_log` it tells, or right
    * after it. For the urgent Telegram groups: an account by id and role, a network, never a name nor a full address.
    */
@@ -529,6 +554,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('fan_flag_set'),
   typedEvent('fan_flag_cleared'),
   typedEvent('sales_feed_signal'),
+  typedEvent('sales_feed_mismatch'),
   typedEvent('security_alert'),
   typedEvent('error'),
 ]);

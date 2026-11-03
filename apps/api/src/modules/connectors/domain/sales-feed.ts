@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import type {
+  EventPayload,
+  PayPeriod,
   Platform,
   PlatformChatter,
   PlatformChatterDailyStat,
@@ -291,6 +293,11 @@ export interface SalesLedger {
    * (an unknown value, an unlinked model).
    */
   signal(platform: Platform, signal: SalesFeedSignal, once: boolean, correlationId: string): Promise<boolean>;
+  /**
+   * Publishes `sales_feed_mismatch` (CRM-04 b3), with no creator, once per platform and fortnight: `false` when it was
+   * already published (the unique index of migration 0086). Nothing goes to `sales_feed_checks`.
+   */
+  publishMismatch(mismatch: EventPayload<'sales_feed_mismatch'>, correlationId: string): Promise<boolean>;
 }
 
 /** The platform's webhook for Nirvana; `secret` is `null` when no listed encryption key opens it any more. */
@@ -325,4 +332,9 @@ export interface SalesFeedWebhookStore {
 /** Wakes the reading of the register now, beside its minute (`connector.read_sales`). */
 export interface SalesFeedJobs {
   readNow(correlationId: string): Promise<void>;
+  /**
+   * The automatic check's second look (CRM-04 b3): `connector.check_sales` for the platform and fortnight at `runAt`.
+   * One waiting job per platform and fortnight (`job_key`): a run replayed enqueues it once.
+   */
+  recheckLater(platform: Platform, from: PayPeriod, runAt: Date): Promise<void>;
 }

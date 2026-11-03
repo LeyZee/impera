@@ -544,6 +544,25 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
         return true;
       });
     },
+
+    publishMismatch(mismatch, correlationId) {
+      return withAdmin(adminDb, async (tx) => {
+        // Once per platform and fortnight: `domain_events_sales_feed_mismatch_unique` (migration 0086).
+        const inserted = await tx
+          .insert(schema.domainEvents)
+          .values({
+            id: newId(EventIdSchema),
+            creatorId: null,
+            type: 'sales_feed_mismatch',
+            payload: EVENT_PAYLOADS.sales_feed_mismatch.parse(mismatch),
+            actor: 'system',
+            correlationId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: schema.domainEvents.id });
+        return inserted.length > 0;
+      });
+    },
   };
 }
 

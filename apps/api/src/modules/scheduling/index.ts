@@ -37,6 +37,11 @@ import { createSchedulingRoutes, type RequireRole } from './infra/routes';
 import { agencyTimeZone } from './infra/rows';
 import { createDrizzleSwapStore } from './infra/swap-store';
 
+/** @public The accounts the automatic sales check compares (CRM-04 b3), read on the job's admin connection. */
+export { salesCheckReads } from './infra/sales-check-reads';
+/** @public An account the automatic sales check compares: its platform and its rules' currency. */
+export type { DetectedAccountForCheck } from './domain/sales-checks';
+
 /** Public entry point of the `scheduling` module (EQ-02, ADR 0002). Other modules import this file only. */
 export interface SchedulingModule {
   readonly name: 'scheduling';
