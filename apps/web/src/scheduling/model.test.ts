@@ -5,6 +5,7 @@ import {
   ShiftSchema,
   ShiftSwapRequestSchema,
   ShiftTemplateSchema,
+  SlotSeatSchema,
   type MyShift,
   type SchedulingSettings,
   type Shift,
@@ -175,6 +176,43 @@ describe('the créneaux of a row (EQ-01)', () => {
     const pair = (chip: SlotChip): [string, boolean, boolean] => [chip.shift.id, chip.earlier, chip.carried];
     expect(week?.get('2026-10-27')?.[3]?.chips.map(pair)).toEqual([[night.id, false, false]]);
     expect(week?.get('2026-10-28')?.[0]?.chips.map(pair)).toEqual([[night.id, true, false]]);
+  });
+
+  it('counts the places of a créneau that wants two chatters, as the server does (ADR 0049 § 2)', () => {
+    // Nora wants two chatters on 12 h – 18 h (rank 2), 11:00 – 17:00 UTC in Paris in October.
+    const [version] = SIX_HOURS.versions;
+    if (version === undefined) throw new Error('no version');
+    const settings = {
+      ...SIX_HOURS,
+      versions: [
+        {
+          ...version,
+          seats: [SlotSeatSchema.parse({ slotRank: 2, platformAccountId: NORA_REVEAL, seats: 2 })],
+        },
+      ],
+    };
+    const whole = (n: number, day: string, member = THEO) =>
+      shift(n, { memberId: member, startsAt: `${day}T11:00:00Z`, endsAt: `${day}T17:00:00Z` });
+    const shifts = [
+      whole(1, '2026-10-26'),
+      whole(2, '2026-10-27'),
+      shift(3, { memberId: BASILE, startsAt: '2026-10-27T14:00:00Z', endsAt: '2026-10-27T17:00:00Z' }),
+      whole(4, '2026-10-29'),
+      whole(5, '2026-10-29', BASILE),
+    ];
+    const cells = cellsOf(shifts, BEFORE, settings);
+    const noon = (day: string) => {
+      const cell = cells?.get(day)?.[2];
+      return [cell?.seats, cell?.places, iso(cell?.open?.from), iso(cell?.open?.to)];
+    };
+    // One chatter on all of it: one place, open all along; one and a half: the first stretch short of two.
+    expect(noon('2026-10-26')).toEqual([2, 1, '2026-10-26T11:00:00.000Z', '2026-10-26T17:00:00.000Z']);
+    expect(noon('2026-10-27')).toEqual([2, 1, '2026-10-27T11:00:00.000Z', '2026-10-27T14:00:00.000Z']);
+    // Nobody: two places; two at once all along: held.
+    expect(noon('2026-10-28')).toEqual([2, 2, '2026-10-28T11:00:00.000Z', '2026-10-28T17:00:00.000Z']);
+    expect(noon('2026-10-29')).toEqual([2, 0, undefined, undefined]);
+    // The other créneaux keep a single place.
+    expect(cells?.get('2026-10-28')?.[1]).toMatchObject({ seats: 1, places: 1 });
   });
 
   it('cuts each day by the créneaux in force, a new version taking effect mid-week (ADR 0049 § 1)', () => {
