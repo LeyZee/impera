@@ -9,9 +9,12 @@ export type Availability =
       readonly kind: 'weekly';
       /** 1 Monday … 7 Sunday. */
       readonly weekday: number;
-      /** Minutes after her midnight. */
+      /** Minutes after her midnight, 0 to 1439. */
       readonly startMinute: number;
-      /** Up to a day after `startMinute`: 22 h – 2 h ends at 26 × 60, the next day. */
+      /**
+       * 0 to 1439, as the créneaux of `scheduling` (`calendar.ts`): at or before `startMinute`, it is the next day's
+       * (22 h – 2 h is `{1320, 120}`), and equal to it, a whole day.
+       */
       readonly endMinute: number;
     }
   | { readonly kind: 'once'; readonly startsAt: Date; readonly endsAt: Date };
@@ -41,8 +44,9 @@ export function availabilityWindows(
     }
     for (let day = fromDay; day <= toDay; day = addDays(day, 1)) {
       if (isoWeekday(day) !== availability.weekday) continue;
+      const endDay = availability.endMinute <= availability.startMinute ? addDays(day, 1) : day;
       const startsAt = wallClockToInstant(day, availability.startMinute, timeZone);
-      const endsAt = wallClockToInstant(day, availability.endMinute, timeZone);
+      const endsAt = wallClockToInstant(endDay, availability.endMinute, timeZone);
       // A wall-clock time the spring gap swallows on both ends leaves nothing open.
       if (endsAt > startsAt) windows.push({ startsAt, endsAt });
     }

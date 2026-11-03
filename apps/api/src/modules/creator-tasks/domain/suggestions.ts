@@ -1,3 +1,5 @@
+import { DomainError, SUGGESTION_DECIDED_CONFLICT } from '@impera/contracts';
+
 import { addDays, isoWeekday } from '../../scheduling/pure';
 
 /**
@@ -8,11 +10,14 @@ export type SuggestionState = 'suggested' | 'accepted' | 'declined';
 
 export type SuggestionDecision = 'accept' | 'decline';
 
-export class SuggestionDecidedError extends Error {
-  readonly code = 'creator_suggestion_decided_conflict';
+/** The other gesture on a decided suggestion: refused, her first decision stands. */
+export class SuggestionDecidedError extends DomainError {
   constructor(readonly state: Exclude<SuggestionState, 'suggested'>) {
-    super(`Suggestion already ${state}`);
-    this.name = 'SuggestionDecidedError';
+    super(
+      SUGGESTION_DECIDED_CONFLICT,
+      state === 'accepted' ? 'Tu as déjà accepté cette suggestion' : 'Tu as déjà refusé cette suggestion',
+      { details: { state } },
+    );
   }
 }
 

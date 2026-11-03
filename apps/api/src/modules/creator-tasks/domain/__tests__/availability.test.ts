@@ -24,9 +24,16 @@ describe('her dispos as instants (ADR 0042 § 4)', () => {
   });
 
   it('keeps a dispo that crosses her midnight whole, on the day it starts', () => {
-    const late: Availability = { kind: 'weekly', weekday: 6, startMinute: 22 * 60, endMinute: 26 * 60 };
+    const late: Availability = { kind: 'weekly', weekday: 6, startMinute: 22 * 60, endMinute: 2 * 60 };
     expect(iso(availabilityWindows([late], '2026-11-07', '2026-11-07', PARIS))).toEqual([
       ['2026-11-07T21:00:00.000Z', '2026-11-08T01:00:00.000Z'],
+    ]);
+  });
+
+  it('reads an end equal to the start as a whole day', () => {
+    const day: Availability = { kind: 'weekly', weekday: 2, startMinute: 9 * 60, endMinute: 9 * 60 };
+    expect(iso(availabilityWindows([day], '2026-11-03', '2026-11-03', PARIS))).toEqual([
+      ['2026-11-03T08:00:00.000Z', '2026-11-04T08:00:00.000Z'],
     ]);
   });
 
