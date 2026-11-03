@@ -1,9 +1,9 @@
 # P3-12 Alertes Telegram : plafond IA en rouge, connexion en panne
 
-Statut : in_progress. Lot 1 dans la PR de cette fiche ; lot 2 attend le contrat `connection_state_changed` de Bilan (après CRM-04 b3).
+Statut : in_progress. Lot 1 fait ; lot 2 : contrat et publieurs `connection_state_changed` livrés par Bilan (migration 0093), rendu Telegram à faire.
 Phase : P3 (notifications, ADR 0020)
 Décision : Charles, 03/11/2026 11h14 (« comble ce trou-là », « je veux bien cette alerte », bot unique à l'agence), 2 h avant le rouge accepté le même jour.
-Dépend de : P3-07 (fait). Lot 2 : l'événement `connection_state_changed` (Bilan, migration 0087).
+Dépend de : P3-07 (fait). Lot 2 : l'événement `connection_state_changed` (Bilan, migration 0093).
 Code : le fil Telegram pour `telegram` ; Bilan pour le contrat, la migration et les publieurs (`providers`, `connectors`). Relectures : Bilan pour tout ce qui touche `contracts`, `db`, `providers`, `connectors` ; Extension pour l'écran.
 
 ## Objectif
@@ -26,11 +26,11 @@ Le groupe d'alertes de l'agence apprend tout de suite qu'une connexion dont dép
 ### Le contrat (Bilan)
 
 - `connection_state_changed`, `creator_id` null, publié **à la transition seulement**, jamais à chaque vérification. Union discriminée sur `state` :
-  - `{ service, state: 'down', reason, since }`, où `reason` vaut `refused`, `expired`, `low_credit` ou `unreachable` ;
+  - `{ service, state: 'down', reason, since }`, où `reason` vaut `refused`, `low_credit` ou `unreachable` (aucune source ne distingue une clé expirée d'une clé refusée : les deux sont `refused`) ;
   - `{ service, state: 'back', since }`.
-- `service` vaut `xai`, `mistral`, `google`, `elevenlabs` ou `reveal_crm`. `meta` entre avec son publieur (PUB-02), pas avant.
+- `service` vaut `xai`, `mistral`, `google`, `elevenlabs` ou `reveal_crm`. `meta` entre avec son publieur (PUB-02), pas avant. Venice, en secours, n'est pas surveillé.
 - Jamais la clé, jamais un extrait de réponse du service.
-- La règle de bascule vit chez le publieur, en code. Un refus d'authentification (401/403) ou un crédit bas passent `down` tout de suite. `unreachable` ne passe qu'après plusieurs échecs de suite (3 lectures ou 15 minutes), pour ne pas faire clignoter le groupe. Pour Reveal CRM, un 429 n'est pas une panne (c'est `pausedUntil`). `back` part au premier succès après un `down` publié.
+- La règle de bascule vit chez le publieur, en code. Un refus d'authentification (401/403) ou un crédit bas passent `down` tout de suite. `unreachable` ne passe qu'après plusieurs échecs de suite, pour ne pas faire clignoter le groupe : 45 minutes sans réponse (trois vérifications) pour un fournisseur IA, hors quota (429) ; trois lectures ratées sur un quart d'heure pour Reveal CRM. Pour Reveal CRM, un 429 n'est pas une panne (c'est `pausedUntil`). `back` part au premier succès après un `down` publié.
 - Publieurs : `providers` (job `providers.check_credentials` et refus à l'appel) ; `connectors` (registre Reveal CRM).
 
 ### Le rendu (Telegram)

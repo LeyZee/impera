@@ -39,6 +39,11 @@ export const domainEvents = pgTable(
     uniqueIndex('domain_events_sales_feed_mismatch_unique')
       .on(sql`(${t.payload}->>'platform')`, sql`(${t.payload}->>'from')`)
       .where(sql`${t.type} = 'sales_feed_mismatch'`),
+    // « Is this service down already? » of `publishConnectionState` (Telegram P3-12): the latest row of one service,
+    // read through this index rather than across the whole outbox.
+    index('domain_events_connection_state_idx')
+      .on(sql`(${t.payload}->>'service')`, t.createdAt)
+      .where(sql`${t.type} = 'connection_state_changed'`),
     tenantPolicy(t.creatorId),
     // `sale_detected` names who sold: her own account never reads the outbox, and still adds to it (CRM-04 lot d).
     hiddenFromCreator(),
