@@ -9,9 +9,13 @@ import {
   PayPeriodSchema,
   TeamMemberIdSchema,
 } from '@nirvana/contracts';
-import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@nirvana/db';
+import { withMember, type Database, type Transaction } from '@nirvana/db';
+import { z } from 'zod';
 
+import { contractorReadsForAccounting as fileReads } from '../../contractors';
 import { PayrollForbidden } from '../../contractors/pure';
+import { invoiceReadsForAccounting as invoiceReads } from '../../invoicing';
+import { payReadsForAccounting as payReads } from '../../payroll';
 import type { Das2Contractor } from '../domain/accounting';
 import type { JournalContractor, JournalDocument, JournalStatement } from '../domain/journal';
 import type { ArchiveDocument, Das2Facts, JournalFacts, PayrollAccountingStore } from '../domain/ports';
@@ -19,26 +23,20 @@ import type { ArchiveDocument, Das2Facts, JournalFacts, PayrollAccountingStore }
 import { audit } from './audit';
 import type { AccountingReads } from './ports';
 
-const {
-  billingSettings,
-  carryOvers,
-  commissionStatements,
-  contractorProfiles,
-  invoicePdfCopies,
-  invoicePdfs,
-  invoices,
-  teamMembers,
-} = schema;
+/** The contractor's name a document froze (`contractor ->> 'legalName'`), `null` when its copy has none. */
+const legalNameOf = (contractor: unknown): string | null => {
+  const read = z.object({ legalName: z.string() }).safeParse(contractor);
+  return read.success ? read.data.legalName : null;
+};
 
 /** The contractors with a document issued or a transfer made from `from` to `to`, as the owner reads them. */
 async function contractorsInRange(tx: Transaction, from: string, to: string): Promise<string[]> {
-  const rows = await tx.execute<{ member_id: string }>(sql`
-    select ${invoices.memberId} as member_id from ${invoices}
-     where ${invoices.issuedOn} between ${from} and ${to}
-    union
-    select ${commissionStatements.memberId} from ${commissionStatements}
-     where ${commissionStatements.status} = 'paid' and ${commissionStatements.paidOn} between ${from} and ${to}`);
-  return rows.rows.map((row) => row.member_id);
+  return [
+    ...new Set([
+      ...(await invoiceReads.issuedBetween(tx, from, to)),
+      ...(await payReads.paidBetween(tx, from, to)),
+    ]),
+  ];
 }
 
 /** Each contractor's facts, all of them whatever the range: the lettering follows the carry-overs back and forth. */
@@ -51,61 +49,22 @@ async function factsOf(
 ): Promise<Pick<JournalFacts, 'contractors' | 'transfersLeftOut'>> {
   if (memberIds.length === 0) return { contractors: [], transfersLeftOut: [] };
   const members = [...memberIds];
-  const statements = await tx
-    .select({
-      memberId: commissionStatements.memberId,
-      id: commissionStatements.id,
-      period: commissionStatements.period,
-      status: commissionStatements.status,
-      totalMinor: commissionStatements.totalMinor,
-      validatedAt: commissionStatements.validatedAt,
-      paidOn: commissionStatements.paidOn,
-      reference: commissionStatements.paymentReference,
-      sentMinor: commissionStatements.sentMinor,
-    })
-    .from(commissionStatements)
-    .where(inArray(commissionStatements.memberId, members));
-  const carried = await tx
-    .select({
-      memberId: carryOvers.memberId,
-      statementId: carryOvers.statementId,
-      toPeriod: carryOvers.toPeriod,
-    })
-    .from(carryOvers)
-    .where(inArray(carryOvers.memberId, members));
-  const documents = await tx
-    .select({
-      memberId: invoices.memberId,
-      kind: invoices.kind,
-      reissuedInvoiceId: invoices.reissuedInvoiceId,
-      number: invoices.number,
-      prefix: invoices.prefix,
-      year: invoices.year,
-      sequence: invoices.sequence,
-      issuedOn: invoices.issuedOn,
-      statementId: invoices.statementId,
-      exclVatMinor: invoices.exclVatMinor,
-      vatMinor: invoices.vatMinor,
-      inclVatMinor: invoices.inclVatMinor,
-      selfAssessedVatMinor: invoices.selfAssessedVatMinor,
-      legalName: sql<string>`${invoices.contractor} ->> 'legalName'`,
-    })
-    .from(invoices)
-    .where(inArray(invoices.memberId, members))
-    .orderBy(invoices.year, invoices.sequence);
-  const profiles = await tx
-    .select({
-      memberId: contractorProfiles.memberId,
-      prefix: contractorProfiles.invoicePrefix,
-      legalName: contractorProfiles.legalName,
-    })
-    .from(contractorProfiles)
-    .where(inArray(contractorProfiles.memberId, members));
+  const statements = await payReads.statementsOf(tx, members);
+  const carried = await payReads.carryOversOf(tx, members);
+  const issued = (await invoiceReads.documentsOf(tx, members)).map((one) => ({
+    ...one,
+    legalName: legalNameOf(one.contractor),
+  }));
+  const profiles = (await fileReads.profilesOf(tx, members)).map(({ profile }) => ({
+    memberId: profile.memberId,
+    prefix: profile.invoicePrefix,
+    legalName: profile.legalName,
+  }));
 
   const contractors: JournalContractor[] = [];
   const transfersLeftOut: JournalFacts['transfersLeftOut'][number][] = [];
   for (const memberId of members) {
-    const own = documents.filter((one) => one.memberId === memberId);
+    const own = issued.filter((one) => one.memberId === memberId);
     const profile = profiles.find((one) => one.memberId === memberId);
     const newest = own.at(-1);
     // The prefix the documents carry, frozen by the first one (lot 5a); the name of the file today.
@@ -162,56 +121,12 @@ async function factsOf(
  * documents of December, and the identity is read on the documents (lot 7c).
  */
 async function das2FactsOf(tx: Transaction, year: number): Promise<Das2Facts> {
-  const paidIn = await tx
-    .selectDistinct({ memberId: commissionStatements.memberId })
-    .from(commissionStatements)
-    .where(
-      and(
-        eq(commissionStatements.status, 'paid'),
-        sql`${commissionStatements.paidOn} between ${`${String(year)}-01-01`} and ${`${String(year)}-12-31`}`,
-      ),
-    );
-  const members = paidIn.map((one) => one.memberId);
+  const members = await payReads.paidBetween(tx, `${String(year)}-01-01`, `${String(year)}-12-31`);
   if (members.length === 0) return { contractors: [] };
-  const statements = await tx
-    .select({
-      memberId: commissionStatements.memberId,
-      id: commissionStatements.id,
-      period: commissionStatements.period,
-      status: commissionStatements.status,
-      totalMinor: commissionStatements.totalMinor,
-      paidOn: commissionStatements.paidOn,
-      sentMinor: commissionStatements.sentMinor,
-    })
-    .from(commissionStatements)
-    .where(inArray(commissionStatements.memberId, members));
-  const carried = await tx
-    .select({
-      memberId: carryOvers.memberId,
-      statementId: carryOvers.statementId,
-      toPeriod: carryOvers.toPeriod,
-    })
-    .from(carryOvers)
-    .where(inArray(carryOvers.memberId, members));
-  const documents = await tx
-    .select({
-      memberId: invoices.memberId,
-      id: invoices.id,
-      kind: invoices.kind,
-      statementId: invoices.statementId,
-      period: invoices.period,
-      issuedOn: invoices.issuedOn,
-      contractor: invoices.contractor,
-      regime: invoices.regime,
-    })
-    .from(invoices)
-    .where(inArray(invoices.memberId, members))
-    .orderBy(invoices.year, invoices.sequence);
-  const profiles = await tx
-    .select({ profile: contractorProfiles, country: teamMembers.country })
-    .from(contractorProfiles)
-    .innerJoin(teamMembers, eq(teamMembers.id, contractorProfiles.memberId))
-    .where(inArray(contractorProfiles.memberId, members));
+  const statements = await payReads.statementsOf(tx, members);
+  const carried = await payReads.carryOversOf(tx, members);
+  const issued = await invoiceReads.documentsOf(tx, members);
+  const profiles = await fileReads.profilesOf(tx, members);
 
   return {
     contractors: members.map((memberId): Das2Contractor => {
@@ -233,7 +148,7 @@ async function das2FactsOf(tx: Transaction, year: number): Promise<Das2Facts> {
         carryOvers: carried
           .filter((one) => one.memberId === memberId)
           .map((one) => ({ statementId: one.statementId, toPeriod: one.toPeriod })),
-        documents: documents
+        documents: issued
           .filter((one) => one.memberId === memberId)
           .map((one) => {
             // What the document froze at its issue: its copy of the contractor's file and of their regime.
@@ -271,26 +186,7 @@ async function das2FactsOf(tx: Transaction, year: number): Promise<Das2Facts> {
 
 /** The documents issued from `from` to `to`, with their PDF and its copies once written (lot 7d). */
 async function documentsInRange(tx: Transaction, from: string, to: string): Promise<ArchiveDocument[]> {
-  const rows = await tx
-    .select({
-      id: invoices.id,
-      memberId: invoices.memberId,
-      number: invoices.number,
-      kind: invoices.kind,
-      reissuedInvoiceId: invoices.reissuedInvoiceId,
-      issuedOn: invoices.issuedOn,
-    })
-    .from(invoices)
-    .where(sql`${invoices.issuedOn} between ${from} and ${to}`)
-    .orderBy(invoices.issuedOn, invoices.prefix, invoices.year, invoices.sequence);
-  if (rows.length === 0) return [];
-  const ids = rows.map((row) => row.id);
-  const pdfs = await tx.select().from(invoicePdfs).where(inArray(invoicePdfs.invoiceId, ids));
-  const copies = await tx
-    .select()
-    .from(invoicePdfCopies)
-    .where(inArray(invoicePdfCopies.invoiceId, ids))
-    .orderBy(invoicePdfCopies.provider);
+  const { rows, pdfs, copies } = await invoiceReads.archiveBetween(tx, from, to);
   return rows.map((row): ArchiveDocument => {
     const pdf = pdfs.find((one) => one.invoiceId === row.id);
     return {
@@ -329,14 +225,8 @@ export function createDrizzlePayrollAccountingStore(
     exportJournal: (actor, from, to, render) =>
       withMember(db, actor.userId, async (tx, scope) => {
         if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
-        const [settings] = await tx
-          .select({ accounts: billingSettings.accounts })
-          .from(billingSettings)
-          .where(eq(billingSettings.id, 1));
-        const accounts =
-          settings?.accounts === undefined || settings.accounts === null
-            ? null
-            : JournalAccountsSchema.parse(settings.accounts);
+        const stored = await fileReads.accounts(tx);
+        const accounts = stored === null ? null : JournalAccountsSchema.parse(stored);
         const members = await contractorsInRange(tx, from, to);
         const facts = await factsOf(tx, members, await reads.agencyTimeZone(tx), from, to);
         const rendered = render({ accounts, ...facts });
