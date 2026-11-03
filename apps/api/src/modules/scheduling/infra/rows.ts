@@ -257,6 +257,7 @@ export async function audit(
       | 'shift'
       | 'shift_template'
       | 'scheduling_settings'
+      | 'scheduling_slot_version'
       | 'leave_request'
       | 'shift_swap'
       | 'shift_report'

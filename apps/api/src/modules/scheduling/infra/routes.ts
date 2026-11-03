@@ -27,6 +27,8 @@ import {
   SchedulingSettingsInputSchema,
   SchedulingSettingsQuerySchema,
   SchedulingSettingsSchema,
+  SlotVersionInputSchema,
+  SlotVersionParamsSchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
   ShiftIdSchema,
@@ -140,6 +142,25 @@ export function createSchedulingRoutes(
         schema: { body: SchedulingSettingsInputSchema, response: { 200: SchedulingSettingsSchema } },
       },
       (request) => scheduling.saveSettings(actorOf(request), request.body),
+    );
+
+    app.post(
+      '/scheduling/settings/versions',
+      {
+        preValidation: owner,
+        schema: { body: SlotVersionInputSchema, response: { 201: SchedulingSettingsSchema } },
+      },
+      async (request, reply) =>
+        reply.code(201).send(await scheduling.addSlotVersion(actorOf(request), request.body)),
+    );
+
+    app.delete(
+      '/scheduling/settings/versions/:id',
+      {
+        preValidation: owner,
+        schema: { params: SlotVersionParamsSchema, response: { 200: SchedulingSettingsSchema } },
+      },
+      (request) => scheduling.withdrawSlotVersion(actorOf(request), request.params.id),
     );
 
     app.get(
