@@ -1,6 +1,6 @@
 # CRM-04 Ventes en direct : alertes, chiffre d'affaires et gains de la créatrice
 
-Statut : in_progress. Lot a en PR (03/11/2026) ; les lots b à d attendent les réponses de Charles aux six questions d'argent et de règle (fin de fiche), posées le 03/11 (ADR 0050, fiche acceptée par Charles le 02/11/2026, détaillée par Équipe et relue par Bilan le 03/11).
+Statut : in_progress. Lot a fusionné (#449, 03/11/2026) ; les six questions d'argent et de règle (fin de fiche) acceptées par Charles le 03/11 à 09h32 (« ok recos ») ; lots b à d ouverts (ADR 0050, fiche acceptée par Charles le 02/11/2026, détaillée par Équipe et relue par Bilan le 03/11).
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01 (fait). CRM-03 pour la bascule (lot d). CR-02 (accès de la créatrice) et CR-04 (écran Ventes) pour le lot d.
 Branche : une par fil, comme d'habitude ; une PR par lot.
@@ -41,11 +41,12 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 ### Lot b : Telegram (`telegram` ; le fil Telegram relit, Extension pour l'onglet)
 
-- Alerte de vente dans le sujet « Ventes ». Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan.
-- Réglages des ventes (P3-07), par créatrice ou pour toutes, dans `telegram_settings` qui existe déjà : un montant minimum (question 2), « ventes de l'agent seulement » ou « toutes », et le bilan du soir allumé ou non.
+- Alerte de vente dans le sujet « Ventes ». Son montant est le prix payé par le fan (TTC), celui que l'équipe voit dans Reveal (question 2). Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan.
+- Réglages des ventes (P3-07), par créatrice ou pour toutes, dans `telegram_settings` qui existe déjà : un montant minimum sur ce même prix (question 2), « ventes de l'agent seulement » ou « toutes », et le bilan du soir allumé ou non.
 - Bilan du soir à 23 h, dans le fuseau de la créatrice, envoyé aux groupes du sujet « Ventes ». Pour chaque créatrice : le chiffre d'affaires, le net, les deux parts, le nombre de ventes et de remboursements, puis le détail par chatteur (son nom), l'agent et « sans chatteur ». Le job `telegram.evening_digest` est branché dans le crontab par Bilan, dans ce lot.
 - L'onglet Ventes de Réglages › Telegram passe de « bientôt » aux vrais réglages.
-- Proposé, à confirmer par Charles (question 6) : une alerte « important » au propriétaire quand la dernière vérification CRM-02 d'une plateforme ne concorde plus alors qu'un compte y est déjà en `detected`. Elle ne change aucun montant.
+- Un remboursement ne sonne pas en direct : il apparaît au bilan du soir et dans les totaux (question 2).
+- Une alerte « important » au propriétaire (question 6) quand la dernière vérification CRM-02 d'une plateforme ne concorde plus alors qu'un compte y est déjà en `detected`. Elle ne change aucun montant.
 
 ### Lot c : le Dashboard (`supervision` ; le fil Agent relit, Extension pour l'écran)
 
@@ -55,9 +56,9 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 ### Lot d : la créatrice (avec CR-02 et CR-04 ; Bilan relit la base, Extension les écrans)
 
-- Sur un compte Reveal basculé, `modelRevenue` est « Ta part » (ADR 0050 § 8). Le parcours ne prend que des chiffres de Reveal, sans aucun calcul dans le navigateur : ce que les fans ont payé, puis la TVA, puis Reveal (commission et frais), puis l'agence, puis toi.
-- Une notification par vente (ADR 0042 § 7), qui suit les règles de CR-01. Elle est idempotente sur la clé de la vente (`objectKey`). Son texte est la question 3.
-- Un écart entre `modelRevenue` et le pourcentage réglé se signale au propriétaire, à titre d'information (ADR 0050 § 8). La règle est la question 5.
+- Sur un compte Reveal dont le modèle est relié, basculé ou non, `modelRevenue` est « Ta part », même sans pourcentage réglé, et l'écran dit « lus chez Reveal » (ADR 0050 § 8, ADR 0054, question 4). Le parcours ne prend que des chiffres de Reveal, sans aucun calcul dans le navigateur : ce que les fans ont payé, puis la TVA, puis Reveal (commission et frais), puis l'agence, puis toi.
+- Une notification par vente (ADR 0042 § 7), qui suit les règles de CR-01. Elle est idempotente sur la clé de la vente (`objectKey`). Elle montre sa part, jamais le chatteur ni l'agent. Exemple inventé : « Nouvelle vente · 12,40 € pour toi » (question 3).
+- Un écart entre `modelRevenue` et le pourcentage réglé se signale au propriétaire, à titre d'information (ADR 0050 § 8), quand l'écart dépasse un centime par vente sur un compte et une quinzaine (question 5). Il ne change aucun montant.
 
 ## Ce que la créatrice voit, et ne voit jamais
 
@@ -73,11 +74,13 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 **La base dit la même chose que l'écran** (ADR 0042 § 2) :
 - La créatrice lit par le chemin de CR-02, qui pose son rôle et son `creator_id` côté serveur, jamais d'après la requête.
-- `platform_sales` porte `platform_chatter_id` et `platform_fan_id`, et sa politique ne filtre aujourd'hui que par créatrice. Moyen choisi par Bilan, dans une seule migration du lot d (numéro à reconfirmer, 0080 aujourd'hui) :
+- `platform_sales` porte `platform_chatter_id` et `platform_fan_id`, et sa politique ne filtre aujourd'hui que par créatrice. Moyen choisi par Bilan, dans une seule migration du lot d (0081 a priori, 0080 allant au lot b de Telegram ; à reconfirmer) :
   - une politique SELECT restrictive sur `platform_sales`, `current_setting('app.account_role', true) is distinct from 'creator'` ;
   - une vue `creator_sales` en `security_barrier`, sans `platform_chatter_id` ni `platform_fan_id` ni rien qui désigne le vendeur, accordée en SELECT à `nirvana_app`. Elle porte son propre filtre, `creator_id = nullif(current_setting('app.creator_id', true), '')::uuid and current_setting('app.account_role', true) = 'creator'` (propriétaire `nirvana_admin` BYPASSRLS, sans `security_invoker`) ;
   - la même politique restrictive sur `domain_events`, qui n'est aujourd'hui fermé que par créatrice (`tenant_isolation` de 0000) : le chemin de CR-02 lirait sinon chaque `sale_detected` et son `memberId`.
 - La route de la créatrice ne lit que sa vue et n'importe rien d'autre de `connectors`.
+- Le fan, tranché par Bilan (03/11) : la vue fait `left join fans f on f.creator_id = l.creator_id and f.platform_account_id = l.platform_account_id and f.platform_fan_id = l.platform_fan_id` et ne rend que `f.id as fan_id`, qui peut être nul ; ni `platform_fan_id` ni pseudo. La condition sur `f.creator_id` est obligatoire, puisque le propriétaire de la vue contourne la RLS de `fans`. L'unique (`platform_account_id`, `platform_fan_id`) de `fans` sert d'index. L'écran lit le nom par sa lecture habituelle des fiches, sur le même chemin RLS que CR-04. Sans fiche, ou sans compte relié, `fan_id` est nul et l'écran dit « un fan ».
+- Test de la migration : la vue n'a aucune colonne `platform_fan_id` ; la fiche d'une autre créatrice n'est jamais jointe ; `fan_id` est nul sans fiche.
 - Un test d'intégration RLS prouve chacun de ces points (la vue ne rend rien hors du chemin de la créatrice ni pour une autre créatrice ; la table et `domain_events` ne rendent rien au chemin de la créatrice), et un test d'écran prouve qu'aucun texte de ses écrans ne nomme l'agent.
 
 ## Routes
@@ -89,7 +92,7 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 ## Questions pour Charles (argent et règles)
 
-Posées à Charles le 03/11 avec ces recommandations. Aucune n'est appliquée sans son message, et rien des lots b à d qui en dépend ne se code avant.
+Posées à Charles le 03/11 avec ces recommandations, toutes acceptées par lui le 03/11/2026 à 09h32 (« ok recos »). La 4 change une phrase de l'ADR 0042 § 6 : c'est l'ADR 0054.
 
 1. **Qui a vendu, chez la créatrice ?** CR-04 dit « qui a vendu ». Mais montrer le chatteur, c'est laisser deviner les ventes de l'agent, qui n'en ont pas. Reco : ne rien montrer, comme pour l'auteur d'un message (ADR 0042 § 2), et retirer « qui a vendu » de CR-04.
 2. **Montant d'une alerte Telegram, et son minimum.** Reco : le prix payé par le fan (TTC), celui que l'équipe voit dans Reveal, avec le minimum sur ce prix. Un remboursement ne sonne pas en direct ; il apparaît au bilan du soir et dans les totaux.
@@ -118,4 +121,5 @@ Posées à Charles le 03/11 avec ces recommandations. Aucune n'est appliquée sa
 ## Notes de session
 
 - 03/11, Équipe, lot a : règle des jours extraite de la vérification (`domain/sale-days.ts`), `salesTotals` et `salesFeedTotals.totalsOf`, `sale_detected` publié par `recordPage` dans la fenêtre de 15 minutes, contrats `SaleSellerSchema`, `SalesTotalsSchema` et payload de `sale_detected`. Reste : lots b, c et d, après les réponses de Charles.
-- 03/11, Agent, lot c : section « Ventes lues chez Reveal » du Dashboard (`revealSalesPanel`, lecteur sous `withTenantMember`, contrat `revealSales`), quatre sortes de vendeur pour le propriétaire et un manager actif, rien pour une lecture de portée « soi » ni pour la créatrice. Les alertes des questions 5 et 6 restent aux lots d et b.
+- 03/11, Charles : « ok recos », les six recommandations acceptées. Lot b au fil Telegram, lot c au fil Agent, retrait de « qui a vendu » de CR-04 au fil Chantier 7 ; ADR 0054 pour la question 4 ; lot d à Équipe après CR-02 et CR-04.
+- 03/11, Agent, lot c : section « Ventes lues chez » la plateforme sur le Dashboard (`revealSalesPanel`, lecteur sous `withTenantMember`, contrat `revealSales`), quatre sortes de vendeur pour le propriétaire et un manager actif, rien pour une lecture de portée « soi » ni pour la créatrice. Les alertes des questions 5 et 6 restent aux lots d et b.
