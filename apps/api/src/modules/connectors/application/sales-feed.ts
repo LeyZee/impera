@@ -4,6 +4,7 @@ import {
   err,
   payPeriodLastDay,
   SALES_FEED_MISMATCH_DAYS_MAX,
+  type ConnectionSignal,
   type JobPayload,
   type PayPeriod,
   type LinkSalesFeedChatterBody,
@@ -20,6 +21,7 @@ import {
 } from '@nirvana/contracts';
 
 import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/auto-check';
+import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
   SalesFeedAccountUnprocessable,
   SalesFeedCheckDaysUnprocessable,
@@ -88,6 +90,15 @@ export interface SalesFeedDeps {
    * by the `scheduling` module and given by the composition root.
    */
   readonly detectedAccounts: (period: PayPeriod) => Promise<readonly AutoCheckedAccount[]>;
+  /**
+   * What the reading saw of the platform's register (Telegram P3-12): the outbox keeps the transitions only
+   * (`connection_state_changed`). Absent in tests that do not look at it.
+   */
+  readonly connectionState?: (
+    platform: Platform,
+    signal: ConnectionSignal,
+    correlationId: string,
+  ) => Promise<unknown>;
 }
 
 export interface SalesFeeds {
@@ -167,6 +178,12 @@ function refusal(kind: SalesFeedRefusal['kind']): SalesFeedRefusal {
 
 export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
   const { ledger, registry, clock } = deps;
+  /** The failed reads in a row of each platform, in the worker that reads; a restart starts the count again. */
+  const unreachable = new Map<Platform, UnreachableRun>();
+
+  async function tell(platform: Platform, signal: ConnectionSignal, correlationId: string): Promise<void> {
+    await deps.connectionState?.(platform, signal, correlationId);
+  }
 
   function factoryOf(platform: Platform): SalesFeedFactory {
     const factory = registry[platform];
@@ -331,8 +348,16 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       if (before?.state !== 'needs_reconnect') {
         await ledger.signal(platform, { kind: 'needs_reconnect', errorKind: kind }, false, correlationId);
       }
+      await tell(platform, { state: 'down', reason: 'refused' }, correlationId);
       logger.warn({ platform, kind }, 'sales feed key refused: reading stopped until it is connected again');
       return;
+    }
+    if (failure.kind === 'unreachable') {
+      const now = clock.now();
+      const run = nextUnreachableRun(unreachable.get(platform) ?? null, now);
+      unreachable.set(platform, run);
+      if (isLastingOutage(run, now))
+        await tell(platform, { state: 'down', reason: 'unreachable' }, correlationId);
     }
     if (failure.kind === 'rate_limited') {
       await ledger.pause(platform, new Date(clock.now().getTime() + failure.retryAfterMs));
@@ -396,7 +421,12 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       position = read.value.endPosition ?? position;
       if (!read.value.hasMore) break;
     }
-    if (stored.lastErrorKind !== null) await keysOrThrow().markState(platform, 'connected', null);
+    unreachable.delete(platform);
+    if (stored.lastErrorKind !== null) {
+      await keysOrThrow().markState(platform, 'connected', null);
+      // An answer after a failure: back, if a `down` was published.
+      await tell(platform, { state: 'back' }, correlationId);
+    }
     await deps.webhooks?.prune(new Date(now.getTime() - DELIVERY_RETENTION_MS));
     // Counts only: never a sale's id, a fan's id or pseudo.
     logger.info({ platform, ...totals }, 'sales feed read');
@@ -540,6 +570,8 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       // Refused, rate-limited or unreachable: nothing is kept, a key already saved stays as it was.
       if (!verified.ok) return err(refusal(errorKindOf(verified.failure)));
       await keys.save(platform, key, verified.value, clock.now(), by);
+      unreachable.delete(platform);
+      await tell(platform, { state: 'back' }, `sales_feed_key:${platform}`);
       await linkByHandle(platform, feed);
       return ok(await statusOf(platform));
     },
