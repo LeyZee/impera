@@ -6,6 +6,7 @@ import {
   buildCheckReport,
   exportAmountToCents,
   exportDay,
+  isCleanMatch,
   readDashboardExport,
   type CheckLine,
   type CheckSources,
@@ -299,5 +300,38 @@ describe('the reliability check', () => {
       }),
     );
     expect(report.chatters[0]).toMatchObject({ register: { sales: 1 }, stats: { sales: 2 }, differs: false });
+  });
+});
+
+describe('the report a switch can rest on (CRM-03)', () => {
+  const FORTNIGHT = { from: '2026-10-16', to: '2026-10-31' };
+  const matching = () => buildCheckReport(sources({ ...FORTNIGHT, exported: { rows: [], notes: [] } }));
+
+  it('is a match over a whole fortnight, with no bot outside the agent nor model of the export unknown', () => {
+    expect(matching().verdict).toBe('match');
+    expect(isCleanMatch(matching())).toBe(true);
+    expect(isCleanMatch({ ...matching(), from: '2026-11-01', to: '2026-11-15' })).toBe(true);
+    expect(isCleanMatch({ ...matching(), notes: [{ kind: 'export_rows_outside', count: 2 }] })).toBe(true);
+    expect(
+      isCleanMatch({
+        ...matching(),
+        notes: [{ kind: 'bot_not_linked_to_agent', platformChatterId: 'bot_test_01' }],
+      }),
+    ).toBe(false);
+    expect(
+      isCleanMatch({ ...matching(), notes: [{ kind: 'export_unknown_model', model: 'inconnue_test' }] }),
+    ).toBe(false);
+  });
+
+  it('is never a part of a fortnight, nor one astride two', () => {
+    expect(isCleanMatch(buildCheckReport(sources({ exported: { rows: [], notes: [] } })))).toBe(false);
+    expect(isCleanMatch({ ...matching(), to: '2026-10-30' })).toBe(false);
+    expect(isCleanMatch({ ...matching(), from: '2026-10-01', to: '2026-10-31' })).toBe(false);
+    expect(isCleanMatch({ ...matching(), from: '2026-10-10', to: '2026-10-25' })).toBe(false);
+  });
+
+  it('is never an incomplete or differing report', () => {
+    expect(isCleanMatch(buildCheckReport(sources({ ...FORTNIGHT })))).toBe(false);
+    expect(isCleanMatch({ ...matching(), verdict: 'mismatch' })).toBe(false);
   });
 });

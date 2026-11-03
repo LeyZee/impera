@@ -4,13 +4,16 @@ import {
   SaleEventSchema,
   SaleStatusSchema,
   SaleTypeSchema,
+  SalesFeedCheckVerdictSchema,
   SalesFeedErrorKindSchema,
   SalesFeedStateSchema,
 } from '@nirvana/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   customType,
+  date,
   foreignKey,
   index,
   integer,
@@ -280,5 +283,35 @@ export const platformSalesQuarantine = pgTable(
       'platform_sales_quarantine_amounts_check',
       sql`${t.agencyMinor} >= 0 and ${t.creatorMinor} >= 0 and ${t.netMinor} <= ${t.grossExclVatMinor} and ${t.grossExclVatMinor} <= ${t.grossInclVatMinor}`,
     ),
+  ],
+);
+
+/**
+ * The reports of the reliability check (ADR 0050 § 8, CRM-02), one per check, never rewritten: the switch of an
+ * account to the platform's net (CRM-03) rests on the latest clean one. `report` is the answer as the owner saw it
+ * (`SalesFeedCheckReport`: totals, models, team members, no fan data); the export itself is never kept. Agency-level,
+ * out of RLS.
+ */
+export const salesFeedChecks = pgTable(
+  'sales_feed_checks',
+  {
+    id: id(),
+    platform: enumText('platform').notNull(),
+    fromDay: date('from_day').notNull(),
+    toDay: date('to_day').notNull(),
+    verdict: enumText('verdict').notNull(),
+    /** A match with no bot outside the agent nor model of the export unknown (`isCleanMatch`). */
+    clean: boolean('clean').notNull(),
+    report: jsonb('report').notNull(),
+    checkedBy: text('checked_by'),
+    generatedAt: timestampTz('generated_at').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('sales_feed_checks_latest_idx').on(t.platform, t.generatedAt),
+    enumCheck('sales_feed_checks', t.platform, PlatformSchema.options),
+    enumCheck('sales_feed_checks', t.verdict, SalesFeedCheckVerdictSchema.options),
+    check('sales_feed_checks_days_check', sql`${t.fromDay} <= ${t.toDay}`),
+    check('sales_feed_checks_clean_check', sql`not ${t.clean} or ${t.verdict} = 'match'`),
   ],
 );
