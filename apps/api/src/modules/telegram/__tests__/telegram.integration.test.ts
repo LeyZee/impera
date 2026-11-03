@@ -415,6 +415,38 @@ describe('telegram module on Postgres', () => {
     expect(rows.map((row) => row.topic)).toEqual(['important']);
   });
 
+  it('tells the Important groups for all of a fortnight whose check no longer matches, once, no amount (CRM-04 b3)', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const { routes, version } = await module.overview();
+    expect(
+      (await module.saveRoutes(version, [...routes, { creatorId: null, topic: 'important', chatId }])).ok,
+    ).toBe(true);
+    await publish(
+      'sales_feed_mismatch',
+      {
+        platform: 'reveal',
+        from: '2026-10-16',
+        to: '2026-10-31',
+        days: [
+          {
+            day: '2026-10-20',
+            platformAccountId: newId(PlatformAccountIdSchema),
+            currency: 'EUR',
+            registerNetMinor: 12_345,
+            platformNetMinor: 12_000,
+            differenceMinor: 345,
+          },
+        ],
+      },
+      null,
+    );
+    await module.jobs.scan();
+    const rows = (await deliveryRows(chatId)).filter((row) => row.threadKey === 'mismatch:reveal:2026-10-16');
+    expect(rows.map((row) => [row.topic, row.isSilent])).toEqual([['important', false]]);
+    expect(rows[0]?.text).toContain('la quinzaine du 16 au 31 oct.');
+    expect(rows[0]?.text).not.toMatch(/123,45|120,00|3,45/);
+  });
+
   it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
     await module.saveSaleSettings([], 'owner-telegram');
     const chatId = await salesGroup();
