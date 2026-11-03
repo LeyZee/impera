@@ -41,7 +41,7 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 ### Lot b : Telegram (`telegram` ; le fil Telegram relit, Extension pour l'onglet)
 
-- Alerte de vente dans le sujet « Ventes ». Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan.
+- [x] Alerte de vente dans le sujet « Ventes ». Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan. Lot b1 : montant TTC (« ok recos » de Charles, 03/11) ; toutes les ventes sonnent tant que les réglages n'existent pas ; une ligne de l'outbox illisible fait avancer le curseur du scan.
 - Réglages des ventes (P3-07), par créatrice ou pour toutes, dans `telegram_settings` qui existe déjà : un montant minimum (question 2), « ventes de l'agent seulement » ou « toutes », et le bilan du soir allumé ou non.
 - Bilan du soir à 23 h, dans le fuseau de la créatrice, envoyé aux groupes du sujet « Ventes ». Pour chaque créatrice : le chiffre d'affaires, le net, les deux parts, le nombre de ventes et de remboursements, puis le détail par chatteur (son nom), l'agent et « sans chatteur ». Le job `telegram.evening_digest` est branché dans le crontab par Bilan, dans ce lot.
 - L'onglet Ventes de Réglages › Telegram passe de « bientôt » aux vrais réglages.

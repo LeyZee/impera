@@ -428,6 +428,15 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
       );
       return row?.name ?? null;
     },
+    async memberName(memberId) {
+      const [row] = await admin((tx) =>
+        tx
+          .select({ name: schema.teamMembers.displayName })
+          .from(schema.teamMembers)
+          .where(eq(schema.teamMembers.id, memberId)),
+      );
+      return row?.name ?? null;
+    },
   };
 
   const deliveriesStore: DeliveriesStore = {
@@ -458,10 +467,13 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
           .orderBy(table.createdAt, table.id)
           .limit(limit),
       );
-      return rows.flatMap((row) => {
-        const event = toScannedEvent(row);
-        return event === null ? [] : [event];
-      });
+      return {
+        events: rows.flatMap((row) => {
+          const event = toScannedEvent(row);
+          return event === null ? [] : [event];
+        }),
+        lastReadAt: rows.at(-1)?.createdAt ?? null,
+      };
     },
     async threadRoots(threadKey) {
       const rows = await admin((tx) =>

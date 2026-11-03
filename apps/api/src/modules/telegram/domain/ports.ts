@@ -139,6 +139,8 @@ export interface BotsStore {
   listCreators(): Promise<readonly CreatorRecord[]>;
   /** The display name of a CRM user, for « Pris en main par … ». */
   userName(userId: string): Promise<string | null>;
+  /** The name the team shows for a member, for « vendue par … » (CRM-04 lot b); null for an unknown id. */
+  memberName(memberId: string): Promise<string | null>;
 }
 
 interface ScanBatch {
@@ -149,8 +151,14 @@ interface ScanBatch {
 
 export interface DeliveriesStore {
   getCursor(): Promise<Date>;
-  /** Consumed events created after `since`, oldest first. */
-  readEvents(since: Date, limit: number): Promise<readonly ScannedEvent[]>;
+  /**
+   * Consumed events created after `since`, oldest first, and the `created_at` of the last row read, readable or not:
+   * a run of rows the module cannot read still moves the cursor past them, never blocks the scan behind them.
+   */
+  readEvents(
+    since: Date,
+    limit: number,
+  ): Promise<{ readonly events: readonly ScannedEvent[]; readonly lastReadAt: Date | null }>;
   /** The sent or pending root messages of a thread, one per group. */
   threadRoots(threadKey: string): Promise<readonly ThreadRoot[]>;
   /** Inserts (a replayed source adds nothing), moves the cursor and enqueues each touched group, in one transaction. */

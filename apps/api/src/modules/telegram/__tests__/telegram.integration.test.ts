@@ -6,6 +6,9 @@ import {
   CustomAlertIdSchema,
   DraftIdSchema,
   EventIdSchema,
+  PlatformAccountIdSchema,
+  SalesLineIdSchema,
+  TeamMemberIdSchema,
   newId,
   type CreatorId,
   type TelegramBot,
@@ -330,6 +333,66 @@ describe('telegram module on Postgres', () => {
     expect(text).toContain('repassé en copilote sur 3 conversations');
     expect(text).toContain('74,5 %');
     expect(text).not.toContain('qui-ne-sort-pas');
+  });
+
+  it('tells the sales groups of a fresh sale, silent, its seller by name, never the fan nor its key (CRM-04)', async () => {
+    const { chatId } = await botInGroup(FAKE_TOKEN, 'demo_bot', '-100');
+    const { routes, version } = await module.overview();
+    const saved = await module.saveRoutes(version, [...routes, { creatorId, topic: 'sale', chatId }]);
+    expect(saved.ok).toBe(true);
+    const userId = 'user-sale-seller';
+    await test.admin.db
+      .insert(schema.user)
+      .values({ id: userId, name: 'Prénom Inventé', email: 'vendeur@example.test' })
+      .onConflictDoNothing();
+    const memberId = newId(TeamMemberIdSchema);
+    await test.admin.db.insert(schema.teamMembers).values({
+      id: memberId,
+      userId,
+      teamRole: 'chatter',
+      firstName: 'Prénom',
+      lastName: 'Inventé',
+      displayName: 'Théo',
+      country: 'BJ',
+      timeZone: 'Africa/Porto-Novo',
+      joinedOn: '2026-10-01',
+    });
+    const saleId = newId(SalesLineIdSchema);
+    const sale = {
+      saleId,
+      platform: 'reveal',
+      platformAccountId: newId(PlatformAccountIdSchema),
+      saleType: 'ppv',
+      occurredAt: new Date(sliceStart).toISOString(),
+      currency: 'EUR',
+      grossInclVatMinor: 4500,
+      netMinor: 3000,
+      agencyMinor: 1500,
+      creatorMinor: 1500,
+      seller: { kind: 'member', memberId },
+    };
+    await publish('sale_detected', sale);
+    await publish('sale_detected', { ...sale, saleId: newId(SalesLineIdSchema), seller: { kind: 'agent' } });
+
+    expect(await module.jobs.scan()).toBe(2);
+    expect(await module.jobs.scan()).toBe(2); // the window re-reads them: nothing new
+    const rows = await deliveryRows(chatId);
+    expect(rows.map((row) => [row.topic, row.isSilent, row.summary])).toEqual([
+      ['sale', true, 'PPV · 45,00\u00a0€ · vendue par Théo'],
+      ['sale', true, 'PPV · 45,00\u00a0€ · vendue par l’agent'],
+    ]);
+    await module.jobs.flushChat(chatId);
+    const text = telegram.sent.map((sent) => sent.text).join('\n');
+    expect(text).toContain('💰 <b>Vente · Démo</b>');
+    expect(text).not.toContain(saleId);
+    expect(text).not.toContain('30,00');
+  });
+
+  it('moves its cursor past rows it cannot read, so they never stall the scan', async () => {
+    for (let i = 0; i < 3; i += 1) await publish('sale_detected', { saleId: 'pas-une-vente' });
+    expect(await module.jobs.scan()).toBe(0);
+    const [state] = await test.admin.db.select().from(schema.telegramState);
+    expect(state?.scanCursor.getTime()).toBe(sliceStart + eventSeq * 1000);
   });
 
   it('tells the groups once that a message of the agent could not leave, and closes it on a takeover', async () => {
