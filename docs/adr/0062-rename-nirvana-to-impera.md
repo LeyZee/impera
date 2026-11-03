@@ -1,6 +1,6 @@
 # 0062. Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel
 
-Statut : proposed (demande de Charles du 03/11/2026, 11 h 37 : « j'aimerais bien qu'on renomme le projet, donc il faudrait renommer partout, sur toute l'extension, partout où ça apparaît […] pourquoi pas Impera, donc I-M-P-E-R-A, comme le nom de mon agence » ; fil « Renommer Nirvana en Impera »). À accepter par « ok 0062 ».
+Statut : accepted (Charles, 03/11/2026, 11 h 50 : « OK, euh, 0062, je le donne », sur la version relue par Extension et Bilan ; demande de Charles du 03/11/2026, 11 h 37 : « j'aimerais bien qu'on renomme le projet, donc il faudrait renommer partout, sur toute l'extension, partout où ça apparaît […] pourquoi pas Impera, donc I-M-P-E-R-A, comme le nom de mon agence » ; fil « Renommer Nirvana en Impera »).
 Date : 2026-11-03
 Précise : aucune ADR n'est remplacée. Les ADR passées gardent le mot « Nirvana » : elles sont immuables et disent ce qui a été décidé, sous le nom de l'époque.
 
