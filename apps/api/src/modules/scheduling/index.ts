@@ -14,6 +14,7 @@ import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
 import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
 import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
+import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/agency-share-check';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
@@ -105,6 +106,12 @@ export interface SchedulingModule {
      * hours lapse; how many. Enqueued after each acceptance and revert, and every quarter of an hour.
      */
     readonly lapseSwaps: () => Promise<number>;
+    /**
+     * `scheduling.check_agency_shares` (CRM-04 lot d3), on the 2nd and the 17th: each creator's part read on the
+     * platform against her agency percentage over the fortnight just over; how many `agency_share_mismatch` were new.
+     * It changes no amount.
+     */
+    readonly checkAgencyShares: (correlationId: string) => Promise<number>;
   };
 }
 
@@ -126,6 +133,11 @@ export interface SchedulingDeps {
    * `salesFeedSwitchReads.switchFactsOf`, read in the pay rules' own transaction.
    */
   readonly switchFactsOf: SwitchFactsRead;
+  /**
+   * A creator's sales totals (CRM-04): the `connectors` module's `salesFeedTotals.totalsOf`, read on the admin
+   * connection by the agency percentages' check (lot d3).
+   */
+  readonly salesTotalsOf: SalesTotalsRead;
   readonly now?: () => Date;
 }
 
@@ -135,6 +147,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const colleagues = createDrizzleColleagueReads(deps.adminDb);
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const calendarReads = createDrizzleCalendarReads(deps.db);
+  const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf);
   const services = {
     scheduling: createSchedulingService(planning, admin, deps.creators, now),
     calendar: createCalendarService(calendarReads, deps.creators, now),
@@ -188,6 +201,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     jobs: {
       makeShifts: (logger) => makeShifts(admin, logger, now()),
       lapseSwaps: () => colleagues.lapseSwapsUnscoped(now()),
+      checkAgencyShares: (correlationId) => shareCheck.run(now(), correlationId),
     },
   };
 }

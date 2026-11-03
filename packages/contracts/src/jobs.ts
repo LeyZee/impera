@@ -45,6 +45,7 @@ export const JOB_NAMES = [
   'notifications.creator_sale',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
+  'scheduling.check_agency_shares',
   'team.apply_roles',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -139,6 +140,13 @@ export const JOB_PAYLOADS = {
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
+  /**
+   * On the 2nd and the 17th (CRM-04 lot d3): the fortnight just over, in the agency's zone, for each creator with an
+   * agency percentage on it. Her part read on the platform is compared with the percentage, and
+   * `agency_share_mismatch` is published once per account, fortnight and currency when they differ by more than
+   * rounding explains. It writes nothing else.
+   */
+  'scheduling.check_agency_shares': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -281,6 +289,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.creator_sale': 5,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
+  // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
+  'scheduling.check_agency_shares': 3,
   'team.apply_roles': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
   'payroll.recalculate': 5,

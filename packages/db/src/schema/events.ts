@@ -39,6 +39,14 @@ export const domainEvents = pgTable(
     uniqueIndex('domain_events_sales_feed_mismatch_unique')
       .on(sql`(${t.payload}->>'platform')`, sql`(${t.payload}->>'from')`)
       .where(sql`${t.type} = 'sales_feed_mismatch'`),
+    // Once per account, fortnight and currency (CRM-04 lot d3): the job that publishes it may run again.
+    uniqueIndex('domain_events_agency_share_mismatch_unique')
+      .on(
+        sql`(${t.payload}->>'platformAccountId')`,
+        sql`(${t.payload}->>'from')`,
+        sql`(${t.payload}->>'currency')`,
+      )
+      .where(sql`${t.type} = 'agency_share_mismatch'`),
     // « Is this service down already? » of `publishConnectionState` (Telegram P3-12): the latest row of one service,
     // read through this index rather than across the whole outbox.
     index('domain_events_connection_state_idx')
