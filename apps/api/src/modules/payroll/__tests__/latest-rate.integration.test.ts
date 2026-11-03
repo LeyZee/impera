@@ -1,9 +1,9 @@
 import { newId, UserIdSchema } from '@nirvana/contracts';
-import { schema, sql } from '@nirvana/db';
+import { schema, sql, withAdmin } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { createLatestRateRead } from '../infra/latest-rate';
+import { createLatestRateRead, latestRateOf } from '../infra/latest-rate';
 
 /** The last rate known, on the application role and under the reader's member context (policy `team_read`). */
 describe('latestRate', () => {
@@ -37,6 +37,11 @@ describe('latestRate', () => {
       day: '2026-10-27',
       rateMicros: 893_815,
     });
+    // A sale's day (Telegram's minimum, CRM-04): the newest rate of that day or before, none before the first.
+    const onOrBefore = (day: string) => withAdmin(test.admin.db, (tx) => latestRateOf(tx, 'USD', day));
+    expect(await onOrBefore('2026-10-26')).toMatchObject({ day: '2026-10-23', rateMicros: 870_000 });
+    expect(await onOrBefore('2026-10-27')).toMatchObject({ day: '2026-10-27' });
+    expect(await onOrBefore('2026-10-22')).toBeNull();
   });
 
   it('reads nothing outside a member context: the policy is not widened', async () => {

@@ -15,6 +15,8 @@ CREATE POLICY "agency_only" ON "sales_feed_checks" AS PERMISSIVE FOR ALL TO publ
 -- the migration role, which bypasses RLS, and is no `security_invoker`: its own filter is the one that holds, her
 -- creator and her account's role as `withCreatorAccount` sets them, so any other transaction reads nothing from it.
 -- The join on `f.creator_id` is what keeps another creator's card out, the owner bypassing the RLS of `fans`.
+-- The view rests on `nirvana_admin BYPASSRLS`: `platform_sales` forces its RLS (0065), so an owner without it would
+-- meet `creator_closed` and the view would go empty in silence (Bilan, review of #469).
 CREATE VIEW "creator_sales" WITH (security_barrier = true) AS
 SELECT l.id, l.creator_id, l.platform, l.platform_account_id, l.platform_sale_id, l.event, l.sale_type, l.occurred_at,
        l.currency, l.gross_incl_vat_minor, l.gross_excl_vat_minor, l.net_minor, l.agency_minor, l.creator_minor,

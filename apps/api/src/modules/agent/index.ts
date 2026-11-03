@@ -23,6 +23,8 @@ export {
   type GuardSettings,
   type GuardViolation,
 } from './domain/guards';
+/** @public The one reading of a persona's limits, for `scripts` too (SC-02, ADR 0056 § 1): whole words, plurals folded. */
+export { touchesTerm } from './domain/guards';
 export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision } from './domain/hold';
