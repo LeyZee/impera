@@ -18,7 +18,17 @@ import type {
 import { shiftSlotsOf } from '@nirvana/contracts';
 
 import type { SchedulingRefusalCode } from './api';
-import { clockOf, dayMonth, dayOf, daysFrom, minuteOf, rangeAt, shortDay, zonedInstant } from './time';
+import {
+  clockOf,
+  dayMonth,
+  dayOf,
+  daysFrom,
+  lengthOf,
+  minuteOf,
+  rangeAt,
+  shortDay,
+  zonedInstant,
+} from './time';
 
 /**
  * The planning without React (EQ-02): where each shift sits in a week, what a conflict says, and where the member is
@@ -311,6 +321,10 @@ export function phaseOf(shift: Pick<Shift, 'startsAt' | 'endsAt'>, now: Date): P
   return new Date(shift.startsAt).getTime() <= at ? 'live' : 'later';
 }
 
+/** « reste 3 h 40 »: what is left of a shift under way, never less than a minute (CR-12, Charles 02/11 17h56). */
+export const leftOf = (shift: Pick<Shift, 'endsAt'>, now: Date): string =>
+  `reste ${lengthOf(Math.max(60_000, new Date(shift.endsAt).getTime() - now.getTime()))}`;
+
 /** A shift in one day of the grid. */
 export interface Chip {
   readonly shift: Shift;
@@ -361,13 +375,18 @@ export function gridOf(planning: Planning, days: readonly string[], timeZone: st
 /** Past this many créneaux a day (slots under four hours), the cells stack their shifts instead of lining them up. */
 export const LINED_SLOTS_MAX = 6;
 
-/** One créneau of one day on one account (EQ-01): the shifts that start in it, and what of it is left to fill. */
+/** A shift on one créneau: `carried` when it began in an earlier one, so that it is drawn on each it touches. */
+export interface SlotChip extends Chip {
+  readonly carried: boolean;
+}
+
+/** One créneau of one day on one account (EQ-01): the shifts on it, and what of it is left to fill. */
 export interface SlotCell {
   readonly slot: ShiftSlot;
   /** Its first and last instants, read at the agency's: a créneau over a change of time is an hour shorter or longer. */
   readonly from: Date;
   readonly to: Date;
-  readonly chips: readonly Chip[];
+  readonly chips: readonly SlotChip[];
   /** A shift of the account overlaps it, whether it starts in it or earlier (a long shift covers the next one). */
   readonly covered: boolean;
   /**
@@ -379,10 +398,10 @@ export interface SlotCell {
 
 /**
  * The days of one account cut into the agency's créneaux, so that one créneau sits at the same height all week and a
- * stretch with nobody shows. A day of créneaux begins at the first one: a shift goes to the créneau that holds its
- * start, so one at 2 h belongs to the night before when the créneaux begin at 5 h. One that starts before the
- * week's first créneau (carried over, or early on Monday) goes to it. `null` when the créneaux are too many to line
- * up.
+ * stretch with nobody shows. A day of créneaux begins at the first one: a shift sits on every créneau it touches,
+ * its own hours kept (ADR 0049 § 1, a shift across two créneaux is drawn on both), so one at 2 h belongs to the night
+ * before when the créneaux begin at 5 h. One outside the week's créneaux goes to the first or the last. `null` when
+ * the créneaux are too many to line up.
  */
 export function slotRowOf(
   row: GridRow,
@@ -404,14 +423,19 @@ export function slotRowOf(
       to: zonedInstant(day, settings.slotStartMinute + (index + 1) * length, zone),
     })),
   );
-  const placed = windows.map((): Chip[] => []);
+  const placed = windows.map((): SlotChip[] => []);
   for (const chips of row.days.values()) {
     for (const chip of chips) {
       const start = new Date(chip.shift.startsAt).getTime();
-      const at = windows.findIndex((window) => window.from.getTime() <= start && start < window.to.getTime());
-      placed[at === -1 ? (start < (windows[0]?.from.getTime() ?? 0) ? 0 : windows.length - 1) : at]?.push(
-        chip,
+      const end = new Date(chip.shift.endsAt).getTime();
+      const touched = windows.flatMap((window, index) =>
+        window.from.getTime() < end && window.to.getTime() > start ? [index] : [],
       );
+      const at =
+        touched.length > 0 ? touched : [start < (windows[0]?.from.getTime() ?? 0) ? 0 : windows.length - 1];
+      for (const index of at) {
+        placed[index]?.push({ ...chip, carried: (windows[index]?.from.getTime() ?? 0) > start });
+      }
     }
   }
   const spans = shifts

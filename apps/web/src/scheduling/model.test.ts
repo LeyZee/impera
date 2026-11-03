@@ -24,6 +24,7 @@ import {
   leaveAhead,
   leaveDaysLine,
   leaveLength,
+  leftOf,
   phaseOf,
   progressOf,
   slotRowOf,
@@ -146,6 +147,16 @@ describe('the créneaux of a row (EQ-01)', () => {
     expect(tuesday?.[1]?.chips).toHaveLength(2);
   });
 
+  it('draws a shift on every créneau it touches, its hours kept, the later ones carried (ADR 0049 § 1)', () => {
+    // 10 h – 14 h in Paris across the créneaux of 6 h and 12 h: on both, read once, from the first.
+    const across = shift(1, { startsAt: '2026-10-27T09:00:00Z', endsAt: '2026-10-27T13:00:00Z' });
+    const tuesday = cellsOf([across], BEFORE)?.get('2026-10-27');
+    expect(tuesday?.[1]?.chips.map((chip) => [chip.shift.id, chip.carried])).toEqual([[across.id, false]]);
+    expect(tuesday?.[2]?.chips.map((chip) => [chip.shift.id, chip.carried])).toEqual([[across.id, true]]);
+    expect(tuesday?.[0]?.chips).toEqual([]);
+    expect(tuesday?.[3]?.chips).toEqual([]);
+  });
+
   it('cuts the créneaux at the agency’s hours over a change of time', () => {
     // 29 March 2026: 0 h – 6 h lasts five hours, and a shift from 6 h does not cover it.
     const spring = weekOf('2026-03-23');
@@ -164,6 +175,12 @@ describe('the créneaux of a row (EQ-01)', () => {
 
 describe('a shift in time', () => {
   const one = shift(1, {});
+  it('says what is left of a shift under way, never less than a minute', () => {
+    // The shift ends at 11 h UTC.
+    expect(leftOf(one, new Date('2026-10-27T07:20:00Z'))).toBe('reste 3\u00a0h\u00a040');
+    expect(leftOf(one, new Date('2026-10-27T10:20:00Z'))).toBe('reste 40\u00a0min');
+    expect(leftOf(one, new Date('2026-10-27T10:59:50Z'))).toBe('reste 1\u00a0min');
+  });
   it('is to come, under way or over, and says how far it has gone', () => {
     expect(phaseOf(one, new Date('2026-10-27T04:59:00Z'))).toBe('later');
     expect(phaseOf(one, new Date('2026-10-27T05:00:00Z'))).toBe('live');

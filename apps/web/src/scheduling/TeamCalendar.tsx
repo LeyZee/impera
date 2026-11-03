@@ -18,7 +18,7 @@ import {
   type CalendarRow,
 } from './calendar';
 import './calendar.css';
-import { accountLine, phaseOf } from './model';
+import { accountLine, leftOf, phaseOf } from './model';
 import { dayNumber, lengthOf, longDay, rangeAt, shortDay, zonedInstant } from './time';
 
 import { Panel } from '@/shell/layout';
@@ -96,12 +96,16 @@ function Slot({
       <span className="cal-sr">{cellWords(cell, members, me, zone, now)}</span>
       {cell.shifts.map((shift) => {
         const member = members.get(shift.memberId);
+        const phase = phaseOf(shift, now);
+        // Begun in an earlier créneau: drawn here too, its hours after « … » (ADR 0049 § 1).
+        const carried = Date.parse(shift.startsAt) < cell.from.getTime();
         return (
           <div
             key={`${shift.memberId}-${shift.startsAt}`}
             className="sc-chip cal-chip"
             aria-hidden="true"
-            data-phase={phaseOf(shift, now)}
+            data-phase={phase}
+            data-carried={carried ? 'true' : undefined}
             data-mine={shift.memberId === me ? 'true' : undefined}
             data-muted={focus !== null && shift.memberId !== focus ? 'true' : undefined}
             style={member === undefined || member.color === null ? undefined : { '--sc-color': member.color }}
@@ -109,7 +113,11 @@ function Slot({
             <span className="sc-chip__who">
               <span className="sc-chip__name">{nameFor(member, me)}</span>
             </span>
-            <span className="sc-chip__hours nv-num">{rangeAt(shift.startsAt, shift.endsAt, zone)}</span>
+            <span className="sc-chip__hours nv-num">
+              {carried ? '… ' : ''}
+              {rangeAt(shift.startsAt, shift.endsAt, zone)}
+            </span>
+            {phase === 'live' ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
           </div>
         );
       })}
@@ -118,7 +126,7 @@ function Slot({
           IA seule
           <span className="cal-hours nv-num">{hours}</span>
         </span>
-      ) : cell.shifts.length === 0 && !cell.held ? (
+      ) : cell.shifts.length === 0 ? (
         <span className="cal-free" data-past={past ? 'true' : undefined} aria-hidden="true">
           {past ? null : 'Libre'}
           <span className="cal-hours nv-num">{hours}</span>

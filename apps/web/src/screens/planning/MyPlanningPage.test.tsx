@@ -692,10 +692,12 @@ describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
     expect(text(screen.getByText(/^Qui chatte quand dans l’équipe/u))).toContain('Paris');
     const row = within(grid).getByRole('row', { name: /Nora Vidal/u });
     expect(text(row)).toContain('IA automatique · jour et nuit');
-    // His own shift reads « Toi », at the agency's hour; a créneau a shift only goes on into says so.
-    expect(text(row)).toContain('Toi, 23 h – 5 h ; l’IA en automatique');
-    expect(text(row)).toContain('Basile, 8 h – 14 h ; l’IA en automatique');
-    expect(text(row)).toContain('12 h – 18 h, suite d’un shift ; l’IA en automatique');
+    // His own shift reads « Toi », at the agency's hour, under way with what is left of it; a shift across two
+    // créneaux is drawn on both, its hours kept, after « … » on the second (ADR 0049 § 1).
+    expect(text(row)).toContain('Toi, 23 h – 5 h, en poste, reste 4 h ; l’IA en automatique');
+    expect(text(row)).toContain('Toi… 23 h – 5 hreste 4 h');
+    expect(within(row).getAllByText('Basile')).toHaveLength(2);
+    expect(text(row)).toContain('Basile… 8 h – 14 h');
     // Nobody but the agent, in Automatique: « IA seule », said in words too.
     expect(text(row)).toContain('18 h – 0 h, l’IA seule');
     expect(within(row).getAllByText('IA seule').length).toBeGreaterThan(0);
