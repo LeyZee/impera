@@ -1,10 +1,11 @@
 import { CommissionStatementStatusSchema } from '@nirvana/contracts';
 import { inArray, schema, sql, type Transaction } from '@nirvana/db';
 
+import { payReadsForInvoicing as payReads } from '../../payroll';
 import type { PayoutSettlementDocument } from '../domain/payouts';
 import type { SettlementCarryOver, SettlementStatement } from '../domain/settlements';
 
-const { carryOvers, commissionStatements, invoiceEvents, invoices } = schema;
+const { invoiceEvents, invoices } = schema;
 
 /** The kinds that settle a document, once (migration 0058's unique index). */
 export const SETTLED = sql.raw(`('paid', 'imputed', 'compensated')`);
@@ -23,7 +24,8 @@ export interface SettlementFacts {
 
 /**
  * The reconciliation's facts of each contractor of `memberIds`, one read per table whoever reads them: the job under
- * its lock (`withAdmin`), pay and the period's read through the policies (`withMember`).
+ * its lock (`withAdmin`), pay and the period's read through the policies (`withMember`). Pay's statements and
+ * carry-overs come from pay (`payReadsForInvoicing`).
  */
 export async function settlementFactsOf(
   tx: Transaction,
@@ -38,17 +40,7 @@ export async function settlementFactsOf(
     if (found === undefined) throw new Error('A row off the contractors read');
     return found;
   };
-  const statements = await tx
-    .select({
-      memberId: commissionStatements.memberId,
-      id: commissionStatements.id,
-      period: commissionStatements.period,
-      status: commissionStatements.status,
-      totalMinor: commissionStatements.totalMinor,
-    })
-    .from(commissionStatements)
-    .where(inArray(commissionStatements.memberId, [...memberIds]));
-  for (const one of statements) {
+  for (const one of await payReads.statementsOf(tx, memberIds)) {
     of(one.memberId).statements.push({
       id: one.id,
       period: one.period,
@@ -56,15 +48,7 @@ export async function settlementFactsOf(
       totalMinor: one.totalMinor,
     });
   }
-  const carried = await tx
-    .select({
-      memberId: carryOvers.memberId,
-      statementId: carryOvers.statementId,
-      toPeriod: carryOvers.toPeriod,
-    })
-    .from(carryOvers)
-    .where(inArray(carryOvers.memberId, [...memberIds]));
-  for (const one of carried)
+  for (const one of await payReads.carryOversOf(tx, memberIds))
     of(one.memberId).carryOvers.push({ statementId: one.statementId, toPeriod: one.toPeriod });
   const documents = await tx
     .select({

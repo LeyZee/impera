@@ -24,8 +24,8 @@ import {
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
-import { regimeVatOf, reviewOf } from '../../contractors';
-import { CountedSchema } from '../../payroll';
+import { contractorReadsForInvoicing as fileReads } from '../../contractors';
+import { CountedSchema, payReadsForInvoicing as payReads, type StatementForInvoicing } from '../../payroll';
 import type { IssueWarning } from '../domain/billing';
 import type { InvoiceSource } from '../domain/invoices';
 import type { DocumentNotIssued, DocumentToIssue, InvoicingFacts, StoredInvoice } from '../domain/invoicing';
@@ -34,30 +34,10 @@ import type { PayrollInvoiceStore } from '../domain/ports';
 import { enqueueDocumentSettle, enqueueInvoiceLapse, enqueueInvoicePdfRender } from './invoice-queue';
 import type { InvoicingReads } from './ports';
 
-const {
-  auditLog,
-  billingRegimes,
-  billingRegimeValidations,
-  billingSettings,
-  commissionStatementLines,
-  commissionStatements,
-  contractAcceptances,
-  contractorDocumentReviews,
-  contractorDocuments,
-  contractorProfiles,
-  contractorRegimes,
-  contractTexts,
-  domainEvents,
-  invoiceCounters,
-  invoiceEvents,
-  invoiceLines,
-  invoices,
-  payAdjustments,
-  platformAccounts,
-  teamMembers,
-} = schema;
+const { auditLog, domainEvents, invoiceCounters, invoiceEvents, invoiceLines, invoices, platformAccounts } =
+  schema;
 
-type Statement = typeof commissionStatements.$inferSelect;
+type Statement = StatementForInvoicing;
 
 /** What an invoice's credit notes took off, summed by Postgres as a `bigint` text: a whole amount, never negative. */
 const CreditedSchema = z.coerce.number().int().nonnegative();
@@ -68,20 +48,7 @@ const CreditedSchema = z.coerce.number().int().nonnegative();
  * accounts, and the period each adjustment corrects, that of the statement it cites.
  */
 async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceSource> {
-  const rows = await tx
-    .select({
-      platformAccountId: commissionStatementLines.platformAccountId,
-      netMinor: commissionStatementLines.netMinor,
-      commissionMinor: commissionStatementLines.commissionMinor,
-    })
-    .from(commissionStatementLines)
-    .where(
-      and(
-        eq(commissionStatementLines.statementId, statement.id),
-        eq(commissionStatementLines.revision, statement.revision),
-      ),
-    )
-    .orderBy(commissionStatementLines.platformAccountId);
+  const rows = await payReads.linesOf(tx, statement.id, statement.revision);
   const perAccount = new Map<string, { netMinor: number; commissionMinor: number }>();
   for (const row of rows) {
     const one = perAccount.get(row.platformAccountId) ?? { netMinor: 0, commissionMinor: 0 };
@@ -106,25 +73,15 @@ async function sourceOf(tx: Transaction, statement: Statement): Promise<InvoiceS
   const corrected = counted.adjustments.flatMap((one) =>
     one.correctsStatementId === null ? [] : [one.correctsStatementId],
   );
-  const correctedPeriods =
-    corrected.length === 0
-      ? []
-      : await tx
-          .select({ id: commissionStatements.id, period: commissionStatements.period })
-          .from(commissionStatements)
-          .where(inArray(commissionStatements.id, corrected));
-  const periodOf = new Map(correctedPeriods.map((row) => [row.id, PayPeriodSchema.parse(row.period)]));
+  const periodOf = new Map(
+    [...(await payReads.periodsOf(tx, corrected))].map(([id, period]) => [id, PayPeriodSchema.parse(period)]),
+  );
   // The document whose upheld contest each adjustment corrects (ADR 0039 § 3): read from the row, which never changes,
   // and not from the statement's copy of the entries, whose shape its inputs' hash keeps.
-  const adjustmentIds = counted.adjustments.map((one) => one.id);
-  const contested =
-    adjustmentIds.length === 0
-      ? []
-      : await tx
-          .select({ id: payAdjustments.id, contestedInvoiceId: payAdjustments.contestedInvoiceId })
-          .from(payAdjustments)
-          .where(inArray(payAdjustments.id, adjustmentIds));
-  const contestedOf = new Map(contested.map((row) => [row.id, row.contestedInvoiceId]));
+  const contestedOf = await payReads.contestsOf(
+    tx,
+    counted.adjustments.map((one) => one.id),
+  );
   const rules = CommissionStatementRulesSchema.parse(statement.rules);
   const tier = BonusTierSchema.nullable().parse(statement.tierBonus);
   return {
@@ -222,22 +179,7 @@ async function invoicesOf(tx: Transaction, memberId: string): Promise<StoredInvo
 
 /** The regimes as an invoice copies them, each with the day the accountant validated it, `null` for not yet. */
 async function regimesOf(tx: Transaction): Promise<InvoiceRegime[]> {
-  const rows = await tx
-    .select({ regime: billingRegimes, validatedOn: billingRegimeValidations.validatedOn })
-    .from(billingRegimes)
-    .leftJoin(billingRegimeValidations, eq(billingRegimeValidations.regimeId, billingRegimes.id));
-  return rows.map(({ regime, validatedOn }) =>
-    InvoiceRegimeSchema.parse({
-      id: regime.id,
-      name: regime.name,
-      vat: regimeVatOf(regime),
-      withholding: regime.withholding,
-      mentions: regime.mentions,
-      documents: regime.documents,
-      taxIdRequired: regime.taxIdRequired,
-      validatedOn,
-    }),
-  );
+  return (await fileReads.regimes(tx)).map((regime) => InvoiceRegimeSchema.parse(regime));
 }
 
 /** Everything the plan reads of the contractor, the agency and the statement, in the job's transaction. */
@@ -248,44 +190,13 @@ async function factsOf(
   timeZone: string,
 ): Promise<InvoicingFacts> {
   const memberId = statement.memberId;
-  const [current] = await tx
-    .select({ version: sql<number | null>`max(${contractTexts.version})` })
-    .from(contractTexts)
-    .where(eq(contractTexts.kind, 'billing_mandate'));
-  const [accepted] = await tx
-    .select({ version: contractTexts.version, contestDelayDays: contractTexts.contestDelayDays })
-    .from(contractAcceptances)
-    .innerJoin(contractTexts, eq(contractTexts.id, contractAcceptances.textId))
-    .where(and(eq(contractAcceptances.memberId, memberId), eq(contractTexts.kind, 'billing_mandate')))
-    .orderBy(sql`${contractTexts.version} desc`)
-    .limit(1);
-  const assignments = await tx
-    .select({ regimeId: contractorRegimes.regimeId, from: contractorRegimes.effectiveFrom })
-    .from(contractorRegimes)
-    .where(eq(contractorRegimes.memberId, memberId));
+  const mandate = await fileReads.mandateOf(tx, memberId);
+  const assignments = await fileReads.assignmentsOf(tx, [memberId]);
   // The country his member record gives today, and the regimes written for it (« ok pays »).
-  const regimesOfCountry = await tx
-    .select({ id: billingRegimes.id })
-    .from(billingRegimes)
-    .innerJoin(teamMembers, eq(teamMembers.id, memberId))
-    .where(sql`${teamMembers.country} = any(${billingRegimes.countries})`);
-  const [profile] = await tx
-    .select({ profile: contractorProfiles, country: teamMembers.country })
-    .from(contractorProfiles)
-    .innerJoin(teamMembers, eq(teamMembers.id, contractorProfiles.memberId))
-    .where(eq(contractorProfiles.memberId, memberId));
-  const documents = await tx
-    .select({
-      kind: contractorDocuments.kind,
-      issuedOn: contractorDocuments.issuedOn,
-      validUntil: contractorDocuments.validUntil,
-      decision: contractorDocumentReviews.decision,
-      reason: contractorDocumentReviews.reason,
-    })
-    .from(contractorDocuments)
-    .leftJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
-    .where(eq(contractorDocuments.memberId, memberId));
-  const [settings] = await tx.select().from(billingSettings).where(eq(billingSettings.id, 1));
+  const regimesOfCountry = await fileReads.regimesOfCountry(tx, memberId);
+  const profile = await fileReads.profileOf(tx, memberId);
+  const documents = await fileReads.documentsOf(tx, memberId);
+  const settings = await fileReads.settings(tx);
   const keys = await tx
     .select({ key: invoices.idempotencyKey })
     .from(invoices)
@@ -298,13 +209,13 @@ async function factsOf(
     issuedAt,
     issuedOn: calendarDayAt(issuedAt, timeZone),
     mandate: {
-      acceptedVersion: accepted?.version ?? null,
-      currentVersion: current?.version ?? 0,
-      contestDelayDays: accepted?.contestDelayDays ?? null,
+      acceptedVersion: mandate.accepted?.version ?? null,
+      currentVersion: mandate.currentVersion ?? 0,
+      contestDelayDays: mandate.accepted?.contestDelayDays ?? null,
     },
-    assignments,
+    assignments: assignments.map((one) => ({ regimeId: one.regimeId, from: one.from })),
     regimes: await regimesOf(tx),
-    regimesOfCountry: new Set(regimesOfCountry.map((one) => one.id)),
+    regimesOfCountry: new Set(regimesOfCountry),
     identity:
       profile === undefined
         ? null
@@ -326,7 +237,7 @@ async function factsOf(
       kind: ContractorDocumentKindSchema.parse(one.kind),
       issuedOn: one.issuedOn,
       validUntil: one.validUntil,
-      review: reviewOf(one),
+      review: one.review,
     })),
     // Without the designation of the service, the settings are not filled: nothing is issued (`agency_missing`).
     settings:
@@ -512,18 +423,12 @@ export function createDrizzlePayrollInvoiceStore(
   return {
     issueUnscoped: (statementId: CommissionStatementId, plan) =>
       withAdmin(adminDb, async (tx) => {
-        const [found] = await tx
-          .select({ memberId: commissionStatements.memberId })
-          .from(commissionStatements)
-          .where(eq(commissionStatements.id, statementId));
-        if (found === undefined) return { kind: 'not_validated' };
+        const memberId = await payReads.memberOfStatement(tx, statementId);
+        if (memberId === null) return { kind: 'not_validated' };
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`invoices.issue:${found.memberId}`}, 0))`,
+          sql`select pg_advisory_xact_lock(hashtextextended(${`invoices.issue:${memberId}`}, 0))`,
         );
-        const [statement] = await tx
-          .select()
-          .from(commissionStatements)
-          .where(eq(commissionStatements.id, statementId));
+        const statement = await payReads.statementOf(tx, statementId);
         if (statement === undefined || CommissionStatementStatusSchema.parse(statement.status) === 'draft') {
           return { kind: 'not_validated' };
         }

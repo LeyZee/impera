@@ -1,6 +1,7 @@
 import {
   ApiErrorSchema,
   REAUTHENTICATION_ERROR_CODE,
+  SalesFeedCheckReportSchema,
   SalesFeedErrorCodeSchema,
   SalesFeedListSchema,
   SalesFeedOverviewSchema,
@@ -8,6 +9,8 @@ import {
   SalesFeedStatusSchema,
   type LinkSalesFeedChatterBody,
   type Platform,
+  type SalesFeedCheckBody,
+  type SalesFeedCheckReport,
   type SalesFeedOverview,
   type SalesFeedRefusal,
   type SalesFeedStatus,
@@ -66,6 +69,14 @@ async function call(path: string, init: RequestInit = {}): Promise<Response> {
       throw new SalesFeedRefused(error.data.error.message);
     }
     throw new ServicesError('unavailable', detail);
+  }
+  // The check's refusal by the platform (its statistics or its models) is a 502 with the same shape.
+  if (response.status === 502) {
+    const body: unknown = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    if (SalesFeedRefusalSchema.safeParse(body).success) return response;
   }
   const error = await apiError(response);
   if (response.status === 403) {
@@ -159,4 +170,25 @@ export async function linkChatter(
     body: JSON.stringify(link),
   });
   return parsed(response, (body) => SalesFeedOverviewSchema.parse(body));
+}
+
+export type CheckResult =
+  { ok: true; report: SalesFeedCheckReport } | { ok: false; refusal: SalesFeedRefusal };
+
+/**
+ * The reliability check (CRM-02, ADR 0050 § 8): the register against the platform's statistics and the export,
+ * read for this answer and kept nowhere. The platform's refusal comes back as one (502); an export the server cannot
+ * read, or days not over, as its own sentence (`SalesFeedRefused`).
+ */
+export async function runCheck(platform: Platform, body: SalesFeedCheckBody): Promise<CheckResult> {
+  const response = await call(`/${platform}/check`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+  return parsed(response, (json): CheckResult =>
+    response.ok
+      ? { ok: true, report: SalesFeedCheckReportSchema.parse(json) }
+      : { ok: false, refusal: SalesFeedRefusalSchema.parse(json) },
+  );
 }

@@ -25,51 +25,6 @@ const payModules: readonly string[] = PAY;
 /** The schema files of pay's tables. */
 const PAY_SCHEMAS = ['payroll.ts', 'invoices.ts'];
 
-/**
- * The reads of another pay module's table that ARC-07 has not closed yet, as `<module>/<file>: <table>`. The list only
- * shrinks: a new read fails the test, and a read closed by a port fails it too until its line is removed here.
- */
-const OPEN_CROSSINGS = [
-  'accounting/infra/accounting-store.ts: billing_settings',
-  'accounting/infra/accounting-store.ts: carry_overs',
-  'accounting/infra/accounting-store.ts: commission_statements',
-  'accounting/infra/accounting-store.ts: contractor_profiles',
-  'accounting/infra/accounting-store.ts: invoice_pdf_copies',
-  'accounting/infra/accounting-store.ts: invoice_pdfs',
-  'accounting/infra/accounting-store.ts: invoices',
-  'contractors/infra/contractor-store.ts: invoices',
-  'contractors/infra/payout-certificate-store.ts: commission_statements',
-  'invoicing/infra/invoice-acceptance-store.ts: commission_statements',
-  'invoicing/infra/invoice-acceptance-store.ts: pay_adjustments',
-  'invoicing/infra/invoice-pdf-store.ts: agency_logos',
-  'invoicing/infra/invoice-pdf-store.ts: billing_settings',
-  'invoicing/infra/invoice-pdf-store.ts: commission_statement_lines',
-  'invoicing/infra/invoice-pdf-store.ts: commission_statements',
-  'invoicing/infra/invoice-pdf-store.ts: contract_acceptances',
-  'invoicing/infra/invoice-pdf-store.ts: contract_texts',
-  'invoicing/infra/invoice-pdf-store.ts: contractor_document_reviews',
-  'invoicing/infra/invoice-pdf-store.ts: contractor_documents',
-  'invoicing/infra/invoice-store.ts: billing_regime_validations',
-  'invoicing/infra/invoice-store.ts: billing_regimes',
-  'invoicing/infra/invoice-store.ts: billing_settings',
-  'invoicing/infra/invoice-store.ts: commission_statement_lines',
-  'invoicing/infra/invoice-store.ts: commission_statements',
-  'invoicing/infra/invoice-store.ts: contract_acceptances',
-  'invoicing/infra/invoice-store.ts: contract_texts',
-  'invoicing/infra/invoice-store.ts: contractor_document_reviews',
-  'invoicing/infra/invoice-store.ts: contractor_documents',
-  'invoicing/infra/invoice-store.ts: contractor_profiles',
-  'invoicing/infra/invoice-store.ts: contractor_regimes',
-  'invoicing/infra/invoice-store.ts: pay_adjustments',
-  'invoicing/infra/payout-facts.ts: billing_regimes',
-  'invoicing/infra/payout-facts.ts: contractor_document_reviews',
-  'invoicing/infra/payout-facts.ts: contractor_documents',
-  'invoicing/infra/payout-facts.ts: contractor_regimes',
-  'invoicing/infra/requeue-store.ts: commission_statements',
-  'invoicing/infra/settlement-rows.ts: carry_overs',
-  'invoicing/infra/settlement-rows.ts: commission_statements',
-];
-
 const read = (file: string): string => readFileSync(file, 'utf8');
 
 /** A module's code: every `.ts` under it but its tests and their support. */
@@ -159,7 +114,7 @@ describe('architecture of pay (ADR 0047 § 1)', () => {
     }
   });
 
-  it("reads another pay module's table only where a read is still open (ARC-07)", () => {
+  it("never reads another pay module's table: it asks its owner's index.ts (ARC-07)", () => {
     const crossings: string[] = [];
     for (const module of PAY) {
       for (const file of sourcesOf(path.join(modulesDir, module))) {
@@ -171,7 +126,7 @@ describe('architecture of pay (ADR 0047 § 1)', () => {
         }
       }
     }
-    expect(crossings.sort()).toEqual([...OPEN_CROSSINGS].sort());
+    expect(crossings.sort()).toEqual([]);
   });
 
   /** Each task as a wiring file registers it: `'<job>': defineTask(`, with the file it is in. */

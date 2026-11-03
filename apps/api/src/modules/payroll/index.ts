@@ -28,6 +28,8 @@ import { createDrizzlePayrollValidationStore } from './infra/validation-store';
  * report, through the composition root (EQ-04). One key and one number of attempts for every writer.
  */
 export { enqueuePayRecalculation } from './infra/recalculation-queue';
+/** What the contractors' file reads of pay, plugged into it by the composition root (ARC-07). */
+export { payReadsForContractors } from './infra/contractor-reads';
 
 /**
  * What pay asks of the other modules of pay and what it gives them (ADR 0047 § 1): the composition root plugs
@@ -39,11 +41,16 @@ export type { PayoutVerdict } from './domain/ports';
 /** Refused to a member on their own pay or document: the owner never decides in their own name (`invoicing` too). */
 export { PayrollOwnForbidden } from './domain/errors';
 /**
- * How a statement's `counted` column reads, for the invoice store that still reads `commission_statements` directly.
- * It goes when that read goes through a read port of this module (ARC-07).
+ * How a statement's `counted` column reads, for the invoices that copy the entries a statement counted from the row
+ * `payReadsForInvoicing.statementOf` gives them.
  */
 export { CountedSchema } from './infra/read-store';
 
+/** What the accountant's exports read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { payReadsForAccounting } from './infra/accounting-reads';
+/** What the invoices read of this module, in their transaction (ADR 0047 § 1, ARC-07). */
+export { payReadsForInvoicing } from './infra/invoicing-reads';
+export type { StatementForInvoicing } from './infra/invoicing-reads';
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
   readonly name: 'payroll';

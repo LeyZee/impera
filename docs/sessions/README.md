@@ -7,7 +7,7 @@ Le projet avance par sessions. Une session = un agent (Claude Opus 5.5 dans Clau
 ### 1. Démarrage (10 min)
 
 - Lire `CLAUDE.md`, `docs/00-START-HERE.md`, ta fiche dans `docs/sessions/tasks/`, les docs qu'elle liste, et les 5 dernières entrées de journal (`pnpm sessions:log 5`, le détail est dans `docs/sessions/log/`).
-- Prérequis sur la machine : Node 22 (`.nvmrc`), pnpm 10, Docker, `gitleaks` sur le PATH.
+- Prérequis sur la machine : Node 22 (`.nvmrc`), pnpm 10, Docker, `gitleaks` sur le PATH (Windows : `winget install Gitleaks.Gitleaks`), sans quoi les hooks refusent commit et push.
 - Vérifier l'état : `git status` propre sur `main` à jour (`git fetch origin main`), `pnpm install` (installe les hooks), `docker compose up -d`, `pnpm check` vert. Si ce n'est pas vert avant de commencer, tu le notes dans ton entrée de journal et tu t'arrêtes : ce n'est pas à toi de réparer en passant, sauf si ta fiche le dit. Depuis le 16/10, `pnpm check`, `pnpm test` et la CI sont verts sur le squelette (seul `packages/design-system` a du code).
 - Créer la branche, en minuscules : `task/<id>-<slug>` (ex. `task/p0-03-database`, le nom exact est dans la fiche).
 - Passer la fiche en `in_progress` (champ `Statut :` en tête de fiche, et la ligne de l'index `docs/sessions/tasks/README.md`) et commiter ce seul changement.

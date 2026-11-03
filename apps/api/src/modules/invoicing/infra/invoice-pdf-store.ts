@@ -22,30 +22,16 @@ import {
 } from '@nirvana/contracts';
 import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@nirvana/db';
 
-import { documentValidUntil, treatyNeedsResidence } from '../../contractors/pure';
+import { contractorReadsForInvoicing as fileReads } from '../../contractors';
+import { treatyNeedsResidence } from '../../contractors/pure';
+import { payReadsForInvoicing as payReads } from '../../payroll';
 import type { StatementAnnexSource } from '../domain/invoice-pdf';
 import type { InvoiceLogo, InvoiceToRender, PayrollInvoicePdfStore, StoredInvoicePdf } from '../domain/ports';
 
 import { enqueueInvoicePdfMirror } from './invoice-queue';
 import type { InvoicingReads } from './ports';
 
-const {
-  agencyLogos,
-  auditLog,
-  billingSettings,
-  commissionStatementLines,
-  commissionStatements,
-  contractAcceptances,
-  contractorDocumentReviews,
-  contractorDocuments,
-  contractTexts,
-  domainEvents,
-  invoiceLines,
-  invoicePdfCopies,
-  invoicePdfs,
-  invoices,
-  platformAccounts,
-} = schema;
+const { auditLog, domainEvents, invoiceLines, invoicePdfCopies, invoicePdfs, invoices } = schema;
 
 /** A PDF's row and its copies, read in the caller's transaction (its policies apply). */
 async function pdfOf(tx: Transaction, invoiceId: string): Promise<StoredInvoicePdf | null> {
@@ -70,34 +56,6 @@ async function pdfOf(tx: Transaction, invoiceId: string): Promise<StoredInvoiceP
 }
 
 /**
- * The storage keys of the tax residence certificates of `memberId` accepted by the owner and of `period`'s civil year:
- * the proof of the treaty for the service an invoice of that period bills. Every one: a rescan accepted besides the
- * first is proof as well. Since ADR 0041 the invoice no longer waits for them, and the transfer locks its own
- * (`payroll.lock_payout_certificate`); one already accepted is kept as long as the invoice too.
- */
-async function certificateKeysOf(tx: Transaction, memberId: string, period: string): Promise<string[]> {
-  const rows = await tx
-    .select({
-      key: contractorDocuments.storageKey,
-      issuedOn: contractorDocuments.issuedOn,
-      validUntil: contractorDocuments.validUntil,
-    })
-    .from(contractorDocuments)
-    .innerJoin(contractorDocumentReviews, eq(contractorDocumentReviews.documentId, contractorDocuments.id))
-    .where(
-      and(
-        eq(contractorDocuments.memberId, memberId),
-        eq(contractorDocuments.kind, 'tax_residence'),
-        eq(contractorDocumentReviews.decision, 'accepted'),
-      ),
-    )
-    .orderBy(contractorDocuments.storageKey);
-  return rows
-    .filter((row) => documentValidUntil({ kind: 'tax_residence', ...row }).slice(0, 4) === period.slice(0, 4))
-    .map((row) => row.key);
-}
-
-/**
  * The statement an invoice bills, line by line as its revision holds them, with the names of its accounts, its rate and
  * the day it was validated, in the agency's time zone.
  */
@@ -106,44 +64,11 @@ async function annexOf(
   statementId: string,
   timeZone: string,
 ): Promise<StatementAnnexSource | null> {
-  const [statement] = await tx
-    .select({
-      revision: commissionStatements.revision,
-      rules: commissionStatements.rules,
-      validatedAt: commissionStatements.validatedAt,
-    })
-    .from(commissionStatements)
-    .where(eq(commissionStatements.id, statementId));
+  const statement = await payReads.annexOf(tx, statementId);
   // An invoice is issued from a validated statement only (lot 3): anything else is a fault, never an annex guessed.
   if (statement?.validatedAt == null)
     throw new Error(`The statement ${statementId} of an invoice is not validated`);
-  const rows = await tx
-    .select({
-      handle: platformAccounts.handle,
-      platform: platformAccounts.platform,
-      currency: commissionStatementLines.currency,
-      rateMicros: commissionStatementLines.rateMicros,
-      grossMinor: commissionStatementLines.grossMinor,
-      grossEurMinor: commissionStatementLines.grossEurMinor,
-      exclVatMinor: commissionStatementLines.exclVatMinor,
-      netMinor: commissionStatementLines.netMinor,
-      commissionMinor: commissionStatementLines.commissionMinor,
-    })
-    .from(commissionStatementLines)
-    .innerJoin(platformAccounts, eq(platformAccounts.id, commissionStatementLines.platformAccountId))
-    .where(
-      and(
-        eq(commissionStatementLines.statementId, statementId),
-        eq(commissionStatementLines.revision, statement.revision),
-      ),
-    )
-    .orderBy(
-      platformAccounts.handle,
-      platformAccounts.platform,
-      commissionStatementLines.currency,
-      commissionStatementLines.vatBps,
-      commissionStatementLines.platformFeeBps,
-    );
+  const rows = await payReads.annexLinesOf(tx, statementId, statement.revision);
   const rules = CommissionStatementRulesSchema.parse(statement.rules);
   /** The day of the rate a line was converted at: the statement's copy of it, never a rate read again. */
   const rateOn = (currency: string, rateMicros: number): string | null => {
@@ -177,31 +102,16 @@ async function mandateAcceptedOn(
   issuedAt: Date,
   timeZone: string,
 ): Promise<string> {
-  const [accepted] = await tx
-    .select({ acceptedAt: contractAcceptances.acceptedAt })
-    .from(contractAcceptances)
-    .innerJoin(contractTexts, eq(contractTexts.id, contractAcceptances.textId))
-    .where(
-      and(
-        eq(contractAcceptances.memberId, memberId),
-        eq(contractTexts.kind, 'billing_mandate'),
-        sql`${contractAcceptances.acceptedAt} <= ${issuedAt.toISOString()}::timestamptz`,
-      ),
-    )
-    .orderBy(sql`${contractTexts.version} desc`)
-    .limit(1);
+  const acceptedAt = await fileReads.mandateAcceptedAt(tx, memberId, issuedAt);
   // No document is issued without an accepted mandate (lot 3): one without is a fault, never printed without it.
-  if (accepted === undefined) throw new Error(`No billing mandate accepted by ${memberId} at the issue`);
-  return calendarDayAt(accepted.acceptedAt, timeZone);
+  if (acceptedAt === null) throw new Error(`No billing mandate accepted by ${memberId} at the issue`);
+  return calendarDayAt(acceptedAt, timeZone);
 }
 
 /** The logo a document froze, by its fingerprint. */
 async function logoOf(tx: Transaction, sha256: string | null): Promise<InvoiceLogo | null> {
   if (sha256 === null) return null;
-  const [logo] = await tx
-    .select({ mediaType: agencyLogos.mediaType, bytes: agencyLogos.bytes })
-    .from(agencyLogos)
-    .where(eq(agencyLogos.sha256, sha256));
+  const logo = await fileReads.logoOf(tx, sha256);
   if (logo === undefined) throw new Error(`The logo ${sha256} of a document is missing`);
   return { mediaType: AgencyLogoMediaTypeSchema.parse(logo.mediaType), bytes: Uint8Array.from(logo.bytes) };
 }
@@ -272,10 +182,7 @@ export function createDrizzlePayrollInvoicePdfStore(
                 .where(eq(invoices.id, invoice.reissuedInvoiceId));
         const kind = InvoiceKindSchema.parse(invoice.kind);
         const regime = InvoiceRegimeSchema.parse(invoice.regime);
-        const [settings] = await tx
-          .select({ fiscalYearEndMonth: billingSettings.fiscalYearEndMonth })
-          .from(billingSettings)
-          .where(eq(billingSettings.id, 1));
+        const fiscalYearEndMonth = await fileReads.fiscalYearEndMonth(tx);
         return {
           id: InvoiceIdSchema.parse(invoice.id),
           memberId: TeamMemberIdSchema.parse(invoice.memberId),
@@ -317,11 +224,11 @@ export function createDrizzlePayrollInvoicePdfStore(
                 : null,
           },
           logo: await logoOf(tx, invoice.logoSha256),
-          fiscalYearEndMonth: settings?.fiscalYearEndMonth ?? DEFAULT_FISCAL_YEAR_END_MONTH,
+          fiscalYearEndMonth: fiscalYearEndMonth ?? DEFAULT_FISCAL_YEAR_END_MONTH,
           // Those of an invoice under a treaty, when accepted already (ADR 0041: the invoice no longer waits for them).
           certificateKeys:
             kind === 'invoice' && treatyNeedsResidence(regime)
-              ? await certificateKeysOf(tx, invoice.memberId, invoice.period)
+              ? await fileReads.residenceKeysOf(tx, invoice.memberId, invoice.period)
               : [],
           pdf: await pdfOf(tx, invoiceId),
         };
