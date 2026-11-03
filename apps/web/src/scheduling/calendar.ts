@@ -7,6 +7,7 @@ import {
   type PlanningMember,
 } from '@nirvana/contracts';
 
+import { leftOf, phaseOf } from './model';
 import { addDays, clockAt, clockOf, mondayOf, zonedInstant } from './time';
 
 /**
@@ -35,12 +36,13 @@ export interface AgentInSlot {
 export interface CalendarCell {
   readonly from: Date;
   readonly to: Date;
-  /** The shifts that start in this créneau (one that starts before the first créneau of the day goes to it). */
+  /**
+   * The shifts that cover part of it, wherever they start, with their own hours: a shift across two créneaux is drawn
+   * on both (ADR 0049 § 1); the month marks the créneau with the first.
+   */
   readonly shifts: readonly CalendarShift[];
-  /** A shift covers part of it, whatever créneau it starts in. */
+  /** A shift covers part of it. */
   readonly held: boolean;
-  /** The shifts that cover part of it, wherever they start: the month marks the créneau with the first. */
-  readonly over: readonly CalendarShift[];
   /** `null` when he does not answer in it, or under Arrêt. */
   readonly agent: AgentInSlot | null;
   /** No chatter on what is left of it (all of it, once gone by) and the agent answers that in Automatique (ADR 0048 § 1). */
@@ -123,7 +125,6 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
       to: zonedInstant(day, settings.slotStartMinute + (index + 1) * length, zone).getTime(),
     })),
   }));
-  const first = windows[0]?.cuts[0]?.from ?? 0;
   return calendar.creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;
     const theirs = calendar.shifts.filter((shift) => shift.creatorId === creator.id);
@@ -133,13 +134,7 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
       cells.set(
         day,
         cuts.map((cut) => {
-          // The créneaux of the window follow each other without a hole: a shift goes to the one its start falls in,
-          // and one that started before the window to the first.
-          const opening = cut.from === first ? Number.NEGATIVE_INFINITY : cut.from;
-          const starting = theirs.filter((shift) => {
-            const start = Date.parse(shift.startsAt);
-            return start >= opening && start < cut.to;
-          });
+          // Every créneau a shift touches shows it, one begun before the window included.
           const over = theirs.filter(
             (shift) => Date.parse(shift.startsAt) < cut.to && Date.parse(shift.endsAt) > cut.from,
           );
@@ -147,9 +142,8 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
           return {
             from: new Date(cut.from),
             to: new Date(cut.to),
-            shifts: starting,
+            shifts: over,
             held: over.length > 0,
-            over,
             agent: inSlot,
             aiAlone,
           };
@@ -245,7 +239,7 @@ export type MonthMark =
 
 export function monthMarks(cells: readonly CalendarCell[], now: Date): MonthMark[] {
   return cells.map((cell) => {
-    const [first] = cell.over;
+    const [first] = cell.shifts;
     if (first !== undefined) return { kind: 'shift', memberId: first.memberId };
     if (cell.aiAlone) return { kind: 'ai' };
     return { kind: 'gap', ahead: cell.to.getTime() > now.getTime() };
@@ -276,7 +270,10 @@ export function minutesOn(shifts: readonly CalendarShift[], memberId: string, fr
     }, 0);
 }
 
-/** Who holds a créneau, in words, then the agent: « Kofi, 12 h – 18 h ; l’IA en automatique dès 14 h », « libre ». */
+/**
+ * Who holds a créneau, in words, then the agent: « Kofi, 12 h – 18 h, en poste, reste 3 h 40 ; l’IA en automatique dès
+ * 14 h », « libre ».
+ */
 export function cellWho(
   cell: CalendarCell,
   members: ReadonlyMap<string, PlanningMember>,
@@ -290,14 +287,12 @@ export function cellWho(
       ? cell.shifts
           .map(
             (shift) =>
-              `${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}`,
+              `${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}${phaseOf(shift, now) === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}`,
           )
           .join(' ; ')
-      : cell.held
-        ? 'suite d’un shift'
-        : cell.to.getTime() <= now.getTime()
-          ? 'personne'
-          : 'libre';
+      : cell.to.getTime() <= now.getTime()
+        ? 'personne'
+        : 'libre';
   return `${who}${cellAgentWords(cell.agent, cell, zone)}`;
 }
 
@@ -351,7 +346,7 @@ export function dayWords(
   const cells = rows.flatMap((row) => row.days.get(day) ?? []);
   const shifts = new Map(
     cells
-      .flatMap((cell) => cell.over)
+      .flatMap((cell) => cell.shifts)
       .map((shift) => [`${shift.creatorId}|${shift.memberId}|${shift.startsAt}`, shift]),
   );
   const mine = me !== null && [...shifts.values()].some((shift) => shift.memberId === me);

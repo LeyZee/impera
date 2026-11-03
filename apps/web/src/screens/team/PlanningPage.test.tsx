@@ -357,13 +357,20 @@ describe('Équipe › Planning', () => {
     // The first render of the file (router, queries) can outlast the default second on a loaded CI runner.
     const chip = await screen.findByRole(
       'button',
-      { name: 'Théo, 23 h – 5 h, jusqu’au lendemain, en poste' },
+      { name: 'Théo, 23 h – 5 h, jusqu’au lendemain, en poste, reste 4 h' },
       { timeout: 4_000 },
     );
     // The night shift starts on Tuesday 27, at the agency's hour.
     const row = screen.getByRole('row', { name: /Nora Vidal/u });
     expect(within(row).getByRole('rowheader').textContent).toContain('Nora Vidal@nora sur Reveal');
     expect(within(row).getAllByRole('cell')[1]?.contains(chip)).toBe(true);
+    // On Wednesday, where a phone shows that day alone, the same shift is read and reached again, its edge breathing.
+    const wednesday = screen.getByRole('button', {
+      name: /^Théo, 23\sh – 5\sh, commencé la veille, en poste, reste 4\sh$/u,
+    });
+    expect(within(row).getAllByRole('cell')[2]?.contains(wednesday)).toBe(true);
+    expect(wednesday.getAttribute('data-carried')).toBe(null);
+    expect(wednesday.textContent).toContain('… 23');
     const duty = screen.getByRole('region', { name: 'En poste maintenant' });
     expect(duty.textContent).toContain('ThéoNora Vidaljusqu’à 5 h');
     expect(screen.getByText('1 shift · 6 h')).toBeTruthy();
@@ -404,7 +411,7 @@ describe('Équipe › Planning', () => {
     reader.zone = 'Indian/Antananarivo';
     serve();
     renderPage();
-    await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h/u });
+    await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h, jusqu/u });
     expect(screen.getAllByRole('button', { name: /^À pourvoir/u }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('radio', { name: 'Mon heure (Antananarivo)' }));
     await screen.findByRole('button', { name: /^Théo, 1\u00a0h – 7\u00a0h/u });
@@ -422,7 +429,7 @@ describe('Équipe › Planning', () => {
     reader.zone = 'Indian/Antananarivo';
     serve();
     renderPage();
-    await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h/u });
+    await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h, jusqu/u });
     fireEvent.click(screen.getByRole('radio', { name: 'Mon heure (Antananarivo)' }));
     expect(await screen.findByRole('button', { name: /^Théo, 1\u00a0h – 7\u00a0h/u })).toBeTruthy();
   });
@@ -772,7 +779,7 @@ describe('Équipe › Planning', () => {
   it('stops a shift under way at the minute, after a confirmation', async () => {
     const written = serve({ write: () => ({ status: 200, body: { ...night, endsAt: NOW.toISOString() } }) });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h/u }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h, jusqu/u }));
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
     expect(sheet.textContent).toContain('En poste');
     fireEvent.click(within(sheet).getByRole('button', { name: 'Arrêter maintenant' }));
@@ -793,7 +800,7 @@ describe('Équipe › Planning', () => {
   it('types the hours of a shift on 24 hours, in the sheet and the panel, whatever the browser’s language', async () => {
     serve({});
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h/u }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h, jusqu/u }));
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
     const end = within(sheet).getByLabelText('Fin');
     expect(end).toHaveProperty('type', 'text');
@@ -816,7 +823,7 @@ describe('Équipe › Planning', () => {
   it('never saves another hour than the one typed: « 22h7 » stays, marked, and Enter sends nothing', async () => {
     const written = serve({ write: () => ({ status: 200, body: night }) });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h/u }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h, jusqu/u }));
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
     const end = within(sheet).getByLabelText('Fin');
     fireEvent.change(end, { target: { value: '22h7' } });
@@ -846,7 +853,7 @@ describe('Équipe › Planning', () => {
   it('closes the sheet when a stop in the first minute cancels the shift (204)', async () => {
     const written = serve({ write: () => ({ status: 204 }) });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h/u }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\u00a0h – 5\u00a0h, jusqu/u }));
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
     fireEvent.click(within(sheet).getByRole('button', { name: 'Arrêter maintenant' }));
     fireEvent.click(within(sheet).getByRole('button', { name: 'Arrêter' }));
@@ -956,10 +963,12 @@ describe('Équipe › Planning', () => {
     const router = renderPage(`/equipe/planning?membre=${THEO}`);
     const name = await screen.findByText('Théo', { selector: '.sc-focus b' }, { timeout: 4_000 });
     expect(text(name.closest('.sc-focus'))).toContain('Théo · 1 shift · 6 h');
-    expect(screen.getByRole('button', { name: /^Théo, 23\sh/u }).getAttribute('data-muted')).toBe(null);
-    expect(screen.getByRole('button', { name: /^Un membre, 23\sh/u }).getAttribute('data-muted')).toBe(
-      'true',
-    );
+    expect(
+      screen.getByRole('button', { name: /^Théo, 23\sh – 5\sh, jusqu/u }).getAttribute('data-muted'),
+    ).toBe(null);
+    expect(
+      screen.getByRole('button', { name: /^Un membre, 23\sh – 5\sh, jusqu/u }).getAttribute('data-muted'),
+    ).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Toute l’équipe' }));
     await waitFor(() => {
       expect(document.querySelector('.sc-focus')).toBe(null);
@@ -1051,7 +1060,7 @@ describe('Équipe › Planning', () => {
       ],
     });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\sh\s–\s5\sh/u }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\sh\s–\s5\sh, jusqu/u }));
     const who = within(screen.getByRole('dialog')).getByLabelText('Membre');
     if (!(who instanceof HTMLSelectElement)) throw new Error('no member list');
     expect([...who.options].map((option) => option.text)).toEqual(['Basile', 'Théo']);
