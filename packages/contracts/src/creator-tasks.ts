@@ -83,8 +83,8 @@ export const CreatorTaskSchema = z.strictObject({
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable(),
-  /** Her shooting sheet, copied from the suggestion she accepted; `null` for any other task. */
-  shootBrief: ShootBriefSchema.nullable(),
+  /** Her shooting sheet, copied from the suggestion she accepted; `null` for any other task, and for an agenda kept on her phone from before it existed. */
+  shootBrief: ShootBriefSchema.nullable().default(null),
   essential: z.boolean(),
   /** Minutes before a timed task she wants a reminder, `null` for none. */
   reminderMinutes: z.number().int().min(0).max(1440).nullable(),
@@ -185,7 +185,7 @@ export const CreatorSuggestionSchema = z.strictObject({
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable(),
   /** The shooting sheet she reads before she accepts (an idea's « à tourner »), `null` for none. */
-  shootBrief: ShootBriefSchema.nullable(),
+  shootBrief: ShootBriefSchema.nullable().default(null),
   essential: z.boolean(),
 });
 export type CreatorSuggestion = z.infer<typeof CreatorSuggestionSchema>;
