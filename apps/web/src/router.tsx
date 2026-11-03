@@ -29,6 +29,8 @@ import { MyInvoicesPage } from './screens/pay/MyInvoicesPage';
 import { PeriodPage } from './screens/pay/PeriodPage';
 import { PeriodsPage } from './screens/pay/PeriodsPage';
 import { MyPlanningPage, type MyPlanningSearch } from './screens/planning/MyPlanningPage';
+import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
+import { parseSalesSearch } from './screens/sales/view';
 import {
   DevicesPage,
   AgentModePage,
@@ -207,6 +209,25 @@ const today = createRoute({
   component: function Today() {
     const { user } = rootRoute.useRouteContext();
     return user.role === 'creator' ? <CreatorTodayPage /> : <TodayPage user={user} />;
+  },
+});
+/**
+ * Ventes, the creator's alone (ADR 0042 § 8): her fans, and a conversation opened from one of them (`?conversation=`).
+ * Any other account is sent home by the root, as this section is not on its rail.
+ */
+const sales = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ventes',
+  validateSearch: parseSalesSearch,
+  component: function Sales() {
+    const { conversation } = sales.useSearch();
+    const navigate = sales.useNavigate();
+    return (
+      <CreatorSalesPage
+        selected={conversation ?? null}
+        onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
+      />
+    );
   },
 });
 const myPlanning = createRoute({
@@ -707,6 +728,7 @@ const routeTree = rootRoute.addChildren([
   tracking,
   trackingAlerts,
   today,
+  sales,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),

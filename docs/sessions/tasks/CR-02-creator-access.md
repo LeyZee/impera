@@ -73,6 +73,13 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 - Moi : **Persona** (`/moi/persona`, son onglet Persona d'avant, enregistrement compris, avec la même demande avant de perdre des changements) et **Sécurité**. Les écrans d'un membre (dossier, factures, calendrier des shifts) la renvoient à sa persona ; `/moi/persona` renvoie un membre à son dossier.
 - Reste : fermer `/v1/dashboard` à son rôle et retirer du Dashboard ce qui ne servait qu'à elle (lot c2b) ; lot c3 (Ventes › Fans, lecteur de conversation).
 
+### 03/11/2026, lot c3 (Ventes : ses fans, une conversation en lecture)
+- Rail de la créatrice : **Aujourd'hui · Ventes · Moi**. Ventes (`/ventes`) est à elle seule : aucun rail de l'équipe ne le porte, et le routeur renvoie tout autre compte chez lui. Ses gains et ses ventes (CR-04) viendront au-dessus de ses fans.
+- **Tes fans**, par `GET /v1/creator-space/fans` (relu chaque minute, cinquante à la fois, « Plus de fans ») : pseudo, « vu il y a 12 min », et à côté le prix des messages qu'il a débloqués, TVA comprise, par devise (« 410 € et 12 $ »), jamais ses gains. Un fan sans conversation est listé et n'ouvre rien. Aucune note.
+- Un fan ouvre sa conversation (`?conversation=`, garde la place au rechargement) : à côté de la liste à partir de 900 px, à la place de la liste sur téléphone avec « ← Tes fans ». Les messages du fan d'un côté, les siens tels qu'il les a vus de l'autre, jamais qui les a écrits (ADR 0021) ; regroupés par jour dans son heure ; médias par leur type et leur description ; « Média payant · 15 € · débloqué ». Ni brouillon, ni champ, ni bouton qui agit : « Lecture seule ». S'ouvre sur le dernier message, « Messages plus anciens » au-dessus.
+- L'ouverture est écrite au journal d'audit par le serveur : `GET /v1/creator-space/conversations/:id` n'est lu qu'une fois par ouverture (jamais relu en arrière-plan ni au retour sur l'onglet), seuls ses messages sont relus toutes les 30 s.
+- Reste : textes de l'éditeur de persona qui nomment encore « l'agent » devant elle (lot à part) ; lot futur des insights de sa base (ADR courte d'abord) ; CR-04 (gains et ventes), CR-05 (agenda).
+
 ### Lot futur : les insights de sa base de fans (demande de Charles, 03/11 11h40)
 - Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines », à la place de toute note par fan (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.
 - Garde-fous à tenir : agrégats seulement à partir des faits `declared` (ni `inferred`, ni `operator_note`, ni `commercial`) ; un pourcentage ne s'affiche qu'au-delà d'un seuil de fans par case, sinon « trop peu de fans » (pas de réidentification) ; calcul côté serveur, l'écran ne calcule rien.
