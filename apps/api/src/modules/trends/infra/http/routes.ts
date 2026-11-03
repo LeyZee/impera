@@ -8,6 +8,10 @@ import {
   ExtensionLinkTokenSchema,
   PastedTrendLinkSchema,
   PasteTrendLinkBodySchema,
+  TREND_CAPTURE_MAX_BYTES,
+  TREND_CAPTURES_MAX,
+  TrendCapturesBodySchema,
+  TrendCapturesDescribedSchema,
   TrendReadingsAcceptedSchema,
   TrendReadingsBatchSchema,
   UserIdSchema,
@@ -17,6 +21,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { describeCaptures } from '../../application/captures';
 import { pasteLink } from '../../application/links';
 import {
   ExtensionLinkForbidden,
@@ -25,6 +30,7 @@ import {
   ExtensionLinkUnauthenticated,
 } from '../../domain/errors';
 import type {
+  CaptureVision,
   ExtensionLinkStore,
   LinkHolder,
   ReadingStore,
@@ -37,6 +43,9 @@ export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandle
 
 /** 30 calls a minute at most per address on the extension's doors, a wrong token counted: a batch is sent when a watch session pauses or ends. */
 const READINGS_LIMIT = { max: 30, timeWindow: '1 minute', skipOnError: false };
+
+/** Four captures in base64 (4/3 of their bytes) and the JSON around them: the server's 1 MiB would refuse them. */
+const CAPTURES_BODY_LIMIT = Math.ceil((TREND_CAPTURES_MAX * TREND_CAPTURE_MAX_BYTES * 4) / 3) + 16_384;
 
 const LinkHeadersSchema = z.looseObject({ 'x-extension-link': z.string().optional() });
 
@@ -56,6 +65,7 @@ export function createTrendRoutes(
     readonly signals: SignalStore;
     readonly links: ExtensionLinkStore;
     readonly readings: ReadingStore;
+    readonly vision: CaptureVision;
   },
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
@@ -144,6 +154,21 @@ export function createTrendRoutes(
         },
       },
       async (request) => ({ accepted: await stores.readings.record(holderOf(request), request.body) }),
+    );
+
+    // The captures of a marked post: held for the vision call only, never written, logged nor echoed (ADR 0060 § 2).
+    app.post(
+      '/trends/readings/captures',
+      {
+        ...extensionDoor,
+        bodyLimit: CAPTURES_BODY_LIMIT,
+        schema: {
+          headers: LinkHeadersSchema,
+          body: TrendCapturesBodySchema,
+          response: { 200: TrendCapturesDescribedSchema },
+        },
+      },
+      (request) => describeCaptures(stores.readings, stores.vision, holderOf(request), request.body),
     );
     return Promise.resolve();
   };

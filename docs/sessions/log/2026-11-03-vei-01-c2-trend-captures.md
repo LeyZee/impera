@@ -1,0 +1,7 @@
+# 2026-11-03 — VEI-01 lot c2 : captures d'un post marqué décrites par la vision — done
+Fait : contrats `TrendCapturesBodySchema`, `TrendCaptureDescriptionSchema`, `TrendCapturesDescribedSchema` et leurs trois codes d'erreur ; `describeTrendCaptures` dans `packages/llm` avec le prompt versionné `sense/trend-captures` (rôle `sense`, Gemini puis Grok, appel `trend_watch` sous le plafond de veille) ; `POST /v1/trends/readings/captures` derrière le lien de l'extension ; `trend_readings.capture_description` (migration 0107) ; `AppOptions.trendVision` pour les tests ; tests de la passerelle (3) et d'intégration (2).
+Pas fait : lot d (idée validée → agenda → demande de contenu), et l'envoi des captures par l'extension (VEI-02).
+Décisions : la description va sur le relevé, pas sur un signal (le signal naîtra du relevé marqué) ; un post doit être marqué par la personne dans la même session, relevé d'abord, sinon 404 et la vision n'est pas appelée ; le plafond du jour comme celui de la veille répondent 429 `trend_watch_budget_limited` (l'extension dit en ambre que la vision reprend demain) ; la sortie du modèle est lue sans `strict`, ses champs en trop sont retirés, puis rangée selon le contrat strict ; l'appel de vision est synchrone, la route attend sa réponse.
+Découvertes : rien.
+Candidats à suppression : rien.
+Vérifié : `packages/llm` 60/60 ✓, `trends` en intégration 10/10 ✓, `pnpm check` (dérive du schéma) ✓.

@@ -431,6 +431,54 @@ describe('trend watch budget (ADR 0060 § 7)', () => {
   });
 });
 
+describe('describeTrendCaptures (ADR 0060 § 2, source 6)', () => {
+  const DESCRIPTION = {
+    hook: 'Un regard caméra puis un rire, dès la première seconde.',
+    angles: ['plan serré visage', 'miroir en pied'],
+    onScreenText: 'POV : tu rentres du sport',
+    editing: 'Trois coupes rapides calées sur le son.',
+  };
+  const input = {
+    captures: [{ mediaType: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff]) }],
+    durationS: 12,
+    trace: { creatorId: 'creator-1' },
+  };
+
+  it('reads the captures as images, as a trend watch call, and drops the fields it was not asked for', async () => {
+    const xai = scripted([{ text: JSON.stringify({ ...DESCRIPTION, account: 'someone' }) }]);
+    const { gateway, log } = setup({ xai });
+
+    const result = await gateway.describeTrendCaptures(input);
+
+    expect(result.ok && result.value.output).toEqual(DESCRIPTION);
+    expect(log.since(new Date(0))).toEqual([
+      expect.objectContaining({ role: 'sense', purpose: 'trend_watch', creatorId: 'creator-1' }),
+    ]);
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt);
+    expect(prompt).toContain('vidéo de 12 s');
+    expect(prompt).toContain('image/jpeg');
+  });
+
+  it('is stopped at the watch’s cap', async () => {
+    const xai = scripted([{ text: JSON.stringify(DESCRIPTION) }]);
+    const { gateway } = setup({ xai }, ALL_KEYS, undefined, { trendWatchCapEur: () => 0.000_001 });
+    expect((await gateway.describeTrendCaptures(input)).ok).toBe(true);
+    const second = await gateway.describeTrendCaptures(input);
+    expect(!second.ok && second.error.code).toBe('trend_watch_budget_reached');
+  });
+
+  it('fails without a vision model, Mistral never standing in for one', async () => {
+    const mistral = scripted([{ text: JSON.stringify(DESCRIPTION) }]);
+    const { gateway } = setup({ mistral });
+    const result = await gateway.describeTrendCaptures(input);
+    expect(!result.ok && result.error.attempts.map((attempt) => attempt.outcome)).toEqual([
+      'missing_key',
+      'missing_key',
+    ]);
+    expect(mistral.doGenerateCalls).toHaveLength(0);
+  });
+});
+
 describe('health', () => {
   it('is degraded while the fallback serves, with the cost of the day', async () => {
     const { gateway } = setup({ xai: scripted([{ status: 401 }]), mistral: scripted([{ text: BUBBLES }]) });

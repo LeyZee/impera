@@ -12,9 +12,11 @@ import {
   TeamMemberIdSchema,
   WatchSessionIdSchema,
   type CreatorId,
+  type TrendCaptureDescription,
 } from '@impera/contracts';
 import { and, eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import type { LlmGateway } from '@impera/llm';
 import { afterAll, afterEach, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -46,6 +48,33 @@ describe('/v1/trends', () => {
     creator: '',
   };
   let creatorUserId = '';
+  const DESCRIPTION: TrendCaptureDescription = {
+    hook: 'Un regard caméra puis un rire, dès la première seconde.',
+    angles: ['plan serré visage'],
+    onScreenText: null,
+    editing: 'Un plan unique, sans coupe.',
+  };
+  /** What the vision answers next: a description, or the gateway's failure. */
+  let visionFails: 'budget_reached' | 'trend_watch_budget_reached' | 'all_models_failed' | null = null;
+  const describeTrendCaptures = vi.fn<LlmGateway['describeTrendCaptures']>(() =>
+    Promise.resolve(
+      visionFails === null
+        ? {
+            ok: true as const,
+            value: {
+              output: DESCRIPTION,
+              meta: {
+                provider: 'google' as const,
+                model: 'vision',
+                isFallback: false,
+                latencyMs: 1,
+                promptHash: 'h',
+              },
+            },
+          }
+        : { ok: false as const, error: { code: visionFails, attempts: [] } },
+    ),
+  );
 
   const call = (method: 'GET' | 'POST' | 'DELETE', url: string, cookie: string, payload?: object) =>
     server.inject({
@@ -133,7 +162,7 @@ describe('/v1/trends', () => {
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
-    app = await createApp(config, createLogger(config));
+    app = await createApp(config, createLogger(config), { trendVision: { describeTrendCaptures } });
     server = await buildServer({
       config,
       logger: createLogger(config),
@@ -339,6 +368,109 @@ describe('/v1/trends', () => {
     expect(written).toHaveLength(0);
     const hers = await readings(creatorToken, { watchSession, readings: [reading({ markedFor: nora })] });
     expect(hers.json()).toEqual({ accepted: 1 });
+  });
+
+  it('describes the captures of a marked post, keeps only the description, and nothing of an unmarked one', async () => {
+    const token = await newToken(cookies.manager, 'Edge');
+    const watchSession = newId(WatchSessionIdSchema);
+    await readings(token, {
+      watchSession,
+      readings: [reading({ code: 'Mk1Mk2Mk3', markedFor: nora }), reading({ code: 'Nm1Nm2Nm3' })],
+    });
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64');
+    const captures = (code: string, over: Record<string, unknown> = {}, linkToken: string | null = token) =>
+      server.inject({
+        method: 'POST',
+        url: '/v1/trends/readings/captures',
+        headers: linkToken === null ? {} : { 'x-extension-link': linkToken },
+        payload: {
+          watchSession,
+          code,
+          durationS: 14,
+          captures: [{ mediaType: 'image/jpeg', data: jpeg }],
+          ...over,
+        },
+      });
+    describeTrendCaptures.mockClear();
+
+    const described = await captures('Mk1Mk2Mk3');
+    expect([described.statusCode, described.json()]).toEqual([200, { description: DESCRIPTION }]);
+    const [input] = describeTrendCaptures.mock.calls[0] ?? [];
+    expect(input?.trace).toEqual({ creatorId: nora });
+    expect(input?.durationS).toBe(14);
+    expect([...(input?.captures[0]?.data ?? [])]).toEqual([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    const [row] = await test.admin.db
+      .select({ description: schema.trendReadings.captureDescription })
+      .from(schema.trendReadings)
+      .where(
+        and(
+          eq(schema.trendReadings.watchSessionId, watchSession),
+          eq(schema.trendReadings.postCode, 'Mk1Mk2Mk3'),
+        ),
+      );
+    expect(row?.description).toEqual(DESCRIPTION);
+
+    // Unmarked, unknown, or another person's reading: nothing for the vision.
+    const owner = await newToken(cookies.owner, 'Firefox');
+    for (const refused of [
+      await captures('Nm1Nm2Nm3'),
+      await captures('Zz0Zz0Zz0'),
+      await captures('Mk1Mk2Mk3', {}, owner),
+    ])
+      expect([refused.statusCode, codeOf(refused)]).toEqual([404, 'trend_capture_reading_not_found']);
+    expect(describeTrendCaptures).toHaveBeenCalledTimes(1);
+
+    // The watch's cap or the daily one: 429 until midnight; no model: 503. Nothing is written.
+    visionFails = 'trend_watch_budget_reached';
+    const spent = await captures('Mk1Mk2Mk3');
+    expect([spent.statusCode, codeOf(spent)]).toEqual([429, 'trend_watch_budget_limited']);
+    visionFails = 'budget_reached';
+    expect((await captures('Mk1Mk2Mk3')).statusCode).toBe(429);
+    visionFails = 'all_models_failed';
+    const down = await captures('Mk1Mk2Mk3');
+    expect([down.statusCode, codeOf(down)]).toEqual([503, 'trend_capture_vision_unavailable']);
+    visionFails = null;
+
+    // Five captures, or none, are refused; without a link, 401 before the body.
+    const five = Array.from({ length: 5 }, () => ({ mediaType: 'image/jpeg', data: jpeg }));
+    expect((await captures('Mk1Mk2Mk3', { captures: five })).statusCode).toBe(400);
+    expect((await captures('Mk1Mk2Mk3', { captures: [] })).statusCode).toBe(400);
+    expect((await captures('Mk1Mk2Mk3', {}, null)).statusCode).toBe(401);
+    expect(describeTrendCaptures).toHaveBeenCalledTimes(4);
+  });
+
+  it('takes four captures of full size, past the server’s 1 MiB', async () => {
+    const token = await newToken(cookies.creator, 'Chrome');
+    const watchSession = newId(WatchSessionIdSchema);
+    await readings(token, { watchSession, readings: [reading({ code: 'Bg1Bg2Bg3', markedFor: nora })] });
+    const big = Buffer.alloc(700_000, 7).toString('base64');
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/trends/readings/captures',
+      headers: { 'x-extension-link': token },
+      payload: {
+        watchSession,
+        code: 'Bg1Bg2Bg3',
+        durationS: null,
+        captures: Array.from({ length: 4 }, () => ({ mediaType: 'image/webp', data: big })),
+      },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const tooBig = Buffer.alloc(800_000, 7).toString('base64');
+    const refused = await server.inject({
+      method: 'POST',
+      url: '/v1/trends/readings/captures',
+      headers: { 'x-extension-link': token },
+      payload: {
+        watchSession,
+        code: 'Bg1Bg2Bg3',
+        durationS: null,
+        captures: [{ mediaType: 'image/webp', data: tooBig }],
+      },
+    });
+    expect(refused.statusCode).toBe(400);
+    // A refused body is never echoed back.
+    expect(refused.body).not.toContain(tooBig.slice(0, 64));
   });
 
   it('opens no connection outward, neither for a pasted link nor for a batch of readings', async () => {

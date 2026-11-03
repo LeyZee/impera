@@ -666,6 +666,13 @@
       "when": 1793728832009,
       "tag": "0105_llm_calls_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1793730587166,
+      "tag": "0107_trend_capture_description",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import type {
   ExtensionLinkCreated,
   ExtensionLinkId,
   PasteTrendLinkBody,
+  TrendCaptureDescription,
   TrendReadingsBatch,
   UserId,
   UserRole,
@@ -61,4 +62,33 @@ export interface ReadingStore {
   markable(holder: LinkHolder): Promise<MarkableCreator[]>;
   /** The posts of a batch kept or updated; how many. A refused mark refuses the whole batch. */
   record(holder: LinkHolder, batch: TrendReadingsBatch): Promise<number>;
+  /** The creator a post of the holder's own watch session is marked for; null if not read, or read unmarked. */
+  markedFor(holder: LinkHolder, watchSession: string, code: string): Promise<CreatorId | null>;
+  /** Keeps the vision's description on that reading; false when it is no longer there or no longer marked. */
+  describe(
+    holder: LinkHolder,
+    watchSession: string,
+    code: string,
+    description: TrendCaptureDescription,
+  ): Promise<boolean>;
+}
+
+/** The captures of a marked post, decoded, in memory only. */
+export interface TrendCaptures {
+  readonly captures: readonly { readonly mediaType: string; readonly data: Uint8Array }[];
+  readonly durationS: number | null;
+  readonly creatorId: CreatorId;
+}
+
+/**
+ * The vision, through the LLM gateway, as a trend watch call. `budget`: the watch's cap or the daily one is spent;
+ * `unavailable`: no model answered.
+ */
+export interface CaptureVision {
+  describe(
+    input: TrendCaptures,
+  ): Promise<
+    | { readonly ok: true; readonly description: TrendCaptureDescription }
+    | { readonly ok: false; readonly reason: 'budget' | 'unavailable' }
+  >;
 }

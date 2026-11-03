@@ -133,6 +133,11 @@ export const trendReadings = pgTable(
     soundId: text('sound_id'),
     dwellMs: integer('dwell_ms').notNull(),
     markedFor: uuid('marked_for_creator_id').references(() => creators.id),
+    /**
+     * How a marked post is made, as the vision read its captures (contracts `TrendCaptureDescriptionSchema`, VEI-01
+     * lot c2); the captures themselves are never kept. Null until described.
+     */
+    captureDescription: jsonb('capture_description'),
     firstSeenAt: timestampTz('first_seen_at').notNull(),
     seenAt: timestampTz('seen_at').notNull(),
     createdAt: createdAt(),
@@ -149,6 +154,10 @@ export const trendReadings = pgTable(
       .where(sql`${t.soundId} is not null`),
     check('trend_readings_sound_id_check', sql`${t.soundId} is null or ${t.soundId} ~ '^[0-9]{1,32}$'`),
     check('trend_readings_path_check', sql`${t.path} in ('post', 'reel')`),
+    check(
+      'trend_readings_capture_marked_check',
+      sql`${t.captureDescription} is null or (${t.markedFor} is not null and jsonb_typeof(${t.captureDescription}) = 'object')`,
+    ),
     check('trend_readings_code_check', sql`${t.postCode} ~ '^[A-Za-z0-9_-]{5,64}$'`),
     check(
       'trend_readings_account_check',
