@@ -47,7 +47,7 @@ Dans OnlyScript, chaque script avait sa couleur, un aplat ou un dégradé de tro
 ### 3. Ce que la structure gagne
 
 - **Une étape dit si elle est offerte ou payante** (`access` : `free` ou `paid`). C'est ce que le carton écrit, et rien d'autre : le prix reste à P6-01, et l'agent ne lit jamais ce champ.
-- Une étape écrite avant cette ADR est **payante** (`paid`) : la migration 0091 le lui donne si sa version n'est pas encore figée, et une version figée est lue avec cette valeur sans être réécrite (règle 6).
+- Une étape écrite avant cette ADR est **payante** (`paid`) : la migration 0095 le lui donne si sa version n'est pas encore figée, et une version figée est lue avec cette valeur sans être réécrite (règle 6).
 - **Un pont peut porter des emplacements** (trois au plus, souvent une photo teasing). Il reste offert : le carton d'un pont dit toujours « (GRATUIT) ». Un pont écrit avant cette ADR n'en porte aucun.
 - Les indications des emplacements d'un pont sont tournées : elles passent contre ce qu'elle ne fait jamais, ne montre jamais et ce qui la dégoûte, comme celles d'une étape. Son teaser reste lu contre ce qu'elle ne dit jamais et ce qui la dégoûte.
 
@@ -63,7 +63,7 @@ C'est une méthode de l'agence, pas une donnée de fan ni de créatrice : l'ADR 
 ## Conséquences
 
 - Positives : on retrouve un script à sa couleur ; les cartons ressemblent à ceux que l'agence et les créatrices connaissent ; le texte reste lisible quelle que soit la couleur choisie, parce que le code le vérifie.
-- Négatives : une colonne `color` sur les versions de structure (migration 0091) ; le carton ne suit plus les thèmes de l'application ; la méthode de vente de l'agence (ses étapes) est lisible dans le dépôt public, par choix de Charles.
+- Négatives : une colonne `color` sur les versions de structure (migration 0095) ; le carton ne suit plus les thèmes de l'application ; la méthode de vente de l'agence (ses étapes) est lisible dans le dépôt public, par choix de Charles.
 - À surveiller : deux scripts de même structure et de même couleur donnent des cartons identiques. Si Reveal refuse un fichier déjà téléversé, le numéro du script (`S014`, ADR 0056 § 5) entre dans le carton (SC-03).
 
 ## Alternatives rejetées

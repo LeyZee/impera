@@ -109,6 +109,7 @@ describe('App on an invitation link', () => {
   };
   const preview = {
     purpose: 'invitation',
+    account: 'member',
     email: theo.email,
     displayName: 'Théo',
     country: 'BJ',

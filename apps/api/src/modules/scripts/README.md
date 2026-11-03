@@ -4,7 +4,7 @@
 
 **Peut dépendre de.** aucun module métier (feuille). Les limites de la persona lui viennent de `persona` par le composition root (`limitsOf`, sa version active).
 
-**Tables possédées.** `script_structures`, `script_structure_versions` et `script_structure_queue` (migrations 0084 et 0091).
+**Tables possédées.** `script_structures`, `script_structure_versions` et `script_structure_queue` (migrations 0084 et 0095).
 
 - La bibliothèque (`script_structures`, `script_structure_versions`) appartient à l'agence : hors RLS des créatrices, sous les politiques de l'équipe (`withMember`). Le propriétaire écrit, le propriétaire et les managers actifs lisent, personne d'autre (un chatteur, un compte de créatrice : rien).
 - Une version porte le nom, le moment et les segments (`ScriptSegment[]`, relus par le contrat). La dernière version change sur place tant qu'elle n'est pas figée ; une fois figée (`frozen_at`, posée par `structures.freeze` quand une demande la prend, SC-02), un enregistrement écrit la version suivante (règle 6). Un déclencheur refuse toute modification d'une version figée, tout changement de numéro et toute suppression, pour tous les rôles.

@@ -193,7 +193,7 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
   it('reads a version written before ADR 0064 as a paid stage and a bridge without slots', async () => {
     const first = body();
     await post(owner, first);
-    // As migration 0091 found them: no `access` on a stage, no `mediaSlots` on a bridge.
+    // As migration 0095 found them: no `access` on a stage, no `mediaSlots` on a bridge.
     await test.admin.db.execute(sql`
       UPDATE script_structure_versions SET segments = (
         SELECT jsonb_agg(segment - 'access' - 'mediaSlots' || CASE WHEN segment->>'kind' = 'stage'

@@ -29,7 +29,7 @@ export interface LinkPageCopy {
   readonly passwordLabel: string;
   readonly submit: string;
   /** Under the button, faint. */
-  readonly footnote?: string;
+  readonly footnote?: (preview: InvitationLinkPreview) => string;
 }
 
 type Step =
@@ -92,7 +92,7 @@ export function LinkPage({ copy, onSignedIn, onLeave }: LinkPageProps & { copy: 
             title="Ce lien ne marche plus"
             action={{ label: 'Aller à la connexion', onClick: onLeave }}
           >
-            Demande un nouveau lien à ton responsable.
+            Demande un nouveau lien à la personne qui te l’a envoyé.
           </Refused>
         );
       case 'used_by_this_page':
@@ -333,7 +333,7 @@ function PasswordForm({
       </button>
       {copy.footnote === undefined ? null : (
         <p className="nv-enter text-center text-sm text-[var(--nv-ink-faint)]" style={{ '--nv-i': 5 }}>
-          {copy.footnote}
+          {copy.footnote(preview)}
         </p>
       )}
     </form>

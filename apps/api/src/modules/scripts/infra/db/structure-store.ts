@@ -36,7 +36,7 @@ const versions = schema.scriptStructureVersions;
 const queue = schema.scriptStructureQueue;
 
 /**
- * A version frozen before migration 0091 has no `access` on its stages nor `mediaSlots` on its bridges, and never
+ * A version frozen before migration 0095 has no `access` on its stages nor `mediaSlots` on its bridges, and never
  * changes again (rule 6): it is read with the defaults ADR 0064 § 3 names, a paid stage and a bridge without slots.
  * What a segment already says wins.
  */

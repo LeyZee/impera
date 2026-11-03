@@ -36,18 +36,46 @@ export const InvitationLinkCreatedSchema = z.object({
 export type InvitationLinkCreated = z.infer<typeof InvitationLinkCreatedSchema>;
 
 /**
+ * `POST /v1/creators/:creatorId/invitation-link` (owner, recent sign-in; CR-02, ADR 0042 § 1): the link of a creator's
+ * own account, valid 72 h, a new one cancelling the one before. `invitation` names her e-mail: her account (role
+ * `creator`, linked to this creator only) is made with it the first time, and an account already made keeps its own
+ * (another e-mail answers 409 `creator_account_conflict`; an e-mail another account has answers 409
+ * `account_email_conflict`). `reset` needs her account already made (404 `creator_account_not_found`). Unknown creator:
+ * 404 `creator_not_found`. Answers `InvitationLinkCreatedSchema`.
+ */
+export const CreateCreatorInvitationLinkBodySchema = z.discriminatedUnion('purpose', [
+  z.strictObject({ purpose: z.literal('invitation'), email: z.email() }),
+  z.strictObject({ purpose: z.literal('reset') }),
+]);
+export type CreateCreatorInvitationLinkBody = z.infer<typeof CreateCreatorInvitationLinkBodySchema>;
+
+/**
  * `POST /v1/invitation-links/inspect`: what the page shows before the link is used (« Bienvenue, Théo », the e-mail read
  * only); reading does not use it. Unknown, used, cancelled or expired all answer `invitation_link_not_found`, so the
  * answer tells nothing about which.
  */
 export const InspectInvitationLinkBodySchema = z.object({ token: InvitationLinkTokenSchema });
-export const InvitationLinkPreviewSchema = z.object({
+const previewFields = {
   purpose: InvitationLinkPurposeSchema,
   email: z.email(),
-  displayName: z.string().min(1),
-  country: CountryCodeSchema,
   expiresAt: z.iso.datetime(),
-});
+};
+/** Whose link it is: a team member's, or a creator's own account (CR-02), which has no country on file. */
+export const InvitationLinkPreviewSchema = z.discriminatedUnion('account', [
+  z.object({
+    ...previewFields,
+    account: z.literal('member'),
+    /** The member's display name, which he checks with his country (EQ-10). */
+    displayName: z.string().min(1),
+    country: CountryCodeSchema,
+  }),
+  z.object({
+    ...previewFields,
+    account: z.literal('creator'),
+    /** Her creator's display name. */
+    displayName: z.string().min(1),
+  }),
+]);
 export type InvitationLinkPreview = z.infer<typeof InvitationLinkPreviewSchema>;
 
 /**
@@ -74,6 +102,10 @@ export const INVITATION_LINK_ERROR_CODES = [
   'password_invalid',
   'member_not_found',
   'member_left_conflict',
+  'creator_not_found',
+  'creator_account_not_found',
+  'creator_account_conflict',
+  'account_email_conflict',
   REAUTHENTICATION_ERROR_CODE,
 ] as const;
 export type InvitationLinkErrorCode = (typeof INVITATION_LINK_ERROR_CODES)[number];

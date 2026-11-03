@@ -199,15 +199,20 @@ export const memberRoles = pgTable(
  * Single-use links to choose a password (EQ-10): a member's first access, or a new password without e-mail. Out of RLS
  * and out of reach of `nirvana_app` (the migration revokes it): only `withAdmin` reads or writes it, like
  * `provider_credentials`. The token itself is never stored, only its SHA-256; it is used by one atomic `UPDATE`
- * (`used_at` set only while unused, not revoked and not expired), and a member has at most one live link.
+ * (`used_at` set only while unused, not revoked and not expired), and a member, or a creator's account (CR-02), has at
+ * most one live link.
  */
 export const invitationLinks = pgTable(
   'invitation_links',
   {
     id: id(),
-    memberId: uuid('member_id')
-      .notNull()
-      .references(() => teamMembers.id),
+    /** The member the link opens, for the team (EQ-10); `null` for a creator's own account. */
+    memberId: uuid('member_id').references(() => teamMembers.id),
+    /**
+     * The account the link opens directly, for a creator (CR-02, ADR 0042 § 1): her account is not a member's. Exactly
+     * one of `member_id` and `user_id` is set.
+     */
+    userId: text('user_id').references(() => user.id),
     purpose: enumText('purpose').notNull(),
     /** SHA-256 of the token, base64url. */
     tokenHash: text('token_hash').notNull().unique(),
@@ -226,6 +231,10 @@ export const invitationLinks = pgTable(
     check('invitation_links_one_end_check', sql`${t.usedAt} is null or ${t.revokedAt} is null`),
     uniqueIndex('invitation_links_live_unique')
       .on(t.memberId)
+      .where(sql`${t.usedAt} is null and ${t.revokedAt} is null`),
+    check('invitation_links_target_check', sql`(${t.memberId} is null) <> (${t.userId} is null)`),
+    uniqueIndex('invitation_links_live_user_unique')
+      .on(t.userId)
       .where(sql`${t.usedAt} is null and ${t.revokedAt} is null`),
   ],
 );
