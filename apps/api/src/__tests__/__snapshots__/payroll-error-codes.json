@@ -55,6 +55,7 @@
   "pay_period_order_conflict": 409,
   "pay_period_reports_pending_conflict": 409,
   "pay_period_reports_unread_conflict": 409,
+  "pay_period_sales_unread_conflict": 409,
   "pay_rule_started_invalid": 400,
   "payment_amount_unprocessable": 422,
   "payment_before_period_unprocessable": 422,

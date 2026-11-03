@@ -2,6 +2,7 @@ import {
   CARRY_OVER_RANK_MAX,
   COMMISSION_STATEMENT_STATUSES,
   CurrencySchema,
+  EARNINGS_BASES,
   EARNINGS_SOURCES,
   ForeignCurrencySchema,
   PAY_AMOUNT_MAX_MINOR,
@@ -11,6 +12,8 @@ import {
   PAYMENT_REFERENCE_MAX,
   PAYOUT_DELAY_MAX_BUSINESS_DAYS,
   PENALTY_KINDS,
+  PlatformSchema,
+  SaleEventSchema,
 } from '@nirvana/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -449,7 +452,11 @@ export const commissionStatements = pgTable(
   ],
 );
 
-/** One account of a statement's revision, each step of Imperium's chain; added only, by the job. */
+/**
+ * One account of a statement's revision, each step of Imperium's chain; added only, by the job. `base` says where its
+ * gross comes from (ADR 0050 § 8): `gross_chain`, its reports under the chain of ADR 0023; `platform_net`, the
+ * platform's net of the sales it counts (`sales`, CRM-03), without VAT nor the platform's commission to take off.
+ */
 export const commissionStatementLines = pgTable(
   'commission_statement_lines',
   {
@@ -472,6 +479,10 @@ export const commissionStatementLines = pgTable(
     commissionMinor: integer('commission_minor').notNull(),
     shiftReportIds: uuid('shift_report_ids').array().notNull(),
     lateReports: jsonb('late_reports').notNull(),
+    base: text('base').notNull().default('gross_chain'),
+    sales: jsonb('sales')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     createdAt: createdAt(),
   },
   (t) => [
@@ -482,8 +493,14 @@ export const commissionStatementLines = pgTable(
       t.currency,
       t.vatBps,
       t.platformFeeBps,
+      t.base,
     ),
     enumCheck('commission_statement_lines', t.currency, CurrencySchema.options),
+    enumCheck('commission_statement_lines', t.base, EARNINGS_BASES),
+    check(
+      'commission_statement_lines_sales_check',
+      sql`jsonb_typeof(${t.sales}) = 'array' and (${t.base} = 'platform_net' or ${t.sales} = '[]'::jsonb) and (${t.base} = 'gross_chain' or (${t.vatBps} = 0 and ${t.platformFeeBps} = 0 and cardinality(${t.shiftReportIds}) = 0 and ${t.lateReports} = '[]'::jsonb))`,
+    ),
     check(
       'commission_statement_lines_rules_check',
       sql`${t.revision} >= 1 and ${t.rateMicros} > 0 and ${t.vatBps} between 0 and 10000 and ${t.platformFeeBps} between 0 and 10000`,
@@ -631,6 +648,49 @@ export const payPeriodReports = pgTable(
   },
   (t) => [
     index('pay_period_reports_period_member_idx').on(t.period, t.memberId),
+    memberRead(t.memberId),
+    pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
+  ],
+);
+
+/**
+ * The registry of counted sales (CRM-03, ADR 0050 §§ 5 and 7, on the model of `pay_period_reports`): a line of the
+ * platform's register is counted once, in the period of the closing that wrote it, for the member and the link's
+ * version that closing saw. It keeps what a statement takes from the line (account, currency, signed net, the sale's
+ * period), so that a closed period counts it again without reading the register.
+ */
+export const payPeriodSales = pgTable(
+  'pay_period_sales',
+  {
+    platform: text('platform').notNull(),
+    platformSaleId: text('platform_sale_id').notNull(),
+    event: text('event').notNull(),
+    period: date('period')
+      .notNull()
+      .references(() => payPeriodClosings.period),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => teamMembers.id),
+    linkVersion: text('link_version').notNull(),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    currency: text('currency').notNull(),
+    netMinor: integer('net_minor').notNull(),
+    salePeriod: date('sale_period').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'pay_period_sales_pkey', columns: [t.platform, t.platformSaleId, t.event] }),
+    index('pay_period_sales_period_member_idx').on(t.period, t.memberId),
+    enumCheck('pay_period_sales', t.platform, PlatformSchema.options),
+    enumCheck('pay_period_sales', t.event, SaleEventSchema.options),
+    enumCheck('pay_period_sales', t.currency, CurrencySchema.options),
+    periodCheck('pay_period_sales_sale_period_check', t.salePeriod),
+    check(
+      'pay_period_sales_net_check',
+      sql`${t.salePeriod} <= ${t.period} and ((${t.event} = 'sale' and ${t.netMinor} >= 0) or (${t.event} = 'refund' and ${t.netMinor} <= 0))`,
+    ),
     memberRead(t.memberId),
     pgPolicy('agency_insert', { for: 'insert', withCheck: readsTeam }),
   ],

@@ -37,6 +37,8 @@ export { payReadsForContractors } from './infra/contractor-reads';
  * correction of an upheld contest through `correctContest`.
  */
 export type { AfterValidation, ContestCorrectionWrite, PayoutGate } from './infra/ports';
+/** @public What pay reads of the other modules, plugged by the composition root (EQ-04, CRM-03). */
+export type { PayInputReads } from './infra/snapshot';
 export type { PayoutVerdict } from './domain/ports';
 /** Refused to a member on their own pay or document: the owner never decides in their own name (`invoicing` too). */
 export { PayrollOwnForbidden } from './domain/errors';

@@ -171,6 +171,18 @@ export class PayPeriodReportsUnread extends DomainError {
 }
 
 /**
+ * Sales of the platform a member would be paid for in the periods to close that the validating member may not read
+ * (CRM-03): the closing would leave them behind, so it refuses, as for reports.
+ */
+export class PayPeriodSalesUnread extends DomainError {
+  constructor(count: number) {
+    super('pay_period_sales_unread_conflict', 'Des ventes de la quinzaine échappent à cette validation', {
+      details: { count },
+    });
+  }
+}
+
+/**
  * A bonus, a penalty or an adjustment for a period the member's validated statements have closed, or tiers and a goal
  * for a period some statement is validated for, or an earlier one (EQ-04).
  */
