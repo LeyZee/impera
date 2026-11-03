@@ -551,8 +551,20 @@ export interface CalendarRow {
  * an active chatter (every shift of the team and the agent), `own` for anyone else (their own shifts, no agent).
  */
 export interface CalendarReads {
+  /**
+   * One snapshot: the view, the shifts and the agent, the settings, and for `agency` alone the accounts and the shifts
+   * of each, read creator by creator (`creatorIds`, the creators that exist) under the same policies as Planning, so
+   * that the créneaux to fill, the hours and the coverage agree with the shifts shown.
+   */
   read(
     actor: UserId,
     window: { readonly from: Date; readonly to: Date },
-  ): Promise<{ view: CalendarView; shifts: CalendarRow[]; agents: CreatorAgent[] }>;
+    creatorIds: readonly CreatorId[],
+  ): Promise<{
+    view: CalendarView;
+    settings: SchedulingSettings | null;
+    shifts: CalendarRow[];
+    agents: CreatorAgent[];
+    agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null;
+  }>;
 }

@@ -20,8 +20,10 @@ import { useReportsOf } from '@/reports/api';
 import { MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
-import { useLeaves, usePlanning, useSwaps } from '@/scheduling/api';
+import { useCalendar, useLeaves, usePlanning, useSwaps } from '@/scheduling/api';
+import { monthWindow, type CalendarSearch } from '@/scheduling/calendar';
 import '@/scheduling/exchanges.css';
 import { accountLine, leaveDaysLine, phaseOf, type Phase } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
@@ -41,6 +43,9 @@ import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+
+/** The chatter's Planning in the address: the week, and the team's calendar by week or month (CR-12). */
+export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | undefined };
 
 type Open =
   | { readonly kind: 'leave' }
@@ -71,11 +76,30 @@ function leaveRangeOf(today: string, zone: string): { from: string; to: string }
  * leaves and swaps sit around it (ADR 0031): the proposals waiting for their answer first, a shift ahead offered to a
  * colleague from its row, a leave asked from the header, and their own leaves and swaps folded below.
  */
-export function MyPlanningPage({ userId }: { userId: string }): JSX.Element {
+export function MyPlanningPage({
+  userId,
+  search = {},
+  onSearch = () => undefined,
+}: {
+  userId: string;
+  /** What the address keeps (`?vue=equipe&affichage=mois&mois=…&semaine=…`), there again on return (CR-12). */
+  search?: MyPlanningSearch;
+  onSearch?: (next: MyPlanningSearch) => void;
+}): JSX.Element {
   const now = useNow();
   const zone = readerZone();
   const today = dayOf(now, zone);
-  const [monday, setMonday] = useState(() => mondayOf(today));
+  const [shown, setShown] = useState<MyPlanningSearch>(search);
+  const show = (patch: MyPlanningSearch): void => {
+    const next = { ...shown, ...patch };
+    setShown(next);
+    onSearch(next);
+  };
+  const monday = shown.semaine ?? mondayOf(today);
+  const setMonday = (next: string): void => {
+    show({ semaine: next === mondayOf(today) ? undefined : next });
+  };
+  const team = shown.vue === 'equipe';
   const [open, setOpen] = useState<Open | null>(null);
   const days = weekOf(monday);
   const planning = usePlanning({
@@ -83,6 +107,24 @@ export function MyPlanningPage({ userId }: { userId: string }): JSX.Element {
     to: zonedInstant(addDays(monday, 7), 0, zone).toISOString(),
     creatorId: null,
   });
+  // The team's calendar speaks the agency's hour: its créneaux line up there (EQ-01). Read once that hour is known.
+  const agency = planning.data?.settings.timeZone ?? null;
+  const agencyToday = agency === null ? today : dayOf(now, agency);
+  const thisMonth = agencyToday.slice(0, 7);
+  const month = shown.mois ?? thisMonth;
+  const byMonth = shown.affichage === 'mois';
+  const window = agency === null || !team ? null : byMonth ? monthWindow(month, agency) : null;
+  const calendar = useCalendar(
+    agency === null || !team
+      ? null
+      : window !== null
+        ? { from: window.from.toISOString(), to: window.to.toISOString() }
+        : {
+            from: zonedInstant(monday, 0, agency).toISOString(),
+            to: zonedInstant(addDays(monday, 7), 0, agency).toISOString(),
+          },
+  );
+  const [focus, setFocus] = useState<string | null>(null);
   // A chatter reads their own record alone: who they are, in which zone their leave days fall.
   const members = useMembers();
   const me = members.data?.find((member) => member.userId === userId) ?? null;
@@ -100,10 +142,24 @@ export function MyPlanningPage({ userId }: { userId: string }): JSX.Element {
     <Page>
       <PageHeader
         title="Planning"
-        lead={`Tes shifts, à ton heure (${cityOf(zone)}).`}
+        lead={
+          team && agency !== null
+            ? `Qui chatte quand dans l’équipe, à l’heure de l’agence (${cityOf(agency)}).`
+            : `Tes shifts, à ton heure (${cityOf(zone)}).`
+        }
         actions={
           <>
-            <WeekNav monday={monday} thisMonday={mondayOf(today)} onMonday={setMonday} />
+            {team && byMonth ? (
+              <MonthNav
+                month={month}
+                thisMonth={thisMonth}
+                onMonth={(next) => {
+                  show({ mois: next === thisMonth ? undefined : next });
+                }}
+              />
+            ) : (
+              <WeekNav monday={monday} thisMonday={mondayOf(today)} onMonday={setMonday} />
+            )}
             <button
               type="button"
               className="nv-btn nv-btn--soft"
@@ -120,6 +176,58 @@ export function MyPlanningPage({ userId }: { userId: string }): JSX.Element {
       />
       {/* One body under the header: the page's grid gives its free height to that one. */}
       <div className="sc-stack">
+        <div className="cal-bar">
+          <div className="tm-choices" role="radiogroup" aria-label="Planning affiché">
+            <button
+              type="button"
+              role="radio"
+              className="nv-chip"
+              aria-checked={!team}
+              onClick={() => {
+                show({ vue: undefined });
+              }}
+            >
+              Mes shifts
+            </button>
+            <button
+              type="button"
+              role="radio"
+              className="nv-chip"
+              aria-checked={team}
+              onClick={() => {
+                show({ vue: 'equipe' });
+              }}
+            >
+              L’équipe
+            </button>
+          </div>
+          {team ? (
+            <div className="tm-choices" role="radiogroup" aria-label="Période">
+              <button
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={!byMonth}
+                onClick={() => {
+                  show({ affichage: undefined });
+                }}
+              >
+                Semaine
+              </button>
+              <button
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={byMonth}
+                onClick={() => {
+                  show({ affichage: 'mois' });
+                }}
+              >
+                Mois
+              </button>
+            </div>
+          ) : null}
+        </div>
         {members.isError && me === null ? (
           <div className="sc-inline-warn sc-unread nv-swap" role="alert">
             <p className="tm-warn">
@@ -154,7 +262,22 @@ export function MyPlanningPage({ userId }: { userId: string }): JSX.Element {
             zone={zone}
           />
         )}
-        {planning.isError ? (
+        {team ? (
+          <TeamPanel
+            calendar={calendar}
+            failed={planning.isError && agency === null}
+            onRetry={() => {
+              void (agency === null ? planning.refetch() : calendar.refetch());
+            }}
+            days={window?.days ?? weekOf(monday)}
+            month={byMonth ? month : null}
+            today={agencyToday}
+            now={now}
+            me={me?.id ?? null}
+            focus={focus}
+            onFocus={setFocus}
+          />
+        ) : planning.isError ? (
           <Panel className="nv-coming">
             <div className="nv-coming__in sc-notice">
               <h2>Le serveur ne répond pas</h2>

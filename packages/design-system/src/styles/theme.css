@@ -34,6 +34,7 @@
   --color-warning: var(--nv-warning);
   --color-danger: var(--nv-danger);
   --color-sale: var(--nv-sale);
+  --color-agent: var(--nv-agent);
   --color-select: var(--nv-select);
   --color-select-strong: var(--nv-select-strong);
   --color-plate: var(--nv-plate);

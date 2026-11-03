@@ -4,14 +4,17 @@ import {
   CreatorIdSchema,
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
+  SchedulingSettingsSchema,
   type CalendarView,
 } from '@nirvana/contracts';
-import { eq, schema, sql, SNAPSHOT_READ, withMember, type Database } from '@nirvana/db';
+import { and, enterCreator, eq, schema, sql, SNAPSHOT_READ, withMember, type Database } from '@nirvana/db';
 import { z } from 'zod';
 
-import type { CalendarReads } from '../domain/ports';
+import type { CalendarReads, StoredAccount, StoredShift } from '../domain/ports';
 
-const { teamMembers } = schema;
+import { shiftColumns, StoredAccountSchema, toShift } from './rows';
+
+const { platformAccounts, schedulingSettings, shifts: shiftTable, teamMembers } = schema;
 
 const ShiftRowSchema = z.object({
   member_id: TeamMemberIdSchema,
@@ -37,7 +40,7 @@ const AgentRowSchema = z.object({
  */
 export function createDrizzleCalendarReads(db: Database): CalendarReads {
   return {
-    read: (actor, window) =>
+    read: (actor, window, creatorIds) =>
       withMember(
         db,
         actor,
@@ -55,8 +58,45 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
             sql`select * from public.calendar_shifts(${window.from}, ${window.to})`,
           );
           const agents = await tx.execute(sql`select * from public.calendar_agent()`);
+          const [settings] = await tx
+            .select({
+              timeZone: schedulingSettings.timeZone,
+              slotStartMinute: schedulingSettings.slotStartMinute,
+              slotLengthMinutes: schedulingSettings.slotLengthMinutes,
+              accessMarginMinutes: schedulingSettings.accessMarginMinutes,
+            })
+            .from(schedulingSettings);
+          let agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null = null;
+          if (view === 'agency') {
+            agency = { accounts: [], shifts: [] };
+            for (const creatorId of creatorIds) {
+              await enterCreator(tx, creatorId, creatorIds);
+              const rows = await tx
+                .select(shiftColumns)
+                .from(shiftTable)
+                .where(
+                  and(
+                    sql`${shiftTable.cancelledAt} is null`,
+                    sql`${shiftTable.startsAt} < ${window.to}`,
+                    sql`${shiftTable.endsAt} > ${window.from}`,
+                  ),
+                );
+              agency.shifts.push(...rows.map(toShift));
+              const accounts = await tx
+                .select({
+                  id: platformAccounts.id,
+                  creatorId: platformAccounts.creatorId,
+                  platform: platformAccounts.platform,
+                  handle: platformAccounts.handle,
+                })
+                .from(platformAccounts);
+              agency.accounts.push(...accounts.map((row) => StoredAccountSchema.parse(row)));
+            }
+          }
           return {
             view,
+            settings: settings === undefined ? null : SchedulingSettingsSchema.parse(settings),
+            agency,
             shifts: shifts.rows.map((raw) => {
               const row = ShiftRowSchema.parse(raw);
               return {

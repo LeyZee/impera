@@ -103,6 +103,14 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     expect(contrast(token(theme, text), ground.void)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
+  it('agent, the violet of the AI, reads at AA on void, on a raised surface and on its own soft tag', () => {
+    expect(contrast(token(theme, 'agent'), ground.void)).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(contrast(token(theme, 'agent'), ground.surfaceRaised)).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(
+      contrast(token(theme, 'agent'), over(ground.surfaceRaised, token(theme, 'agent-soft'))),
+    ).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
   it('neon-ink reads at AA on a neon-soft tag over glass', () => {
     expect(
       contrast(token(theme, 'neon-ink'), over(ground.glassOverAura, token(theme, 'neon-soft'))),
