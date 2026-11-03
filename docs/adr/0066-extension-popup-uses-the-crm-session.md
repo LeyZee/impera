@@ -1,6 +1,6 @@
 # 0066. Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret
 
-Statut : accepted (Charles, 03/11/2026, 17 h 37, « ok 0066 » ; § 7 amendé pour l'aligner sur la liaison de VEI-01 : « ok phrases 0066 », 17 h 38 ; raccourcis du § 6 alignés sur le menu du CRM après la relecture d'Extension, à confirmer ; demande de Charles du 03/11/2026, 17 h 11 : « quand on clique dessus, […] il faut que ça fasse un joli design avec se connecter, etc. Enfin, vraiment que l'extension soit fonctionnelle »)
+Statut : accepted (Charles, 03/11/2026, 17 h 37, « ok 0066 » ; § 7 amendé pour l'aligner sur la liaison de VEI-01 : « ok phrases 0066 », 17 h 38 ; raccourcis du § 6 alignés sur le menu du CRM après la relecture d'Extension : « ok phrases 0066 », 18 h 09 ; demande de Charles du 03/11/2026, 17 h 11 : « quand on clique dessus, […] il faut que ça fasse un joli design avec se connecter, etc. Enfin, vraiment que l'extension soit fonctionnelle »)
 Date : 2026-11-03
 Précise : l'ADR 0008 (rôle de l'extension) et l'ADR 0062 § 8 (identifiant de l'extension non empaquetée). Ne remplace rien.
 
