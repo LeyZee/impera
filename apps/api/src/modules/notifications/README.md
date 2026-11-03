@@ -4,6 +4,8 @@
 
 **Peut dépendre de.** aucun module métier (feuille). Les modules qui notifient (EQ-12, CR-04, CR-13) reçoivent `deliver` par le composition root.
 
+**Vente de la créatrice** (CRM-04 lot d2, ADR 0042 § 7). Le registre des ventes met en file `notifications.creator_sale` dans la transaction qui publie `sale_detected`, une fois par vente fraîche. Le job relit l'événement par le rôle admin et n'en garde que la clé de la ligne, sa part (`creatorMinor`, le `modelRevenue` de Reveal) et sa devise ; le vendeur n'en sort jamais. Il prévient chacun de ses comptes (rôle `creator`, lié à sa seule créatrice) dans le fuseau de sa créatrice, sous les règles d'une vente : « Nouvelle vente », « 12,40 € pour toi », qui ouvre `/ventes`. Jamais le fan, le chatteur, l'agent ni le prix payé. Un remboursement ou une vente lue tard ne publient rien, donc ne préviennent personne. Lu, jamais écrit : `domain_events`, `creators`, `user`.
+
 **Tables possédées** (migration `push_notifications`) :
 
 - `push_server_keys`. La paire VAPID du serveur, créée au premier usage sous un verrou consultatif, sans aucune saisie (ADR 0016). La clé privée est scellée avec `CREDENTIALS_ENCRYPTION_KEYS` (contexte `push:vapid`). La table est hors RLS et retirée au rôle applicatif.
@@ -24,6 +26,7 @@ Sans `CREDENTIALS_ENCRYPTION_KEYS`, toutes les routes répondent 503 `service_un
 
 - `domain/` : `policy.ts` (règles pures, testées) et les ports.
 - `application/devices.ts` : abonnement, réglages, livraison, test.
+- `domain/creator-sale.ts` et `application/creator-sale.ts` : le texte de la vente et le job qui prévient ses comptes ; `infra/db/creator-sales.ts` lit la vente et ses comptes.
 - `infra/web-push.ts` : RFC 8291 et RFC 8292 sur `node:crypto`, sans dépendance. Le test rejoue l'exemple de l'annexe A de la RFC 8291 octet pour octet.
 - `infra/push-sender.ts` : l'envoi HTTP (10 s au plus, TTL 24 h). Un 404 ou un 410 retire l'appareil.
 - `infra/db/`, `infra/http/`.

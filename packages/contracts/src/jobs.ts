@@ -6,6 +6,7 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   DraftIdSchema,
+  EventIdSchema,
   FanIdSchema,
   InvoiceIdSchema,
   MediaAssetIdSchema,
@@ -41,6 +42,7 @@ export const JOB_NAMES = [
   'rate_limit.purge',
   'backups.check',
   'notifications.recap',
+  'notifications.creator_sale',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'team.apply_roles',
@@ -129,6 +131,12 @@ export const JOB_PAYLOADS = {
   'backups.check': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
+  /**
+   * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
+   * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
+   * part and its currency from the event, never its seller.
+   */
+  'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
@@ -269,6 +277,8 @@ export const JOB_MAX_ATTEMPTS = {
   'rate_limit.purge': 1,
   'backups.check': 1,
   'notifications.recap': 3,
+  // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
+  'notifications.creator_sale': 5,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   'team.apply_roles': 1,

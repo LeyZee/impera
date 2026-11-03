@@ -7,6 +7,7 @@ import {
   MessageIdSchema,
   newId,
   PlatformAccountIdSchema,
+  ShiftIdSchema,
   TeamMemberIdSchema,
   UserIdSchema,
 } from '@nirvana/contracts';
@@ -164,9 +165,12 @@ async function count(tx: Transaction, table: string): Promise<number> {
 /**
  * What a creator's account may do on each table that holds a creator's rows (Bilan's review of #460): every table with
  * `tenant_isolation` has a decision here, or a new table would open to her without anyone deciding it. `readsOnly`
- * carries the three `creator_no_*` policies, `closed` carries `creator_closed`; an exception names its reason.
+ * carries the three `creator_no_*` policies, `closed` carries `creator_closed`, `hidden` carries `creator_no_select` (she
+ * never reads it, a write of hers may add to it: CRM-04 lot d); an exception names its reason.
  */
-const CREATOR_DECISIONS: Readonly<Record<string, 'readsOnly' | 'closed' | { readonly exception: string }>> = {
+const CREATOR_DECISIONS: Readonly<
+  Record<string, 'readsOnly' | 'closed' | 'hidden' | { readonly exception: string }>
+> = {
   conversations: 'readsOnly',
   messages: 'readsOnly',
   fans: 'readsOnly',
@@ -188,10 +192,12 @@ const CREATOR_DECISIONS: Readonly<Record<string, 'readsOnly' | 'closed' | { read
   system_alert_settings: 'closed',
   persona_versions: {
     exception:
-      'elle y écrit aujourd’hui par withTenant ; décision au lot b avec Moi › Persona (ADR 0042 § 8)',
+      'elle écrit sa persona (Moi › Persona, ADR 0042 § 8) par la porte de l’agence : son enregistrement et son activation écrivent aussi le journal d’audit et les événements',
   },
-  domain_events: { exception: 'fermée au lot d de CRM-04, migration 0081' },
-  platform_sales: { exception: 'fermée au lot d de CRM-04, migration 0081' },
+  // She reads her sales through the view `creator_sales` (CRM-04 lot d): the register names who sold and the fan.
+  platform_sales: 'closed',
+  // `sale_detected` names who sold; an event her transaction publishes still goes in.
+  domain_events: 'hidden',
 };
 
 /**
@@ -205,6 +211,7 @@ describe('a creator’s own account (CR-02): one creator, her rows read-only, th
   const creatorUser = newId(UserIdSchema);
   const operator = newId(UserIdSchema);
   const chatter = newId(UserIdSchema);
+  const kofi = newId(TeamMemberIdSchema);
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
@@ -229,7 +236,7 @@ describe('a creator’s own account (CR-02): one creator, her rows read-only, th
         { id: chatter, name: 'Kofi', email: 'kofi@example.test', role: 'operator', creatorIds: [] },
       ]);
       await tx.insert(s.teamMembers).values({
-        id: newId(TeamMemberIdSchema),
+        id: kofi,
         userId: chatter,
         teamRole: 'chatter',
         firstName: 'Kofi',
@@ -456,7 +463,54 @@ describe('a creator’s own account (CR-02): one creator, her rows read-only, th
       if (decision === 'readsOnly')
         expect(own, table).toEqual(['creator_no_delete', 'creator_no_insert', 'creator_no_update']);
       else if (decision === 'closed') expect(own, table).toEqual(['creator_closed']);
+      else if (decision === 'hidden') expect(own, table).toEqual(['creator_no_select']);
       else expect(decision?.exception, table).toMatch(/\S/u);
     }
+  });
+
+  it('shows her who is on shift on her accounts, by display name and range only, and nobody else', async () => {
+    const startsAt = new Date('2026-10-17T12:00:00Z');
+    const endsAt = new Date('2026-10-17T18:00:00Z');
+    await withAdmin(test.admin.db, async (tx) => {
+      // The same member, later the same day, on another creator.
+      const later = 7 * 3_600_000;
+      for (const [creator, shift] of [
+        [nora, 0],
+        [ines, later],
+      ] as const) {
+        await tx.insert(s.shifts).values({
+          id: newId(ShiftIdSchema),
+          creatorId: creator.creatorId,
+          platformAccountId: creator.accountId,
+          memberId: kofi,
+          startsAt: new Date(startsAt.getTime() + shift),
+          endsAt: new Date(endsAt.getTime() + shift),
+          createdBy: operator,
+          updatedBy: operator,
+        });
+      }
+    });
+    const seen = await withCreatorAccount(test.app.db, creatorUser, (tx) =>
+      tx.select().from(s.creatorOnDuty),
+    );
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({
+      creatorId: nora.creatorId,
+      platformAccountId: nora.accountId,
+      displayName: 'Kofi',
+      startsAt,
+      endsAt,
+    });
+    expect(Object.keys(seen[0] ?? {}).sort()).toEqual(
+      ['creatorId', 'displayName', 'endsAt', 'platformAccountId', 'shiftId', 'startsAt'].sort(),
+    );
+    // The agency and the jobs read the planning by its own routes: the view is empty for them.
+    expect(await withTenant(test.app.db, nora.creatorId, (tx) => count(tx, 'creator_on_duty'))).toBe(0);
+    expect(await withMember(test.app.db, operator, (tx) => count(tx, 'creator_on_duty'))).toBe(0);
+    // Nothing writes through it.
+    const write = await failure(
+      withCreatorAccount(test.app.db, creatorUser, (tx) => tx.execute(sql`delete from creator_on_duty`)),
+    );
+    expect(write).toMatch(/permission denied|cannot delete/u);
   });
 });

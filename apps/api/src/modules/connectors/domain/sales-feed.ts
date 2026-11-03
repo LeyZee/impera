@@ -295,7 +295,7 @@ export interface SalesLedger {
   signal(platform: Platform, signal: SalesFeedSignal, once: boolean, correlationId: string): Promise<boolean>;
   /**
    * Publishes `sales_feed_mismatch` (CRM-04 b3), with no creator, once per platform and fortnight: `false` when it was
-   * already published (the unique index of migration 0086). Nothing goes to `sales_feed_checks`.
+   * already published (the unique index of migration 0092). Nothing goes to `sales_feed_checks`.
    */
   publishMismatch(mismatch: EventPayload<'sales_feed_mismatch'>, correlationId: string): Promise<boolean>;
 }

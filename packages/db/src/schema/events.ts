@@ -2,7 +2,7 @@ import { EVENT_TYPES } from '@nirvana/contracts';
 import { sql } from 'drizzle-orm';
 import { index, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy } from './columns';
+import { createdAt, enumCheck, enumText, hiddenFromCreator, id, tenantPolicy } from './columns';
 import { creators } from './tenancy';
 
 /** Outbox for what does not belong to one conversation (append-only, same closed list of types). */
@@ -40,5 +40,7 @@ export const domainEvents = pgTable(
       .on(sql`(${t.payload}->>'platform')`, sql`(${t.payload}->>'from')`)
       .where(sql`${t.type} = 'sales_feed_mismatch'`),
     tenantPolicy(t.creatorId),
+    // `sale_detected` names who sold: her own account never reads the outbox, and still adds to it (CRM-04 lot d).
+    hiddenFromCreator(),
   ],
 );

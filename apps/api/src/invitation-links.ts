@@ -2,7 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import {
   AuditEntryIdSchema,
+  CreateCreatorInvitationLinkBodySchema,
   CreateInvitationLinkBodySchema,
+  CreatorIdSchema,
   DomainError,
   InspectInvitationLinkBodySchema,
   InvitationLinkCreatedSchema,
@@ -17,6 +19,7 @@ import {
   PASSWORD_MIN_LENGTH,
   TeamMemberIdSchema,
   UserIdSchema,
+  type CreateCreatorInvitationLinkBody,
   type InvitationLinkPurpose,
   type PasswordInvalidReason,
 } from '@nirvana/contracts';
@@ -101,9 +104,18 @@ function passwordProblem(password: string): PasswordInvalidReason | null {
   return null;
 }
 
-/** A link still usable: not used, not replaced, not expired, and its member has not left. */
+/**
+ * A link still usable: not used, not replaced, not expired, and, for a member's, its member has not left. A creator's
+ * own account (CR-02) has no member: its link names the account itself (`user_id`).
+ */
 const usable = sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null
-  and ${schema.invitationLinks.expiresAt} > now() and ${schema.teamMembers.status} <> 'left'`;
+  and ${schema.invitationLinks.expiresAt} > now()
+  and (${schema.invitationLinks.memberId} is null or exists (
+    select 1 from ${schema.teamMembers} m where m.id = ${schema.invitationLinks.memberId} and m.status <> 'left'))`;
+
+/** The account a link opens: its member's, or the creator's account it names. */
+const accountOfLink = sql<string>`coalesce(${schema.invitationLinks.userId},
+  (select m.user_id from ${schema.teamMembers} m where m.id = ${schema.invitationLinks.memberId}))`;
 
 async function audit(
   tx: Transaction,
@@ -181,6 +193,137 @@ async function createLinkUnscoped(
   });
 }
 
+class CreatorNotFound extends DomainError {
+  constructor() {
+    super('creator_not_found', 'Créatrice introuvable');
+  }
+}
+
+class CreatorAccountNotFound extends DomainError {
+  constructor() {
+    super('creator_account_not_found', 'Elle n’a pas encore de compte : envoie-lui d’abord une invitation');
+  }
+}
+
+class CreatorAccountConflict extends DomainError {
+  constructor() {
+    super('creator_account_conflict', 'Elle a déjà un compte, avec une autre adresse e-mail');
+  }
+}
+
+class AccountEmailConflict extends DomainError {
+  constructor() {
+    super('account_email_conflict', 'Un compte existe déjà avec cet e-mail');
+  }
+}
+
+/**
+ * `POST /v1/creators/:creatorId/invitation-link` (owner, recent sign-in; CR-02, ADR 0042 § 1): the link of her own
+ * account, made the first time with the e-mail given (role `creator`, this creator only, her name as the account's),
+ * replacing a live link of that account, if any. The token leaves the server once, in the URL it answers.
+ */
+async function createCreatorLinkUnscoped(
+  adminDb: Database,
+  input: {
+    creatorId: string;
+    body: CreateCreatorInvitationLinkBody;
+    ownerId: string;
+    ip: string;
+  },
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = randomBytes(TOKEN_BYTES).toString('base64url');
+  return withAdmin(adminDb, async (tx) => {
+    // Her row is the lock: two links asked at once, or two accounts made at once, follow one another.
+    const [creator] = await tx
+      .select({ displayName: schema.creators.displayName })
+      .from(schema.creators)
+      .where(eq(schema.creators.id, input.creatorId))
+      .for('update');
+    if (creator === undefined) throw new CreatorNotFound();
+    const [existing] = await tx
+      .select({ id: schema.user.id, email: schema.user.email })
+      .from(schema.user)
+      .where(
+        and(
+          eq(schema.user.role, 'creator'),
+          sql`${schema.user.creatorIds} = array[${input.creatorId}]::uuid[]`,
+        ),
+      );
+    const { body } = input;
+    // Written as Better Auth looks it up at sign-in, trimmed and in lower case (Bilan, #473).
+    const email = body.purpose === 'invitation' ? body.email.trim().toLowerCase() : null;
+    let userId: string;
+    if (existing !== undefined) {
+      if (email !== null && existing.email.trim().toLowerCase() !== email) throw new CreatorAccountConflict();
+      userId = existing.id;
+    } else {
+      if (email === null) throw new CreatorAccountNotFound();
+      const [taken] = await tx
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(sql`lower(${schema.user.email}) = ${email}`);
+      if (taken !== undefined) throw new AccountEmailConflict();
+      userId = newId(UserIdSchema);
+      await tx.insert(schema.user).values({
+        id: userId,
+        name: creator.displayName,
+        email,
+        role: 'creator',
+        creatorIds: [input.creatorId],
+      });
+      await tx.insert(schema.auditLog).values({
+        id: newId(AuditEntryIdSchema),
+        userId: input.ownerId,
+        action: 'creator_account.create',
+        entity: 'user',
+        entityId: userId,
+        ip: input.ip,
+        details: { creatorId: input.creatorId },
+      });
+    }
+    const replaced = await tx
+      .update(schema.invitationLinks)
+      .set({ revokedAt: sql`now()` })
+      .where(
+        and(
+          eq(schema.invitationLinks.userId, userId),
+          sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null`,
+        ),
+      )
+      .returning({ id: schema.invitationLinks.id });
+    for (const link of replaced) {
+      await audit(tx, {
+        userId: input.ownerId,
+        action: 'invitation_link.revoke',
+        linkId: link.id,
+        ip: input.ip,
+        details: { creatorId: input.creatorId },
+      });
+    }
+    const id = newId(InvitationLinkIdSchema);
+    const [created] = await tx
+      .insert(schema.invitationLinks)
+      .values({
+        id,
+        userId,
+        purpose: body.purpose,
+        tokenHash: hashOf(token),
+        createdBy: input.ownerId,
+        expiresAt: sql`now() + ${LINK_LIFETIME}::interval`,
+      })
+      .returning({ expiresAt: schema.invitationLinks.expiresAt });
+    if (created === undefined) throw new Error('invitation link not created');
+    await audit(tx, {
+      userId: input.ownerId,
+      action: 'invitation_link.create',
+      linkId: id,
+      ip: input.ip,
+      details: { purpose: body.purpose, creatorId: input.creatorId, replaced: replaced.length },
+    });
+    return { token, expiresAt: created.expiresAt };
+  });
+}
+
 /** `POST /v1/invitation-links/inspect`: what the page shows before the link is used; reading does not use it. */
 async function inspectLinkUnscoped(adminDb: Database, token: string) {
   const [row] = await withAdmin(adminDb, (tx) =>
@@ -188,17 +331,37 @@ async function inspectLinkUnscoped(adminDb: Database, token: string) {
       .select({
         purpose: schema.invitationLinks.purpose,
         email: schema.user.email,
-        displayName: schema.teamMembers.displayName,
+        // The member's display name; for a creator's own account, her creator's (CR-02).
+        displayName: sql<string>`coalesce(${schema.teamMembers.displayName}, ${schema.creators.displayName}, ${schema.user.name})`,
         country: schema.teamMembers.country,
+        memberId: schema.teamMembers.id,
         expiresAt: schema.invitationLinks.expiresAt,
       })
       .from(schema.invitationLinks)
-      .innerJoin(schema.teamMembers, eq(schema.teamMembers.id, schema.invitationLinks.memberId))
-      .innerJoin(schema.user, eq(schema.user.id, schema.teamMembers.userId))
+      .leftJoin(schema.teamMembers, eq(schema.teamMembers.id, schema.invitationLinks.memberId))
+      .innerJoin(
+        schema.user,
+        sql`${schema.user.id} = coalesce(${schema.teamMembers.userId}, ${schema.invitationLinks.userId})`,
+      )
+      .leftJoin(
+        schema.creators,
+        sql`${schema.user.role} = 'creator' and ${schema.creators.id} = ${schema.user.creatorIds}[1]`,
+      )
       .where(and(eq(schema.invitationLinks.tokenHash, hashOf(token)), usable)),
   );
   if (row === undefined) throw new InvitationLinkNotFound();
-  return InvitationLinkPreviewSchema.parse({ ...row, expiresAt: row.expiresAt.toISOString() });
+  const common = {
+    purpose: row.purpose,
+    email: row.email,
+    displayName: row.displayName,
+    expiresAt: row.expiresAt.toISOString(),
+  };
+  // A link names a member or an account, never both (`invitation_links_target_check`).
+  return InvitationLinkPreviewSchema.parse(
+    row.memberId === null
+      ? { ...common, account: 'creator' }
+      : { ...common, account: 'member', country: row.country },
+  );
 }
 
 const accountColumns = {
@@ -223,18 +386,11 @@ async function redeemLinkUnscoped(
     const [link] = await tx
       .update(schema.invitationLinks)
       .set({ usedAt: sql`now()` })
-      .from(schema.teamMembers)
-      .where(
-        and(
-          eq(schema.teamMembers.id, schema.invitationLinks.memberId),
-          eq(schema.invitationLinks.tokenHash, hashOf(input.token)),
-          usable,
-        ),
-      )
+      .where(and(eq(schema.invitationLinks.tokenHash, hashOf(input.token)), usable))
       .returning({
         id: schema.invitationLinks.id,
         purpose: schema.invitationLinks.purpose,
-        userId: schema.teamMembers.userId,
+        userId: accountOfLink,
       });
     if (link === undefined) throw new InvitationLinkNotFound();
     const [account] = await tx
@@ -317,10 +473,16 @@ export function liveInvitationLinksUnscoped(
         ),
       );
     return new Map(
-      rows.map((row) => [
-        row.memberId,
-        { purpose: InvitationLinkPurposeSchema.parse(row.purpose), expiresAt: row.expiresAt },
-      ]),
+      rows.flatMap((row) =>
+        row.memberId === null
+          ? []
+          : [
+              [
+                row.memberId,
+                { purpose: InvitationLinkPurposeSchema.parse(row.purpose), expiresAt: row.expiresAt },
+              ] as const,
+            ],
+      ),
     );
   });
 }
@@ -336,6 +498,7 @@ export interface InvitationLinkRoutesDeps {
 }
 
 const MemberParamsSchema = z.object({ memberId: TeamMemberIdSchema });
+const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
 /**
  * The contract bounds the password; read here as a plain string so that a password out of bounds answers
  * `password_invalid` with its reason, as the page expects, rather than a validation error. Bounded all the same.
@@ -361,7 +524,10 @@ async function openSession(
   if (cookies.length > 0) void reply.header('set-cookie', cookies);
 }
 
-/** The three routes of the invitation links (EQ-10). The table is reached through `withAdmin` only. */
+/**
+ * The routes of the invitation links (EQ-10), a member's and a creator's own account's (CR-02). The table is reached
+ * through `withAdmin` only.
+ */
 export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): FastifyPluginAsyncZod {
   return (app) => {
     app.post(
@@ -379,6 +545,30 @@ export function createInvitationLinkRoutes(deps: InvitationLinkRoutesDeps): Fast
         const { token, expiresAt } = await createLinkUnscoped(deps.adminDb, {
           memberId: request.params.memberId,
           purpose: request.body.purpose,
+          ownerId: request.user.id,
+          ip: request.ip,
+        });
+        const url = new URL(PAGE_OF[request.body.purpose], deps.config.WEB_ORIGIN);
+        url.hash = `t=${token}`;
+        return { url: url.toString(), expiresAt: expiresAt.toISOString() };
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/invitation-link',
+      {
+        preValidation: [deps.requireRole('owner'), deps.recentLogin],
+        schema: {
+          params: CreatorParamsSchema,
+          body: CreateCreatorInvitationLinkBodySchema,
+          response: { 200: InvitationLinkCreatedSchema },
+        },
+      },
+      async (request) => {
+        if (request.user === null) throw new Error('requireRole ran without a user');
+        const { token, expiresAt } = await createCreatorLinkUnscoped(deps.adminDb, {
+          creatorId: request.params.creatorId,
+          body: request.body,
           ownerId: request.user.id,
           ip: request.ip,
         });

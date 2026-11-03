@@ -565,8 +565,29 @@
     {
       "idx": 80,
       "version": "7",
-      "when": 1793708807560,
-      "tag": "0086_sales_feed_mismatch",
+      "when": 1793708788993,
+      "tag": "0085_creator_sales",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1793710154097,
+      "tag": "0088_creator_on_duty",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793710996397,
+      "tag": "0089_creator_invitation",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1793711869411,
+      "tag": "0092_sales_feed_mismatch",
       "breakpoints": true
     }
   ]

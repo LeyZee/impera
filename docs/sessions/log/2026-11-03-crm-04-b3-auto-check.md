@@ -2,7 +2,7 @@
 
 - Fiche : CRM-04, lot b3, convenu avec Équipe et Telegram (précisions a à e d'Équipe).
 - Fait :
-  - migration 0086 : `sales_feed_mismatch` dans les CHECK des types d'événements, et index unique `domain_events_sales_feed_mismatch_unique` sur (plateforme, quinzaine) ;
+  - migration 0092 : `sales_feed_mismatch` dans les CHECK des types d'événements, et index unique `domain_events_sales_feed_mismatch_unique` sur (plateforme, quinzaine) ;
   - contrat de l'événement et du job `connector.check_sales` ;
   - `domain/auto-check.ts` (`fortnightBefore`, `mismatchDays`) ;
   - `buildReport`, partagé entre la vérification de Réglages et le job ;

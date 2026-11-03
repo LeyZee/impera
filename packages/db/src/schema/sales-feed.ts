@@ -25,7 +25,17 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz, updatedAt } from './columns';
+import {
+  agencyOnly,
+  closedToCreator,
+  createdAt,
+  enumCheck,
+  enumText,
+  id,
+  tenantPolicy,
+  timestampTz,
+  updatedAt,
+} from './columns';
 import { teamMembers } from './team';
 import { creators, platformAccounts } from './tenancy';
 
@@ -183,6 +193,8 @@ export const salesFeedChatters = pgTable(
     enumCheck('sales_feed_chatters', t.platform, PlatformSchema.options),
     enumCheck('sales_feed_chatters', t.kind, ['member', 'agent']),
     check('sales_feed_chatters_member_check', sql`(${t.kind} = 'member') = (${t.memberId} is not null)`),
+    // Who sells is the agency's: a creator's own account never reads the links (CRM-04 lot d).
+    agencyOnly(),
   ],
 );
 
@@ -253,12 +265,16 @@ export const platformSales = pgTable(
     index('platform_sales_creator_occurred_idx').on(t.creatorId, t.occurredAt),
     index('platform_sales_account_chatter_idx').on(t.platformAccountId, t.platformChatterId, t.occurredAt),
     tenantPolicy(t.creatorId),
+    // Her own account reads her sales through `creator_sales` alone, which names neither the chatter nor the platform's
+    // fan (CRM-04 lot d, ADR 0042 § 2).
+    closedToCreator(),
   ],
 );
 
 /**
  * Lines of a model linked to no creator account (ADR 0050 § 3): counted nowhere, kept until the owner links the
- * model, then moved to `platform_sales` and marked released. Agency-level, out of RLS.
+ * model, then moved to `platform_sales` and marked released. Agency-level, of no creator: RLS only closes it to a
+ * creator's own account (`agencyOnly`).
  */
 export const platformSalesQuarantine = pgTable(
   'platform_sales_quarantine',
@@ -283,6 +299,8 @@ export const platformSalesQuarantine = pgTable(
       'platform_sales_quarantine_amounts_check',
       sql`${t.agencyMinor} >= 0 and ${t.creatorMinor} >= 0 and ${t.netMinor} <= ${t.grossExclVatMinor} and ${t.grossExclVatMinor} <= ${t.grossInclVatMinor}`,
     ),
+    // Lines of no creator, with their chatter and the platform's fan: never a creator's own account (CRM-04 lot d).
+    agencyOnly(),
   ],
 );
 
@@ -290,7 +308,7 @@ export const platformSalesQuarantine = pgTable(
  * The reports of the reliability check (ADR 0050 § 8, CRM-02), one per check, never rewritten: the switch of an
  * account to the platform's net (CRM-03) rests on the latest clean one. `report` is the answer as the owner saw it
  * (`SalesFeedCheckReport`: totals, models, team members, no fan data); the export itself is never kept. Agency-level,
- * out of RLS.
+ * of no creator: RLS only closes it to a creator's own account (`agencyOnly`).
  */
 export const salesFeedChecks = pgTable(
   'sales_feed_checks',
@@ -313,5 +331,7 @@ export const salesFeedChecks = pgTable(
     enumCheck('sales_feed_checks', t.verdict, SalesFeedCheckVerdictSchema.options),
     check('sales_feed_checks_days_check', sql`${t.fromDay} <= ${t.toDay}`),
     check('sales_feed_checks_clean_check', sql`not ${t.clean} or ${t.verdict} = 'match'`),
+    // A report names each team member and what the switch changes for him: never a creator's own account.
+    agencyOnly(),
   ],
 );

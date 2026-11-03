@@ -1,6 +1,8 @@
 import {
   CreatorIdSchema,
+  CreatorSalesSchema,
   EVENT_PAYLOADS,
+  FanIdSchema,
   newId,
   PlatformAccountIdSchema,
   TeamMemberIdSchema,
@@ -8,8 +10,10 @@ import {
   type PlatformAccountId,
   type SalesTotals,
   type TeamMemberId,
+  type UserId,
+  UserIdSchema,
 } from '@nirvana/contracts';
-import { eq, schema, sql, withTenant } from '@nirvana/db';
+import { eq, schema, sql, withCreatorAccount, withTenant } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -17,7 +21,7 @@ import { z } from 'zod';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
-import { revealSalesFeed, salesFeedTotals } from '../modules/connectors';
+import { creatorSalesReads, revealSalesFeed, salesFeedTotals } from '../modules/connectors';
 import { buildServer, type Server } from '../server';
 
 import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, type FakeCrm } from './fake-reveal/crm';
@@ -30,6 +34,18 @@ const CHATTER = { email: 'chatter@example.test', name: 'Chatteur', password: 'st
 const OCTOBER = { from: '2026-10-01', to: '2026-10-31' };
 
 const RungSchema = z.object({ platform_sale_id: z.string(), creator_id: z.string(), payload: z.unknown() });
+const ToldSchema = z.object({
+  platform_sale_id: z.string(),
+  line_id: z.string(),
+  key: z.string(),
+  event_id: z.string(),
+});
+const DeliverySchema = z.object({
+  object_key: z.string(),
+  decision: z.string(),
+  title: z.string(),
+  url: z.string(),
+});
 const StatsSchema = z.object({
   data: z.array(
     z.object({
@@ -59,6 +75,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
   let otherCreatorId: CreatorId;
   let otherAccountId: PlatformAccountId;
   let memberId: TeamMemberId;
+  let creatorUser: UserId;
   let jobLogger: ReturnType<typeof createLogger>;
 
   const read = () => app.modules.connectors.jobs.readSales(jobLogger, 'test', true);
@@ -75,6 +92,19 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
       .array(RungSchema)
       .parse(result.rows)
       .map((row) => ({ ...row, payload: EVENT_PAYLOADS.sale_detected.parse(row.payload) }));
+  }
+
+  /** Every `notifications.creator_sale` waiting, with the register's key of its sale (CRM-04 lot d2). */
+  async function told() {
+    const result = await test.admin.db.execute(sql`
+      select l.platform_sale_id, l.id as line_id, j.key, e.id as event_id
+        from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+        join domain_events e on e.id = (j.payload->>'eventId')::uuid
+        join platform_sales l on l.id = (e.payload->>'saleId')::uuid
+       where t.identifier = 'notifications.creator_sale'
+       order by l.platform_sale_id`);
+    return z.array(ToldSchema).parse(result.rows);
   }
 
   const api = (method: 'PUT', url: string, payload: object) =>
@@ -115,7 +145,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
   }
 
   /** The totals summed by day over every account, kind and seller, as Reveal's statistics are. */
-  function byDay(totals: SalesTotals) {
+  function byDay(totals: { readonly rows: readonly Omit<SalesTotals['rows'][number], 'seller'>[] }) {
     const days = new Map<
       string,
       { grossInclVat: number; grossExclVat: number; agency: number; creator: number }
@@ -218,6 +248,10 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     for (const one of first) {
       expect(JSON.stringify(one.payload)).not.toMatch(/member_test_01|fan_test_01/);
     }
+    // Her accounts are told of the same sales, by one job per sale, keyed by its line (CRM-04 lot d2).
+    const firstTold = await told();
+    expect(firstTold.map((one) => one.platform_sale_id)).toEqual(first.map((one) => one.platform_sale_id));
+    for (const one of firstTold) expect(one.key).toBe(`notifications.creator_sale:${one.line_id}`);
 
     // The register read again from its start, a refund: nothing rings again.
     crm.refund('sale_member', new Date().toISOString());
@@ -227,6 +261,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
       .where(eq(schema.salesFeedCursors.platform, 'reveal'));
     await read();
     expect(await rung()).toEqual(first);
+    expect(await told()).toEqual(firstTold);
 
     // The quarantined sale joins the register when its model is linked: late, it rings nothing.
     const linked = await api('PUT', '/v1/settings/sales-feeds/reveal/models/model_test_02', {
@@ -239,6 +274,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
       .where(eq(schema.platformSales.platformSaleId, 'sale_quarantine'));
     expect(released).toEqual([{ creatorId: otherCreatorId }]);
     expect(await rung()).toEqual(first);
+    expect(await told()).toEqual(firstTold);
   });
 
   it('gives a month of totals equal to Reveal’s statistics to the cent, a refund taken off its sale’s day', async () => {
@@ -334,6 +370,103 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     const [unlinked] = await creatorWithAccount('sans_lien_test');
     expect(await withTenant(app.db.db, unlinked, (tx) => salesFeedTotals.readingsOf(tx, unlinked))).toEqual(
       [],
+    );
+  });
+
+  it('gives the creator, through her own account, Reveal’s figures to the cent, with no seller and her fan by his card', async () => {
+    creatorUser = newId(UserIdSchema);
+    await test.admin.db.insert(schema.user).values({
+      id: creatorUser,
+      name: 'Créatrice test',
+      email: 'creatrice@example.test',
+      role: 'creator',
+      creatorIds: [creatorId],
+    });
+    // The fan of FakeReveal's sales has a card in her creator: his id comes with her lines, never the platform's.
+    const fanId = newId(FanIdSchema);
+    await withTenant(app.db.db, creatorId, (tx) =>
+      tx.insert(schema.fans).values({
+        id: fanId,
+        creatorId,
+        platformAccountId: accountId,
+        platformFanId: 'member_test_01',
+        displayName: 'Fan test',
+      }),
+    );
+
+    const mine = await withCreatorAccount(app.db.db, creatorUser, (tx) =>
+      creatorSalesReads.salesOf(tx, OCTOBER),
+    );
+    // The strict contract of her screen: a field of who sold, or of the platform's fan, would fail it.
+    expect(CreatorSalesSchema.parse(mine)).toEqual(mine);
+    expect(byDay(mine)).toEqual(await revealStats(OCTOBER.from, OCTOBER.to));
+    const totals = await withTenant(app.db.db, creatorId, (tx) =>
+      salesFeedTotals.totalsOf(tx, { creatorId, ...OCTOBER }),
+    );
+    const part = (rows: readonly { creatorMinor: number }[]) =>
+      rows.reduce((sum, row) => sum + row.creatorMinor, 0);
+    expect(part(mine.rows)).toBe(part(totals.rows));
+    // The refund of November sits on its sale's day, the 25th of October, beside its sale.
+    expect(
+      mine.lines
+        .filter((line) => line.saleDay === '2026-10-25')
+        .map((line) => [line.event, line.creatorMinor]),
+    ).toEqual([
+      ['sale', 500],
+      ['refund', 500],
+    ]);
+    expect(new Set(mine.lines.map((line) => line.fanId))).toEqual(new Set([fanId]));
+    expect(JSON.stringify(mine)).not.toMatch(/member_test_01|fan_test_01|chatter_test_01|bot_test_01/);
+
+    // Any other door reads nothing from her view: the agency in her creator, and the job's admin role.
+    const asAgency = await withTenant(app.db.db, creatorId, (tx) => creatorSalesReads.salesOf(tx, OCTOBER));
+    expect(asAgency.rows).toEqual([]);
+    const asAdmin = await test.admin.db.transaction((tx) => creatorSalesReads.salesOf(tx, OCTOBER));
+    expect(asAdmin.lines).toEqual([]);
+  });
+
+  it('tells her own accounts of each fresh sale once, her part only, and no one else', async () => {
+    const { creatorSale } = app.modules.notifications;
+    if (creatorSale === null) throw new Error('push is off');
+    // The other creator's own account: her sales are not this one's.
+    await test.admin.db.insert(schema.user).values({
+      id: newId(UserIdSchema),
+      name: 'Autre créatrice',
+      email: 'autre-creatrice@example.test',
+      role: 'creator',
+      creatorIds: [otherCreatorId],
+    });
+    // 13 h in Paris, out of her quiet hours: the fourth sale within two minutes joins the grouped one (CR-01).
+    const at = new Date('2026-11-03T12:00:00Z');
+    const jobs = await told();
+    expect(jobs.map((one) => one.platform_sale_id)).toEqual([
+      'sale_agent',
+      'sale_member',
+      'sale_nobody',
+      'sale_unlinked',
+    ]);
+    const outcomes = [];
+    for (const job of jobs) outcomes.push(await creatorSale(job.event_id, at));
+    expect(outcomes).toEqual([['rang'], ['rang'], ['rang'], ['grouped']]);
+    // A job run again tells nobody twice.
+    for (const job of jobs) expect(await creatorSale(job.event_id, at)).toEqual(['duplicate']);
+
+    const deliveries = await test.admin.db.execute(sql`
+      select user_id, object_key, decision, title, url from notification_deliveries order by object_key collate "C"`);
+    const rows = z.array(DeliverySchema.extend({ user_id: z.string() })).parse(deliveries.rows);
+    // Hers alone: neither the chatter, nor the owner, nor the other creator; the late sale and the refund told nothing.
+    expect(new Set(rows.map((row) => row.user_id))).toEqual(new Set([creatorUser]));
+    expect(
+      rows.map(({ object_key, decision, title, url }) => ({ object_key, decision, title, url })),
+    ).toEqual(
+      [...jobs]
+        .sort((a, b) => (a.line_id < b.line_id ? -1 : 1))
+        .map((job) => ({
+          object_key: job.line_id,
+          decision: job.platform_sale_id === 'sale_unlinked' ? 'grouped' : 'rang',
+          title: 'Nouvelle vente',
+          url: '/ventes',
+        })),
     );
   });
 });
