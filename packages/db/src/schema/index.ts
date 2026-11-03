@@ -14,6 +14,7 @@ export * from './payroll';
 export * from './persona';
 export * from './sales-feed';
 export * from './scheduling';
+export * from './scripts';
 export * from './supervision';
 export * from './system';
 export * from './tenancy';

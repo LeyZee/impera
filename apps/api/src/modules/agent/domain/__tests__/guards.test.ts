@@ -5,6 +5,7 @@ import {
   checkVoiceOutput,
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
+  touchesTerm,
   type GuardCode,
 } from '../guards';
 
@@ -105,6 +106,27 @@ describe('voice guards', () => {
     expect(codes(['Tu aimes le café ?'], ['cafe'])).toEqual(['forbidden_term']);
     expect(codes(['C’est banal, un canal'], ['anal'])).toEqual([]);
     expect(codes(['Pas d’anal, désolée'], ['anal'])).toEqual(['forbidden_term']);
+  });
+
+  it('folds a plural either way, never under four letters, irregular plurals left to the persona', () => {
+    expect(codes(['Montre tes pieds'], ['pied'])).toEqual(['forbidden_term']);
+    expect(codes(['Juste un pied'], ['pieds'])).toEqual(['forbidden_term']);
+    expect(codes(['Tes cheveux sont doux'], ['cheveu'])).toEqual(['forbidden_term']);
+    expect(codes(['Les crèmes chantilly'], ['crème chantilly'])).toEqual(['forbidden_term']);
+    expect(codes(['Un trépied'], ['pied'])).toEqual([]);
+    expect(codes(['Un joli bra'], ['bras'])).toEqual([]);
+    expect(codes(['Tes yeux'], ['œil'])).toEqual([]);
+    expect(codes(['C’est banal, des canaux'], ['anal'])).toEqual([]);
+  });
+
+  it('reads any text against an entry as the guards do, for the other modules (ADR 0056 § 1)', () => {
+    expect(touchesTerm('Pieds nus sur le lit', 'pied')).toBe(true);
+    expect(touchesTerm('PIED-DE-BICHE', 'pied')).toBe(true);
+    expect(touchesTerm('Un trépied et une lampe', 'pieds')).toBe(false);
+    expect(touchesTerm('Avec de la CREME', 'crème')).toBe(true);
+    expect(touchesTerm('De la crème-chantilly, de la crème, chantilly', 'crème chantilly')).toBe(true);
+    expect(touchesTerm('Une crème au chocolat', 'crème chantilly')).toBe(false);
+    expect(touchesTerm('Tout ce qu’on veut', '  ')).toBe(false);
   });
 
   it('blocks an emoji she never uses, however the keyboard typed it (P5-01)', () => {

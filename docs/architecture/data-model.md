@@ -458,10 +458,26 @@ backup_runs         id uuid PK (défaut en base), started_at, finished_at?, stat
 restore_tests       id PK, backup_run_id FK, tested_at, duration_seconds > 0, row_count_mismatches ≥ 0, notes? ≤ 500, entered_by_user_id FK, created_at   (essai de restauration saisi par le propriétaire, ajout seul, ADR 0028 § 6)
 ```
 
+## Scripts (module `scripts`, ADR 0056)
+
+```
+script_structures         id, reserved_creator_id? → creators, created_by, created_at, archived_at?
+                          (bibliothèque de l'agence, hors RLS des créatrices ; politiques de l'équipe : le propriétaire
+                          écrit, le propriétaire et les managers actifs lisent)
+script_structure_versions id, structure_id, version ≥ 1 (unique par structure), name ≤ 60, moment (day|night|both),
+                          segments jsonb (ScriptSegment[], au moins un), frozen_at?, updated_by, created_at, updated_at
+                          (mêmes politiques ; déclencheur : une version figée ne change plus, aucune n'est supprimée,
+                          le numéro ne change pas)
+script_structure_queue    creator_id, position 1–20, structure_id (unique par créatrice), added_by, created_at
+                          (clé : creator_id, position ; RLS de la créatrice et portée de l'équipe ; remplacée en entier)
+```
+
+La règle 6 de l'ADR 0056 § 1 est tenue en base : la dernière version change sur place tant que `frozen_at` est nul, puis un enregistrement écrit la version suivante (SC-01, migration 0084).
+
 ## Commercial (phase 6, réservé)
 
 ```
-offers, sales, scripts, script_steps, script_runs, cards   — voir docs/roadmap.md phase 6
+offers, sales, script_runs   — voir docs/roadmap.md phase 6
 ```
 
 ## Jobs (Graphile Worker, tables gérées par la lib dans le schéma `graphile_worker`)
