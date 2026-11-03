@@ -57,7 +57,8 @@ type TaskRow = typeof tasks.$inferSelect;
 /**
  * Her reminder, with the task's write (CR-05 lot b3): one job per task, replaced on each write, so a move puts it at
  * the new time. A task without a reminder enqueues nothing; a job left from before finds its start changed and rings
- * nothing (`reminderMessage`).
+ * nothing (`reminderMessage`). A write after the reminder rang (a title changed, same start) puts the job back at a
+ * time already past: it runs at once, and `notify` answers `duplicate` for the same task and start.
  */
 async function scheduleReminder(tx: Transaction, task: CreatorTask): Promise<void> {
   const at = reminderAt(task);
