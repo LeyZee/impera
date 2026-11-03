@@ -227,8 +227,9 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
       readiness: team.app.readiness,
     });
     try {
+      // Théo's sale on shift, and the one off shift the closing would keep held (lot b3): it must read both.
       expect(team.refusal(await team.validate(team.owner, theo, P1, blindServer))).toEqual(
-        expect.objectContaining({ code: 'pay_period_sales_unread_conflict', details: { count: 1 } }),
+        expect.objectContaining({ code: 'pay_period_sales_unread_conflict', details: { count: 2 } }),
       );
     } finally {
       await blindServer.close();

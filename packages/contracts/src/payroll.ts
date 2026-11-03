@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { pageOf } from './conversations';
+import { PlatformSchema } from './enums';
 import {
   BonusIdSchema,
   BonusTierSetIdSchema,
@@ -8,6 +9,7 @@ import {
   CollectiveGoalIdSchema,
   CommissionStatementIdSchema,
   PayAdjustmentIdSchema,
+  PaySaleDecisionIdSchema,
   PenaltyIdSchema,
   PayoutMinimumIdSchema,
   PlatformAccountIdSchema,
@@ -19,6 +21,7 @@ import { PayoutBlockSchema } from './invoices';
 import { CurrencySchema, PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
 import { TimezoneSchema } from './persona';
+import { SaleEventSchema, SaleStatusSchema } from './sales-feed';
 import { BasisPointsSchema } from './team';
 import { CalendarDaySchema } from './team-members';
 
@@ -930,8 +933,122 @@ export function mayValidateStatement(
 }
 
 /**
+ * Why a sale that an account on the platform's net would pay counts for nobody until someone acts (CRM-03, ADR 0050
+ * §§ 3, 5, 7), most telling first:
+ * - `chatter_unlinked`: a chatter the owner has not linked to a member yet;
+ * - `off_shift`: a member neither on shift nor in their margin at the sale's instant (ADR 0025);
+ * - `status_unknown`: a status the platform added that Nirvana does not know;
+ * - `refund_before_register`: a refund whose sale is older than the register;
+ * - `refund_before_base`: a refund whose sale was in a period the account was still paid on its reports (the chain of
+ *   ADR 0023): never taken off the platform's net, no deduction until Charles decides (03/11).
+ */
+export const SALE_HELD_REASONS = [
+  'chatter_unlinked',
+  'off_shift',
+  'status_unknown',
+  'refund_before_register',
+  'refund_before_base',
+] as const;
+export const SaleHeldReasonSchema = z.enum(SALE_HELD_REASONS);
+export type SaleHeldReason = z.infer<typeof SaleHeldReasonSchema>;
+
+/**
+ * What the validator decides on a sale (ADR 0050 § 5): it counts for the member its chatter is linked to (`count`),
+ * or for nobody (`exclude`); `withdraw` takes back the decision in force, and the sale follows the rules again. Its
+ * refunds follow it. Never another member: the link says who made it. Any decision is taken back until a closing
+ * counts the sale.
+ */
+export const SaleDecisionOutcomeSchema = z.enum(['count', 'exclude', 'withdraw']);
+export type SaleDecisionOutcome = z.infer<typeof SaleDecisionOutcomeSchema>;
+
+/** A decision in force on a sale: `withdraw` leaves none. */
+export const SaleDecisionInForceSchema = z.enum(['count', 'exclude']);
+export type SaleDecisionInForce = z.infer<typeof SaleDecisionInForceSchema>;
+
+/**
+ * A line an open period holds, or that a decision in force settles (CRM-03 lot b3), as the owner and an active manager
+ * read it: the line, the member its chatter is linked to (`null` for a chatter not linked), why it is held without a
+ * decision, the decision in force and what may be decided on its sale. A line a closing left held, or a decided one no
+ * closing counted, shows in the team's first open period until it is settled: decided, linked again, or covered by a
+ * shift.
+ */
+export const HeldSaleSchema = z.object({
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1),
+  event: SaleEventSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  status: SaleStatusSchema,
+  /** The line's own instant: a refund's, not its sale's. */
+  occurredAt: z.iso.datetime(),
+  /** The sale's instant and period, `null` for a refund whose sale is older than the register. */
+  saleOccurredAt: z.iso.datetime().nullable(),
+  salePeriod: PayPeriodSchema.nullable(),
+  currency: CurrencySchema,
+  /** The platform's net in minor units of `currency`, signed: a refund is negative. */
+  netMinor: z.number().int(),
+  memberId: TeamMemberIdSchema.nullable(),
+  /** Why the line is held without a decision, `null` for a line a member would be paid for. */
+  reason: SaleHeldReasonSchema.nullable(),
+  /** The decision in force on its sale, `null` for none. */
+  decision: SaleDecisionInForceSchema.nullable(),
+  outcomes: z.array(SaleDecisionOutcomeSchema),
+});
+export type HeldSale = z.infer<typeof HeldSaleSchema>;
+
+/**
+ * `GET /v1/payroll/periods/:period/held-sales` (owner, active manager) → 200: the lines the period holds or a decision
+ * in force settles, in the order of their keys. A closed period shows none: what its closing left shows in the team's
+ * first open period, and before the team's first closing a period shows the earlier ones too, which its closing would
+ * leave held.
+ */
+export const HeldSalesSchema = z.object({
+  period: PayPeriodSchema,
+  sales: z.array(HeldSaleSchema),
+});
+export type HeldSales = z.infer<typeof HeldSalesSchema>;
+
+/**
+ * A decision of the validator on a sale (CRM-03 lot b3, ADR 0050 § 5), added only: the latest one counts, while the
+ * chatter's link keeps the version it was made on; a `withdraw` leaves none. `reason` is why the sale was held without
+ * a decision when it was decided, `null` for a sale a member would be paid for (excluded as wrongly given to them);
+ * `memberId` the member its chatter was linked to then.
+ */
+export const PaySaleDecisionSchema = z.object({
+  id: PaySaleDecisionIdSchema,
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1),
+  revision: z.number().int().min(1),
+  platformAccountId: PlatformAccountIdSchema,
+  outcome: SaleDecisionOutcomeSchema,
+  reason: SaleHeldReasonSchema.nullable(),
+  memberId: TeamMemberIdSchema.nullable(),
+  note: PayReasonSchema.nullable(),
+  decidedBy: UserIdSchema,
+  createdAt: z.iso.datetime(),
+});
+export type PaySaleDecision = z.infer<typeof PaySaleDecisionSchema>;
+
+/**
+ * `POST /v1/payroll/sale-decisions` (owner, active manager, never on a sale of their own) → 201
+ * `PaySaleDecisionSchema`, 200 for the same `id` and values. The sale is one `period` takes and no closing counted,
+ * with an outcome it offers: one of its held lines, one a decision in force settles (to change or `withdraw` it), or,
+ * to `exclude` it, one a member is paid for. Counted, it goes in its own period, or in the team's first open period
+ * once its own is closed (ADR 0032).
+ */
+export const CreatePaySaleDecisionBodySchema = z.object({
+  id: PaySaleDecisionIdSchema,
+  period: PayPeriodSchema,
+  platform: PlatformSchema,
+  platformSaleId: z.string().min(1).max(200),
+  outcome: SaleDecisionOutcomeSchema,
+  note: PayReasonSchema.nullable(),
+});
+export type CreatePaySaleDecisionBody = z.infer<typeof CreatePaySaleDecisionBodySchema>;
+
+/**
  * The error codes of `/v1/payroll`, for the screen to say them in French (the suffix gives the status, api.md):
  * `team_member_not_found`, `commission_statement_not_found`, `bonus_not_found`, `penalty_not_found` 404 ;
+ * `pay_sale_not_found` 404, a sale the period does not hold nor pay a member for as the validator reads it (CRM-03) ;
  * `commission_statement_changed_conflict` 409, another revision or other inputs than the reader saw ;
  * `commission_statement_status_conflict` 409, validating what is not a draft, paying what is not validated, correcting
  * a draft ;
@@ -949,7 +1066,9 @@ export function mayValidateStatement(
  * member before they joined (`details.period`) ;
  * `penalty_cancel_conflict` 409, every period of the penalty is closed ;
  * `bonus_conflict`, `penalty_conflict`, `pay_adjustment_conflict`, `bonus_tier_set_conflict`,
- * `collective_goal_conflict`, `payout_minimum_conflict` 409, the same `id` with other values ;
+ * `collective_goal_conflict`, `payout_minimum_conflict`, `pay_sale_decision_conflict` 409, the same `id` with other
+ * values (a decision written meanwhile on the same sale too) ;
+ * `pay_sale_outcome_conflict` 409, an outcome the sale does not offer (`details.outcomes`, those it does) ;
  * `pay_rule_started_invalid` 400, tiers or a payout minimum from a period that has begun (PAIE-22, `details.period`) ;
  * `collective_goal_late_invalid` 400, a goal for a period past its 3rd day (PAIE-22, `details.period`) ;
  * `exchange_rate_missing_conflict` 409, a currency without a rate read ;
@@ -962,7 +1081,7 @@ export function mayValidateStatement(
  * `details.year`) ;
  * `cursor_invalid` 400, a page cursor the periods' list did not give ;
  * `payroll_entries_too_many_unprocessable` 422, more than `PAYROLL_ENTRIES_MAX` entries of a kind in one period ;
- * `payroll_own_forbidden` 403, one's own statement, bonus, penalty or adjustment ;
+ * `payroll_own_forbidden` 403, one's own statement, bonus, penalty, adjustment or sale ;
  * `payroll_forbidden` 403, a member who is not the owner nor an active manager writing or reading the latest rate, or
  * a manager doing what only the owner does.
  */
@@ -971,6 +1090,7 @@ export const PAYROLL_ERROR_CODES = [
   'commission_statement_not_found',
   'bonus_not_found',
   'penalty_not_found',
+  'pay_sale_not_found',
   'commission_statement_changed_conflict',
   'commission_statement_status_conflict',
   'commission_statement_open_conflict',
@@ -989,6 +1109,8 @@ export const PAYROLL_ERROR_CODES = [
   'bonus_tier_set_conflict',
   'collective_goal_conflict',
   'payout_minimum_conflict',
+  'pay_sale_decision_conflict',
+  'pay_sale_outcome_conflict',
   'pay_rule_started_invalid',
   'collective_goal_late_invalid',
   'exchange_rate_missing_conflict',

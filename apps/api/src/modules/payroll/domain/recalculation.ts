@@ -43,6 +43,7 @@ import {
   saleLinesOf,
   salesCounted,
   salesHeld,
+  salesLeftHeld,
   salesWaitingBefore,
   type CountedSale,
   type HeldSale,
@@ -564,6 +565,8 @@ export function planPeriod(snapshot: PeriodSnapshot): PeriodPlan {
 export interface ClosingPlan {
   readonly counted: readonly ReportForPay[];
   readonly countedSales: readonly CountedSale[];
+  /** The platform's lines the closing leaves held (CRM-03 lot b3), kept so that they are read again after it. */
+  readonly heldSales: readonly HeldSale[];
   readonly teamNetMinor: number;
   readonly collective: CollectiveReached;
   readonly exchangeRates: readonly ExchangeRate[];
@@ -597,6 +600,7 @@ export function closePeriod(snapshot: PeriodSnapshot): {
   }
   const counted = reportsCounted(snapshot);
   const countedSales = salesCountedIn(snapshot);
+  const heldSales = salesLeftHeld(snapshot.sales, period);
   const { computed } = computePeriod(snapshot);
   const frozen = {
     teamNetMinor: computed.teamNetMinor,
@@ -609,7 +613,7 @@ export function closePeriod(snapshot: PeriodSnapshot): {
   const salesRegistered = new Map(snapshot.sales.registered);
   for (const one of countedSales) salesRegistered.set(saleKeyOf(one), registeredIn(period, one));
   return {
-    closing: { ...frozen, counted, countedSales },
+    closing: { ...frozen, counted, countedSales, heldSales },
     closed: {
       ...snapshot,
       closing: frozen,
