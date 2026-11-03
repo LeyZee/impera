@@ -87,6 +87,51 @@ describe('Équipe › Factures : le dépôt dans un seau S3 verrouillé (ADR 003
     await expect(store.writeOnce(KEY, BYTES, SHA, LOCK)).rejects.toThrow(/no answer for/u);
   });
 
+  it('reads again once, on a new connection, when the bucket had closed the one kept alive; never writes twice', async () => {
+    // What undici throws when the bucket closed the connection before answering (MinIO after a 412, CI 03/11).
+    const closed = () =>
+      Promise.reject(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
+        }),
+      );
+    const sent: string[] = [];
+    let failures = 1;
+    const flaky = (request: Request): Promise<Response> => {
+      sent.push(request.method);
+      if (failures > 0) {
+        failures -= 1;
+        return closed();
+      }
+      return Promise.resolve(new Response(BYTES, { status: 200 }));
+    };
+    expect((await createS3InvoiceStore(CONFIG, flaky).read(KEY))?.bytes).toEqual(BYTES);
+    expect(sent).toEqual(['GET', 'GET']);
+
+    // Twice closed is a bucket that does not answer; a PUT is never sent again, nor a timeout retried.
+    sent.length = 0;
+    failures = 2;
+    await expect(createS3InvoiceStore(CONFIG, flaky).read(KEY)).rejects.toBeInstanceOf(
+      InvoiceStorageUnavailable,
+    );
+    expect(sent).toEqual(['GET', 'GET']);
+    sent.length = 0;
+    failures = 1;
+    await expect(createS3InvoiceStore(CONFIG, flaky).writeOnce(KEY, BYTES, SHA, LOCK)).rejects.toBeInstanceOf(
+      InvoiceStorageUnavailable,
+    );
+    expect(sent).toEqual(['PUT']);
+    let timeouts = 0;
+    const slow = (): Promise<Response> => {
+      timeouts += 1;
+      return Promise.reject(new DOMException('The operation timed out.', 'TimeoutError'));
+    };
+    await expect(createS3InvoiceStore(CONFIG, slow).read(KEY)).rejects.toBeInstanceOf(
+      InvoiceStorageUnavailable,
+    );
+    expect(timeouts).toBe(1);
+  });
+
   it('reads an object with the compliance lock the provider names, and nothing for a missing key', async () => {
     const locked = () =>
       new Response(BYTES, {
