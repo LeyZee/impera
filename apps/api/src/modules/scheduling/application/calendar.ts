@@ -10,8 +10,21 @@ import {
   type UserId,
 } from '@nirvana/contracts';
 
-import { coverageOf, slotsToFill, workloadOf, type CreatorAgent, type GridSlot } from '../domain/calendar';
-import type { CalendarReads, CalendarRow, CreatorDirectory, PlanningStore } from '../domain/ports';
+import {
+  agentReplySpans,
+  coverageOf,
+  slotsToFill,
+  workloadOf,
+  type CreatorAgent,
+  type GridSlot,
+} from '../domain/calendar';
+import type {
+  CalendarReads,
+  CalendarRow,
+  CreatorDirectory,
+  StoredAccount,
+  StoredShift,
+} from '../domain/ports';
 import { assertPlanningRange, DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
 
 import { toPlanningAccount } from './dto';
@@ -31,7 +44,6 @@ const toSlot = (slot: GridSlot): CalendarSlot => ({
 
 export function createCalendarService(
   reads: CalendarReads,
-  store: PlanningStore,
   creators: CreatorDirectory,
   now: () => Date = () => new Date(),
 ): CalendarService {
@@ -39,9 +51,13 @@ export function createCalendarService(
     calendar: async (actor, query) => {
       const window = { from: new Date(query.from), to: new Date(query.to) };
       assertPlanningRange(window.from, window.to);
-      const read = await reads.read(actor, window);
-      const settings = (await store.settings(actor)) ?? DEFAULT_SCHEDULING_SETTINGS;
       const directory = await creators.list();
+      const read = await reads.read(
+        actor,
+        window,
+        directory.map((creator) => creator.id),
+      );
+      const settings = read.settings ?? DEFAULT_SCHEDULING_SETTINGS;
       // The filters narrow what is sent back; the database already decided what the reader may read.
       const askedCreator = (creatorId: CreatorId) =>
         query.creatorId === undefined || creatorId === query.creatorId;
@@ -75,34 +91,35 @@ export function createCalendarService(
           startsAt: row.startsAt.toISOString(),
           endsAt: row.endsAt.toISOString(),
         })),
-        agent: agents.map((agent) => ({ ...agent })),
+        agent: agents.map((agent) => ({
+          ...agent,
+          answers: agentReplySpans(agent, window).map((span) => ({
+            startsAt: span.from.toISOString(),
+            endsAt: span.to.toISOString(),
+          })),
+        })),
         agency:
-          read.view === 'agency'
-            ? await agencyOf(actor, window, query.memberId, agents, settings, directory, askedCreator)
-            : null,
+          read.agency === null
+            ? null
+            : agencyOf(read.agency, window, query.memberId, agents, settings, directory, askedCreator),
       };
     },
   };
 
   /**
    * What the owner and an active manager read on top (ADR 0045 § 1 and § 2): the accounts, the créneaux to fill and
-   * those the agent holds alone, each member's hours, the coverage of each account. The accounts and their shifts come
-   * from the planning's read, under the same policies as Planning.
+   * those the agent holds alone, each member's hours, the coverage of each account, from the accounts and shifts the
+   * same snapshot read under the same policies as Planning.
    */
-  async function agencyOf(
-    actor: UserId,
+  function agencyOf(
+    planned: { readonly accounts: readonly StoredAccount[]; readonly shifts: readonly StoredShift[] },
     window: { readonly from: Date; readonly to: Date },
     memberId: TeamMemberId | undefined,
     agents: readonly CreatorAgent[],
     settings: SchedulingSettings,
     directory: readonly CreatorSummary[],
     askedCreator: (creatorId: CreatorId) => boolean,
-  ): Promise<NonNullable<Calendar['agency']>> {
-    const planned = await store.read(
-      actor,
-      directory.map((creator) => creator.id),
-      window,
-    );
+  ): NonNullable<Calendar['agency']> {
     const names = new Map(directory.map((creator) => [creator.id, creator]));
     const accounts = planned.accounts.filter((account) => askedCreator(account.creatorId));
     const { toFill, aiAlone } = slotsToFill({

@@ -1,5 +1,7 @@
 import {
   calendarDayAt,
+  payPeriodLastDay,
+  payPeriodOfDay,
   type PlatformChatter,
   type PlatformChatterDailyStat,
   type PlatformDailyStat,
@@ -523,4 +525,22 @@ function chatterRows(
     });
   }
   return rows;
+}
+
+/**
+ * The report a switch to the platform's net can rest on (CRM-03, ADR 0050 § 8): a match over one whole fortnight (the
+ * 1st to the 15th, or the 16th to the month's end), with no bot of the platform outside the agent (its sales would
+ * count for nobody, or for a member) nor model of the export unknown (its rows left out). A day that agrees, checked
+ * after a fortnight that did not, is never clean.
+ */
+export function isCleanMatch(report: SalesFeedCheckReport): boolean {
+  const period = payPeriodOfDay(report.from);
+  return (
+    report.verdict === 'match' &&
+    report.from === period &&
+    report.to === payPeriodLastDay(period) &&
+    !report.notes.some(
+      (note) => note.kind === 'bot_not_linked_to_agent' || note.kind === 'export_unknown_model',
+    )
+  );
 }

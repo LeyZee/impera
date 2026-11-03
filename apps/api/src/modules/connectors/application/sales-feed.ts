@@ -8,6 +8,7 @@ import {
   type SalesFeedChatterLink,
   type SalesFeedCheckBody,
   type SalesFeedCheckReport,
+  type SalesFeedLastCheck,
   type SalesFeedModelLink,
   type SalesFeedOverview,
   type SalesFeedRefusal,
@@ -27,7 +28,12 @@ import {
   SalesFeedWebhookUrlUnprocessable,
 } from '../domain/errors';
 import type { Clock, JobLogger } from '../domain/ports';
-import { buildCheckReport, readDashboardExport, type CheckSources } from '../domain/reliability-check';
+import {
+  buildCheckReport,
+  isCleanMatch,
+  readDashboardExport,
+  type CheckSources,
+} from '../domain/reliability-check';
 import {
   errorKindOf,
   unknownValueSignals,
@@ -104,13 +110,17 @@ export interface SalesFeeds {
   read(logger: JobLogger, correlationId: string, woken: boolean): Promise<void>;
   /**
    * The reliability check of ADR 0050 § 8 (CRM-02): the register against the platform's statistics and the
-   * dashboard's export, read for this answer only. Writes nothing; a refusal of the platform is said, not recorded
-   * (the minute's reading records it). Throws `SalesFeedExportUnprocessable` (422) for an export it cannot read.
+   * dashboard's export, read for this answer only. The report is kept, by `by`, for the switch of CRM-03; the export
+   * never is. A refusal of the platform is said, not recorded (the minute's reading records it). Throws
+   * `SalesFeedExportUnprocessable` (422) for an export it cannot read.
    */
   check(
     platform: Platform,
     body: SalesFeedCheckBody,
+    by: string | null,
   ): Promise<Result<SalesFeedCheckReport, SalesFeedRefusal>>;
+  /** The latest report kept, `null` before any check. */
+  lastCheck(platform: Platform): Promise<SalesFeedLastCheck>;
 }
 
 /** The two statistics of the days, one call after the other: Reveal allows ten a minute a key. */
@@ -468,7 +478,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       return overview(platform);
     },
 
-    async check(platform, body) {
+    async check(platform, body, by) {
       const feed = await liveFeed(platform);
       if (feed === null) throw new SalesFeedNotConnected();
       if (body.to >= calendarDayAt(clock.now(), feed.timeZone)) throw new SalesFeedCheckDaysUnprocessable();
@@ -496,24 +506,29 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         ledger.modelLinks(platform),
         ledger.chatterLinks(platform),
       ]);
-      return ok(
-        buildCheckReport({
-          platform,
-          from: body.from,
-          to: body.to,
-          timeZone: feed.timeZone,
-          generatedAt: clock.now(),
-          lines,
-          stats,
-          exported,
-          firstLineAt,
-          registerReadAt: cursor.readAt,
-          models: models.value,
-          modelLinks: new Set(modelLinks.keys()),
-          platformChatters: platformChatters.ok ? platformChatters.value : [],
-          chatterLinks,
-        }),
-      );
+      const report = buildCheckReport({
+        platform,
+        from: body.from,
+        to: body.to,
+        timeZone: feed.timeZone,
+        generatedAt: clock.now(),
+        lines,
+        stats,
+        exported,
+        firstLineAt,
+        registerReadAt: cursor.readAt,
+        models: models.value,
+        modelLinks: new Set(modelLinks.keys()),
+        platformChatters: platformChatters.ok ? platformChatters.value : [],
+        chatterLinks,
+      });
+      await ledger.recordCheck(report, isCleanMatch(report), by);
+      return ok(report);
+    },
+
+    async lastCheck(platform) {
+      factoryOf(platform);
+      return { last: await ledger.lastCheck(platform) };
     },
 
     async read(logger, correlationId, woken) {

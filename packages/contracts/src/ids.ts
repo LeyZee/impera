@@ -165,3 +165,7 @@ export type InvoiceEventId = z.infer<typeof InvoiceEventIdSchema>;
 /** A line of a platform's register as Nirvana keeps it (`platform_sales`, its quarantine; ADR 0050). */
 export const SalesLineIdSchema = uuid.brand<'SalesLineId'>();
 export type SalesLineId = z.infer<typeof SalesLineIdSchema>;
+
+/** A reliability check's report as Nirvana keeps it (`sales_feed_checks`, CRM-02 and CRM-03). */
+export const SalesFeedCheckIdSchema = uuid.brand<'SalesFeedCheckId'>();
+export type SalesFeedCheckId = z.infer<typeof SalesFeedCheckIdSchema>;
