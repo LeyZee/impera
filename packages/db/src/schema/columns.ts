@@ -68,3 +68,19 @@ export function creatorReadsOnly() {
 export function closedToCreator() {
   return pgPolicy('creator_closed', { as: 'restrictive', for: 'all', using: notCreatorAccount });
 }
+
+/**
+ * Rows of her own creator she never reads, while a write of hers may still add one (CRM-04 lot d): the outbox, where an
+ * event her transaction publishes goes, and where `sale_detected` names who sold. No `RETURNING` reads them back.
+ */
+export function hiddenFromCreator() {
+  return pgPolicy('creator_no_select', { as: 'restrictive', for: 'select', using: notCreatorAccount });
+}
+
+/**
+ * Agency rows out of tenancy that her own account neither reads nor writes (CRM-04 lot d, ADR 0042 § 2): RLS on, and
+ * this one permissive policy for every other path (the agency, the jobs, the tests), which `withAdmin` bypasses anyway.
+ */
+export function agencyOnly() {
+  return pgPolicy('agency_only', { for: 'all', using: notCreatorAccount, withCheck: notCreatorAccount });
+}
