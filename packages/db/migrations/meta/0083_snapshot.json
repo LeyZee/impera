@@ -1,5 +1,5 @@
 {
-  "id": "bb9feb29-54ab-4e55-8f31-9ba1ea06ba17",
+  "id": "2a3e0498-5725-49a9-b5df-970849682a43",
   "prevId": "f0276b1a-5015-474b-9942-31a8a609abb4",
   "version": "7",
   "dialect": "postgresql",
@@ -14167,38 +14167,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.telegram_state": {
-      "name": "telegram_state",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "scan_cursor": {
-          "name": "scan_cursor",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "routes_version": {
-          "name": "routes_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.telegram_settings": {
       "name": "telegram_settings",
       "schema": "",
@@ -14262,6 +14230,38 @@
           "value": "\"telegram_settings\".\"topic\" in ('sale')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.telegram_state": {
+      "name": "telegram_state",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "scan_cursor": {
+          "name": "scan_cursor",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "routes_version": {
+          "name": "routes_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
