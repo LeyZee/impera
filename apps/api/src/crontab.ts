@@ -67,6 +67,12 @@ const CRON_JOBS: readonly CronJob[] = [
   { task: 'telegram.morning_digest', match: '0 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
   // Each hour, acting only in a creator's 23 o'clock hour (CRM-04 lot b); the key of her day makes it once.
   { task: 'telegram.evening_digest', match: '0 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  // An outage still open 2 hours after its alert gets its single reminder in red (P3-12).
+  {
+    task: 'telegram.connection_reminders',
+    match: '*/10 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: 1 },
+  },
   { task: 'telegram.purge', match: '30 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   { task: 'fans.purge_facts', match: '45 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },

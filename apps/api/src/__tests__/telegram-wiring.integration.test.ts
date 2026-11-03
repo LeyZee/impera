@@ -43,7 +43,7 @@ describe('Telegram wired in the app', () => {
 
   it('gives the worker a task for every Telegram job of the contract', () => {
     const telegramJobs = JOB_NAMES.filter((name) => name.startsWith('telegram.'));
-    expect(telegramJobs).toHaveLength(7);
+    expect(telegramJobs).toHaveLength(8);
     expect(Object.keys(withKeys.tasks)).toEqual(expect.arrayContaining(telegramJobs));
   });
 

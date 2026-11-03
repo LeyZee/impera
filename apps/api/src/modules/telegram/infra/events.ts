@@ -269,6 +269,14 @@ function signalOf(type: string, payload: unknown): Signal | null {
         accounts: new Set(days.map((day) => day.platformAccountId)).size,
       };
     }
+    case 'connection_state_changed': {
+      const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);
+      if (!parsed.success) return null;
+      const { data } = parsed;
+      return data.state === 'down'
+        ? { kind: 'connection_down', service: data.service, reason: data.reason }
+        : { kind: 'connection_back', service: data.service };
+    }
     case 'security_alert': {
       const parsed = SecurityAlertPayloadSchema.safeParse(payload);
       if (!parsed.success) return null;
