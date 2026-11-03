@@ -17,6 +17,7 @@ import {
   type PayPeriod,
   type PayPeriodSummary,
   type PayrollPeriod,
+  type Platform,
 } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -27,6 +28,7 @@ import {
   carryWhat,
   changeBps,
   computedText,
+  countedSalesText,
   countsLine,
   dayMonthText,
   dayShortMonth,
@@ -39,6 +41,7 @@ import {
   gaugePercent,
   goalSpanBps,
   heroPeriodOf,
+  lateWords,
   mainLine,
   memberFacts,
   memberPeriodAmount,
@@ -116,6 +119,8 @@ const line = (patch: Partial<CommissionStatementLine> = {}): CommissionStatement
   commissionMinor: 2_125,
   shiftReportIds: [newId(ShiftReportIdSchema), newId(ShiftReportIdSchema)],
   lateReports: [],
+  base: 'gross_chain',
+  countedSales: null,
   ...patch,
 });
 
@@ -369,6 +374,69 @@ describe('the money of a statement', () => {
     ]);
   });
 
+  it('starts a line on the platform’s net from that net, the VAT and its commission already taken (CRM-03)', () => {
+    const onNet = (patch: Partial<CommissionStatementLine>) =>
+      line({
+        vatBps: 0,
+        platformFeeBps: 0,
+        grossMinor: 8_500,
+        grossEurMinor: 8_500,
+        exclVatMinor: 8_500,
+        commissionMinor: 2_125,
+        shiftReportIds: [],
+        base: 'platform_net',
+        countedSales: { sales: 3, refunds: 1, late: 0, lateNetMinor: 0 },
+        ...patch,
+      });
+    const steps = (one: CommissionStatementLine, platform: Platform | null) =>
+      flowOf(one, 2_500, platform, true).map((step) => plain(`${step.label} | ${step.op} | ${step.amount}`));
+    expect(steps(onNet({}), 'reveal')).toEqual([
+      'Net de Reveal | 3 ventes lues | 85,00 €',
+      'Ta commission | 25 % | 21,25 €',
+    ]);
+    expect(
+      steps(
+        onNet({
+          currency: 'USD',
+          rateMicros: 920_000,
+          grossMinor: 10_000,
+          grossEurMinor: 9_200,
+          exclVatMinor: 9_200,
+          netMinor: 9_200,
+          commissionMinor: 2_300,
+        }),
+        null,
+      ),
+    ).toEqual([
+      'Net de la plateforme | 3 ventes lues | 100,00 $US',
+      'En euros | 1 $ = 0,9200 € | 92,00 €',
+      'Ta commission | 25 % | 23,00 €',
+    ]);
+  });
+
+  it('counts what a line on the platform’s net read, and nothing on a line of reports (CRM-03)', () => {
+    const counted = (sales: number, refunds: number, late: number) =>
+      countedSalesText(
+        line({ base: 'platform_net', countedSales: { sales, refunds, late, lateNetMinor: 0 } }),
+      );
+    expect(counted(1, 0, 0)).toBe('1 vente lue');
+    expect(counted(12, 1, 2)).toBe('12 ventes lues, 1 remboursement, dont 2 après la clôture d’avant');
+    expect(counted(0, 2, 0)).toBe('0 vente lue, 2 remboursements');
+    expect(countedSalesText(line())).toBeNull();
+  });
+
+  it('says that a sale read after the closing goes on the next period too, once a line is on the platform’s net', () => {
+    const onNet = line({
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 0, late: 0, lateNetMinor: 0 },
+    });
+    expect(lateWords([statement()])).toBe('un rapport validé');
+    expect(lateWords([statement(), statement({ lines: [line(), onNet] })])).toBe(
+      'un rapport validé ou une vente lue',
+    );
+    expect(lateWords([])).toBe('un rapport validé');
+  });
+
   it('adds up to what is paid, a carry-over said before it, a capped penalty with what it asked', () => {
     const carried = statement({
       penalties: [
@@ -587,10 +655,43 @@ describe('the export of a period', () => {
     );
     const [head, account, total] = csv.trimEnd().split('\r\n');
     expect(head?.split(';').slice(0, 3)).toEqual(['Membre', 'Compte', 'Devise']);
-    expect(account).toBe('Théo;"Nora Vidal; @nora";EUR;120,00;120,00;100,00;85,00;21,25;;;;;;;;');
+    expect(head?.split(';').at(-1)).toBe('Base');
+    expect(account).toBe('Théo;"Nora Vidal; @nora";EUR;120,00;120,00;100,00;85,00;21,25;;;;;;;;;Rapports');
     expect(total).toBe(
-      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;21,25;0,00;21,25;À valider',
+      'Théo;Total du relevé;EUR;;;;85,00;21,25;0,00;0,00;0,00;0,00;21,25;0,00;21,25;À valider;',
     );
+  });
+
+  it('says a line on the platform’s net, whose sales are that net already (CRM-03)', () => {
+    const onNet = line({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 0, late: 0, lateNetMinor: 0 },
+    });
+    const period: PayrollPeriod = {
+      period: PERIOD,
+      window: WINDOW,
+      ended: true,
+      beforeFirstClosing: false,
+      ...UNREAD,
+      blocked: null,
+      closing: null,
+      statements: [statement({ lines: [onNet] })],
+      bonusTiers: null,
+      collectiveGoal: null,
+      settings: { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null },
+    };
+    const [, account] = statementsCsv(
+      period,
+      () => 'Théo',
+      () => 'Nora',
+    ).split('\r\n');
+    expect(account).toBe('Théo;Nora;EUR;85,00;85,00;85,00;85,00;21,25;;;;;;;;;Net de la plateforme');
   });
 
   it('never lets a name start a formula, and keeps the minus sign of an amount', () => {
@@ -1139,6 +1240,23 @@ describe('Commissions, as the member reads them', () => {
     });
     const bare = statement({ ...paid, payment: { ...payment, reference: null } });
     expect(words(bare, true).notes).toEqual(['Payé le mardi 17 novembre par WorldRemit.']);
+  });
+
+  it('says a statement is computed on the sales read once an account is on the platform’s net (CRM-03)', () => {
+    const sameDay = new Date('2026-11-02T15:00:00Z');
+    const onNet = line({
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 0, late: 0, lateNetMinor: 0 },
+    });
+    const notes = (lines: CommissionStatementLine[]) =>
+      myStatementWords(statement({ lines }), false, sameDay).notes.map(plain);
+    expect(notes([onNet])).toEqual([
+      'Calculé à 10 h 07 sur tes ventes lues. Le versement suit la validation de la quinzaine.',
+    ]);
+    expect(notes([line(), onNet])[0]).toMatch(
+      /^Calculé à 10 h 07 sur tes rapports validés et tes ventes lues\./u,
+    );
+    expect(notes([])[0]).toMatch(/sur tes rapports validés\./u);
   });
 
   it('says the payout delay the owner announced, never one of its own (PAIE-32)', () => {

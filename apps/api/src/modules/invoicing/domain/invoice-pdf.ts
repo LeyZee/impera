@@ -5,6 +5,7 @@ import {
   PLATFORM_NAMES,
   rcsWords,
   type Currency,
+  type EarningsBase,
   type InvoiceAgency,
   type InvoiceContractor,
   type InvoiceKind,
@@ -83,7 +84,7 @@ export interface PdfDocumentSource {
 
 /**
  * What the annex prints of the validated statement an invoice bills: the base of each commission, one row per account
- * and rules (currency, VAT, platform fee) as the statement's revision holds them, never a fan.
+ * and rules (currency, VAT, platform fee, base) as the statement's revision holds them, never a fan.
  */
 export interface StatementAnnexSource {
   /** The day the statement was validated, in the agency's time zone. */
@@ -93,6 +94,11 @@ export interface StatementAnnexSource {
     readonly handle: string;
     readonly platform: Platform;
     readonly currency: Currency;
+    /**
+     * Where the row's gross comes from (ADR 0050 § 8): `gross_chain`, the reports under the chain of ADR 0023;
+     * `platform_net`, the platform's net of the sales it read, the VAT and its commission already taken (CRM-03).
+     */
+    readonly base: EarningsBase;
     /** The ECB rate the gross was converted at, in millionths of a euro per unit (ADR 0033); 1 000 000 for euros. */
     readonly rateMicros: number;
     /** The day of that rate, as the statement copied it; `null` for euros. */
@@ -538,43 +544,77 @@ const left = (text: string): PdfCell => ({ text, align: 'left' });
 const right = (text: string): PdfCell => ({ text, align: 'right' });
 const sum = (amounts: readonly number[]): number => amounts.reduce((total, one) => total + one, 0);
 
+/** A row of the annex that has no figure in a column: the chain's steps on a row of the platform's net. */
+const NONE = '—';
+
+/**
+ * Under a row of the platform's net: what its net is, then, in another currency, what it was in it and the rate. The
+ * platform took the VAT and its commission already, so that only the rate applies (ADR 0050 § 8).
+ */
+function netDetail(account: StatementAnnexSource['accounts'][number]): string {
+  const name = PLATFORM_NAMES[account.platform];
+  const net = `Net ${/^[AEIOUY]/iu.test(name) ? 'd’' : 'de '}${name} des ventes lues, la TVA et sa commission déjà retenues`;
+  return account.currency === 'EUR'
+    ? net
+    : `${net}${COLON}${inCurrency(account.grossMinor, account.currency)} convertis à ${rateWords(account.currency, account.rateMicros, account.rateOn)}`;
+}
+
 /**
  * The annex: the validated statement by account (sales, VAT when any, the platform's fee, net, rate, commission), then
- * the invoice's lines by kind, which add up to the amount invoiced, and what a carry-over does and does not change.
+ * the invoice's lines by kind, which add up to the amount invoiced, and what a carry-over does and does not change. A
+ * row of the platform's net (CRM-03) prints its net only, the chain's columns empty; a statement on the platform's net
+ * alone prints no chain column at all.
  */
 function annexContent(
   source: PdfDocumentSource,
   annex: StatementAnnexSource,
   contractorName: string,
 ): NonNullable<InvoicePdfContent['annex']> {
-  const withVat = annex.accounts.some((account) => account.exclVatMinor !== account.grossEurMinor);
+  const chain = annex.accounts.filter((account) => account.base === 'gross_chain');
+  const withChain = chain.length > 0;
+  const withVat = chain.some((account) => account.exclVatMinor !== account.grossEurMinor);
   const rate = percent(annex.commissionRateBps);
   const header = [
     left('Compte'),
-    right('Ventes brutes'),
-    ...(withVat ? [right('TVA')] : []),
-    right('Commission plateforme'),
-    right('Net'),
+    ...(withChain
+      ? [
+          right('Ventes brutes'),
+          ...(withVat ? [right('TVA')] : []),
+          right('Commission plateforme'),
+          right('Net'),
+        ]
+      : [right('Net de la plateforme')]),
     right('Taux'),
     right('Commission'),
   ];
-  const rows = annex.accounts.map((account) => ({
-    cells: [
-      left(`@${account.handle} · ${PLATFORM_NAMES[account.platform]}`),
-      right(pdfEuros(account.grossEurMinor)),
-      ...(withVat ? [right(pdfEuros(account.exclVatMinor - account.grossEurMinor))] : []),
-      right(pdfEuros(account.netMinor - account.exclVatMinor)),
-      right(pdfEuros(account.netMinor)),
-      right(rate),
-      right(pdfEuros(account.commissionMinor)),
-    ],
-    detail:
-      account.currency === 'EUR'
-        ? null
-        : `${inCurrency(account.grossMinor, account.currency)} convertis à ${rateWords(account.currency, account.rateMicros, account.rateOn)}`,
-  }));
-  const total = (pick: (account: StatementAnnexSource['accounts'][number]) => number): string =>
-    pdfEuros(sum(annex.accounts.map(pick)));
+  const rows = annex.accounts.map((account) => {
+    const onNet = account.base === 'platform_net';
+    const chainCells = onNet
+      ? [right(NONE), ...(withVat ? [right(NONE)] : []), right(NONE)]
+      : [
+          right(pdfEuros(account.grossEurMinor)),
+          ...(withVat ? [right(pdfEuros(account.exclVatMinor - account.grossEurMinor))] : []),
+          right(pdfEuros(account.netMinor - account.exclVatMinor)),
+        ];
+    return {
+      cells: [
+        left(`@${account.handle} · ${PLATFORM_NAMES[account.platform]}`),
+        ...(withChain ? chainCells : []),
+        right(pdfEuros(account.netMinor)),
+        right(rate),
+        right(pdfEuros(account.commissionMinor)),
+      ],
+      detail: onNet
+        ? netDetail(account)
+        : account.currency === 'EUR'
+          ? null
+          : `${inCurrency(account.grossMinor, account.currency)} convertis à ${rateWords(account.currency, account.rateMicros, account.rateOn)}`,
+    };
+  });
+  const total = (
+    pick: (account: StatementAnnexSource['accounts'][number]) => number,
+    accounts: StatementAnnexSource['accounts'] = annex.accounts,
+  ): string => pdfEuros(sum(accounts.map(pick)));
   const kinds: InvoiceLineKind[] = [];
   for (const line of source.lines) if (!kinds.includes(line.kind)) kinds.push(line.kind);
   const byKind = kinds.map((kind) => [
@@ -600,9 +640,15 @@ function annexContent(
       rows,
       total: [
         left('Total des comptes'),
-        right(total((account) => account.grossEurMinor)),
-        ...(withVat ? [right(total((account) => account.exclVatMinor - account.grossEurMinor))] : []),
-        right(total((account) => account.netMinor - account.exclVatMinor)),
+        ...(withChain
+          ? [
+              right(total((account) => account.grossEurMinor, chain)),
+              ...(withVat
+                ? [right(total((account) => account.exclVatMinor - account.grossEurMinor, chain))]
+                : []),
+              right(total((account) => account.netMinor - account.exclVatMinor, chain)),
+            ]
+          : []),
         right(total((account) => account.netMinor)),
         right(''),
         right(total((account) => account.commissionMinor)),

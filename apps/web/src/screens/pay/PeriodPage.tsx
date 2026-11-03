@@ -53,6 +53,7 @@ import {
   daysLeft,
   gaugePercent,
   goalSpanBps,
+  lateWords,
   rateOverdue,
   memberFacts,
   momentAt,
@@ -417,8 +418,9 @@ function PeriodView({
             ) : ended && data.closing === null && pickable.length > 0 ? (
               <div className="rp-notice">
                 <p className="rp-notice__text">
-                  Le premier relevé validé clôt la quinzaine pour toute l’équipe. Un rapport validé ensuite
-                  ira sur la quinzaine {periodLine(followingPeriod(data.period))}.
+                  Le premier relevé validé clôt la quinzaine pour toute l’équipe.{' '}
+                  {capital(lateWords(data.statements))} ensuite ira sur la quinzaine{' '}
+                  {periodLine(followingPeriod(data.period))}.
                 </p>
               </div>
             ) : null}
@@ -572,7 +574,7 @@ function quietOf(data: PayrollPeriod, now: Date): string {
   const at = computed === null || zone === null ? '' : `Calculé ${computedText(computed, zone, now)}. `;
   if (!data.ended) return `${at}Rien ne se valide avant la fin de la quinzaine.`;
   if (data.closing !== null)
-    return `${at}Close : un rapport validé maintenant va sur la quinzaine ${periodLine(followingPeriod(data.period))}.`;
+    return `${at}Close : ${lateWords(data.statements)} maintenant va sur la quinzaine ${periodLine(followingPeriod(data.period))}.`;
   return `${at}Un relevé s’ouvre d’un clic : le parcours de l’argent, ligne par ligne.`;
 }
 

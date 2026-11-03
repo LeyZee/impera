@@ -36,6 +36,7 @@ import {
   momentAt,
   myBlockedText,
   myStatementWords,
+  ofPlatform,
   periodHeadOf,
   roundAmountText,
   salesFor,
@@ -429,10 +430,11 @@ function TierLeft({
           'Pour '
         ) : (
           <>
-            Soit environ <b className="nv-num">{roundAmountText(salesFor(left, line), line.currency)}</b> de
-            ventes
-            {where === null ? '' : ` sur ${platformName(where.platform)}`} d’ici le {longDay(lastDay)},
-            pour{' '}
+            Soit environ <b className="nv-num">{roundAmountText(salesFor(left, line), line.currency)}</b>{' '}
+            {line.base === 'platform_net'
+              ? `de net ${ofPlatform(where?.platform ?? null)}`
+              : `de ventes${where === null ? '' : ` sur ${platformName(where.platform)}`}`}{' '}
+            d’ici le {longDay(lastDay)}, pour{' '}
           </>
         )}
         <b className="nv-num">{signedAmountText(next.bonusMinor, 'EUR')}</b>

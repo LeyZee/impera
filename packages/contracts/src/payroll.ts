@@ -20,6 +20,7 @@ import {
 import { PayoutBlockSchema } from './invoices';
 import { CurrencySchema, PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
+import { EarningsBaseSchema } from './pay-rules';
 import { TimezoneSchema } from './persona';
 import { SaleEventSchema, SaleStatusSchema } from './sales-feed';
 import { BasisPointsSchema } from './team';
@@ -533,10 +534,26 @@ export const LateReportSchema = z.object({
 export type LateReport = z.infer<typeof LateReportSchema>;
 
 /**
+ * What a line on the platform's net counted (ADR 0050 § 8, CRM-03): its sales and its refunds read on the platform,
+ * how many of them came after the closing of their own period (late, as a late report), and their net in the account's
+ * currency, a late refund taking off. Counts only, never a sale's identifier.
+ */
+export const StatementCountedSalesSchema = z.object({
+  sales: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+  late: z.number().int().min(0),
+  lateNetMinor: MinorSchema,
+});
+export type StatementCountedSales = z.infer<typeof StatementCountedSalesSchema>;
+
+/**
  * One account of a statement, each step as Imperium showed it, under the account's rules for the period: the gross of
  * the validated reports (`shiftReportIds`, late ones included) in the account's currency, then in euros at
  * `rateMicros`, excluding VAT, net of the platform's fee, and the member's commission. Each step rounded to the cent,
- * half away from zero, and nowhere else.
+ * half away from zero, and nowhere else. `base` says where the gross comes from: `gross_chain`, the reports; or
+ * `platform_net` (CRM-03), the platform's net of the sales `countedSales` counts, without VAT nor the platform's fee to
+ * take off (`vatBps` and `platformFeeBps` are 0, no report), so that only the rate applies. `countedSales` is `null`
+ * on a line of reports.
  */
 export const CommissionStatementLineSchema = z.object({
   platformAccountId: PlatformAccountIdSchema,
@@ -551,6 +568,8 @@ export const CommissionStatementLineSchema = z.object({
   commissionMinor: MinorSchema,
   shiftReportIds: z.array(ShiftReportIdSchema),
   lateReports: z.array(LateReportSchema),
+  base: EarningsBaseSchema,
+  countedSales: StatementCountedSalesSchema.nullable(),
 });
 export type CommissionStatementLine = z.infer<typeof CommissionStatementLineSchema>;
 

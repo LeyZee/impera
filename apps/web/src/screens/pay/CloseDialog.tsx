@@ -29,6 +29,9 @@ export function CloseDialog({
 }): JSX.Element {
   const { statements } = period;
   const reports = new Set(statements.flatMap((one) => one.lines.flatMap((line) => line.shiftReportIds))).size;
+  // The sales a line on the platform's net counted (CRM-03): each one is counted for one member only.
+  const onNet = statements.flatMap((one) => one.lines.flatMap((line) => line.countedSales ?? []));
+  const sales = onNet.reduce((total, one) => total + one.sales + one.refunds, 0);
   const lastDay = payPeriodLastDay(period.period);
   const rate = statements
     .flatMap((one) => one.rules.exchangeRates)
@@ -54,12 +57,23 @@ export function CloseDialog({
     >
       <div className="tm-dialog__body">
         <dl className="py-lines nv-num">
-          <div>
-            <dt>
-              Rapports comptés<small>tous les rapports validés de la quinzaine</small>
-            </dt>
-            <dd>{reports}</dd>
-          </div>
+          {reports === 0 && onNet.length > 0 ? null : (
+            <div>
+              <dt>
+                Rapports comptés<small>tous les rapports validés de la quinzaine</small>
+              </dt>
+              <dd>{reports}</dd>
+            </div>
+          )}
+          {onNet.length === 0 ? null : (
+            <div>
+              <dt>
+                Ventes comptées
+                <small>ventes et remboursements lus sur la plateforme, comptés pour un membre</small>
+              </dt>
+              <dd>{sales}</dd>
+            </div>
+          )}
           {foreign && rate !== null ? (
             <div>
               <dt>
@@ -93,9 +107,9 @@ export function CloseDialog({
         </dl>
         <div className="rp-notice">
           <p className="rp-notice__text">
-            Un rapport validé après la clôture ira sur la quinzaine{' '}
-            {periodLine(followingPeriod(period.period))}, avec les règles de sa quinzaine. Rien de ce qui est
-            figé ne change ensuite.
+            {onNet.length === 0 ? 'Un rapport validé' : 'Un rapport validé ou une vente lue'} après la clôture
+            ira sur la quinzaine {periodLine(followingPeriod(period.period))}, avec les règles de sa
+            quinzaine. Rien de ce qui est figé ne change ensuite.
           </p>
         </div>
         <div className="py-dialog__foot">

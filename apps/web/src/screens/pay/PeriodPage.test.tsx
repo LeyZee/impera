@@ -322,6 +322,33 @@ describe('Paie › Quinzaine', () => {
     expect(text(await screen.findByText(/^Dernier lu/u))).toMatch(/en panne\. Préviens le propriétaire\.$/u);
   });
 
+  it('counts in the closing the sales read on the platform’s net, and where one read after it goes (CRM-03)', async () => {
+    const onNet = euroLine({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 1, late: 0, lateNetMinor: 0 },
+    });
+    periods[OCT2] = periodOf(OCT2, [statementOf(THEO, OCT2, { lines: [onNet] })]);
+    renderPage(OWNER);
+    expect(text(await screen.findByText(/^Le premier relevé validé clôt la quinzaine/u))).toBe(
+      'Le premier relevé validé clôt la quinzaine pour toute l’équipe. Un rapport validé ou une vente lue ensuite ira sur la quinzaine du 1er au 15 novembre.',
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Valider (1)' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(dialog)).toContain('Ventes comptées');
+    expect(text(dialog.querySelector('.py-lines'))).toMatch(/comptés pour un membre4/u);
+    // No report on a period on the platform's net alone: no line that says 0 of them.
+    expect(text(dialog)).not.toContain('Rapports comptés');
+    expect(text(dialog)).toContain(
+      'Un rapport validé ou une vente lue après la clôture ira sur la quinzaine du 1er au 15 novembre',
+    );
+  });
+
   it('says before the first validation that it closes the period, then validates one by one, a refusal on its row', async () => {
     answer = (path) =>
       path.includes(statementOf(BASILE, OCT2).id)

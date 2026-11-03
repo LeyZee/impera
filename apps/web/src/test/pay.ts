@@ -154,6 +154,8 @@ export function euroLine(
     commissionMinor: 2_125,
     shiftReportIds: [payId(301), payId(302)],
     lateReports: [],
+    base: 'gross_chain',
+    countedSales: null,
     ...patch,
   });
 }
