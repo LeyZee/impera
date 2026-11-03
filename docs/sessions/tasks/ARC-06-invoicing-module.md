@@ -1,5 +1,5 @@
 # ARC-06 Les factures et avoirs sortis de la paie
-Statut : in_progress
+Statut : done (#414, fusionnée le 02/11/2026)
 Phase : exploitation
 Dépend de : ADR 0047 § 1, ADR 0051, ARC-05
 Branche : claude/project-thread-fjrft0 (fil « Ranger l'architecture »)
@@ -32,10 +32,11 @@ Troisième des quatre modules de la paie (ADR 0047 § 1) : `invoicing` (émissio
 
 ## Hors périmètre
 
-- Les lectures croisées des tables et les tests d'architecture d'ADR 0047 § 1 : une table, un seul module qui l'écrit et un `schema.<table>` lu seulement par son propriétaire ; un gestionnaire par job (ARC-07, à écrire).
+- Les lectures croisées des tables et les tests d'architecture d'ADR 0047 § 1 : une table, un seul module qui l'écrit et un `schema.<table>` lu seulement par son propriétaire ; un gestionnaire par job (ARC-07).
 - Le renommage des ports `Payroll*` (`PayrollInvoiceStore`, …) restés tels quels pour garder le diff lisible.
 
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 
 - 02/11 : `domain/billing.ts` ne portait plus que `issueDecision` depuis ARC-03 : il passe entier à `invoicing`.
 - 02/11 : `payouts.ts` (la décision d'un versement) va à `invoicing`, qui la rend à la paie par `PayoutGate` ; `PayoutHold`, le motif d'un refus, reste à la paie (`PayoutBlocked`) et se prête par `payroll/pure.ts`.
+- 02/11 : fusionnée (#414, 6e07b0a) après les relectures de Bilan et d'Équipe ; les deux remarques de README d'Équipe (en-tête « Les factures, règles pures » et migration 0045 des PDF) sont reprises par ARC-07 lot a.

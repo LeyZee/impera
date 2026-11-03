@@ -1,0 +1,5 @@
+# 2026-11-02 — ARC-07 lot a : les tests d'architecture de la paie — in_progress
+Fait : ARC-06 fusionnée (#414) et passée à done. `apps/api/src/__tests__/architecture.test.ts` : une table de la paie, un seul propriétaire (lu dans les README) ; entre les quatre modules de la paie, les lectures d'une table d'un autre sont exactement les 38 encore ouvertes (`OPEN_CROSSINGS`) ; chaque job a sa tâche une seule fois, dans un seul fichier de `wiring/` ; un job de la paie n'est mis en file que par le module qui l'enregistre. `JOBS_WITHOUT_TASK` devient une constante (`wiring/shared.ts`) pour que le type et le test lisent la même liste. Remarques de README d'Équipe sur ARC-06 reprises. Fiche ARC-07 écrite (lots a à d).
+Décisions : une liste exacte des lectures ouvertes plutôt qu'un test qui attendrait la fin d'ARC-07 : toute lecture nouvelle échoue dès maintenant, et chaque lot suivant retire ses lignes.
+Pas fait : lots b, c et d (les ports de lecture).
+Découvertes : `stateAfterCreditNote`, cité par le README d'`invoicing`, n'existe plus dans le code.
