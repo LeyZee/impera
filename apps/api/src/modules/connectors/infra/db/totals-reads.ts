@@ -5,14 +5,22 @@ import {
   SaleEventSchema,
   SaleTypeSchema,
   type CreatorId,
+  type SalesFeedReading,
+  type SalesRefunds,
   type SalesTotals,
 } from '@nirvana/contracts';
 import { sql, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
-import { salesTotals, type TotalsLine } from '../../domain/sales-totals';
+import { refundsOfDay, salesTotals, type TotalsLine } from '../../domain/sales-totals';
 
 import { sellerOf } from './seller';
+
+/** Which refunds a read gives: one creator's, of `day` (each on its own day in its platform's zone). */
+export interface SalesRefundsQuery {
+  readonly creatorId: CreatorId;
+  readonly day: string;
+}
 
 /** Which totals a read gives: one creator's, from `from` to `to`, days both included. */
 export interface SalesTotalsQuery {
@@ -42,6 +50,14 @@ const RowSchema = z.object({
   platform_chatter_id: z.string().nullable(),
   kind: z.string().nullable(),
   member_id: z.string().nullable(),
+});
+
+const RefundRowSchema = RowSchema.extend({ sale_recorded: z.boolean() });
+
+const ReadingSchema = z.object({
+  platform: PlatformSchema,
+  read_at: instant.nullable(),
+  paused_until: instant.nullable(),
 });
 
 function lineOf(row: z.infer<typeof RowSchema>): TotalsLine {
@@ -96,5 +112,57 @@ export const salesFeedTotals = {
       result.rows.map((row) => lineOf(RowSchema.parse(row))),
       { from: query.from, to: query.to },
     );
+  },
+  /**
+   * The refunds of a day by their own day (CRM-04, the evening digest), whatever their sale's: the totals take a
+   * refund off its sale's day, so this is how a refund of an older sale is said at all. Its seller is its sale's when
+   * the sale is recorded, else the chatter the refund line names. In the caller's transaction, as `totalsOf`.
+   */
+  refundsOf: async (tx: Transaction, query: SalesRefundsQuery): Promise<SalesRefunds> => {
+    // A day padded on each side for the zones: `refundsOfDay` keeps the refunds of the day exactly.
+    const start = new Date(Date.parse(`${query.day}T00:00:00Z`) - DAY_MS);
+    const end = new Date(Date.parse(`${query.day}T00:00:00Z`) + 2 * DAY_MS);
+    const result = await tx.execute(sql`
+      select l.platform, l.platform_sale_id, l.event, l.sale_type, l.platform_account_id, l.occurred_at, l.currency,
+             l.gross_incl_vat_minor, l.gross_excl_vat_minor, l.net_minor, l.agency_minor, l.creator_minor,
+             coalesce(s.platform_chatter_id, l.platform_chatter_id) as platform_chatter_id, c.kind, c.member_id,
+             s.id is not null as sale_recorded
+        from platform_sales l
+        left join platform_sales s
+          on s.event = 'sale' and s.platform = l.platform and s.platform_sale_id = l.platform_sale_id
+        left join sales_feed_chatters c
+          on c.platform = l.platform and c.platform_chatter_id = coalesce(s.platform_chatter_id, l.platform_chatter_id)
+       where l.creator_id = ${query.creatorId}
+         and l.event = 'refund'
+         and l.occurred_at >= ${start}
+         and l.occurred_at < ${end}`);
+    return refundsOfDay(
+      result.rows.map((row) => {
+        const parsed = RefundRowSchema.parse(row);
+        return { ...lineOf(parsed), saleRecorded: parsed.sale_recorded };
+      }),
+      query.day,
+    );
+  },
+
+  /**
+   * How far the register of each platform where one of her accounts is linked has been read (ADR 0054): a day not read
+   * is never a day without a sale. Empty while none of her accounts is linked. Agency facts with no secret, readable in
+   * any transaction (the cursors are out of RLS).
+   */
+  readingsOf: async (tx: Transaction, creatorId: CreatorId): Promise<readonly SalesFeedReading[]> => {
+    const result = await tx.execute(sql`
+      select m.platform, c.read_at, c.paused_until
+        from (select distinct platform from sales_feed_models where creator_id = ${creatorId}::uuid) m
+        left join sales_feed_cursors c on c.platform = m.platform
+       order by m.platform`);
+    return result.rows.map((row) => {
+      const parsed = ReadingSchema.parse(row);
+      return {
+        platform: parsed.platform,
+        readAt: parsed.read_at?.toISOString() ?? null,
+        pausedUntil: parsed.paused_until?.toISOString() ?? null,
+      };
+    });
   },
 };

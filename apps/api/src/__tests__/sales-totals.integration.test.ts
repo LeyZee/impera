@@ -299,4 +299,41 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     );
     expect(elsewhere.rows).toEqual([]);
   });
+
+  it('says a day’s refunds on their own day, an older sale’s included, and how far each register was read', async () => {
+    // `sale_oct_refunded` was refunded on the 2nd of November: in no totals of that day, here on its own.
+    const refunds = await withTenant(app.db.db, creatorId, (tx) =>
+      salesFeedTotals.refundsOf(tx, { creatorId, day: '2026-11-02' }),
+    );
+    expect(refunds.day).toBe('2026-11-02');
+    expect(refunds.rows).toHaveLength(1);
+    expect(refunds.rows[0]).toMatchObject({
+      platform: 'reveal',
+      platformAccountId: accountId,
+      currency: 'EUR',
+      saleType: 'ppv',
+      refunds: 1,
+      olderThanRegister: 0,
+      grossInclVatMinor: 1200,
+    });
+    expect(JSON.stringify(refunds)).not.toMatch(/fan_test_01/);
+    // Another creator's tenant reads none of them.
+    const elsewhere = await withTenant(app.db.db, otherCreatorId, (tx) =>
+      salesFeedTotals.refundsOf(tx, { creatorId, day: '2026-11-02' }),
+    );
+    expect(elsewhere.rows).toEqual([]);
+
+    const readings = await withTenant(app.db.db, creatorId, (tx) =>
+      salesFeedTotals.readingsOf(tx, creatorId),
+    );
+    expect(readings.map(({ platform, pausedUntil }) => ({ platform, pausedUntil }))).toEqual([
+      { platform: 'reveal', pausedUntil: null },
+    ]);
+    // Read by the runs above: the last read that went through, not a day without a sale.
+    expect(readings[0]?.readAt).not.toBeNull();
+    const [unlinked] = await creatorWithAccount('sans_lien_test');
+    expect(await withTenant(app.db.db, unlinked, (tx) => salesFeedTotals.readingsOf(tx, unlinked))).toEqual(
+      [],
+    );
+  });
 });
