@@ -1,14 +1,48 @@
-import { createCreatorTasksModule, type CreatorTasksModule } from '../modules/creator-tasks';
+import { JOB_PAYLOADS } from '@impera/contracts';
 
-import type { Routes, Shared } from './shared';
+import { defineTask } from '../jobs';
+import { createCreatorTasksModule, type CreatorTasksModule } from '../modules/creator-tasks';
+import type { NotificationsModule } from '../modules/notifications';
+
+import type { Routes, Shared, TasksOf } from './shared';
 
 export interface WiredCreatorTasks {
   readonly module: CreatorTasksModule;
+  readonly tasks: TasksOf<'creator_tasks'>;
   readonly routes: readonly Routes[];
 }
 
-/** Her agenda (CR-05): no dependency but the shared ones; the time helpers come from `scheduling/pure.ts`. */
-export function wireCreatorTasks(shared: Shared): WiredCreatorTasks {
-  const module = createCreatorTasksModule({ db: shared.db, requireRole: shared.requireRole });
-  return { module, routes: [module.routes] };
+/**
+ * Her agenda (CR-05): the time helpers come from `scheduling/pure.ts`; her reminders ring through the `notifications`
+ * module's `notify` (lot b3).
+ */
+export function wireCreatorTasks(
+  shared: Shared,
+  deps: { readonly notifications: NotificationsModule },
+): WiredCreatorTasks {
+  const module = createCreatorTasksModule({
+    db: shared.db,
+    adminDb: shared.adminDb,
+    requireRole: shared.requireRole,
+    notify: deps.notifications.notify,
+  });
+  return {
+    module,
+    tasks: {
+      'creator_tasks.remind': defineTask(
+        'creator_tasks.remind',
+        JOB_PAYLOADS['creator_tasks.remind'],
+        shared.logger,
+        async (payload, context) => {
+          if (module.remind === null) {
+            context.logger.warn('creator-tasks: push is off, her reminder stays in her agenda');
+            return;
+          }
+          const outcomes = await module.remind(payload, new Date());
+          context.logger.info({ accounts: outcomes.length, outcomes }, 'creator-tasks: reminder');
+        },
+      ),
+    },
+    routes: [module.routes],
+  };
 }
