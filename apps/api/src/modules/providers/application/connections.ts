@@ -4,6 +4,7 @@ import {
   ok,
   ProviderSettingsSchema,
   type AiProvider,
+  type ConnectionSignal,
   type ProviderErrorKind,
   type ProviderRefusal,
   type ProviderSettings,
@@ -12,6 +13,7 @@ import {
 } from '@nirvana/contracts';
 
 import { DASHBOARD_PROVIDERS } from '../domain/catalog';
+import { credentialSignal, unreachableSignal } from '../domain/connection-signal';
 import {
   applyReverification,
   credentialFromVerification,
@@ -61,6 +63,11 @@ export interface ConnectionsDeps {
   readonly onChange?: (provider: AiProvider) => void | Promise<void>;
   /** Outside production only: whether the environment holds a key for this provider. */
   readonly hasEnvironmentKey?: (provider: AiProvider) => boolean;
+  /**
+   * What each check, connection or refused call says of the service (Telegram P3-12); the outbox keeps the transitions
+   * only. Absent in tests that do not look at it.
+   */
+  readonly onSignal?: (provider: AiProvider, signal: ConnectionSignal) => Promise<void>;
 }
 
 /** A refusal as the sheet shows it, under the key field. */
@@ -72,8 +79,15 @@ function verifierFor(deps: ConnectionsDeps, provider: AiProvider): ProviderVerif
   return verifier;
 }
 
-async function changed(deps: ConnectionsDeps, provider: AiProvider): Promise<void> {
+/** After a write: the cache and the live stream follow, and, given the line written, its service's signal. */
+async function changed(
+  deps: ConnectionsDeps,
+  provider: AiProvider,
+  written?: StoredCredential,
+): Promise<void> {
   await deps.onChange?.(provider);
+  const signal = written === undefined ? null : credentialSignal(written);
+  if (signal !== null) await deps.onSignal?.(provider, signal);
 }
 
 /**
@@ -114,7 +128,7 @@ export async function connectProvider(
   }
   const credential = credentialFromVerification(provider, shape.value, outcome, deps.clock.now());
   await deps.store.save(credential, by);
-  await changed(deps, provider);
+  await changed(deps, provider, credential);
   return ok(savedStatus(provider, credential));
 }
 
@@ -127,10 +141,20 @@ export async function reverifyProvider(deps: ConnectionsDeps, provider: AiProvid
   if (stored === null) return statusOf(deps, provider, null);
   if (stored.key === null) return savedStatus(provider, stored);
   const outcome = await verifierFor(deps, provider).verify(stored.key, stored.settings);
-  const next = applyReverification(stored, outcome, deps.clock.now());
-  if (next === stored) return savedStatus(provider, stored);
+  const now = deps.clock.now();
+  const next = applyReverification(stored, outcome, now);
+  if (next === stored) {
+    // No answer: nothing is written, the outage is told once it has lasted (Telegram P3-12). A quota (429) is not
+    // a provider that is down.
+    const signal =
+      !outcome.ok && outcome.kind === 'unreachable' && outcome.reason !== 'rate_limited'
+        ? unreachableSignal(stored, now)
+        : null;
+    if (signal !== null) await deps.onSignal?.(provider, signal);
+    return savedStatus(provider, stored);
+  }
   if (await deps.store.update(next)) {
-    await changed(deps, provider);
+    await changed(deps, provider, next);
     return savedStatus(provider, next);
   }
   const current = await deps.store.find(provider);
@@ -198,8 +222,9 @@ export function createRefusalReporter(deps: ConnectionsDeps, keys: KeysInUse): R
       if (stored === null || stored.state === 'needs_reconnect' || stored.key === null) return;
       const kind = await refusalOf(stored, stored.key, reported, deps.clock.now().getTime());
       if (kind === null) return;
-      if (await deps.store.update(markRefusedInProduction(stored, kind))) {
-        await changed(deps, provider);
+      const refused = markRefusedInProduction(stored, kind);
+      if (await deps.store.update(refused)) {
+        await changed(deps, provider, refused);
         return;
       }
       // A voice picked meanwhile: read the line again and decide over it.

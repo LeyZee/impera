@@ -29,7 +29,7 @@ export function MyPersonaPage(): JSX.Element {
       <PageHeader
         eyebrow="Moi"
         title="Persona"
-        lead="Ta fiche : ce que l’agent sait de toi et la façon dont il parle."
+        lead="Ta fiche : qui tu es, ce que tu aimes, tes limites et ta façon de parler."
         actions={<MeNav creator />}
       />
       <div className="ps-sheet">

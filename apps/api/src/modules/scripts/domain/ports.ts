@@ -77,3 +77,6 @@ export interface ScriptStructureStore {
     | { readonly kind: 'blocked'; readonly refusals: readonly QueueRefusal[] }
   >;
 }
+
+/** A card's SVG drawn as a PNG at its own `width` and `height` (SC-01 lot b): the same SVG gives the same bytes. */
+export type RasterizeCard = (svg: string) => Promise<Uint8Array>;

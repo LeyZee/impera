@@ -43,6 +43,11 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 - Si l'écart tient à la seconde lecture, `publishMismatch` publie `sales_feed_mismatch` sans créatrice. Le payload donne les jours, les comptes, la devise et les deux nets, jamais un fan ni un chatteur. L'index unique de la migration 0092 le limite à une fois par plateforme et quinzaine.
 - Rien n'est gardé dans `sales_feed_checks`, aucune règle ne bascule, et la paie ne lit pas l'événement (`sales-feed-mismatch-isolation.test.ts`). Quand la plateforme refuse, le job lève une erreur et Graphile le relance (3 essais).
 
+## Connexion en panne (Telegram P3-12)
+
+- Le registre de Reveal est le service `reveal_crm` de `connection_state_changed`. Une clé refusée le dit `down` (`refused`) tout de suite. Une lecture sans réponse ne le dit `down` (`unreachable`) qu'après trois lectures ratées de suite sur un quart d'heure (`domain/connection-outage.ts`, compte tenu en mémoire par le worker qui lit). Un 429 est une pause (`pausedUntil`), jamais une panne.
+- `back` part à la première lecture réussie après un échec, ou à la connexion d'une clé. `publishConnectionState` (`src/connection-state.ts`) n'écrit qu'à la bascule, sans créatrice, jamais la clé.
+
 ## Lecture des ventes par la paie (CRM-03, ADR 0050 §§ 5, 7 et 8)
 
 `salesFeedReadsForPay`, exporté par `index.ts` (`infra/db/pay-reads.ts`), lit le registre dans la transaction de l'appelant, ligne par ligne, jamais une somme :

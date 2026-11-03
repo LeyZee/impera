@@ -79,6 +79,12 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
     const rail = railOf(context.user);
     const section = sectionOf(location.pathname);
     if (section !== null && !canOpen(rail, section)) {
+      // The app's own address (the manifest's `start_url`, opened at each launch) is coming home, not someone else's
+      // link: no word for it.
+      if (location.pathname === '/') {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+        throw redirect({ to: rail.home, replace: true });
+      }
       // Said once on arrival (NAV-21): a link pasted from someone else's space is not a broken app. The word rides
       // with the redirect, in the history's state: each arrival has its own, even on the address already shown.
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.

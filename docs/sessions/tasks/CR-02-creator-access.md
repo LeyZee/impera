@@ -69,9 +69,14 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 
 ### 03/11/2026, lot c2 (son rail, Aujourd'hui, Moi)
 - Rail de la créatrice (ADR 0042 § 8) : **Aujourd'hui · Moi** pour l'instant ; Agenda (CR-05), Ventes (CR-04) et Contenu (CR-06) arrivent avec leurs écrans. Elle quitte le Dashboard et Créatrices : toute autre adresse la ramène à Aujourd'hui avec « Cette page n'est pas dans ton espace. »
-- Aujourd'hui (`/aujourdhui`, son écran à elle) : qui est en poste pour elle (nom affiché, son compte, créneau, « encore 3 h 12 », jauge) et « Ensuite » sur 24 h, par `GET /v1/creator-space/on-duty`, relu chaque minute. Personne en poste : quand commence le prochain. Ses dernières ventes s'y ajouteront avec Ventes (CR-04).
+- Aujourd'hui (`/aujourdhui`, son écran à elle) : une carte discrète « Qui répond à tes fans » (« En ce moment : Iris jusqu'à 18 h. », « Ensuite : … » sur 24 h), comme le prototype validé par Charles le 02/11 (une ligne discrète, jamais la vedette de sa journée), par `GET /v1/creator-space/on-duty`, relu chaque minute ; son compte n'est nommé que si plusieurs sont en poste. Personne : quand commence le prochain. Ses tâches (CR-05) et ses dernières ventes (CR-04) passeront devant. Ouvrir l'appli sur `/` la mène chez elle sans « Cette page n'est pas dans ton espace. » (relecture d'Extension, vaut aussi pour le chatteur). Phrase de Moi › Persona choisie par Charles le 03/11 : « Ta fiche : qui tu es, ce que tu aimes, tes limites et ta façon de parler. »
 - Moi : **Persona** (`/moi/persona`, son onglet Persona d'avant, enregistrement compris, avec la même demande avant de perdre des changements) et **Sécurité**. Les écrans d'un membre (dossier, factures, calendrier des shifts) la renvoient à sa persona ; `/moi/persona` renvoie un membre à son dossier.
 - Reste : fermer `/v1/dashboard` à son rôle et retirer du Dashboard ce qui ne servait qu'à elle (lot c2b) ; lot c3 (Ventes › Fans, lecteur de conversation).
+
+### 03/11/2026, lot c2b (le Dashboard fermé à son rôle)
+- `GET /v1/dashboard` : propriétaire et opérateur seuls (`requireRole('owner', 'operator')`) ; sa session reçoit 403. Les masques qui ne servaient qu'à elle disparaissent du serveur : les ventes Reveal sont lues pour tout lecteur restant.
+- Web : plus de `forCreator` dans `heroState`, `foldOf`, `live.ts`, `DashboardPage`, `AgentHero` ni le routeur ; la pastille de mode (`.db-modepill`) part avec. Elle lit sa journée dans son Aujourd'hui (lot c2), jamais l'état de l'agent (ADR 0042 § 8).
+- Reste : lot c3 (Ventes › Fans, lecteur de conversation) ; textes de l'éditeur de persona qui nomment encore « l'agent » devant elle (lot à part).
 
 ### Lot futur : les insights de sa base de fans (demande de Charles, 03/11 11h40)
 - Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines », à la place de toute note par fan (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.

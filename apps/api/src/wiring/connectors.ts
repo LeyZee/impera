@@ -2,6 +2,7 @@ import { JOB_PAYLOADS } from '@nirvana/contracts';
 import { parseEncryptionKeys, withAdmin } from '@nirvana/db';
 
 import { secretOrNull } from '../config';
+import { createConnectionStatePublisher } from '../connection-state';
 import { defineTask } from '../jobs';
 import {
   createConnectorsModule,
@@ -30,6 +31,8 @@ export function wireConnectors(
     readonly registry: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
     readonly salesFeeds?: SalesFeedRegistry;
+    /** Tests only: the connectors' clock. */
+    readonly now?: () => Date;
   },
 ): WiredConnectors {
   const { config, db, adminDb, logger, requireRole, recentLogin } = shared;
@@ -51,6 +54,9 @@ export function wireConnectors(
     publicBaseUrl: config.AUTH_BASE_URL,
     // The automatic sales check compares the accounts the pay rules put on the platform's net (CRM-04 b3).
     detectedAccounts: (period) => withAdmin(adminDb, (tx) => salesCheckReads.detectedAccounts(tx, period)),
+    // Reveal's register down or back (Telegram P3-12), told by the Telegram module.
+    publishConnectionState: createConnectionStatePublisher(adminDb, deps.now),
+    ...(deps.now !== undefined && { clock: { now: deps.now } }),
   });
   return {
     module,
