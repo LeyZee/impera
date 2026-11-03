@@ -72,6 +72,7 @@ export const JOB_NAMES = [
   'telegram.poll_updates',
   'telegram.morning_digest',
   'telegram.evening_digest',
+  'telegram.connection_reminders',
   'telegram.purge',
 ] as const;
 export const JobNameSchema = z.enum(JOB_NAMES);
@@ -338,6 +339,8 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.morning_digest': 1,
   // Its hour is 23 o'clock only: a failed run is retried within it, the key of her day keeps it once.
   'telegram.evening_digest': 3,
+  // Every 10 minutes: the next run is the retry, the reminder's key keeps it once (P3-12).
+  'telegram.connection_reminders': 1,
   'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 

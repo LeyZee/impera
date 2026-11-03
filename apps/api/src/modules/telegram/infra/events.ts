@@ -138,6 +138,14 @@ const SalesFeedMismatchSchema = EVENT_PAYLOADS.sales_feed_mismatch
     days: z.array(z.object({ day: z.iso.date(), platformAccountId: PlatformAccountIdSchema })).min(1),
   });
 
+// Her account and fortnight (CRM-04 d3): her share, the expected one and their difference stay in Impera.
+const AgencyShareMismatchSchema = EVENT_PAYLOADS.agency_share_mismatch.pick({
+  creatorId: true,
+  platform: true,
+  platformAccountId: true,
+  from: true,
+});
+
 function signalOf(type: string, payload: unknown): Signal | null {
   switch (type) {
     case 'handoff_requested': {
@@ -268,6 +276,19 @@ function signalOf(type: string, payload: unknown): Signal | null {
         days: new Set(days.map((day) => day.day)).size,
         accounts: new Set(days.map((day) => day.platformAccountId)).size,
       };
+    }
+    case 'agency_share_mismatch': {
+      const parsed = AgencyShareMismatchSchema.safeParse(payload);
+      if (!parsed.success) return null;
+      return { kind: 'agency_share_mismatch', ...parsed.data };
+    }
+    case 'connection_state_changed': {
+      const parsed = EVENT_PAYLOADS.connection_state_changed.safeParse(payload);
+      if (!parsed.success) return null;
+      const { data } = parsed;
+      return data.state === 'down'
+        ? { kind: 'connection_down', service: data.service, reason: data.reason }
+        : { kind: 'connection_back', service: data.service };
     }
     case 'security_alert': {
       const parsed = SecurityAlertPayloadSchema.safeParse(payload);

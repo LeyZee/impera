@@ -518,6 +518,22 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
         lastReadAt: rows.at(-1)?.createdAt ?? null,
       };
     },
+    async latestOfThread(threadKey) {
+      const [row] = await admin((tx) =>
+        tx
+          .select({
+            sourceKey: deliveries.sourceKey,
+            action: deliveries.action,
+            createdAt: deliveries.createdAt,
+          })
+          .from(deliveries)
+          .where(eq(deliveries.threadKey, threadKey))
+          .orderBy(sql`${deliveries.createdAt} desc`, sql`${deliveries.id} desc`)
+          .limit(1),
+      );
+      if (row === undefined) return null;
+      return { sourceKey: row.sourceKey, action: ActionSchema.parse(row.action), createdAt: row.createdAt };
+    },
     async threadRoots(threadKey) {
       const rows = await admin((tx) =>
         tx

@@ -118,6 +118,15 @@ const moduleRules = moduleNames.flatMap((name) => {
 /** External (npm) and core (node:) modules a given element may not import. */
 const external = (...sources) => ({ module: { origin: ['external', 'core'], source: sources } });
 
+/**
+ * The rule `react/jsx-no-comment-textnodes`, without its plugin: a line comment or a block comment written as JSX
+ * text is shown on the screen, not read as a comment (seen on #486). `scripts/eslint-config.test.mjs` checks it.
+ */
+const JSX_COMMENT_TEXT = {
+  selector: 'JSXText[value=/(^|\\n)\\s*\\/[\\/*]/]',
+  message: 'A comment written as JSX text is displayed: wrap it in braces, {/* … */}.',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -285,6 +294,7 @@ export default tseslint.config(
           selector: 'TSEnumDeclaration',
           message: 'Use literal unions and Zod schemas instead of enums (coding.md).',
         },
+        JSX_COMMENT_TEXT,
       ],
     },
   },
@@ -310,4 +320,4 @@ export default tseslint.config(
   prettier,
 );
 
-export { MODULE_DEPENDENCIES, moduleNames };
+export { JSX_COMMENT_TEXT, MODULE_DEPENDENCIES, moduleNames };

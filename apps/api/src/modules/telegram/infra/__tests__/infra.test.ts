@@ -434,6 +434,55 @@ describe('reading the outbox', () => {
       days: 2,
       accounts: 2,
     });
+    const since = '2026-11-03T10:00:00.000Z';
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'connection_state_changed',
+        payload: { service: 'mistral', state: 'down', reason: 'low_credit', since },
+      })?.signal,
+    ).toEqual({ kind: 'connection_down', service: 'mistral', reason: 'low_credit' });
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'connection_state_changed',
+        payload: { service: 'xai', state: 'back', since },
+      })?.signal,
+    ).toEqual({ kind: 'connection_back', service: 'xai' });
+    const shareCreator = '018f3e5c-0000-7000-8000-0000000000c1';
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'agency_share_mismatch',
+        payload: {
+          creatorId: shareCreator,
+          platform: 'reveal',
+          platformAccountId: accountA,
+          from: '2026-11-01',
+          to: '2026-11-15',
+          currency: 'EUR',
+          sales: 3,
+          refunds: 0,
+          creatorMinor: 10_000,
+          expectedCreatorMinor: 9_000,
+          differenceMinor: 1_000,
+        },
+      })?.signal,
+    ).toEqual({
+      kind: 'agency_share_mismatch',
+      creatorId: shareCreator,
+      platform: 'reveal',
+      platformAccountId: accountA,
+      from: '2026-11-01',
+    });
+    // A service or a reason the contract does not know is not read.
+    expect(
+      toScannedEvent({
+        ...base,
+        type: 'connection_state_changed',
+        payload: { service: 'meta', state: 'down', reason: 'refused', since },
+      }),
+    ).toBeNull();
     // The voice version stays in Impera: the signal carries only the reasons and the count.
     const closed = toScannedEvent({
       ...base,

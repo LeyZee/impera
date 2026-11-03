@@ -89,3 +89,6 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 - Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines », à la place de toute note par fan (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.
 - Garde-fous à tenir : agrégats seulement à partir des faits `declared` (ni `inferred`, ni `operator_note`, ni `commercial`) ; un pourcentage ne s'affiche qu'au-delà d'un seuil de fans par case, sinon « trop peu de fans » (pas de réidentification) ; calcul côté serveur, l'écran ne calcule rien.
 - Où ça rentre : un lot après le lot c de CR-02, sur l'onglet Ventes › Fans. Le seuil et les tranches sont des choix de produit : une ADR courte les fixe avant le code.
+
+### 03/11/2026, journal des lectures de messages (Bilan, relevé par Extension sur #488)
+- `GET /v1/creator-space/conversations/:id/messages` ne lisait le fil qu'avec l'ouverture comme trace : un appel direct le lisait sans rien écrire. Une lecture des messages sans ouverture d'elle de la même conversation dans les 15 dernières minutes (`CREATOR_READ_TRACE_MINUTES`) est maintenant écrite comme une ouverture, `details.via = 'messages'`, dans la transaction de la lecture. L'écran, qui relit toutes les 30 s, n'ajoute rien tant que son ouverture couvre la fenêtre.
