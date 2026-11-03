@@ -160,10 +160,9 @@ function gapsIn(span: Span, spans: readonly Span[]): Span[] {
 /**
  * The créneaux to fill (ADR 0045 § 2, ADR 0048 § 1), as Équipe › Planning counts them (EQ-01): on each account, each
  * créneau with a stretch ahead that no shift covers (from now, at the minute, for the créneau under way), even when a
- * shift holds the rest of it. `open` gives those stretches. One whose every open stretch the agent answers in
- * Automatique is not to fill: it goes in `aiAlone` when no shift touches it (« sans chatteur », ADR 0048 § 1), and is
- * held with its chatter otherwise (Équipe, 03/11). In Copilote it stays to fill: each draft waits for a human (ADR 0019,
- * ADR 0025).
+ * shift holds the rest of it. `open` gives those stretches. One « sans chatteur » (no shift on what is left of it)
+ * whose every open stretch the agent answers in Automatique is not to fill: it goes in `aiAlone` (ADR 0048 § 1). In
+ * Copilote it stays to fill: each draft waits for a human (ADR 0019, ADR 0025); so does one a shift holds in part.
  * The one count of the créneaux to fill: the calendar, Planning and EQ-14's departure alert read this function.
  */
 export function slotsToFill(input: {
@@ -206,15 +205,11 @@ export function slotsToFill(input: {
         endsAt: slot.to,
         open,
       };
-      // The agent answering every open stretch in Automatique holds the créneau: « IA seule » when no chatter is on
-      // it at all, held with the chatter otherwise (ADR 0048 § 1).
-      if (open.every((gap) => coversAll(reply, gap))) {
-        // Only what is left of a créneau under way: a shift already over leaves no chatter on it (Équipe, 03/11).
-        const touched = own.some((shift) => ms(shift.from) < ms(rest.to) && ms(shift.to) > ms(rest.from));
-        if (!touched) aiAlone.push(cell);
-        continue;
-      }
-      toFill.push(cell);
+      // « IA seule » only « sans chatteur » (ADR 0048 § 1): no shift on what is left of the créneau (one already over
+      // leaves no chatter on it), and the agent answers every open stretch in Automatique. A créneau a chatter holds in
+      // part stays to fill, the agent answering the rest or not, as Planning shows it: a hole is never hidden.
+      const touched = own.some((shift) => ms(shift.from) < ms(rest.to) && ms(shift.to) > ms(rest.from));
+      (!touched && open.every((gap) => coversAll(reply, gap)) ? aiAlone : toFill).push(cell);
     }
   }
   return { toFill, aiAlone };

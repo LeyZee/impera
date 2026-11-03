@@ -179,8 +179,8 @@ describe('the créneaux to fill (ADR 0045 § 2, ADR 0048 § 1)', () => {
       [['2026-11-03T15:00:00.000Z', '2026-11-03T19:00:00.000Z']],
     ]);
     expect(copilot.aiAlone).toEqual([]);
-    // In Automatique the agent answers the open stretches: each créneau is held with its chatter, never « IA seule ».
-    expect(across('auto')).toEqual({ toFill: [], aiAlone: [] });
+    // In Automatique too: a créneau with a chatter on it is never « IA seule », and its hole is never hidden.
+    expect(across('auto')).toEqual(copilot);
   });
 
   it('says « IA seule » on what is left of a créneau under way once its shift is over', () => {
