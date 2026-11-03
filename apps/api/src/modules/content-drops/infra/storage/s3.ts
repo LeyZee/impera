@@ -190,7 +190,9 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       const response = await call(what, urlOf(key), { method: 'HEAD' });
       if (response.status === 404) return null;
       if (!response.ok) return refused(what, response);
-      const length = Number(response.headers.get('content-length'));
+      // No length is no answer, never a size of 0 (Bilan on #512): the file would be erased as the wrong size.
+      const header = response.headers.get('content-length');
+      const length = header === null || !/^\d+$/u.test(header) ? Number.NaN : Number(header);
       if (!Number.isInteger(length)) {
         throw new ContentDropStorageUnavailable(`${config.bucket}: ${what} gave no size`);
       }
