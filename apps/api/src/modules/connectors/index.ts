@@ -31,6 +31,10 @@ import { createSessionVault } from './infra/session-vault';
 export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
+/** @public What pay reads of the sales feed, in its transaction (ADR 0050 §§ 5, 7, 8; CRM-03): Équipe's recalculation. */
+export { salesFeedReadsForPay } from './infra/db/pay-reads';
+/** @public The lines pay reads, their author and the range of a read (CRM-03). */
+export type { PaySaleAuthor, PaySaleLine, PaySalesRange } from './infra/db/pay-reads';
 export { FakeConnector } from './infra/fake/FakeConnector';
 
 function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {

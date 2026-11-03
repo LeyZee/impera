@@ -35,6 +35,23 @@ Tables possédées : `sales_feed_credentials`, `sales_feed_cursors`, `sales_feed
 - Verdict : `match` quand les trois sources disent les chiffres du registre et que rien n'est resté sans comparaison ; `mismatch` dès qu'un net diffère (le nombre de ventes d'un membre est affiché, pas comparé : Reveal ne dit pas si son `salesCount` retire un remboursement) ; `incomplete` quand le reste concorde mais qu'une source manque (pas d'export, statistiques refusées), qu'une modèle de l'export est inconnue ou que le registre commence après le premier jour. Notes : remboursement sans vente, bot de la plateforme non relié à l'agent, modèle de l'export inconnue, lignes hors des jours, statistiques indisponibles, registre qui commence après le premier jour. Les jours doivent être terminés dans le fuseau de la plateforme (sinon 422 `sales_feed_check_days_unprocessable`). `registerReadAt` dit quand le registre a été lu ; l'export se télécharge juste avant la vérification. Une ligne de quarantaine libérée vers le registre n'est comptée qu'une fois.
 - L'export : séparateur `;`, `,` ou tabulation, guillemets RFC 4180, montants en euros écrits comme un tableur (`12,34 €`, `1 234,56`), dates `AAAA-MM-JJ`, `JJ/MM/AAAA` ou instant ISO. Colonnes reconnues par leur nom (`EXPORT_HEADERS`) : date, modèle (identifiant ou pseudo de la modèle), montant TTC, revenu agence, revenu modèle, net ; il faut la date, le modèle et le net ou ses deux parts. Une colonne du fan n'est jamais lue. **Le vrai export n'a pas encore été vu** : ses noms de colonnes s'ajoutent à `EXPORT_HEADERS` à son arrivée. Un export illisible est refusé en 422 `sales_feed_export_unprocessable`, avec la colonne et la ligne, jamais une valeur ; un refus de la plateforme répond 502 avec son genre.
 
+## Lecture des ventes par la paie (CRM-03, ADR 0050 §§ 5, 7 et 8)
+
+`salesFeedReadsForPay`, exporté par `index.ts` (`infra/db/pay-reads.ts`), lit le registre dans la transaction de l'appelant, ligne par ligne, jamais une somme :
+- `linesOfSalesBetween` : les ventes dont l'instant tombe dans la plage, et leurs remboursements quel que soit leur jour. Un remboursement compte au jour de sa vente ; celui d'une vente plus ancienne que le registre compte à son propre instant, avec `saleDay` à `null`.
+- `linesRecordedBetween` : les lignes enregistrées dans la plage, quel que soit le jour de leur vente, c'est-à-dire les lignes tardives après une clôture (ADR 0032).
+- `linesRelinkedBetween` : les lignes dont le lien du chatteur a pris sa version actuelle dans la plage. Relier un chatteur après une clôture est une attribution, qui compte dans la première quinzaine encore ouverte (§ 5).
+
+Ces lectures se recouvrent exprès : un remboursement tardif sort dans la quinzaine de sa vente et dans celle où il a été enregistré. Un lecteur indexe donc les lignes par `platform`, `platformSaleId` et `event`, et compte chaque clé une seule fois.
+
+Chaque ligne porte :
+- l'id de la plateforme et l'événement, le compte, le type de vente ;
+- l'instant de la ligne et celui de sa vente, avec son jour dans le fuseau que donne l'appelant (celui de l'agence) ;
+- `recordedAt`, la devise, le net signé (négatif pour un remboursement) et le statut à la première lecture (`other` inconnu, `refund_asked` à signaler) ;
+- son auteur selon le lien du propriétaire : membre, agent, chatteur non relié, ou personne. Pour un membre ou l'agent, la ligne porte aussi la version du lien (`sales_feed_chatters.link_version`) et l'instant où elle a été posée (`link_version_at`). L'auteur d'un remboursement est celui de sa vente.
+
+La version du lien change dès qu'il pointe ailleurs, jamais quand le même lien est reposé : la paie la fige dans les entrées d'un relevé. La base d'une vente (`earningsBaseOf` des contrats : le net de la plateforme pour un compte Reveal en source « détectée », la chaîne de l'ADR 0023 partout ailleurs) suit les règles de paie datées du compte. Rien ici ne somme, n'attribue à un shift ni n'applique de taux : c'est le travail de la paie.
+
 ## Structure
 
 - `domain/` : types, règles pures, machines d'état. Zéro I/O, zéro import de framework.
