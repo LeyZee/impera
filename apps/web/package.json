@@ -1,6 +1,7 @@
 {
   "name": "@impera/web",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "description": "Dashboard de supervision Impera (Vite, React 19, Tailwind v4, shadcn/ui), PWA en phase 5.",
   "type": "module",
