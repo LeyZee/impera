@@ -1,4 +1,4 @@
-import { DraftIdSchema, newId, type JobPayload } from '@nirvana/contracts';
+import { DraftIdSchema, newId, type JobPayload } from '@impera/contracts';
 
 import type {
   Clock,

@@ -1,4 +1,4 @@
-import type { TelegramChatId, TelegramErrorKind } from '@nirvana/contracts';
+import type { TelegramChatId, TelegramErrorKind } from '@impera/contracts';
 
 import { nextBatch, type Batch } from '../domain/batch';
 import type {

@@ -1,5 +1,5 @@
-import { EventIdSchema, EVENT_PAYLOADS, newId } from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { EventIdSchema, EVENT_PAYLOADS, newId } from '@impera/contracts';
+import { schema, sql, withAdmin, type Database } from '@impera/db';
 
 import type { PayrollRateAlerts } from '../domain/ports';
 

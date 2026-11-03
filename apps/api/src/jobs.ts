@@ -1,4 +1,4 @@
-import { JOB_MAX_ATTEMPTS, type JobName, type JobPayload } from '@nirvana/contracts';
+import { JOB_MAX_ATTEMPTS, type JobName, type JobPayload } from '@impera/contracts';
 import { makeWorkerUtils, type Task, type WorkerUtils } from 'graphile-worker';
 import type { Pool } from 'pg';
 import { z } from 'zod';

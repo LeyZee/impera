@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { cleanup, render, screen, within } from '@testing-library/react';

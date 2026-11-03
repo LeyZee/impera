@@ -8,8 +8,8 @@ import {
   JournalAccountsSchema,
   PayPeriodSchema,
   TeamMemberIdSchema,
-} from '@nirvana/contracts';
-import { withMember, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { withMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { contractorReadsForAccounting as fileReads } from '../../contractors';

@@ -6,7 +6,7 @@ import type {
   Platform,
   PlatformAccountId,
   SessionState,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { PlatformConnector } from './platform-connector';
 import type { BreakerState } from './rhythm';

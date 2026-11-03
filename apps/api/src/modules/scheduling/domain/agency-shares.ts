@@ -1,4 +1,4 @@
-import { agencyRateFor, type Currency, type Platform, type PlatformAccountId } from '@nirvana/contracts';
+import { agencyRateFor, type Currency, type Platform, type PlatformAccountId } from '@impera/contracts';
 
 /**
  * The gap between a creator's part as the platform reads it (`modelRevenue`) and the agency's percentage set for her

@@ -1,4 +1,4 @@
-import type { CreatorId, TelegramChatId, TelegramSaleSettings, TelegramTopic } from '@nirvana/contracts';
+import type { CreatorId, TelegramChatId, TelegramSaleSettings, TelegramTopic } from '@impera/contracts';
 
 import { classify, type AlertNameOf, type MemberNameOf } from '../domain/classify';
 import { chatsFor } from '../domain/coverage';

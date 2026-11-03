@@ -1,4 +1,4 @@
-import type { MediaDescription, Result } from '@nirvana/contracts';
+import type { MediaDescription, Result } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
 
 import type { BudgetEvent } from './budget';

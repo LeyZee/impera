@@ -1,4 +1,4 @@
-import { DestinationSchema, type Verdict } from '@nirvana/contracts';
+import { DestinationSchema, type Verdict } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 

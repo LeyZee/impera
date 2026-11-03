@@ -1,6 +1,6 @@
 {
-  "id": "db86b248-c59f-42e9-91f7-956c2685282c",
-  "prevId": "5d2626bb-f623-4fe3-baf5-05cb4500b00b",
+  "id": "70125c9c-4e51-43dd-85ba-9d78f6330cba",
+  "prevId": "4f82812f-e32e-4056-800c-3f68f99637b8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7814,7 +7814,7 @@
       "checkConstraints": {
         "pay_period_held_sales_platform_check": {
           "name": "pay_period_held_sales_platform_check",
-          "value": "\"pay_period_held_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"pay_period_held_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "pay_period_held_sales_event_check": {
           "name": "pay_period_held_sales_event_check",
@@ -8080,7 +8080,7 @@
       "checkConstraints": {
         "pay_period_sales_platform_check": {
           "name": "pay_period_sales_platform_check",
-          "value": "\"pay_period_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"pay_period_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "pay_period_sales_event_check": {
           "name": "pay_period_sales_event_check",
@@ -8297,7 +8297,7 @@
       "checkConstraints": {
         "pay_sale_decisions_platform_check": {
           "name": "pay_sale_decisions_platform_check",
-          "value": "\"pay_sale_decisions\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"pay_sale_decisions\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "pay_sale_decisions_outcome_check": {
           "name": "pay_sale_decisions_outcome_check",
@@ -8510,7 +8510,7 @@
       "checkConstraints": {
         "pay_sale_signals_platform_check": {
           "name": "pay_sale_signals_platform_check",
-          "value": "\"pay_sale_signals\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"pay_sale_signals\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "pay_sale_signals_event_check": {
           "name": "pay_sale_signals_event_check",
@@ -9295,7 +9295,7 @@
       "checkConstraints": {
         "platform_sales_platform_check": {
           "name": "platform_sales_platform_check",
-          "value": "\"platform_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"platform_sales\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "platform_sales_event_check": {
           "name": "platform_sales_event_check",
@@ -9508,7 +9508,7 @@
       "checkConstraints": {
         "platform_sales_quarantine_platform_check": {
           "name": "platform_sales_quarantine_platform_check",
-          "value": "\"platform_sales_quarantine\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"platform_sales_quarantine\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "platform_sales_quarantine_event_check": {
           "name": "platform_sales_quarantine_event_check",
@@ -9625,7 +9625,7 @@
       "checkConstraints": {
         "sales_feed_chatters_platform_check": {
           "name": "sales_feed_chatters_platform_check",
-          "value": "\"sales_feed_chatters\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_chatters\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "sales_feed_chatters_kind_check": {
           "name": "sales_feed_chatters_kind_check",
@@ -9743,7 +9743,7 @@
       "checkConstraints": {
         "sales_feed_checks_platform_check": {
           "name": "sales_feed_checks_platform_check",
-          "value": "\"sales_feed_checks\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_checks\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "sales_feed_checks_verdict_check": {
           "name": "sales_feed_checks_verdict_check",
@@ -9830,7 +9830,7 @@
       "checkConstraints": {
         "sales_feed_credentials_platform_check": {
           "name": "sales_feed_credentials_platform_check",
-          "value": "\"sales_feed_credentials\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_credentials\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "sales_feed_credentials_state_check": {
           "name": "sales_feed_credentials_state_check",
@@ -9887,7 +9887,7 @@
       "checkConstraints": {
         "sales_feed_cursors_platform_check": {
           "name": "sales_feed_cursors_platform_check",
-          "value": "\"sales_feed_cursors\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_cursors\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         }
       },
       "isRLSEnabled": false
@@ -9956,7 +9956,7 @@
       "checkConstraints": {
         "sales_feed_deliveries_platform_check": {
           "name": "sales_feed_deliveries_platform_check",
-          "value": "\"sales_feed_deliveries\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_deliveries\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         }
       },
       "isRLSEnabled": false
@@ -10041,7 +10041,7 @@
       "checkConstraints": {
         "sales_feed_models_platform_check": {
           "name": "sales_feed_models_platform_check",
-          "value": "\"sales_feed_models\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_models\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         }
       },
       "isRLSEnabled": false
@@ -10108,7 +10108,7 @@
       "checkConstraints": {
         "sales_feed_webhooks_platform_check": {
           "name": "sales_feed_webhooks_platform_check",
-          "value": "\"sales_feed_webhooks\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"sales_feed_webhooks\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         }
       },
       "isRLSEnabled": false
@@ -13527,7 +13527,7 @@
       "checkConstraints": {
         "platform_accounts_platform_check": {
           "name": "platform_accounts_platform_check",
-          "value": "\"platform_accounts\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'nirvana')"
+          "value": "\"platform_accounts\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
         },
         "platform_accounts_session_state_check": {
           "name": "platform_accounts_session_state_check",

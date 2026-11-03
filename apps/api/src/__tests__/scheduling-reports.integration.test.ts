@@ -24,9 +24,9 @@ import {
   type ShiftReport,
   type ShiftReportId,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, lockMemberPeriod, schema, sql, type Transaction } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, lockMemberPeriod, schema, sql, type Transaction } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 

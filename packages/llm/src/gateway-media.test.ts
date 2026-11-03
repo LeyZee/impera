@@ -1,4 +1,4 @@
-import type { MediaDescription } from '@nirvana/contracts';
+import type { MediaDescription } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';

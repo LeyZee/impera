@@ -3,7 +3,7 @@ import {
   newId,
   type SalesFeedCheckDay,
   type SalesFeedCheckReport,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { fortnightBefore, mismatchDays } from '../auto-check';

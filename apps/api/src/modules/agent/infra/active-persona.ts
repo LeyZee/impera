@@ -1,4 +1,4 @@
-import type { Persona } from '@nirvana/contracts';
+import type { Persona } from '@impera/contracts';
 
 import { personaForModels, type PersonaForModels } from './persona-file';
 

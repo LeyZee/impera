@@ -1,4 +1,4 @@
-import type { MyShift } from '@nirvana/contracts';
+import type { MyShift } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { ComponentProps, JSX } from 'react';
 

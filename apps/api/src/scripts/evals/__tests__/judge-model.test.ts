@@ -1,4 +1,4 @@
-import { DEFAULT_LLM_CONFIG } from '@nirvana/llm';
+import { DEFAULT_LLM_CONFIG } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
 import { evalsConfig } from '../judge-model';

@@ -1,5 +1,5 @@
-import { JOB_PAYLOADS } from '@nirvana/contracts';
-import { parseEncryptionKeys } from '@nirvana/db';
+import { JOB_PAYLOADS } from '@impera/contracts';
+import { parseEncryptionKeys } from '@impera/db';
 
 import { secretOrNull } from '../config';
 import { defineTask } from '../jobs';

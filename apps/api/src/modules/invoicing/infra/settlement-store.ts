@@ -1,5 +1,5 @@
-import { AuditEntryIdSchema, InvoiceEventIdSchema, newId } from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+import { AuditEntryIdSchema, InvoiceEventIdSchema, newId } from '@impera/contracts';
+import { schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { PayrollSettlementStore } from '../domain/ports';
 import { settlementsDue, type SettlementKind } from '../domain/settlements';

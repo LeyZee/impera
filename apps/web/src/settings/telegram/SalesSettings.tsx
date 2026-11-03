@@ -1,4 +1,4 @@
-import type { TelegramOverview, TelegramSaleSettings, TelegramSaleSettingsEntry } from '@nirvana/contracts';
+import type { TelegramOverview, TelegramSaleSettings, TelegramSaleSettingsEntry } from '@impera/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { fetchSaleSettings, saveSaleSettings } from './api';

@@ -1,4 +1,4 @@
-import { MEDIA_VOCABULARY_VERSION, type MediaDescription, type PlaygroundMedia } from '@nirvana/contracts';
+import { MEDIA_VOCABULARY_VERSION, type MediaDescription, type PlaygroundMedia } from '@impera/contracts';
 
 /**
  * A media the trainer described in a few words, as the agent sees a described one. Nothing is claimed beyond

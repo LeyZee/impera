@@ -46,7 +46,7 @@ export interface FakeCrm {
   sell(sale: Partial<FakeSale> & Pick<FakeSale, 'id'>): string;
   /** Appends the refund of a sale already sold, with its amounts. */
   refund(saleId: string, occurredAt: string): string;
-  /** Appends a raw line, for an event Nirvana does not know. */
+  /** Appends a raw line, for an event Impera does not know. */
   appendRaw(event: string, sale: FakeSale, occurredAt: string): string;
   /** The next `requests` calls answer 429 with this `Retry-After`. */
   rateLimit(requests: number, retryAfterSeconds: number): void;

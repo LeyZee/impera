@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreateLeaveRequestBodySchema, CreateShiftSwapRequestBodySchema } from '@nirvana/contracts';
+import { CreateLeaveRequestBodySchema, CreateShiftSwapRequestBodySchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,

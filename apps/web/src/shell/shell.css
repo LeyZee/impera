@@ -1241,7 +1241,7 @@
   min-height: 44px;
 }
 
-/* « Nouvelle version de Nirvana »: offered at the top, never imposed (src/pwa/UpdateNotice.tsx). */
+/* « Nouvelle version d’Impera »: offered at the top, never imposed (src/pwa/UpdateNotice.tsx). */
 .nv-update.nv-glass {
   /* Fuller than the other glass: the page's text must not read through the message (relecture #402). */
   --nv-glass-thick: var(--nv-void);
@@ -1255,7 +1255,7 @@
 }
 
 /*
- * « Nirvana sur ton écran d'accueil »: above the phone's tab bar, in the thumb's reach like the « Plus » sheet, and
+ * « Impera sur ton écran d'accueil »: above the phone's tab bar, in the thumb's reach like the « Plus » sheet, and
  * under the sheet's veil (src/pwa/InstallNudge.tsx).
  */
 .nv-install.nv-glass {

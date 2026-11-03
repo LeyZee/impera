@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ProviderOverview, ProviderStatus } from '@nirvana/contracts';
+import type { ProviderOverview, ProviderStatus } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

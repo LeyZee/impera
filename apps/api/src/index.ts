@@ -18,7 +18,7 @@ const server = await buildServer({
   rateLimitStore: app.rateLimitStore,
 });
 // `pnpm dev`: one process for both (ADR 0004); production runs `dist/worker.js` separately.
-const worker = config.NIRVANA_INLINE_WORKER
+const worker = config.IMPERA_INLINE_WORKER
   ? await startWorker(app, { logger, concurrency: config.WORKER_CONCURRENCY, release: config.RELEASE })
   : undefined;
 

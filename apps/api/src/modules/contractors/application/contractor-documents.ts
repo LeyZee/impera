@@ -7,7 +7,7 @@ import type {
   TeamMemberId,
   UploadContractorDocumentQuery,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { documentExtension, documentMediaTypeOf } from '../domain/documents';
 import {

@@ -3,7 +3,7 @@ import {
   type SalesFeedModelLink,
   type SalesFeedStatus,
   type TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

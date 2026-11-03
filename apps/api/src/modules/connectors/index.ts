@@ -1,5 +1,5 @@
-import type { ConnectionService, ConnectionSignal, JobPayload } from '@nirvana/contracts';
-import type { Database, EncryptionKey } from '@nirvana/db';
+import type { ConnectionService, ConnectionSignal, JobPayload } from '@impera/contracts';
+import type { Database, EncryptionKey } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { OutboundSender } from '../conversations';
@@ -144,7 +144,7 @@ export interface ConnectorsDeps {
   /** One factory per platform with a sales feed: Reveal's CRM API. */
   readonly salesFeeds: SalesFeedRegistry;
   /**
-   * Nirvana's public HTTPS address (AUTH_BASE_URL), where a platform posts its deliveries; `null` (development over
+   * Impera's public HTTPS address (AUTH_BASE_URL), where a platform posts its deliveries; `null` (development over
    * HTTP) and no webhook can be registered: the minute's reading alone brings the sales.
    */
   readonly publicBaseUrl: string | null;

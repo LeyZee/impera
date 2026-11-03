@@ -3,7 +3,7 @@ import {
   SHIFT_FEEDBACK_SIGNALS_MAX,
   SHIFT_REPORT_MAX_MINOR,
   SHIFT_REPORT_STATUSES,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,

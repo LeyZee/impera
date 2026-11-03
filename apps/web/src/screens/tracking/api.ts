@@ -17,7 +17,7 @@ import {
   type MessageView,
   type SetFanFlagBody,
   type TodosAcrossCreators,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { flagError } from './flags-model';
 import { decisionError, isOutdated } from './reader-model';

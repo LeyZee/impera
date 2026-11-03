@@ -4,7 +4,7 @@
  * secret sealed with the same keys adds its own re-sealer below.
  * Usage: `pnpm ops:reencrypt-credentials`, with `CREDENTIALS_ENCRYPTION_KEYS=v2:<nouvelle>,v1:<ancienne>`.
  */
-import { createDbClient, parseEncryptionKeys } from '@nirvana/db';
+import { createDbClient, parseEncryptionKeys } from '@impera/db';
 
 import { loadConfig, secretOrNull } from '../config';
 import { resealSalesFeedCredentials } from '../modules/connectors';

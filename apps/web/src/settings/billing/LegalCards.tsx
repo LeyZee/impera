@@ -4,7 +4,7 @@ import {
   type BillingSettings,
   type ContractText,
   type ContractTextKind,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import { AccountsDialog, TextDialog, ValidateDialog } from './LegalDialogs';

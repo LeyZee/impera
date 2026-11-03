@@ -9,9 +9,9 @@ import {
   type DesireSignal,
   type PlatformAccountId,
   type SendResult,
-} from '@nirvana/contracts';
-import { and, eq, schema } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { and, eq, schema } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 

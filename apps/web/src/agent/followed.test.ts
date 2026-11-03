@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema } from '@nirvana/contracts';
+import { CreatorIdSchema } from '@impera/contracts';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,7 +39,7 @@ describe('useFollowedCreatorId', () => {
       first.result.current.follow(LEA.id);
     });
     expect(second.result.current.chosen).toBe(LEA.id);
-    expect(localStorage.getItem('nirvana.followed-creator')).toBe(LEA.id);
+    expect(localStorage.getItem('impera.followed-creator')).toBe(LEA.id);
   });
 
   it('keeps the choice in memory when the browser refuses its storage', () => {

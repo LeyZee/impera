@@ -1,4 +1,4 @@
-import { sql, type Transaction } from '@nirvana/db';
+import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { AfterValidation, PayoutGate, PayoutVerdict } from '../../payroll';

@@ -1,4 +1,4 @@
-import { TeamMemberIdSchema, type InvoiceListItem, type Me, type PayPeriod } from '@nirvana/contracts';
+import { TeamMemberIdSchema, type InvoiceListItem, type Me, type PayPeriod } from '@impera/contracts';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 

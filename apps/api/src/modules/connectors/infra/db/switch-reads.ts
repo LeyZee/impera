@@ -1,5 +1,5 @@
-import { CalendarDaySchema, PlatformSchema, type Platform, type PlatformAccountId } from '@nirvana/contracts';
-import { and, eq, schema, sql, type Transaction } from '@nirvana/db';
+import { CalendarDaySchema, PlatformSchema, type Platform, type PlatformAccountId } from '@impera/contracts';
+import { and, eq, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 const { platformAccounts, salesFeedChecks, salesFeedModels } = schema;

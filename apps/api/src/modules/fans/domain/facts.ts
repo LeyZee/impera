@@ -4,7 +4,7 @@ import {
   type FactKind,
   type KycSlot,
   type MessageId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** Facts she brings back in a reply: more would crowd the context (P3-02). */
 export const MAX_ACTIVE_FACTS = 40;

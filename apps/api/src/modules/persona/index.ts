@@ -1,6 +1,6 @@
 /** Public entry point of the `persona` module (ADR 0002). Other modules import this file only. */
-import type { Persona, PersonaSampleReplyFault } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import type { Persona, PersonaSampleReplyFault } from '@impera/contracts';
+import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 

@@ -24,8 +24,8 @@ import {
   type PasskeyErrorCode,
   type SecondFactorCode,
   type UserRole,
-} from '@nirvana/contracts';
-import { and, eq, schema, sql, withMember, type Database } from '@nirvana/db';
+} from '@impera/contracts';
+import { and, eq, schema, sql, withMember, type Database } from '@impera/db';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, isAPIError } from 'better-auth/api';
@@ -84,7 +84,7 @@ export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  * The client IP as Fastify resolved it (`trustProxy`, TRUST_PROXY_HOPS), handed to Better Auth under a header of
  * our own: it never reads `x-forwarded-for`, which any client can write.
  */
-const CLIENT_IP_HEADER = 'x-nirvana-client-ip';
+const CLIENT_IP_HEADER = 'x-impera-client-ip';
 const MIN_PASSWORD_LENGTH = 12;
 /** A sensitive action needs the password and the code given on the session less than this ago (ADR 0046 § 3). */
 const RECENT_LOGIN_MS = 10 * 60 * 1000;
@@ -281,7 +281,7 @@ const BetterAuthErrorSchema = z.object({ code: z.string() });
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createAuth(config: Config, db: Database, logger: Logger) {
   return betterAuth({
-    appName: 'Nirvana',
+    appName: 'Impera',
     baseURL: config.AUTH_BASE_URL,
     basePath: '/v1/auth',
     secret: config.AUTH_SECRET,
@@ -317,7 +317,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
     // Better Auth secret; a trusted device is a signed cookie and a `verification` row, revoked with the sessions.
     plugins: [
       twoFactor({
-        issuer: 'Nirvana',
+        issuer: 'Impera',
         trustDeviceMaxAge: TRUSTED_DEVICE_SECONDS,
         twoFactorCookieMaxAge: SIGN_IN_CODE_SECONDS,
         backupCodeOptions: { amount: 10, storeBackupCodes: 'encrypted' },
@@ -331,7 +331,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
       // (a session opened less than a day ago), which ours replaces.
       passkey({
         rpID: new URL(config.WEB_ORIGIN).hostname,
-        rpName: 'Nirvana',
+        rpName: 'Impera',
         origin: config.WEB_ORIGIN,
         authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
         registration: {

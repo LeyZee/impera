@@ -3,7 +3,7 @@ import {
   newId,
   type CreatorAgencyRateList,
   type CreatorId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 

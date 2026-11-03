@@ -1,5 +1,5 @@
-import { CreatorIdSchema } from '@nirvana/contracts';
-import type { Brief, BrainInput, HealthReport, LlmGateway } from '@nirvana/llm';
+import { CreatorIdSchema } from '@impera/contracts';
+import type { Brief, BrainInput, HealthReport, LlmGateway } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
 import { createAlertTester } from '../alert-test';

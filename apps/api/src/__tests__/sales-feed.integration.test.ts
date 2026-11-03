@@ -6,9 +6,9 @@ import {
   SalesFeedOverviewSchema,
   type CreatorId,
   type PlatformAccountId,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -28,7 +28,7 @@ const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: '
 const NO_LOG = { info: () => undefined, warn: () => undefined };
 
 const CountSchema = z.array(z.object({ n: z.number() }));
-const PUBLIC_BASE_URL = 'https://nirvana.example.test';
+const PUBLIC_BASE_URL = 'https://impera.example.test';
 const DELIVERY_URL = '/v1/webhooks/sales-feeds/reveal';
 
 /** The sales feed of ADR 0050 through the real app: the key in Réglages, the register read by its job (CRM-01). */
@@ -380,7 +380,7 @@ describe('sales feed (CRM-01)', () => {
     // From Reveal's servers: no dashboard cookie, no Origin.
     server.inject({ method: 'POST', url: DELIVERY_URL, headers: delivery.headers, payload: delivery.body });
 
-  it('registers the webhook at Reveal with Nirvana’s HTTPS address, its secret sealed and never shown', async () => {
+  it('registers the webhook at Reveal with Impera’s HTTPS address, its secret sealed and never shown', async () => {
     const position = crm.sell({ id: 'sale_before_hook' });
     expect((await deliver(crm.delivery(position, { secret: 'whsec_unknown' }))).statusCode).toBe(404);
 

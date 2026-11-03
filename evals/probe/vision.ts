@@ -17,7 +17,7 @@ import {
   type LlmConfig,
   type ModelRef,
   type VideoKeyframes,
-} from '@nirvana/llm';
+} from '@impera/llm';
 
 import { inspectBubbles } from './detect';
 

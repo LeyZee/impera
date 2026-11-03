@@ -7,7 +7,7 @@ import {
   type PlanningMember,
   type ShiftReport,
   type TeamMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { useExchangeRates, usePayPeriod, usePayPeriodReads, usePayPeriods } from '@/payroll/api';
 import {

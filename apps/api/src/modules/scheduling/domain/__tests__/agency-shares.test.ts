@@ -1,4 +1,4 @@
-import { PlatformAccountIdSchema } from '@nirvana/contracts';
+import { PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { agencyShareGaps, type ShareTotalsRow } from '../agency-shares';

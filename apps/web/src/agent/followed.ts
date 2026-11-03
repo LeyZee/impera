@@ -1,4 +1,4 @@
-import type { CreatorSummary } from '@nirvana/contracts';
+import type { CreatorSummary } from '@impera/contracts';
 import { useCallback, useSyncExternalStore } from 'react';
 
 /**
@@ -8,7 +8,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  * chosen creator is no longer listed, the first of the list.
  */
 
-const KEY = 'nirvana.followed-creator';
+const KEY = 'impera.followed-creator';
 
 /** Where the choice lives when the browser refuses its storage (private window, blocked site data). */
 let memory: { readonly id: string } | null = null;

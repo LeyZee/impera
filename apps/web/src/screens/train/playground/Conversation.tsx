@@ -7,7 +7,7 @@ import {
   type PlaygroundState,
   type RejectReason,
   type Verdict,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 

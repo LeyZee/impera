@@ -1,4 +1,4 @@
-import type { CreatorSummary } from '@nirvana/contracts';
+import type { CreatorSummary } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
@@ -15,7 +15,7 @@ const PROBLEMS: Record<Exclude<MoveResult['kind'], 'moved' | 'reauth'>, string> 
   forbidden: 'Seul le compte propriétaire change le fuseau d’une créatrice.',
   not_found: 'Cette créatrice n’existe plus.',
   expired: 'Ta session a expiré : reconnecte-toi, puis recommence. Son fuseau n’a pas changé.',
-  failed: 'Son fuseau n’a pas changé : Nirvana ne répond pas. Réessaie dans un instant.',
+  failed: 'Son fuseau n’a pas changé : Impera ne répond pas. Réessaie dans un instant.',
 };
 
 /**

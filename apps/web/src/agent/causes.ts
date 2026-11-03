@@ -1,4 +1,4 @@
-import type { HandoffCause } from '@nirvana/contracts';
+import type { HandoffCause } from '@impera/contracts';
 
 /** Why the agent hands a conversation to a human, in the trade's words: the Dashboard and Suivi say it the same way. */
 export const CAUSE_LABELS: Readonly<Record<HandoffCause, string>> = {

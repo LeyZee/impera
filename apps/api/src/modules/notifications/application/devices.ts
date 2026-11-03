@@ -5,7 +5,7 @@ import {
   type PushMessage,
   type PushSubscriptionInput,
   type PushTestResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { DEFAULT_DAILY_CAP, DEFAULT_QUIET_HOURS } from '../domain/policy';
 import type { PreferencesStore, PushSender, ServerKeyStore, SubscriptionStore } from '../domain/ports';
@@ -76,7 +76,7 @@ export async function deliver(
 export async function sendTest(deps: DevicesDeps, userId: string): Promise<PushTestResult> {
   const result = await deliver(deps, userId, {
     title: 'Notifications activées',
-    body: 'C’est ici que Nirvana te préviendra.',
+    body: 'C’est ici qu’Impera te préviendra.',
     url: '/moi',
     tag: 'test',
   });

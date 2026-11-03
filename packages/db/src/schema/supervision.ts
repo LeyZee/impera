@@ -1,4 +1,4 @@
-import { KillSwitchScopeSchema } from '@nirvana/contracts';
+import { KillSwitchScopeSchema } from '@impera/contracts';
 import { boolean, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
 import {

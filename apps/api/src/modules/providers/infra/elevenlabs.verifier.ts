@@ -1,4 +1,4 @@
-import type { ProviderVoice } from '@nirvana/contracts';
+import type { ProviderVoice } from '@impera/contracts';
 import { z } from 'zod';
 
 import { describeVoiceAccount } from '../domain/messages';

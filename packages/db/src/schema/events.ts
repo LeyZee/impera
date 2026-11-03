@@ -1,4 +1,4 @@
-import { EVENT_TYPES } from '@nirvana/contracts';
+import { EVENT_TYPES } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import { index, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 

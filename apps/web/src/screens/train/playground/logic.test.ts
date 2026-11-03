@@ -1,4 +1,4 @@
-import type { PlaygroundAnswer as Answer, PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundAnswer as Answer, PlaygroundState } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

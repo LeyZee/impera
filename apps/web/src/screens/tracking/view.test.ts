@@ -1,4 +1,4 @@
-import { ConversationSummarySchema, type ConversationSummary } from '@nirvana/contracts';
+import { ConversationSummarySchema, type ConversationSummary } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

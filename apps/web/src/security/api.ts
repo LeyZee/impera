@@ -11,7 +11,7 @@ import {
   type ClosedSessions,
   type OpenSession,
   type Passkey,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's own sessions and backup codes, and for the owner each account's

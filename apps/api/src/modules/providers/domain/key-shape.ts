@@ -1,4 +1,4 @@
-import { err, ok, type AiProvider, type Result } from '@nirvana/contracts';
+import { err, ok, type AiProvider, type Result } from '@impera/contracts';
 
 import { PROVIDER_PROFILES } from './catalog';
 

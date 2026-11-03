@@ -94,6 +94,6 @@ pnpm ops:reencrypt-credentials                              # après une rotatio
 | `db:migrate` : `password authentication failed` | `.env` modifié ou ancien volume Docker | Remettre `change-me` dans les deux URL, ou repartir d'une base vide (ci-dessous) |
 | L'API s'arrête au démarrage avec une erreur de configuration | Variable manquante ou invalide dans `.env` | Lire le nom de la variable dans le message, comparer avec `.env.example` |
 | Connexion refusée avec un bon mot de passe | `AUTH_BASE_URL` ou `WEB_ORIGIN` ne valent pas `http://localhost:5173` | Corriger `.env`, relancer `pnpm dev:crm` |
-| `/ready` répond `"worker":false` | Le worker n'est pas lancé | Vérifier `NIRVANA_INLINE_WORKER=1` dans `.env` |
+| `/ready` répond `"worker":false` | Le worker n'est pas lancé | Vérifier `IMPERA_INLINE_WORKER=1` dans `.env` |
 
 Repartir d'une base vide efface toutes les données locales (jamais en production) : `docker compose down -v`, puis les étapes 4 et 5.

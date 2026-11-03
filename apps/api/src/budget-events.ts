@@ -1,6 +1,6 @@
-import { EventIdSchema, EVENT_PAYLOADS, newId } from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database } from '@nirvana/db';
-import type { BudgetEvent } from '@nirvana/llm';
+import { EventIdSchema, EVENT_PAYLOADS, newId } from '@impera/contracts';
+import { schema, sql, withAdmin, type Database } from '@impera/db';
+import type { BudgetEvent } from '@impera/llm';
 
 /**
  * `budget_threshold_crossed` in the outbox (ADR 0020 §3): the agency-wide daily AI cap belongs to no creator, so the

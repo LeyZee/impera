@@ -1,5 +1,5 @@
-import { ConversationIdSchema, CreatorIdSchema, EventIdSchema, newId } from '@nirvana/contracts';
-import type { schema } from '@nirvana/db';
+import { ConversationIdSchema, CreatorIdSchema, EventIdSchema, newId } from '@impera/contracts';
+import type { schema } from '@impera/db';
 import { describe, expect, it } from 'vitest';
 
 import { toStoredEvent } from '../rows';

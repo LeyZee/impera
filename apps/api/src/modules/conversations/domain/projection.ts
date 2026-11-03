@@ -6,7 +6,7 @@ import {
   type EventBody,
   type EventType,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { MAX_SEND_ATTEMPTS, nextState, type ConversationCommand } from './state-machine';
 

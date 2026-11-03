@@ -4,7 +4,7 @@ import {
   type InvitationLinkPreview,
   type Me,
   type PasswordInvalidReason,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useCallback, useEffect, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';

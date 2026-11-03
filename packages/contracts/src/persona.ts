@@ -178,7 +178,7 @@ const instructionsWhenCustom = (
 export const PersonaDetailsSchema = z.strictObject({
   first_name: text(40),
   date_of_birth: z.iso.date(),
-  /** Deprecated (Charles, 17/10): Nirvana is built for women creators. Still read in older files, never used. */
+  /** Deprecated (Charles, 17/10): Impera is built for women creators. Still read in older files, never used. */
   gender: z.enum(GENDERS).optional(),
   ethnicity: z.enum(ETHNICITIES),
   timezone: TimezoneSchema,

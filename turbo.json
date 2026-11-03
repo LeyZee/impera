@@ -27,7 +27,7 @@
     "test:integration": {
       "outputs": [],
       "cache": false,
-      "passThroughEnv": ["NIRVANA_TEST_PG_URL", "DOCKER_HOST", "TESTCONTAINERS_*"]
+      "passThroughEnv": ["IMPERA_TEST_PG_URL", "DOCKER_HOST", "TESTCONTAINERS_*"]
     },
     "test:e2e": {
       "dependsOn": ["build"],

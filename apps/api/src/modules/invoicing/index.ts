@@ -1,5 +1,5 @@
-import type { CommissionStatementId, InvoiceId, TeamMemberId } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import type { CommissionStatementId, InvoiceId, TeamMemberId } from '@impera/contracts';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { InvoiceObjectStore } from '../contractors';

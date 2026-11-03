@@ -4,7 +4,7 @@ import type {
   ShiftFeedbackRead,
   ShiftId,
   UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { z } from 'zod';
 
 import type { Actor, ShiftFeedbackStore, StoredShiftFeedback } from '../domain/ports';

@@ -1,4 +1,4 @@
-import type { ConversationMode, ConversationState, ConversationSummary } from '@nirvana/contracts';
+import type { ConversationMode, ConversationState, ConversationSummary } from '@impera/contracts';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
 
@@ -135,7 +135,7 @@ export function orderLines<T extends { readonly conversation: ConversationSummar
   );
 }
 
-const ORDER_KEY = 'nirvana.suivi.order';
+const ORDER_KEY = 'impera.suivi.order';
 
 /** The order chosen on this device, like the appearance; storage can throw, and the list is then most recent first. */
 export function readListOrder(): ListOrder {

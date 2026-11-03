@@ -1,5 +1,5 @@
-import type { ConversationSummary, CreatorTodo } from '@nirvana/contracts';
-import { placeSegmentThumb } from '@nirvana/design-system';
+import type { ConversationSummary, CreatorTodo } from '@impera/contracts';
+import { placeSegmentThumb } from '@impera/design-system';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {

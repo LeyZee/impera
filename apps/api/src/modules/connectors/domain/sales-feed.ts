@@ -14,7 +14,7 @@ import type {
   SalesFeedCheckReport,
   SalesFeedErrorKind,
   SalesFeedSignal,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { CheckLine } from './reliability-check';
 
@@ -29,7 +29,7 @@ export type SalesFeedFailure =
   | { readonly kind: 'refused'; readonly errorKind: 'unauthorized' | 'missing_access' }
   | { readonly kind: 'rate_limited'; readonly retryAfterMs: number }
   | { readonly kind: 'unreachable' }
-  /** The answer does not have the shape Nirvana reads, or breaks an invariant (net ≠ agency + creator). */
+  /** The answer does not have the shape Impera reads, or breaks an invariant (net ≠ agency + creator). */
   | { readonly kind: 'unexpected_answer'; readonly detail: string };
 
 /** A value the adapter met and does not know: kept as `other` (type, status) or skipped (event), and signalled. */
@@ -65,7 +65,7 @@ export interface PlatformSalesFeed {
   listChatters(): Promise<SalesFeedResult<readonly PlatformChatter[]>>;
   dailyStats(range: DateRange): Promise<SalesFeedResult<readonly PlatformDailyStat[]>>;
   chatterDailyStats(range: DateRange): Promise<SalesFeedResult<readonly PlatformChatterDailyStat[]>>;
-  /** Registers Nirvana's address for the sales and refunds; the secret the platform signs with, given once. */
+  /** Registers Impera's address for the sales and refunds; the secret the platform signs with, given once. */
   createWebhook(url: string): Promise<SalesFeedResult<CreatedWebhook>>;
   /** Removes it at the platform; one the platform no longer knows counts as removed. */
   deleteWebhook(platformWebhookId: string): Promise<SalesFeedResult<null>>;
@@ -76,7 +76,7 @@ interface CreatedWebhook {
   readonly secret: string;
 }
 
-/** A delivery as it reached Nirvana: its raw bytes, untouched, and its headers (lower-case names). */
+/** A delivery as it reached Impera: its raw bytes, untouched, and its headers (lower-case names). */
 export interface DeliveryRequest {
   readonly rawBody: Buffer;
   readonly headers: Readonly<Record<string, string | undefined>>;
@@ -255,7 +255,7 @@ export interface SalesLedger {
   pause(platform: Platform, until: Date): Promise<void>;
   quarantined(platform: Platform): Promise<ReadonlyMap<string, number>>;
   modelLinks(platform: Platform): Promise<ReadonlyMap<string, ModelLink>>;
-  /** The platform's accounts in Nirvana, every creator's: what a model can be linked to. */
+  /** The platform's accounts in Impera, every creator's: what a model can be linked to. */
   accounts(platform: Platform): Promise<readonly FeedAccount[]>;
   /**
    * Links a model and moves its quarantined lines to the register, in one transaction. `conflict`: the model already
@@ -300,7 +300,7 @@ export interface SalesLedger {
   publishMismatch(mismatch: EventPayload<'sales_feed_mismatch'>, correlationId: string): Promise<boolean>;
 }
 
-/** The platform's webhook for Nirvana; `secret` is `null` when no listed encryption key opens it any more. */
+/** The platform's webhook for Impera; `secret` is `null` when no listed encryption key opens it any more. */
 export interface StoredWebhook {
   readonly platform: Platform;
   readonly platformWebhookId: string;

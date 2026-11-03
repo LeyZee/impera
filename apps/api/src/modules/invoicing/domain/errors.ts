@@ -1,4 +1,4 @@
-import { DomainError, PAY_AMOUNT_MAX_MINOR } from '@nirvana/contracts';
+import { DomainError, PAY_AMOUNT_MAX_MINOR } from '@impera/contracts';
 
 /** A credit note for more than what is left of its invoice (EQ-06): an invoice is never credited below zero. */
 export class CreditNoteExceedsInvoice extends DomainError {

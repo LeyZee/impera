@@ -1,4 +1,4 @@
-import type { SchedulingSettings } from '@nirvana/contracts';
+import type { SchedulingSettings } from '@impera/contracts';
 
 /**
  * The planning settings a test serves: one version of créneaux of `length` minutes from `start` (ADR 0049 § 1), the

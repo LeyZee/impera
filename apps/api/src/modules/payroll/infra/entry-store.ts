@@ -10,7 +10,7 @@ import {
   type PayPeriod,
   type TeamMemberId,
   type TeamScope,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import {
   and,
   eq,
@@ -21,7 +21,7 @@ import {
   withMember,
   type Database,
   type Transaction,
-} from '@nirvana/db';
+} from '@impera/db';
 
 import { PayrollForbidden, TeamMemberNotFound, type Actor } from '../../contractors/pure';
 import {

@@ -3,8 +3,8 @@
  * (ADR 0007), for a row that drifted or after a bug fix in the projection.
  * Usage: `pnpm db:rebuild-projections <conversationId>`.
  */
-import { ConversationIdSchema, CreatorIdSchema } from '@nirvana/contracts';
-import { eq, schema, withAdmin } from '@nirvana/db';
+import { ConversationIdSchema, CreatorIdSchema } from '@impera/contracts';
+import { eq, schema, withAdmin } from '@impera/db';
 
 import { createApp } from '../composition-root';
 import { loadConfig } from '../config';

@@ -59,7 +59,7 @@ describe('held sales (CRM-03 lot b4b)', () => {
       'Son chatteur sur Reveal n’est relié à aucun membre : le propriétaire le relie dans Réglages › Ventes. Sinon, écarte-la.',
     );
     expect(heldReasonText(heldSaleOf({ reason: 'status_unknown' }), THEO, true)).toBe(
-      'Reveal lui donne un statut que Nirvana ne connaît pas encore.',
+      'Reveal lui donne un statut qu’Impera ne connaît pas encore.',
     );
     expect(heldReasonText(heldSaleOf({ reason: 'refund_before_register' }), THEO, true)).toBe(
       'Remboursement d’une vente plus ancienne que le registre des ventes : il n’est retiré à personne.',

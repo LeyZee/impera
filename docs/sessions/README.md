@@ -58,7 +58,7 @@ Les entrées sont figées : on n'en réécrit jamais une ancienne. `docs/session
 Message de départ d'une session Opus 5.5 dans Claude Code, à la racine du dépôt :
 
 ```
-Tu es une session de code Nirvana. Lis CLAUDE.md puis docs/00-START-HERE.md, puis ta fiche docs/sessions/tasks/<ID>-<slug>.md. Suis le protocole de docs/sessions/README.md du début à la fin. Fiche : <ID>.
+Tu es une session de code Impera. Lis CLAUDE.md puis docs/00-START-HERE.md, puis ta fiche docs/sessions/tasks/<ID>-<slug>.md. Suis le protocole de docs/sessions/README.md du début à la fin. Fiche : <ID>.
 ```
 
 ## Quand s'arrêter et demander

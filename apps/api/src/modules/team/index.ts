@@ -1,4 +1,4 @@
-import type { Database, Transaction } from '@nirvana/db';
+import type { Database, Transaction } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createTeamService } from './application/team';

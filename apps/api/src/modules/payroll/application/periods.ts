@@ -12,7 +12,7 @@ import {
   type PayrollPeriod,
   type PayrollSettings,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { redactAuthors } from '../domain/authors';
 import { blockFor } from '../domain/period-blocks';

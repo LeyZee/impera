@@ -1,4 +1,4 @@
-import { CreatorIdSchema, type CreatorId } from '@nirvana/contracts';
+import { CreatorIdSchema, type CreatorId } from '@impera/contracts';
 
 /**
  * The tab of Créatrices and the creator picked, in the address (`?onglet=heures&creatrice=<id>`), so that a link, a

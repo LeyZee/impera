@@ -6,7 +6,7 @@ import {
   type CustomAlert,
   type HandoffCause,
   type SystemAlertCode,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /**
  * Her alert keywords (`notifications.alert_keywords`, P4-01): read in code, never by a model, on what he wrote since

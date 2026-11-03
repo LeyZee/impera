@@ -1,5 +1,5 @@
-import type { JobName } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import type { JobName } from '@impera/contracts';
+import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Task } from 'graphile-worker';

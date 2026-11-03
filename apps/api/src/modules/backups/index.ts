@@ -1,6 +1,6 @@
 /** Public entry point of the `backups` module (ADR 0028 § 5 and § 6, OPS-02). Other modules import this file only. */
-import type { BackupStatus } from '@nirvana/contracts';
-import type { Database } from '@nirvana/db';
+import type { BackupStatus } from '@impera/contracts';
+import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import {

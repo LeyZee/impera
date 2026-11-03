@@ -1,5 +1,5 @@
-import { JOB_PAYLOADS } from '@nirvana/contracts';
-import { parseEncryptionKeys, withAdmin } from '@nirvana/db';
+import { JOB_PAYLOADS } from '@impera/contracts';
+import { parseEncryptionKeys, withAdmin } from '@impera/db';
 
 import { secretOrNull } from '../config';
 import { createConnectionStatePublisher } from '../connection-state';

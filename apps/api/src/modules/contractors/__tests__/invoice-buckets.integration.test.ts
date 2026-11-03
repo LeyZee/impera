@@ -9,8 +9,8 @@ import { createS3InvoiceStore } from '../infra/invoice-buckets';
 
 /**
  * The S3 store against a real object store with Object Lock (ADR 0037 § 8): MinIO in a container, or the server named
- * by `NIRVANA_TEST_S3_URL` where Docker is not available (its root user in `NIRVANA_TEST_S3_USER` and
- * `NIRVANA_TEST_S3_PASSWORD`). Each run makes its own bucket, under compliance locks of one day: nothing to clean, the
+ * by `IMPERA_TEST_S3_URL` where Docker is not available (its root user in `IMPERA_TEST_S3_USER` and
+ * `IMPERA_TEST_S3_PASSWORD`). Each run makes its own bucket, under compliance locks of one day: nothing to clean, the
  * container going away with its data.
  */
 /**
@@ -18,8 +18,8 @@ import { createS3InvoiceStore } from '../infra/invoice-buckets';
  * and publishes it.
  */
 const IMAGE = 'coollabsio/minio:RELEASE.2025-10-15T17-29-55Z';
-const USER = process.env['NIRVANA_TEST_S3_USER'] ?? 'nirvana-test';
-const PASSWORD = process.env['NIRVANA_TEST_S3_PASSWORD'] ?? 'nirvana-test-password';
+const USER = process.env['IMPERA_TEST_S3_USER'] ?? 'impera-test';
+const PASSWORD = process.env['IMPERA_TEST_S3_PASSWORD'] ?? 'impera-test-password';
 const REGION = 'us-east-1';
 
 const bytesOf = (text: string): Uint8Array => new TextEncoder().encode(text);
@@ -33,7 +33,7 @@ const until = (moment: Date): Promise<void> =>
 
 describe('Équipe › Factures : le seau verrouillé, contre un vrai stockage objet (ADR 0037 § 4 à § 8)', () => {
   let container: StartedTestContainer | undefined;
-  let endpoint = process.env['NIRVANA_TEST_S3_URL'] ?? '';
+  let endpoint = process.env['IMPERA_TEST_S3_URL'] ?? '';
   const bucket = `factures-${String(Date.now())}`;
   const admin = new AwsClient({
     accessKeyId: USER,

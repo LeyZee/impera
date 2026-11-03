@@ -7,7 +7,7 @@ import {
   PERSONA_OPTIONS,
   type Persona,
   type PersonaStrategies,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type ReactNode } from 'react';
 

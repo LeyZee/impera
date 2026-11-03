@@ -1,4 +1,4 @@
-import type { PlaygroundState } from '@nirvana/contracts';
+import type { PlaygroundState } from '@impera/contracts';
 import { useEffect, useState, type JSX } from 'react';
 
 import { clockAt, duration, money, scriptsHint } from './logic';

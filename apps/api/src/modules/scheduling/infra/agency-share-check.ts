@@ -11,8 +11,8 @@ import {
   type CreatorId,
   type PayPeriod,
   type SalesTotals,
-} from '@nirvana/contracts';
-import { schema, sql, withAdmin, type Database, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { agencyShareGaps } from '../domain/agency-shares';

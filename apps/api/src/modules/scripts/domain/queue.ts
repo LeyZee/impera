@@ -1,4 +1,4 @@
-import type { CreatorId, PersonaLimits, ScriptQueue } from '@nirvana/contracts';
+import type { CreatorId, PersonaLimits, ScriptQueue } from '@impera/contracts';
 
 import { disgustBlocks } from './disgusts';
 import type { QueuedStructure, QueueRefusal } from './ports';

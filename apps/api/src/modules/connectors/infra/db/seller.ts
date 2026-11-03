@@ -1,4 +1,4 @@
-import { TeamMemberIdSchema, type SaleSeller } from '@nirvana/contracts';
+import { TeamMemberIdSchema, type SaleSeller } from '@impera/contracts';
 
 /** The owner's link of a platform chatter, as `sales_feed_chatters` keeps it. */
 export interface ChatterLinkRow {

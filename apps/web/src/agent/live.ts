@@ -1,4 +1,4 @@
-import { DashboardSchema, type Dashboard as ApiDashboard, type DashboardPeriod } from '@nirvana/contracts';
+import { DashboardSchema, type Dashboard as ApiDashboard, type DashboardPeriod } from '@impera/contracts';
 import { useQuery } from '@tanstack/react-query';
 
 import { followedOf, useFollowedCreatorId } from './followed';

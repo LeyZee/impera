@@ -148,8 +148,8 @@ jobs:
       - name: Throwaway settings
         run: |
           {
-            echo "DATABASE_URL=postgres://nirvana_app:change-me@postgres:5432/nirvana"
-            echo "DATABASE_ADMIN_URL=postgres://nirvana_admin:change-me@postgres:5432/nirvana"
+            echo "DATABASE_URL=postgres://nirvana_app:change-me@postgres:5432/impera"
+            echo "DATABASE_ADMIN_URL=postgres://nirvana_admin:change-me@postgres:5432/impera"
             echo "SESSION_ENCRYPTION_KEYS=v1:$(openssl rand -base64 32)"
             echo "CREDENTIALS_ENCRYPTION_KEYS=v1:$(openssl rand -base64 32)"
             echo "AUTH_SECRET=$(openssl rand -base64 32)"
@@ -208,11 +208,11 @@ jobs:
           recipient=$(grep -o 'age1[0-9a-z]*' backup-out/identity.txt)
           $COMPOSE run --rm --no-deps -v "$PWD/backup-out:/out" -e BACKUP_TARGET=local -e BACKUP_LOCAL_DIR=/out \
             -e BACKUP_AGE_RECIPIENT="$recipient" backup /app/export.sh
-          docker compose exec -T postgres psql -U nirvana_admin -d nirvana -c 'create database nirvana_restore'
-          export_file=$(cd backup-out && ls nirvana-*.tar.age)
+          docker compose exec -T postgres psql -U nirvana_admin -d impera -c 'create database impera_restore'
+          export_file=$(cd backup-out && ls impera-*.tar.age)
           $COMPOSE run --rm --no-deps -v "$PWD/backup-out:/out" backup /app/restore-check.sh "/out/$export_file" \
-            /out/identity.txt postgres://nirvana_admin:change-me@postgres:5432/nirvana_restore
-          docker compose exec -T postgres psql -U nirvana_admin -d nirvana -Atc \
+            /out/identity.txt postgres://nirvana_admin:change-me@postgres:5432/impera_restore
+          docker compose exec -T postgres psql -U nirvana_admin -d impera -Atc \
             "select count(*) from backup_runs where status = 'succeeded'" | grep -x 1
       - name: Logs
         if: failure()

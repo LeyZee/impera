@@ -1,4 +1,4 @@
-import { InvoiceIdSchema, newId, type InvoiceId } from '@nirvana/contracts';
+import { InvoiceIdSchema, newId, type InvoiceId } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { PayrollInvoiceAcceptanceStore } from '../../domain/ports';

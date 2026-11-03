@@ -1,4 +1,4 @@
-import { AiProviderSchema, ProviderConnectionStateSchema, ProviderErrorKindSchema } from '@nirvana/contracts';
+import { AiProviderSchema, ProviderConnectionStateSchema, ProviderErrorKindSchema } from '@impera/contracts';
 import { customType, integer, jsonb, pgTable, text } from 'drizzle-orm/pg-core';
 
 import { createdAt, enumCheck, enumText, timestampTz, updatedAt } from './columns';

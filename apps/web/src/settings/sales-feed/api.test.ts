@@ -1,4 +1,4 @@
-import { REAUTHENTICATION_ERROR_CODE, type SalesFeedStatus } from '@nirvana/contracts';
+import { REAUTHENTICATION_ERROR_CODE, type SalesFeedStatus } from '@impera/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { connectKey, connectWebhook, linkModel, SalesFeedRefused } from './api';

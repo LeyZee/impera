@@ -5,7 +5,7 @@ import {
   type InvoiceListItem,
   type PayPeriod,
   type UpholdInvoiceContestBody,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 

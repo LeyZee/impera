@@ -1,4 +1,4 @@
-import type { InvitationLinkCreated, InvitationLinkPurpose } from '@nirvana/contracts';
+import type { InvitationLinkCreated, InvitationLinkPurpose } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
@@ -36,7 +36,7 @@ type Step =
   | { readonly kind: 'error'; readonly message: string };
 
 /**
- * Makes a member's link (EQ-10) and hands it over: copied, or shared through the phone's sheet (WhatsApp). Nirvana
+ * Makes a member's link (EQ-10) and hands it over: copied, or shared through the phone's sheet (WhatsApp). Impera
  * sends no e-mail. A new link cancels the one before; making one asks for a recent sign-in, so the owner may be asked
  * for his password first.
  */

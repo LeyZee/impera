@@ -1,8 +1,8 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { DestinationSchema, MediaDescriptionSchema, VerdictSchema } from '@nirvana/contracts';
-import { BriefSchema } from '@nirvana/llm';
+import { DestinationSchema, MediaDescriptionSchema, VerdictSchema } from '@impera/contracts';
+import { BriefSchema } from '@impera/llm';
 import { z } from 'zod';
 
 import { isTimeZone } from '../domain/situation';
@@ -42,7 +42,7 @@ const RecordSchema = z.object({
 
 /**
  * Ratings as JSON lines, outside the repository (they hold persona phrasing): `.scratch/training/` or
- * `NIRVANA_TRAINING_DIR`, until the database (P0-03). A damaged line is skipped, never fatal.
+ * `IMPERA_TRAINING_DIR`, until the database (P0-03). A damaged line is skipped, never fatal.
  */
 export function createJsonlCalibrationStore(path: string): CalibrationStore {
   return {

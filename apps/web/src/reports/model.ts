@@ -10,7 +10,7 @@ import {
   type ShiftReport,
   type ShiftReportList,
   type ShiftReportStatus,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { ReportRefusal, ReportRefusalCode } from './api';
 
@@ -209,7 +209,7 @@ export function lateFor(endsAt: string, now: Date): string {
 
 /**
  * The word « Relancer » copies for a member whose report is late (EQ-15), at his own hour: « Kofi, ton rapport du
- * mer. 28 oct. · 11 h – 17 h (Léa) n’est pas encore fait. Fais-le dans Nirvana dès que tu peux. » Nirvana sends
+ * mer. 28 oct. · 11 h – 17 h (Léa) n’est pas encore fait. Fais-le dans Impera dès que tu peux. » Impera sends
  * nothing: the agency pastes it where it talks to him.
  */
 export function nudgeText(
@@ -220,7 +220,7 @@ export function nudgeText(
 ): string {
   const when = swapShiftLine(shift.startsAt, shift.endsAt, undefined, timeZone);
   const on = creatorName === undefined ? '' : ` (${creatorName})`;
-  return `${name}, ton rapport du ${when}${on} n’est pas encore fait. Fais-le dans Nirvana dès que tu peux.`;
+  return `${name}, ton rapport du ${when}${on} n’est pas encore fait. Fais-le dans Impera dès que tu peux.`;
 }
 
 /**

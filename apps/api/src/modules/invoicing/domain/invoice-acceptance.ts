@@ -1,4 +1,4 @@
-import type { InvoiceAcceptanceState, InvoiceEventKind } from '@nirvana/contracts';
+import type { InvoiceAcceptanceState, InvoiceEventKind } from '@impera/contracts';
 
 import { InvoiceAcceptanceConflict } from './errors';
 

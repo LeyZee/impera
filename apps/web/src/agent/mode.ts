@@ -2,7 +2,7 @@
  * The agent's single control (revue 08, ADR 0019): Automatique, Copilote or Arrêt, the same on the Dashboard and
  * in the bar. The server decides whether Automatique may open; the screen only says why it may not.
  */
-import type { AgentMode, AutomaticMissing } from '@nirvana/contracts';
+import type { AgentMode, AutomaticMissing } from '@impera/contracts';
 
 export type { AgentMode };
 

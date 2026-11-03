@@ -8,7 +8,7 @@ import {
   type SchedulingSettings,
   type TeamMemberId,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   agentReplySpans,

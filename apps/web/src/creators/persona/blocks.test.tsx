@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { SAMPLE_REPLIES_MAX, type Persona } from '@nirvana/contracts';
+import { SAMPLE_REPLIES_MAX, type Persona } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

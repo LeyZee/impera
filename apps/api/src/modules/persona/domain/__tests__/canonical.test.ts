@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PersonaSchema } from '@nirvana/contracts';
+import { PersonaSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 

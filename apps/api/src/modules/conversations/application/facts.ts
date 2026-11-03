@@ -1,4 +1,4 @@
-import { FactCategorySchema } from '@nirvana/contracts';
+import { FactCategorySchema } from '@impera/contracts';
 
 import type { DraftFact, ProposedFact } from '../domain/ports';
 

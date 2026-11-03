@@ -3,7 +3,7 @@ import {
   type InvoiceAgency,
   type InvoiceContractor,
   type RegimeVat,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import type { PdfDocumentSource } from '../invoice-pdf';
 import { creditNoteMention, paymentTermsMention, reissueMention } from '../invoices';

@@ -1,5 +1,5 @@
 /*
- * Nirvana design tokens: the single source of every visual value.
+ * Impera design tokens: the single source of every visual value.
  * Framework-free CSS custom properties, prefixed `--nv-` so they never collide with Tailwind's
  * theme namespaces or shadcn/ui's semantic variables. `theme.css` maps them to Tailwind utilities.
  *

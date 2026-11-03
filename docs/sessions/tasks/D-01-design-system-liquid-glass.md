@@ -6,7 +6,7 @@ Dépend de : P0-01
 Branche : task/d-01-design-system
 
 ## Objectif
-Donner à Nirvana une identité visuelle moderne et épurée inspirée du Liquid Glass d'iOS 26 et 27, sous forme de tokens Tailwind v4, de composants shadcn/ui restylés et d'un guide, sans compromettre l'usage au clavier ni la lisibilité.
+Donner à Impera une identité visuelle moderne et épurée inspirée du Liquid Glass d'iOS 26 et 27, sous forme de tokens Tailwind v4, de composants shadcn/ui restylés et d'un guide, sans compromettre l'usage au clavier ni la lisibilité.
 
 ## Contexte à lire
 `docs/design/brief.md` (intention, contraintes, livrables, questions ouvertes), `apps/web/README.md`, `docs/architecture/message-flow.md` (mode copilote), `brand/banner.svg` (bannière actuelle, logo dans `brand/README.md`).

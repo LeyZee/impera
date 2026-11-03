@@ -1,4 +1,4 @@
-import type { DraftView } from '@nirvana/contracts';
+import type { DraftView } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
@@ -26,7 +26,7 @@ const REFRESH_MS = 10_000;
 const NOTE_MAX = 300;
 
 /**
- * One conversation, read in Nirvana (decided by Charles on 19/10, « Valider dans Suivi »): the thread, the drafts
+ * One conversation, read in Impera (decided by Charles on 19/10, « Valider dans Suivi »): the thread, the drafts
  * waiting for a person, and who has the hand. Nobody writes to a fan from here: a person who takes over answers in
  * Reveal, and gives the hand back once done.
  */
@@ -76,7 +76,7 @@ export function Reader({
       ) : query.isError && query.data === undefined ? (
         <div className="tr-reader__empty" role="status">
           <p className="tr-warn">Le serveur ne répond pas</p>
-          <p>La conversation n’a pas pu être lue. Nirvana réessaie tout seul.</p>
+          <p>La conversation n’a pas pu être lue. Impera réessaie tout seul.</p>
         </div>
       ) : query.data === undefined ? (
         <div className="tr-skeleton" aria-busy="true" aria-label="Chargement de la conversation">

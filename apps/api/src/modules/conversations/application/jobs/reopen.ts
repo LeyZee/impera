@@ -1,4 +1,4 @@
-import { jobKeyFor, queueNameFor, resumeRunAt, type JobPayload } from '@nirvana/contracts';
+import { jobKeyFor, queueNameFor, resumeRunAt, type JobPayload } from '@impera/contracts';
 
 import type { Clock, JobLogger, UnitOfWork } from '../../domain/ports';
 

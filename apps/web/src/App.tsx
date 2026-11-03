@@ -1,4 +1,4 @@
-import type { Me } from '@nirvana/contracts';
+import type { Me } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useState, type JSX } from 'react';
@@ -106,7 +106,7 @@ export function App(): JSX.Element {
     // A breathing dot while the session is read: the page is not blank, and says nothing it does not know yet.
     return (
       <main className="nv-aura grid min-h-dvh place-items-center" aria-busy="true">
-        <span className="nv-dot nv-dot--live" role="status" aria-label="Chargement de Nirvana" />
+        <span className="nv-dot nv-dot--live" role="status" aria-label="Chargement d’Impera" />
       </main>
     );
   }

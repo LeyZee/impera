@@ -16,8 +16,8 @@ import {
   TeamMemberIdSchema,
   type PayPeriod,
   type TeamMember,
-} from '@nirvana/contracts';
-import { schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { schema } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';

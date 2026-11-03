@@ -1,4 +1,4 @@
-import type { SecondFactorSetup } from '@nirvana/contracts';
+import type { SecondFactorSetup } from '@impera/contracts';
 import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { BackupCodesList, CopyButton } from './BackupCodesList';
@@ -121,8 +121,8 @@ export function SecondFactorPage({
             <div className="nv-enter flex flex-col gap-2">
               <h1 className="text-xl font-semibold">Active la validation en deux étapes</h1>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                En plus de ton mot de passe, Nirvana te demandera un code à 6 chiffres qui change toutes les
-                30 secondes. Il s’affiche dans une application d’authentification sur ton téléphone : Google
+                En plus de ton mot de passe, Impera te demandera un code à 6 chiffres qui change toutes les 30
+                secondes. Il s’affiche dans une application d’authentification sur ton téléphone : Google
                 Authenticator, Microsoft Authenticator, 1Password, Bitwarden…
               </p>
               <p className="text-sm text-[var(--nv-ink-muted)]">
@@ -151,7 +151,7 @@ export function SecondFactorPage({
           <form className="flex flex-col gap-5" onSubmit={(event) => void sendCode(event, setup)}>
             <div className="nv-enter flex flex-col gap-2">
               <h1 tabIndex={-1} className="text-xl font-semibold outline-none">
-                Ajoute Nirvana dans ton application
+                Ajoute Impera dans ton application
               </h1>
               <p className="text-sm text-[var(--nv-ink-muted)]">
                 Sur ton téléphone, touche le bouton. Sur un ordinateur, choisis « Saisir une clé » dans
@@ -228,7 +228,7 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
         <span>J’ai mis ces codes en lieu sûr.</span>
       </label>
       <button type="button" className="nv-btn nv-btn--neon" disabled={!kept} onClick={onDone}>
-        Ouvrir Nirvana
+        Ouvrir Impera
       </button>
     </>
   );

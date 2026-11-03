@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { NotificationPreferencesSchema } from '@nirvana/contracts';
+import { NotificationPreferencesSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -111,7 +111,7 @@ describe('Notifications, this device', () => {
     fireEvent.click(turnOn);
     expect(turnOnPush).toHaveBeenCalledExactlyOnceWith(SERVER_KEY);
     expect(await screen.findByRole('button', { name: 'Envoyer un test' })).toBeTruthy();
-    expect(screen.getByText('Cet appareil reçoit les notifications de Nirvana.')).toBeTruthy();
+    expect(screen.getByText('Cet appareil reçoit les notifications d’Impera.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Activer les notifications' })).toBeNull();
   });
 
@@ -138,7 +138,7 @@ describe('Notifications, this device', () => {
     renderPage();
     expect(
       await screen.findByText(
-        'Nirvana ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.',
+        'Impera ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.',
       ),
     ).toBeTruthy();
     const turnOn = screen.getByRole('button', { name: 'Activer les notifications' });
@@ -169,7 +169,7 @@ describe('Notifications, this device', () => {
     serve();
     deviceIs('needs_install');
     renderPage();
-    const link = await screen.findByRole('link', { name: 'Installer Nirvana' });
+    const link = await screen.findByRole('link', { name: 'Installer Impera' });
     expect(link.getAttribute('href')).toBe('/aide/installer');
   });
 });

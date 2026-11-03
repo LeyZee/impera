@@ -3,7 +3,7 @@ import {
   type Me,
   type MyShift,
   type ShiftReport,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
@@ -281,13 +281,13 @@ function Hero({
   );
 }
 
-/** What the state means for Nirvana: when the creator's conversations open and close (ADR 0025). */
+/** What the state means for Impera: when the creator's conversations open and close (ADR 0025). */
 function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): string {
   const { shift } = state;
   const name = shift.creatorName;
   switch (state.kind) {
     case 'on':
-      return `Tu chattes sur ${platformName(shift.platform)}. Dans Nirvana, les conversations de ${name} restent ouvertes jusqu’à ${clockAt(shift.accessEndsAt, zone)}.`;
+      return `Tu chattes sur ${platformName(shift.platform)}. Dans Impera, les conversations de ${name} restent ouvertes jusqu’à ${clockAt(shift.accessEndsAt, zone)}.`;
     case 'ended':
       return `Les conversations de ${name} restent ouvertes dans Suivi jusqu’à ${clockAt(shift.accessEndsAt, zone)}, le temps de finir.`;
     case 'soon':

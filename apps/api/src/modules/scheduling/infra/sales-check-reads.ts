@@ -5,8 +5,8 @@ import {
   PlatformAccountIdSchema,
   PlatformSchema,
   type PayPeriod,
-} from '@nirvana/contracts';
-import { sql, type Transaction } from '@nirvana/db';
+} from '@impera/contracts';
+import { sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { detectedForCheck, type DetectedAccountForCheck } from '../domain/sales-checks';

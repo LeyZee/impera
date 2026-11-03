@@ -1,4 +1,4 @@
-import { PushPublicKeySchema, PushSubscriptionInputSchema } from '@nirvana/contracts';
+import { PushPublicKeySchema, PushSubscriptionInputSchema } from '@impera/contracts';
 
 import { isStandalone, platformOf } from './install';
 

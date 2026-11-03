@@ -1,4 +1,4 @@
-import type { UserRole } from '@nirvana/contracts';
+import type { UserRole } from '@impera/contracts';
 
 /** « à l’instant », « il y a 12 min », « il y a 3 h », « il y a 2 j »: when a session was last used, the number never cut from its unit. */
 export function ago(at: string, now: Date): string {

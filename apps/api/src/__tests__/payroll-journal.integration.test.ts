@@ -7,8 +7,8 @@ import {
   ContractorRegimeIdSchema,
   PayPeriodSchema,
   type TeamMember,
-} from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+} from '@impera/contracts';
+import { eq, schema } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { createMemoryInvoiceStore } from '../modules/contractors/infra/invoice-buckets';

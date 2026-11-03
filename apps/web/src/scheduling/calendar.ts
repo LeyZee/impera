@@ -5,7 +5,7 @@ import {
   type CalendarAgent,
   type CalendarShift,
   type PlanningMember,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { leftOf, phaseOf } from './model';
 import { addDays, clockAt, clockOf, mondayOf, zonedInstant } from './time';

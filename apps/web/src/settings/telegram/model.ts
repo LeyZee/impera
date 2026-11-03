@@ -11,7 +11,7 @@ import {
   type TelegramSaleSettings,
   type TelegramSaleSettingsEntry,
   type TelegramTopic,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 /** View rules of Réglages › Telegram, kept out of the components so they are tested. */
 
@@ -363,7 +363,7 @@ export function botLine(bot: TelegramBot): { text: string; isWarning: boolean } 
     case 'conflict':
       return { text: 'Un autre programme lit ce bot', isWarning: true };
     case 'active':
-      // Its identifier alone: when Nirvana last asked Telegram for news helps no one (recette du 29/10).
+      // Its identifier alone: when Impera last asked Telegram for news helps no one (recette du 29/10).
       return { text: `@${bot.username}`, isWarning: false };
   }
 }
@@ -416,11 +416,11 @@ export function suggestedUsername(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
-  const base = words === '' ? 'nirvana' : /^[a-z]/.test(words) ? words : `nirvana_${words}`;
+  const base = words === '' ? 'impera' : /^[a-z]/.test(words) ? words : `impera_${words}`;
   if (base.endsWith('bot') && base.length >= 5 && base.length <= USERNAME_MAX) return base;
   const stem = base
     .replace(/_?bot$/, '')
     .slice(0, USERNAME_MAX - '_bot'.length)
     .replace(/_+$/, '');
-  return `${stem === '' ? 'nirvana' : stem}_bot`;
+  return `${stem === '' ? 'impera' : stem}_bot`;
 }

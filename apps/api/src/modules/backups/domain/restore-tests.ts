@@ -1,4 +1,4 @@
-import { DomainError, RESTORE_TEST_FRESH_DAYS } from '@nirvana/contracts';
+import { DomainError, RESTORE_TEST_FRESH_DAYS } from '@impera/contracts';
 
 /** A restore test as the owner enters it, the export already matched by its fingerprint. */
 export interface RestoreTestEntry {

@@ -1,4 +1,4 @@
-import { BillingRegimeIdSchema, type CreateBillingRegimeBody } from '@nirvana/contracts';
+import { BillingRegimeIdSchema, type CreateBillingRegimeBody } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { assertRegimeOfCountry, dayStartsAt, sameRegime } from '../regimes';

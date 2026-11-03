@@ -18,7 +18,7 @@ import {
   type TelegramRoute,
   type TelegramSaleSettingsEntry,
   type TelegramSalesSettings,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { ReauthRequired } from '../services/api';
 

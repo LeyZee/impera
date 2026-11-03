@@ -10,9 +10,9 @@ import {
   type JobPayload,
   type PlatformAccountId,
   type SendResult,
-} from '@nirvana/contracts';
-import { eq, schema, sql } from '@nirvana/db';
-import { createTestDb, type TestDb } from '@nirvana/db/testing';
+} from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
+import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 

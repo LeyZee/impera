@@ -18,7 +18,7 @@ import {
   type ExternalMessage,
   type PlatformAccountId,
   type UserId,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import {
   AutomaticLocked,

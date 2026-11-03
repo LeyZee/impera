@@ -1,4 +1,4 @@
-import { CreatorAgencyRateSchema } from '@nirvana/contracts';
+import { CreatorAgencyRateSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { bpsOfPercent, confirmSentence, dayLabel, earliestDay, nextDay, percentOf, standing } from './model';

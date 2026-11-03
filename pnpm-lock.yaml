@@ -113,13 +113,13 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@nirvana/contracts':
+      '@impera/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@nirvana/db':
+      '@impera/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@nirvana/llm':
+      '@impera/llm':
         specifier: workspace:*
         version: link:../../packages/llm
       '@types/fontkit':
@@ -161,7 +161,7 @@ importers:
 
   apps/extension:
     dependencies:
-      '@nirvana/design-system':
+      '@impera/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
     devDependencies:
@@ -177,10 +177,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@nirvana/contracts':
+      '@impera/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@nirvana/design-system':
+      '@impera/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
       '@simplewebauthn/browser':
@@ -250,7 +250,7 @@ importers:
 
   evals:
     dependencies:
-      '@nirvana/llm':
+      '@impera/llm':
         specifier: workspace:*
         version: link:../packages/llm
       zod:
@@ -294,7 +294,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@nirvana/contracts':
+      '@impera/contracts':
         specifier: workspace:*
         version: link:../contracts
       drizzle-orm:
@@ -368,7 +368,7 @@ importers:
       '@ai-sdk/xai':
         specifier: 5.0.24
         version: 5.0.24(zod@4.6.7)
-      '@nirvana/contracts':
+      '@impera/contracts':
         specifier: workspace:*
         version: link:../contracts
       ai:

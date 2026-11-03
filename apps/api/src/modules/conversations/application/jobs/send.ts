@@ -6,7 +6,7 @@ import {
   type JobPayload,
   type MessageAuthor,
   type SendResult,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { BLOCKED_EXPIRY_REASONS, SendRefused } from '../../domain/errors';
 import type {

@@ -1,4 +1,4 @@
-import type { PlatformModel } from '@nirvana/contracts';
+import type { PlatformModel } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { SalesFeedExportUnprocessable } from '../errors';

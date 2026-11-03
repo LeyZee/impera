@@ -18,19 +18,19 @@ const STEPS: Record<
   ios: {
     title: 'Sur iPhone',
     steps: [
-      'Ouvre Nirvana dans Safari (pas dans une autre application).',
+      'Ouvre Impera dans Safari (pas dans une autre application).',
       'Touche le bouton Partager, le carré avec une flèche vers le haut.',
       'Choisis « Sur l’écran d’accueil », puis « Ajouter ».',
-      'Ouvre Nirvana depuis son icône : c’est là que les notifications arrivent.',
+      'Ouvre Impera depuis son icône : c’est là que les notifications arrivent.',
     ],
   },
   android: {
     title: 'Sur Android',
     steps: [
-      'Ouvre Nirvana dans Chrome.',
+      'Ouvre Impera dans Chrome.',
       'Touche le menu ⋮ en haut à droite.',
       'Choisis « Installer l’application », puis « Installer ».',
-      'Ouvre Nirvana depuis son icône.',
+      'Ouvre Impera depuis son icône.',
     ],
   },
 };
@@ -44,14 +44,14 @@ export function InstallPage(): JSX.Element {
   return (
     <Page>
       <PageHeader
-        title="Installer Nirvana"
-        lead="Une minute, une seule fois : ensuite Nirvana s’ouvre depuis son icône, en plein écran, comme une app."
+        title="Installer Impera"
+        lead="Une minute, une seule fois : ensuite Impera s’ouvre depuis son icône, en plein écran, comme une app."
       />
       <div className="nv-help-install">
         {isStandalone() ? (
           <Panel>
             <PanelSection className="nv-help-install__done">
-              <p>Nirvana est installée sur cet appareil : tu l’as ouverte depuis son icône.</p>
+              <p>Impera est installée sur cet appareil : tu l’as ouverte depuis son icône.</p>
             </PanelSection>
           </Panel>
         ) : null}
@@ -66,7 +66,7 @@ export function InstallPage(): JSX.Element {
                   void promptInstall();
                 }}
               >
-                Installer Nirvana
+                Installer Impera
               </button>
             </PanelSection>
           </Panel>

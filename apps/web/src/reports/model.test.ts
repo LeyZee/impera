@@ -5,7 +5,7 @@ import {
   ShiftSchema,
   type Shift,
   type ShiftReport,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {

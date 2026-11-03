@@ -68,7 +68,7 @@ export function icsOf(input: { name: string; events: readonly FeedEvent[]; stamp
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Nirvana//Shifts//FR',
+    'PRODID:-//Impera//Shifts//FR',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `NAME:${escapeText(input.name)}`,

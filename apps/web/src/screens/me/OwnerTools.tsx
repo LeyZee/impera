@@ -3,7 +3,7 @@ import {
   ContractorRegimeIdSchema,
   type BillingRegimes,
   type ContractorFile,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 

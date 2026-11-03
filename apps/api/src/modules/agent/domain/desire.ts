@@ -1,4 +1,4 @@
-import { DESIRE_BAND_FLOORS, desireNow, type DesireSignal } from '@nirvana/contracts';
+import { DESIRE_BAND_FLOORS, desireNow, type DesireSignal } from '@impera/contracts';
 
 import { NO_SALE_RISKS } from './policy';
 

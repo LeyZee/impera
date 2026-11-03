@@ -4,7 +4,7 @@ import {
   personaCompletion,
   PersonaSchema,
   type Persona,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import demoYaml from '../../../../../personas/demo/v0.1.0.yaml?raw';
@@ -186,7 +186,7 @@ describe('Persona screen rules', () => {
     expect(validate({ ...draft, details: { ...draft.details, first_name: 'Léa' } })).toEqual([
       { field: 'details.date_of_birth', message: 'À remplir' },
     ]);
-    // Her name in Nirvana is known: her first name starts from its first word (CREA-13).
+    // Her name in Impera is known: her first name starts from its first word (CREA-13).
     const named = firstDraft(
       await example(),
       '0192f3a0-0000-7000-8000-0000000000c1',

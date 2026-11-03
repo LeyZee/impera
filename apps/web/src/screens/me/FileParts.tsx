@@ -8,7 +8,7 @@ import {
   type ContractorFile,
   type ContractorFileDocument,
   type ContractText,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 import { useId, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { BeninGuide } from './BeninGuide';

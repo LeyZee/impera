@@ -11,7 +11,7 @@ import {
   type SalesRefundsRow,
   type SalesTotals,
   type SalesTotalsRow,
-} from '@nirvana/contracts';
+} from '@impera/contracts';
 
 import { onSaleDays, salesFeedTimeZone, sumsBy, type SaleDayLine } from './sale-days';
 

@@ -1,5 +1,5 @@
-import { ForeignCurrencySchema } from '@nirvana/contracts';
-import { inArray, schema, sql, withAdmin, type Database } from '@nirvana/db';
+import { ForeignCurrencySchema } from '@impera/contracts';
+import { inArray, schema, sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { PayrollRateStore } from '../domain/ports';

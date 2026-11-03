@@ -1,4 +1,4 @@
-import type { InvoiceContractor } from '@nirvana/contracts';
+import type { InvoiceContractor } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { invoicePdfRetainUntil } from '../../../contractors/domain/retention';

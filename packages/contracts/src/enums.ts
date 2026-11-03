@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /** Closed value sets shared by the database (`text` + `check`), the API and the jobs (data-model.md). */
 
-export const PlatformSchema = z.enum(['reveal', 'onlyfans', 'instagram', 'nirvana']);
+export const PlatformSchema = z.enum(['reveal', 'onlyfans', 'instagram', 'impera']);
 export type Platform = z.infer<typeof PlatformSchema>;
 
 /** A platform as people write it, on a screen or an invoice: never its code. */
@@ -10,7 +10,7 @@ export const PLATFORM_NAMES: Readonly<Record<Platform, string>> = {
   reveal: 'Reveal',
   onlyfans: 'OnlyFans',
   instagram: 'Instagram',
-  nirvana: 'Nirvana',
+  impera: 'Impera',
 };
 
 export const ConversationStateSchema = z.enum([
