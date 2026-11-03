@@ -1,5 +1,5 @@
 # CR-12 Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier
-Statut : in_progress, lot a (serveur) fait le 03/11/2026 ; restent les écrans (lot b), les liens iCal (lot c), les places d'ADR 0049 et la couche de la créatrice (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 1, § 2 et § 5, acceptée le 02/11/2026 ; ADR 0048 pour l'IA, acceptée le même jour). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
+Statut : in_progress, lot a (serveur) fait le 03/11/2026, lot b1 (« l'équipe » du chatteur, couche IA) le même jour ; restent Équipe › Planning (lot b2), les liens iCal (lot c), les places d'ADR 0049 et la couche de la créatrice (prototype validé par Charles le 02/11/2026 à 17h47, ADR 0045 § 7) (ADR 0045 § 1, § 2 et § 5, acceptée le 02/11/2026 ; ADR 0048 pour l'IA, acceptée le même jour). Référence visuelle : le prototype https://claude.ai/artifact/8AJCiUp1ZoEXEvfx9wknPE (données inventées).
 Phase : espaces (ADR 0045)
 Dépend de : EQ-02 (planning, module `scheduling`), P3-14 (heures d'activité de l'agent), CR-02 (chemin de lecture de la créatrice, pour sa couche) ; le prototype validé
 Branche : task/cr-12-shift-calendar-read
@@ -38,3 +38,8 @@ Poser, déplacer, ajouter en masse, suggérer (CR-13) ; notifications et rappels
 - Contrat `packages/contracts/src/calendar.ts` ; route `GET /v1/scheduling/calendar` pour tout membre, jamais pour une créatrice ; vues `agency`, `team`, `own`. Règles pures `domain/calendar.ts` (`agentReplySpans`, `gridSlots`, `slotsToFill`, `workloadOf`, `coverageOf`), 11 tests unitaires dont le jour du changement d'heure (25/10/2026) et la semaine de 169 h ; 6 tests d'intégration de la route.
 - `slotsToFill` est la seule fonction du décompte « à pourvoir » ; elle n'est pas encore exportée par `index.ts` (knip refuse un export sans lecteur) : EQ-14 l'exportera en la lisant. Elle compte une place par compte et par créneau, et lit le réglage de créneaux actuel : les places et les réglages datés d'ADR 0049 viendront avec leur migration.
 - La couche « utile à l'équipe » de l'agenda (ADR 0043 § 7) et la lecture par la créatrice (vue `creator`, prête côté SQL) restent pour CR-05 et le lot des écrans.
+
+### 03/11/2026, lot b1 (écrans du chatteur)
+- Jeton `--nv-agent` (design system, contraste testé) ; `answers` rendu par le serveur, lecture de l'agence dans une seule photo.
+- Planning du chatteur : « L'équipe » en Semaine (grille par créatrice, créneaux de l'agence, un jour à la fois sur téléphone) et en Mois (une marque par créneau et créatrice, un jour touché ouvert en détail), légende pour suivre un membre (44 px sur téléphone), l'IA en violet et en mots dans chaque créneau. Vue et période gardées dans l'adresse.
+- Reste pour le lot b2 : le Mois, la charge, la couverture et la couche IA dans Équipe › Planning ; la palette de 12 nuances des membres.

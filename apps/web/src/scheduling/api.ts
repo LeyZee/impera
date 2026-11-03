@@ -1,5 +1,6 @@
 import {
   ApiErrorSchema,
+  CalendarSchema,
   LeaveRequestListSchema,
   LeaveRequestSchema,
   MyShiftsSchema,
@@ -12,6 +13,7 @@ import {
   ShiftTemplateListSchema,
   ShiftTemplateSchema,
   SwapCandidatesSchema,
+  type Calendar,
   type CreateLeaveRequestBody,
   type CreateShiftBody,
   type CreateShiftSwapRequestBody,
@@ -70,6 +72,23 @@ export function usePlanning(range: PlanningRange, enabled = true): UseQueryResul
     // One retry, not three: a silent server is said in about a second, not seven (EQ-22).
     retry: 1,
     // The week stays on screen while the next one loads: no blank grid between two weeks.
+    placeholderData: (before) => before,
+  });
+}
+
+/** Équipe › Calendrier (CR-12): who chats when, for the whole team, and the agent's hours, on at most six weeks. */
+export function useCalendar(
+  range: { readonly from: string; readonly to: string } | null,
+): UseQueryResult<Calendar> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'calendar', range?.from ?? null, range?.to ?? null],
+    queryFn: () => {
+      if (range === null) throw new Error('calendar read without a range');
+      const query = new URLSearchParams({ from: range.from, to: range.to });
+      return read(`/v1/scheduling/calendar?${query.toString()}`, (body) => CalendarSchema.parse(body));
+    },
+    enabled: range !== null,
+    retry: 1,
     placeholderData: (before) => before,
   });
 }

@@ -45,13 +45,16 @@ export type CalendarShift = z.infer<typeof CalendarShiftSchema>;
 
 /**
  * The agent on one creator (ADR 0048 § 3): her clock, the mode in force (`stop` under the global stop or hers) and
- * when he answers (P3-14). Never the follow-up quiet hours, the night, the persona, a prompt, the budget or a figure.
+ * when he answers (P3-14). `answers` is that, read on her clock within the window asked: the stretches he answers, in
+ * order and joined, none under `stop`; the screens draw from it, so that no slot is read on a clock twice. Never the
+ * follow-up quiet hours, the night, the persona, a prompt, the budget or a figure.
  */
 export const CalendarAgentSchema = z.object({
   creatorId: CreatorIdSchema,
   timeZone: z.string().min(1),
   mode: AgentModeSchema,
   reply: AgentHoursSchema.shape.reply,
+  answers: z.array(z.object({ startsAt: z.iso.datetime(), endsAt: z.iso.datetime() })),
 });
 export type CalendarAgent = z.infer<typeof CalendarAgentSchema>;
 
