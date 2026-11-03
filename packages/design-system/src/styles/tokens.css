@@ -64,6 +64,9 @@
   --nv-warning: #ffa340;
   --nv-danger: #ff5a45;
   --nv-sale: #e8c37a;
+  /* The agent (ADR 0048, CR-12): one violet, never the brand's red, for everything that says the AI. */
+  --nv-agent: #b9a2ff;
+  --nv-agent-soft: rgba(185, 162, 255, 0.14);
 
   /* Data: the first series is warm white; the neon only lights the one figure a screen is about. */
   --nv-data-1: #f1e4e8;
@@ -137,6 +140,8 @@
   --nv-warning: #9a4a00;
   --nv-danger: #c42a12;
   --nv-sale: #7a5a12;
+  --nv-agent: #5b34c9;
+  --nv-agent-soft: rgba(91, 52, 201, 0.1);
 
   --nv-data-1: #3a2630;
   --nv-data-2: #a07a20;
