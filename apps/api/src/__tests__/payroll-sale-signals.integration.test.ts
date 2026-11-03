@@ -31,7 +31,14 @@ const MineSchema = z.object({
     }),
   ),
   nextCursor: z.string().nullable(),
-  days: z.array(z.object({ day: z.string().nullable(), sales: z.number(), refunds: z.number() })),
+  days: z.array(
+    z.object({
+      day: z.string().nullable(),
+      sales: z.number(),
+      refunds: z.number(),
+      nets: z.array(z.object({ currency: z.string(), netMinor: z.number() })),
+    }),
+  ),
 });
 const HeldListSchema = z.object({
   sales: z.array(
