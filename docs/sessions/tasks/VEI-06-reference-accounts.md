@@ -14,6 +14,7 @@ ADR 0060 § 2 (source 3), documentation Business Discovery de Meta au moment du 
 ## À faire
 - [ ] Faux d'abord ; branchement du compte de l'agence par la voie Facebook Login ; jeton scellé (ADR 0016).
 - [ ] Liste de comptes réglée par l'agence ; comptes à âge restreint signalés comme illisibles.
+- [ ] Débit borné : les appels Business Discovery comptent dans la limite horaire de l'application Meta.
 
 ## Critères d'acceptation
 - Tests contre le faux ; seuil de dépassement réglable.

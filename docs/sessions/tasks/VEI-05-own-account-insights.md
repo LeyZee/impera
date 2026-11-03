@@ -13,7 +13,7 @@ ADR 0057 § 2 et § 3, ADR 0060 § 2 (source 1) et § 3.
 
 ## À faire
 - [ ] Lecture nocturne des médias et statistiques par le port du connecteur, contre `FakeInstagram`.
-- [ ] Nombres seulement, jamais le texte ni le nom d'un commentateur.
+- [ ] Jamais le texte ni le nom d'un commentateur ; ses propres médias, légendes et statistiques, oui.
 
 ## Critères d'acceptation
 - Tests contre le faux.
