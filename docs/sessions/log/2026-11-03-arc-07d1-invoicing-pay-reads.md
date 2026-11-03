@@ -1,4 +1,4 @@
-# 2026-11-03 — ARC-07 lot d1 : les factures lisent la paie par son index.ts — in_progress
+# 2026-11-03 — ARC-07 lot d1 : les factures lisent la paie par son index.ts — done
 Fait : `invoicing` ne lit plus aucune table de `payroll`. Il lit les relevés, leurs lignes, les ajustements d'une contestation et les reports par `payReadsForInvoicing`, exporté par l'`index.ts` de la paie, dans la transaction de l'appelant. Dix lignes de moins dans `OPEN_CROSSINGS` (19 restent, toutes des tables du dossier lues par `invoicing`).
 Décisions : pas de port branché au composition root, puisque `invoicing` dépend déjà de `payroll` ; les sous-requêtes corrélées deviennent des lectures séparées dans la même transaction (détail dans les notes de la fiche) ; `statementsOf` et `carryOversOf` sont ceux des exports.
 Pas fait : lot d2 (tables du dossier lues par `invoicing`).
