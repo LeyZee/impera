@@ -645,6 +645,13 @@
       "when": 1793723369460,
       "tag": "0102_telegram_scan_agency_share",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1793725059667,
+      "tag": "0104_trend_watch_force_rls",
+      "breakpoints": true
     }
   ]
 }

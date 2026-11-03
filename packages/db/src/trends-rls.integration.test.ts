@@ -329,4 +329,18 @@ describe('the trend watch’s tables (VEI-01): the agency’s, never the creator
       await failure(withTenantMember(test.app.db, nora, owner, (tx) => tx.select().from(s.extensionLinks))),
     ).toMatch(/permission denied/u);
   });
+
+  it('forces each of its tables under its policies, the table’s owner included (migration 0104)', async () => {
+    const result = await test.admin.db.execute(
+      sql`select relname, relrowsecurity, relforcerowsecurity from pg_class
+           where relname in ('trend_signals', 'trend_readings', 'content_ideas') order by relname`,
+    );
+    expect(result.rows).toEqual(
+      ['content_ideas', 'trend_readings', 'trend_signals'].map((relname) => ({
+        relname,
+        relrowsecurity: true,
+        relforcerowsecurity: true,
+      })),
+    );
+  });
 });

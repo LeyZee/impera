@@ -233,3 +233,34 @@ export const ContentIdeaSchema = ContentIdeaDraftSchema.extend({
   refusalReason: z.string().max(280).nullable(),
 });
 export type ContentIdea = z.infer<typeof ContentIdeaSchema>;
+
+/** What `POST /v1/trends/links` answers: the signal, and whether this paste added it (a second paste adds nothing). */
+export const PastedTrendLinkSchema = z.strictObject({
+  created: z.boolean(),
+  url: z.string().max(2048),
+  expiresAt: z.iso.datetime().nullable(),
+});
+export type PastedTrendLink = z.infer<typeof PastedTrendLinkSchema>;
+
+/**
+ * The link of one person's extension to the server (VEI-01 lot b), 256 random bits in base64url: shown once at its
+ * creation, kept as a hash only, sent by the extension in `x-extension-link` with each batch of readings.
+ */
+export const ExtensionLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/u);
+
+/** `GET /v1/trends/extension-link`: whether the person's extension is linked, never the token. */
+export const ExtensionLinkStateSchema = z.strictObject({
+  link: z.strictObject({ createdAt: z.iso.datetime() }).nullable(),
+});
+export type ExtensionLinkState = z.infer<typeof ExtensionLinkStateSchema>;
+
+/** `POST /v1/trends/extension-link` (« Relier l'extension »): the new token, once; the previous link is revoked. */
+export const ExtensionLinkCreatedSchema = z.strictObject({
+  token: ExtensionLinkTokenSchema,
+  createdAt: z.iso.datetime(),
+});
+export type ExtensionLinkCreated = z.infer<typeof ExtensionLinkCreatedSchema>;
+
+/** `POST /v1/trends/readings`: how many posts of the batch were kept, new or seen again. */
+export const TrendReadingsAcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
+export type TrendReadingsAccepted = z.infer<typeof TrendReadingsAcceptedSchema>;

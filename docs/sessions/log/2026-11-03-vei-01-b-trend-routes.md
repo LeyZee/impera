@@ -1,0 +1,7 @@
+# 2026-11-03 — VEI-01 lot b : coller un lien, relier l'extension, entrée des relevés — done
+Fait : `POST /v1/trends/links` (propriétaire, membre, créatrice pour elle seule ; un collage par créatrice et adresse), `GET|POST|DELETE /v1/trends/extension-link` (jeton de 256 bits montré une fois, haché, un vivant par personne, audité), `POST /v1/trends/readings` (en-tête `x-extension-link`, jeton vérifié avant le corps et la personne relue à chaque lot, une ligne par personne, session et post, lot refusé entier sur une marque interdite) ; `index.ts` du module, `wiring/trends.ts`, migration 0104 (FORCE ROW LEVEL SECURITY sur les trois tables de la veille sous RLS) ; tests d'intégration des routes (6) dont celui qui échoue sur une connexion sortante, test RLS du FORCE.
+Pas fait : lots c et d.
+Décisions : un signal collé est de genre `format` (il porte un format de post) ; le jeton de liaison est réservé au propriétaire, à un membre qui n'est pas parti et à un compte de créatrice lié à une créatrice ; un membre parti ne colle plus et son jeton ne nomme plus personne ; un post deux fois dans un lot garde sa dernière lecture et sa première vue.
+Découvertes : 0100 n'avait pas FORCE ROW LEVEL SECURITY (relevé par Chantier 7), corrigé ici par 0104.
+Candidats à suppression : `EXTENSION_DEVICE_TOKEN` pour les relevés n'a jamais servi (la capture Reveal le garde) ; rien à supprimer.
+Vérifié : `pnpm check` ✓, `trends` en intégration 6/6 ✓, `trends-rls` 8/8 ✓.

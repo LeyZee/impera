@@ -46,6 +46,7 @@ import type { ScriptsModule } from './modules/scripts';
 import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
+import type { TrendsModule } from './modules/trends';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
@@ -71,6 +72,7 @@ import type { JobWithTask, Shared } from './wiring/shared';
 import { wireSupervision } from './wiring/supervision';
 import { wireTeam } from './wiring/team';
 import { wireTelegram } from './wiring/telegram';
+import { wireTrends } from './wiring/trends';
 
 /** Every business module, wired. */
 interface Modules {
@@ -88,6 +90,7 @@ interface Modules {
   readonly team: TeamModule;
   readonly scheduling: SchedulingModule;
   readonly scripts: ScriptsModule;
+  readonly trends: TrendsModule;
   readonly contractors: ContractorsModule;
   readonly payroll: PayrollModule;
   readonly invoicing: InvoicingModule;
@@ -257,6 +260,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
+  const trends = wireTrends(shared);
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
@@ -327,6 +331,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     team: team.module,
     scheduling: scheduling.module,
     scripts: scripts.module,
+    trends: trends.module,
     contractors: contractors.module,
     payroll: payroll.module,
     invoicing: invoicing.module,
@@ -401,6 +406,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
+      ...trends.routes,
       ...contractors.routes,
       ...payroll.routes,
       ...invoicing.routes,
