@@ -49,7 +49,7 @@ Une créatrice sur une plateforme d'abonnement reçoit chaque jour des dizaines 
 | **L'agence** (propriétaire, managers) | Dashboard en direct (santé de l'agent, ventes, fans à traiter), Suivi des conversations et de leurs alertes, Entraîner (playground, corrections, tests à l'aveugle), Créatrices (persona, pourcentage de l'agence, heures de l'agent), Réglages (modèles IA, flux de ventes, alertes, Telegram, règles de paie, facturation, sauvegardes, sécurité) |
 | **Les chatteurs** | Aujourd'hui, leurs conversations pendant leur shift et rien en dehors, leur planning avec congés et échanges de shifts, leurs ventes saisies une à une, leurs commissions et leurs factures |
 | **L'équipe** | Planning partagé où l'agence pose et déplace les shifts au doigt, rapports de fin de shift contrôlés par le code, paie par quinzaine au centime, factures PDF/A et avoirs, exports pour le comptable |
-| **La créatrice** | Une appli sur son téléphone (PWA) : sa journée, ses gains lus sur la plateforme, son calendrier, sa persona. Elle ne voit ni l'équipe, ni l'IA, ni les notes de ses fans, seulement des chiffres sur l'ensemble de sa base |
+| **La créatrice** | Une appli sur son téléphone (PWA) : sa journée et qui répond à ses fans, sa persona ; ses fans et leurs conversations en lecture seule arrivent avec Ventes. Elle ne voit ni l'IA, ni qui a écrit un message, ni la paie de l'équipe, ni les notes de l'agence sur ses fans ([ADR 0042](docs/adr/0042-creator-space.md), [ADR 0063](docs/adr/0063-no-fan-notes-for-the-creator.md)) |
 
 Le cœur ne connaît aucune plateforme. Reveal.me est la première, branchée par un adaptateur ; d'autres suivront, puis la plateforme propre d'Impera, sans rien changer au cœur.
 
@@ -113,7 +113,7 @@ Un **monolithe modulaire** TypeScript. Chaque module a un domaine pur, des cas d
 flowchart TB
   subgraph Clients
     W[apps/web<br/>dashboard de l'agence · PWA créatrice et chatteur]
-    X[apps/extension<br/>capture de session · veille]
+    X[apps/extension<br/>capture de session · veille (à venir)]
     T[Telegram<br/>alertes de l'équipe]
   end
   subgraph API["apps/api · Fastify + Graphile Worker"]
@@ -233,18 +233,18 @@ Rien ne part vers une plateforme ni vers un fan en local : chaque compte de plat
 2. **Activer le deuxième facteur** au premier passage : appli d'authentification et codes de secours, ou une clé d'accès (Face ID, empreinte), qui vaut alors mot de passe et code ([ADR 0046](docs/adr/0046-dashboard-access-second-factor.md), [ADR 0053](docs/adr/0053-passkey-sign-in.md)).
 3. **Brancher les services IA** : Réglages › Modèles IA. On colle la clé de chaque fournisseur, Impera la vérifie, la chiffre et affiche l'état du service. Sans clé, l'agent ne génère rien et le dit sur le Dashboard.
 4. **Ajouter une créatrice** : Créatrices › Ajouter une créatrice (ou `pnpm creator:create`). Puis sa persona, versionnée ; le pourcentage de l'agence, daté et jamais rétroactif ; les heures où l'agent chatte.
-5. **Inviter l'équipe** : Équipe › Membres. Chaque membre reçoit un lien d'invitation et choisit son mot de passe ; son rôle (manager, chatteur, créatrice) décide de ce qu'il voit.
+5. **Inviter l'équipe** : Équipe › Membres pour un chatteur ou un manager, Créatrices › Accès pour une créatrice. Impera donne un lien d'invitation valable 72 h, que tu transmets toi-même (aucun e-mail ne part) ; la personne y choisit son mot de passe, et son rôle décide de ce qu'elle voit.
 
 ### Au quotidien
 
 - **Propriétaire et managers** : le **Dashboard** dit ce qui attend (fans à traiter, jobs bloqués, sauvegarde en retard, papiers manquants). **Suivi** liste les conversations de chaque créatrice suivie, avec la fiche du fan et l'historique des alertes. En copilote, les brouillons de l'agent s'y valident, se corrigent ou se rejettent. **Entraîner** sert à tester l'agent sans fan réel : playground, corrections, tests à l'aveugle qui ouvrent le mode Automatique ([ADR 0019](docs/adr/0019-two-rates-and-automatic-mode-gate.md)).
 - **Équipe** : **Planning** pour poser et déplacer les shifts, **Rapports** pour les fins de shift, **Paie** pour clôturer la quinzaine, ajouter primes et malus, émettre les factures et sortir les exports du comptable.
 - **Chatteurs** : **Aujourd'hui** pour la journée, **Suivi** pour la créatrice qu'ils ont en shift (rien hors shift, [ADR 0025](docs/adr/0025-chatter-access-during-shift.md)), **Planning** pour leurs shifts, congés et échanges, **Commissions** pour leurs ventes et leurs factures. Leur calendrier s'abonne depuis Moi › Calendrier.
-- **Créatrice** : elle installe l'appli depuis le navigateur de son téléphone, guidée pas à pas par la page `/aide/installer`, puis choisit ses notifications. Elle y voit sa journée et sa persona ; ses gains, son agenda et son contenu arrivent avec leurs écrans ([ADR 0042](docs/adr/0042-creator-space.md)).
+- **Créatrice** : elle installe l'appli depuis le navigateur de son téléphone, guidée pas à pas par la page `/aide/installer`, puis règle ses notifications sur la page `/notifications` (depuis le menu de son compte). Elle y voit sa journée et sa persona ; ses fans, ses gains, son agenda et son contenu arrivent avec leurs écrans ([ADR 0042](docs/adr/0042-creator-space.md)).
 
 ### Extension Chrome
 
-L'extension capture la session du membre « bot » sur la plateforme et la dépose, chiffrée, côté serveur ; elle ne porte aucune clé et n'appelle aucun modèle. Pour la charger en développement : `pnpm --filter @impera/extension dev`, puis `chrome://extensions`, mode développeur, « Charger l'extension non empaquetée » sur `apps/extension/.output/chrome-mv3-dev`. Détails : [`apps/extension/README.md`](apps/extension/README.md).
+L'extension capturera la session du membre « bot » sur la plateforme et la déposera, chiffrée, côté serveur (en attente, voir [Où on en est](#où-on-en-est)) ; elle ne porte aucune clé et n'appelle aucun modèle. Pour la charger en développement : `pnpm --filter @impera/extension dev`, puis `chrome://extensions`, mode développeur, « Charger l'extension non empaquetée » sur `apps/extension/.output/chrome-mv3-dev`. Détails : [`apps/extension/README.md`](apps/extension/README.md).
 
 ### Alertes Telegram
 
