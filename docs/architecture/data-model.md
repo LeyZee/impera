@@ -476,6 +476,29 @@ script_structure_queue    creator_id, position 1–20, structure_id (unique par 
 
 La règle 6 de l'ADR 0056 § 1 est tenue en base : la dernière version change sur place tant que `frozen_at` est nul, puis un enregistrement écrit la version suivante (SC-01, migration 0084).
 
+## Veille (module `trends`, ADR 0060, VEI-01, migration 0098)
+
+```
+trend_signals     id, creator_id? → creators (nul : pour toute l'agence), source (six de l'ADR 0060 § 2),
+                  kind (format|sound|theme|date), text 1–280, url?, format?, views?, likes?, comments?,
+                  reading_id? → trend_readings (unique ; présent si et seulement si source = passive_capture),
+                  created_by? (lien collé), observed_at, expires_at (> observed_at)
+                  (lien collé : url, auteur, créatrice et format requis, unique par créatrice et adresse ;
+                  lu par le propriétaire et un manager actif ; un membre colle un lien `agency_link`, la créatrice
+                  un lien `creator_link`, tous deux à leur nom ; jamais changé ni retiré par l'application)
+trend_readings    id, recorded_by → user, watch_session_id, post_code, path (post|reel), account?, views?, likes?,
+                  comments?, caption?, hashtags text[], sound?, dwell_ms, marked_for? → creators,
+                  first_seen_at, seen_at
+                  (unique : recorded_by, watch_session_id, post_code ; chacun lit et met à jour les siens, le
+                  propriétaire et un manager actif lisent tout ; la créatrice ne marque que pour elle)
+content_ideas     id, creator_id → creators, signal_id → trend_signals, title ≤ 120, category (catégorie de dépôt),
+                  to_shoot ≤ 600, reason ≤ 200, shoot_minutes 1–600, state (proposed|validated|refused|suggested|
+                  deposited), proposed_on, refusal_reason? (refus seulement), decided_by?, decided_at?
+                  (propriétaire et manager actif ; ni le chatteur ni la créatrice)
+extension_links   id, user_id → user, token_hash (unique), created_at, revoked_at? (une liaison vivante par
+                  personne ; hors de portée de `nirvana_app`, lue par `withAdmin`, comme `calendar_links`)
+```
+
 ## Commercial (phase 6, réservé)
 
 ```

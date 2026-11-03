@@ -1,0 +1,7 @@
+# 2026-11-03 — VEI-01 lot a : la base de la veille (ADR 0060) — done
+Fait : contrats de la veille (signaux, relevés, idées, lien collé lu par sa forme sans jamais ouvrir instagram.com), catégories de dépôt de l'ADR 0055 et garde des sorties publiques (« jamais de nu », garde Instagram) dans `packages/contracts` ; migration 0098 (`trend_signals`, `trend_readings`, `content_ideas`, `extension_links`) avec RLS et droits explicites ; domaine pur du module `trends` (péremption, « dépasse nettement la moyenne de son compte », filtres des idées) ; frontière `trends → agent` pour `touchesTerm`.
+Pas fait : routes, liaison de l'extension, plafond de veille, captures, agenda (lots b, c, d de la fiche).
+Décisions : les limites de la persona sont lues par `touchesTerm` de l'index de l'agent, injecté dans le domaine pur ; la créatrice lit ses propres relevés (l'upsert l'exige) mais ni signal ni idée ; un signal n'est jamais changé par l'application, il expire ; les snapshots Drizzle sortent de la règle des 500 Ko de `check-repo` (texte généré, le 0098 la dépasse).
+Découvertes : #483 et #482 dépasseront aussi 500 Ko par leur snapshot ; la règle les couvre une fois ce lot fusionné, ou elles portent la même exemption.
+Candidats à suppression : aucun.
+Vérifié : `pnpm check` ✓, tests unitaires du module et des contrats ✓, `trends-rls` en intégration 7/7 ✓.
