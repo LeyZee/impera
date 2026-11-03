@@ -40,7 +40,7 @@ const WEEKDAYS: readonly (readonly [number, string, string])[] = [
   [7, 'D', 'dimanche'],
 ];
 
-const TASK_KINDS: readonly (readonly [TaskWhenKind, string])[] = [
+export const TASK_KINDS: readonly (readonly [TaskWhenKind, string])[] = [
   ['timed', 'À une heure'],
   ['day', 'Un jour'],
   ['routine', 'Chaque semaine'],
@@ -61,7 +61,7 @@ const REMINDERS: readonly (readonly [number | null, string])[] = [
 const OFFLINE =
   'Pas de réseau : ce que tu ajoutes part quand le téléphone est en ligne. Réessaie dans un moment.';
 
-function Choices<T>({
+export function Choices<T>({
   label,
   options,
   value,
@@ -98,7 +98,7 @@ function Choices<T>({
   );
 }
 
-function Weekdays({
+export function Weekdays({
   value,
   invalid,
   onChange,
@@ -136,7 +136,7 @@ function Weekdays({
   );
 }
 
-function Hours({
+export function Hours({
   start,
   end,
   onStart,
@@ -170,7 +170,13 @@ function Hours({
   );
 }
 
-function DayField({ value, onChange }: { value: string; onChange: (day: string) => void }): JSX.Element {
+export function DayField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (day: string) => void;
+}): JSX.Element {
   const id = useId();
   return (
     <div className="nv-field tm-field">
@@ -280,12 +286,23 @@ function KindPicker({
 }
 
 /** What she is adding, as her agenda will show it: it changes as she types. */
-function Preview({ mark, title, when }: { mark: JSX.Element; title: string; when: string }): JSX.Element {
+export function Preview({
+  mark,
+  title,
+  when,
+  placeholder = 'Ta tâche',
+}: {
+  mark: JSX.Element;
+  title: string;
+  when: string;
+  /** Read while the title is empty. */
+  placeholder?: string;
+}): JSX.Element {
   return (
     <div className="ag-preview" aria-hidden="true">
       {mark}
       <div className="ag-preview__text">
-        <b data-empty={title === '' ? 'true' : undefined}>{title === '' ? 'Ta tâche' : title}</b>
+        <b data-empty={title === '' ? 'true' : undefined}>{title === '' ? placeholder : title}</b>
         <span className="nv-num">{when}</span>
       </div>
     </div>
@@ -295,7 +312,7 @@ function Preview({ mark, title, when }: { mark: JSX.Element; title: string; when
 const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** When a draft is, in her words, or what is missing for it to be read. */
-function draftWhen(draft: TaskDraft, zone: string): string {
+export function draftWhen(draft: TaskDraft, zone: string): string {
   if (draft.kind === 'routine' && draft.weekdays.length === 0) return 'Choisis les jours';
   if (draft.kind !== 'routine' && !DAY.test(draft.day)) return 'Choisis le jour';
   return whenWords(whenOf(draft, zone), zone);
@@ -312,8 +329,8 @@ function dispoWhen(draft: AvailabilityDraft): string {
   return `${names.length === 7 ? 'Chaque jour' : `Chaque ${names.join(', ')}`}, ${hours}`;
 }
 
-/** Her six categories as tiles: the emoji on its colour, the name under it. */
-function Categories({
+/** Her six categories as tiles: the emoji on its colour, the name under it (« Ajouter », and the agency's « Proposer »). */
+export function Categories({
   value,
   onPick,
 }: {

@@ -221,6 +221,34 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
   });
 });
 
+describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05 lot c)', () => {
+  it('opens right after the persona, the creator kept in the address', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
+    const names = within(views)
+      .getAllByRole('link')
+      .map((link) => link.textContent);
+    expect(names.slice(0, 2)).toEqual(['Persona', 'Agenda']);
+    fireEvent.click(within(views).getByRole('link', { name: 'Agenda' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
+    });
+    // The suggestions answer 404 here: the sheet says they do not load, and still offers to propose.
+    expect(await screen.findByText('Ses propositions ne se chargent pas')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
+  });
+
+  it('takes an operator who is not an active manager back to the persona', async () => {
+    await serve([ANNA]);
+    const router = renderAt(operator, `/creatrices?onglet=agenda&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+    expect(screen.queryByText('Son agenda')).toBeNull();
+  });
+});
+
 describe('Créatrices, what a member without the list reads', () => {
   it('tells a member that no creator is entrusted to him, instead of the example', async () => {
     await serve([]);
