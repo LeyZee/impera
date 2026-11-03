@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 import type { CalendarReads, StoredAccount, StoredShift } from '../domain/ports';
 
-import { shiftColumns, StoredAccountSchema, toShift } from './rows';
+import { settingsColumns, shiftColumns, StoredAccountSchema, toShift } from './rows';
 
 const { platformAccounts, schedulingSettings, shifts: shiftTable, teamMembers } = schema;
 
@@ -58,14 +58,7 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
             sql`select * from public.calendar_shifts(${window.from}, ${window.to})`,
           );
           const agents = await tx.execute(sql`select * from public.calendar_agent()`);
-          const [settings] = await tx
-            .select({
-              timeZone: schedulingSettings.timeZone,
-              slotStartMinute: schedulingSettings.slotStartMinute,
-              slotLengthMinutes: schedulingSettings.slotLengthMinutes,
-              accessMarginMinutes: schedulingSettings.accessMarginMinutes,
-            })
-            .from(schedulingSettings);
+          const [settings] = await tx.select(settingsColumns).from(schedulingSettings);
           let agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null = null;
           if (view === 'agency') {
             agency = { accounts: [], shifts: [] };

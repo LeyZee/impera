@@ -18,7 +18,7 @@ import { addDays, clockAt, clockOf, mondayOf, zonedInstant } from './time';
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
-interface Span {
+export interface Span {
   readonly from: number;
   readonly to: number;
 }
@@ -76,6 +76,37 @@ const coversAll = (spans: readonly Span[], span: Span): boolean =>
   span.to <= span.from || spans.some((one) => one.from <= span.from && one.to >= span.to);
 
 /**
+ * How the agent stands in one créneau (ADR 0048): the part he answers, and whether he holds it alone, which takes
+ * Automatique, no shift on what is left of it (all of it, once gone by) and his hours over all of that. `shifts` are
+ * the spans of the shifts that count for it (a creator's, an account's). The same rule as the server's `slotsToFill`.
+ */
+export function agentOnSlot(
+  agent: CalendarAgent | null,
+  cut: Span,
+  shifts: readonly Span[],
+  now: Date,
+): { agent: AgentInSlot | null; aiAlone: boolean } {
+  if (agent === null || agent.mode === 'stop') return { agent: null, aiAlone: false };
+  const answers = spansOf(agent.answers);
+  const part = coveredPart(answers, cut);
+  const ahead = Math.ceil(now.getTime() / MINUTE_MS) * MINUTE_MS;
+  const rest = { from: cut.to <= ahead ? cut.from : Math.max(cut.from, ahead), to: cut.to };
+  const onRest = shifts.some((span) => span.from < rest.to && span.to > rest.from);
+  return {
+    agent:
+      part === null
+        ? null
+        : {
+            mode: agent.mode,
+            full: coversAll(answers, cut),
+            from: new Date(part.from),
+            to: new Date(part.to),
+          },
+    aiAlone: agent.mode === 'auto' && rest.to > rest.from && !onRest && coversAll(answers, rest),
+  };
+}
+
+/**
  * Each creator's days cut into the agency's créneaux (`settings`), from `days` (calendar days in the agency's zone).
  * A créneau ends where the next starts, in wall-clock time: the night of a change of time has one an hour longer or
  * shorter. `now` decides what is left of a créneau under way.
@@ -85,7 +116,6 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
   const zone = settings.timeZone;
   const slots = shiftSlotsOf(settings);
   const length = settings.slotLengthMinutes;
-  const ahead = Math.ceil(now.getTime() / MINUTE_MS) * MINUTE_MS;
   const windows = days.map((day) => ({
     day,
     cuts: slots.map((_, index) => ({
@@ -96,7 +126,6 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
   const first = windows[0]?.cuts[0]?.from ?? 0;
   return calendar.creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;
-    const answers = agent === null || agent.mode === 'stop' ? [] : spansOf(agent.answers);
     const theirs = calendar.shifts.filter((shift) => shift.creatorId === creator.id);
     const spans = spansOf(theirs);
     const cells = new Map<string, CalendarCell[]>();
@@ -114,26 +143,15 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
           const over = theirs.filter(
             (shift) => Date.parse(shift.startsAt) < cut.to && Date.parse(shift.endsAt) > cut.from,
           );
-          const part = agent === null || agent.mode === 'stop' ? null : coveredPart(answers, cut);
-          // A créneau gone by is judged whole, one under way on what is left of it.
-          const rest = { from: cut.to <= ahead ? cut.from : Math.max(cut.from, ahead), to: cut.to };
-          const onRest = spans.some((span) => span.from < rest.to && span.to > rest.from);
+          const { agent: inSlot, aiAlone } = agentOnSlot(agent, cut, spans, now);
           return {
             from: new Date(cut.from),
             to: new Date(cut.to),
             shifts: starting,
             held: over.length > 0,
             over,
-            agent:
-              part === null || agent === null || agent.mode === 'stop'
-                ? null
-                : {
-                    mode: agent.mode,
-                    full: coversAll(answers, cut),
-                    from: new Date(part.from),
-                    to: new Date(part.to),
-                  },
-            aiAlone: agent?.mode === 'auto' && rest.to > rest.from && !onRest && coversAll(answers, rest),
+            agent: inSlot,
+            aiAlone,
           };
         }),
       );
@@ -176,19 +194,25 @@ export function agentRowLabel(agent: CalendarAgent): string {
   return `IA ${mode} · ${hours}${days}`;
 }
 
-/** The words a créneau says to a screen reader, the agent included (« Kofi, 12 h – 18 h ; l’IA en automatique dès 14 h »). */
-export function cellAgentWords(
-  agent: AgentInSlot | null,
+/** The agent in a créneau, in words: « l’IA en automatique », « l’IA en copilote dès 9 h ». */
+export function agentWords(
+  agent: AgentInSlot,
   cell: Pick<CalendarCell, 'from' | 'to'>,
   zone: string,
 ): string {
-  if (agent === null) return '';
   const mode = MODE_WORD[agent.mode];
-  if (agent.full) return ` ; l’IA en ${mode}`;
+  if (agent.full) return `l’IA en ${mode}`;
   return agent.from.getTime() > cell.from.getTime()
-    ? ` ; l’IA en ${mode} dès ${clockAt(agent.from, zone)}`
-    : ` ; l’IA en ${mode} jusqu’à ${clockAt(agent.to, zone)}`;
+    ? `l’IA en ${mode} dès ${clockAt(agent.from, zone)}`
+    : `l’IA en ${mode} jusqu’à ${clockAt(agent.to, zone)}`;
 }
+
+/** The same, after what precedes it (« Kofi, 12 h – 18 h ; l’IA en automatique dès 14 h »), empty without him. */
+export const cellAgentWords = (
+  agent: AgentInSlot | null,
+  cell: Pick<CalendarCell, 'from' | 'to'>,
+  zone: string,
+): string => (agent === null ? '' : ` ; ${agentWords(agent, cell, zone)}`);
 
 /** Who a member is to the reader: « Toi » for themselves. */
 export const nameFor = (member: PlanningMember | undefined, me: string | null): string =>
@@ -205,6 +229,12 @@ export function monthWindow(month: string, zone: string): { days: string[]; from
   const from = zonedInstant(start, 0, zone);
   const end = zonedInstant(addDays(start, CALENDAR_MAX_DAYS), 0, zone);
   return { days, from, to: new Date(Math.min(end.getTime(), from.getTime() + CALENDAR_MAX_DAYS * DAY_MS)) };
+}
+
+/** The month itself, from its 1st to the next 1st at midnight in `zone`: what « sur novembre » sums (Extension on #431). */
+export function monthBounds(month: string, zone: string): { from: Date; to: Date } {
+  const first = `${month.slice(0, 7)}-01`;
+  return { from: zonedInstant(first, 0, zone), to: zonedInstant(`${addMonths(month, 1)}-01`, 0, zone) };
 }
 
 /** What one day of the month says per creator: one mark per créneau, in the member's colour, the agent's, or a gap. */
@@ -316,6 +346,7 @@ export function dayWords(
   day: string,
   me: string | null,
   now: Date,
+  fill = false,
 ): { said: string; mine: boolean } {
   const cells = rows.flatMap((row) => row.days.get(day) ?? []);
   const shifts = new Map(
@@ -335,7 +366,11 @@ export function dayWords(
         ? counted(shifts.size, 'ton shift', '# shifts, dont le tien')
         : counted(shifts.size, '1 shift', '# shifts'),
     alone === 0 ? null : counted(alone, 'l’IA seule sur 1 créneau', 'l’IA seule sur # créneaux'),
-    free === 0 ? null : counted(free, '1 créneau libre', '# créneaux libres'),
+    free === 0
+      ? null
+      : fill
+        ? counted(free, '1 créneau à pourvoir', '# créneaux à pourvoir')
+        : counted(free, '1 créneau libre', '# créneaux libres'),
   ]
     .filter((part) => part !== null)
     .join(', ');

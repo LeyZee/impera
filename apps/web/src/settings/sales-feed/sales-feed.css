@@ -311,6 +311,22 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-faint);
 }
+/* What the report says of the switch (CRM-03): a quiet line, green when it can carry it, amber when it cannot. */
+.sf-switch {
+  margin: 0;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sf-switch > .sv-dot {
+  flex: none;
+  transform: translateY(-1px);
+}
+.sf-switch[data-tone='low'] {
+  color: var(--nv-warning);
+}
 .sf-notes {
   margin: 0;
   padding-left: 18px;
