@@ -398,6 +398,7 @@ describe('reading the outbox', () => {
     expect(saleOf({ ...detected, platformFanId: 'fan-inventé', fanName: 'Inventé' })).toEqual({
       kind: 'sale',
       saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00.000Z'),
       currency: 'EUR',
       grossInclVatMinor: 4500,
       seller: { kind: 'member', memberId: '018f3e5c-0000-7000-8000-000000000001' },

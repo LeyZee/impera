@@ -66,7 +66,7 @@ Faits Telegram qui contraignent le choix :
    - `telegram_bots` : un bot, son jeton scellé, son identité Telegram, son état, son curseur `getUpdates`.
    - `telegram_chats` : un groupe où un bot se trouve, découvert, jamais saisi à la main.
    - `telegram_routes` : quel sujet va dans quel groupe, pour une créatrice ou pour toutes.
-   - `telegram_settings` : les réglages d'un sujet (montant minimum d'une vente, ventes de l'agent seulement, bilan du soir), ajoutée avec l'onglet Ventes (migration 0080, CRM-04 lot b) : une ligne par créatrice ou pour toutes, la sienne l'emporte ; sans ligne, toutes les ventes sonnent et le bilan du soir part.
+   - `telegram_settings` : les réglages d'un sujet (montant minimum d'une vente, en euros, une vente en dollars convertie au taux de son jour et qui sonne sans taux, ventes de l'agent seulement, bilan du soir), ajoutée avec l'onglet Ventes (migration 0080, CRM-04 lot b) : une ligne par créatrice ou pour toutes, la sienne l'emporte ; sans ligne, toutes les ventes sonnent et le bilan du soir part.
    - `telegram_deliveries` : un message à livrer dans un groupe, unique par (source, groupe).
    - `telegram_state` : une ligne, le curseur du scan et la version du routage.
 

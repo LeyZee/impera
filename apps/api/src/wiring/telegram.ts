@@ -6,9 +6,18 @@ import { defineTask } from '../jobs';
 import type { Logger } from '../logger';
 import type { AlertsModule } from '../modules/alerts';
 import { salesFeedTotals } from '../modules/connectors';
+import { latestRateOf } from '../modules/payroll';
 import { startTelegramModule, type TelegramModule } from '../modules/telegram';
 
 import type { Routes, Shared, TasksOf } from './shared';
+
+/** The agency's day (ADR 0023 § Paie, Europe/Paris until it has a setting), as `YYYY-MM-DD`. */
+const AGENCY_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Paris',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
 
 export interface WiredTelegram {
   /** Null without CREDENTIALS_ENCRYPTION_KEYS: a bot token is never kept unsealed (ADR 0020 §5). */
@@ -44,6 +53,14 @@ export async function wireTelegram(
           salesTotals: {
             totalsOf: (creatorId, day) =>
               withAdmin(adminDb, (tx) => salesFeedTotals.totalsOf(tx, { creatorId, from: day, to: day })),
+          },
+          // A dollar sale against the minimum in euros: the newest ECB rate of its day or before (ADR 0033), the day in
+          // the agency's zone, as the creator's screen and the Dashboard convert.
+          usdRate: {
+            onDayOf: async (occurredAt) => {
+              const day = AGENCY_DAY.format(occurredAt);
+              return (await withAdmin(adminDb, (tx) => latestRateOf(tx, 'USD', day)))?.rateMicros ?? null;
+            },
           },
         });
   if (module === null) logger.warn('Telegram notifications off: CREDENTIALS_ENCRYPTION_KEYS is not set');

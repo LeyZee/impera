@@ -303,7 +303,8 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.dispatch_polls': 1,
   'telegram.poll_updates': 1,
   'telegram.morning_digest': 1,
-  'telegram.evening_digest': 1,
+  // Its hour is 23 o'clock only: a failed run is retried within it, the key of her day keeps it once.
+  'telegram.evening_digest': 3,
   'telegram.purge': 1,
 } as const satisfies Record<JobName, number>;
 

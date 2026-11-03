@@ -1,4 +1,4 @@
-import type { CreatorId, TelegramChatId, TelegramTopic } from '@nirvana/contracts';
+import type { CreatorId, TelegramChatId, TelegramSaleSettings, TelegramTopic } from '@nirvana/contracts';
 
 import { classify, type AlertNameOf, type MemberNameOf } from '../domain/classify';
 import { chatsFor } from '../domain/coverage';
@@ -9,11 +9,12 @@ import type {
   CreatorRecord,
   DeliveriesStore,
   NewDelivery,
+  UsdRateReader,
 } from '../domain/ports';
 import { isSilentTopic, renderNotice, renderClosedBy, renderPlain } from '../domain/render';
 import { saleRings, saleSettingsFor } from '../domain/sales';
 import { SCAN_OVERLAP_MS } from '../domain/schedule';
-import type { Closure, Notice, ScannedEvent } from '../domain/signals';
+import type { Closure, Notice, ScannedEvent, Signal } from '../domain/signals';
 
 export interface ScanDeps {
   readonly bots: BotsStore;
@@ -25,6 +26,8 @@ export interface ScanDeps {
   readonly onUncovered: (event: ScannedEvent) => void;
   /** Her alerts' names (P4-01); without them, a message says « une alerte personnalisée ». */
   readonly alertNames?: AlertNames;
+  /** The rate of a dollar sale's day, to weigh it against the minimum in euros; without it, a dollar sale rings. */
+  readonly usdRate?: UsdRateReader;
 }
 
 const SCAN_LIMIT = 500;
@@ -59,12 +62,22 @@ export async function scanEvents(deps: ScanDeps): Promise<number> {
   const creatorById = new Map<CreatorId, CreatorRecord>(creators.map((creator) => [creator.id, creator]));
   const nameOf = alertNamer(deps.alertNames);
   const memberNameOf = memberNamer(deps.bots);
+  const usdRateOf = usdRater(deps.usdRate);
+  const saleRingsNow = async (settings: TelegramSaleSettings, sale: Signal & { kind: 'sale' }) =>
+    saleRings(
+      settings,
+      sale,
+      sale.currency !== 'EUR' && settings.minimumMinor > 0 ? await usdRateOf(sale.occurredAt) : null,
+    );
 
   let reached = cursor;
   for (const event of events) {
     const { signal } = event;
     // Under the minimum, or not the agent's when only his ring (CRM-04 lot b): read, and nothing sent.
-    if (signal.kind === 'sale' && !saleRings(saleSettingsFor(saleSettings, event.creatorId), signal)) {
+    if (
+      signal.kind === 'sale' &&
+      !(await saleRingsNow(saleSettingsFor(saleSettings, event.creatorId), signal))
+    ) {
       if (event.createdAt > reached) reached = event.createdAt;
       await deps.deliveries.applyScan({ deliveries: [], cursor: reached });
       continue;
@@ -203,4 +216,22 @@ async function closureDeliveries(
       } satisfies NewDelivery;
     }),
   );
+}
+
+/**
+ * The rate of a dollar sale's day, read once a day a scan and only for a dollar sale under a minimum; unreadable, it is
+ * `null` and the sale rings.
+ */
+function usdRater(reader: UsdRateReader | undefined): (occurredAt: Date) => Promise<number | null> {
+  const byDay = new Map<string, Promise<number | null>>();
+  return (occurredAt) => {
+    if (reader === undefined) return Promise.resolve(null);
+    const key = occurredAt.toISOString().slice(0, 13);
+    let rate = byDay.get(key);
+    if (rate === undefined) {
+      rate = reader.onDayOf(occurredAt).catch(() => null);
+      byDay.set(key, rate);
+    }
+    return rate;
+  };
 }

@@ -28,6 +28,8 @@ export function SalesSettings({
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [notice, setNotice] = useState<string | null>(null);
   const saving = useRef<Promise<void>>(Promise.resolve());
+  // Saves not yet answered: only the last one's answer is shown, so two quick changes never flicker back.
+  const pending = useRef(0);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -46,13 +48,16 @@ export function SalesSettings({
     (next: TelegramSaleSettingsEntry[]): void => {
       setNotice(null);
       setLoad({ kind: 'ready', entries: next });
+      pending.current += 1;
       saving.current = saving.current.then(async () => {
         try {
           const saved = await saveSaleSettings(next);
-          setLoad({ kind: 'ready', entries: saved.settings });
+          if (pending.current === 1) setLoad({ kind: 'ready', entries: saved.settings });
         } catch {
           setNotice('Le réglage n’a pas été enregistré. Réessaie dans un instant.');
-          await refresh();
+          if (pending.current === 1) await refresh();
+        } finally {
+          pending.current -= 1;
         }
       });
     },
@@ -187,7 +192,10 @@ function MinimumRow({
         <label htmlFor={id}>
           <b>Montant minimum</b>
         </label>
-        <small>Le prix payé par le fan, TTC, comme dans Reveal. Vide : toutes les ventes.</small>
+        <small>
+          Le prix payé par le fan, TTC, en euros. Une vente en dollars est convertie au taux du jour. Vide :
+          toutes les ventes.
+        </small>
         {parsed === null ? (
           <small className="tg-route__warn" role="alert">
             Écris un montant en euros, par exemple 20 ou 19,90.

@@ -153,6 +153,14 @@ export interface BotsStore {
  * One creator's sales totals of a day (CRM-04 lot b): `salesFeedTotals.totalsOf` of `connectors`, given by the
  * composition root. The day is the sale's in the platform's zone, the rule every reader of the totals shares.
  */
+/**
+ * The dollar rate of a sale (ADR 0033, `exchange_rates`): the newest of its day or before, the day read in the
+ * agency's zone, in euros per million dollars; `null` when there is none.
+ */
+export interface UsdRateReader {
+  onDayOf(occurredAt: Date): Promise<number | null>;
+}
+
 export interface SalesTotalsReader {
   totalsOf(creatorId: CreatorId, day: string): Promise<SalesTotals>;
 }

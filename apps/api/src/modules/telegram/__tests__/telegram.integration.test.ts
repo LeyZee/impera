@@ -52,6 +52,7 @@ describe('telegram module on Postgres', () => {
   /** Her day's sales totals, as `salesFeedTotals` gives them; the days asked, to check the digest's day. */
   let salesTotals: SalesTotals = { from: '', to: '', rows: [], refundsWithoutSale: 0 };
   const totalsAsked: string[] = [];
+  let usdRateMicros: number | null = null;
 
   function build(encryptionKeys = keys): {
     module: TelegramModule;
@@ -77,6 +78,7 @@ describe('telegram module on Postgres', () => {
             return Promise.resolve({ ...salesTotals, from: day, to: day });
           },
         },
+        usdRate: { onDayOf: () => Promise.resolve(usdRateMicros) },
       }),
       resealTokens: store.resealTokens,
     };
@@ -366,13 +368,13 @@ describe('telegram module on Postgres', () => {
     return memberId;
   }
 
-  const salePayload = (seller: object, grossInclVatMinor = 4500) => ({
+  const salePayload = (seller: object, grossInclVatMinor = 4500, currency = 'EUR') => ({
     saleId: newId(SalesLineIdSchema),
     platform: 'reveal',
     platformAccountId: newId(PlatformAccountIdSchema),
     saleType: 'ppv',
     occurredAt: new Date(sliceStart).toISOString(),
-    currency: 'EUR',
+    currency,
     grossInclVatMinor,
     netMinor: 3000,
     agencyMinor: 1500,
@@ -408,6 +410,25 @@ describe('telegram module on Postgres', () => {
     expect(text).toContain('💰 <b>Vente · Démo</b>');
     expect(text).not.toContain(sale.saleId);
     expect(text).not.toContain('30,00');
+  });
+
+  it('weighs a dollar sale against the minimum in euros at its day’s rate, and rings it with no rate (CRM-04)', async () => {
+    const chatId = await salesGroup();
+    await module.saveSaleSettings(
+      [{ creatorId: null, minimumMinor: 2000, agentOnly: false, eveningDigest: true }],
+      'owner-telegram',
+    );
+    usdRateMicros = null;
+    await publish('sale_detected', salePayload({ kind: 'agent' }, 1000, 'USD')); // no rate: rings
+    await module.jobs.scan();
+    usdRateMicros = 920_000;
+    await publish('sale_detected', salePayload({ kind: 'agent' }, 2000, 'USD')); // 18,40 €: under
+    await publish('sale_detected', salePayload({ kind: 'agent' }, 2200, 'USD')); // 20,24 €: rings
+    await module.jobs.scan();
+    expect((await deliveryRows(chatId)).map((row) => row.summary)).toEqual([
+      'PPV · 10,00\u00a0$US · vendue par l’agent',
+      'PPV · 22,00\u00a0$US · vendue par l’agent',
+    ]);
   });
 
   it('rings only what the sales settings let through: her minimum, the agent’s only (CRM-04)', async () => {

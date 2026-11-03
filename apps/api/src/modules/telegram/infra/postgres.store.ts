@@ -448,6 +448,8 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
     async replaceSaleSettings(entries, userId) {
       await admin(async (tx) => {
         const table = schema.telegramSettings;
+        // Two saves at once queue here: the second replaces the first whole, never a 500 on the unique key.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext('telegram_settings.sale'))`);
         await tx.delete(table).where(eq(table.topic, 'sale'));
         if (entries.length > 0) {
           await tx.insert(table).values(

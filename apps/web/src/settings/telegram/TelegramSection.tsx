@@ -801,7 +801,7 @@ function SalesTab({ scope, onScope, ...routing }: ScopedProps): JSX.Element {
         heading="Sans son, sans le fan"
         points={[
           'Le type de vente, le prix payé par le fan et qui a vendu. Jamais le pseudo du fan.',
-          'Une vente est annoncée dès que Reveal l’enregistre, une seule fois.',
+          'Une vente est annoncée dès que la plateforme l’enregistre, une seule fois.',
           'Les ventes arrivent sans son : elles ne réveillent personne la nuit.',
           'Le bilan du soir donne les chiffres du jour à 23 h.',
         ]}

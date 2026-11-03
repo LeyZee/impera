@@ -29,6 +29,7 @@ import type {
   DeliveriesStore,
   NotificationChannel,
   SalesTotalsReader,
+  UsdRateReader,
 } from './domain/ports';
 import type { ScannedEvent } from './domain/signals';
 import { createPostgresTelegramStore, type ResealReport } from './infra/postgres.store';
@@ -52,6 +53,8 @@ export interface TelegramDeps {
   readonly alertNames?: AlertNames;
   /** Her day's sales totals (`salesFeedTotals` of `connectors`), for the evening digest; without them, no digest. */
   readonly salesTotals?: SalesTotalsReader;
+  /** Pay's dollar rate (`latestRateOf` of `payroll`), for the minimum price of a dollar sale. */
+  readonly usdRate?: UsdRateReader;
 }
 
 /** The job handlers, one per `telegram.*` job (TELEGRAM_JOB_PAYLOADS); the worker wires them. */
@@ -101,6 +104,7 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
           webOrigin: deps.webOrigin,
           onUncovered: deps.onUncovered ?? (() => undefined),
           ...(deps.alertNames !== undefined && { alertNames: deps.alertNames }),
+          ...(deps.usdRate !== undefined && { usdRate: deps.usdRate }),
         }),
       flushChat: (chatId) => flushChat(base, chatId),
       dispatchPolls: () => dispatchPolls(base),
@@ -127,6 +131,7 @@ export interface TelegramStartOptions {
   readonly onUnreadableTokens: (bots: readonly string[]) => void;
   readonly alertNames: AlertNames;
   readonly salesTotals: SalesTotalsReader;
+  readonly usdRate: UsdRateReader;
 }
 
 /** Builds the module on Postgres and the Telegram Bot API, and re-seals the tokens of a past rotation. */
@@ -144,6 +149,7 @@ export async function startTelegramModule(options: TelegramStartOptions): Promis
     resealTokens: store.resealTokens,
     alertNames: options.alertNames,
     salesTotals: options.salesTotals,
+    usdRate: options.usdRate,
   });
   const report = await module.start();
   if (report.unreadable.length > 0) options.onUnreadableTokens(report.unreadable);

@@ -30,10 +30,33 @@ export function saleSettingsFor(
     : { minimumMinor: chosen.minimumMinor, agentOnly: chosen.agentOnly, eveningDigest: chosen.eveningDigest };
 }
 
-/** A fresh sale rings at or above the minimum price (VAT included), and only the agent's when the owner said so. */
-export function saleRings(settings: TelegramSaleSettings, signal: Signal & { kind: 'sale' }): boolean {
+const RATE_SCALE = BigInt(1_000_000);
+
+/**
+ * A dollar price in euro cents (`rateMicros` euros per million dollars), as pay and the Dashboard convert: `usdMinor ×
+ * rateMicros ÷ 1 000 000`, a half cent rounded away from zero, on integers.
+ */
+function usdToEurMinor(usdMinor: number, rateMicros: number): bigint {
+  const product = BigInt(usdMinor) * BigInt(rateMicros);
+  const quotient = product / RATE_SCALE;
+  return BigInt(2) * (product % RATE_SCALE) >= RATE_SCALE ? quotient + BigInt(1) : quotient;
+}
+
+/**
+ * A fresh sale rings at or above the minimum price (VAT included, in euros), and only the agent's when the owner said
+ * so. A dollar sale is weighed at the rate of its day (`usdRateMicros`); with no rate, it rings: the minimum filters
+ * noise, it never hides a sale it cannot weigh. The message keeps the sale's own currency.
+ */
+export function saleRings(
+  settings: TelegramSaleSettings,
+  signal: Signal & { kind: 'sale' },
+  usdRateMicros: number | null,
+): boolean {
   if (settings.agentOnly && signal.seller.kind !== 'agent') return false;
-  return signal.grossInclVatMinor >= settings.minimumMinor;
+  if (settings.minimumMinor === 0) return true;
+  if (signal.currency === 'EUR') return signal.grossInclVatMinor >= settings.minimumMinor;
+  if (usdRateMicros === null) return true;
+  return usdToEurMinor(signal.grossInclVatMinor, usdRateMicros) >= BigInt(settings.minimumMinor);
 }
 
 const AMOUNT: Readonly<Record<Currency, Intl.NumberFormat>> = {

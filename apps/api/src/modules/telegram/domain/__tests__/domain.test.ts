@@ -289,6 +289,7 @@ describe('classification (ADR 0020 §2)', () => {
     const sale = {
       kind: 'sale',
       saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00Z'),
       currency: 'EUR',
       grossInclVatMinor: 4500,
       seller: { kind: 'member', memberId },
@@ -557,15 +558,36 @@ describe('sales topic (CRM-04 lot b)', () => {
     const sale = {
       kind: 'sale',
       saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00Z'),
       currency: 'EUR',
       grossInclVatMinor: 2000,
       seller: { kind: 'member', memberId },
     } as const;
     const settings = { minimumMinor: 2000, agentOnly: false, eveningDigest: true };
-    expect(saleRings(settings, sale)).toBe(true);
-    expect(saleRings(settings, { ...sale, grossInclVatMinor: 1999 })).toBe(false);
-    expect(saleRings({ ...settings, agentOnly: true }, sale)).toBe(false);
-    expect(saleRings({ ...settings, agentOnly: true }, { ...sale, seller: { kind: 'agent' } })).toBe(true);
+    expect(saleRings(settings, sale, null)).toBe(true);
+    expect(saleRings(settings, { ...sale, grossInclVatMinor: 1999 }, null)).toBe(false);
+    expect(saleRings({ ...settings, agentOnly: true }, sale, null)).toBe(false);
+    expect(saleRings({ ...settings, agentOnly: true }, { ...sale, seller: { kind: 'agent' } }, null)).toBe(
+      true,
+    );
+  });
+
+  it('weighs a dollar sale in euros at pay’s rate, and rings it while pay has no rate', () => {
+    const sale = {
+      kind: 'sale',
+      saleType: 'ppv',
+      occurredAt: new Date('2026-11-03T20:00:00Z'),
+      currency: 'USD',
+      grossInclVatMinor: 2000,
+      seller: { kind: 'member', memberId },
+    } as const;
+    const settings = { minimumMinor: 2000, agentOnly: false, eveningDigest: true };
+    // 20,00 $ at 0,92 € the dollar: 18,40 €, under a minimum of 20 €.
+    expect(saleRings(settings, sale, 920_000)).toBe(false);
+    // 22,00 $ at 0,92: 20,24 €.
+    expect(saleRings(settings, { ...sale, grossInclVatMinor: 2200 }, 920_000)).toBe(true);
+    expect(saleRings(settings, sale, null)).toBe(true);
+    expect(saleRings({ ...settings, minimumMinor: 0 }, sale, 920_000)).toBe(true);
   });
 
   it('finds her 23 o’clock hour and keys the digest by her day', () => {
