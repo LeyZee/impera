@@ -7,7 +7,7 @@ import { DayView } from './DayView';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
 import { WeekList } from './WeekList';
-import { tickTask, useAgenda, useFlushOnReconnect, useWithPending } from './api';
+import { tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
 import './agenda.css';
 
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
@@ -55,19 +55,20 @@ export function AgendaPage({
   const read = useAgenda(monday, addDays(monday, 6));
   const { agenda, waiting } = useWithPending(read.data);
 
-  const onRefused = useCallback((count: number) => {
-    setNotice(
-      count === 1
-        ? 'Une coche faite hors ligne n’a pas pu compter : la tâche a changé, ou elle date de plus de 48 heures.'
-        : `${String(count)} coches faites hors ligne n’ont pas pu compter : les tâches ont changé, ou elles datent de plus de 48 heures.`,
-    );
+  const onSent = useCallback(({ refused, expired }: Flushed) => {
+    if (expired)
+      setNotice('Ta session a expiré : reconnecte-toi, et tes coches faites hors ligne partiront ensuite.');
+    else if (refused > 0)
+      setNotice(
+        refused === 1
+          ? 'Une coche faite hors ligne n’a pas pu compter : la tâche a changé, ou elle date de plus de 48 heures.'
+          : `${String(refused)} coches faites hors ligne n’ont pas pu compter : les tâches ont changé, ou elles datent de plus de 48 heures.`,
+      );
   }, []);
-  useFlushOnReconnect(onRefused);
+  useFlushOnReconnect(onSent);
 
   const tick = (task: CreatorTask, on: boolean, onDayOf: string): void => {
-    void tickTask(client, task, onDayOf, on).then(({ refused }) => {
-      if (refused > 0) onRefused(refused);
-    });
+    void tickTask(client, task, onDayOf, on).then(onSent);
   };
 
   const herToday = agenda?.today ?? today;

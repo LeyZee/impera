@@ -9,7 +9,7 @@
   --ag-c: #f07a94;
 }
 .ag-page [data-cat='live'] {
-  --ag-c: #f5a15f;
+  --ag-c: #e6c65c;
 }
 .ag-page [data-cat='post'] {
   --ag-c: #a395ff;
@@ -32,7 +32,7 @@
   --ag-c: #c8385a;
 }
 :root[data-theme='light'] .ag-page [data-cat='live'] {
-  --ag-c: #b85c12;
+  --ag-c: #8a6d00;
 }
 :root[data-theme='light'] .ag-page [data-cat='post'] {
   --ag-c: #6a55e0;
@@ -468,6 +468,8 @@
   color: var(--nv-ink-muted);
 }
 .ag-ess {
+  /* An atomic inline: the line through a task done strikes its title, not this pill. */
+  display: inline-block;
   margin-left: 8px;
   padding: 1px 7px;
   border-radius: var(--nv-radius-full);
@@ -508,8 +510,13 @@
   font-size: var(--nv-text-caption);
   color: var(--nv-ink-faint);
 }
+/* The past in muted ink at full opacity: still read at 4.5:1, never taken for a disabled control. */
 .ag-row[data-past] .ag-slot {
-  opacity: 0.55;
+  background: transparent;
+}
+.ag-row[data-past] .ag-slot .ag-task__body b,
+.ag-row[data-past] .ag-time b {
+  color: var(--nv-ink-muted);
 }
 .ag-row[data-live] .ag-slot {
   background: color-mix(in srgb, var(--ag-c) 10%, var(--nv-plate));
@@ -651,8 +658,9 @@
   padding: var(--nv-space-3) 0;
   border-top: 1px solid var(--nv-hairline);
 }
-.ag-wday[data-past] {
-  opacity: 0.7;
+.ag-wday[data-past] .ag-wday__date b,
+.ag-wday[data-past] .ag-witem b {
+  color: var(--nv-ink-muted);
 }
 .ag-wday__date {
   grid-area: date;

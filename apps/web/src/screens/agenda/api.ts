@@ -13,6 +13,7 @@ import {
 } from '@impera/contracts';
 import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
+import { z } from 'zod';
 
 import {
   dropGestures,
@@ -96,53 +97,105 @@ export function useWithPending(agenda: CreatorAgenda | undefined): {
   };
 }
 
-/** What a send of her gestures ended with: how many the server would not take (a task removed, a tick too late). */
+/**
+ * What a send of her gestures ended with: how many the server will never take (a task removed, a tick too late), and
+ * whether her session had expired (her gestures then wait for her to sign in again: nothing is lost).
+ */
 export interface Flushed {
   readonly refused: number;
+  readonly expired: boolean;
+}
+
+/** A refusal of the gesture itself, never to retry: anything else (session, rate limit, server, network) is retried. */
+const REFUSALS = new Set([400, 404, 409, 422]);
+
+/** The tasks a refusal of `POST /ticks` names (`details.taskIds`): the batch is refused as a whole, they alone are why. */
+async function namedTasks(response: Response): Promise<ReadonlySet<string> | null> {
+  const refusal = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  if (!refusal.success) return null;
+  const ids = z.array(z.string()).safeParse(refusal.data.error.details['taskIds']);
+  return ids.success && ids.data.length > 0 ? new Set(ids.data) : null;
+}
+
+/** The longest chain of refusals a batch meets: a removed task, then a day off, then a tick too late. */
+const TICK_ATTEMPTS = 4;
+
+async function sendGestures(): Promise<Flushed & { readonly answered: boolean }> {
+  const gestures = pendingGestures();
+  if (gestures.length === 0) return { refused: 0, expired: false, answered: false };
+  let refused = 0;
+  let expired = false;
+  let answered = false;
+  const done: PendingGesture[] = [];
+  const note = (status: number): void => {
+    answered = true;
+    if (status === 401) expired = true;
+  };
+  try {
+    let ticks = gestures.filter((gesture) => gesture.kind === 'tick');
+    for (let attempt = 0; ticks.length > 0 && attempt < TICK_ATTEMPTS; attempt += 1) {
+      const response = await fetch(`${BASE}/ticks`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ ticks: ticks.map((gesture) => gesture.tick) }),
+      });
+      note(response.status);
+      if (response.ok) {
+        done.push(...ticks);
+        break;
+      }
+      if (!REFUSALS.has(response.status)) break;
+      // The batch is refused as a whole: only the ticks it names are forgotten, the others go again.
+      const named = await namedTasks(response);
+      const bad = named === null ? ticks : ticks.filter((gesture) => named.has(gesture.tick.taskId));
+      done.push(...bad);
+      refused += bad.length;
+      ticks = ticks.filter((gesture) => !bad.includes(gesture));
+    }
+    for (const gesture of gestures) {
+      if (gesture.kind !== 'untick') continue;
+      const response = await fetch(`${BASE}/tasks/${gesture.taskId}/ticks/${gesture.day}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      note(response.status);
+      // 404: the tick or the task is gone already, which is what she wanted.
+      if (response.ok || response.status === 404) done.push(gesture);
+      else if (REFUSALS.has(response.status)) {
+        done.push(gesture);
+        refused += 1;
+      }
+    }
+  } finally {
+    // What got an answer is settled even when the network drops halfway.
+    dropGestures(done);
+  }
+  return { refused, expired, answered };
 }
 
 let flushing: Promise<Flushed> | null = null;
+/** A gesture kept while a send was running: it was not in the list that send read, so one more send follows. */
+let keptDuringSend = false;
+/** Read through a call: `tickTask` sets it between the awaits of a send. */
+const keptMeanwhile = (): boolean => keptDuringSend;
 
-async function sendGestures(): Promise<Flushed> {
-  const gestures = pendingGestures();
-  if (gestures.length === 0) return { refused: 0 };
+async function sendAll(): Promise<Flushed> {
   let refused = 0;
-  const done: PendingGesture[] = [];
-  const ticks = gestures.filter((gesture) => gesture.kind === 'tick');
-  if (ticks.length > 0) {
-    const response = await fetch(`${BASE}/ticks`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ ticks: ticks.map((gesture) => gesture.tick) }),
-    });
-    // A 4xx will never pass: forgotten and said. A 5xx is tried again later.
-    if (response.ok) done.push(...ticks);
-    else if (response.status < 500) {
-      done.push(...ticks);
-      refused += ticks.length;
-    }
+  let expired = false;
+  for (;;) {
+    keptDuringSend = false;
+    const result = await sendGestures().catch(() => ({ refused: 0, expired: false, answered: false }));
+    refused += result.refused;
+    expired ||= result.expired;
+    // Again only when the server answered (online) and a tap came meanwhile; offline, it waits for `online`.
+    if (!result.answered || result.expired || !keptMeanwhile()) return { refused, expired };
   }
-  for (const gesture of gestures) {
-    if (gesture.kind !== 'untick') continue;
-    const response = await fetch(`${BASE}/tasks/${gesture.taskId}/ticks/${gesture.day}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-    if (response.ok || response.status === 404) done.push(gesture);
-    else if (response.status < 500) {
-      done.push(gesture);
-      refused += 1;
-    }
-  }
-  dropGestures(done);
-  return { refused };
 }
 
 /** Sends what her phone kept, once at a time; offline, it all stays for the next try. */
 export function flushGestures(client: QueryClient): Promise<Flushed> {
-  flushing ??= sendGestures()
-    .catch(() => ({ refused: 0 }))
+  flushing ??= sendAll()
     .then(async (result) => {
       changed();
       await client.invalidateQueries({ queryKey: AGENDA_KEY });
@@ -161,25 +214,24 @@ export function tickTask(client: QueryClient, task: CreatorTask, day: string, on
       ? { kind: 'tick', tick: { taskId: task.id, day, doneAt: new Date().toISOString() } }
       : { kind: 'untick', taskId: task.id, day },
   );
+  if (flushing !== null) keptDuringSend = true;
   changed();
   return flushGestures(client);
 }
 
 /** Sends her kept gestures when the screen opens and each time the network comes back. */
-export function useFlushOnReconnect(onRefused: (count: number) => void): void {
+export function useFlushOnReconnect(onSent: (flushed: Flushed) => void): void {
   const client = useQueryClient();
   useEffect(() => {
     const flush = (): void => {
-      void flushGestures(client).then(({ refused }) => {
-        if (refused > 0) onRefused(refused);
-      });
+      void flushGestures(client).then(onSent);
     };
     flush();
     addEventListener('online', flush);
     return () => {
       removeEventListener('online', flush);
     };
-  }, [client, onRefused]);
+  }, [client, onSent]);
 }
 
 /* ---- What needs the network ---- */
