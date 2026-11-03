@@ -467,12 +467,13 @@ export function classify(
             text: 'Rendu à l’agent',
             userId: signal.userId,
           };
+    // The cap reached stops every generation until midnight: red (Charles, 03/11/2026); the 80 % warning stays amber.
     case 'budget':
       return {
         kind: 'notice',
-        topic: 'important',
+        topic: signal.threshold === 'reached' ? 'urgent' : 'important',
         threadKey: null,
-        title: 'Important',
+        title: signal.threshold === 'reached' ? 'URGENT' : 'Important',
         body:
           signal.threshold === 'reached'
             ? `Plafond IA atteint (${euros(signal.capMinor)}) : plus de génération jusqu’à minuit, les chatteurs reprennent.`

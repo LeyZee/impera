@@ -126,12 +126,13 @@ describe('classification (ADR 0020 §2)', () => {
     expect(classify({ kind: 'release', conversationId: null, userId: 'u1' })).toBeNull();
   });
 
-  it('says the budget alert and the cap reached', () => {
+  it('says the budget alert in amber and the cap reached in red', () => {
     expect(classify({ kind: 'budget', threshold: 'alert', spentMinor: 1600, capMinor: 2000 })).toMatchObject({
       topic: 'important',
       body: 'Plafond IA : 16 € sur 20 € aujourd’hui.',
     });
     const reached = classify({ kind: 'budget', threshold: 'reached', spentMinor: 2000, capMinor: 2000 });
+    expect(reached).toMatchObject({ topic: 'urgent', title: 'URGENT' });
     expect(reached?.kind === 'notice' ? reached.body : '').toContain('Plafond IA atteint (20 €)');
   });
 
