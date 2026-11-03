@@ -9,7 +9,7 @@ import { screenLabel, type ScreenPath } from '@/shell/nav';
  */
 export function MeNav({ manager }: { manager: boolean }): JSX.Element {
   const screens: readonly ScreenPath[] = manager
-    ? ['/moi/dossier', '/moi/factures', '/moi/securite']
-    : ['/moi/dossier', '/moi/securite'];
+    ? ['/moi/dossier', '/moi/factures', '/moi/agenda', '/moi/securite']
+    : ['/moi/dossier', '/moi/agenda', '/moi/securite'];
   return <SubNav label="Moi" items={screens.map((to) => ({ to, label: screenLabel(to) }))} />;
 }

@@ -15,6 +15,7 @@ import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
+import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
@@ -478,6 +479,15 @@ const meInvoices = createRoute({
   },
 });
 
+const meCalendar = createRoute({
+  getParentRoute: () => me,
+  path: '/agenda',
+  component: function MyCalendarLink() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyCalendarLinkPage user={user} />;
+  },
+});
+
 const meSecurity = createRoute({
   getParentRoute: () => me,
   path: '/securite',
@@ -667,7 +677,7 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, meFile, meInvoices, meSecurity]),
+  me.addChildren([meIndex, meFile, meInvoices, meCalendar, meSecurity]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,
