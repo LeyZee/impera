@@ -1,5 +1,5 @@
 import { CalendarDaySchema, CreatorAgencyRateIdSchema, CreatorIdSchema } from '@nirvana/contracts';
-import { and, eq, schema, SNAPSHOT_READ, withTenantMember, type Database } from '@nirvana/db';
+import { and, eq, schema, SNAPSHOT_READ, sql, withTenantMember, type Database } from '@nirvana/db';
 import { z } from 'zod';
 
 import { assertRateStart } from '../domain/agency-rates';
@@ -62,6 +62,10 @@ export function createDrizzleAgencyRatesStore(db: Database): AgencyRatesStore {
     create: (actor, creatorId, rate, now) =>
       withTenantMember(db, creatorId, actor.userId, async (tx, scope) => {
         if (scope !== 'owner') throw new AgencyRateForbidden();
+        // Whether this one is her first is read under her lock: two sent at once never both pass as the first (Bilan).
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`scheduling.agency_rate:${creatorId}`}, 0))`,
+        );
         const [existing] = await tx
           .select(rateColumns)
           .from(creatorAgencyRates)

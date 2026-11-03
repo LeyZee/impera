@@ -8,7 +8,7 @@ import {
   TeamMemberSchema,
   type CreatorId,
 } from '@nirvana/contracts';
-import { eq, schema } from '@nirvana/db';
+import { eq, schema, sql } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -19,6 +19,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { lockWaits } from './support/lock-waits';
 import { parisDay } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
@@ -34,6 +35,7 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
   let test: TestDb;
   let app: App;
   let server: Server;
+  let ownerId: string;
   let owner: string;
   let creator: string;
   let manager: string;
@@ -71,7 +73,7 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
       routes: app.routes,
       readiness: app.readiness,
     });
-    await createOwner(app.auth, app.db.db, OWNER);
+    ({ userId: ownerId } = await createOwner(app.auth, app.db.db, OWNER));
     anna = (await app.modules.persona.creators.create({ displayName: 'Anna' })).id;
     ines = (await app.modules.persona.creators.create({ displayName: 'Inès' })).id;
     const { userId: creatorUserId } = await createOwner(app.auth, app.db.db, CREATOR);
@@ -161,6 +163,44 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
       [parisDay(0), 3500],
     ]);
     expect(read.current?.agencyBps).toBe(3500);
+  });
+
+  it('reads whether it is her first under her lock: two sent at once never both pass as the first', async () => {
+    const cleo = (await app.modules.persona.creators.create({ displayName: 'Cléo' })).id;
+    // Another percentage of hers, for tomorrow, written while this one waits: the key the store locks on.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const meanwhile = test.admin.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`scheduling.agency_rate:${cleo}`}, 0))`,
+      );
+      locked();
+      await held;
+      await tx.insert(schema.creatorAgencyRates).values({
+        id: newId(CreatorAgencyRateIdSchema),
+        creatorId: cleo,
+        fromDay: parisDay(1),
+        agencyBps: 3000,
+        createdBy: ownerId,
+      });
+    });
+    await ready;
+    const sending = add(cleo, rateBody(parisDay(0)));
+    for (let tries = 0; (await lockWaits(test.admin.db)) < 1; tries += 1) {
+      if (tries > 250) throw new Error('nobody waited for the lock');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    release();
+    await meanwhile;
+    const sent = await sending;
+    expect([sent.statusCode, codeOf(sent)]).toEqual([400, 'agency_rate_day_invalid']);
+    expect((await list(cleo)).rates.map((one) => one.fromDay)).toEqual([parisDay(1)]);
   });
 
   it('is the owner’s alone: neither a manager nor her own account reads or adds it', async () => {
