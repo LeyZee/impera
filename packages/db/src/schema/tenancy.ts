@@ -13,7 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
+import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
@@ -72,6 +72,7 @@ export const platformAccounts = pgTable(
     unique('platform_accounts_id_creator_unique').on(t.id, t.creatorId),
     index('platform_accounts_creator_idx').on(t.creatorId),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );
 

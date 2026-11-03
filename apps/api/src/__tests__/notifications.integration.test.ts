@@ -1,6 +1,8 @@
 import { createDecipheriv, createECDH, createHmac, randomBytes } from 'node:crypto';
 
 import {
+  CreatorIdSchema,
+  newId,
   NotificationPreferencesSchema,
   PushPublicKeySchema,
   PushTestResultSchema,
@@ -91,7 +93,15 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
     });
     await createOwner(app.auth, app.db.db, OWNER);
     ({ userId: creatorId } = await createOwner(app.auth, app.db.db, CREATOR));
-    await test.admin.db.update(schema.user).set({ role: 'creator' }).where(eq(schema.user.id, creatorId));
+    // A creator's account opens exactly one creator (CR-02, user_creator_link_check).
+    const anna = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id: anna, nameKey: anna, displayName: 'Créatrice Anna', timezone: 'Europe/Paris' });
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'creator', creatorIds: [anna] })
+      .where(eq(schema.user.id, creatorId));
     owner = { cookie: await signIn(server, OWNER.email, OWNER.password), origin: DASHBOARD_ORIGIN };
     creator = { cookie: await signIn(server, CREATOR.email, CREATOR.password), origin: DASHBOARD_ORIGIN };
   });

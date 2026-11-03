@@ -12,7 +12,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
+import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { messages } from './conversations';
 import { fans } from './fans';
 import { creators } from './tenancy';
@@ -49,6 +49,7 @@ export const fanFacts = pgTable(
       .on(t.fanId)
       .where(sql`${t.supersededBy} is null`),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );
 
@@ -67,5 +68,9 @@ export const fanSummaries = pgTable(
     basedOnMessageId: uuid('based_on_message_id').references((): AnyPgColumn => messages.id),
     createdAt: createdAt(),
   },
-  (t) => [unique('fan_summaries_fan_version_unique').on(t.fanId, t.version), tenantPolicy(t.creatorId)],
+  (t) => [
+    unique('fan_summaries_fan_version_unique').on(t.fanId, t.version),
+    tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
+  ],
 );

@@ -29,7 +29,11 @@ export const user = pgTable(
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
   },
-  (t) => [check('user_role_check', sql`${t.role} in ('owner', 'operator', 'creator')`)],
+  (t) => [
+    check('user_role_check', sql`${t.role} in ('owner', 'operator', 'creator')`),
+    // A creator's account opens exactly one creator (CR-02): `withCreatorAccount` reads it, never the caller.
+    check('user_creator_link_check', sql`${t.role} <> 'creator' or cardinality(${t.creatorIds}) = 1`),
+  ],
 );
 
 export const session = pgTable('session', {
