@@ -10,6 +10,7 @@ import {
   monthMarks,
   monthBounds,
   monthWindow,
+  slotLinesOf,
 } from './calendar';
 import { zonedInstant } from './time';
 
@@ -135,6 +136,19 @@ describe('calendarRows', () => {
     const cells = cellsOf(calendarOf(), at(0, '2027-03-20'), day);
     const hours = cells.map((cell) => (cell.to.getTime() - cell.from.getTime()) / 3_600_000);
     expect(hours).toEqual([5, 6, 6, 6]);
+  });
+});
+
+describe('slotLinesOf', () => {
+  it('takes the most créneaux of the week, a version adding one mid-week getting its line (ADR 0049 § 1)', () => {
+    const three = [0, 1, 2];
+    const four = [0, 1, 2, 3];
+    const row = new Map([
+      ['2026-10-28', three],
+      ['2026-10-29', four],
+    ]);
+    expect(slotLinesOf([null, row, new Map([['2026-10-28', three]])])).toBe(4);
+    expect(slotLinesOf([null])).toBe(0);
   });
 });
 

@@ -30,6 +30,7 @@ import {
   monthLabel,
   monthBounds,
   monthWindow,
+  slotLinesOf,
   type AgentInSlot,
   type CalendarSearch,
 } from '@/scheduling/calendar';
@@ -182,11 +183,14 @@ export function PlanningPage({
   const month = view.mois ?? thisMonth;
   const byMonth = view.affichage === 'mois';
   const window = agency === null || !byMonth ? null : monthWindow(month, agency);
-  // The week begins at Monday's first créneau, in the version in force then.
-  const startMinute =
+  // The week begins at Monday's first créneau, in the version in force then, and ends at the next Monday's, which a
+  // version taking effect in between may move (ADR 0049 § 1).
+  const firstMinuteOn = (day: string): number =>
     data === undefined || agency === null
       ? 0
-      : (slotVersionAt(data.settings.versions, zonedInstant(monday, 0, agency)).slots[0]?.startMinute ?? 0);
+      : (slotVersionAt(data.settings.versions, zonedInstant(day, 0, agency)).slots[0]?.startMinute ?? 0);
+  const startMinute = firstMinuteOn(monday);
+  const endMinute = firstMinuteOn(addDays(monday, 7));
   const calendar = useCalendar(
     agency === null
       ? null
@@ -196,7 +200,7 @@ export function PlanningPage({
             // The week on the agency's créneaux, as its grid: Sunday's last one whole, the one before Monday's first
             // left to the week before (Équipe on #431).
             from: zonedInstant(monday, startMinute, agency).toISOString(),
-            to: zonedInstant(addDays(monday, 7), startMinute, agency).toISOString(),
+            to: zonedInstant(addDays(monday, 7), endMinute, agency).toISOString(),
           },
   );
   // The panels under the month sum the month itself, not the six weeks its table shows (Extension on #431).
@@ -851,7 +855,7 @@ function Grid({
       ),
     0,
   );
-  const slotCount = slotted.find((cells) => cells !== null)?.get(days[0] ?? today)?.length ?? 0;
+  const slotCount = slotLinesOf(slotted);
   const marked = {
     repeat: week.some((shift) => shift.templateId !== null),
     incident: week.some((shift) => incidents.has(shift.id)),
@@ -1042,7 +1046,7 @@ function Cell({
             const hours = rangeAt(slot.from.toISOString(), slot.to.toISOString(), zone);
             return (
               <div
-                key={slot.slot.startMinute}
+                key={slot.from.getTime()}
                 className="sc-slot cal-slot"
                 data-ai={agent === null || alone ? undefined : agent.full ? 'full' : 'part'}
               >

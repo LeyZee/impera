@@ -109,6 +109,16 @@ export function agentOnSlot(
 }
 
 /**
+ * The lines a week cut into créneaux takes: the most créneaux any day of any row has, so that a version which adds one
+ * mid-week (ADR 0049 § 1) gets its line from the first day, the subgrid adding none.
+ */
+export function slotLinesOf(rows: Iterable<ReadonlyMap<string, readonly unknown[]> | null>): number {
+  let lines = 0;
+  for (const days of rows) for (const cells of days?.values() ?? []) lines = Math.max(lines, cells.length);
+  return lines;
+}
+
+/**
  * Each creator's days cut into the agency's créneaux (`settings`), from `days` (calendar days in the agency's zone).
  * A créneau ends where the next starts, in wall-clock time: the night of a change of time has one an hour longer or
  * shorter. `now` decides what is left of a créneau under way.

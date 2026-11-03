@@ -272,6 +272,13 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
         parisInstant(parisDay(offset + 3), 0),
       );
       expect(after.settings.versions.map((version) => version.slots.length)).toEqual([3]);
+      // The settings cover the day before the window, as its shifts do (Équipe on #442).
+      const noon = await planning(
+        owner,
+        parisInstant(parisDay(offset), 12 * 60),
+        parisInstant(parisDay(offset + 2), 0),
+      );
+      expect(noon.settings.versions.map((version) => version.id)).toEqual([null, versionId]);
     } finally {
       await test.admin.db
         .delete(schema.schedulingSlotVersions)

@@ -93,13 +93,13 @@ export function createSchedulingService(
       const from = new Date(query.from);
       const to = new Date(query.to);
       assertPlanningRange(from, to);
+      // A day on either side: a shift begun the day before stands in the way, and the grid cuts the days around the
+      // window too (Équipe on #442).
+      const around = { from: addMinutes(from, -24 * 60), to: addMinutes(to, 24 * 60) };
       // The créneaux the grid cuts the window with, day by day: the version in force at its start, then those after.
-      const settings = await store.settings(actor, { from, to });
+      const settings = await store.settings(actor, around);
       // Every creator is read even when one is asked: a member busy on another creator stands in the way too.
-      const read = await store.read(actor, await everyCreator(), {
-        from: addMinutes(from, -24 * 60),
-        to: addMinutes(to, 24 * 60),
-      });
+      const read = await store.read(actor, await everyCreator(), around);
       const asked = (creatorId: string) => query.creatorId === undefined || creatorId === query.creatorId;
       const inRange = (shift: StoredShift) =>
         shift.startsAt.getTime() < to.getTime() && from.getTime() < shift.endsAt.getTime();

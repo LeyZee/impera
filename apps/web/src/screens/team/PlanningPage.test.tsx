@@ -1151,6 +1151,26 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('gives the week the lines of its most créneaux when a version adds one mid-week, the + under them', async () => {
+    // Three créneaux of 8 h until Thursday 29, then four of 6 h (ADR 0049 § 1): every day takes four lines.
+    const three = settingsOf({ length: 480 });
+    const four = settingsOf().versions[0];
+    if (four === undefined) throw new Error('no version');
+    const settings = {
+      ...three,
+      versions: [...three.versions, { ...four, id: id(51), effectiveAt: '2026-10-28T23:00:00.000Z' }],
+    };
+    const base = planning();
+    if (typeof base !== 'object' || base === null) throw new Error('no planning');
+    serve({ planning: { ...base, settings } });
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
+    expect(row.style.getPropertyValue('--sc-slots')).toBe('4');
+    const cells = within(row).getAllByRole('cell');
+    expect(cells[2]?.querySelectorAll('.sc-slot')).toHaveLength(3);
+    expect(cells[3]?.querySelectorAll('.sc-slot')).toHaveLength(4);
+  });
+
   it('opens the month, with the créneaux to fill said and each one’s hours beside it', async () => {
     serve({ calendar: agencyCalendar('copilot') });
     renderPage('/equipe/planning?affichage=mois');
