@@ -1,24 +1,26 @@
 import type { CreatorId } from '@nirvana/contracts';
 import { useBlocker, useRouteContext } from '@tanstack/react-router';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
+import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
 import { PersonaSection } from './persona/PersonaSection';
-import { creatorsSearch } from './search';
+import { AgencyRateSection } from './rate/AgencyRateSection';
+import { creatorsSearch, type CreatorSheet } from './search';
 
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
-export type CreatorTab = 'persona' | 'hours' | 'access';
+export type CreatorTab = CreatorSheet;
 
 /**
  * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
- * not to the settings), then for the owner alone her hours (P3-14) and her access to her own space (CR-02). With
- * several creators, a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and
- * the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes not saved are never lost silently:
- * leaving asks first.
+ * not to the settings), then for the owner alone her hours (P3-14), her access to her own space (CR-02) and the
+ * agency's percentage (CR-04). With several creators, a row of chips picks one; with one, her name is enough. The
+ * owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
+ * not saved are never lost silently: leaving asks first.
  */
 export function CreatorsPage({
   tab,
@@ -51,7 +53,7 @@ export function CreatorsPage({
   const showForm = isOwner && (adding || (query.isSuccess && creators.length === 0));
   const current = creators.find((creator) => creator.id === creatorId) ?? creators[0];
   const selected = current?.id ?? null;
-  // The router keeps anyone but the owner off the hours; here they also need a creator to read them for.
+  // The router keeps anyone but the owner off the hours, the access and the percentage; here they also need a creator.
   const shown: CreatorTab = isOwner && current !== undefined ? tab : 'persona';
 
   const leaving = blocker.status === 'blocked' || pending !== null;
@@ -131,6 +133,16 @@ export function CreatorsPage({
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
+    if (shown === 'rate' && current !== undefined) {
+      return (
+        <AgencyRateSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          onDirty={setDirty}
+        />
+      );
+    }
     return shown === 'hours' && current !== undefined ? (
       <HoursSection
         key={current.id}
@@ -142,7 +154,7 @@ export function CreatorsPage({
       <PersonaSection
         key={selected ?? 'none'}
         creatorId={selected}
-        canSave={user.role === 'owner' || user.role === 'creator'}
+        canSave={isOwner}
         isOwner={isOwner}
         creatorName={current?.displayName ?? null}
         timezone={current?.timezone ?? null}
@@ -150,23 +162,19 @@ export function CreatorsPage({
       />
     );
   };
-  // Persona · Heures d'activité are the views of the sheet, in the header like every section's sub-tabs (NAV-10);
-  // they say where one is: the eyebrow then says nothing more (CREA-24).
+  // Persona · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every section's
+  // sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
   const switchShown = isOwner && current !== undefined && !showForm && query.isSuccess;
-  // A creator reads her own sheet, her tab named « Persona » (NAV-18).
-  const own = user.role === 'creator';
 
   return (
     <Page>
       <PageHeader
-        eyebrow={current === undefined || showForm || switchShown || own ? undefined : current.displayName}
-        title={own ? 'Persona' : 'Créatrices'}
+        eyebrow={current === undefined || showForm || switchShown ? undefined : current.displayName}
+        title="Créatrices"
         lead={
-          own
-            ? 'Ta fiche : ce que l’agent sait de toi et la façon dont il parle.'
-            : isOwner
-              ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité et son accès.'
-              : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
+          isOwner
+            ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.'
+            : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
           <>
@@ -191,6 +199,12 @@ export function CreatorsPage({
                     search: creatorsSearch('access', selected),
                     current: shown === 'access',
                     label: 'Accès',
+                  },
+                  {
+                    to: '/creatrices',
+                    search: creatorsSearch('rate', selected),
+                    current: shown === 'rate',
+                    label: 'Pourcentage',
                   },
                 ]}
               />
@@ -238,29 +252,5 @@ export function CreatorsPage({
         {body()}
       </div>
     </Page>
-  );
-}
-
-/** Asked in the page, never with `confirm()` (docs/design/README.md): drop the changes not saved, or stay. */
-function LeaveConfirm({ onLeave, onStay }: { onLeave: () => void; onStay: () => void }): JSX.Element {
-  const stayRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    stayRef.current?.focus();
-  }, []);
-  return (
-    <div className="nv-confirm ps-leave" role="alertdialog" aria-labelledby="ps-leave-text">
-      <p id="ps-leave-text">
-        <b>Tes modifications ne sont pas enregistrées.</b> Si tu quittes cette fiche, elles seront perdues.
-      </p>
-      <div className="nv-confirm__actions">
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--destructive" onClick={onLeave}>
-          Les abandonner
-        </button>
-        {/* Soft, not neon: the one neon of the screen stays on « Enregistrer » (CREA-07). */}
-        <button type="button" className="nv-btn nv-btn--soft" ref={stayRef} onClick={onStay}>
-          Rester
-        </button>
-      </div>
-    </div>
   );
 }

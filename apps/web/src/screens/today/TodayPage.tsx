@@ -17,7 +17,16 @@ import '@/reports/reports.css';
 import { useMyShifts } from '@/scheduling/api';
 import { accountLine, dayStateOf, platformName, progressOf, type DayState } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { addDays, clockAt, dayOf, lengthOf, longDay, rangeAt, readerZone, untilOf } from '@/scheduling/time';
+import {
+  clockAt,
+  dayOf,
+  dayWordOf,
+  lengthOf,
+  longDay,
+  rangeAt,
+  readerZone,
+  untilOf,
+} from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
@@ -154,15 +163,6 @@ function Day({
 const soonOf = (milliseconds: number): string | null =>
   milliseconds < 86_400_000 ? untilOf(milliseconds) : null;
 
-/** « Aujourd'hui », « Demain » or « jeudi 29 octobre »: the day of a shift, in the chatter's time. */
-function dayWord(instant: string, zone: string, today: string): string {
-  const day = dayOf(instant, zone);
-  if (day === today) return 'Aujourd’hui';
-  if (day === addDays(today, 1)) return 'Demain';
-  const long = longDay(day);
-  return long.charAt(0).toUpperCase() + long.slice(1);
-}
-
 /** The report of the hero's shift: not open yet, to make now, or made (and how it stands). */
 type HeroReport =
   { readonly kind: 'none' | 'later' | 'due' } | { readonly kind: 'made'; readonly report: ShiftReport };
@@ -235,7 +235,7 @@ function Hero({
       </div>
       <p className="sc-hero__hours nv-num">
         {state.kind === 'later' ? (
-          <span className="sc-hero__day">{dayWord(shift.startsAt, zone, today)}</span>
+          <span className="sc-hero__day">{dayWordOf(shift.startsAt, zone, today)}</span>
         ) : null}
         {rangeAt(shift.startsAt, shift.endsAt, zone)}
       </p>
@@ -319,7 +319,7 @@ function NextCard({
         </div>
         <div className="sc-next__side">
           <p className="sc-next__hours nv-num">
-            {dayWord(shift.startsAt, zone, today)} · {rangeAt(shift.startsAt, shift.endsAt, zone)}
+            {dayWordOf(shift.startsAt, zone, today)} · {rangeAt(shift.startsAt, shift.endsAt, zone)}
           </p>
           {soon === null ? null : <p className="sc-next__in">{soon}</p>}
         </div>
