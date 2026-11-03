@@ -340,13 +340,13 @@ export const SOURCE_REFUSAL_TEXTS: Readonly<Record<PayRulesSourceRefusal, string
   platform_without_net:
     'La plateforme de ce compte ne donne pas de net : sa paie se lit dans les rapports validés.',
   model_unlinked:
-    'Aucun modèle de la plateforme n’est relié à ce compte : relie-le dans Réglages › Ventes, sinon ses ventes ne comptent nulle part.',
+    'Aucun modèle de la plateforme n’est relié à ce compte : relie son modèle dans Réglages › Ventes, sinon ses ventes ne comptent nulle part.',
   check_missing:
-    'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Ventes, sur une quinzaine passée.',
+    'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Ventes, sur une quinzaine entière déjà finie.',
   check_not_clean:
-    'La dernière vérification de fiabilité ne concorde pas sur une quinzaine entière : refais-la dans Réglages › Ventes une fois l’écart réglé.',
+    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, avec l’export, où tout concorde et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
   check_not_before:
-    'La dernière vérification porte sur une quinzaine qui ne finit pas avant ces règles : fais-les partir d’une quinzaine plus tardive.',
+    'La dernière vérification porte sur une quinzaine qui ne finit pas avant ces règles : fais-les partir d’une quinzaine plus tardive, ou vérifie une quinzaine qui finit avant elles.',
 };
 
 /** What a refusal says: the exact reason of a refused « Ventes relevées » when the server gives one, else its code. */
