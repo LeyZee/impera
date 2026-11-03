@@ -23,6 +23,7 @@ import {
   rateAhead,
   STATUS_LABELS,
 } from './model';
+import { MEMBER_PALETTE, shadeOf } from './palette';
 
 import { usePlanning } from '@/scheduling/api';
 import { useAgencyToday } from '@/screens/pay/data';
@@ -160,23 +161,7 @@ export function EditMemberPanel({
             {name === '' ? 'Indique le nom que voit l’équipe.' : 'Celui du planning et des passations.'}
           </span>
         </div>
-        <div className="nv-field tm-field">
-          <label className="nv-field__label" htmlFor={`${id}-color`}>
-            Couleur du planning
-          </label>
-          <span className="tm-color">
-            <input
-              id={`${id}-color`}
-              type="color"
-              className="tm-color__well"
-              value={color ?? '#8a8a8a'}
-              onChange={(event) => {
-                setColor(event.target.value.toLowerCase());
-              }}
-            />
-            <span className="tm-hint">{color ?? 'Aucune pour l’instant.'}</span>
-          </span>
-        </div>
+        <ShadePicker name={`${id}-color`} saved={member.color} color={color} onChange={setColor} />
         <div className="nv-field tm-field">
           <span className="nv-field__label">Créatrices</span>
           {creators.length === 0 ? (
@@ -531,5 +516,55 @@ export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: 
         />
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * « Couleur du planning » : the twelve shades of the palette, one tap each, the chosen one ringed and ticked (never by
+ * its colour alone) and named under them. A colour saved before the palette stays first, as « Couleur actuelle »,
+ * until another is chosen.
+ */
+function ShadePicker({
+  name,
+  saved,
+  color,
+  onChange,
+}: {
+  name: string;
+  saved: string | null;
+  color: string | null;
+  onChange: (color: string) => void;
+}): JSX.Element {
+  const kept = saved !== null && shadeOf(saved) === null ? [{ hex: saved, name: 'Couleur actuelle' }] : [];
+  const chosen = shadeOf(color);
+  const hint =
+    color === null
+      ? 'Aucune pour l’instant.'
+      : chosen === null
+        ? 'Couleur d’avant la palette : garde-la ou choisis une nuance.'
+        : chosen.name;
+  return (
+    <fieldset className="nv-field tm-field tm-shades-field">
+      <legend className="nv-field__label">Couleur du planning</legend>
+      <div className="tm-shades">
+        {[...kept, ...MEMBER_PALETTE].map((shade) => (
+          <label key={shade.hex} className="tm-shade" style={{ '--tm-shade': shade.hex }}>
+            <input
+              type="radio"
+              className="tm-shade__input"
+              name={name}
+              value={shade.hex}
+              aria-label={shade.name}
+              checked={color === shade.hex}
+              onChange={() => {
+                onChange(shade.hex);
+              }}
+            />
+            <span className="tm-shade__dot" aria-hidden="true" />
+          </label>
+        ))}
+      </div>
+      <span className="tm-hint">{hint}</span>
+    </fieldset>
   );
 }
