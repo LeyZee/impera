@@ -154,6 +154,17 @@ describe('WelcomePage', () => {
     });
   });
 
+  it('welcomes a creator to her own space, she who has no country on file (CR-02)', async () => {
+    serve({
+      inspect: [[200, { ...preview('invitation'), displayName: 'Nora', country: null }]],
+      redeem: [[200, ME]],
+    });
+    open('welcome');
+
+    expect(await screen.findByRole('heading', { name: 'Bienvenue, Nora' })).toBeDefined();
+    expect(screen.getByText('Ton espace créatrice')).toBeDefined();
+  });
+
   it('says the length before sending, and sends nothing too short', async () => {
     const fake = serve({ inspect: [[200, preview('invitation')]] });
     open('welcome');

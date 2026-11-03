@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { REAUTHENTICATION_ERROR_CODE } from './auth';
 import {
+  CreateCreatorInvitationLinkBodySchema,
   INVITATION_LINK_ERROR_CODES,
   InvitationLinkPreviewSchema,
   InvitationLinkTokenSchema,
@@ -41,5 +42,29 @@ describe('invitation links', () => {
     expect(PasswordInvalidReasonSchema.options).toEqual(['too_short', 'too_long', 'breached', 'refused']);
     expect(INVITATION_LINK_ERROR_CODES).toContain(REAUTHENTICATION_ERROR_CODE);
     expect(INVITATION_LINK_ERROR_CODES).toContain('member_left_conflict');
+  });
+
+  it('names her e-mail on a creator’s invitation, and nothing on her reset (CR-02)', () => {
+    expect(
+      CreateCreatorInvitationLinkBodySchema.safeParse({ purpose: 'invitation', email: 'nora@example.test' })
+        .success,
+    ).toBe(true);
+    expect(CreateCreatorInvitationLinkBodySchema.safeParse({ purpose: 'invitation' }).success).toBe(false);
+    expect(CreateCreatorInvitationLinkBodySchema.safeParse({ purpose: 'reset' }).success).toBe(true);
+    expect(
+      CreateCreatorInvitationLinkBodySchema.safeParse({ purpose: 'reset', email: 'nora@example.test' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('previews a creator’s own account without a country', () => {
+    const preview = {
+      purpose: 'invitation',
+      email: 'nora@example.test',
+      displayName: 'Nora',
+      country: null,
+      expiresAt: '2026-11-06T12:00:00.000Z',
+    };
+    expect(InvitationLinkPreviewSchema.safeParse(preview).success).toBe(true);
   });
 });
