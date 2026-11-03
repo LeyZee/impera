@@ -18,6 +18,14 @@ const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds:
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 /** An operator without a team row: the rail that still opens Créatrices, read-only. */
 const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
+/** Anna herself, in her own space (ADR 0042). */
+const anna: Me = { ...base, role: 'creator', creatorIds: [ANNA.id], team: null, teamScope: 'self' };
+const chatter: Me = {
+  ...base,
+  role: 'operator',
+  team: { role: 'chatter', status: 'active' },
+  teamScope: 'self',
+};
 
 const summary = (n: number) => ({
   id: `0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4${String(n)}`,
@@ -203,5 +211,46 @@ describe('Créatrices, what a member without the list reads', () => {
     renderAt(owner, '/creatrices');
     expect(await screen.findByText('La liste des créatrices ne se charge pas')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
+  });
+});
+
+describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
+  it('opens her persona in Moi, never Créatrices, and keeps a member’s Moi screens from her', async () => {
+    await serve([ANNA]);
+    const router = renderAt(anna, '/moi');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
+    expect(router.state.location.pathname).toBe('/moi/persona');
+    const moi = screen.getByRole('navigation', { name: 'Moi' });
+    expect(
+      within(moi)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Persona', 'Sécurité']);
+    // She saves her own persona, as before.
+    expect(await screen.findByRole('button', { name: 'Enregistrer une version' })).toBeDefined();
+    cleanup();
+
+    for (const path of ['/moi/dossier', '/moi/calendrier', '/moi/factures']) {
+      await serve([ANNA]);
+      const again = renderAt(anna, path);
+      await waitFor(() => {
+        expect(again.state.location.pathname).toBe('/moi/persona');
+      });
+      cleanup();
+    }
+
+    await serve([ANNA]);
+    const away = renderAt(anna, `/creatrices?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(away.state.location.pathname).toBe('/aujourdhui');
+    });
+  });
+
+  it('sends a member who opens it to his own file', async () => {
+    await serve([ANNA]);
+    const router = renderAt(chatter, '/moi/persona');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/moi/dossier');
+    });
   });
 });

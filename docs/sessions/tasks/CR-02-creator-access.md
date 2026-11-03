@@ -67,6 +67,12 @@ Gains et ventes (CR-04), agenda (CR-05), contenu (CR-06).
 - `LinkShare` sort de `ShareLink` (même rendu, message d'accueil fourni par l'appelant) pour servir les deux fiches.
 - Reste : lot c2 (rail de la créatrice, Aujourd'hui avec « qui est en poste », Moi, fermeture de `/v1/dashboard` à son rôle) ; lot c3 (Ventes › Fans, lecteur de conversation).
 
+### 03/11/2026, lot c2 (son rail, Aujourd'hui, Moi)
+- Rail de la créatrice (ADR 0042 § 8) : **Aujourd'hui · Moi** pour l'instant ; Agenda (CR-05), Ventes (CR-04) et Contenu (CR-06) arrivent avec leurs écrans. Elle quitte le Dashboard et Créatrices : toute autre adresse la ramène à Aujourd'hui avec « Cette page n'est pas dans ton espace. »
+- Aujourd'hui (`/aujourdhui`, son écran à elle) : qui est en poste pour elle (nom affiché, son compte, créneau, « encore 3 h 12 », jauge) et « Ensuite » sur 24 h, par `GET /v1/creator-space/on-duty`, relu chaque minute. Personne en poste : quand commence le prochain. Ses dernières ventes s'y ajouteront avec Ventes (CR-04).
+- Moi : **Persona** (`/moi/persona`, son onglet Persona d'avant, enregistrement compris, avec la même demande avant de perdre des changements) et **Sécurité**. Les écrans d'un membre (dossier, factures, calendrier des shifts) la renvoient à sa persona ; `/moi/persona` renvoie un membre à son dossier.
+- Reste : fermer `/v1/dashboard` à son rôle et retirer du Dashboard ce qui ne servait qu'à elle (lot c2b) ; lot c3 (Ventes › Fans, lecteur de conversation).
+
 ### Lot futur : les insights de sa base de fans (demande de Charles, 03/11 11h40)
 - Ce qu'il veut : des chiffres agrégés sur sa base, « entre copines », à la place de toute note par fan (part de ses fans par tranche d'âge, par métier, ce genre de pourcentages), **jamais un détail par fan**.
 - Garde-fous à tenir : agrégats seulement à partir des faits `declared` (ni `inferred`, ni `operator_note`, ni `commercial`) ; un pourcentage ne s'affiche qu'au-delà d'un seuil de fans par case, sinon « trop peu de fans » (pas de réidentification) ; calcul côté serveur, l'écran ne calcule rien.
