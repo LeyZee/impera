@@ -74,7 +74,7 @@ export interface ReadingStore {
 }
 
 /** The captures of a marked post, decoded, in memory only. */
-export interface TrendCaptures {
+interface TrendCaptures {
   readonly captures: readonly { readonly mediaType: string; readonly data: Uint8Array }[];
   readonly durationS: number | null;
   readonly creatorId: CreatorId;
