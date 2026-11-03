@@ -23,6 +23,7 @@ import type { OpenPeriodFacts, PayrollJobStore } from '../domain/ports';
 import type { CollectiveReached, StatementContent, StatementDraft } from '../domain/recalculation';
 
 import { recordBlock } from './period-blocks';
+import { earliestWaitingSalePeriodUnscoped } from './sales-reads';
 import { closingsSpan, readSnapshot, registeredAmong, type PayInputReads } from './snapshot';
 
 const { commissionStatementLines, commissionStatements } = schema;
@@ -99,6 +100,9 @@ async function writeLines(
       commissionMinor: line.commissionMinor,
       shiftReportIds: [...line.shiftReportIds],
       lateReports: line.lateReports,
+      // A line of the platform's sales says so, with the sales it counts (CRM-03); a line of reports keeps the default.
+      base: line.base ?? 'gross_chain',
+      sales: line.sales ?? [],
     })),
   );
 }
@@ -118,11 +122,12 @@ export function createDrizzlePayrollJobStore(
       withAdmin(adminDb, async (tx) => {
         await lockPayrollClose(tx);
         await writeWindow(tx, period, await reads.agencyTimeZone(tx));
-        const snapshot = await readSnapshot(
+        const { snapshot } = await readSnapshot(
           tx,
           reads,
           period,
           await reads.validatedReportsUnscoped(tx, period),
+          { kind: 'admin' },
         );
         const decision = decide(snapshot);
         const computedAt = now();
@@ -169,11 +174,19 @@ export function createDrizzlePayrollJobStore(
           tx,
           reports.map((report) => report.id),
         );
-        const waiting = reports
-          .filter((report) => !registered.has(report.id))
-          .map((report) => report.period)
-          .sort();
-        return { current, lastClosed: last, earliestUncounted: waiting[0] ?? null };
+        const waiting = reports.filter((report) => !registered.has(report.id)).map((report) => report.period);
+        // Before the first closing, a sale a member would be paid for waits in its own period too (CRM-03).
+        const sale =
+          last === null
+            ? await earliestWaitingSalePeriodUnscoped(
+                tx,
+                reads.sales,
+                current,
+                await reads.agencyTimeZone(tx),
+              )
+            : null;
+        if (sale !== null) waiting.push(sale);
+        return { current, lastClosed: last, earliestUncounted: waiting.sort()[0] ?? null };
       }),
   };
 }

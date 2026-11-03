@@ -4,6 +4,6 @@ Fait :
 - `payroll.requeue_invoice_issues` lit les `invoice_not_issued` par un index partiel (`domain_events_invoice_not_issued_idx`, migration 0075), et seulement ceux du prestataire quand la relance en nomme un. La paie garde toujours, parmi ces relevés, ceux qui sont validés ou payés.
 Pas fait : rien.
 Décisions : un index partiel plutôt qu'un filtre par date, parce qu'une émission bloquée depuis longtemps doit rester relancée ; même forme que les deux index partiels déjà posés sur `domain_events`.
-Découvertes : aucune.
+Découvertes : avant le déploiement, vérifier que Traefik dans Coolify ne journalise pas les URL de `/v1/calendar-feed/` (le jeton du lien d'agenda est dans le chemin, relecture de #435) ; un `CREATE INDEX` sur `domain_events` bloque l'outbox pendant sa construction, à faire `CONCURRENTLY` hors migration une fois en production (remarque d'Équipe sur #434).
 Candidats à suppression : aucun.
-Vérifié : test unitaire de l'ordre (`accounting/domain/__tests__/journal.test.ts`) ; `payroll-journal`, `payroll-regimes` et `payroll-reference` en intégration ; drift Drizzle aligné.
+Vérifié : test unitaire de l'ordre (`accounting/domain/__tests__/journal.test.ts`) ; `payroll-journal`, `payroll-regimes` et `payroll-reference` en intégration ; drift Drizzle aligné. La 0075 est régénérée par drizzle-kit au-dessus de la 0074 de #433 (`prevId` et `when` après les siens).

@@ -9,6 +9,7 @@ import {
   ShiftReportIdSchema,
   TeamMemberIdSchema,
   type PayPeriod,
+  type PlatformAccountId,
   type ShiftReportId,
   type TeamMemberId,
 } from '@nirvana/contracts';
@@ -37,17 +38,20 @@ import {
   PayPeriodOrder,
   PayPeriodReportsPending,
   PayPeriodReportsUnread,
+  PayPeriodSalesUnread,
 } from '../domain/errors';
 import type { PayrollValidationStore } from '../domain/ports';
 import {
   closePeriod,
   paysMember,
   periodIsEmpty,
+  salesCountedIn,
   statementOf,
   type ClosingPlan,
   type PeriodSnapshot,
   type ReportForPay,
 } from '../domain/recalculation';
+import { saleKeyOf, salesWaitingBefore, type CountedSale } from '../domain/sales';
 import {
   assertValidates,
   periodBeforeFirstClosing,
@@ -57,11 +61,25 @@ import {
 
 import type { AfterValidation, PayoutGate } from './ports';
 import { enqueuePayRecalculation } from './recalculation-queue';
-import { closingsSpan, readSnapshot, registeredAmong, type PayInputReads } from './snapshot';
+import { waitingSaleKeysUnscoped, type PayReadScope } from './sales-reads';
+import {
+  closingsSpan,
+  readSnapshot,
+  registeredAmong,
+  type PayInputReads,
+  type ReadSnapshot,
+} from './snapshot';
 import { audit } from './writes';
 
-const { carryOvers, commissionStatements, payPeriodClosings, payPeriodReports, payPeriods, teamMembers } =
-  schema;
+const {
+  carryOvers,
+  commissionStatements,
+  payPeriodClosings,
+  payPeriodReports,
+  payPeriodSales,
+  payPeriods,
+  teamMembers,
+} = schema;
 
 /** The validated reports no closing counted yet, on every creator: a read bounded to the closing's check. */
 function waitingReportsUnscoped(
@@ -79,6 +97,36 @@ function waitingReportsUnscoped(
   });
 }
 
+/**
+ * The sales a member would be paid for in the periods a closing up to `upTo` closes, on every creator: a read bounded
+ * to the closing's check (`waitingSaleKeysUnscoped`). Before any closing, only `upTo` closes, its earlier sales stop it.
+ */
+function waitingSalesUnscoped(
+  adminDb: Database,
+  reads: PayInputReads,
+  upTo: PayPeriod,
+  last: PayPeriod | null,
+): Promise<Set<string>> {
+  return withAdmin(adminDb, async (tx) => {
+    const periods: PayPeriod[] = [];
+    for (
+      let period = last === null ? upTo : nextPayPeriod(last);
+      period <= upTo;
+      period = nextPayPeriod(period)
+    ) {
+      periods.push(period);
+    }
+    return waitingSaleKeysUnscoped(tx, reads.sales, periods, last, await reads.agencyTimeZone(tx));
+  });
+}
+
+/** The sales the admin read waiting that the member's read neither counts nor leaves waiting before: refused. */
+function assertSalesRead(waiting: ReadonlySet<string>, read: readonly CountedSale[]): void {
+  const seen = new Set(read.map((one) => saleKeyOf(one)));
+  const unread = [...waiting].filter((key) => !seen.has(key)).length;
+  if (unread > 0) throw new PayPeriodSalesUnread(unread);
+}
+
 /** Before the team's first closing, the earliest period that has a statement or an entry before `period`. */
 async function earliestEntriesBefore(tx: Transaction, period: PayPeriod): Promise<PayPeriod | null> {
   const result = await tx.execute(sql`
@@ -94,8 +142,9 @@ async function earliestEntriesBefore(tx: Transaction, period: PayPeriod): Promis
 }
 
 /**
- * Writes `period`'s closing and its registry (ADR 0032). Each report is registered in its own creator: the registry's
- * trigger reads it under the writer's policies. The rates go in their one order (`canonicalExchangeRates`).
+ * Writes `period`'s closing and its registries (ADR 0032): the reports counted, and the platform's sales counted
+ * (CRM-03). Each report and each sale is registered in its own creator, the creator of its account for a sale: the
+ * registries' triggers read it under the writer's policies. The rates go in their one order (`canonicalExchangeRates`).
  */
 async function writeClosing(
   tx: Transaction,
@@ -103,6 +152,7 @@ async function writeClosing(
   period: PayPeriod,
   closing: ClosingPlan,
   creatorOf: ReadonlyMap<ShiftReportId, string>,
+  creatorOfAccount: ReadonlyMap<PlatformAccountId, string>,
   creatorIds: readonly string[],
 ): Promise<void> {
   const [window] = await tx
@@ -130,12 +180,36 @@ async function writeClosing(
       .insert(payPeriodReports)
       .values(reports.map((report) => ({ shiftReportId: report.id, period, memberId: report.memberId })));
   }
+  const salesByCreator = new Map<string, CountedSale[]>();
+  for (const one of closing.countedSales) {
+    const creatorId = creatorOfAccount.get(one.platformAccountId);
+    if (creatorId === undefined)
+      throw new Error(`Account ${one.platformAccountId} was not read in a creator`);
+    salesByCreator.set(creatorId, [...(salesByCreator.get(creatorId) ?? []), one]);
+  }
+  for (const [creatorId, sales] of [...salesByCreator.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    await enterCreator(tx, creatorId, creatorIds);
+    await tx.insert(payPeriodSales).values(
+      sales.map((one) => ({
+        platform: one.platform,
+        platformSaleId: one.platformSaleId,
+        event: one.event,
+        period,
+        memberId: one.memberId,
+        linkVersion: one.linkVersion,
+        platformAccountId: one.platformAccountId,
+        currency: one.currency,
+        netMinor: one.netMinor,
+        salePeriod: one.salePeriod,
+      })),
+    );
+  }
   await audit(
     tx,
     actor,
     'pay_period.close',
     { kind: 'pay_period', id: period },
-    { reports: closing.counted.length },
+    { reports: closing.counted.length, sales: closing.countedSales.length },
   );
 }
 
@@ -163,8 +237,8 @@ const upTo = (reports: readonly ReportForPay[], period: PayPeriod): ReportForPay
 
 /**
  * The closing of `period` and of the empty periods before it (ADR 0032), in the validation's transaction, under
- * `payroll.close`: nothing waits for review, the member reads every report the closing counts, and the earlier
- * periods are settled. Returns the period's snapshot once closed, and the periods it closed.
+ * `payroll.close`: nothing waits for review, the member reads every report and every sale the closing counts, and the
+ * earlier periods are settled. Returns the period's snapshot once closed, and the reports it read.
  */
 async function closeUpTo(
   tx: Transaction,
@@ -179,25 +253,36 @@ async function closeUpTo(
   if (pending > 0) throw new PayPeriodReportsPending(pending);
   // Read first on the admin connection: the member's read, after it, sees every one of them and maybe newer ones.
   const waiting = await waitingReportsUnscoped(adminDb, reads, period);
+  const waitingSales = await waitingSalesUnscoped(adminDb, reads, period, last);
   const { reports, creatorOf } = await reportsAsMember(tx, reads, creatorIds, period);
   const unread = waiting.filter((id) => !creatorOf.has(id)).length;
   if (unread > 0) throw new PayPeriodReportsUnread(unread);
+  const scope: PayReadScope = { kind: 'member', creatorIds };
 
+  let target: ReadSnapshot;
   if (last === null) {
+    target = await readSnapshot(tx, reads, period, reports, scope);
+    const before = salesWaitingBefore(target.snapshot.sales, period);
+    assertSalesRead(waitingSales, [...salesCountedIn(target.snapshot), ...before]);
     const blocking = periodBeforeFirstClosing(period, [
       await earliestEntriesBefore(tx, period),
       ...reports.map((report) => report.period),
+      ...before.map((one) => one.salePeriod),
     ]);
     if (blocking !== null) throw new PayPeriodOrder(blocking);
   } else {
     for (let between = nextPayPeriod(last); between < period; between = nextPayPeriod(between)) {
-      const snapshot = await readSnapshot(tx, reads, between, upTo(reports, between));
-      if (!periodIsEmpty(snapshot)) throw new PayPeriodOrder(between);
-      await writeClosing(tx, actor, between, closePeriod(snapshot).closing, creatorOf, creatorIds);
+      const read = await readSnapshot(tx, reads, between, upTo(reports, between), scope);
+      if (!periodIsEmpty(read.snapshot)) throw new PayPeriodOrder(between);
+      const { closing } = closePeriod(read.snapshot);
+      await writeClosing(tx, actor, between, closing, creatorOf, read.creatorOfAccount, creatorIds);
     }
+    target = await readSnapshot(tx, reads, period, reports, scope);
+    // An empty period before counts no sale: what the admin read waiting is all in `period` now.
+    assertSalesRead(waitingSales, salesCountedIn(target.snapshot));
   }
-  const { closing, closed } = closePeriod(await readSnapshot(tx, reads, period, reports));
-  await writeClosing(tx, actor, period, closing, creatorOf, creatorIds);
+  const { closing, closed } = closePeriod(target.snapshot);
+  await writeClosing(tx, actor, period, closing, creatorOf, target.creatorOfAccount, creatorIds);
   return { closed, reports };
 }
 
@@ -210,6 +295,7 @@ async function assertNothingOwedBefore(
   reads: PayInputReads,
   snapshot: PeriodSnapshot,
   reports: readonly ReportForPay[],
+  creatorIds: readonly string[],
   memberId: TeamMemberId,
 ): Promise<void> {
   const member = snapshot.members.find((one) => one.id === memberId);
@@ -235,7 +321,8 @@ async function assertNothingOwedBefore(
     joinedOn: member.joinedOn,
   }).filter((period) => !written.has(period));
   for (const period of owed) {
-    if (paysMember(await readSnapshot(tx, reads, period, upTo(reports, period)), memberId)) {
+    const read = await readSnapshot(tx, reads, period, upTo(reports, period), { kind: 'member', creatorIds });
+    if (paysMember(read.snapshot, memberId)) {
       throw new CommissionStatementOrder({ period });
     }
   }
@@ -319,7 +406,10 @@ export function createDrizzlePayrollValidationStore(
           ).length;
           if (unread > 0) throw new PayPeriodReportsUnread(unread);
           reports = read.reports;
-          closed = await readSnapshot(tx, reads, head.period, reports);
+          ({ snapshot: closed } = await readSnapshot(tx, reads, head.period, reports, {
+            kind: 'member',
+            creatorIds,
+          }));
         }
 
         const statement = statementOf(closed, head.memberId);
@@ -328,7 +418,7 @@ export function createDrizzlePayrollValidationStore(
           // A member who left (ADR 0039 § 6): his documents first, as the base's `keep_final_statement` counts them.
           assertDocumentsSettled(true, await gate.documentsOpen(tx, head.memberId));
         }
-        await assertNothingOwedBefore(tx, reads, closed, reports, head.memberId);
+        await assertNothingOwedBefore(tx, reads, closed, reports, creatorIds, head.memberId);
 
         const validated = await tx
           .update(commissionStatements)

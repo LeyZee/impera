@@ -76,20 +76,57 @@ export interface ShiftForPay {
   readonly stopped: boolean;
 }
 
-/** What a closing registered of a line: the member it counted for and the link's version it saw. */
-interface RegisteredSale {
-  readonly period: PayPeriod;
+/**
+ * A line as a period counts it: its key, its account, currency and net, its sale's period, the member it counts for
+ * and the link's version that gave it to them.
+ */
+export interface CountedSaleLine extends SaleKey {
+  readonly platformAccountId: PlatformAccountId;
+  readonly currency: Currency;
+  readonly netMinor: number;
+  readonly salePeriod: PayPeriod;
   readonly memberId: TeamMemberId;
   readonly linkVersion: string;
 }
 
+/**
+ * What a closing registered of a line: all a statement takes from it, so that a closed period counts again exactly
+ * what its closing saw without reading the register (ADR 0032).
+ */
+export interface RegisteredSale extends CountedSaleLine {
+  readonly period: PayPeriod;
+}
+
+/** The fields of a counted line alone, from a registry entry or a counted sale, in one order. */
+const countedLineOf = (one: CountedSaleLine): CountedSaleLine => ({
+  platform: one.platform,
+  platformSaleId: one.platformSaleId,
+  event: one.event,
+  platformAccountId: one.platformAccountId,
+  currency: one.currency,
+  netMinor: one.netMinor,
+  salePeriod: one.salePeriod,
+  memberId: one.memberId,
+  linkVersion: one.linkVersion,
+});
+
+/** What the closing of `period` registers of a line it counts. */
+export const registeredIn = (period: PayPeriod, one: CountedSaleLine): RegisteredSale => ({
+  ...countedLineOf(one),
+  period,
+});
+
 /** Everything the sales of a period are counted from, read in the same transaction as the rest of the snapshot. */
 export interface SalesSnapshot {
-  /** The period's own lines, and for the team's first open period the late ones the reader found. */
+  /**
+   * An open period's own lines, and for the team's first open period the late ones the reader found; nothing for a
+   * closed period, which counts its registry.
+   */
   readonly lines: readonly SaleForPay[];
   /**
-   * Of those lines, the ones a closing registered, by `saleKeyOf`, with the registry of the sale of each refund among
-   * them: a refund goes to the member its sale was counted for.
+   * By `saleKeyOf`: for an open period, the lines a closing registered among those, with the registry of the sale of
+   * each refund among them (a refund goes to the member its sale was counted for); for a closed period, what its
+   * closing registered.
    */
   readonly registered: ReadonlyMap<string, RegisteredSale>;
   /** Every account's dated sources, from its first rules on. */
@@ -211,11 +248,8 @@ export function saleAttribution(line: SaleForPay, sales: SalesSnapshot): SaleAtt
   return { kind: 'member', memberId: author.memberId, linkVersion: author.linkVersion };
 }
 
-/** A line a period counts, for whom, under which link's version, and the earlier period it comes late from. */
-export interface CountedSale {
-  readonly line: SaleForPay;
-  readonly memberId: TeamMemberId;
-  readonly linkVersion: string;
+/** A line a period counts, and the earlier period it comes late from. */
+export interface CountedSale extends CountedSaleLine {
   /** The sale's period when it is earlier than the period counting the line, `null` otherwise. */
   readonly lateFrom: PayPeriod | null;
 }
@@ -226,10 +260,10 @@ export interface HeldSale {
   readonly reason: SaleHeldReason;
 }
 
-const byKey = <T extends { readonly line: SaleKey }>(items: readonly T[]): T[] =>
+const byKey = <T>(items: readonly T[], keyOf: (item: T) => SaleKey): T[] =>
   [...items].sort((a, b) => {
-    const left = saleKeyOf(a.line);
-    const right = saleKeyOf(b.line);
+    const left = saleKeyOf(keyOf(a));
+    const right = saleKeyOf(keyOf(b));
     return left < right ? -1 : left > right ? 1 : 0;
   });
 
@@ -251,8 +285,8 @@ function takes(place: PeriodPlace, line: SaleForPay): boolean {
   );
 }
 
-const lateFrom = (line: SaleForPay, period: PayPeriod): PayPeriod | null =>
-  line.salePeriod !== null && line.salePeriod < period ? line.salePeriod : null;
+const lateFrom = (salePeriod: PayPeriod, period: PayPeriod): PayPeriod | null =>
+  salePeriod < period ? salePeriod : null;
 
 /**
  * The lines `place.period` counts, in key order (see above): a closed period, exactly what its closing registered
@@ -261,31 +295,32 @@ const lateFrom = (line: SaleForPay, period: PayPeriod): PayPeriod | null =>
  */
 export function salesCounted(sales: SalesSnapshot, place: PeriodPlace): CountedSale[] {
   const counted: CountedSale[] = [];
-  for (const line of sales.lines) {
-    const registered = sales.registered.get(saleKeyOf(line));
-    if (place.closed) {
-      if (registered?.period === place.period) {
-        counted.push({
-          line,
-          memberId: registered.memberId,
-          linkVersion: registered.linkVersion,
-          lateFrom: lateFrom(line, place.period),
-        });
-      }
-      continue;
+  if (place.closed) {
+    for (const registered of sales.registered.values()) {
+      if (registered.period !== place.period) continue;
+      counted.push({ ...countedLineOf(registered), lateFrom: lateFrom(registered.salePeriod, place.period) });
     }
-    if (registered !== undefined || !takes(place, line)) continue;
-    const attribution = saleAttribution(line, sales);
-    if (attribution.kind === 'member') {
-      counted.push({
-        line,
-        memberId: attribution.memberId,
-        linkVersion: attribution.linkVersion,
-        lateFrom: lateFrom(line, place.period),
-      });
-    }
+    return byKey(counted, (one) => one);
   }
-  return byKey(counted);
+  for (const line of sales.lines) {
+    if (sales.registered.has(saleKeyOf(line)) || !takes(place, line)) continue;
+    const attribution = saleAttribution(line, sales);
+    // A member is paid only for a sale of a period on the platform's net, so its period is known.
+    if (attribution.kind !== 'member' || line.salePeriod === null) continue;
+    counted.push({
+      platform: line.platform,
+      platformSaleId: line.platformSaleId,
+      event: line.event,
+      platformAccountId: line.platformAccountId,
+      currency: line.currency,
+      netMinor: line.netMinor,
+      salePeriod: line.salePeriod,
+      memberId: attribution.memberId,
+      linkVersion: attribution.linkVersion,
+      lateFrom: lateFrom(line.salePeriod, place.period),
+    });
+  }
+  return byKey(counted, (one) => one);
 }
 
 /**
@@ -300,7 +335,7 @@ export function salesHeld(sales: SalesSnapshot, place: PeriodPlace): HeldSale[] 
     const attribution = saleAttribution(line, sales);
     if (attribution.kind === 'held') held.push({ line, reason: attribution.reason });
   }
-  return byKey(held);
+  return byKey(held, (one) => one.line);
 }
 
 /**
@@ -337,11 +372,11 @@ export function saleLinesOf(counted: readonly CountedSale[]): SaleLineGroup[] {
     string,
     { platformAccountId: PlatformAccountId; currency: Currency; sales: CountedSale[] }
   >();
-  for (const one of byKey(counted)) {
-    const key = `${one.line.platformAccountId} ${one.line.currency}`;
+  for (const one of byKey(counted, (item) => item)) {
+    const key = `${one.platformAccountId} ${one.currency}`;
     const group = groups.get(key) ?? {
-      platformAccountId: one.line.platformAccountId,
-      currency: one.line.currency,
+      platformAccountId: one.platformAccountId,
+      currency: one.currency,
       sales: [],
     };
     group.sales.push(one);
@@ -352,12 +387,12 @@ export function saleLinesOf(counted: readonly CountedSale[]): SaleLineGroup[] {
     .map(([, group]) => ({
       platformAccountId: group.platformAccountId,
       currency: group.currency,
-      netMinor: group.sales.reduce((total, one) => total + one.line.netMinor, 0),
+      netMinor: group.sales.reduce((total, one) => total + one.netMinor, 0),
       sales: group.sales.map((one) => ({
-        platform: one.line.platform,
-        platformSaleId: one.line.platformSaleId,
-        event: one.line.event,
-        netMinor: one.line.netMinor,
+        platform: one.platform,
+        platformSaleId: one.platformSaleId,
+        event: one.event,
+        netMinor: one.netMinor,
         linkVersion: one.linkVersion,
         ...(one.lateFrom !== null && { lateFrom: one.lateFrom }),
       })),
