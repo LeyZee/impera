@@ -52,7 +52,11 @@ export function SalesSettings({
       saving.current = saving.current.then(async () => {
         try {
           const saved = await saveSaleSettings(next);
-          if (pending.current === 1) setLoad({ kind: 'ready', entries: saved.settings });
+          if (pending.current === 1) {
+            // The last save sends the whole state: an earlier failure is saved now, its notice goes.
+            setNotice(null);
+            setLoad({ kind: 'ready', entries: saved.settings });
+          }
         } catch {
           setNotice('Le réglage n’a pas été enregistré. Réessaie dans un instant.');
           if (pending.current === 1) await refresh();

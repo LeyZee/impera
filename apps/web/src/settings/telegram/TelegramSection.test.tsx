@@ -297,7 +297,7 @@ describe('Réglages › Telegram, her own alerts (P4-01)', () => {
     const hint = 'Sans groupe choisi ici, un mot-clé ne prévient personne sur Telegram.';
     expect(await screen.findByText(hint)).toBeTruthy();
     // The keywords are not « Important »: that line no longer claims them.
-    expect(screen.getByText('Plafond IA, session expirée, agent arrêté')).toBeTruthy();
+    expect(screen.getByText('Plafond IA à 80 %, session expirée, agent arrêté')).toBeTruthy();
     const row = screen.getByRole('group', { name: 'Groupes pour Mots-clés' });
     fireEvent.click(within(row).getByRole('checkbox', { name: /Équipe/ }));
     await waitFor(() => {
@@ -472,6 +472,29 @@ describe('Réglages › Telegram, the sales settings (CRM-04)', () => {
       expect(saveSaleSettings).toHaveBeenLastCalledWith([
         { creatorId: null, minimumMinor: 0, agentOnly: false, eveningDigest: true },
       ]);
+    });
+  });
+
+  it('drops the failure notice once a later save goes through: it sent the whole state', async () => {
+    // The first save fails while the second already waits behind it.
+    let failFirst: (reason: Error) => void = () => undefined;
+    vi.mocked(saveSaleSettings).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failFirst = reject;
+        }),
+    );
+    await openSales();
+    fireEvent.click(screen.getByRole('switch', { name: /Bilan du soir/ }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Celles de l’agent seulement' }));
+    failFirst(new Error('offline'));
+    await waitFor(() => {
+      expect(saveSaleSettings).toHaveBeenLastCalledWith([
+        { creatorId: null, minimumMinor: 0, agentOnly: true, eveningDigest: false },
+      ]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/n’a pas été enregistré/)).toBeNull();
     });
   });
 
