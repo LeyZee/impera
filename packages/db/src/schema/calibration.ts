@@ -2,7 +2,7 @@ import { DestinationSchema, type Verdict } from '@nirvana/contracts';
 import { sql } from 'drizzle-orm';
 import { check, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
+import { closedToCreator, createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { creators } from './tenancy';
 
 const VERDICT_KINDS = ['validated', 'corrected', 'rejected'] as const satisfies readonly Verdict['kind'][];
@@ -45,5 +45,6 @@ export const calibrationRatings = pgTable(
     index('calibration_ratings_creator_at_idx').on(t.creatorId, t.ratedAt.desc()),
     index('calibration_ratings_version_idx').on(t.creatorId, t.voicePrompt, t.voiceModel, t.ratedAt.desc()),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );

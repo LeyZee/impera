@@ -2,6 +2,7 @@ import { KillSwitchScopeSchema } from '@nirvana/contracts';
 import { boolean, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
 import {
+  closedToCreator,
   createdAt,
   enumCheck,
   enumText,
@@ -27,7 +28,11 @@ export const notifications = pgTable(
     readAt: timestampTz('read_at'),
     createdAt: createdAt(),
   },
-  (t) => [index('notifications_user_unread_idx').on(t.userId, t.readAt), tenantPolicy(t.creatorId)],
+  (t) => [
+    index('notifications_user_unread_idx').on(t.userId, t.readAt),
+    tenantPolicy(t.creatorId),
+    closedToCreator(),
+  ],
 );
 
 /** A `global` kill switch has no creator and stays visible to every tenant. */
@@ -47,5 +52,6 @@ export const killSwitches = pgTable(
     enumCheck('kill_switches', t.scope, KillSwitchScopeSchema.options),
     index('kill_switches_scope_idx').on(t.scope, t.scopeId),
     ...tenantOrGlobalPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );

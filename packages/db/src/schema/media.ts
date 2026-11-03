@@ -2,7 +2,7 @@ import { CurrencySchema } from '@nirvana/contracts';
 import { sql } from 'drizzle-orm';
 import { bigint, char, check, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
+import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
 import { conversations, messages } from './conversations';
 import { fans } from './fans';
 import { creators } from './tenancy';
@@ -37,6 +37,7 @@ export const mediaAssets = pgTable(
     enumCheck('media_assets', t.origin, MEDIA_ORIGINS),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );
 
@@ -56,7 +57,11 @@ export const mediaDescriptions = pgTable(
     promptHash: text('prompt_hash').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index('media_descriptions_asset_idx').on(t.mediaAssetId), tenantPolicy(t.creatorId)],
+  (t) => [
+    index('media_descriptions_asset_idx').on(t.mediaAssetId),
+    tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
+  ],
 );
 
 /** Anti-duplicate: a paid media is never sold twice to the same fan. */
@@ -86,5 +91,6 @@ export const mediaSends = pgTable(
     check('media_sends_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     index('media_sends_fan_media_idx').on(t.fanId, t.mediaAssetId),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );

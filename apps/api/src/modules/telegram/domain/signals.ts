@@ -1,6 +1,7 @@
 import type {
   AlertRef,
   AutomaticMissing,
+  Currency,
   ConversationId,
   ContractorDocumentKind,
   CreatorId,
@@ -11,6 +12,8 @@ import type {
   KillSwitchScope,
   PayoutBlock,
   PayPeriod,
+  SaleSeller,
+  SaleType,
   SecurityAlertPayload,
   TelegramTopic,
 } from '@nirvana/contracts';
@@ -138,6 +141,17 @@ export type Signal =
       readonly memberId: string;
       readonly document: ContractorDocumentKind;
       readonly lastDay: string;
+    }
+  | {
+      /**
+       * A fresh sale read in a platform's register (CRM-04 lot b): its kind, the price the fan paid (VAT included, the
+       * figure the team sees in the platform) and who sold it. Never the fan, never the sale's key.
+       */
+      readonly kind: 'sale';
+      readonly saleType: SaleType;
+      readonly currency: Currency;
+      readonly grossInclVatMinor: number;
+      readonly seller: SaleSeller;
     }
   | {
       /** Automatique closed on its own (ADR 0019): its conversations went back to the copilot. */

@@ -77,6 +77,7 @@ export function apiDashboard(patch: Partial<ApiDashboard> = {}): ApiDashboard {
       },
     ],
     usdSales: { seen: false, rate: null },
+    revealSales: null,
     ...patch,
   });
 }

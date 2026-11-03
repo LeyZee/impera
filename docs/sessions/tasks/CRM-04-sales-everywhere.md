@@ -41,7 +41,7 @@ Une fonction pure, `salesTotals`, dans le domaine de `connectors`, avec son port
 
 ### Lot b : Telegram (`telegram` ; le fil Telegram relit, Extension pour l'onglet)
 
-- Alerte de vente dans le sujet « Ventes ». Son montant est le prix payé par le fan (TTC), celui que l'équipe voit dans Reveal (question 2). Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan.
+- [x] Alerte de vente dans le sujet « Ventes ». Son montant est le prix payé par le fan (TTC), celui que l'équipe voit dans Reveal (question 2). Exemple inventé : « Vente · Nora · PPV · 45,00 € · vendue par Théo », ou « … · vendue par l'agent », « … · chatteur non relié », ou « … · sans chatteur ». Jamais un fan. Lot b1 : toutes les ventes sonnent tant que les réglages n'existent pas ; une ligne de l'outbox illisible fait avancer le curseur du scan.
 - Réglages des ventes (P3-07), par créatrice ou pour toutes, dans `telegram_settings` qui existe déjà : un montant minimum sur ce même prix (question 2), « ventes de l'agent seulement » ou « toutes », et le bilan du soir allumé ou non.
 - Bilan du soir à 23 h, dans le fuseau de la créatrice, envoyé aux groupes du sujet « Ventes ». Pour chaque créatrice : le chiffre d'affaires, le net, les deux parts, le nombre de ventes et de remboursements, puis le détail par chatteur (son nom), l'agent et « sans chatteur ». Le job `telegram.evening_digest` est branché dans le crontab par Bilan, dans ce lot.
 - L'onglet Ventes de Réglages › Telegram passe de « bientôt » aux vrais réglages.
@@ -122,3 +122,4 @@ Posées à Charles le 03/11 avec ces recommandations, toutes acceptées par lui 
 
 - 03/11, Équipe, lot a : règle des jours extraite de la vérification (`domain/sale-days.ts`), `salesTotals` et `salesFeedTotals.totalsOf`, `sale_detected` publié par `recordPage` dans la fenêtre de 15 minutes, contrats `SaleSellerSchema`, `SalesTotalsSchema` et payload de `sale_detected`. Reste : lots b, c et d, après les réponses de Charles.
 - 03/11, Charles : « ok recos », les six recommandations acceptées. Lot b au fil Telegram, lot c au fil Agent, retrait de « qui a vendu » de CR-04 au fil Chantier 7 ; ADR 0054 pour la question 4 ; lot d à Équipe après CR-02 et CR-04.
+- 03/11, Agent, lot c : section « Ventes lues chez » la plateforme sur le Dashboard (`revealSalesPanel`, lecteur sous `withTenantMember`, contrat `revealSales`), quatre sortes de vendeur pour le propriétaire et un manager actif, rien pour une lecture de portée « soi » ni pour la créatrice. Les alertes des questions 5 et 6 restent aux lots d et b.

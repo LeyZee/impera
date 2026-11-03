@@ -18,6 +18,18 @@ La créatrice dépose une séance ou une vidéo pour le feed, ou des médias pou
 - [ ] Compartiment à part, **sans verrou d'objet** (celui des factures, ADR 0037, n'efface jamais) ; chaque original porte sa date d'effacement en base (publication ou envoi + 30 jours, ou retrait du dépôt) ; un job rejouable efface à cette date ; à la publication ou à l'envoi, l'original est copié sous le préfixe `released/` et l'objet d'origine effacé, et seule ce préfixe porte une règle de cycle de vie (35 jours), en filet : un dépôt en attente n'est jamais effacé par elle ; un effacement refusé passe en ambre ; trace au journal.
 - [ ] Écran Contenu : déposer (choix séance ou vidéo pour le feed), voir les dépôts en attente, les retirer.
 
+## Amendement de l'ADR 0055 (acceptée le 03/11/2026)
+- [ ] L'usage `feed` | `mass_dm` devient la catégorie fermée `drop_category` de l'ADR 0055 § 1, choisie par la créatrice ; correction par l'agence au journal ; catégories affichées selon les sorties branchées et les réglages.
+- [ ] Vérification du format par catégorie, par les métadonnées du fichier (`ffprobe`), refus immédiat avec une phrase claire (§ 2).
+- [ ] Retrait des métadonnées (EXIF, GPS, appareil ; équivalents vidéo) à la réception, avant tout stockage durable ; empreinte du fichier nettoyé ; nom d'origine jamais gardé (§ 3).
+- [ ] Demandes de contenu (`content_request`) : catégorie, échéance, raison ; tâche dans l'Agenda ; sources code (stock), cadence (SC-02), agence ; rappels la veille et le jour même (§ 4).
+- [ ] Stock par catégorie et seuil réglable (§ 5) ; états Reçu, Prêt, Programmé, Publié, ambre (§ 6) ; 30 jours après la dernière sortie (§ 7).
+- [ ] Onglet Contenu dans l'ordre de l'ADR 0055 § 8 : À tourner, Déposer (grille de catégories), En route, Ton stock, Publié.
+- [ ] `ffprobe` dans le worker, avec délai et poids maximaux vérifiés avant l'appel ; test qui dépose un fichier inventé portant du GPS et prouve qu'il n'en reste rien après nettoyage, ni dans l'EXIF ni dans les atomes QuickTime ; le brut sous son préfixe, effacé après nettoyage, expiration 24 h (relecture Bilan).
+- [ ] Écritures de la créatrice (déposer, refuser une demande) par des politiques RLS étroites : sa créatrice seulement, et pour une demande la seule transition vers « refusée » ; aucune politique générale d'écriture (CR-02 la garde en lecture seule).
+- [ ] Numéros de migration attribués par Bilan au moment du lot.
+- [ ] Écran (relecture Extension) : sections vides cachées ; stock lu en temps (« Prêt jusqu'à dimanche »), seules les catégories sous seuil mises en avant ; grille « Déposer » groupée par sortie (Reveal, Instagram, Telegram) ; la tuile Script ne s'ouvre que depuis une demande ; ambre seulement quand elle a quelque chose à faire ; format vérifié avant l'envoi ; un dépôt Programmé porte « corriger la légende » et « retirer ».
+
 ## Critères d'acceptation
 - Tests : empreinte en double, sorte obligatoire pour le feed, effacement à J+30 seulement après publication, lecture refusée à une autre créatrice ; intégration avec MinIO comme pour les factures.
 - Dépôt d'une vidéo de 500 Mo depuis un téléphone en 4G, reprise après coupure ; une vidéo plus lourde ou une photo de plus de 30 Mo refusée avec un texte clair.

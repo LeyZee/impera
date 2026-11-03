@@ -3,3 +3,4 @@ Fait : fiche CR-04 corrigée sur décision de Charles (« ok recos » sur la fic
 Décisions : aucune de plus que celle de Charles.
 Pas fait : le code de CR-04 (fiche à faire).
 Découvertes : aucune.
+Suite (même jour) : l'ADR 0054 fusionnée (#453), la fiche la cite comme acceptée et non plus « à venir ».

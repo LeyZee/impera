@@ -1,7 +1,7 @@
 import { CurrencySchema, LlmRoleSchema } from '@nirvana/contracts';
 import { bigint, boolean, char, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
-import { createdAt, enumCheck, enumText, id, tenantPolicy } from './columns';
+import { closedToCreator, createdAt, enumCheck, enumText, id, tenantPolicy } from './columns';
 import { conversations } from './conversations';
 import { creators } from './tenancy';
 
@@ -52,5 +52,6 @@ export const llmCalls = pgTable(
     enumCheck('llm_calls', t.currency, CurrencySchema.options),
     index('llm_calls_creator_created_idx').on(t.creatorId, t.createdAt),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );

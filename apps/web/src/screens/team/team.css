@@ -902,19 +902,85 @@
   flex-wrap: wrap;
   gap: var(--nv-space-2);
 }
-.tm-color {
-  display: flex;
-  align-items: center;
-  gap: var(--nv-space-3);
-}
-.tm-color__well {
-  width: 44px;
-  height: 32px;
+/* « Couleur du planning » : the palette's twelve shades, the chosen one ringed and ticked, never by colour alone. */
+.tm-shades-field {
+  margin: 0;
   padding: 0;
   border: 0;
-  border-radius: var(--nv-radius-sm);
-  background: transparent;
+  min-width: 0;
+}
+.tm-shades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  /* The first dot lines up with the label; its tap target spills into the margin. */
+  margin-inline-start: -6px;
+}
+.tm-shade {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   cursor: pointer;
+}
+.tm-shade__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  border-radius: 50%;
+  opacity: 0;
+  cursor: pointer;
+}
+.tm-shade__dot {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--tm-shade);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.tm-shade:hover .tm-shade__dot {
+  transform: scale(1.1);
+}
+.tm-shade__input:checked + .tm-shade__dot {
+  box-shadow:
+    0 0 0 2px var(--nv-surface-raised),
+    0 0 0 4px var(--tm-shade);
+}
+/* The tick: what says « chosen » to an eye that does not tell the shades apart. */
+.tm-shade__input:checked + .tm-shade__dot::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 9px;
+  width: 5px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.tm-shade__input:focus-visible + .tm-shade__dot {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 5px;
+}
+@media (max-width: 820px), (pointer: coarse) {
+  .tm-shades {
+    margin-inline-start: -10px;
+  }
+  .tm-shade {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-shade__dot {
+    transition: none;
+  }
+  .tm-shade:hover .tm-shade__dot {
+    transform: none;
+  }
 }
 .tm-sure {
   display: inline-flex;
