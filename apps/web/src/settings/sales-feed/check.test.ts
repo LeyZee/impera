@@ -1,4 +1,4 @@
-import type { SalesFeedChatterLink, SalesFeedCheckChatter } from '@nirvana/contracts';
+import type { SalesFeedChatterLink, SalesFeedCheckChatter, SalesFeedCheckReport } from '@nirvana/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,11 +7,14 @@ import {
   figureGap,
   fortnightsOver,
   gap,
+  isWholeFortnight,
   lastDayOver,
   money,
   noteText,
   rangeLabel,
   rangeProblem,
+  readBefore,
+  switchLine,
 } from './check';
 
 describe('the days a check can cover', () => {
@@ -57,6 +60,48 @@ describe('the days a check can cover', () => {
     expect(rangeProblem({ from: '2026-10-01', to: '2026-10-31' }, last)).toBeNull();
     expect(rangeProblem({ from: '2026-10-01', to: '2026-11-01' }, last)).toMatch(/31 jours au plus/u);
     expect(rangeProblem({ from: '', to: '2026-10-31' }, last)).toMatch(/Choisis/u);
+  });
+});
+
+describe('what a report says of the switch (CRM-03)', () => {
+  it('knows a whole fortnight, February and the 31st included', () => {
+    expect(isWholeFortnight({ from: '2026-10-16', to: '2026-10-31' })).toBe(true);
+    expect(isWholeFortnight({ from: '2026-11-01', to: '2026-11-15' })).toBe(true);
+    expect(isWholeFortnight({ from: '2027-02-16', to: '2027-02-28' })).toBe(true);
+    expect(isWholeFortnight({ from: '2026-10-16', to: '2026-10-30' })).toBe(false);
+    expect(isWholeFortnight({ from: '2026-10-20', to: '2026-10-20' })).toBe(false);
+    expect(isWholeFortnight({ from: '', to: '2026-10-31' })).toBe(false);
+  });
+
+  const fortnight: Pick<SalesFeedCheckReport, 'from' | 'to' | 'verdict' | 'notes'> = {
+    from: '2026-10-16',
+    to: '2026-10-31',
+    verdict: 'match',
+    notes: [],
+  };
+
+  it('says a clean report can carry the switch, and nothing before the server said', () => {
+    expect(switchLine(fortnight, true)?.tone).toBe('ok');
+    expect(switchLine(fortnight, null)).toBeNull();
+  });
+
+  it('says why a report that agrees cannot: days that are not a fortnight, or a note to settle', () => {
+    expect(switchLine({ ...fortnight, from: '2026-10-20', to: '2026-10-20' }, false)?.text).toMatch(
+      /mais pas sur une quinzaine entière/u,
+    );
+    expect(switchLine(fortnight, false)?.text).toMatch(/une note ci-dessus reste à régler/u);
+  });
+
+  it('adds nothing to a verdict that already says it differs or misses a source', () => {
+    expect(switchLine({ ...fortnight, verdict: 'mismatch' }, false)).toBeNull();
+    expect(switchLine({ ...fortnight, verdict: 'incomplete' }, false)).toBeNull();
+  });
+
+  it('says how long before the check the register had been read', () => {
+    expect(readBefore('2026-11-03T08:59:30Z', '2026-11-03T09:00:05Z')).toBe('juste avant');
+    expect(readBefore('2026-11-03T08:57:00Z', '2026-11-03T09:00:05Z')).toBe('3 min avant');
+    expect(readBefore('2026-11-03T06:00:00Z', '2026-11-03T09:00:05Z')).toBe('3 h avant');
+    expect(readBefore('2026-11-01T06:00:00Z', '2026-11-03T09:00:05Z')).toMatch(/^le 1er nov\. à/u);
   });
 });
 
@@ -136,6 +181,31 @@ describe('the notes', () => {
       noteText({ kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' }, 'Reveal', linked, names),
     ).toBe(
       'Le compte bot « Bot Nirvana » est relié à « Ana T. » : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
+    );
+  });
+
+  it('says the link the report saw, not the one set since: a kept report is read again later', () => {
+    const reported: SalesFeedCheckChatter[] = [
+      {
+        platformChatterId: 'c-bot',
+        isBot: true,
+        link: 'member',
+        register: { net: 0, sales: 0 },
+        stats: null,
+        differs: false,
+      },
+    ];
+    // Linked to nobody now, linked to a member when the check ran.
+    expect(
+      noteText(
+        { kind: 'bot_not_linked_to_agent', platformChatterId: 'c-bot' },
+        'Reveal',
+        CHATTERS,
+        () => null,
+        reported,
+      ),
+    ).toBe(
+      'Le compte bot « Bot Nirvana » est relié à un membre : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe Reveal ».',
     );
   });
 

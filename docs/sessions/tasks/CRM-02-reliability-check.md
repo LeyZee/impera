@@ -42,3 +42,8 @@ La bascule elle-même (CRM-03).
 - Réglages › Ventes, bloc « Vérification de fiabilité » sous les liens, tant que la clé est lue (`connected`) : les deux dernières quinzaines terminées (1er–15, 16–fin du mois, heure de Paris) ou d'autres jours, refusés avant l'appel s'ils comptent aujourd'hui ou plus de 31 jours ; l'export choisi sur l'appareil, lu en UTF-8 puis en Windows-1252 (CSV d'un tableur français), 2 000 000 caractères au plus, envoyé en texte et gardé nulle part.
 - Le rapport : verdict (ambre pour un écart ou une comparaison incomplète, jamais rouge), jours de la plateforme et `registerReadAt`, notes en phrases, totaux des trois sources avec l'écart au registre, jours en écart détaillés par figure, tous les jours repliés, puis chaque membre de l'équipe (nom chez la plateforme, lien Nirvana, net et nombre de ventes, l'écart sur le net seul).
 - Reste : inchangé pour Bilan et Équipe (vrai export, devise, commissions) ; lancer la vérification avec la clé de Charles.
+
+03/11/2026, Extension, PR 3 (le dernier rapport réaffiché) :
+- Au retour sur Réglages › Ventes, le dernier rapport gardé (`GET …/check`, #426) s'affiche sous le formulaire, avec sa date (« Vérifié il y a 3 h ») et l'avance du registre sur la vérification (« registre lu 2 min avant ») ; une vérification lancée depuis le remplace.
+- Ce que le rapport dit de la bascule vient du serveur (`clean`, relu après chaque vérification) : une ligne discrète quand il pourra la porter, ambre quand tout concorde mais pas sur une quinzaine entière, ou qu'une note reste à régler. Les « Autres jours » rappellent que la bascule demandera une quinzaine entière.
+- La note d'un bot relié à un membre suit le lien que le rapport a vu (`chatters[].link`), pas celui posé depuis.

@@ -1,8 +1,11 @@
 import {
+  payPeriodLastDay,
+  payPeriodOfDay,
   SALES_FEED_CHECK_MAX_DAYS,
   type SalesFeedCheckChatter,
   type SalesFeedCheckDay,
   type SalesFeedCheckNote,
+  type SalesFeedCheckReport,
   type SalesFeedCheckTotals,
   type SalesFeedCheckVerdict,
   type SalesFeedChatterLink,
@@ -104,6 +107,13 @@ export function rangeProblem(range: DayRange, lastOver: string): string | null {
   return null;
 }
 
+/** Whole fortnight: the 1st to the 15th, or the 16th to the month's end, as pay counts them (ADR 0023, ADR 0050 § 8). */
+export function isWholeFortnight({ from, to }: DayRange): boolean {
+  if (from === '' || to === '') return false;
+  const period = payPeriodOfDay(from);
+  return from === period && to === payPeriodLastDay(period);
+}
+
 /** The export goes up as text, 2 000 000 characters at most (the contract's bound). */
 export const EXPORT_MAX_CHARS = 2_000_000;
 
@@ -184,6 +194,42 @@ export function verdictOf(verdict: SalesFeedCheckVerdict): VerdictView {
   }
 }
 
+/**
+ * What a report says of the switch to the platform's net (CRM-03): the server decides (`clean`), this only says why a
+ * report that agrees cannot carry it. `null` when there is nothing to add to the verdict, or before the server said.
+ */
+export function switchLine(
+  report: Pick<SalesFeedCheckReport, 'from' | 'to' | 'verdict' | 'notes'>,
+  clean: boolean | null,
+): { readonly tone: 'ok' | 'low'; readonly text: string } | null {
+  if (clean === true) {
+    return {
+      tone: 'ok',
+      text: 'Une quinzaine entière, et tout concorde : la bascule du compte pourra s’appuyer sur ce rapport.',
+    };
+  }
+  if (clean === null || report.verdict !== 'match') return null;
+  if (!isWholeFortnight(report)) {
+    return {
+      tone: 'low',
+      text: 'Tout concorde, mais pas sur une quinzaine entière (du 1er au 15, ou du 16 à la fin du mois) : la bascule ne s’appuiera pas sur ce rapport.',
+    };
+  }
+  return {
+    tone: 'low',
+    text: 'Tout concorde, mais une note ci-dessus reste à régler : la bascule ne s’appuiera pas sur ce rapport.',
+  };
+}
+
+/** How long before the check the register had last been read: « juste avant », « 3 min avant », then the day. */
+export function readBefore(registerReadAt: string, generatedAt: string): string {
+  const minutes = Math.floor((Date.parse(generatedAt) - Date.parse(registerReadAt)) / 60_000);
+  if (minutes < 1) return 'juste avant';
+  if (minutes < 60) return `${String(minutes)} min avant`;
+  if (minutes < 24 * 60) return `${String(Math.floor(minutes / 60))} h avant`;
+  return `le ${dayTime(registerReadAt)}`;
+}
+
 const plural = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
 
@@ -193,6 +239,7 @@ export function noteText(
   platform: string,
   chatters: readonly SalesFeedChatterLink[],
   memberName: (memberId: string) => string | null = () => null,
+  reported: readonly SalesFeedCheckChatter[] = [],
 ): string {
   switch (note.kind) {
     case 'refund_without_sale':
@@ -200,10 +247,14 @@ export function noteText(
     case 'bot_not_linked_to_agent': {
       const chatter = chatters.find((one) => one.platformChatterId === note.platformChatterId);
       const name = chatter === undefined ? note.platformChatterId : chatterName(chatter);
-      // A bot linked to a member is the worse case: the agent's sales would pay that member a commission.
-      if (chatter?.link?.kind === 'member') {
-        const member = memberName(chatter.link.memberId) ?? 'un membre';
-        return `Le compte bot « ${name} » est relié à « ${member} » : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe ${platform} ».`;
+      // A bot linked to a member is the worse case: the agent's sales would pay that member a commission. The link
+      // is the one the report saw (a kept report is read again later), named after the member it points to now.
+      const row = reported.find((one) => one.platformChatterId === note.platformChatterId);
+      const linkedTo = row === undefined ? (chatter?.link?.kind ?? null) : row.link;
+      if (linkedTo === 'member') {
+        const member = chatter?.link?.kind === 'member' ? memberName(chatter.link.memberId) : null;
+        const whom = member === null ? 'un membre' : `« ${member} »`;
+        return `Le compte bot « ${name} » est relié à ${whom} : ses ventes lui compteraient. Relie-le à l’agent dans « Équipe ${platform} ».`;
       }
       return `Le compte bot « ${name} » n’est pas relié à l’agent : ses ventes ne compteraient pour personne. Relie-le dans « Équipe ${platform} ».`;
     }

@@ -17,6 +17,8 @@ import {
   money,
   noteText,
   rangeLabel,
+  readBefore,
+  switchLine,
   verdictOf,
 } from './check';
 import { ago } from './view';
@@ -68,18 +70,22 @@ function Cell({
  */
 export function CheckReport({
   report,
+  clean,
   platformName,
   models,
   chatters,
   now,
 }: {
   report: SalesFeedCheckReport;
+  /** Whether the switch to the platform's net can rest on it (server's rule), `null` before it said. */
+  clean: boolean | null;
   platformName: string;
   models: readonly SalesFeedModelLink[];
   chatters: readonly SalesFeedChatterLink[];
   now: Date;
 }): JSX.Element {
   const verdict = verdictOf(report.verdict);
+  const toSwitch = switchLine(report, clean);
   const hasMembers = chatters.some((chatter) => chatter.link?.kind === 'member');
   const members = useMembers(hasMembers);
   const memberName = (memberId: string): string | null =>
@@ -99,9 +105,11 @@ export function CheckReport({
           <h4 className="sf-verdict__title">{verdict.title}</h4>
           <p className="sv-muted">{verdict.line}</p>
           <p className="sf-meta">
-            {rangeLabel(report).replace(/^./u, (first) => first.toUpperCase())}, jours de {platformName} (
+            Vérifié {ago(report.generatedAt, now)} · {rangeLabel(report)}, jours de {platformName} (
             {zoneName(report.timeZone)}) · registre lu{' '}
-            {report.registerReadAt === null ? 'jamais' : ago(report.registerReadAt, now)}
+            {report.registerReadAt === null
+              ? 'jamais'
+              : readBefore(report.registerReadAt, report.generatedAt)}
           </p>
         </div>
       </div>
@@ -110,11 +118,18 @@ export function CheckReport({
         <ul className="sf-notes">
           {report.notes.map((note) => (
             <li key={JSON.stringify(note)} className="sf-warn">
-              {noteText(note, platformName, chatters, memberName)}
+              {noteText(note, platformName, chatters, memberName, report.chatters)}
             </li>
           ))}
         </ul>
       ) : null}
+
+      {toSwitch === null ? null : (
+        <p className="sf-switch" data-tone={toSwitch.tone}>
+          <span className="sv-dot" data-dot={toSwitch.tone} aria-hidden="true" />
+          {toSwitch.text}
+        </p>
+      )}
 
       <section className="sf-block" aria-labelledby="sf-check-total">
         <h5 id="sf-check-total" className="sf-block__title">
