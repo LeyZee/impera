@@ -553,7 +553,7 @@ const NONE = '—';
  */
 function netDetail(account: StatementAnnexSource['accounts'][number]): string {
   const name = PLATFORM_NAMES[account.platform];
-  const net = `Net ${name} des ventes lues, TVA et commission de ${name} déjà retenues`;
+  const net = `Net ${/^[AEIOUY]/iu.test(name) ? 'd’' : 'de '}${name} des ventes lues, la TVA et sa commission déjà retenues`;
   return account.currency === 'EUR'
     ? net
     : `${net}${COLON}${inCurrency(account.grossMinor, account.currency)} convertis à ${rateWords(account.currency, account.rateMicros, account.rateOn)}`;

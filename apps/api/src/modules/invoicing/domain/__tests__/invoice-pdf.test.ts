@@ -298,7 +298,7 @@ describe('Équipe › Factures : ce que la facture imprime (EQ-06 lot 4, audit d
       [['@awa.demo · Reveal', '2 315,50 €', '-385,92 €', '-77,18 €', '1 852,40 €', '40 %', '740,96 €'], null],
       [
         ['@awa.second · Reveal', '—', '—', '—', '412,50 €', '40 %', '165,00 €'],
-        'Net Reveal des ventes lues, TVA et commission de Reveal déjà retenues',
+        'Net de Reveal des ventes lues, la TVA et sa commission déjà retenues',
       ],
     ]);
     // The chain's totals are those of its rows; the net and the commissions, every row's.
@@ -359,11 +359,11 @@ describe('Équipe › Factures : ce que la facture imprime (EQ-06 lot 4, audit d
     ).toEqual([
       [
         ['@awa.demo · Reveal', '1 852,40 €', '40 %', '740,96 €'],
-        'Net Reveal des ventes lues, TVA et commission de Reveal déjà retenues : 2 005,93 $US convertis à 1 $US = 0,923456 € (cours BCE du 13 novembre 2026)',
+        'Net de Reveal des ventes lues, la TVA et sa commission déjà retenues : 2 005,93 $US convertis à 1 $US = 0,923456 € (cours BCE du 13 novembre 2026)',
       ],
       [
         ['@awa.second · Reveal', '412,50 €', '40 %', '165,00 €'],
-        'Net Reveal des ventes lues, TVA et commission de Reveal déjà retenues',
+        'Net de Reveal des ventes lues, la TVA et sa commission déjà retenues',
       ],
     ]);
     expect(content.annex?.accounts.total.map((cell) => plain(cell.text))).toEqual([

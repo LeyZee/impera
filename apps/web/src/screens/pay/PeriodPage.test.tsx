@@ -335,6 +335,9 @@ describe('Paie › Quinzaine', () => {
     });
     periods[OCT2] = periodOf(OCT2, [statementOf(THEO, OCT2, { lines: [onNet] })]);
     renderPage(OWNER);
+    expect(text(await screen.findByText(/^Le premier relevé validé clôt la quinzaine/u))).toBe(
+      'Le premier relevé validé clôt la quinzaine pour toute l’équipe. Un rapport validé ou une vente lue ensuite ira sur la quinzaine du 1er au 15 novembre.',
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Valider (1)' }));
     const dialog = await screen.findByRole('dialog');
     expect(text(dialog)).toContain('Ventes comptées');

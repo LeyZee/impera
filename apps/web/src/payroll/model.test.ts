@@ -41,6 +41,7 @@ import {
   gaugePercent,
   goalSpanBps,
   heroPeriodOf,
+  lateWords,
   mainLine,
   memberFacts,
   memberPeriodAmount,
@@ -390,7 +391,7 @@ describe('the money of a statement', () => {
     const steps = (one: CommissionStatementLine, platform: Platform | null) =>
       flowOf(one, 2_500, platform, true).map((step) => plain(`${step.label} | ${step.op} | ${step.amount}`));
     expect(steps(onNet({}), 'reveal')).toEqual([
-      'Net Reveal | 3 ventes lues | 85,00 €',
+      'Net de Reveal | 3 ventes lues | 85,00 €',
       'Ta commission | 25 % | 21,25 €',
     ]);
     expect(
@@ -422,6 +423,18 @@ describe('the money of a statement', () => {
     expect(counted(12, 1, 2)).toBe('12 ventes lues, 1 remboursement, dont 2 après la clôture d’avant');
     expect(counted(0, 2, 0)).toBe('0 vente lue, 2 remboursements');
     expect(countedSalesText(line())).toBeNull();
+  });
+
+  it('says that a sale read after the closing goes on the next period too, once a line is on the platform’s net', () => {
+    const onNet = line({
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 0, late: 0, lateNetMinor: 0 },
+    });
+    expect(lateWords([statement()])).toBe('un rapport validé');
+    expect(lateWords([statement(), statement({ lines: [line(), onNet] })])).toBe(
+      'un rapport validé ou une vente lue',
+    );
+    expect(lateWords([])).toBe('un rapport validé');
   });
 
   it('adds up to what is paid, a carry-over said before it, a capped penalty with what it asked', () => {

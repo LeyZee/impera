@@ -397,13 +397,13 @@ describe('CommissionsPage', () => {
     renderPage();
     const path = await waitFor(() => panel('Le parcours de ton argent'));
     expect(text(path)).toContain('3 ventes lues, 1 remboursement, dont 1 après la clôture d’avant');
-    expect(text(path)).toContain('Net Reveal');
+    expect(text(path)).toContain('Net de Reveal');
     expect(text(path)).not.toContain('Hors TVA');
     const performance = panel('Ma performance');
     // 200 € of net to go, and the net is Reveal's already: 200 € of it, nothing to take back.
     await waitFor(() => {
       expect(text(performance)).toContain(
-        'Soit environ 200 € de net Reveal d’ici le dimanche 15 novembre, pour +10,00 €.',
+        'Soit environ 200 € de net de Reveal d’ici le dimanche 15 novembre, pour +10,00 €.',
       );
     });
   });

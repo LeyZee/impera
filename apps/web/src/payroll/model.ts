@@ -297,9 +297,24 @@ export interface FlowStep {
   readonly amount: string;
 }
 
-/** « Net Reveal », « Net de la plateforme »: the name of a line's net on the platform's net (CRM-03). */
-export const platformNetName = (platform: Platform | null): string =>
-  platform === null ? 'Net de la plateforme' : `Net ${platformName(platform)}`;
+/** « de Reveal », « de la plateforme »: the platform after « de », elided before a vowel. */
+export function ofPlatform(platform: Platform | null): string {
+  const where = platform === null ? 'la plateforme' : platformName(platform);
+  return `${/^[AEIOUY]/iu.test(where) ? 'd’' : 'de '}${where}`;
+}
+
+/**
+ * « Net de Reveal »: what is left of a sale once the VAT and the platform's commission are taken. One name for one
+ * figure, whether the chain of the ADR 0023 computed it from reports or the platform gave it (CRM-03).
+ */
+export const platformNetName = (platform: Platform | null): string => `Net ${ofPlatform(platform)}`;
+
+/** « un rapport validé ou une vente lue »: what may still reach a period after its closing (CRM-03). */
+export function lateWords(statements: readonly Pick<CommissionStatement, 'lines'>[]): string {
+  return statements.some((one) => one.lines.some((line) => line.base === 'platform_net'))
+    ? 'un rapport validé ou une vente lue'
+    : 'un rapport validé';
+}
 
 /**
  * « 12 ventes lues, 1 remboursement, dont 2 après la clôture d’avant »: what a line on the platform's net counted
@@ -355,10 +370,9 @@ export function flowOf(
       op: line.vatBps === 0 ? 'sans TVA' : `TVA ${percentText(line.vatBps)}`,
       amount: amountText(line.exclVatMinor, 'EUR'),
     });
-    const where = platform === null ? 'la plateforme' : platformName(platform);
     steps.push({
-      label: `Net ${/^[AEIOUY]/iu.test(where) ? 'd’' : 'de '}${where}`,
-      op: `${where} ${percentText(line.platformFeeBps)}`,
+      label: platformNetName(platform),
+      op: `${platform === null ? 'la plateforme' : platformName(platform)} ${percentText(line.platformFeeBps)}`,
       amount: amountText(line.netMinor, 'EUR'),
     });
   }
