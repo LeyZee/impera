@@ -43,3 +43,5 @@ Le rapprochement d'un rapport déclaré (CR-09), les signaux hors shift (CRM-05)
 - **Équipe** : brancher le port dans le recalcul.
 - **Bilan** : la garde de bascule. Elle lève `pay_rules_source_conflict` pour un compte Reveal relié à un modèle quand le dernier rapport de vérification est `match` propre, sur une quinzaine passée, et seulement une fois le calcul d'Équipe fusionné. Il faut pour cela garder les rapports, ce qui demande une migration.
 - **Bilan** : `shift_feedback`, puis le téléphone (Extension).
+
+03/11/2026, Bilan, lot b1 : chaque rapport de vérification est gardé (`sales_feed_checks`, migration 0071, jamais réécrit) avec son verdict, s'il est propre (`isCleanMatch`) et qui l'a lancé ; `GET …/check` rend le dernier. Reste à Bilan : la garde de bascule, ouverte seulement après la fusion des quatre PR de calcul d'Équipe (b1 à b4), puis `shift_feedback`.

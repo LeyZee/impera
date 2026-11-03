@@ -3,6 +3,7 @@ import {
   newId,
   PlatformAccountIdSchema,
   SalesFeedCheckReportSchema,
+  SalesFeedLastCheckSchema,
 } from '@nirvana/contracts';
 import { eq, schema } from '@nirvana/db';
 import { createTestDb, type TestDb } from '@nirvana/db/testing';
@@ -47,6 +48,18 @@ describe('sales feed reliability check (CRM-02)', () => {
   let jobLogger: ReturnType<typeof createLogger>;
 
   const read = () => app.modules.connectors.jobs.readSales(jobLogger, 'test', true);
+  /** The latest report kept (CRM-03 rests the switch on it). */
+  const lastCheck = async (cookie = owner) => {
+    const answer = await server.inject({
+      method: 'GET',
+      url: CHECK_URL,
+      headers: { cookie, origin: DASHBOARD_ORIGIN },
+    });
+    return {
+      statusCode: answer.statusCode,
+      body: answer.statusCode === 200 ? SalesFeedLastCheckSchema.parse(answer.json()) : null,
+    };
+  };
   let calls = 0;
   /** Each call from its own address: the route allows a few checks a minute an address, as Reveal's quota is small. */
   const check = (payload: object, cookie = owner) => {
@@ -106,6 +119,8 @@ describe('sales feed reliability check (CRM-02)', () => {
   it('needs a connected key, and is the owner’s only', async () => {
     expect((await check({ ...DAYS, export: null })).statusCode).toBe(409);
     expect((await check({ ...DAYS, export: null }, operator)).statusCode).toBe(403);
+    expect((await lastCheck()).body).toEqual({ last: null });
+    expect((await lastCheck(operator)).statusCode).toBe(403);
   });
 
   it('compares the register with the statistics per model and day, a refund taken off its sale’s day', async () => {
@@ -182,6 +197,14 @@ describe('sales feed reliability check (CRM-02)', () => {
       kind: 'bot_not_linked_to_agent',
       platformChatterId: 'bot_test_01',
     });
+    // The report is kept as the owner saw it, by whom; not clean, as nothing would switch on it.
+    const kept = (await lastCheck()).body?.last;
+    expect(kept).toMatchObject({
+      clean: false,
+      report: { verdict: 'incomplete', generatedAt: report.generatedAt },
+    });
+    expect(kept?.report).toEqual(report);
+    expect(kept?.checkedBy).not.toBeNull();
   });
 
   it('agrees to the cent with the dashboard’s export, whose fan column is never read', async () => {
@@ -198,6 +221,16 @@ describe('sales feed reliability check (CRM-02)', () => {
     expect(report.total.export).toEqual({ grossInclVat: 6000, agency: 1500, creator: 2500, net: 4000 });
     expect(report.notes).toEqual([{ kind: 'export_rows_outside', count: 1 }]);
     expect(JSON.stringify(report)).not.toContain('fan_test');
+    // A clean match, kept without the export; a kept report is never rewritten, whoever asks.
+    expect((await lastCheck()).body?.last).toMatchObject({ clean: true, report });
+    const rows = await test.admin.db.select().from(schema.salesFeedChecks);
+    expect(JSON.stringify(rows)).not.toContain('fan_test');
+    await expect(
+      test.admin.db
+        .update(schema.salesFeedChecks)
+        .set({ clean: false })
+        .where(eq(schema.salesFeedChecks.clean, true)),
+    ).rejects.toThrow();
   });
 
   it('counts a quarantined sale once after its model is linked and its line released to the register', async () => {

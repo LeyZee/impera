@@ -6,6 +6,7 @@ import {
   buildCheckReport,
   exportAmountToCents,
   exportDay,
+  isCleanMatch,
   readDashboardExport,
   type CheckLine,
   type CheckSources,
@@ -299,5 +300,28 @@ describe('the reliability check', () => {
       }),
     );
     expect(report.chatters[0]).toMatchObject({ register: { sales: 1 }, stats: { sales: 2 }, differs: false });
+  });
+});
+
+describe('the report a switch can rest on (CRM-03)', () => {
+  const matching = () => buildCheckReport(sources({ exported: { rows: [], notes: [] } }));
+
+  it('is a match with no bot outside the agent nor model of the export unknown', () => {
+    expect(isCleanMatch(matching())).toBe(true);
+    expect(isCleanMatch({ ...matching(), notes: [{ kind: 'export_rows_outside', count: 2 }] })).toBe(true);
+    expect(
+      isCleanMatch({
+        ...matching(),
+        notes: [{ kind: 'bot_not_linked_to_agent', platformChatterId: 'bot_test_01' }],
+      }),
+    ).toBe(false);
+    expect(
+      isCleanMatch({ ...matching(), notes: [{ kind: 'export_unknown_model', model: 'inconnue_test' }] }),
+    ).toBe(false);
+  });
+
+  it('is never an incomplete or differing report', () => {
+    expect(isCleanMatch(buildCheckReport(sources()))).toBe(false);
+    expect(isCleanMatch({ ...matching(), verdict: 'mismatch' })).toBe(false);
   });
 });

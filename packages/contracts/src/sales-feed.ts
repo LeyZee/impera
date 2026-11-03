@@ -310,7 +310,7 @@ export const SALES_FEED_CHECK_MAX_DAYS = 31;
 /**
  * `POST /v1/settings/sales-feeds/:platform/check` (CRM-02, ADR 0050 § 8): the days to compare, in the platform's own
  * day, and the dashboard's export as the owner downloaded it (CSV text), or `null` to compare the register with the
- * statistics only. The export is read for this answer and kept nowhere.
+ * statistics only. The export is read for this answer and kept nowhere; the report is kept (`SalesFeedLastCheck`).
  */
 export const SalesFeedCheckBodySchema = z
   .object({
@@ -404,8 +404,8 @@ export type SalesFeedCheckNote = z.infer<typeof SalesFeedCheckNoteSchema>;
 
 /**
  * The reliability check of ADR 0050 § 8 (CRM-02): the register's `netAmount` against the statistics and the
- * dashboard's export, to the cent, per model and day, then per team member. Read-only: it writes nothing and changes
- * no amount; no account switches on it (CRM-03).
+ * dashboard's export, to the cent, per model and day, then per team member. It changes no amount and switches no
+ * account; its report is kept, and the switch of an account (CRM-03) reads the latest one.
  */
 export const SalesFeedCheckReportSchema = z.object({
   platform: PlatformSchema,
@@ -429,6 +429,22 @@ export const SalesFeedCheckReportSchema = z.object({
   notes: z.array(SalesFeedCheckNoteSchema),
 });
 export type SalesFeedCheckReport = z.infer<typeof SalesFeedCheckReportSchema>;
+
+/**
+ * `GET /v1/settings/sales-feeds/:platform/check`: the latest report kept, `null` before any check. `clean` is a match
+ * with no bot outside the agent nor model of the export unknown, the one a switch to the platform's net can rest on
+ * (CRM-03); `checkedBy` the user who ran it.
+ */
+export const SalesFeedLastCheckSchema = z.object({
+  last: z
+    .object({
+      report: SalesFeedCheckReportSchema,
+      clean: z.boolean(),
+      checkedBy: z.string().nullable(),
+    })
+    .nullable(),
+});
+export type SalesFeedLastCheck = z.infer<typeof SalesFeedLastCheckSchema>;
 
 /** The refusals of `/v1/settings/sales-feeds`, each with its French sentence in `message`. */
 export const SALES_FEED_ERROR_CODES = [

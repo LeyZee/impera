@@ -524,3 +524,16 @@ function chatterRows(
   }
   return rows;
 }
+
+/**
+ * The report a switch to the platform's net can rest on (CRM-03): a match, with no bot of the platform outside the
+ * agent (its sales would count for nobody, or for a member) nor model of the export unknown (its rows left out).
+ */
+export function isCleanMatch(report: SalesFeedCheckReport): boolean {
+  return (
+    report.verdict === 'match' &&
+    !report.notes.some(
+      (note) => note.kind === 'bot_not_linked_to_agent' || note.kind === 'export_unknown_model',
+    )
+  );
+}
