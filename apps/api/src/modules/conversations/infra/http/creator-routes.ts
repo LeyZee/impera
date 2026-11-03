@@ -90,7 +90,7 @@ export function createCreatorSpaceRoutes(
       },
       async (request) => {
         const page = await asCreator(() =>
-          reader.messages(creatorOf(request), request.params.id, request.query),
+          reader.messages(creatorOf(request), request.params.id, request.query, request.ip),
         );
         if (page === null) throw new ConversationNotFound();
         return page;
