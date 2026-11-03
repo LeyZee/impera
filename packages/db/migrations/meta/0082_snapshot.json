@@ -1,5 +1,5 @@
 {
-  "id": "bdc939d2-7352-4531-9fa1-15df527a1d38",
+  "id": "f0276b1a-5015-474b-9942-31a8a609abb4",
   "prevId": "932550bf-325f-4114-9ee0-9fb58021a7a9",
   "version": "7",
   "dialect": "postgresql",
@@ -79,6 +79,13 @@
           "to": ["public"],
           "using": "\"alert_seen\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"alert_seen\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {},
@@ -239,6 +246,13 @@
           "to": ["public"],
           "using": "\"custom_alerts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"custom_alerts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -333,6 +347,13 @@
           "to": ["public"],
           "using": "\"system_alert_settings\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"system_alert_settings\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -1200,6 +1221,13 @@
           "to": ["public"],
           "using": "\"blind_tests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"blind_tests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -4919,6 +4947,27 @@
           "to": ["public"],
           "using": "\"media_assets\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"media_assets\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -5199,6 +5248,27 @@
           "to": ["public"],
           "using": "\"media_sends\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"media_sends\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -5363,6 +5433,27 @@
           "to": ["public"],
           "using": "\"fan_facts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"fan_facts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -5475,6 +5566,27 @@
           "to": ["public"],
           "using": "\"fan_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"fan_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {},
@@ -11978,6 +12090,13 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "\"kill_switches\".\"creator_id\" is null"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {
@@ -12081,6 +12200,13 @@
           "to": ["public"],
           "using": "\"notifications\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"notifications\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {},
@@ -12778,6 +12904,27 @@
           "to": ["public"],
           "using": "\"platform_accounts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"platform_accounts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_delete": {
+          "name": "creator_no_delete",
+          "as": "RESTRICTIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
       "checkConstraints": {

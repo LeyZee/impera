@@ -37,6 +37,7 @@ export const mediaAssets = pgTable(
     enumCheck('media_assets', t.origin, MEDIA_ORIGINS),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );
 
@@ -90,5 +91,6 @@ export const mediaSends = pgTable(
     check('media_sends_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     index('media_sends_fan_media_idx').on(t.fanId, t.mediaAssetId),
     tenantPolicy(t.creatorId),
+    ...creatorReadsOnly(),
   ],
 );

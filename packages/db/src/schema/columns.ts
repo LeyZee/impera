@@ -45,14 +45,16 @@ export function tenantOrGlobalPolicy(creatorId: PgColumn) {
 }
 
 /**
- * True unless the transaction runs as a creator's own account (`withCreatorAccount`, CR-02): unset for the agency, the
- * jobs and the tests, so the restrictive policies below change nothing for them.
+ * True unless the transaction runs as a creator's own account (`withCreatorAccount`, CR-02): another role for the
+ * agency (`withMember`), unset for the jobs and the tests, so the restrictive policies below change nothing for them.
  */
 const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
 
 /**
- * A creator reads these rows of her own creator, never writes them (ADR 0042 § 2): restrictive, so no permissive
- * policy can reopen them. Her few permitted writes come each with a policy of its own, written with the screen.
+ * A creator reads these rows of her own creator, never writes them (ADR 0042 § 2). Restrictive policies are ANDed
+ * over the permissive ones, so no permissive policy can ever reopen them: each of her three permitted writes (CR-06)
+ * replaces the restrictive policy of its table by one carved for it, `using (<not creator> or <that write>)`, with a
+ * `GRANT UPDATE (<column>)` limited to the column it changes. A policy added beside this one would open nothing.
  */
 export function creatorReadsOnly() {
   return [

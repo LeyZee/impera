@@ -1,5 +1,9 @@
 ALTER TABLE "user" ADD CONSTRAINT "user_creator_link_check" CHECK ("user"."role" <> 'creator' or cardinality("user"."creator_ids") = 1);--> statement-breakpoint
+CREATE POLICY "creator_closed" ON "alert_seen" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_closed" ON "custom_alerts" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_closed" ON "system_alert_settings" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_closed" ON "calibration_ratings" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_closed" ON "blind_tests" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_closed" ON "conversation_events" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_no_insert" ON "conversations" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_no_update" ON "conversations" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
@@ -12,6 +16,23 @@ CREATE POLICY "creator_no_insert" ON "fans" AS RESTRICTIVE FOR INSERT TO public 
 CREATE POLICY "creator_no_update" ON "fans" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_no_delete" ON "fans" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_closed" ON "llm_calls" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_insert" ON "media_assets" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_update" ON "media_assets" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_delete" ON "media_assets" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_no_insert" ON "media_descriptions" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
 CREATE POLICY "creator_no_update" ON "media_descriptions" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
-CREATE POLICY "creator_no_delete" ON "media_descriptions" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');
+CREATE POLICY "creator_no_delete" ON "media_descriptions" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_insert" ON "media_sends" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_update" ON "media_sends" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_delete" ON "media_sends" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_insert" ON "fan_facts" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_update" ON "fan_facts" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_delete" ON "fan_facts" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_insert" ON "fan_summaries" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_update" ON "fan_summaries" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_delete" ON "fan_summaries" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_closed" ON "kill_switches" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_closed" ON "notifications" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_insert" ON "platform_accounts" AS RESTRICTIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_update" ON "platform_accounts" AS RESTRICTIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
+CREATE POLICY "creator_no_delete" ON "platform_accounts" AS RESTRICTIVE FOR DELETE TO public USING (current_setting('app.account_role', true) is distinct from 'creator');

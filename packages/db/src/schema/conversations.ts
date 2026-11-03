@@ -248,5 +248,6 @@ export const blindTests = pgTable(
       t.recordedAt.desc(),
     ),
     tenantPolicy(t.creatorId),
+    closedToCreator(),
   ],
 );

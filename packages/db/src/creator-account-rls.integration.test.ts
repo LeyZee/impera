@@ -162,6 +162,39 @@ async function count(tx: Transaction, table: string): Promise<number> {
 }
 
 /**
+ * What a creator's account may do on each table that holds a creator's rows (Bilan's review of #460): every table with
+ * `tenant_isolation` has a decision here, or a new table would open to her without anyone deciding it. `readsOnly`
+ * carries the three `creator_no_*` policies, `closed` carries `creator_closed`; an exception names its reason.
+ */
+const CREATOR_DECISIONS: Readonly<Record<string, 'readsOnly' | 'closed' | { readonly exception: string }>> = {
+  conversations: 'readsOnly',
+  messages: 'readsOnly',
+  fans: 'readsOnly',
+  fan_facts: 'readsOnly',
+  fan_summaries: 'readsOnly',
+  media_descriptions: 'readsOnly',
+  media_assets: 'readsOnly',
+  media_sends: 'readsOnly',
+  platform_accounts: 'readsOnly',
+  drafts: 'closed',
+  conversation_events: 'closed',
+  llm_calls: 'closed',
+  calibration_ratings: 'closed',
+  blind_tests: 'closed',
+  notifications: 'closed',
+  kill_switches: 'closed',
+  custom_alerts: 'closed',
+  alert_seen: 'closed',
+  system_alert_settings: 'closed',
+  persona_versions: {
+    exception:
+      'elle y écrit aujourd’hui par withTenant ; décision au lot b avec Moi › Persona (ADR 0042 § 8)',
+  },
+  domain_events: { exception: 'fermée au lot d de CRM-04, migration 0081' },
+  platform_sales: { exception: 'fermée au lot d de CRM-04, migration 0081' },
+};
+
+/**
  * A creator's own account (CR-02, ADR 0042 § 2): `withCreatorAccount` is her one door, the base holds her to one
  * creator, and restrictive policies close to her what only the agency writes or reads. Invented data only (ADR 0010).
  */
@@ -401,5 +434,29 @@ describe('a creator’s own account (CR-02): one creator, her rows read-only, th
       ),
     );
     expect(writes).toMatch(/row-level security/u);
+  });
+
+  it('has a decision for her on every table with tenant_isolation, and the policies that carry it', async () => {
+    const result = await test.admin.db.execute(
+      sql`select tablename, policyname from pg_policies where schemaname = 'public' order by tablename, policyname`,
+    );
+    const policies = new Map<string, string[]>();
+    for (const row of result.rows) {
+      const table = String(row['tablename']);
+      policies.set(table, [...(policies.get(table) ?? []), String(row['policyname'])]);
+    }
+    const tenantTables = [...policies]
+      .filter(([, names]) => names.includes('tenant_isolation'))
+      .map(([t]) => t);
+    expect(tenantTables.filter((table) => !(table in CREATOR_DECISIONS))).toEqual([]);
+    expect(Object.keys(CREATOR_DECISIONS).filter((table) => !tenantTables.includes(table))).toEqual([]);
+    for (const table of tenantTables) {
+      const decision = CREATOR_DECISIONS[table];
+      const own = (policies.get(table) ?? []).filter((name) => name.startsWith('creator_'));
+      if (decision === 'readsOnly')
+        expect(own, table).toEqual(['creator_no_delete', 'creator_no_insert', 'creator_no_update']);
+      else if (decision === 'closed') expect(own, table).toEqual(['creator_closed']);
+      else expect(decision?.exception, table).toMatch(/\S/u);
+    }
   });
 });
