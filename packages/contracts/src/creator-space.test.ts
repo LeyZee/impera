@@ -47,7 +47,7 @@ describe('the creator space contracts (CR-02)', () => {
     expect(
       CreatorFanPageSchema.safeParse({ items: [{ ...fan, desire: 80 }], nextCursor: null }).success,
     ).toBe(false);
-    const conversation = { id: message.id, fan: { id: fan.id, displayName: 'Fan test', notes: [] } };
+    const conversation = { id: message.id, fan: { id: fan.id, displayName: 'Fan test' } };
     expect(CreatorConversationSchema.safeParse(conversation).success).toBe(true);
     expect(CreatorConversationSchema.safeParse({ ...conversation, mode: 'auto' }).success).toBe(false);
     expect(

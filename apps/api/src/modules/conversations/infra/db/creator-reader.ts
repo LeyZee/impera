@@ -14,8 +14,7 @@ import {
 import { and, eq, schema, sql, withCreatorAccount, type Database, type Transaction } from '@nirvana/db';
 import { z } from 'zod';
 
-import { creatorNotesOf } from '../../domain/creator-notes';
-import type { CreatorSpaceReader, FanDirectory, MediaDescriptions, PageRequest } from '../../domain/ports';
+import type { CreatorSpaceReader, MediaDescriptions, PageRequest } from '../../domain/ports';
 
 import { mediaOf } from './reader';
 import { cursorInstant, decodeCursor, encodeCursor } from './rows';
@@ -69,7 +68,6 @@ async function conversationOf(tx: Transaction, id: ConversationId) {
  */
 export function createDrizzleCreatorSpaceReader(
   db: Database,
-  fans: Pick<FanDirectory, 'activeFacts'>,
   mediaDescriptions: MediaDescriptions,
 ): CreatorSpaceReader {
   return {
@@ -127,19 +125,14 @@ export function createDrizzleCreatorSpaceReader(
           ip,
           details: { creatorId, by: 'creator' },
         });
-        return { creatorId, row };
+        return { row };
       });
       if (opened === null) return null;
-      const { creatorId, row } = opened;
-      // The `fans` module reads its own table, bound to the creator her account names.
-      const notes = await fans.activeFacts(CreatorIdSchema.parse(creatorId), FanIdSchema.parse(row.fanId));
+      const { row } = opened;
+      // No note of her fan: what the agency knows of him is its own (Charles, 03/11).
       return {
         id: ConversationIdSchema.parse(row.id),
-        fan: {
-          id: FanIdSchema.parse(row.fanId),
-          displayName: row.displayName,
-          notes: creatorNotesOf(notes),
-        },
+        fan: { id: FanIdSchema.parse(row.fanId), displayName: row.displayName },
       };
     },
 

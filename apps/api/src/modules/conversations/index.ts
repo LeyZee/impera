@@ -122,7 +122,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         deps.requireRole,
       )(app, options);
       await createCreatorSpaceRoutes(
-        createDrizzleCreatorSpaceReader(deps.db, deps.fans, deps.mediaDescriptions ?? noMediaDescriptions),
+        createDrizzleCreatorSpaceReader(deps.db, deps.mediaDescriptions ?? noMediaDescriptions),
         deps.requireRole,
       )(app, options);
     },

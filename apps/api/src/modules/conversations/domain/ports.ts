@@ -348,15 +348,7 @@ export interface FanDirectory {
   activeFacts(
     creatorId: CreatorId,
     fanId: FanId,
-  ): Promise<
-    readonly {
-      readonly category: FactCategory;
-      readonly key: string;
-      readonly value: string;
-      /** Said by him (`declared`) or deduced by the model (`inferred`): the creator reads only the former (CR-02). */
-      readonly kind: FactKind;
-    }[]
-  >;
+  ): Promise<readonly { readonly category: FactCategory; readonly key: string; readonly value: string }[]>;
 }
 
 /**
@@ -552,7 +544,7 @@ interface Page<T> {
  */
 export interface CreatorSpaceReader {
   fans(userId: UserId, page: PageRequest): Promise<CreatorFanPage>;
-  /** The conversation she opens, `null` when she has none of that id; each opening is written in the audit log. */
+  /** The conversation she opens and its fan, `null` when she has none of that id; each opening is in the audit log. */
   openConversation(userId: UserId, id: ConversationId, ip: string): Promise<CreatorConversation | null>;
   /** `null` when she has no conversation of that id. */
   messages(userId: UserId, id: ConversationId, page: PageRequest): Promise<CreatorMessagePage | null>;

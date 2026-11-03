@@ -177,7 +177,6 @@ describe('/v1/creator-space', () => {
         sourceMessageId: null,
         observedAt: new Date('2026-11-01T10:00:00Z'),
       },
-      // Deduced by the model, and his buying profile: never hers to read.
       {
         category: 'interests',
         key: 'hobby',
@@ -240,7 +239,7 @@ describe('/v1/creator-space', () => {
     expect(second.nextCursor).toBeNull();
   });
 
-  it('opens her conversation with what her fan said himself, and writes each opening in the audit log', async () => {
+  it('opens her conversation with her fan’s pseudo and none of his notes, and writes each opening in the audit log', async () => {
     const julien = conversations.get('Julien');
     const response = await get(
       `/v1/creator-space/conversations/${julien?.conversationId ?? ''}`,
@@ -249,8 +248,10 @@ describe('/v1/creator-space', () => {
     expect(response.statusCode, response.body).toBe(200);
     expect(CreatorConversationSchema.parse(response.json())).toEqual({
       id: julien?.conversationId,
-      fan: { id: julien?.fanId, displayName: 'Julien', notes: ['Infirmier de nuit'] },
+      fan: { id: julien?.fanId, displayName: 'Julien' },
     });
+    // What the agency knows of him stays its own (Charles, 03/11): no fact, declared or not.
+    expect(response.body).not.toMatch(/Infirmier|randonnée|packs/u);
     await get(`/v1/creator-space/conversations/${julien?.conversationId ?? ''}`, creatorCookie);
     const opened = await test.admin.db
       .select()

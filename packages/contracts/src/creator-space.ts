@@ -42,17 +42,14 @@ export const CreatorFanPageSchema = z.strictObject({
 export type CreatorFanPage = z.infer<typeof CreatorFanPageSchema>;
 
 /**
- * `GET /v1/creator-space/conversations/:id` (creator): the conversation she opens, with her fan's notes (what the agent
- * learned of him and keeps). Each opening is written in the audit log, as a chatter's would be. Another creator's
- * conversation, or none, answers 404 `conversation_not_found`.
+ * `GET /v1/creator-space/conversations/:id` (creator): the conversation she opens and its fan, by his pseudo. No note
+ * of him: what the agency knows of a fan is its own (Charles, 03/11; she will read figures of her whole base, never one
+ * fan's). Each opening is written in the audit log, as a chatter's would be. Another creator's conversation, or none,
+ * answers 404 `conversation_not_found`.
  */
 export const CreatorConversationSchema = z.strictObject({
   id: ConversationIdSchema,
-  fan: z.strictObject({
-    id: FanIdSchema,
-    displayName: z.string(),
-    notes: z.array(z.string().min(1)),
-  }),
+  fan: z.strictObject({ id: FanIdSchema, displayName: z.string() }),
 });
 export type CreatorConversation = z.infer<typeof CreatorConversationSchema>;
 
