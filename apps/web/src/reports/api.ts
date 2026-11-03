@@ -3,6 +3,7 @@ import {
   AccountPayRulesSchema,
   ApiErrorSchema,
   PAY_RULES_ERROR_CODES,
+  PayRulesSourceRefusalSchema,
   SchedulingSettingsSchema,
   SHIFT_REPORT_BATCH_MAX,
   SHIFT_REPORT_ERROR_CODES,
@@ -16,6 +17,7 @@ import {
   type CreateShiftReportBody,
   type PayPeriod,
   type PayRulesErrorCode,
+  type PayRulesSourceRefusal,
   type RejectShiftReportBody,
   type SchedulingSettings,
   type ShiftReport,
@@ -139,6 +141,8 @@ export type ReportRefusal =
       readonly shiftReportId: string | null;
       /** When the shift takes its report (`shift_report_early_conflict`). */
       readonly opensAt: string | null;
+      /** Why the account cannot be paid on its platform's net yet (`pay_rules_source_conflict`, ADR 0050 § 8). */
+      readonly sourceReason: PayRulesSourceRefusal | null;
     }
   | { readonly kind: 'failed' };
 
@@ -152,7 +156,12 @@ const KNOWN: ReadonlySet<string> = new Set<string>([
 ]);
 const isKnown = (code: string): code is ReportRefusalCode => KNOWN.has(code);
 
-const DetailsSchema = z.object({ shiftReportId: z.string().optional(), opensAt: z.string().optional() });
+const DetailsSchema = z.object({
+  shiftReportId: z.string().optional(),
+  opensAt: z.string().optional(),
+  // A reason this screen does not know yet is said by the code alone, and keeps the other details.
+  reason: PayRulesSourceRefusalSchema.optional().catch(undefined),
+});
 
 async function refusalOf(response: Response): Promise<ReportRefusal> {
   const parsed = ApiErrorSchema.safeParse(await response.json().catch(() => null));
@@ -163,6 +172,7 @@ async function refusalOf(response: Response): Promise<ReportRefusal> {
     code: parsed.data.error.code,
     shiftReportId: details.success ? (details.data.shiftReportId ?? null) : null,
     opensAt: details.success ? (details.data.opensAt ?? null) : null,
+    sourceReason: details.success ? (details.data.reason ?? null) : null,
   };
 }
 

@@ -21,7 +21,7 @@ import {
   percentText,
   periodLine,
   READ_AGAIN,
-  REPORT_ERRORS,
+  refusalText,
   SOURCE_LABELS,
   startablePeriods,
 } from '@/reports/model';
@@ -441,7 +441,7 @@ function RulesPanel({
             <p className="tm-warn sc-refusal nv-swap" role="alert">
               {refusal.kind === 'failed'
                 ? 'Le serveur ne répond pas : rien n’a été enregistré. Réessaie dans un instant.'
-                : REPORT_ERRORS[refusal.code]}
+                : refusalText(refusal)}
             </p>
           )}
 
