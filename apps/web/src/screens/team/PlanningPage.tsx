@@ -633,7 +633,8 @@ function OnDutyStrip({
   return (
     <section className="sc-duty" aria-labelledby="sc-duty-title">
       <h2 id="sc-duty-title" className="sc-duty__title">
-        <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok nv-dot--live'}`} />
+        {/* Fixed: the shift under way on the grid is the page's one moving sign (CR-12, Charles 02/11 17h56). */}
+        <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok'}`} />
         En poste maintenant
       </h2>
       {list.length === 0 ? (

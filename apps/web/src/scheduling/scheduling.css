@@ -471,6 +471,10 @@ button.sc-duty__one:active {
   pointer-events: none;
   animation: sc-live 2.8s var(--nv-ease-in-out) infinite alternate;
 }
+/* Its copy on a later créneau keeps the edge, still: one shift, one moving sign. */
+.sc-chip[data-phase='live'][data-carried='true']::after {
+  animation: none;
+}
 @keyframes sc-live {
   from {
     opacity: 0.85;

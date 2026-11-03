@@ -433,9 +433,8 @@ export function slotRowOf(
       );
       const at =
         touched.length > 0 ? touched : [start < (windows[0]?.from.getTime() ?? 0) ? 0 : windows.length - 1];
-      for (const index of at) {
-        placed[index]?.push({ ...chip, carried: (windows[index]?.from.getTime() ?? 0) > start });
-      }
+      // The first créneau it is on carries its name, even for a shift begun before the week (Sunday night on Monday).
+      for (const index of at) placed[index]?.push({ ...chip, carried: index !== at[0] });
     }
   }
   const spans = shifts

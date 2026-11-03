@@ -157,6 +157,13 @@ describe('the créneaux of a row (EQ-01)', () => {
     expect(tuesday?.[3]?.chips).toEqual([]);
   });
 
+  it('names a shift begun before the week on its first créneau, not as a copy', () => {
+    // Sunday 25 at 22 h – Monday 26 at 4 h in Paris, seen on the week of Monday 26: on its first créneau, read there.
+    const sunday = shift(1, { startsAt: '2026-10-25T21:00:00Z', endsAt: '2026-10-26T03:00:00Z' });
+    const monday = cellsOf([sunday], BEFORE)?.get('2026-10-26');
+    expect(monday?.[0]?.chips.map((chip) => [chip.shift.id, chip.carried])).toEqual([[sunday.id, false]]);
+  });
+
   it('cuts the créneaux at the agency’s hours over a change of time', () => {
     // 29 March 2026: 0 h – 6 h lasts five hours, and a shift from 6 h does not cover it.
     const spring = weekOf('2026-03-23');
