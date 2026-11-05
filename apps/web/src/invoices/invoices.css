@@ -41,11 +41,17 @@
   font-weight: 560;
 }
 .iv-doc__sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.3em;
   margin: 0;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   text-wrap: pretty;
+}
+.iv-doc__fact {
+  min-width: 0;
 }
 .iv-doc__reason {
   margin: var(--nv-space-1) 0 0;
@@ -86,6 +92,10 @@
   align-items: center;
   gap: var(--nv-space-1);
 }
+/* A plain action first reads on the content's edge, its padding outside it (recette EQP-08). */
+.iv-doc__acts > .nv-btn--plain:first-child {
+  margin-left: calc(-1 * var(--nv-space-4));
+}
 /* A PDF that could not be read: its sentence on a line of its own, under the buttons (recette EQP-08). */
 .iv-doc__failure {
   flex-basis: 100%;
@@ -103,9 +113,16 @@
     grid-column: 1;
     justify-content: flex-start;
   }
+  /* The document's name and facts take the whole width; its state and amount go under them. */
+  .iv-doc:has(> .iv-doc__chips) > .iv-doc__main {
+    grid-column: 1 / -1;
+  }
   /* Four actions hold on one line of a phone; each keeps its height, the target. */
   .iv-doc__acts .nv-btn--plain {
     padding-inline: var(--nv-space-2);
+  }
+  .iv-doc__acts > .nv-btn--plain:first-child {
+    margin-left: calc(-1 * var(--nv-space-2));
   }
 }
 

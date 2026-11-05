@@ -104,7 +104,16 @@ export function InvoiceRow({
           <span className="nv-num">{item.number}</span>
           <span className="iv-doc__kind">{kindLabel(item)}</span>
         </p>
-        <p className="iv-doc__sub nv-num">{facts.join(' · ')}</p>
+        {/* Each fact whole on its line (« émise le lun. 2 nov. » never cut after « lun. »), the dot kept with the
+            one before it. */}
+        <p className="iv-doc__sub nv-num">
+          {facts.map((fact, index) => (
+            <span key={fact} className="iv-doc__fact">
+              {fact}
+              {index === facts.length - 1 ? '' : '\u00a0·'}
+            </span>
+          ))}
+        </p>
         {item.acceptance.reason === null ? null : (
           <p className="iv-doc__reason">
             <span>{reader.contractor ? 'Ton motif' : 'Motif du prestataire'} : </span>«&nbsp;

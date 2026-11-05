@@ -7,12 +7,16 @@ Fait :
   - le téléchargement répond `invoice_pdf_gone` (410), « Ce PDF est perdu : le serveur de développement le gardait en mémoire et l'a oublié en redémarrant. Il ne sera pas refait. », au lieu de « momentanément indisponible, réessaie » ;
   - l'archive du comptable l'écrit dans `manifeste.csv` : « PDF perdu au redémarrage du serveur de développement, jamais refait », au lieu de « hébergeurs injoignables, relancer l'export » ;
   - `readChecked` rend `forgotten` pour un objet absent d'un seau `volatile`. `checkedInvoicePdf` ne dit « perdu » que si aucun seau ne peut plus le rendre : un seau muet garde « hors d'atteinte ».
+- La ligne d'une facture, montrée dans les captures, est mise d'aplomb :
+  - sur téléphone, le numéro et la nature (« Facture », « Avoir ») tiennent sur une ligne, sur toute la largeur ; l'état et le montant passent dessous ;
+  - les faits (« émise le lun. 2 nov. ») ne se coupent plus au milieu : chacun reste entier, le point avec celui d'avant ;
+  - la première action (« PDF ») s'aligne sur le bord gauche du contenu.
 
 Décisions :
 - 410 `*_gone`, comme `contractor_document_file_gone` : la ressource a existé et ne reviendra pas.
 - La liste garde `pdfReady: true` : vérifier chaque PDF à la lecture de la liste coûterait une lecture de seau par ligne, pour un cas qui n'existe qu'en développement. Le bouton dit la vérité au clic.
 
-Découvertes : les fichiers du dossier d'un prestataire (`screens/me/FileParts.tsx`, « Voir le fichier » et « Ouvrir le fichier ») sont encore des `<a href download>` : un refus du serveur s'y enregistrerait aussi comme un fichier JSON.
+Découvertes : Paie › Factures choisit encore son membre dans une liste du système (« Toute l'équipe ») ; la liste du design system d'Extension la remplacera. Les fichiers du dossier d'un prestataire (`screens/me/FileParts.tsx`, « Voir le fichier » et « Ouvrir le fichier ») sont encore des `<a href download>` : un refus du serveur s'y enregistrerait aussi comme un fichier JSON.
 
 Candidats à suppression : aucun.
 
