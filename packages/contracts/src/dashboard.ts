@@ -166,6 +166,14 @@ export const DashboardRevealSalesSchema = z.object({
 });
 export type DashboardRevealSales = z.infer<typeof DashboardRevealSalesSchema>;
 
+/** Stuck jobs of one kind (PRO-10): the worker's task name, hers or the agency's, and how many. */
+export const StuckJobSchema = z.object({
+  task: z.string().min(1).max(120),
+  creator: z.boolean(),
+  count: z.number().int().positive(),
+});
+export type StuckJob = z.infer<typeof StuckJobSchema>;
+
 export const DashboardSchema = z.object({
   creator: z.object({ id: CreatorIdSchema, name: z.string().min(1), timezone: z.string().min(1), now: at }),
   period: DashboardPeriodSchema,
@@ -209,7 +217,14 @@ export const DashboardSchema = z.object({
    * task takes. Work that will not happen until someone looks (operations.md). `null` when the count could not be read,
    * and for a creator: jobs of no creator are the agency's (ADR 0023).
    */
-  jobs: z.object({ dead: count.nullable() }),
+  jobs: z.object({
+    dead: count.nullable(),
+    /**
+     * The same jobs by kind (recette 05/11, PRO-10): the worker's task name, and whether the job is hers (`creator`) or
+     * the agency's (cron, pay, Telegram). The screen names each kind in French; only hers count in her agent's health.
+     */
+    stuck: z.array(StuckJobSchema).max(50),
+  }),
   replies: z.object({
     /** Median time between a fan's message and her answer, over the period. */
     medianReplyMinutes: z.number().nonnegative().nullable(),

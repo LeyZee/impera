@@ -6,6 +6,7 @@ import {
   TodosAcrossCreatorsSchema,
   type CreatorId,
   type DashboardPeriod,
+  type StuckJob,
   type UserRole,
   UserIdSchema,
 } from '@impera/contracts';
@@ -41,8 +42,8 @@ export interface DashboardRouteDeps {
   readonly budget: () => BudgetReading;
   /** A voice model answers, main or fallback; `keyMissing` when neither has a key. */
   readonly voiceHealth: () => VoiceHealth;
-  /** Jobs the worker gave up on, hers or of no creator (read with the admin role: Graphile's schema). */
-  readonly deadJobs: (creatorId: CreatorId) => Promise<number | null>;
+  /** Stuck jobs by kind, hers or of no creator (read with the admin role: Graphile's schema). */
+  readonly stuckJobs: (creatorId: CreatorId) => Promise<StuckJob[] | null>;
   readonly voice: VoiceVersion;
   readonly automatic: AutomaticView;
   /** The last ECB rate known for the dollar (pay's), to rank the best fans in euros. */
@@ -94,10 +95,10 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           usdRate,
         );
         if (read === undefined) throw new DomainError('creator_not_found', 'Créatrice introuvable');
-        const [telegram, automatic, deadJobs, sales] = await Promise.all([
+        const [telegram, automatic, stuckJobs, sales] = await Promise.all([
           deps.telegram?.read(creatorId),
           deps.automatic.read(creatorId),
-          deps.deadJobs(creatorId),
+          deps.stuckJobs(creatorId),
           deps.revealSales.read(
             creatorId,
             UserIdSchema.parse(user.id),
@@ -111,7 +112,7 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           window: read.window,
           budget: deps.budget(),
           voice: deps.voiceHealth(),
-          deadJobs,
+          stuckJobs,
           telegram,
           automatic,
           revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),

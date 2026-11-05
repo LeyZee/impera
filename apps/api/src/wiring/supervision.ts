@@ -6,7 +6,7 @@ import type { ConversationsModule } from '../modules/conversations';
 import type { PayrollModule } from '../modules/payroll';
 import { createSupervisionModule, type SupervisionModule } from '../modules/supervision';
 import type { TelegramModule } from '../modules/telegram';
-import { countDeadJobs } from '../readiness';
+import { stuckJobsOf } from '../readiness';
 
 import type { WiredAgent } from './agent';
 import type { Routes, Shared } from './shared';
@@ -43,7 +43,7 @@ export function wireSupervision(
       };
     },
     voice: deps.activeVoice,
-    deadJobs: (creatorId) => countDeadJobs(adminDb, creatorId, deps.jobNames()),
+    stuckJobs: (creatorId) => stuckJobsOf(adminDb, creatorId, deps.jobNames()),
     allCreatorIds: deps.allCreatorIds,
     // The one sum of the register (CRM-04 lot a): the sales panel reads it, never sums again.
     salesTotalsOf: salesFeedTotals.totalsOf,

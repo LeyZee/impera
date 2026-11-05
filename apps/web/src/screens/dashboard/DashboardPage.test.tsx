@@ -121,8 +121,8 @@ describe('DashboardPage on the server’s data', () => {
     expect(await screen.findByText('Kévin')).toBeDefined();
     expect(screen.queryByText('Exemple')).toBeNull();
     expect(headline()).toBe('Une urgence t’attend');
-    // No sales block until they are observed: one quiet line (DASH-02).
-    expect(screen.getByText(/Ventes : bientôt lues depuis Reveal/u)).toBeDefined();
+    // No sales block until they are observed, and no « bientôt » line either (recette 05/11, PRO-24).
+    expect(screen.queryByText(/bientôt/u)).toBeNull();
     expect(screen.queryByRole('heading', { name: /^Ventes/u })).toBeNull();
     expect(screen.getByText('Théo')).toBeDefined();
     // The best fans' bar names no colour: the agent's part is the data colour, not the urgencies' red.
@@ -289,6 +289,18 @@ describe('DashboardPage on the server’s data', () => {
     serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
     renderDashboard();
     expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeDefined();
+  });
+
+  it('offers the group to choose to the owner only, and tells anyone else who does (recette 05/11, PRO-08)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
+    renderDashboard(false);
+    expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeDefined();
+    expect(screen.queryByRole('link', { name: 'Choisir un groupe' })).toBeNull();
+    expect(screen.getByText('Le propriétaire choisit ce groupe dans Réglages › Telegram.')).toBeDefined();
+    cleanup();
+    serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
+    renderDashboard(true);
+    expect(await screen.findByRole('link', { name: 'Choisir un groupe' })).toBeDefined();
   });
 });
 
@@ -815,10 +827,37 @@ describe('DashboardPage, the fold of the agent', () => {
     serveDashboard({ status: 200, body: apiDashboard() });
     renderDashboard(true);
     await screen.findByText('Kévin');
-    const budget = [...document.querySelectorAll('.nv-tile')].find((tile) =>
-      tile.textContent.includes('Budget IA du jour'),
+    const rate = [...document.querySelectorAll('.nv-tile')].find((tile) =>
+      tile.textContent.includes('Taux en réel'),
     );
-    expect(budget?.querySelector('.sr-only')?.textContent).toContain('Compté : pour toutes les créatrices.');
+    expect(rate?.querySelector('.sr-only')?.textContent).toContain('Automatique : à partir de');
+  });
+
+  it('says the AI budget once, for the whole agency, apart from her agent’s health (recette 05/11, reco 18)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard(true);
+    await screen.findByText('Kévin');
+    const tiles = [...document.querySelectorAll('.nv-tile')].map((tile) => tile.textContent);
+    expect(tiles.some((text) => text.includes('Budget IA'))).toBe(false);
+    const agency = screen.getByRole('complementary', { name: 'Pour toute l’agence' });
+    expect(agency.textContent).toContain('Budget IA du jour, toutes créatrices');
+  });
+
+  it('names the agency’s stuck job for the owner alone, outside her health (recette 05/11, PRO-10)', async () => {
+    const body = apiDashboard({
+      jobs: { dead: 1, stuck: [{ task: 'payroll.fetch_exchange_rates', creator: false, count: 1 }] },
+    });
+    serveDashboard({ status: 200, body });
+    renderDashboard(true);
+    await screen.findByText('Kévin');
+    expect(screen.getByRole('complementary', { name: 'Pour toute l’agence' }).textContent).toContain(
+      'Taux de change du jour : bloquée',
+    );
+    cleanup();
+    serveDashboard({ status: 200, body });
+    renderDashboard(false);
+    await screen.findByText('Kévin');
+    expect(screen.queryByText(/Taux de change du jour/u)).toBeNull();
   });
 });
 

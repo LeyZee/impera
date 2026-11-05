@@ -43,8 +43,10 @@ describe('fromApi', () => {
   });
 
   it('writes the server’s figures the French way, nothing more', () => {
-    expect(card('budget')?.value).toBe('7,40 € sur 20 €');
-    expect(card('budget')?.gauge).toEqual({ kind: 'spend', value: 37, mark: 80 });
+    // The agency's budget is said once, apart from her agent's health (recette 05/11, reco 18).
+    expect(card('budget')).toBeUndefined();
+    expect(flat(fromApi(apiDashboard()).agency.budget?.value)).toBe('7,40 € sur 20 €');
+    expect(fromApi(apiDashboard()).agency.budget?.gauge).toEqual({ value: 37, mark: 80 });
     expect(card('live-rate')?.value).toBe('64,5 % sans retouche');
     expect(card('activity')?.value).toBe('1 min 42');
     expect(card('voice')?.rows[0]).toEqual(['Temps pour écrire', '3,1 s']);
@@ -164,8 +166,8 @@ describe('fromApi', () => {
       apiDashboard({ budget: { spentToday: 18.62, cap: 20, alertAt: 16, costPerEuroSold: null } }),
     );
     expect(flat(near.agent.budgetNote)).toBe('À 18,62 € sur 20 € de budget IA, l’agent s’arrêtera bientôt.');
-    expect(card('budget', near)).toMatchObject({ tone: 'warn', alarm: 'Le budget IA approche du plafond' });
-    expect(flat(card('budget', near)?.sub)).toBe('alerte à 16 €, arrêt à 20 €');
+    expect(near.agency.budget?.tone).toBe('warn');
+    expect(flat(near.agency.budget?.sub)).toBe('alerte à 16 €, l’agent s’arrête à 20 €');
     expect(fromApi(apiDashboard()).agent.budgetNote).toBeUndefined();
   });
 
@@ -231,16 +233,45 @@ describe('fromApi', () => {
     expect(both.agent.lead).toContain('L’IA qui écrit attend aussi sa clé.');
   });
 
-  it('says jobs the worker gave up on in amber, and none when it could not count them', () => {
-    const stuck = fromApi(apiDashboard({ jobs: { dead: 3 } }));
+  it('says her stuck jobs in amber by name, and leaves the agency’s out of her health (recette 05/11, PRO-10)', () => {
+    const stuck = fromApi(
+      apiDashboard({
+        jobs: {
+          dead: 4,
+          stuck: [
+            { task: 'conversation.send', creator: true, count: 3 },
+            { task: 'payroll.fetch_exchange_rates', creator: false, count: 1 },
+          ],
+        },
+      }),
+    );
     expect(card('activity', stuck)).toMatchObject({ tone: 'warn' });
-    expect(card('activity', stuck)?.rows).toContainEqual(['Tâches bloquées', '3, à regarder']);
+    expect(card('activity', stuck)?.rows).toContainEqual(['Tâches bloquées', 'Envoi d’un message (3)']);
     expect(stuck.agent.foldSummary).toContain('3 tâches bloquées');
+    expect(stuck.agency.stuck).toEqual([
+      expect.objectContaining({
+        task: 'payroll.fetch_exchange_rates',
+        name: 'Taux de change du jour',
+        count: 1,
+      }),
+    ]);
+    const agencyOnly = fromApi(
+      apiDashboard({
+        jobs: { dead: 1, stuck: [{ task: 'payroll.fetch_exchange_rates', creator: false, count: 1 }] },
+      }),
+    );
+    expect(card('activity', agencyOnly)?.tone).toBe('ok');
+    expect(agencyOnly.agent.foldSummary).not.toContain('bloquée');
     expect(card('activity')?.rows).toContainEqual(['Tâches bloquées', 'aucune']);
-    const unread = fromApi(apiDashboard({ jobs: { dead: null } }));
+    const unread = fromApi(apiDashboard({ jobs: { dead: null, stuck: [] } }));
     expect(card('activity', unread)?.rows).toContainEqual(['Tâches bloquées', 'pas lu']);
     expect(card('activity', unread)?.tone).toBe('ok');
-    expect(unread.agent.foldSummary).not.toContain('bloquée');
+  });
+
+  it('folds the health into what is not green, each with its word, and counts the rest (recette 05/11, PRO-23)', () => {
+    const summary = fromApi(apiDashboard()).agent.foldSummary;
+    expect(summary).not.toMatch(/€/u);
+    expect(summary).toMatch(/(tout va bien|le reste va bien)/u);
   });
 
   it('opens every line in Suivi, on its conversation', () => {
@@ -271,7 +302,7 @@ describe('fromApi', () => {
     const unmeasured = fromApi(
       apiDashboard({ liveRate: { rate: null, target: 80, decided: 0, threeWeeksAgo: null } }),
     );
-    expect(unmeasured.agent.foldSummary).toMatch(/ · taux en réel pas encore mesuré$/u);
+    expect(unmeasured.agent.foldSummary).toMatch(/(^| · )taux en réel pas encore mesuré( · |$)/u);
   });
 
   it('says first that Reveal is disconnected, then that the voice is down', () => {

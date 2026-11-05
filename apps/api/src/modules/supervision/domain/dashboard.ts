@@ -15,6 +15,7 @@ import {
   type DashboardPeriod,
   type DashboardTodo,
   type HandoffCause,
+  type StuckJob,
   type TodosAcrossCreators,
 } from '@impera/contracts';
 
@@ -220,8 +221,8 @@ export function assembleDashboard(input: {
   readonly budget: BudgetReading;
   /** From the gateway's health: a voice model answers, and whether any key exists for it (main or fallback). */
   readonly voice: VoiceHealth;
-  /** Jobs the worker gave up on, hers or of no creator; `null` when unreadable. */
-  readonly deadJobs: number | null;
+  /** Stuck jobs by kind, hers or of no creator; `null` when unreadable. */
+  readonly stuckJobs: readonly StuckJob[] | null;
   /** Undefined when Telegram is off. */
   readonly telegram: TelegramReading | undefined;
   /**
@@ -263,7 +264,10 @@ export function assembleDashboard(input: {
       medianWriteMs: facts.voice.medianWriteMs === null ? null : Math.round(facts.voice.medianWriteMs),
       outagesLast7d: facts.voice.outageHoursLast7d,
     },
-    jobs: { dead: input.deadJobs },
+    jobs: {
+      dead: input.stuckJobs === null ? null : input.stuckJobs.reduce((sum, job) => sum + job.count, 0),
+      stuck: input.stuckJobs === null ? [] : [...input.stuckJobs],
+    },
     replies: {
       medianReplyMinutes:
         facts.replies.medianReplyMinutes === null

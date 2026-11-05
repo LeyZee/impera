@@ -4,6 +4,7 @@ import {
   DashboardSchema,
   type AutomaticGate,
   type LiveRateReading,
+  type StuckJob,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -59,7 +60,7 @@ const assemble = (
   telegram: TelegramReading | 'off' = { alertsTonight: 3, urgentReachable: false },
   automatic: AutomaticGate = { open: false, missing: [{ kind: 'blind_test' }] },
   reading: LiveRateReading = { rate: 0.8, decided: 10 },
-  health: { voice?: VoiceHealth; deadJobs?: number | null } = {},
+  health: { voice?: VoiceHealth; stuckJobs?: readonly StuckJob[] | null } = {},
 ) =>
   assembleDashboard({
     creatorId: CreatorIdSchema.parse('0b9d4b7e-2f7a-4c1e-9a55-3d1f0c2b8e41'),
@@ -73,7 +74,7 @@ const assemble = (
     },
     budget: { spentEur: 3.204, capEur: 20, alertAtEur: 16 },
     voice: health.voice ?? { ok: true, keyMissing: false },
-    deadJobs: health.deadJobs === undefined ? 0 : health.deadJobs,
+    stuckJobs: health.stuckJobs === undefined ? [] : health.stuckJobs,
     telegram: telegram === 'off' ? undefined : telegram,
     automatic: { gate: automatic, reading },
     revealSales: null,
@@ -124,12 +125,25 @@ describe('dashboard', () => {
 
   it('passes a missing key and the stuck jobs through as read, unknown included', () => {
     const missing = DashboardSchema.parse(
-      assemble({}, 'off', undefined, undefined, { voice: { ok: false, keyMissing: true }, deadJobs: 2 }),
+      assemble({}, 'off', undefined, undefined, {
+        voice: { ok: false, keyMissing: true },
+        stuckJobs: [
+          { task: 'payroll.fetch_exchange_rates', creator: false, count: 1 },
+          { task: 'conversation.send', creator: true, count: 1 },
+        ],
+      }),
     );
     expect(missing.voice).toMatchObject({ ok: false, keyMissing: true });
-    expect(missing.jobs).toEqual({ dead: 2 });
-    const unknown = DashboardSchema.parse(assemble({}, 'off', undefined, undefined, { deadJobs: null }));
-    expect(unknown.jobs).toEqual({ dead: null });
+    // The kind of each stuck job goes with the count, hers told from the agency's (recette 05/11, PRO-10).
+    expect(missing.jobs).toEqual({
+      dead: 2,
+      stuck: [
+        { task: 'payroll.fetch_exchange_rates', creator: false, count: 1 },
+        { task: 'conversation.send', creator: true, count: 1 },
+      ],
+    });
+    const unknown = DashboardSchema.parse(assemble({}, 'off', undefined, undefined, { stuckJobs: null }));
+    expect(unknown.jobs).toEqual({ dead: null, stuck: [] });
   });
 
   it('says Telegram is off rather than that no alert gets through', () => {

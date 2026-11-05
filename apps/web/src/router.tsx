@@ -6,7 +6,9 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
+import { followCreator } from './agent/followed';
 import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { creatorsSearch, parseCreatorsSearch, sheetOf, sheetsFor } from './creators/search';
@@ -113,10 +115,15 @@ const dashboard = createRoute({
     const { user } = rootRoute.useRouteContext();
     const search = dashboard.useSearch();
     const navigate = dashboard.useNavigate();
+    // A link that names her opens her Dashboard, and she is followed from then on (recette 05/11, PRO-28).
+    useEffect(() => {
+      if (search.creatrice !== undefined) followCreator(search.creatrice);
+    }, [search.creatrice]);
     return (
       <DashboardPage
         period={periodOf(search)}
-        onPeriod={(next) => void navigate({ search: dashboardSearch(next), replace: true })}
+        onPeriod={(next) => void navigate({ search: dashboardSearch(next, search.creatrice), replace: true })}
+        onCreator={(id) => void navigate({ search: dashboardSearch(periodOf(search), id), replace: true })}
         forOwner={user.role === 'owner'}
         opensTracking={canOpen(railOf(user), '/suivi')}
         canAddCreator={canOpen(railOf(user), '/creatrices')}
