@@ -1,6 +1,6 @@
 {
-  "id": "89ad8977-13df-463d-93c6-e1eb9d3609cb",
-  "prevId": "dbdf818f-981e-44d2-82f5-16921ca148a8",
+  "id": "05095063-9148-4a01-90f3-2418b1a10af0",
+  "prevId": "0470aea2-966e-4649-bd54-0ebe5364ed1c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1271,7 +1271,7 @@
         },
         "content_drop_files_state_check": {
           "name": "content_drop_files_state_check",
-          "value": "\"content_drop_files\".\"state\" in ('awaiting', 'kept', 'refused', 'duplicate')"
+          "value": "\"content_drop_files\".\"state\" in ('awaiting', 'received', 'kept', 'refused', 'duplicate')"
         },
         "content_drop_files_position_check": {
           "name": "content_drop_files_position_check",
@@ -2056,7 +2056,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'reply_skipped', 'reply_deferred', 'desire_scored', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'reply_skipped', 'reply_deferred', 'desire_scored', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -3936,7 +3936,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'reply_skipped', 'reply_deferred', 'desire_scored', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'reply_skipped', 'reply_deferred', 'desire_scored', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'connection_state_changed', 'security_alert', 'content_drop_received', 'error')"
         }
       },
       "isRLSEnabled": false

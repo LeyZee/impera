@@ -372,6 +372,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...payroll.tasks,
     ...invoicing.tasks,
     ...notifications.tasks,
+    ...contentDrops.tasks,
     ...creatorTasks.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',

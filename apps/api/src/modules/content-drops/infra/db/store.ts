@@ -1,8 +1,11 @@
 import {
+  JOB_MAX_ATTEMPTS,
   AuditEntryIdSchema,
+  EventIdSchema,
   ContentDropFileIdSchema,
   ContentDropSchema,
   ContentRequestSchema,
+  DropFileStateSchema,
   DropMimeSchema,
   DropStateSchema,
   kindOfMime,
@@ -21,6 +24,7 @@ import {
   schema,
   sql,
   withCreatorAccount,
+  withAdmin,
   withTenantMember,
   type Database,
   type Transaction,
@@ -28,6 +32,8 @@ import {
 
 import { dropRefusals, mayWithdraw, needsRequest } from '../../domain/drops';
 import {
+  ContentDropFileNotFound,
+  ContentDropFileSettled,
   ContentDropFormatUnprocessable,
   ContentDropForbidden,
   ContentDropIdConflict,
@@ -40,7 +46,12 @@ import {
   ContentRequestNotFound,
   ContentRequestStructureUnprocessable,
 } from '../../domain/errors';
-import type { AgencyContentStore, CreatorContentStore } from '../../domain/ports';
+import type {
+  AgencyContentStore,
+  CreatorContentStore,
+  DropFileTarget,
+  ReceiptStore,
+} from '../../domain/ports';
 
 const { auditLog, contentDropFiles, contentDrops, contentRequests } = schema;
 
@@ -276,6 +287,54 @@ async function withdrawIn(
   });
 }
 
+/** A file of a drop the reader sees, with the drop's state; a withdrawn drop is still found (its sender is told). */
+async function fileTargetIn(tx: Transaction, dropId: string, fileId: string): Promise<DropFileTarget> {
+  const drop = await readDrop(tx, dropId);
+  if (drop === undefined) throw new ContentDropNotFound();
+  const [file] = await tx
+    .select()
+    .from(contentDropFiles)
+    .where(and(eq(contentDropFiles.id, fileId), eq(contentDropFiles.dropId, dropId)));
+  if (file === undefined) throw new ContentDropFileNotFound();
+  return {
+    creatorId: drop.creatorId,
+    dropId,
+    fileId: ContentDropFileIdSchema.parse(fileId),
+    mime: DropMimeSchema.parse(file.mime),
+    bytes: file.bytes,
+    fileState: DropFileStateSchema.parse(file.state),
+    dropState: DropStateSchema.parse(drop.state),
+  };
+}
+
+/**
+ * The receipt of a file whose bytes are whole, enqueued with the transaction (ADR 0006): one per file, the first one
+ * kept (`preserve_run_at`). A file already past `awaiting` enqueues nothing; a drop that no longer sends refuses.
+ */
+async function markSentIn(
+  tx: Transaction,
+  dropId: string,
+  fileId: string,
+  correlationId: string,
+): Promise<ContentDrop> {
+  const target = await fileTargetIn(tx, dropId, fileId);
+  if (target.fileState === 'awaiting') {
+    if (target.dropState !== 'uploading') throw new ContentDropFileSettled();
+    await tx.execute(
+      sql`select public.enqueue_job(
+        task => 'content_drops.receive_file',
+        payload => ${JSON.stringify({ creatorId: target.creatorId, fileId, correlationId })}::jsonb,
+        max_attempts => ${JOB_MAX_ATTEMPTS['content_drops.receive_file']}::int,
+        job_key => ${`content_drops.receive_file:${fileId}`},
+        job_key_mode => 'preserve_run_at'
+      )`,
+    );
+  }
+  const drop = await readDrop(tx, dropId);
+  if (drop === undefined) throw new ContentDropNotFound();
+  return viewOf(tx, drop);
+}
+
 export function createDrizzleCreatorContentStore(db: Database): CreatorContentStore {
   return {
     content: (userId) => withCreatorAccount(db, userId, (tx) => contentIn(tx, true)),
@@ -301,6 +360,10 @@ export function createDrizzleCreatorContentStore(db: Database): CreatorContentSt
           .set({ state: 'refused', refusalReason: reason, decidedAt: now, updatedAt: now })
           .where(eq(contentRequests.id, requestId));
       }),
+    fileTarget: (userId, dropId, fileId) =>
+      withCreatorAccount(db, userId, (tx) => fileTargetIn(tx, dropId, fileId)),
+    markSent: (userId, dropId, fileId, correlationId) =>
+      withCreatorAccount(db, userId, (tx) => markSentIn(tx, dropId, fileId, correlationId)),
   };
 }
 
@@ -427,6 +490,62 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
           .update(contentRequests)
           .set({ state: 'cancelled', decidedAt: now, updatedAt: now })
           .where(eq(contentRequests.id, requestId));
+      }),
+    fileTarget: (creatorId, userId, dropId, fileId) =>
+      asTeam(creatorId, userId, (tx) => fileTargetIn(tx, dropId, fileId)),
+    markSent: (creatorId, userId, dropId, fileId, correlationId) =>
+      asTeam(creatorId, userId, (tx) => markSentIn(tx, dropId, fileId, correlationId)),
+  };
+}
+
+/**
+ * The receipt job's side, as the admin role (`withAdmin`): the states of a drop move by the job only (0108's trigger
+ * refuses them to the team, her policies to her).
+ */
+export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
+  return {
+    pending: (fileId) =>
+      withAdmin(adminDb, async (tx) => {
+        const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
+        if (file === undefined) return null;
+        return fileTargetIn(tx, file.dropId, fileId);
+      }),
+    settle: (fileId, outcome, now, correlationId) =>
+      withAdmin(adminDb, async (tx) => {
+        const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
+        if (file === undefined) return;
+        // The drop first, as every writer of its files does: two receipts of one drop run one after the other.
+        const drop = await readDrop(tx, file.dropId, true);
+        if (drop === undefined) return;
+        await tx
+          .update(contentDropFiles)
+          .set({
+            state: outcome.state,
+            refusal: outcome.state === 'refused' ? outcome.refusal : null,
+            updatedAt: now,
+          })
+          .where(and(eq(contentDropFiles.id, fileId), eq(contentDropFiles.state, 'awaiting')));
+        if (drop.state !== 'uploading') return;
+        const [waiting] = await tx
+          .select({ id: contentDropFiles.id })
+          .from(contentDropFiles)
+          .where(and(eq(contentDropFiles.dropId, drop.id), eq(contentDropFiles.state, 'awaiting')))
+          .limit(1);
+        if (waiting !== undefined) return;
+        await tx
+          .update(contentDrops)
+          .set({ state: 'received', updatedAt: now })
+          .where(eq(contentDrops.id, drop.id));
+        // In the same transaction, once per drop: the drop was locked and still sending.
+        await tx.insert(schema.domainEvents).values({
+          id: newId(EventIdSchema),
+          creatorId: drop.creatorId,
+          type: 'content_drop_received',
+          payload: { dropId: drop.id, requestId: drop.requestId },
+          actor: 'system',
+          correlationId,
+          createdAt: now,
+        });
       }),
   };
 }
