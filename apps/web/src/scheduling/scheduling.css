@@ -915,6 +915,10 @@ button.sc-duty__one:active {
   text-align: right;
   font-weight: 600;
 }
+/* A row whose value is a gesture (« Faire mon rapport », EQP-02): its label sits level with the button. */
+.sc-sheet__facts li:has(> .nv-btn, > .sc-sheet__report > .nv-tap) {
+  align-items: center;
+}
 .sc-sheet__edit {
   display: flex;
   flex-direction: column;

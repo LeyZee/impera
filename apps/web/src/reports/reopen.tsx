@@ -27,8 +27,8 @@ export interface ReportDraft {
   readonly incident: string;
 }
 
-/** The screens that open a report panel. */
-export type ReportScreen = '/aujourdhui' | '/planning' | '/equipe/rapports';
+/** The screens that open a report panel: a manager makes his own from Équipe › Planning (EQP-02). */
+export type ReportScreen = '/aujourdhui' | '/planning' | '/equipe/planning' | '/equipe/rapports';
 
 export interface Reopening {
   readonly screen: ReportScreen;
