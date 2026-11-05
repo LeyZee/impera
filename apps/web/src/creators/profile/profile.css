@@ -6,8 +6,11 @@
   gap: 12px;
 }
 
+/* A second section, of another nature: a real step and a neutral rule above it, never a colour. */
 .cr-profile__next {
-  margin-top: 12px;
+  margin-top: var(--nv-space-5);
+  padding-top: var(--nv-space-5);
+  border-top: 1px solid var(--nv-plate-edge);
 }
 
 .cr-archive-ask {

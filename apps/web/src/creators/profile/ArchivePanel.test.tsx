@@ -94,6 +94,9 @@ describe('ArchivePanel (ADR 0071 § 2)', () => {
     confirmIdentity.mockResolvedValue('ok');
     archive();
     expect(await screen.findByText('Pour l’archiver, confirme ton mot de passe et ton code.')).toBeDefined();
+    // Only the prompt's own buttons while it asks: never two « Annuler » one under the other.
+    expect(screen.getAllByRole('button', { name: 'Annuler' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Archiver / })).toBeNull();
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'staple battery horse' } });
     fireEvent.change(screen.getByLabelText('Code à 6 chiffres ou de secours'), {
       target: { value: '123456' },

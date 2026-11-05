@@ -48,8 +48,12 @@ describe('/v1/creators/:creatorId/archive and /restore', () => {
     return { userId, headers: { cookie: await signIn(server, email, PASSWORD), origin: DASHBOARD_ORIGIN } };
   }
 
-  const call = (method: 'GET' | 'POST', url: string, headers: Record<string, string>, payload?: object) =>
-    server.inject({ method, url, headers, ...(payload === undefined ? {} : { payload }) });
+  const call = (
+    method: 'GET' | 'POST' | 'DELETE',
+    url: string,
+    headers: Record<string, string>,
+    payload?: object,
+  ) => server.inject({ method, url, headers, ...(payload === undefined ? {} : { payload }) });
   const codeOf = (response: { json: () => unknown }) => ErrorBodySchema.parse(response.json()).error.code;
 
   beforeAll(async () => {

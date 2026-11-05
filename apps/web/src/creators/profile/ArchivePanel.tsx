@@ -104,30 +104,33 @@ export function ArchivePanel({
               }}
             />
           ) : null}
-          <div className="ps-head__actions">
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
-              disabled={busy}
-              onClick={() => {
-                setAsking(false);
-                setProblem(null);
-                setPlanned(null);
-                setReauth(false);
-              }}
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              disabled={busy || reauth}
-              aria-busy={busy}
-              onClick={() => void archive()}
-            >
-              {busy ? 'Archivage…' : `Archiver ${creatorName}`}
-            </button>
-          </div>
+          {/* While the password is asked again, its own « Confirmer / Annuler » are the only buttons (no two « Annuler »). */}
+          {reauth ? null : (
+            <div className="ps-head__actions">
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain nv-btn--sm"
+                disabled={busy}
+                onClick={() => {
+                  setAsking(false);
+                  setProblem(null);
+                  setPlanned(null);
+                  setReauth(false);
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="nv-btn nv-btn--soft nv-btn--sm"
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => void archive()}
+              >
+                {busy ? 'Archivage…' : `Archiver ${creatorName}`}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <button

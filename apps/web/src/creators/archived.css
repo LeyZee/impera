@@ -17,3 +17,10 @@
   justify-content: space-between;
   gap: var(--nv-space-3);
 }
+/* A long name with its date wraps; « Rouvrir » keeps its place. */
+.cr-archived__row > span {
+  min-width: 0;
+}
+.cr-archived__row > button {
+  flex: none;
+}
