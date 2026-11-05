@@ -12,6 +12,7 @@ export type NavIconName =
   | 'settings'
   | 'today'
   | 'planning'
+  | 'content'
   | 'team'
   | 'pay'
   | 'me'
@@ -74,6 +75,15 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
       <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
       <path d="M8 3v4M16 3v4M3.5 10h17" />
       <circle className="nav-day" cx="15.5" cy="15" r="1.3" fill="currentColor" />
+    </>
+  ),
+  // Contenu: a photo with its sun, and the arrow of a drop going up.
+  content: (
+    <>
+      <rect x="3.5" y="5.5" width="13" height="13" rx="3" />
+      <path d="m3.5 15.5 3.6-3.6a1.5 1.5 0 0 1 2.1 0l4.3 4.3" />
+      <circle cx="12.6" cy="9.4" r="1.2" fill="currentColor" />
+      <path className="nav-up" d="M19.5 21v-7M17 16.4l2.5-2.5 2.5 2.5" />
     </>
   ),
   team: (
