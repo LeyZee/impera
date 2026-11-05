@@ -132,7 +132,7 @@ export function ArchivePanel({
       ) : (
         <button
           type="button"
-          className="nv-btn nv-btn--plain nv-btn--sm ps-self-start"
+          className="nv-btn nv-btn--soft nv-btn--sm ps-self-start"
           onClick={() => {
             setAsking(true);
           }}

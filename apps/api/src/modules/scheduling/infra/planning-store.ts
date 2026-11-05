@@ -700,7 +700,9 @@ export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
           .where(
             and(
               eq(shiftTemplates.creatorId, creatorId),
-              sql`(${shiftTemplates.validUntil} is null or ${shiftTemplates.validUntil} >= ${today})`,
+              // Ended today (`endTemplate` writes today) or before its first day (the day before it), it makes
+              // nothing more: only a template still to make a day ahead keeps her planned (#562, Équipe's review).
+              sql`(${shiftTemplates.validUntil} is null or (${shiftTemplates.validUntil} > ${today} and ${shiftTemplates.validUntil} >= ${shiftTemplates.validFrom}))`,
             ),
           );
         return { shiftsAhead: ahead?.count ?? 0, templatesRunning: running?.count ?? 0 };

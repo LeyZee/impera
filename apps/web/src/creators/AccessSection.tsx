@@ -6,6 +6,7 @@ import { createCreatorLink, creatorAccountKey, useCreatorAccount } from './api';
 
 import { LinkShare, type LinkOutcome } from '@/screens/team/ShareLink';
 import { deadline, invitationState } from '@/screens/team/model';
+import './access.css';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 

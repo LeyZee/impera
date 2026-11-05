@@ -14,3 +14,5 @@
 - Découvertes :
   - le planning peut encore créer un shift sur une créatrice archivée à la main : à fermer côté Équipe ;
   - un groupe d'alertes « toutes les créatrices » ne s'étend pas d'office à une créatrice rouverte.
+
+**Après relecture Équipe** : un modèle de shift arrêté aujourd'hui, ou avant son premier jour, ne retient plus l'archivage (`valid_until > today and valid_until >= valid_from`) ; le test arrête les modèles par `DELETE /v1/scheduling/shift-templates/:id`. Espacement repris sur Accès et Profil (consigne design du 05/11), captures refaites.

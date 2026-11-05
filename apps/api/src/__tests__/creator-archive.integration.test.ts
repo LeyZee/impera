@@ -135,6 +135,19 @@ describe('/v1/creators/:creatorId/archive and /restore', () => {
       validFrom: '2026-10-01',
       createdBy: ownerRow.id,
     });
+    // A second one that starts far ahead: ended before its first day, it no longer holds her.
+    const laterId = newId(ShiftTemplateIdSchema);
+    await test.admin.db.insert(schema.shiftTemplates).values({
+      id: laterId,
+      creatorId: nora.id,
+      platformAccountId: accountId,
+      memberId,
+      weekday: 3,
+      startMinute: 600,
+      endMinute: 720,
+      validFrom: '2099-01-07',
+      createdBy: ownerRow.id,
+    });
 
     // Only the owner archives: a manager of hers is refused.
     const manager = await account('manager@example.test', { role: 'operator', creatorIds: [nora.id] });
@@ -145,7 +158,7 @@ describe('/v1/creators/:creatorId/archive and /restore', () => {
     expect([planned.statusCode, codeOf(planned)]).toEqual([409, 'creator_planned_conflict']);
     expect(CreatorPlannedSchema.parse(ErrorBodySchema.parse(planned.json()).error.details)).toEqual({
       shiftsAhead: 1,
-      templatesRunning: 1,
+      templatesRunning: 2,
     });
     // Nothing archived.
     expect(
@@ -159,10 +172,11 @@ describe('/v1/creators/:creatorId/archive and /restore', () => {
       .update(schema.shifts)
       .set({ cancelledAt: new Date() })
       .where(eq(schema.shifts.id, shiftId));
-    await test.admin.db
-      .update(schema.shiftTemplates)
-      .set({ validUntil: '2026-09-30' })
-      .where(eq(schema.shiftTemplates.id, templateId));
+    // Each template ended in the agenda as the owner ends it: today for the running one, the day before its first
+    // day for the one ahead; neither keeps her planned (Équipe's review of #562).
+    for (const id of [templateId, laterId]) {
+      expect((await call('DELETE', `/v1/scheduling/shift-templates/${id}`, owner)).statusCode).toBe(204);
+    }
     const archived = await call('POST', `/v1/creators/${nora.id}/archive`, owner);
     expect(archived.statusCode).toBe(200);
     expect(ArchivedCreatorSchema.parse(archived.json())).toMatchObject({ id: nora.id, displayName: 'Nora' });
