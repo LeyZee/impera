@@ -3,6 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { AgentHero } from './AgentHero';
+import { AutomaticConfirm } from './AutomaticConfirm';
 import { BackupBanner } from './BackupBanner';
 import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
@@ -247,6 +248,13 @@ function Loaded({
           running={running}
           onChange={setMode}
         />
+        {writer.asking ? (
+          <AutomaticConfirm
+            creatorName={data.creator.name}
+            onConfirmed={writer.confirmed}
+            onCancel={writer.cancelled}
+          />
+        ) : null}
         {writer.pending ? (
           <p className="db-notice db-notice--quiet" role="status">
             Envoi au serveur…
