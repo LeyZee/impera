@@ -24,3 +24,12 @@
   width: 16px;
   height: 16px;
 }
+/* The panel's title already says « Apparence »: the control keeps its name for screen readers only. */
+.me-prefs .nv-appearance__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

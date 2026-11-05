@@ -25,3 +25,8 @@
   font-size: var(--nv-text-footnote);
   font-weight: 650;
 }
+
+/* The lines sit at the panel head's inset, like every other list in a panel. */
+.td-todo > .td-todo__list {
+  padding: 4px 24px 22px;
+}
