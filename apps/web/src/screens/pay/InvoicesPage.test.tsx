@@ -216,7 +216,7 @@ describe('Paie › Factures', () => {
     await waitFor(() => rowIn(documents, THEO_CREDIT.number));
     expect(reads).toContain(`?period=${OCT2}`);
     const credit = rowIn(documents, THEO_CREDIT.number);
-    expect(credit.textContent.replace(NBSP, ' ')).toContain('corrige la quinzaine du 1er – 15 octobre 2026');
+    expect(credit.textContent.replace(NBSP, ' ')).toContain('corrige la quinzaine du 1er au 15 octobre 2026');
     expect(credit.textContent.replace(NBSP, ' ')).toContain('−25,00 €');
     // Its statement is the one that owed it, as the server says: not the quinzaine it corrects.
     expect(within(credit).getByRole('link', { name: 'Voir le relevé' }).getAttribute('href')).toBe(

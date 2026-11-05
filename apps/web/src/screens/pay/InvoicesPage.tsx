@@ -5,7 +5,7 @@ import { useId, useState, type JSX, type ReactNode } from 'react';
 import { AnswerDialog, DetailDialog, InvoiceRow, SettleDialog } from './InvoiceRow';
 import { InvoiceYears } from './InvoiceYears';
 import { PayNav } from './PayNav';
-import { useAgencyToday, useCurrentPeriod } from './data';
+import { useAgencySettingsDown, useAgencyToday, useCurrentPeriod } from './data';
 import { Empty, Loading, PayoutHoldLine, PeriodArrows, Unreachable } from './parts';
 
 import { useInvoices, useInvoiceYears } from '@/invoices/api';
@@ -50,6 +50,7 @@ export function InvoicesPage({
   const id = useId();
   const owner = user.role === 'owner';
   const current = useCurrentPeriod();
+  const down = useAgencySettingsDown();
   const today = useAgencyToday();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const members = useMembers();
@@ -181,7 +182,9 @@ export function InvoicesPage({
             </div>
           }
         >
-          {memberId === undefined ? (
+          {down !== null && timeZone === null ? (
+            <Unreachable what="la quinzaine en cours" onRetry={down} />
+          ) : memberId === undefined ? (
             byPeriod.isError && byPeriod.data === undefined ? (
               <Unreachable
                 what="la liste des documents"

@@ -126,13 +126,13 @@ describe('a document in words', () => {
 
   it('says the quinzaine a credit note or a corrective invoice corrects, not the one it was owed in', () => {
     expect(flat(periodText({ kind: 'invoice', corrective: false, period: OCT2 }))).toBe(
-      'quinzaine du 16 – 31 octobre 2026',
+      'quinzaine du 16 au 31 octobre 2026',
     );
     expect(flat(periodText({ kind: 'credit_note', corrective: false, period: OCT1 }))).toBe(
-      'corrige la quinzaine du 1er – 15 octobre 2026',
+      'corrige la quinzaine du 1er au 15 octobre 2026',
     );
     expect(flat(periodText({ kind: 'invoice', corrective: true, period: OCT1 }))).toBe(
-      'corrige la quinzaine du 1er – 15 octobre 2026',
+      'corrige la quinzaine du 1er au 15 octobre 2026',
     );
   });
 

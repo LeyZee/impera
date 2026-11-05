@@ -1006,12 +1006,37 @@ export const validatable = (period: Pick<PayrollPeriod, 'ended' | 'statements'>)
     ? period.statements.filter((statement) => statement.status === 'draft' && statement.canValidate)
     : [];
 
-/** What a member's row says after their net: their rate or team share, their tier, their penalty. */
+/** One word for one entry, the other for several. */
+const counted = (count: number, one: string, several: string): string => (count > 1 ? several : one);
+
+/**
+ * What a member's row says after their net, in the order the engine adds them up: their rate or team share, then each
+ * amount the total holds besides the commission (tier, team goal, bonuses, penalty, carry-overs in, adjustments),
+ * signed, so that the row adds up to its total (recette EQP-06). A statement is in euros.
+ */
 export function memberFacts(statement: CommissionStatement): string[] {
   const facts = [`commission ${percentText(statement.rules.commissionRateBps)}`];
+  const signed = (minor: number): string => signedAmountText(minor, 'EUR');
   if (statement.teamShare !== null) facts.push(`part d’équipe ${percentText(statement.teamShare.bps)}`);
-  if (statement.tierBonus !== null) facts.push(`palier ${statement.tierBonus.label}`);
-  if (statement.penaltiesMinor > 0) facts.push(`malus ${signedAmountText(-statement.penaltiesMinor, 'EUR')}`);
+  const tierMinor = statement.tierBonus?.bonusMinor ?? 0;
+  if (statement.tierBonus !== null) facts.push(`palier ${statement.tierBonus.label} ${signed(tierMinor)}`);
+  if (statement.collectiveBonusMinor !== 0)
+    facts.push(`objectif d’équipe ${signed(statement.collectiveBonusMinor)}`);
+  // The engine's bonuses are the tier's, the team goal's and the ones written by hand: these last, apart.
+  const manualMinor = statement.bonusesMinor - tierMinor - statement.collectiveBonusMinor;
+  if (manualMinor !== 0)
+    facts.push(
+      `${counted(statement.bonuses.filter((bonus) => bonus.cancellation === null).length, 'prime', 'primes')} ${signed(manualMinor)}`,
+    );
+  if (statement.penaltiesMinor > 0) facts.push(`malus ${signed(-statement.penaltiesMinor)}`);
+  if (statement.carryOversInMinor !== 0)
+    facts.push(
+      `${counted(statement.carryOversIn.length, 'report reçu', 'reports reçus')} ${signed(statement.carryOversInMinor)}`,
+    );
+  if (statement.adjustmentsMinor !== 0)
+    facts.push(
+      `${counted(statement.adjustments.length, 'ajustement', 'ajustements')} ${signed(statement.adjustmentsMinor)}`,
+    );
   return facts;
 }
 

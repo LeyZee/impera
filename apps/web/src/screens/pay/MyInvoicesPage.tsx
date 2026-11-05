@@ -4,8 +4,8 @@ import { useState, type JSX, type ReactNode } from 'react';
 import { CommissionsNav } from './CommissionsNav';
 import { AnswerDialog, DetailDialog, InvoiceRow } from './InvoiceRow';
 import { InvoiceYears } from './InvoiceYears';
-import { useAgencyToday } from './data';
-import { Loading } from './parts';
+import { useAgencySettingsDown, useAgencyToday } from './data';
+import { Loading, Unreachable } from './parts';
 
 import { useInvoiceYears } from '@/invoices/api';
 import '@/payroll/pay.css';
@@ -40,6 +40,7 @@ export function MyInvoicesPage({
   memberId?: TeamMemberId;
 }): JSX.Element {
   const today = useAgencyToday();
+  const down = useAgencySettingsDown();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const years = useInvoiceYears(memberId === undefined ? {} : { memberId }, today);
   const [opened, setOpened] = useState<Opened | null>(null);
@@ -54,7 +55,9 @@ export function MyInvoicesPage({
       />
       <div className="py-board">
         <Panel className="nv-enter">
-          {timeZone === null ? (
+          {timeZone === null && down !== null ? (
+            <Unreachable what="l’heure de l’agence" onRetry={down} />
+          ) : timeZone === null ? (
             <Loading rows={3} />
           ) : (
             <InvoiceYears

@@ -491,6 +491,14 @@ describe('Équipe › Rapports', () => {
     await within(late).findAllByText('Parti');
     expect(within(late).queryByRole('button', { name: 'Relancer Basile' })).toBeNull();
     expect(within(late).getByRole('button', { name: 'Relancer Théo' })).toBeTruthy();
+    // The period says it beside his name, the fold closed: his last one (recette EQP-17).
+    const summaries = [...document.querySelectorAll('.rp-period .rp-member > summary')];
+    const basile = summaries.find(
+      (one) => one.querySelector('.nv-disclosure__title')?.textContent === 'Basile',
+    );
+    const theo = summaries.find((one) => one.querySelector('.nv-disclosure__title')?.textContent === 'Théo');
+    expect(basile?.querySelector('.rp-chip--neutral')?.textContent).toBe('Parti');
+    expect(theo?.querySelector('.rp-chip--neutral')).toBeNull();
   });
 
   it('says why « Relancer » waits when the team cannot be read, and when the late shifts cannot be', async () => {

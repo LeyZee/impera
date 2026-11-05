@@ -920,15 +920,40 @@ describe('a member’s row', () => {
       memberFacts(
         statement({
           tierBonus: { thresholdMinor: 100_000, bonusMinor: 5_000, label: 'Or' },
+          // The engine's bonuses hold the tier's.
+          bonusesMinor: 5_000,
           penaltiesMinor: 1_500,
         }),
       ).map(plain),
-    ).toEqual(['commission 25 %', 'palier Or', 'malus −15,00 €']);
+    ).toEqual(['commission 25 %', 'palier Or +50,00 €', 'malus −15,00 €']);
     expect(
       memberFacts(statement({ teamShare: { baseNetMinor: 100_000, bps: 1_000, amountMinor: 10_000 } })).map(
         plain,
       ),
     ).toEqual(['commission 25 %', 'part d’équipe 10 %']);
+  });
+
+  it('names every amount the total holds, so that the row adds up (recette EQP-06)', () => {
+    // 30 % of 655,63 € is 196,69 €; with the 25 € bonus, the 221,69 € paid.
+    const october = statement({
+      netMinor: 65_563,
+      commissionMinor: 19_669,
+      rules: { ...statement().rules, commissionRateBps: 3_000 },
+      collectiveBonusMinor: 1_000,
+      bonusesMinor: 2_500 + 1_000,
+      penaltiesMinor: 3_667,
+      carryOversInMinor: -500,
+      adjustmentsMinor: 1_200,
+      totalMinor: 19_669 + 3_500 - 3_667 - 500 + 1_200,
+    });
+    expect(memberFacts(october).map(plain)).toEqual([
+      'commission 30 %',
+      'objectif d’équipe +10,00 €',
+      'prime +25,00 €',
+      'malus −36,67 €',
+      'report reçu −5,00 €',
+      'ajustement +12,00 €',
+    ]);
   });
 
   it('says a carry-over in one sentence, under the minimum or under zero', () => {

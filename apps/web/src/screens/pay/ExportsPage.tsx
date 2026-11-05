@@ -3,8 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { useId, useState, type SyntheticEvent, type JSX, type ReactNode } from 'react';
 
 import { PayNav } from './PayNav';
-import { useAgencyToday } from './data';
-import { Loading } from './parts';
+import { useAgencySettingsDown, useAgencyToday } from './data';
+import { Loading, Unreachable } from './parts';
 
 import {
   bytesOf,
@@ -28,7 +28,7 @@ import {
   type DayRange,
 } from '@/accounting/model';
 import '@/payroll/pay.css';
-import { amountText, periodTitle } from '@/reports/model';
+import { amountText, periodLine } from '@/reports/model';
 import '@/reports/reports.css';
 import { fullDay } from '@/scheduling/time';
 import { useMembers } from '@/screens/team/api';
@@ -44,6 +44,7 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
  */
 export function ExportsPage({ user }: { user: Me }): JSX.Element {
   const today = useAgencyToday();
+  const down = useAgencySettingsDown();
   const billing = useBillingSettings();
   const members = useMembers();
   const nameOf = (memberId: string): string =>
@@ -62,7 +63,11 @@ export function ExportsPage({ user }: { user: Me }): JSX.Element {
         actions={<PayNav user={user} />}
       />
       <div className="py-board">
-        {years === null || today === null ? (
+        {today === null && down !== null ? (
+          <Panel className="nv-enter">
+            <Unreachable what="l’heure de l’agence" onRetry={down} />
+          </Panel>
+        ) : years === null || today === null ? (
           <Panel className="nv-enter">
             <Loading rows={3} />
           </Panel>
@@ -161,7 +166,7 @@ function JournalReady({
         >
           {journal.unbalanced.map((group) => (
             <li key={`${group.prefix}-${group.period}`}>
-              <span className="nv-num">{group.prefix}</span>, relevé du {periodTitle(group.period)}
+              <span className="nv-num">{group.prefix}</span>, relevé {periodLine(group.period, true)}
             </li>
           ))}
         </Notice>
@@ -177,7 +182,7 @@ function JournalReady({
         >
           {journal.transfersLeftOut.map((transfer) => (
             <li key={`${transfer.memberId}-${transfer.period}`}>
-              {nameOf(transfer.memberId)}, quinzaine du {periodTitle(transfer.period)}
+              {nameOf(transfer.memberId)}, quinzaine {periodLine(transfer.period, true)}
             </li>
           ))}
         </Notice>

@@ -467,7 +467,7 @@ describe('CommissionsPage', () => {
     renderPage();
     const panelOf = await waitFor(() => panel('Mes relevés'));
     const carried = await within(panelOf).findByRole('button', { name: /^1er – 15 octobre/u });
-    expect(text(carried)).toContain('Reporté6,67 €reporté sur le 16 – 31 octobre');
+    expect(text(carried)).toContain('Reporté6,67 €reporté sur la quinzaine du 16 au 31 octobre');
     expect(text(carried)).not.toContain('touché');
   });
 

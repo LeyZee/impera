@@ -79,10 +79,11 @@ const dayNumber = (day: string): string => {
   return date === 1 ? '1er' : String(date);
 };
 
-/** « du 1er au 15 octobre », « du 16 au 31 octobre »: a period in a sentence. */
-export function periodLine(period: PayPeriod): string {
+/** « du 1er au 15 octobre », « du 16 au 31 octobre 2026 » with its year: a period in a sentence, never « du 1er – 15 » (EQP-13). */
+export function periodLine(period: PayPeriod, year = false): string {
   const last = payPeriodLastDay(period);
-  return `du ${dayNumber(period)} au ${dayNumber(last)} ${MONTH.format(new Date(`${period}T12:00:00Z`))}`;
+  const month = (year ? MONTH_YEAR : MONTH).format(new Date(`${period}T12:00:00Z`));
+  return `du ${dayNumber(period)} au ${dayNumber(last)} ${month}`;
 }
 
 /** « 1er – 15 octobre 2026 »: a period as a title; « 1er – 15 octobre » in a list that has room for no more. */

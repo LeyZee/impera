@@ -215,10 +215,10 @@ describe('Paie › Exports', () => {
 
     const unlettered = within(panel).getByText('Un groupe reste sans lettre').closest('.rp-notice');
     expect(unlettered?.getAttribute('data-tone')).toBe('warn');
-    expect(unlettered?.textContent).toContain('NORA, relevé du 1er – 15 octobre 2026');
+    expect(unlettered?.textContent).toContain('NORA, relevé du 1er au 15 octobre 2026');
     const left = within(panel).getByText('Un virement reste hors du fichier').closest('.rp-notice');
     expect(left?.getAttribute('data-tone')).toBe('warn');
-    expect(left?.textContent).toContain('Lou, quinzaine du 16 – 31 octobre 2026');
+    expect(left?.textContent).toContain('Lou, quinzaine du 16 au 31 octobre 2026');
   });
 
   it('names the accounts the accountant has not given, and leads to Réglages › Facturation', async () => {
