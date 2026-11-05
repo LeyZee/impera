@@ -61,8 +61,23 @@ const probeRoutes: FastifyPluginAsyncZod = (app) => {
   });
   app.get('/db-missing-ref', () => {
     throw new Error('Failed query: insert into blind_tests\nparams: 1', {
-      cause: Object.assign(new Error('violates foreign key constraint'), { code: '23503' }),
+      cause: Object.assign(new Error('violates foreign key constraint'), {
+        code: '23503',
+        detail: 'Key (creator_id)=(x) is not present in table "creators".',
+      }),
     });
+  });
+  // A signed webhook reads its body as bytes, like the Reveal sales feed (relecture #538).
+  void app.register((raw, _options, done) => {
+    raw.removeContentTypeParser('application/json');
+    raw.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_request, body, parsed) => {
+      parsed(null, body);
+    });
+    raw.post('/raw', (request) => ({
+      buffer: Buffer.isBuffer(request.body),
+      hex: Buffer.isBuffer(request.body) ? request.body.toString('hex') : null,
+    }));
+    done();
   });
   app.get('/boom', () => {
     throw new Error('select * from secrets where leaked = true');
@@ -132,6 +147,20 @@ describe('hostile input (recette 05/11)', () => {
     ).inject({ method: 'POST', url: '/v1/echo', payload: { text: 'coucou\u0000toi' }, headers: ORIGIN });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ text: 'coucoutoi' });
+  });
+
+  it('leaves a raw body byte for byte, U+0000 included, for a signature to check', async () => {
+    const payload = Buffer.from('{"t":"a\\u0000b"}\u0000', 'utf8');
+    const response = await (
+      await server()
+    ).inject({
+      method: 'POST',
+      url: '/v1/raw',
+      payload,
+      headers: { ...ORIGIN, 'content-type': 'application/json' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ buffer: true, hex: payload.toString('hex') });
   });
 
   it('refuses U+0000 in the path or the query with the common body', async () => {

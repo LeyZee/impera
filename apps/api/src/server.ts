@@ -146,7 +146,10 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
       await reply.code(400).send(errorBody(request, 'request_invalid', 'Requête invalide'));
       return;
     }
-    if (request.body !== undefined && request.body !== null) request.body = jsonWithoutNul(request.body);
+    // JSON only: a raw body (signed Reveal sales, logos, contractor documents) keeps its exact bytes.
+    if (request.body !== undefined && request.body !== null && !Buffer.isBuffer(request.body)) {
+      request.body = jsonWithoutNul(request.body);
+    }
   });
 
   await server.register(helmet);

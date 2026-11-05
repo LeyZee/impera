@@ -41,9 +41,17 @@ export function postgresCode(error: unknown): string | undefined {
   return undefined;
 }
 
+// Node's fetch (undici) wraps a refused or reset connection in `TypeError: fetch failed`: that is a provider out
+// there (xAI, Telegram, Reveal), not the database, and must not read as « database unavailable » (relecture #538).
+function isOutboundFetch(chain: readonly unknown[]): boolean {
+  return chain.some((link) => link instanceof TypeError && link.message === 'fetch failed');
+}
+
 /** The database is down, restarting or out of connections: 503 and retry, never 500. */
 export function isDatabaseUnavailable(error: unknown): boolean {
-  return causes(error).some((link) => {
+  const chain = causes(error);
+  if (isOutboundFetch(chain)) return false;
+  return chain.some((link) => {
     const code = codeOf(link);
     if (code !== undefined && (code.startsWith('08') || UNAVAILABLE_SQLSTATES.has(code))) return true;
     if (code !== undefined && UNAVAILABLE_NODE_CODES.has(code)) return true;
@@ -51,9 +59,22 @@ export function isDatabaseUnavailable(error: unknown): boolean {
   });
 }
 
-/** A foreign key pointed at a row that does not exist: an id the client sent is unknown. */
+function detailOf(error: unknown): string {
+  for (const link of causes(error)) {
+    if (typeof link === 'object' && link !== null && 'detail' in link && typeof link.detail === 'string') {
+      return link.detail;
+    }
+  }
+  return '';
+}
+
+/**
+ * A foreign key pointed at a row that does not exist: an id the client sent is unknown. Only on insert or update
+ * (« is not present in table »): a delete refused because rows still point at it (« is still referenced ») is not a
+ * missing reference and stays a server error until its route says otherwise (relecture #538).
+ */
 export function isMissingReference(error: unknown): boolean {
-  return postgresCode(error) === '23503';
+  return postgresCode(error) === '23503' && detailOf(error).includes('is not present in table');
 }
 
 /**
@@ -68,11 +89,20 @@ export function withoutNul(text: string): string {
   return text.includes('\u0000') ? text.replace(NUL, '') : text;
 }
 
-/** A copy of a JSON value with U+0000 dropped from every string, keys included. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * A copy of a JSON value with U+0000 dropped from every string, keys included. Anything that is not JSON (a Buffer
+ * of a signed webhook or an upload, a stream) is returned untouched: its bytes are the point (relecture #538).
+ */
 export function jsonWithoutNul(value: unknown): unknown {
   if (typeof value === 'string') return withoutNul(value);
   if (Array.isArray(value)) return value.map(jsonWithoutNul);
-  if (typeof value === 'object' && value !== null) {
+  if (isPlainObject(value)) {
     return Object.fromEntries(
       Object.entries(value).map(([key, inner]) => [withoutNul(key), jsonWithoutNul(inner)]),
     );

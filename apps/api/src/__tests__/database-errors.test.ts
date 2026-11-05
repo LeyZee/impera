@@ -10,8 +10,8 @@ import {
 } from '../database-errors';
 
 /** As Drizzle wraps a driver error: the query and its parameters in the message, the driver's error in `cause`. */
-function drizzleError(code: string, params = 'Fan\u0000Nul,secret'): Error {
-  const driver = Object.assign(new Error('driver says no'), { code });
+function drizzleError(code: string, params = 'Fan\u0000Nul,secret', detail = ''): Error {
+  const driver = Object.assign(new Error('driver says no'), { code, detail });
   return new Error(`Failed query: insert into fans values ($1, $2)\nparams: ${params}`, { cause: driver });
 }
 
@@ -27,7 +27,22 @@ describe('database errors (recette 05/11)', () => {
     expect(isDatabaseUnavailable(Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }))).toBe(true);
     expect(isDatabaseUnavailable(new Error('timeout exceeded when trying to connect'))).toBe(true);
     expect(isDatabaseUnavailable(drizzleError('23505'))).toBe(false);
-    expect(isMissingReference(drizzleError('23503'))).toBe(true);
+    // An outside provider that refuses the connection is not the database (relecture #538).
+    const fetchFailed = new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
+    expect(isDatabaseUnavailable(fetchFailed)).toBe(false);
+  });
+
+  it('calls a reference missing only when the id sent points at nothing, not when a delete is still referenced', () => {
+    const missing = drizzleError('23503', '', 'Key (creator_id)=(x) is not present in table "creators".');
+    const stillReferenced = drizzleError(
+      '23503',
+      '',
+      'Key (id)=(x) is still referenced from table "shifts".',
+    );
+    expect(isMissingReference(missing)).toBe(true);
+    expect(isMissingReference(stillReferenced)).toBe(false);
     expect(isMissingReference(drizzleError('23505'))).toBe(false);
   });
 
@@ -37,6 +52,8 @@ describe('database errors (recette 05/11)', () => {
       k: ['x', 1, null, { y: 'z' }],
       n: true,
     });
+    const bytes = Buffer.from('a\u0000b');
+    expect(jsonWithoutNul(bytes)).toBe(bytes);
   });
 
   it('gives the job runner and the logs an error without U+0000 nor SQL parameters', () => {
