@@ -275,6 +275,17 @@ export const CreateSuggestionBodySchema = z.strictObject({
 });
 export type CreateSuggestionBody = z.infer<typeof CreateSuggestionBodySchema>;
 
+/**
+ * What became of an accepted suggestion, for the agency (CR-05 lot c): the task as she keeps it (moved if she moved
+ * it), the days she ticked it (of the suggestion's week for her routine), and whether she removed it since.
+ */
+export const SuggestionFollowUpSchema = z.strictObject({
+  when: CreatorTaskWhenSchema,
+  doneDays: z.number().int().min(0),
+  removed: z.boolean(),
+});
+export type SuggestionFollowUp = z.infer<typeof SuggestionFollowUpSchema>;
+
 /** A suggestion as the agency reads it: what she did of it, and her reason only when she gave one. */
 export const AgencySuggestionSchema = CreatorSuggestionSchema.extend({
   origin: SuggestionOriginSchema,
@@ -282,6 +293,8 @@ export const AgencySuggestionSchema = CreatorSuggestionSchema.extend({
   reason: z.string().nullable(),
   decidedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
+  /** `null` until she accepts it. */
+  task: SuggestionFollowUpSchema.nullable(),
 });
 export type AgencySuggestion = z.infer<typeof AgencySuggestionSchema>;
 

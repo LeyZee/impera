@@ -1634,6 +1634,75 @@
   }
 }
 
+/* ── Her shooting sheet (VEI-01 d): plain text, its lines kept; folded on a proposal, open in her task ───────────── */
+.ag-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.ag-brief__title {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+/* Folded, its hidden content still takes the flex gap in Chromium: none until it opens. */
+details.ag-brief:not([open]) {
+  gap: 0;
+}
+/* Folded, a quiet chevron at the end of its name rather than the browser's marker: right when closed, down when open. */
+summary.ag-brief__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  cursor: pointer;
+  list-style: none;
+}
+summary.ag-brief__title::-webkit-details-marker {
+  display: none;
+}
+summary.ag-brief__title::after {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-right: 1.5px solid var(--nv-ink-muted);
+  border-bottom: 1.5px solid var(--nv-ink-muted);
+  transform: rotate(-45deg);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+details[open] > summary.ag-brief__title::after {
+  transform: rotate(45deg);
+}
+/* After its base rule, which has the same weight: the chevron turns without moving. */
+@media (prefers-reduced-motion: reduce) {
+  summary.ag-brief__title::after {
+    transition: none;
+  }
+}
+summary.ag-brief__title:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
+.ag-brief__text {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+/* Her task's three buttons on a phone: they go to the next line rather than past the edge of the dialog. */
+.ag-task-foot {
+  flex-wrap: wrap;
+}
+
 /* « Dans mon téléphone » (lot c2): a quiet line under her agenda, and its dialog's column. */
 .ag-foot {
   display: flex;
