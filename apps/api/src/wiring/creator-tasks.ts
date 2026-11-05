@@ -4,11 +4,12 @@ import { defineTask } from '../jobs';
 import { createCreatorTasksModule, type CreatorTasksModule } from '../modules/creator-tasks';
 import type { NotificationsModule } from '../modules/notifications';
 
-import type { Routes, Shared, TasksOf } from './shared';
+import type { Routes, Shared, TasksNamed } from './shared';
 
 export interface WiredCreatorTasks {
   readonly module: CreatorTasksModule;
-  readonly tasks: TasksOf<'creator_tasks'>;
+  /** `creator_tasks.suggestion_decided` is the trend watch's to handle (`wiring/trends.ts`). */
+  readonly tasks: TasksNamed<'creator_tasks.remind'>;
   readonly routes: readonly Routes[];
 }
 

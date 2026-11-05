@@ -322,6 +322,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
     agenda: creatorTasks.module,
+    contentDrops: contentDrops.module,
   });
   const supervision = wireSupervision(shared, {
     llm,
@@ -374,6 +375,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...notifications.tasks,
     ...contentDrops.tasks,
     ...creatorTasks.tasks,
+    ...trends.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

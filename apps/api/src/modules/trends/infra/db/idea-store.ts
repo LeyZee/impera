@@ -1,16 +1,27 @@
 import {
   ContentIdeaIdSchema,
   ContentIdeaSchema,
+  ContentIdeaStateSchema,
   CreatorIdSchema,
+  DropCategorySchema,
   TrendSignalIdSchema,
   TrendSignalSchema,
   type ContentIdea,
   type TrendSignal,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  eq,
+  schema,
+  sql,
+  withAdmin,
+  withTenantMember,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 
 import { ContentIdeaDecided, ContentIdeaForbidden, ContentIdeaNotFound } from '../../domain/errors';
-import type { IdeaStore } from '../../domain/ports';
+import type { IdeaFollowStore, IdeaStore } from '../../domain/ports';
 
 const ideas = schema.contentIdeas;
 const signals = schema.trendSignals;
@@ -159,6 +170,39 @@ export function createDrizzleIdeaStore(db: Database): IdeaStore {
           .returning();
         if (updated === undefined) throw new ContentIdeaNotFound();
         return ideaOf(updated);
+      }),
+  };
+}
+
+/** The follow-up of an idea her agenda decided (VEI-01 d2), as the owner role: the job reads under no account. */
+export function createDrizzleIdeaFollowStore(adminDb: Database): IdeaFollowStore {
+  return {
+    ofSuggestion: (suggestionId) =>
+      withAdmin(adminDb, async (tx) => {
+        const [row] = await tx.select().from(ideas).where(eq(ideas.suggestionId, suggestionId));
+        if (row === undefined) return null;
+        return {
+          id: row.id,
+          creatorId: row.creatorId,
+          state: ContentIdeaStateSchema.parse(row.state),
+          category: DropCategorySchema.parse(row.category),
+          title: row.title,
+          requestId: row.requestId,
+        };
+      }),
+    requested: (ideaId) =>
+      withAdmin(adminDb, async (tx) => {
+        await tx
+          .update(ideas)
+          .set({ requestId: ideaId, updatedAt: sql`now()` })
+          .where(and(eq(ideas.id, ideaId), eq(ideas.state, 'suggested'), sql`${ideas.requestId} is null`));
+      }),
+    declined: (ideaId) =>
+      withAdmin(adminDb, async (tx) => {
+        await tx
+          .update(ideas)
+          .set({ state: 'declined', updatedAt: sql`now()` })
+          .where(and(eq(ideas.id, ideaId), eq(ideas.state, 'suggested')));
       }),
   };
 }

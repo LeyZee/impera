@@ -76,6 +76,39 @@ async function scheduleReminder(tx: Transaction, task: CreatorTask): Promise<voi
   );
 }
 
+/**
+ * Her gesture announced (VEI-01 d2), in the transaction that records it: one job per suggestion (her gesture happens
+ * once). Whoever listens (the trend watch) decides what it means; the agenda knows none.
+ */
+async function announceDecision(
+  tx: Transaction,
+  decision: {
+    readonly creatorId: string;
+    readonly suggestionId: string;
+    readonly state: 'accepted' | 'declined';
+    readonly day: string;
+  },
+): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => ${'creator_tasks.suggestion_decided'},
+      payload => ${JSON.stringify(decision)}::jsonb,
+      queue_name => null,
+      run_at => null,
+      max_attempts => ${JOB_MAX_ATTEMPTS['creator_tasks.suggestion_decided']}::int,
+      job_key => ${`creator_tasks.suggestion_decided:${decision.suggestionId}`},
+      job_key_mode => ${'preserve_run_at'}
+    )`,
+  );
+}
+
+/** The day a task falls on in her zone; a routine, which has none, takes `fallback`. */
+function dayOfTask(when: CreatorTaskWhen, zone: string, fallback: string): string {
+  if (when.kind === 'timed') return calendarDayIn(new Date(when.startsAt), zone);
+  if (when.kind === 'day') return when.day;
+  return fallback;
+}
+
 async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
@@ -389,6 +422,12 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             updatedAt: sql`now()`,
           })
           .where(eq(suggestions.id, row.id));
+        await announceDecision(tx, {
+          creatorId,
+          suggestionId: row.id,
+          state: 'accepted',
+          day: dayOfTask(when, zone, calendarDayIn(now, zone)),
+        });
         return taskOf(task);
       }),
 
@@ -416,6 +455,12 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             updatedAt: sql`now()`,
           })
           .where(eq(suggestions.id, row.id));
+        await announceDecision(tx, {
+          creatorId,
+          suggestionId: row.id,
+          state: 'declined',
+          day: calendarDayIn(now, zone),
+        });
       }),
   };
 }

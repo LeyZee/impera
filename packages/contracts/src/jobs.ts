@@ -13,6 +13,7 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  SuggestionIdSchema,
   TeamMemberIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
@@ -46,6 +47,7 @@ export const JOB_NAMES = [
   'notifications.recap',
   'notifications.creator_sale',
   'creator_tasks.remind',
+  'creator_tasks.suggestion_decided',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
@@ -149,6 +151,19 @@ export const JOB_PAYLOADS = {
    * move replaces the job, and a job left from before rings nothing.
    */
   'creator_tasks.remind': z.object({ taskId: CreatorTaskIdSchema, startsAt: z.iso.datetime() }),
+  /**
+   * Her gesture on one of the agency's suggestions (VEI-01 d2): enqueued in the transaction of her accept or decline,
+   * under the key `creator_tasks.suggestion_decided:<suggestionId>`, once per suggestion. `day` is the day of the task
+   * she accepted, in her zone (the day she decided for a routine or a decline). The agenda only announces it; the
+   * trend watch handles it (an idea's shoot becomes a content request, or the idea is declined) and does nothing for a
+   * suggestion that no idea became.
+   */
+  'creator_tasks.suggestion_decided': z.object({
+    creatorId: CreatorIdSchema,
+    suggestionId: SuggestionIdSchema,
+    state: z.enum(['accepted', 'declined']),
+    day: z.iso.date(),
+  }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -309,6 +324,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.creator_sale': 5,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
+  // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
+  'creator_tasks.suggestion_decided': 5,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.

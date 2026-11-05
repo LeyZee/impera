@@ -43,6 +43,18 @@ export interface DropFileTarget {
 }
 
 /** What the receipt job finds of a file (`withAdmin`): `null` when it is not there. */
+/**
+ * A content request asked by an idea of the trend watch (VEI-01 d2): the shoot she accepted in her agenda. Its id is
+ * the idea's, its reason the idea's title (80 characters at most), due on the day of her shoot.
+ */
+export interface IdeaContentRequest {
+  readonly id: string;
+  readonly creatorId: string;
+  readonly category: DropCategory;
+  readonly dueOn: string;
+  readonly reason: string;
+}
+
 export interface ReceiptStore {
   pending(fileId: string): Promise<DropFileTarget | null>;
   /**
