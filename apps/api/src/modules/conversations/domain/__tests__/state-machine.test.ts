@@ -4,12 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { canDraftBecome, nextState, statesAllowing } from '../state-machine';
 
 describe('conversation state machine', () => {
-  it('moves a fan message to pending, except where a human or an error holds the conversation', () => {
+  it('moves a fan message to pending, except where a human or a pause holds the conversation', () => {
     expect(nextState('idle', 'receive_inbound')).toBe('pending');
     expect(nextState('awaiting_approval', 'receive_inbound')).toBe('pending');
     expect(nextState('human', 'receive_inbound')).toBe('human');
     expect(nextState('paused', 'receive_inbound')).toBe('paused');
-    expect(nextState('error', 'receive_inbound')).toBe('error');
+    // After a send that failed for good, his new message gets a new draft (recette CHAT-12).
+    expect(nextState('error', 'receive_inbound')).toBe('pending');
   });
 
   it('follows the copilot path: draft, approval, verified send', () => {

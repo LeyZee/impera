@@ -11,7 +11,7 @@ export const STATE_LABELS: Readonly<Record<ConversationState, string>> = {
   sending: 'Envoi en cours',
   human: 'Un humain répond',
   paused: 'En pause',
-  error: 'Erreur',
+  error: 'Pas parti : à envoyer dans Reveal',
 };
 
 /** The mode in a word, said in the reader beside the state. */

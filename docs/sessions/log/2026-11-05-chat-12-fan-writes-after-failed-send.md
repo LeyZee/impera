@@ -1,0 +1,5 @@
+# 2026-11-05 · CHAT-12 : un fan qui réécrit après un envoi raté reçoit un nouveau brouillon
+
+- Fiche : recette du 05/11, CHAT-12, reco 5 (Charles, « go recos »).
+- Fait : un message du fan fait passer une conversation de `error` à `pending` (machine à états). `commands.ts` relance alors `conversation.respond` comme pour toute conversation `pending`, et l'agent propose un nouveau brouillon. Le brouillon raté reste dans `failedDraft` tant que rien n'est parti après lui et que la conversation est sur le chemin de l'agent (`pending`, `drafting`, `awaiting_approval`, `sending`). Une prise en main ou un repos le retire. Le libellé de l'état `error` dans le Suivi devient « Pas parti : à envoyer dans Reveal ».
+- Tests : machine à états, test HTTP (le fan réécrit : `pending`, brouillon raté visible, réponse en file, puis prise en main), tests web du Suivi.

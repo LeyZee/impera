@@ -19,6 +19,7 @@ import {
   type ConversationSummary,
   type DraftView,
   type MessageMediaView,
+  type ConversationState,
 } from '@impera/contracts';
 import { and, eq, schema, SNAPSHOT_READ, sql, withTenant, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
@@ -28,6 +29,8 @@ import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '
 import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toStoredEvent } from './rows';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
+/** The states where the agent answers him again after a failed send; once a human holds it or it rests, it is theirs. */
+const AGENT_ANSWERING: readonly ConversationState[] = ['pending', 'drafting', 'awaiting_approval', 'sending'];
 
 /** One more row than asked tells whether a next page exists. */
 function paged<T>(rows: readonly T[], page: PageRequest, cursorOf: (last: T) => string) {
@@ -200,20 +203,24 @@ export function createDrizzleConversationReader(
               ),
             )
             .orderBy(schema.drafts.createdAt);
-          // In `error`, what did not leave: the latest draft whose send failed for good.
-          const [failed] =
-            summary.state === 'error'
-              ? await tx
-                  .select()
-                  .from(schema.drafts)
-                  .where(and(eq(schema.drafts.conversationId, id), eq(schema.drafts.status, 'failed')))
-                  .orderBy(sql`${schema.drafts.createdAt} desc`)
-                  .limit(1)
-              : [];
+          // What did not leave: the latest draft whose send failed for good, while nothing left after it. A fan who
+          // writes again takes the conversation out of `error` (recette CHAT-12), the failure stays in sight.
+          const [failed] = await tx
+            .select()
+            .from(schema.drafts)
+            .where(and(eq(schema.drafts.conversationId, id), eq(schema.drafts.status, 'failed')))
+            .orderBy(sql`${schema.drafts.createdAt} desc`)
+            .limit(1);
+          const lastOut = summary.lastOutboundAt === null ? null : Date.parse(summary.lastOutboundAt);
+          const stillUnsent =
+            failed !== undefined &&
+            (summary.state === 'error' ||
+              (AGENT_ANSWERING.includes(summary.state) &&
+                (lastOut === null || failed.createdAt.getTime() > lastOut)));
           return {
             ...summary,
             openDrafts: drafts.map(draftView),
-            failedDraft: failed === undefined ? null : draftView(failed),
+            failedDraft: stillUnsent ? draftView(failed) : null,
           };
         },
         SNAPSHOT_READ,
