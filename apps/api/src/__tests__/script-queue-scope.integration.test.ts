@@ -50,7 +50,8 @@ describe('a creator’s script queue, out of scope (recette SEC-06)', () => {
       const { userId } = await createOwner(app.auth, app.db.db, account);
       await test.admin.db
         .update(schema.user)
-        .set({ role: 'operator', creatorIds: teamRole === 'chatter' ? [hers] : [] })
+        // The manager has both on his list (recette 05/11, reco 8); the chatter, his own creator.
+        .set({ role: 'operator', creatorIds: teamRole === 'chatter' ? [hers] : [hers, other] })
         .where(eq(schema.user.id, userId));
       await test.admin.db.insert(schema.teamMembers).values({
         id: newId(TeamMemberIdSchema),
@@ -91,11 +92,12 @@ describe('a creator’s script queue, out of scope (recette SEC-06)', () => {
     expect(await refusal(owner, UNKNOWN)).toEqual([404, 'script_queue_creator_not_found']);
   });
 
-  it('answers anyone else the same 404 for another creator and for one that does not exist', async () => {
+  it('answers anyone else the same refusal for another creator and for one that does not exist', async () => {
+    // Off his list, `requireRole` refuses first (reco 8), the same for a creator that exists and one that does not.
     const outOfScope = await refusal(chatter, other);
-    expect(outOfScope).toEqual([404, 'script_queue_creator_not_found']);
+    expect(outOfScope).toEqual([403, 'creator_forbidden']);
     expect(await refusal(chatter, UNKNOWN)).toEqual(outOfScope);
-    // Her own creator too: the queue is the agency's (ADR 0056 § 2), the policies never gave him a line of it.
-    expect(await refusal(chatter, hers)).toEqual(outOfScope);
+    // Her own creator: the queue is the agency's (ADR 0056 § 2), the policies never gave him a line of it.
+    expect(await refusal(chatter, hers)).toEqual([404, 'script_queue_creator_not_found']);
   });
 });
