@@ -180,11 +180,11 @@ describe('error format (api.md)', () => {
     }>();
     expect(body.error.code).toBe('request_invalid');
     expect(body.error.requestId).toBe('req-400');
-    // Zod's own messages in French, like the rest of the body (recette 28/10).
+    // Zod's own messages in plain French, like the rest of the body (recette 28/10, recette 05/11 SEC-14).
     expect(body.error.details.fields).toEqual(
       expect.arrayContaining([
-        { path: '/name', message: 'Trop petit : chaîne de caractères doit avoir >=1 caractères' },
-        { path: '/count', message: 'Entrée invalide : entier attendu, nombre reçu' },
+        { path: '/name', message: 'Ne peut pas être vide.' },
+        { path: '/count', message: 'Un nombre entier est attendu, pas un nombre à virgule.' },
       ]),
     );
   });
