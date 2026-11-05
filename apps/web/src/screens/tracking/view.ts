@@ -11,6 +11,12 @@ export const STATE_LABELS: Readonly<Record<ConversationState, string>> = {
   sending: 'Envoi en cours',
   human: 'Un humain répond',
   paused: 'En pause',
+  error: 'Pas parti',
+};
+
+/** The reader's pill has room for the whole sentence: what to do about a send that failed (CHAT-12). */
+export const READER_STATE_LABELS: Readonly<Record<ConversationState, string>> = {
+  ...STATE_LABELS,
   error: 'Pas parti : à envoyer dans Reveal',
 };
 
