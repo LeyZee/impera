@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlanningPage } from './PlanningPage';
 import { parsePlanningSearch } from './model';
 
+import { HoldProvider } from '@/reports/Hold';
+import { ReopenProvider } from '@/reports/reopen';
 import { parseCalendarSearch } from '@/scheduling/calendar';
 import { settingsOf } from '@/test/settings';
 
@@ -171,6 +173,10 @@ function serve(
     swaps?: unknown[];
     /** The reports of every period asked. */
     reports?: unknown[];
+    /** The shifts that take a report already, listed with them. */
+    reportShifts?: unknown[];
+    /** The context of a shift's report panel, by shift (EQP-02). */
+    reportContext?: (shiftId: string) => unknown;
     /** The team's calendar (CR-12) for a window; unanswered (404) when left out. */
     calendar?: (from: string, to: string) => unknown;
     write?: (method: string, path: string, body: unknown) => Reply;
@@ -242,8 +248,16 @@ function serve(
       else if (path === '/v1/scheduling/shift-reports')
         reply = {
           status: 200,
-          body: { reports: routes.reports ?? [], shifts: [], accounts: [], members: [] },
+          body: {
+            reports: routes.reports ?? [],
+            shifts: routes.reportShifts ?? [],
+            accounts: [],
+            members: [],
+          },
         };
+      else if (path === '/v1/scheduling/settings') reply = { status: 200, body: settingsOf() };
+      else if (routes.reportContext !== undefined && /^\/v1\/scheduling\/shifts\/[^/]+\/report$/u.test(path))
+        reply = { status: 200, body: routes.reportContext(path.split('/')[4] ?? '') };
       else reply = { status: 404 };
       return Promise.resolve(
         new Response(reply.status === 204 ? null : JSON.stringify(reply.body ?? null), {
@@ -287,9 +301,14 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
     routeTree: root.addChildren([page]),
     history: createMemoryHistory({ initialEntries: [at] }),
   });
+  // The app's one hold and its reopener, as the shell mounts them: a manager's own report opens here (EQP-02).
   render(
     <QueryClientProvider client={client}>
-      <RouterProvider router={router} />
+      <HoldProvider>
+        <ReopenProvider>
+          <RouterProvider router={router} />
+        </ReopenProvider>
+      </HoldProvider>
     </QueryClientProvider>,
   );
   return router;
@@ -987,6 +1006,79 @@ describe('Équipe › Planning', () => {
       `/equipe/membres?membre=${THEO}`,
     );
     expect(text(over)).not.toContain('Ce shift est fini');
+  });
+
+  it('lets a manager make his own report from his shift’s sheet, and open it again (recette EQP-02)', async () => {
+    const past = (n: number, day: string) => ({
+      ...night,
+      id: id(n),
+      startsAt: `${day}T15:00:00Z`,
+      endsAt: `${day}T21:00:00Z`,
+      templateId: null,
+    });
+    const monday = past(103, '2026-10-26');
+    const tuesday = past(104, '2026-10-27');
+    const sentBack = {
+      id: id(302),
+      shiftId: tuesday.id,
+      creatorId: NORA,
+      platformAccountId: NORA_REVEAL,
+      memberId: THEO,
+      period: '2026-10-16',
+      correctsId: null,
+      amount: { amountMinor: 8_000, currency: 'EUR' },
+      comment: null,
+      incident: null,
+      status: 'rejected',
+      version: 1,
+      byAgency: false,
+      canReview: false,
+      submittedAt: '2026-10-27T21:05:00Z',
+      reviewedAt: '2026-10-27T22:00:00Z',
+      reviewNote: 'Il manque la vente de 21 h.',
+      createdAt: '2026-10-27T21:05:00Z',
+    };
+    serve({
+      planning: planning([], [night, monday, tuesday]),
+      // The reader is Théo, a manager who chats (ADR 0024).
+      members: [member({ userId: OWNER_USER, teamRole: 'manager' })],
+      reports: [sentBack],
+      reportShifts: [monday, tuesday],
+      reportContext: (shiftId) => {
+        const shift = shiftId === monday.id ? monday : tuesday;
+        return {
+          shift,
+          account: ACCOUNTS[0],
+          period: '2026-10-16',
+          opensAt: '2026-10-26T20:30:00.000Z',
+          rules: { currency: 'EUR', earningsSource: 'declared' },
+          reports: shift.id === tuesday.id ? [sentBack] : [],
+        };
+      },
+    });
+    renderPage();
+
+    const [first, second] = await screen.findAllByRole('button', { name: /^Théo, 16\sh\s–\s22\sh$/u });
+    if (first === undefined || second === undefined) throw new Error('two finished shifts expected');
+    fireEvent.click(first);
+    const sheet = await screen.findByRole('dialog');
+    // His own shift: no « Sans rapport » to the agency's Rapports, his report to make.
+    expect(within(sheet).queryByRole('link', { name: 'Sans rapport' })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Faire mon rapport' }));
+    const panel = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    const [close] = within(panel).getAllByRole('button', { name: 'Fermer' });
+    if (close === undefined) throw new Error('no way to close the panel');
+    fireEvent.click(close);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    // A report sent back says so in his words, and opens to be taken up again.
+    fireEvent.click(second);
+    const again = await screen.findByRole('dialog');
+    expect(text(again)).toContain('80,00 €');
+    fireEvent.click(within(again).getByRole('button', { name: 'Mon rapport : Renvoyé' }));
+    expect(await screen.findByRole('dialog', { name: 'Reprendre mon rapport' })).toBeTruthy();
   });
 
   it('makes one member’s shifts stand out from his record, and gives the whole team back (EQ-11)', async () => {

@@ -19,8 +19,10 @@ import { STATUS_LABELS } from './model';
 import { Unread } from './parts';
 import './team.css';
 
+import { ReportPanel } from '@/reports/ReportPanel';
 import { useReportsOf } from '@/reports/api';
 import { incidentsOf, periodAt } from '@/reports/model';
+import { useReopening, type ReportDraft } from '@/reports/reopen';
 import { AgencyLoad, AgentLabel, MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
 import { useCalendar, useLeaves, usePlanning, useOnDuty, useSwaps, useTemplates } from '@/scheduling/api';
@@ -72,7 +74,10 @@ import { useNow } from '@/scheduling/useNow';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 type Open =
-  { readonly kind: 'add'; readonly start: ShiftStart } | { readonly kind: 'shift'; readonly id: string };
+  | { readonly kind: 'add'; readonly start: ShiftStart }
+  | { readonly kind: 'shift'; readonly id: string }
+  // A manager's own report (EQP-02), opened from his shift's sheet.
+  | { readonly kind: 'report'; readonly shiftId: string; readonly draft: ReportDraft | null };
 
 const NONE: ReadonlySet<string> = new Set();
 const NO_INCIDENTS: ReadonlyMap<string, readonly string[]> = new Map();
@@ -173,6 +178,10 @@ export function PlanningPage({
     [data],
   );
   const reports = useReportsOf(periods).list;
+  // His own report opens again here after « Annuler » or a refusal, wherever he went since (EQP-02).
+  useReopening('/equipe/planning', (what) => {
+    setOpen({ kind: 'report', shiftId: what.shiftId, draft: what.draft });
+  });
   const incidents = useMemo(
     () => (reports === null ? NO_INCIDENTS : incidentsOf(reports.reports)),
     [reports],
@@ -427,6 +436,7 @@ export function PlanningPage({
       {data === undefined || open === null ? null : (
         <Opened
           open={open}
+          userId={userId}
           planning={data}
           members={members.data ?? null}
           templates={templates.data ?? []}
@@ -451,6 +461,7 @@ function rangeOf(monday: string, zone: string): { from: string; to: string; crea
 
 function Opened({
   open,
+  userId,
   planning,
   members,
   templates,
@@ -460,6 +471,7 @@ function Opened({
   onOpen,
 }: {
   open: Open;
+  userId: string;
   planning: Planning;
   /** `null` while the team is not read, or could not be. */
   members: readonly TeamMember[] | null;
@@ -487,6 +499,16 @@ function Opened({
       />
     );
   }
+  if (open.kind === 'report')
+    return (
+      <ReportPanel
+        key={open.shiftId + (open.draft?.id ?? '')}
+        shiftId={open.shiftId}
+        draft={open.draft}
+        from="/equipe/planning"
+        onClose={close}
+      />
+    );
   const shift = planning.shifts.find((one) => one.id === open.id);
   if (shift === undefined) return null;
   return (
@@ -499,6 +521,11 @@ function Opened({
       zone={zone}
       now={now}
       reports={reports === null ? null : reports.reports.filter((one) => one.shiftId === shift.id)}
+      userId={userId}
+      reportable={reports?.shifts.some((one) => one.id === shift.id) ?? false}
+      onReport={() => {
+        onOpen({ kind: 'report', shiftId: shift.id, draft: null });
+      }}
       onClose={close}
     />
   );
