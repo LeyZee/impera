@@ -30,6 +30,10 @@ Une tâche à heures peut porter un rappel qu'elle choisit (`reminderMinutes`, d
 
 `GET /v1/creators/:creatorId/suggestions?week=` rend, pour chaque suggestion acceptée, le suivi de la tâche qu'elle est devenue (`task`, `null` avant son geste) : son moment tel qu'elle le garde (déplacée si elle l'a déplacée, placée si la suggestion était sans date), les jours qu'elle l'a cochée (`doneDays` : de la semaine de la suggestion pour sa routine, qui revient chaque semaine ; toutes ses coches pour une tâche datée) et si elle l'a retirée depuis (`removed`). La lecture passe par la RLS de son équipe (`team_read` sur ses tâches et ses coches), sans rôle admin. L'écran est Créatrices › Agenda, du propriétaire et du manager actif, qui n'ouvre que cet onglet de Créatrices (Charles, 05/11).
 
+## Son geste annoncé (VEI-01 d2)
+
+Son acceptation ou son refus d'une suggestion met en file, dans la même transaction, `creator_tasks.suggestion_decided` (`{creatorId, suggestionId, state, day}`, clé `creator_tasks.suggestion_decided:<suggestionId>`). `day` est le jour de la tâche acceptée dans son fuseau, ou le jour de son geste pour une routine et un refus. Le module ne sait pas qui écoute : la veille (`trends`) tient le job et suit l'idée devenue cette suggestion.
+
 ## Règles pures (`domain/`)
 
 - **Série** (`streak.ts`) : une journée est « réussie » quand toutes ses tâches essentielles sont cochées (la routine de l'agence qu'elle a acceptée), « parfaite » quand toutes ses tâches du jour le sont (les siennes comprises). La série compte les journées réussies d'affilée dans **son** fuseau ; aujourd'hui compte dès qu'il est réussi et ne casse jamais tant qu'il dure (« série en danger » seulement). Une journée sans essentielle ne compte ni ne casse. Un joker pardonne une journée manquée dans la série, la deuxième la casse ; un joker n'est dépensé que s'il sauve une journée réussie d'avant. Paliers 7, 14, 30, 50, 100.

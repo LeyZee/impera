@@ -2,7 +2,9 @@ import type {
   ContentIdea,
   ContentIdeaCorrection,
   ContentIdeaList,
+  ContentIdeaState,
   CreatorId,
+  DropCategory,
   ExtensionLink,
   ExtensionLinkCreated,
   ExtensionLinkId,
@@ -122,4 +124,27 @@ export interface IdeaStore {
   ): Promise<ContentIdea>;
   /** The suggestion it became, of the same id: `validated` → `suggested`. */
   suggested(creatorId: CreatorId, userId: UserId, ideaId: string): Promise<ContentIdea>;
+}
+
+/** An idea as its follow-up job reads it (`withAdmin`): what the content request it asks is made of. */
+interface FollowedIdea {
+  readonly id: string;
+  readonly creatorId: string;
+  readonly state: ContentIdeaState;
+  readonly category: DropCategory;
+  readonly title: string;
+  readonly requestId: string | null;
+}
+
+/**
+ * The follow-up of an idea once she decided in her agenda (VEI-01 d2), under the owner's role: a job has no account
+ * to read under. Each write moves the idea only from `suggested`, so a replay changes nothing.
+ */
+export interface IdeaFollowStore {
+  /** The idea that became this suggestion, `null` when none did (a suggestion of the agency's own). */
+  ofSuggestion(suggestionId: string): Promise<FollowedIdea | null>;
+  /** Her shoot accepted: the content request asked under the idea's id is recorded on it. */
+  requested(ideaId: string): Promise<void>;
+  /** Her shoot declined: the idea is `declined`, its request never asked. */
+  declined(ideaId: string): Promise<void>;
 }
