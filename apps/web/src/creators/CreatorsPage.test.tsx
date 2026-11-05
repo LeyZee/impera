@@ -313,7 +313,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
     expect(await screen.findByRole('button', { name: 'Enregistrer une version' })).toBeDefined();
     cleanup();
 
-    for (const path of ['/moi/dossier', '/moi/calendrier', '/moi/factures']) {
+    for (const path of ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/factures']) {
       await serve([ANNA]);
       const again = renderAt(anna, path);
       await waitFor(() => {
@@ -329,11 +329,11 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
     });
   });
 
-  it('sends a member who opens it to his own file', async () => {
+  it('sends a member who opens it to his own profile', async () => {
     await serve([ANNA]);
     const router = renderAt(chatter, '/moi/persona');
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/moi/dossier');
+      expect(router.state.location.pathname).toBe('/moi/profil');
     });
   });
 });

@@ -49,7 +49,7 @@ function renderPage(): void {
     path: '/moi/calendrier',
     component: () => <MyCalendarLinkPage user={THEO_ME} />,
   });
-  const others = ['/moi/dossier', '/moi/securite'].map((path) =>
+  const others = ['/moi/profil', '/moi/dossier', '/moi/securite'].map((path) =>
     createRoute({ getParentRoute: () => root, path, component: () => null }),
   );
   const router = createRouter({

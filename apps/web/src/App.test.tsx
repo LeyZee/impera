@@ -375,12 +375,12 @@ describe('App on the screens of a contractor’s file', () => {
     );
   }
 
-  it('leads Moi to its file, and a chatter’s own invoices to Commissions, where he reads them', async () => {
+  it('leads Moi to his profile (CHAT-30), and a chatter’s own invoices to Commissions, where he reads them', async () => {
     serveAs(member('chatter'));
     window.history.replaceState(null, '', '/moi');
     render(<App />);
-    expect(await screen.findByRole('heading', { name: 'Dossier' })).toBeDefined();
-    expect(window.location.pathname).toBe('/moi/dossier');
+    expect(await screen.findByRole('heading', { name: 'Profil' })).toBeDefined();
+    expect(window.location.pathname).toBe('/moi/profil');
     cleanup();
     window.history.replaceState(null, '', '/moi/factures');
     render(<App />);

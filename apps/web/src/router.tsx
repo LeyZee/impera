@@ -23,6 +23,7 @@ import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
+import { MyProfilePage } from './screens/me/MyProfilePage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
@@ -541,13 +542,14 @@ const meIndex = createRoute({
   getParentRoute: () => me,
   path: '/',
   beforeLoad: ({ context }) => {
+    // A team member's Moi opens on his profile; the file, a task of once in a while, is the next tab (CHAT-30).
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/dossier', replace: true });
+    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/profil', replace: true });
   },
 });
 /**
  * A creator's Moi holds her persona and her security (ADR 0042 § 8): a team member's screens (his file, his invoices,
- * his calendar of shifts) send her to her persona, as her persona sends anyone else to his file.
+ * his calendar of shifts) send her to her persona, as her persona sends anyone else to his profile.
  */
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
@@ -561,10 +563,19 @@ const mePersona = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'creator') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/moi/dossier', replace: true });
+      throw redirect({ to: '/moi/profil', replace: true });
     }
   },
   component: MyPersonaPage,
+});
+const meProfile = createRoute({
+  getParentRoute: () => me,
+  path: '/profil',
+  beforeLoad: creatorAway,
+  component: function MyProfile() {
+    const { user } = rootRoute.useRouteContext();
+    return <MyProfilePage user={user} />;
+  },
 });
 const meFile = createRoute({
   getParentRoute: () => me,
@@ -823,7 +834,7 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
+  me.addChildren([meIndex, mePersona, meProfile, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,
