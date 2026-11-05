@@ -72,6 +72,8 @@ export const creatorTasks = pgTable(
     category: enumText('category').notNull(),
     title: text('title').notNull(),
     purpose: text('purpose'),
+    /** Her shooting sheet, copied once from the suggestion she accepted (VEI-01 d); out of her UPDATE grant. */
+    shootBrief: text('shoot_brief'),
     startsAt: timestampTz('starts_at'),
     endsAt: timestampTz('ends_at'),
     day: date('day', { mode: 'string' }),
@@ -96,6 +98,10 @@ export const creatorTasks = pgTable(
     check(
       'creator_tasks_purpose_check',
       sql`${t.purpose} is null or char_length(${t.purpose}) between 1 and 160`,
+    ),
+    check(
+      'creator_tasks_shoot_brief_check',
+      sql`${t.shootBrief} is null or char_length(${t.shootBrief}) between 1 and 600`,
     ),
     check(
       'creator_tasks_reminder_check',
@@ -224,6 +230,8 @@ export const creatorSuggestions = pgTable(
     category: enumText('category').notNull(),
     title: text('title').notNull(),
     purpose: text('purpose'),
+    /** The shooting sheet the agency wrote (an idea's « à tourner », VEI-01 d). */
+    shootBrief: text('shoot_brief'),
     startsAt: timestampTz('starts_at'),
     endsAt: timestampTz('ends_at'),
     day: date('day', { mode: 'string' }),
@@ -257,6 +265,10 @@ export const creatorSuggestions = pgTable(
     check(
       'creator_suggestions_purpose_check',
       sql`${t.purpose} is null or char_length(${t.purpose}) between 1 and 160`,
+    ),
+    check(
+      'creator_suggestions_shoot_brief_check',
+      sql`${t.shootBrief} is null or char_length(${t.shootBrief}) between 1 and 600`,
     ),
     check(
       'creator_suggestions_reason_check',

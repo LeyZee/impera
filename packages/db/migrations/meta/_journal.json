@@ -687,6 +687,13 @@
       "when": 1793736603766,
       "tag": "0109_content_drop_received",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1793892832953,
+      "tag": "0110_shoot_brief",
+      "breakpoints": true
     }
   ]
 }

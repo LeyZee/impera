@@ -61,6 +61,7 @@ export function taskOf(row: TaskRow): CreatorTask {
     category: row.category,
     title: row.title,
     purpose: row.purpose,
+    shootBrief: row.shootBrief,
     essential: row.essential,
     reminderMinutes: row.reminderMinutes,
   });
@@ -128,6 +129,7 @@ const creatorSide = (row: SuggestionRow) => ({
   category: row.category,
   title: row.title,
   purpose: row.purpose,
+  shootBrief: row.shootBrief,
   essential: row.kind === 'routine',
 });
 

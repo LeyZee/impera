@@ -1,5 +1,10 @@
 import {
+  ContentIdeaIdSchema,
+  ContentIdeaListSchema,
+  ContentIdeaSchema,
+  ContentIdeasQuerySchema,
   CreateExtensionLinkBodySchema,
+  CreatorIdSchema,
   DomainError,
   ExtensionLinkCreatedSchema,
   ExtensionLinkCreatorsSchema,
@@ -8,6 +13,7 @@ import {
   ExtensionLinkTokenSchema,
   PastedTrendLinkSchema,
   PasteTrendLinkBodySchema,
+  RefuseContentIdeaBodySchema,
   TREND_CAPTURE_MAX_BYTES,
   TREND_CAPTURES_MAX,
   TrendCapturesBodySchema,
@@ -15,6 +21,8 @@ import {
   TrendReadingsAcceptedSchema,
   TrendReadingsBatchSchema,
   UserIdSchema,
+  ValidateContentIdeaBodySchema,
+  ValidatedContentIdeaSchema,
   type UserRole,
 } from '@impera/contracts';
 import { DEFAULT_LLM_CONFIG, startOfLocalDay } from '@impera/llm';
@@ -23,6 +31,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { describeCaptures } from '../../application/captures';
+import { validateIdea, type DecideDeps } from '../../application/decide';
 import { pasteLink } from '../../application/links';
 import {
   ExtensionLinkForbidden,
@@ -78,6 +87,7 @@ export function createTrendRoutes(
     readonly readings: ReadingStore;
     readonly vision: CaptureVision;
   },
+  decide: DecideDeps,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   return (app) => {
@@ -189,6 +199,64 @@ export function createTrendRoutes(
           throw error;
         }
       },
+    );
+    // « Idées du jour » (VEI-01 d, ADR 0060 § 5): the owner and an active manager, checked again in the store.
+    const agency = { preValidation: requireRole('owner', 'operator') };
+    const IdeaParamsSchema = z.object({ creatorId: CreatorIdSchema, ideaId: ContentIdeaIdSchema });
+
+    app.get(
+      '/creators/:creatorId/ideas',
+      {
+        ...agency,
+        schema: {
+          params: z.object({ creatorId: CreatorIdSchema }),
+          querystring: ContentIdeasQuerySchema,
+          response: { 200: ContentIdeaListSchema },
+        },
+      },
+      (request) =>
+        decide.ideas.ofDay(request.params.creatorId, actorOf(request).userId, request.query.day, new Date()),
+    );
+
+    app.post(
+      '/creators/:creatorId/ideas/:ideaId/validate',
+      {
+        ...agency,
+        schema: {
+          params: IdeaParamsSchema,
+          body: ValidateContentIdeaBodySchema,
+          response: { 200: ValidatedContentIdeaSchema },
+        },
+      },
+      (request) =>
+        validateIdea(
+          decide,
+          request.params.creatorId,
+          actorOf(request).userId,
+          request.params.ideaId,
+          request.body.correction,
+          new Date(),
+        ),
+    );
+
+    app.post(
+      '/creators/:creatorId/ideas/:ideaId/refuse',
+      {
+        ...agency,
+        schema: {
+          params: IdeaParamsSchema,
+          body: RefuseContentIdeaBodySchema,
+          response: { 200: ContentIdeaSchema },
+        },
+      },
+      (request) =>
+        decide.ideas.refuse(
+          request.params.creatorId,
+          actorOf(request).userId,
+          request.params.ideaId,
+          request.body.reason,
+          new Date(),
+        ),
     );
     return Promise.resolve();
   };

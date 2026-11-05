@@ -266,7 +266,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
-  const trends = wireTrends(shared, options.trendVision ?? llm.gateway);
   const contentDrops = wireContentDrops(shared);
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
@@ -319,6 +318,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const backups = wireBackups(shared);
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
+  const trends = wireTrends(shared, {
+    gateway: options.trendVision ?? llm.gateway,
+    persona: persona.module,
+    agenda: creatorTasks.module,
+  });
   const supervision = wireSupervision(shared, {
     llm,
     activeVoice: agent.activeVoice,
