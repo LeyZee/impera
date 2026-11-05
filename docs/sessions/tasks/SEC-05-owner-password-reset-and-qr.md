@@ -3,7 +3,7 @@ Statut : todo (ADR 0068 acceptée par Charles le 05/11/2026, 18 h 13)
 Phase : exploitation
 Dépend de : ADR 0068, ADR 0046, ADR 0020 (bot de l'agence), EQ-10 (liens d'invitation et de réinitialisation)
 Branche : claude/project-thread-a8l1w6 (fil Bilan)
-Propriétaires : Bilan (auth, telegram, migration 0113 attribuée par le coordinateur) ; relecture Extension pour l'écran du QR et la page de connexion
+Propriétaires : Bilan (auth, telegram, migration 0114 attribuée par le coordinateur) ; relecture Extension pour l'écran du QR et la page de connexion
 
 ## Objectif (1 phrase)
 
@@ -19,7 +19,7 @@ Le propriétaire retrouve l'accès sans terminal, par un lien reçu en privé su
 Lot 1 : QR code
 - [ ] QR de l'adresse `otpauth` dessiné dans le navigateur, à côté de la clé ; encodeur dans le dépôt ou bibliothèque ancienne en quarantaine de 14 jours ; aucun appel externe ; disparaît après confirmation.
 
-Lot 2 : liaison Telegram privée (migration 0113)
+Lot 2 : liaison Telegram privée (migration 0114)
 - [ ] Réglages › Telegram, connexion récente exigée : code à usage unique, 10 minutes, à envoyer au bot par `/start <code>` ; seule l'empreinte du code est gardée.
 - [ ] Le bot garde l'identifiant du chat privé du compte, en rôle admin, pour ce seul usage ; délier possible ; audit.
 
