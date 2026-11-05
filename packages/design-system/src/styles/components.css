@@ -845,8 +845,9 @@
 .nv-status--pending {
   --_c: var(--nv-ink-muted);
 }
+/* The agent writing is normal work, never an alarm: neutral, it breathes (red stays for urgencies, D-03). */
 .nv-status--drafting {
-  --_c: var(--nv-neon);
+  --_c: var(--nv-ink-muted);
 }
 .nv-status--awaiting-approval {
   --_c: var(--nv-warning);
