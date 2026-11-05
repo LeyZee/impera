@@ -187,6 +187,7 @@ describe('creator photo (CRM-07 a2b)', () => {
     const served = await get(avatarUrl(ids.photo));
     expect(served.statusCode).toBe(200);
     expect(served.headers['content-type']).toBe('image/jpeg');
+    expect(served.headers['x-content-type-options']).toBe('nosniff');
     expect(served.rawPayload.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
 
     // A page is not a photo, and a creator without one has her initials.

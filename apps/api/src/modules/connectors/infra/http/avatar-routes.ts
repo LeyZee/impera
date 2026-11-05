@@ -42,6 +42,7 @@ export function createAvatarRoutes(
         return reply
           .header('content-type', 'image/jpeg')
           .header('cache-control', `private, max-age=${String(CACHE_SECONDS)}`)
+          .header('x-content-type-options', 'nosniff')
           .send(Buffer.from(jpeg));
       },
     );
