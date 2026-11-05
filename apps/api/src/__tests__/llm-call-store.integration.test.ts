@@ -58,6 +58,18 @@ describe('llm_calls as the gateway journal (LlmCallStore)', () => {
     expect(total).toBeCloseTo(0.000_834, 9);
   });
 
+  it('keeps what a call was for, so the trend watch is summed apart (ADR 0060 § 7)', async () => {
+    const start = new Date(Date.now() - 1_000);
+    await store.insert(call({ purpose: 'trend_watch', promptHash: 'watch' }));
+    await store.insert(call({ promptHash: 'fan' }));
+    const since = (await store.listSince(start)).filter((record) =>
+      ['watch', 'fan'].includes(record.promptHash),
+    );
+    expect(since.map((record) => record.purpose)).toEqual(['trend_watch', undefined]);
+    const rows = await test.admin.db.select({ purpose: schema.llmCalls.purpose }).from(schema.llmCalls);
+    expect(new Set(rows.map((row) => row.purpose))).toEqual(new Set(['chatting', 'trend_watch']));
+  });
+
   it('gives each call a UUID v7, like every other row (ADR 0011)', async () => {
     await store.insert(call());
     const rows = await test.admin.db.select({ id: schema.llmCalls.id }).from(schema.llmCalls);

@@ -14,7 +14,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { nextBatch, type Pending } from '../batch';
-import { classify } from '../classify';
+import { classify, connectionReminder } from '../classify';
 import { chatsFor, computeCoverage } from '../coverage';
 import { mayRemoveChat } from '../membership';
 import { describeTelegramError } from '../messages';
@@ -144,6 +144,64 @@ describe('classification (ADR 0020 §2)', () => {
       title: 'Important',
       body: 'Ventes Reveal : la vérification de la quinzaine du 1er au 15 nov. ne concorde plus avec les statistiques de Reveal, sur 3 jours et 1 compte. La paie lit toujours le net de Reveal : vérifie avant de clôturer.',
       link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
+    });
+  });
+
+  it('tells the owner her share strays from the percentage, to the groups for all, once, no amount (CRM-04 d3)', () => {
+    const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
+    expect(
+      classify({
+        kind: 'agency_share_mismatch',
+        creatorId,
+        platform: 'reveal',
+        platformAccountId: '018f3e5c-0000-7000-8000-0000000000a1',
+        from: PayPeriodSchema.parse('2026-11-01'),
+      }),
+    ).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      allCreatorsOnly: true,
+      oncePerThread: true,
+      threadKey: 'agency_share:018f3e5c-0000-7000-8000-0000000000a1:2026-11-01',
+      title: 'Important',
+      body: 'Part créatrice chez Reveal : sur la quinzaine du 1er au 15 nov., elle s’écarte du pourcentage de l’agence réglé pour elle. À titre d’information.',
+      link: {
+        label: 'Ouvrir le pourcentage',
+        path: `/creatrices?onglet=pourcentage&creatrice=${creatorId}`,
+      },
+    });
+  });
+
+  it('tells an outage per service and reason, never the key, and « Rétabli » in its thread', () => {
+    expect(classify({ kind: 'connection_down', service: 'xai', reason: 'refused' })).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: 'connection:xai',
+      title: 'Important',
+      body: 'La connexion xAI est en panne : la clé est refusée. Reconnecte-la. L’agent passe sur le modèle de secours, s’il est connecté.',
+      link: { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' },
+    });
+    expect(classify({ kind: 'connection_down', service: 'reveal_crm', reason: 'unreachable' })).toMatchObject(
+      {
+        body: 'La connexion à l’API CRM de Reveal est en panne : le service ne répond plus. Les ventes ne sont plus relevées.',
+        link: { label: 'Ouvrir les ventes', path: '/reglages/ventes' },
+      },
+    );
+    expect(classify({ kind: 'connection_back', service: 'elevenlabs' })).toEqual({
+      kind: 'closure',
+      threadKey: 'connection:elevenlabs',
+      mode: 'reply',
+      text: 'Rétabli : la connexion ElevenLabs fonctionne de nouveau.',
+      userId: null,
+    });
+    expect(connectionReminder('google')).toEqual({
+      kind: 'notice',
+      topic: 'urgent',
+      fallbackTopic: 'important',
+      threadKey: 'connection:google',
+      title: 'URGENT',
+      body: 'La connexion Google est toujours en panne après 2 h. Les médias ne sont plus décrits.',
+      link: { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' },
     });
   });
 

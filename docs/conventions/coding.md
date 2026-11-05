@@ -24,7 +24,7 @@
 ## Style
 
 - Prettier décide de la forme (`.prettierrc`). Pas de débat.
-- ESLint : `typescript-eslint` strict + `eslint-plugin-boundaries` (règles générées depuis `MODULE_DEPENDENCIES` dans `eslint.config.js`, voir `docs/architecture/modules.md`) + `eslint-plugin-import-x` (ordre, pas de cycles). Une règle désactivée localement demande un commentaire `// eslint-disable-next-line <règle> -- <raison>`. Les règles de frontière ne se désactivent jamais.
+- ESLint : `typescript-eslint` strict + `eslint-plugin-boundaries` (règles générées depuis `MODULE_DEPENDENCIES` dans `eslint.config.js`, voir `docs/architecture/modules.md`) + `eslint-plugin-import-x` (ordre, pas de cycles). Une règle désactivée localement demande un commentaire `// eslint-disable-next-line <règle> -- <raison>`. Les règles de frontière ne se désactivent jamais. Un commentaire écrit comme texte JSX (`// …` hors accolades) est refusé : il s'afficherait à l'écran (`JSX_COMMENT_TEXT`, l'équivalent sans greffon de `react/jsx-no-comment-textnodes`).
 - Noms : anglais, explicites, pas d'abréviation sauf `id`, `db`, `llm`. Booléens en `is/has/can`. Fonctions en verbe. Événements au passé (`MessageReceived`), commandes à l'impératif (`IngestMessage`).
 - Commentaires : pourquoi, pas quoi. Un `TODO` porte un identifiant de fiche (`// TODO(P2-03): …`), sinon `scripts/check-repo.mjs` le refuse dans `pnpm check`.
 - Logs : `logger.info({ conversationId, jobId }, 'draft created')`. Objet d'abord, message court en anglais, jamais de contenu de message.

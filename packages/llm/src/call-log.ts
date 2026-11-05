@@ -1,6 +1,8 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+import type { LlmPurpose } from '@impera/contracts';
+
 import { startOfLocalDay } from './budget';
 import type { LlmRole, ProviderId } from './config';
 
@@ -39,6 +41,8 @@ export interface LlmCallRecord {
   readonly creatorId?: string;
   readonly conversationId?: string;
   readonly draftId?: string;
+  /** What it was for (ADR 0060 § 7); absent is `chatting`. */
+  readonly purpose?: LlmPurpose;
 }
 
 /** Journal of calls; the llm_calls table implements it once the database exists (P0-03). */

@@ -34,7 +34,7 @@ import {
   type StepKey,
 } from './model';
 
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 /** The legal forms a French agency most often has: a suggestion, never a list to choose from. */
 const LEGAL_FORMS = ['SAS', 'SASU', 'SARL', 'EURL', 'SA', 'SNC'] as const;

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
 import { DropCategorySchema } from './content-drops';
+import { AgencySuggestionSchema, CreatorTaskTitleSchema } from './creator-tasks';
 import {
   ContentIdeaIdSchema,
   CreatorIdSchema,
+  ExtensionLinkIdSchema,
   TrendReadingIdSchema,
   TrendSignalIdSchema,
   WatchSessionIdSchema,
@@ -214,7 +216,8 @@ export const CONTENT_IDEAS_PER_DAY_MAX = 3;
 
 /** What an idea says, as the model writes it and the agency corrects it (ADR 0060 § 4). */
 export const ContentIdeaDraftSchema = z.strictObject({
-  title: z.string().trim().min(1).max(120),
+  /** Her agenda's title (80 at most): a validated idea becomes a suggestion under it, never cut. */
+  title: CreatorTaskTitleSchema,
   category: DropCategorySchema,
   toShoot: z.string().trim().min(1).max(600),
   signalId: TrendSignalIdSchema,
@@ -233,3 +236,171 @@ export const ContentIdeaSchema = ContentIdeaDraftSchema.extend({
   refusalReason: z.string().max(280).nullable(),
 });
 export type ContentIdea = z.infer<typeof ContentIdeaSchema>;
+
+/** What `POST /v1/trends/links` answers: the signal, and whether this paste added it (a second paste adds nothing). */
+export const PastedTrendLinkSchema = z.strictObject({
+  created: z.boolean(),
+  url: z.string().max(2048),
+  expiresAt: z.iso.datetime().nullable(),
+});
+export type PastedTrendLink = z.infer<typeof PastedTrendLinkSchema>;
+
+/**
+ * The link of one browser's extension to the server (VEI-01 lot b), 256 random bits in base64url: shown once at its
+ * creation, kept as a hash only, sent by the extension in `x-extension-link` with each batch of readings.
+ */
+export const ExtensionLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/u);
+
+/** A person links one extension per browser, this many at most at once (Chrome and Edge, a laptop). */
+export const EXTENSION_LINKS_LIVE_MAX = 3;
+
+/** The browser a link was made for, as the person names it (« Chrome », « Edge du bureau »). */
+export const ExtensionLinkLabelSchema = z.string().trim().min(1).max(40);
+
+/** One live link, never its token. `lastUsedAt`: the last batch it brought, null before the first. */
+export const ExtensionLinkSchema = z.strictObject({
+  id: ExtensionLinkIdSchema,
+  label: z.string(),
+  createdAt: z.iso.datetime(),
+  lastUsedAt: z.iso.datetime().nullable(),
+});
+export type ExtensionLink = z.infer<typeof ExtensionLinkSchema>;
+
+/** `GET /v1/trends/extension-links`: the person's live links, the oldest first. */
+export const ExtensionLinkListSchema = z.strictObject({ items: z.array(ExtensionLinkSchema) });
+export type ExtensionLinkList = z.infer<typeof ExtensionLinkListSchema>;
+
+/**
+ * `POST /v1/trends/extension-links` (« Relier l'extension »): a live link of the same label is replaced (the same
+ * browser linked again), otherwise one is added; past `EXTENSION_LINKS_LIVE_MAX`, 409 `extension_links_full_conflict`.
+ */
+export const CreateExtensionLinkBodySchema = z.strictObject({ label: ExtensionLinkLabelSchema });
+export type CreateExtensionLinkBody = z.infer<typeof CreateExtensionLinkBodySchema>;
+
+/** Its answer: the new token, once. */
+export const ExtensionLinkCreatedSchema = ExtensionLinkSchema.omit({ lastUsedAt: true }).extend({
+  token: ExtensionLinkTokenSchema,
+});
+export type ExtensionLinkCreated = z.infer<typeof ExtensionLinkCreatedSchema>;
+
+/**
+ * `GET /v1/trends/readings/creators`, with `x-extension-link`: the creators the linked person may mark a post for,
+ * as `POST /v1/trends/readings` checks them (herself for a creator; every creator for the agency).
+ */
+export const ExtensionLinkCreatorsSchema = z.strictObject({
+  items: z.array(z.strictObject({ id: CreatorIdSchema, displayName: z.string() })),
+});
+export type ExtensionLinkCreators = z.infer<typeof ExtensionLinkCreatorsSchema>;
+
+/** `POST /v1/trends/readings`: how many posts of the batch were kept, new or seen again. */
+export const TrendReadingsAcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
+export type TrendReadingsAccepted = z.infer<typeof TrendReadingsAcceptedSchema>;
+
+/* ---- The captures of a marked post (ADR 0060 § 2, source 6; VEI-01 lot c2) ---- */
+
+/** At most four captures of the visible tab, taken while the marked post shows. */
+export const TREND_CAPTURES_MAX = 4;
+/** One capture, decoded: a JPEG of a full-HD tab at the extension's quality stays well under it. */
+export const TREND_CAPTURE_MAX_BYTES = 750_000;
+/** Its base64, padding included. */
+const TREND_CAPTURE_MAX_BASE64 = Math.ceil(TREND_CAPTURE_MAX_BYTES / 3) * 4;
+
+export const TrendCaptureSchema = z.strictObject({
+  mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  data: z.base64().max(TREND_CAPTURE_MAX_BASE64),
+});
+export type TrendCapture = z.infer<typeof TrendCaptureSchema>;
+
+/**
+ * `POST /v1/trends/readings/captures`, with `x-extension-link`: the captures of one post the person marked in this watch
+ * session, its reading already sent. Held in memory for the vision call only, then dropped: never written, never logged,
+ * never echoed. Only the description stays, on the reading.
+ */
+export const TrendCapturesBodySchema = z.strictObject({
+  watchSession: WatchSessionIdSchema,
+  code: InstagramPostCodeSchema,
+  /** The length of the video as its element shows it; null for a photo or a carousel. */
+  durationS: z.number().positive().max(3_600).nullable(),
+  captures: z.array(TrendCaptureSchema).min(1).max(TREND_CAPTURES_MAX),
+});
+export type TrendCapturesBody = z.infer<typeof TrendCapturesBodySchema>;
+
+/** What the vision model says of a post from its captures: how it is made, never the post itself. */
+export const TrendCaptureDescriptionSchema = z.strictObject({
+  /** What holds the eye in the first seconds, in a sentence. */
+  hook: z.string().min(1).max(300),
+  /** The angles and shots, a few words each. */
+  angles: z.array(z.string().min(1).max(120)).max(6),
+  /** The text written on the screen, copied as it shows; null when there is none. */
+  onScreenText: z.string().min(1).max(500).nullable(),
+  /** The cutting and its pace, as far as the captures let it be judged. */
+  editing: z.string().min(1).max(300),
+});
+export type TrendCaptureDescription = z.infer<typeof TrendCaptureDescriptionSchema>;
+
+/** Its answer: the description kept on the reading. */
+export const TrendCapturesDescribedSchema = z.strictObject({ description: TrendCaptureDescriptionSchema });
+export type TrendCapturesDescribed = z.infer<typeof TrendCapturesDescribedSchema>;
+
+/** No reading of that post in that session marked for a creator: send the reading, marked, first. */
+export const TREND_CAPTURE_READING_NOT_FOUND = 'trend_capture_reading_not_found';
+/** The trend watch's cap of the day is spent (ADR 0060 § 7): no vision until midnight, shown in amber. */
+export const TREND_WATCH_BUDGET_LIMITED = 'trend_watch_budget_limited';
+/** No vision model answered (no key, every model failed): the captures are dropped, the reading stays. */
+export const TREND_CAPTURE_VISION_UNAVAILABLE = 'trend_capture_vision_unavailable';
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * VEI-01 lot d: « Idées du jour » (ADR 0060 § 5), for the owner and an active manager. Validated, corrected on the spot
+ * or refused; a validated idea becomes a suggestion in her agenda, its « à tourner » her shooting sheet.
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/**
+ * `GET /v1/creators/:creatorId/ideas?day=` (owner, active manager): the ideas proposed on one of her days, today in her
+ * zone when `day` is left out. Each with the signal it cites, which the agency reads and she never does.
+ */
+export const ContentIdeasQuerySchema = z.strictObject({ day: CalendarDaySchema.optional() });
+export const ContentIdeaOfDaySchema = ContentIdeaSchema.extend({ signal: TrendSignalSchema });
+export type ContentIdeaOfDay = z.infer<typeof ContentIdeaOfDaySchema>;
+export const ContentIdeaListSchema = z.strictObject({
+  /** The day read, in her zone. */
+  day: CalendarDaySchema,
+  items: z.array(ContentIdeaOfDaySchema),
+});
+export type ContentIdeaList = z.infer<typeof ContentIdeaListSchema>;
+
+/** What the agency may correct of an idea before validating it: never its origin signal. */
+export const ContentIdeaCorrectionSchema = ContentIdeaDraftSchema.omit({ signalId: true })
+  .partial()
+  .refine((correction) => Object.keys(correction).length > 0, { message: 'Rien à corriger' });
+export type ContentIdeaCorrection = z.infer<typeof ContentIdeaCorrectionSchema>;
+
+/**
+ * `POST /v1/creators/:creatorId/ideas/:ideaId/validate` (owner, active manager): as it is, or corrected. The code reads
+ * the idea as it leaves again (her limits, « jamais de nu » for a public output, the Instagram guard): a correction that
+ * breaks one is refused (422), never sent. Replayed, the same gesture changes nothing and its correction is not read.
+ */
+export const ValidateContentIdeaBodySchema = z.strictObject({
+  correction: ContentIdeaCorrectionSchema.nullable().default(null),
+});
+export type ValidateContentIdeaBody = z.infer<typeof ValidateContentIdeaBodySchema>;
+
+/** The answer of a validation: the idea, and the suggestion it became (undated when no dispo of hers had room). */
+export const ValidatedContentIdeaSchema = z.strictObject({
+  idea: ContentIdeaSchema,
+  suggestion: AgencySuggestionSchema,
+});
+export type ValidatedContentIdea = z.infer<typeof ValidatedContentIdeaSchema>;
+
+/** `POST /v1/creators/:creatorId/ideas/:ideaId/refuse` (owner, active manager): a reason if one is given. Never proposed again. */
+export const RefuseContentIdeaBodySchema = z.strictObject({
+  reason: z.string().trim().min(1).max(280).nullable().default(null),
+});
+export type RefuseContentIdeaBody = z.infer<typeof RefuseContentIdeaBodySchema>;
+
+/** Refusals of « Idées du jour », beside the shared ones. */
+export const CONTENT_IDEA_NOT_FOUND = 'content_idea_not_found';
+export const CONTENT_IDEA_FORBIDDEN = 'content_idea_forbidden';
+/** Validated when refused, or refused once validated: the other gesture is refused. */
+export const CONTENT_IDEA_DECIDED_CONFLICT = 'content_idea_decided_conflict';
+/** The idea, as corrected, touches one of her limits or breaks a guard of its output: corrected again, or refused. */
+export const CONTENT_IDEA_GUARD_UNPROCESSABLE = 'content_idea_guard_unprocessable';

@@ -328,12 +328,12 @@ describe('TrackingPage', () => {
     renderPage();
     const list = await screen.findByRole('list', { name: 'Conversations' });
     const rows = within(list).getAllByRole('listitem');
-    expect(rows.map((row) => row.querySelector('.nv-convo__name')?.textContent)).toEqual([
+    expect(rows.map((row) => row.querySelector('.tr-row__pseudo')?.textContent)).toEqual([
       'Fan sans nom',
       'Fan 1',
     ]);
     expect(rows[0]?.textContent).toContain('À valider');
-    expect(rows[0]?.textContent).toContain('3 non lus');
+    expect(rows[0]?.querySelector('.tr-unread')?.getAttribute('aria-label')).toBe('3 non lus');
     // One creator: her name heads the page, not every row.
     expect(screen.getByText('Léa')).toBeDefined();
     expect(rows[1]?.textContent).not.toContain('Léa');
@@ -419,8 +419,8 @@ describe('TrackingPage', () => {
     const queue = await screen.findByRole('list', { name: 'À traiter' });
     const rows = within(queue).getAllByRole('button');
     expect(rows.map((row) => row.querySelector('.nv-convo__name')?.textContent)).toEqual([
-      'Léa · Mineur possible · Kévin',
-      'Inès · Brouillon à valider · Arthur',
+      'Kévin · Mineur possible · Léa',
+      'Arthur · Brouillon à valider · Inès',
     ]);
     // Inès's conversation is not in the loaded list: it opens with her id, from the queue's line.
     const second = rows[1];
@@ -445,7 +445,7 @@ describe('TrackingPage', () => {
     });
     renderPage();
     const queue = await screen.findByRole('list', { name: 'À traiter' });
-    expect(queue.textContent).toContain('Mineur possible · Kévin');
+    expect(queue.textContent).toContain('Kévin · Mineur possible');
     expect(queue.textContent).toContain('19 min');
     fireEvent.click(within(queue).getByRole('button'));
     expect(await screen.findByText('Salut, ça va ?')).toBeDefined();
@@ -1058,7 +1058,7 @@ describe('his desire score in Suivi (P3-12)', () => {
     renderPage();
     const list = await screen.findByRole('list', { name: 'Conversations' });
     const [first, second] = within(list).getAllByRole('listitem');
-    expect(second?.querySelector('.nv-convo__preview')?.textContent).toBe('Pas encore écrit · chaud');
+    expect(second?.querySelector('.nv-convo__preview')?.textContent).toBe('Pas encore écrit · 🔥 chaud');
     expect(second?.textContent).not.toContain('82');
     expect(first?.querySelector('.nv-convo__preview')?.textContent).toBe('Pas encore écrit');
     expect(list.querySelector('[class*="neon"], [class*="danger"], [class*="amber"]')).toBeNull();

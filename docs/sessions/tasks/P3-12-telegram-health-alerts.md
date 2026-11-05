@@ -1,6 +1,6 @@
 # P3-12 Alertes Telegram : plafond IA en rouge, connexion en panne
 
-Statut : in_progress. Lot 1 fait ; lot 2 : contrat et publieurs `connection_state_changed` livrés par Bilan (migration 0093), rendu Telegram à faire.
+Statut : done. Lot 1 fait ; lot 2 : contrat et publieurs livrés par Bilan (migration 0093), rendu Telegram fait (déclencheur : migration 0097).
 Phase : P3 (notifications, ADR 0020)
 Décision : Charles, 03/11/2026 11h14 (« comble ce trou-là », « je veux bien cette alerte », bot unique à l'agence), 2 h avant le rouge accepté le même jour.
 Dépend de : P3-07 (fait). Lot 2 : l'événement `connection_state_changed` (Bilan, migration 0093).
@@ -35,11 +35,11 @@ Le groupe d'alertes de l'agence apprend tout de suite qu'une connexion dont dép
 
 ### Le rendu (Telegram)
 
-- [ ] `down` part en `important` dans le fil `connection:<service>` : « La connexion xAI est refusée : l'agent n'écrit plus. Reconnecter la clé. » Le texte varie selon le service et la raison, et le lien ouvre Réglages › Modèles IA (ou Réglages › Ventes pour Reveal CRM).
-- [ ] Une connexion toujours en panne 2 h après son alerte reçoit une seule relance en `urgent`. Le job horaire du module la lit dans son propre registre d'envois : le fil est ouvert, il n'est pas fermé, et aucune relance n'est déjà partie.
-- [ ] `back` répond dans le même fil : « Rétabli : la connexion xAI fonctionne de nouveau. »
-- [ ] Tests : une alerte par panne, la relance unique à 2 h, rien quand le retour arrive avant 2 h, jamais la clé.
-- [ ] Le sous-titre « Important » et l'ADR 0020 § 3 nomment l'événement.
+- [x] `down` part en `important` dans le fil `connection:<service>` : « La connexion xAI est en panne : la clé est refusée. Reconnecte-la. L’agent passe sur le modèle de secours, s’il est connecté. » Le texte varie selon le service et la raison, et le lien ouvre Réglages › Modèles IA (ou Réglages › Ventes pour Reveal CRM).
+- [x] Une connexion toujours en panne 2 h après son alerte reçoit une seule relance en `urgent` (repli `important`), sans raison puisqu'elle a pu changer. Le job `telegram.connection_reminders` (toutes les 10 minutes, pour ne pas la retarder d'une heure) la lit dans son propre registre d'envois : le dernier envoi du fil est encore l'alerte, ni « Rétabli » ni une relance.
+- [x] `back` répond dans le même fil : « Rétabli : la connexion xAI fonctionne de nouveau. »
+- [x] Tests : une alerte par panne, la relance unique à 2 h, rien quand le retour arrive avant 2 h, jamais la clé.
+- [x] Les sous-titres « Important » et « Urgent » et l'ADR 0020 § 3 nomment l'événement.
 
 ## Hors périmètre
 

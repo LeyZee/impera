@@ -17,13 +17,14 @@ Le 27/10, Charles a demandé de réorganiser Nirvana « parce que ça va devenir
 | Rôle | Onglets, dans l'ordre | Téléphone |
 |---|---|---|
 | Propriétaire | Dashboard · Chatting : Suivi, Entraîner · Agence : Équipe, Paie, Créatrices · Réglages | Dashboard, Suivi, Équipe, Paie, Plus |
-| Manager | Dashboard · Suivi · Équipe · Paie · Moi | les mêmes cinq |
+| Manager | Dashboard · Suivi · Équipe · Paie · Créatrices (son agenda seul) · Moi | Dashboard, Suivi, Équipe, Paie, Plus |
 | Chatteur | Aujourd'hui · Suivi · Planning · Commissions · Moi | les mêmes cinq |
 | Créatrice | sa PWA (EQ-09) : Aujourd'hui · Revenus · Factures · Qui chatte · Moi | les mêmes cinq |
 
 - Deux familles, séparées par un intertitre discret dans le rail : **Chatting** (l'agent, les conversations) et **Agence** (l'équipe, l'argent, les créatrices).
 - Au plus six onglets plus Réglages sur ordinateur ; cinq emplacements sur téléphone, dont **Plus** (une feuille de verre, elle flotte) quand il en faut davantage.
 - Un onglet n'apparaît que lorsque son écran existe : pas d'onglet vide ni grisé.
+- Créatrices n'ouvre au manager actif que l'agenda de chaque créatrice, où il lui propose des tâches (Charles, 05/11/2026, « Ouvrir aux managers ») ; sa persona, ses heures d'activité, son accès et le pourcentage de l'agence restent au propriétaire. Sur téléphone, Créatrices et Moi passent sous Plus.
 
 ### Ce que contient chaque onglet
 

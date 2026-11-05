@@ -1,0 +1,150 @@
+/*
+ * The app's dialog (shell/Dialog.tsx): its scrim, its one glass and its quiet ×. Moved from the team screen, where it
+ * was born (EQ-03), once every screen used it; the class names keep their `tm-` prefix so no screen had to change.
+ */
+
+/* Closing is quiet: a screen's one neon stays on its own action. */
+.tm-close {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+/* 36px seen, 44px to touch, as the design system's close (CR-01, passe téléphone). */
+.tm-close::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.tm-close:hover:not(:disabled) {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+  transform: rotate(90deg);
+}
+.tm-close:active:not(:disabled) {
+  transform: scale(0.9);
+  transition-duration: var(--nv-dur-instant);
+}
+.tm-close:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.tm-close:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.tm-close svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.tm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* A panel taller than the phone stops under the status bar, never behind it (CR-01, passe téléphone). */
+  padding: calc(var(--nv-space-4) + env(safe-area-inset-top, 0px))
+    max(var(--nv-space-4), env(safe-area-inset-right, 0px))
+    calc(var(--nv-space-4) + env(safe-area-inset-bottom, 0px))
+    max(var(--nv-space-4), env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: tm-fade var(--nv-dur-fast) var(--nv-ease-out) both;
+}
+@media (min-width: 700px) {
+  .tm-scrim {
+    align-items: center;
+  }
+}
+.tm-dialog {
+  --_radius: var(--nv-radius-xl);
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100% - 8px);
+  overflow: auto;
+  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  animation: tm-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.tm-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.tm-dialog__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.tm-dialog__title h2 {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.tm-dialog__title p {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tm-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.tm-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+  padding-top: var(--nv-space-2);
+}
+
+@keyframes tm-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-scrim,
+  .tm-dialog {
+    animation: none;
+  }
+  .tm-close:hover:not(:disabled) {
+    transform: none;
+  }
+}

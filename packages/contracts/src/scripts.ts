@@ -105,6 +105,13 @@ export const ScriptStageSchema = z.strictObject({
   access: ScriptStageAccessSchema,
   /** The mood the card gives her. */
   mood: sentence(SCRIPT_SENTENCE_MAX).nullable(),
+  /**
+   * What she wears and where she shoots (« Lingerie noire », « Salon »): the shooting order groups the stages by them
+   * (SC-07), the selling order stays the structure's. `null` when the agency leaves it to her; a stage written before
+   * them has none.
+   */
+  outfit: sentence(SCRIPT_STAGE_NAME_MAX).nullable().default(null),
+  place: sentence(SCRIPT_STAGE_NAME_MAX).nullable().default(null),
   mediaSlots: z.array(MediaSlotSchema).max(MEDIA_SLOTS_MAX),
   variants: z.array(ScriptVariantSchema).max(SCRIPT_VARIANT_LETTERS.length),
 });
@@ -353,6 +360,38 @@ export const SCRIPT_COLOR_PRESETS = [
   { key: 'desert', name: 'Désert', color: { primary: '#f0c987', secondary: '#e6d5ac', accent: '#f3e5ab' } },
   { key: 'luxe', name: 'Noir et or', color: { primary: '#0f0f0f', secondary: '#1a1a1a', accent: '#3a2f12' } },
   { key: 'pastel', name: 'Pastel', color: { primary: '#ffcad4', secondary: '#c7ceea', accent: '#b5ead7' } },
+  { key: 'cerise', name: 'Cerise', color: { primary: '#7a0f24', secondary: '#a3122f', accent: '#c2185b' } },
+  {
+    key: 'bordeaux',
+    name: 'Bordeaux',
+    color: { primary: '#3d0a14', secondary: '#5e1224', accent: '#7d1d33' },
+  },
+  { key: 'corail', name: 'Corail', color: { primary: '#ff8a80', secondary: '#ff9e7a', accent: '#ffb199' } },
+  { key: 'peche', name: 'Pêche', color: { primary: '#ffd1b3', secondary: '#ffc2a8', accent: '#ffe0cc' } },
+  {
+    key: 'champagne',
+    name: 'Champagne',
+    color: { primary: '#f5e6c8', secondary: '#ead7b0', accent: '#fbf1dc' },
+  },
+  { key: 'lavande', name: 'Lavande', color: { primary: '#d9ccf5', secondary: '#c9b8ef', accent: '#e8defa' } },
+  { key: 'prune', name: 'Prune', color: { primary: '#2e0f3a', secondary: '#4a1a5c', accent: '#6b2a7e' } },
+  {
+    key: 'nuit',
+    name: 'Nuit étoilée',
+    color: { primary: '#0b1026', secondary: '#1b2350', accent: '#3a2f7a' },
+  },
+  { key: 'lagon', name: 'Lagon', color: { primary: '#a8edea', secondary: '#bfe9ff', accent: '#d4fcf0' } },
+  { key: 'menthe', name: 'Menthe', color: { primary: '#c8f7dc', secondary: '#b2f0d0', accent: '#e0fbe9' } },
+  {
+    key: 'emeraude',
+    name: 'Émeraude',
+    color: { primary: '#04392b', secondary: '#065f46', accent: '#0f766e' },
+  },
+  {
+    key: 'rose-noir',
+    name: 'Noir et rose',
+    color: { primary: '#120a0f', secondary: '#2a0f1f', accent: '#6b1640' },
+  },
 ] as const satisfies readonly { key: string; name: string; color: ScriptColor }[];
 
 /** What the owner writes in the workshop. */
@@ -440,6 +479,17 @@ export const ScriptQueueSchema = z.object({
 });
 export type ScriptQueue = z.infer<typeof ScriptQueueSchema>;
 
+/** `details` of `script_queue_disgust_unprocessable`: by structure, the stages that touch her limits. */
+export const ScriptQueueRefusalsSchema = z.object({
+  refusals: z.array(
+    z.object({ structureId: ScriptStructureIdSchema, blocks: z.array(ScriptDisgustBlockSchema) }),
+  ),
+});
+export type ScriptQueueRefusals = z.infer<typeof ScriptQueueRefusalsSchema>;
+
+/** `details` of `script_queue_structure_unprocessable`: unknown, archived or reserved for another creator. */
+export const ScriptQueueUnprocessableSchema = z.object({ structureIds: z.array(ScriptStructureIdSchema) });
+
 /** Codes of the `scripts` module's `DomainError`s. */
 export const SCRIPT_ERROR_CODES = [
   'script_structure_not_found',
@@ -475,3 +525,19 @@ export const ScriptCardQuerySchema = z.strictObject({
   variant: ScriptVariantLetterSchema.optional(),
 });
 export type ScriptCardQuery = z.infer<typeof ScriptCardQuerySchema>;
+
+/**
+ * A card drawn from a draft, before it is saved: the workshop's live preview (SC-01 lot c). The segments are read one
+ * by one, not against the structure rules, so that a draft still being written can be previewed; the colour is any
+ * colour, a refused one being drawn in the dark ink. Always an SVG.
+ */
+export const ScriptCardPreviewBodySchema = z.strictObject({
+  name: sentence(SCRIPT_STRUCTURE_NAME_MAX),
+  moment: ScriptMomentSchema,
+  color: ScriptColorSchema,
+  segments: z.array(ScriptSegmentSchema).min(1).max(SCRIPT_SEGMENTS_MAX),
+  segmentKey: ScriptSegmentKeySchema,
+  variant: ScriptVariantLetterSchema.optional(),
+  format: z.enum(['card', 'thumbnail']).default('card'),
+});
+export type ScriptCardPreviewBody = z.infer<typeof ScriptCardPreviewBodySchema>;

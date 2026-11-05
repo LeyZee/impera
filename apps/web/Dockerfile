@@ -14,12 +14,18 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile --filter impera --filter "@impera/web..."
+    pnpm install --offline --frozen-lockfile --filter impera --filter "@impera/web..." --filter "@impera/extension..."
 RUN pnpm turbo run build --filter=@impera/web
+# The extension the team downloads from the guide (/aide/extension, ADR 0067): built with the CRM, so both ship together.
+RUN pnpm --filter @impera/extension zip \
+ && mkdir -p apps/web/dist/extension \
+ && cp apps/extension/.output/impera.zip apps/web/dist/extension/impera.zip
 
 FROM ${NGINX_IMAGE} AS runtime
 # Where nginx forwards /v1: the API service on the deployment's private network.
 ENV API_UPSTREAM=api:3000
+# The media bucket's origin (S3_ENDPOINT), the only other one her phone talks to (CR-06 b); empty without a bucket.
+ENV MEDIA_ORIGIN=""
 COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080

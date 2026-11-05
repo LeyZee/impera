@@ -1,4 +1,4 @@
-import { CurrencySchema, LlmRoleSchema } from '@impera/contracts';
+import { CurrencySchema, LlmPurposeSchema, LlmRoleSchema } from '@impera/contracts';
 import { bigint, boolean, char, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
 import { closedToCreator, createdAt, enumCheck, enumText, id, tenantPolicy } from './columns';
@@ -28,6 +28,8 @@ export const llmCalls = pgTable(
     id: id(),
     creatorId: uuid('creator_id').references(() => creators.id),
     role: enumText('role').notNull(),
+    /** What the call was for (ADR 0060 § 7): the trend watch is summed apart, under its own cap. */
+    purpose: enumText('purpose').notNull().default('chatting'),
     provider: text('provider').notNull(),
     model: text('model').notNull(),
     promptHash: text('prompt_hash').notNull(),
@@ -48,6 +50,7 @@ export const llmCalls = pgTable(
   },
   (t) => [
     enumCheck('llm_calls', t.role, LlmRoleSchema.options),
+    enumCheck('llm_calls', t.purpose, LlmPurposeSchema.options),
     enumCheck('llm_calls', t.status, LLM_CALL_STATUSES),
     enumCheck('llm_calls', t.currency, CurrencySchema.options),
     index('llm_calls_creator_created_idx').on(t.creatorId, t.createdAt),

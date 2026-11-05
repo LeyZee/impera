@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
 import { JOB_PAYLOADS } from '@impera/contracts';
 import { createDbClient, type Database, type DbClient } from '@impera/db';
-import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore } from '@impera/llm';
+import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Task, TaskList } from 'graphile-worker';
 import type { Pool } from 'pg';
@@ -33,6 +33,7 @@ import type { BackupsModule } from './modules/backups';
 import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './modules/connectors';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
+import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { FansModule } from './modules/fans';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
@@ -46,6 +47,7 @@ import type { ScriptsModule } from './modules/scripts';
 import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
+import type { TrendsModule } from './modules/trends';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
@@ -55,8 +57,10 @@ import { wireAgent } from './wiring/agent';
 import { wireAlerts } from './wiring/alerts';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
+import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
+import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMedia } from './wiring/media';
@@ -71,6 +75,7 @@ import type { JobWithTask, Shared } from './wiring/shared';
 import { wireSupervision } from './wiring/supervision';
 import { wireTeam } from './wiring/team';
 import { wireTelegram } from './wiring/telegram';
+import { wireTrends } from './wiring/trends';
 
 /** Every business module, wired. */
 interface Modules {
@@ -83,11 +88,13 @@ interface Modules {
   readonly agent: AgentModule;
   readonly media: MediaModule;
   readonly notifications: NotificationsModule;
+  readonly creatorTasks: CreatorTasksModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
   readonly scheduling: SchedulingModule;
   readonly scripts: ScriptsModule;
+  readonly trends: TrendsModule;
   readonly contractors: ContractorsModule;
   readonly payroll: PayrollModule;
   readonly invoicing: InvoicingModule;
@@ -162,6 +169,8 @@ export interface AppOptions {
   readonly salesFeeds?: SalesFeedRegistry;
   /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
   readonly composer?: DraftComposer;
+  /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
+  readonly trendVision?: Pick<LlmGateway, 'describeTrendCaptures'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -255,8 +264,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
-  const scheduling = wireScheduling(shared, { persona: persona.module });
+  // Before the planning: her calendar link's feed reads her agenda (CR-05 lot c2).
+  const notifications = wireNotifications(shared);
+  const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
+  const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
+  const contentDrops = wireContentDrops(shared);
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
     requeue: invoiceRequeue,
@@ -306,7 +319,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media,
   });
   const backups = wireBackups(shared);
-  const notifications = wireNotifications(shared);
+  const trends = wireTrends(shared, {
+    gateway: options.trendVision ?? llm.gateway,
+    persona: persona.module,
+    agenda: creatorTasks.module,
+    contentDrops: contentDrops.module,
+  });
   const supervision = wireSupervision(shared, {
     llm,
     activeVoice: agent.activeVoice,
@@ -327,6 +345,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     team: team.module,
     scheduling: scheduling.module,
     scripts: scripts.module,
+    trends: trends.module,
     contractors: contractors.module,
     payroll: payroll.module,
     invoicing: invoicing.module,
@@ -334,6 +353,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     agent: agent.module,
     media: media.module,
     notifications: notifications.module,
+    creatorTasks: creatorTasks.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -354,6 +374,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...payroll.tasks,
     ...invoicing.tasks,
     ...notifications.tasks,
+    ...contentDrops.tasks,
+    ...creatorTasks.tasks,
+    ...trends.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],
@@ -401,6 +424,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
+      ...trends.routes,
+      ...creatorTasks.routes,
+      ...contentDrops.routes,
       ...contractors.routes,
       ...payroll.routes,
       ...invoicing.routes,

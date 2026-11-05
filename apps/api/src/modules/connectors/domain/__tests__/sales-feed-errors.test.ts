@@ -6,6 +6,7 @@ import {
   SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
   SalesFeedExportUnprocessable,
+  SalesFeedListUnavailable,
   SalesFeedMemberUnprocessable,
   SalesFeedModelConflict,
   SalesFeedNotConnected,
@@ -30,6 +31,7 @@ describe('sales feed refusals', () => {
       new SalesFeedWebhookNotFound(),
       new SalesFeedExportUnprocessable('test', {}),
       new SalesFeedCheckDaysUnprocessable(),
+      new SalesFeedListUnavailable(),
     ].map((error) => error.code);
     expect([...thrown].sort()).toEqual([...SALES_FEED_ERROR_CODES].sort());
   });

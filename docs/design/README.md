@@ -134,10 +134,12 @@ Chaque écran se relit à la place d'un nouvel utilisateur, qui connaît le chat
 | Token                                                                                                         | Usage                                                                                                        |
 | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `void`, `abyss`, `surface-raised`                                                                             | Fond de page ; colonnes encastrées ; cartes opaques et repli « Réduire la transparence ».                    |
+| `bubble-sent` | Bulle d'un message parti (chatteur, agent) : mauve désaturé, sous le rouge et l'ambre (D-03). Le brouillon reste en contour pointillé `ink-faint`, son étiquette et le point « Rédaction » en `ink-muted`. |
+| `fill-soft` | Fond doux qui tient sur toute surface : bouton `nv-btn--soft`, avatar, rail d'une jauge. Sur le verre clair, une teinte d'encre, jamais un second verre (D-03). |
 | `ink`, `ink-muted`, `ink-faint`                                                                               | Texte principal ; secondaire ; métadonnées (heures, sources de faits, placeholders), jamais sous 11px.       |
-| `neon`                                                                                                        | Halos, icônes actives, curseur, point « Rédaction ». Texte seulement à partir de 15px.                       |
-| `neon-solid` + `on-neon`                                                                                      | Bouton principal, interrupteur activé, bulle de la créatrice.                                                |
-| `neon-ink` sur `neon-soft`                                                                                    | Petites étiquettes néon : « Brouillon », fait déclaré.                                                       |
+| `neon`                                                                                                        | Halos, icônes actives, curseur. Texte seulement à partir de 15px.                       |
+| `neon-solid` + `on-neon`                                                                                      | Bouton principal, interrupteur activé. Jamais une bulle de message : un message parti est en `bubble-sent` (mauve désaturé, choisi par Charles sur captures le 05/11), un brouillon en contour neutre (D-03, Charles 05/11/2026 : « pas de message envoyé en rouge »).                                                |
+| `neon-ink` sur `neon-soft`                                                                                    | Petites étiquettes néon : fait déclaré.                                                       |
 | `select`, `select-strong`                                                                                     | Sélection : ligne ouverte, onglet actif, pouce d'un segment. Une lumière neutre, jamais du néon.            |
 | `plate`, `plate-hover`, `plate-edge`                                                                          | Plaques de contenu (`nv-plate`), champs de saisie, puces au repos.                                          |
 | `data-1`, `data-2`                                                                                            | Séries de données : blanc chaud, puis doré. Le néon ne dessine que le chiffre dont parle l'écran.            |
@@ -264,7 +266,7 @@ Le bloc de couleurs généré par `shadcn init` est supprimé au profit de cette
 
 ## Extension Chrome
 
-Le popup (capture de session, enregistreur) importe `@impera/design-system/styles.css` : en-tête `nv-popup__brand`, état de la session (`platform_session` : valide, à surveiller, expirée) en `nv-status`, un bouton néon « Synchroniser la session ». Pas de verre au-dessus de Reveal : l'extension n'injecte aucun style dans la page Reveal.
+Le popup (ADR 0066) importe `@impera/design-system/styles.css` et suit `prefers-color-scheme` (Nuit ou Jour). Ordre : en-tête `nv-popup__brand` et une `nv-status` d'état (Connecté, Déconnecté, ambre pour Injoignable, Code à activer, À autoriser ; jamais de rouge), le bonjour en Instrument Serif italique avec le prénom éclairé, la carte du compte en verre (`nv-avatar--ring`), la carte de l'onglet ouvert en `nv-plate` (Reveal, Instagram), au plus quatre raccourcis en tuiles qui se soulèvent au survol, un seul bouton néon. Classes locales `pp-` dans `apps/extension/src/entrypoints/popup/popup.css`. Pas de verre au-dessus de Reveal : l'extension n'injecte aucun style dans la page Reveal.
 
 ## Ce qui reste (fiche D-01)
 

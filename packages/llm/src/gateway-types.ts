@@ -1,4 +1,4 @@
-import type { MediaDescription, Result } from '@impera/contracts';
+import type { LlmPurpose, MediaDescription, Result, TrendCaptureDescription } from '@impera/contracts';
 import type { TranscriptionModel } from 'ai';
 
 import type { BudgetEvent } from './budget';
@@ -56,6 +56,11 @@ export interface CallTrace {
   readonly creatorId?: string;
   readonly conversationId?: string;
   readonly draftId?: string;
+  /**
+   * `trend_watch` for a call of the trend watch: refused at its own cap as well as at the daily one (ADR 0060 § 7).
+   * Absent is `chatting`, which only the daily cap stops.
+   */
+  readonly purpose?: LlmPurpose;
 }
 
 export interface SenseInput {
@@ -98,6 +103,15 @@ export interface JudgeInput extends ConversationInput {
   readonly criteria: readonly JudgeCriterion[];
 }
 
+/** The captures of a post marked during a trend watch (ADR 0060 § 2, source 6), in memory only. */
+export interface TrendCapturesInput {
+  readonly captures: readonly { readonly mediaType: string; readonly data: Uint8Array }[];
+  /** The video's length as the page showed it; null for a photo or a carousel. */
+  readonly durationS: number | null;
+  /** Always a trend watch call: its purpose is set by the gateway. */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
+}
+
 export interface CallMeta {
   readonly provider: ProviderId;
   readonly model: string;
@@ -113,8 +127,12 @@ export interface LlmSuccess<T> {
 }
 
 export interface LlmFailure {
-  /** `budget_reached`: the daily cap is spent, nothing was called; the chatters take over until midnight. */
-  readonly code: 'all_models_failed' | 'budget_reached';
+  /**
+   * `budget_reached`: the daily cap is spent, nothing was called; the chatters take over until midnight.
+   * `trend_watch_budget_reached`: a trend watch call, refused at the watch's own cap; its jobs stop until midnight,
+   * the fans' answers go on.
+   */
+  readonly code: 'all_models_failed' | 'budget_reached' | 'trend_watch_budget_reached';
   readonly attempts: readonly {
     readonly provider: ProviderId;
     readonly model: string;
@@ -136,6 +154,13 @@ export interface LlmGateway {
   voice(input: VoiceInput): Promise<Result<LlmSuccess<VoiceOutput>, LlmFailure>>;
   /** Scores a reply against the rubric criteria (`pnpm evals`). */
   judge(input: JudgeInput): Promise<Result<LlmSuccess<JudgeOutput>, LlmFailure>>;
+  /**
+   * How a marked post is made, from its captures (vision, role `sense`): a trend watch call, under the watch's cap
+   * (`trend_watch_budget_reached`) and the daily one. The captures are read, never kept nor journaled.
+   */
+  describeTrendCaptures(
+    input: TrendCapturesInput,
+  ): Promise<Result<LlmSuccess<TrendCaptureDescription>, LlmFailure>>;
   health(): HealthReport;
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
@@ -160,6 +185,7 @@ export interface LlmGatewayDeps {
     readonly brain: PromptTemplate;
     readonly sense: PromptTemplate;
     readonly judge?: PromptTemplate;
+    readonly trendCaptures?: PromptTemplate;
   };
   /** Secret written in every system prompt: an output that contains it has leaked the prompt. */
   readonly canary?: string;
@@ -172,6 +198,8 @@ export interface LlmGatewayDeps {
   readonly onKeyRefused?: (refusal: KeyRefusal) => void;
   /** The cap in euros set in Réglages (later); `config.dailyBudget.capEur` otherwise. Read before each call. */
   readonly dailyCapEur?: () => number;
+  /** The trend watch's cap in euros, inside the daily one; `config.dailyBudget.trendWatchCapEur` otherwise. */
+  readonly trendWatchCapEur?: () => number;
   /** Once per day and kind: alert at 80 %, then cap reached. Never throws into a call. */
   readonly onBudget?: (event: BudgetEvent) => void;
   /** Waits before a transient retry (backoff); a real timer unless a test passes its own. */

@@ -22,8 +22,8 @@ import { DOCUMENT_NAMES } from '@/contractors/model';
 import type { InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryFlag, countryName } from '@/lib/country';
-import { Dialog } from '@/screens/team/Dialog';
 import { FIRST_COUNTRIES, OTHER_COUNTRIES } from '@/screens/team/model';
+import { Dialog } from '@/shell/Dialog';
 
 /** What the code prints on every invoice already: a regime's mentions never say it again. */
 export const PRINTED_BY_CODE =

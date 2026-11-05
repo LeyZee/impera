@@ -31,7 +31,7 @@ import { useSchedulingSettings } from '@/reports/api';
 import { periodLine, previousPeriod } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { readerZone } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 

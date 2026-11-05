@@ -191,22 +191,22 @@ export function createSchedulingRoutes(
       (request) => calendar.calendar(userOf(request), request.query),
     );
 
-    // CR-12, ADR 0045 § 5: a member's own calendar link. Only the team's accounts have shifts; the service refuses
-    // an account that is not a member, or who left.
-    const member = requireRole('operator');
+    // CR-12, ADR 0045 § 5: a member's own calendar link, and a creator's for her agenda (CR-05, ADR 0042 § 4). The
+    // service refuses an operator account that is not a member, or who left.
+    const linkHolder = requireRole('operator', 'creator');
     app.get(
       '/scheduling/calendar-link',
-      { preValidation: member, schema: { response: { 200: CalendarLinkStateSchema } } },
+      { preValidation: linkHolder, schema: { response: { 200: CalendarLinkStateSchema } } },
       (request) => calendarLinks.state(userOf(request)),
     );
 
     app.post(
       '/scheduling/calendar-link',
-      { preValidation: member, schema: { response: { 201: CalendarLinkCreatedSchema } } },
+      { preValidation: linkHolder, schema: { response: { 201: CalendarLinkCreatedSchema } } },
       async (request, reply) => reply.code(201).send(await calendarLinks.create(actorOf(request))),
     );
 
-    app.delete('/scheduling/calendar-link', { preValidation: member }, async (request, reply) => {
+    app.delete('/scheduling/calendar-link', { preValidation: linkHolder }, async (request, reply) => {
       await calendarLinks.revoke(actorOf(request));
       return reply.code(204).send();
     });

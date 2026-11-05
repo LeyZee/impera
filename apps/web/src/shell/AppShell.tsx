@@ -48,12 +48,19 @@ export interface Account {
   readonly role: string;
   /** Its sessions and backup codes (SEC-04): the same entry of the account's menu for every role. */
   readonly security: string;
+  /** The extension's guide (ADR 0067), for the team: a creator has no use for it. */
+  readonly extension: boolean;
 }
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   const rail = useMemo(() => railOf(user), [user]);
   const account = useMemo(
-    () => ({ name: user.name, role: roleLabel(user), security: securityPathOf(user) }),
+    () => ({
+      name: user.name,
+      role: roleLabel(user),
+      security: securityPathOf(user),
+      extension: user.role !== 'creator',
+    }),
     [user],
   );
   // The address on screen: while the next one loads, the screen, its tab and its title are still the last one's.
@@ -272,7 +279,8 @@ export function RailNav({
       {/* On the Dashboard the mode's own control is on screen: the pill would say it twice (NAV-07). */}
       {rail.items.some(({ to }) => to === '/') && current !== '/' ? <AgentPill /> : null}
       {rail.settings === null ? null : link(rail.settings)}
-      {more.length === 0 && onSignOut === undefined ? null : (
+      {/* No « Plus » when the tabs fit and Moi › Préférences holds the rest (D-03). */}
+      {more.length === 0 && (onSignOut === undefined || !rail.phoneMenu) ? null : (
         <button
           ref={moreRef}
           type="button"
@@ -497,6 +505,17 @@ function UserMenu({ account, onSignOut }: { account: Account; onSignOut: () => v
           >
             Sécurité
           </Link>
+          {account.extension ? (
+            <Link
+              to="/aide/extension"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
+              Extension
+            </Link>
+          ) : null}
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onSignOut}>
             Se déconnecter
           </button>

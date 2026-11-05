@@ -23,6 +23,7 @@ import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { cityOf } from '@/scheduling/time';
 import { useAgencyToday } from '@/screens/pay/data';
+import '@/shell/dialog.css';
 
 /** Arrived less than this many days ago: the « Nouveau » badge of Imperium. */
 const NEW_DAYS = 30;

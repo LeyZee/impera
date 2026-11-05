@@ -39,8 +39,8 @@ import '@/contractors/contractors.css';
 import type { InvoiceOutcome, InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryName } from '@/lib/country';
-import { Dialog } from '@/screens/team/Dialog';
 import { weightText } from '@/settings/billing/model';
+import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
 /**
@@ -166,45 +166,47 @@ export function TextsPanel({
 }): JSX.Element {
   return (
     <Panel className="nv-enter" eyebrow="Contrat et mandat" title={reader.self ? 'Tes textes' : 'Ses textes'}>
-      <ul className="cf-list">
-        {TEXT_KINDS.map((kind) => {
-          const standing = textStanding(kind, texts, file.acceptances);
-          return (
-            <li key={kind} className="cf-item">
-              <div className="cf-item__main">
-                <p className="cf-item__name">{TEXT_NAMES[kind]}</p>
-                <p className="cf-item__sub">{textLine(standing, reader, timeZone)}</p>
-              </div>
-              <div className="cf-item__chips">
-                {standing.kind === 'none' ? (
-                  <Chip tone="wait">Pas encore publié</Chip>
-                ) : standing.kind === 'accepted' ? (
-                  <Chip tone="ok">Accepté</Chip>
-                ) : (
-                  <Chip tone="warn">{reader.self ? 'À accepter' : 'Pas encore accepté'}</Chip>
-                )}
-              </div>
-              <div className="cf-item__acts">
-                {standing.kind === 'none' ? null : (
-                  <button
-                    type="button"
-                    className={
-                      reader.self && standing.kind === 'to_accept'
-                        ? 'nv-btn nv-btn--soft nv-btn--sm'
-                        : 'nv-btn nv-btn--plain nv-btn--sm'
-                    }
-                    onClick={() => {
-                      onRead(standing.text, standing);
-                    }}
-                  >
-                    {reader.self && standing.kind === 'to_accept' ? 'Lire et accepter' : 'Lire'}
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="rp-sec">
+        <ul className="cf-list">
+          {TEXT_KINDS.map((kind) => {
+            const standing = textStanding(kind, texts, file.acceptances);
+            return (
+              <li key={kind} className="cf-item">
+                <div className="cf-item__main">
+                  <p className="cf-item__name">{TEXT_NAMES[kind]}</p>
+                  <p className="cf-item__sub">{textLine(standing, reader, timeZone)}</p>
+                </div>
+                <div className="cf-item__chips">
+                  {standing.kind === 'none' ? (
+                    <Chip tone="wait">Pas encore publié</Chip>
+                  ) : standing.kind === 'accepted' ? (
+                    <Chip tone="ok">Accepté</Chip>
+                  ) : (
+                    <Chip tone="warn">{reader.self ? 'À accepter' : 'Pas encore accepté'}</Chip>
+                  )}
+                </div>
+                <div className="cf-item__acts">
+                  {standing.kind === 'none' ? null : (
+                    <button
+                      type="button"
+                      className={
+                        reader.self && standing.kind === 'to_accept'
+                          ? 'nv-btn nv-btn--soft nv-btn--sm'
+                          : 'nv-btn nv-btn--plain nv-btn--sm'
+                      }
+                      onClick={() => {
+                        onRead(standing.text, standing);
+                      }}
+                    >
+                      {reader.self && standing.kind === 'to_accept' ? 'Lire et accepter' : 'Lire'}
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </Panel>
   );
 }
@@ -376,98 +378,100 @@ export function DocumentsPanel({
   const treaty = regime?.withholding === 'treaty_exempt';
   return (
     <Panel className="nv-enter" eyebrow="Pièces" title={reader.self ? 'Tes pièces' : 'Ses pièces'}>
-      {regime === null ? (
-        <p className="py-quiet">
-          {reader.self
-            ? 'Aucun régime de facturation pour l’instant : le propriétaire t’en attribue un selon ton pays, et les pièces qu’il demande s’afficheront ici.'
-            : `${name} n’a pas encore de régime : attribue-lui celui de son pays pour voir les pièces qu’il demande.`}
-        </p>
-      ) : regime.documents.length === 0 ? (
-        <p className="py-quiet">
-          {reader.self ? 'Ton régime ne demande aucune pièce.' : 'Son régime ne demande aucune pièce.'}
-        </p>
-      ) : (
-        <ul className="cf-list">
-          {regime.documents.map((kind) => {
-            const standing = documentStanding(kind, file.documents, file.today);
-            const older = olderDocuments(kind, file.documents, standing);
-            const shown = standing.kind === 'missing' ? null : standing.document;
-            const reminder = shown === null ? null : reminderText(shown, file.today, reader.self, treaty);
-            return (
-              <li
-                key={kind}
-                className="cf-item cf-item--doc"
-                data-remind={reminder === null ? undefined : 'true'}
-              >
-                <div className="cf-item__main">
-                  <p className="cf-item__name">{DOCUMENT_NAMES[kind]}</p>
-                  {shown === null ? (
-                    <p className="cf-item__sub">
-                      {reader.self ? 'Pas encore déposée.' : `${name} ne l’a pas encore déposée.`}
-                    </p>
-                  ) : (
-                    <DocumentLine
-                      memberId={file.memberId}
-                      document={shown}
-                      today={file.today}
-                      reader={reader}
-                      onReview={onReview}
-                    />
-                  )}
-                  {reminder === null ? null : <p className="tm-warn cf-remind">{reminder}</p>}
-                </div>
-                <div className="cf-item__chips">{standingChip(standing, reader)}</div>
-                {reader.self ? (
-                  <div className="cf-item__acts cf-item__acts--side">
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--soft nv-btn--sm"
-                      onClick={() => {
-                        onUpload(kind);
-                      }}
-                    >
-                      {standing.kind === 'missing' || standing.kind === 'refused'
-                        ? 'Déposer'
-                        : 'Déposer une nouvelle'}
-                    </button>
+      <div className="rp-sec">
+        {regime === null ? (
+          <p className="py-quiet">
+            {reader.self
+              ? 'Aucun régime de facturation pour l’instant : le propriétaire t’en attribue un selon ton pays, et les pièces qu’il demande s’afficheront ici.'
+              : `${name} n’a pas encore de régime : attribue-lui celui de son pays pour voir les pièces qu’il demande.`}
+          </p>
+        ) : regime.documents.length === 0 ? (
+          <p className="py-quiet">
+            {reader.self ? 'Ton régime ne demande aucune pièce.' : 'Son régime ne demande aucune pièce.'}
+          </p>
+        ) : (
+          <ul className="cf-list">
+            {regime.documents.map((kind) => {
+              const standing = documentStanding(kind, file.documents, file.today);
+              const older = olderDocuments(kind, file.documents, standing);
+              const shown = standing.kind === 'missing' ? null : standing.document;
+              const reminder = shown === null ? null : reminderText(shown, file.today, reader.self, treaty);
+              return (
+                <li
+                  key={kind}
+                  className="cf-item cf-item--doc"
+                  data-remind={reminder === null ? undefined : 'true'}
+                >
+                  <div className="cf-item__main">
+                    <p className="cf-item__name">{DOCUMENT_NAMES[kind]}</p>
+                    {shown === null ? (
+                      <p className="cf-item__sub">
+                        {reader.self ? 'Pas encore déposée.' : `${name} ne l’a pas encore déposée.`}
+                      </p>
+                    ) : (
+                      <DocumentLine
+                        memberId={file.memberId}
+                        document={shown}
+                        today={file.today}
+                        reader={reader}
+                        onReview={onReview}
+                      />
+                    )}
+                    {reminder === null ? null : <p className="tm-warn cf-remind">{reminder}</p>}
                   </div>
-                ) : null}
-                {/* The guide says the money cannot leave without the certificate: true under a treaty alone. */}
-                {reader.self && kind === 'tax_residence' && file.country === 'BJ' && treaty ? (
-                  <details className="cf-guide">
-                    <summary>Comment obtenir ton attestation</summary>
-                    <BeninGuide year={year} />
-                  </details>
-                ) : null}
-                {older.length === 0 ? null : (
-                  <details className="cf-older">
-                    <summary>
-                      {older.length === 1
-                        ? 'Une pièce précédente'
-                        : `${String(older.length)} pièces précédentes`}
-                    </summary>
-                    <ul className="cf-list">
-                      {older.map((document) => (
-                        <li key={document.id} className="cf-item cf-item--old">
-                          <div className="cf-item__main">
-                            <DocumentLine
-                              memberId={file.memberId}
-                              document={document}
-                              today={file.today}
-                              reader={reader}
-                              onReview={onReview}
-                            />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  <div className="cf-item__chips">{standingChip(standing, reader)}</div>
+                  {reader.self ? (
+                    <div className="cf-item__acts cf-item__acts--side">
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--soft nv-btn--sm"
+                        onClick={() => {
+                          onUpload(kind);
+                        }}
+                      >
+                        {standing.kind === 'missing' || standing.kind === 'refused'
+                          ? 'Déposer'
+                          : 'Déposer une nouvelle'}
+                      </button>
+                    </div>
+                  ) : null}
+                  {/* The guide says the money cannot leave without the certificate: true under a treaty alone. */}
+                  {reader.self && kind === 'tax_residence' && file.country === 'BJ' && treaty ? (
+                    <details className="cf-guide">
+                      <summary>Comment obtenir ton attestation</summary>
+                      <BeninGuide year={year} />
+                    </details>
+                  ) : null}
+                  {older.length === 0 ? null : (
+                    <details className="cf-older">
+                      <summary>
+                        {older.length === 1
+                          ? 'Une pièce précédente'
+                          : `${String(older.length)} pièces précédentes`}
+                      </summary>
+                      <ul className="cf-list">
+                        {older.map((document) => (
+                          <li key={document.id} className="cf-item cf-item--old">
+                            <div className="cf-item__main">
+                              <DocumentLine
+                                memberId={file.memberId}
+                                document={document}
+                                today={file.today}
+                                reader={reader}
+                                onReview={onReview}
+                              />
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </Panel>
   );
 }

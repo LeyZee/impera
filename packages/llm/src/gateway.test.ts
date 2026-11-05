@@ -71,7 +71,7 @@ function setup(
   models: { xai?: MockLanguageModelV4; mistral?: MockLanguageModelV4 },
   credentials = ALL_KEYS,
   onKeyRefused?: (refusal: KeyRefusal) => void,
-  budget: Pick<LlmGatewayDeps, 'dailyCapEur' | 'onBudget'> = {},
+  budget: Pick<LlmGatewayDeps, 'dailyCapEur' | 'trendWatchCapEur' | 'onBudget'> = {},
   waits: number[] = [],
 ) {
   const log = createInMemoryCallLog();
@@ -381,6 +381,101 @@ describe('daily budget', () => {
     await gateway.voice(INPUT);
     const second = await gateway.voice(INPUT);
     expect(!second.ok && second.error.code).toBe('budget_reached');
+  });
+});
+
+describe('trend watch budget (ADR 0060 § 7)', () => {
+  const watch = { ...INPUT, trace: { purpose: 'trend_watch' } } as const;
+
+  it('stops the watch at its own cap and never a fan’s answer', async () => {
+    const events: BudgetEvent[] = [];
+    const xai = scripted([{ text: BUBBLES }]);
+    // One call is about 0.0024 €: the first watch call reaches a 0.002 € watch cap, far under the daily one.
+    const { gateway, log } = setup({ xai }, ALL_KEYS, undefined, {
+      trendWatchCapEur: () => 0.002,
+      onBudget: (event) => events.push(event),
+    });
+
+    expect((await gateway.voice(watch)).ok).toBe(true);
+    const second = await gateway.voice(watch);
+    expect(!second.ok && second.error.code).toBe('trend_watch_budget_reached');
+    expect((await gateway.voice(INPUT)).ok).toBe(true);
+
+    expect(xai.doGenerateCalls).toHaveLength(2);
+    expect(log.since(new Date(0)).map((record) => record.purpose)).toEqual(['trend_watch', undefined]);
+    expect(gateway.health().trendWatchBudget).toMatchObject({ capEur: 0.002, state: 'reached' });
+    expect(gateway.health().budget.state).toBe('ok');
+    // The watch's cap is read in amber on its screen: it raises no alert of the daily cap.
+    expect(events).toEqual([]);
+  });
+
+  it('counts the watch in the daily cap, which stops the watch too', async () => {
+    const xai = scripted([{ text: BUBBLES }]);
+    const { gateway } = setup({ xai }, ALL_KEYS, undefined, {
+      dailyCapEur: () => 0.002,
+      trendWatchCapEur: () => 1,
+    });
+
+    expect((await gateway.voice(watch)).ok).toBe(true);
+    const fan = await gateway.voice(INPUT);
+    expect(!fan.ok && fan.error.code).toBe('budget_reached');
+    const again = await gateway.voice(watch);
+    expect(!again.ok && again.error.code).toBe('budget_reached');
+    expect(gateway.health().trendWatchBudget.state).toBe('ok');
+  });
+
+  it('defaults the watch’s cap to 1 € inside the 20 €', () => {
+    const { gateway } = setup({ xai: scripted([]) });
+    expect(gateway.health().trendWatchBudget).toMatchObject({ capEur: 1, spentEur: 0, state: 'ok' });
+    expect(gateway.health().budget.capEur).toBe(20);
+  });
+});
+
+describe('describeTrendCaptures (ADR 0060 § 2, source 6)', () => {
+  const DESCRIPTION = {
+    hook: 'Un regard caméra puis un rire, dès la première seconde.',
+    angles: ['plan serré visage', 'miroir en pied'],
+    onScreenText: 'POV : tu rentres du sport',
+    editing: 'Trois coupes rapides calées sur le son.',
+  };
+  const input = {
+    captures: [{ mediaType: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff]) }],
+    durationS: 12,
+    trace: { creatorId: 'creator-1' },
+  };
+
+  it('reads the captures as images, as a trend watch call, and drops the fields it was not asked for', async () => {
+    const xai = scripted([{ text: JSON.stringify({ ...DESCRIPTION, account: 'someone' }) }]);
+    const { gateway, log } = setup({ xai });
+
+    const result = await gateway.describeTrendCaptures(input);
+
+    expect(result.ok && result.value.output).toEqual(DESCRIPTION);
+    expect(log.since(new Date(0))).toEqual([
+      expect.objectContaining({ role: 'sense', purpose: 'trend_watch', creatorId: 'creator-1' }),
+    ]);
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt);
+    expect(prompt).toContain('vidéo de 12 s');
+    expect(prompt).toContain('image/jpeg');
+  });
+
+  it('is stopped at the watch’s cap', async () => {
+    const xai = scripted([{ text: JSON.stringify(DESCRIPTION) }]);
+    const { gateway } = setup({ xai }, ALL_KEYS, undefined, { trendWatchCapEur: () => 0.000_001 });
+    expect((await gateway.describeTrendCaptures(input)).ok).toBe(true);
+    const second = await gateway.describeTrendCaptures(input);
+    expect(!second.ok && second.error.code).toBe('trend_watch_budget_reached');
+  });
+
+  it('fails without a vision model, Mistral never standing in for one', async () => {
+    const mistral = scripted([{ text: JSON.stringify(DESCRIPTION) }]);
+    const { gateway } = setup({ mistral });
+    const result = await gateway.describeTrendCaptures(input);
+    expect(!result.ok && result.error.attempts.map((attempt) => attempt.outcome)).toEqual([
+      'missing_key',
+      'missing_key',
+    ]);
+    expect(mistral.doGenerateCalls).toHaveLength(0);
   });
 });
 

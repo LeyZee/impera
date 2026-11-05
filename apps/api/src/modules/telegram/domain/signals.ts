@@ -1,6 +1,8 @@
 import type {
   AlertRef,
   AutomaticMissing,
+  ConnectionDownReason,
+  ConnectionService,
   Currency,
   ConversationId,
   ContractorDocumentKind,
@@ -181,6 +183,28 @@ export type Signal =
       readonly from: PayPeriod;
       readonly days: number;
       readonly accounts: number;
+    }
+  | {
+      /**
+       * A service the agent needs went down (P3-12): which one and why, never the key nor a word of its answer.
+       * Published at the transition only (Bilan's `connection_state_changed`).
+       */
+      readonly kind: 'connection_down';
+      readonly service: ConnectionService;
+      readonly reason: ConnectionDownReason;
+    }
+  | { readonly kind: 'connection_back'; readonly service: ConnectionService }
+  | {
+      /**
+       * Her share read on the platform strays from the agency's percentage set for her, by more than a cent a sale or
+       * refund, on one account and fortnight (CRM-04 d3, ADR 0054 § 2). For the owner, as information: never an amount,
+       * the percentage, a fan nor a chatter.
+       */
+      readonly kind: 'agency_share_mismatch';
+      readonly creatorId: CreatorId;
+      readonly platform: Platform;
+      readonly platformAccountId: string;
+      readonly from: PayPeriod;
     };
 
 export interface ScannedEvent {
@@ -202,6 +226,10 @@ export interface Notice {
    * important groups rather than to nobody (P4-01).
    */
   readonly fallbackTopic?: TelegramTopic;
+  /** To the groups « pour toutes » only, even for an event of hers: what the agency alone should read (CRM-04 d3). */
+  readonly allCreatorsOnly?: true;
+  /** Nothing more once the thread has a message: one fact published in several events (one per currency) is told once. */
+  readonly oncePerThread?: true;
   readonly title: string;
   readonly body: string;
   readonly link: { readonly label: string; readonly path: string } | null;

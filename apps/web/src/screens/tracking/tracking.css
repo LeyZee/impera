@@ -40,11 +40,26 @@
 .tr-list > li:nth-child(n + 6) {
   --nv-i: 5;
 }
+/* His unread messages, a round count beside his pseudo (D-03). */
 .tr-unread {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+  color: var(--nv-void);
   font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink);
-  font-weight: 600;
+  line-height: 1;
+  font-weight: 700;
+}
+/* In « À traiter », why he waits follows his pseudo, quieter. */
+.tr-cause {
+  color: var(--nv-ink-muted);
+  font-weight: 500;
 }
 .tr-wait {
   font-size: var(--nv-text-caption);
@@ -195,7 +210,9 @@
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
-  flex-wrap: wrap;
+  /* The state and the mode on one line, under the name (D-03). */
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 .tr-reader__body {
   display: flex;
@@ -626,4 +643,17 @@
   .tr-reader__top {
     display: contents;
   }
+}
+
+/* The draft's three gestures on one line, Valider the widest: no lone « Refuser » on its own row (D-03). */
+.tr-draft .nv-draft-panel__actions {
+  flex-wrap: nowrap;
+}
+.tr-draft .nv-draft-panel__actions > .nv-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: var(--nv-space-3);
+}
+.tr-draft .nv-draft-panel__actions > .nv-btn--neon {
+  flex-grow: 1.6;
 }

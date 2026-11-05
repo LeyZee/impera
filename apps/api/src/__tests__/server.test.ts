@@ -5,7 +5,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { loadConfig } from '../config';
+import { loadConfig, mediaBucket } from '../config';
 import { createLogger } from '../logger';
 import type { Readiness } from '../readiness';
 import { buildServer, statusForCode } from '../server';
@@ -415,6 +415,46 @@ describe('loadConfig', () => {
           ...bucket('INVOICES_COPY_S3_', 'http://127.0.0.1:9000/', 'Factures'),
         }),
       ).toThrow(/names the bucket of INVOICES_S3_\*/u);
+    });
+  });
+
+  describe('the media bucket (CR-06 b)', () => {
+    const MEDIA: NodeJS.ProcessEnv = {
+      S3_ENDPOINT: 'https://fsn1.objects.example.test',
+      S3_REGION: 'fsn1',
+      S3_BUCKET: 'medias',
+      S3_ACCESS_KEY_ID: 'EXAMPLEKEYID',
+      S3_SECRET_ACCESS_KEY: 'example-secret-for-tests-only',
+    };
+
+    it('takes it whole or not at all; its name alone, as `.env.example` gives it, counts for none', () => {
+      expect(mediaBucket(testConfig(MEDIA))).toEqual({
+        endpoint: 'https://fsn1.objects.example.test',
+        region: 'fsn1',
+        bucket: 'medias',
+        accessKeyId: 'EXAMPLEKEYID',
+        secretAccessKey: 'example-secret-for-tests-only',
+      });
+      expect(mediaBucket(testConfig({ S3_BUCKET: 'impera-media', S3_ENDPOINT: '' }))).toBeNull();
+      expect(() => testConfig({ ...MEDIA, S3_REGION: '' })).toThrow(/S3_\* must all be set, or none/u);
+      expect(() => testConfig({ S3_ENDPOINT: MEDIA['S3_ENDPOINT'] })).toThrow(/S3_\* must all be set/u);
+    });
+
+    it('wants a plain URL, https in production', () => {
+      expect(() => testConfig({ ...MEDIA, S3_ENDPOINT: 'http://127.0.0.1:9000' })).not.toThrow();
+      expect(() => testConfig({ ...MEDIA, S3_ENDPOINT: 'objects.example.test' })).toThrow(
+        /S3_ENDPOINT must be an http\(s\) URL/u,
+      );
+      expect(() =>
+        testConfig({
+          NODE_ENV: 'production',
+          CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
+          SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
+          EXTENSION_DEVICE_TOKEN: 'c'.repeat(48),
+          ...MEDIA,
+          S3_ENDPOINT: 'http://fsn1.objects.example.test',
+        }),
+      ).toThrow(/S3_ENDPOINT must be an https URL/u);
     });
   });
 

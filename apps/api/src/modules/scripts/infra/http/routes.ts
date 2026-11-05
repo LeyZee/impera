@@ -10,6 +10,7 @@ import {
   ScriptStructureIdSchema,
   ScriptStructureListSchema,
   SCRIPT_STARTERS,
+  ScriptCardPreviewBodySchema,
   ScriptStarterListSchema,
   ScriptStructureSchema,
   type CreatorId,
@@ -177,6 +178,27 @@ export function createScriptRoutes(
             .type('image/svg+xml; charset=utf-8')
             .send(svg);
         return reply.type('image/png').send(Buffer.from(await rasterize(svg)));
+      },
+    );
+
+    // The workshop's live preview (SC-01 lot c): the card of a draft, never stored. Same drawing, same escaping and same
+    // headers as a stored card's SVG; nothing is rasterised, so a screen that types cannot start ffmpeg.
+    app.post(
+      '/script-structures/cards/preview',
+      {
+        preValidation: requireRole('owner'),
+        schema: { body: ScriptCardPreviewBodySchema },
+      },
+      (request, reply) => {
+        const { segmentKey, variant, format, ...draft } = request.body;
+        const content = cardContent(draft, segmentKey, variant === undefined ? {} : { variant });
+        if (content === null) throw new ScriptCardNotFound();
+        return reply
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-security-policy', "default-src 'none'")
+          .type('image/svg+xml; charset=utf-8')
+          .send(cardSvg(content, format));
       },
     );
 

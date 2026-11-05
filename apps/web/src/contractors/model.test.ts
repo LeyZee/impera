@@ -7,6 +7,7 @@ import {
   documentStateText,
   earliestRegimeDay,
   fileReminders,
+  fileToDos,
   identityLines,
   olderDocuments,
   prefixOf,
@@ -385,5 +386,92 @@ describe('the reminders of one’s own file on Aujourd’hui', () => {
     expect(fileReminders({ documents, today: '2026-12-01' }, FRANCE_REGIME)).toEqual([]);
     expect(fileReminders({ documents: [], today: '2026-12-01' }, BENIN_REGIME)).toEqual([]);
     expect(fileReminders({ documents, today: '2026-12-01' }, null)).toEqual([]);
+  });
+});
+
+describe('what one’s own file waits on, on Aujourd’hui (D-03)', () => {
+  const accepted = [
+    acceptanceOf(1, CONTRACT_V1, '2026-11-01T09:00:00.000Z'),
+    acceptanceOf(2, MANDATE_V1, '2026-11-01T09:00:00.000Z'),
+  ];
+
+  it('lists the texts to accept, then the documents never filed or refused, then the renewals due', () => {
+    expect(
+      fileToDos({ acceptances: [], documents: [], today: '2026-11-05' }, BENIN_REGIME, [
+        MANDATE_V1,
+        CONTRACT_V1,
+      ]),
+    ).toEqual([
+      {
+        key: 'text-service_contract',
+        title: 'Contrat de prestation à accepter',
+        text: 'Version 1, à lire avant d’accepter.',
+        go: 'text',
+      },
+      {
+        key: 'text-billing_mandate',
+        title: 'Mandat de facturation à accepter',
+        text: 'Version 1, à lire avant d’accepter.',
+        go: 'text',
+      },
+      {
+        key: 'document-tax_residence',
+        title: 'Attestation de résidence fiscale à déposer',
+        text: 'Pas encore déposée.',
+        go: 'document',
+      },
+    ]);
+    const refused = documentOf(1, {
+      review: { decision: 'refused', reviewedAt: '2026-02-12T09:00:00.000Z', reason: 'Illisible' },
+    });
+    expect(
+      fileToDos({ acceptances: accepted, documents: [refused], today: '2026-11-05' }, BENIN_REGIME, [
+        MANDATE_V1,
+        CONTRACT_V1,
+      ]).map((one) => one.title),
+    ).toEqual(['Attestation de résidence fiscale à redéposer']);
+    expect(
+      fileToDos({ acceptances: accepted, documents: [documentOf(1)], today: '2026-12-01' }, BENIN_REGIME, [
+        MANDATE_V1,
+        CONTRACT_V1,
+      ]),
+    ).toEqual([
+      {
+        key: 'reminder-tax_residence',
+        title: 'Attestation de résidence fiscale',
+        text: 'Ton attestation se termine le 31 décembre. Sans celle de 2027, tes versements à partir du 1er janvier 2027 seront bloqués : demande-la dès janvier.',
+        go: 'document',
+      },
+    ]);
+  });
+
+  it('asks again for a text whose new version came out, and nothing once all is in order', () => {
+    expect(
+      fileToDos({ acceptances: accepted, documents: [documentOf(1)], today: '2026-11-05' }, BENIN_REGIME, [
+        MANDATE_V2,
+        MANDATE_V1,
+        CONTRACT_V1,
+      ]),
+    ).toEqual([
+      {
+        key: 'text-billing_mandate',
+        title: 'Mandat de facturation à accepter',
+        text: 'Nouvelle version 2 : elle remplace celle que tu as acceptée.',
+        go: 'text',
+      },
+    ]);
+    expect(
+      fileToDos({ acceptances: accepted, documents: [documentOf(1)], today: '2026-11-05' }, BENIN_REGIME, [
+        MANDATE_V1,
+        CONTRACT_V1,
+      ]),
+    ).toEqual([]);
+    // No regime: no document is asked for, the texts still are.
+    expect(
+      fileToDos({ acceptances: accepted, documents: [], today: '2026-11-05' }, null, [
+        MANDATE_V1,
+        CONTRACT_V1,
+      ]),
+    ).toEqual([]);
   });
 });

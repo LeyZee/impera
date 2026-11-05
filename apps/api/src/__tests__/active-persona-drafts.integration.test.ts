@@ -95,6 +95,7 @@ function health(): HealthReport {
     providers: [],
     costTodayUsd: 0,
     budget: { day: '2026-10-29', spentEur: 0, capEur: 20, alertAtEur: 16, state: 'ok' },
+    trendWatchBudget: { day: '2026-10-29', spentEur: 0, capEur: 1, alertAtEur: 0.8, state: 'ok' },
   };
 }
 
@@ -102,6 +103,7 @@ function health(): HealthReport {
 const GATEWAY: LlmGateway = {
   sense: () => Promise.reject(new Error('not used')),
   transcribe: () => Promise.reject(new Error('not used')),
+  describeTrendCaptures: () => Promise.reject(new Error('not used')),
   brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
   voice: () => Promise.resolve({ ok: true, value: { output: { bubbles: ['Coucou toi'] }, meta: META } }),
   health,

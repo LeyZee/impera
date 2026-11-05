@@ -87,6 +87,7 @@ function health(hasKey: boolean): HealthReport {
     providers: [],
     costTodayUsd: 0,
     budget: { day: '2026-10-17', spentEur: 0, capEur: 20, alertAtEur: 16, state: 'ok' },
+    trendWatchBudget: { day: '2026-10-17', spentEur: 0, capEur: 1, alertAtEur: 0.8, state: 'ok' },
   };
 }
 
@@ -109,6 +110,7 @@ function gateway(script: Script, seen: Seen): LlmGateway {
   return {
     sense: () => Promise.reject(new Error('not used')),
     transcribe: () => Promise.reject(new Error('not used')),
+    describeTrendCaptures: () => Promise.reject(new Error('not used')),
     brain: (input) => {
       seen.traces.push(input.trace);
       seen.brainInputs?.push(input);

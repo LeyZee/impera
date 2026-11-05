@@ -1,6 +1,7 @@
 {
   "name": "@impera/api",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "description": "API Fastify et worker Graphile d’Impera : même code, deux entrées (src/index.ts, src/worker.ts).",
   "type": "module",

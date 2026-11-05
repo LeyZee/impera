@@ -3,13 +3,14 @@ import {
   SaleAmountsSchema,
   SaleStatusSchema,
   SaleTypeSchema,
+  type PlatformModelStatus,
   type PlatformSale,
   type SaleEvent,
   type SaleStatus,
   type SaleType,
   type SalesFeedCapability,
 } from '@impera/contracts';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { SALES_FEED_TIME_ZONES } from '../../domain/sale-days';
 import type {
@@ -80,6 +81,22 @@ function retryAfterMs(header: string | null, now: Date): number {
   const at = Date.parse(header);
   return Number.isNaN(at) ? DEFAULT_RETRY_AFTER_MS : Math.max(0, at - now.getTime());
 }
+
+/** Reveal's model statuses (camelCase) in the contract's words; any other value reads as `other`. */
+const MODEL_STATUSES: ReadonlyMap<string, PlatformModelStatus> = new Map([
+  ['validated', 'validated'],
+  ['pending', 'pending'],
+  ['onboardingChangesRequested', 'onboarding_changes_requested'],
+  ['refused', 'refused'],
+  ['banned', 'banned'],
+]);
+
+/** A photo address kept only when it is a valid `https` URL; anything else reads as no photo. */
+function httpsUrl(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  return HttpsUrlSchema.safeParse(value).success ? value : null;
+}
+const HttpsUrlSchema = z.url({ protocol: /^https$/ });
 
 /** A value Reveal says may grow: known, or `other` with its raw value kept and signalled. */
 function mapped<T extends string>(
@@ -255,6 +272,8 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
           handle: model.userName,
           displayName: model.displayName,
           isActive: model.isActive,
+          status: MODEL_STATUSES.get(model.status) ?? 'other',
+          avatarUrl: httpsUrl(model.avatarUrl),
         })),
       };
     },

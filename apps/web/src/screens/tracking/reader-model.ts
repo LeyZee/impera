@@ -38,6 +38,8 @@ export type ThreadItem =
       readonly from: 'fan' | 'creator';
       /** Outbound only: written by a person (in Reveal), not by the agent. */
       readonly byHuman: boolean;
+      /** Outbound only: written by the agent, signed « Automatique » as the creator reads it (D-03). */
+      readonly byAgent: boolean;
       readonly text: string;
       /** Its media: what kind, and what it shows once the media module described it (SUIVI-26). */
       readonly media: readonly { readonly label: string; readonly description: string | null }[];
@@ -149,6 +151,7 @@ export function threadOf(
         id: message.id,
         from: message.direction === 'inbound' ? 'fan' : 'creator',
         byHuman: message.direction === 'outbound' && message.author === 'human',
+        byAgent: message.direction === 'outbound' && message.author === 'ai',
         text: message.text,
         media: message.media.map((m) => ({ label: MEDIA_LABELS[m.kind], description: m.description })),
         ppv:

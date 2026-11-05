@@ -1,4 +1,13 @@
-import type { Me } from '@impera/contracts';
+import {
+  CRM_RAILS,
+  CRM_SECTION_LABELS,
+  CRM_SECTIONS,
+  railKindOf,
+  type CrmSection,
+  type Me,
+  type RailFamily,
+  type RailKind,
+} from '@impera/contracts';
 
 import type { NavIconName } from './NavIcon';
 
@@ -8,27 +17,15 @@ import type { NavIconName } from './NavIcon';
  * the real barrier; this only keeps everyone from landing on a screen that is not theirs.
  */
 
-/** Every section a rail can hold, by its address (French, like the routes). */
-export const SECTIONS = [
-  '/',
-  '/aujourdhui',
-  '/suivi',
-  '/entrainer',
-  '/planning',
-  '/commissions',
-  '/ventes',
-  '/equipe',
-  '/paie',
-  '/creatrices',
-  '/moi',
-  '/reglages',
-] as const;
-export type Section = (typeof SECTIONS)[number];
+/** Every section a rail can hold, by its address: the table shared with the extension (ADR 0066 § 6). */
+export const SECTIONS = CRM_SECTIONS;
+export type Section = CrmSection;
 
 /** The sections whose screen exists: a tab appears only then, never empty nor greyed out (ADR 0024). */
 export const READY_SECTIONS = [
   '/',
   '/aujourdhui',
+  '/agenda',
   '/suivi',
   '/entrainer',
   '/planning',
@@ -42,7 +39,7 @@ export const READY_SECTIONS = [
 ] as const;
 export type ReadySection = (typeof READY_SECTIONS)[number];
 
-export type Family = 'chatting' | 'agency';
+export type Family = RailFamily;
 
 export const FAMILY_LABELS: Readonly<Record<Family, string>> = { chatting: 'Chatting', agency: 'Agence' };
 
@@ -53,108 +50,28 @@ export interface NavItem {
   readonly family: Family | null;
 }
 
-const ITEMS: Readonly<Record<Section, { readonly label: string; readonly icon: NavIconName }>> = {
-  '/': { label: 'Dashboard', icon: 'dashboard' },
-  '/aujourdhui': { label: 'Aujourd’hui', icon: 'today' },
-  '/suivi': { label: 'Suivi', icon: 'tracking' },
-  '/entrainer': { label: 'Entraîner', icon: 'train' },
-  '/planning': { label: 'Planning', icon: 'planning' },
-  '/commissions': { label: 'Commissions', icon: 'pay' },
-  '/ventes': { label: 'Ventes', icon: 'pay' },
-  '/equipe': { label: 'Équipe', icon: 'team' },
-  '/paie': { label: 'Paie', icon: 'pay' },
-  '/creatrices': { label: 'Créatrices', icon: 'creators' },
-  '/moi': { label: 'Moi', icon: 'me' },
-  '/reglages': { label: 'Réglages', icon: 'settings' },
+const ICONS: Readonly<Record<Section, NavIconName>> = {
+  '/': 'dashboard',
+  '/aujourdhui': 'today',
+  '/agenda': 'planning',
+  '/suivi': 'tracking',
+  '/entrainer': 'train',
+  '/planning': 'planning',
+  '/commissions': 'pay',
+  '/ventes': 'pay',
+  '/equipe': 'team',
+  '/paie': 'pay',
+  '/creatrices': 'creators',
+  '/moi': 'me',
+  '/reglages': 'settings',
 };
 
-/**
- * Which rail an account gets. `operator` is today's operator: no team row, so no team tab. `creator` is a creator in
- * her own space (ADR 0042 § 8): Aujourd'hui · Agenda · Ventes · Contenu · Moi, each once its screen exists.
- */
-export type RailKind = 'owner' | 'manager' | 'chatter' | 'operator' | 'creator';
+const itemOf = (section: Section): { readonly label: string; readonly icon: NavIconName } => ({
+  label: CRM_SECTION_LABELS[section],
+  icon: ICONS[section],
+});
 
-interface RailPlan {
-  /** In the order of ADR 0024, each with its family when the rail has families. */
-  readonly sections: readonly (readonly [Section, Family | null])[];
-  /** Réglages, apart at the foot of the rail. */
-  readonly settings: boolean;
-  /** What the phone keeps on its bar first when the rail does not fit in five (ADR 0024, column « Téléphone »). */
-  readonly phone: readonly Section[];
-}
-
-const RAILS: Readonly<Record<RailKind, RailPlan>> = {
-  owner: {
-    sections: [
-      ['/', null],
-      ['/suivi', 'chatting'],
-      ['/entrainer', 'chatting'],
-      ['/equipe', 'agency'],
-      ['/paie', 'agency'],
-      ['/creatrices', 'agency'],
-    ],
-    settings: true,
-    phone: ['/', '/suivi', '/equipe', '/paie'],
-  },
-  manager: {
-    sections: [
-      ['/', null],
-      ['/suivi', null],
-      ['/equipe', null],
-      ['/paie', null],
-      ['/moi', null],
-    ],
-    settings: false,
-    phone: ['/', '/suivi', '/equipe', '/paie'],
-  },
-  chatter: {
-    sections: [
-      ['/aujourdhui', null],
-      ['/suivi', null],
-      ['/planning', null],
-      ['/commissions', null],
-      ['/moi', null],
-    ],
-    settings: false,
-    phone: ['/aujourdhui', '/suivi', '/planning', '/commissions'],
-  },
-  // No Entraîner for an operator nor a creator: the playground is the owner's alone on the server
-  // (`requireRole('owner')`), and a tab never leads to a screen that can only refuse. Nor Réglages: every page of it
-  // is the owner's, and the appearance lives in the account's menu (NAV-03, NAV-18).
-  operator: {
-    sections: [
-      ['/', null],
-      ['/suivi', 'chatting'],
-      ['/creatrices', 'agency'],
-    ],
-    settings: false,
-    phone: ['/', '/suivi', '/creatrices'],
-  },
-  // Agenda (CR-05) and Contenu (CR-06) join it with their screens; Ventes holds her fans first, then her earnings
-  // and her sales (CR-04); her persona lives in Moi.
-  creator: {
-    sections: [
-      ['/aujourdhui', null],
-      ['/ventes', null],
-      ['/moi', null],
-    ],
-    settings: false,
-    phone: ['/aujourdhui', '/ventes', '/moi'],
-  },
-};
-
-/**
- * The owner gets his rail; a manager gets his while his scope is `agency`; any other team member, a manager on leave
- * included, gets the chatter's, as his scope does. An operator without a team row keeps today's rail; a creator gets
- * her own space's.
- */
-export function railKindOf(me: Me): RailKind {
-  if (me.role === 'owner') return 'owner';
-  if (me.role === 'creator') return 'creator';
-  if (me.teamScope === 'agency') return 'manager';
-  if (me.team !== null) return 'chatter';
-  return 'operator';
-}
+export { railKindOf, type RailKind };
 
 /** The phone shows five places at most: four sections and « Plus » once there are more. */
 const PHONE_SLOTS = 5;
@@ -170,7 +87,7 @@ export interface RailLayout {
 }
 
 export function layoutRail(kind: RailKind, ready: (section: Section) => boolean): RailLayout {
-  const plan = RAILS[kind];
+  const plan = CRM_RAILS[kind];
   const sections = plan.sections.filter(([to]) => ready(to));
   const settings = plan.settings && ready('/reglages');
   const all: Section[] = sections.map(([to]) => to);
@@ -206,6 +123,11 @@ export interface Rail {
   readonly headed: ReadonlySet<Family>;
   /** On the phone, the tabs under « Plus ». */
   readonly more: ReadonlySet<ReadySection>;
+  /**
+   * Whether the phone's bar ends with « Plus »: only when tabs overflow, or when the rail has no Moi to hold the
+   * appearance, the notifications and the way out (D-03: then they live in Moi › Préférences, never twice).
+   */
+  readonly phoneMenu: boolean;
 }
 
 /** The rail of the signed-in account, with the screens that exist today. */
@@ -215,7 +137,7 @@ export function railOf(me: Me): Rail {
   const item = (to: ReadySection, family: Family | null): NavItem => ({
     to,
     family,
-    ...ITEMS[to],
+    ...itemOf(to),
   });
   const items: NavItem[] = [];
   for (const [to, family] of layout.sections) if (isReady(to)) items.push(item(to, family));
@@ -227,6 +149,7 @@ export function railOf(me: Me): Rail {
     home: items[0]?.to ?? '/suivi',
     headed: layout.headed,
     more: new Set([...layout.more].filter(isReady)),
+    phoneMenu: layout.more.size > 0 || !items.some((one) => one.to === '/moi'),
   };
 }
 
@@ -238,7 +161,7 @@ export function sectionOf(pathname: string): Section | null {
 
 /** What a section is called, in the rail and in the tab's title. */
 export function sectionLabel(section: Section): string {
-  return ITEMS[section].label;
+  return CRM_SECTION_LABELS[section];
 }
 
 /**
@@ -246,6 +169,7 @@ export function sectionLabel(section: Section): string {
  * « Rapports · Équipe » so that Équipe › Rapports and Équipe › Planning read apart (NAV-12).
  */
 const SCREENS = {
+  '/creatrices/structures': 'Structures',
   '/suivi': 'Conversations',
   '/suivi/alertes': 'Historique des alertes',
   '/equipe/planning': 'Planning',
@@ -263,6 +187,7 @@ const SCREENS = {
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
+  '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Ventes',
   '/reglages/alertes': 'Alertes',

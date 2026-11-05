@@ -200,8 +200,19 @@ export function SwapBody({ view, message }: { view: SwapView; message: string | 
   );
 }
 
-/** « Mes congés »: folded, with what is in it on one line; a pending request is withdrawn from here. */
-export function MyLeaves({ leaves, now }: { leaves: readonly LeaveRequest[]; now: Date }): JSX.Element {
+/**
+ * « Mes congés »: folded, with what is in it on one line; a pending request is withdrawn from here, and a new one asked
+ * from here too, where leaves are read, rather than above the shifts (D-03).
+ */
+export function MyLeaves({
+  leaves,
+  now,
+  onAsk,
+}: {
+  leaves: readonly LeaveRequest[];
+  now: Date;
+  onAsk: () => void;
+}): JSX.Element {
   const ahead = leaves.filter((leave) => leaveAhead(leave, now));
   const pending = ahead.filter((leave) => leave.status === 'pending').length;
   const approved = ahead.filter((leave) => leave.status === 'approved').length;
@@ -224,6 +235,9 @@ export function MyLeaves({ leaves, now }: { leaves: readonly LeaveRequest[]; now
         <span className="nv-disclosure__sum">{sum}</span>
       </summary>
       <div className="nv-disclosure__body">
+        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm sc-fold__ask" onClick={onAsk}>
+          Demander un congé
+        </button>
         {shown.length === 0 ? (
           <p className="tm-hint">Aucun congé demandé ces derniers temps.</p>
         ) : (

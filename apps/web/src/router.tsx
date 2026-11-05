@@ -9,16 +9,20 @@ import {
 
 import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
-import { creatorsSearch, parseCreatorsSearch, sheetOf } from './creators/search';
+import { creatorsSearch, parseCreatorsSearch, sheetOf, sheetsFor } from './creators/search';
 import { parsePaySearch } from './payroll/model';
+import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
+import { AgendaPage } from './screens/agenda/AgendaPage';
+import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
+import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
@@ -60,6 +64,7 @@ import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TestsPage } from './screens/train/TestsPage';
 import { TrainLayout } from './screens/train/TrainLayout';
+import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
@@ -122,14 +127,17 @@ const creators = createRoute({
   getParentRoute: () => rootRoute,
   path: '/creatrices',
   validateSearch: parseCreatorsSearch,
-  // Her hours (P3-14), her access (CR-02) and the agency's percentage (CR-04) are the owner's alone: anyone else lands
-  // on the persona, not on a page the server would refuse.
+  // Her hours (P3-14), her access (CR-02) and the agency's percentage (CR-04) are the owner's alone, her agenda (CR-05)
+  // the owner's and an active manager's, who opens nothing else: anyone lands on their first sheet, never on a page
+  // the server would refuse.
   beforeLoad: ({ context, search }) => {
-    if (search.onglet !== undefined && context.user.role !== 'owner') {
+    const sheets = sheetsFor(context.user);
+    const first = sheets[0];
+    if (first !== undefined && !sheets.includes(sheetOf(search))) {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
-        search: creatorsSearch('persona', search.creatrice ?? null),
+        search: creatorsSearch(first, search.creatrice ?? null),
         replace: true,
       });
     }
@@ -147,6 +155,21 @@ const creators = createRoute({
       />
     );
   },
+});
+/**
+ * Créatrices › Structures (SC-01 lot c): the agency's script structures, the owner's alone as the server writes them;
+ * anyone else lands on Créatrices.
+ */
+const scriptStructures = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/creatrices/structures',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/creatrices', replace: true });
+    }
+  },
+  component: StructuresPage,
 });
 const tracking = createRoute({
   getParentRoute: () => rootRoute,
@@ -209,6 +232,42 @@ const today = createRoute({
   component: function Today() {
     const { user } = rootRoute.useRouteContext();
     return user.role === 'creator' ? <CreatorTodayPage /> : <TodayPage user={user} />;
+  },
+});
+/**
+ * Agenda, the creator's alone (CR-05, ADR 0042 § 8): her day (`?jour=`), her week (`?vue=semaine`) or her month
+ * (`?vue=mois`). Any other account is sent home by the root, as this section is not on its rail.
+ */
+const agenda = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/agenda',
+  validateSearch: parseAgendaSearch,
+  component: function Agenda() {
+    const search = agenda.useSearch();
+    const navigate = agenda.useNavigate();
+    return (
+      <AgendaPage
+        day={search.jour ?? null}
+        view={viewOf(search)}
+        onDay={(day) =>
+          void navigate({
+            search: ({ vue }) => ({
+              ...(day === null ? {} : { jour: day }),
+              ...(vue === undefined ? {} : { vue }),
+            }),
+            replace: true,
+          })
+        }
+        onView={(view) =>
+          void navigate({
+            search: ({ jour }) => ({
+              ...(jour === undefined ? {} : { jour }),
+              ...vueOf(view),
+            }),
+          })
+        }
+      />
+    );
   },
 });
 /**
@@ -552,6 +611,15 @@ const meSecurity = createRoute({
   },
 });
 
+const mePreferences = createRoute({
+  getParentRoute: () => me,
+  path: '/preferences',
+  component: function MyPreferences() {
+    const { user, onSignOut } = rootRoute.useRouteContext();
+    return <MyPreferencesPage user={user} onSignOut={onSignOut} />;
+  },
+});
+
 // Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
 const accountSecurity = createRoute({
   getParentRoute: () => rootRoute,
@@ -712,6 +780,16 @@ const installHelp = createRoute({
   path: '/aide/installer',
   component: InstallPage,
 });
+/** /aide/extension (ADR 0067): the extension's guide, outside the rail like the phone's; the menu offers it to the team. */
+const extensionHelp = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/aide/extension',
+  component: function ExtensionHelp() {
+    const { user } = rootRoute.useRouteContext();
+    // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
+    return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
+  },
+});
 /** /notifications (CR-01): every role, from the account's menu; this device and the account's quiet hours. */
 const notifications = createRoute({
   getParentRoute: () => rootRoute,
@@ -721,19 +799,22 @@ const notifications = createRoute({
 
 const routeTree = rootRoute.addChildren([
   installHelp,
+  extensionHelp,
   notifications,
   dashboard,
   creators,
+  scriptStructures,
   train.addChildren([trainIndex, playground, corrections, tests]),
   tracking,
   trackingAlerts,
   today,
+  agenda,
   sales,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity]),
+  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,

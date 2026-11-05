@@ -3,6 +3,7 @@ import {
   CreatorIdSchema,
   ExtensionLinkIdSchema,
   newId,
+  SuggestionIdSchema,
   TeamMemberIdSchema,
   TrendReadingIdSchema,
   TrendSignalIdSchema,
@@ -262,14 +263,21 @@ describe('the trend watch’s tables (VEI-01): the agency’s, never the creator
     // Her « no » in her agenda reaches the idea by the agenda's event, written by a job; it carries no agency reason.
     const hersDeclined = idea();
     await withAdmin(test.admin.db, (tx) =>
-      tx.insert(s.contentIdeas).values({ ...hersDeclined, state: 'declined', decidedAt: new Date() }),
+      tx
+        .insert(s.contentIdeas)
+        .values({ ...hersDeclined, state: 'declined', decidedAt: new Date(), suggestionId: hersDeclined.id }),
     );
     expect(
       await failure(
         withAdmin(test.admin.db, (tx) =>
-          tx
-            .insert(s.contentIdeas)
-            .values(idea({ state: 'declined', decidedAt: new Date(), refusalReason: 'Non' })),
+          tx.insert(s.contentIdeas).values(
+            idea({
+              state: 'declined',
+              decidedAt: new Date(),
+              refusalReason: 'Non',
+              suggestionId: newId(SuggestionIdSchema),
+            }),
+          ),
         ),
       ),
     ).toMatch(/content_ideas_refusal_check/u);
@@ -328,5 +336,19 @@ describe('the trend watch’s tables (VEI-01): the agency’s, never the creator
     expect(
       await failure(withTenantMember(test.app.db, nora, owner, (tx) => tx.select().from(s.extensionLinks))),
     ).toMatch(/permission denied/u);
+  });
+
+  it('forces each of its tables under its policies, the table’s owner included (migration 0104)', async () => {
+    const result = await test.admin.db.execute(
+      sql`select relname, relrowsecurity, relforcerowsecurity from pg_class
+           where relname in ('trend_signals', 'trend_readings', 'content_ideas') order by relname`,
+    );
+    expect(result.rows).toEqual(
+      ['content_ideas', 'trend_readings', 'trend_signals'].map((relname) => ({
+        relname,
+        relrowsecurity: true,
+        relforcerowsecurity: true,
+      })),
+    );
   });
 });

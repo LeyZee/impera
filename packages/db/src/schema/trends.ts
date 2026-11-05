@@ -133,6 +133,11 @@ export const trendReadings = pgTable(
     soundId: text('sound_id'),
     dwellMs: integer('dwell_ms').notNull(),
     markedFor: uuid('marked_for_creator_id').references(() => creators.id),
+    /**
+     * How a marked post is made, as the vision read its captures (contracts `TrendCaptureDescriptionSchema`, VEI-01
+     * lot c2); the captures themselves are never kept. Null until described.
+     */
+    captureDescription: jsonb('capture_description'),
     firstSeenAt: timestampTz('first_seen_at').notNull(),
     seenAt: timestampTz('seen_at').notNull(),
     createdAt: createdAt(),
@@ -149,6 +154,10 @@ export const trendReadings = pgTable(
       .where(sql`${t.soundId} is not null`),
     check('trend_readings_sound_id_check', sql`${t.soundId} is null or ${t.soundId} ~ '^[0-9]{1,32}$'`),
     check('trend_readings_path_check', sql`${t.path} in ('post', 'reel')`),
+    check(
+      'trend_readings_capture_marked_check',
+      sql`${t.captureDescription} is null or (${t.markedFor} is not null and jsonb_typeof(${t.captureDescription}) = 'object')`,
+    ),
     check('trend_readings_code_check', sql`${t.postCode} ~ '^[A-Za-z0-9_-]{5,64}$'`),
     check(
       'trend_readings_account_check',
@@ -209,15 +218,27 @@ export const contentIdeas = pgTable(
     refusalReason: text('refusal_reason'),
     decidedBy: text('decided_by').references(() => user.id),
     decidedAt: timestampTz('decided_at'),
+    /**
+     * The suggestion it became in her agenda (VEI-01 d), of the same id: no foreign key, `creator_suggestions` being
+     * the agenda's and out of the trend watch's writes (ADR 0060).
+     */
+    suggestionId: uuid('suggestion_id'),
+    /** The content request born when she accepted it (VEI-01 d2), the agency's: no foreign key, for the same reason. */
+    requestId: uuid('request_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     enumCheck('content_ideas', t.category, DROP_CATEGORIES),
+    check(
+      'content_ideas_suggestion_check',
+      sql`(${t.suggestionId} is not null) = (${t.state} in ('suggested', 'declined', 'deposited'))`,
+    ),
+    check('content_ideas_request_check', sql`${t.requestId} is null or ${t.suggestionId} is not null`),
     enumCheck('content_ideas', t.state, CONTENT_IDEA_STATES),
     check(
       'content_ideas_texts_check',
-      sql`char_length(${t.title}) between 1 and 120 and char_length(${t.toShoot}) between 1 and 600 and char_length(${t.reason}) between 1 and 200`,
+      sql`char_length(${t.title}) between 1 and 80 and char_length(${t.toShoot}) between 1 and 600 and char_length(${t.reason}) between 1 and 200`,
     ),
     check('content_ideas_shoot_minutes_check', sql`${t.shootMinutes} between 1 and 600`),
     check(
@@ -238,9 +259,10 @@ export const contentIdeas = pgTable(
 );
 
 /**
- * The link between one person's extension and the server (VEI-01): a token drawn by the server, shown once, kept as its
- * SHA-256, revocable, for the readings only. One live link per account; a new one revokes the one before. Out of RLS
- * and out of `nirvana_app`'s reach (migration), like `calendar_links`: read through `withAdmin` only.
+ * The link between one browser's extension and the server (VEI-01): a token drawn by the server, shown once, kept as its
+ * SHA-256, revocable, for the readings only. A few live links per account, one per browser and named by its label
+ * (Chrome, Edge), at most `EXTENSION_LINKS_LIVE_MAX` (code, under the account's lock; migration 0104). Out of RLS and
+ * out of `nirvana_app`'s reach (migration 0100), like `calendar_links`: read through `withAdmin` only.
  */
 export const extensionLinks = pgTable(
   'extension_links',
@@ -251,13 +273,16 @@ export const extensionLinks = pgTable(
       .references(() => user.id),
     /** SHA-256 of the token, base64url. */
     tokenHash: text('token_hash').notNull().unique(),
+    /** The browser it was made for, as the person named it. */
+    label: text('label').notNull().default('Navigateur'),
     createdAt: createdAt(),
     lastUsedAt: timestampTz('last_used_at'),
     revokedAt: timestampTz('revoked_at'),
   },
   (t) => [
     check('extension_links_revoked_check', sql`${t.revokedAt} is null or ${t.revokedAt} >= ${t.createdAt}`),
-    uniqueIndex('extension_links_live_unique')
+    check('extension_links_label_check', sql`char_length(${t.label}) between 1 and 40`),
+    index('extension_links_live_idx')
       .on(t.userId)
       .where(sql`${t.revokedAt} is null`),
   ],

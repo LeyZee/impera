@@ -43,6 +43,8 @@ export interface HealthReport {
   /** Since her midnight (budget time zone), in USD as journaled. */
   readonly costTodayUsd: number;
   readonly budget: BudgetStatus;
+  /** The trend watch's spend against its own cap (ADR 0060 § 7): `reached` stops its jobs until midnight. */
+  readonly trendWatchBudget: BudgetStatus;
 }
 
 const HOUR_MS = 3_600_000;
@@ -131,6 +133,7 @@ export function computeHealth(
   log: LlmCallLog,
   now: Date,
   budget: BudgetStatus,
+  trendWatchBudget: BudgetStatus,
 ): HealthReport {
   const today = log.since(startOfLocalDay(now, config.dailyBudget.timeZone));
   const roles = (['voice', 'brain', 'sense', 'judge'] as const).map((role) =>
@@ -160,5 +163,6 @@ export function computeHealth(
     })),
     costTodayUsd: today.reduce((sum, r) => sum + (r.costUsd ?? 0), 0),
     budget,
+    trendWatchBudget,
   };
 }

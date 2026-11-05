@@ -1,18 +1,24 @@
 import { randomBytes } from 'node:crypto';
 
-import { err, MEDIA_VOCABULARY_VERSION, ok } from '@impera/contracts';
+import { err, MEDIA_VOCABULARY_VERSION, ok, type LlmPurpose } from '@impera/contracts';
 import { generateText, transcribe as transcribeAudio } from 'ai';
 
 import { budgetStatus, type BudgetStatus } from './budget';
 import type { LlmCallLog } from './call-log';
 import { classify, createCallRunner } from './call-runner';
-import { MODELS, TRANSCRIPTION_MODEL } from './catalog';
+import { acceptsInput, MODELS, TRANSCRIPTION_MODEL } from './catalog';
 import type { ProviderId } from './config';
 import { alertsBlock, describeBrief, notesBlock, toMessages } from './conversation-messages';
-import type { LlmGateway, LlmGatewayDeps, VideoKeyframes } from './gateway-types';
+import type { LlmFailure, LlmGateway, LlmGatewayDeps, VideoKeyframes } from './gateway-types';
 import { computeHealth } from './health';
 import { loadPrompt, renderPrompt } from './prompts';
-import { BriefSchema, JudgeOutputSchema, SenseOutputSchema, VoiceOutputSchema } from './schemas';
+import {
+  BriefSchema,
+  JudgeOutputSchema,
+  SenseOutputSchema,
+  TrendCapturesOutputSchema,
+  VoiceOutputSchema,
+} from './schemas';
 import { senseContent } from './sense-content';
 import { wrapUntrusted } from './untrusted';
 
@@ -26,6 +32,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     sense: loadPrompt('sense'),
   };
   const judgePrompt = prompts.judge ?? loadPrompt('judge');
+  const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
   const canary = deps.canary ?? `nv-${randomBytes(6).toString('hex')}`;
 
   const reportRefusal = (provider: ProviderId, status: 401 | 403): void => {
@@ -37,6 +44,11 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   };
   const capEur = (): number => deps.dailyCapEur?.() ?? deps.config.dailyBudget.capEur;
   const status = (): BudgetStatus => budgetStatus(deps.config.dailyBudget, capEur(), deps.log, now());
+  const trendWatchCapEur = (): number =>
+    deps.trendWatchCapEur?.() ?? deps.config.dailyBudget.trendWatchCapEur;
+  /** The trend watch's own spend, under its own cap; never announced (the agency reads it in amber, ADR 0060 § 7). */
+  const trendWatchStatus = (): BudgetStatus =>
+    budgetStatus(deps.config.dailyBudget, trendWatchCapEur(), deps.log, now(), 'trend_watch');
   const announced = new Set<string>();
   const announce = (current: BudgetStatus): void => {
     const kinds =
@@ -64,10 +76,14 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     },
     since: (from) => deps.log.since(from),
   };
-  const isOverBudget = (): boolean => {
+  /** The daily cap stops every call; the watch's cap, only the watch's (a fan's answer never waits on it). */
+  const overBudget = (purpose: LlmPurpose | undefined): LlmFailure['code'] | undefined => {
     const current = status();
     announce(current);
-    return current.state === 'reached';
+    if (current.state === 'reached') return 'budget_reached';
+    if (purpose === 'trend_watch' && trendWatchStatus().state === 'reached')
+      return 'trend_watch_budget_reached';
+    return undefined;
   };
   const run = createCallRunner({
     config: deps.config,
@@ -76,7 +92,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     now,
     canary,
     reportRefusal,
-    isOverBudget,
+    overBudget,
     ...(deps.sleep !== undefined && { sleep: deps.sleep }),
   });
 
@@ -177,7 +193,8 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const model = deps.resolveTranscriber?.();
       if (model === undefined)
         return err({ code: 'all_models_failed', attempts: [{ ...ref, outcome: 'missing_key' }] });
-      if (isOverBudget()) return err({ code: 'budget_reached', attempts: [] });
+      const refusedBy = overBudget(audio.trace?.purpose);
+      if (refusedBy !== undefined) return err({ code: refusedBy, attempts: [] });
       const startedAt = now().getTime();
       const base = {
         role: 'sense',
@@ -218,8 +235,42 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       }
     },
 
+    describeTrendCaptures(input) {
+      const system = renderPrompt(trendCapturesPrompt, { canary });
+      const intro =
+        input.durationS === null
+          ? `${String(input.captures.length)} capture(s) d'un post, photo ou carrousel.`
+          : `${String(input.captures.length)} capture(s) d'une vidéo de ${String(Math.round(input.durationS))} s.`;
+      return run(
+        'sense',
+        trendCapturesPrompt,
+        system,
+        (ref) =>
+          Promise.resolve(
+            // A model that reads no image is skipped for the fallback.
+            acceptsInput(ref, 'image')
+              ? [
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: intro },
+                      ...input.captures.map((capture) => ({
+                        type: 'file' as const,
+                        data: capture.data,
+                        mediaType: capture.mediaType,
+                      })),
+                    ],
+                  },
+                ]
+              : undefined,
+          ),
+        TrendCapturesOutputSchema,
+        { ...input.trace, purpose: 'trend_watch' },
+      );
+    },
+
     health() {
-      return computeHealth(deps.config, deps.credentials, deps.log, now(), status());
+      return computeHealth(deps.config, deps.credentials, deps.log, now(), status(), trendWatchStatus());
     },
 
     async testConnection(provider) {

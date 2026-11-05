@@ -9,7 +9,7 @@ import type { JSX } from 'react';
 import { rateText } from '@/payroll/model';
 import { amountText, followingPeriod, percentText, periodLine, signedAmountText } from '@/reports/model';
 import { dayMonth } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 /**
  * The first validation of a period closes it for the whole team (ADR 0032): said before, with what it freezes — the

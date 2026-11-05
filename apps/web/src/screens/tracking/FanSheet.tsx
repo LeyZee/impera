@@ -6,6 +6,7 @@ import { FanLimits, useFanFlags } from './FanLimits';
 import { FanToLearn, useFanKyc } from './FanToLearn';
 import { FanFlagsRefused } from './api';
 import { sheetSummary, type SheetFacts } from './flags-model';
+import { DESIRE_BAND_EMOJIS } from './view';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
 
@@ -34,7 +35,12 @@ export function FanSheet({
       flags.data?.flags ??
       (flags.error instanceof FanFlagsRefused ? 'refused' : flags.isError ? 'down' : 'loading'),
     toLearn: canDecide ? (kyc.data?.length ?? null) : null,
-    band: desire === null ? null : DESIRE_BAND_LABELS[desire.band],
+    band:
+      desire === null
+        ? null
+        : desire.band === 'neutral'
+          ? DESIRE_BAND_LABELS[desire.band]
+          : `${DESIRE_BAND_LABELS[desire.band]} ${DESIRE_BAND_EMOJIS[desire.band]}`,
   };
   const summary = sheetSummary(facts);
   return (

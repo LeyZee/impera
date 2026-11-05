@@ -34,8 +34,14 @@ const MODULE_DEPENDENCIES = {
   invoicing: ['payroll', 'contractors'],
   accounting: ['payroll', 'invoicing', 'contractors'],
   notifications: [],
-  // ADR 0060: the trend watch reads her limits as the agent's guards do (`touchesTerm`).
-  trends: ['agent'],
+  // ADR 0060: the trend watch reads her limits as the agent's guards do (`touchesTerm`), and a validated idea enters her
+  // agenda through the agenda's own door (`suggestShoot`, VEI-01 d1), and the shoot she accepts asks its content
+  // through the drops' door (`requestFromIdea`, d2), never by writing their tables.
+  trends: ['agent', 'content-drops', 'creator-tasks'],
+  // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
+  'creator-tasks': ['scheduling'],
+  // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
+  'content-drops': [],
 };
 
 const moduleNames = Object.keys(MODULE_DEPENDENCIES);
@@ -115,6 +121,15 @@ const moduleRules = moduleNames.flatMap((name) => {
 
 /** External (npm) and core (node:) modules a given element may not import. */
 const external = (...sources) => ({ module: { origin: ['external', 'core'], source: sources } });
+
+/**
+ * The rule `react/jsx-no-comment-textnodes`, without its plugin: a line comment or a block comment written as JSX
+ * text is shown on the screen, not read as a comment (seen on #486). `scripts/eslint-config.test.mjs` checks it.
+ */
+const JSX_COMMENT_TEXT = {
+  selector: 'JSXText[value=/(^|\\n)\\s*\\/[\\/*]/]',
+  message: 'A comment written as JSX text is displayed: wrap it in braces, {/* … */}.',
+};
 
 export default tseslint.config(
   {
@@ -283,6 +298,7 @@ export default tseslint.config(
           selector: 'TSEnumDeclaration',
           message: 'Use literal unions and Zod schemas instead of enums (coding.md).',
         },
+        JSX_COMMENT_TEXT,
       ],
     },
   },
@@ -308,4 +324,4 @@ export default tseslint.config(
   prettier,
 );
 
-export { MODULE_DEPENDENCIES, moduleNames };
+export { JSX_COMMENT_TEXT, MODULE_DEPENDENCIES, moduleNames };

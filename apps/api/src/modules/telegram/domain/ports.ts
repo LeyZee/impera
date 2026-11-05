@@ -87,6 +87,12 @@ export interface ThreadRoot {
   readonly closedBy: string | null;
 }
 
+interface LatestOfThread {
+  readonly sourceKey: string;
+  readonly action: DeliveryAction;
+  readonly createdAt: Date;
+}
+
 export interface CreatorRecord {
   readonly id: CreatorId;
   readonly displayName: string;
@@ -196,6 +202,8 @@ export interface DeliveriesStore {
   ): Promise<{ readonly events: readonly ScannedEvent[]; readonly lastReadAt: Date | null }>;
   /** The sent or pending root messages of a thread, one per group. */
   threadRoots(threadKey: string): Promise<readonly ThreadRoot[]>;
+  /** The latest delivery of a thread, every group and action together (P3-12's reminder); null when it has none. */
+  latestOfThread(threadKey: string): Promise<LatestOfThread | null>;
   /** Inserts (a replayed source adds nothing), moves the cursor and enqueues each touched group, in one transaction. */
   applyScan(batch: ScanBatch): Promise<void>;
   /** Inserts and enqueues one delivery outside a scan (test message, digest). False if its source was already there. */

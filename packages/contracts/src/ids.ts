@@ -208,3 +208,27 @@ export type ExtensionLinkId = z.infer<typeof ExtensionLinkIdSchema>;
 /** A watch session of the extension, drawn by the extension when someone turns « Veille » on (ADR 0060 § 2). */
 export const WatchSessionIdSchema = uuid.brand<'WatchSessionId'>();
 export type WatchSessionId = z.infer<typeof WatchSessionIdSchema>;
+
+/** A task of her agenda (`creator_tasks`, CR-05): timed, of a day, or of her routine. */
+export const CreatorTaskIdSchema = uuid.brand<'CreatorTaskId'>();
+export type CreatorTaskId = z.infer<typeof CreatorTaskIdSchema>;
+
+/** A dispo she opens to the agency (`creator_availabilities`, CR-05). */
+export const AvailabilityIdSchema = uuid.brand<'AvailabilityId'>();
+export type AvailabilityId = z.infer<typeof AvailabilityIdSchema>;
+
+/** A suggestion of the agency or the AI for her agenda (`creator_suggestions`, CR-05, ADR 0042 § 3). */
+export const SuggestionIdSchema = uuid.brand<'SuggestionId'>();
+export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
+
+/** A drop of hers (`content_drops`, CR-06, ADR 0044 § 1 and ADR 0055): drawn by her phone, so that a replay adds nothing. */
+export const ContentDropIdSchema = uuid.brand<'ContentDropId'>();
+export type ContentDropId = z.infer<typeof ContentDropIdSchema>;
+
+/** One file of a drop (`content_drop_files`), drawn by her phone with the drop. */
+export const ContentDropFileIdSchema = uuid.brand<'ContentDropFileId'>();
+export type ContentDropFileId = z.infer<typeof ContentDropFileIdSchema>;
+
+/** What the agency asks of her (`content_requests`, ADR 0055 § 4). */
+export const ContentRequestIdSchema = uuid.brand<'ContentRequestId'>();
+export type ContentRequestId = z.infer<typeof ContentRequestIdSchema>;

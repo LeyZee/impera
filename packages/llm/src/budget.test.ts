@@ -28,6 +28,22 @@ describe('daily budget', () => {
     expect(status.spentEur).toBeCloseTo(0.05 / dailyBudget.usdPerEur);
   });
 
+  it('sums one purpose apart, and every call for the daily cap', () => {
+    const log = createInMemoryCallLog();
+    log.append(call('2026-10-17T08:00:00Z', 0.11));
+    log.append({ ...call('2026-10-17T09:00:00Z', 0.22), purpose: 'trend_watch' });
+    log.append({ ...call('2026-10-17T10:00:00Z', 0.33), purpose: 'chatting' });
+    const { dailyBudget } = DEFAULT_LLM_CONFIG;
+    const at = new Date('2026-10-17T20:00:00Z');
+    expect(budgetStatus(dailyBudget, 20, log, at).spentEur).toBeCloseTo(0.66 / dailyBudget.usdPerEur);
+    expect(budgetStatus(dailyBudget, 1, log, at, 'trend_watch').spentEur).toBeCloseTo(
+      0.22 / dailyBudget.usdPerEur,
+    );
+    expect(budgetStatus(dailyBudget, 20, log, at, 'chatting').spentEur).toBeCloseTo(
+      0.44 / dailyBudget.usdPerEur,
+    );
+  });
+
   it('starts the day at midnight in Paris, including the day the clocks go back', () => {
     expect(startOfLocalDay(new Date('2026-10-17T20:05:00Z'), 'Europe/Paris').toISOString()).toBe(
       '2026-10-16T22:00:00.000Z',

@@ -2,6 +2,7 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import { salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
+import type { CreatorTasksModule } from '../modules/creator-tasks';
 import { enqueuePayRecalculation } from '../modules/payroll';
 import type { PersonaModule } from '../modules/persona';
 import { createSchedulingModule, type SchedulingModule } from '../modules/scheduling';
@@ -14,7 +15,10 @@ export interface WiredScheduling {
   readonly routes: readonly Routes[];
 }
 
-export function wireScheduling(shared: Shared, deps: { readonly persona: PersonaModule }): WiredScheduling {
+export function wireScheduling(
+  shared: Shared,
+  deps: { readonly persona: PersonaModule; readonly creatorTasks: CreatorTasksModule },
+): WiredScheduling {
   const { db, adminDb, logger, requireRole } = shared;
   const module = createSchedulingModule({
     db,
@@ -26,6 +30,8 @@ export function wireScheduling(shared: Shared, deps: { readonly persona: Persona
     switchFactsOf: salesFeedSwitchReads.switchFactsOf,
     // The agency percentages' check reads the register's totals, the one rule of CRM-04 (lot d3).
     salesTotalsOf: salesFeedTotals.totalsOf,
+    // A creator's calendar link shows her agenda (CR-05 lot c2, ADR 0042 § 4), read by her agenda's own module.
+    creatorAgendaFeed: deps.creatorTasks.feedOf,
   });
   return {
     module,

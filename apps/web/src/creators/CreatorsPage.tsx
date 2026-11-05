@@ -1,15 +1,16 @@
 import type { CreatorId } from '@impera/contracts';
-import { useBlocker, useRouteContext } from '@tanstack/react-router';
+import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
+import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
 import { PersonaSection } from './persona/PersonaSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
-import { creatorsSearch, type CreatorSheet } from './search';
+import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 
@@ -17,9 +18,9 @@ export type CreatorTab = CreatorSheet;
 
 /**
  * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
- * not to the settings), then for the owner alone her hours (P3-14), her access to her own space (CR-02) and the
- * agency's percentage (CR-04). With several creators, a row of chips picks one; with one, her name is enough. The
- * owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
+ * not to the settings), then for the owner and an active manager her agenda (CR-05 lot c), and for the owner alone
+ * her hours (P3-14), her access to her own space (CR-02) and the agency's percentage (CR-04). With several creators,
+ * a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
  * not saved are never lost silently: leaving asks first.
  */
 export function CreatorsPage({
@@ -53,8 +54,9 @@ export function CreatorsPage({
   const showForm = isOwner && (adding || (query.isSuccess && creators.length === 0));
   const current = creators.find((creator) => creator.id === creatorId) ?? creators[0];
   const selected = current?.id ?? null;
-  // The router keeps anyone but the owner off the hours, the access and the percentage; here they also need a creator.
-  const shown: CreatorTab = isOwner && current !== undefined ? tab : 'persona';
+  // The router keeps each member to their sheets (`sheetsFor`); here they also need a creator.
+  const sheets = sheetsFor(user);
+  const shown: CreatorTab = current !== undefined && sheets.includes(tab) ? tab : (sheets[0] ?? 'persona');
 
   const leaving = blocker.status === 'blocked' || pending !== null;
   const stay = (): void => {
@@ -130,6 +132,16 @@ export function CreatorsPage({
         </section>
       );
     }
+    if (shown === 'agenda' && current !== undefined) {
+      return (
+        <AgendaSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          timezone={current.timezone}
+        />
+      );
+    }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
@@ -162,9 +174,18 @@ export function CreatorsPage({
       />
     );
   };
-  // Persona · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every section's
-  // sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
-  const switchShown = isOwner && current !== undefined && !showForm && query.isSuccess;
+  // Persona · Agenda · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every
+  // section's sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
+  const switchShown = sheets.length > 1 && current !== undefined && !showForm && query.isSuccess;
+  const labels: Readonly<Record<CreatorSheet, string>> = {
+    persona: 'Persona',
+    agenda: 'Agenda',
+    hours: 'Heures d’activité',
+    access: 'Accès',
+    rate: 'Pourcentage',
+  };
+  // Her agenda right after her persona: the sheet a manager opens most (CR-05 lot c).
+  const order: readonly CreatorSheet[] = ['persona', 'agenda', 'hours', 'access', 'rate'];
 
   return (
     <Page>
@@ -173,40 +194,24 @@ export function CreatorsPage({
         title="Créatrices"
         lead={
           isOwner
-            ? 'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.'
-            : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
+            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès et le pourcentage de l’agence.'
+            : sheets.includes('agenda')
+              ? 'L’agenda de chaque créatrice : ce qu’elle a prévu, et les tâches que l’agence lui propose.'
+              : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={
           <>
             {switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"
-                items={[
-                  {
+                items={order
+                  .filter((sheet) => sheets.includes(sheet))
+                  .map((sheet) => ({
                     to: '/creatrices',
-                    search: creatorsSearch('persona', selected),
-                    current: shown === 'persona',
-                    label: 'Persona',
-                  },
-                  {
-                    to: '/creatrices',
-                    search: creatorsSearch('hours', selected),
-                    current: shown === 'hours',
-                    label: 'Heures d’activité',
-                  },
-                  {
-                    to: '/creatrices',
-                    search: creatorsSearch('access', selected),
-                    current: shown === 'access',
-                    label: 'Accès',
-                  },
-                  {
-                    to: '/creatrices',
-                    search: creatorsSearch('rate', selected),
-                    current: shown === 'rate',
-                    label: 'Pourcentage',
-                  },
-                ]}
+                    search: creatorsSearch(sheet, selected),
+                    current: shown === sheet,
+                    label: labels[sheet],
+                  }))}
               />
             ) : null}
             {/* While a creator is added, only « Annuler » leads back: a chip would change nothing on screen. */}
@@ -227,6 +232,12 @@ export function CreatorsPage({
                   </button>
                 ))}
               </div>
+            ) : null}
+            {isOwner && !showForm && query.isSuccess ? (
+              // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
+              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
+                Structures de script
+              </Link>
             ) : null}
             {isOwner && !showForm && query.isSuccess ? (
               <button
