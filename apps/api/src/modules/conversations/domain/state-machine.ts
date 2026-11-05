@@ -22,7 +22,8 @@ export type ConversationCommand =
 type Transitions = Readonly<Partial<Record<ConversationState, ConversationState>>>;
 
 const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
-  // A fan writes: the bot has something to answer, unless a human holds the conversation or it is stuck.
+  // A fan writes: the bot has something to answer, unless a human holds the conversation or it is paused. After a
+  // send that failed for good, his new message gets a new draft; the failure stays in sight (recette CHAT-12).
   receive_inbound: {
     idle: 'pending',
     pending: 'pending',
@@ -31,7 +32,7 @@ const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
     sending: 'pending',
     human: 'human',
     paused: 'paused',
-    error: 'error',
+    error: 'pending',
   },
   // From `idle` too: a follow-up to a fan who went silent after her answer (P3-10).
   create_draft: { pending: 'awaiting_approval', idle: 'awaiting_approval' },

@@ -5,6 +5,7 @@ import {
   EventIdSchema,
   MediaAssetIdSchema,
   MeSchema,
+  MessageIdSchema,
   CreatorIdSchema,
   MessageViewSchema,
   newId,
@@ -199,7 +200,7 @@ describe('/v1/conversations', () => {
     expect(rejected.json()).toMatchObject({ error: { code: 'draft_conflict' } });
   });
 
-  it('shows, in error, the draft whose send failed for good, until the conversation leaves the error', async () => {
+  it('shows the draft whose send failed for good, and answers him again when he writes (CHAT-12)', async () => {
     const id = conversationIds[0]!;
     const read = async () =>
       ConversationDetailSchema.parse(
@@ -222,6 +223,58 @@ describe('/v1/conversations', () => {
       status: 'failed',
       finalBubbles: ['Coucou Julien'],
     });
+
+    // He writes again: a new draft is on its way, and what did not leave stays in sight (recette CHAT-12).
+    const [account] = await test.admin.db
+      .select({ id: schema.platformAccounts.id })
+      .from(schema.platformAccounts)
+      .where(eq(schema.platformAccounts.creatorId, creatorId));
+    await app.modules.conversations.ingestMessage({
+      creatorId,
+      platformAccountId: PlatformAccountIdSchema.parse(account?.id),
+      platformConversationId: 'c-Julien',
+      platformFanId: 'f-Julien',
+      fanDisplayName: 'Julien',
+      message: {
+        ref: { platform: 'reveal', id: 'm-Julien-again' },
+        conversationRef: { platform: 'reveal', id: 'c-Julien' },
+        direction: 'inbound',
+        text: 'Tu me réponds ou pas ?',
+        media: [],
+        priceMinor: null,
+        currency: null,
+        isPaid: false,
+        createdAt: new Date().toISOString(),
+      },
+      correlationId: 'again',
+    });
+    const again = await read();
+    expect(again.state).toBe('pending');
+    expect(again.failedDraft).toMatchObject({ id: draftId, status: 'failed' });
+    const queued = await test.admin.db.execute<{ key: string }>(
+      sql`select key from graphile_worker._private_jobs where key = ${`conversation.respond:${id}`}`,
+    );
+    expect(queued.rows).toHaveLength(1);
+
+    // A partial send: its own first bubble that left is not « something after it », the rest still did not leave.
+    const outbound = (draft: string | null, platformMessageId: string) =>
+      test.admin.db.insert(schema.messages).values({
+        id: newId(MessageIdSchema),
+        creatorId,
+        platformAccountId: PlatformAccountIdSchema.parse(account?.id),
+        conversationId: id,
+        platformMessageId,
+        direction: 'outbound',
+        author: draft === null ? 'human' : 'ai',
+        text: 'Coucou',
+        platformCreatedAt: new Date(),
+        draftId: draft,
+      });
+    await outbound(draftId, 'm-Julien-partial');
+    expect((await read()).failedDraft).toMatchObject({ id: draftId });
+    // Someone answered him in Reveal since: what failed is behind.
+    await outbound(null, 'm-Julien-by-hand');
+    expect((await read()).failedDraft).toBeNull();
 
     const takeover = await call(
       'POST',

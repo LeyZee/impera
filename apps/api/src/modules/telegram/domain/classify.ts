@@ -61,6 +61,7 @@ export const SCANNED_EVENT_TYPES = [
   'sales_feed_mismatch',
   'connection_state_changed',
   'agency_share_mismatch',
+  'sales_feed_signal',
 ] as const;
 
 const URGENT_CAUSES: ReadonlySet<HandoffCause> = new Set([
@@ -694,6 +695,19 @@ export function classify(
         title: 'Important',
         body: `Ventes ${PLATFORM_NAMES[signal.platform]} : la vérification de ${periodText(signal.from)} ne concorde plus avec les statistiques de ${PLATFORM_NAMES[signal.platform]}, sur ${countText(signal.days, 'jour', 'jours')} et ${countText(signal.accounts, 'compte', 'comptes')}. La paie lit toujours le net de ${PLATFORM_NAMES[signal.platform]} : vérifie avant de clôturer.`,
         link: { label: 'Ouvrir la vérification', path: '/reglages/ventes' },
+      };
+    // Important (ADR 0069 § 5): nothing is deleted, the owner looks. No name, no id: a group may hold managers.
+    case 'sales_feed_model':
+      return {
+        kind: 'notice',
+        topic: 'important',
+        threadKey: `sales_feed_model:${signal.platform}:${signal.platformModelId}:${signal.change}`,
+        title: 'Important',
+        body:
+          signal.change === 'gone'
+            ? `Ventes ${PLATFORM_NAMES[signal.platform]} : une créatrice reliée n’apparaît plus dans la liste des modèles de ${PLATFORM_NAMES[signal.platform]}. Rien n’est supprimé : regarde sa fiche et ses ventes.`
+            : `Ventes ${PLATFORM_NAMES[signal.platform]} : une créatrice reliée est marquée bannie par ${PLATFORM_NAMES[signal.platform]}. Rien n’est supprimé : regarde sa fiche et ses ventes.`,
+        link: { label: 'Ouvrir Ventes', path: '/reglages/ventes' },
       };
     // Urgent (ADR 0046 § 8), with the important groups for a fallback: an agency without an urgent group still hears.
     // Important to the groups for all (CRM-04 d3, ADR 0054 § 2): a group may hold managers, so no amount, no

@@ -175,6 +175,16 @@ export type Signal =
     }
   | {
       /**
+       * A model linked to one of her accounts is gone from the platform's list, or listed `banned` (ADR 0069 § 5,
+       * CRM-07 a2): nothing is deleted. Never her name nor the model's id: a group may hold managers.
+       */
+      readonly kind: 'sales_feed_model';
+      readonly platform: Platform;
+      readonly change: 'gone' | 'banned';
+      readonly platformModelId: string;
+    }
+  | {
+      /**
        * After a switch to the platform's net (CRM-04 b3): a fortnight's automatic check still finds the register and
        * the platform's statistics apart, 24 hours later. Only how many days and accounts: never an amount.
        */

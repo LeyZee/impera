@@ -434,6 +434,19 @@ describe('reading the outbox', () => {
       days: 2,
       accounts: 2,
     });
+    // CRM-07 a2: a linked model gone or banned is told, by her id only; the other signals stay in Réglages.
+    const salesSignal = (signal: object) =>
+      toScannedEvent({ ...base, type: 'sales_feed_signal', payload: { platform: 'reveal', signal } })?.signal;
+    expect(salesSignal({ kind: 'model_gone', platformModelId: 'model_test_01' })).toEqual({
+      kind: 'sales_feed_model',
+      platform: 'reveal',
+      change: 'gone',
+      platformModelId: 'model_test_01',
+    });
+    expect(salesSignal({ kind: 'model_banned', platformModelId: 'model_test_01' })).toMatchObject({
+      change: 'banned',
+    });
+    expect(salesSignal({ kind: 'model_unlinked', platformModelId: 'model_test_01' })).toBeUndefined();
     const since = '2026-11-03T10:00:00.000Z';
     expect(
       toScannedEvent({

@@ -17,6 +17,7 @@ export const CRM_SECTIONS = [
   '/planning',
   '/commissions',
   '/ventes',
+  '/contenu',
   '/equipe',
   '/paie',
   '/creatrices',
@@ -35,6 +36,7 @@ export const CRM_SECTION_LABELS: Readonly<Record<CrmSection, string>> = {
   '/planning': 'Planning',
   '/commissions': 'Commissions',
   '/ventes': 'Ventes',
+  '/contenu': 'Contenu',
   '/equipe': 'Équipe',
   '/paie': 'Paie',
   '/creatrices': 'Créatrices',
@@ -114,17 +116,18 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
     phone: ['/', '/suivi', '/creatrices'],
     shortcuts: ['/', '/suivi', '/creatrices'],
   },
-  // Contenu (CR-06) joins it with its screen; Agenda holds her tasks and dispos (CR-05); Ventes her fans first, then
-  // her earnings and her sales (CR-04); her persona lives in Moi.
+  // Agenda holds her tasks and dispos (CR-05); Ventes her fans first, then her earnings and her sales (CR-04); Contenu
+  // what she is asked for and what she drops (CR-06 d, ADR 0055 § 8); her persona lives in Moi. Five: all on the bar.
   creator: {
     sections: [
       ['/aujourdhui', null],
       ['/agenda', null],
       ['/ventes', null],
+      ['/contenu', null],
       ['/moi', null],
     ],
     settings: false,
-    phone: ['/aujourdhui', '/agenda', '/ventes', '/moi'],
+    phone: ['/aujourdhui', '/agenda', '/ventes', '/contenu', '/moi'],
     shortcuts: ['/aujourdhui', '/agenda', '/ventes', '/moi'],
   },
 };
