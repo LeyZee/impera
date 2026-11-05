@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRef, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { followedOf, useFollowedCreatorId } from '@/agent/followed';
+import { ChipFace } from '@/creators/CreatorFace';
 import { useCreators } from '@/creators/api';
 import { todosAcrossQuery } from '@/screens/tracking/api';
 
@@ -67,6 +68,7 @@ export function CreatorPicker(): JSX.Element | null {
                   : `${creator.displayName}, ${grave === 1 ? 'une urgence' : `${String(grave)} urgences`}`
               }
             >
+              <ChipFace creator={creator} />
               {creator.displayName}
               {grave === 0 ? null : (
                 <span className="db-creators__grave nv-num" aria-hidden="true">
