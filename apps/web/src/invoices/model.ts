@@ -9,7 +9,7 @@ import {
 import type { InvoiceRefusal } from './api';
 
 import { dayMonthText, momentAt, type PayChip } from '@/payroll/model';
-import { periodTitle } from '@/reports/model';
+import { periodLine } from '@/reports/model';
 import { addDays, fullDay } from '@/scheduling/time';
 
 /**
@@ -157,7 +157,7 @@ export function dueText(item: Pick<InvoiceListItem, 'kind' | 'settlement' | 'due
  */
 export function periodText(item: Pick<InvoiceListItem, 'kind' | 'corrective' | 'period'>): string {
   const corrects = item.kind === 'credit_note' || item.corrective;
-  return `${corrects ? 'corrige la quinzaine du' : 'quinzaine du'} ${periodTitle(item.period)}`;
+  return `${corrects ? 'corrige la quinzaine' : 'quinzaine'} ${periodLine(item.period, true)}`;
 }
 
 /** The answer still open to the contractor, with the moment its delay ends; `null` once answered. */

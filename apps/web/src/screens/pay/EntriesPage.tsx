@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { EntryForm, type EntryAdded } from './EntryForm';
 import { PayNav } from './PayNav';
-import { useCurrentPeriod, usePayNames, type PayMember } from './data';
+import { useAgencySettingsDown, useCurrentPeriod, usePayNames, type PayMember } from './data';
 import { Chip, Empty, Loading, PeriodArrows, PeriodHeading, Swatch, Unreachable } from './parts';
 
 import {
@@ -50,6 +50,7 @@ export function EntriesPage({
   onPeriod: (period: PayPeriod | null) => void;
 }): JSX.Element {
   const current = useCurrentPeriod();
+  const down = useAgencySettingsDown();
   const period = chosen ?? current;
   const me = { id: user.id, name: user.name };
   const entries = usePayEntries(period);
@@ -122,7 +123,9 @@ export function EntriesPage({
       {head}
       <div className="py-board">
         <Panel className="nv-enter" eyebrow="Saisies">
-          {period === null || (data === undefined && !entries.isError) ? (
+          {period === null && down !== null ? (
+            <Unreachable what="la quinzaine en cours" onRetry={down} />
+          ) : period === null || (data === undefined && !entries.isError) ? (
             <Loading />
           ) : data === undefined ? (
             <Unreachable

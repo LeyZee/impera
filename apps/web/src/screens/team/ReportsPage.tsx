@@ -909,6 +909,8 @@ function MemberPeriod({
     fold.current.querySelector('summary')?.focus();
   }, [focused]);
   const name = member?.displayName ?? 'Un membre';
+  // Gone from the team: his period is his last, which the badge says beside his name (recette EQP-17).
+  const left = member !== undefined && nudging.to(member.id).kind === 'gone';
   const missing = lines.filter((line) => line.report === null).length;
   const sums = periodSums(reports);
   const waiting = reports.filter((one) => one.status === 'submitted').length;
@@ -929,6 +931,7 @@ function MemberPeriod({
       <summary>
         <span className="sc-swatch" style={swatchOf(member)} aria-hidden="true" />
         <span className="nv-disclosure__title">{name}</span>
+        {left ? <span className="rp-chip rp-chip--neutral">Parti</span> : null}
         <span className="nv-disclosure__sum">
           {summary}
           {missing === 0 ? null : (

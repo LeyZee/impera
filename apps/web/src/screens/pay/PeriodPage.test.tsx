@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { HeldSale, Me, PayrollPeriod } from '@impera/contracts';
+import type { HeldSale, Me, PayrollPeriod, TeamMember } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -65,6 +65,9 @@ let answer: (path: string) => { status: number; body: unknown };
 const writes: { path: string; body: unknown }[] = [];
 /** When set, a period is answered only once it resolves: a read the screen waits on. */
 let gate: Promise<void> | null;
+/** The agency's settings answer a server error (recette EQP-05). */
+let settingsDown: boolean;
+let team: readonly TeamMember[];
 
 function serve(): void {
   vi.stubGlobal(
@@ -96,6 +99,7 @@ function serve(): void {
       }
       switch (url.pathname) {
         case '/v1/scheduling/settings':
+          if (settingsDown) return json({ error: { code: 'internal', message: 'down' } }, 500);
           return json(SCHEDULING_SETTINGS);
         case '/v1/payroll/periods':
           return json({
@@ -106,7 +110,7 @@ function serve(): void {
             nextCursor: null,
           });
         case '/v1/team/members':
-          return json({ members: MEMBERS });
+          return json({ members: team });
         case '/v1/team/pay-rules':
           return json(rules);
         case '/v1/payroll/exchange-rates':
@@ -217,6 +221,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-02T09:00:00Z'));
   writes.length = 0;
   gate = null;
+  settingsDown = false;
+  team = MEMBERS;
   reports = [];
   held = {};
   rules = PAY_RULES;
@@ -267,6 +273,8 @@ describe('Paie › Quinzaine', () => {
     // No change against the period before on a row: the statement says it, with what it compares to.
     expect(row('Théo').querySelector('.nv-delta')).toBeNull();
     expect(screen.getByText(/Le premier relevé validé clôt la quinzaine pour toute l’équipe/u)).toBeTruthy();
+    // Ended since the day after its last one, at 0 h: never « le samedi 31 octobre à minuit » (recette EQP-13).
+    expect(screen.getByText('depuis le dimanche 1er novembre à 0 h')).toBeTruthy();
   });
 
   it('counts a draft under zero apart from one under the minimum, with the words of their chips', async () => {
@@ -382,6 +390,9 @@ describe('Paie › Quinzaine', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(text(dialog)).toContain('Clore la quinzaine du 16 au 31 octobre ?');
+    // Every statement at once: one amount to pay, the team's.
+    expect(text(dialog.querySelector('.py-lines__pay'))).toBe('À verser342,50 €');
+    expect(text(dialog)).not.toContain('pour l’équipe');
     expect(text(dialog)).toContain(
       'Un rapport validé après la clôture ira sur la quinzaine du 1er au 15 novembre',
     );
@@ -413,6 +424,31 @@ describe('Paie › Quinzaine', () => {
     const said = text(screen.getAllByRole('alert').find((one) => one.classList.contains('rp-island')));
     expect(said).toContain('3 validés, 1 non validé');
     expect(said).toContain('Basile : Ce relevé a changé depuis que tu l’as ouvert.');
+  });
+
+  it('says « Parti » beside a member who left the team, and of no one else (recette EQP-17)', async () => {
+    team = MEMBERS.map((one): TeamMember => (one.id === LOU.id ? { ...one, status: 'left' } : one));
+    renderPage(OWNER);
+    await screen.findByRole('button', { name: 'Lou' });
+    expect(await within(row('Lou')).findByText('Parti')).toBeTruthy();
+    expect(within(row('Lou')).getByText('Parti').className).toBe('rp-chip rp-chip--neutral');
+    expect(within(row('Théo')).queryByText('Parti')).toBeNull();
+  });
+
+  it('says what one statement pays apart from the whole team, when it alone closes the period (recette EQP-16)', async () => {
+    renderPage(OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: 'Basile' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Valider ce relevé' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: /^Clore la quinzaine/u });
+    expect(text(dialog)).toContain('Tu valides un relevé : il clôt la quinzaine pour toute l’équipe.');
+    const lines = [...dialog.querySelectorAll('.py-lines > div')].map((one) => text(one));
+    expect(lines.slice(-2)).toEqual([
+      'À verser pour l’équipetous les relevés de la quinzaine342,50 €',
+      'Ce relevéce que tu valides maintenant21,25 €',
+    ]);
+    expect(within(dialog).getByRole('button', { name: 'Clore et valider le relevé' })).toBeTruthy();
   });
 
   it('says what blocks the period, and offers nothing to validate meanwhile, the manager’s own row locked', async () => {
@@ -656,8 +692,20 @@ describe('Paie › Quinzaine', () => {
     expect(text(within(dialog).getByText('Règles et calcul').nextElementSibling)).toMatch(
       /^révision 3 · calculé /u,
     );
-    // The change against the period before is said with what it compares to.
-    expect(text(dialog)).toContain('vs 1er – 15 octobre');
+    // The change against the period before is said in French, with what it compares to (recette EQP-13):
+    // Basile had no statement then, which « nouveau » says.
+    expect(text(within(dialog).getByText(/^net /u))).toBe(
+      'net 85,00 € nouveau : rien sur la quinzaine du 1er au 15 octobre',
+    );
+    fireEvent.click(within(dialog).getByText('Fermer', { selector: '.py-dialog__foot button' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Théo' }));
+    dialog = await screen.findByRole('dialog');
+    expect(text(within(dialog).getByText(/^net /u))).toMatch(
+      /^net .+ € [+−]\d+ % par rapport à la quinzaine du 1er au 15 octobre$/u,
+    );
     fireEvent.click(within(dialog).getByText('Fermer', { selector: '.py-dialog__foot button' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -810,6 +858,20 @@ describe('Paie › Quinzaine', () => {
     const dialog = await screen.findByRole('dialog');
     expect(text(dialog)).toContain('le membre n’a pas encore accepté son mandat de facturation.');
     expect(within(dialog).getByRole('link', { name: 'Ouvrir son dossier' })).toBeTruthy();
+  });
+
+  it('says the server does not answer when the agency’s settings cannot be read, and reads them again (recette EQP-05)', async () => {
+    settingsDown = true;
+    renderPage(OWNER);
+    const said = await screen.findByText(
+      'Le serveur ne répond pas : la quinzaine en cours n’a pas pu être lue.',
+    );
+    settingsDown = false;
+    fireEvent.click(
+      within(said.closest('.sc-empty') ?? document.body).getByRole('button', { name: 'Réessayer' }),
+    );
+    await waitFor(() => row('Théo'));
+    expect(screen.queryByText(/Le serveur ne répond pas/u)).toBeNull();
   });
 
   it('tells a manager why a transfer waits, the way to settle it being the owner’s (recette EQP-04)', async () => {
