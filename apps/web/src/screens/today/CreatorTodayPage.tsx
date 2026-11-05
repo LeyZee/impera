@@ -107,7 +107,7 @@ function Fans({ now, today }: { now: Date; today: string }): JSX.Element {
     return (
       <Panel className="sc-fans">
         <h2 className="sc-fans__title">Qui répond à tes fans</h2>
-        <p className="sc-fans__line">Le planning n’a pas pu être lu. Rien ici n’est à jour en attendant.</p>
+        <p className="sc-fans__line">Le planning n’a pas pu être lu.</p>
         <button
           type="button"
           className="nv-btn nv-btn--plain nv-btn--sm sc-fans__retry"
