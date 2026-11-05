@@ -363,6 +363,9 @@ function Views({
         wide={wide}
         shifts={shifts}
         onDay={onDay}
+        onSuggestion={(suggestion) => {
+          onOpen({ kind: 'suggestion', suggestion });
+        }}
         {...actions}
       />
     );

@@ -101,13 +101,15 @@ export function WeekList({
                     data-cat={item.task.category}
                     data-done={item.done ? 'true' : undefined}
                     onClick={() => {
-                      actions.onTask(item.task, day);
+                      actions.onTask(item.task, item.day);
                     }}
                   >
                     <CategoryMark category={item.task.category} size="sm" />
                     <b>{item.task.title}</b>
                     <span className="nv-num">
-                      {clockOf(item.start)} – {clockOf(item.end)}
+                      {item.carried
+                        ? `depuis hier · ${clockOf(item.end)}`
+                        : `${clockOf(item.start)} – ${clockOf(item.end)}`}
                     </span>
                   </button>
                 ))}
