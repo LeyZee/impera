@@ -5,6 +5,7 @@ import {
   EventIdSchema,
   MediaAssetIdSchema,
   MeSchema,
+  MessageIdSchema,
   CreatorIdSchema,
   MessageViewSchema,
   newId,
@@ -254,6 +255,26 @@ describe('/v1/conversations', () => {
       sql`select key from graphile_worker._private_jobs where key = ${`conversation.respond:${id}`}`,
     );
     expect(queued.rows).toHaveLength(1);
+
+    // A partial send: its own first bubble that left is not « something after it », the rest still did not leave.
+    const outbound = (draft: string | null, platformMessageId: string) =>
+      test.admin.db.insert(schema.messages).values({
+        id: newId(MessageIdSchema),
+        creatorId,
+        platformAccountId: PlatformAccountIdSchema.parse(account?.id),
+        conversationId: id,
+        platformMessageId,
+        direction: 'outbound',
+        author: draft === null ? 'human' : 'ai',
+        text: 'Coucou',
+        platformCreatedAt: new Date(),
+        draftId: draft,
+      });
+    await outbound(draftId, 'm-Julien-partial');
+    expect((await read()).failedDraft).toMatchObject({ id: draftId });
+    // Someone answered him in Reveal since: what failed is behind.
+    await outbound(null, 'm-Julien-by-hand');
+    expect((await read()).failedDraft).toBeNull();
 
     const takeover = await call(
       'POST',

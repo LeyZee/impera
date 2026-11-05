@@ -211,7 +211,26 @@ export function createDrizzleConversationReader(
             .where(and(eq(schema.drafts.conversationId, id), eq(schema.drafts.status, 'failed')))
             .orderBy(sql`${schema.drafts.createdAt} desc`)
             .limit(1);
-          const lastOut = summary.lastOutboundAt === null ? null : Date.parse(summary.lastOutboundAt);
+          // Its own bubbles that left before one failed (a partial send) are not « something after it ».
+          const lastOut =
+            failed === undefined || summary.state === 'error' || !AGENT_ANSWERING.includes(summary.state)
+              ? null
+              : ((
+                  await tx
+                    .select({
+                      at: sql<
+                        number | null
+                      >`(extract(epoch from max(${schema.messages.platformCreatedAt})) * 1000)::float8`,
+                    })
+                    .from(schema.messages)
+                    .where(
+                      and(
+                        eq(schema.messages.conversationId, id),
+                        eq(schema.messages.direction, 'outbound'),
+                        sql`${schema.messages.draftId} is distinct from ${failed.id}`,
+                      ),
+                    )
+                )[0]?.at ?? null);
           const stillUnsent =
             failed !== undefined &&
             (summary.state === 'error' ||
