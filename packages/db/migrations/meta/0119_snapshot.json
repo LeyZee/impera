@@ -1,6 +1,6 @@
 {
-  "id": "a20675e8-376f-44ed-8273-e0cb237cc5db",
-  "prevId": "9075f772-8d1f-4f5a-9b71-3a5c59c901f5",
+  "id": "bb6aef32-89f5-4c2b-944b-d0f04d496cf7",
+  "prevId": "0837ff82-14c5-447a-87a6-6f9e17bd3243",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -11628,6 +11628,96 @@
         "sales_feed_model_dismissals_id_check": {
           "name": "sales_feed_model_dismissals_id_check",
           "value": "char_length(\"sales_feed_model_dismissals\".\"platform_model_id\") between 1 and 200"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sales_feed_model_sightings": {
+      "name": "sales_feed_model_sightings",
+      "schema": "",
+      "columns": {
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_model_id": {
+          "name": "platform_model_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "gone_signalled_at": {
+          "name": "gone_signalled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "banned_signalled_at": {
+          "name": "banned_signalled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "sales_feed_model_sightings_pk": {
+          "name": "sales_feed_model_sightings_pk",
+          "columns": ["platform", "platform_model_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "agency_only": {
+          "name": "agency_only",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "sales_feed_model_sightings_platform_check": {
+          "name": "sales_feed_model_sightings_platform_check",
+          "value": "\"sales_feed_model_sightings\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "sales_feed_model_sightings_status_check": {
+          "name": "sales_feed_model_sightings_status_check",
+          "value": "\"sales_feed_model_sightings\".\"status\" in ('validated', 'pending', 'onboarding_changes_requested', 'refused', 'banned', 'other')"
+        },
+        "sales_feed_model_sightings_id_check": {
+          "name": "sales_feed_model_sightings_id_check",
+          "value": "char_length(\"sales_feed_model_sightings\".\"platform_model_id\") between 1 and 200"
         }
       },
       "isRLSEnabled": false

@@ -8,6 +8,7 @@ import {
   SalesFeedImportResultSchema,
   SalesFeedLastCheckSchema,
   SalesFeedListSchema,
+  SalesFeedNewModelsSchema,
   SalesFeedOverviewSchema,
   SalesFeedRefusalSchema,
   SalesFeedStatusSchema,
@@ -59,6 +60,13 @@ export function createSalesFeedRoutes(
     app.get('/settings/sales-feeds', { schema: { response: { 200: SalesFeedListSchema } } }, async () => ({
       feeds: await feeds.list(),
     }));
+
+    // The badge « N nouvelles créatrices sur Reveal » (ADR 0069 § 5): read in the base, never a call to the platform.
+    app.get(
+      '/settings/sales-feeds/new-models',
+      { schema: { response: { 200: SalesFeedNewModelsSchema } } },
+      () => feeds.newModels(),
+    );
 
     app.get(
       '/settings/sales-feeds/:platform',

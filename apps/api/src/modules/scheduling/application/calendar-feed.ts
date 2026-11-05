@@ -51,6 +51,7 @@ const shiftEventOf = (shift: CreatorFeedShift): FeedEvent => ({
   endsAt: shift.endsAt,
   summary: `💬 ${shift.displayName} répond à tes fans`,
   description: `Sur ${PLATFORM_NAMES[shift.platform]}`,
+  free: true,
 });
 
 export function createCalendarLinkService(

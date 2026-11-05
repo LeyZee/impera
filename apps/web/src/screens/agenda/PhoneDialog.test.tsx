@@ -51,7 +51,7 @@ describe('« Mon agenda dans mon téléphone » (CR-05, ADR 0045 § 5)', () => {
   it('adds who answers her fans to her link when she turns it on', async () => {
     const calls = serve({ createdAt: '2026-11-01T10:00:00.000Z', withShifts: false });
     show();
-    const choice = await screen.findByRole('switch', { name: /Qui répond à tes fans dans ton téléphone/u });
+    const choice = await screen.findByRole('switch', { name: /Qui répond à tes fans/u });
     expect(choice).toHaveProperty('checked', false);
     fireEvent.click(choice);
     await waitFor(() => {

@@ -146,7 +146,7 @@ export const CalendarLinkStateSchema = z.object({
     .object({
       createdAt: z.iso.datetime(),
       /** A creator's link also gives her accounts' shifts (ADR 0045 § 5); always false on a member's. */
-      withShifts: z.boolean(),
+      withShifts: z.boolean().default(false),
     })
     .nullable(),
 });

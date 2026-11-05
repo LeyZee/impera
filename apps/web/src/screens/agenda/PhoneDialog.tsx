@@ -61,15 +61,15 @@ function ShiftsChoice(): JSX.Element | null {
           className="nv-switch"
           checked={live.withShifts}
           disabled={busy}
-          aria-label={`Qui répond à tes fans dans ton téléphone : ${live.withShifts ? 'ajouté' : 'non ajouté'}`}
           onChange={(event) => {
             const on = event.target.checked;
             setBusy(true);
             setFailed(false);
             void chooseCalendarShifts(on).then(async (outcome) => {
-              setBusy(false);
               if (outcome.kind !== 'ok') setFailed(true);
+              // Released once her link is read again: the switch never shows the old state for an instant.
               await refresh();
+              setBusy(false);
             });
           }}
         />

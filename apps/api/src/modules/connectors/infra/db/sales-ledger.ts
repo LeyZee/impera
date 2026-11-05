@@ -9,6 +9,8 @@ import {
   JOB_MAX_ATTEMPTS,
   newId,
   PlatformAccountIdSchema,
+  PlatformModelStatusSchema,
+  PlatformSchema,
   SaleEventSchema,
   SalesFeedCheckIdSchema,
   SalesFeedCheckReportSchema,
@@ -43,6 +45,7 @@ const models = schema.salesFeedModels;
 const chatters = schema.salesFeedChatters;
 const checks = schema.salesFeedChecks;
 const dismissals = schema.salesFeedModelDismissals;
+const sightings = schema.salesFeedModelSightings;
 
 /** The columns of a line, shared by the register and the quarantine. */
 function lineValues(platform: Platform, sale: PlatformSale) {
@@ -370,6 +373,94 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
     async dismissals(platform) {
       const rows = await db.select().from(dismissals).where(eq(dismissals.platform, platform));
       return new Map(rows.map((row) => [row.platformModelId, row.dismissedAt]));
+    },
+
+    async sightings(platform) {
+      const rows = await db.select().from(sightings).where(eq(sightings.platform, platform));
+      return new Map(
+        rows.map((row) => [
+          row.platformModelId,
+          {
+            platformModelId: row.platformModelId,
+            status: PlatformModelStatusSchema.parse(row.status),
+            goneSignalledAt: row.goneSignalledAt,
+            bannedSignalledAt: row.bannedSignalledAt,
+          },
+        ]),
+      );
+    },
+
+    async recordSightings(platform, listed, changes, now) {
+      const banned = new Set(changes.banned);
+      const unbanned = new Set(changes.unbanned);
+      await db.transaction(async (tx) => {
+        for (const model of listed) {
+          const id = model.platformModelId;
+          const bannedMark = banned.has(id) ? now : unbanned.has(id) ? null : undefined;
+          await tx
+            .insert(sightings)
+            .values({
+              platform,
+              platformModelId: id,
+              status: model.status,
+              isActive: model.isActive,
+              firstSeenAt: now,
+              lastSeenAt: now,
+              bannedSignalledAt: bannedMark ?? null,
+            })
+            .onConflictDoUpdate({
+              target: [sightings.platform, sightings.platformModelId],
+              set: {
+                status: model.status,
+                isActive: model.isActive,
+                lastSeenAt: now,
+                // Listed again: a later departure is signalled again.
+                goneSignalledAt: null,
+                ...(bannedMark === undefined ? {} : { bannedSignalledAt: bannedMark }),
+              },
+            });
+        }
+        for (const id of changes.gone) {
+          // Never listed since the table exists: a row of its own, `other` and inactive, so that it is signalled once.
+          await tx
+            .insert(sightings)
+            .values({
+              platform,
+              platformModelId: id,
+              status: 'other',
+              isActive: false,
+              firstSeenAt: now,
+              lastSeenAt: now,
+              goneSignalledAt: now,
+            })
+            .onConflictDoUpdate({
+              target: [sightings.platform, sightings.platformModelId],
+              set: { goneSignalledAt: now },
+            });
+        }
+      });
+    },
+
+    async newModels() {
+      const rows = await db
+        .select({ platform: sightings.platform, count: sql<number>`count(*)::int` })
+        .from(sightings)
+        .where(
+          and(
+            sql`${sightings.goneSignalledAt} is null`,
+            sql`${sightings.lastSeenAt} = (select max(latest.last_seen_at) from ${sightings} latest
+                                          where latest.platform = ${sightings.platform})`,
+            sql`not exists (select 1 from ${models} link
+                             where link.platform = ${sightings.platform}
+                               and link.platform_model_id = ${sightings.platformModelId})`,
+            sql`not exists (select 1 from ${dismissals} aside
+                             where aside.platform = ${sightings.platform}
+                               and aside.platform_model_id = ${sightings.platformModelId})`,
+          ),
+        )
+        .groupBy(sightings.platform)
+        .orderBy(sightings.platform);
+      return rows.map((row) => ({ platform: PlatformSchema.parse(row.platform), count: row.count }));
     },
 
     async dismissModel(platform, platformModelId, by) {

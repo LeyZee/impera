@@ -228,6 +228,11 @@ describe('Lien de calendrier de la créatrice (CR-05 lot c2)', () => {
     const lines = (await feed(path)).body.split('\r\n');
     expect(lines).toContain('SUMMARY:💬 Kofi répond à tes fans');
     expect(lines).toContain('DESCRIPTION:Sur Reveal');
+    // A chatter's time, never hers: the shift leaves her free in her calendar, her own slots stay busy.
+    const shift = lines.indexOf('SUMMARY:💬 Kofi répond à tes fans');
+    expect(lines.slice(shift, lines.indexOf('END:VEVENT', shift))).toContain('TRANSP:TRANSPARENT');
+    const shoot = lines.indexOf('SUMMARY:🎬 Tournage robe rouge');
+    expect(lines.slice(shoot, lines.indexOf('END:VEVENT', shoot))).toContain('TRANSP:OPAQUE');
     expect(lines).toContain(
       `DTSTART:${at(addDays(today, 1), 18)
         .replace(/[-:]/gu, '')

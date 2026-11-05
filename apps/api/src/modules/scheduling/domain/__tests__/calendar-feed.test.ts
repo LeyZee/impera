@@ -79,6 +79,27 @@ describe('calendar feed (CR-12, RFC 5545)', () => {
     expect(lines.some((line) => line.startsWith('DTSTART:'))).toBe(false);
   });
 
+  it('leaves her free during a slot that is not her time (a shift of her accounts)', () => {
+    const ics = icsOf({
+      name: 'Impera · mon agenda',
+      events: [
+        {
+          uid: 'shift-1@impera',
+          startsAt: new Date('2026-11-06T17:00:00.000Z'),
+          endsAt: new Date('2026-11-06T21:00:00.000Z'),
+          summary: '💬 Kofi répond à tes fans',
+          description: 'Sur Reveal',
+          free: true,
+        },
+      ],
+      stamp: new Date('2026-11-05T10:00:00.000Z'),
+    });
+    const lines = ics.split('\r\n');
+    expect(lines).toContain('DTSTART:20261106T170000Z');
+    expect(lines).toContain('TRANSP:TRANSPARENT');
+    expect(lines).not.toContain('TRANSP:OPAQUE');
+  });
+
   it('reads 42 days around now at most, what calendar_shifts accepts', () => {
     const window = feedWindow(new Date('2026-11-03T08:00:00Z'));
     expect(window.to.getTime() - window.from.getTime()).toBe(42 * 86_400_000);

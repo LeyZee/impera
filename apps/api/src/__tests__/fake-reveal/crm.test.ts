@@ -245,6 +245,10 @@ describe('Reveal sales feed adapter', () => {
       ['model_imp_handle', 'validated', null],
       ['model_imp_double', 'validated', null],
     ]);
+    // Reveal's own word stays beside it, for the signal of an unknown status (CRM-07 a2).
+    expect(models.ok && models.value.find((model) => model.status === 'other')?.rawStatus).toBe(
+      'suspendedForReview',
+    );
   });
 
   it('lists models, team and statistics in the contract shape', async () => {
@@ -256,6 +260,7 @@ describe('Reveal sales feed adapter', () => {
       displayName: 'Créatrice test',
       isActive: true,
       status: 'validated',
+      rawStatus: 'validated',
       avatarUrl: null,
     });
     const chatters = await feed.listChatters();

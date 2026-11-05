@@ -256,7 +256,8 @@
 .ct-chosen {
   list-style: none;
   margin: 0;
-  padding: 0;
+  /* Room for the rank on each thumbnail's corner, inside the scrolling list. */
+  padding: 6px 0 0 6px;
   display: flex;
   flex-direction: column;
   max-height: 40vh;
@@ -265,9 +266,50 @@
 .ct-chosen__item {
   display: flex;
   align-items: center;
-  gap: var(--nv-space-3);
+  gap: var(--nv-space-2);
   padding: var(--nv-space-2) 0;
   border-bottom: 1px solid var(--nv-hairline);
+}
+.ct-chosen__visual {
+  position: relative;
+  flex: none;
+}
+/* Her order, on the corner of each thumbnail. */
+.ct-chosen__rank {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+  color: var(--nv-void);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ct-thumb {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-fill-soft);
+  font-size: 20px;
+}
+.ct-thumb img,
+.ct-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ct-chosen__move {
+  flex: none;
+  display: inline-flex;
 }
 .ct-chosen__text {
   flex: 1;

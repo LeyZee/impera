@@ -15,6 +15,7 @@ import {
   type SalesFeedCheckBody,
   type SalesFeedCheckReport,
   type SalesFeedLastCheck,
+  type SalesFeedNewModels,
   type ImportSalesFeedModelsBody,
   type SalesFeedDismissedModel,
   type SalesFeedImportCandidate,
@@ -42,6 +43,7 @@ import {
   SalesFeedWebhookUrlUnprocessable,
 } from '../domain/errors';
 import { proposeImports } from '../domain/model-import';
+import { sightingChanges } from '../domain/model-sightings';
 import type { Clock, JobLogger } from '../domain/ports';
 import {
   buildCheckReport,
@@ -54,6 +56,7 @@ import {
   unknownValueSignals,
   type DateRange,
   type KeyActor,
+  type ListedModel,
   type PlatformSalesFeed,
   type SalesFeedFactory,
   type SalesFeedFailure,
@@ -66,6 +69,11 @@ import {
 } from '../domain/sales-feed';
 import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-feed-messages';
 
+/**
+ * How often the reading looks at the platform's model list (CRM-07 a2): for the badge of new models, and the signal of a
+ * linked model gone or banned. One call more in a quarter of an hour, under Reveal's ten a minute.
+ */
+const WATCH_MODELS_MS = 15 * 60 * 1000;
 /** At most this many pages per platform and run (500 lines each): the next minute goes on from the cursor. */
 const MAX_PAGES_PER_RUN = 20;
 /** The inbox only tells a second sending of a delivery, which the platform makes within hours: a week is plenty. */
@@ -173,6 +181,8 @@ export interface SalesFeeds {
   ): Promise<Result<SalesFeedCheckReport, SalesFeedRefusal>>;
   /** The latest report kept, `null` before any check. */
   lastCheck(platform: Platform): Promise<SalesFeedLastCheck>;
+  /** The models listed last with no link and not set aside, for the owner's badge (ADR 0069 § 5). */
+  newModels(): Promise<SalesFeedNewModels>;
   /**
    * The `connector.check_sales` job (CRM-04 b3). On the 2nd and the 17th, without `recheck`: every connected feed,
    * the fortnight just over, the register's net against the platform's statistics for the accounts paid on that net
@@ -204,6 +214,28 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
   const { ledger, registry, clock } = deps;
   /** The failed reads in a row of each platform, in the worker that reads; a restart starts the count again. */
   const unreachable = new Map<Platform, UnreachableRun>();
+  /** When each platform's model list was last looked at, in the worker that reads; a restart looks at once. */
+  const watchedAt = new Map<Platform, number>();
+
+  /**
+   * One reading of the model list kept (ADR 0069 § 5): the sightings, a signal for a linked model gone or banned (sent
+   * before its mark is written: a failure repeats it rather than loses it), and a status the adapter did not know.
+   */
+  async function watchModels(
+    platform: Platform,
+    listed: readonly ListedModel[],
+    correlationId: string,
+  ): Promise<void> {
+    const [previous, links] = await Promise.all([ledger.sightings(platform), ledger.modelLinks(platform)]);
+    const changes = sightingChanges(previous, listed, new Set(links.keys()));
+    for (const signal of changes.signals) await ledger.signal(platform, signal, false, correlationId);
+    const unknown = listed
+      .filter((model) => model.status === 'other' && model.rawStatus !== '')
+      .map((model) => ({ field: 'status' as const, value: model.rawStatus }));
+    for (const signal of unknownValueSignals(unknown))
+      await ledger.signal(platform, signal, true, correlationId);
+    await ledger.recordSightings(platform, listed, changes, clock.now());
+  }
 
   async function tell(platform: Platform, signal: ConnectionSignal, correlationId: string): Promise<void> {
     await deps.connectionState?.(platform, signal, correlationId);
@@ -429,12 +461,18 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     const cursor = await ledger.cursorOf(platform);
     const now = clock.now();
     if (cursor.pausedUntil !== null && cursor.pausedUntil > now) return;
+    const feed = factory.create(stored.key);
+    if (now.getTime() - (watchedAt.get(platform) ?? 0) >= WATCH_MODELS_MS) {
+      watchedAt.set(platform, now.getTime());
+      const listed = await feed.listModels();
+      // A list that does not answer is looked at again in a quarter of an hour; the sales are read all the same.
+      if (listed.ok) await watchModels(platform, listed.value, correlationId);
+    }
     if (!woken && cursor.readAt !== null && now.getTime() - cursor.readAt.getTime() < CATCH_UP_MS) {
       const webhook = await deps.webhooks?.find(platform);
       // A webhook whose secret still opens: its deliveries wake the reading, the minute has nothing to add.
       if (webhook?.secret != null) return;
     }
-    const feed = factory.create(stored.key);
     let position = cursor.position;
     const totals = { pages: 0, recorded: 0, quarantined: 0, duplicates: 0 };
     for (let page = 0; page < MAX_PAGES_PER_RUN; page += 1) {
@@ -738,6 +776,11 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
       if (!built.ok) return built;
       await ledger.recordCheck(built.value.report, isCleanMatch(built.value.report), by);
       return ok(built.value.report);
+    },
+
+    async newModels() {
+      const byPlatform = (await ledger.newModels()).filter((row) => row.count > 0);
+      return { total: byPlatform.reduce((sum, row) => sum + row.count, 0), byPlatform: [...byPlatform] };
     },
 
     async lastCheck(platform) {
