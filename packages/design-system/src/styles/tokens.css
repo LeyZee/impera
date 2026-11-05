@@ -19,6 +19,8 @@
 
   /* Text */
   --nv-ink: #f8f3f4;
+  /* A message that left: warm grey, never the neon, which stays for urgencies and the one action (D-03). */
+  --nv-bubble-sent: #3b3236;
   --nv-ink-muted: #bfb4b9;
   --nv-ink-faint: #9b9197;
 
@@ -52,6 +54,9 @@
   --nv-glass-rim: rgba(0, 0, 0, 0.6);
   --nv-hairline: rgba(255, 255, 255, 0.075);
   --nv-fill-track: rgba(255, 255, 255, 0.14);
+  /* A quiet fill that holds on any surface: a soft button, an avatar, a gauge's rail. On white glass it is a tint of
+     ink, never more white (D-03: in Jour they vanished). */
+  --nv-fill-soft: rgba(255, 255, 255, 0.09);
   --nv-thumb: #ffffff;
 
   /* Aura: one neon light source above the page, and its wine shadow. */
@@ -105,6 +110,7 @@
   --nv-surface-raised: #ffffff;
 
   --nv-ink: #1b1016;
+  --nv-bubble-sent: #e6dcdf;
   --nv-ink-muted: #5e5157;
   --nv-ink-faint: #6e6268;
 
@@ -131,6 +137,7 @@
   --nv-glass-rim: rgba(60, 10, 30, 0.12);
   --nv-hairline: rgba(60, 10, 30, 0.09);
   --nv-fill-track: rgba(60, 10, 30, 0.14);
+  --nv-fill-soft: rgba(60, 10, 30, 0.07);
 
   --nv-aura-neon: rgba(255, 92, 122, 0.34);
   --nv-aura-wine: rgba(255, 168, 190, 0.6);

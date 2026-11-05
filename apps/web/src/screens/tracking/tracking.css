@@ -210,7 +210,9 @@
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
-  flex-wrap: wrap;
+  /* The state and the mode on one line, under the name (D-03). */
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 .tr-reader__body {
   display: flex;
@@ -641,4 +643,17 @@
   .tr-reader__top {
     display: contents;
   }
+}
+
+/* The draft's three gestures on one line, Valider the widest: no lone « Refuser » on its own row (D-03). */
+.tr-draft .nv-draft-panel__actions {
+  flex-wrap: nowrap;
+}
+.tr-draft .nv-draft-panel__actions > .nv-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: var(--nv-space-3);
+}
+.tr-draft .nv-draft-panel__actions > .nv-btn--neon {
+  flex-grow: 1.6;
 }
