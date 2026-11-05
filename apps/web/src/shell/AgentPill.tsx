@@ -55,7 +55,14 @@ export function AgentPill(): JSX.Element {
         aria-hidden="true"
       />
       {/* A long name is cut with « … » inside the pill, its title keeping it whole (recette 05/11, PRO-12). */}
-      <span className="nv-rail__agent-label">{label}</span>
+      {live !== null && several ? (
+        <>
+          <span className="nv-rail__agent-label">{live.creatorName}</span>{' '}
+          <span className="nv-rail__agent-mode">· {mode}</span>
+        </>
+      ) : (
+        <span className="nv-rail__agent-label">{label}</span>
+      )}
     </Link>
   );
 }

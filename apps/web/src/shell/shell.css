@@ -190,6 +190,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.nv-rail__agent-mode {
+  flex: none;
+  margin-left: -4px;
+}
 .nv-rail__agent:hover {
   color: var(--nv-ink);
   background: var(--nv-glass-fill-strong);
