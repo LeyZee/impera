@@ -213,7 +213,7 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
             and(
               eq(queue.creatorId, creatorId),
               eq(queue.structureId, structureId),
-              sql`${queue.createdAt} <= ${askedAt.toISOString()}::timestamptz`,
+              askedAt === null ? undefined : sql`${queue.createdAt} <= ${askedAt.toISOString()}::timestamptz`,
             ),
           )
           .returning({ position: queue.position });

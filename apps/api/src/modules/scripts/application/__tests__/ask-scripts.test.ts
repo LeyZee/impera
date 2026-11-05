@@ -53,9 +53,10 @@ function world(options: { readonly limits: PersonaLimits | null }) {
   const creatorId = newId(CreatorIdSchema);
   const library = new Map<ScriptStructureId, ScriptStructureVersion>();
   let queue: ScriptStructureId[] = [];
+  /** The database's clock, never the job's: a row's `created_at` is `now()` where it is written. */
+  let queuedAt = new Date();
   const asked: Asked[] = [];
   const outcomes: ScriptCadenceOutcome[] = [];
-  let clock = new Date('2026-11-05T10:00:00Z');
   /** The library changed between the reading and the freezing (a save by the owner). */
   let onFreeze: (() => void) | null = null;
 
@@ -79,7 +80,8 @@ function world(options: { readonly limits: PersonaLimits | null }) {
       library.set(structureId, frozen);
       return Promise.resolve(frozen);
     },
-    dequeue: (_creator, structureId) => {
+    dequeue: (_creator, structureId, askedAt) => {
+      if (askedAt !== null && queuedAt > askedAt) return Promise.resolve();
       queue = queue.filter((id) => id !== structureId);
       return Promise.resolve();
     },
@@ -91,7 +93,7 @@ function world(options: { readonly limits: PersonaLimits | null }) {
   const requests: ScriptRequests = {
     ask: (request) => {
       // `content_requests_cadence_unique`: one per due day.
-      if (!asked.some((row) => row.dueOn === request.dueOn)) asked.push({ ...request, askedAt: clock });
+      if (!asked.some((row) => row.dueOn === request.dueOn)) asked.push({ ...request, askedAt: new Date() });
       return Promise.resolve();
     },
     last: () => Promise.resolve(asked.at(-1) ?? null),
@@ -108,14 +110,17 @@ function world(options: { readonly limits: PersonaLimits | null }) {
     outcomes,
     setQueue: (ids: ScriptStructureId[]) => {
       queue = ids;
+      queuedAt = new Date();
     },
     queue: () => queue,
     onFreeze: (fn: () => void) => {
       onFreeze = fn;
     },
     run: (at: string) => {
-      clock = new Date(at);
-      return askScripts({ cadences, requests, limitsOf: () => Promise.resolve(options.limits) }, clock);
+      return askScripts(
+        { cadences, requests, limitsOf: () => Promise.resolve(options.limits) },
+        new Date(at),
+      );
     },
   };
 }

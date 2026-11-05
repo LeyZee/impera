@@ -85,7 +85,7 @@ async function askOne(
     structureId: choice.structureId,
     structureVersionId: version.id,
   });
-  if (choice.outcome === 'asked') await cadences.dequeue(creatorId, choice.structureId, now);
+  if (choice.outcome === 'asked') await cadences.dequeue(creatorId, choice.structureId, null);
   await cadences.record(creatorId, choice.outcome, choice.skipped, now);
   return 'asked';
 }

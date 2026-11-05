@@ -113,10 +113,10 @@ export interface CadenceStore {
   /** Freezes its latest version (or gives it, already frozen); `null` when it is archived or unknown. */
   freeze(structureId: ScriptStructureId): Promise<ScriptStructureVersion | null>;
   /**
-   * Takes the structure out of her queue, the positions after it moving up, if it was queued before `askedAt`: a
-   * structure put back in her queue since it was asked stays.
+   * Takes the structure out of her queue, the positions after it moving up. With `askedAt` (the request's own time,
+   * the database's clock), only if it was queued before: a structure put back in her queue since it was asked stays.
    */
-  dequeue(creatorId: CreatorId, structureId: ScriptStructureId, askedAt: Date): Promise<void>;
+  dequeue(creatorId: CreatorId, structureId: ScriptStructureId, askedAt: Date | null): Promise<void>;
   /** What the job found for her this time. */
   record(
     creatorId: CreatorId,
