@@ -101,6 +101,9 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
       expect(response.statusCode).toBe(403);
       expect(codeOf(response)).toBe('second_factor_forbidden');
     }
+    // Anonymous, the activation answers 401 before reading its body (recette SEC-17).
+    const anonymous = await post('/v1/auth/two-factor/enable', {}, '');
+    expect([anonymous.statusCode, codeOf(anonymous)]).toEqual([401, 'session_unauthenticated']);
     const wrongPassword = await post('/v1/auth/two-factor/enable', { password: 'not the password' }, cookie);
     expect(wrongPassword.statusCode).toBe(401);
     expect(codeOf(wrongPassword)).toBe('password_unauthenticated');
