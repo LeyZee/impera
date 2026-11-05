@@ -25,14 +25,38 @@ const FIRST: readonly { readonly zone: string; readonly city: string }[] = [
 ];
 const FIRST_ZONES: ReadonlySet<string> = new Set(FIRST.map((one) => one.zone));
 
-/** « Tokyo · Asia »: a city read as one, its region beside it, for every other zone the browser knows. */
-const OTHERS: readonly { readonly zone: string; readonly city: string }[] = Intl.supportedValuesOf('timeZone')
-  .filter((zone) => !FIRST_ZONES.has(zone))
-  .map((zone) => {
-    const region = zone.includes('/') ? zone.split('/')[0] : undefined;
-    return { zone, city: region === undefined ? cityOf(zone) : `${cityOf(zone)} · ${region}` };
-  })
-  .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
+/** The regions of the zones, in French (recette 05/11, PRO-13): only zones under one of them are offered. */
+const REGIONS: ReadonlyMap<string, string> = new Map([
+  ['Africa', 'Afrique'],
+  ['America', 'Amérique'],
+  ['Antarctica', 'Antarctique'],
+  ['Arctic', 'Arctique'],
+  ['Asia', 'Asie'],
+  ['Atlantic', 'Atlantique'],
+  ['Australia', 'Australie'],
+  ['Europe', 'Europe'],
+  ['Indian', 'océan Indien'],
+  ['Pacific', 'Pacifique'],
+]);
+
+/**
+ * « Tokyo · Asie », « Le Caire · Afrique »: a city in French, its region beside it, for every other zone the browser
+ * knows. Neither aliases (« UTC », « Etc/GMT+1 », « US/Eastern ») nor a country's local zones (« America/Indiana/Knox »,
+ * « America/Argentina/Salta »): a city of a region, once (PRO-13).
+ */
+export function otherZones(
+  zones: readonly string[],
+): readonly { readonly zone: string; readonly city: string }[] {
+  return zones
+    .filter((zone) => !FIRST_ZONES.has(zone))
+    .flatMap((zone) => {
+      const parts = zone.split('/');
+      const region = parts.length === 2 ? REGIONS.get(parts[0] ?? '') : undefined;
+      return region === undefined ? [] : [{ zone, city: `${cityOf(zone)} · ${region}` }];
+    })
+    .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
+}
+const OTHERS = otherZones(Intl.supportedValuesOf('timeZone'));
 
 /**
  * A creator's zone, chosen by city (« Paris », « Toronto (Montréal) ») with the zone kept behind it (CREA-27): never an

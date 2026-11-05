@@ -122,5 +122,10 @@ describe('cities', () => {
     expect(cityOf('Africa/Lome')).toBe('Lomé');
     expect(cityOf('America/Toronto')).toBe('Toronto');
     expect(cityOf('America/New_York')).toBe('New York');
+    // The names French writes otherwise, and the old names updated (recette 05/11, PRO-13).
+    expect(cityOf('Africa/Cairo')).toBe('Le Caire');
+    expect(cityOf('Europe/Bucharest')).toBe('Bucarest');
+    expect(cityOf('Asia/Saigon')).toBe('Hô Chi Minh-Ville');
+    expect(cityOf('Indian/Reunion')).toBe('La Réunion');
   });
 });

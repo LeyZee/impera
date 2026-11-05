@@ -57,7 +57,7 @@ describe('NewCreatorForm', () => {
     expect(zone.selectedOptions[0]?.textContent).toBe('Paris');
     const montreal = screen.getByRole<HTMLOptionElement>('option', { name: 'Toronto (Montréal)' });
     expect(montreal.value).toBe('America/Toronto');
-    expect(screen.getByRole('option', { name: 'Tokyo · Asia' })).toBeDefined();
+    expect(screen.getByRole('option', { name: 'Tokyo · Asie' })).toBeDefined();
   });
 
   it('sends once when the form is submitted again before the answer', async () => {
