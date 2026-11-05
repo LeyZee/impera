@@ -24,11 +24,14 @@ function asRole(superuserUrl: string, database: string, role: string, password: 
   return url.toString();
 }
 
+/** The password of the two test roles: `test`, or the one they already have on an existing server (recette MOT-12). */
+export const testRolePassword = (): string => process.env['IMPERA_TEST_ROLE_PASSWORD'] ?? 'test';
+
 /**
  * A fresh database for one test file, migrated with the real migrations (never a schema sync), owned by
  * `nirvana_admin`. `superuserUrl` comes from the global setup (`inject('pgSuperuserUrl')`).
  */
-export async function createTestDb(superuserUrl: string, password = 'test'): Promise<TestDb> {
+export async function createTestDb(superuserUrl: string, password = testRolePassword()): Promise<TestDb> {
   const database = `test_${randomBytes(6).toString('hex')}`;
   const root = new Client({ connectionString: superuserUrl });
   await root.connect();
