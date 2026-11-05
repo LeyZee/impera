@@ -104,9 +104,9 @@ describe('railOf, with the screens of today', () => {
     expect(railOf(chatter).phoneMenu).toBe(false);
     expect(railOf(manager).phoneMenu).toBe(true);
     expect(railOf(operator).phoneMenu).toBe(true);
-    // A creator gets her own space (ADR 0042 § 8): Aujourd'hui, Agenda, Ventes (her fans first) and Moi, Contenu
-    // coming with its screen; never Suivi nor the agency's Dashboard, her persona being in Moi.
-    expect(labels(creator)).toEqual(['Aujourd’hui', 'Agenda', 'Ventes', 'Moi']);
+    // A creator gets her own space (ADR 0042 § 8): Aujourd'hui, Agenda, Ventes (her fans first), Contenu (CR-06 d)
+    // and Moi; never Suivi nor the agency's Dashboard, her persona being in Moi.
+    expect(labels(creator)).toEqual(['Aujourd’hui', 'Agenda', 'Ventes', 'Contenu', 'Moi']);
     expect(railOf(creator).home).toBe('/aujourdhui');
   });
 

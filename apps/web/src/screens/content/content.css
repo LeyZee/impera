@@ -1,0 +1,321 @@
+/* Contenu, the creator's (CR-06 d): sections, tiles, cards, the drop sheet. Amber only where she has to act. */
+
+.ct-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-8);
+  max-width: 760px;
+}
+.ct-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.ct-section__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.ct-output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.ct-output__name {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+
+/* ---- Déposer: one tile per category, its emoji, its name, what goes in it ---- */
+.ct-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+}
+@media (min-width: 900px) {
+  .ct-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.ct-tile {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-1);
+  min-height: 112px;
+  padding: var(--nv-space-4);
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.ct-tile:hover {
+  background: var(--nv-plate-hover);
+}
+.ct-tile:active {
+  transform: scale(0.98);
+}
+.ct-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+.ct-tile__emoji {
+  font-size: 24px;
+  line-height: 1;
+  margin-bottom: var(--nv-space-1);
+}
+.ct-tile__name {
+  font-weight: 650;
+}
+.ct-tile__hint {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+
+/* ---- Cards: a request, a drop ---- */
+.ct-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.ct-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4);
+}
+.ct-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.ct-card__emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+.ct-card__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 650;
+}
+.ct-card__why,
+.ct-card__meta {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.ct-card__why {
+  color: var(--nv-ink);
+  font-size: var(--nv-text-callout);
+}
+.ct-card__blocked {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.ct-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-1);
+}
+.ct-card__ask {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+
+/* A request: its name and when it is due, stacked; her two answers at the foot, on the right. */
+.ct-card__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ct-due {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+}
+.ct-due--late {
+  color: var(--nv-warning);
+  font-weight: 650;
+}
+.ct-card__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+/* A drop's state, calm unless she has something to do. */
+.ct-state {
+  flex: none;
+  padding: 2px var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ct-state--warn {
+  background: color-mix(in srgb, var(--nv-warning) 16%, transparent);
+  color: var(--nv-warning);
+}
+.ct-state--ok {
+  background: color-mix(in srgb, var(--nv-success) 14%, transparent);
+  color: var(--nv-success);
+}
+
+/* ---- A drop's files, and their sends ---- */
+.ct-files {
+  list-style: none;
+  margin: var(--nv-space-1) 0 0;
+  padding: var(--nv-space-2) 0 0;
+  border-top: 1px solid var(--nv-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.ct-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ct-file__row {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-height: 32px;
+}
+.ct-file__name {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.ct-file__line {
+  flex: 1;
+  min-width: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  text-align: right;
+}
+.ct-file__line--warn {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.ct-file__hint {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-caption);
+}
+
+/* ---- Publié: quiet lines ---- */
+.ct-out {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-2) 0;
+  border-bottom: 1px solid var(--nv-hairline);
+}
+.ct-list--quiet {
+  gap: 0;
+}
+.ct-out__name {
+  font-weight: 600;
+}
+.ct-out__meta {
+  margin-left: auto;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+
+/* ---- The sheet and the refusal ---- */
+.ct-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.ct-pick {
+  width: 100%;
+}
+.ct-chosen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.ct-chosen__item {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-2) 0;
+  border-bottom: 1px solid var(--nv-hairline);
+}
+.ct-chosen__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ct-chosen__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.ct-chosen__sub {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+}
+.ct-chosen__sub--warn,
+.ct-warn {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.ct-warn,
+.ct-note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.ct-note {
+  color: var(--nv-ink-muted);
+}
+.ct-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+/* ---- While it reads ---- */
+.ct-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  max-width: 760px;
+}
+.ct-skeleton i {
+  display: block;
+  height: 96px;
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-fill-soft);
+}
