@@ -68,15 +68,22 @@ export function createSalesFeedRoutes(
     app.addHook('preValidation', options.guard);
 
     /**
-     * A limit counted per owner and address, run after the guard (recette SEC-05): an anonymous or a chatter's call is
-     * refused by it (401, 403) and never spends the owner's quota, even from the same address. 429 as any limit.
+     * A limit counted per owner, address and route, run after the guard (recette SEC-05): an anonymous or a chatter's
+     * call is refused by it (401, 403) and never spends the owner's quota, even from the same address. 429 as any
+     * limit. One limiter per bound: the shared store names a `createRateLimit` limiter by its bounds and refuses two
+     * of the same (`rate-limit-store.ts`); the route in the key keeps each gesture's own counter.
      */
-    const ownerLimit = (name: string, max: number): preValidationAsyncHookHandler => {
-      const limit = app.createRateLimit({
-        max,
-        timeWindow: '1 minute',
-        keyGenerator: (request) => `sales-feed-${name}:${request.user?.id ?? ''}:${request.ip}`,
-      });
+    const limiters = new Map<number, ReturnType<typeof app.createRateLimit>>();
+    const ownerLimit = (max: number): preValidationAsyncHookHandler => {
+      const limit =
+        limiters.get(max) ??
+        app.createRateLimit({
+          max,
+          timeWindow: '1 minute',
+          keyGenerator: (request) =>
+            `sales-feed:${request.routeOptions.url ?? ''}:${request.user?.id ?? ''}:${request.ip}`,
+        });
+      limiters.set(max, limit);
       return async (request, reply) => {
         const attempt = await limit(request);
         if (attempt.isAllowed || !attempt.isExceeded) return;
@@ -84,10 +91,9 @@ export function createSalesFeedRoutes(
         throw new OwnerLimitReached();
       };
     };
-    const keyCalls = ownerLimit('key', KEY_CALLS_PER_MINUTE);
-    const webhookCalls = ownerLimit('webhook', KEY_CALLS_PER_MINUTE);
-    const imports = ownerLimit('import', IMPORTS_PER_MINUTE);
-    const checks = ownerLimit('check', CHECKS_PER_MINUTE);
+    const keyCalls = ownerLimit(KEY_CALLS_PER_MINUTE);
+    const imports = ownerLimit(IMPORTS_PER_MINUTE);
+    const checks = ownerLimit(CHECKS_PER_MINUTE);
 
     app.get('/settings/sales-feeds', { schema: { response: { 200: SalesFeedListSchema } } }, async () => ({
       feeds: await feeds.list(),
@@ -134,7 +140,7 @@ export function createSalesFeedRoutes(
     app.put(
       '/settings/sales-feeds/:platform/webhook',
       {
-        preValidation: [options.recentLogin, webhookCalls],
+        preValidation: [options.recentLogin, keyCalls],
         schema: {
           params: PlatformParamsSchema,
           response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalSchema },
