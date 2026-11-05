@@ -12,6 +12,7 @@ import {
   PayAdjustmentIdSchema,
   PayAdjustmentSchema,
   PayPeriodSchema,
+  PayrollPeriodSchema,
   type TeamMember,
 } from '@impera/contracts';
 import { and, eq, schema, sql } from '@impera/db';
@@ -81,6 +82,21 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
         )
         .orderBy(schema.domainEvents.id)
     ).map((row) => ({ creatorId: row.creatorId, actor: row.actor, payload: row.payload }));
+
+  /** What stops the member's transfer for the period, and why, as `cookie` reads the period (recette EQP-04). */
+  const heldOf = async (member: TeamMember, period: typeof Q1, cookie: string) => {
+    const response = await team.call('GET', `/payroll/periods/${period}`, cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    const found = PayrollPeriodSchema.parse(response.json()).statements.find(
+      (one) => one.memberId === member.id,
+    );
+    if (found === undefined) throw new Error('the statement, not read');
+    return { block: found.payoutBlock, reason: found.notIssuedReason };
+  };
+  const held = (reason: string | null) => ({
+    block: { reason: 'documents_not_issued', year: null },
+    reason,
+  });
 
   const adjust = async (member: TeamMember, amountMinor: number, corrects: typeof Q1, reason: string) => {
     const response = await team.call('POST', '/payroll/adjustments', team.owner, {
@@ -313,6 +329,8 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
   it('tells the owner once of an invoice it cannot issue, the statement staying validated', async () => {
     expect((await team.validate(team.owner, lea, Q1)).statusCode).toBe(200);
     const id = await statementId(lea, Q1);
+    // Before the invoicing ran, her transfer waits for its documents, and no reason is said yet.
+    expect(await heldOf(lea, Q1, team.owner)).toEqual(held(null));
     const outcome = await issue(id);
     const { commissionMinor, status } = await team.statementOf(lea, Q1);
     expect(outcome).toMatchObject({
@@ -337,6 +355,9 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
       },
     ]);
     expect(await team.audited('invoice.not_issued')).toBe(1);
+    // Said on her statement, to the owner and to her: her mandate is what is left (recette EQP-04).
+    expect(await heldOf(lea, Q1, team.owner)).toEqual(held('no_mandate'));
+    expect(await heldOf(lea, Q1, leaCookie)).toEqual(held('no_mandate'));
 
     // Run again (a retry, or lot 5's enqueue): the same refusal is not said twice.
     expect(await issue(id)).toMatchObject({ issued: [], notIssued: [{ reason: 'no_mandate' }] });
@@ -523,11 +544,14 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
 
     // The file filled again: a change of identity cleared the owner's check, so nothing goes out until he checks it.
     await db().update(profile).set(company).where(eq(profile.memberId, lea.id));
+    expect(await heldOf(lea, Q6, leaCookie)).toEqual(held('identity_incomplete'));
     expect(await issue(id)).toMatchObject({
       issued: [],
       notIssued: [{ document: 'invoice', reason: 'identity_unverified' }],
     });
     expect(await documentsOf(lea)).toHaveLength(before);
+    // The newest reason said is the one in force: her identity now waits for the owner's check.
+    expect(await heldOf(lea, Q6, team.owner)).toEqual(held('identity_unverified'));
     // Checked: the next run issues the invoice, which copies the three.
     await db()
       .update(profile)
@@ -537,6 +561,8 @@ describe('Équipe › Factures : l’émission à la validation d’un relevé (
     expect(
       (await notIssued(id)).map((one) => EVENT_PAYLOADS.invoice_not_issued.parse(one.payload).reason),
     ).toEqual(['identity_incomplete', 'identity_unverified']);
+    // Issued: nothing stops her transfer any more, and no old reason lingers.
+    expect(await heldOf(lea, Q6, leaCookie)).toEqual({ block: null, reason: null });
     const issued = (await documentsOf(lea)).at(-1);
     expect(issued?.contractor).toMatchObject({
       legalName: 'Léa Inventée',

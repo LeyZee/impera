@@ -57,6 +57,8 @@ describe('client IP and sign-in limits (G6)', () => {
         logger: createLogger(withHops),
         routes: app.routes,
         readiness: app.readiness,
+        // The counters of production: a good sign-in forgets its tries there (recette SEC-11).
+        rateLimitStore: app.rateLimitStore,
       });
     };
     direct = await server('0');
@@ -111,6 +113,27 @@ describe('client IP and sign-in limits (G6)', () => {
     ).toBe(401);
   });
 
+  it('counts only refusals: good sign-ins never lock an account, wrong passwords still do (recette SEC-11)', async () => {
+    const busy = { email: 'busy@example.test', name: 'Busy', password: 'busy correct horse battery' };
+    await createOwner(app.auth, app.db.db, busy);
+    const from = { remoteAddress: '192.0.2.40' };
+    // Phone, computer, extension: twelve sign-ins in a quarter of an hour, more than the ten tries of one address.
+    for (let i = 0; i < 12; i += 1) {
+      expect((await signIn(direct, busy.email, busy.password, from)).statusCode).toBe(200);
+    }
+    // A sign-in that succeeds after refusals gives them back too.
+    for (let i = 0; i < 9; i += 1) {
+      expect((await signIn(direct, busy.email, 'wrong password!', from)).statusCode).toBe(401);
+    }
+    expect((await signIn(direct, busy.email, busy.password, from)).statusCode).toBe(200);
+    for (let i = 0; i < 10; i += 1) {
+      expect((await signIn(direct, busy.email, 'wrong password!', from)).statusCode).toBe(401);
+    }
+    const blocked = await signIn(direct, busy.email, busy.password, from);
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.json<{ error: { code: string } }>().error.code).toBe('sign_in_limited');
+  }, 60_000);
+
   it('caps an account at 100 tries from all addresses, a trusted device aside', async () => {
     const holder = { email: 'holder@example.test', name: 'Holder', password: 'holder correct horse battery' };
     await createOwner(app.auth, app.db.db, holder);
@@ -133,7 +156,7 @@ describe('client IP and sign-in limits (G6)', () => {
     expect(session).not.toBe('');
 
     // Someone else spreads guesses over many addresses, each under its own limit: with the holder's three sign-ins
-    // above, the account reaches its 100.
+    // above, the account reaches its 100. A good sign-in never gives back the tries of the cap (recette SEC-11).
     for (let i = 0; i < 97; i += 1) {
       const from = { remoteAddress: `198.51.${String(100 + Math.floor(i / 9))}.${String(i % 9)}` };
       expect((await signIn(direct, holder.email, 'wrong password!', from)).statusCode).toBe(401);

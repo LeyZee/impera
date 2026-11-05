@@ -37,6 +37,7 @@ import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { cityOf } from '@/scheduling/time';
 import '@/shell/dialog.css';
+import { useRevealAlerts } from '@/shell/reveal';
 
 const ZONES: readonly string[] = Intl.supportedValuesOf('timeZone');
 const ROLES: readonly TeamRole[] = ['chatter', 'manager'];
@@ -128,6 +129,8 @@ export function AddMemberPanel({
   const id = useId();
   const client = useQueryClient();
   const dialog = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  useRevealAlerts(scroller);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [step, setStep] = useState(0);
   const [shown, setShown] = useState<Problems>({});
@@ -258,106 +261,108 @@ export function AddMemberPanel({
         aria-labelledby={`${id}-title`}
         onKeyDown={onKeyDown}
       >
-        <header className="tm-dialog__head">
-          <div className="tm-dialog__title">
-            <h2 id={`${id}-title`}>
-              {created === null ? 'Nouveau membre' : `${created.member.displayName} est dans l’équipe`}
-            </h2>
-            {created === null ? (
-              <ol className="tm-steps" aria-label="Étapes">
-                {STEP_TITLES.map((title, index) => (
-                  <li
-                    key={title}
-                    data-state={index < step ? 'done' : index === step ? 'now' : 'later'}
-                    aria-current={index === step ? 'step' : undefined}
-                  >
-                    <span className="tm-steps__num">{String(index + 1)}</span>
-                    {title}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p>Envoie-lui son lien : il y choisira son mot de passe.</p>
-            )}
-          </div>
-          <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m4 4 8 8M12 4l-8 8" />
-            </svg>
-          </button>
-        </header>
-
-        {created !== null ? (
-          <div className="tm-dialog__body nv-swap" key="done">
-            <ShareLink
-              memberId={created.member.id}
-              name={created.member.displayName}
-              purpose="invitation"
-              label="Créer son lien"
-              initial={created.link}
-              primary
-            />
-            <div className="tm-dialog__foot">
-              <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
-                Voir sa fiche
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form
-            className="tm-dialog__body nv-swap"
-            key={step}
-            noValidate
-            onSubmit={(event) => {
-              event.preventDefault();
-              next();
-            }}
-          >
-            {step === 0 ? <Who id={id} draft={draft} problems={shown} onChange={change} /> : null}
-            {step === 1 ? <Where id={id} draft={draft} problems={shown} onChange={change} /> : null}
-            {step === 2 ? (
-              <Rate
-                id={id}
-                draft={draft}
-                problems={shown}
-                presets={presets}
-                creators={creators}
-                onChange={change}
-              />
-            ) : null}
-            {failure === null ? null : (
-              <p className="tm-warn nv-swap" role="alert">
-                {failure}
-              </p>
-            )}
-            <div className="tm-dialog__foot">
-              {step === 0 ? (
-                <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
-                  Annuler
-                </button>
+        <div ref={scroller} className="tm-dialog__scroll">
+          <header className="tm-dialog__head">
+            <div className="tm-dialog__title">
+              <h2 id={`${id}-title`}>
+                {created === null ? 'Nouveau membre' : `${created.member.displayName} est dans l’équipe`}
+              </h2>
+              {created === null ? (
+                <ol className="tm-steps" aria-label="Étapes">
+                  {STEP_TITLES.map((title, index) => (
+                    <li
+                      key={title}
+                      data-state={index < step ? 'done' : index === step ? 'now' : 'later'}
+                      aria-current={index === step ? 'step' : undefined}
+                    >
+                      <span className="tm-steps__num">{String(index + 1)}</span>
+                      {title}
+                    </li>
+                  ))}
+                </ol>
               ) : (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain"
-                  disabled={busy}
-                  onClick={() => {
-                    setShown({});
-                    setStep(step - 1);
-                  }}
-                >
-                  Retour
-                </button>
+                <p>Envoie-lui son lien : il y choisira son mot de passe.</p>
               )}
-              <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-                {step < 2
-                  ? 'Continuer'
-                  : busy
-                    ? 'Ajout…'
-                    : `Ajouter ${draft.displayName.trim() === '' ? 'le membre' : draft.displayName.trim()}`}
-              </button>
             </div>
-          </form>
-        )}
+            <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 4 8 8M12 4l-8 8" />
+              </svg>
+            </button>
+          </header>
+
+          {created !== null ? (
+            <div className="tm-dialog__body nv-swap" key="done">
+              <ShareLink
+                memberId={created.member.id}
+                name={created.member.displayName}
+                purpose="invitation"
+                label="Créer son lien"
+                initial={created.link}
+                primary
+              />
+              <div className="tm-dialog__foot">
+                <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
+                  Voir sa fiche
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form
+              className="tm-dialog__body nv-swap"
+              key={step}
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                next();
+              }}
+            >
+              {step === 0 ? <Who id={id} draft={draft} problems={shown} onChange={change} /> : null}
+              {step === 1 ? <Where id={id} draft={draft} problems={shown} onChange={change} /> : null}
+              {step === 2 ? (
+                <Rate
+                  id={id}
+                  draft={draft}
+                  problems={shown}
+                  presets={presets}
+                  creators={creators}
+                  onChange={change}
+                />
+              ) : null}
+              {failure === null ? null : (
+                <p className="tm-warn nv-swap" role="alert">
+                  {failure}
+                </p>
+              )}
+              <div className="tm-dialog__foot">
+                {step === 0 ? (
+                  <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
+                    Annuler
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain"
+                    disabled={busy}
+                    onClick={() => {
+                      setShown({});
+                      setStep(step - 1);
+                    }}
+                  >
+                    Retour
+                  </button>
+                )}
+                <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+                  {step < 2
+                    ? 'Continuer'
+                    : busy
+                      ? 'Ajout…'
+                      : `Ajouter ${draft.displayName.trim() === '' ? 'le membre' : draft.displayName.trim()}`}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>,
     document.body,

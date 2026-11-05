@@ -1766,3 +1766,29 @@ summary.ag-brief__title:focus-visible {
   text-overflow: ellipsis;
   color: var(--nv-ink-faint);
 }
+
+/* ── Recette, lot A ───────────────────────────────────────────────────────────────────────────────────────────── */
+/* CREA-07: the page's rows never stretch; the bar sits under the title, the day under the bar. */
+.nv-page.ag-page {
+  grid-template-rows: auto;
+  align-content: start;
+}
+/* CREA-22: an agency's suggestion at its hour in the Programme, dashed, to decide. */
+.ag-slot[data-proposed] {
+  background: transparent;
+  box-shadow: none;
+  outline: 1.5px dashed color-mix(in srgb, var(--ag-c) 70%, transparent);
+  outline-offset: -1.5px;
+}
+.ag-slot[data-proposed]:hover {
+  background: var(--nv-plate-hover);
+}
+.ag-proposed-note {
+  margin: 0 0 var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+/* CREA-21: a timed task whose time is over, not ticked. */
+.ag-late {
+  color: var(--nv-warning);
+}

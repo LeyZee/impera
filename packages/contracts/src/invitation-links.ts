@@ -18,6 +18,17 @@ export type InvitationLinkPurpose = z.infer<typeof InvitationLinkPurposeSchema>;
 export const PASSWORD_MIN_LENGTH = 12;
 /** Better Auth's default ceiling. */
 export const PASSWORD_MAX_LENGTH = 128;
+/** Fewest different characters of a chosen password: twelve spaces or « aaaaaaaaaaaa » are refused (recette SEC-04). */
+export const PASSWORD_MIN_DISTINCT = 4;
+
+/**
+ * A password long enough only by its blanks or by one character repeated (recette SEC-04): refused by the server as
+ * `too_plain`, which the link page says in clear. The length is in UTF-16 units like `PASSWORD_MIN_LENGTH`, the
+ * distinct ones in characters.
+ */
+export function isPasswordTooPlain(password: string): boolean {
+  return password.trim().length < PASSWORD_MIN_LENGTH || new Set(password).size < PASSWORD_MIN_DISTINCT;
+}
 
 /** At least 128 random bits, base64url: what the page reads after `#t=` and posts back. */
 export const InvitationLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{22,128}$/);
@@ -113,7 +124,13 @@ export type RedeemInvitationLinkBody = z.infer<typeof RedeemInvitationLinkBodySc
  * `details.reason` of `password_invalid`: too short, too long, found in a known data breach (ADR 0046 § 4), or refused
  * by Better Auth.
  */
-export const PasswordInvalidReasonSchema = z.enum(['too_short', 'too_long', 'breached', 'refused']);
+export const PasswordInvalidReasonSchema = z.enum([
+  'too_short',
+  'too_long',
+  'too_plain',
+  'breached',
+  'refused',
+]);
 export type PasswordInvalidReason = z.infer<typeof PasswordInvalidReasonSchema>;
 
 /** The error codes of these routes, besides `rate_limited` from the limiter of the redeem and inspect routes. */

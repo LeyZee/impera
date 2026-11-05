@@ -382,8 +382,8 @@ export function WeekGrid({
                 onPress={(event, item) => {
                   onPointerDown(event, plan.day, item);
                 }}
-                onOpen={(task) => {
-                  if (!justDragged()) actions.onTask(task, plan.day);
+                onOpen={(task, day) => {
+                  if (!justDragged()) actions.onTask(task, day);
                 }}
                 onSuggestion={(suggestion) => {
                   if (!justDragged()) onSuggestion(suggestion);
@@ -459,7 +459,7 @@ function Column({
   height: (from: number, to: number) => string;
   hoursLast: number;
   onPress: (event: ReactPointerEvent<HTMLDivElement>, item: TimedTask) => void;
-  onOpen: (task: CreatorTask) => void;
+  onOpen: (task: CreatorTask, day: string) => void;
   onSuggestion: (suggestion: CreatorSuggestion) => void;
 }): JSX.Element {
   const suggested = timedSuggestionsOf(plan, agenda.timeZone);
@@ -502,6 +502,8 @@ function Column({
         }
         const { item } = one;
         const over = isOver(item, plan.day, agenda.today, nowMinute);
+        // A task carried from the day before is shown from 0 h; it is moved from the day it starts.
+        const fixed = over || item.carried;
         const lifted = drag?.kind === 'move' && drag.task.id === item.task.id;
         return (
           <div
@@ -515,18 +517,18 @@ function Column({
             data-short={short ? 'true' : undefined}
             data-placeholder={lifted ? 'true' : undefined}
             style={style}
-            aria-label={`${item.task.title}, ${clockOf(item.start)} – ${clockOf(item.end % 1440)}`}
+            aria-label={`${item.task.title}, ${item.carried ? 'depuis hier, jusqu’à ' : `${clockOf(item.start)} – `}${clockOf(item.end % 1440)}`}
             onPointerDown={(event) => {
               event.stopPropagation();
-              if (!over) onPress(event, item);
+              if (!fixed) onPress(event, item);
             }}
             onClick={() => {
-              onOpen(item.task);
+              onOpen(item.task, item.day);
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                onOpen(item.task);
+                onOpen(item.task, item.day);
               }
             }}
           >
@@ -534,7 +536,9 @@ function Column({
               <span aria-hidden="true">{CATEGORY_EMOJI[item.task.category]}</span> {item.task.title}
             </b>
             <span className="nv-num">
-              {clockOf(item.start)} – {clockOf(item.end % 1440)}
+              {item.carried
+                ? `depuis hier · ${clockOf(item.end)}`
+                : `${clockOf(item.start)} – ${clockOf(item.end % 1440)}`}
             </span>
           </div>
         );

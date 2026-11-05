@@ -953,6 +953,32 @@
   flex-direction: column;
   gap: var(--nv-space-2);
 }
+/* A transfer that waits (recette EQP-04): the notice under the amount, its one gesture at its start, never stretched. */
+.py-hold {
+  margin-top: var(--nv-space-2);
+}
+.py-hold__go {
+  align-self: flex-start;
+  margin-top: var(--nv-space-2);
+}
+/* The owner's way to settle a transfer that waits: a quiet link in the line, as the planning's (`sc-link`). */
+.py-hold__link {
+  color: var(--nv-ink);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: var(--nv-ink-faint);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.py-hold__link:hover {
+  text-decoration-color: currentColor;
+}
+.py-hold__link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
 .py-mehero__top {
   display: flex;
   flex-wrap: wrap;
@@ -1103,7 +1129,7 @@
 
 /* A statement opened: its name and amount on top, its gestures at the bottom, only the path of the money scrolls in
    between, and the glass behind the whole height. */
-.py-dialog:has(.py-read) {
+.py-dialog:has(.py-read) .tm-dialog__scroll {
   overflow: hidden;
 }
 .py-read {
