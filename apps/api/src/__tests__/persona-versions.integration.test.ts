@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   ApiErrorSchema,
+  MyPersonaSchema,
   newId,
   PersonaSampleReplyUnprocessableDetailsSchema,
   PersonaSchema,
@@ -28,6 +29,7 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: 'staple battery horse' };
+const CREATOR = { email: 'creator@example.test', name: 'Anna', password: 'battery staple horse' };
 
 /** The fictional demo persona of the repository (ADR 0010: never a real one in a test). */
 const demo = (): Persona =>
@@ -214,7 +216,7 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(actions).toHaveLength(2);
   });
 
-  it('activates a version from the dashboard, for her owner and herself only, audited with who did it', async () => {
+  it('activates a version from the dashboard, for her owner only, audited with who did it', async () => {
     const activate = (creatorId: string, versionId: string, cookie: string, expectedActive: string | null) =>
       server.inject({
         method: 'POST',
@@ -309,6 +311,40 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(ApiErrorSchema.parse(refused.json()).error.code).toBe('persona_sample_reply_unprocessable');
     const after = (await get(anna, owner)).json<PersonaOverview>().versions;
     expect(after.filter((v) => v.isActive).map((v) => v.id)).toEqual([active.id]);
+  });
+
+  it('shows the creator her sheet in force, never the agency’s, and lets only the owner change it (CREA-01)', async () => {
+    const { userId } = await createOwner(app.auth, app.db.db, CREATOR);
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'creator', creatorIds: [anna] })
+      .where(eq(schema.user.id, userId));
+    const creator = await signIn(server, CREATOR.email, CREATOR.password);
+    const mine = (creatorId: string, cookie: string) =>
+      server.inject({ method: 'GET', url: `/v1/creators/${creatorId}/persona/mine`, headers: { cookie } });
+
+    const read = await mine(anna, creator);
+    expect(read.statusCode, read.body).toBe(200);
+    const body = MyPersonaSchema.parse(read.json());
+    const active = await app.modules.persona.versions.active(anna);
+    expect(body.sheet?.limits).toEqual(active?.persona.limits);
+    expect(Object.keys(body.sheet ?? {})).not.toContain('strategies');
+    expect((await mine(bea, creator)).statusCode).toBe(403);
+    expect((await mine(anna, owner)).statusCode).toBe(403);
+
+    // The agency's sheet and its writes are closed to her.
+    expect((await get(anna, creator)).statusCode).toBe(403);
+    expect(
+      (await post(anna, creator, { persona: withVersion(demo(), '9.0.0'), basedOn: null })).statusCode,
+    ).toBe(403);
+    const versionId = (await get(anna, owner)).json<PersonaOverview>().versions[0]?.id ?? '';
+    const activate = await server.inject({
+      method: 'POST',
+      url: `/v1/creators/${anna}/persona/versions/${versionId}/activate`,
+      headers: { cookie: creator, origin: DASHBOARD_ORIGIN },
+      payload: { expectedActive: null },
+    });
+    expect(activate.statusCode).toBe(403);
   });
 
   it('lets the owner add a creator, and nobody else', async () => {
