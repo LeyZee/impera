@@ -28,7 +28,7 @@ Une tâche à heures peut porter un rappel qu'elle choisit (`reminderMinutes`, d
 
 ## Ce que l'agence en voit (lot c)
 
-`GET /v1/creators/:creatorId/suggestions?week=` rend, pour chaque suggestion acceptée, le suivi de la tâche qu'elle est devenue (`task`, `null` avant son geste) : son moment tel qu'elle le garde (déplacée si elle l'a déplacée, placée si la suggestion était sans date), les jours qu'elle l'a cochée (`doneDays` : de la semaine de la suggestion pour sa routine, qui revient chaque semaine ; toutes ses coches pour une tâche datée) et si elle l'a retirée depuis (`removed`). La lecture passe par la RLS de son équipe (`team_read` sur ses tâches et ses coches), sans rôle admin. L'écran est Créatrices › Agenda.
+`GET /v1/creators/:creatorId/suggestions?week=` rend, pour chaque suggestion acceptée, le suivi de la tâche qu'elle est devenue (`task`, `null` avant son geste) : son moment tel qu'elle le garde (déplacée si elle l'a déplacée, placée si la suggestion était sans date), les jours qu'elle l'a cochée (`doneDays` : de la semaine de la suggestion pour sa routine, qui revient chaque semaine ; toutes ses coches pour une tâche datée) et si elle l'a retirée depuis (`removed`). La lecture passe par la RLS de son équipe (`team_read` sur ses tâches et ses coches), sans rôle admin. L'écran est Créatrices › Agenda, du propriétaire et du manager actif, qui n'ouvre que cet onglet de Créatrices (Charles, 05/11).
 
 ## Règles pures (`domain/`)
 

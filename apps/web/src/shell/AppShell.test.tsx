@@ -151,7 +151,7 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Moi']);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
   });
 });
 

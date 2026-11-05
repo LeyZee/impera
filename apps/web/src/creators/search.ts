@@ -18,12 +18,13 @@ const SHEETS = { heures: 'hours', acces: 'access', pourcentage: 'rate', agenda: 
 const ALL_SHEETS: readonly CreatorSheet[] = ['persona', 'hours', 'access', 'rate', 'agenda'];
 
 /**
- * The sheets a member opens: all of them for the owner; the persona and her agenda (CR-05 lot c) for an active
- * manager, as the server answers them; the persona alone for anyone else.
+ * The sheets a member opens: all of them for the owner; her agenda alone for an active manager (CR-05 lot c, Charles,
+ * 05/11 17h22: « Ouvrir aux managers », the other sheets stay the owner's); the persona alone for anyone else. The
+ * first one is where Créatrices opens.
  */
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
-  return user.teamScope === 'agency' ? ['persona', 'agenda'] : ['persona'];
+  return user.teamScope === 'agency' ? ['agenda'] : ['persona'];
 }
 
 /** Anything but a known tab reads as the persona; anything but a creator id, as no creator picked. */

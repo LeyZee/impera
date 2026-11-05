@@ -56,7 +56,7 @@ export function CreatorsPage({
   const selected = current?.id ?? null;
   // The router keeps each member to their sheets (`sheetsFor`); here they also need a creator.
   const sheets = sheetsFor(user);
-  const shown: CreatorTab = current !== undefined && sheets.includes(tab) ? tab : 'persona';
+  const shown: CreatorTab = current !== undefined && sheets.includes(tab) ? tab : (sheets[0] ?? 'persona');
 
   const leaving = blocker.status === 'blocked' || pending !== null;
   const stay = (): void => {
@@ -196,7 +196,7 @@ export function CreatorsPage({
           isOwner
             ? 'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès et le pourcentage de l’agence.'
             : sheets.includes('agenda')
-              ? 'La fiche de chaque créatrice : sa persona, et son agenda où l’agence lui propose des tâches.'
+              ? 'L’agenda de chaque créatrice : ce qu’elle a prévu, et les tâches que l’agence lui propose.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={

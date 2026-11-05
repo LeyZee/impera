@@ -10,7 +10,7 @@ Fait :
   Décisions :
 - L'agence lit d'où vient une suggestion (« Idée de l'IA ») ; elle, jamais.
 - Une routine est « faite » quand tous ses jours de la semaine sont cochés, sinon « 2 sur 7 cette semaine ».
-  Découvertes : le menu d'un manager (`RAILS.manager`, ADR 0024) n'a pas Créatrices, alors que l'API des suggestions lui est ouverte. L'onglet est prêt pour lui ; l'ajouter au menu est une décision de Charles.
+  Découvertes : le menu d'un manager (`RAILS.manager`, ADR 0024) n'a pas Créatrices, alors que l'API des suggestions lui est ouverte. L'onglet est prêt pour lui ; l'ajouter au menu est une décision de Charles. Tranché le 05/11 à 17h22 (« Ouvrir aux managers ») : le menu du manager gagne Créatrices, qui ne lui ouvre que l'agenda ; sur téléphone, Créatrices et Moi passent sous « Plus ». Le tableau de l'ADR 0024 (menu du manager) est à amender par sa procédure.
   Candidats à suppression : aucun.
   Vérifié :
 - `suggestions.test.ts` (`doneDays`, 2 tests) ; `creator-agenda.integration.test.ts` (suivi d'une suggestion placée ailleurs, routine cochée puis retirée) ;

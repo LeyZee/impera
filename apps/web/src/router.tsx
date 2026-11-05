@@ -127,13 +127,16 @@ const creators = createRoute({
   path: '/creatrices',
   validateSearch: parseCreatorsSearch,
   // Her hours (P3-14), her access (CR-02) and the agency's percentage (CR-04) are the owner's alone, her agenda (CR-05)
-  // the owner's and an active manager's: anyone else lands on the persona, not on a page the server would refuse.
+  // the owner's and an active manager's, who opens nothing else: anyone lands on their first sheet, never on a page
+  // the server would refuse.
   beforeLoad: ({ context, search }) => {
-    if (search.onglet !== undefined && !sheetsFor(context.user).includes(sheetOf(search))) {
+    const sheets = sheetsFor(context.user);
+    const first = sheets[0];
+    if (first !== undefined && !sheets.includes(sheetOf(search))) {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
-        search: creatorsSearch('persona', search.creatrice ?? null),
+        search: creatorsSearch(first, search.creatrice ?? null),
         replace: true,
       });
     }

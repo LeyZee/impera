@@ -20,6 +20,13 @@ const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
 /** Anna herself, in her own space (ADR 0042). */
 const anna: Me = { ...base, role: 'creator', creatorIds: [ANNA.id], team: null, teamScope: 'self' };
+/** An active manager: Créatrices opens on her agenda alone (Charles, 05/11 17h22). */
+const manager: Me = {
+  ...base,
+  role: 'operator',
+  team: { role: 'manager', status: 'active' },
+  teamScope: 'agency',
+};
 const chatter: Me = {
   ...base,
   role: 'operator',
@@ -237,6 +244,22 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     // The suggestions answer 404 here: the sheet says they do not load, and still offers to propose.
     expect(await screen.findByText('Ses propositions ne se chargent pas')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
+  });
+
+  it('opens on her agenda alone for an active manager, the persona and the other sheets the owner’s', async () => {
+    await serve([ANNA]);
+    const router = renderAt(manager, `/creatrices?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
+    });
+    expect(await screen.findByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
+    expect(screen.queryByRole('navigation', { name: 'Fiche de la créatrice' })).toBeNull();
+    for (const onglet of ['pourcentage', 'acces', 'heures']) {
+      router.history.push(`/creatrices?onglet=${onglet}&creatrice=${ANNA.id}`);
+      await waitFor(() => {
+        expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
+      });
+    }
   });
 
   it('takes an operator who is not an active manager back to the persona', async () => {
