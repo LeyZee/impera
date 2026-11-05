@@ -127,7 +127,7 @@ describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
     expect(hand('drafting')).toBe('agent');
     expect(hand('sending')).toBe('agent');
     expect(hand('idle')).toBe('quiet');
-    expect(situationOf(conversation('1', { state: 'error' })).label).toBe('Envoi échoué');
+    expect(situationOf(conversation('1', { state: 'error' })).label).toBe('Pas parti');
   });
 
   it('tells the chatter the hand is his, anyone else that a human answers', () => {

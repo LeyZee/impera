@@ -73,7 +73,7 @@ export function situationOf(
   if (state === 'awaiting_approval') return { hand: 'yours', label: STATE_LABELS[state], pill };
   if (state === 'human')
     return { hand: 'yours', label: holdsHand ? 'Tu as la main' : STATE_LABELS[state], pill };
-  if (state === 'error') return { hand: 'yours', label: 'Envoi échoué', pill };
+  if (state === 'error') return { hand: 'yours', label: 'Pas parti', pill };
   if ((state === 'idle' || state === 'paused') && fanWaits(conversation))
     return { hand: 'yours', label: 'Sans réponse', pill: statusClass('awaiting_approval') };
   if (state === 'pending' || state === 'drafting' || state === 'sending')
