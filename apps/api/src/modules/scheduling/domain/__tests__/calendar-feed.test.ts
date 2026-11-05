@@ -59,6 +59,26 @@ describe('calendar feed (CR-12, RFC 5545)', () => {
     expect(ics.replace(/\r\n/gu, '')).not.toMatch(/\n|\r/u);
   });
 
+  it('writes a whole day as a date, its end the next day, free in her calendar (CR-05)', () => {
+    const ics = icsOf({
+      name: 'Impera · mon agenda',
+      events: [
+        {
+          uid: 'task-1@impera',
+          day: '2026-12-31',
+          summary: '🖼️ Post du réveillon',
+          description: 'Publication',
+        },
+      ],
+      stamp: new Date('2026-11-05T10:00:00.000Z'),
+    });
+    const lines = ics.split('\r\n');
+    expect(lines).toContain('DTSTART;VALUE=DATE:20261231');
+    expect(lines).toContain('DTEND;VALUE=DATE:20270101');
+    expect(lines).toContain('TRANSP:TRANSPARENT');
+    expect(lines.some((line) => line.startsWith('DTSTART:'))).toBe(false);
+  });
+
   it('reads 42 days around now at most, what calendar_shifts accepts', () => {
     const window = feedWindow(new Date('2026-11-03T08:00:00Z'));
     expect(window.to.getTime() - window.from.getTime()).toBe(42 * 86_400_000);

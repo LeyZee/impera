@@ -4,8 +4,10 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { remind } from './application/remind';
+import type { AgendaFeedEntry } from './domain/feed';
 import type { ShootSuggestion } from './domain/ports';
 import { createDrizzleCreatorAgendaStore } from './infra/db/agenda-store';
+import { createDrizzleAgendaFeed } from './infra/db/feed-reads';
 import { createReminderSource } from './infra/db/reminder-source';
 import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
@@ -26,6 +28,14 @@ export interface CreatorTasksModule {
     shoot: ShootSuggestion,
     now: Date,
   ) => Promise<AgencySuggestion>;
+  /**
+   * Her agenda in her calendar link's feed (CR-05 lot c2): her tasks with hours or of a day between two instants, read
+   * with her own rights, as the `scheduling` feed writes them.
+   */
+  readonly feedOf: (
+    userId: string,
+    window: { readonly from: Date; readonly to: Date },
+  ) => Promise<readonly AgendaFeedEntry[]>;
   /**
    * The task of `creator_tasks.remind` (CR-05 lot b3): her accounts told that a task is coming; null when push is off
    * (the reminder is then only in her agenda).
@@ -62,6 +72,7 @@ export function createCreatorTasksModule(deps: CreatorTasksDeps): CreatorTasksMo
       deps.requireRole,
       deps.clock,
     ),
+    feedOf: createDrizzleAgendaFeed(deps.db),
     suggestShoot: (creatorId, userId, shoot, now) => suggestions.suggestShoot(creatorId, userId, shoot, now),
     remind: notify === null ? null : (payload, at) => remind({ source, notify }, payload, at),
   };

@@ -5,6 +5,7 @@ import { useCallback, useState, type JSX } from 'react';
 import { AddDialog, type AddPreset } from './AddDialog';
 import { DayView } from './DayView';
 import { MonthView } from './MonthView';
+import { PhoneDialog } from './PhoneDialog';
 import { SuggestionDialog } from './SuggestionCard';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
@@ -45,6 +46,7 @@ type Open =
   | { readonly kind: 'decline'; readonly suggestion: CreatorSuggestion }
   | { readonly kind: 'place'; readonly suggestion: CreatorSuggestion }
   | { readonly kind: 'suggestion'; readonly suggestion: CreatorSuggestion }
+  | { readonly kind: 'phone' }
   | null;
 
 /**
@@ -249,6 +251,19 @@ export function AgendaPage({
           onOpen={setOpen}
         />
       )}
+      {agenda === undefined ? null : (
+        <p className="ag-foot">
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            onClick={() => {
+              setOpen({ kind: 'phone' });
+            }}
+          >
+            📲 Mon agenda dans mon téléphone
+          </button>
+        </p>
+      )}
       {agenda === undefined || open === null ? null : (
         <Dialogs
           agenda={agenda}
@@ -359,6 +374,8 @@ function Dialogs({
           }}
         />
       );
+    case 'phone':
+      return <PhoneDialog onClose={onClose} />;
     case 'decline':
       return <DeclineDialog suggestion={open.suggestion} onClose={onClose} onNotice={onNotice} />;
     case 'place':

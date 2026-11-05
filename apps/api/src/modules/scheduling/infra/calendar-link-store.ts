@@ -9,9 +9,9 @@ import {
 } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
-import type { Actor, CalendarLinkStore } from '../domain/ports';
+import type { Actor, CalendarLinkHolder, CalendarLinkStore } from '../domain/ports';
 
-const { auditLog, calendarLinks, teamMembers } = schema;
+const { auditLog, calendarLinks, teamMembers, user } = schema;
 
 /** 256 random bits, base64url: 43 characters (`CalendarLinkTokenSchema`). */
 const TOKEN_BYTES = 32;
@@ -48,6 +48,19 @@ async function revokeLive(tx: Transaction, actor: Actor): Promise<number> {
   return revoked.length;
 }
 
+/** A creator's account, or a member who has not left; anyone else's link answers nothing. */
+function holderOf(row: {
+  userId: string;
+  role: string;
+  memberId: string | null;
+  memberStatus: string | null;
+}): CalendarLinkHolder | null {
+  const userId = UserIdSchema.parse(row.userId);
+  if (row.role === 'creator') return { kind: 'creator', userId };
+  if (row.memberId === null || row.memberStatus === 'left') return null;
+  return { kind: 'member', userId, memberId: TeamMemberIdSchema.parse(row.memberId) };
+}
+
 /** `calendar_links` through `withAdmin` (migration 0074): the application role cannot reach it. */
 export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkStore {
   return {
@@ -63,13 +76,21 @@ export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkS
 
     replace: (actor) =>
       withAdmin(adminDb, async (tx) => {
-        // The member's row is the lock: two links asked at once are made one after the other.
-        const [member] = await tx
-          .select({ status: teamMembers.status })
-          .from(teamMembers)
-          .where(eq(teamMembers.userId, actor.userId))
+        // The account's row is the lock: two links asked at once are made one after the other.
+        const [account] = await tx
+          .select({ role: user.role })
+          .from(user)
+          .where(eq(user.id, actor.userId))
           .for('update');
-        if (member === undefined || member.status === 'left') return null;
+        if (account === undefined) return null;
+        // A creator's account opens exactly one creator (`user_creator_link_check`): her link is her agenda's (CR-05).
+        if (account.role !== 'creator') {
+          const [member] = await tx
+            .select({ status: teamMembers.status })
+            .from(teamMembers)
+            .where(eq(teamMembers.userId, actor.userId));
+          if (member === undefined || member.status === 'left') return null;
+        }
         await revokeLive(tx, actor);
         const token = randomBytes(TOKEN_BYTES).toString('base64url');
         const id = newId(CalendarLinkIdSchema);
@@ -91,20 +112,17 @@ export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkS
           .select({
             tokenHash: calendarLinks.tokenHash,
             userId: calendarLinks.userId,
+            role: user.role,
             memberId: teamMembers.id,
+            memberStatus: teamMembers.status,
           })
           .from(calendarLinks)
-          .innerJoin(teamMembers, eq(teamMembers.userId, calendarLinks.userId))
-          .where(
-            and(
-              eq(calendarLinks.tokenHash, hash),
-              sql`${calendarLinks.revokedAt} is null`,
-              sql`${teamMembers.status} <> 'left'`,
-            ),
-          ),
+          .innerJoin(user, eq(user.id, calendarLinks.userId))
+          .leftJoin(teamMembers, eq(teamMembers.userId, calendarLinks.userId))
+          .where(and(eq(calendarLinks.tokenHash, hash), sql`${calendarLinks.revokedAt} is null`)),
       );
       if (row === undefined || !sameHash(row.tokenHash, hash)) return null;
-      return { userId: UserIdSchema.parse(row.userId), memberId: TeamMemberIdSchema.parse(row.memberId) };
+      return holderOf(row);
     },
   };
 }

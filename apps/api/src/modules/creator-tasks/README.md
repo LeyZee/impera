@@ -34,6 +34,10 @@ Une tâche à heures peut porter un rappel qu'elle choisit (`reminderMinutes`, d
 
 Son acceptation ou son refus d'une suggestion met en file, dans la même transaction, `creator_tasks.suggestion_decided` (`{creatorId, suggestionId, state, day}`, clé `creator_tasks.suggestion_decided:<suggestionId>`). `day` est le jour de la tâche acceptée dans son fuseau, ou le jour de son geste pour une routine et un refus. Le module ne sait pas qui écoute : la veille (`trends`) tient le job et suit l'idée devenue cette suggestion.
 
+## Dans son téléphone (lot c2)
+
+Son lien de calendrier (ADR 0042 § 4) vit sur la table et les routes de `scheduling` (ADR 0045 § 5) ; ce module ne fait que lire ce qu'il montre : `feedOf` (`infra/db/feed-reads.ts`, par `withCreatorAccount`) donne ses tâches à heures qui croisent la fenêtre du flux et celles d'un jour dedans, et `domain/feed.ts` les dit : l'emoji de la catégorie et le titre, puis à quoi la tâche sert (ou sa catégorie). Une routine, sans date, n'y va pas. Une fiche de tournage n'y est que nommée (« Ta fiche de tournage est dans ton agenda Impera. ») : une application de calendrier garde le flux sur ses serveurs. L'identifiant de l'événement est celui de la tâche, donc une tâche déplacée bouge dans son téléphone au lieu de doubler.
+
 ## Règles pures (`domain/`)
 
 - **Série** (`streak.ts`) : une journée est « réussie » quand toutes ses tâches essentielles sont cochées (la routine de l'agence qu'elle a acceptée), « parfaite » quand toutes ses tâches du jour le sont (les siennes comprises). La série compte les journées réussies d'affilée dans **son** fuseau ; aujourd'hui compte dès qu'il est réussi et ne casse jamais tant qu'il dure (« série en danger » seulement). Une journée sans essentielle ne compte ni ne casse. Un joker pardonne une journée manquée dans la série, la deuxième la casse ; un joker n'est dépensé que s'il sauve une journée réussie d'avant. Paliers 7, 14, 30, 50, 100.

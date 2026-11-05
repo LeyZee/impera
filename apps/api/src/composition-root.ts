@@ -264,7 +264,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
     ...(options.teamClock !== undefined && { now: options.teamClock }),
   });
-  const scheduling = wireScheduling(shared, { persona: persona.module });
+  // Before the planning: her calendar link's feed reads her agenda (CR-05 lot c2).
+  const notifications = wireNotifications(shared);
+  const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
+  const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
   const contentDrops = wireContentDrops(shared);
   const contractors = wireContractors(shared, {
@@ -316,8 +319,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media,
   });
   const backups = wireBackups(shared);
-  const notifications = wireNotifications(shared);
-  const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
