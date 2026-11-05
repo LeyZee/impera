@@ -29,13 +29,14 @@ describe('the format of a drop, read from the file and never from the image (ADR
     expect(takesVocals).toEqual(['script', 'mass_dm']);
   });
 
-  it('weighs a photo at 30 Mo and a video at 500 Mo at most', () => {
+  it('weighs a photo at 30 Mo and a video at 10 Go at most (ADR 0070)', () => {
     expect(declaredFileRefusal('feed_shoot', { mime: 'image/heic', bytes: 30 * MB })).toBeNull();
     expect(declaredFileRefusal('feed_shoot', { mime: 'image/heic', bytes: 30 * MB + 1 })).toBe(
       'Une photo fait au plus 30 Mo',
     );
-    expect(declaredFileRefusal('feed_video', { mime: 'video/quicktime', bytes: 500 * MB + 1 })).toBe(
-      'Une vidéo fait au plus 500 Mo',
+    expect(declaredFileRefusal('feed_video', { mime: 'video/quicktime', bytes: 10 * 1024 * MB })).toBeNull();
+    expect(declaredFileRefusal('feed_video', { mime: 'video/x-matroska', bytes: 10 * 1024 * MB + 1 })).toBe(
+      'Une vidéo fait au plus 10 Go',
     );
   });
 

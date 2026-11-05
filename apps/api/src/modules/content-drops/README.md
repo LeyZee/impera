@@ -14,7 +14,7 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 ## Règles
 
-- **Format** (`packages/contracts`, `DROP_FORMAT_RULES`) : chaque catégorie connaît ses sortes (photo, vidéo, vocal), si elle veut du vertical, la durée la plus longue d'une vidéo et d'un vocal, et le nombre de fichiers. Une photo fait au plus 30 Mo, une vidéo 500 Mo. Le type et le poids sont vérifiés à la déclaration (`declaredFileRefusal`), l'orientation et la durée sur le fichier arrivé (`probedFileRefusal`, lot b). Les mêmes phrases servent au téléphone, qui vérifie d'abord, et au serveur. Ce sont des valeurs de code ; leur réglage par l'agence viendra avec l'écran.
+- **Format** (`packages/contracts`, `DROP_FORMAT_RULES`) : chaque catégorie connaît ses sortes (photo, vidéo, vocal), si elle veut du vertical, la durée la plus longue d'une vidéo et d'un vocal, et le nombre de fichiers. Une photo fait au plus 30 Mo, une vidéo 10 Go (ADR 0070). Le type et le poids sont vérifiés à la déclaration (`declaredFileRefusal`), l'orientation et la durée sur le fichier arrivé (`probedFileRefusal`, lot b). Les mêmes phrases servent au téléphone, qui vérifie d'abord, et au serveur. Ce sont des valeurs de code ; leur réglage par l'agence viendra avec l'écran.
 - **Script** : il ne se dépose que depuis une demande de script de la créatrice, ouverte (la tuile Script ne s'ouvre que depuis une demande).
 - **Demande** : satisfaite par un dépôt non retiré, un seul à la fois (index `content_drops_request_live_unique`) ; retirer ce dépôt la rouvre. « Déposée » n'est donc jamais stockée.
 
@@ -37,6 +37,14 @@ Le même job, une fois le fichier reçu, le télécharge dans un dossier tempora
 - **vérifie le format sur le fichier nettoyé** (`probedFileRefusal` : sorte, verticalité après rotation, durée) ;
 - **prend l'empreinte du fichier nettoyé**, l'écrit sous `media/<créatrice>/<empreinte>` et crée le média de la médiathèque, ou marque le fichier « doublon » du média qu'elle a déjà donné ;
 - **efface le brut**, refusé ou gardé.
+
+### Les vidéos lourdes et les autres formats (ADR 0070)
+
+- Une vidéo pèse jusqu'à 10 Gio (`DROP_MAX_BYTES`, migration 0115) et vient en MOV, MP4, M4V, 3GP (ISO-BMFF), MKV, WebM (EBML) ou AVI (RIFF), reconnus à leurs premiers octets.
+- ffprobe lit son codec, et le chemin suit (`videoRouteOf`) : H.264 ou HEVC en ISO-BMFF, recopié tel quel (toute vidéo d'iPhone) ; H.264 ou HEVC dans un autre conteneur, passé en MP4 sans réencodage ; le reste (ProRes, VP8, VP9, AV1, MJPEG…), converti en MP4 H.264, profil High, CRF 18, 4K au plus. Le son est recopié s'il est en AAC, converti en AAC à 192 kbit/s sinon. Le média prend le type du fichier de sortie (`video/mp4`, ou `video/quicktime` recopié).
+- Une vidéo à convertir est confiée à `content_drops.convert_file`, dans la file `content_drops:convert` : une conversion à la fois, et la réception des autres fichiers ne l'attend jamais.
+- Les délais suivent le fichier : téléchargement et recopie, une seconde par 10 Mo plus une à trois minutes ; conversion, trois fois la durée plus dix minutes, quatre heures au plus. Au-delà, ffmpeg est tué et le job réessaie.
+- Avant de télécharger, le job prend 2,5 fois le poids du fichier sur le disque (`infra/cleaning/room.ts`, compté avec les jobs qui tournent à côté) ; sans cette place, il revient 15 minutes plus tard, et refuse le fichier si le brut a disparu.
 
 Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au moins un est gardé, à « bloqué » (« Aucun fichier de ce dépôt n'a pu être gardé ») quand tous sont refusés. Un ffmpeg absent ou tué par son délai fait réessayer le job, jamais refuser le fichier.
 

@@ -4,7 +4,7 @@ import type { DropMime } from '@impera/contracts';
  * What a file is by its first bytes, never by the type her phone declared (ADR 0055 § 3): the cleaning that follows
  * is the one of the family found, and a file that is not what it says is refused.
  */
-export type FileFamily = 'jpeg' | 'png' | 'webp' | 'heif' | 'isobmff' | 'mp3' | 'adts';
+export type FileFamily = 'jpeg' | 'png' | 'webp' | 'heif' | 'isobmff' | 'ebml' | 'avi' | 'mp3' | 'adts';
 
 const ascii = (bytes: Uint8Array, from: number, length: number): string =>
   String.fromCharCode(...bytes.subarray(from, from + length));
@@ -17,6 +17,10 @@ export function sniff(head: Uint8Array): FileFamily | null {
   if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'jpeg';
   if (head.length >= 8 && ascii(head, 0, 8) === '\x89PNG\r\n\x1a\n') return 'png';
   if (head.length >= 12 && ascii(head, 0, 4) === 'RIFF' && ascii(head, 8, 4) === 'WEBP') return 'webp';
+  // A video in another container (ADR 0070 § 2): Matroska and WebM open on the EBML header, AVI is a RIFF of `AVI `.
+  if (head.length >= 4 && head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3)
+    return 'ebml';
+  if (head.length >= 12 && ascii(head, 0, 4) === 'RIFF' && ascii(head, 8, 4) === 'AVI ') return 'avi';
   if (head.length >= 12 && ascii(head, 4, 4) === 'ftyp') {
     return HEIF_BRANDS.has(ascii(head, 8, 4)) ? 'heif' : 'isobmff';
   }
@@ -39,6 +43,11 @@ const FAMILIES_OF: Readonly<Record<DropMime, readonly FileFamily[]>> = {
   'image/webp': ['webp'],
   'video/mp4': ['isobmff'],
   'video/quicktime': ['isobmff'],
+  'video/x-m4v': ['isobmff'],
+  'video/3gpp': ['isobmff'],
+  'video/x-matroska': ['ebml'],
+  'video/webm': ['ebml'],
+  'video/x-msvideo': ['avi'],
   'audio/mpeg': ['mp3'],
   'audio/mp4': ['isobmff'],
   'audio/x-m4a': ['isobmff'],

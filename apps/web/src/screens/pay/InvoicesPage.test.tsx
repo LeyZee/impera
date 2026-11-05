@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { InvoiceListItem, Me } from '@impera/contracts';
+import type { InvoiceListItem, Me, PayrollPeriod } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -24,7 +24,9 @@ import {
   OCT2,
   OWNER,
   payId,
+  periodOf,
   SCHEDULING_SETTINGS,
+  statementOf,
   THEO,
 } from '@/test/pay';
 
@@ -50,6 +52,8 @@ const THEO_CREDIT = invoiceOf(4, THEO, OCT1, {
 });
 
 let lists: (search: URLSearchParams) => InvoiceListItem[];
+/** The quinzaine's statements as the period's read gives them; `null` answers like a period not found. */
+let period: PayrollPeriod | null;
 const reads: string[] = [];
 const writes: { path: string; body: unknown }[] = [];
 
@@ -92,6 +96,9 @@ function serve(): void {
           return json(SCHEDULING_SETTINGS);
         case '/v1/team/members':
           return json({ members: MEMBERS });
+        case `/v1/payroll/periods/${OCT2}`:
+          if (period !== null) return json(period);
+          return json({ items: [], nextCursor: null });
         default:
           return json({ items: [], nextCursor: null });
       }
@@ -116,9 +123,18 @@ function renderPage(user: Me, member: string | null = null): { filters: Invoices
       />
     ),
   });
-  const period = createRoute({ getParentRoute: () => root, path: '/paie/quinzaine', component: () => null });
+  const statements = createRoute({
+    getParentRoute: () => root,
+    path: '/paie/quinzaine',
+    component: () => null,
+  });
+  const file = createRoute({
+    getParentRoute: () => root,
+    path: '/equipe/membres/$memberId/dossier',
+    component: () => null,
+  });
   const router = createRouter({
-    routeTree: root.addChildren([page, period]),
+    routeTree: root.addChildren([page, statements, file]),
     history: createMemoryHistory({ initialEntries: ['/paie/factures'] }),
   });
   render(
@@ -162,6 +178,7 @@ beforeEach(() => {
     if (search.get('period') === OCT2) return [LOU_CONTESTED, BASILE_SOON, THEO_CREDIT];
     return [];
   };
+  period = null;
   reads.length = 0;
   writes.length = 0;
   serve();
@@ -205,6 +222,33 @@ describe('Paie › Factures', () => {
     expect(within(credit).getByRole('link', { name: 'Voir le relevé' }).getAttribute('href')).toBe(
       `/paie/quinzaine?quinzaine=${OCT2}&membre=${THEO.id}`,
     );
+  });
+
+  it('names the validated statements whose invoice waits, and why (recette EQP-04)', async () => {
+    const held = {
+      status: 'validated' as const,
+      validatedAt: '2026-11-02T08:41:00.000Z',
+      payableMinor: 22_169,
+      totalMinor: 22_169,
+      payoutBlock: { reason: 'documents_not_issued' as const, year: null },
+    };
+    period = periodOf(OCT2, [
+      statementOf(THEO, OCT2, { ...held, notIssuedReason: 'no_mandate' }),
+      // A transfer that waits for a certificate is not about its invoice: not listed here.
+      statementOf(BASILE, OCT2, { ...held, payoutBlock: { reason: 'tax_residence_missing', year: '2026' } }),
+    ]);
+    renderPage(OWNER);
+    const panel = await waitFor(() => panelOf('1 relevé validé sans facture'));
+    const theo = within(panel).getByText('Théo').closest('article');
+    if (theo === null) throw new Error('No row for Théo');
+    expect(theo.textContent.replace(NBSP, ' ')).toContain('221,69 €à verser');
+    expect(theo.textContent).toContain(
+      'Versement bloqué : facture pas encore émise, le membre n’a pas encore accepté son mandat de facturation.',
+    );
+    expect(within(theo).getByRole('link', { name: 'Ouvrir son dossier' }).getAttribute('href')).toBe(
+      `/equipe/membres/${THEO.id}/dossier`,
+    );
+    expect(within(panel).queryByText('Basile')).toBeNull();
   });
 
   it('upholds a contest with one amount whose side is chosen in words, checked before it leaves', async () => {

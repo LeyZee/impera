@@ -92,7 +92,30 @@ export interface ReceiptStore {
    * settled and one was kept, blocked when all were refused.
    */
   settle(fileId: string, outcome: FileOutcome, now: Date, correlationId: string): Promise<void>;
+  /**
+   * The file's job enqueued (ADR 0070 § 4), keyed by the task and the file: `content_drops.convert_file` in the queue
+   * `content_drops:convert`, where conversions pass one at a time, or either job again at `runAt` when the machine is
+   * short of disk. Enqueued from the running job, it is a new job: Graphile frees the key of a locked one.
+   */
+  enqueue(
+    task: ReceiptTask,
+    file: { readonly creatorId: string; readonly fileId: string },
+    correlationId: string,
+    runAt: Date | null,
+  ): Promise<void>;
 }
+
+/**
+ * The room on the worker's disk (ADR 0070 § 4): a job takes what it needs before it downloads, and gives it back once
+ * its folder is erased, so that jobs running side by side never count the same free bytes twice.
+ */
+export interface ScratchRoom {
+  /** `bytes` taken, and how to give them back; `null` when the disk has not that much free beyond what is taken. */
+  take(bytes: number): Promise<(() => void) | null>;
+}
+
+/** The two jobs that receive a file: the receipt itself, and the conversion it hands a video over to. */
+export type ReceiptTask = 'content_drops.receive_file' | 'content_drops.convert_file';
 
 /**
  * The media storage, S3-compatible (CR-06 b): a file goes up in parts, straight from her phone, each under its own
@@ -114,8 +137,11 @@ export interface DropStorage {
   /** The size of the object at `key`, `null` when there is none. */
   sizeOf(key: string): Promise<number | null>;
   remove(key: string): Promise<void>;
-  /** The object at `key` written to the local file `path`; `false` when there is none. */
-  download(key: string, path: string): Promise<boolean>;
+  /**
+   * The object at `key`, of `bytes` bytes, written to the local file `path`; `false` when there is none. Its time
+   * limit grows with its size (ADR 0070 § 4).
+   */
+  download(key: string, path: string, bytes: number): Promise<boolean>;
   /** The local file `path` written at `key`, signed with its fingerprint, in parts when it is large. */
   upload(key: string, path: string, mime: DropMime, sha256: string): Promise<void>;
 }
@@ -180,8 +206,12 @@ export interface AgencyContentStore {
   ): Promise<ContentDrop>;
 }
 
-/** A file as the cleaning leaves it (`FileCleaner`): the size it shows at, its length, the streams it holds. */
+/**
+ * A file as the cleaning leaves it (`FileCleaner`): its type (a video moved to MP4 or converted is `video/mp4`), the
+ * size it shows at, its length, the streams it holds.
+ */
 export interface CleanedFile {
+  readonly mime: DropMime;
   readonly width: number | null;
   readonly height: number | null;
   readonly durationMs: number | null;
@@ -194,5 +224,10 @@ export interface CleanedFile {
  * `UnreadableFile` when the file cannot be followed: it is refused rather than kept half cleaned.
  */
 export interface FileCleaner {
+  /**
+   * Whether this video must be converted (ADR 0070 § 3): neither H.264 nor HEVC. `false` for a photo or a vocal.
+   * Throws `UnreadableFile` when the file cannot be read.
+   */
+  needsConversion(raw: string, family: FileFamily, mime: DropMime): Promise<boolean>;
   clean(raw: string, out: string, family: FileFamily, mime: DropMime): Promise<CleanedFile>;
 }

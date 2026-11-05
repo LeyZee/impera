@@ -8,6 +8,7 @@ import { eraseOriginals, type RetentionRun } from './application/retention';
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type { DropStorage, IdeaContentRequest } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
+import { createScratchRoom } from './infra/cleaning/room';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import {
   createDrizzleAgencyContentStore,
@@ -25,6 +26,8 @@ export interface ContentDropsModule {
   readonly jobs: {
     /** `content_drops.receive_file`: her file whole in the storage, received (CR-06 b). */
     receiveFile(fileId: string, correlationId: string): Promise<void>;
+    /** `content_drops.convert_file`: her video in a format the platforms do not read, converted (ADR 0070). */
+    convertFile(fileId: string, correlationId: string): Promise<void>;
     /**
      * `content_drops.erase_originals`, each hour (CR-06 c): unfinished sends refused after 24 h, the agency told 7 days
      * before an original goes, the originals due erased. Counts only.
@@ -61,6 +64,8 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const receipts = createDrizzleReceiptStore(deps.adminDb);
   const cleaner = createFileCleaner();
   const clock = deps.clock ?? (() => new Date());
+  const scratchDir = deps.scratchDir ?? tmpdir();
+  const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
   return {
     name: 'content-drops',
     routes: createContentDropRoutes(
@@ -71,13 +76,9 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       clock,
     ),
     jobs: {
-      receiveFile: (fileId, correlationId) =>
-        receiveFile(
-          { storage, receipts, cleaner, scratchDir: deps.scratchDir ?? tmpdir() },
-          fileId,
-          clock(),
-          correlationId,
-        ),
+      receiveFile: (fileId, correlationId) => receiveFile(receipt, fileId, clock(), correlationId),
+      convertFile: (fileId, correlationId) =>
+        receiveFile(receipt, fileId, clock(), correlationId, 'content_drops.convert_file'),
       eraseOriginals: (correlationId) =>
         eraseOriginals(
           { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },

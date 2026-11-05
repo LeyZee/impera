@@ -236,10 +236,10 @@ export const contentDropFiles = pgTable(
     enumCheck('content_drop_files', t.mime, DROP_MIME_TYPES),
     enumCheck('content_drop_files', t.state, DROP_FILE_STATES),
     check('content_drop_files_position_check', sql`${t.position} between 0 and 59`),
-    // The heaviest file of each kind (`DROP_MAX_BYTES`): 500 Mo for a video, 30 Mo for a photo or a vocal.
+    // The heaviest file of each kind (`DROP_MAX_BYTES`, ADR 0070 § 1): 10 Gio for a video, 30 Mo for a photo or a vocal.
     check(
       'content_drop_files_bytes_check',
-      sql`${t.bytes} > 0 and ${t.bytes} <= case when ${t.kind} = 'video' then 524288000 else 31457280 end`,
+      sql`${t.bytes} > 0 and ${t.bytes} <= case when ${t.kind} = 'video' then 10737418240 else 31457280 end`,
     ),
     check(
       'content_drop_files_refusal_check',
