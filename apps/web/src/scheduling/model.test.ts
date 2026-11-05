@@ -134,6 +134,15 @@ describe('the créneaux of a row (EQ-01)', () => {
     expect(tuesday?.[0]?.open).toBe(null);
     expect(iso(tuesday?.[1]?.open?.from)).toBe('2026-10-27T07:31:00.000Z');
     expect(iso(tuesday?.[1]?.open?.to)).toBe('2026-10-27T11:00:00.000Z');
+    // Said « maintenant », not « 8 h 31 » (recette #564); the créneaux ahead keep their hours.
+    expect(tuesday?.[1]?.open?.now).toBe(true);
+    expect(tuesday?.[2]?.open?.now).toBe(false);
+  });
+
+  it('keeps the hours of a créneau that begins at the very minute', () => {
+    const tuesday = cellsOf([], new Date('2026-10-27T11:00:00Z'))?.get('2026-10-27');
+    expect(iso(tuesday?.[2]?.open?.from)).toBe('2026-10-27T11:00:00.000Z');
+    expect(tuesday?.[2]?.open?.now).toBe(false);
   });
 
   it('says the rest of a créneau a shift left, and nothing for two shifts end to end', () => {
@@ -147,6 +156,8 @@ describe('the créneaux of a row (EQ-01)', () => {
     const tuesday = cellsOf([stopped, morning, noon], new Date('2026-10-27T00:00:00Z'))?.get('2026-10-27');
     expect(iso(tuesday?.[0]?.open?.from)).toBe('2026-10-27T02:00:00.000Z');
     expect(iso(tuesday?.[0]?.open?.to)).toBe('2026-10-27T05:00:00.000Z');
+    // It begins when the shift stopped, not now: its hours.
+    expect(tuesday?.[0]?.open?.now).toBe(false);
     expect(tuesday?.[1]?.open).toBe(null);
     expect(tuesday?.[1]?.chips).toHaveLength(2);
   });

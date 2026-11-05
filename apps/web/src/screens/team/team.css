@@ -615,6 +615,11 @@
   flex-wrap: wrap;
   gap: var(--nv-space-2);
 }
+/* What tells two accounts of one creator apart, quieter than her name, on a chip plain or checked. */
+.tm-chip__more {
+  font-weight: 500;
+  opacity: 0.72;
+}
 .tm-select {
   cursor: pointer;
 }
