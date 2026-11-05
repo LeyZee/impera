@@ -14,6 +14,7 @@ const base: AgencySuggestion = {
   title: 'Publication',
   purpose: null,
   essential: false,
+  shootBrief: null,
   origin: 'agency',
   state: 'suggested',
   reason: null,

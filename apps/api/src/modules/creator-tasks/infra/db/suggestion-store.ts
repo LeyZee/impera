@@ -213,7 +213,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
         if (zone === null) throw new SuggestionForbidden();
         const [known] = await tx.select().from(suggestions).where(eq(suggestions.id, shoot.id));
         if (known !== undefined) {
-          const stored = agencySuggestionOf(known);
+          const stored = agencySuggestionOf(known, (await followUps(tx, [known])).get(known.id) ?? null);
           // The same shoot replayed answers itself; anything else under its id is refused.
           if (stored.title !== shoot.title || stored.shootBrief !== shoot.shootBrief)
             throw new SuggestionIdTaken();
@@ -258,7 +258,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
           .onConflictDoNothing()
           .returning();
         if (row === undefined) throw new SuggestionIdTaken();
-        return agencySuggestionOf(row);
+        return agencySuggestionOf(row, null);
       }),
 
     list: (creatorId, userId, week) =>
