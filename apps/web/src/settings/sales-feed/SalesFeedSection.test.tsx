@@ -147,6 +147,22 @@ describe('Réglages › Ventes', () => {
     expect(screen.queryByText('Modèles Reveal')).toBeNull();
   });
 
+  it('masks the key, and shows it on « Afficher » (recette 05/11, PRO-29)', async () => {
+    const none = status({ state: 'not_connected', capabilities: [], lastReadAt: null, message: 'Sans clé.' });
+    serve({
+      [`GET ${BASE}`]: ok({ feeds: [none] }),
+      [`GET ${BASE}/reveal`]: ok(overview({ status: none, models: [], accounts: [], chatters: [] })),
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Connecter la clé' }));
+    const field = screen.getByLabelText('Clé de l’API CRM de Reveal');
+    expect(field.className).toContain('sv-key__secret');
+    expect(field.getAttribute('data-shown')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Afficher' }));
+    expect(field.getAttribute('data-shown')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Masquer' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('says the platform’s refusal under the field, and never keeps a refused key', async () => {
     const none = status({ state: 'not_connected', capabilities: [], lastReadAt: null, message: 'Sans clé.' });
     const fetch = serve({

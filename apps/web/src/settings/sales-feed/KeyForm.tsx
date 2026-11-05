@@ -5,6 +5,7 @@ import { connectKey } from './api';
 import { platformName, shownOf } from './shown';
 
 import { PasswordPrompt, SignInAgain } from '@/settings/services/PasswordPrompt';
+import { RevealKey } from '@/settings/services/RevealKey';
 import { ReauthRequired, type ShownError } from '@/settings/services/api';
 import { normalizeKey } from '@/settings/services/view';
 
@@ -30,6 +31,7 @@ export function KeyForm({
 }): JSX.Element {
   const name = platformName(platform);
   const input = useRef<HTMLInputElement>(null);
+  const [shown, setShown] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: 'edit', error: null });
   const isBusy = phase.kind === 'busy';
 
@@ -101,6 +103,7 @@ export function KeyForm({
           ref={input}
           type="text"
           className="sv-key__secret"
+          data-shown={shown ? 'true' : undefined}
           name="nv-sales-feed-key"
           autoComplete="off"
           autoCorrect="off"
@@ -120,6 +123,13 @@ export function KeyForm({
             const pasted = normalizeKey(event.clipboardData.getData('text'));
             event.currentTarget.value = pasted;
             void submit(pasted);
+          }}
+        />
+        <RevealKey
+          shown={shown}
+          disabled={isBusy}
+          onToggle={() => {
+            setShown(!shown);
           }}
         />
         <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={isBusy}>
