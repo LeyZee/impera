@@ -33,9 +33,24 @@
   max-width: 820px;
   margin: 0;
 }
+/*
+ * Créatrices' header (recette 05/11, PRO-22): the creators on a line of their own, first; below, her sheet's tabs and,
+ * set apart on the right, the agency's actions.
+ */
+.cr-creators {
+  flex: 1 1 100%;
+}
+.cr-agency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
 /* A phone: the creators on one line that scrolls, its far edge fading, instead of rows of chips (CREA-19). */
 @media (max-width: 640px) {
-  .cr-creators {
+  /* `.ps-chips` wraps and comes later in this file: the pair outweighs it, or the chips stacked one per row (PRO-22). */
+  .ps-chips.cr-creators {
     flex-wrap: nowrap;
     max-width: 100%;
     overflow-x: auto;

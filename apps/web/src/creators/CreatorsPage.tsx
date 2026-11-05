@@ -201,20 +201,11 @@ export function CreatorsPage({
         }
         actions={
           <>
-            {switchShown ? (
-              <SubNav
-                label="Fiche de la créatrice"
-                items={order
-                  .filter((sheet) => sheets.includes(sheet))
-                  .map((sheet) => ({
-                    to: '/creatrices',
-                    search: creatorsSearch(sheet, selected),
-                    current: shown === sheet,
-                    label: labels[sheet],
-                  }))}
-              />
-            ) : null}
-            {/* While a creator is added, only « Annuler » leads back: a chip would change nothing on screen. */}
+            {/*
+             * The creator first, then her sheet's tabs, then the agency's actions (recette 05/11, PRO-22): the tabs
+             * speak of the creator picked, so she comes before them.
+             * While a creator is added, only « Annuler » leads back: a chip would change nothing on screen.
+             */}
             {creators.length > 1 && !showForm ? (
               <div className="ps-chips cr-creators" role="radiogroup" aria-label="Créatrice">
                 {creators.map((creator) => (
@@ -233,26 +224,39 @@ export function CreatorsPage({
                 ))}
               </div>
             ) : null}
-            {isOwner && !showForm && query.isSuccess ? (
-              // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
-              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
-                Structures de script
-              </Link>
+            {switchShown ? (
+              <SubNav
+                label="Fiche de la créatrice"
+                items={order
+                  .filter((sheet) => sheets.includes(sheet))
+                  .map((sheet) => ({
+                    to: '/creatrices',
+                    search: creatorsSearch(sheet, selected),
+                    current: shown === sheet,
+                    label: labels[sheet],
+                  }))}
+              />
             ) : null}
             {isOwner && !showForm && query.isSuccess ? (
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                onClick={() => {
-                  const add = (): void => {
-                    setAdding(true);
-                  };
-                  if (dirty) setPending(() => add);
-                  else add();
-                }}
-              >
-                Ajouter une créatrice
-              </button>
+              <div className="cr-agency">
+                {/* The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c). */}
+                <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
+                  Structures de script
+                </Link>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--soft nv-btn--sm"
+                  onClick={() => {
+                    const add = (): void => {
+                      setAdding(true);
+                    };
+                    if (dirty) setPending(() => add);
+                    else add();
+                  }}
+                >
+                  Ajouter une créatrice
+                </button>
+              </div>
             ) : null}
           </>
         }

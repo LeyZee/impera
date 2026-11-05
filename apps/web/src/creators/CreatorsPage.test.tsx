@@ -126,6 +126,19 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
   });
 
+  it('heads the page with the creator, then her sheet’s tabs, then the agency’s actions (recette 05/11, PRO-22)', async () => {
+    await serve([ANNA, BEA]);
+    renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    await picked('Anna');
+    const creators = screen.getByRole('radiogroup', { name: 'Créatrice' });
+    const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
+    const structures = screen.getByRole('link', { name: 'Structures de script' });
+    const follows = (a: Node, b: Node): boolean =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(follows(creators, views)).toBe(true);
+    expect(follows(views, structures)).toBe(true);
+  });
+
   it('gives the owner her Accès, in the address, and keeps it from anyone else (CR-02)', async () => {
     await serve([ANNA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
