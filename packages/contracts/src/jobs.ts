@@ -6,6 +6,7 @@ import {
   ContentDropFileIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
+  CreatorTaskIdSchema,
   DraftIdSchema,
   EventIdSchema,
   FanIdSchema,
@@ -44,6 +45,7 @@ export const JOB_NAMES = [
   'backups.check',
   'notifications.recap',
   'notifications.creator_sale',
+  'creator_tasks.remind',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
@@ -141,6 +143,12 @@ export const JOB_PAYLOADS = {
    * part and its currency from the event, never its seller.
    */
   'notifications.creator_sale': z.object({ eventId: EventIdSchema }),
+  /**
+   * The reminder she chose for a task at an hour (CR-05 lot b3): enqueued with the task's write under the key
+   * `creator_tasks.remind:<taskId>`, at its start less her minutes. `startsAt` is the start it was scheduled for: a
+   * move replaces the job, and a job left from before rings nothing.
+   */
+  'creator_tasks.remind': z.object({ taskId: CreatorTaskIdSchema, startsAt: z.iso.datetime() }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -299,6 +307,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.recap': 3,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
+  // Replayable: told once per task and start (`notification_deliveries`).
+  'creator_tasks.remind': 3,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.

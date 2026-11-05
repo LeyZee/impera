@@ -4,7 +4,7 @@ import { useId, useState, type JSX } from 'react';
 import { setPayrollSettings, usePayrollSettings, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import { payoutDelayText, payRefusalText } from '@/payroll/model';
 import '@/payroll/pay.css';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 /** A whole number of business days the owner may announce, or null for a typo. */
 function parseDelay(text: string): number | null {

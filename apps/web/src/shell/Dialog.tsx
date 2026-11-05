@@ -3,9 +3,12 @@ import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/utils';
 
+import './dialog.css';
+
 /**
- * The floating panel of the planning (a new shift, one shift): the one glass of the screen, modal, its focus kept
- * inside, closed by Échap, by a tap outside or by its ×, and the focus given back to what opened it.
+ * The app's floating panel, born on the planning (a new shift, one shift) and used by every screen since: the one
+ * glass of the screen, modal, its focus kept inside, closed by Échap, by a tap outside or by its ×, and the focus
+ * given back to what opened it. Its styles are `dialog.css`, beside it.
  */
 export function Dialog({
   title,

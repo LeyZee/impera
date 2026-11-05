@@ -22,7 +22,7 @@ import {
 import { countryName } from '@/lib/country';
 import { fullDay } from '@/scheduling/time';
 import { Loading, Unreachable } from '@/screens/pay/parts';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
 /**

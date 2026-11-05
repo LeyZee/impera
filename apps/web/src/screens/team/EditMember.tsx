@@ -11,7 +11,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
 
-import { Dialog } from './Dialog';
 import { changeStatus, MEMBERS_KEY, setCommission, updateMember, useRates, type Outcome } from './api';
 import {
   ERROR_MESSAGES,
@@ -27,6 +26,7 @@ import { MEMBER_PALETTE, shadeOf } from './palette';
 
 import { usePlanning } from '@/scheduling/api';
 import { useAgencyToday } from '@/screens/pay/data';
+import { Dialog } from '@/shell/Dialog';
 
 /**
  * Changing a member once added (EQ-10, owner only): their team name, colour and creators; their rate from a 1st or a

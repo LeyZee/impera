@@ -27,7 +27,7 @@ import {
 import { payRefusalText } from '@/payroll/model';
 import { useSchedulingSettings } from '@/reports/api';
 import { accountLine } from '@/scheduling/model';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
 /** The longest note pay keeps on a decision (`PayReasonSchema`). */

@@ -24,7 +24,7 @@ import {
   signedAmountText,
 } from '@/reports/model';
 import { longDay } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 /** The most tiers a goal and a set keep (`CollectiveTiersSchema`, `BonusTiersSchema`). */
 const GOAL_TIERS_MAX = 10;

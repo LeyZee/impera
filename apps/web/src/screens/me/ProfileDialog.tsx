@@ -24,7 +24,7 @@ import {
   type ProfileField,
 } from '@/contractors/model';
 import { countryName } from '@/lib/country';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 const STATUSES: readonly (readonly [ContractorStatus, string])[] = [
   ['individual', 'Entrepreneur individuel'],

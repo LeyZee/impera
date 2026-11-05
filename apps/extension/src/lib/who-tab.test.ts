@@ -46,14 +46,15 @@ describe('who is signed in', () => {
     expect(firstNameOf({ name: ' Alex Morel ' })).toBe('Alex');
   });
 
-  it('offers four shortcuts at most, never a screen the role cannot open', () => {
+  it('offers four shortcuts at most, read in the CRM menus (ADR 0066 § 6), the creator her Agenda', () => {
     expect(shortcutsFor('chatter').map((s) => s.path)).toEqual([
       '/aujourdhui',
       '/suivi',
       '/planning',
       '/commissions',
     ]);
-    expect(shortcutsFor('creator').map((s) => s.path)).toEqual(['/aujourdhui', '/ventes', '/moi']);
+    expect(shortcutsFor('creator').map((s) => s.path)).toEqual(['/aujourdhui', '/agenda', '/ventes', '/moi']);
+    expect(shortcutsFor('creator')[1]).toEqual({ path: '/agenda', label: 'Agenda', icon: 'planning' });
     for (const kind of ['owner', 'manager', 'chatter', 'operator', 'creator'] as const) {
       expect(shortcutsFor(kind).length).toBeLessThanOrEqual(4);
     }

@@ -7,7 +7,7 @@ import { CategoryMark } from './category';
 import { whenWords } from './words';
 
 import { lengthOf } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 /** When a suggestion asks for, in her words; « Sans date » when it found no room in her dispos. */

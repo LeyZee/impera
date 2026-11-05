@@ -31,7 +31,7 @@ import { useReopen, type ReportDraft, type ReportScreen } from './reopen';
 import { accountLine, swapShiftLine } from '@/scheduling/model';
 import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 
 const COMMENT_MAX = 1000;
 

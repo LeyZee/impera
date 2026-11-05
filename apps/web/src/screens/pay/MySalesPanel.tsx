@@ -32,7 +32,7 @@ import { useSchedulingSettings } from '@/reports/api';
 import { amountText } from '@/reports/model';
 import { accountLine } from '@/scheduling/model';
 import { dayOf } from '@/scheduling/time';
-import { Dialog } from '@/screens/team/Dialog';
+import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
 /** The longest note pay keeps on a signal (`PayReasonSchema`). */
