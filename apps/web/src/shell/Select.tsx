@@ -59,7 +59,12 @@ const SEARCH_FROM = 10;
 /** The room the list wants under its field, search included, before it opens above it instead. */
 const POP_ROOM = 360;
 /** The space between the field and its list. */
-const GAP = 6;
+const GAP = 4;
+/**
+ * How far the list reaches past each side of its field: its rounded corners then fall outside the text under the field,
+ * so nothing of it shows between the field and the list (recette #566).
+ */
+const OUTSET = 4;
 
 /**
  * The design system's list (consigne de Charles, 05/11: no control of the system, a `<select>` least of all): a field
@@ -167,8 +172,8 @@ export function Select<V extends string>({
         host,
         above,
         style: {
-          left: box.left,
-          width: box.width,
+          left: box.left - OUTSET,
+          width: box.width + 2 * OUTSET,
           ...(above ? { bottom: window.innerHeight - box.top + GAP } : { top: box.bottom + GAP }),
         },
       });
@@ -317,7 +322,12 @@ export function Select<V extends string>({
           )}
         >
           {current === undefined ? (value === '' ? placeholder : value) : current.label}
-          {current?.hint === undefined ? null : <span className="nv-select__hint">{current.hint}</span>}
+          {current?.hint === undefined ? null : (
+            <>
+              {' '}
+              <span className="nv-select__hint">{current.hint}</span>
+            </>
+          )}
         </span>
         <svg className="nv-select__chevron" viewBox="0 0 16 16" aria-hidden="true">
           <path d="m4 6 4 4 4-4" />

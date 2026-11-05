@@ -224,6 +224,7 @@ const FRENCH_CITIES: ReadonlyMap<string, string> = new Map([
   ['Moscow', 'Moscou'],
   ['Mexico City', 'Mexico'],
   ['Sao Paulo', 'São Paulo'],
+  ['DumontDUrville', 'Dumont-d’Urville'],
 ]);
 
 /**

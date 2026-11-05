@@ -60,7 +60,7 @@ describe('NewCreatorForm', () => {
     const list = openList(zone);
     const montreal = within(list).getByRole('option', { name: 'Toronto (Montréal)' });
     expect(montreal.getAttribute('data-value')).toBe('America/Toronto');
-    expect(within(list).getByRole('option', { name: 'Tokyo · Asia' })).toBeDefined();
+    expect(within(list).getByRole('option', { name: 'Tokyo · Asie' })).toBeDefined();
   });
 
   it('sends once when the form is submitted again before the answer', async () => {

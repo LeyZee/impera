@@ -26,12 +26,27 @@ const FIRST: readonly { readonly zone: string; readonly city: string }[] = [
 ];
 const FIRST_ZONES: ReadonlySet<string> = new Set(FIRST.map((one) => one.zone));
 
-/** « Tokyo · Asia »: a city read as one, its region beside it, for every other zone the browser knows. */
+/** The regions of the zones, in French: « Monterrey · Amérique », never « · America » (recette #566). */
+const REGIONS: ReadonlyMap<string, string> = new Map([
+  ['Africa', 'Afrique'],
+  ['America', 'Amérique'],
+  ['Antarctica', 'Antarctique'],
+  ['Arctic', 'Arctique'],
+  ['Asia', 'Asie'],
+  ['Atlantic', 'Atlantique'],
+  ['Australia', 'Australie'],
+  ['Europe', 'Europe'],
+  ['Indian', 'océan Indien'],
+  ['Pacific', 'Pacifique'],
+]);
+
+/** « Tokyo · Asie »: a city read as one, its region beside it, for every other zone the browser knows. */
 const OTHERS: readonly { readonly zone: string; readonly city: string }[] = Intl.supportedValuesOf('timeZone')
   .filter((zone) => !FIRST_ZONES.has(zone))
   .map((zone) => {
     const region = zone.includes('/') ? zone.split('/')[0] : undefined;
-    return { zone, city: region === undefined ? cityOf(zone) : `${cityOf(zone)} · ${region}` };
+    const named = region === undefined ? undefined : (REGIONS.get(region) ?? region);
+    return { zone, city: named === undefined ? cityOf(zone) : `${cityOf(zone)} · ${named}` };
   })
   .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
 
