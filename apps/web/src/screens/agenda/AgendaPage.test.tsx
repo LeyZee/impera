@@ -160,6 +160,16 @@ describe('Agenda, the creator’s (CR-05)', () => {
     const shown = await screen.findByLabelText('Ton lien de calendrier');
     expect(shown.textContent).toBe(`http://localhost:3000/v1/calendar-feed/${'a'.repeat(43)}.ics`);
     expect(screen.getByText(/quiconque l’a voit ton agenda/u)).toBeDefined();
+    // Shown once: Échap keeps it on the screen until « C’est fait ».
+    fireEvent.keyDown(shown, { key: 'Escape' });
+    expect(screen.getByLabelText('Ton lien de calendrier')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'C’est fait' }));
+    fireEvent.keyDown(await screen.findByText(/Tes routines et tes fiches de tournage restent ici/u), {
+      key: 'Escape',
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
     expect(calls.some((call) => call.method === 'POST' && call.url === '/v1/scheduling/calendar-link')).toBe(
       true,
     );

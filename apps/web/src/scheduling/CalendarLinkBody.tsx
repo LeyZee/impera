@@ -48,7 +48,14 @@ export const SHIFT_LINK_WORDS: CalendarLinkWords = {
  */
 type Step = 'idle' | 'replace' | 'stop';
 
-export function CalendarLinkBody({ words }: { words: CalendarLinkWords }): JSX.Element {
+export function CalendarLinkBody({
+  words,
+  onShown,
+}: {
+  words: CalendarLinkWords;
+  /** While the address is shown, and when it is put away: a dialog around it then holds still (CR-05). */
+  onShown?: (shown: boolean) => void;
+}): JSX.Element {
   const state = useCalendarLink();
   const refresh = useRefreshPlanning();
   const [made, setMade] = useState<FeedAddresses | null>(null);
@@ -75,6 +82,7 @@ export function CalendarLinkBody({ words }: { words: CalendarLinkWords }): JSX.E
       return;
     }
     setMade(feedAddresses(outcome.value.path, window.location.origin));
+    onShown?.(true);
     setStep('idle');
     await refresh();
   }
@@ -101,6 +109,7 @@ export function CalendarLinkBody({ words }: { words: CalendarLinkWords }): JSX.E
           warning={words.made}
           onDone={() => {
             setMade(null);
+            onShown?.(false);
             setRefocus(true);
           }}
         />
@@ -166,7 +175,7 @@ export function CalendarLinkBody({ words }: { words: CalendarLinkWords }): JSX.E
             <Confirm
               words={
                 step === 'replace'
-                  ? 'L’ancien lien cessera de marcher : tu ajouteras le nouveau à ton calendrier.'
+                  ? 'L’ancien lien cessera de marcher\u00a0: tu ajouteras le nouveau à ton calendrier.'
                   : words.stopped
               }
               act={step === 'replace' ? 'Remplacer' : 'Couper'}

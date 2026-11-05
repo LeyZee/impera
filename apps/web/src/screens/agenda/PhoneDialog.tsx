@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { CalendarLinkBody, type CalendarLinkWords } from '@/scheduling/CalendarLinkBody';
 import { Dialog } from '@/shell/Dialog';
@@ -17,10 +17,17 @@ const AGENDA_LINK_WORDS: CalendarLinkWords = {
  * stays there.
  */
 export function PhoneDialog({ onClose }: { onClose: () => void }): JSX.Element {
+  // Shown once: while her address is on the screen, neither Échap nor a tap beside closes it, only « C’est fait ».
+  const [shown, setShown] = useState(false);
   return (
-    <Dialog title="Mon agenda dans mon téléphone" lead="iPhone, Mac, Google Agenda" onClose={onClose}>
+    <Dialog
+      title="Mon agenda dans mon téléphone"
+      lead="iPhone, Mac, Google Agenda"
+      busy={shown}
+      onClose={onClose}
+    >
       <div className="ag-phone">
-        <CalendarLinkBody words={AGENDA_LINK_WORDS} />
+        <CalendarLinkBody words={AGENDA_LINK_WORDS} onShown={setShown} />
       </div>
     </Dialog>
   );
