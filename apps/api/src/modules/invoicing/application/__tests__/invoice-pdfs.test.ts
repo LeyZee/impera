@@ -15,7 +15,12 @@ import {
   type MemoryInvoiceStore,
 } from '../../../contractors/infra/invoice-buckets';
 import { sampleInvoice } from '../../domain/__tests__/invoice-pdf-fixtures';
-import { InvoiceNotFound, InvoicePdfNotFound, InvoicePdfUnavailable } from '../../domain/errors';
+import {
+  InvoiceNotFound,
+  InvoicePdfGone,
+  InvoicePdfNotFound,
+  InvoicePdfUnavailable,
+} from '../../domain/errors';
 import { invoicePdfKey } from '../../domain/invoice-pdf';
 import type {
   InvoicePdfRenderer,
@@ -496,12 +501,19 @@ describe('Équipe › Factures : le téléchargement, vérifié par l’empreint
     expect(store.alerts.map((alert) => alert.place)).toEqual(['primary', 'ovhcloud', 'primary', 'ovhcloud']);
   });
 
-  it('takes a PDF a store in memory forgot with a restart for one out of reach, never a damaged one', async () => {
+  // Recette EQP-09: lost with development's memory, it is said lost, never « réessaie dans un instant ».
+  it('says lost a PDF a store in memory forgot with a restart, never a damaged one', async () => {
+    const pdf = store.invoice?.pdf ?? null;
+    if (pdf === null) throw new Error('no PDF');
+    const check = (buckets: Pick<InvoicePdfDeps, 'primary' | 'copy'>) =>
+      checkedInvoicePdf({ store, ...buckets }, { invoiceId, memberId, number: 'AEX-2026-0021', pdf }, quiet);
     const forgetful = createMemoryInvoiceStore({ volatile: true });
     expect(await download({ primary: forgetful })).toEqual({ fileName: 'AEX-2026-0021.pdf', bytes });
-    await expect(download({ primary: forgetful, copy: forgetful })).rejects.toBeInstanceOf(
-      InvoicePdfUnavailable,
-    );
+    await expect(download({ primary: forgetful, copy: forgetful })).rejects.toBeInstanceOf(InvoicePdfGone);
+    expect(await check({ primary: forgetful, copy: forgetful })).toEqual({ kind: 'forgotten' });
+    // A bucket that did not answer may still give it back: out of reach, not lost.
+    expect(await check({ primary: forgetful, copy: silent })).toEqual({ kind: 'unreachable' });
+    expect(await check({ primary: silent, copy: forgetful })).toEqual({ kind: 'unreachable' });
     expect(store.alerts).toEqual([]);
     // A bucket keeps what its lock holds: an object gone from it is a wrong file, and alerts.
     expect(await download({ primary: createMemoryInvoiceStore() })).toEqual({
@@ -519,6 +531,10 @@ describe('Équipe › Factures : le téléchargement, vérifié par l’empreint
     store.invoice = { ...store.invoice, pdf };
     await expect(download({ primary: silent })).rejects.toBeInstanceOf(InvoicePdfUnavailable);
     await expect(download({ primary: silent, copy: silent })).rejects.toBeInstanceOf(InvoicePdfUnavailable);
+    // Forgotten by the first, with no copy written from it: lost.
+    await expect(download({ primary: createMemoryInvoiceStore({ volatile: true }) })).rejects.toBeInstanceOf(
+      InvoicePdfGone,
+    );
   });
 
   it('says « not found » to a reader the document is not for, and « not ready » before the render', async () => {

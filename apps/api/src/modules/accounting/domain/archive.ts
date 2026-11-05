@@ -7,7 +7,7 @@
  * What became of a document in the archive: archived; its PDF not rendered yet; wrong at its reading (a bucket gave a
  * file unlike its fingerprint, the owner is alerted); or out of reach (no bucket answered, the export can run again).
  */
-export type ArchiveEntryState = 'archived' | 'not_rendered' | 'unreadable' | 'unreachable';
+export type ArchiveEntryState = 'archived' | 'not_rendered' | 'unreadable' | 'unreachable' | 'forgotten';
 
 /** A document of the range, as the manifest lists it. */
 export interface ArchiveEntry {
@@ -39,6 +39,7 @@ const STATES: Readonly<Record<ArchiveEntryState, string>> = {
   not_rendered: 'PDF pas encore rendu',
   unreadable: 'PDF faux à la relecture, propriétaire alerté',
   unreachable: "hébergeurs injoignables, relancer l'export",
+  forgotten: 'PDF perdu au redémarrage du serveur de développement, jamais refait',
 };
 
 const COLUMNS = ['Numéro', 'Nature', 'Émise le', 'Fichier', 'Empreinte SHA-256', 'État'] as const;

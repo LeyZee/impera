@@ -64,6 +64,7 @@ export type ArchivePdfs = (pdf: PdfToServe, logger: JobLogger) => Promise<Checke
 function stateOf(checked: CheckedPdf | null): ArchiveEntryState {
   if (checked === null) return 'not_rendered';
   if (checked.kind === 'ok') return 'archived';
+  if (checked.kind === 'forgotten') return 'forgotten';
   return checked.kind === 'wrong' ? 'unreadable' : 'unreachable';
 }
 

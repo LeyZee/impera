@@ -242,6 +242,8 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
       return 'Le PDF est en préparation : il sera là dans un instant.';
     case 'invoice_pdf_unavailable':
       return 'Le PDF n’a pas pu être relu intact : réessaie plus tard, jamais un fichier altéré n’est servi.';
+    case 'invoice_pdf_gone':
+      return 'Ce PDF est perdu : le serveur de développement le gardait en mémoire et l’a oublié en redémarrant. Il ne sera pas refait.';
     case 'agency_logo_invalid':
       return 'Ce logo n’a pas été gardé : un PNG transparent de 512 Ko au plus.';
     case 'agency_logo_not_found':

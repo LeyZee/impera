@@ -44,6 +44,7 @@
   "invoice_correction_unprocessable": 422,
   "invoice_not_found": 404,
   "invoice_pdf_conflict": 409,
+  "invoice_pdf_gone": 410,
   "invoice_pdf_not_found": 404,
   "invoice_pdf_unavailable": 503,
   "invoice_prefix_frozen_conflict": 409,

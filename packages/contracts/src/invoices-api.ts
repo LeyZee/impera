@@ -24,7 +24,8 @@ import { CalendarDaySchema } from './team-members';
  *
  * - `GET /v1/payroll/invoices/:invoiceId/pdf` (EQ-06 lot 4, ADR 0037 § 7): its PDF, as `application/pdf` named after
  *   its number. Only ever a file whose SHA-256 is the one recorded at its render; `invoice_pdf_not_found` while it is
- *   being rendered, `invoice_pdf_unavailable` when neither bucket gives it intact.
+ *   being rendered, `invoice_pdf_unavailable` when neither bucket gives it intact, `invoice_pdf_gone` when a
+ *   development server's stores in memory lost it with a restart.
  * - `GET /v1/payroll/invoices/:invoiceId/acceptance` (lot 6) → `InvoiceAcceptanceViewSchema`.
  * - `POST /v1/payroll/invoices/:invoiceId/accept` (lot 6, the contractor alone, ADR 0039 § 1) → the view, 200; the
  *   same answer sent again gives the view back.

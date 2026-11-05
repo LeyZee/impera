@@ -59,6 +59,11 @@ export const INVOICE_ERROR_CODES = [
   'invoice_pdf_not_found',
   /** Neither bucket gave the PDF with its fingerprint: never an altered file (ADR 0037 § 7). */
   'invoice_pdf_unavailable',
+  /**
+   * 410: the stores in memory of a development server lost the PDF when it restarted; it is never rendered again
+   * (ADR 0037). Production never answers it: it refuses to start without its buckets.
+   */
+  'invoice_pdf_gone',
   /** Only the contractor accepts his contract and his mandate, never the owner nor a manager for him. */
   'contract_acceptance_forbidden',
   /** The text the screen showed is not this version's: the contractor accepts only what he read. */
