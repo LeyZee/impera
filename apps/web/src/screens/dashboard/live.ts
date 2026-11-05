@@ -143,6 +143,23 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
   const lastRead = reveal.lastReadAt === null ? null : ago(reveal.lastReadAt, now);
   const waitingLong = replies.fansWaitingOver10Min;
   const dead = jobs.dead ?? 0;
+  // Named, never counted: hers and what stops her agent first, then the agency's, which only the owner is sent (PRO-10).
+  const hersStuck = jobs.stuck.filter((job) => !job.agency);
+  const agencyStuck = jobs.stuck.filter((job) => job.agency);
+  const stuckRows: [string, string][] =
+    jobs.dead === null
+      ? [['Tâches bloquées', 'pas lu']]
+      : hersStuck.length === 0
+        ? [['Tâches bloquées', 'aucune']]
+        : hersStuck.map((job): [string, string] => [
+            job.label,
+            job.count === 1 ? 'bloquée' : `${String(job.count)} bloquées`,
+          ]);
+  const agencyRows = agencyStuck.map((job): [string, string] => [
+    `Agence · ${job.label}`,
+    job.count === 1 ? 'bloquée' : `${String(job.count)} bloquées`,
+  ]);
+  const firstStuck = hersStuck[0]?.label;
   const cards: AgentState['cards'] = [
     {
       id: 'reveal',
@@ -211,20 +228,22 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         waitingLong > 0
           ? `${plural(waitingLong, 'fan attend', 'fans attendent')} plus de 10 min`
           : dead > 0
-            ? `${plural(dead, 'tâche bloquée', 'tâches bloquées')}, à regarder`
+            ? hersStuck.length === 1 && firstStuck !== undefined
+              ? `Bloqué : ${firstStuck}`
+              : `${plural(dead, 'tâche bloquée', 'tâches bloquées')}, à regarder`
             : plural(replies.conversationsOpen, 'conversation en cours', 'conversations en cours'),
       rows: [
         ['Conversations en cours', String(replies.conversationsOpen)],
         ['Fans qui attendent plus de 10 min', String(waitingLong)],
-        [
-          'Tâches bloquées',
-          jobs.dead === null ? 'pas lu' : jobs.dead === 0 ? 'aucune' : `${String(jobs.dead)}, à regarder`,
-        ],
+        ...stuckRows,
+        ...agencyRows,
       ],
       alarm:
         waitingLong > 0
           ? `${plural(waitingLong, 'fan attend', 'fans attendent')} depuis plus de 10 min`
-          : plural(dead, 'tâche est bloquée', 'tâches sont bloquées'),
+          : hersStuck.length === 1 && firstStuck !== undefined
+            ? `Bloqué : ${firstStuck}`
+            : plural(dead, 'tâche est bloquée', 'tâches sont bloquées'),
     },
     {
       // The handoffs the guards made, by cause: « Passages à l’humain », the glossary's word, never « gardes » (DASH-16).

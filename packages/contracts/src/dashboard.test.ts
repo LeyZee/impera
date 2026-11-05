@@ -19,7 +19,7 @@ const dashboard = {
   liveRate: { rate: 84, target: 80, decided: 37, threeWeeksAgo: null },
   reveal: { connected: true, lastReadAt: '2026-10-17T21:29:30.000Z', late: false, conversations: 42 },
   voice: { ok: true, keyMissing: false, medianWriteMs: 1400, outagesLast7d: 0 },
-  jobs: { dead: 0 },
+  jobs: { dead: 0, stuck: [] },
   replies: { medianReplyMinutes: 3.5, fansWaitingOver10Min: 1, conversationsOpen: 12 },
   guards: {
     today: { ...Object.fromEntries(HANDOFF_CAUSES.map((cause) => [cause, 0])), minor: 1, meeting: 2 },

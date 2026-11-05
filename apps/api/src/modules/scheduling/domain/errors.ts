@@ -435,6 +435,13 @@ export class CalendarLinkForbidden extends DomainError {
   }
 }
 
+/** A choice about her link when there is no live one: none made, or stopped. */
+export class CalendarLinkNotFound extends DomainError {
+  constructor() {
+    super('calendar_link_not_found', 'Aucun lien de calendrier en service');
+  }
+}
+
 /** Unknown, revoked, or its member left: one answer, so it tells nothing about which (CR-12). */
 export class CalendarFeedNotFound extends DomainError {
   constructor() {
