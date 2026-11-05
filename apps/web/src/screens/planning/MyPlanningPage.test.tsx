@@ -229,7 +229,8 @@ function serve(
         const from = url.searchParams.get('from') ?? '';
         const to = url.searchParams.get('to') ?? '';
         const touched = (one: Record<string, unknown>): boolean =>
-          new Date(String(one.endsAt)) > new Date(from) && new Date(String(one.startsAt)) < new Date(to);
+          new Date(String(one['endsAt'])) > new Date(from) &&
+          new Date(String(one['startsAt'])) < new Date(to);
         reply = {
           status: 200,
           body: {
