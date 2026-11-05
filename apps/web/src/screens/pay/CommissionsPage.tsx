@@ -165,10 +165,21 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const nowData = nowRead.data?.period === current ? nowRead.data : undefined;
   const past = summaries.filter((summary) => summary.window.period !== hero);
 
+  // Nothing to follow in the period under way and no statement before: one quiet line under the path rather than a
+  // column of two cards that each say there is nothing (recette 05/11, CHAT-29).
+  const plain =
+    hero === current &&
+    statement !== undefined &&
+    nowData !== undefined &&
+    !hasPerformance(nowData, user.team?.role !== 'manager') &&
+    past.length === 0 &&
+    !periods.hasNextPage &&
+    !periods.isError;
+
   return (
     <Page>
       {head()}
-      <div className="py-me">
+      <div className="py-me" data-single={plain ? 'true' : undefined}>
         <div className="py-me__col">
           {heroData === undefined ? (
             heroRead.isError ? (
@@ -222,77 +233,86 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                 expected={statement.lines.some((line) => line.base === 'platform_net')}
                 now={now}
               />
+              {plain ? (
+                <p className="py-quiet py-me__none">
+                  Pas de palier ni d’objectif d’équipe sur cette quinzaine. Tes relevés passés viendront ici.
+                </p>
+              ) : null}
             </>
           )}
         </div>
-        <div className="py-me__col">
-          <Panel
-            className="nv-enter"
-            eyebrow="Ma performance"
-            title={hero === current ? undefined : `Quinzaine ${periodLine(current)}`}
-          >
-            {nowData === undefined ? (
-              nowRead.isError ? (
-                <Unreachable
-                  what="la quinzaine en cours"
-                  onRetry={() => {
-                    void nowRead.refetch();
-                  }}
+        {plain ? null : (
+          <div className="py-me__col">
+            <Panel
+              className="nv-enter"
+              eyebrow="Ma performance"
+              title={hero === current ? undefined : `Quinzaine ${periodLine(current)}`}
+            >
+              {nowData === undefined ? (
+                nowRead.isError ? (
+                  <Unreachable
+                    what="la quinzaine en cours"
+                    onRetry={() => {
+                      void nowRead.refetch();
+                    }}
+                  />
+                ) : (
+                  <Loading rows={1} />
+                )
+              ) : (
+                <Performance
+                  period={nowData}
+                  account={nowNames.account}
+                  chatter={user.team?.role !== 'manager'}
                 />
-              ) : (
-                <Loading rows={1} />
-              )
-            ) : (
-              <Performance
-                period={nowData}
-                account={nowNames.account}
-                chatter={user.team?.role !== 'manager'}
-              />
-            )}
-          </Panel>
-          <Panel className="nv-enter" eyebrow="Mes relevés">
-            <div className="rp-sec">
-              {past.length === 0 ? (
-                <p className="py-quiet">Tes quinzaines précédentes viendront ici, chacune avec son relevé.</p>
-              ) : (
-                <ul className="py-periods">
-                  {past.map((summary, index) => (
-                    <li
-                      key={summary.window.period}
-                      className="nv-enter"
-                      style={{ '--nv-i': Math.min(index, 8) }}
-                    >
-                      <MyPeriodRow
-                        summary={summary}
-                        onOpen={() => {
-                          setOpened(summary.window.period);
-                        }}
-                      />
-                    </li>
-                  ))}
-                </ul>
               )}
-              {periods.hasNextPage ? (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
-                  disabled={periods.isFetchingNextPage}
-                  aria-busy={periods.isFetchingNextPage}
-                  onClick={() => {
-                    void periods.fetchNextPage();
-                  }}
-                >
-                  {periods.isFetchingNextPage ? 'Lecture…' : 'Quinzaines plus anciennes'}
-                </button>
-              ) : null}
-              {periods.isError && !lost ? (
-                <p className="tm-warn" role="alert">
-                  Le serveur ne répond pas : les quinzaines plus anciennes n’ont pas pu être lues.
-                </p>
-              ) : null}
-            </div>
-          </Panel>
-        </div>
+            </Panel>
+            <Panel className="nv-enter" eyebrow="Mes relevés">
+              <div className="rp-sec">
+                {past.length === 0 ? (
+                  <p className="py-quiet">
+                    Tes quinzaines précédentes viendront ici, chacune avec son relevé.
+                  </p>
+                ) : (
+                  <ul className="py-periods">
+                    {past.map((summary, index) => (
+                      <li
+                        key={summary.window.period}
+                        className="nv-enter"
+                        style={{ '--nv-i': Math.min(index, 8) }}
+                      >
+                        <MyPeriodRow
+                          summary={summary}
+                          onOpen={() => {
+                            setOpened(summary.window.period);
+                          }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {periods.hasNextPage ? (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--sm"
+                    disabled={periods.isFetchingNextPage}
+                    aria-busy={periods.isFetchingNextPage}
+                    onClick={() => {
+                      void periods.fetchNextPage();
+                    }}
+                  >
+                    {periods.isFetchingNextPage ? 'Lecture…' : 'Quinzaines plus anciennes'}
+                  </button>
+                ) : null}
+                {periods.isError && !lost ? (
+                  <p className="tm-warn" role="alert">
+                    Le serveur ne répond pas : les quinzaines plus anciennes n’ont pas pu être lues.
+                  </p>
+                ) : null}
+              </div>
+            </Panel>
+          </div>
+        )}
       </div>
       {opened === null ? null : (
         <MyStatementDialog
@@ -345,6 +365,14 @@ function Hero({
       ))}
     </section>
   );
+}
+
+/** Whether the period under way has a tier or, for a chatter, a team goal to follow. */
+function hasPerformance(period: PayrollPeriod, chatter: boolean): boolean {
+  const statement = period.statements[0];
+  const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
+  const goal = chatter ? (statement?.rules.collectiveGoal ?? period.collectiveGoal) : null;
+  return tiers.length > 0 || goal !== null;
 }
 
 /**

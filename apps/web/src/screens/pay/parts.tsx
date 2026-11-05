@@ -216,6 +216,7 @@ export function MoneyPath({
   /** The name of what is paid, as the screen's hero says it, so that one amount has one name. */
   payLabel?: string;
 }): JSX.Element {
+  const totals = totalsOf(statement, you, payLabel);
   return (
     <>
       {statement.lines.length === 0 ? null : (
@@ -275,20 +276,22 @@ export function MoneyPath({
           })}
         </ul>
       )}
-      <dl className="py-lines nv-num">
-        {totalsOf(statement, you, payLabel).map((row, index) => (
-          <div
-            key={`${row.label}-${String(index)}`}
-            className={row.kind === 'line' ? undefined : `py-lines__${row.kind}`}
-          >
-            <dt>
-              {row.kind === 'carry' ? <span>{row.label}</span> : row.label}
-              {row.note === null ? null : <small>{row.note}</small>}
-            </dt>
-            <dd>{row.amount}</dd>
-          </div>
-        ))}
-      </dl>
+      {totals.length === 0 ? null : (
+        <dl className="py-lines nv-num">
+          {totals.map((row, index) => (
+            <div
+              key={`${row.label}-${String(index)}`}
+              className={row.kind === 'line' ? undefined : `py-lines__${row.kind}`}
+            >
+              <dt>
+                {row.kind === 'carry' ? <span>{row.label}</span> : row.label}
+                {row.note === null ? null : <small>{row.note}</small>}
+              </dt>
+              <dd>{row.amount}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </>
   );
 }
