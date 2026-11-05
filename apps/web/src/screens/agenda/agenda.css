@@ -1629,8 +1629,7 @@
     animation: none;
   }
   .ag-wk__ev,
-  .ag-frieze__task,
-  summary.ag-brief__title::after {
+  .ag-frieze__task {
     transition: none;
   }
 }
@@ -1678,6 +1677,12 @@ summary.ag-brief__title::after {
 }
 details[open] > summary.ag-brief__title::after {
   transform: rotate(45deg);
+}
+/* After its base rule, which has the same weight: the chevron turns without moving. */
+@media (prefers-reduced-motion: reduce) {
+  summary.ag-brief__title::after {
+    transition: none;
+  }
 }
 summary.ag-brief__title:focus-visible {
   outline: 2px solid var(--nv-focus);
