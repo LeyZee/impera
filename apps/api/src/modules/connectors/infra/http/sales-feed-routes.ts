@@ -85,6 +85,7 @@ export function createSalesFeedRoutes(
       };
     };
     const keyCalls = ownerLimit('key', KEY_CALLS_PER_MINUTE);
+    const webhookCalls = ownerLimit('webhook', KEY_CALLS_PER_MINUTE);
     const imports = ownerLimit('import', IMPORTS_PER_MINUTE);
     const checks = ownerLimit('check', CHECKS_PER_MINUTE);
 
@@ -133,7 +134,7 @@ export function createSalesFeedRoutes(
     app.put(
       '/settings/sales-feeds/:platform/webhook',
       {
-        preValidation: [options.recentLogin, keyCalls],
+        preValidation: [options.recentLogin, webhookCalls],
         schema: {
           params: PlatformParamsSchema,
           response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalSchema },
