@@ -7,6 +7,7 @@ import {
   CreatorIdSchema,
   AnswerShiftSwapRequestBodySchema,
   CalendarLinkCreatedSchema,
+  CalendarLinkChoiceSchema,
   CalendarLinkStateSchema,
   CalendarQuerySchema,
   CalendarSchema,
@@ -204,6 +205,16 @@ export function createSchedulingRoutes(
       '/scheduling/calendar-link',
       { preValidation: linkHolder, schema: { response: { 201: CalendarLinkCreatedSchema } } },
       async (request, reply) => reply.code(201).send(await calendarLinks.create(actorOf(request))),
+    );
+
+    // ADR 0045 § 5: her accounts' shifts in her link, a creator's choice alone (a member's link is his shifts already).
+    app.patch(
+      '/scheduling/calendar-link',
+      {
+        preValidation: requireRole('creator'),
+        schema: { body: CalendarLinkChoiceSchema, response: { 200: CalendarLinkStateSchema } },
+      },
+      (request) => calendarLinks.choose(actorOf(request), request.body),
     );
 
     app.delete('/scheduling/calendar-link', { preValidation: linkHolder }, async (request, reply) => {
