@@ -15,7 +15,7 @@ import {
 } from './api';
 import { draftsOf, threadOf, whyHuman } from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
-import { bubblesFromText, bubblesProblem, MODE_LABELS, STATE_LABELS, statusClass } from './view';
+import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, statusClass } from './view';
 
 import { initialOf } from '@/lib/utils';
 
@@ -201,7 +201,7 @@ function Loaded({
             <span className="tr-reader__state">
               <span className={`nv-status ${statusClass(drafts.state)}`}>
                 <span className="nv-status__dot" />
-                {STATE_LABELS[drafts.state]}
+                {READER_STATE_LABELS[drafts.state]}
               </span>
               <span className="nv-meta">{MODE_LABELS[detail.mode]}</span>
             </span>

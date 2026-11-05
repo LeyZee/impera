@@ -70,9 +70,17 @@ describe('/v1/creators/:creatorId/ideas', () => {
     return creatorId;
   }
 
-  async function member(email: string, teamRole: 'manager' | 'chatter'): Promise<string> {
+  /** An operator with Nora and Ines on his list: a manager reaches only those (recette 05/11, reco 8). */
+  async function member(
+    email: string,
+    teamRole: 'manager' | 'chatter',
+    creatorIds: readonly CreatorId[] = [nora, ines],
+  ): Promise<string> {
     const { userId } = await createOwner(app.auth, app.db.db, { email, name: email, password: PASSWORD });
-    await test.admin.db.update(schema.user).set({ role: 'operator' }).where(eq(schema.user.id, userId));
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'operator', creatorIds: [...creatorIds] })
+      .where(eq(schema.user.id, userId));
     await test.admin.db.insert(schema.teamMembers).values({
       id: newId(TeamMemberIdSchema),
       userId,
@@ -178,6 +186,10 @@ describe('/v1/creators/:creatorId/ideas', () => {
     const chatter = await call('GET', `/v1/creators/${nora}/ideas?day=${TODAY}`, cookies.chatter);
     expect([chatter.statusCode, codeOf(chatter)]).toEqual([403, 'content_idea_forbidden']);
     expect((await call('GET', `/v1/creators/${nora}/ideas?day=${TODAY}`, cookies.nora)).statusCode).toBe(403);
+    // A manager of Ines alone never reads Nora's ideas (recette 05/11, reco 8).
+    const ofInes = await member('manager-ines@example.test', 'manager', [ines]);
+    const elsewhere = await call('GET', `/v1/creators/${nora}/ideas?day=${TODAY}`, ofInes);
+    expect([elsewhere.statusCode, codeOf(elsewhere)]).toEqual([403, 'creator_forbidden']);
     const otherDay = await call('GET', `/v1/creators/${nora}/ideas?day=2026-11-04`, cookies.owner);
     expect(ContentIdeaListSchema.parse(otherDay.json())).toEqual({ day: '2026-11-04', items: [] });
     // Without a day: today in her zone.
