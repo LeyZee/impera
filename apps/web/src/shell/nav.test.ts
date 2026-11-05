@@ -99,6 +99,10 @@ describe('railOf, with the screens of today', () => {
     expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
     expect(railOf(chatter).more.size).toBe(0);
+    // Their bar ends there: Moi › Préférences holds what « Plus » held (D-03); the operator, without Moi, keeps it.
+    expect(railOf(chatter).phoneMenu).toBe(false);
+    expect(railOf(manager).phoneMenu).toBe(false);
+    expect(railOf(operator).phoneMenu).toBe(true);
     // A creator gets her own space (ADR 0042 § 8): Aujourd'hui, Agenda, Ventes (her fans first) and Moi, Contenu
     // coming with its screen; never Suivi nor the agency's Dashboard, her persona being in Moi.
     expect(labels(creator)).toEqual(['Aujourd’hui', 'Agenda', 'Ventes', 'Moi']);
