@@ -40,6 +40,10 @@ Le même job, une fois le fichier reçu, le télécharge dans un dossier tempora
 
 Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au moins un est gardé, à « bloqué » (« Aucun fichier de ce dépôt n'a pu être gardé ») quand tous sont refusés. Un ffmpeg absent ou tué par son délai fait réessayer le job, jamais refuser le fichier.
 
+## Une demande née d'une idée (VEI-01 d2)
+
+`requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.
+
 ## Routes
 
 - `GET /v1/creator-space/content` (créatrice) : ses demandes (la plus proche d'abord) et ses 100 derniers dépôts non retirés.

@@ -5,12 +5,13 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { NO_STORAGE, receiveFile } from './application/uploads';
-import type { DropStorage } from './domain/ports';
+import type { DropStorage, IdeaContentRequest } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
   createDrizzleReceiptStore,
+  requestFromIdea,
 } from './infra/db/store';
 import { createContentDropRoutes, type RequireRole } from './infra/http/routes';
 import { createS3DropStorage, type MediaBucketConfig } from './infra/storage/s3';
@@ -23,7 +24,14 @@ export interface ContentDropsModule {
     /** `content_drops.receive_file`: her file whole in the storage, received (CR-06 b). */
     receiveFile(fileId: string, correlationId: string): Promise<void>;
   };
+  /**
+   * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
+   * `idea`, under the idea's id, replayable.
+   */
+  requestFromIdea(request: IdeaContentRequest): Promise<void>;
 }
+
+export type { IdeaContentRequest } from './domain/ports';
 
 export interface ContentDropsDeps {
   /** Application role: her own account's RLS, or the team's. */
@@ -64,5 +72,6 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
           correlationId,
         ),
     },
+    requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
   };
 }

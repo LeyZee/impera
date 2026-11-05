@@ -60,6 +60,19 @@ export type FileOutcome =
   | { readonly state: 'refused'; readonly refusal: string }
   | { readonly state: 'kept'; readonly media: CleanedMedia };
 
+/**
+ * A content request asked by an idea of the trend watch (VEI-01 d2): the shoot she accepted in her agenda. Its id is
+ * the idea's, its reason the idea's title (80 characters at most), due on the day of her shoot. Never a script: a
+ * script is asked with a structure of the library, which only the team's own request checks.
+ */
+export interface IdeaContentRequest {
+  readonly id: string;
+  readonly creatorId: string;
+  readonly category: Exclude<DropCategory, 'script'>;
+  readonly dueOn: string;
+  readonly reason: string;
+}
+
 /** What the receipt job finds of a file and writes of it (`withAdmin`). */
 export interface ReceiptStore {
   /** The file, its drop and the drop's category; `null` when it is not there. */
