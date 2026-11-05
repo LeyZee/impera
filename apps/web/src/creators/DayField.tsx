@@ -48,7 +48,7 @@ export function DayField({
   /** Refused by the form as it stands (a day too early): said on the control itself. */
   invalid?: boolean;
   disabled?: boolean;
-  describedBy?: string;
+  describedBy?: string | undefined;
 }): JSX.Element {
   const [draft, setDraft] = useState<string | null>(null);
   const [left, setLeft] = useState(false);
