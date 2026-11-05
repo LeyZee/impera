@@ -368,13 +368,17 @@ button.sc-duty__one:active {
   min-width: 0;
   padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-5);
 }
+/* Her name on two lines at most, so that « Créatrice Recette A » and « … B » read apart (recette 05/11, CHAT-15). */
 .sc-grid__creator {
+  display: -webkit-box;
   font-size: var(--nv-text-callout);
   line-height: var(--nv-text-callout-leading);
   font-weight: 650;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .sc-grid__handle {
   font-size: var(--nv-text-caption);

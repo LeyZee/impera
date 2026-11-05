@@ -758,7 +758,11 @@ describe('the team’s calendar on the chatter’s Planning (CR-12)', () => {
     const live = [...row.querySelectorAll('.cal-chip[data-phase="live"]')];
     expect(live.map((chip) => chip.getAttribute('data-carried'))).toEqual([null, null]);
     expect(within(row).getAllByText('Basile')).toHaveLength(2);
-    expect(text(row)).toContain('Basile… 8 h – 14 h');
+    // Across two créneaux of one day, it is read once: the second only says it goes on, greyed (CHAT-15).
+    expect(text(row)).not.toContain('Basile… 8 h – 14 h');
+    const cont = row.querySelector('.cal-chip--cont');
+    expect(text(cont)).toBe('Basilesuite');
+    expect(cont?.getAttribute('data-carried')).toBe('true');
     // Nobody but the agent, in Automatique: « IA seule », said in words too.
     expect(text(row)).toContain('18 h – 0 h, l’IA seule');
     expect(within(row).getAllByText('IA seule').length).toBeGreaterThan(0);
