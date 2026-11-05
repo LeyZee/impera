@@ -32,7 +32,7 @@ ADR 0069 (tout), ADR 0050 § 3 et § 4, ADR 0054, ADR 0010 (aucune donnée réel
 ### Lot b (Extension)
 
 - [x] (b1) Réglages › Ventes Reveal : bloc « N créatrices trouvées sur Reveal », une ligne par modèle (initiales, nom, pseudo, statut, action proposée modifiable), cases, « Importer la sélection » (mot de passe redemandé), résultat par ligne avec « Voir sa fiche », liste repliée « Écartées » avec « Reprendre » (`ImportPanel.tsx`, `importing.ts`). Photo : la CSP du CRM (`img-src 'self'`) refuse l'adresse Reveal ; avant l'import, ses initiales ; après, la photo copiée (lot a2).
-- [ ] (b2) Badge « N nouvelles créatrices sur Reveal » pour le propriétaire seul : attend un compteur lu en base (lot a2), l'aperçu lisant Reveal en direct.
+- [x] (b2) Badge « N nouvelles créatrices sur Reveal » pour le propriétaire seul : le nombre sur l'onglet Réglages › Ventes, dit en toutes lettres au survol et au lecteur d'écran (`GET /v1/settings/sales-feeds/new-models`, lu en base ; relu à chaque lecture du bloc d'import). Une erreur ou une attente laisse l'onglet nu.
 - [ ] (b2) Sur la fiche d'une créatrice importée : ce qui reste à faire (pourcentage, fuseau, persona, invitation). En b1, le résultat de l'import le dit en une ligne.
 - [ ] Captures Nuit et Jour, téléphone et ordinateur, montrées à Charles avant fusion (b1 : `reglages-ventes/crm-07b/` dans les fichiers du projet).
 
