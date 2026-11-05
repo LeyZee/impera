@@ -2,7 +2,7 @@
 
 - Fiche : recette du 05/11, PRO-14 et reco 23 ; ADR 0071 § 2, acceptée par Charles (« ok 0071 », 05/11 20 h 22).
 - Fait :
-  - migration 0118 : `creators.archived_at` ;
+  - migration `creators_archive` : `creators.archived_at` ;
   - `POST /v1/creators/:creatorId/archive` et `…/restore`, `GET /v1/creators/archived` (propriétaire seul, connexion récente pour écrire) ;
   - l'archivage est refusé en 409 `creator_planned_conflict` tant qu'un shift n'est pas fini ou qu'un shift régulier tourne, avec les deux comptes (`scheduling.planned`) ;
   - une fois archivée :
