@@ -117,7 +117,6 @@ export function useInvoiceAcceptance(invoiceId: string | null): UseQueryResult<I
 }
 
 /** Where a document's PDF downloads: the server names the file after its number (`attachment`). */
-export const invoicePdfUrl = (invoiceId: string): string => `${BASE}/${invoiceId}/pdf`;
 
 /** Besides the invoices' own: an end of a contest by anyone but the owner, a role guard, a body let through. */
 export type InvoiceRefusalCode =
@@ -150,6 +149,22 @@ async function refusalOf(response: Response): Promise<InvoiceRefusal> {
   if (!parsed.success || !isKnown(parsed.data.error.code)) return { kind: 'failed' };
   const details = DetailsSchema.safeParse(parsed.data.error.details);
   return { kind: 'refused', code: parsed.data.error.code, details: details.success ? details.data : {} };
+}
+
+/**
+ * A document's PDF as its bytes, read before it is saved: a PDF the server cannot give says why on the screen, never
+ * saved as a file holding its error (recette EQP-08). An answer that is not a PDF is `failed`.
+ */
+export async function readInvoicePdf(invoiceId: string): Promise<InvoiceOutcome<Blob>> {
+  try {
+    const response = await fetch(`${BASE}/${invoiceId}/pdf`, { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) return await refusalOf(response);
+    if (!(response.headers.get('content-type') ?? '').startsWith('application/pdf'))
+      return { kind: 'failed' };
+    return { kind: 'ok', value: new Blob([await response.arrayBuffer()], { type: 'application/pdf' }) };
+  } catch {
+    return { kind: 'failed' };
+  }
 }
 
 /** What a write sends: a JSON body, or a file's bytes as they are. */

@@ -210,6 +210,12 @@ const CORRECTION_REFUSALS: ReadonlyMap<string, string> = new Map([
   ['above_pay_amount_max', 'Ce qui reste de cette facture dépasse ce qu’un ajustement de paie peut porter.'],
 ]);
 
+/** Why a PDF was not saved: a read, so a server that does not answer has saved nothing to say (recette EQP-08). */
+export const pdfRefusalText = (refusal: InvoiceRefusal): string =>
+  refusal.kind === 'failed'
+    ? 'Le serveur ne répond pas : le PDF n’a pas pu être lu. Réessaie dans un instant.'
+    : invoiceRefusalText(refusal);
+
 /**
  * Every refusal of the invoices' routes, in French (EQ-06 lot 8: never a raw code). The codes of the file and of
  * Réglages › Facturation are worded here too, for the screens of 8b and 8c; one switch, exhaustive, so a new code
