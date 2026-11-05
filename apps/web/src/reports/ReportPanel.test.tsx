@@ -158,7 +158,11 @@ function renderPage(): void {
     path: '/aujourdhui',
     component: () => <TodayPage user={THEO_ME} />,
   });
-  const tracking = createRoute({ getParentRoute: () => root, path: '/suivi', component: () => <p>Suivi</p> });
+  const tracking = createRoute({
+    getParentRoute: () => root,
+    path: '/suivi',
+    component: () => <p>Écran Suivi</p>,
+  });
   const router = createRouter({
     routeTree: root.addChildren([page, tracking]),
     history: createMemoryHistory({ initialEntries: ['/aujourdhui'] }),
@@ -293,8 +297,8 @@ describe('Faire mon rapport', () => {
     await screen.findByRole('dialog');
     fireEvent.change(amountField(), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer mon rapport' }));
-    fireEvent.click(screen.getByRole('link', { name: 'Ouvrir Suivi' }));
-    await screen.findByText('Suivi');
+    fireEvent.click(screen.getByRole('link', { name: 'Suivi' }));
+    await screen.findByText('Écran Suivi');
     await act(() => vi.advanceTimersByTimeAsync(5_000));
 
     expect(writes).toHaveLength(1);
@@ -305,7 +309,7 @@ describe('Faire mon rapport', () => {
     // Aujourd'hui is gone with its panel: « Rouvrir » goes back to it and opens the report there.
     fireEvent.click(within(alert).getByRole('button', { name: 'Rouvrir' }));
     const dialog = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
-    expect(screen.queryByText('Suivi')).toBeNull();
+    expect(screen.queryByText('Écran Suivi')).toBeNull();
     expect(within(dialog).getByDisplayValue('30')).toBe(amountField());
   });
 
@@ -315,8 +319,8 @@ describe('Faire mon rapport', () => {
     await screen.findByRole('dialog');
     fireEvent.change(amountField(), { target: { value: '45' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer mon rapport' }));
-    fireEvent.click(screen.getByRole('link', { name: 'Ouvrir Suivi' }));
-    await screen.findByText('Suivi');
+    fireEvent.click(screen.getByRole('link', { name: 'Suivi' }));
+    await screen.findByText('Écran Suivi');
 
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
     const dialog = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
@@ -418,7 +422,7 @@ describe('Mes rapports', () => {
     renderPage();
     const mine = await screen.findByText('Tous mes rapports');
     const text = (mine.closest('section')?.textContent ?? '').replaceAll(/\s/gu, ' ');
-    expect(text).toContain('Validé0,00 €');
+    expect(text).toContain('Ventes validées0,00 €');
     expect(text).toContain('En attente15,00 €');
     expect(text).toContain('1 validé · 1 en attente');
   });
@@ -439,7 +443,7 @@ describe('Mes rapports', () => {
     const mine = await screen.findByText('Tous mes rapports');
     const card = mine.closest('section');
     const text = (card?.textContent ?? '').replaceAll(/\s/gu, ' ');
-    expect(text).toContain('Validé80,00 €');
+    expect(text).toContain('Ventes validées80,00 €');
     expect(text).toContain('En attente15,00 €');
     expect(text).toContain('Renvoyé40,00 €');
     // Report by report: the correction waiting is said on its line, not counted as a report.
