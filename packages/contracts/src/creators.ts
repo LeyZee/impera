@@ -8,6 +8,11 @@ export const CreatorSummarySchema = z.object({
   id: CreatorIdSchema,
   displayName: z.string().min(1),
   timezone: z.string().min(1),
+  /**
+   * Her photo is kept by us (CRM-07 a2b): `GET /v1/creators/:creatorId/avatar` serves it. Given by the list only;
+   * absent, her initials.
+   */
+  hasAvatar: z.boolean().optional(),
 });
 export type CreatorSummary = z.infer<typeof CreatorSummarySchema>;
 
@@ -57,11 +62,13 @@ export type UpdateCreatorBody = z.infer<typeof UpdateCreatorBodySchema>;
 /**
  * The error codes of `/v1/creators` (the suffix gives the status, api.md): `creator_conflict` 409, this form's id
  * already made a creator under another name or zone ; `creator_name_conflict` 409, another creator has this name
- * (`creatorNameKey`) ; `creator_not_found` 404. Nothing is written on any of them.
+ * (`creatorNameKey`) ; `creator_not_found` 404 ; `creator_avatar_not_found` 404, no photo kept for her (her
+ * initials then). Nothing is written on any of them.
  */
 export const CREATOR_ERROR_CODES = [
   'creator_conflict',
   'creator_name_conflict',
   'creator_not_found',
+  'creator_avatar_not_found',
 ] as const;
 export type CreatorErrorCode = (typeof CREATOR_ERROR_CODES)[number];

@@ -28,6 +28,7 @@ import {
 } from '@impera/contracts';
 
 import { fortnightBefore, mismatchDays, type CheckedAccount } from '../domain/auto-check';
+import type { AvatarPorts } from '../domain/avatar';
 import { isLastingOutage, nextUnreachableRun, type UnreachableRun } from '../domain/connection-outage';
 import {
   SalesFeedAccountUnprocessable,
@@ -68,6 +69,8 @@ import {
   type StoredSalesFeedKey,
 } from '../domain/sales-feed';
 import { SALES_FEED_ERROR_MESSAGES, salesFeedMessage } from '../domain/sales-feed-messages';
+
+import { copyAvatarFrom } from './avatar-copy';
 
 /**
  * How often the reading looks at the platform's model list (CRM-07 a2): for the badge of new models, and the signal of a
@@ -115,6 +118,8 @@ export interface SalesFeedDeps {
     signal: ConnectionSignal,
     correlationId: string,
   ) => Promise<unknown>;
+  /** Her photo's copy at import (CRM-07 a2b); `null` without a media bucket (`S3_*`): her initials stay. */
+  readonly avatars?: AvatarPorts | null;
 }
 
 export interface SalesFeeds {
@@ -195,6 +200,12 @@ export interface SalesFeeds {
     logger: JobLogger,
     correlationId: string,
   ): Promise<void>;
+  /**
+   * The `connector.copy_avatar` job (CRM-07 a2b): the model read again in the platform's live list, never an address
+   * the client or the queue carried, and her photo copied to our bucket. What cannot be copied is said in the log and
+   * left (her initials stay); a platform or storage that does not answer throws, so the job is tried again.
+   */
+  copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
 }
 
 /** The two statistics of the days, one call after the other: Reveal allows ten a minute a key. */
@@ -303,6 +314,25 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     const stored = await deps.keys?.find(platform);
     if (stored?.key == null || stored.state !== 'connected') return null;
     return factoryOf(platform).create(stored.key);
+  }
+
+  /** The photo's copy, or why it was not made (CRM-07 a2b). */
+  async function copyAvatarOf(payload: JobPayload<'connector.copy_avatar'>): Promise<string | null> {
+    const avatars = deps.avatars ?? null;
+    if (avatars === null) return 'no_bucket';
+    if (registry[payload.platform] === undefined) return 'not_connected';
+    const feed = await liveFeed(payload.platform);
+    if (feed === null) return 'not_connected';
+    const listed = await feed.listModels();
+    if (!listed.ok) {
+      if (listed.failure.kind === 'refused') return 'list_refused';
+      throw new Error(`creator photo: ${payload.platform} model list unavailable (${listed.failure.kind})`);
+    }
+    const model = listed.value.find((candidate) => candidate.platformModelId === payload.platformModelId);
+    if (model === undefined) return 'not_listed';
+    if (model.avatarUrl === null) return 'no_photo';
+    const outcome = await copyAvatarFrom(avatars, payload.creatorId, model.avatarUrl);
+    return outcome.copied ? null : outcome.skip;
   }
 
   async function overview(platform: Platform): Promise<SalesFeedOverview> {
@@ -801,6 +831,14 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         if (outcome === 'refused') refused.push(platform);
       }
       if (refused.length > 0) throw new Error(`sales feed automatic check refused by ${refused.join(', ')}`);
+    },
+
+    async copyAvatar(payload, logger) {
+      const { platform, platformModelId, creatorId } = payload;
+      const skip = await copyAvatarOf(payload);
+      // Ids only: never the address, which names her at the platform.
+      if (skip === null) logger.info({ platform, platformModelId, creatorId }, 'creator photo copied');
+      else logger.info({ platform, platformModelId, creatorId, skip }, 'creator photo not copied');
     },
 
     async read(logger, correlationId, woken) {

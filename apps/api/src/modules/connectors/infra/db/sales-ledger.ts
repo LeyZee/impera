@@ -16,6 +16,7 @@ import {
   SalesFeedCheckReportSchema,
   SalesLineIdSchema,
   type CreatorId,
+  type JobPayload,
   type Platform,
   type PlatformSale,
   type SalesFeedImportLineResult,
@@ -580,6 +581,22 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
             .delete(dismissals)
             .where(and(eq(dismissals.platform, platform), eq(dismissals.platformModelId, platformModelId)));
           const created = action.kind === 'create';
+          // Her photo copied to our bucket once she exists (ADR 0069 § 3), in this transaction: a refused line enqueues
+          // nothing. The job reads the address again from the platform's list; the queue carries ids only.
+          if (created && model.avatarUrl !== null) {
+            const payload: JobPayload<'connector.copy_avatar'> = { platform, platformModelId, creatorId };
+            await tx.execute(
+              sql`select public.enqueue_job(
+                task => ${'connector.copy_avatar'},
+                payload => ${JSON.stringify(payload)}::jsonb,
+                queue_name => null,
+                run_at => null,
+                max_attempts => ${JOB_MAX_ATTEMPTS['connector.copy_avatar']}::int,
+                job_key => ${`connector.copy_avatar:${creatorId}`},
+                job_key_mode => ${'replace'}
+              )`,
+            );
+          }
           // The model's id and what it became: never its subscribers, prices or amounts (ADR 0069 § 6).
           await auditModel(tx, 'sales_feed.model_imported', platform, platformModelId, by, {
             creatorId,
