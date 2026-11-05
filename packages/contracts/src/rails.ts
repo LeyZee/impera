@@ -81,6 +81,8 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
       ['/suivi', null],
       ['/equipe', null],
       ['/paie', null],
+      // Her agenda alone (CR-05 lot c, Charles, 05/11): the other sheets of Créatrices stay the owner's.
+      ['/creatrices', null],
       ['/moi', null],
     ],
     settings: false,

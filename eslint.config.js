@@ -35,8 +35,9 @@ const MODULE_DEPENDENCIES = {
   accounting: ['payroll', 'invoicing', 'contractors'],
   notifications: [],
   // ADR 0060: the trend watch reads her limits as the agent's guards do (`touchesTerm`), and a validated idea enters her
-  // agenda through the agenda's own door (`suggestShoot`, VEI-01 d), never by writing its tables.
-  trends: ['agent', 'creator-tasks'],
+  // agenda through the agenda's own door (`suggestShoot`, VEI-01 d1), and the shoot she accepts asks its content
+  // through the drops' door (`requestFromIdea`, d2), never by writing their tables.
+  trends: ['agent', 'content-drops', 'creator-tasks'],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
   'creator-tasks': ['scheduling'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
