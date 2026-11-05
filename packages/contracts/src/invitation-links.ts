@@ -22,8 +22,9 @@ export const PASSWORD_MAX_LENGTH = 128;
 export const PASSWORD_MIN_DISTINCT = 4;
 
 /**
- * A password long enough only by its blanks or by one character repeated (recette SEC-04): refused as `refused`, the
- * same rule on the page and on the server. Characters, not UTF-16 units, are counted.
+ * A password long enough only by its blanks or by one character repeated (recette SEC-04): refused by the server as
+ * `too_plain`, which the link page says in clear. The length is in UTF-16 units like `PASSWORD_MIN_LENGTH`, the
+ * distinct ones in characters.
  */
 export function isPasswordTooPlain(password: string): boolean {
   return password.trim().length < PASSWORD_MIN_LENGTH || new Set(password).size < PASSWORD_MIN_DISTINCT;
