@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { decide, doneDays, maySuggest, sameTask, SuggestionDecidedError, weekOf } from '../suggestions';
+import {
+  decide,
+  doneDays,
+  maySuggest,
+  repeatsOpen,
+  sameTask,
+  SuggestionDecidedError,
+  weekOf,
+} from '../suggestions';
 
 describe('her gesture on a suggestion (ADR 0042 § 3)', () => {
   it('accepts or declines a suggestion once', () => {
@@ -53,5 +61,21 @@ describe('doneDays', () => {
   it('counts every tick of a dated task, whatever week she moved it to', () => {
     expect(doneDays('day', '2026-11-02', ['2026-11-12'])).toBe(1);
     expect(doneDays('timed', '2026-11-02', [])).toBe(0);
+  });
+});
+
+describe('a suggestion that repeats one still open (CREA-16)', () => {
+  const live = { category: 'live', title: 'Live hors dispo', moment: '["timed","a"]' };
+
+  it('is the same task at the same moment, or the same task where either found no room', () => {
+    expect(repeatsOpen({ ...live, title: 'live hors dispo ' }, [live])).toBe(true);
+    expect(repeatsOpen({ ...live, moment: null }, [live])).toBe(true);
+    expect(repeatsOpen(live, [{ ...live, moment: null }])).toBe(true);
+  });
+
+  it('is not another moment, nor another task', () => {
+    expect(repeatsOpen({ ...live, moment: '["timed","b"]' }, [live])).toBe(false);
+    expect(repeatsOpen({ ...live, title: 'Live du soir' }, [live])).toBe(false);
+    expect(repeatsOpen(live, [])).toBe(false);
   });
 });

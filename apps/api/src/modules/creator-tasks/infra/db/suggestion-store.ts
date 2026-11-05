@@ -3,10 +3,15 @@ import { and, eq, inArray, schema, sql, withTenantMember, type Database, type Tr
 
 import { addDays, calendarDayIn } from '../../../scheduling/pure';
 import { availabilityWindows, type Interval } from '../../domain/availability';
-import { SuggestionDeclinedRecently, SuggestionForbidden, SuggestionIdTaken } from '../../domain/errors';
+import {
+  SuggestionAlreadyOpen,
+  SuggestionDeclinedRecently,
+  SuggestionForbidden,
+  SuggestionIdTaken,
+} from '../../domain/errors';
 import { firstPlacement, placementOf } from '../../domain/placement';
 import type { AgencySuggestionStore } from '../../domain/ports';
-import { doneDays, maySuggest, weekOf } from '../../domain/suggestions';
+import { doneDays, maySuggest, repeatsOpen, weekOf } from '../../domain/suggestions';
 
 import { agencySuggestionOf, availabilityOf, taskOf, whenColumns } from './rows';
 
@@ -142,6 +147,24 @@ async function firstRoom(
   return firstPlacement(minutes, windows, await busyBetween(tx, now, new Date(until)), now);
 }
 
+/** A suggestion's moment as a key, `null` when it found no room: its kind and the columns of that kind. */
+function momentOf(columns: {
+  readonly kind: string;
+  readonly startsAt: Date | null;
+  readonly endsAt: Date | null;
+  readonly day: string | null;
+  readonly weekdays: readonly number[] | null;
+}): string | null {
+  if (columns.kind === 'timed' && (columns.startsAt === null || columns.endsAt === null)) return null;
+  return JSON.stringify([
+    columns.kind,
+    columns.startsAt?.toISOString() ?? null,
+    columns.endsAt?.toISOString() ?? null,
+    columns.day,
+    columns.weekdays,
+  ]);
+}
+
 /** `withTenantMember` for the owner and an active manager; a chatter is refused before any read. */
 export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStore {
   return {
@@ -185,6 +208,18 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
           if ((await placed(tx, wanted, zone)) === null)
             columns = { ...columns, startsAt: null, endsAt: null };
         }
+        const open = await tx
+          .select()
+          .from(suggestions)
+          .where(and(eq(suggestions.state, 'suggested'), eq(suggestions.week, week)));
+        const candidate = { category: body.category, title: body.title, moment: momentOf(columns) };
+        if (
+          repeatsOpen(
+            candidate,
+            open.map((row) => ({ ...row, moment: momentOf(row) })),
+          )
+        )
+          throw new SuggestionAlreadyOpen();
         const [row] = await tx
           .insert(suggestions)
           .values({

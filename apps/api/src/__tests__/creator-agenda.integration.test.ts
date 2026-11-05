@@ -157,6 +157,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       (await call('POST', '/v1/creator-space/tasks', 'nora', { ...task, title: 'Autre' })).statusCode,
     ).toBe(409);
     expect((await agenda()).tasks.map((one) => one.title)).toContain('Tournage robe rouge');
+    // CREA-14: never 1900 nor 9999.
+    for (const day of ['1900-01-01', '9999-12-31']) {
+      const far = { ...task, id: newId(CreatorTaskIdSchema), when: { kind: 'day', day } };
+      expect((await call('POST', '/v1/creator-space/tasks', 'nora', far)).statusCode).toBe(400);
+    }
     expect((await agenda('ines')).tasks).toEqual([]);
     // Ines cannot move it: for her it does not exist.
     expect(
@@ -200,6 +205,9 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       when: { kind: 'routine', weekdays: [1, 2, 3, 4, 5, 6, 7] },
     };
     expect((await call('POST', '/v1/creator-space/tasks', 'nora', daily)).statusCode).toBe(200);
+    // CREA-08: her agenda says when it entered it, from which day her phone counts it due.
+    const created = (await agenda()).tasks.find((one) => one.id === daily.id)?.createdAt;
+    expect(Math.abs(Date.now() - Date.parse(created ?? ''))).toBeLessThan(60_000);
     const ahead = await call('POST', '/v1/creator-space/ticks', 'nora', {
       ticks: [{ ...tick, taskId: daily.id, day: addDays(today, 1) }],
     });
@@ -234,6 +242,14 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       AgencySuggestionSchema.parse((await suggest('owner', 15, 16, 'Live sur le tournage')).json()).when,
     ).toBeNull();
     expect((await suggest('chatter', 18, 19, 'Live du chatteur')).statusCode).toBe(403);
+    // CREA-16: the same task again, at the same moment or undated, while she has not answered: 409.
+    for (const [from, to] of [
+      [17, 18],
+      [10, 11],
+    ] as const)
+      expect((await suggest('owner', from, to, 'live du mercredi ')).json()).toMatchObject({
+        error: { code: 'creator_suggestion_open_conflict' },
+      });
     // She reads them without where they came from.
     const seen = (await agenda()).suggestions;
     expect(seen.map((one) => one.title).sort()).toEqual([
@@ -330,6 +346,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       when: { kind: 'day', day: today },
     });
     expect(toDay.statusCode).toBe(422);
+    // CREA-09: never into her past.
+    const past = await call('POST', `/v1/creator-space/suggestions/${dated.id}/accept`, 'nora', {
+      when: { kind: 'day', day: addDays(today, -1) },
+    });
+    expect(past.json()).toMatchObject({ error: { code: 'creator_suggestion_past_unprocessable' } });
     // Moved within its kind, it is accepted.
     const moved = await call('POST', `/v1/creator-space/suggestions/${dated.id}/accept`, 'nora', {
       when: { kind: 'day', day: addDays(nextWednesday, 1) },

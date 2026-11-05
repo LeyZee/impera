@@ -6,7 +6,15 @@ import type {
   CreatorTick,
 } from '@impera/contracts';
 
-import { addDays, dayOf, minuteOf, MINUTES_PER_DAY, weekdayOf, zonedInstant } from '@/scheduling/time';
+import {
+  addDays,
+  dayOf,
+  minuteOf,
+  MINUTES_PER_DAY,
+  weekdayOf,
+  weekOf,
+  zonedInstant,
+} from '@/scheduling/time';
 
 /*
  * Her agenda read for one day (CR-05, ADR 0042 § 3), pure: what she has to do, what is timed, where she is free. Read
@@ -56,10 +64,14 @@ export interface DayPlan {
 const done = (ticks: readonly CreatorTick[], taskId: string, day: string): boolean =>
   ticks.some((tick) => tick.taskId === taskId && tick.day === day);
 
-/** Whether a task is due on one of her days: its day, the day it starts, or one of its weekdays. */
+/**
+ * Whether a task is due on one of her days: its day, the day it starts, or one of its weekdays from the day it entered
+ * her agenda (CREA-08), never before: a day before it existed is not a day she missed.
+ */
 export function dueOn(task: CreatorTask, day: string, zone: string): boolean {
   if (task.when.kind === 'day') return task.when.day === day;
   if (task.when.kind === 'timed') return dayOf(task.when.startsAt, zone) === day;
+  if (task.createdAt !== null && dayOf(task.createdAt, zone) > day) return false;
   return task.when.weekdays.includes(weekdayOf(day));
 }
 
@@ -112,15 +124,29 @@ export function windowsOn(
 const byEssentialThenTitle = (a: DayTask, b: DayTask): number =>
   Number(b.task.essential) - Number(a.task.essential) || a.task.title.localeCompare(b.task.title, 'fr');
 
-/** Whether a suggestion is dated on a day (an undated one waits in « Ma semaine »). */
-export function suggestedOn(suggestion: CreatorSuggestion, day: string, zone: string): boolean {
+/**
+ * The one day of her day view a proposed routine shows on (CREA-15): the first of its weekdays in its week from
+ * `today` on, else its first. Decided once, it is never a card on each of its days.
+ */
+export function routineDayOf(suggestion: CreatorSuggestion, today: string): string | null {
+  const { when } = suggestion;
+  if (when?.kind !== 'routine') return null;
+  const days = weekOf(suggestion.week).filter((day) => when.weekdays.includes(weekdayOf(day)));
+  return days.find((day) => day >= today) ?? days[0] ?? null;
+}
+
+/** Whether a suggestion is shown on a day (an undated one waits in « Ma semaine »; a routine, on one day only). */
+export function suggestedOn(
+  suggestion: CreatorSuggestion,
+  day: string,
+  zone: string,
+  today: string,
+): boolean {
   const { when } = suggestion;
   if (when === null) return false;
   if (when.kind === 'day') return when.day === day;
   if (when.kind === 'timed') return dayOf(when.startsAt, zone) === day;
-  return (
-    when.weekdays.includes(weekdayOf(day)) && suggestion.week <= day && day <= addDays(suggestion.week, 6)
-  );
+  return routineDayOf(suggestion, today) === day;
 }
 
 export function planOf(agenda: CreatorAgenda, day: string): DayPlan {
@@ -149,7 +175,7 @@ export function planOf(agenda: CreatorAgenda, day: string): DayPlan {
     todo: todo.sort(byEssentialThenTitle),
     timed: timed.sort((a, b) => a.start - b.start || a.end - b.end),
     windows: windowsOn(agenda.availabilities, day, zone),
-    suggestions: agenda.suggestions.filter((suggestion) => suggestedOn(suggestion, day, zone)),
+    suggestions: agenda.suggestions.filter((suggestion) => suggestedOn(suggestion, day, zone, agenda.today)),
   };
 }
 
@@ -262,3 +288,9 @@ export function programOf(
 /** Her suggestions that found no room: she places them herself. */
 export const undatedOf = (agenda: CreatorAgenda): CreatorSuggestion[] =>
   agenda.suggestions.filter((suggestion) => suggestion.when === null);
+
+/** The routines the agency proposes for a week of hers, decided once at the top of « Ma semaine » (CREA-15). */
+export const proposedRoutinesOf = (agenda: CreatorAgenda, monday: string): CreatorSuggestion[] =>
+  agenda.suggestions.filter(
+    (suggestion) => suggestion.when?.kind === 'routine' && suggestion.week === monday,
+  );

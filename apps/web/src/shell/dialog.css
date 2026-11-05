@@ -78,18 +78,29 @@
     align-items: center;
   }
 }
+/* The glass holds still and its content scrolls inside it: a glass that scrolls itself carries its rim along with the
+   content, and the rim then crosses the form at the height of the window (Chantier 7, « Proposer une tâche »). */
 .tm-dialog {
   --_radius: var(--nv-radius-xl);
   width: 100%;
   max-width: 520px;
   max-height: calc(100% - 8px);
-  overflow: auto;
+  overflow: hidden;
   border-radius: var(--nv-radius-xl);
+  display: flex;
+  flex-direction: column;
+  animation: tm-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.tm-dialog__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: inherit;
   padding: var(--nv-space-5);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  animation: tm-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
 }
 .tm-dialog__head {
   display: flex;

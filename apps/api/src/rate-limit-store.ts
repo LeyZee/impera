@@ -131,6 +131,20 @@ export function postgresRateLimitStore({ db, logger }: RateLimitStoreDeps): Fast
   return PostgresRateLimitStore;
 }
 
+/**
+ * Forgets what a `createRateLimit` limiter of these bounds counted for `key` (recette SEC-11): a sign-in that succeeds
+ * clears its tries, so that only refusals bring an account near its limit. The namespace is the one `child` gives it.
+ * Only counters of this store are forgotten: a server on the plugin's memory store (some tests) keeps its counts.
+ */
+export async function forgetCount(
+  db: RateLimitDb,
+  bounds: { readonly max: number; readonly timeWindowMs: number },
+  key: string,
+): Promise<void> {
+  const namespace = namespaceOf({ max: bounds.max, timeWindow: bounds.timeWindowMs });
+  await db.execute(sql`delete from rate_limit_counters where key = ${storedKey(namespace, key)}`);
+}
+
 /** `rate_limit.purge`: drops the counters whose window ended over an hour ago; returns how many. */
 export async function purgeRateLimitCounters(db: RateLimitDb): Promise<number> {
   const result = await db.execute(

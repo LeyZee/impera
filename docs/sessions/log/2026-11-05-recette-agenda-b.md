@@ -1,0 +1,6 @@
+# 2026-11-05 · Recette du 05/11, agenda de la créatrice, lot B (règles)
+
+Fait : CREA-08 (routine due à partir de sa création, `createdAt` dans le contrat de la tâche), CREA-09 (moment par défaut à venir, refus serveur d'une acceptation à un moment passé), CREA-14 (portée de l'agenda : un an en arrière, deux ans en avant, dans les corps de requête et les champs de date), CREA-15 (routine proposée montrée une fois), CREA-16 (409 pour une proposition qui répète une proposition encore ouverte) ; tests de contrat, du domaine, du modèle web et d'intégration ; captures dans `espaces/captures-recette-agenda-b/` ; README de `creator-tasks` ; fiche CR-05.
+Décisions : la portée ne s'applique qu'à ce qu'on envoie (tâche, déplacement, suggestion, acceptation), jamais à ce qu'on lit ; une proposition est un doublon si la même tâche attend déjà sa réponse la même semaine, au même moment ou sans date de l'une ou l'autre : un autre moment reste une autre proposition ; pas d'index unique (il demanderait une migration), deux envois simultanés peuvent encore passer.
+Pas fait : la partie « échéance de demande de contenu dans le passé » de CREA-14 (module content-drops, fil Médias) ; lots C (hors ligne), D (écrans créatrice).
+Découvertes : le formulaire « Proposer une tâche » de l'agence s'ouvre sur l'heure en cours (18 h à 18 h 40), déjà commencée.
