@@ -120,30 +120,29 @@ export function payoutBlockText(
 ): string {
   if (block.reason === 'documents_not_issued') {
     if (reason === null) return 'Versement bloqué : facture ou avoir pas encore émis.';
-    const why = NOT_ISSUED_FOR_AGENCY[reason];
-    return `Versement bloqué : ${reason === 'no_invoice_to_credit' ? 'avoir pas encore émis' : 'facture pas encore émise'}, ${
-      owner ? why : why.replace('ta vérification', 'la vérification du propriétaire')
-    }.`;
+    const why = NOT_ISSUED_FOR_AGENCY[reason](owner ? 'ta vérification' : 'la vérification du propriétaire');
+    return `Versement bloqué : ${reason === 'no_invoice_to_credit' ? 'avoir pas encore émis' : 'facture pas encore émise'}, ${why}.`;
   }
   return `Versement bloqué : attestation de résidence ${block.year ?? ''} ${block.reason === 'tax_residence_missing' ? 'absente' : 'à vérifier'}.`;
 }
 
 /**
  * Why the invoicing held a document back (`invoice_not_issued`), as the owner settles it (recette EQP-04): what is
- * missing and where, the member never named (the row already does).
+ * missing and where, the member never named (the row already does). `check` is who checks the file: the owner reads
+ * « ta vérification », a manager « la vérification du propriétaire ».
  */
-const NOT_ISSUED_FOR_AGENCY: Readonly<Record<InvoiceNotIssuedReason, string>> = {
-  no_mandate: 'le membre n’a pas encore accepté son mandat de facturation',
-  no_regime: 'aucun régime de facturation ne lui est donné',
-  regime_not_validated: 'son régime de facturation attend la validation du comptable',
-  regime_country_mismatch: 'son régime de facturation n’est pas celui du pays de sa fiche',
-  identity_incomplete: 'son identité est incomplète dans son dossier',
-  identity_unverified: 'son identité attend ta vérification dans son dossier',
-  tax_residence_missing: 'son attestation de résidence fiscale manque',
-  tax_residence_unverified: 'son attestation de résidence fiscale attend ta vérification',
-  prefix_missing: 'son préfixe de factures n’est pas posé',
-  agency_missing: 'l’identité de l’agence n’est pas remplie dans Réglages › Facturation',
-  no_invoice_to_credit: 'aucune facture ne peut le prendre entier, à voir avec le comptable',
+const NOT_ISSUED_FOR_AGENCY: Readonly<Record<InvoiceNotIssuedReason, (check: string) => string>> = {
+  no_mandate: () => 'le membre n’a pas encore accepté son mandat de facturation',
+  no_regime: () => 'aucun régime de facturation ne lui est donné',
+  regime_not_validated: () => 'son régime de facturation attend la validation du comptable',
+  regime_country_mismatch: () => 'son régime de facturation n’est pas celui du pays de sa fiche',
+  identity_incomplete: () => 'son identité est incomplète dans son dossier',
+  identity_unverified: (check) => `son identité attend ${check} dans son dossier`,
+  tax_residence_missing: () => 'son attestation de résidence fiscale manque',
+  tax_residence_unverified: (check) => `son attestation de résidence fiscale attend ${check}`,
+  prefix_missing: () => 'son préfixe de factures n’est pas posé',
+  agency_missing: () => 'l’identité de l’agence n’est pas remplie dans Réglages › Facturation',
+  no_invoice_to_credit: () => 'aucune facture ne peut le prendre entier, à voir avec le comptable',
 };
 
 /**

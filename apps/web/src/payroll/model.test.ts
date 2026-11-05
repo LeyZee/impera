@@ -1,5 +1,6 @@
 import {
   BonusIdSchema,
+  INVOICE_NOT_ISSUED_REASONS,
   CarryOverIdSchema,
   CommissionStatementIdSchema,
   newId,
@@ -248,6 +249,10 @@ describe('a statement’s marks', () => {
     expect(payoutBlockText(documents, 'identity_unverified', false)).toBe(
       'Versement bloqué : facture pas encore émise, son identité attend la vérification du propriétaire dans son dossier.',
     );
+    // Whatever the reason, a manager is never told « ta » (the owner checks the file, not him).
+    for (const reason of INVOICE_NOT_ISSUED_REASONS) {
+      expect(payoutBlockText(documents, reason, false)).not.toMatch(/\b(ta|ton|tes)\b/u);
+    }
     expect(payoutBlockText(documents, 'no_invoice_to_credit')).toBe(
       'Versement bloqué : avoir pas encore émis, aucune facture ne peut le prendre entier, à voir avec le comptable.',
     );

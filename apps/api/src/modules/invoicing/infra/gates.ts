@@ -8,6 +8,8 @@ import { payoutDecision } from '../domain/payouts';
 import { enqueueDocumentSettle, enqueueInvoiceIssue } from './invoice-queue';
 import { payoutFactsOf } from './payout-facts';
 
+const { domainEvents } = schema;
+
 /**
  * `PayoutGate` (ADR 0047 § 1), which the composition root gives pay: what the invoices and the contractor's file say of
  * a transfer (ADR 0041), read in pay's transaction, one read per table whoever asks.
@@ -51,9 +53,12 @@ export const payoutGate: PayoutGate = {
       .where(
         and(
           eq(domainEvents.type, 'invoice_not_issued'),
+          // The member first, for the partial index; the statements then, so a long-standing member's other
+          // fortnights are never read (Bilan's review of #528).
           inArray(sql<string>`${domainEvents.payload}->>'memberId'`, [
             ...new Set(statements.map((one) => one.memberId)),
           ]),
+          inArray(sql<string>`${domainEvents.payload}->>'statementId'`, [...wanted]),
         ),
       )
       .orderBy(
@@ -67,8 +72,6 @@ export const payoutGate: PayoutGate = {
     return reasons;
   },
 };
-
-const { domainEvents } = schema;
 
 /** The invoices' part of `AfterValidation` (ADR 0047 § 1): their issue and their settlement, in pay's transaction. */
 export const invoicesAfterValidation: Pick<AfterValidation, 'issueInvoices' | 'settleDocuments'> = {

@@ -247,10 +247,6 @@ export function InvoicesPage({
 }
 
 /**
- * A list of what waits (contests, due dates): shown only when something waits, never an empty plate; a server that
- * does not answer is said, never taken for « nothing ».
- */
-/**
  * The quinzaine's validated statements whose invoice is not issued (recette EQP-04): who, what waits to be paid, why,
  * and for the owner where to settle it. Without them, an empty list of documents read as « nothing to do ». Nothing
  * while none waits, nor while the period is unread: the documents' panel below says a server that does not answer.
@@ -275,26 +271,33 @@ function AwaitingInvoices({
       eyebrow="En attente de facture"
       title={`${String(held.length)} relevé${many ? 's' : ''} validé${many ? 's' : ''} sans facture`}
     >
-      <ul className="iv-list">
-        {held.map((statement, index) => (
-          <li key={statement.id} className="nv-enter" style={{ '--nv-i': Math.min(index, 8) }}>
-            <article className="iv-doc">
-              <div className="iv-doc__main">
-                <p className="iv-doc__name">{nameOf(statement.memberId)}</p>
-                <PayoutHoldLine statement={statement} owner={owner} className="iv-doc__sub" />
-              </div>
-              <p className="iv-doc__amount nv-num">
-                {amountText(statement.payableMinor, 'EUR')}
-                <small>à verser</small>
-              </p>
-            </article>
-          </li>
-        ))}
-      </ul>
+      <div className="rp-sec">
+        <ul className="iv-list">
+          {held.map((statement, index) => (
+            <li key={statement.id} className="nv-enter" style={{ '--nv-i': Math.min(index, 8) }}>
+              <article className="iv-doc">
+                <div className="iv-doc__main">
+                  <p className="iv-doc__name">{nameOf(statement.memberId)}</p>
+                  <PayoutHoldLine statement={statement} owner={owner} className="iv-doc__sub" />
+                </div>
+                <p className="iv-doc__amount nv-num">
+                  {/* A statement is in euros: pay converts every sale to euros (`exchange_rates`). */}
+                  {amountText(statement.payableMinor, 'EUR')}
+                  <small>à verser</small>
+                </p>
+              </article>
+            </li>
+          ))}
+        </ul>
+      </div>
     </Panel>
   );
 }
 
+/**
+ * A list of what waits (contests, due dates): shown only when something waits, never an empty plate; a server that
+ * does not answer is said, never taken for « nothing ».
+ */
 function Waiting({
   query,
   title,
