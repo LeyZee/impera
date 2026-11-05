@@ -12,7 +12,18 @@ import type { AddPreset } from './AddDialog';
 import { DayReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
-import { firstOf, momentOf, planOf, programOf, progressOf, type DayPlan, type DayTask } from './model';
+import { timedSuggestionsOf } from './grid';
+import {
+  firstOf,
+  momentOf,
+  ownTimed,
+  planOf,
+  programOf,
+  progressOf,
+  type DayPlan,
+  type DayTask,
+  type ProposedAt,
+} from './model';
 import { repliesOn } from './replies';
 
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
@@ -41,6 +52,7 @@ export function DayView({
   wide,
   shifts,
   onDay,
+  onSuggestion,
   ...actions
 }: {
   agenda: CreatorAgenda;
@@ -51,22 +63,27 @@ export function DayView({
   /** Her accounts' shifts: a line under the Programme, never on the frieze. */
   shifts: readonly CreatorAccountShift[];
   onDay: (day: string | null) => void;
+  /** A suggestion at an hour, touched in the Programme: opened to decide. */
+  onSuggestion: (suggestion: CreatorSuggestion) => void;
 } & DayActions): JSX.Element {
   const now = useNow();
   const plan = planOf(agenda, day);
   const isToday = day === agenda.today;
   const nowMinute = isToday ? minuteOf(now, agenda.timeZone) : null;
+  // Suggestions at an hour sit in the Programme (CREA-22); the others, without an hour, stay as cards on top.
+  const proposed = timedSuggestionsOf(plan, agenda.timeZone);
+  const cards = plan.suggestions.filter((suggestion) => suggestion.when?.kind !== 'timed');
   const swipe = useSwipe((step) => {
     onDay(addDays(day, step));
   });
   return (
     <div className="ag-day" data-slide={swipe.slide} {...swipe.handlers}>
       <DayStrip agenda={agenda} monday={monday} day={day} onDay={onDay} />
-      <Glance plan={plan} agenda={agenda} nowMinute={nowMinute} />
+      <Glance plan={plan} agenda={agenda} now={now} nowMinute={nowMinute} />
       {wide ? <Frieze plan={plan} nowMinute={nowMinute} onTask={actions.onTask} /> : null}
-      {plan.suggestions.length === 0 ? null : (
+      {cards.length === 0 ? null : (
         <section className="ag-sec" aria-label="Propositions de l’agence">
-          {plan.suggestions.map((suggestion) => (
+          {cards.map((suggestion) => (
             <SuggestionCard
               key={suggestion.id}
               suggestion={suggestion}
@@ -100,7 +117,21 @@ export function DayView({
                 : `${String(plan.timed.length)} ${plan.timed.length > 1 ? 'tâches' : 'tâche'} à heure`}
             </span>
           </div>
-          <Program plan={plan} nowMinute={nowMinute} {...actions} />
+          {proposed.length === 0 ? null : (
+            <p className="ag-proposed-note">
+              {proposed.length > 1
+                ? `${String(proposed.length)} propositions de l’agence à décider, en pointillés.`
+                : 'Une proposition de l’agence à décider, en pointillés.'}
+            </p>
+          )}
+          <Program
+            plan={plan}
+            now={now}
+            nowMinute={nowMinute}
+            proposed={proposed}
+            onSuggestion={onSuggestion}
+            {...actions}
+          />
           <DayReplies lines={repliesOn(shifts, day, agenda.timeZone)} />
         </section>
       </div>
@@ -142,7 +173,7 @@ function DayStrip({
     <div className="ag-strip" role="group" aria-label="Jours de la semaine" onKeyDown={onKeyDown}>
       {days.map((one, index) => {
         const plan = planOf(agenda, one);
-        const dots = [...plan.timed, ...plan.todo].slice(0, 3);
+        const dots = [...ownTimed(plan), ...plan.todo].slice(0, 3);
         return (
           <button
             key={one}
@@ -189,15 +220,17 @@ const ringDash = (share: number): string => {
 function Glance({
   plan,
   agenda,
+  now,
   nowMinute,
 }: {
   plan: DayPlan;
   agenda: CreatorAgenda;
+  now: Date;
   nowMinute: number | null;
 }): JSX.Element {
   const { done, total } = progressOf(plan);
   const left = total - done;
-  const first = firstOf(plan);
+  const first = firstOf(plan, nowMinute);
   const title =
     total === 0
       ? 'Rien à faire'
@@ -205,7 +238,8 @@ function Glance({
         ? 'Tout est fait'
         : `${String(left)} ${left > 1 ? 'choses' : 'chose'} à faire`;
   const proposed = plan.suggestions.length;
-  const moment = nowMinute === null ? null : momentOf(plan, nowMinute);
+  // « Plus rien à heure » only when there was something at an hour: an empty day says it once, in the title.
+  const moment = nowMinute === null || plan.timed.length === 0 ? null : momentOf(plan, nowMinute);
   const { streak } = agenda;
   return (
     <section className="nv-plate ag-glance nv-enter" aria-label="Ta journée">
@@ -241,12 +275,15 @@ function Glance({
               ) : (
                 'Profite de ta journée.'
               )
-            ) : first === null ? (
+            ) : left === 0 ? (
               `${String(done)} sur ${String(total)}, bravo.`
+            ) : first === null ? (
+              `${String(done)} sur ${String(total)} fait.`
             ) : (
               <>
-                Commence par : <Emoji category={first.category} />
-                <b>{first.title}</b>
+                Commence par : <Emoji category={first.task.category} />
+                <b>{first.task.title}</b>
+                {first.late ? <span className="ag-late"> · en retard</span> : null}
               </>
             )}
           </span>
@@ -269,7 +306,9 @@ function Glance({
               <span>
                 En cours : <Emoji category={moment.task.category} />
                 <b>{moment.task.title}</b> · reste{' '}
-                <span className="nv-num">{lengthOf(moment.left * MINUTE_MS)}</span>
+                <span className="nv-num">
+                  {lengthOf(leftOf(moment.task, now) ?? moment.left * MINUTE_MS)}
+                </span>
               </span>
             </>
           ) : moment.kind === 'next' ? (
@@ -363,13 +402,19 @@ function TaskRow({
 /** Her timed tasks and the free times between them, in order; a free time is a button to add a task there. */
 function Program({
   plan,
+  now,
   nowMinute,
+  proposed,
+  onSuggestion,
   ...actions
 }: {
   plan: DayPlan;
+  now: Date;
   nowMinute: number | null;
+  proposed: readonly ProposedAt[];
+  onSuggestion: (suggestion: CreatorSuggestion) => void;
 } & DayActions): JSX.Element {
-  const rows = programOf(plan, nowMinute);
+  const rows = programOf(plan, nowMinute, proposed);
   return (
     <ol className="ag-program">
       {rows.map((row) => {
@@ -410,6 +455,8 @@ function Program({
               </button>
             </li>
           );
+        if (row.kind === 'proposed')
+          return <ProposedRow key={row.at.suggestion.id} at={row.at} onOpen={onSuggestion} />;
         const { item } = row;
         const liveAt =
           nowMinute !== null && item.start <= nowMinute && nowMinute < item.end ? nowMinute : null;
@@ -426,22 +473,31 @@ function Program({
               <b>{clockOf(item.start)}</b>
               <span>{clockOf(item.end)}</span>
             </span>
-            <div className="ag-slot" data-cat={item.task.category} data-done={item.done ? 'true' : undefined}>
+            <div
+              className="ag-slot"
+              data-cat={item.task.category}
+              data-done={item.done ? 'true' : undefined}
+              data-carried={item.carried ? 'true' : undefined}
+            >
               <CategoryMark category={item.task.category} />
               <button
                 type="button"
                 className="ag-task__body"
                 onClick={() => {
-                  actions.onTask(item.task, plan.day);
+                  actions.onTask(item.task, item.day);
                 }}
               >
                 <b>{item.task.title}</b>
                 <span className="ag-meta">
                   <span>{CREATOR_TASK_CATEGORY_LABELS[item.task.category]}</span>
-                  <span className="nv-num">{lengthOf((item.end - item.start) * MINUTE_MS)}</span>
+                  {item.carried ? (
+                    <span>depuis hier</span>
+                  ) : (
+                    <span className="nv-num">{lengthOf(item.length)}</span>
+                  )}
                   {liveAt === null ? null : (
                     <span className="ag-live nv-num">
-                      en cours · reste {lengthOf((item.end - liveAt) * MINUTE_MS)}
+                      en cours · reste {lengthOf(leftOf(item.task, now) ?? (item.end - liveAt) * MINUTE_MS)}
                     </span>
                   )}
                 </span>
@@ -455,12 +511,52 @@ function Program({
                   </span>
                 )}
               </button>
-              <Check item={item} day={plan.day} onTick={actions.onTick} />
+              <Check item={item} day={item.day} onTick={actions.onTick} />
             </div>
           </li>
         );
       })}
     </ol>
+  );
+}
+
+/** What is left of a timed task from now, by its instants: a day of clock change keeps its true length (CREA-05). */
+function leftOf(task: CreatorTask, now: Date): number | null {
+  return task.when.kind === 'timed' ? Math.max(0, Date.parse(task.when.endsAt) - now.getTime()) : null;
+}
+
+/** An agency's suggestion at its hour in her Programme, dashed: touched, it opens to accept it or say « Non merci ». */
+function ProposedRow({
+  at,
+  onOpen,
+}: {
+  at: ProposedAt;
+  onOpen: (suggestion: CreatorSuggestion) => void;
+}): JSX.Element {
+  const { suggestion } = at;
+  return (
+    <li className="ag-row">
+      <span className="ag-time nv-num">
+        <b>{clockOf(at.start)}</b>
+        <span>{clockOf(at.end)}</span>
+      </span>
+      <div className="ag-slot" data-cat={suggestion.category} data-proposed="true">
+        <CategoryMark category={suggestion.category} />
+        <button
+          type="button"
+          className="ag-task__body"
+          onClick={() => {
+            onOpen(suggestion);
+          }}
+        >
+          <b>{suggestion.title}</b>
+          <span className="ag-meta">
+            <span>Proposé par l’agence</span>
+            <span>{CREATOR_TASK_CATEGORY_LABELS[suggestion.category]}</span>
+          </span>
+        </button>
+      </div>
+    </li>
   );
 }
 

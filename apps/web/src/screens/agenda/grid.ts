@@ -1,7 +1,7 @@
-import type { CreatorAgenda, CreatorSuggestion, CreatorTask, CreatorTaskWhen } from '@impera/contracts';
+import type { CreatorAgenda, CreatorTask, CreatorTaskWhen } from '@impera/contracts';
 
 import { spanOf } from './draft';
-import { planOf, type DayPlan, type TimedTask } from './model';
+import { ownTimed, planOf, type DayPlan, type ProposedAt, type TimedTask } from './model';
 
 import { addDays, dayOf, minuteOf, mondayOf, MINUTES_PER_DAY } from '@/scheduling/time';
 
@@ -106,9 +106,7 @@ export function movedWhen(task: CreatorTask, day: string, span: Span, zone: stri
 }
 
 /** A timed suggestion on a day, placed in the grid like a task (dashed). */
-export interface TimedSuggestion extends Span {
-  readonly suggestion: CreatorSuggestion;
-}
+export type TimedSuggestion = ProposedAt;
 
 export function timedSuggestionsOf(plan: DayPlan, zone: string): TimedSuggestion[] {
   const timed: TimedSuggestion[] = [];
@@ -166,7 +164,7 @@ export interface MonthLine {
 export function monthLinesOf(agenda: CreatorAgenda, day: string): MonthLine[] {
   const plan = planOf(agenda, day);
   const zone = agenda.timeZone;
-  const timed: MonthLine[] = plan.timed.map((item) => ({
+  const timed: MonthLine[] = ownTimed(plan).map((item) => ({
     key: item.task.id,
     title: item.task.title,
     category: item.task.category,
