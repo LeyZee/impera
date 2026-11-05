@@ -500,10 +500,6 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
 }
 
 /**
- * The receipt job's side, as the admin role (`withAdmin`): the states of a drop move by the job only (0108's trigger
- * refuses them to the team, her policies to her).
- */
-/**
  * A request born of an idea of the trend watch (VEI-01 d2), written by its job under the owner's role: origin `idea`,
  * no author (`content_requests_author_check`), under the idea's own id, so that a replay writes nothing more.
  */
@@ -525,6 +521,10 @@ export async function requestFromIdea(adminDb: Database, request: IdeaContentReq
   });
 }
 
+/**
+ * The receipt job's side, as the admin role (`withAdmin`): the states of a drop move by the job only (0108's trigger
+ * refuses them to the team, her policies to her).
+ */
 export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
   return {
     pending: (fileId) =>

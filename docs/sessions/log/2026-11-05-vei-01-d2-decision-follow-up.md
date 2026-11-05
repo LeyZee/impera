@@ -8,10 +8,13 @@ Pas fait : d3 (dépôt reçu → `deposited`).
 
 Décisions :
 - un job annoncé par l'agenda plutôt qu'un événement `creator_suggestion_decided` dans `domain_events` : aucun module ne lit l'outbox pour réagir, et le job s'écrit dans la même transaction que son geste, sans migration. La 0111 réservée n'a pas servi ;
-- la demande prend l'identifiant de l'idée, pour qu'un rejeu n'en écrive pas une deuxième.
+- la demande prend l'identifiant de l'idée, pour qu'un rejeu n'en écrive pas une deuxième ;
+- une idée de catégorie script ne demande rien : un script se demande avec une structure de la bibliothèque, que seule la demande de l'équipe contrôle (relecture Médias).
 
-Découvertes : aucune.
+Découvertes :
+- une tâche déplacée ou retirée après son acceptation laisse la demande de contenu sur sa date d'origine (relecture Chantier 7) ; à suivre avec Médias.
 
 Vérifié :
 - `pnpm check` ;
+- unitaire `followDecision` (acceptée, script, refusée, autre créatrice) ;
 - intégration `trend-ideas` (acceptée, refusée, rejouée, suggestion sans idée), `creator-agenda`, `creator-reminders`, `content-drops`.

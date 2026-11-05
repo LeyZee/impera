@@ -12,7 +12,8 @@ export interface FollowDeps {
 /**
  * `creator_tasks.suggestion_decided` (VEI-01 d2): her gesture on the shoot an idea became. Accepted, the content
  * request is asked for the day of her shoot (ADR 0055 § 4), under the idea's id, then recorded on the idea; declined,
- * the idea is `declined`. A suggestion that no idea became, or an idea of another creator, changes nothing.
+ * the idea is `declined`. A suggestion that no idea became, an idea of another creator, or a script idea (a script is
+ * asked with a structure of the library) asks nothing.
  * Replayable: the request is written once under its id, the idea moves only from `suggested`.
  */
 export async function followDecision(
@@ -25,7 +26,8 @@ export async function followDecision(
     await deps.ideas.declined(idea.id);
     return;
   }
-  if (idea.requestId !== null) return;
+  // A script is asked with a structure of the library, chosen by the team: an idea never asks one by itself.
+  if (idea.requestId !== null || idea.category === 'script') return;
   await deps.requestFromIdea({
     id: idea.id,
     creatorId: decision.creatorId,
