@@ -8,7 +8,7 @@ import type {
 import { useEffect, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from 'react';
 
 import type { DayActions } from './DayView';
-import { ShortReplies } from './ReplyLines';
+import { CellReplies } from './ReplyLines';
 import { CATEGORY_EMOJI } from './category';
 import {
   createdSpan,
@@ -35,6 +35,8 @@ const MOUSE_SLOP = 5;
 const TOUCH_SLOP = 8;
 /** The height of an hour in the grid (agenda.css `.ag-wk__grid`). */
 const HOUR_PX = 52;
+/** How far above an hour the grid opens, for its label to show under the rows that stay on top. */
+const LABEL_CLEARANCE_PX = 14;
 
 type Drag =
   | {
@@ -118,7 +120,8 @@ export function WeekGrid({
     const element = scroller.current;
     if (element === null || opened.current === monday) return;
     opened.current = monday;
-    element.scrollTop = ((opensAt - hours.first * 60) / 60) * HOUR_PX;
+    // A little above the hour, so that its label clears the rows that stay on top (days, tasks, « fans »).
+    element.scrollTop = Math.max(0, ((opensAt - hours.first * 60) / 60) * HOUR_PX - LABEL_CLEARANCE_PX);
   }, [monday, opensAt, hours.first]);
 
   // Once a long press has lifted a task, the finger drags it: the page must not scroll under it (React's touch
@@ -321,7 +324,7 @@ export function WeekGrid({
               </span>
               {plans.map((plan) => (
                 <div key={plan.day} className="ag-wk__cell">
-                  <ShortReplies lines={repliesOn(shifts, plan.day, agenda.timeZone)} />
+                  <CellReplies lines={repliesOn(shifts, plan.day, agenda.timeZone)} />
                 </div>
               ))}
             </div>

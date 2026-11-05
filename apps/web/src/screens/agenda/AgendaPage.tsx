@@ -275,7 +275,6 @@ export function AgendaPage({
             <button
               type="button"
               className="nv-btn nv-btn--plain nv-btn--sm"
-              aria-pressed={repliesShown}
               onClick={() => {
                 setRepliesShown(!repliesShown);
               }}

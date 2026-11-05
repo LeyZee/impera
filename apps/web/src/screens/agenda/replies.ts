@@ -43,7 +43,11 @@ export function repliesOn(shifts: readonly CreatorAccountShift[], day: string, z
   const start = zonedInstant(day, 0, zone).getTime();
   const end = zonedInstant(addDays(day, 1), 0, zone).getTime();
   const lines = new Map<Platform, Reply[]>();
-  for (const shift of shifts) {
+  const byStart = [...shifts].sort(
+    (a, b) =>
+      Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.displayName.localeCompare(b.displayName, 'fr'),
+  );
+  for (const shift of byStart) {
     const from = Date.parse(shift.startsAt);
     const to = Date.parse(shift.endsAt);
     if (to <= start || from >= end) continue;
