@@ -113,16 +113,23 @@ export function StatementDialog({
             </div>
             <p className="py-hero__note nv-num">
               net {amountText(statement.netMinor, 'EUR')}{' '}
-              <Delta
-                bps={change}
-                title={
-                  previousNet === null
-                    ? 'Pas de relevé la quinzaine d’avant'
-                    : `${amountText(previousNet, 'EUR')} de net la quinzaine d’avant`
-                }
-              />
-              {/* In French, and « nouveau » says why: nothing earned the period before (EQP-13). */}
-              {change === null ? ' : rien sur la quinzaine ' : ' par rapport à la quinzaine '}
+              {/* In French, and « nouveau » says why: nothing earned the period before (EQP-13). Said in the
+                  sentence, not in a badge, whose inner space would part « nouveau » from its colon. */}
+              {change === null ? (
+                'nouveau : rien sur la quinzaine '
+              ) : (
+                <>
+                  <Delta
+                    bps={change}
+                    title={
+                      previousNet === null
+                        ? 'Pas de relevé la quinzaine d’avant'
+                        : `${amountText(previousNet, 'EUR')} de net la quinzaine d’avant`
+                    }
+                  />{' '}
+                  par rapport à la quinzaine{' '}
+                </>
+              )}
               {periodLine(previousPeriod(statement.window.period))}
             </p>
           </div>
