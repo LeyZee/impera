@@ -22,6 +22,8 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import { createDrizzleRetentionStore } from '../modules/content-drops/infra/db/retention-store';
+import { createDrizzleReceiptStore } from '../modules/content-drops/infra/db/store';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -544,6 +546,72 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
         sql`${schema.domainEvents.type} = 'content_media_erased' and ${schema.domainEvents.payload}->>'mediaAssetId' = ${medium.id}`,
       );
     expect(erased?.payload).toEqual({ mediaAssetId: medium.id, reason: 'withdrawn' });
+  });
+
+  /**
+   * The two orders of a race between the hourly erasure and the same photo given again (relecture Bilan de #525), each
+   * step called by hand where the jobs would interleave: the storage holds the key whenever the row says held.
+   */
+  it('never leaves a medium held without its bytes when she gives it again while it is erased', async () => {
+    const receipts = createDrizzleReceiptStore(test.admin.db);
+    const retention = createDrizzleRetentionStore(test.admin.db);
+    const removeRaw = (key: string) =>
+      s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' }).then(() => undefined);
+    const keptAgain = async (fileId: string, medium: Awaited<ReturnType<typeof mediumOf>>) => {
+      await receipts.settle(fileId, { state: 'received' }, new Date(), 'test');
+      // As a receipt that found the medium held and skipped writing its bytes.
+      await receipts.settle(
+        fileId,
+        {
+          state: 'kept',
+          media: {
+            kind: 'image',
+            mime: 'image/jpeg',
+            bytes: medium.bytes,
+            sha256: medium.sha256,
+            storageKey: medium.storageKey,
+            durationMs: null,
+            uploaded: false,
+          },
+        },
+        new Date(),
+        'test',
+      );
+    };
+    const withdrawnOnce = async (seed: number) => {
+      const first = await dropOne('nora', jpegOf(MB, 30, 40, seed));
+      await sendWhole(first);
+      await receive();
+      expect((await call('DELETE', `/v1/creator-space/drops/${first.dropId}`, 'nora')).statusCode).toBe(204);
+      return { first, medium: await mediumOf(first.fileId) };
+    };
+
+    // 1. Erased between the receipt's look and its settling: the settling refuses, the retry writes the bytes again.
+    const one = await withdrawnOnce(0x91);
+    const again = await dropOne('nora', jpegOf(MB, 30, 40, 0x91));
+    await sendWhole(again);
+    const [due] = (await retention.dueOriginals(new Date())).filter((o) => o.mediaAssetId === one.medium.id);
+    if (due === undefined) throw new Error('not due');
+    expect(await retention.erase(due, new Date(), 'test', removeRaw)).toBe(true);
+    await expect(keptAgain(again.fileId, one.medium)).rejects.toThrow('erased meanwhile');
+    expect((await rows(again.dropId)).files).toEqual([{ state: 'received', refusal: null }]);
+    await receive();
+    expect((await rows(again.dropId)).files).toEqual([{ state: 'kept', refusal: null }]);
+    expect((await mediumOf(again.fileId)).erasedAt).toBeNull();
+    expect(await held(one.medium.storageKey)).toBe(200);
+
+    // 2. Given again between the erasure's read and its removal: checked again under the lock, it stays.
+    const two = await withdrawnOnce(0x92);
+    const [stale] = (await retention.dueOriginals(new Date())).filter(
+      (o) => o.mediaAssetId === two.medium.id,
+    );
+    if (stale === undefined) throw new Error('not due');
+    const redrop = await dropOne('nora', jpegOf(MB, 30, 40, 0x92));
+    await sendWhole(redrop);
+    await keptAgain(redrop.fileId, two.medium);
+    expect(await retention.erase(stale, new Date(), 'test', removeRaw)).toBe(false);
+    expect(await held(two.medium.storageKey)).toBe(200);
+    expect((await mediumOf(two.first.fileId)).erasedAt).toBeNull();
   });
 
   it('refuses a send left unfinished for 24 hours, and its drop is blocked with her sentence', async () => {

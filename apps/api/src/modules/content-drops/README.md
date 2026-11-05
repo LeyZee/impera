@@ -52,6 +52,7 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
   2. l'agence est prévenue 7 jours avant qu'un original parte (`content_media_expiring`, une fois par média et par date) ;
   3. chaque original dû est effacé du bucket, puis marqué (`erased_at`, `content_media_erased`). Il est dû à sa date, ou dès que **tous** les dépôts par lesquels il est venu sont retirés : un dépôt retiré efface donc ses originaux dans l'heure, sauf si un autre dépôt d'elle tient le même média.
 - La ligne reste, avec l'empreinte, la durée, le type et la description (ADR 0044 § 2) ; `storage_key` ne nomme alors plus rien.
+- L'effacement d'un original se fait sous le verrou de sa ligne, que la réception prend aussi : redonné pendant l'effacement, il reste (octets et ligne) ; effacé pendant une réception qui n'a pas réécrit ses octets, la réception échoue et son rejeu les réécrit. Jamais une ligne « gardée » sans ses octets.
 - Un bucket qui refuse ou ne répond pas laisse l'original en place et le dit une fois en ambre (`content_media_erase_failed`) ; l'heure suivante réessaie. Aucun événement ne porte de nom ni de contenu, seulement l'identifiant du média.
 - Redonné après son effacement, le même média reprend un original (le fichier nettoyé est réécrit sous sa clé) et une nouvelle date d'un an. Redonné avant, sa date est repoussée à un an à partir du nouveau dépôt.
 

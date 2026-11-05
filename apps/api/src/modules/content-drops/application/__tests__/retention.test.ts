@@ -50,9 +50,12 @@ describe('content-drops › content_drops.erase_originals', () => {
         return Promise.resolve(2);
       },
       dueOriginals: () => Promise.resolve([...due]),
-      erased: (one) => {
+      // Given again meanwhile: checked again under the lock, it stays held.
+      erase: async (one, _now, _correlationId, remove) => {
+        if (one.mediaAssetId === 'given-again') return false;
+        await remove(one.storageKey);
         log.push(`erased ${one.mediaAssetId} ${one.reason}`);
-        return Promise.resolve();
+        return true;
       },
       eraseFailed: (one) => {
         log.push(`failed ${one.mediaAssetId}`);
@@ -69,7 +72,7 @@ describe('content-drops › content_drops.erase_originals', () => {
   it('refuses the unfinished sends, announces, then erases each original due before marking it', async () => {
     const { log, removed, deps } = fakes(
       ['media/creator/m2'],
-      [original('m1'), original('m2'), original('m3', 'withdrawn')],
+      [original('m1'), original('m2'), original('given-again'), original('m3', 'withdrawn')],
     );
     const run = await eraseOriginals(deps, NOW, 'job:1');
     expect(run).toEqual({ abandoned: 1, announced: 2, erased: 2, failed: 1 });

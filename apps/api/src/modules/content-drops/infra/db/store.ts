@@ -48,6 +48,7 @@ import {
   ContentRequestIdConflict,
   ContentRequestNotFound,
   ContentRequestStructureUnprocessable,
+  MediumErasedMeanwhile,
 } from '../../domain/errors';
 import type {
   AgencyContentStore,
@@ -617,6 +618,9 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
           // Given again, it is a new drop: its original is held a year from today. Erased already, the bytes this
           // job just wrote under its key are its original again, and this file the one that kept it.
           const revived = inserted.length === 0 && known.erasedAt !== null;
+          // Erased after this job found it held: the bytes it skipped are gone, the retry writes them again.
+          if (revived && !media.uploaded)
+            throw new MediumErasedMeanwhile(`media ${known.id} erased meanwhile`);
           // A medium of her library that came another way than a drop (no date) is left as it is.
           if (inserted.length === 0)
             await tx

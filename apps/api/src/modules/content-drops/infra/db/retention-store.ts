@@ -116,21 +116,30 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
         }));
       }),
 
-    erased: (original, now, correlationId) =>
+    erase: (original, now, correlationId, remove) =>
       withAdmin(adminDb, async (tx) => {
-        const marked = await tx
-          .update(mediaAssets)
-          .set({ erasedAt: now })
+        // The receipt's settle locks this row too: a medium given again waits for the erasure, or keeps it away.
+        await tx
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, original.mediaAssetId))
+          .for('update');
+        // Checked again once locked, in a statement of its own that sees what committed while it waited: given again
+        // meanwhile (a new date, a drop not withdrawn), it stays held.
+        const [due] = await tx
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
           .where(
             and(
               eq(mediaAssets.id, original.mediaAssetId),
               sql`${mediaAssets.erasedAt} is null`,
-              // Still due: given again meanwhile (a new date), it stays held.
               sql`(${mediaAssets.expiresAt} <= ${now} or ${allWithdrawn})`,
             ),
-          )
-          .returning({ id: mediaAssets.id });
-        if (marked.length === 0) return;
+          );
+        if (due === undefined) return false;
+        // The storage's call under the lock: an hourly job, and the client's time limit bounds it.
+        await remove(original.storageKey);
+        await tx.update(mediaAssets).set({ erasedAt: now }).where(eq(mediaAssets.id, original.mediaAssetId));
         await tx.insert(domainEvents).values({
           id: newId(EventIdSchema),
           creatorId: original.creatorId,
@@ -140,6 +149,7 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           correlationId,
           createdAt: now,
         });
+        return true;
       }),
 
     eraseFailed: (original, now, correlationId) =>

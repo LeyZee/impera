@@ -52,6 +52,11 @@ interface CleanedMedia {
   readonly sha256: string;
   readonly storageKey: string;
   readonly durationMs: number | null;
+  /**
+   * Whether this receipt wrote the bytes under `storageKey`: it skips them when she already holds the medium. A
+   * medium erased meanwhile is held again only by bytes written (relecture Bilan de #525).
+   */
+  readonly uploaded: boolean;
 }
 
 /** What becomes of a file: received (raw, whole), refused with its sentence, or kept once cleaned. */
@@ -136,8 +141,17 @@ export interface RetentionStore {
   announce(now: Date, until: Date, correlationId: string): Promise<number>;
   /** The originals still held that go now, by date or because each drop they came in by was withdrawn. */
   dueOriginals(now: Date): Promise<DueOriginal[]>;
-  /** Marked erased with `content_media_erased`; an original already marked is left as it is. */
-  erased(original: DueOriginal, now: Date, correlationId: string): Promise<void>;
+  /**
+   * The original erased by `remove`, then marked with `content_media_erased`, under the medium's row lock that a
+   * receipt also takes (relecture Bilan de #525): checked again under it, an original given again meanwhile, or
+   * already marked, is left as it is (`false`). A `remove` that throws leaves it held and unmarked.
+   */
+  erase(
+    original: DueOriginal,
+    now: Date,
+    correlationId: string,
+    remove: (key: string) => Promise<void>,
+  ): Promise<boolean>;
   /** `content_media_erase_failed`, once per medium and date: the next run tries again. */
   eraseFailed(original: DueOriginal, now: Date, correlationId: string): Promise<void>;
 }

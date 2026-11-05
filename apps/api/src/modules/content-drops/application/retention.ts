@@ -21,7 +21,8 @@ export interface RetentionRun {
  * only what is still due, so that a replay says nothing twice:
  * 1. a file still waiting for its bytes 24 hours after its drop began is refused, and its drop follows as on any refusal;
  * 2. the agency is told of each original that goes within 7 days;
- * 3. each original due (its date passed, or every drop it came in by withdrawn) is erased from the storage, then marked.
+ * 3. each original due (its date passed, or every drop it came in by withdrawn) is erased from the storage, then marked,
+ *    under the medium's row lock: one given again meanwhile stays held, bytes and row.
  * A storage that refuses or does not answer leaves the original held and says it once in amber; the next run tries
  * again. Any other failure stops the run: the job's retry, the next hour, takes it again.
  */
@@ -38,15 +39,13 @@ export async function eraseOriginals(
   let failed = 0;
   for (const original of await deps.retention.dueOriginals(now)) {
     try {
-      await deps.storage.remove(original.storageKey);
+      if (await deps.retention.erase(original, now, correlationId, (key) => deps.storage.remove(key)))
+        erased += 1;
     } catch (error) {
       if (!(error instanceof ContentDropStorageUnavailable)) throw error;
       await deps.retention.eraseFailed(original, now, correlationId);
       failed += 1;
-      continue;
     }
-    await deps.retention.erased(original, now, correlationId);
-    erased += 1;
   }
   return { abandoned: abandoned.length, announced, erased, failed };
 }
