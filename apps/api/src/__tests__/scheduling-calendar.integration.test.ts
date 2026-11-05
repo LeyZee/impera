@@ -125,7 +125,7 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     }
   };
 
-  const setStatus = (member: TeamMember, status: 'active' | 'sick') =>
+  const setStatus = (member: TeamMember, status: 'active' | 'sick' | 'suspended') =>
     test.admin.db.update(schema.teamMembers).set({ status }).where(eq(schema.teamMembers.id, member.id));
 
   beforeAll(async () => {
@@ -265,6 +265,25 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
       expect(read.agency).toBeNull();
     } finally {
       await setStatus(basile, 'active');
+    }
+  });
+
+  it('counts the créneaux of a member who is not at work as to fill: his shift holds nothing (recette EQP-03)', async () => {
+    await setStatus(theo, 'suspended');
+    try {
+      const read = await calendar(owner);
+      // His shift stays in the week, but Anna's day is open from end to end.
+      expect(read.shifts.some((shift) => shift.memberId === theo.id)).toBe(true);
+      const stretch = (start: number, end: number) => [
+        { startsAt: parisInstant(day, start).toISOString(), endsAt: parisInstant(day, end).toISOString() },
+      ];
+      expect(
+        read.agency?.toFill.filter((slot) => slot.platformAccountId === annaAccount).map((slot) => slot.open),
+      ).toEqual([stretch(0, 360), stretch(360, 720), stretch(720, 1080), stretch(1080, 1440)]);
+      const anna = read.agency?.coverage.find((one) => one.platformAccountId === annaAccount);
+      expect((anna?.withAgent ?? -1) + (anna?.chatterAlone ?? -1)).toBe(0);
+    } finally {
+      await setStatus(theo, 'active');
     }
   });
 

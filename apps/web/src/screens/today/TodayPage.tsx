@@ -16,8 +16,9 @@ import { ReportPanel } from '@/reports/ReportPanel';
 import { MEMBER_STATUS, reportOf, STATUS_TONES } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { useMyShifts } from '@/scheduling/api';
-import { accountLine, dayStateOf, progressOf, type DayState } from '@/scheduling/model';
+import { accountLine, dayStateOf, myAwayOf, progressOf, type DayState } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import {
   clockAt,
@@ -134,18 +135,24 @@ function Day({
           list.shifts.some((shift) => shift.id === heroShift.id) || reportOpensAt(heroShift) <= now
           ? { kind: 'due' }
           : { kind: 'later' };
+  // Away from the team, that is the day's one state: no shift is his to hold (CHAT-09).
+  const away = myAwayOf(user);
   return (
     <div className="sc-today">
-      <Hero
-        state={state}
-        now={now}
-        zone={zone}
-        today={today}
-        report={report}
-        onReport={() => {
-          if (heroShift !== null) onReport(heroShift.id);
-        }}
-      />
+      {away === null ? (
+        <Hero
+          state={state}
+          now={now}
+          zone={zone}
+          today={today}
+          report={report}
+          onReport={() => {
+            if (heroShift !== null) onReport(heroShift.id);
+          }}
+        />
+      ) : (
+        <MyAwayCard status={away} />
+      )}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}

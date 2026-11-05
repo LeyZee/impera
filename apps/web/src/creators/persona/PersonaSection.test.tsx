@@ -297,6 +297,34 @@ describe('Créatrices › Persona, recette 28/10', () => {
   });
 });
 
+describe('Créatrices › Persona, her date of birth (recette PRO-04, reco 22)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('checks her age on the day of the save, never on the date of the last version', async () => {
+    // The stored version is of 28/10; she turns 18 on 05/11, the day of the save.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 5, 12));
+    await serve([201, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    const birth = await screen.findByLabelText('Date de naissance');
+    fireEvent.change(birth, { target: { value: '2008-11-05' } });
+    expect(screen.queryByText(/au moins 18 ans/u)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Enregistrer une version' })).toHaveProperty('disabled', false);
+
+    fireEvent.change(birth, { target: { value: '2008-11-06' } });
+    expect(await screen.findByText(/au moins 18 ans/u)).toBeDefined();
+  });
+
+  it('says a date of birth 100 years back is a typo', async () => {
+    await serve([201, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    fireEvent.change(await screen.findByLabelText('Date de naissance'), { target: { value: '1890-01-01' } });
+    expect(await screen.findByText(/vérifie l’année de naissance/u)).toBeDefined();
+  });
+});
+
 /** A persona file as picked in « Importer un fichier »: the demo, renumbered and renamed, or any text. */
 const draftFile = (text: string, name = 'brouillon.yaml'): File =>
   new File([text], name, { type: 'text/yaml' });

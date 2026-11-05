@@ -133,6 +133,17 @@ describe('Aujourd’hui', () => {
     expect(screen.getByRole('link', { name: 'Ouvrir Suivi' })).toBeTruthy();
   });
 
+  it('says first and alone that the member is suspended, never « Aucun shift prévu » (CHAT-09)', async () => {
+    serve({ current: null, next: null, ended: null });
+    renderPage({ ...THEO_ME, team: { role: 'chatter', status: 'suspended' } });
+    const card = (await screen.findByRole('heading', { name: 'Ton accès est suspendu', level: 2 })).closest(
+      'section',
+    );
+    expect(card?.textContent).toContain('Parle à ton responsable.');
+    expect(screen.queryByText('Aucun shift prévu')).toBeNull();
+    expect(screen.queryByText('Rien pour l’instant')).toBeNull();
+  });
+
   it('says the server does not answer as the Dashboard does, with « Réessayer » (DASH-22)', async () => {
     vi.stubGlobal(
       'fetch',

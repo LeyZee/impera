@@ -7,6 +7,7 @@ import { CATEGORY_EMOJI, CategoryMark } from './category';
 import {
   availabilityBodiesOf,
   defaultStart,
+  dayInReach,
   dispoIds,
   OUT_OF_REACH,
   reachOf,
@@ -323,12 +324,10 @@ export function Preview({
   );
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/u;
-
-/** When a draft is, in her words, or what is missing for it to be read. */
+/** When a draft is, in her words, or what is missing for it to be read: never a day her agenda does not reach. */
 export function draftWhen(draft: TaskDraft, zone: string): string {
   if (draft.kind === 'routine' && draft.weekdays.length === 0) return 'Choisis les jours';
-  if (draft.kind !== 'routine' && !DAY.test(draft.day)) return 'Choisis le jour';
+  if (draft.kind !== 'routine' && !dayInReach(draft.day)) return 'Choisis le jour';
   return whenWords(whenOf(draft, zone), zone);
 }
 
@@ -337,7 +336,7 @@ const WEEKDAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samed
 function dispoWhen(draft: AvailabilityDraft): string {
   const hours = `${clockOf(draft.start)} – ${clockOf(draft.end)}`;
   if (draft.kind === 'once')
-    return DAY.test(draft.day) ? `${longDay(draft.day)}, ${hours}` : 'Choisis le jour';
+    return dayInReach(draft.day) ? `${longDay(draft.day)}, ${hours}` : 'Choisis le jour';
   if (draft.weekdays.length === 0) return 'Choisis les jours';
   const names = [...draft.weekdays].sort((a, b) => a - b).map((one) => WEEKDAY_NAMES[one - 1] ?? '');
   return `${names.length === 7 ? 'Chaque jour' : `Chaque ${names.join(', ')}`}, ${hours}`;

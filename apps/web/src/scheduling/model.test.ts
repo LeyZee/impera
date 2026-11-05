@@ -16,6 +16,7 @@ import type { z } from 'zod';
 
 import {
   accessOpen,
+  myAwayOf,
   accountLine,
   conflictLines,
   conflictTitle,
@@ -60,7 +61,7 @@ const shift = (n: number, patch: Partial<z.input<typeof ShiftSchema>>): Shift =>
     ...patch,
   });
 
-const planning = (shifts: Shift[], conflicts: unknown[] = []) =>
+const planning = (shifts: Shift[], conflicts: unknown[] = [], away: unknown[] = []) =>
   PlanningSchema.parse({
     settings: settingsOf(),
     accounts: [
@@ -73,6 +74,7 @@ const planning = (shifts: Shift[], conflicts: unknown[] = []) =>
     ],
     shifts,
     conflicts,
+    away,
   });
 
 describe('the week grid', () => {
@@ -396,6 +398,15 @@ describe('the member’s day', () => {
 
 /** As read: no-break spaces (« 23 h ») as plain ones. */
 const plain = (line: string): string => line.replaceAll('\u00a0', ' ');
+
+describe('a member away (CHAT-09)', () => {
+  it('reads his status when he is away, nothing at work or outside the team', () => {
+    expect(myAwayOf({ team: { role: 'chatter', status: 'suspended' } })).toBe('suspended');
+    expect(myAwayOf({ team: { role: 'manager', status: 'on_leave' } })).toBe('on_leave');
+    expect(myAwayOf({ team: { role: 'chatter', status: 'active' } })).toBeNull();
+    expect(myAwayOf({ team: null })).toBeNull();
+  });
+});
 
 describe('leaves', () => {
   it('says the shifts in the way of an approval, with their days once read', () => {
