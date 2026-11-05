@@ -13,13 +13,29 @@ vi.mock('@/scheduling/time', async (importOriginal) => ({
 
 /* Her agenda, invented (ADR 0010): Wednesday 4 November 2026 at 13 h in Paris (12:00Z). */
 
+/** Who answers her fans on Wednesday, invented: Kofi 14 h – 18 h, Awa 22 h – 2 h, in Paris. */
+const SHIFTS = [
+  {
+    displayName: 'Kofi',
+    platform: 'reveal',
+    startsAt: '2026-11-04T13:00:00.000Z',
+    endsAt: '2026-11-04T17:00:00.000Z',
+  },
+  {
+    displayName: 'Awa',
+    platform: 'reveal',
+    startsAt: '2026-11-04T21:00:00.000Z',
+    endsAt: '2026-11-05T01:00:00.000Z',
+  },
+];
+
 interface Call {
   readonly method: string;
   readonly url: string;
   readonly body: unknown;
 }
 
-function serve(online: () => boolean): Call[] {
+function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
     'fetch',
@@ -49,6 +65,8 @@ function serve(online: () => boolean): Call[] {
               )
             : new Response(JSON.stringify({ link: null }), { status: 200 }),
         );
+      if (url.startsWith('/v1/creator-space/shifts'))
+        return Promise.resolve(new Response(JSON.stringify({ shifts }), { status: 200 }));
       if (url === '/v1/creator-space/ticks')
         return Promise.resolve(
           new Response(JSON.stringify({ added: 1, streak: agendaOf().streak }), { status: 200 }),
@@ -212,6 +230,31 @@ describe('Agenda, the creator’s (CR-05)', () => {
     cleanup();
     show('month');
     expect(await screen.findAllByRole('gridcell')).toHaveLength(42);
+  });
+
+  it('says who answers her fans under the Programme, a layer she hides on this device (c3)', async () => {
+    const calls = serve(() => true);
+    show();
+    const line = await screen.findByText(/Qui répond à tes fans dans Reveal/u);
+    expect(line.textContent).toMatch(
+      /^💬 Qui répond à tes fans dans Reveal : Kofi 14\sh – 18\sh, Awa 22\sh – 2\sh$/u,
+    );
+    // Her days' bounds in her zone: Monday 0 h to the Monday after, in Paris.
+    expect(calls.find((call) => call.url.startsWith('/v1/creator-space/shifts'))?.url).toBe(
+      '/v1/creator-space/shifts?from=2026-11-01T23%3A00%3A00.000Z&to=2026-11-08T23%3A00%3A00.000Z',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Masquer qui répond à tes fans/u }));
+    expect(screen.queryByText(/Qui répond à tes fans dans/u)).toBeNull();
+    expect(localStorage.getItem('impera.agenda.replies')).toBe('hidden');
+    fireEvent.click(screen.getByRole('button', { name: /Voir qui répond à tes fans/u }));
+    expect(await screen.findByText(/Qui répond à tes fans dans Reveal/u)).toBeDefined();
+  });
+
+  it('shows no switch when nobody is planned on her accounts', async () => {
+    serve(() => true, []);
+    show();
+    await screen.findByText('4 choses à faire');
+    expect(screen.queryByRole('button', { name: /qui répond à tes fans/u })).toBeNull();
   });
 
   it('changes the moment of a task with a button, what a drag does', async () => {

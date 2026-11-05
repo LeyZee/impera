@@ -1,4 +1,10 @@
-import type { CreatorAgenda, CreatorSuggestion, CreatorTask, CreatorTaskWhen } from '@impera/contracts';
+import type {
+  CreatorAccountShift,
+  CreatorAgenda,
+  CreatorSuggestion,
+  CreatorTask,
+  CreatorTaskWhen,
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type JSX } from 'react';
 
@@ -13,14 +19,18 @@ import { WeekGrid } from './WeekGrid';
 import { WeekList } from './WeekList';
 import { moveTask, tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
 import { monthLabel, monthOf, monthRange } from './grid';
+import { shiftRangeOf, useRepliesShown } from './replies';
 import { useWide } from './useWide';
 import './agenda.css';
 
+import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
 
 export type AgendaView = 'day' | 'week' | 'month';
+
+const NO_SHIFTS: readonly CreatorAccountShift[] = [];
 
 /** On her phone her week is a list and there is no month; on a computer, Semaine is a grid of hours, and Mois. */
 const PHONE_VIEWS: readonly (readonly [AgendaView, string])[] = [
@@ -80,6 +90,12 @@ export function AgendaPage({
   const range = seen === 'month' ? monthRange(shown) : { from: monday, to: addDays(monday, 6) };
   const read = useAgenda(range.from, range.to);
   const { agenda, waiting } = useWithPending(read.data);
+  // « Qui répond à tes fans » (CR-05 c3): the shifts of her accounts, a layer she can hide on this device.
+  const [repliesShown, setRepliesShown] = useRepliesShown();
+  const shiftsRead = useCreatorShifts(
+    agenda !== undefined && repliesShown ? shiftRangeOf(range, agenda.timeZone) : null,
+  );
+  const shifts = repliesShown ? (shiftsRead.data ?? NO_SHIFTS) : NO_SHIFTS;
 
   const onSent = useCallback(({ refused, expired }: Flushed) => {
     if (expired)
@@ -249,10 +265,24 @@ export function AgendaPage({
           onTick={tick}
           onMove={move}
           onOpen={setOpen}
+          shifts={shifts}
         />
       )}
       {agenda === undefined ? null : (
         <p className="ag-foot">
+          {/* The layer's switch, only once there is something to hide (or to bring back). */}
+          {repliesShown && shifts.length === 0 ? null : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              aria-pressed={repliesShown}
+              onClick={() => {
+                setRepliesShown(!repliesShown);
+              }}
+            >
+              💬 {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
+            </button>
+          )}
           <button
             type="button"
             className="nv-btn nv-btn--plain nv-btn--sm"
@@ -290,6 +320,7 @@ function Views({
   onTick,
   onMove,
   onOpen,
+  shifts,
 }: {
   agenda: CreatorAgenda;
   view: AgendaView;
@@ -301,6 +332,8 @@ function Views({
   onTick: (task: CreatorTask, on: boolean, day: string) => void;
   onMove: (task: CreatorTask, when: CreatorTaskWhen) => void;
   onOpen: (open: Open) => void;
+  /** Her accounts' shifts, empty while the layer is hidden. */
+  shifts: readonly CreatorAccountShift[];
 }): JSX.Element {
   const actions = {
     onTick,
@@ -322,12 +355,23 @@ function Views({
     onView('day');
   };
   if (view === 'day')
-    return <DayView agenda={agenda} day={day} monday={monday} wide={wide} onDay={onDay} {...actions} />;
-  if (view === 'month') return <MonthView agenda={agenda} day={day} onOpenDay={openDay} />;
+    return (
+      <DayView
+        agenda={agenda}
+        day={day}
+        monday={monday}
+        wide={wide}
+        shifts={shifts}
+        onDay={onDay}
+        {...actions}
+      />
+    );
+  if (view === 'month') return <MonthView agenda={agenda} day={day} shifts={shifts} onOpenDay={openDay} />;
   return wide ? (
     <WeekGrid
       agenda={agenda}
       monday={monday}
+      shifts={shifts}
       onOpenDay={openDay}
       onMove={onMove}
       onSuggestion={(suggestion) => {
@@ -336,7 +380,7 @@ function Views({
       {...actions}
     />
   ) : (
-    <WeekList agenda={agenda} monday={monday} onOpenDay={openDay} {...actions} />
+    <WeekList agenda={agenda} monday={monday} shifts={shifts} onOpenDay={openDay} {...actions} />
   );
 }
 

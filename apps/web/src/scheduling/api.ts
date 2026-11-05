@@ -3,6 +3,7 @@ import {
   CalendarLinkCreatedSchema,
   CalendarLinkStateSchema,
   CalendarSchema,
+  CreatorAccountShiftsSchema,
   CreatorOnDutyListSchema,
   LeaveRequestListSchema,
   LeaveRequestSchema,
@@ -23,6 +24,7 @@ import {
   type CreateShiftBody,
   type CreateShiftSwapRequestBody,
   type CreateShiftTemplateBody,
+  type CreatorAccountShift,
   type CreatorOnDutyList,
   type DecideLeaveRequestBody,
   type LeaveRequest,
@@ -118,6 +120,26 @@ export function useCreatorOnDuty(): UseQueryResult<CreatorOnDutyList> {
     queryKey: [...SCHEDULING_KEY, 'creator-on-duty'],
     queryFn: () => read('/v1/creator-space/on-duty', (body) => CreatorOnDutyListSchema.parse(body)),
     refetchInterval: 60_000,
+    retry: 1,
+  });
+}
+
+/**
+ * Her accounts' shifts over the range of her Agenda (CR-05 c3, ADR 0045 § 1), for « Qui répond à tes fans »: `from`
+ * and `to` are instants (her days' bounds in her zone). Not read while the layer is hidden.
+ */
+export function useCreatorShifts(
+  range: { readonly from: string; readonly to: string } | null,
+): UseQueryResult<CreatorAccountShift[]> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'creator-shifts', range?.from, range?.to],
+    queryFn: () =>
+      read(
+        `/v1/creator-space/shifts?${new URLSearchParams({ from: range?.from ?? '', to: range?.to ?? '' }).toString()}`,
+        (body) => CreatorAccountShiftsSchema.parse(body).shifts,
+      ),
+    enabled: range !== null,
+    staleTime: 60_000,
     retry: 1,
   });
 }

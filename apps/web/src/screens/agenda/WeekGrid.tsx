@@ -1,7 +1,14 @@
-import type { CreatorAgenda, CreatorSuggestion, CreatorTask, CreatorTaskWhen } from '@impera/contracts';
+import type {
+  CreatorAccountShift,
+  CreatorAgenda,
+  CreatorSuggestion,
+  CreatorTask,
+  CreatorTaskWhen,
+} from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from 'react';
 
 import type { DayActions } from './DayView';
+import { ShortReplies } from './Replies';
 import { CATEGORY_EMOJI } from './category';
 import {
   createdSpan,
@@ -15,6 +22,7 @@ import {
   type Span,
 } from './grid';
 import { planOf, type DayPlan, type TimedTask } from './model';
+import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
@@ -65,6 +73,7 @@ interface Press {
 export function WeekGrid({
   agenda,
   monday,
+  shifts,
   onOpenDay,
   onMove,
   onSuggestion,
@@ -72,6 +81,8 @@ export function WeekGrid({
 }: {
   agenda: CreatorAgenda;
   monday: string;
+  /** Her accounts' shifts: a row « fans » under her tasks of the day, never in the hours. */
+  shifts: readonly CreatorAccountShift[];
   onOpenDay: (day: string) => void;
   onMove: (task: CreatorTask, when: CreatorTaskWhen) => void;
   onSuggestion: (suggestion: CreatorSuggestion) => void;
@@ -239,67 +250,82 @@ export function WeekGrid({
   return (
     <div ref={root} className="ag-wk nv-plate" data-dragging={drag === null ? undefined : 'true'}>
       <div ref={scroller} className="ag-wk__scroll">
-        <div className="ag-wk__head">
-          <span />
-          {days.map((day, index) => (
-            <button
-              key={day}
-              type="button"
-              className="ag-wk__day"
-              data-today={day === agenda.today ? 'true' : undefined}
-              aria-label={`Ouvrir ${WEEKDAY_SHORT[index] ?? ''} ${dayNumber(day)} en Jour`}
-              onClick={() => {
-                onOpenDay(day);
-              }}
-            >
-              <span aria-hidden="true">{WEEKDAY_SHORT[index]}</span>
-              <b className="nv-num" aria-hidden="true">
-                {dayNumber(day)}
-              </b>
-              <Routine plan={plans[index]} />
-            </button>
-          ))}
-        </div>
-        <div className="ag-wk__all">
-          <span className="ag-wk__label">tâches</span>
-          {plans.map((plan) => (
-            <div key={plan.day} className="ag-wk__cell">
-              {plan.todo
-                .filter((item) => item.task.when.kind === 'day')
-                .map((item) => (
-                  <button
-                    key={item.task.id}
-                    type="button"
-                    className="ag-mini"
-                    data-cat={item.task.category}
-                    data-done={item.done ? 'true' : undefined}
-                    onClick={() => {
-                      actions.onTask(item.task, plan.day);
-                    }}
-                  >
-                    <span aria-hidden="true">{CATEGORY_EMOJI[item.task.category]}</span>
-                    <span className="ag-mini__title">{item.task.title}</span>
-                  </button>
-                ))}
-              {plan.suggestions
-                .filter((suggestion) => suggestion.when?.kind === 'day')
-                .map((suggestion) => (
-                  <button
-                    key={suggestion.id}
-                    type="button"
-                    className="ag-mini"
-                    data-cat={suggestion.category}
-                    data-proposed="true"
-                    onClick={() => {
-                      onSuggestion(suggestion);
-                    }}
-                  >
-                    <span aria-hidden="true">{CATEGORY_EMOJI[suggestion.category]}</span>
-                    <span className="ag-mini__title">{suggestion.title}</span>
-                  </button>
-                ))}
+        {/* Days, her tasks of the day and who answers her fans stay in view while the hours scroll (CREA-27). */}
+        <div className="ag-wk__top">
+          <div className="ag-wk__head">
+            <span />
+            {days.map((day, index) => (
+              <button
+                key={day}
+                type="button"
+                className="ag-wk__day"
+                data-today={day === agenda.today ? 'true' : undefined}
+                aria-label={`Ouvrir ${WEEKDAY_SHORT[index] ?? ''} ${dayNumber(day)} en Jour`}
+                onClick={() => {
+                  onOpenDay(day);
+                }}
+              >
+                <span aria-hidden="true">{WEEKDAY_SHORT[index]}</span>
+                <b className="nv-num" aria-hidden="true">
+                  {dayNumber(day)}
+                </b>
+                <Routine plan={plans[index]} />
+              </button>
+            ))}
+          </div>
+          <div className="ag-wk__all">
+            <span className="ag-wk__label">tâches</span>
+            {plans.map((plan) => (
+              <div key={plan.day} className="ag-wk__cell">
+                {plan.todo
+                  .filter((item) => item.task.when.kind === 'day')
+                  .map((item) => (
+                    <button
+                      key={item.task.id}
+                      type="button"
+                      className="ag-mini"
+                      data-cat={item.task.category}
+                      data-done={item.done ? 'true' : undefined}
+                      onClick={() => {
+                        actions.onTask(item.task, plan.day);
+                      }}
+                    >
+                      <span aria-hidden="true">{CATEGORY_EMOJI[item.task.category]}</span>
+                      <span className="ag-mini__title">{item.task.title}</span>
+                    </button>
+                  ))}
+                {plan.suggestions
+                  .filter((suggestion) => suggestion.when?.kind === 'day')
+                  .map((suggestion) => (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      className="ag-mini"
+                      data-cat={suggestion.category}
+                      data-proposed="true"
+                      onClick={() => {
+                        onSuggestion(suggestion);
+                      }}
+                    >
+                      <span aria-hidden="true">{CATEGORY_EMOJI[suggestion.category]}</span>
+                      <span className="ag-mini__title">{suggestion.title}</span>
+                    </button>
+                  ))}
+              </div>
+            ))}
+          </div>
+          {shifts.length === 0 ? null : (
+            <div className="ag-wk__all ag-wk__fans">
+              <span className="ag-wk__label" aria-hidden="true">
+                fans
+              </span>
+              {plans.map((plan) => (
+                <div key={plan.day} className="ag-wk__cell">
+                  <ShortReplies lines={repliesOn(shifts, plan.day, agenda.timeZone)} />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
         <div className="ag-wk__grid" style={{ '--ag-hours': hours.last - hours.first }}>
           <div className="ag-wk__hours" aria-hidden="true">
