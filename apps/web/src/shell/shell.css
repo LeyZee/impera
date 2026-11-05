@@ -1514,6 +1514,12 @@ label.nv-notif__row {
   gap: 10px;
   margin-top: 14px;
 }
+.nv-notif__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: 14px;
+}
 .nv-notif__end {
   display: inline-flex;
   flex-wrap: nowrap;
