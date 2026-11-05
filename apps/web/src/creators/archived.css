@@ -23,4 +23,6 @@
 }
 .cr-archived__row > button {
   flex: none;
+  /* Its words end on the right edge of the count and chevron above, not a button's padding short of it. */
+  margin-inline-end: calc(-1 * var(--nv-space-4));
 }
