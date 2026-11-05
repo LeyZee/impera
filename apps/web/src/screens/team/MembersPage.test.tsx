@@ -436,7 +436,7 @@ describe('adding a member', () => {
     who();
     fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
     fireEvent.click(await screen.findByRole('radio', { name: /Autre/u }));
-    fill('Taux à la main', '12,5');
+    fill('Taux à la main, en %', '12,5');
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
     expect(await screen.findByText(/Personne n’a été ajouté/u)).toBeDefined();
     expect(posted[0]?.body).toMatchObject({ commission: { rateBps: 1250 } });
@@ -592,7 +592,8 @@ describe('changing a member once added (EQ-10)', () => {
     expect(within(panel).getByLabelText<HTMLInputElement>('Part du net de l’équipe').value).toBe('5');
     expect(within(panel).queryByRole('status')).toBeNull();
     fireEvent.click(within(panel).getByRole('radio', { name: /Autre/u }));
-    fireEvent.change(within(panel).getByLabelText('Taux à la main'), { target: { value: '45' } });
+    // Named with its unit, the « % » beside it hidden from a screen reader (recette EQP-15).
+    fireEvent.change(within(panel).getByLabelText('Nouveau taux, en %'), { target: { value: '45' } });
     fireEvent.click(within(panel).getByRole('radio', { name: '1er décembre 2026' }));
     // A day that already has a rate is closed and says it.
     const set = within(panel).getByRole('radio', { name: /^16 novembre 2026 · 40\s%\sprévu$/u });

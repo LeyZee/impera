@@ -393,6 +393,21 @@ describe('Équipe › Rapports', () => {
     ]);
   });
 
+  it('says « 0,00 € validés » of a report validated at nothing, never a blank row (recette EQP-14)', async () => {
+    period = [
+      report(5, 1, {
+        status: 'validated',
+        amount: { amountMinor: 0, currency: 'EUR' },
+        reviewedAt: '2026-10-27T08:00:00.000Z',
+      }),
+    ];
+    renderPage();
+    const basile = await screen.findByText('Basile', { selector: '.nv-disclosure__title' });
+    expect(text(basile.closest('summary')?.querySelector('.nv-disclosure__sum') ?? null)).toMatch(
+      /^0,00 € validés/u,
+    );
+  });
+
   it('reads a period member by member, with the shifts still without a report', async () => {
     period = [
       report(5, 0, { status: 'validated', reviewedAt: '2026-10-27T08:00:00.000Z' }),

@@ -33,10 +33,19 @@
   max-width: 820px;
   margin: 0;
 }
-/* Whose sheet, on a row of its own above the tabs and the page's actions: never « Ajouter » alone on a second row. */
+/*
+ * Who, then what: the creators on a row of their own above the tabs of her sheet, and the agency's own buttons apart
+ * at the end of the tabs' row, so a chip is never read as a tab (captures de #563).
+ */
 .cr-creators {
   order: -1;
   flex-basis: 100%;
+  margin-bottom: var(--nv-space-1);
+}
+@media (min-width: 641px) {
+  .cr-agency-first {
+    margin-inline-start: var(--nv-space-4);
+  }
 }
 /* A phone: the creators on one line that scrolls, its far edge fading, instead of rows of chips (CREA-19). */
 @media (max-width: 640px) {
@@ -802,6 +811,15 @@
   border-top: 1px solid var(--nv-hairline);
 }
 
+/* A phone: the head's actions fall under her name, each as wide as the column, their words centred on one axis. */
+@media (max-width: 640px) {
+  .ps-head__actions {
+    flex-basis: 100%;
+  }
+  .ps-head__actions > .nv-btn {
+    flex: 1 1 100%;
+  }
+}
 @media (max-width: 820px) {
   .ps-page {
     overflow: visible;

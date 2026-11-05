@@ -694,44 +694,49 @@ export function AgencyLoad({
         <h2 id="cal-cover-title" className="cal-agency__title">
           Couverture des comptes {period}
         </h2>
-        <ul className="cal-cover__list">
-          {agency.coverage.map((one) => {
-            const account = accounts.get(one.platformAccountId);
-            const total = Math.max(1, one.withAgent + one.chatterAlone + one.agentAlone + one.nobody);
-            const parts = [
-              { kind: 'both', minutes: one.withAgent, label: 'Chatteur et IA' },
-              { kind: 'chatter', minutes: one.chatterAlone, label: 'Chatteur seul' },
-              { kind: 'agent', minutes: one.agentAlone, label: 'IA seule' },
-              { kind: 'nobody', minutes: one.nobody, label: 'Personne' },
-            ];
-            return (
-              <li key={one.platformAccountId} className="cal-cover__one">
-                <p className="cal-cover__name">
-                  {account === undefined ? 'Un compte' : `${account.creatorName}, ${accountLine(account)}`}
-                </p>
-                <span className="cal-cover__bar" aria-hidden="true">
-                  {parts.map((part) =>
-                    part.minutes === 0 ? null : (
-                      <i
-                        key={part.kind}
-                        data-kind={part.kind}
-                        style={{ width: `${String((part.minutes / total) * 100)}%` }}
-                      />
-                    ),
-                  )}
-                </span>
-                <p className="cal-cover__words">
-                  {parts.map((part) => (
-                    <span key={part.kind} className="cal-cover__word" data-kind={part.kind}>
-                      <i aria-hidden="true" />
-                      {part.label} <span className="nv-num">{hoursOf(part.minutes)}</span>
-                    </span>
-                  ))}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
+        {/* Its words when there is no account, as the load has its own (recette EQP-12). */}
+        {agency.coverage.length === 0 ? (
+          <p className="cal-agency__empty">Aucun compte à couvrir.</p>
+        ) : (
+          <ul className="cal-cover__list">
+            {agency.coverage.map((one) => {
+              const account = accounts.get(one.platformAccountId);
+              const total = Math.max(1, one.withAgent + one.chatterAlone + one.agentAlone + one.nobody);
+              const parts = [
+                { kind: 'both', minutes: one.withAgent, label: 'Chatteur et IA' },
+                { kind: 'chatter', minutes: one.chatterAlone, label: 'Chatteur seul' },
+                { kind: 'agent', minutes: one.agentAlone, label: 'IA seule' },
+                { kind: 'nobody', minutes: one.nobody, label: 'Personne' },
+              ];
+              return (
+                <li key={one.platformAccountId} className="cal-cover__one">
+                  <p className="cal-cover__name">
+                    {account === undefined ? 'Un compte' : `${account.creatorName}, ${accountLine(account)}`}
+                  </p>
+                  <span className="cal-cover__bar" aria-hidden="true">
+                    {parts.map((part) =>
+                      part.minutes === 0 ? null : (
+                        <i
+                          key={part.kind}
+                          data-kind={part.kind}
+                          style={{ width: `${String((part.minutes / total) * 100)}%` }}
+                        />
+                      ),
+                    )}
+                  </span>
+                  <p className="cal-cover__words">
+                    {parts.map((part) => (
+                      <span key={part.kind} className="cal-cover__word" data-kind={part.kind}>
+                        <i aria-hidden="true" />
+                        {part.label} <span className="nv-num">{hoursOf(part.minutes)}</span>
+                      </span>
+                    ))}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
