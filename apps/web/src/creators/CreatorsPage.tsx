@@ -3,6 +3,7 @@ import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
+import { ChipFace } from './CreatorFace';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { SetupCard } from './SetupCard';
@@ -234,6 +235,7 @@ export function CreatorsPage({
                       if (creator.id !== selected) onCreator(creator.id);
                     }}
                   >
+                    <ChipFace creator={creator} />
                     {creator.displayName}
                   </button>
                 ))}
@@ -241,7 +243,7 @@ export function CreatorsPage({
             ) : null}
             {isOwner && !showForm && query.isSuccess ? (
               // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
-              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
+              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm cr-agency-first">
                 Structures de script
               </Link>
             ) : null}
