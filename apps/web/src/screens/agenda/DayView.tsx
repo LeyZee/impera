@@ -1,4 +1,4 @@
-import type { CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
+import type { CreatorAccountShift, CreatorAgenda, CreatorSuggestion, CreatorTask } from '@impera/contracts';
 import { CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
 import {
   useRef,
@@ -9,9 +9,11 @@ import {
 } from 'react';
 
 import type { AddPreset } from './AddDialog';
+import { DayReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { firstOf, momentOf, planOf, programOf, progressOf, type DayPlan, type DayTask } from './model';
+import { repliesOn } from './replies';
 
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
@@ -37,6 +39,7 @@ export function DayView({
   day,
   monday,
   wide,
+  shifts,
   onDay,
   ...actions
 }: {
@@ -45,6 +48,8 @@ export function DayView({
   monday: string;
   /** A computer: the proportional bar of her day under the glance. */
   wide: boolean;
+  /** Her accounts' shifts: a line under the Programme, never on the frieze. */
+  shifts: readonly CreatorAccountShift[];
   onDay: (day: string | null) => void;
 } & DayActions): JSX.Element {
   const now = useNow();
@@ -96,6 +101,7 @@ export function DayView({
             </span>
           </div>
           <Program plan={plan} nowMinute={nowMinute} {...actions} />
+          <DayReplies lines={repliesOn(shifts, day, agenda.timeZone)} />
         </section>
       </div>
     </div>

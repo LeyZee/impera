@@ -29,6 +29,17 @@ export function wireContentDrops(shared: Shared): WiredContentDrops {
         shared.logger,
         (payload) => module.jobs.receiveFile(payload.fileId, payload.correlationId),
       ),
+      'content_drops.erase_originals': defineTask(
+        'content_drops.erase_originals',
+        JOB_PAYLOADS['content_drops.erase_originals'],
+        shared.logger,
+        async (_payload, context) => {
+          context.logger.info(
+            await module.jobs.eraseOriginals(`job:${context.jobId}`),
+            'content drops: unfinished sends refused, originals announced and erased',
+          );
+        },
+      ),
     },
     routes: [module.routes],
   };

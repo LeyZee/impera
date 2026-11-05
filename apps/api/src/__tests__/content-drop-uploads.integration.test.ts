@@ -6,12 +6,13 @@ import {
   ContentDropSchema,
   CreatorIdSchema,
   DROP_PART_BYTES,
+  DROP_KEPT_DAYS,
   DropFileUploadSchema,
   newId,
   TeamMemberIdSchema,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, inArray, schema } from '@impera/db';
+import { eq, inArray, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { AwsClient } from 'aws4fetch';
 import { runOnce } from 'graphile-worker';
@@ -21,6 +22,8 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import { createDrizzleRetentionStore } from '../modules/content-drops/infra/db/retention-store';
+import { createDrizzleReceiptStore } from '../modules/content-drops/infra/db/store';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -373,10 +376,13 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
   });
 
   /** Her file sent whole in one part and « complete » called, as her phone does for a small photo. */
-  async function sendWhole(one: { readonly base: string; readonly bytes: Uint8Array }) {
-    const plan = await upload(one.base, 'nora');
+  async function sendWhole(
+    one: { readonly base: string; readonly bytes: Uint8Array },
+    who: 'nora' | 'manager' = 'nora',
+  ) {
+    const plan = await upload(one.base, who);
     const sent = await put(plan.missing[0]?.url ?? '', one.bytes);
-    const done = await call('POST', `${one.base}/complete`, 'nora', {
+    const done = await call('POST', `${one.base}/complete`, who, {
       parts: [{ number: 1, etag: sent.headers.get('etag') ?? '' }],
     });
     expect(done.statusCode, done.body).toBe(200);
@@ -433,5 +439,216 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     const key = `incoming/${nora}/${fileId}`;
     expect((await s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'HEAD' })).status).toBe(404);
     expect(await rows(dropId)).toEqual({ drop: 'withdrawn', files: [{ state: 'awaiting', refusal: null }] });
+  });
+
+  /** `content_drops.erase_originals` once, as the hourly cron would enqueue it (CR-06 c). */
+  async function erase() {
+    await test.admin.db.execute(
+      sql`select graphile_worker.add_job('content_drops.erase_originals', '{}'::json)`,
+    );
+    await runOnce({
+      pgPool: test.admin.pool,
+      taskList: { 'content_drops.erase_originals': app.tasks['content_drops.erase_originals'] },
+    });
+  }
+
+  const mediumOf = async (fileId: string) => {
+    const [row] = await test.admin.db
+      .select({ media: schema.mediaAssets })
+      .from(schema.contentDropFiles)
+      .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.contentDropFiles.mediaAssetId))
+      .where(eq(schema.contentDropFiles.id, fileId));
+    if (row === undefined) throw new Error(`no medium for ${fileId}`);
+    return row.media;
+  };
+
+  const eventsOf = async (mediaAssetId: string) =>
+    (
+      await test.admin.db
+        .select({ type: schema.domainEvents.type, payload: schema.domainEvents.payload })
+        .from(schema.domainEvents)
+        .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${mediaAssetId}`)
+        .orderBy(schema.domainEvents.createdAt)
+    ).map((one) => one.type);
+
+  const held = async (key: string) =>
+    (await s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'HEAD' })).status;
+
+  it('keeps an original a year, tells the agency 7 days before, erases it at its date, holds it again if given again', async () => {
+    const photo = jpegOf(MB, 30, 40, 0x66);
+    const first = await dropOne('nora', photo);
+    await sendWhole(first);
+    await receive();
+    const medium = await mediumOf(first.fileId);
+    // A year from its keeping (ADR 0055 § 7), while no exit is planned.
+    const year = (medium.expiresAt?.getTime() ?? 0) - medium.createdAt.getTime();
+    expect(Math.abs(year - DROP_KEPT_DAYS * 86_400_000)).toBeLessThan(60_000);
+    await erase();
+    expect(await eventsOf(medium.id)).toEqual([]);
+
+    // Three days left: the agency is told, once however many runs.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ expiresAt: sql`now() + interval '3 days'` })
+      .where(eq(schema.mediaAssets.id, medium.id));
+    await erase();
+    await erase();
+    expect(await eventsOf(medium.id)).toEqual(['content_media_expiring']);
+    expect(await held(medium.storageKey)).toBe(200);
+
+    // Its date passed: erased from the storage, the row kept with its fingerprint.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ expiresAt: sql`now() - interval '1 minute'` })
+      .where(eq(schema.mediaAssets.id, medium.id));
+    await erase();
+    await erase();
+    expect(await held(medium.storageKey)).toBe(404);
+    const gone = await mediumOf(first.fileId);
+    expect(gone.erasedAt).not.toBeNull();
+    expect(gone.sha256).toBe(medium.sha256);
+    expect(await eventsOf(medium.id)).toEqual(['content_media_expiring', 'content_media_erased']);
+
+    // Given again: the same medium holds its original again, for a year from today.
+    const again = await dropOne('nora', photo);
+    await sendWhole(again);
+    await receive();
+    expect(await rows(again.dropId)).toEqual({ drop: 'ready', files: [{ state: 'kept', refusal: null }] });
+    const back = await mediumOf(again.fileId);
+    expect(back.id).toBe(medium.id);
+    expect(back.erasedAt).toBeNull();
+    expect((back.expiresAt?.getTime() ?? 0) - Date.now()).toBeGreaterThan((DROP_KEPT_DAYS - 1) * 86_400_000);
+    expect(await held(back.storageKey)).toBe(200);
+  });
+
+  it('erases a withdrawn drop’s originals within the hour, unless another drop of hers still holds them', async () => {
+    const photo = jpegOf(MB, 30, 40, 0x77);
+    const first = await dropOne('nora', photo);
+    await sendWhole(first);
+    await receive();
+    const twin = await dropOne('manager', photo);
+    await sendWhole(twin, 'manager');
+    await receive();
+    const medium = await mediumOf(first.fileId);
+    expect((await call('DELETE', `/v1/creator-space/drops/${first.dropId}`, 'nora')).statusCode).toBe(204);
+    await erase();
+    // The manager's drop still points at it.
+    expect(await held(medium.storageKey)).toBe(200);
+    expect((await call('DELETE', `/v1/creators/${nora}/drops/${twin.dropId}`, 'manager')).statusCode).toBe(
+      204,
+    );
+    await erase();
+    expect(await held(medium.storageKey)).toBe(404);
+    const [erased] = await test.admin.db
+      .select({ payload: schema.domainEvents.payload })
+      .from(schema.domainEvents)
+      .where(
+        sql`${schema.domainEvents.type} = 'content_media_erased' and ${schema.domainEvents.payload}->>'mediaAssetId' = ${medium.id}`,
+      );
+    expect(erased?.payload).toEqual({ mediaAssetId: medium.id, reason: 'withdrawn' });
+  });
+
+  /**
+   * The two orders of a race between the hourly erasure and the same photo given again (relecture Bilan de #525), each
+   * step called by hand where the jobs would interleave: the storage holds the key whenever the row says held.
+   */
+  it('never leaves a medium held without its bytes when she gives it again while it is erased', async () => {
+    const receipts = createDrizzleReceiptStore(test.admin.db);
+    const retention = createDrizzleRetentionStore(test.admin.db);
+    const removeRaw = (key: string) =>
+      s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' }).then(() => undefined);
+    const keptAgain = async (fileId: string, medium: Awaited<ReturnType<typeof mediumOf>>) => {
+      await receipts.settle(fileId, { state: 'received' }, new Date(), 'test');
+      // As a receipt that found the medium held and skipped writing its bytes.
+      await receipts.settle(
+        fileId,
+        {
+          state: 'kept',
+          media: {
+            kind: 'image',
+            mime: 'image/jpeg',
+            bytes: medium.bytes,
+            sha256: medium.sha256,
+            storageKey: medium.storageKey,
+            durationMs: null,
+            uploaded: false,
+          },
+        },
+        new Date(),
+        'test',
+      );
+    };
+    const withdrawnOnce = async (seed: number) => {
+      const first = await dropOne('nora', jpegOf(MB, 30, 40, seed));
+      await sendWhole(first);
+      await receive();
+      expect((await call('DELETE', `/v1/creator-space/drops/${first.dropId}`, 'nora')).statusCode).toBe(204);
+      return { first, medium: await mediumOf(first.fileId) };
+    };
+
+    // 1. Erased between the receipt's look and its settling: the settling refuses, the retry writes the bytes again.
+    const one = await withdrawnOnce(0x91);
+    const again = await dropOne('nora', jpegOf(MB, 30, 40, 0x91));
+    await sendWhole(again);
+    const [due] = (await retention.dueOriginals(new Date())).filter((o) => o.mediaAssetId === one.medium.id);
+    if (due === undefined) throw new Error('not due');
+    expect(await retention.erase(due, new Date(), 'test', removeRaw)).toBe(true);
+    await expect(keptAgain(again.fileId, one.medium)).rejects.toThrow('erased meanwhile');
+    expect((await rows(again.dropId)).files).toEqual([{ state: 'received', refusal: null }]);
+    await receive();
+    expect((await rows(again.dropId)).files).toEqual([{ state: 'kept', refusal: null }]);
+    expect((await mediumOf(again.fileId)).erasedAt).toBeNull();
+    expect(await held(one.medium.storageKey)).toBe(200);
+
+    // 2. Given again between the erasure's read and its removal: checked again under the lock, it stays.
+    const two = await withdrawnOnce(0x92);
+    const [stale] = (await retention.dueOriginals(new Date())).filter(
+      (o) => o.mediaAssetId === two.medium.id,
+    );
+    if (stale === undefined) throw new Error('not due');
+    const redrop = await dropOne('nora', jpegOf(MB, 30, 40, 0x92));
+    await sendWhole(redrop);
+    await keptAgain(redrop.fileId, two.medium);
+    expect(await retention.erase(stale, new Date(), 'test', removeRaw)).toBe(false);
+    expect(await held(two.medium.storageKey)).toBe(200);
+    expect((await mediumOf(two.first.fileId)).erasedAt).toBeNull();
+  });
+
+  it('refuses a send left unfinished for 24 hours, and its drop is blocked with her sentence', async () => {
+    // Begun 25 hours ago: written as the admin role, a drop's date never moves once written (0108's trigger).
+    const dropId = newId(ContentDropIdSchema);
+    const [her] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'nora@example.test'));
+    await test.admin.db.insert(schema.contentDrops).values({
+      id: dropId,
+      creatorId: nora,
+      category: 'feed_shoot',
+      createdBy: her?.id ?? '',
+      createdAt: new Date(Date.now() - 25 * 3_600_000),
+    });
+    await test.admin.db.insert(schema.contentDropFiles).values({
+      id: newId(ContentDropFileIdSchema),
+      creatorId: nora,
+      dropId,
+      position: 0,
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: MB,
+    });
+    const fresh = await dropOne('nora', jpegOf(MB, 30, 40, 0x88));
+    await erase();
+    expect(await rows(dropId)).toEqual({
+      drop: 'blocked',
+      files: [
+        { state: 'refused', refusal: 'L’envoi ne s’est pas terminé dans les 24 h : dépose-le à nouveau' },
+      ],
+    });
+    // Begun just now, it waits.
+    expect(await rows(fresh.dropId)).toEqual({
+      drop: 'uploading',
+      files: [{ state: 'awaiting', refusal: null }],
+    });
   });
 });

@@ -28,6 +28,14 @@ describe('conversation state machine', () => {
     expect(nextState('sending', 'create_draft')).toBeNull();
   });
 
+  it('keeps a fan a stop left unanswered waiting, wherever the draft was (recette MOT-03)', () => {
+    expect(nextState('sending', 'expire_unanswered')).toBe('pending');
+    expect(nextState('awaiting_approval', 'expire_unanswered')).toBe('pending');
+    expect(nextState('pending', 'expire_unanswered')).toBe('pending');
+    expect(nextState('sending', 'expire')).toBe('idle');
+    expect(nextState('human', 'expire_unanswered')).toBeNull();
+  });
+
   it('refuses what the state does not allow', () => {
     expect(nextState('idle', 'approve')).toBeNull();
     expect(nextState('human', 'create_draft')).toBeNull();

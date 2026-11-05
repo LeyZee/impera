@@ -542,6 +542,37 @@ export const CreatorOnDutyListSchema = z.strictObject({
 export type CreatorOnDutyList = z.infer<typeof CreatorOnDutyListSchema>;
 
 /**
+ * A shift on one of her accounts, for « Qui répond à tes fans » in her Agenda (CR-05 c3, ADR 0045 § 1): the member's
+ * name in the team, the platform of the account (her screen names it, the core does not) and the range. Never a
+ * member id, a colour, a status or a rate, and never whether the agent writes too (ADR 0021).
+ */
+export const CreatorAccountShiftSchema = z.strictObject({
+  displayName: z.string().min(1),
+  platform: PlatformSchema,
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+});
+export type CreatorAccountShift = z.infer<typeof CreatorAccountShiftSchema>;
+
+/** The widest read: the 42 days of her month, and one more for a change of clock. */
+export const CREATOR_SHIFTS_MAX_DAYS = 43;
+
+/** `GET /v1/creator-space/shifts?from=&to=` (creator): the shifts of her accounts that overlap `[from, to)`. */
+export const CreatorAccountShiftsQuerySchema = z
+  .strictObject({ from: z.iso.datetime(), to: z.iso.datetime() })
+  .refine(
+    ({ from, to }) =>
+      Date.parse(from) < Date.parse(to) &&
+      Date.parse(to) - Date.parse(from) <= CREATOR_SHIFTS_MAX_DAYS * 86_400_000,
+    { message: `De 1 minute à ${String(CREATOR_SHIFTS_MAX_DAYS)} jours` },
+  );
+export type CreatorAccountShiftsQuery = z.infer<typeof CreatorAccountShiftsQuerySchema>;
+
+/** Her accounts' shifts, by start, then by name. */
+export const CreatorAccountShiftsSchema = z.strictObject({ shifts: z.array(CreatorAccountShiftSchema) });
+export type CreatorAccountShifts = z.infer<typeof CreatorAccountShiftsSchema>;
+
+/**
  * A member's own shift, for Aujourd'hui: its creator's name (a chatter does not read the creators' list, ADR 0025),
  * the account to open in the platform (the chatter chats there, never in Impera), and the access window the server
  * computed for it (`accessEndsAt` is `endsAt` for a stopped shift).

@@ -102,7 +102,7 @@ Mode auto : `CreatorSettings.auto_approve_categories` (ex. `['small_talk','kyc',
 
 ## 6. Interrupteurs
 
-`kill_switches` à trois niveaux. Le job `respond` et le job `send` les relisent à chaque exécution. L'approbation d'un brouillon les relit aussi : interrupteur actif ou session expirée, elle est refusée (409 `kill_switch_conflict` ou `session_expired_conflict`) et le brouillon reste en attente. Le job `send` les relit avant chaque bulle : un brouillon arrêté ainsi expire, et rien ne repart tout seul quand l'interrupteur est levé. Un interrupteur « envois seulement » existe : le bot continue de proposer (copilote), rien ne part.
+`kill_switches` à trois niveaux. Le job `respond` et le job `send` les relisent à chaque exécution. L'approbation d'un brouillon les relit aussi : interrupteur actif ou session expirée, elle est refusée (409 `kill_switch_conflict` ou `session_expired_conflict`) et le brouillon reste en attente. Le job `send` les relit avant chaque bulle : un brouillon arrêté ainsi expire, et rien ne repart tout seul quand l'interrupteur est levé. Si rien n'a encore répondu au dernier message du fan, la conversation repasse en `pending` dans la même transaction (`draft_expired` porte `leavesFanWaiting`) : la reprise la relance avec les autres, et un nouveau brouillon est proposé. Un interrupteur « envois seulement » existe : le bot continue de proposer (copilote), rien ne part.
 
 Le contrôle du Dashboard passe par `PUT /v1/agent/mode { creatorId, mode }` (propriétaire ou opérateur de la créatrice) :
 
