@@ -8,10 +8,12 @@ import {
   dueOf,
   fileLine,
   mimeOf,
+  moved,
   onTheirWay,
   openRequests,
   published,
   remainingOf,
+  sameFile,
   stateTone,
   weightOf,
 } from './model';
@@ -103,5 +105,18 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(droppedOn('2026-11-04T23:30:00Z', '2026-11-05', 'Europe/Paris')).toBe('Aujourd’hui');
     expect(droppedOn('2026-11-04T10:00:00Z', '2026-11-05', 'Europe/Paris')).toBe('Hier');
     expect(droppedOn('2026-11-02T10:00:00Z', '2026-11-05', 'Europe/Paris')).toBe('Lundi');
+  });
+
+  it('moves a file one place up or down, and never past either end', () => {
+    expect(moved(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b']);
+    expect(moved(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
+    expect(moved(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
+    expect(moved(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('knows the same file picked twice', () => {
+    const file = { name: 'IMG_1.HEIC', size: 3, lastModified: 1 };
+    expect(sameFile(file, { ...file })).toBe(true);
+    expect(sameFile(file, { ...file, lastModified: 2 })).toBe(false);
   });
 });
