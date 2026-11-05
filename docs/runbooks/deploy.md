@@ -192,11 +192,13 @@ Avant la première facture réelle (EQ-06 lot 4, ADR 0037). En production, l'API
 Avant le premier dépôt réel d'une créatrice (CR-06 b, ADR 0055 § 3). Son téléphone envoie chaque fichier **directement** au bucket, par morceaux de 8 Mio, chacun à une adresse que l'API signe pour une heure et pour sa taille exacte. Le fichier brut arrive sous `incoming/` ; le nettoyage (CR-06 b2) en retire les métadonnées, garde le fichier nettoyé, puis efface le brut. Charles crée le projet Hetzner (aucune commande à taper) ; la session de mise en service fait le reste, sans jamais coller une clé dans un chat.
 
 1. **Hetzner, un projet pour les médias** (`impera-medias`) : ni les sauvegardes ni les factures n'y vivent, la clé de l'application ne les voit donc pas. Object Storage, même région que le VPS, un bucket **privé**, sans versioning ni verrou (un fichier effacé doit l'être vraiment, CR-06 c).
-2. **Deux règles de cycle de vie** sur le préfixe `incoming/` : expiration au bout d'**un jour** (tout brut disparaît en 24 h, même si le nettoyage n'a pas eu lieu), et abandon des envois par morceaux non terminés au bout d'un jour.
+2. **Deux règles de cycle de vie.** Sur le préfixe `incoming/`, l'expiration au bout d'**un jour** : tout brut disparaît en 24 h, même si le nettoyage n'a pas eu lieu. Sur **tout le bucket** (sans préfixe), l'abandon des envois par morceaux non terminés au bout d'un jour : ceux de son téléphone sous `incoming/`, et ceux du serveur sous `media/` quand il range un gros fichier nettoyé et s'arrête en chemin (relecture Bilan de #516 ; le serveur abandonne déjà lui-même un envoi qui échoue).
 
    ```json
-   {"Rules": [{"ID": "brut-24h", "Status": "Enabled", "Filter": {"Prefix": "incoming/"},
-     "Expiration": {"Days": 1}, "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}}]}
+   {"Rules": [
+     {"ID": "brut-24h", "Status": "Enabled", "Filter": {"Prefix": "incoming/"}, "Expiration": {"Days": 1}},
+     {"ID": "envois-inacheves", "Status": "Enabled", "Filter": {"Prefix": ""},
+      "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}}]}
    ```
 
 3. **CORS** : le navigateur de la créatrice envoie ses morceaux depuis l'adresse du CRM et doit lire l'`ETag` de chaque réponse, sans quoi l'envoi ne peut pas se terminer.

@@ -254,22 +254,32 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
           return;
         }
         const uploadId = await storage.startUpload(key, mime);
-        const parts: { number: number; etag: string }[] = [];
-        for (let number = 1; (number - 1) * DROP_PART_BYTES < size; number += 1) {
-          const from = (number - 1) * DROP_PART_BYTES;
-          const what = `part ${String(number)} of ${key}`;
-          const response = await call(
-            what,
-            urlOf(key, `partNumber=${String(number)}&uploadId=${encodeURIComponent(uploadId)}`),
-            { method: 'PUT', body: await read(from, Math.min(DROP_PART_BYTES, size - from)) },
-          );
-          await response.body?.cancel();
-          const etag = response.headers.get('etag');
-          if (!response.ok || etag === null) return await refused(what, response);
-          parts.push({ number, etag });
-        }
-        if ((await storage.completeUpload(key, uploadId, parts)) === 'refused') {
-          throw new ContentDropStorageUnavailable(`${config.bucket}: the parts of ${key} were refused`);
+        try {
+          const parts: { number: number; etag: string }[] = [];
+          for (let number = 1; (number - 1) * DROP_PART_BYTES < size; number += 1) {
+            const from = (number - 1) * DROP_PART_BYTES;
+            const what = `part ${String(number)} of ${key}`;
+            const response = await call(
+              what,
+              urlOf(key, `partNumber=${String(number)}&uploadId=${encodeURIComponent(uploadId)}`),
+              { method: 'PUT', body: await read(from, Math.min(DROP_PART_BYTES, size - from)) },
+            );
+            await response.body?.cancel();
+            const etag = response.headers.get('etag');
+            if (!response.ok || etag === null) return await refused(what, response);
+            parts.push({ number, etag });
+          }
+          if ((await storage.completeUpload(key, uploadId, parts)) === 'refused') {
+            throw new ContentDropStorageUnavailable(`${config.bucket}: the parts of ${key} were refused`);
+          }
+        } catch (error) {
+          // Never a send left open under media/ (Bilan on #516): its parts would be kept, and billed, for ever. The
+          // abort is best effort, the bucket's rule on unfinished sends (runbook § 4.4) is the net; the job retries.
+          const abort = await call(`abort ${key}`, urlOf(key, `uploadId=${encodeURIComponent(uploadId)}`), {
+            method: 'DELETE',
+          }).catch(() => null);
+          await abort?.body?.cancel();
+          throw error;
         }
       } finally {
         await file.close();
