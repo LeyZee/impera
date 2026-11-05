@@ -1,4 +1,6 @@
 import {
+  CompleteDropFileBodySchema,
+  ContentDropFileIdSchema,
   ContentDropIdSchema,
   ContentDropSchema,
   ContentRequestIdSchema,
@@ -9,6 +11,7 @@ import {
   CreatorContentSchema,
   CreatorIdSchema,
   DomainError,
+  DropFileUploadSchema,
   RefuseContentRequestBodySchema,
   type UserRole,
 } from '@impera/contracts';
@@ -17,7 +20,8 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import type { AgencyContentStore, CreatorContentStore } from '../../domain/ports';
+import { finishUpload, uploadOf } from '../../application/uploads';
+import type { AgencyContentStore, CreatorContentStore, DropStorage } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -47,6 +51,12 @@ const DropParamsSchema = z.object({ id: ContentDropIdSchema });
 const RequestParamsSchema = z.object({ id: ContentRequestIdSchema });
 const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
 const CreatorDropParamsSchema = z.object({ creatorId: CreatorIdSchema, id: ContentDropIdSchema });
+const FileParamsSchema = z.object({ id: ContentDropIdSchema, fileId: ContentDropFileIdSchema });
+const CreatorFileParamsSchema = z.object({
+  creatorId: CreatorIdSchema,
+  id: ContentDropIdSchema,
+  fileId: ContentDropFileIdSchema,
+});
 const CreatorRequestParamsSchema = z.object({ creatorId: CreatorIdSchema, id: ContentRequestIdSchema });
 
 /**
@@ -57,6 +67,7 @@ const CreatorRequestParamsSchema = z.object({ creatorId: CreatorIdSchema, id: Co
 export function createContentDropRoutes(
   creator: CreatorContentStore,
   agency: AgencyContentStore,
+  storage: DropStorage,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
@@ -94,6 +105,38 @@ export function createContentDropRoutes(
         );
         return reply.code(204).send();
       },
+    );
+
+    // Her file's bytes, straight to the storage (CR-06 b): where to send them, then « every part sent ».
+    app.post(
+      '/creator-space/drops/:id/files/:fileId/upload',
+      { ...creatorOnly, schema: { params: FileParamsSchema, response: { 200: DropFileUploadSchema } } },
+      (request) =>
+        asCreator(async () =>
+          uploadOf(
+            storage,
+            await creator.fileTarget(signedIn(request.user), request.params.id, request.params.fileId),
+          ),
+        ),
+    );
+
+    app.post(
+      '/creator-space/drops/:id/files/:fileId/complete',
+      {
+        ...creatorOnly,
+        schema: {
+          params: FileParamsSchema,
+          body: CompleteDropFileBodySchema,
+          response: { 200: ContentDropSchema },
+        },
+      },
+      (request) =>
+        asCreator(async () => {
+          const userId = signedIn(request.user);
+          const { id, fileId } = request.params;
+          await finishUpload(storage, await creator.fileTarget(userId, id, fileId), request.body.parts);
+          return creator.markSent(userId, id, fileId, request.id);
+        }),
     );
 
     app.get(
@@ -141,6 +184,37 @@ export function createContentDropRoutes(
       async (request, reply) => {
         await agency.withdraw(request.params.creatorId, signedIn(request.user), request.params.id, clock());
         return reply.code(204).send();
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/upload',
+      { ...team, schema: { params: CreatorFileParamsSchema, response: { 200: DropFileUploadSchema } } },
+      async (request) => {
+        const { creatorId, id, fileId } = request.params;
+        return uploadOf(storage, await agency.fileTarget(creatorId, signedIn(request.user), id, fileId));
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/complete',
+      {
+        ...team,
+        schema: {
+          params: CreatorFileParamsSchema,
+          body: CompleteDropFileBodySchema,
+          response: { 200: ContentDropSchema },
+        },
+      },
+      async (request) => {
+        const userId = signedIn(request.user);
+        const { creatorId, id, fileId } = request.params;
+        await finishUpload(
+          storage,
+          await agency.fileTarget(creatorId, userId, id, fileId),
+          request.body.parts,
+        );
+        return agency.markSent(creatorId, userId, id, fileId, request.id);
       },
     );
 
