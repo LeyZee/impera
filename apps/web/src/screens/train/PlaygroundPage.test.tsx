@@ -43,7 +43,7 @@ const BASE: PlaygroundState = {
   rejectReasons: [{ id: 'sounds_ai', label: 'sonne IA' }],
   sessionCostEur: 0,
   voice: { reachable: true },
-  persona: { name: 'Elena' },
+  persona: { name: 'Elena', played: null },
   pending: null,
 };
 

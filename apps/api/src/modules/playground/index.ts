@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { CreatorId, Persona, PersonaVersionId, PlaygroundState } from '@impera/contracts';
 import { DEFAULT_LLM_CONFIG, loadPrompt, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -17,6 +18,7 @@ import {
   type PersonaForModels,
 } from '../agent/index';
 
+import { PlaygroundPersonaNotFound } from './application/engine';
 import { createPlaygroundService } from './application/playground-service';
 import { createPlaygroundEngine } from './infra/engine';
 import { createPlaygroundGateway, createVoiceVariant, type PlaygroundGatewayDeps } from './infra/gateways';
@@ -27,6 +29,19 @@ export { ratingRecord } from './infra/engine';
 export { createPlaygroundGateway, createVoiceVariant } from './infra/gateways';
 export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
+
+/** One of her stored versions with her name, as `persona.versions.version` answers it (matched by shape). */
+export type PersonaVersionSource = (
+  creatorId: CreatorId,
+  versionId: PersonaVersionId,
+) => Promise<{
+  readonly id: string;
+  readonly version: string;
+  readonly creatorName: string;
+  readonly persona: Persona;
+} | null>;
+
+type PlayedVersion = NonNullable<PlaygroundState['persona']['played']>;
 
 export interface PlaygroundModule {
   readonly name: 'playground';
@@ -41,6 +56,11 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
   readonly persona: PersonaForModels;
   /** Her active persona version (`persona` module): « Tester » an alert reads the phrase with it, as her drafts do. */
   readonly activePersona: ActivePersonaSource;
+  /**
+   * One of her versions, active or not (`persona.versions.version`, recette PRO-21): the trainer talks to it before
+   * activating it. Absent: only the invented persona plays.
+   */
+  readonly personaVersion?: PersonaVersionSource;
   readonly store: CalibrationStore;
   /** The ratings already kept: the rate starts from them and the corrections come back as voice examples. */
   readonly records: CalibrationRecord[];
@@ -60,22 +80,33 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
     voicePrompt: loadPrompt('voice').header.version,
     voiceModel: DEFAULT_LLM_CONFIG.roles.voice.model,
   };
-  const service = createPlaygroundService(() =>
+  const now = deps.now ?? (() => new Date());
+  const engineFor = (persona: PersonaForModels, played?: PlayedVersion) =>
     createPlaygroundEngine({
       gateway,
       gatewayForVoice: deps.gatewayForVoice ?? ((model) => createVoiceVariant(deps, model)),
-      persona: deps.persona,
+      persona,
       store: deps.store,
       records: deps.records,
       version,
       sessionId: `api-${randomUUID()}`,
       usdPerEur: DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur,
+      ...(played !== undefined && { played }),
       ...(deps.creatorId !== undefined && { creatorId: deps.creatorId }),
       ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
       ...(deps.now !== undefined && { now: deps.now }),
-    }),
-  );
-  const now = deps.now ?? (() => new Date());
+    });
+  const service = createPlaygroundService({
+    invented: () => engineFor(deps.persona),
+    ofVersion: async ({ creatorId, versionId }) => {
+      const stored = (await deps.personaVersion?.(creatorId, versionId)) ?? null;
+      if (stored === null) throw new PlaygroundPersonaNotFound();
+      // Read as her drafts read her active one: her name for a placeholder first name, her day for her age.
+      const persona = await activePersonaForModels(() => Promise.resolve(stored), creatorId, now());
+      if (persona === null) throw new PlaygroundPersonaNotFound();
+      return engineFor(persona, { creatorId, versionId, version: stored.version });
+    },
+  });
   const alertTester = createAlertTester({
     gateway,
     personaOf: (creatorId) => activePersonaForModels(deps.activePersona, creatorId, now()),
@@ -94,6 +125,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly trainingDir: string;
   readonly creatorId?: () => Promise<string | null>;
   readonly activePersona: ActivePersonaSource;
+  readonly personaVersion?: PersonaVersionSource;
 }
 
 /** Reads the persona and the ratings kept so far, then builds the module. Throws when the persona is unreadable. */

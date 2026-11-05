@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RateBar } from './RateBar';
 
 const STATE: PlaygroundState = {
-  persona: { name: 'Elena' },
+  persona: { name: 'Elena', played: null },
   presets: [],
   presetId: null,
   situation: {

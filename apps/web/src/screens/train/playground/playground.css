@@ -171,6 +171,27 @@
   flex-direction: column;
   overflow: hidden;
 }
+/* Elle: the persona played, before the fan (recette PRO-21). */
+.pg-who {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px 4px;
+}
+.pg-who > .nv-eyebrow {
+  margin: 0;
+}
+.pg-who__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.pg-who__row:has(> :only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pg-who__activate {
+  align-self: flex-start;
+}
 .pg-fan {
   display: flex;
   flex-direction: column;
