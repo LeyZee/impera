@@ -63,13 +63,14 @@ export function MonthView({
         {days.map((one) => {
           const lines = monthLinesOf(agenda, one);
           const rest = lines.length - LINES_SHOWN;
+          // Names only, in the same order every day, so that the month reads at a glance.
           const names = [
             ...new Set(
               repliesOn(shifts, one, agenda.timeZone).flatMap((line) =>
                 line.replies.map((reply) => reply.name),
               ),
             ),
-          ];
+          ].sort((a, b) => a.localeCompare(b, 'fr'));
           return (
             <button
               key={one}
