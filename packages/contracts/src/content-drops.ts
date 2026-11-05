@@ -268,8 +268,11 @@ export const WITHDRAWABLE_DROP_STATES: ReadonlySet<DropState> = new Set([
   'blocked',
 ]);
 
-/** A file of a drop: waiting for its bytes, kept (cleaned, in the library), refused with its sentence, or a duplicate. */
-export const DROP_FILE_STATES = ['awaiting', 'kept', 'refused', 'duplicate'] as const;
+/**
+ * A file of a drop: waiting for its bytes, received (its raw bytes are in the storage, waiting for the cleaning), kept
+ * (cleaned, in the library), refused with its sentence, or a duplicate.
+ */
+export const DROP_FILE_STATES = ['awaiting', 'received', 'kept', 'refused', 'duplicate'] as const;
 export const DropFileStateSchema = z.enum(DROP_FILE_STATES);
 export type DropFileState = z.infer<typeof DropFileStateSchema>;
 
@@ -333,7 +336,11 @@ export const ContentDropRefusalsSchema = z.strictObject({
 /** `PATCH /v1/creators/:creatorId/drops/:id` (owner, operator): her category corrected (ADR 0055 § 1), at the journal. */
 export const CorrectDropCategoryBodySchema = z.strictObject({ category: DropCategorySchema });
 
-export const CONTENT_REQUEST_ORIGINS = ['agency', 'stock', 'cadence'] as const;
+/**
+ * Where a request comes from (ADR 0055 § 4): by hand (`agency`, its author), the stock, the scripts' cadence, or a
+ * suggestion born of an idea that she accepted (`idea`, ADR 0060 § 5, VEI-01 d), the last three with no author.
+ */
+export const CONTENT_REQUEST_ORIGINS = ['agency', 'stock', 'cadence', 'idea'] as const;
 export const ContentRequestOriginSchema = z.enum(CONTENT_REQUEST_ORIGINS);
 
 /**
@@ -402,3 +409,56 @@ export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';
 export const CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE = 'content_request_structure_unprocessable';
+
+/**
+ * The size of each part a file goes up in (CR-06 b), the last one shorter: 8 Mio, so that a cut on a phone costs at
+ * most 8 Mio, and a video of 500 Mo takes 63 parts (S3 asks at least 5 Mio a part, at most 10 000 parts).
+ */
+export const DROP_PART_BYTES = 8 * 1024 * 1024;
+
+/** How long an address to send a part keeps (an hour): the phone asks again for the parts still missing. */
+export const DROP_PART_URL_SECONDS = 3600;
+
+/** The number of parts a file of `bytes` goes up in. */
+export const dropPartCount = (bytes: number): number => Math.max(1, Math.ceil(bytes / DROP_PART_BYTES));
+
+export const DropPartNumberSchema = z.number().int().min(1).max(10_000);
+
+/**
+ * `POST /v1/creator-space/drops/:id/files/:fileId/upload` (creator) and its twin under `/v1/creators/:creatorId`
+ * (owner, operator): where the phone sends the file's bytes, straight to the storage (ADR 0055 § 3). Each missing part
+ * comes with its own signed address, for exactly its size; the parts already in the storage come with their `etag`,
+ * so that a send cut in the middle resumes where it stopped. `sent` is true when the file is already whole: nothing is
+ * left to send.
+ */
+export const DropFileUploadSchema = z.strictObject({
+  fileId: ContentDropFileIdSchema,
+  sent: z.boolean(),
+  partBytes: z.number().int().min(1),
+  missing: z.array(
+    z.strictObject({ number: DropPartNumberSchema, bytes: z.number().int().min(1), url: z.url() }),
+  ),
+  stored: z.array(z.strictObject({ number: DropPartNumberSchema, etag: z.string().min(1).max(200) })),
+});
+export type DropFileUpload = z.infer<typeof DropFileUploadSchema>;
+
+/**
+ * `POST …/drops/:id/files/:fileId/complete`: every part sent, each with the `ETag` the storage answered. The file is
+ * then received; when it is the drop's last one, the drop is too, and the cleaning takes it (CR-06 b2). Replayed once
+ * the file is received, it answers the drop as it is.
+ */
+export const CompleteDropFileBodySchema = z.strictObject({
+  parts: z
+    .array(z.strictObject({ number: DropPartNumberSchema, etag: z.string().min(1).max(200) }))
+    .min(1)
+    .max(10_000),
+});
+export type CompleteDropFileBody = z.infer<typeof CompleteDropFileBodySchema>;
+
+export const CONTENT_DROP_FILE_NOT_FOUND = 'content_drop_file_not_found';
+/** The file is no longer waiting for its bytes, or its drop no longer takes any (withdrawn, received). */
+export const CONTENT_DROP_FILE_SETTLED_CONFLICT = 'content_drop_file_settled_conflict';
+/** The parts named are not the file's whole, or the bytes in the storage are not the size declared. */
+export const CONTENT_DROP_UPLOAD_UNPROCESSABLE = 'content_drop_upload_unprocessable';
+/** No storage configured, or it does not answer: the phone tries again later. */
+export const CONTENT_DROP_STORAGE_UNAVAILABLE = 'content_drop_storage_unavailable';

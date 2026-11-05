@@ -1,4 +1,6 @@
 import {
+  CONTENT_DROP_FILE_NOT_FOUND,
+  CONTENT_DROP_FILE_SETTLED_CONFLICT,
   CONTENT_DROP_FORBIDDEN,
   CONTENT_DROP_FORMAT_UNPROCESSABLE,
   CONTENT_DROP_ID_CONFLICT,
@@ -6,6 +8,8 @@ import {
   CONTENT_DROP_REQUEST_UNPROCESSABLE,
   CONTENT_DROP_SCRIPT_UNPROCESSABLE,
   CONTENT_DROP_SETTLED_CONFLICT,
+  CONTENT_DROP_STORAGE_UNAVAILABLE,
+  CONTENT_DROP_UPLOAD_UNPROCESSABLE,
   CONTENT_REQUEST_CLOSED_CONFLICT,
   CONTENT_REQUEST_ID_CONFLICT,
   CONTENT_REQUEST_NOT_FOUND,
@@ -98,6 +102,39 @@ export class ContentRequestStructureUnprocessable extends DomainError {
     super(
       CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
       'Cette structure n’est pas disponible pour cette créatrice',
+    );
+  }
+}
+
+export class ContentDropFileNotFound extends DomainError {
+  constructor() {
+    super(CONTENT_DROP_FILE_NOT_FOUND, 'Ce fichier n’est pas dans ce dépôt');
+  }
+}
+
+/** Its drop no longer takes bytes: withdrawn, or every file already received. */
+export class ContentDropFileSettled extends DomainError {
+  constructor() {
+    super(CONTENT_DROP_FILE_SETTLED_CONFLICT, 'Ce dépôt ne prend plus de fichier : recharge ton contenu');
+  }
+}
+
+/** The parts named are not the file's whole, or the bytes stored are not the size declared. */
+export class ContentDropUploadUnprocessable extends DomainError {
+  constructor(sentence: string) {
+    super(CONTENT_DROP_UPLOAD_UNPROCESSABLE, sentence);
+  }
+}
+
+/** No storage configured, or it does not answer: the phone tries again later. The log has the cause, never her. */
+export class ContentDropStorageUnavailable extends DomainError {
+  constructor(reason: string, options?: { readonly cause?: unknown }) {
+    super(
+      CONTENT_DROP_STORAGE_UNAVAILABLE,
+      'L’envoi ne répond pas pour l’instant : réessaie dans un moment',
+      {
+        cause: options?.cause ?? new Error(reason),
+      },
     );
   }
 }

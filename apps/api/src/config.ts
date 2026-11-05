@@ -83,6 +83,15 @@ const configSchema = z
     INVOICES_COPY_S3_BUCKET: optionalValue,
     INVOICES_COPY_S3_ACCESS_KEY_ID: optionalValue,
     INVOICES_COPY_S3_SECRET_ACCESS_KEY: optionalValue,
+    /**
+     * The media bucket (CR-06 b, ADR 0055 § 3): her drops go up there straight from her phone, raw under `incoming/`
+     * (24 hours at most), then cleaned. Unset, every send answers 503: nothing is kept in memory in its place.
+     */
+    S3_ENDPOINT: optionalValue,
+    S3_REGION: optionalValue,
+    S3_BUCKET: optionalValue,
+    S3_ACCESS_KEY_ID: optionalValue,
+    S3_SECRET_ACCESS_KEY: optionalValue,
   })
   .refine(
     // `.env.example` placeholders are long enough to pass `min(32)`; production must not start with one.
@@ -111,6 +120,25 @@ const configSchema = z
       path: ['EXTENSION_DEVICE_TOKEN'],
     },
   )
+  .superRefine((config, context) => {
+    // The media bucket: all five or none, its endpoint a plain URL, https in production. Its name alone counts for
+    // none: `.env.example` and the production compose have always given `impera-media`, with nothing else.
+    const production = config.NODE_ENV === 'production';
+    const set = BUCKET_FIELDS.filter((field) => secretOrNull(config[`S3_${field}`]) !== null);
+    if (set.every((field) => field === 'BUCKET' || field === 'REGION')) return;
+    if (set.length < BUCKET_FIELDS.length) {
+      context.addIssue({ code: 'custom', message: 'S3_* must all be set, or none', path: ['S3_BUCKET'] });
+      return;
+    }
+    const at = endpointOf(config.S3_ENDPOINT);
+    if (at === null || (production && at.protocol !== 'https:')) {
+      context.addIssue({
+        code: 'custom',
+        message: `S3_ENDPOINT must be an ${production ? 'https' : 'http(s)'} URL, without a bucket`,
+        path: ['S3_ENDPOINT'],
+      });
+    }
+  })
   .superRefine((config, context) => {
     const production = config.NODE_ENV === 'production';
     const whole: {
@@ -175,6 +203,26 @@ function endpointOf(value: string | undefined): URL | null {
 const locationOf = (url: URL): string => `${url.origin}${url.pathname.replace(/\/+$/u, '')}`.toLowerCase();
 
 export type Config = Readonly<z.infer<typeof configSchema>>;
+
+/** The media bucket as the configuration gives it (`S3_*`), `null` when unset. */
+export function mediaBucket(config: Config): {
+  readonly endpoint: string;
+  readonly region: string;
+  readonly bucket: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+} | null {
+  const [endpoint, region, bucket, accessKeyId, secretAccessKey] = BUCKET_FIELDS.map((field) =>
+    secretOrNull(config[`S3_${field}`]),
+  );
+  return endpoint == null ||
+    region == null ||
+    bucket == null ||
+    accessKeyId == null ||
+    secretAccessKey == null
+    ? null
+    : { endpoint, region, bucket, accessKeyId, secretAccessKey };
+}
 
 /** A bucket of invoices as the configuration gives it, `null` when unset (development, the tests). */
 export function invoiceBucket(

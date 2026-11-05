@@ -24,6 +24,8 @@ RUN pnpm --filter @impera/extension zip \
 FROM ${NGINX_IMAGE} AS runtime
 # Where nginx forwards /v1: the API service on the deployment's private network.
 ENV API_UPSTREAM=api:3000
+# The media bucket's origin (S3_ENDPOINT), the only other one her phone talks to (CR-06 b); empty without a bucket.
+ENV MEDIA_ORIGIN=""
 COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080

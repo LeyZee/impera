@@ -115,8 +115,9 @@ async function streakNow(tx: Transaction, zone: string, now: Date): Promise<Crea
   return streakOf(records, today);
 }
 
-const sameTask = (stored: CreatorTask, body: Omit<CreatorTask, 'essential'>): boolean =>
-  JSON.stringify({ ...stored, essential: undefined }) === JSON.stringify({ ...body, essential: undefined });
+const sameTask = (stored: CreatorTask, body: Omit<CreatorTask, 'essential' | 'shootBrief'>): boolean =>
+  JSON.stringify({ ...stored, essential: undefined, shootBrief: undefined }) ===
+  JSON.stringify({ ...body, essential: undefined, shootBrief: undefined });
 
 /** `withCreatorAccount` for every reading and writing of her agenda (CR-05). */
 export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStore {
@@ -369,6 +370,8 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             category: row.category,
             title: row.title,
             purpose: row.purpose,
+            // Her shooting sheet, hers to read from now on and never hers to edit (VEI-01 d).
+            shootBrief: row.shootBrief,
             // The agency's routine, once hers, counts for her streak (glossary « Routine »).
             essential: row.kind === 'routine',
             suggestionId: row.id,

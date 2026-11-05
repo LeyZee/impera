@@ -218,15 +218,27 @@ export const contentIdeas = pgTable(
     refusalReason: text('refusal_reason'),
     decidedBy: text('decided_by').references(() => user.id),
     decidedAt: timestampTz('decided_at'),
+    /**
+     * The suggestion it became in her agenda (VEI-01 d), of the same id: no foreign key, `creator_suggestions` being
+     * the agenda's and out of the trend watch's writes (ADR 0060).
+     */
+    suggestionId: uuid('suggestion_id'),
+    /** The content request born when she accepted it (VEI-01 d2), the agency's: no foreign key, for the same reason. */
+    requestId: uuid('request_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     enumCheck('content_ideas', t.category, DROP_CATEGORIES),
+    check(
+      'content_ideas_suggestion_check',
+      sql`(${t.suggestionId} is not null) = (${t.state} in ('suggested', 'declined', 'deposited'))`,
+    ),
+    check('content_ideas_request_check', sql`${t.requestId} is null or ${t.suggestionId} is not null`),
     enumCheck('content_ideas', t.state, CONTENT_IDEA_STATES),
     check(
       'content_ideas_texts_check',
-      sql`char_length(${t.title}) between 1 and 120 and char_length(${t.toShoot}) between 1 and 600 and char_length(${t.reason}) between 1 and 200`,
+      sql`char_length(${t.title}) between 1 and 80 and char_length(${t.toShoot}) between 1 and 600 and char_length(${t.reason}) between 1 and 200`,
     ),
     check('content_ideas_shoot_minutes_check', sql`${t.shootMinutes} between 1 and 600`),
     check(

@@ -4,7 +4,7 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 **Peut dépendre de.** Rien pour l'instant. Au lot b, `media` (la médiathèque, où chaque fichier nettoyé entre par son empreinte).
 
-**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. L'envoi des fichiers et leur nettoyage viennent au lot b, l'effacement daté au lot c, l'écran Contenu au lot d.
+**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. Lot b1 : l'envoi des fichiers au bucket des médias, la reprise d'un envoi coupé, la réception par un job (migration 0109). Le nettoyage vient au lot b2, l'effacement daté au lot c, l'écran Contenu au lot d.
 
 ## Qui lit, qui écrit (migration 0108)
 
@@ -17,6 +17,14 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 - **Format** (`packages/contracts`, `DROP_FORMAT_RULES`) : chaque catégorie connaît ses sortes (photo, vidéo, vocal), si elle veut du vertical, la durée la plus longue d'une vidéo et d'un vocal, et le nombre de fichiers. Une photo fait au plus 30 Mo, une vidéo 500 Mo. Le type et le poids sont vérifiés à la déclaration (`declaredFileRefusal`), l'orientation et la durée sur le fichier arrivé (`probedFileRefusal`, lot b). Les mêmes phrases servent au téléphone, qui vérifie d'abord, et au serveur. Ce sont des valeurs de code ; leur réglage par l'agence viendra avec l'écran.
 - **Script** : il ne se dépose que depuis une demande de script de la créatrice, ouverte (la tuile Script ne s'ouvre que depuis une demande).
 - **Demande** : satisfaite par un dépôt non retiré, un seul à la fois (index `content_drops_request_live_unique`) ; retirer ce dépôt la rouvre. « Déposée » n'est donc jamais stockée.
+
+## L'envoi des fichiers (lot b1)
+
+- Le téléphone envoie chaque fichier **directement** au bucket des médias (`S3_*`, runbook deploy.md § 4.4), jamais par le corps d'une requête à l'API : par morceaux de 8 Mio (`DROP_PART_BYTES`), chacun à une adresse que l'API signe pour une heure et pour sa taille exacte. Le brut arrive sous `incoming/<créatrice>/<fichier>` ; le nom d'origine n'apparaît nulle part.
+- `POST …/drops/:id/files/:fileId/upload` rend les morceaux qui manquent, chacun avec son adresse, et ceux que le bucket tient déjà avec leur `ETag` : un envoi coupé reprend où il s'était arrêté. Un fichier déjà entier répond `sent: true`.
+- `POST …/drops/:id/files/:fileId/complete` avec chaque morceau et son `ETag` : le bucket assemble le fichier, sa taille est comparée à celle que le téléphone avait annoncée (un brut d'une autre taille est effacé, 422 `content_drop_upload_unprocessable`), puis le job `content_drops.receive_file` est mis en file dans la même transaction. Rejoué, il répond le dépôt tel qu'il est.
+- Le job (rôle administrateur, seul à faire avancer un état) passe le fichier à « reçu », et le dépôt aussi quand c'était son dernier fichier en attente, avec l'événement `content_drop_received` (`dropId`, `requestId`) dans la même transaction : la veille y lit la demande née d'une idée (VEI-01 d). Un dépôt retiré pendant l'envoi a son brut effacé tout de suite.
+- Sans `S3_*`, chaque envoi répond 503 `content_drop_storage_unavailable` : rien n'est gardé en mémoire à la place. Un dépôt retiré ne prend plus de fichier (409 `content_drop_file_settled_conflict`).
 
 ## Routes
 

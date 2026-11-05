@@ -3,6 +3,7 @@ import {
   CreatorIdSchema,
   ExtensionLinkIdSchema,
   newId,
+  SuggestionIdSchema,
   TeamMemberIdSchema,
   TrendReadingIdSchema,
   TrendSignalIdSchema,
@@ -262,14 +263,21 @@ describe('the trend watch’s tables (VEI-01): the agency’s, never the creator
     // Her « no » in her agenda reaches the idea by the agenda's event, written by a job; it carries no agency reason.
     const hersDeclined = idea();
     await withAdmin(test.admin.db, (tx) =>
-      tx.insert(s.contentIdeas).values({ ...hersDeclined, state: 'declined', decidedAt: new Date() }),
+      tx
+        .insert(s.contentIdeas)
+        .values({ ...hersDeclined, state: 'declined', decidedAt: new Date(), suggestionId: hersDeclined.id }),
     );
     expect(
       await failure(
         withAdmin(test.admin.db, (tx) =>
-          tx
-            .insert(s.contentIdeas)
-            .values(idea({ state: 'declined', decidedAt: new Date(), refusalReason: 'Non' })),
+          tx.insert(s.contentIdeas).values(
+            idea({
+              state: 'declined',
+              decidedAt: new Date(),
+              refusalReason: 'Non',
+              suggestionId: newId(SuggestionIdSchema),
+            }),
+          ),
         ),
       ),
     ).toMatch(/content_ideas_refusal_check/u);

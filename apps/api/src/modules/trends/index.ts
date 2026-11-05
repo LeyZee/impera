@@ -1,8 +1,12 @@
 /** Public entry point of the `trends` module (VEI-01, ADR 0060). Other modules import this file only. */
+import type { CreatorId, PersonaLimits } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import type { CreatorTasksModule } from '../creator-tasks';
+
+import { createDrizzleIdeaStore } from './infra/db/idea-store';
 import { createDrizzleExtensionLinkStore } from './infra/db/link-store';
 import { createDrizzleReadingStore } from './infra/db/reading-store';
 import { createDrizzleSignalStore } from './infra/db/signal-store';
@@ -11,7 +15,10 @@ import { createGatewayCaptureVision } from './infra/vision';
 
 export interface TrendsModule {
   readonly name: 'trends';
-  /** Mounted under `/v1` by the server: `/trends/links`, `/trends/extension-links`, `/trends/readings` and its captures. */
+  /**
+   * Mounted under `/v1` by the server: `/trends/links`, `/trends/extension-links`, `/trends/readings` and its captures,
+   * and « Idées du jour » under `/creators/:creatorId/ideas`.
+   */
   readonly routes: FastifyPluginAsyncZod;
 }
 
@@ -23,6 +30,10 @@ export interface TrendsDeps {
   readonly requireRole: RequireRole;
   /** The app's LLM gateway: the vision of a marked post's captures, a trend watch call (ADR 0060 § 7). */
   readonly gateway: Pick<LlmGateway, 'describeTrendCaptures'>;
+  /** Her active persona's limits, null without one: what a corrected idea is read against (ADR 0056 § 1). */
+  readonly limitsOf: (creatorId: CreatorId) => Promise<PersonaLimits | null>;
+  /** The agenda's door for a validated idea (VEI-01 d): the trend watch writes no table of hers. */
+  readonly agenda: Pick<CreatorTasksModule, 'suggestShoot'>;
 }
 
 export function createTrendsModule(deps: TrendsDeps): TrendsModule {
@@ -34,6 +45,11 @@ export function createTrendsModule(deps: TrendsDeps): TrendsModule {
         links: createDrizzleExtensionLinkStore(deps.adminDb),
         readings: createDrizzleReadingStore(deps.db),
         vision: createGatewayCaptureVision(deps.gateway),
+      },
+      {
+        ideas: createDrizzleIdeaStore(deps.db),
+        limitsOf: deps.limitsOf,
+        suggestShoot: deps.agenda.suggestShoot,
       },
       deps.requireRole,
     ),
