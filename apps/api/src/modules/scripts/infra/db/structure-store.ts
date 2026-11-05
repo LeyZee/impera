@@ -312,9 +312,13 @@ export function createDrizzleScriptStructureStore(db: Database): ScriptStructure
         return toVersion(frozen);
       }),
 
+    // `creators` is out of RLS: only the owner and an active manager (scope `owner` | `agency`) read a queue, so anyone
+    // else gets the same 404 for a creator that exists and one that does not, never her existence (recette SEC-06).
     queue: (creatorId, userId) =>
-      withTenantMember(db, creatorId, userId, async (tx) =>
-        (await creatorIds(tx)).includes(creatorId) ? queueOf(tx) : null,
+      withTenantMember(db, creatorId, userId, async (tx, scope) =>
+        (scope === 'owner' || scope === 'agency') && (await creatorIds(tx)).includes(creatorId)
+          ? queueOf(tx)
+          : null,
       ),
 
     setQueue: (creatorId, ids, userId, vet) =>
