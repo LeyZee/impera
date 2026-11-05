@@ -62,7 +62,7 @@ function counted(value: number, origin: string): string {
 /**
  * The plain sentence of a frequent issue, or `undefined` to let Zod's French locale speak (exported for its tests).
  */
-export const frenchIssueMessage: z.core.$ZodErrorMap = (issue) => {
+const frenchIssueMessage: z.core.$ZodErrorMap = (issue) => {
   switch (issue.code) {
     case 'invalid_type': {
       if (issue.input === undefined) return 'Champ requis.';

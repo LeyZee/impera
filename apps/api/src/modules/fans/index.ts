@@ -17,7 +17,6 @@ import {
 } from './infra/http/flag-routes';
 
 export type { FactProposal } from './domain/facts';
-export type { FanRoutedTo } from './infra/http/flag-routes';
 
 /** Public entry point of the `fans` module (ADR 0002). Other modules import this file only. */
 export interface FansModule extends FansService {
