@@ -321,6 +321,42 @@ describe('App when the session ends while it is open (recette 05/11, SEC-01)', (
     expect(screen.getByRole('button', { name: /Nora/u })).toBeDefined();
   });
 
+  it('does not take a sign-out she asked for as a session that ended (relecture #538)', async () => {
+    let isOpen = true;
+    let close: () => void = () => undefined;
+    const closed = new Promise<void>((resolve) => {
+      close = resolve;
+    });
+    vi.stubGlobal('scrollTo', vi.fn());
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        if (input === '/v1/session') {
+          return Promise.resolve(
+            Response.json(isOpen ? { state: 'signed_in', me: owner } : { state: 'signed_out' }),
+          );
+        }
+        if (input === '/v1/auth/sign-out') {
+          isOpen = false;
+          close();
+          return Promise.resolve(Response.json({}));
+        }
+        // A screen's read in flight: it gets its 401 once the session is gone.
+        return closed.then(gone);
+      }),
+    );
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: /Nora/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }));
+    expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText('Ta session a pris fin. Reconnecte-toi pour continuer.')).toBeNull();
+  });
+
   it('reads the session again when the app is shown again, and signs out a session that expired meanwhile', async () => {
     let isOpen = true;
     serveSession(

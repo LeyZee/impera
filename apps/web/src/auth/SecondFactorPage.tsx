@@ -51,7 +51,8 @@ export function SecondFactorPage({
 }): JSX.Element {
   const [step, setStep] = useState<Step>({ kind: 'password' });
   // Just chosen on the link page: the first step only explains, and does not ask for it again (recette SEC-15).
-  const [held, setHeld] = useState(() => chosenPassword());
+  // Only whether one is held: the password itself stays in its module, which lets it lapse (relecture #538).
+  const [isHeld, setIsHeld] = useState(() => chosenPassword() !== null);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const keyRef = useRef<HTMLElement>(null);
@@ -66,6 +67,12 @@ export function SecondFactorPage({
 
   async function sendPassword(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    const held = isHeld ? chosenPassword() : null;
+    if (isHeld && held === null) {
+      // Lapsed while the page stood open: the field comes back, nothing was sent.
+      setIsHeld(false);
+      return;
+    }
     const password = held ?? fieldOf(new FormData(event.currentTarget), 'password');
     setIsBusy(true);
     setError(null);
@@ -79,7 +86,7 @@ export function SecondFactorPage({
     if (held !== null && result.kind === 'wrong_password') {
       // No longer the account's (changed in between): the field comes back, with nothing to blame her for.
       forgetChosenPassword();
-      setHeld(null);
+      setIsHeld(false);
       return;
     }
     setError(START_MESSAGES[result.kind]);
@@ -142,12 +149,10 @@ export function SecondFactorPage({
                 Authenticator, Microsoft Authenticator, 1Password, Bitwarden…
               </p>
               <p className="text-sm text-[var(--nv-ink-muted)]">
-                {held === null
-                  ? 'Installe-la, puis confirme ton mot de passe.'
-                  : 'Installe-la, puis continue.'}
+                {!isHeld ? 'Installe-la, puis confirme ton mot de passe.' : 'Installe-la, puis continue.'}
               </p>
             </div>
-            {held === null ? (
+            {!isHeld ? (
               <label className="nv-field">
                 <span className="nv-field__label">Mot de passe</span>
                 <input
@@ -160,7 +165,7 @@ export function SecondFactorPage({
                 />
               </label>
             ) : null}
-            <button className="nv-btn nv-btn--neon" type="submit" disabled={isBusy} autoFocus={held !== null}>
+            <button className="nv-btn nv-btn--neon" type="submit" disabled={isBusy} autoFocus={isHeld}>
               {isBusy ? 'Préparation…' : 'Continuer'}
             </button>
           </form>

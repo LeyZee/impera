@@ -67,7 +67,9 @@ function serve(shifts: unknown, handover = false): void {
             ? { creators }
             : path === '/v1/conversations'
               ? { items: [taken], nextCursor: null }
-              : null;
+              : path === '/v1/dashboard/todos'
+                ? { items: [], creators: [] }
+                : null;
       return Promise.resolve(new Response(JSON.stringify(body), { status: body === null ? 404 : 200 }));
     }),
   );

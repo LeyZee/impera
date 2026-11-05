@@ -62,7 +62,8 @@ export function LeavePanel({
     firstOk && lastOk && !tooLong,
   );
   const clashes =
-    !firstOk || !lastOk || tooLong
+    // While the new days are read, the previous answer is another range's: nothing shown rather than wrong shifts.
+    !firstOk || !lastOk || tooLong || planning.isPlaceholderData
       ? []
       : (planning.data?.shifts ?? [])
           .filter((shift) => shift.memberId === memberId && phaseOf(shift, now) !== 'past')

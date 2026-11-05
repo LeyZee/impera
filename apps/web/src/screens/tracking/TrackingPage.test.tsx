@@ -187,7 +187,13 @@ const kycCalls = (): unknown[] =>
   vi.mocked(fetch).mock.calls.filter(([input]) => typeof input === 'string' && input.includes('/kyc?'));
 
 /** Suivi as the app mounts it: the open conversation lives in the address. */
-function renderPage(at = '/suivi', canDecide = true, canAddCreator = true, routedOnly = false): void {
+function renderPage(
+  at = '/suivi',
+  canDecide = true,
+  canAddCreator = true,
+  routedOnly = false,
+  nothingListed?: string,
+): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
   const tracking = createRoute({
@@ -205,6 +211,7 @@ function renderPage(at = '/suivi', canDecide = true, canAddCreator = true, route
           canDecide={canDecide}
           canAddCreator={canAddCreator}
           routedOnly={routedOnly}
+          nothingListed={nothingListed}
         />
       );
     },
@@ -293,6 +300,17 @@ describe('TrackingPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByRole('list', { name: 'À traiter' })).toBeDefined();
     expect(screen.queryByText(/« À traiter » n’a pas pu être lu/u)).toBeNull();
+  });
+
+  it('never tells a chatter there is nothing for him while « À traiter » could not be read (relecture #538)', async () => {
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [], nextCursor: null } },
+      todos: { status: 500 },
+    });
+    renderPage('/suivi', true, false, true, 'Rien à suivre');
+    expect(await screen.findByText(/« À traiter » n’a pas pu être lu/u)).toBeDefined();
+    expect(screen.queryByText('Rien à suivre')).toBeNull();
   });
 
   it('says the server does not answer, and Réessayer reads again', async () => {
@@ -453,6 +471,32 @@ describe('TrackingPage', () => {
     fireEvent.click(within(queue).getByRole('button'));
     expect(await screen.findByText('Salut, ça va ?')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Rendre la main à l’agent' })).toBeDefined();
+  });
+
+  it('asks before giving back a grave handoff, with the focus on the safe choice (PRO-26)', async () => {
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
+      events: [
+        {
+          seq: 4,
+          actor: 'system',
+          createdAt: '2026-10-17T20:02:00Z',
+          type: 'handoff_requested',
+          payload: { conversationId: conversation('1').id, cause: 'minor' },
+        },
+      ],
+    });
+    renderPage(OPEN);
+    const giveBack = await screen.findByRole('button', { name: 'Rendre la main à l’agent' });
+    fireEvent.click(giveBack);
+    const keep = await screen.findByRole('button', { name: 'Garder la main' });
+    expect(screen.getByRole('button', { name: 'J’ai vérifié, rendre la main' })).toBeDefined();
+    expect(document.activeElement).toBe(keep);
+    fireEvent.click(keep);
+    const back = screen.getByRole('button', { name: 'Rendre la main à l’agent' });
+    expect(document.activeElement).toBe(back);
   });
 
   it('shows the three gravest of « À traiter », and the others on demand', async () => {

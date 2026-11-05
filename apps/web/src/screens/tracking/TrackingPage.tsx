@@ -128,6 +128,8 @@ export function TrackingPage({
   };
   // Each line of the queue carries its creator: its conversation opens with her id.
   const todos = queue.data?.items ?? [];
+  // « Nothing for you » only once the queue answered: a queue in error or on its way may hide an urgency (relecture #538).
+  const isQueueEmpty = queue.isSuccess && todos.length === 0;
   // The gravest first (the server's order): three lines keep the search and the list above the fold; the one open stays.
   // A fourth line is shown rather than hidden alone, so at least two hide behind « Voir les N autres ».
   const openIndex = todos.findIndex((t) => t.conversationId === selected);
@@ -181,15 +183,15 @@ export function TrackingPage({
           </Link>
         </Notice>
       ) : // Off shift with nothing listed: the banner above says it all, never « no conversation yet ».
-      offShift !== undefined && lines.length === 0 && todos.length === 0 ? (
+      offShift !== undefined && lines.length === 0 && todos.length === 0 && !queue.isError ? (
         releasedNote(released)
-      ) : (creators.length === 0 || (routedOnly && lines.length === 0 && todos.length === 0)) &&
+      ) : (creators.length === 0 || (routedOnly && lines.length === 0 && isQueueEmpty)) &&
         nothingListed !== undefined ? (
         <>
           {releasedNote(released)}
           {nothingListed}
         </>
-      ) : creators.length === 0 ? (
+      ) : creators.length === 0 && isQueueEmpty ? (
         <Notice
           title="Rien pour toi pour l’instant"
           text="Les conversations des créatrices qui te sont confiées arrivent ici."

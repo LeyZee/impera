@@ -47,6 +47,8 @@ export function App(): JSX.Element {
   // The session ended while the app was open (closed elsewhere, past its 12 h or 7 days): the sign-in page says so.
   const [hasEnded, setHasEnded] = useState(false);
   const isRechecking = useRef(false);
+  // A sign-out she asked for: a screen's 401 in flight meanwhile is not a session that ended (relecture #538).
+  const isLeaving = useRef(false);
 
   const refresh = useCallback(() => {
     readSession().then(
@@ -57,6 +59,7 @@ export function App(): JSX.Element {
         if (current.kind === 'signed_in') {
           void refreshPushSubscription();
           setHasEnded(false);
+          isLeaving.current = false;
           // Signed in by now: a password kept for the code's activation has nothing left to do.
           forgetChosenPassword();
         }
@@ -81,12 +84,12 @@ export function App(): JSX.Element {
    * changes nothing: the screens say it their own way, and the agenda kept offline stays readable.
    */
   const recheck = useCallback(() => {
-    if (isRechecking.current) return;
+    if (isRechecking.current || isLeaving.current) return;
     isRechecking.current = true;
     readSession()
       .then(
         (current) => {
-          if (current.kind === 'signed_in') return;
+          if (current.kind === 'signed_in' || isLeaving.current) return;
           void forgetDevice();
           forgetChosenPassword();
           setHasEnded(true);
@@ -102,10 +105,13 @@ export function App(): JSX.Element {
   const leave = useCallback(() => {
     setSignOutFailed(false);
     setHasEnded(false);
+    isLeaving.current = true;
     // While the session still opens the door: the server forgets this device before the account leaves it.
     turnOffPush()
       .then(signOut)
       .then(refresh, () => {
+        // Still signed in: a 401 from now on is a session that ended again.
+        isLeaving.current = false;
         setSignOutFailed(true);
       });
   }, [refresh]);

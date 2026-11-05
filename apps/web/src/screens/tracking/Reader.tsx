@@ -179,6 +179,15 @@ function Loaded({
   // A grave handoff (minor, consent, distress) is given back only after a second, explicit click (PRO-26).
   const grave = isHuman ? graveHandoffOf(read) : null;
   const [confirming, setConfirming] = useState(false);
+  // The focus follows the question: on the safe choice when it opens, back on the button when it closes.
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const handRef = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (confirming) keepRef.current?.focus();
+    else if (wasConfirming.current) handRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
 
   const toggleHand = async (): Promise<void> => {
     if (grave !== null && !confirming) {
@@ -238,6 +247,7 @@ function Loaded({
 
   const handButton = (
     <button
+      ref={handRef}
       type="button"
       // Taking over is a rare gesture beside the state, quiet so that it is not touched by chance (D-03).
       className={`nv-btn nv-btn--sm ${isHuman ? 'nv-btn--soft' : 'nv-btn--plain'}`}
@@ -340,6 +350,7 @@ function Loaded({
                   </p>
                   <div className="tr-hand__confirm-actions">
                     <button
+                      ref={keepRef}
                       type="button"
                       className="nv-btn nv-btn--plain nv-btn--sm"
                       onClick={() => {
