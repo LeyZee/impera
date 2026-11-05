@@ -97,7 +97,7 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
       headers: { cookie: await signIn(server, OPERATOR.email, OPERATOR.password) },
     });
     expect(operator.json()).toEqual({
-      creators: [{ id: anna.id, displayName: 'Anna', timezone: 'Europe/Paris' }],
+      creators: [{ id: anna.id, displayName: 'Anna', timezone: 'Europe/Paris', hasAvatar: false }],
     });
   });
 

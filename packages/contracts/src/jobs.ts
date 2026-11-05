@@ -74,6 +74,7 @@ export const JOB_NAMES = [
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
+  'connector.copy_avatar',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -134,6 +135,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
+  'connector.copy_avatar': 'Copie de la photo d’une créatrice',
   'telegram.scan': 'Alertes Telegram',
   'telegram.flush_chat': 'Envoi des messages Telegram',
   'telegram.dispatch_polls': 'Lecture de Telegram',
@@ -377,6 +379,16 @@ export const JOB_PAYLOADS = {
   'connector.check_sales': z.object({
     recheck: z.object({ platform: PlatformSchema, from: PayPeriodSchema }).optional(),
   }),
+  /**
+   * The photo of a creator just imported from a platform (CRM-07 a2b, ADR 0069 § 3): read again from the platform's
+   * model list, fetched, re-encoded and kept in the media bucket under `creators/<id>/avatar`. Replayable: the object
+   * is written over and `creators.avatar_key` set to the same key.
+   */
+  'connector.copy_avatar': z.object({
+    platform: PlatformSchema,
+    platformModelId: z.string().min(1).max(200),
+    creatorId: CreatorIdSchema,
+  }),
   ...TELEGRAM_JOB_PAYLOADS,
 } as const satisfies Record<JobName, z.ZodType>;
 
@@ -458,6 +470,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Twice a month and its recheck: a refusal of the platform (429, outage) is worth a retry, and a mismatch is
   // published once per platform and fortnight whatever the attempts.
   'connector.check_sales': 3,
+  // A platform or a storage out for a while: a few tries over some minutes, then her initials stay.
+  'connector.copy_avatar': 5,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,
