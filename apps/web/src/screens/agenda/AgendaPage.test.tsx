@@ -135,6 +135,21 @@ describe('Agenda, the creator’s (CR-05)', () => {
     expect(await screen.findByRole('heading', { name: 'Sans date' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Choisir un moment' })).toBeDefined();
     expect(screen.getAllByText(/Dispo pour l’agence/u).length).toBe(2);
+    // The shooting sheet of a proposal, folded under its name until she opens it (VEI-01 d).
+    const brief = screen.getByText('🎬 Fiche de tournage');
+    expect(brief.tagName).toBe('SUMMARY');
+    expect(brief.parentElement?.textContent).toContain('Ambiance Nuit, noir et dentelle');
+  });
+
+  it('opens a task on its shooting sheet, its lines kept', async () => {
+    serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    fireEvent.click(screen.getByRole('button', { name: /^Tournage tenue rouge/u }));
+    const sheet = await screen.findByRole('region', { name: 'Fiche de tournage' });
+    expect(sheet.querySelector('p')?.textContent).toBe(
+      'Pour : pack du vendredi\nTenue rouge, lumière douce\n10 photos, 2 vidéos courtes',
+    );
   });
 
   it('offers « Une tâche » or « Une dispo » under « Ajouter »', async () => {

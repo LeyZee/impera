@@ -1633,3 +1633,41 @@
     transition: none;
   }
 }
+
+/* ── Her shooting sheet (VEI-01 d): plain text, its lines kept; folded on a proposal, open in her task ───────────── */
+.ag-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.ag-brief__title {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+summary.ag-brief__title {
+  cursor: pointer;
+  list-style-position: inside;
+}
+summary.ag-brief__title:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: var(--nv-radius-xs);
+}
+.ag-brief__text {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+/* Her task's three buttons on a phone: they go to the next line rather than past the edge of the dialog. */
+.ag-task-foot {
+  flex-wrap: wrap;
+}
