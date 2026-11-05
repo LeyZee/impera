@@ -19,8 +19,8 @@ export type CreatorTab = CreatorSheet;
 /**
  * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
  * not to the settings), then for the owner and an active manager her agenda (CR-05 lot c), and for the owner alone
- * her hours (P3-14), her access to her own space (CR-02) and the agency's percentage (CR-04). With several creators, a row of chips picks one; with one, her name is enough. The
- * owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
+ * her hours (P3-14), her access to her own space (CR-02) and the agency's percentage (CR-04). With several creators,
+ * a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
  * not saved are never lost silently: leaving asks first.
  */
 export function CreatorsPage({
@@ -174,8 +174,8 @@ export function CreatorsPage({
       />
     );
   };
-  // Persona · Agenda · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every section's
-  // sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
+  // Persona · Agenda · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every
+  // section's sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
   const switchShown = sheets.length > 1 && current !== undefined && !showForm && query.isSuccess;
   const labels: Readonly<Record<CreatorSheet, string>> = {
     persona: 'Persona',

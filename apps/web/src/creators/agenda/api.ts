@@ -55,7 +55,7 @@ export const SUGGEST_ERRORS: Readonly<Record<Exclude<SuggestOutcome['kind'], 'ok
     'Elle a refusé cette tâche cette semaine ou la semaine dernière : on ne la lui repropose pas tout de suite.',
   taken: 'Cette proposition vient d’être envoyée avec d’autres valeurs. Ferme et recommence.',
   forbidden: 'Seuls le propriétaire et un manager actif proposent une tâche à une créatrice.',
-  refused: 'Cette proposition ne passe pas. Vérifie le jour et les heures : 24 heures au plus.',
+  refused: 'Cette proposition ne passe pas telle quelle. Vérifie ce que tu as saisi : rien n’a été envoyé.',
   failed: 'Le serveur ne répond pas. Réessaie dans un instant : rien n’a été envoyé.',
 };
 
