@@ -187,7 +187,8 @@ function answerOf(path: string, server: FileServer): unknown {
   if (path.endsWith('/accept')) return acceptanceOf(9, CONTRACT_V1, '2026-11-05T09:00:00.000Z');
   if (path.endsWith('/regimes')) return contractorRegimeOf(9, BENIN_REGIME, server.file.today);
   if (path.includes('/documents')) return documentOf(9, { review: null });
-  return server.file.profile ?? profileOf();
+  // `…/profile`, `…/profile/verify` and `…/profile/prefix` answer the whole file, as the routes do.
+  return { ...server.file, profile: server.file.profile ?? profileOf() };
 }
 
 /** Stubs `fetch` with the server's state, read at each call: a test changes the file, the next read sees it. */
