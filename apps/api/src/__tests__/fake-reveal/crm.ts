@@ -48,6 +48,8 @@ export interface FakeCrm {
   refund(saleId: string, occurredAt: string): string;
   /** Appends a raw line, for an event Impera does not know. */
   appendRaw(event: string, sale: FakeSale, occurredAt: string): string;
+  /** `/v1/models` lists these from now on (the two default models otherwise). */
+  setModels(models: readonly FakeModel[]): void;
   /** The next `requests` calls answer 429 with this `Retry-After`. */
   rateLimit(requests: number, retryAfterSeconds: number): void;
   /** The key is revoked: every call answers 401. */
@@ -90,6 +92,130 @@ export function revealSignature(secret: string, t: number, body: string): string
     .digest('hex')}`;
 }
 
+/** A model of `/v1/models`, its subscribers and prices left at zero: Impera never reads them. */
+export interface FakeModel {
+  readonly modelId: string;
+  readonly userName: string;
+  readonly displayName: string;
+  readonly isActive: boolean;
+  /** Reveal's own words (camelCase), any string to test one Impera does not know. */
+  readonly status: string;
+  readonly avatarUrl?: string | null;
+}
+
+const DEFAULT_MODELS: readonly FakeModel[] = [
+  {
+    modelId: 'model_test_01',
+    userName: 'creatrice_test',
+    displayName: 'Créatrice test',
+    isActive: true,
+    status: 'validated',
+  },
+  {
+    modelId: 'model_test_02',
+    userName: 'autre_test',
+    displayName: 'Autre test',
+    isActive: true,
+    status: 'pending',
+  },
+];
+
+/**
+ * Invented models for the import (CRM-07, ADR 0069 § 7): one per status Reveal names and one it does not, an inactive
+ * one, one without a display name, one whose handle an account already has (`creatrice_test`) and one whose name
+ * another creator already has (`Doublon Test`, to create beforehand). Everything here is invented (ADR 0010).
+ */
+export const IMPORT_MODELS: readonly FakeModel[] = [
+  {
+    modelId: 'model_imp_valid',
+    userName: 'valide_test',
+    displayName: 'Validée Test',
+    isActive: true,
+    status: 'validated',
+    avatarUrl: 'https://cdn.example.test/avatars/valide.jpg',
+  },
+  {
+    modelId: 'model_imp_pending',
+    userName: 'attente_test',
+    displayName: 'Attente Test',
+    isActive: true,
+    status: 'pending',
+  },
+  {
+    modelId: 'model_imp_changes',
+    userName: 'retouches_test',
+    displayName: 'Retouches Test',
+    isActive: true,
+    status: 'onboardingChangesRequested',
+  },
+  {
+    modelId: 'model_imp_refused',
+    userName: 'refusee_test',
+    displayName: 'Refusée Test',
+    isActive: true,
+    status: 'refused',
+  },
+  {
+    modelId: 'model_imp_banned',
+    userName: 'bannie_test',
+    displayName: 'Bannie Test',
+    isActive: false,
+    status: 'banned',
+  },
+  {
+    modelId: 'model_imp_unknown',
+    userName: 'inconnu_test',
+    displayName: 'Inconnu Test',
+    isActive: true,
+    status: 'suspendedForReview',
+  },
+  {
+    modelId: 'model_imp_inactive',
+    userName: 'inactive_test',
+    displayName: 'Inactive Test',
+    isActive: false,
+    status: 'validated',
+  },
+  {
+    modelId: 'model_imp_noname',
+    userName: 'sansnom_test',
+    displayName: '',
+    isActive: true,
+    status: 'validated',
+    avatarUrl: 'http://cdn.example.test/plain.jpg',
+  },
+  {
+    modelId: 'model_imp_handle',
+    userName: 'creatrice_test',
+    displayName: 'Pseudo Pris',
+    isActive: true,
+    status: 'validated',
+  },
+  {
+    modelId: 'model_imp_double',
+    userName: 'doublon_reveal',
+    displayName: 'Doublon  TEST',
+    isActive: true,
+    status: 'validated',
+  },
+];
+
+/** `/v1/models` as the documentation shows a line. */
+function wireModel(model: FakeModel) {
+  return {
+    modelId: model.modelId,
+    userName: model.userName,
+    displayName: model.displayName,
+    avatarUrl: model.avatarUrl ?? null,
+    isActive: model.isActive,
+    status: model.status,
+    subscribersCount: 0,
+    subscriptionPrice: 0,
+    subscriptionPlans: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
 const DEFAULT_SALE: Omit<FakeSale, 'id'> = {
   modelId: 'model_test_01',
   type: 'ppv',
@@ -116,6 +242,7 @@ export function createFakeCrm(): FakeCrm {
   };
   const calls: { method: string; path: string; status: number }[] = [];
   const webhooks = new Map<string, { url: string; secret: string }>();
+  let models: readonly FakeModel[] = DEFAULT_MODELS;
   let counter = 1000;
 
   const append = (event: string, sale: FakeSale, occurredAt: string): string => {
@@ -179,34 +306,7 @@ export function createFakeCrm(): FakeCrm {
     };
   });
 
-  app.get('/v1/models', () => ({
-    data: [
-      {
-        modelId: 'model_test_01',
-        userName: 'creatrice_test',
-        displayName: 'Créatrice test',
-        avatarUrl: null,
-        isActive: true,
-        status: 'validated',
-        subscribersCount: 0,
-        subscriptionPrice: 0,
-        subscriptionPlans: [{ periodicity: 'oneMonth', price: 0 }],
-        createdAt: '2026-01-01T00:00:00.000Z',
-      },
-      {
-        modelId: 'model_test_02',
-        userName: 'autre_test',
-        displayName: 'Autre test',
-        avatarUrl: null,
-        isActive: true,
-        status: 'pending',
-        subscribersCount: 0,
-        subscriptionPrice: null,
-        subscriptionPlans: [],
-        createdAt: '2026-01-01T00:00:00.000Z',
-      },
-    ],
-  }));
+  app.get('/v1/models', () => ({ data: models.map(wireModel) }));
 
   app.get('/v1/chatters', () => ({
     data: [
@@ -468,6 +568,9 @@ export function createFakeCrm(): FakeCrm {
       return append('sale_refunded', { ...sold.sale, status: 'refunded' }, occurredAt);
     },
     appendRaw: append,
+    setModels(next) {
+      models = next;
+    },
     rateLimit(requests, retryAfterSeconds) {
       state.rateLimited = requests;
       state.retryAfterSeconds = retryAfterSeconds;

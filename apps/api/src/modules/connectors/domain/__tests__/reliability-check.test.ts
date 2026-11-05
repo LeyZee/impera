@@ -19,6 +19,8 @@ const MODELS: PlatformModel[] = [
     handle: 'creatrice_test',
     displayName: 'Créatrice test',
     isActive: true,
+    status: 'validated',
+    avatarUrl: null,
   },
 ];
 const CONTEXT = { from: '2026-10-20', to: '2026-10-21', timeZone: 'Europe/Paris', models: MODELS };

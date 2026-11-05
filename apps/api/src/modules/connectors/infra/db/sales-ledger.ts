@@ -2,21 +2,28 @@ import { randomUUID } from 'node:crypto';
 
 import {
   AuditEntryIdSchema,
+  CreatorIdSchema,
+  creatorNameKey,
   EVENT_PAYLOADS,
   EventIdSchema,
   JOB_MAX_ATTEMPTS,
   newId,
+  PlatformAccountIdSchema,
   SaleEventSchema,
   SalesFeedCheckIdSchema,
   SalesFeedCheckReportSchema,
   SalesLineIdSchema,
+  type CreatorId,
   type Platform,
   type PlatformSale,
+  type SalesFeedImportLineResult,
+  type SalesFeedImportRefusal,
   type SalesFeedSignal,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
+import { importedNameOf } from '../../domain/model-import';
 import type { CheckLine } from '../../domain/reliability-check';
 import {
   inputsHashOf,
@@ -35,6 +42,7 @@ const cursors = schema.salesFeedCursors;
 const models = schema.salesFeedModels;
 const chatters = schema.salesFeedChatters;
 const checks = schema.salesFeedChecks;
+const dismissals = schema.salesFeedModelDismissals;
 
 /** The columns of a line, shared by the register and the quarantine. */
 function lineValues(platform: Platform, sale: PlatformSale) {
@@ -59,6 +67,50 @@ function lineValues(platform: Platform, sale: PlatformSale) {
     position: sale.position,
     inputsHash: inputsHashOf(sale),
   };
+}
+
+/** A created creator's zone until the owner changes it on her page (ADR 0069 § 3). */
+const IMPORTED_TIMEZONE = 'Europe/Paris';
+
+/** A line of the import refused: the transaction rolls back, and the line says why. */
+class ImportRefused extends Error {
+  constructor(readonly reason: SalesFeedImportRefusal) {
+    super(`sales feed import refused: ${reason}`);
+  }
+}
+
+/** A unique index refused the row, raised by the driver directly or wrapped by Drizzle (`cause`). */
+function isUniqueViolation(error: unknown, constraint: string): boolean {
+  return (
+    error instanceof Error &&
+    [error, error.cause].some(
+      (e) =>
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        e.code === '23505' &&
+        'constraint' in e &&
+        e.constraint === constraint,
+    )
+  );
+}
+
+async function auditModel(
+  tx: Transaction,
+  action: 'sales_feed.model_dismissed' | 'sales_feed.model_restored' | 'sales_feed.model_imported',
+  platform: Platform,
+  platformModelId: string,
+  by: string | null,
+  details: Record<string, unknown>,
+): Promise<void> {
+  await tx.insert(schema.auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId: by,
+    action,
+    entity: 'sales_feed_model',
+    entityId: `${platform}:${platformModelId}`,
+    details: { platform, platformModelId, ...details },
+  });
 }
 
 /** `SET LOCAL app.creator_id`: what follows in the transaction is that creator's, as in `withTenant`. */
@@ -285,83 +337,7 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
     },
 
     linkModel(platform, platformModelId, account, by) {
-      return db.transaction(async (tx) => {
-        const [current] = await tx
-          .select()
-          .from(models)
-          .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)))
-          .for('update');
-        if (current?.platformAccountId === account.platformAccountId) {
-          // The owner confirms a link the handle posed: it becomes theirs, dated, with nothing else moving.
-          if (current.linkedBy !== null || by === null) return 'linked';
-          await tx
-            .update(models)
-            .set({ linkedBy: by, linkedAt: new Date() })
-            .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)));
-          await tx.insert(schema.auditLog).values({
-            id: newId(AuditEntryIdSchema),
-            userId: by,
-            action: 'sales_feed.model_linked',
-            entity: 'sales_feed_model',
-            entityId: `${platform}:${platformModelId}`,
-            details: {
-              platform,
-              platformModelId,
-              platformAccountId: account.platformAccountId,
-              previousAccountId: current.platformAccountId,
-              auto: false,
-              confirmed: true,
-              released: 0,
-            },
-          });
-          return 'linked';
-        }
-        // Lines already recorded for another account stay there (append-only): moving the model would split it.
-        const [elsewhere] = await withAdmin(adminDb, (admin) =>
-          admin
-            .select({ id: sales.id })
-            .from(sales)
-            .where(
-              and(
-                eq(sales.platform, platform),
-                eq(sales.platformModelId, platformModelId),
-                sql`${sales.platformAccountId} <> ${account.platformAccountId}`,
-              ),
-            )
-            .limit(1),
-        );
-        if (elsewhere !== undefined) return 'conflict';
-        const [taken] = await tx
-          .select({ model: models.platformModelId })
-          .from(models)
-          .where(eq(models.platformAccountId, account.platformAccountId));
-        if (taken !== undefined && taken.model !== platformModelId) return 'conflict';
-        await tx
-          .insert(models)
-          .values({ platform, platformModelId, ...account, linkedBy: by })
-          .onConflictDoUpdate({
-            target: [models.platform, models.platformModelId],
-            set: { ...account, linkedBy: by, linkedAt: new Date() },
-          });
-        const released = await releaseQuarantine(tx, platform, platformModelId, account);
-        // The link decides whose sales these are (CRM-03 pays by it): dated, and by whom, the handle's own when null.
-        await tx.insert(schema.auditLog).values({
-          id: newId(AuditEntryIdSchema),
-          userId: by,
-          action: 'sales_feed.model_linked',
-          entity: 'sales_feed_model',
-          entityId: `${platform}:${platformModelId}`,
-          details: {
-            platform,
-            platformModelId,
-            platformAccountId: account.platformAccountId,
-            previousAccountId: current?.platformAccountId ?? null,
-            auto: by === null,
-            released,
-          },
-        });
-        return 'linked';
-      });
+      return db.transaction((tx) => linkIn(tx, adminDb, platform, platformModelId, account, by));
     },
 
     async unlinkModel(platform, platformModelId, by) {
@@ -381,6 +357,154 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
           details: { platform, platformModelId, previousAccountId: was.platformAccountId },
         });
       });
+    },
+
+    async creators() {
+      const rows = await db
+        .select({ creatorId: schema.creators.id, displayName: schema.creators.displayName })
+        .from(schema.creators)
+        .orderBy(schema.creators.displayName);
+      return rows.map((row) => ({ ...row, creatorId: CreatorIdSchema.parse(row.creatorId) }));
+    },
+
+    async dismissals(platform) {
+      const rows = await db.select().from(dismissals).where(eq(dismissals.platform, platform));
+      return new Map(rows.map((row) => [row.platformModelId, row.dismissedAt]));
+    },
+
+    async dismissModel(platform, platformModelId, by) {
+      await db.transaction(async (tx) => {
+        const inserted = await tx
+          .insert(dismissals)
+          .values({ platform, platformModelId, dismissedBy: by })
+          .onConflictDoNothing()
+          .returning({ platformModelId: dismissals.platformModelId });
+        if (inserted.length === 0) return;
+        await auditModel(tx, 'sales_feed.model_dismissed', platform, platformModelId, by, {});
+      });
+    },
+
+    async restoreModel(platform, platformModelId, by) {
+      await db.transaction(async (tx) => {
+        const removed = await tx
+          .delete(dismissals)
+          .where(and(eq(dismissals.platform, platform), eq(dismissals.platformModelId, platformModelId)))
+          .returning({ platformModelId: dismissals.platformModelId });
+        if (removed.length === 0) return;
+        await auditModel(tx, 'sales_feed.model_restored', platform, platformModelId, by, {});
+      });
+    },
+
+    async importModel(platform, model, action, by) {
+      const platformModelId = model.platformModelId;
+      const refused = (reason: SalesFeedImportRefusal): SalesFeedImportLineResult => ({
+        platformModelId,
+        outcome: 'refused',
+        reason,
+      });
+      try {
+        return await db.transaction(async (tx): Promise<SalesFeedImportLineResult> => {
+          // One import of a model at a time: a double click waits for the first, then finds its link.
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`sales_feed_import:${platform}:${platformModelId}`}))`,
+          );
+          const [current] = await tx
+            .select({ creatorId: models.creatorId })
+            .from(models)
+            .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)));
+          if (current !== undefined) {
+            return {
+              platformModelId,
+              outcome: 'already_linked',
+              creatorId: CreatorIdSchema.parse(current.creatorId),
+            };
+          }
+          // Every creator's accounts with this handle (any case): `platform_accounts` is under RLS.
+          const holders = await withAdmin(adminDb, (admin) =>
+            admin
+              .select({ id: schema.platformAccounts.id, creatorId: schema.platformAccounts.creatorId })
+              .from(schema.platformAccounts)
+              .where(
+                and(
+                  eq(schema.platformAccounts.platform, platform),
+                  sql`lower(${schema.platformAccounts.handle}) = lower(${model.handle})`,
+                ),
+              ),
+          );
+          let creatorId: CreatorId;
+          if (action.kind === 'link') {
+            const [creator] = await tx
+              .select({ id: schema.creators.id })
+              .from(schema.creators)
+              .where(eq(schema.creators.id, action.creatorId));
+            if (creator === undefined) throw new ImportRefused('creator_not_found');
+            creatorId = action.creatorId;
+          } else {
+            if (holders.length > 0) throw new ImportRefused('handle_taken');
+            const name = importedNameOf(model);
+            if (name === null) throw new ImportRefused('name_invalid');
+            const nameKey = creatorNameKey(name);
+            const [taken] = await tx
+              .select({ id: schema.creators.id })
+              .from(schema.creators)
+              .where(eq(schema.creators.nameKey, nameKey));
+            if (taken !== undefined) throw new ImportRefused('name_taken');
+            creatorId = newId(CreatorIdSchema);
+            await tx
+              .insert(schema.creators)
+              .values({ id: creatorId, displayName: name, nameKey, timezone: IMPORTED_TIMEZONE });
+            await tx.insert(schema.auditLog).values({
+              id: newId(AuditEntryIdSchema),
+              userId: by,
+              action: 'creator.create',
+              entity: 'creator',
+              entityId: creatorId,
+              details: {
+                displayName: name,
+                timezone: IMPORTED_TIMEZONE,
+                importedFrom: { platform, platformModelId },
+              },
+            });
+          }
+          if (holders.some((holder) => holder.creatorId !== creatorId))
+            throw new ImportRefused('handle_taken');
+          await enterTenant(tx, creatorId);
+          let platformAccountId = holders[0]?.id;
+          if (platformAccountId === undefined) {
+            platformAccountId = newId(PlatformAccountIdSchema);
+            await tx
+              .insert(schema.platformAccounts)
+              .values({ id: platformAccountId, creatorId, platform, handle: model.handle });
+          }
+          const linked = await linkIn(
+            tx,
+            adminDb,
+            platform,
+            platformModelId,
+            { platformAccountId, creatorId },
+            by,
+          );
+          if (linked === 'conflict') throw new ImportRefused('link_conflict');
+          await tx
+            .delete(dismissals)
+            .where(and(eq(dismissals.platform, platform), eq(dismissals.platformModelId, platformModelId)));
+          const created = action.kind === 'create';
+          // The model's id and what it became: never its subscribers, prices or amounts (ADR 0069 § 6).
+          await auditModel(tx, 'sales_feed.model_imported', platform, platformModelId, by, {
+            creatorId,
+            platformAccountId,
+            created,
+          });
+          return { platformModelId, outcome: created ? 'created' : 'linked', creatorId };
+        });
+      } catch (error) {
+        if (error instanceof ImportRefused) return refused(error.reason);
+        // Taken between the check and the insert, by another request.
+        if (isUniqueViolation(error, 'creators_name_key_unique')) return refused('name_taken');
+        if (isUniqueViolation(error, 'platform_accounts_platform_handle_unique'))
+          return refused('handle_taken');
+        throw error;
+      }
     },
 
     async chatterLinks(platform) {
@@ -578,6 +702,95 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
       });
     },
   };
+}
+
+/**
+ * Links a model inside `tx` and moves its quarantined lines to the register: `conflict` when the model already has
+ * lines recorded for another account, or the account is linked to another model. Shared by a link and an import.
+ */
+async function linkIn(
+  tx: Transaction,
+  adminDb: Database,
+  platform: Platform,
+  platformModelId: string,
+  account: LinkedAccount,
+  by: string | null,
+): Promise<'linked' | 'conflict'> {
+  const [current] = await tx
+    .select()
+    .from(models)
+    .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)))
+    .for('update');
+  if (current?.platformAccountId === account.platformAccountId) {
+    // The owner confirms a link the handle posed: it becomes theirs, dated, with nothing else moving.
+    if (current.linkedBy !== null || by === null) return 'linked';
+    await tx
+      .update(models)
+      .set({ linkedBy: by, linkedAt: new Date() })
+      .where(and(eq(models.platform, platform), eq(models.platformModelId, platformModelId)));
+    await tx.insert(schema.auditLog).values({
+      id: newId(AuditEntryIdSchema),
+      userId: by,
+      action: 'sales_feed.model_linked',
+      entity: 'sales_feed_model',
+      entityId: `${platform}:${platformModelId}`,
+      details: {
+        platform,
+        platformModelId,
+        platformAccountId: account.platformAccountId,
+        previousAccountId: current.platformAccountId,
+        auto: false,
+        confirmed: true,
+        released: 0,
+      },
+    });
+    return 'linked';
+  }
+  // Lines already recorded for another account stay there (append-only): moving the model would split it.
+  const [elsewhere] = await withAdmin(adminDb, (admin) =>
+    admin
+      .select({ id: sales.id })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.platform, platform),
+          eq(sales.platformModelId, platformModelId),
+          sql`${sales.platformAccountId} <> ${account.platformAccountId}`,
+        ),
+      )
+      .limit(1),
+  );
+  if (elsewhere !== undefined) return 'conflict';
+  const [taken] = await tx
+    .select({ model: models.platformModelId })
+    .from(models)
+    .where(eq(models.platformAccountId, account.platformAccountId));
+  if (taken !== undefined && taken.model !== platformModelId) return 'conflict';
+  await tx
+    .insert(models)
+    .values({ platform, platformModelId, ...account, linkedBy: by })
+    .onConflictDoUpdate({
+      target: [models.platform, models.platformModelId],
+      set: { ...account, linkedBy: by, linkedAt: new Date() },
+    });
+  const released = await releaseQuarantine(tx, platform, platformModelId, account);
+  // The link decides whose sales these are (CRM-03 pays by it): dated, and by whom, the handle's own when null.
+  await tx.insert(schema.auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId: by,
+    action: 'sales_feed.model_linked',
+    entity: 'sales_feed_model',
+    entityId: `${platform}:${platformModelId}`,
+    details: {
+      platform,
+      platformModelId,
+      platformAccountId: account.platformAccountId,
+      previousAccountId: current?.platformAccountId ?? null,
+      auto: by === null,
+      released,
+    },
+  });
+  return 'linked';
 }
 
 /** The quarantined lines of a model, moved to the register of the account it is now linked to. */

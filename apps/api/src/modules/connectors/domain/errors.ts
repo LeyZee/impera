@@ -127,3 +127,13 @@ export class SalesFeedCheckDaysUnprocessable extends DomainError {
     );
   }
 }
+
+/** The platform's list of models could not be read now (a refusal, an outage): nothing is imported (503). */
+export class SalesFeedListUnavailable extends DomainError {
+  constructor() {
+    super(
+      'sales_feed_list_unavailable',
+      'La liste des modèles de la plateforme ne répond pas : réessaie dans un instant',
+    );
+  }
+}

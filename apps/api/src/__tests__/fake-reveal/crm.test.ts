@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { revealSalesFeed } from '../../modules/connectors';
 
-import { createFakeCrm, FAKE_CRM_BASE_URL, FAKE_CRM_KEY, revealSignature, type FakeCrm } from './crm';
+import {
+  createFakeCrm,
+  FAKE_CRM_BASE_URL,
+  FAKE_CRM_KEY,
+  IMPORT_MODELS,
+  revealSignature,
+  type FakeCrm,
+} from './crm';
 
 const opened: FakeCrm[] = [];
 
@@ -220,6 +227,26 @@ describe('Reveal sales feed adapter', () => {
     expect(read(signed.body, { 'x-reveal-signature': both })).toMatchObject({ ok: true });
   });
 
+  it('reads each model status in the contract’s words, an unknown one as other, and keeps only an https photo', async () => {
+    const { crm, feed } = setup();
+    crm.setModels(IMPORT_MODELS);
+    const models = await feed.listModels();
+    expect(
+      models.ok && models.value.map((model) => [model.platformModelId, model.status, model.avatarUrl]),
+    ).toEqual([
+      ['model_imp_valid', 'validated', 'https://cdn.example.test/avatars/valide.jpg'],
+      ['model_imp_pending', 'pending', null],
+      ['model_imp_changes', 'onboarding_changes_requested', null],
+      ['model_imp_refused', 'refused', null],
+      ['model_imp_banned', 'banned', null],
+      ['model_imp_unknown', 'other', null],
+      ['model_imp_inactive', 'validated', null],
+      ['model_imp_noname', 'validated', null],
+      ['model_imp_handle', 'validated', null],
+      ['model_imp_double', 'validated', null],
+    ]);
+  });
+
   it('lists models, team and statistics in the contract shape', async () => {
     const { feed } = setup();
     const models = await feed.listModels();
@@ -228,6 +255,8 @@ describe('Reveal sales feed adapter', () => {
       handle: 'creatrice_test',
       displayName: 'Créatrice test',
       isActive: true,
+      status: 'validated',
+      avatarUrl: null,
     });
     const chatters = await feed.listChatters();
     expect(
