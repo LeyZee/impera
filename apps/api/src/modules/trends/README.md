@@ -2,7 +2,7 @@
 
 Les signaux de tendance (`trend_signals`), les posts que l'extension relève quand une personne regarde Instagram (`trend_readings`), les idées de contenu du matin (`content_ideas`) et la liaison de l'extension d'une personne avec le serveur (`extension_links`). Migrations 0100, 0104 (FORCE ROW LEVEL SECURITY, une liaison par navigateur) et 0107 (description des captures).
 
-**Lots a et b de VEI-01** (ce qui existe) : les tables et leur RLS (migration 0100, forcée par 0104), les contrats (`packages/contracts`, `trends.ts`, `content-drops.ts`, `public-outputs.ts`), les règles pures, et les trois portes du lot b ci-dessous. À venir : lots c (plafond de veille, captures pour la vision) et d (idée validée → suggestion de l'agenda → demande de contenu, après CR-05 et CR-06).
+**Lots a, b, c et d1 de VEI-01** (ce qui existe) : les tables et leur RLS (migration 0100, forcée par 0104), les contrats (`packages/contracts`, `trends.ts`, `content-drops.ts`, `public-outputs.ts`), les règles pures, et les trois portes du lot b ci-dessous. Le lot c a ajouté le plafond de veille et les captures pour la vision ; le lot d1, « Idées du jour » ci-dessous ; le lot d2, la suite de son geste dans l'agenda. À venir : d3.
 
 ## Routes (`/v1`, lot b)
 
@@ -14,6 +14,16 @@ Les signaux de tendance (`trend_signals`), les posts que l'extension relève qua
   - `POST /trends/readings/captures` : dans cet ordre, le relevé du post marqué d'abord (`POST /trends/readings`), ses captures ensuite. Au plus quatre captures de l'onglet (JPEG, PNG ou WebP, 750 000 octets chacune) d'un post que la personne a marqué dans cette session, son relevé déjà envoyé. Elles restent en mémoire le temps de l'appel de vision (`describeTrendCaptures`, un appel `trend_watch`), puis elles disparaissent : jamais écrites, journalisées ni renvoyées. Seule la description (accroche, angles, texte à l'écran, montage) reste, dans `trend_readings.capture_description`. Un post non marqué, inconnu ou relevé par une autre personne donne 404 `trend_capture_reading_not_found`. Le plafond de veille ou le plafond du jour atteint donne 429 `trend_watch_budget_limited` avec `Retry-After` jusqu'à minuit (heure de Paris), à distinguer du 429 `rate_limited` des 30 appels par minute ; l'absence de modèle 503 `trend_capture_vision_unavailable`.
 - La créatrice reçoit toujours `created: true` à un collage : « déjà là » lui dirait que l'agence l'a collé avant elle.
 - Aucune de ces routes n'ouvre de connexion sortante : `__tests__/trends.integration.test.ts` échoue si `fetch`, `http`, `https`, `tls` ou une résolution DNS hors de la base sont appelés.
+
+## « Idées du jour » (`/v1`, lot d1, ADR 0060 § 5)
+
+Le propriétaire et un manager actif, vérifiés deux fois (rôle de la session, puis scope `owner` ou `agency` dans la transaction) ; un chatteur reçoit 403 `content_idea_forbidden`.
+
+- `GET /creators/:creatorId/ideas?day=` : `{ day, items }`, ses idées proposées ce jour-là (aujourd'hui dans son fuseau sans `day`), dans l'ordre où elles sont arrivées, chacune avec le signal qu'elle cite (lu par l'agence, jamais par elle). États : `proposed` (à décider), `validated` (validée mais pas encore dans son agenda : la suggestion a échoué, le même geste la refait), `suggested` (dans son agenda), `refused`, `declined` (elle a refusé le tournage dans son agenda), puis `deposited` au lot d3.
+- `POST /creators/:creatorId/ideas/:ideaId/validate`, corps `{ correction }` (facultative ; tout sauf le signal d'origine). L'idée corrigée est relue par les gardes du code, les mêmes que les filtres du matin (`guardFaultOf`) : limites de sa persona active, « jamais de nu » pour une sortie publique, garde Instagram. Une faute donne 422 `content_idea_guard_unprocessable`, et l'idée reste à décider. Validée, elle devient une **suggestion** de son agenda par la porte du module `creator-tasks` (`suggestShoot`), jamais par ses tables. La suggestion porte l'identifiant de l'idée, la catégorie Tournage, le titre, « Pour : » suivi de la catégorie de dépôt, et « à tourner » comme fiche de tournage (`shootBrief`). Elle prend la première place libre dans ses dispos sur quatorze jours, sinon elle reste sans date. Jamais la raison ni le signal : elle ne voit pas la veille. Rejouée, la validation ne change rien et sa correction n'est pas lue ; une idée laissée `validated` par un échec est suggérée par le même geste.
+- `POST /creators/:creatorId/ideas/:ideaId/refuse`, corps `{ reason }` : refusée, jamais reproposée. Le même geste rejoué ne change rien ; l'autre geste sur une idée décidée répond 409 `content_idea_decided_conflict`.
+
+À venir : sa réponse à la suggestion (acceptée, elle fait naître la demande de contenu ; refusée, l'idée passe à `declined`), au lot d2, puis le dépôt reçu (`deposited`), au lot d3.
 
 ## Qui lit, qui écrit
 
@@ -33,3 +43,7 @@ Les signaux de tendance (`trend_signals`), les posts que l'extension relève qua
 - **« Trop proche »** (`tooClose`) : même catégorie de dépôt et même signal d'origine, ou au moins 60 % de mots partagés entre le titre et « à tourner » (indice de Jaccard sur les mots de trois lettres ou plus, petits mots écartés, pluriel plié comme dans les gardes de l'agent).
 
 Le serveur ne demande jamais rien à instagram.com : une adresse collée est lue par sa forme (`instagramPostOf`), jamais ouverte.
+
+## La suite de son geste (job, lot d2, ADR 0055 § 4)
+
+Quand elle accepte ou refuse une suggestion, son agenda met en file `creator_tasks.suggestion_decided` dans la même transaction ; le job est celui de la veille (`followDecision`, câblé dans `wiring/trends.ts`). Il lit sous le rôle admin l'idée devenue cette suggestion ; sans idée (une suggestion de l'agence elle-même), il ne fait rien. Acceptée : la demande de contenu naît par la porte de `content-drops` (`requestFromIdea`) sous l'identifiant de l'idée, origine `idea`, pour le jour de son tournage dans son fuseau, avec le titre de l'idée comme motif, puis `content_ideas.request_id` la retient ; l'idée reste `suggested` jusqu'au dépôt. Refusée : l'idée passe à `declined`, aucune demande. Rejouable : la demande s'écrit une fois sous son identifiant, l'idée ne bouge que depuis `suggested`.

@@ -54,7 +54,7 @@ describe('layoutRail, once every screen exists', () => {
       '/creatrices',
       '/reglages',
     ]);
-    expect(order('manager')).toEqual(['/', '/suivi', '/equipe', '/paie', '/moi']);
+    expect(order('manager')).toEqual(['/', '/suivi', '/equipe', '/paie', '/creatrices', '/moi']);
     expect(order('chatter')).toEqual(['/aujourdhui', '/suivi', '/planning', '/commissions', '/moi']);
   });
 
@@ -64,9 +64,12 @@ describe('layoutRail, once every screen exists', () => {
     expect([...layout.more]).toEqual(['/entrainer', '/creatrices', '/reglages']);
   });
 
-  it('keeps five tabs on the bar, without « Plus », for the manager and the chatter', () => {
-    expect(layoutRail('manager', all).more.size).toBe(0);
+  it('keeps five tabs on the bar, without « Plus », for the chatter', () => {
     expect(layoutRail('chatter', all).more.size).toBe(0);
+  });
+
+  it('puts Créatrices and Moi on the manager’s « Plus », since her agenda opened to him (CR-05 lot c)', () => {
+    expect([...layoutRail('manager', all).more]).toEqual(['/creatrices', '/moi']);
   });
 
   it('fills the bar from the phone order, then the rail order, when only Équipe is new', () => {
@@ -91,10 +94,10 @@ describe('railOf, with the screens of today', () => {
     // Nor Entraîner: the server keeps the playground to the owner.
     // Nor Réglages: every page of it is the owner's (NAV-18).
     expect(labels(operator)).toEqual(['Dashboard', 'Suivi', 'Créatrices']);
-    // Moi, the fifth tab of the manager and the chatter, on the phone's bar too (EQ-06 lot 8b): no « Plus ».
-    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Moi']);
+    // Moi, the fifth tab of the chatter, on the phone's bar too (EQ-06 lot 8b): no « Plus ». The manager's sixth,
+    // Créatrices for her agenda alone (CR-05 lot c), sends it and Moi to « Plus » on the phone.
+    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
-    expect(railOf(manager).more.size).toBe(0);
     expect(railOf(chatter).more.size).toBe(0);
     // A creator gets her own space (ADR 0042 § 8): Aujourd'hui, Agenda, Ventes (her fans first) and Moi, Contenu
     // coming with its screen; never Suivi nor the agency's Dashboard, her persona being in Moi.

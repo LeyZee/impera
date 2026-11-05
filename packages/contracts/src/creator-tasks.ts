@@ -40,6 +40,12 @@ export const CREATOR_TASK_CATEGORY_LABELS: Readonly<Record<CreatorTaskCategory, 
 export const CreatorTaskTitleSchema = z.string().trim().min(1).max(80);
 /** What the task is for, one sentence, never an invented figure (CR-05). */
 export const CreatorTaskPurposeSchema = z.string().trim().min(1).max(160);
+/**
+ * Her shooting sheet (ADR 0042 § 4, VEI-01 lot d): what to shoot, as the agency validated an idea. Plain text, shown as
+ * it is (never Markdown). Written by the agency on a suggestion and copied once into the task she accepts; she reads it
+ * and never edits it.
+ */
+export const ShootBriefSchema = z.string().trim().min(1).max(600);
 
 /** The longest a timed task or a dispo lasts: a day. */
 export const CREATOR_TASK_MAX_MINUTES = 24 * 60;
@@ -77,6 +83,8 @@ export const CreatorTaskSchema = z.strictObject({
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable(),
+  /** Her shooting sheet, copied from the suggestion she accepted; `null` for any other task, and for an agenda kept on her phone from before it existed. */
+  shootBrief: ShootBriefSchema.nullable().default(null),
   essential: z.boolean(),
   /** Minutes before a timed task she wants a reminder, `null` for none. */
   reminderMinutes: z.number().int().min(0).max(1440).nullable(),
@@ -176,6 +184,8 @@ export const CreatorSuggestionSchema = z.strictObject({
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable(),
+  /** The shooting sheet she reads before she accepts (an idea's « à tourner »), `null` for none. */
+  shootBrief: ShootBriefSchema.nullable().default(null),
   essential: z.boolean(),
 });
 export type CreatorSuggestion = z.infer<typeof CreatorSuggestionSchema>;
@@ -252,6 +262,17 @@ export const CreateSuggestionBodySchema = z.strictObject({
 });
 export type CreateSuggestionBody = z.infer<typeof CreateSuggestionBodySchema>;
 
+/**
+ * What became of an accepted suggestion, for the agency (CR-05 lot c): the task as she keeps it (moved if she moved
+ * it), the days she ticked it (of the suggestion's week for her routine), and whether she removed it since.
+ */
+export const SuggestionFollowUpSchema = z.strictObject({
+  when: CreatorTaskWhenSchema,
+  doneDays: z.number().int().min(0),
+  removed: z.boolean(),
+});
+export type SuggestionFollowUp = z.infer<typeof SuggestionFollowUpSchema>;
+
 /** A suggestion as the agency reads it: what she did of it, and her reason only when she gave one. */
 export const AgencySuggestionSchema = CreatorSuggestionSchema.extend({
   origin: SuggestionOriginSchema,
@@ -259,6 +280,8 @@ export const AgencySuggestionSchema = CreatorSuggestionSchema.extend({
   reason: z.string().nullable(),
   decidedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
+  /** `null` until she accepts it. */
+  task: SuggestionFollowUpSchema.nullable(),
 });
 export type AgencySuggestion = z.infer<typeof AgencySuggestionSchema>;
 

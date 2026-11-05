@@ -110,16 +110,22 @@ function limitTerms(limits: PersonaLimits): readonly string[] {
   return [...limits.never_do, ...limits.never_show, ...limits.never_say, ...limits.disgusts];
 }
 
-function dropOf(
-  idea: ContentIdeaDraft,
-  context: IdeaFilterContext,
-  kept: readonly KnownIdea[],
-): IdeaDrop | null {
-  if (!context.liveSignals.has(idea.signalId)) return { reason: 'no_live_signal' };
+/** What an idea's own text breaks, whoever wrote it: her limits, « jamais de nu » for a public output, the Instagram guard. */
+export type GuardFault = Extract<IdeaDrop, { reason: 'no_persona' | 'limit' | 'nudity' | 'instagram_guard' }>;
+
+/**
+ * The guards an idea's text is read against, as the model wrote it or as the agency corrected it (« Idées du jour »,
+ * ADR 0060 § 5): the same reading both times, so that a correction never sends what the filters would have dropped.
+ */
+export function guardFaultOf(
+  idea: Pick<ContentIdeaDraft, 'title' | 'category' | 'toShoot' | 'reason'>,
+  limits: PersonaLimits | null,
+  touches: (text: string, term: string) => boolean,
+): GuardFault | null {
   const text = `${idea.title}\n${idea.toShoot}\n${idea.reason}`;
   // No persona, no idea: nothing can tell what touches her.
-  if (context.limits === null) return { reason: 'no_persona' };
-  const term = limitTerms(context.limits).find((entry) => context.touches(text, entry));
+  if (limits === null) return { reason: 'no_persona' };
+  const term = limitTerms(limits).find((entry) => touches(text, entry));
   if (term !== undefined) return { reason: 'limit', term };
   if (PUBLIC_DROP_CATEGORIES.has(idea.category)) {
     const word = nudityIn(text);
@@ -127,6 +133,17 @@ function dropOf(
   }
   if (INSTAGRAM_DROP_CATEGORIES.has(idea.category) && instagramFaults(text).length > 0)
     return { reason: 'instagram_guard' };
+  return null;
+}
+
+function dropOf(
+  idea: ContentIdeaDraft,
+  context: IdeaFilterContext,
+  kept: readonly KnownIdea[],
+): IdeaDrop | null {
+  if (!context.liveSignals.has(idea.signalId)) return { reason: 'no_live_signal' };
+  const fault = guardFaultOf(idea, context.limits, context.touches);
+  if (fault !== null) return fault;
   if (context.refused.some((known) => tooClose(idea, known))) return { reason: 'refused_before' };
   if ([...context.recent, ...kept].some((known) => tooClose(idea, known))) return { reason: 'too_close' };
   if (kept.length >= CONTENT_IDEAS_PER_DAY_MAX) return { reason: 'over_daily_cap' };

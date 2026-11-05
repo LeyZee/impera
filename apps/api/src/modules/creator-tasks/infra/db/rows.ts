@@ -12,6 +12,7 @@ import {
   type CreatorTask,
   type CreatorTaskWhen,
   type CreatorTick,
+  type SuggestionFollowUp,
 } from '@impera/contracts';
 import type { schema } from '@impera/db';
 
@@ -61,6 +62,7 @@ export function taskOf(row: TaskRow): CreatorTask {
     category: row.category,
     title: row.title,
     purpose: row.purpose,
+    shootBrief: row.shootBrief,
     essential: row.essential,
     reminderMinutes: row.reminderMinutes,
   });
@@ -128,6 +130,7 @@ const creatorSide = (row: SuggestionRow) => ({
   category: row.category,
   title: row.title,
   purpose: row.purpose,
+  shootBrief: row.shootBrief,
   essential: row.kind === 'routine',
 });
 
@@ -135,7 +138,8 @@ const creatorSide = (row: SuggestionRow) => ({
 export const creatorSuggestionOf = (row: SuggestionRow): CreatorSuggestion =>
   CreatorSuggestionSchema.parse(creatorSide(row));
 
-export const agencySuggestionOf = (row: SuggestionRow): AgencySuggestion =>
+/** A suggestion as the agency reads it, with what became of it once accepted (`null` until then). */
+export const agencySuggestionOf = (row: SuggestionRow, task: SuggestionFollowUp | null): AgencySuggestion =>
   AgencySuggestionSchema.parse({
     ...creatorSide(row),
     origin: row.origin,
@@ -143,4 +147,5 @@ export const agencySuggestionOf = (row: SuggestionRow): AgencySuggestion =>
     reason: row.reason,
     decidedAt: row.decidedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
+    task,
   });

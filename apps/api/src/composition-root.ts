@@ -266,7 +266,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const scheduling = wireScheduling(shared, { persona: persona.module });
   const scripts = wireScripts(shared, { persona: persona.module, cardFontsDir: CARD_FONTS_DIR });
-  const trends = wireTrends(shared, options.trendVision ?? llm.gateway);
   const contentDrops = wireContentDrops(shared);
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
@@ -319,6 +318,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const backups = wireBackups(shared);
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
+  const trends = wireTrends(shared, {
+    gateway: options.trendVision ?? llm.gateway,
+    persona: persona.module,
+    agenda: creatorTasks.module,
+    contentDrops: contentDrops.module,
+  });
   const supervision = wireSupervision(shared, {
     llm,
     activeVoice: agent.activeVoice,
@@ -368,7 +373,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...payroll.tasks,
     ...invoicing.tasks,
     ...notifications.tasks,
+    ...contentDrops.tasks,
     ...creatorTasks.tasks,
+    ...trends.tasks,
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

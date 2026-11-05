@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
+  ContentDropFileIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   CreatorTaskIdSchema,
@@ -12,6 +13,7 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  SuggestionIdSchema,
   TeamMemberIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
@@ -45,6 +47,7 @@ export const JOB_NAMES = [
   'notifications.recap',
   'notifications.creator_sale',
   'creator_tasks.remind',
+  'creator_tasks.suggestion_decided',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
@@ -65,6 +68,7 @@ export const JOB_NAMES = [
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
   'media.describe',
+  'content_drops.receive_file',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -147,6 +151,19 @@ export const JOB_PAYLOADS = {
    * move replaces the job, and a job left from before rings nothing.
    */
   'creator_tasks.remind': z.object({ taskId: CreatorTaskIdSchema, startsAt: z.iso.datetime() }),
+  /**
+   * Her gesture on one of the agency's suggestions (VEI-01 d2): enqueued in the transaction of her accept or decline,
+   * under the key `creator_tasks.suggestion_decided:<suggestionId>`, once per suggestion. `day` is the day of the task
+   * she accepted, in her zone (the day she decided for a routine or a decline). The agenda only announces it; the
+   * trend watch handles it (an idea's shoot becomes a content request, or the idea is declined) and does nothing for a
+   * suggestion that no idea became.
+   */
+  'creator_tasks.suggestion_decided': z.object({
+    creatorId: CreatorIdSchema,
+    suggestionId: SuggestionIdSchema,
+    state: z.enum(['accepted', 'declined']),
+    day: z.iso.date(),
+  }),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -250,6 +267,15 @@ export const JOB_PAYLOADS = {
     mediaAssetId: MediaAssetIdSchema,
     correlationId: z.string().min(1),
   }),
+  /**
+   * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared,
+   * then marks the file received, and its drop when it was the last one. One per file (job key), replayable.
+   */
+  'content_drops.receive_file': z.object({
+    creatorId: CreatorIdSchema,
+    fileId: ContentDropFileIdSchema,
+    correlationId: z.string().min(1),
+  }),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -298,6 +324,8 @@ export const JOB_MAX_ATTEMPTS = {
   'notifications.creator_sale': 5,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
+  // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
+  'creator_tasks.suggestion_decided': 5,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
@@ -334,6 +362,9 @@ export const JOB_MAX_ATTEMPTS = {
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
   'media.describe': 3,
+  // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
+  // short outage of the storage; a file left waiting is sent again by her phone.
+  'content_drops.receive_file': 9,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,

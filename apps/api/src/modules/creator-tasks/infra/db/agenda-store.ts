@@ -76,6 +76,39 @@ async function scheduleReminder(tx: Transaction, task: CreatorTask): Promise<voi
   );
 }
 
+/**
+ * Her gesture announced (VEI-01 d2), in the transaction that records it: one job per suggestion (her gesture happens
+ * once). Whoever listens (the trend watch) decides what it means; the agenda knows none.
+ */
+async function announceDecision(
+  tx: Transaction,
+  decision: {
+    readonly creatorId: string;
+    readonly suggestionId: string;
+    readonly state: 'accepted' | 'declined';
+    readonly day: string;
+  },
+): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => ${'creator_tasks.suggestion_decided'},
+      payload => ${JSON.stringify(decision)}::jsonb,
+      queue_name => null,
+      run_at => null,
+      max_attempts => ${JOB_MAX_ATTEMPTS['creator_tasks.suggestion_decided']}::int,
+      job_key => ${`creator_tasks.suggestion_decided:${decision.suggestionId}`},
+      job_key_mode => ${'preserve_run_at'}
+    )`,
+  );
+}
+
+/** The day a task falls on in her zone; a routine, which has none, takes `fallback`. */
+function dayOfTask(when: CreatorTaskWhen, zone: string, fallback: string): string {
+  if (when.kind === 'timed') return calendarDayIn(new Date(when.startsAt), zone);
+  if (when.kind === 'day') return when.day;
+  return fallback;
+}
+
 async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
@@ -115,8 +148,9 @@ async function streakNow(tx: Transaction, zone: string, now: Date): Promise<Crea
   return streakOf(records, today);
 }
 
-const sameTask = (stored: CreatorTask, body: Omit<CreatorTask, 'essential'>): boolean =>
-  JSON.stringify({ ...stored, essential: undefined }) === JSON.stringify({ ...body, essential: undefined });
+const sameTask = (stored: CreatorTask, body: Omit<CreatorTask, 'essential' | 'shootBrief'>): boolean =>
+  JSON.stringify({ ...stored, essential: undefined, shootBrief: undefined }) ===
+  JSON.stringify({ ...body, essential: undefined, shootBrief: undefined });
 
 /** `withCreatorAccount` for every reading and writing of her agenda (CR-05). */
 export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStore {
@@ -369,6 +403,8 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             category: row.category,
             title: row.title,
             purpose: row.purpose,
+            // Her shooting sheet, hers to read from now on and never hers to edit (VEI-01 d).
+            shootBrief: row.shootBrief,
             // The agency's routine, once hers, counts for her streak (glossary « Routine »).
             essential: row.kind === 'routine',
             suggestionId: row.id,
@@ -386,6 +422,12 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             updatedAt: sql`now()`,
           })
           .where(eq(suggestions.id, row.id));
+        await announceDecision(tx, {
+          creatorId,
+          suggestionId: row.id,
+          state: 'accepted',
+          day: dayOfTask(when, zone, calendarDayIn(now, zone)),
+        });
         return taskOf(task);
       }),
 
@@ -413,6 +455,12 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
             updatedAt: sql`now()`,
           })
           .where(eq(suggestions.id, row.id));
+        await announceDecision(tx, {
+          creatorId,
+          suggestionId: row.id,
+          state: 'declined',
+          day: calendarDayIn(now, zone),
+        });
       }),
   };
 }

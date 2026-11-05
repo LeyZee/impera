@@ -1,5 +1,5 @@
-# Rendered by the nginx image at start (envsubst on ${API_UPSTREAM}). The only public entry of a deployment:
-# Coolify's proxy → this server → the API, which therefore runs with TRUST_PROXY_HOPS=2.
+# Rendered by the nginx image at start (envsubst on ${API_UPSTREAM} and ${MEDIA_ORIGIN}). The only public entry of a
+# deployment: Coolify's proxy → this server → the API, which therefore runs with TRUST_PROXY_HOPS=2.
 server {
     listen 8080;
     server_name _;
@@ -75,10 +75,11 @@ server {
         add_header X-Content-Type-Options nosniff always;
         add_header Referrer-Policy no-referrer always;
         add_header X-Frame-Options DENY always;
-        # Scripts, fonts, images and API calls from this origin only; no inline script, no frame, no plugin.
+        # Scripts, fonts, images and API calls from this origin only; no inline script, no frame, no plugin. The one
+        # exception is the media bucket (MEDIA_ORIGIN, its S3_ENDPOINT), where her phone sends her files (CR-06 b).
         # Inline styles stay allowed: React sets `style` attributes, which only 'unsafe-inline' lets through
         # everywhere (style-src-attr is not in every Safari the team uses).
-        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ${MEDIA_ORIGIN}; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'" always;
         try_files $uri $uri/ /index.html;
     }
 }

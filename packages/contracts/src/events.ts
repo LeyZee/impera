@@ -16,6 +16,8 @@ import {
 import { FanFlagNameSchema, FanFlagsSchema } from './fans';
 import {
   CommissionStatementIdSchema,
+  ContentDropIdSchema,
+  ContentRequestIdSchema,
   ContractorDocumentIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
@@ -239,6 +241,7 @@ export const EVENT_TYPES = [
   'agency_share_mismatch',
   'connection_state_changed',
   'security_alert',
+  'content_drop_received',
   'error',
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -461,6 +464,15 @@ export const EVENT_PAYLOADS = {
   invoice_due_soon: invoiceDuePayload,
   invoice_overdue: invoiceDuePayload,
   /**
+   * Every file of her drop arrived whole in the media storage (CR-06 b): the receipt job publishes it in the
+   * transaction that moves the drop to « Reçu », once per drop. The trend watch reads `requestId` to mark the idea
+   * that asked for it (VEI-01 d).
+   */
+  content_drop_received: z.object({
+    dropId: ContentDropIdSchema,
+    requestId: ContentRequestIdSchema.nullable(),
+  }),
+  /**
    * A document a contractor's regime asks for comes to its end, or has passed it, and no newer one is filed (EQ-06 lot
    * 5c-2): a tax residence certificate from 1 December of its year (it is renewed in January), another from the
    * owner's delay before its last day (`documentReminderDays`). Published once per document by
@@ -621,6 +633,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('agency_share_mismatch'),
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
+  typedEvent('content_drop_received'),
   typedEvent('error'),
 ]);
 export type EventBody = z.infer<typeof EventBodySchema>;
