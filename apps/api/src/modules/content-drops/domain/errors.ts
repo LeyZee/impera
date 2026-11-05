@@ -141,3 +141,9 @@ export class ContentDropStorageUnavailable extends DomainError {
 
 /** A file the cleaning cannot follow (a damaged photo, a video ffmpeg cannot read): refused with her sentence. */
 export class UnreadableFile extends Error {}
+
+/**
+ * Its medium was erased between the receipt's look at her library and its settling, so the bytes it skipped are gone
+ * (relecture Bilan de #525): thrown, the job's retry finds the medium erased and writes the bytes again.
+ */
+export class MediumErasedMeanwhile extends Error {}

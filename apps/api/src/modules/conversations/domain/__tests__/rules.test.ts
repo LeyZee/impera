@@ -6,6 +6,7 @@ import {
   debounceFor,
   DEFAULT_DEBOUNCE_SECONDS,
   deferredRespondAt,
+  fanAwaitsAnswer,
   followUpIdempotencyKey,
   followUpRetry,
   nextFollowUp,
@@ -73,5 +74,17 @@ describe('conversation rules', () => {
     expect(deferredRespondAt(later(20 * 60), AT)).toEqual(later(20 * 60));
     expect(deferredRespondAt(later(25 * 60), AT)).toEqual(later(25 * 60));
     expect(deferredRespondAt(later(25 * 60 + 1), AT)).toBeNull();
+  });
+});
+
+describe('fanAwaitsAnswer', () => {
+  const at = (minute: number) => new Date(`2026-11-05T18:${String(minute).padStart(2, '0')}:00Z`);
+
+  it('is true while nothing left after his last message, and only then', () => {
+    expect(fanAwaitsAnswer({ lastInboundAt: at(2), lastOutboundAt: null })).toBe(true);
+    expect(fanAwaitsAnswer({ lastInboundAt: at(2), lastOutboundAt: at(1) })).toBe(true);
+    expect(fanAwaitsAnswer({ lastInboundAt: at(2), lastOutboundAt: at(3) })).toBe(false);
+    // A follow-up to a fan who never wrote answers nothing.
+    expect(fanAwaitsAnswer({ lastInboundAt: null, lastOutboundAt: at(3) })).toBe(false);
   });
 });

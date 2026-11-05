@@ -216,6 +216,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
       status: readiness.isReady ? 'ready' : 'not_ready',
       checks: readiness.checks,
       deadJobs: readiness.deadJobs ?? null,
+      orphanedJobs: readiness.orphanedJobs ?? null,
     });
   });
 

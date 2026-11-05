@@ -311,4 +311,26 @@ describe('App on the screens of a contractor’s file', () => {
     expect(screen.getByRole('link', { name: 'Exports' }).getAttribute('href')).toBe('/paie/exports');
     expect(window.location.pathname).toBe('/paie/exports');
   });
+
+  it('keeps the extension’s guide to the team: a creator who opens its address is sent home (CREA-13)', async () => {
+    serveAs({
+      ...member('chatter'),
+      id: 'u-creator',
+      name: 'Lou',
+      role: 'creator',
+      team: null,
+      teamScope: 'self',
+    });
+    window.history.replaceState(null, '', '/aide/extension');
+    render(<App />);
+    await vi.waitFor(() => {
+      expect(window.location.pathname).toBe('/aujourdhui');
+    });
+    expect(screen.queryByRole('heading', { name: 'Installer l’extension' })).toBeNull();
+    cleanup();
+    serveAs(member('chatter'));
+    window.history.replaceState(null, '', '/aide/extension');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Installer l’extension' })).toBeDefined();
+  });
 });

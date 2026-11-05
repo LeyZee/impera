@@ -568,7 +568,8 @@ describe('conversations module (P0-05)', () => {
       await conversations.jobs.send(payload, NO_LOG, 1);
       expect(sender.sent.filter((send) => send.key.startsWith(draftId))).toEqual([]);
       expect((await events(conversationId)).at(-1)).toBe('draft_expired');
-      expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
+      // The fan is still unanswered: the conversation waits, so the resume drafts his answer (recette MOT-03).
+      expect(await conversationRow(conversationId)).toMatchObject({ state: 'pending' });
 
       await killSwitch('creator', false);
       await conversations.jobs.send(payload, NO_LOG, 2);

@@ -149,5 +149,6 @@ describe('client IP and sign-in limits (G6)', () => {
     });
     expect(fromTrusted.statusCode).toBe(200);
     expect(fromTrusted.json()).toMatchObject({ user: { email: holder.email } });
-  });
+    // A hundred hashed passwords: 15 s alone, more under a loaded full suite (recette MOT-11).
+  }, 90_000);
 });

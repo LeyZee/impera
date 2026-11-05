@@ -1,5 +1,7 @@
 import { migrationStatus, sql, type Database } from '@impera/db';
 
+import { countOrphanedJobs } from './orphaned-locks';
+
 /** A worker that has not written its heartbeat for this long is considered gone (P0-04). */
 const HEARTBEAT_MAX_AGE_SECONDS = 90;
 const CHECK_TIMEOUT_MS = 2_000;
@@ -17,6 +19,11 @@ export interface Readiness {
    * so that a test stub may leave it out.
    */
   readonly deadJobs?: number | null;
+  /**
+   * Jobs still held by the lock of a worker that is gone (recette MOT-02): a running worker frees them within a
+   * minute, so a number that stays says no worker frees them. `null` when the count could not be read.
+   */
+  readonly orphanedJobs?: number | null;
 }
 
 async function within<T>(promise: Promise<T>, fallback: T): Promise<T> {
@@ -85,7 +92,7 @@ export function countDeadJobs(
  * wrote its heartbeat recently. The age is computed by Postgres so that the API's clock does not matter.
  */
 export async function checkReadiness(db: Database, adminDb: Database): Promise<Readiness> {
-  const [database, migrations, worker, deadJobs] = await Promise.all([
+  const [database, migrations, worker, deadJobs, orphanedJobs] = await Promise.all([
     within(
       db.execute(sql`select 1`).then(() => true),
       false,
@@ -114,10 +121,12 @@ export async function checkReadiness(db: Database, adminDb: Database): Promise<R
         .then((result) => result.rows[0]?.dead ?? null),
       null,
     ),
+    within(countOrphanedJobs(adminDb), null),
   ]);
   return {
     isReady: database && migrations && worker,
     checks: { database, migrations, worker },
     deadJobs,
+    orphanedJobs,
   };
 }

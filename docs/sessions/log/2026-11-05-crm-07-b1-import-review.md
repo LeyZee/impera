@@ -1,0 +1,8 @@
+# 2026-11-05 — CRM-07 b1 Revue de l'import des créatrices Reveal — in-progress
+
+Fait : dans Réglages › Ventes, au-dessus de « Modèles Reveal », le bloc « N créatrices trouvées sur Reveal » (`ImportPanel.tsx`, règles pures dans `importing.ts`) : une ligne par modèle sans lien (initiales, nom, pseudo, statut en un mot, ambre s'il mérite un second regard), cochée d'avance si validée et active, avec l'action proposée par le serveur (« Créer sa fiche » ou « Relier à … », et pourquoi) que le propriétaire change ; « Importer la sélection » n'envoie que les identifiants et les choix, redemande le mot de passe quand la connexion est trop ancienne, puis dit ce qui a été fait ligne par ligne avec « Voir sa fiche » ; « Écarter » et la liste repliée « Écartées » avec « Reprendre ». Appels `importModels` et `setDismissal` dans `api.ts`.
+Pas fait : badge « N nouvelles créatrices » et liste de ce qui reste à faire sur sa fiche (b2, après le compteur et la photo du lot a2).
+Décisions : la photo Reveal n'est pas affichée avant l'import (CSP `img-src 'self'`, et rien n'est chargé d'ailleurs) ; une case cochée est une sélection, donc neutre (`accent-color: ink`), jamais le néon ; le résultat d'un import passe au-dessus de ce qui reste à choisir.
+Découvertes : `overview()` lit Reveal en direct à chaque appel, y compris le rafraîchissement de 30 s de la page et chaque « Écarter » (dit à Bilan sur #520).
+Candidats à suppression : aucun.
+Vérifié : tests `importing.test.ts` (5) et `ImportPanel.test.tsx` (5), 72 tests du dossier verts ; typecheck et lint d'apps/web ; captures Nuit et Jour, téléphone et ordinateur, hors dépôt (`reglages-ventes/crm-07b/`).

@@ -2,6 +2,7 @@ import type { Platform, SalesFeedOverview, SalesFeedStatus } from '@impera/contr
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { CheckPanel } from './CheckPanel';
+import { ImportPanel } from './ImportPanel';
 import { KeyForm } from './KeyForm';
 import { ChatterLinks, ModelLinks } from './Links';
 import {
@@ -29,8 +30,9 @@ type Load<T> =
   | { kind: 'ready'; value: T };
 
 /**
- * Réglages › Ventes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the owner's
- * links of its models and its team, and the reliability check (CRM-02, § 8). Nothing on this page ever shows the
+ * Réglages › Ventes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the creators to
+ * import from it (CRM-07, ADR 0069), the owner's links of its models and its team, and the reliability check (CRM-02,
+ * § 8). Nothing on this page ever shows the
  * key, even masked.
  */
 export function SalesFeedSection(): JSX.Element {
@@ -210,7 +212,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
     );
   }
 
-  const { status, models, accounts, chatters, listError } = load.value;
+  const { status, models, accounts, chatters, listError, candidates, dismissed } = load.value;
   const isConnected = status.state !== 'not_connected';
   const webhook = webhookViewOf(status.webhook, now);
   const canWebhook = status.state === 'connected';
@@ -422,6 +424,8 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
               restent ; la page réessaie toute seule.
             </p>
           )}
+          {/* Her creators to add first (CRM-07): what the links below are made of. */}
+          <ImportPanel platform={platform} candidates={candidates} dismissed={dismissed} onChanged={land} />
           <ModelLinks platform={platform} models={models} accounts={accounts} onChanged={land} />
           <ChatterLinks platform={platform} chatters={chatters} onChanged={land} />
           {/* The check reads the platform's statistics: only while the key is read (CRM-02). */}

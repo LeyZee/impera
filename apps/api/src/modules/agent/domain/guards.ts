@@ -180,6 +180,20 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     pattern:
       /\b(rien a payer|pas besoin (de payer|d'argent|de sous)|(t'?as|tu (n'?)?as) (rien|pas) a payer)\b(?! pour (me |te )?(parler|discuter|ecrire))/,
   },
+  // A payment outside the platform (recette MOT-04): Reveal is the only till, as it is the only inbox. Even her refusal
+  // (« pas de paypal 😘 ») names the means, so it is blocked too, like a contact.
+  {
+    code: 'off_platform_payment',
+    pattern:
+      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
+  },
+  // A price is the script's, set in code and carried by the offer itself: never a sum in her words (recette MOT-04,
+  // Charles 05/11). Her thanks for a tip (« merci pour les 20 € 🥰 ») pass.
+  {
+    code: 'price_outside_offer',
+    pattern:
+      /(?<!merci (pour|de|des) (les |tes |ton |ta |ce |cette |ces )?)(?<![\d.,])\d+([.,]\d{1,2})? ?(€|\$|(euros?|eur|balles|dollars?|usd)\b)|(€|\$) ?\d/,
+  },
   // Never a negotiation nor a discount, not even once (méthode de chatting): the price is the script's, set in code.
   // Her « je fais pas de promo » or « pas de réduc avec moi 😌 » pass.
   {

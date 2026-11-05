@@ -75,6 +75,11 @@ const draftPayload = z.object({
   editedBubbles: z.array(z.string()).optional(),
   /** Why a human rejected or the system expired it; kept for the evals (message-flow.md §3). */
   reason: z.string().min(1).max(500).optional(),
+  /**
+   * A draft expired by a kill switch or an expired session while the fan's last message was still unanswered: the
+   * conversation waits for an answer again, and the resume answers it (recette MOT-03). Absent everywhere else.
+   */
+  leavesFanWaiting: z.literal(true).optional(),
 });
 
 const factPayload = z.object({
@@ -242,6 +247,9 @@ export const EVENT_TYPES = [
   'connection_state_changed',
   'security_alert',
   'content_drop_received',
+  'content_media_expiring',
+  'content_media_erased',
+  'content_media_erase_failed',
   'error',
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -473,6 +481,24 @@ export const EVENT_PAYLOADS = {
     requestId: ContentRequestIdSchema.nullable(),
   }),
   /**
+   * An original she dropped goes in `DROP_ERASE_NOTICE_DAYS` days (CR-06 c, ADR 0055 § 7): for the agency, once per
+   * medium and date, by `content_drops.erase_originals`. Its day (UTC), never its content.
+   */
+  content_media_expiring: z.object({ mediaAssetId: MediaAssetIdSchema, erasedOn: z.iso.date() }),
+  /**
+   * An original she dropped was erased from the media storage (ADR 0044 § 2): its fingerprint, length, type and
+   * description stay. `withdrawn` when its drops were all withdrawn, `due` at its date.
+   */
+  content_media_erased: z.object({
+    mediaAssetId: MediaAssetIdSchema,
+    reason: z.enum(['due', 'withdrawn']),
+  }),
+  /**
+   * The storage did not erase an original that was due (ADR 0044 § 2: amber, never silent): once per medium and date
+   * (`erasedOn`, the date it was kept until), tried again each hour.
+   */
+  content_media_erase_failed: z.object({ mediaAssetId: MediaAssetIdSchema, erasedOn: z.iso.date() }),
+  /**
    * A document a contractor's regime asks for comes to its end, or has passed it, and no newer one is filed (EQ-06 lot
    * 5c-2): a tax residence certificate from 1 December of its year (it is renewed in January), another from the
    * owner's delay before its last day (`documentReminderDays`). Published once per document by
@@ -634,6 +660,9 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('connection_state_changed'),
   typedEvent('security_alert'),
   typedEvent('content_drop_received'),
+  typedEvent('content_media_expiring'),
+  typedEvent('content_media_erased'),
+  typedEvent('content_media_erase_failed'),
   typedEvent('error'),
 ]);
 export type EventBody = z.infer<typeof EventBodySchema>;
