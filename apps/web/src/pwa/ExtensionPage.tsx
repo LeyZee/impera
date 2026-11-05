@@ -74,31 +74,26 @@ function AddressStep({ origin }: { readonly origin: string }): JSX.Element {
 interface Offer {
   readonly title: string;
   readonly text: string;
-  readonly soon?: true;
 }
 
-const ACCOUNT: Offer = {
-  title: 'Ton compte, d’un clic',
-  text: 'Elle reprend ta connexion au CRM : rien à retaper, ni mot de passe ni code.',
-};
-const SHORTCUTS: Offer = {
-  title: 'Tes raccourcis',
-  text: 'Les pages du CRM qui te servent, depuis n’importe quel onglet.',
-};
-const FAN: Offer = {
-  title: 'Le fan sous les yeux',
-  text: 'Sur Reveal, à côté de la conversation ouverte : ce qu’il faut savoir de ce fan, sans changer d’onglet.',
-  soon: true,
-};
-const WATCH: Offer = {
-  title: 'La veille Instagram',
-  text: 'Tu scrolles comme d’habitude, elle note les posts qui marchent. Jamais un message, jamais un clic à ta place.',
-  soon: true,
-};
+/** What the extension does today; what comes later is one line at the foot of the page (recette 05/11, PRO-24). */
+const OFFERS: readonly Offer[] = [
+  {
+    title: 'Ton compte, d’un clic',
+    text: 'Elle reprend ta connexion au CRM : rien à retaper, ni mot de passe ni code.',
+  },
+  {
+    title: 'Tes raccourcis',
+    text: 'Les pages du CRM qui te servent, depuis n’importe quel onglet.',
+  },
+];
 
-/** What the page promises: the trend watch only to those who do it (ADR 0060), Reveal to everyone of the team. */
-export function offersFor(watches: boolean): readonly Offer[] {
-  return watches ? [ACCOUNT, SHORTCUTS, FAN, WATCH] : [ACCOUNT, SHORTCUTS, FAN];
+/** What comes later, in one sentence: the trend watch only to those who do it (ADR 0060). */
+function comingFor(watches: boolean): string {
+  const reveal = 'sur Reveal, ce qu’il faut savoir du fan de la conversation ouverte';
+  return watches
+    ? `Bientôt dans l’extension : ${reveal}, et la veille Instagram pendant que tu scrolles.`
+    : `Bientôt dans l’extension : ${reveal}.`;
 }
 
 /** /aide/extension (ADR 0067): what the extension offers, then the steps for Chrome and Edge, this browser's first. */
@@ -140,12 +135,9 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
               />
             </figure>
             <ul className="nv-help-ext__offers">
-              {offersFor(watches).map((offer) => (
+              {OFFERS.map((offer) => (
                 <li key={offer.title} className="nv-help-ext__offer">
-                  <span className="nv-help-ext__offer-head">
-                    <strong>{offer.title}</strong>
-                    {offer.soon === true ? <span className="nv-help-ext__soon">Bientôt</span> : null}
-                  </span>
+                  <strong>{offer.title}</strong>
                   <span>{offer.text}</span>
                 </li>
               ))}
@@ -196,6 +188,7 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
             </ol>
           </PanelSection>
         </Panel>
+        <p className="nv-help-install__note">{comingFor(watches)}</p>
         <p className="nv-help-install__note">
           Au démarrage, le navigateur peut rappeler qu’une extension en mode développeur est active : c’est
           normal, garde-la. Elle n’a accès qu’à Reveal et au CRM ; à l’ouverture, elle regarde seulement

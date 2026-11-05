@@ -780,10 +780,19 @@ const installHelp = createRoute({
   path: '/aide/installer',
   component: InstallPage,
 });
-/** /aide/extension (ADR 0067): the extension's guide, outside the rail like the phone's; the menu offers it to the team. */
+/**
+ * /aide/extension (ADR 0067): the extension's guide, outside the rail like the phone's; the menu offers it to the team,
+ * and its address too: a creator is sent home like any page that is not hers (recette 05/11, CREA-13).
+ */
 const extensionHelp = createRoute({
   getParentRoute: () => rootRoute,
   path: '/aide/extension',
+  beforeLoad: ({ context }) => {
+    if (context.user.role === 'creator') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: railOf(context.user).home, replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
     // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
