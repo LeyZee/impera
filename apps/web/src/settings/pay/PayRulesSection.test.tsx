@@ -211,6 +211,19 @@ describe('Réglages › Règles de paie', () => {
     });
   });
 
+  it('says the ceiling of a minimum too large, not decimals (recette 05/11, PRO-09)', async () => {
+    renderSection();
+    const minimum = (await screen.findByText('Minimum de versement')).closest<HTMLElement>('.rp-account');
+    if (minimum === null) throw new Error('No minimum');
+    fireEvent.click(await within(minimum).findByRole('button', { name: 'Changer' }));
+    const dialog = screen.getByRole('dialog', { name: 'Minimum de versement' });
+    fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '60000' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(plain(within(dialog).getByText(/^Au plus/u).textContent)).toBe('Au plus 50 000,00 €.');
+    fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '12,345' } });
+    expect(within(dialog).getByText('Un montant en euros, deux décimales au plus.')).toBeTruthy();
+  });
+
   it('lets the period that starts today take the minimum, and says so, on the 1st', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     // Sunday 1 November in Paris: today's period has not begun yet (PAIE-22).
