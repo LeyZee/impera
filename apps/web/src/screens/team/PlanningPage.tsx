@@ -932,9 +932,11 @@ function Grid({
             <span className="nv-num">
               {week.length === 1 ? '1 shift' : `${String(week.length)} shifts`}
               {week.length === 0 ? '' : ` · ${lengthOf(total)}`}
+              {/* On its own line, whole: the thing to do under the count, never « places / à pourvoir » cut in two. */}
               {toFill === 0 ? null : (
                 <span className="sc-grid__tofill">
-                  {toFill === 1 ? ' · 1 place à pourvoir' : ` · ${String(toFill)} places à pourvoir`}
+                  <span className="sc-grid__sep"> · </span>
+                  {toFill === 1 ? '1 place à pourvoir' : `${String(toFill)} places à pourvoir`}
                 </span>
               )}
             </span>
@@ -1155,8 +1157,8 @@ function Cell({
 }
 
 /**
- * « À pourvoir » on what is left of a créneau with nobody: its hours, from now at the minute for the créneau under way,
- * and the new-shift panel opens on them.
+ * « À pourvoir » on what is left of a créneau with nobody: its hours, « maintenant – 0 h » for the créneau under way
+ * (never « 20 h 01 », recette #564), and the new-shift panel opens on them, from the present minute.
  */
 function OpenStretch({
   open,
@@ -1168,7 +1170,7 @@ function OpenStretch({
   agentWords = '',
   onAdd,
 }: {
-  open: { readonly from: Date; readonly to: Date };
+  open: { readonly from: Date; readonly to: Date; readonly now: boolean };
   /** A chatter already holds the créneau, which wants two (ADR 0049 § 2): « + 2e chatteur ». */
   second?: boolean;
   /** The places to fill there: two on a créneau that wants two and has nobody. */
@@ -1180,7 +1182,9 @@ function OpenStretch({
   agentWords?: string;
   onAdd: (hours: Pick<ShiftStart, 'day' | 'hours'>) => void;
 }): JSX.Element {
-  const hours = rangeAt(open.from.toISOString(), open.to.toISOString(), zone);
+  const hours = open.now
+    ? `maintenant – ${clockAt(open.to.toISOString(), zone)}`
+    : rangeAt(open.from.toISOString(), open.to.toISOString(), zone);
   return (
     <button
       type="button"
