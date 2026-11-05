@@ -62,8 +62,8 @@ export const ConversationDetailSchema = ConversationSummarySchema.extend({
   /** Drafts still waiting for a decision or being sent, oldest first. */
   openDrafts: z.array(DraftViewSchema),
   /**
-   * While the conversation is in `error`: the draft whose send failed for good, so that a person reads what did not
-   * leave and sends it in Reveal. `null` otherwise.
+   * The latest draft whose send failed for good, while nothing left after it (in `error`, or since the fan wrote
+   * again, recette CHAT-12), so that a person reads what did not leave and sends it in Reveal. `null` otherwise.
    */
   failedDraft: DraftViewSchema.nullable(),
 });

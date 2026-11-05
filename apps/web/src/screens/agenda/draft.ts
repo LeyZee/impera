@@ -1,9 +1,12 @@
 import {
   AvailabilityIdSchema,
+  CREATOR_AGENDA_DAYS_AHEAD,
+  CREATOR_AGENDA_DAYS_BACK,
   CreateAvailabilityBodySchema,
   CreateCreatorTaskBodySchema,
   CreatorTaskIdSchema,
   newId,
+  withinAgendaReach,
   type CreateAvailabilityBody,
   type CreateCreatorTaskBody,
   type CreatorTaskCategory,
@@ -42,6 +45,33 @@ export interface AvailabilityDraft {
   readonly end: number;
 }
 
+const MORNING = 10 * 60;
+const LAST_HOUR = 23 * 60;
+
+/**
+ * The hour a form starts at on `day` (CREA-09): 10 h, or on her today the next full hour when 10 h is past, never
+ * later than 23 h.
+ */
+export function defaultStart(day: string, today: string, nowMinute: number): number {
+  if (day !== today) return MORNING;
+  const nextHour = (Math.floor(nowMinute / 60) + 1) * 60;
+  return Math.min(Math.max(nextHour, MORNING), LAST_HOUR);
+}
+
+/**
+ * Where « Choisir un moment » opens (CREA-09): the first day of the suggestion's week still ahead, today while a full
+ * hour is left in it, at its default hour; the last day of the week when none is left.
+ */
+export function firstMoment(
+  days: readonly string[],
+  today: string,
+  nowMinute: number,
+): { readonly day: string; readonly start: number } {
+  const ahead = days.filter((day) => day > today || (day === today && nowMinute < LAST_HOUR));
+  const day = ahead[0] ?? days.at(-1) ?? today;
+  return { day, start: defaultStart(day, today, nowMinute) };
+}
+
 /** A timed span of her day: the end on the next day when it is at or before the start. */
 export function spanOf(
   day: string,
@@ -64,12 +94,25 @@ export function whenOf(draft: TaskDraft, zone: string): CreatorTaskWhen {
 
 export type TaskProblem = 'title' | 'weekdays' | 'day';
 
+/** Whether a day typed in a form reads, and falls within her agenda's reach (CREA-14). */
+export const dayInReach = (day: string, now: number = Date.now()): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/u.test(day) && withinAgendaReach({ kind: 'day', day }, now);
+
+/** A day the date field lets through but her agenda does not reach, or that does not read. */
+export const OUT_OF_REACH = 'Choisis un jour entre il y a un an et dans deux ans.';
+
+/** The first and last days a date field offers: her agenda's reach, a day inside it at each end. */
+export function reachOf(now: number = Date.now()): { readonly min: string; readonly max: string } {
+  const at = (days: number): string => new Date(now + days * 86_400_000).toISOString().slice(0, 10);
+  return { min: at(1 - CREATOR_AGENDA_DAYS_BACK), max: at(CREATOR_AGENDA_DAYS_AHEAD - 1) };
+}
+
 /** What keeps the task from being saved, in the order of the form. */
-export function taskProblems(draft: TaskDraft): TaskProblem[] {
+export function taskProblems(draft: TaskDraft, now: number = Date.now()): TaskProblem[] {
   const problems: TaskProblem[] = [];
   if (draft.title.trim() === '') problems.push('title');
   if (draft.kind === 'routine' && draft.weekdays.length === 0) problems.push('weekdays');
-  if (draft.kind !== 'routine' && !/^\d{4}-\d{2}-\d{2}$/u.test(draft.day)) problems.push('day');
+  if (draft.kind !== 'routine' && !dayInReach(draft.day, now)) problems.push('day');
   return problems;
 }
 
