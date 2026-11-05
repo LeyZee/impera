@@ -29,6 +29,7 @@ import {
 
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
+import { useOnline } from '@/pwa/online';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
 
@@ -118,6 +119,16 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
     };
   }, [said]);
 
+  // No network (CREA-04): said where nothing else says it. Her agenda says it in its own words, with the ticks that
+  // wait (CREA-24); a notice of the route guard comes first.
+  const online = useOnline();
+  const offline =
+    online || pathname.startsWith('/agenda')
+      ? null
+      : user.role === 'creator'
+        ? 'Hors ligne : ton agenda et ta routine restent dans Agenda.'
+        : 'Hors ligne : Impera revient dès que le réseau revient.';
+
   // The hold outlives the screens: a report sent on leaving Aujourd'hui says its refusal in Suivi, and « Rouvrir »
   // takes the reader back to it (EQ-03).
   return (
@@ -139,11 +150,13 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
           <InstallNudge />
           {/* Always there, empty when silent: a screen reader announces what comes into a region it already knows. */}
           <p className="nv-notice-region" role="status">
-            {said === null ? null : (
+            {said !== null ? (
               <span className="nv-notice nv-glass nv-glass--thick" key={said.at}>
                 {said.text}
               </span>
-            )}
+            ) : offline !== null ? (
+              <span className="nv-notice nv-glass nv-glass--thick">{offline}</span>
+            ) : null}
           </p>
         </div>
       </ReopenProvider>

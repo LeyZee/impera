@@ -23,6 +23,7 @@ import { shiftRangeOf, useRepliesShown } from './replies';
 import { useWide } from './useWide';
 import './agenda.css';
 
+import { useOnline } from '@/pwa/online';
 import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -129,7 +130,9 @@ export function AgendaPage({
   };
 
   const herToday = agenda?.today ?? today;
-  const offline = read.isError || (read.isFetched && read.fetchStatus === 'paused');
+  // Her kept agenda answers a read without a network: the browser's word says she is offline (CREA-24).
+  const online = useOnline();
+  const offline = !online || read.isError || (read.isFetched && read.fetchStatus === 'paused');
 
   return (
     <Page className="ag-page">

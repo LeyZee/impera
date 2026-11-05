@@ -1,8 +1,11 @@
 import type { JSX } from 'react';
 
+import { useOnline } from '@/pwa/online';
+
 /**
  * « Le serveur ne répond pas », said the same way on every screen that reads first (DASH-22): the sentence, what it
- * holds back, and « Réessayer ». Amber, a warning: the red stays the urgencies'.
+ * holds back, and « Réessayer ». Amber, a warning: the red stays the urgencies'. Without a network, it says so: the
+ * server is not the one silent (CREA-04).
  */
 export function ServerSilent({
   text,
@@ -16,12 +19,21 @@ export function ServerSilent({
   headline?: boolean;
 }): JSX.Element {
   const Heading = headline ? 'h1' : 'h2';
+  const online = useOnline();
   return (
     <section className="nv-silent nv-enter" role="status" aria-live="polite">
       <span className="nv-orb nv-tone--warn" aria-hidden="true" />
       <div className="nv-silent__body">
         <Heading className="nv-silent__title">
-          Le serveur <em>ne répond pas</em>
+          {online ? (
+            <>
+              Le serveur <em>ne répond pas</em>
+            </>
+          ) : (
+            <>
+              Pas de <em>réseau</em>
+            </>
+          )}
         </Heading>
         <p className="nv-silent__text">{text}</p>
       </div>

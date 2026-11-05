@@ -40,6 +40,17 @@ describe('forgetDevice', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
+  it('drops her agenda and her session kept for offline, and nothing else (CREA-04)', async () => {
+    localStorage.setItem('impera.agenda.pending', '[]');
+    localStorage.setItem('impera.session.me', '{}');
+    localStorage.setItem('impera.appearance', 'night');
+    await forgetDevice();
+    expect(localStorage.getItem('impera.agenda.pending')).toBeNull();
+    expect(localStorage.getItem('impera.session.me')).toBeNull();
+    expect(localStorage.getItem('impera.appearance')).toBe('night');
+    localStorage.clear();
+  });
+
   it('has nothing to forget on a browser without these features', async () => {
     await expect(forgetDevice()).resolves.toBeUndefined();
   });

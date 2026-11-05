@@ -11,6 +11,7 @@ import {
 import type { AddPreset } from './AddDialog';
 import { DayReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
+import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { timedSuggestionsOf } from './grid';
 import {
@@ -26,6 +27,7 @@ import {
 } from './model';
 import { repliesOn } from './replies';
 
+import { useOnline } from '@/pwa/online';
 import { addDays, clockOf, dayNumber, lengthOf, minuteOf, weekOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 
@@ -347,13 +349,19 @@ function Check({
   day: string;
   onTick: DayActions['onTick'];
 }): JSX.Element {
+  // Offline, a tick that waits for the network says so with an amber dot; online, it leaves at once (CREA-24).
+  const kept = useWaiting(item.task.id, day);
+  const online = useOnline();
+  const waiting = kept && !online;
+  const label = item.done ? `Décocher ${item.task.title}` : `Cocher ${item.task.title}`;
   return (
     <button
       type="button"
       className="ag-check"
       data-cat={item.task.category}
+      data-waiting={waiting ? 'true' : undefined}
       aria-pressed={item.done}
-      aria-label={item.done ? `Décocher ${item.task.title}` : `Cocher ${item.task.title}`}
+      aria-label={waiting ? `${label}, en attente du réseau` : label}
       onClick={() => {
         onTick(item.task, !item.done, day);
       }}

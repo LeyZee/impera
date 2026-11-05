@@ -87,6 +87,16 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** Whether a gesture on this task and day waits for the network (CREA-24): its tick shows an amber dot. */
+export function useWaiting(taskId: string, day: string): boolean {
+  const gestures = useSyncExternalStore(subscribe, () => pending);
+  return gestures.some((gesture) =>
+    gesture.kind === 'tick'
+      ? gesture.tick.taskId === taskId && gesture.tick.day === day
+      : gesture.taskId === taskId && gesture.day === day,
+  );
+}
+
 /** Her agenda with the ticks she made and that are not sent yet. */
 export function useWithPending(agenda: CreatorAgenda | undefined): {
   readonly agenda: CreatorAgenda | undefined;

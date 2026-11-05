@@ -95,6 +95,58 @@ describe('App before any session', () => {
   });
 });
 
+describe('App without a network (CREA-04)', () => {
+  const nora: Me = {
+    id: 'u-nora',
+    email: 'nora@example.test',
+    name: 'Nora Exemple',
+    role: 'creator',
+    creatorIds: ['01936f00-0000-7000-8000-0000000000aa'],
+    routedCreatorIds: [],
+    team: null,
+    teamScope: 'self',
+  };
+  const offline = (): void => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+  };
+
+  afterEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('opens her app on what her phone kept, never on « Le serveur ne répond pas »', async () => {
+    vi.stubGlobal('scrollTo', vi.fn());
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    );
+    localStorage.setItem('impera.session.me', JSON.stringify(nora));
+    offline();
+    render(<App />);
+    expect(await screen.findByRole('button', { name: /Nora/u })).toBeDefined();
+    expect(screen.queryByText('ne répond pas')).toBeNull();
+  });
+
+  it('says there is no network, not that the server is silent, with nothing kept', async () => {
+    offline();
+    render(<App />);
+    expect(await screen.findByText('réseau')).toBeDefined();
+    expect(screen.queryByText('ne répond pas')).toBeNull();
+  });
+
+  it('keeps no session but a creator’s', async () => {
+    localStorage.setItem('impera.session.me', JSON.stringify({ ...nora, role: 'owner', teamScope: 'owner' }));
+    offline();
+    render(<App />);
+    expect(await screen.findByText('réseau')).toBeDefined();
+  });
+});
+
 describe('App on an invitation link', () => {
   const TOKEN = 'lien-invente-pour-les-tests';
   const theo: Me = {

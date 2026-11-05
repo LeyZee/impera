@@ -159,6 +159,31 @@ describe('Agenda, the creator’s (CR-05)', () => {
     expect(await screen.findByText('4 choses à faire')).toBeDefined();
   });
 
+  it('says she is offline, and marks the tick that waits for the network (CREA-24)', async () => {
+    let online = true;
+    serve(() => online);
+    show();
+    await screen.findByText('4 choses à faire');
+    online = false;
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    fireEvent(window, new Event('offline'));
+    expect(await screen.findByText(/Hors ligne : tu vois ta dernière lecture\./u)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: `Cocher ${post.title}` }));
+    const waiting = await screen.findByRole('button', {
+      name: `Décocher ${post.title}, en attente du réseau`,
+    });
+    expect(waiting.dataset['waiting']).toBe('true');
+    expect(screen.getByText(/1 coche partira au retour du réseau/u)).toBeDefined();
+    // Back online: sent, and the dot goes.
+    offline.mockRestore();
+    online = true;
+    fireEvent(window, new Event('online'));
+    expect(await screen.findByRole('button', { name: `Décocher ${post.title}` })).toBeDefined();
+    await waitFor(() => {
+      expect(localStorage.getItem('impera.agenda.pending')).toBe('[]');
+    });
+  });
+
   it('lists her week, the suggestions without a date first', async () => {
     serve(() => true);
     show('week');
