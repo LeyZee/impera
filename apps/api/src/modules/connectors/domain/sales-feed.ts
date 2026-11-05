@@ -19,6 +19,7 @@ import type {
 } from '@impera/contracts';
 
 import type { ImportableCreator } from './model-import';
+import type { ModelSighting, SightingChanges } from './model-sightings';
 import type { CheckLine } from './reliability-check';
 
 /**
@@ -54,6 +55,11 @@ export interface DateRange {
   readonly to: string;
 }
 
+/** A model as the platform lists it, with its status as the platform wrote it (an unknown one is read `other`). */
+export interface ListedModel extends PlatformModel {
+  readonly rawStatus: string;
+}
+
 export interface PlatformSalesFeed {
   readonly platform: Platform;
   /** What this adapter can do at all; a key may open less (`verify`). */
@@ -64,7 +70,7 @@ export interface PlatformSalesFeed {
   verify(): Promise<SalesFeedResult<readonly SalesFeedCapability[]>>;
   /** The register after `position` (`null`: from its start), in the register's order. */
   readSales(position: string | null): Promise<SalesFeedResult<SalesPageRead>>;
-  listModels(): Promise<SalesFeedResult<readonly PlatformModel[]>>;
+  listModels(): Promise<SalesFeedResult<readonly ListedModel[]>>;
   listChatters(): Promise<SalesFeedResult<readonly PlatformChatter[]>>;
   dailyStats(range: DateRange): Promise<SalesFeedResult<readonly PlatformDailyStat[]>>;
   chatterDailyStats(range: DateRange): Promise<SalesFeedResult<readonly PlatformChatterDailyStat[]>>;
@@ -276,6 +282,24 @@ export interface SalesLedger {
   creators(): Promise<readonly ImportableCreator[]>;
   /** The models set aside from the import, with when (`sales_feed_model_dismissals`). */
   dismissals(platform: Platform): Promise<ReadonlyMap<string, Date>>;
+  /** What the model list showed last of each model (CRM-07 a2), by its id. */
+  sightings(platform: Platform): Promise<ReadonlyMap<string, ModelSighting>>;
+  /**
+   * Records one reading of the model list, in one transaction: each listed model's status and `now` as its last
+   * sighting, and the marks of `changes` (a gone model never listed before gets a row of its own, so that it is
+   * signalled once).
+   */
+  recordSightings(
+    platform: Platform,
+    listed: readonly ListedModel[],
+    changes: SightingChanges,
+    now: Date,
+  ): Promise<void>;
+  /**
+   * The models each platform listed at its last reading that have no link and were not set aside (the badge of ADR 0069
+   * § 5); platforms with none left out.
+   */
+  newModels(): Promise<readonly { readonly platform: Platform; readonly count: number }[]>;
   /** Sets a model aside from the import, or takes it back; each with its `audit_log` line, none when nothing changes. */
   dismissModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;
   restoreModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;

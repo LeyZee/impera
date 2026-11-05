@@ -280,6 +280,13 @@ export const SalesFeedSignalSchema = z.discriminatedUnion('kind', [
   }),
   /** An answer whose shape Impera does not read: the cursor did not move. */
   z.object({ kind: z.literal('unexpected_answer') }),
+  /**
+   * A linked model no longer in the platform's list (ADR 0069 § 5, CRM-07 a2): nothing is deleted, her card stays.
+   * Once until she is listed again.
+   */
+  z.object({ kind: z.literal('model_gone'), platformModelId: z.string().min(1).max(200) }),
+  /** A linked model the platform now lists as `banned` (ADR 0069 § 5): nothing is deleted. Once until she is not. */
+  z.object({ kind: z.literal('model_banned'), platformModelId: z.string().min(1).max(200) }),
 ]);
 export type SalesFeedSignal = z.infer<typeof SalesFeedSignalSchema>;
 
@@ -734,3 +741,14 @@ export const CreatorSalesSchema = z.strictObject({
   refundsWithoutSale: z.number().int().min(0),
 });
 export type CreatorSales = z.infer<typeof CreatorSalesSchema>;
+
+/**
+ * `GET /v1/settings/sales-feeds/new-models` (owner, ADR 0069 § 5, CRM-07 a2): how many models the platforms listed
+ * last that have no link and were not set aside, read in the base without calling the platform, for the badge
+ * « N nouvelles créatrices sur Reveal ». By platform, those with none left out.
+ */
+export const SalesFeedNewModelsSchema = z.strictObject({
+  total: z.number().int().min(0),
+  byPlatform: z.array(z.strictObject({ platform: PlatformSchema, count: z.number().int().min(1) })),
+});
+export type SalesFeedNewModels = z.infer<typeof SalesFeedNewModelsSchema>;

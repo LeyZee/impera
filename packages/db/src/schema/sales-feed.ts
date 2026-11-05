@@ -1,5 +1,6 @@
 import {
   CurrencySchema,
+  PlatformModelStatusSchema,
   PlatformSchema,
   SaleEventSchema,
   SaleStatusSchema,
@@ -181,6 +182,33 @@ export const salesFeedModelDismissals = pgTable(
     primaryKey({ name: 'sales_feed_model_dismissals_pk', columns: [t.platform, t.platformModelId] }),
     enumCheck('sales_feed_model_dismissals', t.platform, PlatformSchema.options),
     check('sales_feed_model_dismissals_id_check', sql`char_length(${t.platformModelId}) between 1 and 200`),
+    agencyOnly(),
+  ],
+);
+
+/**
+ * What the platform's model list showed last (ADR 0069 § 5, CRM-07 a2), one row per model ever listed: its status, and
+ * when it was first and last listed. The badge « N nouvelles créatrices » counts the listed ones with no link and not
+ * set aside; a linked model gone from the list or `banned` is signalled once (`goneSignalledAt`, `bannedSignalledAt`,
+ * cleared when it comes back). Nothing is ever deleted for it. Agency-level, of no creator (`agencyOnly`).
+ */
+export const salesFeedModelSightings = pgTable(
+  'sales_feed_model_sightings',
+  {
+    platform: enumText('platform').notNull(),
+    platformModelId: text('platform_model_id').notNull(),
+    status: enumText('status').notNull(),
+    isActive: boolean('is_active').notNull(),
+    firstSeenAt: timestampTz('first_seen_at').notNull().defaultNow(),
+    lastSeenAt: timestampTz('last_seen_at').notNull().defaultNow(),
+    goneSignalledAt: timestampTz('gone_signalled_at'),
+    bannedSignalledAt: timestampTz('banned_signalled_at'),
+  },
+  (t) => [
+    primaryKey({ name: 'sales_feed_model_sightings_pk', columns: [t.platform, t.platformModelId] }),
+    enumCheck('sales_feed_model_sightings', t.platform, PlatformSchema.options),
+    enumCheck('sales_feed_model_sightings', t.status, PlatformModelStatusSchema.options),
+    check('sales_feed_model_sightings_id_check', sql`char_length(${t.platformModelId}) between 1 and 200`),
     agencyOnly(),
   ],
 );

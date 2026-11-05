@@ -277,6 +277,19 @@ function signalOf(type: string, payload: unknown): Signal | null {
         accounts: new Set(days.map((day) => day.platformAccountId)).size,
       };
     }
+    case 'sales_feed_signal': {
+      // Only a linked model gone or banned is told; the other signals are for Réglages › Ventes.
+      const parsed = EVENT_PAYLOADS.sales_feed_signal.safeParse(payload);
+      if (!parsed.success) return null;
+      const { platform, signal } = parsed.data;
+      if (signal.kind !== 'model_gone' && signal.kind !== 'model_banned') return null;
+      return {
+        kind: 'sales_feed_model',
+        platform,
+        change: signal.kind === 'model_gone' ? 'gone' : 'banned',
+        platformModelId: signal.platformModelId,
+      };
+    }
     case 'agency_share_mismatch': {
       const parsed = AgencyShareMismatchSchema.safeParse(payload);
       if (!parsed.success) return null;
