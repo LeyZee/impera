@@ -20,7 +20,7 @@ import type {
   Transaction,
   UnitOfWork,
 } from '../../domain/ports';
-import { bubbleIdempotencyKey, canSend } from '../../domain/rules';
+import { bubbleIdempotencyKey, canSend, fanAwaitsAnswer } from '../../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../../domain/state-machine';
 import { scheduleFollowUp } from '../follow-ups';
 import { appendEvent, lockConversation, setDraftStatus } from '../journal';
@@ -56,7 +56,8 @@ export function createSendJob({ uow, clock, sender, followUps }: SendDeps) {
   /**
    * Locks both rows and checks the draft may still leave; expires it when it no longer may. Before a bubble goes
    * out (`beforeSending`), the kill switches and the session are read again too (message-flow.md §6): a draft
-   * caught by them expires, so nothing leaves on its own once the switch is lifted.
+   * caught by them expires, so nothing leaves on its own once the switch is lifted; a fan it leaves unanswered keeps
+   * the conversation waiting, and the resume drafts his answer again.
    */
   async function lockSendable(
     tx: Transaction,
@@ -76,10 +77,20 @@ export function createSendJob({ uow, clock, sender, followUps }: SendDeps) {
     if (blocked === null && canSend(check)) return { conversation, draft };
     const at = meta(payload);
     const reason = blocked === null ? 'Plus valable à l’envoi' : BLOCKED_EXPIRY_REASONS[blocked];
+    // Stopped before anything answered the fan: the conversation waits again, so the resume answers him (MOT-03).
+    const leavesFanWaiting = blocked !== null && fanAwaitsAnswer(conversation);
     await appendEvent(
       tx,
       conversation,
-      { type: 'draft_expired', payload: { draftId: draft.id, status: 'expired', reason } },
+      {
+        type: 'draft_expired',
+        payload: {
+          draftId: draft.id,
+          status: 'expired',
+          reason,
+          ...(leavesFanWaiting && { leavesFanWaiting: true }),
+        },
+      },
       at,
     );
     await setDraftStatus(tx, draft, 'expired', { decidedBy: null, at: at.at });

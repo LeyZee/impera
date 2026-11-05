@@ -64,6 +64,7 @@ export function commandFor(event: EventBody): ConversationCommand | null {
     const isFinal = event.payload.isFinal ?? event.payload.attempt >= MAX_SEND_ATTEMPTS;
     return isFinal ? 'send_failed_final' : null;
   }
+  if (event.type === 'draft_expired' && event.payload.leavesFanWaiting === true) return 'expire_unanswered';
   return COMMANDS[event.type] ?? null;
 }
 
