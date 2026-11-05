@@ -14,7 +14,7 @@ Demande de Charles du 05/11/2026 : sur chaque écran du chatteur, une hiérarchi
 ## Fait
 - Lot a, Aujourd'hui : un seul « À faire » (rapports, factures à accepter, textes et pièces du dossier), le chemin vers Suivi avec le nombre à traiter, les urgences en rouge seulement.
 - Lot b, Suivi (liste) : le rouge réservé aux urgences, le pseudo du fan d'abord avec ses non-lus, la cause à côté de l'action, la bande de désir en mots et emoji.
-- Lot c, conversation : bulles envoyées en gris chaud (`--nv-bubble-sent`), brouillon en contour neutre, « Automatique » sous les messages de l'agent, la fiche du fan dans l'en-tête, `--nv-fill-soft` pour les fonds doux lisibles en Jour.
+- Lot c, conversation : bulles envoyées en mauve désaturé (`--nv-bubble-sent`), brouillon en contour neutre, « Automatique » sous les messages de l'agent, la fiche du fan dans l'en-tête, `--nv-fill-soft` pour les fonds doux lisibles en Jour.
 - Lot d : Moi › Préférences (apparence, notifications, déconnexion) remplace « Plus » sur la barre du téléphone quand tous les onglets y tiennent (`railOf().phoneMenu`) ; « Demander un congé » dans « Mes congés » ; Commissions ne répète plus la quinzaine du héros ; Dossier aligné sur le padding du panneau.
 
 ## Reste
