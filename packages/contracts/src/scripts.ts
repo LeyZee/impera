@@ -490,6 +490,72 @@ export type ScriptQueueRefusals = z.infer<typeof ScriptQueueRefusalsSchema>;
 /** `details` of `script_queue_structure_unprocessable`: unknown, archived or reserved for another creator. */
 export const ScriptQueueUnprocessableSchema = z.object({ structureIds: z.array(ScriptStructureIdSchema) });
 
+/**
+ * The cadence of her scripts (ADR 0056 § 2, SC-02): a script every `days` days, the agency's setting for each creator,
+ * never hers. Each request is made `SCRIPT_REQUEST_LEAD_DAYS` before its due day (fewer when the cadence is shorter).
+ */
+export const SCRIPT_CADENCE_DEFAULT_DAYS = 14;
+export const SCRIPT_CADENCE_MIN_DAYS = 1;
+export const SCRIPT_CADENCE_MAX_DAYS = 90;
+export const SCRIPT_REQUEST_LEAD_DAYS = 7;
+export const ScriptCadenceDaysSchema = z
+  .number()
+  .int()
+  .min(SCRIPT_CADENCE_MIN_DAYS)
+  .max(SCRIPT_CADENCE_MAX_DAYS);
+
+/**
+ * What the cadence did the last time it looked at her (SC-02), for the agency's screen: `asked` (a request made with
+ * the next structure of her queue), `reused` (her queue was empty: the last structure asked again, amber), `queue_empty`
+ * (nothing ever asked and nothing queued, amber), `no_persona` (no active persona: no request, amber), `blocked` (the
+ * structures of her queue touch her limits: each skipped, amber).
+ */
+export const SCRIPT_CADENCE_OUTCOMES = ['asked', 'reused', 'queue_empty', 'no_persona', 'blocked'] as const;
+export const ScriptCadenceOutcomeSchema = z.enum(SCRIPT_CADENCE_OUTCOMES);
+export type ScriptCadenceOutcome = z.infer<typeof ScriptCadenceOutcomeSchema>;
+
+/** A structure the cadence skipped: its name, and the stages that touch her limits. */
+export const ScriptCadenceSkipSchema = z.strictObject({
+  structureId: ScriptStructureIdSchema,
+  name: z.string(),
+  blocks: z.array(ScriptDisgustBlockSchema),
+});
+export type ScriptCadenceSkip = z.infer<typeof ScriptCadenceSkipSchema>;
+
+/** `GET` and `PUT /v1/creators/:creatorId/script-cadence`: her cadence, and what it last did. */
+export const ScriptCadenceSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  days: ScriptCadenceDaysSchema,
+  /** The due day of her last script asked by the cadence; `null` before the first. */
+  lastDueOn: z.iso.date().nullable(),
+  /** `null` until the cadence first looked at her. */
+  outcome: ScriptCadenceOutcomeSchema.nullable(),
+  skipped: z.array(ScriptCadenceSkipSchema),
+  checkedAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type ScriptCadence = z.infer<typeof ScriptCadenceSchema>;
+
+export const SetScriptCadenceBodySchema = z.strictObject({ days: ScriptCadenceDaysSchema });
+export type SetScriptCadenceBody = z.infer<typeof SetScriptCadenceBodySchema>;
+
+/** `day` (`YYYY-MM-DD`) moved by `by` days. */
+const shiftDay = (day: string, by: number): string =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + by * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * The due day of her next script, when it is time to ask it; `null` when it is not yet. The first is due `lead` days
+ * from today; each next one `days` after the last, asked `lead` days before (`SCRIPT_REQUEST_LEAD_DAYS`, at most the
+ * cadence). A cadence left idle (no persona for a month) starts again from today: never a request already late. Days
+ * are hers (`YYYY-MM-DD` in her zone), never instants.
+ */
+export function nextScriptDue(lastDueOn: string | null, days: number, today: string): string | null {
+  const lead = Math.min(SCRIPT_REQUEST_LEAD_DAYS, days);
+  if (lastDueOn === null) return shiftDay(today, lead);
+  const due = shiftDay(lastDueOn, days);
+  if (shiftDay(due, -lead) > today) return null;
+  return due < today ? shiftDay(today, lead) : due;
+}
+
 /** Codes of the `scripts` module's `DomainError`s. */
 export const SCRIPT_ERROR_CODES = [
   'script_structure_not_found',
@@ -504,6 +570,7 @@ export const SCRIPT_ERROR_CODES = [
   'script_queue_structure_unprocessable',
   /** A stage touches her disgusts: `details.blocks` by structure. */
   'script_queue_disgust_unprocessable',
+  'script_cadence_creator_not_found',
   /** The structure has no such segment, or the stage no such variant. */
   'script_card_not_found',
 ] as const;

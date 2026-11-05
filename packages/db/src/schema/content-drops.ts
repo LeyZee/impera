@@ -27,7 +27,7 @@ import {
 import { user } from './auth';
 import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
 import { mediaAssets } from './media';
-import { scriptStructures } from './scripts';
+import { scriptStructureVersions, scriptStructures } from './scripts';
 import { creators } from './tenancy';
 
 /*
@@ -63,6 +63,12 @@ export const contentRequests = pgTable(
     dueOn: date('due_on', { mode: 'string' }).notNull(),
     reason: text('reason').notNull(),
     structureId: uuid('structure_id').references(() => scriptStructures.id),
+    /**
+     * The version of the structure asked, frozen when the request is made (SC-02, ADR 0056 § 1): a change of the
+     * structure afterwards writes the next version and never reaches her drop. `null` for a request of another category,
+     * and for a script asked by hand before SC-02.
+     */
+    structureVersionId: uuid('structure_version_id').references(() => scriptStructureVersions.id),
     origin: enumText('origin').notNull(),
     state: enumText('state').notNull().default('open'),
     refusalReason: text('refusal_reason'),
@@ -86,6 +92,14 @@ export const contentRequests = pgTable(
         and (${t.refusalReason} is null or (${t.state} = 'refused' and char_length(${t.refusalReason}) between 1 and 200))`,
     ),
     check('content_requests_author_check', sql`(${t.origin} = 'agency') = (${t.createdBy} is not null)`),
+    check(
+      'content_requests_structure_version_check',
+      sql`${t.structureVersionId} is null or ${t.structureId} is not null`,
+    ),
+    // The cadence asks one script per due day (SC-02): its job replayed finds the request it made, never a second.
+    uniqueIndex('content_requests_cadence_unique')
+      .on(t.creatorId, t.dueOn)
+      .where(sql`${t.origin} = 'cadence'`),
     unique('content_requests_creator_unique').on(t.id, t.creatorId),
     index('content_requests_creator_due_idx').on(t.creatorId, t.dueOn),
     pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),

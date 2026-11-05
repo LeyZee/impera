@@ -7,6 +7,8 @@ import {
   ScriptCardQuerySchema,
   ScriptQueueBodySchema,
   ScriptQueueSchema,
+  ScriptCadenceSchema,
+  SetScriptCadenceBodySchema,
   ScriptStructureIdSchema,
   ScriptStructureListSchema,
   SCRIPT_STARTERS,
@@ -14,7 +16,6 @@ import {
   ScriptStarterListSchema,
   ScriptStructureSchema,
   type CreatorId,
-  type PersonaLimits,
   type ScriptErrorCode,
   type UserRole,
 } from '@impera/contracts';
@@ -23,7 +24,15 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { cardContent, cardSvg } from '../../domain/cards';
-import type { QueueRefusal, RasterizeCard, ScriptStructureStore } from '../../domain/ports';
+import type {
+  CadenceStore,
+  LimitsOf,
+  QueueRefusal,
+  RasterizeCard,
+  ScriptRequests,
+  ScriptStructureStore,
+  StoredCadence,
+} from '../../domain/ports';
 import { queueRefusals, queueView } from '../../domain/queue';
 
 const StructureParamsSchema = z.object({ structureId: ScriptStructureIdSchema });
@@ -78,6 +87,12 @@ class ScriptQueueStructureUnprocessable extends DomainError {
   }
 }
 
+class ScriptCadenceCreatorNotFound extends DomainError {
+  constructor() {
+    super('script_cadence_creator_not_found' satisfies ScriptErrorCode, 'Créatrice introuvable');
+  }
+}
+
 class ScriptCardNotFound extends DomainError {
   constructor() {
     super('script_card_not_found' satisfies ScriptErrorCode, 'Ce carton n’existe pas dans la structure');
@@ -98,8 +113,7 @@ class ScriptQueueDisgustUnprocessable extends DomainError {
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
-/** Her persona's limits, from her active version; `null` without one. */
-export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;
+export type { LimitsOf } from '../../domain/ports';
 
 function signedIn(user: { readonly id: string } | null): string {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
@@ -116,6 +130,7 @@ export function createScriptRoutes(
   limitsOf: LimitsOf,
   requireRole: RequireRole,
   rasterize: RasterizeCard,
+  cadence: { readonly store: CadenceStore; readonly requests: ScriptRequests },
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
@@ -286,6 +301,49 @@ export function createScriptRoutes(
           throw new ScriptQueueStructureUnprocessable(written.structureIds);
         if (written.kind === 'blocked') throw new ScriptQueueDisgustUnprocessable(written.refusals);
         return queueView(creatorId, written.entries, limits);
+      },
+    );
+
+    // Her cadence (SC-02, ADR 0056 § 2): every how many days a script is asked of her, and what the hourly job last
+    // found, for the amber of the agency's screen. The owner sets it; the owner and the active managers read it.
+    const cadenceView = async (creatorId: CreatorId, stored: StoredCadence) => ({
+      creatorId,
+      days: stored.days,
+      lastDueOn: (await cadence.requests.last(creatorId))?.dueOn ?? null,
+      outcome: stored.outcome,
+      skipped: [...stored.skipped],
+      checkedAt: stored.checkedAt?.toISOString() ?? null,
+    });
+
+    app.get(
+      '/creators/:creatorId/script-cadence',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: { params: CreatorParamsSchema, response: { 200: ScriptCadenceSchema } },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        const stored = await cadence.store.read(creatorId, signedIn(request.user));
+        if (stored === null) throw new ScriptCadenceCreatorNotFound();
+        return cadenceView(creatorId, stored);
+      },
+    );
+
+    app.put(
+      '/creators/:creatorId/script-cadence',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: CreatorParamsSchema,
+          body: SetScriptCadenceBodySchema,
+          response: { 200: ScriptCadenceSchema },
+        },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        const stored = await cadence.store.setDays(creatorId, request.body.days, signedIn(request.user));
+        if (stored === null) throw new ScriptCadenceCreatorNotFound();
+        return cadenceView(creatorId, stored);
       },
     );
     return Promise.resolve();

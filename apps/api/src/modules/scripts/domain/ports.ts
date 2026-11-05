@@ -2,6 +2,9 @@ import type {
   CreateScriptStructureBody,
   CreatorId,
   SaveScriptStructureBody,
+  PersonaLimits,
+  ScriptCadenceOutcome,
+  ScriptCadenceSkip,
   ScriptDisgustBlock,
   ScriptStructure,
   ScriptStructureId,
@@ -80,3 +83,64 @@ export interface ScriptStructureStore {
 
 /** A card's SVG drawn as a PNG at its own `width` and `height` (SC-01 lot b): the same SVG gives the same bytes. */
 export type RasterizeCard = (svg: string) => Promise<Uint8Array>;
+
+/** Her cadence as stored: `days`, and what the job last found; no row reads as the default, never checked. */
+export interface StoredCadence {
+  readonly days: number;
+  readonly outcome: ScriptCadenceOutcome | null;
+  readonly skipped: readonly ScriptCadenceSkip[];
+  readonly checkedAt: Date | null;
+}
+
+/**
+ * Each creator's script cadence (SC-02, ADR 0056 § 2). `read` and `setDays` run as the signed-in account
+ * (`withTenantMember`: the owner writes, the owner and the active managers read); the rest is the hourly job's, as the
+ * admin role.
+ */
+export interface CadenceStore {
+  /** Her cadence; `null` for a creator who does not exist, or a reader other than the owner and an active manager. */
+  read(creatorId: CreatorId, userId: string): Promise<StoredCadence | null>;
+  /** Writes `days`, audited; `null` for a creator who does not exist. */
+  setDays(creatorId: CreatorId, days: number, userId: string): Promise<StoredCadence | null>;
+  /** Every creator, with her zone. */
+  creators(): Promise<readonly { readonly id: CreatorId; readonly timeZone: string }[]>;
+  /** Her `days` (the default without a row). */
+  days(creatorId: CreatorId): Promise<number>;
+  /** Her queue in order, with each structure's latest version. */
+  queue(creatorId: CreatorId): Promise<readonly QueuedStructure[]>;
+  /** A structure not archived and kept for no other creator, with its latest version; `null` otherwise. */
+  usable(creatorId: CreatorId, structureId: ScriptStructureId): Promise<QueuedStructure | null>;
+  /** Freezes its latest version (or gives it, already frozen); `null` when it is archived or unknown. */
+  freeze(structureId: ScriptStructureId): Promise<ScriptStructureVersion | null>;
+  /**
+   * Takes the structure out of her queue, the positions after it moving up, if it was queued before `askedAt`: a
+   * structure put back in her queue since it was asked stays.
+   */
+  dequeue(creatorId: CreatorId, structureId: ScriptStructureId, askedAt: Date): Promise<void>;
+  /** What the job found for her this time. */
+  record(
+    creatorId: CreatorId,
+    outcome: ScriptCadenceOutcome,
+    skipped: readonly ScriptCadenceSkip[],
+    now: Date,
+  ): Promise<void>;
+}
+
+/** The scripts asked of her, written by `content-drops` (wired by the composition root). */
+export interface ScriptRequests {
+  ask(request: {
+    readonly creatorId: CreatorId;
+    readonly dueOn: string;
+    readonly reason: string;
+    readonly structureId: ScriptStructureId;
+    readonly structureVersionId: string;
+  }): Promise<void>;
+  last(creatorId: CreatorId): Promise<{
+    readonly dueOn: string;
+    readonly structureId: ScriptStructureId;
+    readonly askedAt: Date;
+  } | null>;
+}
+
+/** Her persona's limits, from her active version; `null` without one. */
+export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;

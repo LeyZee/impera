@@ -1,4 +1,12 @@
-import { SCRIPT_MOMENTS, SCRIPT_QUEUE_MAX, SCRIPT_STRUCTURE_NAME_MAX } from '@impera/contracts';
+import {
+  SCRIPT_CADENCE_DEFAULT_DAYS,
+  SCRIPT_CADENCE_MAX_DAYS,
+  SCRIPT_CADENCE_MIN_DAYS,
+  SCRIPT_CADENCE_OUTCOMES,
+  SCRIPT_MOMENTS,
+  SCRIPT_QUEUE_MAX,
+  SCRIPT_STRUCTURE_NAME_MAX,
+} from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
   check,
@@ -148,6 +156,52 @@ export const scriptStructureQueue = pgTable(
     pgPolicy('owner_delete', {
       for: 'delete',
       using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * Each creator's script cadence (SC-02, ADR 0056 § 2): every how many days a script is asked of her, and what the hourly
+ * job `scripts.ask_scripts` last found (`outcome`, `skipped`: the structures it passed over because they touch her
+ * limits). No row: 14 days, never checked. Under her RLS and the team's scopes; the job writes it as the admin role.
+ */
+export const scriptCadences = pgTable(
+  'script_cadences',
+  {
+    creatorId: uuid('creator_id')
+      .primaryKey()
+      .references(() => creators.id),
+    days: smallint('days').notNull().default(SCRIPT_CADENCE_DEFAULT_DAYS),
+    outcome: enumText('outcome'),
+    /** `ScriptCadenceSkip[]`, read back through the contract. */
+    skipped: jsonb('skipped')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    checkedAt: timestampTz('checked_at'),
+    updatedBy: text('updated_by').references(() => user.id),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check(
+      'script_cadences_days_check',
+      sql`${t.days} between ${sql.raw(String(SCRIPT_CADENCE_MIN_DAYS))} and ${sql.raw(String(SCRIPT_CADENCE_MAX_DAYS))}`,
+    ),
+    check('script_cadences_skipped_check', sql`jsonb_typeof(${t.skipped}) = 'array'`),
+    check('script_cadences_checked_check', sql`(${t.outcome} is null) = (${t.checkedAt} is null)`),
+    enumCheck('script_cadences', t.outcome, SCRIPT_CADENCE_OUTCOMES),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('owner_update', {
+      for: 'update',
+      using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.updatedBy} = ${currentUser}`,
     }),
     closedToCreator(),
   ],
