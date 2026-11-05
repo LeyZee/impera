@@ -382,7 +382,7 @@ function ImportDone({ done, platformName: name }: { done: Done; platformName: st
                         : 'Déjà reliée.'}
                 </span>
               </span>
-              {line.outcome !== 'refused' && line.creatorId !== null ? (
+              {line.outcome !== 'refused' ? (
                 <Link
                   to="/creatrices"
                   search={creatorsSearch('persona', line.creatorId)}
