@@ -22,7 +22,7 @@ export const shoot: CreatorTask = CreatorTaskSchema.parse({
   category: 'shoot',
   title: 'Tournage tenue rouge',
   purpose: 'Les photos du pack de vendredi',
-  shootBrief: 'Pour : pack du vendredi\nTenue rouge, lumière douce\n10 photos, 2 vidéos courtes',
+  shootBrief: 'Tenue rouge, lumière douce\n10 photos, 2 vidéos courtes',
   essential: false,
   reminderMinutes: 30,
 });
@@ -76,7 +76,7 @@ export const agendaOf = (patch: Partial<CreatorAgenda> = {}): CreatorAgenda =>
         category: 'shoot',
         title: 'Séance lingerie',
         purpose: 'Pour le script de la semaine',
-        shootBrief: 'Pour : feed\nAmbiance Nuit, noir et dentelle',
+        shootBrief: 'Ambiance Nuit, noir et dentelle\n8 photos, 1 vidéo courte',
         essential: false,
       },
       {

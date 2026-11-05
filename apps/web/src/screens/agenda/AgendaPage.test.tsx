@@ -148,7 +148,7 @@ describe('Agenda, the creator’s (CR-05)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Tournage tenue rouge/u }));
     const sheet = await screen.findByRole('region', { name: 'Fiche de tournage' });
     expect(sheet.querySelector('p')?.textContent).toBe(
-      'Pour : pack du vendredi\nTenue rouge, lumière douce\n10 photos, 2 vidéos courtes',
+      'Tenue rouge, lumière douce\n10 photos, 2 vidéos courtes',
     );
   });
 
