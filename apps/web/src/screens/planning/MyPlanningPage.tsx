@@ -87,7 +87,12 @@ export function MyPlanningPage({
   onSearch?: (next: MyPlanningSearch) => void;
 }): JSX.Element {
   const now = useNow();
-  const zone = readerZone();
+  // A chatter reads their own record alone: who they are, in which zone their shifts and leave days fall.
+  const members = useMembers();
+  const me = members.data?.find((member) => member.userId === userId) ?? null;
+  // One « ton heure » on the whole page, the one of his record, as the leave asks it; the device's only while the
+  // record is not read (recette 05/11, CHAT-11).
+  const zone = me?.timeZone ?? readerZone();
   const today = dayOf(now, zone);
   const [shown, setShown] = useState<MyPlanningSearch>(search);
   const show = (patch: MyPlanningSearch): void => {
@@ -125,9 +130,6 @@ export function MyPlanningPage({
           },
   );
   const [focus, setFocus] = useState<string | null>(null);
-  // A chatter reads their own record alone: who they are, in which zone their leave days fall.
-  const members = useMembers();
-  const me = members.data?.find((member) => member.userId === userId) ?? null;
   const leaves = useLeaves(leaveRangeOf(today, zone));
   const swaps = useSwaps();
   const opened =
@@ -282,7 +284,7 @@ export function MyPlanningPage({
               </button>
             </div>
           </Panel>
-        ) : planning.data === undefined ? (
+        ) : planning.data === undefined || members.isPending ? (
           <Panel>
             <div className="sc-skeleton" aria-hidden="true">
               <i />
@@ -292,7 +294,7 @@ export function MyPlanningPage({
           </Panel>
         ) : (
           <Week
-            planning={planning.data}
+            planning={mineOf(planning.data, me)}
             days={days}
             zone={zone}
             today={today}
@@ -362,6 +364,16 @@ export function MyPlanningPage({
       </div>
     </Page>
   );
+}
+
+/**
+ * « Mes shifts » holds his shifts alone: the server's planning of a member also carries the shifts of the swaps that
+ * touch him, a colleague's offered to him or his own given away (recette 05/11, CHAT-05). Those live in the exchanges.
+ * Without his record (it could not be read), the planning stays as the server sends it.
+ */
+function mineOf(planning: Planning, me: Pick<TeamMember, 'id'> | null): Planning {
+  if (me === null) return planning;
+  return { ...planning, shifts: planning.shifts.filter((shift) => shift.memberId === me.id) };
 }
 
 /** The reader's open proposals by shift, with the colleague each one waits on. */

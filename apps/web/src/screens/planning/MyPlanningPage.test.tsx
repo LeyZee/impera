@@ -136,6 +136,10 @@ interface Data {
   lastWeek: boolean;
   /** The report reads that fail before one answers. */
   reportsDown: number;
+  /** Basile's Friday shift, offered to Théo: the server's planning carries it (recette 05/11, CHAT-05). */
+  offered: boolean;
+  /** The zone of his record, when it is not the device's. */
+  meZone: string | null;
 }
 
 const TUESDAY = id(104);
@@ -203,6 +207,8 @@ function serve(
     night: data.night ?? false,
     lastWeek: data.lastWeek ?? false,
     reportsDown: data.reportsDown ?? 0,
+    offered: data.offered ?? false,
+    meZone: data.meZone ?? null,
   };
   const written: Written[] = [];
   vi.stubGlobal(
@@ -231,6 +237,9 @@ function serve(
                   shift(101, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z'),
                   shift(102, '2026-10-29T16:00:00Z', '2026-10-29T22:00:00Z'),
                   ...(state.night ? [shift(105, '2026-10-28T19:00:00Z', '2026-10-29T01:00:00Z')] : []),
+                  ...(state.offered
+                    ? [shift(201, '2026-10-30T16:00:00Z', '2026-10-30T22:00:00Z', BASILE)]
+                    : []),
                 ]
               : lastWeek
                 ? [
@@ -262,7 +271,10 @@ function serve(
                 },
               };
       } else if (url.pathname === '/v1/team/members') {
-        reply = state.membersDown > 0 ? { status: 503 } : { status: 200, body: { members: [me] } };
+        reply =
+          state.membersDown > 0
+            ? { status: 503 }
+            : { status: 200, body: { members: [{ ...me, timeZone: state.meZone ?? me.timeZone }] } };
         state.membersDown -= 1;
       } else if (url.pathname === '/v1/scheduling/leave-requests')
         reply = { status: 200, body: { leaveRequests: state.leaves, members: [people[0]] } };
@@ -344,6 +356,28 @@ describe('the chatter’s Planning', () => {
     expect(text(thursday)).not.toContain('À venir');
     expect(within(thursday).getByRole('button', { name: /^Échanger/u })).toBeTruthy();
     expect(screen.getByText('2 shifts · 12 h')).toBeTruthy();
+  });
+
+  it('keeps a colleague’s shift offered to him out of his shifts and their total (CHAT-05)', async () => {
+    serve({ offered: true, swaps: [swap({})] });
+    renderPage();
+    expect(await screen.findByText('2 shifts · 12 h')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Vendredi 30 octobre' })).toBe(null);
+    // The proposal waits in the exchanges, where it is answered.
+    expect(await screen.findByText('Tu peux me remplacer ?', { exact: false })).toBeTruthy();
+  });
+
+  it('speaks the hour of his record, not of the device, on the page as in the leave (CHAT-11)', async () => {
+    serve({ meZone: 'Africa/Porto-Novo' });
+    renderPage();
+    await screen.findByText('Tes shifts, à ton heure (Porto-Novo).');
+    const ask = screen.getByRole('button', { name: 'Demander un congé' });
+    await waitFor(() => {
+      expect(ask.hasAttribute('disabled')).toBe(false);
+    });
+    fireEvent.click(ask);
+    const panel = await screen.findByRole('dialog', { name: 'Demander un congé' });
+    expect(text(panel)).toContain('à ton heure (Porto-Novo)');
   });
 
   it('opens on today, folds the days gone by with the reports left, and makes a report from its shift', async () => {
