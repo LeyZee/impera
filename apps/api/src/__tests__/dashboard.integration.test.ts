@@ -206,21 +206,29 @@ describe('GET /v1/dashboard', () => {
     );
   });
 
-  it('counts the jobs the worker gave up on or has no task for, hers and those of no creator only', async () => {
-    const dead = async () => {
+  it('counts in her health the stuck jobs that stop her agent, and names the agency’s to the owner', async () => {
+    const jobs = async () => {
       const response = await call(`/v1/dashboard?creatorId=${creatorId}&period=week`, ownerCookie);
-      return DashboardSchema.parse(response.json()).jobs.dead;
+      return DashboardSchema.parse(response.json()).jobs;
     };
+    const dead = async () => (await jobs()).dead;
     const before = (await dead()) ?? 0;
-    for (const payload of [{ creatorId }, { creatorId: '0190a000-0000-7000-8000-000000000000' }, {}]) {
+    for (const [task, payload] of [
+      ['conversation.respond', { creatorId }],
+      ['conversation.respond', { creatorId: '0190a000-0000-7000-8000-000000000000' }],
+      // The agency's pay, of no creator: named for the owner, never counted in her agent's health (PRO-10).
+      ['payroll.fetch_exchange_rates', {}],
+    ] as const) {
       await test.admin.db.execute(sql`
-        select graphile_worker.add_job('conversation.respond', ${JSON.stringify(payload)}::json,
+        select graphile_worker.add_job(${task}, ${JSON.stringify(payload)}::json,
           max_attempts => 1, run_at => now() + interval '1 day')`);
       await test.admin.db.execute(sql`
         update graphile_worker._private_jobs set attempts = max_attempts, last_error = 'test'
         where id = (select max(id) from graphile_worker._private_jobs)`);
     }
-    expect(await dead()).toBe(before + 2);
+    expect(await dead()).toBe(before + 1);
+    expect((await jobs()).stuck).toContainEqual({ label: 'Taux de change du jour', count: 1, agency: true });
+    expect((await jobs()).stuck).toContainEqual({ label: 'Réponse aux fans', count: 1, agency: false });
 
     // No worker task takes `fans.refresh_summary` yet: due for an hour, it never spends an attempt.
     for (const [task, runAt] of [
@@ -231,7 +239,7 @@ describe('GET /v1/dashboard', () => {
       await test.admin.db.execute(sql`
         select graphile_worker.add_job(${task}, ${JSON.stringify({ creatorId })}::json, run_at => ${runAt})`);
     }
-    expect(await dead()).toBe(before + 3);
+    expect(await dead()).toBe(before + 2);
   });
 
   it('computes the dashboard of one creator from her conversations', async () => {

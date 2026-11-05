@@ -49,17 +49,24 @@ const SYSTEM_DEAD_JOB_HOURS = 24;
 /** A job no worker task takes is stuck once it has waited this long: it never spends an attempt. */
 const ORPHAN_AFTER_MINUTES = 15;
 
+/** A stuck job's task, how many, and whether they are hers (payload `creatorId`) or of no creator. */
+export interface StuckJobs {
+  readonly task: string;
+  readonly hers: boolean;
+  readonly count: number;
+}
+
 /**
- * Stuck jobs that concern one creator: hers (payload `creatorId`) and the ones of no creator (cron, dispatch),
- * which stop her too. Stuck is given up on (attempts spent), or due for `ORPHAN_AFTER_MINUTES` under a name
- * the worker has no task for (`handledTasks`): Graphile leaves those in the queue forever. `null` when the
- * count could not be read in time.
+ * Stuck jobs that may concern one creator, by task: hers (payload `creatorId`) and the ones of no creator (cron,
+ * dispatch, pay). Stuck is given up on (attempts spent), or due for `ORPHAN_AFTER_MINUTES` under a name the worker
+ * has no task for (`handledTasks`): Graphile leaves those in the queue forever. Which of them stop her agent is the
+ * Dashboard's call (`AGENT_SYSTEM_JOBS`). `null` when they could not be read in time.
  */
-export function countDeadJobs(
+export function readStuckJobs(
   adminDb: Database,
   creatorId: string,
   handledTasks: readonly string[],
-): Promise<number | null> {
+): Promise<readonly StuckJobs[] | null> {
   // `not in (null)` is never true: without a task list, no job counts as orphaned.
   const handled =
     handledTasks.length === 0
@@ -70,9 +77,9 @@ export function countDeadJobs(
         );
   return within(
     adminDb
-      .execute<{ dead: number }>(
+      .execute<{ task: string; hers: boolean; count: number }>(
         // The public `jobs` view has no payload: the tables behind it do.
-        sql`select count(*)::int as dead
+        sql`select task.identifier as task, (job.payload->>'creatorId' is not null) as hers, count(*)::int as count
             from graphile_worker._private_jobs job
             join graphile_worker._private_tasks task on task.id = job.task_id
             where ((job.attempts >= job.max_attempts
@@ -80,9 +87,11 @@ export function countDeadJobs(
                          or job.updated_at > now() - make_interval(hours => ${SYSTEM_DEAD_JOB_HOURS})))
                 or (task.identifier not in (${handled}) and job.locked_at is null
                     and job.run_at < now() - make_interval(mins => ${ORPHAN_AFTER_MINUTES})))
-              and (job.payload->>'creatorId' is null or job.payload->>'creatorId' = ${creatorId})`,
+              and (job.payload->>'creatorId' is null or job.payload->>'creatorId' = ${creatorId})
+            group by 1, 2
+            order by 1, 2`,
       )
-      .then((result) => result.rows[0]?.dead ?? null),
+      .then((result) => result.rows.map((row) => ({ task: row.task, hers: row.hers, count: row.count }))),
     null,
   );
 }

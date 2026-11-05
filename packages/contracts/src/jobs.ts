@@ -86,6 +86,70 @@ export const JOB_NAMES = [
 export const JobNameSchema = z.enum(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
 
+/**
+ * What each job does, in the owner's words: the Dashboard names a stuck job by it, never by its identifier (recette
+ * 05/11, PRO-10).
+ */
+export const JOB_LABELS: Readonly<Record<JobName, string>> = {
+  'conversation.respond': 'Réponse aux fans',
+  'conversation.send': 'Envoi des messages',
+  'conversation.follow_up': 'Relances des fans',
+  'conversation.record_facts': 'Mémoire des fans',
+  'conversation.reopen': 'Reprise à l’ouverture de ses heures',
+  'conversation.release_unavailable': 'Conversations rendues par un membre absent',
+  'connector.dispatch': 'Lecture des comptes Reveal',
+  'connector.poll': 'Lecture d’un compte Reveal',
+  'connector.reconcile': 'Vérification des envois Reveal',
+  'fans.refresh_summary': 'Résumé des fans',
+  'fans.purge_facts': 'Nettoyage de la mémoire des fans',
+  'rate_limit.purge': 'Nettoyage des limites de connexion',
+  'backups.check': 'Vérification des sauvegardes',
+  'notifications.recap': 'Récapitulatif des notifications',
+  'notifications.creator_sale': 'Notification de vente à la créatrice',
+  'creator_tasks.remind': 'Rappels de l’agenda',
+  'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
+  'scheduling.make_shifts': 'Création des shifts réguliers',
+  'scheduling.lapse_swaps': 'Échanges de shift expirés',
+  'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
+  'team.apply_roles': 'Rôles de l’équipe',
+  'payroll.recalculate': 'Calcul de la paie',
+  'payroll.recalculate_open': 'Calcul de la paie en cours',
+  'payroll.fetch_exchange_rates': 'Taux de change du jour',
+  'payroll.issue_invoices': 'Émission des factures',
+  'payroll.requeue_invoice_issues': 'Reprise des factures',
+  'payroll.render_invoice_pdf': 'PDF des factures',
+  'payroll.mirror_invoice_pdf': 'Copie des PDF de factures',
+  'payroll.lapse_invoice': 'Factures expirées',
+  'payroll.announce_invoice_contest': 'Contestation de facture',
+  'payroll.sweep_invoice_acceptance': 'Acceptation des factures',
+  'payroll.remind_documents': 'Rappels de documents',
+  'payroll.remind_due_invoices': 'Rappels de factures dues',
+  'payroll.purge_refused_documents': 'Nettoyage des documents refusés',
+  'payroll.settle_documents': 'Règlement des documents',
+  'payroll.lock_payout_certificate': 'Attestation de paiement',
+  'media.describe': 'Description des médias',
+  'content_drops.receive_file': 'Réception des fichiers de contenu',
+  'content_drops.convert_file': 'Conversion des vidéos',
+  'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
+  'providers.check_credentials': 'Vérification des clés des services',
+  'connector.read_sales': 'Lecture des ventes Reveal',
+  'connector.check_sales': 'Contrôle des ventes Reveal',
+  'telegram.scan': 'Alertes Telegram',
+  'telegram.flush_chat': 'Envoi des messages Telegram',
+  'telegram.dispatch_polls': 'Lecture de Telegram',
+  'telegram.poll_updates': 'Réponses reçues sur Telegram',
+  'telegram.morning_digest': 'Résumé Telegram du matin',
+  'telegram.evening_digest': 'Résumé Telegram du soir',
+  'telegram.connection_reminders': 'Rappels de connexion Telegram',
+  'telegram.purge': 'Nettoyage de Telegram',
+};
+
+/**
+ * The jobs of no creator that still stop her agent when they are stuck (recette 05/11, PRO-10): the reading of the
+ * Reveal accounts. Any other job of no creator (pay, Telegram, backups) is the agency's, never her agent's health.
+ */
+export const AGENT_SYSTEM_JOBS: readonly JobName[] = ['connector.dispatch'];
+
 export const JOB_PAYLOADS = {
   /**
    * Her answer to his last message (message-flow.md §1). `waitedFor` only on the second pass after she chose to wait
