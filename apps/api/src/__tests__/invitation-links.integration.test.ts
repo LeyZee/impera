@@ -199,7 +199,7 @@ describe('invitation links (EQ-10)', () => {
     // Twelve blanks, or one character twelve times, are long enough only in appearance (recette SEC-04).
     for (const plain of [' '.repeat(12), 'a'.repeat(12), '  abc  abc  ']) {
       const refused = await post('/v1/invitation-links/redeem', { token, password: plain });
-      expect(codeOf(refused)).toMatchObject({ code: 'password_invalid', details: { reason: 'refused' } });
+      expect(codeOf(refused)).toMatchObject({ code: 'password_invalid', details: { reason: 'too_plain' } });
     }
     const breached = await post('/v1/invitation-links/redeem', { token, password: BREACHED });
     expect(codeOf(breached)).toMatchObject({ code: 'password_invalid', details: { reason: 'breached' } });

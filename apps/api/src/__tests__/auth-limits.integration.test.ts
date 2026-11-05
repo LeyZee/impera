@@ -155,9 +155,9 @@ describe('client IP and sign-in limits (G6)', () => {
     expect(trustCookie).not.toBe('');
     expect(session).not.toBe('');
 
-    // Someone else spreads guesses over many addresses, each under its own limit: the holder's sign-ins above gave
-    // their tries back (recette SEC-11), so a hundred refusals reach the cap.
-    for (let i = 0; i < 100; i += 1) {
+    // Someone else spreads guesses over many addresses, each under its own limit: with the holder's three sign-ins
+    // above, the account reaches its 100. A good sign-in never gives back the tries of the cap (recette SEC-11).
+    for (let i = 0; i < 97; i += 1) {
       const from = { remoteAddress: `198.51.${String(100 + Math.floor(i / 9))}.${String(i % 9)}` };
       expect((await signIn(direct, holder.email, 'wrong password!', from)).statusCode).toBe(401);
     }

@@ -1,5 +1,6 @@
 import {
   PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_DISTINCT,
   PASSWORD_MIN_LENGTH,
   type InvitationLinkPreview,
   type Me,
@@ -182,6 +183,7 @@ function Refused({
 const REFUSED_PASSWORD: Readonly<Record<PasswordInvalidReason, string>> = {
   too_short: `Ce mot de passe est trop court : il faut ${String(PASSWORD_MIN_LENGTH)} caractères au moins.`,
   too_long: `Ce mot de passe est trop long : ${String(PASSWORD_MAX_LENGTH)} caractères au plus.`,
+  too_plain: `Ce mot de passe est trop simple : ${String(PASSWORD_MIN_LENGTH)} caractères hors espaces, dont ${String(PASSWORD_MIN_DISTINCT)} différents au moins.`,
   breached: 'Ce mot de passe circule déjà dans des fuites de données connues. Choisis-en un autre.',
   refused: 'Ce mot de passe est refusé. Choisis-en un autre.',
 };

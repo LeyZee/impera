@@ -696,19 +696,18 @@ export function createAuthRoutes(
       skipOnError: false,
     });
     /**
-     * A sign-in step that succeeded gives its tries back, on both limits (recette SEC-11): only refusals bring an account
-     * near its lock, and ten good sign-ins in a quarter of an hour (phone, computer, extension) never reach it. A failure
-     * to forget is only logged: the count then stays as it was.
+     * A sign-in step that succeeded gives back the tries of its account from this address (recette SEC-11): ten good
+     * sign-ins in a quarter of an hour (phone, computer, extension) never lock the holder there. The cap of the account
+     * from all addresses is never forgotten: a holder who signs in must not reopen the count of someone guessing from
+     * many addresses. A failure to forget is only logged: the count then stays as it was.
      */
     const forgive = async (request: FastifyRequest) => {
-      const key = accountKeyOf(request);
       try {
         await forgetCount(
           db,
           { max: SIGN_IN_PER_ACCOUNT_ADDRESS, timeWindowMs: SIGN_IN_ACCOUNT_WINDOW_MS },
-          `${key}@${request.ip}`,
+          `${accountKeyOf(request)}@${request.ip}`,
         );
-        await forgetCount(db, { max: SIGN_IN_PER_ACCOUNT, timeWindowMs: SIGN_IN_ACCOUNT_WINDOW_MS }, key);
       } catch (error) {
         logger.warn({ err: error }, 'sign-in tries not forgotten');
       }
