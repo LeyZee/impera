@@ -1,4 +1,8 @@
-import { CREATOR_TASK_CATEGORY_LABELS, type CreatorTaskCategory } from '@impera/contracts';
+import {
+  CREATOR_TASK_CATEGORY_EMOJI,
+  CREATOR_TASK_CATEGORY_LABELS,
+  type CreatorTaskCategory,
+} from '@impera/contracts';
 import type { JSX } from 'react';
 
 /*
@@ -7,14 +11,7 @@ import type { JSX } from 'react';
  * decoration, the label is what is read.
  */
 
-export const CATEGORY_EMOJI: Readonly<Record<CreatorTaskCategory, string>> = {
-  shoot: '🎬',
-  live: '📡',
-  post: '🖼️',
-  socials: '💬',
-  appointment: '📅',
-  personal: '🌿',
-};
+export const CATEGORY_EMOJI = CREATOR_TASK_CATEGORY_EMOJI;
 
 /** The tile of a category: its emoji on its colour, hidden from a screen reader (the label says it). */
 export function CategoryMark({

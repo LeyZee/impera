@@ -2,6 +2,7 @@ import { CREATOR_TASK_CATEGORY_LABELS, type CreatorAgenda, type CreatorTask } fr
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
+import { ShootBrief } from './ShootBrief';
 import { AGENDA_KEY, archiveTask, moveTask } from './api';
 import { spanOf } from './draft';
 import { whenWords } from './words';
@@ -75,6 +76,7 @@ export function TaskDialog({
       ) : (
         <div className="tm-dialog__body">
           {task.purpose === null ? null : <p className="ag-explain">{task.purpose}</p>}
+          {task.shootBrief === null ? null : <ShootBrief brief={task.shootBrief} folded={false} />}
           {task.essential ? (
             <p className="ag-explain">
               <span className="ag-ess">essentielle</span> Elle compte pour ta série : coche-la chaque jour

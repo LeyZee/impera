@@ -2,6 +2,7 @@ import { CREATOR_TASK_CATEGORY_LABELS, type CreatorAgenda, type CreatorSuggestio
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type JSX } from 'react';
 
+import { ShootBrief } from './ShootBrief';
 import { acceptSuggestion, AGENDA_KEY } from './api';
 import { CategoryMark } from './category';
 import { whenWords } from './words';
@@ -72,6 +73,7 @@ export function SuggestionCard({
         </div>
       </div>
       {suggestion.purpose === null ? null : <p className="ag-proposal__purpose">{suggestion.purpose}</p>}
+      {suggestion.shootBrief === null ? null : <ShootBrief brief={suggestion.shootBrief} folded />}
       {failed === null ? null : (
         <p className="ag-proposal__failed" role="alert">
           {failed}

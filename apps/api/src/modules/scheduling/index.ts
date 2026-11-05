@@ -12,7 +12,7 @@ import { createPayRulesService } from './application/pay-rules';
 import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
-import type { CreatorDirectory, JobLogger, OnShift } from './domain/ports';
+import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, OnShift } from './domain/ports';
 import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
 import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/agency-share-check';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
@@ -138,6 +138,8 @@ export interface SchedulingDeps {
    * connection by the agency percentages' check (lot d3).
    */
   readonly salesTotalsOf: SalesTotalsRead;
+  /** A creator's agenda in her calendar link's feed (CR-05 lot c2): the `creator-tasks` module's `feedOf`. */
+  readonly creatorAgendaFeed: CreatorAgendaFeed;
   readonly now?: () => Date;
 }
 
@@ -155,6 +157,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       createDrizzleCalendarLinkStore(deps.adminDb),
       calendarReads,
       deps.creators,
+      deps.creatorAgendaFeed,
       now,
     ),
     leaves: createLeaveService(
