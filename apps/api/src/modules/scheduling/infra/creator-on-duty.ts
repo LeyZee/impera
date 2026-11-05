@@ -13,6 +13,8 @@ import {
 import { and, eq, NotACreatorAccount, schema, sql, withCreatorAccount, type Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import type { CreatorShiftsFeed } from '../domain/ports';
+
 import type { RequireRole } from './routes';
 
 /** How far ahead « Bientôt » looks. */
@@ -65,6 +67,32 @@ export function createDrizzleCreatorOnDuty(db: Database) {
   };
 }
 
+/** Her accounts' shifts that overlap `[from, to)`, by start then name, with the shift's id for the calendar feed. */
+function accountShifts(db: Database, userId: UserId, from: string, to: string) {
+  return withCreatorAccount(db, userId, (tx) =>
+    tx
+      .select({
+        shiftId: schema.creatorOnDuty.shiftId,
+        displayName: schema.creatorOnDuty.displayName,
+        platform: schema.platformAccounts.platform,
+        startsAt: schema.creatorOnDuty.startsAt,
+        endsAt: schema.creatorOnDuty.endsAt,
+      })
+      .from(schema.creatorOnDuty)
+      .innerJoin(
+        schema.platformAccounts,
+        eq(schema.platformAccounts.id, schema.creatorOnDuty.platformAccountId),
+      )
+      .where(
+        and(
+          sql`${schema.creatorOnDuty.endsAt} > ${from}::timestamptz`,
+          sql`${schema.creatorOnDuty.startsAt} < ${to}::timestamptz`,
+        ),
+      )
+      .orderBy(schema.creatorOnDuty.startsAt, schema.creatorOnDuty.displayName),
+  );
+}
+
 /**
  * The shifts of her accounts over a range (CR-05 c3, ADR 0045 § 1), for « Qui répond à tes fans » in her Agenda: the
  * same view and the same door as « qui est en poste », with the platform of the account. A member who is not active
@@ -72,27 +100,7 @@ export function createDrizzleCreatorOnDuty(db: Database) {
  */
 export function createDrizzleCreatorAccountShifts(db: Database) {
   return async (userId: UserId, range: CreatorAccountShiftsQuery): Promise<CreatorAccountShifts> => {
-    const rows = await withCreatorAccount(db, userId, (tx) =>
-      tx
-        .select({
-          displayName: schema.creatorOnDuty.displayName,
-          platform: schema.platformAccounts.platform,
-          startsAt: schema.creatorOnDuty.startsAt,
-          endsAt: schema.creatorOnDuty.endsAt,
-        })
-        .from(schema.creatorOnDuty)
-        .innerJoin(
-          schema.platformAccounts,
-          eq(schema.platformAccounts.id, schema.creatorOnDuty.platformAccountId),
-        )
-        .where(
-          and(
-            sql`${schema.creatorOnDuty.endsAt} > ${range.from}::timestamptz`,
-            sql`${schema.creatorOnDuty.startsAt} < ${range.to}::timestamptz`,
-          ),
-        )
-        .orderBy(schema.creatorOnDuty.startsAt, schema.creatorOnDuty.displayName),
-    );
+    const rows = await accountShifts(db, userId, range.from, range.to);
     return {
       shifts: rows.map((row) => ({
         displayName: row.displayName,
@@ -101,6 +109,24 @@ export function createDrizzleCreatorAccountShifts(db: Database) {
         endsAt: row.endsAt.toISOString(),
       })),
     };
+  };
+}
+
+/**
+ * The same shifts for her calendar link (ADR 0045 § 5, CR-05), when she chose to add them: read through her own door,
+ * with her rights, over the feed's window. Only a name, a platform and a range come out, and the shift's id, which the
+ * feed hashes into a stable event id.
+ */
+export function createDrizzleCreatorShiftsFeed(db: Database): CreatorShiftsFeed {
+  return async (userId, window) => {
+    const rows = await accountShifts(db, userId, window.from.toISOString(), window.to.toISOString());
+    return rows.map((row) => ({
+      shiftId: row.shiftId,
+      displayName: row.displayName,
+      platform: PlatformSchema.parse(row.platform),
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+    }));
   };
 }
 

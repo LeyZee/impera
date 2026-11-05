@@ -1721,6 +1721,10 @@ summary.ag-brief__title:focus-visible {
   flex-direction: column;
   gap: var(--nv-space-3);
 }
+.ag-phone__shifts {
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
 
 /* ── « Qui répond à tes fans » (CR-05 c3): her accounts' shifts, discreet, never on the frieze ──────────────────── */
 .ag-replies {

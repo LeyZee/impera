@@ -26,7 +26,13 @@ function sameHash(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-async function audit(tx: Transaction, actor: Actor, action: string, linkId: string): Promise<void> {
+async function audit(
+  tx: Transaction,
+  actor: Actor,
+  action: string,
+  linkId: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId: actor.userId,
@@ -34,29 +40,31 @@ async function audit(tx: Transaction, actor: Actor, action: string, linkId: stri
     entity: 'calendar_link',
     entityId: linkId,
     ip: actor.ip,
-    details: {},
+    details,
   });
 }
 
-async function revokeLive(tx: Transaction, actor: Actor): Promise<number> {
+/** Revokes the live link, in the audit log; the links revoked, with her choice of shifts. */
+async function revokeLive(tx: Transaction, actor: Actor): Promise<{ withShifts: boolean }[]> {
   const revoked = await tx
     .update(calendarLinks)
     .set({ revokedAt: sql`now()` })
     .where(and(eq(calendarLinks.userId, actor.userId), sql`${calendarLinks.revokedAt} is null`))
-    .returning({ id: calendarLinks.id });
+    .returning({ id: calendarLinks.id, withShifts: calendarLinks.withShifts });
   for (const link of revoked) await audit(tx, actor, 'calendar_link.revoke', link.id);
-  return revoked.length;
+  return revoked;
 }
 
 /** A creator's account, or a member who has not left; anyone else's link answers nothing. */
 function holderOf(row: {
   userId: string;
   role: string;
+  withShifts: boolean;
   memberId: string | null;
   memberStatus: string | null;
 }): CalendarLinkHolder | null {
   const userId = UserIdSchema.parse(row.userId);
-  if (row.role === 'creator') return { kind: 'creator', userId };
+  if (row.role === 'creator') return { kind: 'creator', userId, withShifts: row.withShifts };
   if (row.memberId === null || row.memberStatus === 'left') return null;
   return { kind: 'member', userId, memberId: TeamMemberIdSchema.parse(row.memberId) };
 }
@@ -67,7 +75,7 @@ export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkS
     live: async (userId) => {
       const [row] = await withAdmin(adminDb, (tx) =>
         tx
-          .select({ createdAt: calendarLinks.createdAt })
+          .select({ createdAt: calendarLinks.createdAt, withShifts: calendarLinks.withShifts })
           .from(calendarLinks)
           .where(and(eq(calendarLinks.userId, userId), sql`${calendarLinks.revokedAt} is null`)),
       );
@@ -91,19 +99,33 @@ export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkS
             .where(eq(teamMembers.userId, actor.userId));
           if (member === undefined || member.status === 'left') return null;
         }
-        await revokeLive(tx, actor);
+        // A new address keeps her choice of shifts (ADR 0045 § 5): only the address changes.
+        const before = await revokeLive(tx, actor);
+        const withShifts = account.role === 'creator' && before.some((link) => link.withShifts);
         const token = randomBytes(TOKEN_BYTES).toString('base64url');
         const id = newId(CalendarLinkIdSchema);
         const [created] = await tx
           .insert(calendarLinks)
-          .values({ id, userId: actor.userId, tokenHash: hashOf(token) })
+          .values({ id, userId: actor.userId, tokenHash: hashOf(token), withShifts })
           .returning({ createdAt: calendarLinks.createdAt });
         if (created === undefined) throw new Error('calendar link not created');
         await audit(tx, actor, 'calendar_link.create', id);
         return { token, createdAt: created.createdAt };
       }),
 
-    revoke: (actor) => withAdmin(adminDb, async (tx) => (await revokeLive(tx, actor)) > 0),
+    revoke: (actor) => withAdmin(adminDb, async (tx) => (await revokeLive(tx, actor)).length > 0),
+
+    choose: (actor, withShifts) =>
+      withAdmin(adminDb, async (tx) => {
+        const [changed] = await tx
+          .update(calendarLinks)
+          .set({ withShifts })
+          .where(and(eq(calendarLinks.userId, actor.userId), sql`${calendarLinks.revokedAt} is null`))
+          .returning({ id: calendarLinks.id, createdAt: calendarLinks.createdAt });
+        if (changed === undefined) return null;
+        await audit(tx, actor, 'calendar_link.choose', changed.id, { withShifts });
+        return { createdAt: changed.createdAt, withShifts };
+      }),
 
     holder: async (token) => {
       const hash = hashOf(token);
@@ -112,6 +134,7 @@ export function createDrizzleCalendarLinkStore(adminDb: Database): CalendarLinkS
           .select({
             tokenHash: calendarLinks.tokenHash,
             userId: calendarLinks.userId,
+            withShifts: calendarLinks.withShifts,
             role: user.role,
             memberId: teamMembers.id,
             memberStatus: teamMembers.status,

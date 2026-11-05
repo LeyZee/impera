@@ -3,19 +3,23 @@ import { createHash } from 'node:crypto';
 import {
   CALENDAR_FEED_PREFIX,
   CalendarLinkTokenSchema,
+  PLATFORM_NAMES,
+  type CalendarLinkChoice,
   type CalendarLinkCreated,
   type CalendarLinkState,
   type UserId,
 } from '@impera/contracts';
 
 import { feedWindow, icsOf, type FeedEvent } from '../domain/calendar-feed';
-import { CalendarFeedNotFound, CalendarLinkForbidden } from '../domain/errors';
+import { CalendarFeedNotFound, CalendarLinkForbidden, CalendarLinkNotFound } from '../domain/errors';
 import type {
   Actor,
   CalendarLinkStore,
   CalendarReads,
   CreatorAgendaFeed,
   CreatorDirectory,
+  CreatorFeedShift,
+  CreatorShiftsFeed,
 } from '../domain/ports';
 
 /** Moi › Calendrier for a member, Agenda › « Dans mon téléphone » for a creator, and the feed each gives (CR-12, CR-05). */
@@ -24,6 +28,8 @@ export interface CalendarLinkService {
   /** A new address, which revokes the one before; the token leaves the server here, once. */
   create(actor: Actor): Promise<CalendarLinkCreated>;
   revoke(actor: Actor): Promise<void>;
+  /** A creator's choice of her accounts' shifts in her live link (ADR 0045 § 5); `CalendarLinkNotFound` without one. */
+  choose(actor: Actor, choice: CalendarLinkChoice): Promise<CalendarLinkState>;
   /** The feed of a link, `text/calendar`; any link that does not answer throws one same `CalendarFeedNotFound`. */
   feed(token: string): Promise<string>;
 }
@@ -35,17 +41,32 @@ const AGENDA_FEED_NAME = 'Impera · mon agenda';
 const uidOf = (memberId: string, creatorId: string, startsAt: Date): string =>
   `${createHash('sha256').update(`${memberId}|${creatorId}|${startsAt.toISOString()}`).digest('base64url')}@nirvana`;
 
+/**
+ * « 💬 Kofi répond à tes fans », on Reveal (ADR 0045 § 5): the range and the name in the team, nothing else. Its id is
+ * the shift's, hashed: a shift given to someone else is renamed in her calendar, not doubled.
+ */
+const shiftEventOf = (shift: CreatorFeedShift): FeedEvent => ({
+  uid: `${createHash('sha256').update(`shift|${shift.shiftId}`).digest('base64url')}@nirvana`,
+  startsAt: shift.startsAt,
+  endsAt: shift.endsAt,
+  summary: `💬 ${shift.displayName} répond à tes fans`,
+  description: `Sur ${PLATFORM_NAMES[shift.platform]}`,
+});
+
 export function createCalendarLinkService(
   store: CalendarLinkStore,
   reads: CalendarReads,
   creators: CreatorDirectory,
   agendaOf: CreatorAgendaFeed,
+  shiftsOf: CreatorShiftsFeed,
   now: () => Date = () => new Date(),
 ): CalendarLinkService {
   return {
     state: async (actor) => {
       const live = await store.live(actor);
-      return { link: live === null ? null : { createdAt: live.createdAt.toISOString() } };
+      return {
+        link: live === null ? null : { createdAt: live.createdAt.toISOString(), withShifts: live.withShifts },
+      };
     },
 
     create: async (actor) => {
@@ -58,18 +79,27 @@ export function createCalendarLinkService(
       await store.revoke(actor);
     },
 
+    choose: async (actor, choice) => {
+      const live = await store.choose(actor, choice.withShifts);
+      if (live === null) throw new CalendarLinkNotFound();
+      return { link: { createdAt: live.createdAt.toISOString(), withShifts: live.withShifts } };
+    },
+
     feed: async (token) => {
       if (!CalendarLinkTokenSchema.safeParse(token).success) throw new CalendarFeedNotFound();
       const holder = await store.holder(token);
       if (holder === null) throw new CalendarFeedNotFound();
       const at = now();
-      // Her link is her agenda's (CR-05, ADR 0042 § 4), read with her own rights; her accounts' shifts come with lot c3.
-      if (holder.kind === 'creator')
-        return icsOf({
-          name: AGENDA_FEED_NAME,
-          events: await agendaOf(holder.userId, feedWindow(at)),
-          stamp: at,
-        });
+      // Her link is her agenda's (CR-05, ADR 0042 § 4), and her accounts' shifts when she chose them (ADR 0045 § 5),
+      // both read with her own rights.
+      if (holder.kind === 'creator') {
+        const window = feedWindow(at);
+        const [tasks, shifts] = await Promise.all([
+          agendaOf(holder.userId, window),
+          holder.withShifts ? shiftsOf(holder.userId, window) : Promise.resolve([]),
+        ]);
+        return icsOf({ name: AGENDA_FEED_NAME, events: [...tasks, ...shifts.map(shiftEventOf)], stamp: at });
+      }
       const directory = await creators.list();
       // Read with the holder's own rights (`calendar_shifts` decides), then his own shifts only: the link is his.
       const read = await reads.read(

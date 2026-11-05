@@ -142,9 +142,22 @@ export const CALENDAR_FEED_PREFIX = '/v1/calendar-feed/';
 export const CalendarLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 
 export const CalendarLinkStateSchema = z.object({
-  link: z.object({ createdAt: z.iso.datetime() }).nullable(),
+  link: z
+    .object({
+      createdAt: z.iso.datetime(),
+      /** A creator's link also gives her accounts' shifts (ADR 0045 § 5); always false on a member's. */
+      withShifts: z.boolean(),
+    })
+    .nullable(),
 });
 export type CalendarLinkState = z.infer<typeof CalendarLinkStateSchema>;
+
+/**
+ * `PATCH /v1/scheduling/calendar-link` (creator): whether her live link also gives her accounts' shifts, « Qui répond à
+ * tes fans » (ADR 0045 § 5, CR-05). Kept when she makes a new address.
+ */
+export const CalendarLinkChoiceSchema = z.strictObject({ withShifts: z.boolean() });
+export type CalendarLinkChoice = z.infer<typeof CalendarLinkChoiceSchema>;
 
 /** The new address, as a path on the dashboard's origin: the token leaves the server once, here. */
 export const CalendarLinkCreatedSchema = z.object({
