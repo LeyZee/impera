@@ -46,6 +46,16 @@ function actorOf(request: FastifyRequest): KeyActor {
   return { userId: request.user?.id ?? null, ip: request.ip };
 }
 
+/** The common 429 `rate_limited` (server.ts), as the plugin's own limits answer. */
+class OwnerLimitReached extends Error {
+  readonly statusCode = 429;
+
+  constructor() {
+    super('owner limit reached');
+    this.name = 'OwnerLimitReached';
+  }
+}
+
 /**
  * `/v1/settings/sales-feeds` (CRM-01): the key of a platform's sales feed and the owner's links. No answer ever
  * carries the key, even masked; the request body is redacted from the logs (`*.body`, logger.ts).
@@ -56,6 +66,27 @@ export function createSalesFeedRoutes(
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.addHook('preValidation', options.guard);
+
+    /**
+     * A limit counted per owner and address, run after the guard (recette SEC-05): an anonymous or a chatter's call is
+     * refused by it (401, 403) and never spends the owner's quota, even from the same address. 429 as any limit.
+     */
+    const ownerLimit = (name: string, max: number): preValidationAsyncHookHandler => {
+      const limit = app.createRateLimit({
+        max,
+        timeWindow: '1 minute',
+        keyGenerator: (request) => `sales-feed-${name}:${request.user?.id ?? ''}:${request.ip}`,
+      });
+      return async (request, reply) => {
+        const attempt = await limit(request);
+        if (attempt.isAllowed || !attempt.isExceeded) return;
+        void reply.header('retry-after', attempt.ttlInSeconds);
+        throw new OwnerLimitReached();
+      };
+    };
+    const keyCalls = ownerLimit('key', KEY_CALLS_PER_MINUTE);
+    const imports = ownerLimit('import', IMPORTS_PER_MINUTE);
+    const checks = ownerLimit('check', CHECKS_PER_MINUTE);
 
     app.get('/settings/sales-feeds', { schema: { response: { 200: SalesFeedListSchema } } }, async () => ({
       feeds: await feeds.list(),
@@ -77,8 +108,7 @@ export function createSalesFeedRoutes(
     app.put(
       '/settings/sales-feeds/:platform/key',
       {
-        preValidation: options.recentLogin,
-        config: { rateLimit: { max: KEY_CALLS_PER_MINUTE, timeWindow: '1 minute' } },
+        preValidation: [options.recentLogin, keyCalls],
         schema: {
           params: PlatformParamsSchema,
           body: SaveSalesFeedKeyBodySchema,
@@ -103,8 +133,7 @@ export function createSalesFeedRoutes(
     app.put(
       '/settings/sales-feeds/:platform/webhook',
       {
-        preValidation: options.recentLogin,
-        config: { rateLimit: { max: KEY_CALLS_PER_MINUTE, timeWindow: '1 minute' } },
+        preValidation: [options.recentLogin, keyCalls],
         schema: {
           params: PlatformParamsSchema,
           response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalSchema },
@@ -147,8 +176,7 @@ export function createSalesFeedRoutes(
       '/settings/sales-feeds/:platform/import',
       {
         // Creating creators is the owner's, password asked again (ADR 0069 § 6); each click reads the live list once.
-        preValidation: options.recentLogin,
-        config: { rateLimit: { max: IMPORTS_PER_MINUTE, timeWindow: '1 minute' } },
+        preValidation: [options.recentLogin, imports],
         schema: {
           params: PlatformParamsSchema,
           body: ImportSalesFeedModelsBodySchema,
@@ -204,7 +232,7 @@ export function createSalesFeedRoutes(
       '/settings/sales-feeds/:platform/check',
       {
         bodyLimit: CHECK_BODY_LIMIT,
-        config: { rateLimit: { max: CHECKS_PER_MINUTE, timeWindow: '1 minute' } },
+        preValidation: checks,
         schema: {
           params: PlatformParamsSchema,
           body: SalesFeedCheckBodySchema,
