@@ -7,6 +7,7 @@ import {
   InvitationLinkPreviewSchema,
   InvitationLinkTokenSchema,
   PASSWORD_MIN_LENGTH,
+  isPasswordTooPlain,
   PasswordInvalidReasonSchema,
   RedeemInvitationLinkBodySchema,
 } from './invitation-links';
@@ -44,6 +45,15 @@ describe('invitation links', () => {
       'expiresAt',
       'purpose',
     ]);
+  });
+
+  it('refuses a password long only by its blanks or one repeated character (recette SEC-04)', () => {
+    expect(isPasswordTooPlain(' '.repeat(12))).toBe(true);
+    expect(isPasswordTooPlain('a'.repeat(20))).toBe(true);
+    expect(isPasswordTooPlain('  abcabcabc  ')).toBe(true);
+    expect(isPasswordTooPlain('staple battery horse')).toBe(false);
+    expect(isPasswordTooPlain('😀😀😀😀🎸🎸🎸🎸🔥🔥🔥🔥')).toBe(true);
+    expect(isPasswordTooPlain('😀🎸🔥💜😀🎸🔥💜😀🎸🔥💜')).toBe(false);
   });
 
   it('names why a password is refused and what the owner meets when making a link', () => {

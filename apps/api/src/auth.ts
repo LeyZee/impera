@@ -51,6 +51,7 @@ import {
   requireUserVerification,
 } from './passkeys';
 import type { PasswordBreachCheck } from './password-breaches';
+import { forgetCount } from './rate-limit-store';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
 
 declare module 'fastify' {
@@ -65,8 +66,11 @@ declare module 'fastify' {
 /** Dashboard sessions are short (security.md §6): 12 h, refreshed at most once an hour while in use. */
 const SESSION_SECONDS = 12 * 60 * 60;
 const SESSION_REFRESH_SECONDS = 60 * 60;
-/** Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit. */
-const AUTH_RATE_LIMIT_PER_MINUTE = 20;
+/**
+ * Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit, wide enough for a team behind one
+ * address at a change of shift: ten sign-ins, password and code, and their pages (recette SEC-11).
+ */
+const AUTH_RATE_LIMIT_PER_MINUTE = 60;
 /**
  * Sign-in limits (ADR 0046 § 5), password and code each with its own counters: 10 tries per quarter of an hour for an
  * account from one address, so that someone else's tries never lock its holder out; 100 for an account from all
@@ -75,6 +79,7 @@ const AUTH_RATE_LIMIT_PER_MINUTE = 20;
 const SIGN_IN_PER_ACCOUNT_ADDRESS = 10;
 const SIGN_IN_PER_ACCOUNT = 100;
 const SIGN_IN_ACCOUNT_WINDOW = '15 minutes';
+const SIGN_IN_ACCOUNT_WINDOW_MS = 15 * 60 * 1000;
 /** The cookies of Better Auth's `two-factor` plugin: the code step of a sign-in, and a trusted device. */
 const TWO_FACTOR_COOKIE = 'two_factor';
 const TRUST_DEVICE_COOKIE = 'trust_device';
@@ -690,6 +695,24 @@ export function createAuthRoutes(
       keyGenerator: accountKeyOf,
       skipOnError: false,
     });
+    /**
+     * A sign-in step that succeeded gives its tries back, on both limits (recette SEC-11): only refusals bring an account
+     * near its lock, and ten good sign-ins in a quarter of an hour (phone, computer, extension) never reach it. A failure
+     * to forget is only logged: the count then stays as it was.
+     */
+    const forgive = async (request: FastifyRequest) => {
+      const key = accountKeyOf(request);
+      try {
+        await forgetCount(
+          db,
+          { max: SIGN_IN_PER_ACCOUNT_ADDRESS, timeWindowMs: SIGN_IN_ACCOUNT_WINDOW_MS },
+          `${key}@${request.ip}`,
+        );
+        await forgetCount(db, { max: SIGN_IN_PER_ACCOUNT, timeWindowMs: SIGN_IN_ACCOUNT_WINDOW_MS }, key);
+      } catch (error) {
+        logger.warn({ err: error }, 'sign-in tries not forgotten');
+      }
+    };
     /** Counts one try against both limits, the account's own unless `trusted`; whether one is spent. */
     const exceeded = async (request: FastifyRequest, reply: FastifyReply, key: string, trusted: boolean) => {
       limitKeys.set(request, key);
@@ -885,6 +908,7 @@ export function createAuthRoutes(
         return forward(request, reply, {
           onUnauthorized: () => new SignInRefused(),
           onSuccess: async (json) => {
+            await forgive(request);
             await closeReplaced(json);
             await recordPasswordLogin(request, json);
           },
@@ -930,6 +954,7 @@ export function createAuthRoutes(
             }
           },
           onSuccess: async (json) => {
+            await forgive(request);
             await closeReplaced(json);
             await usedForSignIn(request, credentialId);
           },
@@ -950,6 +975,7 @@ export function createAuthRoutes(
      * which never reaches the page (`withoutToken`).
      */
     const stampSignIn = (request: FastifyRequest) => async (json: unknown) => {
+      await forgive(request);
       const opened = SessionTokenSchema.safeParse(json);
       if (!opened.success) return;
       const [session] = await db
@@ -1010,7 +1036,14 @@ export function createAuthRoutes(
     // more, then a secret and ten backup codes, shown once. Asking again before the first code restarts it.
     app.post(
       '/auth/two-factor/enable',
-      { config: perIp, schema: { body: SecondFactorEnableBodySchema } },
+      {
+        config: perIp,
+        // Signed in before the body is read: an anonymous call gets 401, never the list of fields (recette SEC-17).
+        preValidation: async (request) => {
+          if ((await currentUser(auth, db, request)) === null) throw new SessionUnauthenticated();
+        },
+        schema: { body: SecondFactorEnableBodySchema },
+      },
       async (request, reply) => {
         const session = await currentUser(auth, db, request);
         if (session === null) throw new SessionUnauthenticated();

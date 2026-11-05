@@ -18,6 +18,16 @@ export type InvitationLinkPurpose = z.infer<typeof InvitationLinkPurposeSchema>;
 export const PASSWORD_MIN_LENGTH = 12;
 /** Better Auth's default ceiling. */
 export const PASSWORD_MAX_LENGTH = 128;
+/** Fewest different characters of a chosen password: twelve spaces or « aaaaaaaaaaaa » are refused (recette SEC-04). */
+export const PASSWORD_MIN_DISTINCT = 4;
+
+/**
+ * A password long enough only by its blanks or by one character repeated (recette SEC-04): refused as `refused`, the
+ * same rule on the page and on the server. Characters, not UTF-16 units, are counted.
+ */
+export function isPasswordTooPlain(password: string): boolean {
+  return password.trim().length < PASSWORD_MIN_LENGTH || new Set(password).size < PASSWORD_MIN_DISTINCT;
+}
 
 /** At least 128 random bits, base64url: what the page reads after `#t=` and posts back. */
 export const InvitationLinkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{22,128}$/);

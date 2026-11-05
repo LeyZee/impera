@@ -22,6 +22,7 @@ import {
   UserIdSchema,
   type CreateCreatorInvitationLinkBody,
   type InvitationLinkPurpose,
+  isPasswordTooPlain,
   type PasswordInvalidReason,
 } from '@impera/contracts';
 import {
@@ -102,6 +103,7 @@ function hashOf(token: string): string {
 function passwordProblem(password: string): PasswordInvalidReason | null {
   if (password.length < PASSWORD_MIN_LENGTH) return 'too_short';
   if (password.length > PASSWORD_MAX_LENGTH) return 'too_long';
+  if (isPasswordTooPlain(password)) return 'refused';
   return null;
 }
 
