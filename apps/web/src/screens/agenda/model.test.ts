@@ -1,9 +1,18 @@
-import { AvailabilitySchema, CreatorTaskSchema } from '@impera/contracts';
+import { AvailabilitySchema, CreatorSuggestionSchema, CreatorTaskSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { agendaOf, live, post, shoot, stretch, WEDNESDAY } from './fixtures';
+import { agendaOf, live, MONDAY, post, shoot, stretch, WEDNESDAY } from './fixtures';
 import { timedSuggestionsOf } from './grid';
-import { firstOf, momentOf, planOf, programOf, progressOf, undatedOf, windowsOn } from './model';
+import {
+  firstOf,
+  momentOf,
+  planOf,
+  programOf,
+  progressOf,
+  proposedRoutinesOf,
+  undatedOf,
+  windowsOn,
+} from './model';
 
 /** An invented timed task (ADR 0010). */
 const timedTask = (n: number, title: string, startsAt: string, endsAt: string) =>
@@ -170,5 +179,30 @@ describe('her day (CR-05)', () => {
             : row.kind,
       ),
     ).toEqual(['libre 480-1020', 'proposé Répondre aux commentaires', 'libre 1080-1440']);
+  });
+
+  it('shows a proposed routine once: in Jour on its first day from today, at the top of Ma semaine (CREA-15)', () => {
+    const routine = CreatorSuggestionSchema.parse({
+      id: '01936f00-0000-7000-8000-000000000930',
+      when: { kind: 'routine', weekdays: [1, 2, 3, 4, 5] },
+      week: MONDAY,
+      minutes: null,
+      category: 'socials',
+      title: 'Répondre aux commentaires Insta',
+      purpose: null,
+      essential: true,
+    });
+    const agenda = agendaOf({ suggestions: [routine] });
+    const shownOn = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'].filter(
+      (day) => planOf(agenda, day).suggestions.length > 0,
+    );
+    // Wednesday is her today: the days gone are not asked again.
+    expect(shownOn).toEqual([WEDNESDAY]);
+    expect(proposedRoutinesOf(agenda, MONDAY)).toEqual([routine]);
+    expect(proposedRoutinesOf(agenda, '2026-11-09')).toEqual([]);
+    // Seen in a week to come, it shows on its first day.
+    expect(planOf(agendaOf({ suggestions: [routine], today: '2026-10-28' }), MONDAY).suggestions).toEqual([
+      routine,
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import {
   CREATOR_TASK_CATEGORY_LABELS,
   type CreatorAccountShift,
   type CreatorAgenda,
+  type CreatorSuggestion,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
@@ -11,7 +12,7 @@ import { ShortReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
 import { CategoryMark } from './category';
-import { planOf, undatedOf, type DayWindow } from './model';
+import { planOf, proposedRoutinesOf, undatedOf, type DayWindow } from './model';
 import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, weekOf } from '@/scheduling/time';
@@ -36,6 +37,17 @@ export function WeekList({
   onOpenDay: (day: string) => void;
 } & DayActions): JSX.Element {
   const undated = undatedOf(agenda);
+  const routines = proposedRoutinesOf(agenda, monday);
+  const cards = (suggestions: readonly CreatorSuggestion[]): JSX.Element[] =>
+    suggestions.map((suggestion) => (
+      <SuggestionCard
+        key={suggestion.id}
+        suggestion={suggestion}
+        zone={agenda.timeZone}
+        onDecline={actions.onDecline}
+        onPlace={actions.onPlace}
+      />
+    ));
   return (
     <div className="ag-week">
       {undated.length === 0 ? null : (
@@ -44,21 +56,24 @@ export function WeekList({
             <h2>Sans date</h2>
             <span className="ag-count nv-num">{undated.length}</span>
           </div>
-          {undated.map((suggestion) => (
-            <SuggestionCard
-              key={suggestion.id}
-              suggestion={suggestion}
-              zone={agenda.timeZone}
-              onDecline={actions.onDecline}
-              onPlace={actions.onPlace}
-            />
-          ))}
+          {cards(undated)}
+        </section>
+      )}
+      {routines.length === 0 ? null : (
+        <section className="ag-sec">
+          <div className="ag-sec__head">
+            <h2>{routines.length === 1 ? 'Routine proposée' : 'Routines proposées'}</h2>
+            <span className="ag-count nv-num">{routines.length}</span>
+          </div>
+          {cards(routines)}
         </section>
       )}
       <ol className="ag-weeklist">
         {weekOf(monday).map((day, index) => {
           const plan = planOf(agenda, day);
-          const empty = plan.todo.length === 0 && plan.timed.length === 0 && plan.suggestions.length === 0;
+          // A proposed routine is decided once, at the top (CREA-15).
+          const dated = plan.suggestions.filter((suggestion) => suggestion.when?.kind !== 'routine');
+          const empty = plan.todo.length === 0 && plan.timed.length === 0 && dated.length === 0;
           return (
             <li
               key={day}
@@ -133,15 +148,7 @@ export function WeekList({
                     </span>
                   </button>
                 ))}
-                {plan.suggestions.map((suggestion) => (
-                  <SuggestionCard
-                    key={suggestion.id}
-                    suggestion={suggestion}
-                    zone={agenda.timeZone}
-                    onDecline={actions.onDecline}
-                    onPlace={actions.onPlace}
-                  />
-                ))}
+                {cards(dated)}
                 {plan.windows.map((window) => (
                   <Dispo key={window.id} window={window} />
                 ))}
