@@ -69,6 +69,8 @@ function overview(patch: Partial<SalesFeedOverview> = {}): SalesFeedOverview {
       },
     ],
     listError: null,
+    candidates: [],
+    dismissed: [],
     ...patch,
   };
 }

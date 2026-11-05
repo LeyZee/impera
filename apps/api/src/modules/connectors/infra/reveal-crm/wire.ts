@@ -51,6 +51,8 @@ export const RevealModelsSchema = z.object({
       displayName: z.string(),
       isActive: z.boolean(),
       status: text,
+      /** A public address without expiry, or `null`; absent reads as `null`, the photo being only a convenience. */
+      avatarUrl: z.string().nullable().optional(),
     }),
   ),
 });

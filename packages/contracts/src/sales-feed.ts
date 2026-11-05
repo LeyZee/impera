@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { PlatformSchema } from './enums';
-import { FanIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
+import { CreatorIdSchema, FanIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
 /**
@@ -95,12 +95,30 @@ export const PlatformSalesPageSchema = z.object({
 });
 export type PlatformSalesPage = z.infer<typeof PlatformSalesPageSchema>;
 
+/**
+ * Where a model stands with the platform (ADR 0069 § 2): only a `validated` and active one is ticked in advance for
+ * import. A value the adapter does not know is `other`, shown and never ticked.
+ */
+export const PLATFORM_MODEL_STATUSES = [
+  'validated',
+  'pending',
+  'onboarding_changes_requested',
+  'refused',
+  'banned',
+  'other',
+] as const;
+export const PlatformModelStatusSchema = z.enum(PLATFORM_MODEL_STATUSES);
+export type PlatformModelStatus = z.infer<typeof PlatformModelStatusSchema>;
+
 /** A creator account as the platform lists it, for the owner's mapping. */
 export const PlatformModelSchema = z.object({
   platformModelId: z.string().min(1),
   handle: z.string().min(1),
   displayName: z.string(),
   isActive: z.boolean(),
+  status: PlatformModelStatusSchema,
+  /** Her public photo on the platform, `https` only, `null` when none; copied into our storage at import (a2). */
+  avatarUrl: z.url({ protocol: /^https$/ }).nullable(),
 });
 export type PlatformModel = z.infer<typeof PlatformModelSchema>;
 
@@ -292,14 +310,112 @@ export const SalesFeedAccountChoiceSchema = z.object({
 });
 export type SalesFeedAccountChoice = z.infer<typeof SalesFeedAccountChoiceSchema>;
 
+/**
+ * What the import proposes for a model without a link (ADR 0069 § 1): link it to an existing creator, when one of her
+ * accounts has its handle or her name matches (`creatorNameKey`), or create her. Only a proposal: the owner changes it.
+ */
+export const SalesFeedImportProposalSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('link'),
+    creatorId: CreatorIdSchema,
+    creatorDisplayName: z.string(),
+    /** Why: one of her accounts has the model's handle, or her name matches. */
+    match: z.enum(['handle', 'name']),
+  }),
+  z.object({ kind: z.literal('create') }),
+]);
+export type SalesFeedImportProposal = z.infer<typeof SalesFeedImportProposalSchema>;
+
+/** A live model without a link and not dismissed: one line of « N créatrices trouvées sur Reveal ». */
+export const SalesFeedImportCandidateSchema = z.object({
+  model: PlatformModelSchema,
+  proposal: SalesFeedImportProposalSchema,
+  /** Ticked in advance: `validated` and active only (ADR 0069 § 2). */
+  preselected: z.boolean(),
+});
+export type SalesFeedImportCandidate = z.infer<typeof SalesFeedImportCandidateSchema>;
+
+/** A live model the owner dismissed from the import: it does not come back, and can be taken back. */
+export const SalesFeedDismissedModelSchema = z.object({
+  model: PlatformModelSchema,
+  dismissedAt: z.iso.datetime(),
+});
+export type SalesFeedDismissedModel = z.infer<typeof SalesFeedDismissedModelSchema>;
+
 export const SalesFeedOverviewSchema = z.object({
   status: SalesFeedStatusSchema,
   models: z.array(SalesFeedModelLinkSchema),
   accounts: z.array(SalesFeedAccountChoiceSchema),
   chatters: z.array(SalesFeedChatterLinkSchema),
   listError: SalesFeedErrorKindSchema.nullable(),
+  /** Models of the live list to import, empty when the list could not be read (`listError`). */
+  candidates: z.array(SalesFeedImportCandidateSchema).default([]),
+  dismissed: z.array(SalesFeedDismissedModelSchema).default([]),
 });
 export type SalesFeedOverview = z.infer<typeof SalesFeedOverviewSchema>;
+
+/** The most lines one import takes; a larger agency imports in several clicks. */
+export const SALES_FEED_IMPORT_MAX_LINES = 100;
+
+/** What the owner chose for one model: create her, or link it to an existing creator. */
+export const SalesFeedImportActionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('create') }),
+  z.object({ kind: z.literal('link'), creatorId: CreatorIdSchema }),
+]);
+export type SalesFeedImportAction = z.infer<typeof SalesFeedImportActionSchema>;
+
+/**
+ * « Importer la sélection ». Only identifiers and choices: the model's handle, name and status are read again from the
+ * platform at import, never taken from the client.
+ */
+export const ImportSalesFeedModelsBodySchema = z.object({
+  lines: z
+    .array(z.object({ platformModelId: z.string().min(1).max(200), action: SalesFeedImportActionSchema }))
+    .min(1)
+    .max(SALES_FEED_IMPORT_MAX_LINES)
+    .refine((lines) => new Set(lines.map((line) => line.platformModelId)).size === lines.length, {
+      message: 'Un modèle ne figure qu’une fois.',
+    }),
+});
+export type ImportSalesFeedModelsBody = z.infer<typeof ImportSalesFeedModelsBodySchema>;
+
+/**
+ * Why one line was refused, the others going on (ADR 0069 § 3): `not_listed`, the platform no longer lists the model;
+ * `name_taken`, another creator already has that name; `name_invalid`, neither the display name nor the handle is a
+ * name (no letter); `handle_taken`, an account of another creator has that handle;
+ * `creator_not_found`, the creator to link to does not exist; `link_conflict`, the account is already linked to another
+ * model of the platform.
+ */
+export const SalesFeedImportRefusalSchema = z.enum([
+  'not_listed',
+  'name_taken',
+  'name_invalid',
+  'handle_taken',
+  'creator_not_found',
+  'link_conflict',
+]);
+export type SalesFeedImportRefusal = z.infer<typeof SalesFeedImportRefusalSchema>;
+
+/** One line's outcome. `already_linked`: a replay, or a link posed meanwhile; nothing was written. */
+export const SalesFeedImportLineResultSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    platformModelId: z.string().min(1),
+    outcome: z.enum(['created', 'linked', 'already_linked']),
+    creatorId: CreatorIdSchema.nullable(),
+  }),
+  z.object({
+    platformModelId: z.string().min(1),
+    outcome: z.literal('refused'),
+    reason: SalesFeedImportRefusalSchema,
+  }),
+]);
+export type SalesFeedImportLineResult = z.infer<typeof SalesFeedImportLineResultSchema>;
+
+export const SalesFeedImportResultSchema = z.object({
+  lines: z.array(SalesFeedImportLineResultSchema),
+  overview: SalesFeedOverviewSchema,
+});
+export type SalesFeedImportResult = z.infer<typeof SalesFeedImportResultSchema>;
 
 /** Réglages › Connexions: one line per platform that has a sales feed. */
 export const SalesFeedListSchema = z.object({ feeds: z.array(SalesFeedStatusSchema) });
@@ -558,6 +674,7 @@ export const SALES_FEED_ERROR_CODES = [
   'sales_feed_webhook_not_found',
   'sales_feed_export_unprocessable',
   'sales_feed_check_days_unprocessable',
+  'sales_feed_list_unavailable',
 ] as const;
 export const SalesFeedErrorCodeSchema = z.enum(SALES_FEED_ERROR_CODES);
 export type SalesFeedErrorCode = z.infer<typeof SalesFeedErrorCodeSchema>;
