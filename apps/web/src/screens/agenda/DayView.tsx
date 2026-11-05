@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import type { AddPreset } from './AddDialog';
-import { DayReplies } from './Replies';
+import { DayReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { firstOf, momentOf, planOf, programOf, progressOf, type DayPlan, type DayTask } from './model';

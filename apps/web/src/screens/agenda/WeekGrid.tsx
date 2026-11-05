@@ -8,7 +8,7 @@ import type {
 import { useEffect, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from 'react';
 
 import type { DayActions } from './DayView';
-import { ShortReplies } from './Replies';
+import { ShortReplies } from './ReplyLines';
 import { CATEGORY_EMOJI } from './category';
 import {
   createdSpan,

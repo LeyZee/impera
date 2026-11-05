@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
 import type { DayActions } from './DayView';
-import { ShortReplies } from './Replies';
+import { ShortReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
 import { CategoryMark } from './category';
