@@ -138,3 +138,6 @@ export class ContentDropStorageUnavailable extends DomainError {
     );
   }
 }
+
+/** A file the cleaning cannot follow (a damaged photo, a video ffmpeg cannot read): refused with her sentence. */
+export class UnreadableFile extends Error {}
