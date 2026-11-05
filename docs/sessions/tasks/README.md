@@ -63,6 +63,7 @@ Branche : task/<id>-<slug>
 | H-01 | Première session d'hygiène | 0 | todo | P0-07b |
 | D-01 | Design system « Liquid Glass » | 4 | in_progress | P0-01 |
 | D-02 | Recette design et navigation de l'interface web | 4 | in_progress | D-01 |
+| D-03 | Peaufiner les écrans du chatteur | 4 | in_progress | D-01, D-02 |
 | EQ-01 | Équipe : membres, pays, commission, paramètres de paie des plateformes | équipe | in_progress | ADR 0023, ADR 0024 ; écrans : EQ-11 |
 | EQ-02 | Planning des shifts et « qui est en poste » | équipe | in_progress | EQ-01 |
 | EQ-03 | Rapport de fin de shift dans Impera | équipe | in_progress | EQ-02 |

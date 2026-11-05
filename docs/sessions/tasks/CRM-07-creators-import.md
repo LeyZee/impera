@@ -1,6 +1,6 @@
 # CRM-07 Importer les créatrices depuis Reveal, après revue du propriétaire
 
-Statut : todo (ADR 0069 acceptée par Charles le 03/11/2026, 19 h 58)
+Statut : in_progress (lot a1 en PR ; ADR 0069 acceptée par Charles le 03/11/2026, 19 h 58)
 Phase : API CRM (ADR 0050)
 Dépend de : CRM-01 (clé et `listModels`) ; rien d'autre
 Branches : task/crm-07-a-creators-import-api, task/crm-07-b-creators-import-screen
@@ -16,16 +16,17 @@ ADR 0069 (tout), ADR 0050 § 3 et § 4, ADR 0054, ADR 0010 (aucune donnée réel
 
 ## À faire
 
-### Lot a (Bilan)
+### Lot a (Bilan), en deux PR : a1 (contrat, import, écartées, migration 0112) puis a2 (photo, alertes)
 
-- [ ] `PlatformModel` gagne `status` (valeur inconnue lue `other` et signalée, comme ADR 0050 § 3) et `avatarUrl` ; schéma Zod de `/v1/models` mis à jour.
-- [ ] Proposition calculée par le code pour chaque modèle sans lien : `link` (nom par `creatorNameKey` ou pseudo d'un compte existant), sinon `create` ; `preselected` seulement pour `validated` et actif.
-- [ ] Route propriétaire (mot de passe redemandé) « importer la sélection » : par ligne, créer créatrice + compte Reveal + lien (`linkedBy: member`) ou relier ; idempotente sur l'identifiant du modèle ; nom déjà pris refusé ligne par ligne sans faire tomber le lot ; ventes mises de côté libérées comme un lien à la main.
-- [ ] Photo copiée dans notre stockage (pas d'adresse Reveal gardée comme source).
-- [ ] État « écartée » d'une ligne, réversible ; migration seulement s'il ne tient pas dans `sales_feed_models` (numéro demandé au coordinateur).
-- [ ] Modèle disparu de `/v1/models` ou passé `banned` : alerte, rien de supprimé.
-- [ ] Journal d'audit : création et ligne écartée (identifiant du modèle seulement).
-- [ ] `FakeReveal` : modèles inventées pour chaque statut, un pseudo déjà pris, un nom en double.
+- [x] (a1) `PlatformModel` gagne `status` (valeur inconnue lue `other`) et `avatarUrl` (`https` seulement, sinon `null`) ; schéma Zod de `/v1/models` mis à jour.
+- [ ] (a2) Statut inconnu signalé (`sales_feed_signal` `unknown_value`, une fois), comme ADR 0050 § 3.
+- [x] (a1) Proposition calculée par le code pour chaque modèle sans lien : `link` (pseudo d'un compte existant d'abord, puis nom par `creatorNameKey`), sinon `create` ; `preselected` seulement pour `validated` et actif (`domain/model-import.ts`).
+- [x] (a1) Route propriétaire (mot de passe redemandé) « importer la sélection » : par ligne, créer créatrice + compte Reveal + lien (`linkedBy` : le propriétaire) ou relier ; idempotente sur l'identifiant du modèle ; nom déjà pris refusé ligne par ligne sans faire tomber le lot ; ventes mises de côté libérées comme un lien à la main.
+- [ ] (a2) Photo copiée dans notre stockage (pas d'adresse Reveal gardée comme source) ; la colonne `creators.avatar_key` existe depuis a1.
+- [x] (a1) État « écartée » d'une ligne, réversible : table `sales_feed_model_dismissals` (migration 0112, attribuée par le coordinateur).
+- [ ] (a2) Modèle disparu de `/v1/models` ou passé `banned` : alerte, rien de supprimé.
+- [x] (a1) Journal d'audit : création, import, ligne écartée et reprise (identifiant du modèle seulement).
+- [x] (a1) `FakeReveal` : modèles inventées pour chaque statut, un pseudo déjà pris, un nom en double (`IMPORT_MODELS`).
 
 ### Lot b (Extension)
 
@@ -47,3 +48,6 @@ ADR 0069 (tout), ADR 0050 § 3 et § 4, ADR 0054, ADR 0010 (aucune donnée réel
 Historique au-delà de 31 jours (export du dashboard), persona, capture de session, invitation de la créatrice.
 
 ## Notes de session
+
+- 05/11 (Bilan, a1) : contrat et routes prêts pour le lot b. `GET /v1/settings/sales-feeds/:plateforme` rend en plus `candidates` (modèle, proposition, `preselected`) et `dismissed` ; `POST …/import` (`lines` : identifiant et action `create` ou `link`, 100 au plus, connexion récente exigée) rend un résultat par ligne (`created`, `linked`, `already_linked` ou `refused` avec sa raison) et l'aperçu ; `PUT` et `DELETE …/models/:id/dismissal` écartent et reprennent. L'import relit la liste de Reveal : il ne prend du client que les identifiants et les choix. Liste illisible : 503 `sales_feed_list_unavailable`, rien d'importé. Reste a2 (photo, statut inconnu signalé, alertes de disparition ou de bannissement).
+

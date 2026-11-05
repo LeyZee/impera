@@ -456,3 +456,8 @@
     transform: none;
   }
 }
+
+/* « Demander un congé », first in « Mes congés » where leaves are read (D-03). */
+.sc-fold__ask {
+  align-self: flex-start;
+}

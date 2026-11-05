@@ -588,11 +588,13 @@ describe('the chatter’s Planning', () => {
     renderPage();
     const warning = await screen.findByRole('alert', {}, { timeout: 4_000 });
     expect(text(warning)).toContain('Le serveur ne répond pas : ta fiche n’a pas pu être lue');
-    expect(screen.getByRole('button', { name: 'Demander un congé' }).hasAttribute('disabled')).toBe(true);
+    // « Mes congés », where a leave is asked, waits for his record.
+    expect(screen.queryByRole('button', { name: 'Demander un congé' })).toBe(null);
     fireEvent.click(within(warning).getByRole('button', { name: 'Réessayer' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Demander un congé' }).hasAttribute('disabled')).toBe(false);
-    });
+    expect(await screen.findByRole('button', { name: 'Demander un congé' })).toHaveProperty(
+      'disabled',
+      false,
+    );
     expect(screen.queryByRole('alert')).toBe(null);
   });
 
@@ -603,11 +605,7 @@ describe('the chatter’s Planning', () => {
     }));
     renderPage();
     await screen.findByText('2 shifts · 12 h');
-    const ask = screen.getByRole('button', { name: 'Demander un congé' });
-    await waitFor(() => {
-      expect(ask.hasAttribute('disabled')).toBe(false);
-    });
-    fireEvent.click(ask);
+    fireEvent.click(await screen.findByRole('button', { name: 'Demander un congé' }));
     const panel = await screen.findByRole('dialog', { name: 'Demander un congé' });
     expect(text(panel)).toContain('à ton heure (Antananarivo)');
     fireEvent.change(within(panel).getByLabelText('Premier jour'), { target: { value: '2026-11-03' } });

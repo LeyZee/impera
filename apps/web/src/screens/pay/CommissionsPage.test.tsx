@@ -260,7 +260,7 @@ describe('CommissionsPage', () => {
       expect(text(hero)).toContain('≈ 20 466 FCFA, avant frais WorldRemit');
     });
     expect(text(hero)).toContain('L’agence valide, puis le versement suit.');
-    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Quinzaine du 16 au 31 octobre');
+    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Mon argent');
 
     expect(text(panel('Le parcours de ton argent'))).toContain('Ta commission');
     // One amount, one name: the path ends on the hero's words.
@@ -381,7 +381,7 @@ describe('CommissionsPage', () => {
     // Not the chatter's gesture: the agency validates.
     expect(text(hero)).toContain('validation par l’agence à partir du lun. 16 nov.');
     expect(text(hero)).toContain('Calculé le lun. 2 nov. à 10 h 07 sur tes rapports validés.');
-    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Quinzaine du 1er au 15 novembre');
+    expect(text(hero.querySelector('.py-mehero__period'))).toBe('1er – 15 novembre');
     const performance = panel('Ma performance');
     expect(within(performance).queryByRole('heading')).toBeNull();
     await waitFor(() => {

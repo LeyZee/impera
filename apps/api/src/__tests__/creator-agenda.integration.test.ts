@@ -295,6 +295,12 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
     expect(listed.items.find((one) => one.title === 'Live sur le tournage')).toMatchObject({
       state: 'declined',
       reason: 'Pas en live',
+      task: null,
+    });
+    // The agency reads the task as she keeps it: moved to 19 h, not done yet, still in her agenda.
+    expect(listed.items.find((one) => one.title === 'Live du matin')).toMatchObject({
+      state: 'accepted',
+      task: { when: moved, doneDays: 0, removed: false },
     });
     expect((await call('GET', `/v1/creators/${nora}/suggestions?week=${week}`, 'chatter')).statusCode).toBe(
       403,
@@ -370,5 +376,13 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       ).json(),
     );
     expect(ticked.streak).toMatchObject({ days: 1, atRisk: false });
+    // The agency sees the day she did it, then that she removed it.
+    const followUp = async () =>
+      AgencySuggestionListSchema.parse(
+        (await call('GET', `/v1/creators/${nora}/suggestions?week=${today}`, 'manager')).json(),
+      ).items.find((one) => one.id === created.id)?.task;
+    expect(await followUp()).toMatchObject({ doneDays: 1, removed: false });
+    expect((await call('DELETE', `/v1/creator-space/tasks/${task.id}`, 'nora')).statusCode).toBe(204);
+    expect(await followUp()).toMatchObject({ doneDays: 1, removed: true });
   });
 });

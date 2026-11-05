@@ -165,6 +165,27 @@ export const salesFeedModels = pgTable(
 );
 
 /**
+ * The models the owner set aside from the import review (ADR 0069 § 1, CRM-07): a line set aside does not come back
+ * among the proposals, and stays in « Écartées », from where it can be taken back (the row is deleted). One per model;
+ * a model linked since has none. Agency-level, of no creator: never a creator's own account (`agencyOnly`).
+ */
+export const salesFeedModelDismissals = pgTable(
+  'sales_feed_model_dismissals',
+  {
+    platform: enumText('platform').notNull(),
+    platformModelId: text('platform_model_id').notNull(),
+    dismissedBy: text('dismissed_by'),
+    dismissedAt: timestampTz('dismissed_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: 'sales_feed_model_dismissals_pk', columns: [t.platform, t.platformModelId] }),
+    enumCheck('sales_feed_model_dismissals', t.platform, PlatformSchema.options),
+    check('sales_feed_model_dismissals_id_check', sql`char_length(${t.platformModelId}) between 1 and 200`),
+    agencyOnly(),
+  ],
+);
+
+/**
  * The owner's link of a platform's team member (ADR 0050 § 5): one of the team, or the agent (the platform's bot,
  * whose sales earn no commission). Pay reads it through `salesFeedReadsForPay` (CRM-03), with its version.
  */

@@ -1,0 +1,35 @@
+/* Moi › Préférences (D-03): one panel per thing, the same inset as the panels' heads. */
+.me-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  max-width: 720px;
+}
+.me-prefs__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  padding: 0 var(--nv-space-6) var(--nv-space-6);
+}
+.me-prefs__body > :first-child:not(p, a, button) {
+  align-self: stretch;
+}
+.me-prefs__text {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.me-prefs__go svg {
+  width: 16px;
+  height: 16px;
+}
+/* The panel's title already says « Apparence »: the control keeps its name for screen readers only. */
+.me-prefs .nv-appearance__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

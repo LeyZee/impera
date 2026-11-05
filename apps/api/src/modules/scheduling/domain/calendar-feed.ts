@@ -1,7 +1,8 @@
 /**
- * The calendar feed (CR-12, ADR 0045 § 5): a member's own shifts as an iCalendar file (RFC 5545), for Apple Agenda
- * and Google Agenda. Pure: the slot, the creator and the member's name in the team, nothing else (never an amount,
- * a fan, a leave or a report). Times are written in UTC, which every calendar shows in its own zone.
+ * The calendar feed (CR-12, ADR 0045 § 5): a member's own shifts, or a creator's agenda (CR-05, ADR 0042 § 4), as an
+ * iCalendar file (RFC 5545), for Apple Agenda and Google Agenda. Pure: for a shift, the slot, the creator and the
+ * member's name in the team, nothing else (never an amount, a fan, a leave or a report). Times are written in UTC,
+ * which every calendar shows in its own zone; a whole day is written as a date.
  */
 
 /** What the feed covers around now: two weeks back, four ahead, the 42 days `calendar_shifts` reads at most. */
@@ -16,14 +17,16 @@ export function feedWindow(now: Date): { from: Date; to: Date } {
   };
 }
 
-export interface FeedEvent {
+/**
+ * One event of a feed: a slot between two instants, or a whole day (`day`, a calendar day `2026-11-05`, written as a
+ * date so that every calendar keeps it on that day, whatever its zone: a creator's task « juste un jour », CR-05).
+ */
+export type FeedEvent = {
   /** Stable across reads, so that a calendar updates an event instead of doubling it. */
   readonly uid: string;
-  readonly startsAt: Date;
-  readonly endsAt: Date;
   readonly summary: string;
   readonly description: string;
-}
+} & ({ readonly startsAt: Date; readonly endsAt: Date } | { readonly day: string });
 
 /** `20261103T120000Z`. */
 const utc = (at: Date): string =>
@@ -31,6 +34,11 @@ const utc = (at: Date): string =>
     .toISOString()
     .replace(/[-:]/gu, '')
     .replace(/\.\d{3}/u, '');
+
+/** `20261105`, and the day after it for the end of a whole day (`DTEND` is exclusive, RFC 5545 § 3.6.1). */
+const dateValue = (day: string): string => day.replace(/-/gu, '');
+const dayAfter = (day: string): string =>
+  new Date(Date.parse(`${day}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10);
 
 /** TEXT values (RFC 5545 § 3.3.11): backslash, semicolon, comma and line breaks escaped. */
 export function escapeText(value: string): string {
@@ -81,11 +89,13 @@ export function icsOf(input: { name: string; events: readonly FeedEvent[]; stamp
       'BEGIN:VEVENT',
       `UID:${escapeText(event.uid)}`,
       `DTSTAMP:${stamp}`,
-      `DTSTART:${utc(event.startsAt)}`,
-      `DTEND:${utc(event.endsAt)}`,
+      ...('day' in event
+        ? [`DTSTART;VALUE=DATE:${dateValue(event.day)}`, `DTEND;VALUE=DATE:${dateValue(dayAfter(event.day))}`]
+        : [`DTSTART:${utc(event.startsAt)}`, `DTEND:${utc(event.endsAt)}`]),
       `SUMMARY:${escapeText(event.summary)}`,
       `DESCRIPTION:${escapeText(event.description)}`,
-      'TRANSP:OPAQUE',
+      // A whole day is something to do that day, never time taken: it leaves her free in her calendar.
+      'day' in event ? 'TRANSP:TRANSPARENT' : 'TRANSP:OPAQUE',
       'END:VEVENT',
     );
   }

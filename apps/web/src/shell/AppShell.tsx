@@ -279,7 +279,8 @@ export function RailNav({
       {/* On the Dashboard the mode's own control is on screen: the pill would say it twice (NAV-07). */}
       {rail.items.some(({ to }) => to === '/') && current !== '/' ? <AgentPill /> : null}
       {rail.settings === null ? null : link(rail.settings)}
-      {more.length === 0 && onSignOut === undefined ? null : (
+      {/* No « Plus » when the tabs fit and Moi › Préférences holds the rest (D-03). */}
+      {more.length === 0 && (onSignOut === undefined || !rail.phoneMenu) ? null : (
         <button
           ref={moreRef}
           type="button"

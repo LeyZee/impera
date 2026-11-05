@@ -92,9 +92,10 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const heroNames = usePayNames(hero, false);
   const nowNames = usePayNames(current, false);
 
-  const head = (period: PayPeriod | null): JSX.Element => (
+  // The period is the hero's own first word: said twice above the fold, it was read as two periods (D-03).
+  const head = (): JSX.Element => (
     <PageHeader
-      eyebrow={period === null ? 'Quinzaine' : `Quinzaine ${periodLine(period)}`}
+      eyebrow="Mon argent"
       title="Commissions"
       lead="Ce que tu as gagné sur la quinzaine, et comment ta commission se construit."
       actions={<CommissionsNav />}
@@ -104,7 +105,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   if (periods.isError && !lost && periods.data === undefined)
     return (
       <Page>
-        {head(current)}
+        {head()}
         <div className="py-board">
           <Panel className="nv-enter">
             <Unreachable
@@ -120,7 +121,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   if (hero === null || current === null)
     return (
       <Page>
-        {head(null)}
+        {head()}
         <div className="py-me">
           <div className="py-me__col">
             <Panel>
@@ -141,7 +142,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   if (summaries.length === 0)
     return (
       <Page>
-        {head(current)}
+        {head()}
         <div className="py-board">
           <Panel className="nv-enter">
             <div className="py-empty">
@@ -166,7 +167,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
 
   return (
     <Page>
-      {head(hero)}
+      {head()}
       <div className="py-me">
         <div className="py-me__col">
           {heroData === undefined ? (

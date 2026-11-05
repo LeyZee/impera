@@ -10,9 +10,15 @@ import {
 
 import { feedWindow, icsOf, type FeedEvent } from '../domain/calendar-feed';
 import { CalendarFeedNotFound, CalendarLinkForbidden } from '../domain/errors';
-import type { Actor, CalendarLinkStore, CalendarReads, CreatorDirectory } from '../domain/ports';
+import type {
+  Actor,
+  CalendarLinkStore,
+  CalendarReads,
+  CreatorAgendaFeed,
+  CreatorDirectory,
+} from '../domain/ports';
 
-/** Moi › Mon agenda and the feed it gives (CR-12, ADR 0045 § 5). */
+/** Moi › Calendrier for a member, Agenda › « Dans mon téléphone » for a creator, and the feed each gives (CR-12, CR-05). */
 export interface CalendarLinkService {
   state(actor: UserId): Promise<CalendarLinkState>;
   /** A new address, which revokes the one before; the token leaves the server here, once. */
@@ -23,6 +29,7 @@ export interface CalendarLinkService {
 }
 
 const FEED_NAME = 'Impera · mes shifts';
+const AGENDA_FEED_NAME = 'Impera · mon agenda';
 
 /** Stable for a shift that keeps its member, creator and start: a calendar updates it in place when its end moves. */
 const uidOf = (memberId: string, creatorId: string, startsAt: Date): string =>
@@ -32,6 +39,7 @@ export function createCalendarLinkService(
   store: CalendarLinkStore,
   reads: CalendarReads,
   creators: CreatorDirectory,
+  agendaOf: CreatorAgendaFeed,
   now: () => Date = () => new Date(),
 ): CalendarLinkService {
   return {
@@ -55,6 +63,13 @@ export function createCalendarLinkService(
       const holder = await store.holder(token);
       if (holder === null) throw new CalendarFeedNotFound();
       const at = now();
+      // Her link is her agenda's (CR-05, ADR 0042 § 4), read with her own rights; her accounts' shifts come with lot c3.
+      if (holder.kind === 'creator')
+        return icsOf({
+          name: AGENDA_FEED_NAME,
+          events: await agendaOf(holder.userId, feedWindow(at)),
+          stamp: at,
+        });
       const directory = await creators.list();
       // Read with the holder's own rights (`calendar_shifts` decides), then his own shifts only: the link is his.
       const read = await reads.read(

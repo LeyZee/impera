@@ -37,6 +37,19 @@ export const CREATOR_TASK_CATEGORY_LABELS: Readonly<Record<CreatorTaskCategory, 
   personal: 'Perso',
 };
 
+/**
+ * A category at a glance (Charles, 03/11): its emoji, on her screens and in front of a title in the calendar of her
+ * phone (her calendar link, CR-05 lot c2).
+ */
+export const CREATOR_TASK_CATEGORY_EMOJI: Readonly<Record<CreatorTaskCategory, string>> = {
+  shoot: '🎬',
+  live: '📡',
+  post: '🖼️',
+  socials: '💬',
+  appointment: '📅',
+  personal: '🌿',
+};
+
 export const CreatorTaskTitleSchema = z.string().trim().min(1).max(80);
 /** What the task is for, one sentence, never an invented figure (CR-05). */
 export const CreatorTaskPurposeSchema = z.string().trim().min(1).max(160);
@@ -262,6 +275,17 @@ export const CreateSuggestionBodySchema = z.strictObject({
 });
 export type CreateSuggestionBody = z.infer<typeof CreateSuggestionBodySchema>;
 
+/**
+ * What became of an accepted suggestion, for the agency (CR-05 lot c): the task as she keeps it (moved if she moved
+ * it), the days she ticked it (of the suggestion's week for her routine), and whether she removed it since.
+ */
+export const SuggestionFollowUpSchema = z.strictObject({
+  when: CreatorTaskWhenSchema,
+  doneDays: z.number().int().min(0),
+  removed: z.boolean(),
+});
+export type SuggestionFollowUp = z.infer<typeof SuggestionFollowUpSchema>;
+
 /** A suggestion as the agency reads it: what she did of it, and her reason only when she gave one. */
 export const AgencySuggestionSchema = CreatorSuggestionSchema.extend({
   origin: SuggestionOriginSchema,
@@ -269,6 +293,8 @@ export const AgencySuggestionSchema = CreatorSuggestionSchema.extend({
   reason: z.string().nullable(),
   decidedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
+  /** `null` until she accepts it. */
+  task: SuggestionFollowUpSchema.nullable(),
 });
 export type AgencySuggestion = z.infer<typeof AgencySuggestionSchema>;
 

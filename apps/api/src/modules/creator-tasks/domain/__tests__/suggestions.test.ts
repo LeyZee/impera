@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decide, maySuggest, sameTask, SuggestionDecidedError, weekOf } from '../suggestions';
+import { decide, doneDays, maySuggest, sameTask, SuggestionDecidedError, weekOf } from '../suggestions';
 
 describe('her gesture on a suggestion (ADR 0042 § 3)', () => {
   it('accepts or declines a suggestion once', () => {
@@ -34,5 +34,24 @@ describe('a declined task is not suggested again the week after (ADR 0042, Cons�
     expect(maySuggest(shoot, '2026-11-09', declined)).toBe(false);
     expect(maySuggest(shoot, '2026-11-16', declined)).toBe(true);
     expect(maySuggest({ category: 'content', title: 'Live du dimanche' }, '2026-11-09', declined)).toBe(true);
+  });
+});
+
+describe('doneDays', () => {
+  it('counts her routine within the suggestion’s week only, each day once', () => {
+    expect(
+      doneDays('routine', '2026-11-02', [
+        '2026-11-01',
+        '2026-11-02',
+        '2026-11-02',
+        '2026-11-08',
+        '2026-11-09',
+      ]),
+    ).toBe(2);
+  });
+
+  it('counts every tick of a dated task, whatever week she moved it to', () => {
+    expect(doneDays('day', '2026-11-02', ['2026-11-12'])).toBe(1);
+    expect(doneDays('timed', '2026-11-02', [])).toBe(0);
   });
 });

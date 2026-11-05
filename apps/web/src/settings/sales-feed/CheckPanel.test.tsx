@@ -59,6 +59,8 @@ const OVERVIEW: SalesFeedOverview = {
     },
   ],
   listError: null,
+  candidates: [],
+  dismissed: [],
 };
 
 const totals = (net: number): SalesFeedCheckReport['total']['register'] => ({
