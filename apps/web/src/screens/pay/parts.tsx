@@ -1,4 +1,5 @@
 import type { CollectiveTier, CommissionStatement, PayPeriod } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import type { PayNames } from './data';
@@ -9,6 +10,8 @@ import {
   flowOf,
   gaugePercent,
   goalTiersInOrder,
+  payoutBlockPlace,
+  payoutBlockText,
   signedPercentText,
   tickAmountText,
   totalsOf,
@@ -24,6 +27,48 @@ export function Chip({ chip, title }: { chip: PayChip; title?: string | undefine
     <span className={`rp-chip rp-chip--${chip.tone}`} title={title}>
       {chip.label}
     </span>
+  );
+}
+
+/**
+ * A validated transfer that waits, for the agency (recette EQP-04, ADR 0041 § 4): what is missing, and for the owner the
+ * way to settle it, the member's file or Réglages › Facturation. A manager reads why; the owner settles it.
+ */
+export function PayoutHoldLine({
+  statement,
+  owner,
+  className,
+}: {
+  statement: Pick<CommissionStatement, 'memberId' | 'payoutBlock' | 'notIssuedReason'>;
+  owner: boolean;
+  className: string;
+}): JSX.Element | null {
+  const { payoutBlock: block, notIssuedReason: reason } = statement;
+  if (block === null) return null;
+  const place = owner ? payoutBlockPlace(block, reason) : null;
+  return (
+    <p className={className}>
+      {payoutBlockText(block, reason, owner)}
+      {place === 'file' ? (
+        <>
+          {' '}
+          <Link
+            to="/equipe/membres/$memberId/dossier"
+            params={{ memberId: statement.memberId }}
+            className="py-hold__link"
+          >
+            Ouvrir son dossier
+          </Link>
+        </>
+      ) : place === 'billing' ? (
+        <>
+          {' '}
+          <Link to="/reglages/facturation" className="py-hold__link">
+            Ouvrir Réglages › Facturation
+          </Link>
+        </>
+      ) : null}
+    </p>
   );
 }
 

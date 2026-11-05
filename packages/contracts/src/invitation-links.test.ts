@@ -7,6 +7,7 @@ import {
   InvitationLinkPreviewSchema,
   InvitationLinkTokenSchema,
   PASSWORD_MIN_LENGTH,
+  isPasswordTooPlain,
   PasswordInvalidReasonSchema,
   RedeemInvitationLinkBodySchema,
 } from './invitation-links';
@@ -46,8 +47,23 @@ describe('invitation links', () => {
     ]);
   });
 
+  it('refuses a password long only by its blanks or one repeated character (recette SEC-04)', () => {
+    expect(isPasswordTooPlain(' '.repeat(12))).toBe(true);
+    expect(isPasswordTooPlain('a'.repeat(20))).toBe(true);
+    expect(isPasswordTooPlain('  abcabcabc  ')).toBe(true);
+    expect(isPasswordTooPlain('staple battery horse')).toBe(false);
+    expect(isPasswordTooPlain('😀😀😀😀🎸🎸🎸🎸🔥🔥🔥🔥')).toBe(true);
+    expect(isPasswordTooPlain('😀🎸🔥💜😀🎸🔥💜😀🎸🔥💜')).toBe(false);
+  });
+
   it('names why a password is refused and what the owner meets when making a link', () => {
-    expect(PasswordInvalidReasonSchema.options).toEqual(['too_short', 'too_long', 'breached', 'refused']);
+    expect(PasswordInvalidReasonSchema.options).toEqual([
+      'too_short',
+      'too_long',
+      'too_plain',
+      'breached',
+      'refused',
+    ]);
     expect(INVITATION_LINK_ERROR_CODES).toContain(REAUTHENTICATION_ERROR_CODE);
     expect(INVITATION_LINK_ERROR_CODES).toContain('member_left_conflict');
   });

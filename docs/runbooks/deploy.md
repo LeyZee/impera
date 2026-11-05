@@ -210,7 +210,8 @@ Avant le premier dépôt réel d'une créatrice (CR-06 b, ADR 0055 § 3). Son t�
 
 4. **Une clé pour l'application** (API et worker) : lire, écrire, lister et supprimer des objets de ce bucket, et rien d'autre.
 5. **Coolify**, sur `api` et `worker` : `S3_ENDPOINT` (`https://<région>.your-objectstorage.com`, sans le bucket), `S3_REGION` (`fsn1`, `nbg1`…), `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. Les cinq ensemble, l'adresse en `https`, sinon l'API refuse de démarrer en nommant le réglage. Le service `web` reçoit `S3_ENDPOINT` comme `MEDIA_ORIGIN` : c'est la seule autre adresse que sa politique de sécurité (`connect-src`) laisse joindre.
-6. **L'essai** : la créatrice de recette dépose une photo depuis son téléphone ; le dépôt passe à « Reçu », et un objet existe sous `incoming/<créatrice>/<fichier>` jusqu'au nettoyage. Un dépôt retiré pendant l'envoi n'y laisse rien.
+6. **La place disque du worker** (ADR 0070 § 4) : le worker écrit chaque fichier reçu dans son dossier temporaire (`/tmp` du conteneur, sur le disque du VPS), brut et nettoyé, et prend 2,5 fois son poids avant de commencer. Garder au moins **30 Go libres** sur le VPS pour qu'une vidéo de 10 Gio passe ; sinon le job revient toutes les 15 minutes, et le fichier est refusé (« n'est pas arrivé à temps ») quand le brut disparaît du bucket, au bout de 24 h. Une conversion (ProRes, MKV en VP9…) occupe tous les cœurs moins un, une à la fois ; un redéploiement pendant une conversion la fait reprendre au début.
+7. **L'essai** : la créatrice de recette dépose une photo depuis son téléphone ; le dépôt passe à « Reçu », et un objet existe sous `incoming/<créatrice>/<fichier>` jusqu'au nettoyage. Un dépôt retiré pendant l'envoi n'y laisse rien.
 
 ## 5. Coupe-circuit
 

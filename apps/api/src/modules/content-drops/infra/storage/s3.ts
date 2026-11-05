@@ -20,8 +20,11 @@ type FetchLike = (request: Request) => Promise<Response>;
 
 /** A storage that hangs is a storage that does not answer: the phone tries again, the job retries. */
 const REQUEST_TIMEOUT_MS = 30_000;
-/** A whole video of 500 Mo read by the job, at a bucket in the same region: minutes at most. */
-const DOWNLOAD_TIMEOUT_MS = 600_000;
+/**
+ * A whole file read by the job, at a bucket in the same region (ADR 0070 § 4): a second per 10 Mo, plus a minute.
+ * A 10 Gio video has about twenty minutes.
+ */
+const downloadTimeoutMs = (bytes: number): number => 60_000 + Math.ceil(bytes / 10_000_000) * 1000;
 /** A file up to this size goes up in one PUT; above, in parts of `DROP_PART_BYTES`, read one at a time. */
 const SINGLE_PUT_BYTES = 2 * DROP_PART_BYTES;
 
@@ -209,9 +212,9 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       return length;
     },
 
-    async download(key, path) {
+    async download(key, path, bytes) {
       const what = `GET ${key}`;
-      const response = await call(what, urlOf(key), { method: 'GET' }, DOWNLOAD_TIMEOUT_MS);
+      const response = await call(what, urlOf(key), { method: 'GET' }, downloadTimeoutMs(bytes));
       if (response.status === 404) {
         await response.body?.cancel();
         return false;

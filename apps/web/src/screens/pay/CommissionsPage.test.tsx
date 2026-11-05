@@ -147,8 +147,9 @@ function renderPage(user: Me = THEO_ME): void {
     component: () => <CommissionsPage user={user} />,
   });
   const planning = createRoute({ getParentRoute: () => root, path: '/planning', component: () => null });
+  const file = createRoute({ getParentRoute: () => root, path: '/moi/dossier', component: () => null });
   const router = createRouter({
-    routeTree: root.addChildren([page, planning]),
+    routeTree: root.addChildren([page, planning, file]),
     history: createMemoryHistory({ initialEntries: ['/commissions'] }),
   });
   render(
@@ -339,6 +340,61 @@ describe('CommissionsPage', () => {
     expect(hero.getAttribute('data-stale')).toBe('true');
     expect(text(hero)).toContain('Plus à jour');
     expect(text(hero)).not.toContain('En validation');
+  });
+
+  it('never says « Le versement suit » while the transfer waits for the invoice, and leads to the file (recette EQP-04)', async () => {
+    periods[OCT2] = periodOf(
+      OCT2,
+      [
+        statementOf(THEO, OCT2, {
+          status: 'validated',
+          canValidate: false,
+          validatedAt: '2026-11-02T18:12:00.000Z',
+          netMinor: 98_000,
+          payableMinor: 3_120,
+          totalMinor: 3_120,
+          payoutBlock: { reason: 'documents_not_issued', year: null },
+          notIssuedReason: 'no_mandate',
+        }),
+      ],
+      { closing: CLOSED(OCT2, '2026-11-02T18:12:00.000Z') },
+    );
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    const title = await within(hero).findByText('Ton versement attend ta facture');
+    const notice = title.closest('.rp-notice');
+    expect(notice?.getAttribute('data-tone')).toBe('warn');
+    expect(text(notice)).toContain(
+      'L’agence l’émet pour toi dès que tu acceptes ton mandat de facturation, dans Moi › Dossier.',
+    );
+    expect(within(hero).getByRole('link', { name: 'Ouvrir mon dossier' }).getAttribute('href')).toBe(
+      '/moi/dossier',
+    );
+    expect(text(hero)).not.toContain('Le versement suit');
+  });
+
+  it('says the agency finishes it when the next step is not the member’s, without a link (recette EQP-04)', async () => {
+    periods[OCT2] = periodOf(
+      OCT2,
+      [
+        statementOf(THEO, OCT2, {
+          status: 'validated',
+          canValidate: false,
+          validatedAt: '2026-11-02T18:12:00.000Z',
+          payableMinor: 3_120,
+          totalMinor: 3_120,
+          payoutBlock: { reason: 'documents_not_issued', year: null },
+          notIssuedReason: 'identity_unverified',
+        }),
+      ],
+      { closing: CLOSED(OCT2, '2026-11-02T18:12:00.000Z') },
+    );
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await within(hero).findByText(
+      'Ton dossier est rempli : l’agence le vérifie, puis émet ta facture. Rien à faire de ton côté.',
+    );
+    expect(within(hero).queryByRole('link', { name: 'Ouvrir mon dossier' })).toBeNull();
   });
 
   it('opens a past statement in the second person, paid in the past tense', async () => {

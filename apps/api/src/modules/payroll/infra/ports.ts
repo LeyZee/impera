@@ -1,4 +1,9 @@
-import type { CommissionStatementId, PayPeriod, TeamMemberId } from '@impera/contracts';
+import type {
+  CommissionStatementId,
+  InvoiceNotIssuedReason,
+  PayPeriod,
+  TeamMemberId,
+} from '@impera/contracts';
 import type { Transaction } from '@impera/db';
 
 import type { Actor } from '../../contractors/pure';
@@ -20,6 +25,16 @@ export interface PayoutGate {
   ): Promise<ReadonlyMap<string, PayoutVerdict>>;
   /** How many of the member's documents are open: issued and neither accepted, lapsed nor ended (ADR 0039 § 6). */
   documentsOpen(tx: Transaction, memberId: string): Promise<number>;
+  /**
+   * Why a document each statement of `statements` makes due is not issued, as the invoicing said it last
+   * (`invoice_not_issued`); a statement it said nothing for is left out. Read in an admin transaction: those events are
+   * the agency's, they carry no creator. Only a reason comes out, of statements the caller already read under its own
+   * policies (recette EQP-04).
+   */
+  notIssuedReasonsUnscoped(
+    adminTx: Transaction,
+    statements: readonly { readonly memberId: string; readonly statementId: string }[],
+  ): Promise<ReadonlyMap<string, InvoiceNotIssuedReason>>;
 }
 
 /**

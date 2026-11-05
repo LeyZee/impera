@@ -2,7 +2,17 @@ import { z } from 'zod';
 
 import { GuardCodeSchema } from './guards';
 import { CreatorIdSchema, PersonaVersionIdSchema } from './ids';
-import { PersonaSchema, SAMPLE_REPLIES_MAX } from './persona';
+import {
+  PersonaDetailsSchema,
+  PersonaIntimateSchema,
+  PersonaLifestyleSchema,
+  PersonaLimitsSchema,
+  PersonaSchema,
+  PersonaTastesSchema,
+  PersonaWritingStyleSchema,
+  SAMPLE_REPLIES_MAX,
+  SampleReplySchema,
+} from './persona';
 
 /** Hex SHA-256 of a persona's canonical JSON (keys sorted): two equal personas have the same hash. */
 export const ContentHashSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -28,6 +38,30 @@ export const PersonaOverviewSchema = z.strictObject({
   versions: z.array(PersonaVersionSummarySchema),
 });
 export type PersonaOverview = z.infer<typeof PersonaOverviewSchema>;
+
+/**
+ * Her sheet as she reads it (recette CREA-01, Charles 05/11 « go recos »): who she is, her life, her tastes, the
+ * intimate, her way of writing, her sample replies and her limits, from the version in force. Never the agency's
+ * settings (strategies, follow-ups, notifications, behaviour) nor its history (ADR 0063: the methods stay with the
+ * agency); she reads it, the agency changes it.
+ */
+export const CreatorPersonaSheetSchema = z.strictObject({
+  details: PersonaDetailsSchema,
+  lifestyle: PersonaLifestyleSchema.nullable(),
+  tastes: PersonaTastesSchema.nullable(),
+  intimate: PersonaIntimateSchema.nullable(),
+  writing_style: PersonaWritingStyleSchema.nullable(),
+  sample_replies: z.array(SampleReplySchema).max(SAMPLE_REPLIES_MAX),
+  limits: PersonaLimitsSchema,
+});
+export type CreatorPersonaSheet = z.infer<typeof CreatorPersonaSheetSchema>;
+
+/** `GET /v1/creators/:creatorId/persona/mine`, the creator only: her sheet in force, null while she has none. */
+export const MyPersonaSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  sheet: CreatorPersonaSheetSchema.nullable(),
+});
+export type MyPersona = z.infer<typeof MyPersonaSchema>;
 
 /**
  * `POST /v1/creators/:creatorId/persona/versions` → 201 `PersonaVersionSummary`, never active. `basedOn` is the

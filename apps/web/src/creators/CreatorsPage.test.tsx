@@ -322,8 +322,9 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['Persona', 'Sécurité', 'Préférences']);
-    // She saves her own persona, as before.
-    expect(await screen.findByRole('button', { name: 'Enregistrer une version' })).toBeDefined();
+    // She reads her sheet; the agency changes it (recette CREA-01).
+    await screen.findByText(/Ta fiche/);
+    expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 
     for (const path of ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/factures']) {

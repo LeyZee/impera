@@ -54,7 +54,16 @@ describe('content-drops › a video’s and a vocal’s metadata removed by ffmp
     expect(before).toContain(PLACE);
     expect(before).toContain(DEVICE);
 
-    await cleanAv(raw, out, { family: 'isobmff', quicktime: true, video: true });
+    const probed = await probeAv(raw);
+    expect(probed).toMatchObject({ videoCodec: 'h264', audio: { index: 1, codec: 'aac' } });
+    await cleanAv(raw, out, {
+      video: true,
+      route: 'copy',
+      quicktime: true,
+      audio: probed.audio,
+      bytes: 1,
+      durationMs: probed.durationMs,
+    });
     const after = (await readFile(out)).toString('latin1');
     expect(after).not.toContain(PLACE);
     expect(after).not.toContain(DEVICE);
@@ -63,6 +72,8 @@ describe('content-drops › a video’s and a vocal’s metadata removed by ffmp
     expect(await probeAv(out)).toEqual({
       hasVideo: true,
       hasAudio: true,
+      videoCodec: 'h264',
+      audio: { index: 1, codec: 'aac' },
       width: 240,
       height: 320,
       durationMs: 2000,
@@ -77,7 +88,7 @@ describe('content-drops › a video’s and a vocal’s metadata removed by ffmp
       ...['-metadata', `artist=${DEVICE}`, '-metadata', `comment=${PLACE}`, raw],
     ]);
     expect((await readFile(raw)).toString('latin1')).toContain(DEVICE);
-    await cleanAv(raw, out, { family: 'mp3', quicktime: false, video: false });
+    await cleanAv(raw, out, { video: false, family: 'mp3', bytes: 1 });
     const after = await readFile(out);
     expect(after.toString('latin1')).not.toContain(DEVICE);
     expect(after.toString('latin1').startsWith('ID3')).toBe(false);
@@ -90,7 +101,14 @@ describe('content-drops › a video’s and a vocal’s metadata removed by ffmp
     const raw = join(dir, 'broken.mp4');
     await run('sh', ['-c', `printf '\\000\\000\\000\\030ftypmp42garbage' > '${raw}'`]);
     await expect(
-      cleanAv(raw, join(dir, 'x.mp4'), { family: 'isobmff', quicktime: false, video: true }),
+      cleanAv(raw, join(dir, 'x.mp4'), {
+        video: true,
+        route: 'copy',
+        quicktime: false,
+        audio: null,
+        bytes: 1,
+        durationMs: null,
+      }),
     ).rejects.toThrow();
   });
 });

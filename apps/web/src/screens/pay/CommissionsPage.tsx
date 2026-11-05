@@ -37,6 +37,7 @@ import {
   momentAt,
   myBlockedText,
   myStatementWords,
+  type MyPayoutHold,
   ofPlatform,
   periodHeadOf,
   roundAmountText,
@@ -363,6 +364,7 @@ function Hero({
           {note}
         </p>
       ))}
+      {words.hold === null ? null : <MyHoldNotice hold={words.hold} />}
     </section>
   );
 }
@@ -373,6 +375,24 @@ function hasPerformance(period: PayrollPeriod, chatter: boolean): boolean {
   const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
   const goal = chatter ? (statement?.rules.collectiveGoal ?? period.collectiveGoal) : null;
   return tiers.length > 0 || goal !== null;
+}
+
+/**
+ * A validated transfer that waits (recette EQP-04, ADR 0041 § 4), in amber: why, and when it is theirs to act, the way
+ * to their file. Never « Le versement suit » while nothing can leave.
+ */
+function MyHoldNotice({ hold }: { hold: MyPayoutHold }): JSX.Element {
+  return (
+    <div className="rp-notice py-hold nv-enter" data-tone="warn" role="status">
+      <p className="rp-notice__title">{hold.title}</p>
+      <p className="rp-notice__text">{hold.text}</p>
+      {hold.yours ? (
+        <Link to="/moi/dossier" className="nv-btn nv-btn--soft nv-btn--sm py-hold__go">
+          Ouvrir mon dossier
+        </Link>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -646,6 +666,7 @@ function MyStatementDialog({
                 </p>
               ))}
             </div>
+            {words.hold === null ? null : <MyHoldNotice hold={words.hold} />}
             <MoneyPath statement={statement} names={names} you payLabel={words.label} />
           </>
         )}

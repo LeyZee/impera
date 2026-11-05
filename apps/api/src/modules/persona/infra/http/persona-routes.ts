@@ -4,6 +4,7 @@ import {
   CreatePersonaVersionBodySchema,
   CreatorIdSchema,
   DomainError,
+  MyPersonaSchema,
   PersonaOverviewSchema,
   PersonaVersionSummarySchema,
   type CreatorId,
@@ -13,6 +14,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { sheetOf } from '../../domain/sheet';
 import type { PersonaVersionStore } from '../../domain/versions';
 
 import type { RequireRole } from './routes';
@@ -46,7 +48,9 @@ export function createPersonaRoutes(
     app.get(
       '/creators/:creatorId/persona',
       {
-        preValidation: requireRole('owner', 'operator', 'creator'),
+        // The agency's sheet, its strategies and its history: never the creator's (recette CREA-01), who reads hers
+        // at `…/persona/mine`.
+        preValidation: requireRole('owner', 'operator'),
         schema: { params: CreatorParamsSchema, response: { 200: PersonaOverviewSchema } },
       },
       async (request) => {
@@ -56,11 +60,26 @@ export function createPersonaRoutes(
       },
     );
 
+    app.get(
+      '/creators/:creatorId/persona/mine',
+      {
+        preValidation: requireRole('creator'),
+        schema: { params: CreatorParamsSchema, response: { 200: MyPersonaSchema } },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        actorFor(request, creatorId);
+        const active = await store.active(creatorId);
+        return { creatorId, sheet: active === null ? null : sheetOf(active.persona) };
+      },
+    );
+
     app.post(
       '/creators/:creatorId/persona/versions',
       {
-        // Chatters read her persona; only the owner and the creator herself change it.
-        preValidation: requireRole('owner', 'creator'),
+        // Only the owner changes it: the creator reads her sheet and proposes, the agency writes (recette CREA-01,
+        // Charles 05/11).
+        preValidation: requireRole('owner'),
         schema: {
           params: CreatorParamsSchema,
           body: CreatePersonaVersionBodySchema,
@@ -78,10 +97,10 @@ export function createPersonaRoutes(
     app.post(
       '/creators/:creatorId/persona/versions/:versionId/activate',
       {
-        // The one the agent writes with: the same people who change her persona choose it. It changes what the agent
+        // The one in force: the owner, who alone changes her persona, chooses it. It changes what the agent
         // says of her to every fan, so a sign-in of less than 10 minutes is asked, as for her hours (audit de
         // sécurité du 02/11, M1): a stolen session or a laptop left open is not enough.
-        preValidation: [requireRole('owner', 'creator'), recentLogin],
+        preValidation: [requireRole('owner'), recentLogin],
         schema: {
           params: ActivatePersonaVersionParamsSchema,
           body: ActivatePersonaVersionBodySchema,
