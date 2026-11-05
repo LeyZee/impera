@@ -541,6 +541,9 @@ export async function requestFromIdea(adminDb: Database, request: IdeaContentReq
  * The receipt job's side, as the admin role (`withAdmin`): the states of a drop move by the job only (0108's trigger
  * refuses them to the team, her policies to her).
  */
+/** Where conversions pass one at a time (ADR 0070 § 4): a long one never takes the whole machine. */
+const CONVERSION_QUEUE = 'content_drops:convert';
+
 export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
   return {
     pending: (fileId) =>
@@ -677,6 +680,21 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
             )
             .where(eq(contentDrops.id, drop.id));
         }
+      }),
+
+    enqueue: (task, file, correlationId, runAt) =>
+      withAdmin(adminDb, async (tx) => {
+        await tx.execute(
+          sql`select public.enqueue_job(
+            task => ${task},
+            payload => ${JSON.stringify({ creatorId: file.creatorId, fileId: file.fileId, correlationId })}::jsonb,
+            queue_name => ${task === 'content_drops.convert_file' ? CONVERSION_QUEUE : null}::text,
+            run_at => ${runAt === null ? null : runAt.toISOString()}::timestamptz,
+            max_attempts => ${JOB_MAX_ATTEMPTS[task]}::int,
+            job_key => ${`${task}:${file.fileId}`},
+            job_key_mode => 'replace'
+          )`,
+        );
       }),
   };
 }

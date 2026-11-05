@@ -64,7 +64,10 @@ export const DROP_MEDIA_KINDS = ['image', 'video', 'audio'] as const;
 export const DropMediaKindSchema = z.enum(DROP_MEDIA_KINDS);
 export type DropMediaKind = z.infer<typeof DropMediaKindSchema>;
 
-/** The file types a phone sends, each with its kind: a bounded list, nothing else goes up. */
+/**
+ * The file types a phone sends, each with its kind: a bounded list, nothing else goes up. A video comes in any common
+ * container (ADR 0070 § 2): MOV, MP4, M4V, 3GP (ISO-BMFF), MKV, WebM (EBML), AVI (RIFF).
+ */
 export const DROP_MIME_TYPES = [
   'image/jpeg',
   'image/png',
@@ -73,6 +76,11 @@ export const DROP_MIME_TYPES = [
   'image/webp',
   'video/mp4',
   'video/quicktime',
+  'video/x-m4v',
+  'video/3gpp',
+  'video/x-matroska',
+  'video/webm',
+  'video/x-msvideo',
   'audio/mpeg',
   'audio/mp4',
   'audio/aac',
@@ -89,10 +97,13 @@ export function kindOfMime(mime: DropMime): DropMediaKind {
 
 const MB = 1024 * 1024;
 
-/** The heaviest file of each kind (CR-06, proposition de Bilan du 02/11): a 4G phone sends 500 Mo with resumption. */
+/**
+ * The heaviest file of each kind (CR-06, ADR 0070 § 1): a video weighs up to 10 Gio (a few minutes of iPhone ProRes),
+ * sent in 1 280 parts at most with resumption; a photo or a vocal 30 Mo.
+ */
 export const DROP_MAX_BYTES: Readonly<Record<DropMediaKind, number>> = {
   image: 30 * MB,
-  video: 500 * MB,
+  video: 10 * 1024 * MB,
   audio: 30 * MB,
 };
 
