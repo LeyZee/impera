@@ -1,3 +1,4 @@
+import { CREATOR_REPLIES_EMOJI } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import type { Reply, ReplyLine } from './replies';
@@ -32,7 +33,7 @@ export function DayReplies({ lines }: { lines: readonly ReplyLine[] }): JSX.Elem
     <div className="ag-replies">
       {lines.map((line) => (
         <p key={line.platform}>
-          <span aria-hidden="true">💬 </span>
+          <span aria-hidden="true">{CREATOR_REPLIES_EMOJI} </span>
           Qui répond à tes fans dans {line.label} :{' '}
           <span className="ag-replies__who">
             <People line={line} />
@@ -50,7 +51,7 @@ export function ShortReplies({ lines }: { lines: readonly ReplyLine[] }): JSX.El
     <div className="ag-replies ag-replies--short">
       {lines.map((line) => (
         <p key={line.platform}>
-          <span aria-hidden="true">💬 </span>
+          <span aria-hidden="true">{CREATOR_REPLIES_EMOJI} </span>
           <span className="sr-only">Qui répond à tes fans dans {line.label} : </span>
           {lines.length > 1 ? <span aria-hidden="true">{line.label} : </span> : null}
           <People line={line} />

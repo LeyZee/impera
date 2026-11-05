@@ -25,7 +25,7 @@ import {
   type UserId,
   type UserRole,
 } from '@impera/contracts';
-import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
+import type { FastifyReply, FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -102,6 +102,14 @@ export function createConversationRoutes(
     // A creator never reads a conversation (ADR 0023): her fans' words stay with the agency.
     const read = { preValidation: requireRole('owner', 'operator') };
     const act = { preValidation: requireRole('owner', 'operator') };
+    /**
+     * Automatique sends without anyone reading first: whoever turns it on, owner or manager, gave the password and the
+     * code less than 10 minutes ago (recette 05/11, reco 9), otherwise 403 `reauthentication_forbidden` and the page
+     * asks again. Arrêt and Copilote never ask: stopping must never wait. Called once the body is validated.
+     */
+    const confirmAutomatic = async (request: FastifyRequest, reply: FastifyReply, mode: string) => {
+      if (mode === 'auto') await guards.recentLogin.call(app, request, reply);
+    };
 
     app.get(
       '/conversations',
@@ -294,6 +302,7 @@ export function createConversationRoutes(
       async (request, reply) => {
         // The conversation's mode is a supervisor's control: never through routing.
         const { userId } = actorFor(request, request.query.creatorId);
+        await confirmAutomatic(request, reply, request.body.mode);
         await commands.setMode({
           creatorId: request.query.creatorId,
           conversationId: request.params.id,
@@ -305,13 +314,14 @@ export function createConversationRoutes(
       },
     );
 
-    // The Dashboard's control for every conversation of hers; Arrêt takes effect without a re-authentication.
+    // The Dashboard's control for every conversation of hers; Arrêt takes effect without a re-authentication, Automatique asks one.
     app.put(
       '/agent/mode',
       { ...act, schema: { body: SetAgentModeBodySchema, response: { 200: AgentModeResultSchema } } },
-      async (request) => {
+      async (request, reply) => {
         const { creatorId, mode } = request.body;
         const { userId } = actorFor(request, creatorId);
+        await confirmAutomatic(request, reply, mode);
         return commands.setAgentMode({ creatorId, userId, mode, correlationId: request.id });
       },
     );

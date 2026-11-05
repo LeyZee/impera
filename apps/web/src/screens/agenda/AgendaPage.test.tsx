@@ -277,7 +277,7 @@ describe('Agenda, the creator’s (CR-05)', () => {
     show();
     const line = await screen.findByText(/Qui répond à tes fans dans Reveal/u);
     expect(line.textContent).toMatch(
-      /^💬 Qui répond à tes fans dans Reveal : Kofi 14\sh – 18\sh, Awa 22\sh – 2\sh$/u,
+      /^👥 Qui répond à tes fans dans Reveal : Kofi 14\sh – 18\sh, Awa 22\sh – 2\sh$/u,
     );
     // Her days' bounds in her zone: Monday 0 h to the Monday after, in Paris.
     expect(calls.find((call) => call.url.startsWith('/v1/creator-space/shifts'))?.url).toBe(
