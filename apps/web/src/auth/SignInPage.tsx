@@ -12,7 +12,7 @@ import {
   signInWithPasskey,
   type PasskeySignInResult,
 } from './passkeys';
-import { signIn, verifySignInCode, type CodeResult, type SignInResult } from './session';
+import { normalizeCode, signIn, verifySignInCode, type CodeResult, type SignInResult } from './session';
 
 const MESSAGES: Record<Exclude<SignInResult, 'ok' | 'code_required'>, string> = {
   wrong_credentials: 'E-mail ou mot de passe incorrect.',
@@ -163,7 +163,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
     const form = new FormData(formElement);
     setIsSubmitting(true);
     setError(null);
-    const code = fieldOf(form, 'code');
+    const code = normalizeCode(fieldOf(form, 'code'));
     // A backup code typed in the app's field is still a backup code: its shape picks the check, not the button.
     const isBackup = isBackupCode(code);
     const result = await verifySignInCode(code, {
@@ -197,7 +197,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
         <h1 className="text-xl font-semibold">{backup ? 'Code de secours' : 'Code de connexion'}</h1>
         <p className="text-sm text-[var(--nv-ink-muted)]">
           {backup
-            ? 'Un des dix codes notés à l’activation. Chacun ne sert qu’une fois.'
+            ? 'Un des dix codes notés à l’activation, recopié avec ses majuscules et ses minuscules. Chacun ne sert qu’une fois.'
             : 'Ouvre ton application d’authentification et recopie le code à 6 chiffres d’Impera.'}
         </p>
       </div>

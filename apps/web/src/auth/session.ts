@@ -71,6 +71,18 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   return 'unavailable';
 }
 
+/**
+ * A code as the server reads it (recette 05/11, SEC-08): spaces dropped, a dash typed or autocorrected as « – » or « — »
+ * made a plain one, and a backup code typed without its dash given it back (`aB3dE9fGh1` → `aB3dE-9fGh1`). Letters keep
+ * their case: the stored backup codes are compared as they were made.
+ */
+export function normalizeCode(raw: string): string {
+  const code = raw.replace(/\s+/gu, '').replace(/[\u2010-\u2015\u2212_]/gu, '-');
+  return /^[A-Za-z0-9]{10}$/u.test(code) && !/^\d+$/u.test(code)
+    ? `${code.slice(0, 5)}-${code.slice(5)}`
+    : code;
+}
+
 export type CodeResult =
   | 'ok'
   | 'wrong_code'
@@ -99,7 +111,7 @@ export async function verifySignInCode(
   options: { readonly backup: boolean; readonly trustDevice: boolean },
 ): Promise<CodeResult> {
   const path = options.backup ? '/v1/auth/two-factor/verify-backup-code' : '/v1/auth/two-factor/verify-totp';
-  const response = await post(path, { code, trustDevice: options.trustDevice });
+  const response = await post(path, { code: normalizeCode(code), trustDevice: options.trustDevice });
   if (response.ok) return 'ok';
   return codeResultOf(response.status, await errorCodeOf(response));
 }
@@ -124,7 +136,7 @@ export async function startActivation(password: string): Promise<ActivationStart
 
 /** The activation, second step: the first code from the app. Right, the account's code is active. */
 export async function confirmActivation(code: string): Promise<CodeResult> {
-  const response = await post('/v1/auth/two-factor/verify-totp', { code });
+  const response = await post('/v1/auth/two-factor/verify-totp', { code: normalizeCode(code) });
   if (response.ok) return 'ok';
   return codeResultOf(response.status, await errorCodeOf(response));
 }
@@ -140,7 +152,7 @@ export type ReauthenticateResult =
 
 /** The password and a code, before a sensitive action (ADR 0046 § 3): the action can be retried for 10 minutes. */
 export async function reauthenticate(password: string, code: string): Promise<ReauthenticateResult> {
-  const response = await post('/v1/auth/reauthenticate', { password, code });
+  const response = await post('/v1/auth/reauthenticate', { password, code: normalizeCode(code) });
   if (response.ok) return 'ok';
   const error = await errorCodeOf(response);
   if (error === 'reauthentication_unauthenticated' || error === 'request_invalid') return 'wrong_credentials';

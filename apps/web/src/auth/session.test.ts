@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchCurrentUser, readSession, signIn, signOut, verifySignInCode } from './session';
+import { fetchCurrentUser, normalizeCode, readSession, signIn, signOut, verifySignInCode } from './session';
 
 function answer(status: number, body: unknown = {}): void {
   vi.stubGlobal(
@@ -85,6 +85,27 @@ describe('dashboard session', () => {
     expect(await refused('second_factor_challenge_unauthenticated', 401)).toBe('expired');
     expect(await refused('second_factor_limited', 429)).toBe('locked');
     expect(await refused('rate_limited', 429)).toBe('too_many_attempts');
+  });
+
+  it('sends a backup code as the server reads it, its letters untouched (recette 05/11, SEC-08)', async () => {
+    expect(normalizeCode(' mSpVs JE09z ')).toBe('mSpVs-JE09z');
+    expect(normalizeCode('mSpVsJE09z')).toBe('mSpVs-JE09z');
+    expect(normalizeCode('mSpVs–JE09z')).toBe('mSpVs-JE09z');
+    expect(normalizeCode('123 456')).toBe('123456');
+    // Ten digits are no backup code: left as they are, the server refuses them.
+    expect(normalizeCode('1234567890')).toBe('1234567890');
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        calls.push(`${url} ${typeof init?.body === 'string' ? init.body : ''}`);
+        return Promise.resolve(new Response('{}', { status: 200 }));
+      }),
+    );
+    await verifySignInCode('mSpVs — JE09z', { backup: true, trustDevice: false });
+    expect(calls).toEqual([
+      '/v1/auth/two-factor/verify-backup-code {"code":"mSpVs-JE09z","trustDevice":false}',
+    ]);
   });
 
   it('throws when the server did not close the session, so that the page can say so (recette 28/10, G9)', async () => {
