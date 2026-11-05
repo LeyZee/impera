@@ -211,11 +211,11 @@ export interface DeclaredDropFile {
   readonly bytes: number;
 }
 
-/** Why a declared file does not go up for this category, in her words; `null` when it may go. */
 /** A weight as she reads it: « 30 Mo », « 10 Go ». */
 const weightFr = (bytes: number): string =>
   bytes >= 1024 * MB ? `${String(bytes / (1024 * MB))} Go` : `${String(bytes / MB)} Mo`;
 
+/** Why a declared file does not go up for this category, in her words; `null` when it may go. */
 export function declaredFileRefusal(category: DropCategory, file: DeclaredDropFile): string | null {
   const kind = kindOfMime(file.mime);
   const { kinds } = DROP_FORMAT_RULES[category];
