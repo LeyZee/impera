@@ -19,6 +19,8 @@ export const HTTP_ERROR_CODES = [
   'payload_too_large',
   'rate_limited',
   'service_unavailable',
+  /** 404: an id in the request points at a row that does not exist (a foreign key refused it). */
+  'reference_not_found',
   'internal_error',
 ] as const;
 export type HttpErrorCode = (typeof HTTP_ERROR_CODES)[number];

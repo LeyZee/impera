@@ -46,6 +46,24 @@ const probeRoutes: FastifyPluginAsyncZod = (app) => {
   app.get('/conflict', () => {
     throw new DraftConflict('draft_conflict', 'Brouillon déjà envoyé');
   });
+  app.post('/echo', { schema: { body: z.object({ text: z.string() }) } }, (request) => ({
+    text: request.body.text,
+  }));
+  app.get('/item/:id', { schema: { params: z.object({ id: z.string() }) } }, (request) => ({
+    id: request.params.id,
+  }));
+  app.get('/db-down', () => {
+    throw new Error('Failed query: select 1\nparams: ', {
+      cause: Object.assign(new Error('terminating connection due to administrator command'), {
+        code: '57P01',
+      }),
+    });
+  });
+  app.get('/db-missing-ref', () => {
+    throw new Error('Failed query: insert into blind_tests\nparams: 1', {
+      cause: Object.assign(new Error('violates foreign key constraint'), { code: '23503' }),
+    });
+  });
   app.get('/boom', () => {
     throw new Error('select * from secrets where leaked = true');
   });
@@ -104,6 +122,45 @@ describe('request id', () => {
       headers: { 'x-request-id': 'evil\nlog line' },
     });
     expect(replaced.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
+
+describe('hostile input (recette 05/11)', () => {
+  it('drops U+0000 from a JSON body before validation (MOT-05)', async () => {
+    const response = await (
+      await server()
+    ).inject({ method: 'POST', url: '/v1/echo', payload: { text: 'coucou\u0000toi' }, headers: ORIGIN });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ text: 'coucoutoi' });
+  });
+
+  it('refuses U+0000 in the path or the query with the common body', async () => {
+    const app = await server();
+    for (const url of ['/v1/item/a%00b', '/v1/item/a?q=%00']) {
+      const response = await app.inject({ method: 'GET', url });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ error: { code: string } }>().error.code).toBe('request_invalid');
+    }
+  });
+
+  it('answers a path parameter that is too long in the common body, in French (MOT-08)', async () => {
+    const response = await (await server()).inject({ method: 'GET', url: `/v1/item/${'x'.repeat(5000)}` });
+    expect(response.statusCode).toBe(400);
+    const body = response.json<{ error: { code: string; message: string } }>();
+    expect(body.error).toMatchObject({ code: 'request_invalid', message: 'Requête invalide' });
+    expect(response.body).not.toContain('xxxxxxxx');
+  });
+
+  it('answers 503 when the database cannot answer (MOT-07)', async () => {
+    const response = await (await server()).inject({ method: 'GET', url: '/v1/db-down' });
+    expect(response.statusCode).toBe(503);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('service_unavailable');
+  });
+
+  it('answers 404 when an id the client sent points at nothing (MOT-06)', async () => {
+    const response = await (await server()).inject({ method: 'GET', url: '/v1/db-missing-ref' });
+    expect(response.statusCode).toBe(404);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('reference_not_found');
   });
 });
 

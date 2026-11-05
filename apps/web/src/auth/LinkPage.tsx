@@ -233,6 +233,13 @@ function PasswordForm({
       case 'too_many_attempts':
         setError({ kind: 'retry', text: 'Trop d’essais. Attends quelques minutes, puis réessaie.' });
         return;
+      case 'password_check_unavailable':
+        // Impera answered; only the check of known leaked passwords did not. The link is still unused.
+        setError({
+          kind: 'retry',
+          text: 'La vérification de ton mot de passe ne répond pas. Réessaie dans un instant, ton lien reste valable.',
+        });
+        return;
       case 'unavailable':
         setHasLostAnswer(true);
         setError({ kind: 'retry', text: 'Le serveur ne répond pas. Réessaie dans un instant.' });
