@@ -51,7 +51,9 @@ export function BackupsSection(): JSX.Element {
   const hasCopy = status.data.lastSucceededAt !== null;
 
   return (
-    <section className="bk-page">
+    // Without a copy, the copy is the thing to fix first: its title takes the larger size, the restore test (which
+    // needs one) steps back (recette 05/11, PRO-19).
+    <section className="bk-page" data-first={hasCopy ? 'restore' : 'copy'}>
       <p className="bk-lede nv-enter">
         Chaque nuit, une copie chiffrée de la base part chez un autre hébergeur. Une copie ne vaut que si on a
         déjà su la restaurer : c’est l’essai, une fois par trimestre.
