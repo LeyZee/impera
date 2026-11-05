@@ -151,7 +151,7 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Moi']);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
   });
 });
 
@@ -734,7 +734,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
       [
         '/creatrices',
-        'La fiche de chaque créatrice : sa persona, ses heures d’activité, son accès et le pourcentage de l’agence.',
+        'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès et le pourcentage de l’agence.',
       ],
     ] as const) {
       renderApp(owner, path);

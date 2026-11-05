@@ -71,3 +71,18 @@ export function maySuggest(candidate: TaskIdentity, week: string, declined: read
     (decline) => decline.declinedOn >= since && decline.declinedOn <= until && sameTask(decline, candidate),
   );
 }
+
+/**
+ * The days she ticked the task an accepted suggestion became, for the agency (CR-05 lot c): of the suggestion's week
+ * for her routine, which comes back every week; every tick otherwise, a timed task or a task of a day being ticked on
+ * its one day. A day counts once.
+ */
+export function doneDays(
+  kind: 'timed' | 'day' | 'routine',
+  week: string,
+  tickDays: readonly string[],
+): number {
+  const last = addDays(week, 6);
+  const counted = kind === 'routine' ? tickDays.filter((day) => day >= week && day <= last) : tickDays;
+  return new Set(counted).size;
+}

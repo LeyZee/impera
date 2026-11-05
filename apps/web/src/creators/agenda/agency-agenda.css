@@ -1,0 +1,159 @@
+/*
+ * Créatrices › Agenda (CR-05 lot c). The head, panel and skeletons are the persona's (`ps-*`), the category tiles and
+ * the form are her agenda's (`ag-*`); the week switch and the rows of what she did live here, prefixed `aa-`. A row
+ * says its category by its tile, never by a coloured edge; where it stands is a quiet pill, the one tint of a done
+ * task is the success colour on its dot.
+ */
+.aa-week {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.aa-week__label {
+  min-width: 13ch;
+  text-align: center;
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+}
+
+.aa-notice {
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink);
+}
+
+.aa-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+.aa-empty__title {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  font-weight: 600;
+}
+
+.aa-summary {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+.aa-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.aa-group__title {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.aa-group__title .nv-num {
+  color: var(--nv-ink-faint);
+  font-weight: 500;
+}
+
+.aa-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+
+.aa-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+}
+.aa-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.aa-row__title {
+  font-size: var(--nv-text-callout);
+  overflow-wrap: anywhere;
+}
+.aa-row__meta,
+.aa-row__purpose,
+.aa-row__detail {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.aa-row__purpose {
+  color: var(--nv-ink-faint);
+}
+.aa-row__detail {
+  color: var(--nv-ink);
+}
+/* Removed or declined: read in retreat, the title struck only when removed. */
+.aa-row[data-standing='declined'] .aa-row__title,
+.aa-row[data-standing='removed'] .aa-row__title {
+  color: var(--nv-ink-muted);
+}
+.aa-row[data-standing='removed'] .aa-row__title {
+  text-decoration: line-through;
+  text-decoration-color: var(--nv-ink-faint);
+}
+
+.aa-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--nv-ink-muted);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.aa-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nv-ink-faint);
+}
+.aa-pill[data-standing='done'] {
+  color: var(--nv-ink);
+}
+.aa-pill[data-standing='done']::before {
+  display: none;
+}
+.aa-pill[data-standing='done'] > span {
+  color: var(--nv-success);
+}
+.aa-pill[data-standing='accepted'] {
+  color: var(--nv-ink);
+}
+.aa-pill[data-standing='accepted']::before {
+  background: var(--nv-ink-muted);
+}
+
+/* On a phone the pill goes under the text, aligned on it: the title keeps the width of the row. */
+@media (max-width: 520px) {
+  .aa-row {
+    flex-wrap: wrap;
+  }
+  .aa-row__text {
+    flex-basis: calc(100% - 38px - var(--nv-space-3));
+  }
+  .aa-pill {
+    margin-left: calc(38px + var(--nv-space-3));
+  }
+}
