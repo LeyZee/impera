@@ -120,6 +120,17 @@ describe('Moi › Persona (recette CREA-01)', () => {
     expect(asked).not.toContain(`/v1/creators/${CREATOR}/persona`);
   });
 
+  it('leaves out what is not written, and says it once for a block with nothing', async () => {
+    renderPage();
+    const life = await screen.findByRole('region', { name: 'Ta vie' });
+    expect(life.textContent).toContain('Rien d’écrit pour l’instant.');
+    const limits = screen.getByRole('region', { name: 'Tes limites' });
+    expect(limits.textContent).toContain('Ce que tu ne fais jamais');
+    expect(limits.textContent).not.toContain('Ce que tu ne montres jamais');
+    expect(document.body.textContent).not.toMatch(/rien d’écrit$/mu);
+    expect(screen.getAllByText('Rien d’écrit pour l’instant.')).toHaveLength(3);
+  });
+
   it('says her sheet is being prepared while she has none', async () => {
     sheet = null;
     renderPage();
