@@ -297,7 +297,7 @@ describe('Faire mon rapport', () => {
     await screen.findByRole('dialog');
     fireEvent.change(amountField(), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer mon rapport' }));
-    fireEvent.click(screen.getByRole('link', { name: 'Suivi' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Ouvrir Suivi' }));
     await screen.findByText('Écran Suivi');
     await act(() => vi.advanceTimersByTimeAsync(5_000));
 
@@ -319,7 +319,7 @@ describe('Faire mon rapport', () => {
     await screen.findByRole('dialog');
     fireEvent.change(amountField(), { target: { value: '45' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer mon rapport' }));
-    fireEvent.click(screen.getByRole('link', { name: 'Suivi' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Ouvrir Suivi' }));
     await screen.findByText('Écran Suivi');
 
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
