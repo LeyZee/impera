@@ -179,8 +179,13 @@ describe('Équipe › Dossier prestataire, contrat et mandat : écrire, vérifie
     expect(ContractorFileSchema.parse(again.json())).toEqual(file);
     expect(await team.audited('contractor_profile.update')).toBe(0);
 
-    // A manager reads it, never writes it; another member neither reads nor writes it.
-    expect((await fileOf(theo.id, miaCookie)).statusCode).toBe(200);
+    // A manager neither reads it nor writes it (reco 10, 05/11: the API says what the screens say), though the
+    // policies let him read; another member neither reads nor writes it.
+    const readByManager = await fileOf(theo.id, miaCookie);
+    expect(readByManager.statusCode).toBe(403);
+    expect(team.refusal(readByManager).code).toBe('contractor_profile_forbidden');
+    // His own file, he reads.
+    expect((await fileOf(mia.id, miaCookie)).statusCode).toBe(200);
     const byManager = await write(theo.id, miaCookie, { ...THEO_FILE, email: 'autre@example.test' });
     expect(byManager.statusCode).toBe(403);
     expect(team.refusal(byManager).code).toBe('contractor_profile_forbidden');
