@@ -17,6 +17,8 @@ import { fetchConversations, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
   duration,
+  groupByHand,
+  HAND_TITLES,
   LIST_ORDER_LABELS,
   LIST_ORDERS,
   MODE_MEANINGS,
@@ -25,10 +27,10 @@ import {
   readListOrder,
   searchLines,
   sharedMode,
-  STATE_LABELS,
-  statusClass,
+  situationOf,
   storeListOrder,
   subline,
+  type Hand,
   type ListOrder,
 } from './view';
 import './tracking.css';
@@ -57,6 +59,8 @@ export function TrackingPage({
   canDecide,
   canAddCreator,
   offShift,
+  routedOnly = false,
+  nothingListed,
   nav,
 }: {
   /** The conversation open in the reader (`/suivi?conversation=<id>`), or null for the list alone. */
@@ -73,6 +77,13 @@ export function TrackingPage({
    * listed: off shift, the server only lists the one whose handover he took, until he gives it back (ADR 0025).
    */
   offShift?: ((holdsHandover: boolean) => ReactNode) | undefined;
+  /**
+   * A team member whose scope is `self` (a chatter): he reads only the conversations routed to him, a human hand on one
+   * of them is his, he reads the fan's limits without changing them, and a hand given back leaves his list.
+   */
+  routedOnly?: boolean;
+  /** What a member who reads only his routed conversations sees while none is listed: what to do, never a blank. */
+  nothingListed?: ReactNode;
   /** Suivi's sub-views, for whoever reads the history of the alerts too (P4-01); a chatter has none. */
   nav?: ReactNode;
 }): JSX.Element {
@@ -91,6 +102,8 @@ export function TrackingPage({
   const [order, setOrder] = useState<ListOrder>(readListOrder);
   const [search, setSearch] = useState('');
   const [allTodos, setAllTodos] = useState(false);
+  /** A hand just given back by a member who reads only his routed conversations: it left his list, said once. */
+  const [released, setReleased] = useState<string | null>(null);
 
   const isLoading = creatorsQuery.isPending || queries.some((q) => q.isPending);
   const failed = queries.filter((q) => q.isError);
@@ -168,7 +181,15 @@ export function TrackingPage({
           </Link>
         </Notice>
       ) : // Off shift with nothing listed: the banner above says it all, never « no conversation yet ».
-      offShift !== undefined && lines.length === 0 && todos.length === 0 ? null : creators.length === 0 ? (
+      offShift !== undefined && lines.length === 0 && todos.length === 0 ? (
+        releasedNote(released)
+      ) : (creators.length === 0 || (routedOnly && lines.length === 0 && todos.length === 0)) &&
+        nothingListed !== undefined ? (
+        <>
+          {releasedNote(released)}
+          {nothingListed}
+        </>
+      ) : creators.length === 0 ? (
         <Notice
           title="Rien pour toi pour l’instant"
           text="Les conversations des créatrices qui te sont confiées arrivent ici."
@@ -176,6 +197,7 @@ export function TrackingPage({
       ) : (
         <div className="tr-layout">
           <div className="tr-side">
+            {releasedNote(released)}
             {/* An unread queue is never silent: an urgency may be missing from it. */}
             {queue.isError ? (
               <Panel className="tr-panel" eyebrow="À traiter">
@@ -252,20 +274,36 @@ export function TrackingPage({
                   {isSearching && shown.length === 0 ? (
                     <p className="tr-more">Aucun fan ne porte ce pseudo dans la liste.</p>
                   ) : null}
-                  <ul className="nv-list tr-list" aria-label="Conversations">
-                    {shown.map(({ conversation, creatorName }) => (
-                      <Row
-                        key={conversation.id}
-                        conversation={conversation}
-                        creatorName={showsCreator ? creatorName : undefined}
-                        now={now}
-                        isOpen={conversation.id === selected}
-                        onOpen={() => {
-                          onSelect(conversation.id);
-                        }}
-                      />
+                  {/* Grouped by who acts (CHAT-22): the state is said by the group, not on every line. */}
+                  <div role="group" aria-label="Conversations" className="tr-groups">
+                    {groupByHand(shown, routedOnly).map((group) => (
+                      <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
+                        <h3 className="tr-group__title">
+                          {HAND_TITLES[group.hand]}
+                          {group.hand === 'yours' ? (
+                            <span className="tr-group__count">{group.lines.length}</span>
+                          ) : null}
+                        </h3>
+                        <ul className="nv-list tr-list" aria-label={HAND_TITLES[group.hand]}>
+                          {group.lines.map(({ conversation, creatorName }) => (
+                            <Row
+                              key={conversation.id}
+                              conversation={conversation}
+                              hand={group.hand}
+                              holdsHand={routedOnly}
+                              creatorName={showsCreator ? creatorName : undefined}
+                              now={now}
+                              isOpen={conversation.id === selected}
+                              onOpen={() => {
+                                setReleased(null);
+                                onSelect(conversation.id);
+                              }}
+                            />
+                          ))}
+                        </ul>
+                      </section>
                     ))}
-                  </ul>
+                  </div>
                   {hasMore ? (
                     <p className="tr-more">
                       {isSearching
@@ -295,9 +333,18 @@ export function TrackingPage({
               creatorId={open}
               conversationId={selected}
               canDecide={canDecide}
+              routedOnly={routedOnly}
               onClose={() => {
                 onSelect(null);
               }}
+              onReleased={
+                routedOnly
+                  ? (fan) => {
+                      setReleased(fan);
+                      onSelect(null);
+                    }
+                  : undefined
+              }
             />
           )}
         </div>
@@ -410,14 +457,25 @@ function QueueRow({
   );
 }
 
+/**
+ * A conversation of the list: his pseudo first, his messages without an answer and whose fan he is beside it (D-03),
+ * when he wrote under it. The state shows only where it tells something: in « À toi », why a person must act; elsewhere
+ * the group's title says it, but for a pause (CHAT-22).
+ */
 function Row({
   conversation,
+  hand,
+  holdsHand,
   creatorName,
   now,
   isOpen,
   onOpen,
 }: {
   conversation: ConversationSummary;
+  /** The group the line is in: its state is said once, by the group. */
+  hand: Hand;
+  /** The reader holds the conversations routed to him: a human hand is his. */
+  holdsHand: boolean;
   /** Shown beside his pseudo when the account sees several creators, never cut. */
   creatorName: string | undefined;
   now: Date;
@@ -426,6 +484,8 @@ function Row({
 }): JSX.Element {
   const name = conversation.fanDisplayName.trim() === '' ? 'Fan sans nom' : conversation.fanDisplayName;
   const line = subline(conversation, now);
+  const situation = situationOf(conversation, holdsHand);
+  const says = hand === 'yours' ? 'pill' : conversation.state === 'paused' ? 'word' : null;
   return (
     <li className="nv-enter">
       <button
@@ -440,11 +500,9 @@ function Row({
         <span className="nv-convo__main">
           <span className="nv-convo__name tr-row__name">
             <span className="tr-row__pseudo">{name}</span>
+            {/* What it counts: his messages since the last answer, which reading does not lower (CHAT-13). */}
             {conversation.unreadCount > 0 ? (
-              <span
-                className="tr-unread nv-num"
-                aria-label={`${String(conversation.unreadCount)} non lu${conversation.unreadCount > 1 ? 's' : ''}`}
-              >
+              <span className="tr-unread nv-num" aria-label={`${String(conversation.unreadCount)} sans réponse`}>
                 {conversation.unreadCount}
               </span>
             ) : null}
@@ -456,17 +514,30 @@ function Row({
             {line.band === null ? line.text : `${line.text} · ${line.band}`}
           </span>
         </span>
-        {/* Nothing to do says nothing: no pill on an idle line (D-03). */}
-        {conversation.state === 'idle' ? null : (
+        {says === null ? null : (
           <span className="nv-convo__side">
-            <span className={`nv-status ${statusClass(conversation.state)}`}>
-              <span className="nv-status__dot" />
-              {STATE_LABELS[conversation.state]}
-            </span>
+            {says === 'pill' ? (
+              <span className={`nv-status ${situation.pill}`}>
+                <span className="nv-status__dot" />
+                {situation.label}
+              </span>
+            ) : (
+              <span className="nv-meta">{situation.label}</span>
+            )}
           </span>
         )}
       </button>
     </li>
+  );
+}
+
+/** The hand a chatter just gave back: the conversation left his list, so the screen says it went through (CHAT-08). */
+function releasedNote(fan: string | null): JSX.Element | null {
+  if (fan === null) return null;
+  return (
+    <p className="tr-released" role="status">
+      Main rendue à l’agent pour {fan} : ta note est gardée.
+    </p>
   );
 }
 

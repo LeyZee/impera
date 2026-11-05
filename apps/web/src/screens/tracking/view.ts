@@ -23,6 +23,75 @@ export const MODE_LABELS: Readonly<Record<ConversationMode, string>> = {
 /** The design system's class for a state: its values use `_`, the classes `-`. */
 export const statusClass = (state: ConversationState): string => `nv-status--${state.replaceAll('_', '-')}`;
 
+/**
+ * His last message has no answer yet: written after the last message that left, or nothing left at all. What the
+ * server reads for « Sans réponse » in « À traiter » (`last_inbound_at > last_outbound_at`), so that the list and the
+ * reader never say « Rien à faire » while a fan waits (recette 05/11, PRO-03).
+ */
+export function fanWaits(
+  conversation: Pick<ConversationSummary, 'lastInboundAt' | 'lastOutboundAt'>,
+): boolean {
+  const { lastInboundAt, lastOutboundAt } = conversation;
+  if (lastInboundAt === null) return false;
+  return lastOutboundAt === null || Date.parse(lastInboundAt) > Date.parse(lastOutboundAt);
+}
+
+/**
+ * Who acts on a conversation, the way Suivi groups its list (recette 05/11, CHAT-22): « À toi » when a person must act
+ * (a draft to decide, the hand a person holds, a send that failed, a fan nobody will answer), the agent while it is on
+ * it, nothing to do otherwise.
+ */
+export type Hand = 'yours' | 'agent' | 'quiet';
+
+export const HANDS: readonly Hand[] = ['yours', 'agent', 'quiet'];
+
+export const HAND_TITLES: Readonly<Record<Hand, string>> = {
+  yours: 'À toi',
+  agent: 'L’agent s’en occupe',
+  quiet: 'Rien à faire',
+};
+
+/** Where a conversation stands for the person reading, in a word, and the pill that says it. */
+export interface Situation {
+  readonly hand: Hand;
+  readonly label: string;
+  /** The design system's pill (`nv-status--…`). */
+  readonly pill: string;
+}
+
+/**
+ * The conversation's situation for this reader. `holdsHand`: the reader is the person the conversation is routed to (a
+ * chatter), so a human hand is his (« Tu as la main »). An idle or paused conversation whose fan waits is « Sans
+ * réponse »: the agent only answers a new message, so a person must (PRO-03, CHAT-25).
+ */
+export function situationOf(
+  conversation: Pick<ConversationSummary, 'state' | 'lastInboundAt' | 'lastOutboundAt'>,
+  holdsHand = false,
+): Situation {
+  const { state } = conversation;
+  const pill = statusClass(state);
+  if (state === 'awaiting_approval') return { hand: 'yours', label: STATE_LABELS[state], pill };
+  if (state === 'human')
+    return { hand: 'yours', label: holdsHand ? 'Tu as la main' : STATE_LABELS[state], pill };
+  if (state === 'error') return { hand: 'yours', label: 'Envoi échoué', pill };
+  if ((state === 'idle' || state === 'paused') && fanWaits(conversation))
+    return { hand: 'yours', label: 'Sans réponse', pill: statusClass('awaiting_approval') };
+  if (state === 'pending' || state === 'drafting' || state === 'sending')
+    return { hand: 'agent', label: STATE_LABELS[state], pill };
+  return { hand: 'quiet', label: STATE_LABELS[state], pill };
+}
+
+/** The lines split by who acts, each group in the order it came; an empty group is left out. */
+export function groupByHand<T extends { readonly conversation: ConversationSummary }>(
+  lines: readonly T[],
+  holdsHand = false,
+): { readonly hand: Hand; readonly lines: readonly T[] }[] {
+  return HANDS.map((hand) => ({
+    hand,
+    lines: lines.filter((l) => situationOf(l.conversation, holdsHand).hand === hand),
+  })).filter((group) => group.lines.length > 0);
+}
+
 export interface Line {
   readonly conversation: ConversationSummary;
   /** Whose conversation it is: every read and decision names the creator. */

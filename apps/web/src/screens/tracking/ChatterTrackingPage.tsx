@@ -7,17 +7,18 @@ import { TrackingPage } from './TrackingPage';
 import { useMyShifts } from '@/scheduling/api';
 import { accessOpen } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
-import { addDays, clockAt, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
+import { addDays, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Panel } from '@/shell/layout';
 
 /**
- * Suivi of a chatter (EQ-13, ADR 0025): the server opens a creator's conversations from the start margin of his shift
- * to its end margin. Outside, Suivi says so plainly, with his next shift, instead of an empty list. Only a handover he
- * took stays readable under it, until he gives it back.
+ * Suivi of a chatter (ADR 0025): he reads the conversations routed to him (a handover, a draft of the agent to decide).
+ * The access to every conversation of his creators during his shift (EQ-13) is not built yet: until it is, Suivi says
+ * so plainly instead of an empty list (Charles, « go recos » of 05/11, reco 7; recette CHAT-02, CHAT-14). Outside his
+ * shift, it says so too, with his next shift; only a handover he took stays readable, until he gives it back.
  */
 export function ChatterTrackingPage(
-  props: Omit<ComponentProps<typeof TrackingPage>, 'offShift'>,
+  props: Omit<ComponentProps<typeof TrackingPage>, 'offShift' | 'routedOnly' | 'nothingListed'>,
 ): JSX.Element {
   const mine = useMyShifts();
   const now = useNow();
@@ -25,6 +26,8 @@ export function ChatterTrackingPage(
   return (
     <TrackingPage
       {...props}
+      routedOnly
+      nothingListed={<NothingRouted />}
       offShift={
         off
           ? (holdsHandover: boolean) => (
@@ -71,7 +74,7 @@ function OffShift({
           <p className="sc-off__lead">
             {next === null
               ? 'Aucun shift prévu pour l’instant.'
-              : `Prochain shift ${when}, ${rangeAt(next.startsAt, next.endsAt, zone)} sur ${next.creatorName}. Ses conversations s’ouvrent ici à ${clockAt(next.accessStartsAt, zone)}.`}
+              : `Prochain shift ${when}, ${rangeAt(next.startsAt, next.endsAt, zone)} sur ${next.creatorName}.`}
             {holdsHandover
               ? ' La passation que tu as prise reste ici jusqu’à ce que tu rendes la main.'
               : null}
@@ -79,6 +82,31 @@ function OffShift({
         </div>
         <Link to="/planning" className="nv-btn nv-btn--soft nv-btn--sm sc-off__go">
           Mon planning
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * On shift with nothing routed to him: what Suivi holds for now, what he does meanwhile, and where his shift is said.
+ * Never a promise of what EQ-13 will open (CHAT-02), never a blank (CHAT-14).
+ */
+function NothingRouted(): JSX.Element {
+  return (
+    <Panel className="nv-coming">
+      <div className="nv-coming__in tr-notice" role="status">
+        <h2>Rien pour toi pour l’instant</h2>
+        <p>
+          Tu chattes dans Reveal. Ici arrivent seulement les conversations qu’on te confie : une passation, un
+          brouillon de l’agent à valider.
+        </p>
+        <p>
+          Voir toutes les conversations de ta créatrice pendant ton shift n’est pas encore ouvert dans Impera
+          : en attendant, tout se passe dans Reveal.
+        </p>
+        <Link to="/aujourdhui" className="nv-btn nv-btn--soft nv-btn--sm">
+          Voir mon shift
         </Link>
       </div>
     </Panel>
