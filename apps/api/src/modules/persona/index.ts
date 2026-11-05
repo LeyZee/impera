@@ -17,8 +17,6 @@ import {
   type RequireRole,
 } from './infra/http/routes';
 
-export type { CreatorArchiving } from './infra/http/routes';
-
 export interface PersonaModule {
   readonly name: 'persona';
   /** The creators (one creator, one persona): listed by the dashboard, created by `pnpm creator:create`. */
