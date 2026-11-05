@@ -256,6 +256,10 @@ export const contentDropFiles = pgTable(
       foreignColumns: [contentDrops.id, contentDrops.creatorId],
     }),
     index('content_drop_files_creator_idx').on(t.creatorId),
+    // The drops a medium came in by, read each hour by `content_drops.erase_originals` (CR-06 c).
+    index('content_drop_files_media_idx')
+      .on(t.mediaAssetId)
+      .where(sql`${t.mediaAssetId} is not null`),
     pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
     // A file joins only a drop of hers still sending, and waits for its bytes.
     pgPolicy('creator_insert', {

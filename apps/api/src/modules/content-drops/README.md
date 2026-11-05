@@ -4,7 +4,7 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 **Peut dépendre de.** Rien. Il écrit lui-même la ligne `media_assets` d'un fichier gardé (rôle administrateur, empreinte unique par créatrice) ; la description par `sense` viendra avec la clé de vision.
 
-**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. Lot b1 : l'envoi des fichiers au bucket des médias, la reprise d'un envoi coupé, la réception par un job (migration 0109). Lot b2 : le nettoyage de chaque fichier, son format vérifié, son entrée dans la médiathèque. L'effacement daté vient au lot c, l'écran Contenu au lot d.
+**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. Lot b1 : l'envoi des fichiers au bucket des médias, la reprise d'un envoi coupé, la réception par un job (migration 0109). Lot b2 : le nettoyage de chaque fichier, son format vérifié, son entrée dans la médiathèque. Lot c : l'effacement daté des originaux et l'envoi abandonné (migration 0113). L'écran Contenu vient au lot d.
 
 ## Qui lit, qui écrit (migration 0108)
 
@@ -43,6 +43,17 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 ## Une demande née d'une idée (VEI-01 d2)
 
 `requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.
+
+## L'effacement daté (lot c)
+
+- Un **original** est un média qu'un dépôt a gardé (un de ses fichiers le nomme à l'état `kept`). Il est gardé **un an** après le jour où il a été gardé (`media_assets.expires_at`, ADR 0055 § 7), tant qu'aucune sortie n'est prévue. Les sorties (PUB-01) ramèneront cette date à la dernière sortie plus 30 jours, avec le préfixe `released/`.
+- Le job `content_drops.erase_originals` tourne chaque heure, en trois temps, chacun rejouable :
+  1. un fichier qui attend encore ses octets 24 h après le début de son dépôt est refusé (« L'envoi ne s'est pas terminé dans les 24 h : dépose-le à nouveau ») et son dépôt suit, comme pour tout refus ;
+  2. l'agence est prévenue 7 jours avant qu'un original parte (`content_media_expiring`, une fois par média et par date) ;
+  3. chaque original dû est effacé du bucket, puis marqué (`erased_at`, `content_media_erased`). Il est dû à sa date, ou dès que **tous** les dépôts par lesquels il est venu sont retirés : un dépôt retiré efface donc ses originaux dans l'heure, sauf si un autre dépôt d'elle tient le même média.
+- La ligne reste, avec l'empreinte, la durée, le type et la description (ADR 0044 § 2) ; `storage_key` ne nomme alors plus rien.
+- Un bucket qui refuse ou ne répond pas laisse l'original en place et le dit une fois en ambre (`content_media_erase_failed`) ; l'heure suivante réessaie. Aucun événement ne porte de nom ni de contenu, seulement l'identifiant du média.
+- Redonné après son effacement, le même média reprend un original (le fichier nettoyé est réécrit sous sa clé) et une nouvelle date d'un an. Redonné avant, sa date est repoussée à un an à partir du nouveau dépôt.
 
 ## Routes
 

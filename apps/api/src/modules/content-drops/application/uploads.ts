@@ -206,7 +206,7 @@ export async function receiveFile(
     }
     const { sha256, bytes } = await sha256Of(out);
     const storageKey = mediaKeyOf(target.creatorId, sha256);
-    // A medium she already has is not written again: the file becomes its duplicate.
+    // A medium she already holds is not written again: the file becomes its duplicate. Erased, it is written again.
     if ((await receipts.knownMedia(target.creatorId, sha256)) === null)
       await storage.upload(storageKey, out, target.mime, sha256);
     await receipts.settle(
