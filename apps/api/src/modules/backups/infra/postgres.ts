@@ -201,12 +201,13 @@ const requestColumns = {
  * never make two; the `audit_log` line goes in the same transaction.
  */
 export function createPostgresBackupRequestsStore(db: Database): BackupRequestsStore {
-  const oldestPending = async (tx: Pick<Database, 'select'>): Promise<StoredBackupRequest | null> => {
+  // The latest one: a request asked again after a stale one (PRO-06) is the one the page speaks of.
+  const latestPending = async (tx: Pick<Database, 'select'>): Promise<StoredBackupRequest | null> => {
     const [row] = await tx
       .select(requestColumns)
       .from(schema.backupRequests)
       .where(sql`${schema.backupRequests.pickedAt} is null`)
-      .orderBy(schema.backupRequests.requestedAt)
+      .orderBy(sql`${schema.backupRequests.requestedAt} desc`)
       .limit(1);
     return row === undefined ? null : StoredBackupRequestSchema.parse(row);
   };
@@ -225,7 +226,7 @@ export function createPostgresBackupRequestsStore(db: Database): BackupRequestsS
           .limit(1);
         const decision = decide({
           sameId: same === undefined ? null : StoredBackupRequestSchema.parse(same),
-          pending: await oldestPending(tx),
+          pending: await latestPending(tx),
           latestRun: latest === undefined ? null : toRun(latest),
         });
         if (decision.kind === 'existing') return { created: false, request: decision.request };
@@ -245,6 +246,6 @@ export function createPostgresBackupRequestsStore(db: Database): BackupRequestsS
         return { created: true, request: StoredBackupRequestSchema.parse(inserted) };
       });
     },
-    pending: () => oldestPending(db),
+    pending: () => latestPending(db),
   };
 }

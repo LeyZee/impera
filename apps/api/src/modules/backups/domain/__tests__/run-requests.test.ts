@@ -41,6 +41,16 @@ describe('a request to export now (REG-24)', () => {
     });
   });
 
+  it('records a new request when the one waiting was not picked up for more than 5 minutes (recette 05/11, PRO-06)', () => {
+    const stale: StoredBackupRequest = { ...request('old'), requestedAt: hoursAgo(0.25) };
+    expect(decideRequest({ sameId: null, pending: stale, latestRun: null }, NOW)).toEqual({ kind: 'insert' });
+    const recent: StoredBackupRequest = { ...request('new'), requestedAt: hoursAgo(0.05) };
+    expect(decideRequest({ sameId: null, pending: recent, latestRun: null }, NOW)).toEqual({
+      kind: 'existing',
+      request: recent,
+    });
+  });
+
   it('refuses while an export runs, but not past 26 hours of a run that crashed', () => {
     expect(() => decideRequest({ sameId: null, pending: null, latestRun: run('running', 0.2) }, NOW)).toThrow(
       BackupRunInProgress,
