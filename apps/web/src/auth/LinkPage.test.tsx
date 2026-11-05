@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NewPasswordPage } from './NewPasswordPage';
 import { WelcomePage } from './WelcomePage';
 import { forgetTakenToken } from './api';
+import { chosenPassword, forgetChosenPassword } from './chosen-password';
 
 const TOKEN = 'lien-invente-pour-les-tests';
 const PASSWORD = 'une phrase que je retiens';
@@ -83,6 +84,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   forgetTakenToken();
+  forgetChosenPassword();
   window.history.replaceState(null, '', '/');
 });
 
@@ -153,6 +155,8 @@ describe('WelcomePage', () => {
     await vi.waitFor(() => {
       expect(onSignedIn).toHaveBeenCalledWith(ME);
     });
+    // Kept in memory for the code's activation that follows, so it is not asked twice (recette SEC-15).
+    expect(chosenPassword()).toBe(PASSWORD);
   });
 
   it('welcomes a creator to her own space, she who has no country on file (CR-02)', async () => {
@@ -314,6 +318,24 @@ describe('another account signed in on this browser', () => {
       cleanup();
       forgetTakenToken();
     }
+  });
+});
+
+describe('the page follows the link, not the address (recette SEC-10)', () => {
+  it('welcomes a first access opened on the new-password page, and moves the address', async () => {
+    serve({ inspect: [[200, preview('invitation')]] });
+    open('reset');
+    expect(await screen.findByRole('heading', { name: 'Bienvenue, Théo' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Entrer' })).toBeDefined();
+    expect(window.location.pathname).toBe('/bienvenue');
+  });
+
+  it('asks for a new password when a reset link is opened on the welcome page', async () => {
+    serve({ inspect: [[200, preview('reset')]] });
+    open('welcome');
+    expect(await screen.findByRole('heading', { name: 'Nouveau mot de passe' })).toBeDefined();
+    expect(screen.queryByText(/Bienvenue/u)).toBeNull();
+    expect(window.location.pathname).toBe('/nouveau-mot-de-passe');
   });
 });
 

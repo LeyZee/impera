@@ -2,13 +2,16 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   type InvitationLinkPreview,
+  type InvitationLinkPurpose,
   type Me,
   type PasswordInvalidReason,
 } from '@impera/contracts';
 import { useCallback, useEffect, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';
-import { inspectInvitationLink, redeemInvitationLink, takeToken } from './api';
+import { LINK_PAGE_PATHS, inspectInvitationLink, redeemInvitationLink, takeToken } from './api';
+import { holdChosenPassword } from './chosen-password';
+import { LINK_COPIES, type LinkPageCopy } from './link-copy';
 import { fetchCurrentUser } from './session';
 
 export interface LinkPageProps {
@@ -16,20 +19,6 @@ export interface LinkPageProps {
   onSignedIn: (me: Me | null) => void;
   /** Leaves a link that does not work, for the sign-in page. */
   onLeave: () => void;
-}
-
-/** What tells the two pages apart; the rest is the same walk. */
-export interface LinkPageCopy {
-  /** Above the title: what the member checks of his record (EQ-10 « vérifier son nom et son pays »). */
-  readonly eyebrow?: (preview: InvitationLinkPreview) => string;
-  readonly title: (preview: InvitationLinkPreview) => string;
-  /** The browser tab's name for the page, before the link is read. */
-  readonly page: string;
-  readonly lead: string;
-  readonly passwordLabel: string;
-  readonly submit: string;
-  /** Under the button, faint. */
-  readonly footnote?: (preview: InvitationLinkPreview) => string;
 }
 
 type Step =
@@ -41,7 +30,14 @@ type Step =
  * A one-time link (EQ-10), on the sign-in page's plate: the link is read first (whose it is, his e-mail read only),
  * then the member chooses his password, and his session opens. Chatters open it from WhatsApp: the phone comes first.
  */
-export function LinkPage({ copy, onSignedIn, onLeave }: LinkPageProps & { copy: LinkPageCopy }): JSX.Element {
+export function LinkPage({
+  purpose,
+  onSignedIn,
+  onLeave,
+}: LinkPageProps & {
+  /** What the address it was opened at is for; the link, once read, has the last word. */
+  purpose: InvitationLinkPurpose;
+}): JSX.Element {
   const [token] = useState(() => takeToken());
   const [step, setStep] = useState<Step>({ kind: token === null ? 'gone' : 'reading' });
   /** Who this browser is signed in as, if anyone: redeem opens the member's session in place of it. */
@@ -58,6 +54,13 @@ export function LinkPage({ copy, onSignedIn, onLeave }: LinkPageProps & { copy: 
   }, [token]);
 
   useEffect(read, [read]);
+
+  const linkPurpose = step.kind === 'ready' ? step.preview.purpose : purpose;
+  const copy = LINK_COPIES[linkPurpose];
+  useEffect(() => {
+    // The address follows: a reload or a screenshot names the right page.
+    if (linkPurpose !== purpose) window.history.replaceState(null, '', LINK_PAGE_PATHS[linkPurpose]);
+  }, [linkPurpose, purpose]);
 
   useEffect(() => {
     if (token === null) return;
@@ -222,6 +225,8 @@ function PasswordForm({
     setIsSending(false);
     switch (result.kind) {
       case 'ok':
+        // The code's activation comes next: it takes this password instead of asking for it again.
+        holdChosenPassword(password);
         onSignedIn(result.me);
         return;
       case 'gone':

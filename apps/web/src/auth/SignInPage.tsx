@@ -27,6 +27,9 @@ const CODE_MESSAGES: Record<Exclude<CodeResult, 'ok' | 'expired'>, string> = {
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
 };
 
+/** A wrong backup code: the clock of a phone she does not have at hand is beside the point. */
+const WRONG_BACKUP_CODE = 'Ce code de secours ne marche pas, ou il a déjà servi. Chacun ne sert qu’une fois.';
+
 const PASSKEY_MESSAGES: Record<Exclude<PasskeySignInResult, 'ok' | 'cancelled'>, string> = {
   refused: 'Cette clé n’ouvre aucun compte. Connecte-toi avec ton e-mail, ton mot de passe et ton code.',
   too_many_attempts: MESSAGES.too_many_attempts,
@@ -162,8 +165,9 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
     setError(null);
     const code = fieldOf(form, 'code');
     // A backup code typed in the app's field is still a backup code: its shape picks the check, not the button.
+    const isBackup = isBackupCode(code);
     const result = await verifySignInCode(code, {
-      backup: isBackupCode(code),
+      backup: isBackup,
       trustDevice: form.get('trust') === 'on',
     }).catch((): CodeResult => 'unavailable');
     setIsSubmitting(false);
@@ -180,7 +184,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
       field.value = '';
       field.focus();
     }
-    setError(CODE_MESSAGES[result]);
+    setError(result === 'wrong_code' && isBackup ? WRONG_BACKUP_CODE : CODE_MESSAGES[result]);
   }
 
   return (
