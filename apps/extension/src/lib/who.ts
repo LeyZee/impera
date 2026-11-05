@@ -65,6 +65,8 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/planning': 'planning',
   '/commissions': 'pay',
   '/ventes': 'pay',
+  // Contenu is no role's shortcut today (her four stay Aujourd'hui, Agenda, Ventes, Moi).
+  '/contenu': 'today',
   '/equipe': 'team',
   '/paie': 'pay',
   '/creatrices': 'creators',

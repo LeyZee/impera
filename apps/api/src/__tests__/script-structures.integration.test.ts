@@ -249,6 +249,14 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
 
   it('keeps out of her queue a structure whose stage touches her limits, and names the stage', async () => {
     const nora = await app.modules.persona.creators.create({ displayName: 'Nora' });
+    // A manager reaches only the creators of his list (recette 05/11, reco 8): Nora joins it.
+    const queueOf = () =>
+      server.inject({ method: 'GET', url: `/v1/creators/${nora.id}/script-queue`, headers: manager });
+    expect(errorOf(await queueOf())).toEqual([403, 'creator_forbidden']);
+    await test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [nora.id] })
+      .where(eq(schema.user.email, MANAGER.email));
     const fine = body();
     const harsh = body({ segments: [stage('dur', 'Humiliation douce')] });
     await post(owner, fine);
@@ -272,11 +280,7 @@ describe('script structures (SC-01, /v1/script-structures)', () => {
     });
 
     // What was queued before her persona is shown blocked, never dropped behind her back.
-    const view = ScriptQueueSchema.parse(
-      (
-        await server.inject({ method: 'GET', url: `/v1/creators/${nora.id}/script-queue`, headers: manager })
-      ).json(),
-    );
+    const view = ScriptQueueSchema.parse((await queueOf()).json());
     expect(view.personaChecked).toBe(true);
     expect(view.entries.map((e) => [e.structureId, e.blocks.length])).toEqual([[harsh.id, 1]]);
 

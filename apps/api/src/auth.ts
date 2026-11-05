@@ -120,6 +120,16 @@ class RoleForbidden extends DomainError {
   }
 }
 
+/** A creator named in the route that the operator's `creator_ids` do not hold (ADR 0023, recette 05/11 reco 8). */
+class CreatorForbidden extends DomainError {
+  constructor() {
+    super('creator_forbidden', 'Créatrice hors de ton périmètre');
+  }
+}
+
+/** The `:creatorId` of a route, when it has one. */
+const CreatorParamSchema = z.object({ creatorId: z.string() });
+
 /** Too many sign-ins on one account (security.md §6), whatever the addresses they came from. */
 class SignInLimited extends DomainError {
   constructor() {
@@ -550,6 +560,16 @@ export function createRequireRole(auth: Auth, db: Database): RequireRole {
       if (session === null) throw new SessionUnauthenticated();
       if (!session.secondFactorEnabled) throw new SecondFactorRequired();
       if (!roles.includes(session.user.role)) throw new RoleForbidden();
+      // An operator, chatter or manager alike, reaches only the creators of his list, on every route that names one in
+      // its path: her content, her ideas, her suggestions, her scripts (Charles, recette 05/11, reco 8). His team role
+      // widens the team he sees, never the creators (ADR 0023). A chatter's list is the one routed to him: the route
+      // then says what he may do there.
+      const named = CreatorParamSchema.safeParse(request.params);
+      if (session.user.role === 'operator' && named.success) {
+        const { creatorIds, routedCreatorIds } = session.user;
+        if (![...creatorIds, ...routedCreatorIds].includes(named.data.creatorId))
+          throw new CreatorForbidden();
+      }
       request.user = session.user;
       request.membership = session.membership;
     };

@@ -142,7 +142,7 @@ describe('the rail of each role', () => {
       expect(router.state.location.pathname).toBe('/aujourdhui');
     });
     // Her own space (ADR 0042 § 8), and no Réglages: every page of it is the owner's (NAV-18).
-    expect(tabs()).toEqual(['Aujourd’hui', 'Agenda', 'Ventes', 'Moi']);
+    expect(tabs()).toEqual(['Aujourd’hui', 'Agenda', 'Ventes', 'Contenu', 'Moi']);
     expect(screen.getByText('Créatrice')).toBeDefined();
   });
 

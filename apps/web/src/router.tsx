@@ -17,6 +17,7 @@ import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
 import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
+import { ContentPage } from './screens/content/ContentPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
@@ -288,6 +289,15 @@ const sales = createRoute({
       />
     );
   },
+});
+/**
+ * Contenu, the creator's alone (CR-06 d, ADR 0055 § 8): what she is asked for, what she drops, where it is. Any other
+ * account is sent home by the root, as this section is not on its rail.
+ */
+const content = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/contenu',
+  component: ContentPage,
 });
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
@@ -803,7 +813,11 @@ const extensionHelp = createRoute({
 const notifications = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notifications',
-  component: NotificationsPage,
+  component: function Notifications() {
+    const { user } = rootRoute.useRouteContext();
+    // The creator has no shift (ADR 0049 § 4): her words never speak of one (CREA-12).
+    return <NotificationsPage creator={user.role === 'creator'} />;
+  },
 });
 
 const routeTree = rootRoute.addChildren([
@@ -819,6 +833,7 @@ const routeTree = rootRoute.addChildren([
   today,
   agenda,
   sales,
+  content,
   myPlanning,
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
