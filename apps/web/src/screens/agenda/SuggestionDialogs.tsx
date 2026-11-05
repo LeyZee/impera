@@ -1,16 +1,17 @@
-import type { CreatorSuggestion } from '@impera/contracts';
+import { SUGGESTION_PAST_UNPROCESSABLE, type CreatorSuggestion } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { acceptSuggestion, AGENDA_KEY, declineSuggestion, NOT_SENT } from './api';
-import { spanOf } from './draft';
+import { firstMoment, spanOf } from './draft';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
-import { addDays, clockOf, weekOf } from '@/scheduling/time';
+import { addDays, clockOf, dayOf, minuteOf, weekOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 const REFUSED = 'Cette proposition n’est plus là. Ton agenda est relu.';
+const PAST = 'Ce moment est déjà passé : choisis-en un à venir.';
 
 /** « Non merci », with a reason if she likes: the agency reads it, and does not suggest it again next week. */
 export function DeclineDialog({
@@ -94,10 +95,12 @@ export function PlaceDialog({
 }): JSX.Element {
   const id = useId();
   const client = useQueryClient();
-  const days = weekOf(suggestion.week);
+  const [opened] = useState(() => new Date());
+  const today = dayOf(opened, zone);
+  const first = firstMoment(weekOf(suggestion.week), today, minuteOf(opened, zone));
   const minutes = suggestion.minutes ?? 60;
-  const [day, setDay] = useState(days[0] ?? suggestion.week);
-  const [start, setStart] = useState(10 * 60);
+  const [day, setDay] = useState(first.day);
+  const [start, setStart] = useState(first.start);
   const { unreadable, onUnreadable } = useUnreadableTimes();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -112,6 +115,10 @@ export function PlaceDialog({
         setBusy(false);
         if (outcome.kind === 'offline' || outcome.kind === 'failed') {
           setFailed(NOT_SENT[outcome.kind]);
+          return;
+        }
+        if (outcome.kind === 'refused' && outcome.code === SUGGESTION_PAST_UNPROCESSABLE) {
+          setFailed(PAST);
           return;
         }
         await client.invalidateQueries({ queryKey: AGENDA_KEY });
@@ -132,7 +139,7 @@ export function PlaceDialog({
             type="date"
             className="nv-field__control nv-glass tm-date"
             value={day}
-            min={suggestion.week}
+            min={today > suggestion.week ? today : suggestion.week}
             max={addDays(suggestion.week, 6)}
             data-autofocus
             onChange={(event) => {

@@ -366,6 +366,7 @@ function ProposeDialog({
         ) : (
           <DayField
             value={draft.day}
+            invalid={tried && problems.includes('day')}
             onChange={(next) => {
               set({ day: next });
             }}

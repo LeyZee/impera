@@ -65,6 +65,7 @@ export function taskOf(row: TaskRow): CreatorTask {
     shootBrief: row.shootBrief,
     essential: row.essential,
     reminderMinutes: row.reminderMinutes,
+    createdAt: row.createdAt.toISOString(),
   });
 }
 

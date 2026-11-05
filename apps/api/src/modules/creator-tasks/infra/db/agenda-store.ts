@@ -26,6 +26,7 @@ import {
   CreatorTaskNotFound,
   CreatorTickDayUnprocessable,
   CreatorTickLateUnprocessable,
+  SuggestionInPast,
   SuggestionKindChanged,
   SuggestionNotFound,
   SuggestionUndated,
@@ -109,6 +110,13 @@ function dayOfTask(when: CreatorTaskWhen, zone: string, fallback: string): strin
   return fallback;
 }
 
+/** Whether a moment is over: a timed one ended, a day before her today. A routine is never over. */
+function isOver(when: CreatorTaskWhen, zone: string, now: Date): boolean {
+  if (when.kind === 'timed') return Date.parse(when.endsAt) <= now.getTime();
+  if (when.kind === 'day') return when.day < calendarDayIn(now, zone);
+  return false;
+}
+
 async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
   const [creator] = await tx
     .select({ timeZone: schema.creators.timezone })
@@ -148,9 +156,12 @@ async function streakNow(tx: Transaction, zone: string, now: Date): Promise<Crea
   return streakOf(records, today);
 }
 
-const sameTask = (stored: CreatorTask, body: Omit<CreatorTask, 'essential' | 'shootBrief'>): boolean =>
-  JSON.stringify({ ...stored, essential: undefined, shootBrief: undefined }) ===
-  JSON.stringify({ ...body, essential: undefined, shootBrief: undefined });
+const sameTask = (
+  stored: CreatorTask,
+  body: Omit<CreatorTask, 'essential' | 'shootBrief' | 'createdAt'>,
+): boolean =>
+  JSON.stringify({ ...stored, essential: undefined, shootBrief: undefined, createdAt: undefined }) ===
+  JSON.stringify({ ...body, essential: undefined, shootBrief: undefined, createdAt: undefined });
 
 /** `withCreatorAccount` for every reading and writing of her agenda (CR-05). */
 export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStore {
@@ -394,6 +405,7 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
         // Moved, never changed in kind: what is essential is what the agency proposed as her routine.
         if (when.kind !== row.kind) throw new SuggestionKindChanged();
         const zone = await zoneOf(tx, creatorId);
+        if (isOver(when, zone, now)) throw new SuggestionInPast();
         const [task] = await tx
           .insert(tasks)
           .values({

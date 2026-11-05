@@ -6,7 +6,10 @@ import { AGENDA_KEY, createAvailability, createTask, NOT_SENT } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import {
   availabilityBodiesOf,
+  defaultStart,
   dispoIds,
+  OUT_OF_REACH,
+  reachOf,
   newTaskId,
   taskBodyOf,
   taskProblems,
@@ -19,7 +22,7 @@ import {
 import { whenWords } from './words';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
-import { clockOf, longDay, weekdayOf } from '@/scheduling/time';
+import { clockOf, dayOf, longDay, minuteOf, weekdayOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
@@ -167,14 +170,18 @@ export function Hours({
   );
 }
 
+/** A day, offered within her agenda's reach (CREA-14): a year back, two years ahead. */
 export function DayField({
   value,
+  invalid = false,
   onChange,
 }: {
   value: string;
+  invalid?: boolean;
   onChange: (day: string) => void;
 }): JSX.Element {
   const id = useId();
+  const [reach] = useState(() => reachOf());
   return (
     <div className="nv-field tm-field">
       <label className="nv-field__label" htmlFor={id}>
@@ -185,10 +192,19 @@ export function DayField({
         type="date"
         className="nv-field__control nv-glass tm-date"
         value={value}
+        min={reach.min}
+        max={reach.max}
+        aria-invalid={invalid ? 'true' : undefined}
+        aria-describedby={invalid ? `${id}-error` : undefined}
         onChange={(event) => {
           onChange(event.target.value);
         }}
       />
+      {invalid ? (
+        <p id={`${id}-error`} className="tm-hint tm-hint--error" role="alert">
+          {OUT_OF_REACH}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -208,7 +224,8 @@ export function AddDialog({
   onClose: () => void;
 }): JSX.Element {
   const [what, setWhat] = useState<'task' | 'dispo'>('task');
-  const start = preset.start ?? 10 * 60;
+  const [opened] = useState(() => new Date());
+  const start = preset.start ?? defaultStart(preset.day, dayOf(opened, zone), minuteOf(opened, zone));
   const end = preset.end ?? (start + 60) % 1440;
   return (
     <Dialog title="Ajouter" className="ag-scope" onClose={onClose}>
@@ -489,6 +506,7 @@ function TaskForm({
       ) : (
         <DayField
           value={draft.day}
+          invalid={tried && problems.includes('day')}
           onChange={(day) => {
             set({ day });
           }}
