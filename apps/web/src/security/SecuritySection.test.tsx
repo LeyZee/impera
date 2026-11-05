@@ -19,7 +19,8 @@ const SESSIONS = [
     device: 'Chrome sur Windows',
     network: '198.51.100.x',
     createdAt: minutesAgo(600),
-    lastActiveAt: minutesAgo(0),
+    // The server writes the activity at most every so often: the session in use can read 36 min old (PRO-18).
+    lastActiveAt: minutesAgo(36),
     current: true,
   },
   {
@@ -47,7 +48,7 @@ const ACCOUNTS = [
     secondFactor: true,
     sessions: 1,
     passkeys: 0,
-    lastActiveAt: minutesAgo(0),
+    lastActiveAt: minutesAgo(36),
   },
   {
     userId: 'u-team',
@@ -230,7 +231,8 @@ describe('SecuritySection (SEC-04)', () => {
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
     expect(within(present(rows[0])).getByText('Cet appareil')).toBeTruthy();
-    expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · dernière activité à l’instant');
+    // The device in use is active now, whatever the last activity the server wrote (recette 05/11, PRO-18).
+    expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · actif maintenant');
     expect(rows[1]?.textContent).toContain(
       'Réseau 203.0.113.x · dernière activité il\u00a0y\u00a0a\u00a03\u00a0h',
     );
@@ -367,6 +369,9 @@ describe('SecuritySection (SEC-04)', () => {
     const list = await screen.findByRole('list', { name: 'Comptes de l’agence' });
     const [owner, team] = within(list).getAllByRole('listitem');
     expect(owner?.textContent).toContain('Propriétaire');
+    // The owner reads this page: his account is active now (PRO-18).
+    expect(owner?.textContent).toContain('actif maintenant');
+    expect(owner?.textContent).not.toContain('dernière activité');
     expect(owner?.textContent).toContain('Code à 6 chiffres actif');
     // His own sessions are closed above, one by one.
     expect(within(present(owner)).queryByRole('button')).toBeNull();

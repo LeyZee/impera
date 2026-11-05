@@ -204,8 +204,9 @@ function SessionsPanel(): JSX.Element {
                   </span>
                   <span className={MUTED}>
                     {group.network === null ? 'Réseau inconnu' : `Réseau ${group.network}`}
-                    {group.ids.length > 1 ? ` · ${String(group.ids.length)}\u00a0sessions` : ''} · dernière
-                    activité {ago(group.lastActiveAt, now)}
+                    {group.ids.length > 1 ? ` · ${String(group.ids.length)}\u00a0sessions` : ''} ·{' '}
+                    {/* The device in use is active now: the server writes the activity only now and then (PRO-18). */}
+                    {group.current ? 'actif maintenant' : `dernière activité ${ago(group.lastActiveAt, now)}`}
                   </span>
                 </div>
                 {group.current ? null : (
@@ -600,9 +601,11 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
                     </span>
                     <span className={MUTED}>
                       {sessionsText(account.sessions)}
-                      {account.lastActiveAt === null
-                        ? ''
-                        : ` · dernière activité ${ago(account.lastActiveAt, now)}`}
+                      {account.userId === ownerId
+                        ? ' · actif maintenant'
+                        : account.lastActiveAt === null
+                          ? ''
+                          : ` · dernière activité ${ago(account.lastActiveAt, now)}`}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
