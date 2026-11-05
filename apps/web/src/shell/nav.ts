@@ -123,6 +123,11 @@ export interface Rail {
   readonly headed: ReadonlySet<Family>;
   /** On the phone, the tabs under « Plus ». */
   readonly more: ReadonlySet<ReadySection>;
+  /**
+   * Whether the phone's bar ends with « Plus »: only when tabs overflow, or when the rail has no Moi to hold the
+   * appearance, the notifications and the way out (D-03: then they live in Moi › Préférences, never twice).
+   */
+  readonly phoneMenu: boolean;
 }
 
 /** The rail of the signed-in account, with the screens that exist today. */
@@ -144,6 +149,7 @@ export function railOf(me: Me): Rail {
     home: items[0]?.to ?? '/suivi',
     headed: layout.headed,
     more: new Set([...layout.more].filter(isReady)),
+    phoneMenu: layout.more.size > 0 || !items.some((one) => one.to === '/moi'),
   };
 }
 
@@ -181,6 +187,7 @@ const SCREENS = {
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
+  '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Ventes',
   '/reglages/alertes': 'Alertes',

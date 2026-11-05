@@ -308,7 +308,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Sécurité']);
+    ).toEqual(['Persona', 'Sécurité', 'Préférences']);
     // She saves her own persona, as before.
     expect(await screen.findByRole('button', { name: 'Enregistrer une version' })).toBeDefined();
     cleanup();

@@ -117,6 +117,10 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     ).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
+  it('ink reads at AA on a sent bubble', () => {
+    expect(contrast(token(theme, 'ink'), token(theme, 'bubble-sent'))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
   it('on-neon reads at AA on neon-solid', () => {
     expect(contrast(token(theme, 'on-neon'), token(theme, 'neon-solid'))).toBeGreaterThanOrEqual(AA_TEXT);
   });

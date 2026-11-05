@@ -13,9 +13,12 @@ import type {
   SalesFeedCapability,
   SalesFeedCheckReport,
   SalesFeedErrorKind,
+  SalesFeedImportAction,
+  SalesFeedImportLineResult,
   SalesFeedSignal,
 } from '@impera/contracts';
 
+import type { ImportableCreator } from './model-import';
 import type { CheckLine } from './reliability-check';
 
 /**
@@ -269,6 +272,25 @@ export interface SalesLedger {
   ): Promise<'linked' | 'conflict'>;
   /** Further lines of the model wait in quarantine; those recorded stay. */
   unlinkModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;
+  /** Every creator, for the import's name match (CRM-07). */
+  creators(): Promise<readonly ImportableCreator[]>;
+  /** The models set aside from the import, with when (`sales_feed_model_dismissals`). */
+  dismissals(platform: Platform): Promise<ReadonlyMap<string, Date>>;
+  /** Sets a model aside from the import, or takes it back; each with its `audit_log` line, none when nothing changes. */
+  dismissModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;
+  restoreModel(platform: Platform, platformModelId: string, by: string | null): Promise<void>;
+  /**
+   * Imports one live model (ADR 0069 § 3), in one transaction: the creator created (or the one chosen), her account of
+   * the platform (created, or hers with that handle), the link (`linkedBy` the owner), its quarantined lines released,
+   * its dismissal gone, and the audit lines. A model already linked writes nothing (`already_linked`): a double click
+   * or a replay creates no second creator. A refusal writes nothing either, and the other lines go on.
+   */
+  importModel(
+    platform: Platform,
+    model: PlatformModel,
+    action: SalesFeedImportAction,
+    by: string | null,
+  ): Promise<SalesFeedImportLineResult>;
   chatterLinks(platform: Platform): Promise<ReadonlyMap<string, ChatterLink>>;
   /**
    * For the reliability check (CRM-02): the sales recorded or quarantined between `from` (included) and `to`

@@ -230,6 +230,7 @@ describe('« Plus » on the phone', () => {
     ],
     settings: item('/reglages', 'Réglages', 'settings'),
     home: '/suivi',
+    phoneMenu: true,
     headed: new Set(),
     more: new Set(['/entrainer', '/creatrices', '/reglages']),
   };
@@ -307,11 +308,12 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
     home: '/suivi',
     headed: new Set(),
     more: new Set(),
+    phoneMenu: true,
   };
 
-  function renderRail(onSignOut: () => void): void {
+  function renderRail(onSignOut: () => void, shown: Rail = rail): void {
     const root = createRootRoute({
-      component: (): JSX.Element => <RailNav rail={rail} current="/suivi" onSignOut={onSignOut} />,
+      component: (): JSX.Element => <RailNav rail={shown} current="/suivi" onSignOut={onSignOut} />,
     });
     const router = createRouter({
       routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: '/suivi' })]),
@@ -319,6 +321,16 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
     });
     render(<RouterProvider router={router} />);
   }
+
+  it('leaves « Plus » out when every tab fits and Moi › Préférences holds the rest (D-03)', async () => {
+    renderRail(vi.fn(), {
+      ...rail,
+      items: [...rail.items, { to: '/moi', label: 'Moi', icon: 'me', family: null }],
+      phoneMenu: false,
+    });
+    await screen.findByRole('link', { name: 'Moi' });
+    expect(screen.queryByRole('button', { name: 'Plus' })).toBeNull();
+  });
 
   it('offers to sign out, even on a rail whose tabs all fit on the bar', async () => {
     const onSignOut = vi.fn();

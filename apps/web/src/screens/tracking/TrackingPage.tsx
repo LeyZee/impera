@@ -13,7 +13,7 @@ import {
 } from 'react';
 
 import { Reader } from './Reader';
-import { fetchConversations, fetchTodosAcross } from './api';
+import { fetchConversations, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
   duration,
@@ -85,13 +85,8 @@ export function TrackingPage({
       refetchInterval: REFRESH_MS,
     })),
   });
-  // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09). Under ['dashboard'], so a
-  // decision in the reader, which reads the Dashboard again, reads this queue again too.
-  const queue = useQuery({
-    queryKey: ['dashboard', 'todos-across'],
-    queryFn: fetchTodosAcross,
-    refetchInterval: REFRESH_MS,
-  });
+  // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09).
+  const queue = useQuery(todosAcrossQuery);
   const now = useNow();
   const [order, setOrder] = useState<ListOrder>(readListOrder);
   const [search, setSearch] = useState('');
@@ -141,11 +136,8 @@ export function TrackingPage({
       <PageHeader
         eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
         title="Suivi"
-        lead={
-          mode === null
-            ? 'Ce qui attend un humain, puis les conversations et qui a la main.'
-            : `Ce qui attend un humain, puis les conversations et qui a la main. ${MODE_MEANINGS[mode]}`
-        }
+        // Only what the mode means: the panels say the rest themselves (D-03).
+        lead={mode === null ? undefined : MODE_MEANINGS[mode]}
         actions={nav}
       />
       {offShift?.(lines.length > 0)}
@@ -404,9 +396,11 @@ function QueueRow({
       >
         <span className={`nv-dot nv-tone--${todo.tone}`} aria-hidden="true" />
         <span className="nv-convo__main">
+          {/* The fan first: the chatter looks for a fan, then reads why he waits (D-03). */}
           <span className="nv-convo__name">
-            {withCreator ? `${todo.creatorName} · ` : ''}
-            {todoLabel(todo)} · {todo.title}
+            {todo.title}
+            <span className="tr-cause"> · {todoLabel(todo)}</span>
+            {withCreator ? <span className="tr-cause"> · {todo.creatorName}</span> : null}
           </span>
           <span className="nv-convo__preview tr-why">{todo.why}</span>
         </span>
@@ -446,6 +440,14 @@ function Row({
         <span className="nv-convo__main">
           <span className="nv-convo__name tr-row__name">
             <span className="tr-row__pseudo">{name}</span>
+            {conversation.unreadCount > 0 ? (
+              <span
+                className="tr-unread nv-num"
+                aria-label={`${String(conversation.unreadCount)} non lu${conversation.unreadCount > 1 ? 's' : ''}`}
+              >
+                {conversation.unreadCount}
+              </span>
+            ) : null}
             {creatorName === undefined ? null : (
               <span className="nv-tag nv-tag--declared tr-row__creator">{creatorName}</span>
             )}
@@ -454,17 +456,15 @@ function Row({
             {line.band === null ? line.text : `${line.text} · ${line.band}`}
           </span>
         </span>
-        <span className="nv-convo__side">
-          <span className={`nv-status ${statusClass(conversation.state)}`}>
-            <span className="nv-status__dot" />
-            {STATE_LABELS[conversation.state]}
-          </span>
-          {conversation.unreadCount > 0 ? (
-            <span className="tr-unread">
-              {conversation.unreadCount} non lu{conversation.unreadCount > 1 ? 's' : ''}
+        {/* Nothing to do says nothing: no pill on an idle line (D-03). */}
+        {conversation.state === 'idle' ? null : (
+          <span className="nv-convo__side">
+            <span className={`nv-status ${statusClass(conversation.state)}`}>
+              <span className="nv-status__dot" />
+              {STATE_LABELS[conversation.state]}
             </span>
-          ) : null}
-        </span>
+          </span>
+        )}
       </button>
     </li>
   );
