@@ -241,7 +241,16 @@ export function useFlushOnReconnect(onSent: (flushed: Flushed) => void): void {
 export type Outcome<T> =
   | { readonly kind: 'ok'; readonly value: T }
   | { readonly kind: 'refused'; readonly code: string }
+  /** The request never reached the server: nothing was sent, and nothing waits to be (recette 05/11, CREA-06). */
+  | { readonly kind: 'offline' }
+  /** The server answered, with an error of its own (5xx) or an answer that cannot be read. */
   | { readonly kind: 'failed' };
+
+/** What a change that did not go through says: never « no network » for a server error, never a promise to send later. */
+export const NOT_SENT: Readonly<Record<'offline' | 'failed', string>> = {
+  offline: 'Pas de réseau : rien n’est parti. Réessaie quand tu es en ligne.',
+  failed: 'Ça n’a pas marché de notre côté. Réessaie dans un moment.',
+};
 
 async function send<T>(
   method: 'POST' | 'PATCH' | 'DELETE',
@@ -249,12 +258,18 @@ async function send<T>(
   body: unknown,
   parse: (json: unknown) => T,
 ): Promise<Outcome<T>> {
+  let response: Response;
   try {
-    const response = await fetch(url, {
+    response = await fetch(url, {
       method,
       credentials: 'include',
       ...(body === undefined ? {} : { headers: JSON_HEADERS, body: JSON.stringify(body) }),
     });
+  } catch {
+    return { kind: 'offline' };
+  }
+  try {
+    if (response.status >= 500) return { kind: 'failed' };
     if (!response.ok) {
       const refusal = ApiErrorSchema.safeParse(await response.json().catch(() => null));
       return refusal.success ? { kind: 'refused', code: refusal.data.error.code } : { kind: 'failed' };

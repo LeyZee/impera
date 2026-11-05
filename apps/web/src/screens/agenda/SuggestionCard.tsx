@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type JSX } from 'react';
 
 import { ShootBrief } from './ShootBrief';
-import { acceptSuggestion, AGENDA_KEY } from './api';
+import { acceptSuggestion, AGENDA_KEY, NOT_SENT } from './api';
 import { CategoryMark } from './category';
 import { whenWords } from './words';
 
@@ -49,9 +49,9 @@ export function SuggestionCard({
         return;
       }
       setFailed(
-        outcome.kind === 'failed'
-          ? 'Pas de réseau : réessaie dans un moment.'
-          : 'Cette proposition n’est plus là. Ton agenda est relu.',
+        outcome.kind === 'refused'
+          ? 'Cette proposition n’est plus là. Ton agenda est relu.'
+          : NOT_SENT[outcome.kind],
       );
       void client.invalidateQueries({ queryKey: AGENDA_KEY });
     });
