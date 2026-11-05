@@ -6,14 +6,14 @@ import './me.css';
 
 import { countryName } from '@/lib/country';
 import { percentText } from '@/reports/model';
-import { usePlanning } from '@/scheduling/api';
+import { useCalendar } from '@/scheduling/api';
 import { cityOf, fullDay } from '@/scheduling/time';
 import { Loading, Unreachable } from '@/screens/pay/parts';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
-/** An hour around now: the read that names the agency's accounts, and so his creators. */
+/** An hour from now: the team's calendar names every creator, and so his (a planning read names only those on a shift). */
 const HOUR_MS = 3_600_000;
 
 /**
@@ -62,18 +62,13 @@ export function MyProfilePage({ user }: { user: Me }): JSX.Element {
 
 function Facts({ member }: { member: TeamMember }): JSX.Element {
   const [at] = useState(() => Date.now());
-  const planning = usePlanning({
+  const calendar = useCalendar({
     from: new Date(at).toISOString(),
     to: new Date(at + HOUR_MS).toISOString(),
-    creatorId: null,
   });
-  const names = [
-    ...new Set(
-      (planning.data?.accounts ?? [])
-        .filter((account) => member.creatorIds.includes(account.creatorId))
-        .map((account) => account.creatorName),
-    ),
-  ];
+  const names = (calendar.data?.creators ?? [])
+    .filter((creator) => member.creatorIds.includes(creator.id))
+    .map((creator) => creator.name);
   const { commission } = member;
 
   return (
@@ -90,7 +85,7 @@ function Facts({ member }: { member: TeamMember }): JSX.Element {
               <span className="tm-muted">Aucune créatrice confiée</span>
             ) : names.length === 0 ? (
               <span className="tm-muted">
-                {planning.isPending
+                {calendar.isPending
                   ? '…'
                   : member.creatorIds.length === 1
                     ? '1 créatrice'

@@ -30,14 +30,19 @@ function serve(members: readonly TeamMember[]): void {
     vi.fn((input: string) => {
       const url = new URL(input, 'http://localhost');
       if (url.pathname === '/v1/team/members') return Promise.resolve(Response.json({ members }));
-      if (url.pathname === '/v1/scheduling/planning')
+      if (url.pathname === '/v1/scheduling/calendar')
         return Promise.resolve(
           Response.json({
+            view: 'team',
             settings: SCHEDULING_SETTINGS,
-            accounts: [NORA_REVEAL, LEA_ONLYFANS],
+            creators: [NORA_REVEAL, LEA_ONLYFANS].map(({ creatorId, creatorName }) => ({
+              id: creatorId,
+              name: creatorName,
+            })),
             members: [],
             shifts: [],
-            conflicts: [],
+            agent: [],
+            agency: null,
           }),
         );
       return Promise.resolve(new Response(null, { status: 404 }));
