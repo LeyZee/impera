@@ -140,6 +140,9 @@ export function ImportPanel({
         )}
       </header>
 
+      {/* What the click just did comes first, above what is left to choose. */}
+      {done === null ? null : <ImportDone done={done} platformName={name} />}
+
       {candidates.length === 0 ? null : (
         <ul className="sf-import__list" aria-label={`Créatrices de ${name} à importer`}>
           {candidates.map((candidate) => (
@@ -178,7 +181,9 @@ export function ImportPanel({
                 : `Importer la sélection (${String(lines.length)})`}
           </button>
           <p className="sv-muted sf-import__count" aria-live="polite">
-            {lines.length} sur {candidates.length} cochée{lines.length > 1 ? 's' : ''}
+            {lines.length === 0
+              ? 'Coche au moins une créatrice.'
+              : `${String(lines.length)} sur ${String(candidates.length)} cochée${lines.length > 1 ? 's' : ''}`}
           </p>
         </div>
       )}
@@ -206,8 +211,6 @@ export function ImportPanel({
           {failed.error.isSessionExpired ? <SignInAgain /> : null}
         </div>
       ) : null}
-
-      {done === null ? null : <ImportDone done={done} platformName={name} />}
 
       {dismissed.length === 0 ? null : (
         <details className="sf-dismissed">
@@ -264,7 +267,7 @@ function Who({
     <div className="sf-imp__who">
       <span className="sf-imp__name">{modelName(model)}</span>
       <span className="sf-imp__meta">
-        {hasName ? <span className="sf-imp__handle">@{model.handle}</span> : null}
+        {hasName ? `@${model.handle} · ` : null}
         <span className="sf-imp__status" data-warn={isStatusWarning(model) ? 'true' : undefined}>
           {statusLabel(model, name)}
         </span>
@@ -310,7 +313,7 @@ function CandidateRow({
   const why = proposalWhy(candidate);
   const isProposed = actionValue(choice.action) === actionValue(proposedChoice(candidate).action);
   return (
-    <li className="sf-imp" data-selected={choice.selected ? 'true' : undefined}>
+    <li className="sf-imp">
       <input
         type="checkbox"
         className="sf-imp__pick"
@@ -367,15 +370,17 @@ function ImportDone({ done, platformName: name }: { done: Done; platformName: st
           const label = done.labels.get(line.platformModelId) ?? line.platformModelId;
           return (
             <li key={line.platformModelId} className="sf-res" data-outcome={line.outcome}>
-              <span className="sf-res__name">{label}</span>
-              <span className="sf-res__what">
-                {line.outcome === 'refused'
-                  ? refusalLine(line.reason, name)
-                  : line.outcome === 'created'
-                    ? 'Fiche créée.'
-                    : line.outcome === 'linked'
-                      ? 'Reliée.'
-                      : 'Déjà reliée.'}
+              <span className="sf-res__text">
+                <span className="sf-res__name">{label}</span>
+                <span className="sf-res__what">
+                  {line.outcome === 'refused'
+                    ? refusalLine(line.reason, name)
+                    : line.outcome === 'created'
+                      ? 'Fiche créée.'
+                      : line.outcome === 'linked'
+                        ? 'Reliée.'
+                        : 'Déjà reliée.'}
+                </span>
               </span>
               {line.outcome !== 'refused' && line.creatorId !== null ? (
                 <Link
