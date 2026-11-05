@@ -14,8 +14,9 @@ import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 
 /**
  * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her fans, what each unlocked and when he was last seen; a fan
- * opens his conversation, read only. Her earnings and her sales (CR-04) come above them once they exist. No note of
- * a fan: what the agency knows of him is its own (Charles, 03/11).
+ * opens his conversation, read only. Her earnings and her sales (CR-04) come above them once they exist; until then
+ * the price is said « avant parts », what he paid and not what she earns (recette 05/11, reco 20). No note of a fan:
+ * what the agency knows of him is its own (Charles, 03/11).
  */
 export function CreatorSalesPage({
   selected,
@@ -66,7 +67,7 @@ export function CreatorSalesPage({
                 ) : (
                   <>
                     <p className="vt-note">
-                      À côté de chacun, le prix des messages qu’il a débloqués, TVA comprise.
+                      À côté de chacun, le prix des messages qu’il a débloqués, TVA comprise, avant parts.
                     </p>
                     <ul className="vt-rows">
                       {list.map((fan) => (

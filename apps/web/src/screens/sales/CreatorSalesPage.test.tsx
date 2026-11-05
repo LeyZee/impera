@@ -120,7 +120,10 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     const open = await screen.findByRole('button', { name: /loup_bleu/u });
     expect(open.textContent).toContain('vu il y a 12\u00a0min');
     expect(open.textContent).toContain('64\u00a0€');
-    expect(screen.getByText(/le prix des messages qu’il a débloqués, TVA comprise/u)).toBeDefined();
+    // What he paid, not what she earns, until her share is there (reco 20).
+    expect(
+      screen.getByText(/le prix des messages qu’il a débloqués, TVA comprise, avant parts\./u),
+    ).toBeDefined();
     // A fan without a conversation is listed, and opens nothing.
     expect(screen.getByText('vince.r')).toBeDefined();
     expect(screen.queryByRole('button', { name: /vince\.r/u })).toBeNull();
