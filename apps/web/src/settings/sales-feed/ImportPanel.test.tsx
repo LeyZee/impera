@@ -201,6 +201,59 @@ describe('« N créatrices trouvées sur Reveal » (CRM-07)', () => {
     });
   });
 
+  it('sends more than 100 lines in turns, and keeps what the first turn did when the next fails', async () => {
+    const many = Array.from({ length: 101 }, (_, index) =>
+      SalesFeedImportCandidateSchema.parse({
+        model: {
+          platformModelId: `b${String(index)}`,
+          handle: `fake${String(index)}`,
+          displayName: `Fausse ${String(index)}`,
+          isActive: true,
+          status: 'validated',
+          avatarUrl: null,
+        },
+        proposal: { kind: 'create' },
+        preselected: true,
+      }),
+    );
+    let calls = 0;
+    const fetch = serve({
+      'GET /v1/creators': CREATORS,
+      [`POST ${BASE}/import`]: (init) => {
+        calls += 1;
+        if (calls > 1) {
+          return {
+            status: 500,
+            body: { error: { code: 'internal', message: 'Oups.', details: {}, requestId: 'r' } },
+          };
+        }
+        const body: unknown = JSON.parse(typeof init?.body === 'string' ? init.body : '{}');
+        const sentLines =
+          typeof body === 'object' && body !== null && 'lines' in body && Array.isArray(body.lines)
+            ? body.lines.length
+            : 0;
+        expect(sentLines).toBe(100);
+        return {
+          status: 200,
+          body: {
+            lines: many.slice(0, 100).map((c) => ({
+              platformModelId: c.model.platformModelId,
+              outcome: 'created',
+              creatorId: NEW_NORA,
+            })),
+            overview: overviewAfter({}),
+          },
+        };
+      },
+    });
+    const onChanged = show(many);
+    fireEvent.click(await screen.findByRole('button', { name: 'Importer la sélection (101)' }));
+    expect(await screen.findByText('100 créées.')).toBeDefined();
+    expect(await screen.findByText(/Le reste n’a pas été importé/u)).toBeDefined();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls.filter(([url]) => url === `${BASE}/import`)).toHaveLength(2);
+  });
+
   it('asks for her password again when the sign-in is too old, and keeps the selection', async () => {
     serve({
       'GET /v1/creators': CREATORS,

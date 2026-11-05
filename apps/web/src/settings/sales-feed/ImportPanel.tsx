@@ -1,9 +1,10 @@
-import type {
-  Platform,
-  SalesFeedDismissedModel,
-  SalesFeedImportCandidate,
-  SalesFeedImportLineResult,
-  SalesFeedOverview,
+import {
+  SALES_FEED_IMPORT_MAX_LINES,
+  type Platform,
+  type SalesFeedDismissedModel,
+  type SalesFeedImportCandidate,
+  type SalesFeedImportLineResult,
+  type SalesFeedOverview,
 } from '@impera/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -13,6 +14,7 @@ import { importModels, setDismissal } from './api';
 import {
   actionOf,
   actionValue,
+  batchesOf,
   creatorOptionsOf,
   foundTitle,
   initialsOf,
@@ -91,21 +93,27 @@ export function ImportPanel({
     setFailed(null);
     setBusy({ kind: 'import' });
     const labels = new Map(candidates.map((c) => [c.model.platformModelId, modelLabel(c.model)]));
-    importModels(platform, { lines })
-      .then(
-        (result) => {
-          setDone({ lines: result.lines, labels });
-          setChoices(new Map());
-          onChanged(result.overview);
-        },
-        (error: unknown) => {
-          if (error instanceof ReauthRequired) {
-            setIsAsking(true);
-            return;
-          }
-          setFailed({ id: null, error: shownOf(error, 'Rien n’a été importé.') });
-        },
-      )
+    // The server takes 100 lines per call: a bigger selection goes in turns, and
+    // what a turn already did stays shown if a later one fails.
+    const sent: SalesFeedImportLineResult[] = [];
+    const sendAll = async (): Promise<void> => {
+      for (const batch of batchesOf(lines, SALES_FEED_IMPORT_MAX_LINES)) {
+        const result = await importModels(platform, { lines: batch });
+        sent.push(...result.lines);
+        setDone({ lines: [...sent], labels });
+        onChanged(result.overview);
+      }
+      setChoices(new Map());
+    };
+    sendAll()
+      .catch((error: unknown) => {
+        if (error instanceof ReauthRequired) {
+          setIsAsking(true);
+          return;
+        }
+        const lead = sent.length === 0 ? 'Rien n’a été importé.' : 'Le reste n’a pas été importé.';
+        setFailed({ id: null, error: shownOf(error, lead) });
+      })
       .finally(() => {
         setBusy(null);
       });

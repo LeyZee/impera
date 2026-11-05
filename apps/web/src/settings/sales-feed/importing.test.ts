@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   actionOf,
   actionValue,
+  batchesOf,
   creatorOptionsOf,
   foundTitle,
   initialsOf,
@@ -115,5 +116,11 @@ describe('the review of the import (CRM-07)', () => {
     expect(refusalLine('not_listed', 'Reveal')).toBe('Reveal ne la liste plus.');
     expect(foundTitle(1, 'Reveal')).toBe('1 créatrice trouvée sur Reveal');
     expect(foundTitle(0, 'Reveal')).toBe('Aucune nouvelle créatrice sur Reveal');
+  });
+
+  it('cuts a big selection into sends the server takes, in order', () => {
+    expect(batchesOf([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(batchesOf([1, 2], 2)).toEqual([[1, 2]]);
+    expect(batchesOf([], 2)).toEqual([]);
   });
 });

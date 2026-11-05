@@ -125,6 +125,13 @@ export function selectedLines(
   });
 }
 
+/** The lines cut into sends the server takes (it refuses a body of more than `size`), in order. */
+export function batchesOf<T>(lines: readonly T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let start = 0; start < lines.length; start += size) batches.push(lines.slice(start, start + size));
+  return batches;
+}
+
 const REFUSALS: Readonly<Record<SalesFeedImportRefusal, (platform: string) => string>> = {
   not_listed: (platform) => `${platform} ne la liste plus.`,
   name_taken: () => 'Une créatrice d’Impera porte déjà ce nom\u00a0: relie-la à elle plutôt.',
