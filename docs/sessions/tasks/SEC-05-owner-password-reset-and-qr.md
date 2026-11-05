@@ -3,7 +3,7 @@ Statut : todo (ADR 0068 acceptée par Charles le 05/11/2026, 18 h 13)
 Phase : exploitation
 Dépend de : ADR 0068, ADR 0046, ADR 0020 (bot de l'agence), EQ-10 (liens d'invitation et de réinitialisation)
 Branche : claude/project-thread-a8l1w6 (fil Bilan)
-Propriétaires : Bilan (auth, telegram, migration 0114 attribuée par le coordinateur) ; relecture Extension pour l'écran du QR et la page de connexion
+Propriétaires : Bilan (auth, telegram, migration 0114 attribuée par le coordinateur) ; Extension écrit les écrans (QR, « Mot de passe oublié » de la page de connexion, page d'arrivée du lien par `LinkPage` et `NewPasswordPage`, Réglages › Telegram) ; QR en SVG en ligne, sombre sur fond blanc fixe avec une marge de 4 modules, même en Nuit ; sur téléphone, le bouton `otpauth` et la clé avant le QR
 
 ## Objectif (1 phrase)
 
@@ -26,7 +26,7 @@ Lot 2 : liaison Telegram privée (migration 0114)
 Lot 3 : mot de passe oublié
 - [ ] Lien « Mot de passe oublié » sur la page de connexion ; réponse identique et de même durée que le compte existe ou non ; une demande par compte toutes les 5 minutes, plus une limite par adresse.
 - [ ] Lien à usage unique, 15 minutes, empreinte seule ; envoyé en privé par le bot (jamais un montant, un nom de créatrice ni une clé) ; le nouveau mot de passe ferme toutes les sessions ; le deuxième facteur reste demandé et n'est jamais remis à zéro par ce lien.
-- [ ] Sans canal lié : la page dit de demander à un autre propriétaire ou d'utiliser la commande d'exploitation.
+- [ ] La page dit toujours la même phrase, canal lié ou non, compte connu ou non (même code HTTP, même corps) : « Si cette adresse a un compte relié à Telegram, le lien vient d'y partir ; il vaut 15 minutes. Sinon, demande à un autre propriétaire. » La commande d'exploitation est dans /aide, jamais sur cette page.
 - [ ] Audit de chaque demande, envoi et réinitialisation, sans le lien.
 
 Plus tard (décision à part) : e-mail par un service d'envoi, clé saisie dans le CRM ; e-mails au design system, beaux et hiérarchisés (Charles, 05/11), captures avant fusion.
