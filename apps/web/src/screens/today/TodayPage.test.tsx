@@ -91,7 +91,7 @@ afterEach(() => {
 });
 
 describe('Aujourd’hui', () => {
-  it('puts the shift under way first: where, until when, and when Suivi closes', async () => {
+  it('puts the shift under way first: where, until when, and what arrives in Suivi', async () => {
     serve({
       current: mine(1, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z'),
       next: mine(2, '2026-10-29T22:00:00Z', '2026-10-30T04:00:00Z'),
@@ -102,8 +102,9 @@ describe('Aujourd’hui', () => {
     expect(hero?.textContent).toContain('En poste');
     expect(hero?.textContent).toContain('encore 4 h');
     expect(hero?.textContent).toContain('23 h – 5 h');
-    // One line: the account line already says the platform (D-03).
-    expect(hero?.textContent).toMatch(/Suivi reste ouvert jusqu’à 5\s*h\s*15\./u);
+    // No window of Suivi is promised while EQ-13 is not built: only the passations arrive there (CHAT-02).
+    expect(hero?.textContent).toContain('Les passations qu’on te confie arrivent dans Suivi.');
+    expect(hero?.textContent).not.toMatch(/reste ouvert|restent ouvertes/u);
     expect(screen.getByRole('progressbar', { name: 'Avancée du shift' }).getAttribute('aria-valuenow')).toBe(
       '33',
     );
@@ -111,23 +112,24 @@ describe('Aujourd’hui', () => {
     expect(screen.getByText('Ensuite').closest('section')?.textContent).toContain('Demain · 23 h – 5 h');
   });
 
-  it('says when the next shift opens Suivi, and offers no Suivi before', async () => {
+  it('says what the next shift brings to Suivi, and offers no Suivi before', async () => {
     serve({ current: null, next: mine(2, '2026-10-28T22:00:00Z', '2026-10-29T04:00:00Z'), ended: null });
     renderPage();
     const hero = (await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 })).closest('section');
     expect(hero?.textContent).toContain('Prochain shift');
     expect(hero?.textContent).toContain('dans 22 h');
-    expect(hero?.textContent).toMatch(/Suivi s’ouvrira à 22\s*h\s*45\./u);
+    expect(hero?.textContent).toContain('Les passations qu’on te confie arriveront dans Suivi.');
+    expect(hero?.textContent).not.toMatch(/s’ouvrir/u);
     expect(screen.queryByRole('link', { name: 'Ouvrir Suivi' })).toBeNull();
   });
 
-  it('keeps Suivi open in the end margin of a shift just over', async () => {
+  it('says a shift just over without promising Suivi a window', async () => {
     serve({ current: null, next: null, ended: mine(1, '2026-10-27T18:00:00Z', '2026-10-27T23:55:00Z') });
     renderPage();
     const hero = (await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 })).closest('section');
     expect(hero?.textContent).toContain('Shift fini');
-    // The corner says how long Suivi stays open, the hours below say when it ended.
-    expect(hero?.textContent).toMatch(/Suivi ouvert encore 10\smin/u);
+    expect(hero?.textContent).not.toMatch(/Suivi ouvert/u);
+    expect(hero?.textContent).toContain('Les passations qu’on t’a confiées restent dans Suivi.');
     expect(screen.getByRole('link', { name: 'Ouvrir Suivi' })).toBeTruthy();
   });
 

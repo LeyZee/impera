@@ -229,7 +229,8 @@ function Hero({
           {state.kind === 'on'
             ? `encore ${lengthOf(left)}`
             : state.kind === 'ended'
-              ? `Suivi ouvert encore ${lengthOf(new Date(shift.accessEndsAt).getTime() - now.getTime())}`
+              ? // The hours below say when it ended; no window of Suivi is promised (CHAT-02).
+                null
               : soonOf(toStart)}
         </span>
       </div>
@@ -301,18 +302,21 @@ function Hero({
   );
 }
 
-/** When Suivi opens and closes for the creator (ADR 0025), in one line: the account line already says the platform. */
+/**
+ * What Impera brings him around his shift, in one line: the account line already says the platform. Until EQ-13 opens a
+ * shift's conversations in Suivi, only the passations handed to him arrive there: no window is promised (CHAT-02).
+ */
 function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): string {
   const { shift } = state;
   switch (state.kind) {
     case 'on':
-      return `Suivi reste ouvert jusqu’à ${clockAt(shift.accessEndsAt, zone)}.`;
+      return 'Les passations qu’on te confie arrivent dans Suivi.';
     case 'ended':
-      return `Suivi reste ouvert jusqu’à ${clockAt(shift.accessEndsAt, zone)}, le temps de finir.`;
+      return 'Ton shift est fini. Les passations qu’on t’a confiées restent dans Suivi.';
     case 'soon':
-      return `Suivi est déjà ouvert. Ton shift commence à ${clockAt(shift.startsAt, zone)}.`;
+      return `Ton shift commence à ${clockAt(shift.startsAt, zone)}. Les passations qu’on te confie arrivent dans Suivi.`;
     case 'later':
-      return `Suivi s’ouvrira à ${clockAt(shift.accessStartsAt, zone)}.`;
+      return 'Les passations qu’on te confie arriveront dans Suivi.';
   }
 }
 
