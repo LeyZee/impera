@@ -5,3 +5,18 @@
   padding-top: 18px;
   gap: 12px;
 }
+
+.cr-profile__next {
+  margin-top: 12px;
+}
+
+.cr-archive-ask {
+  margin: 0;
+  font-weight: 600;
+}
+
+.cr-archive-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
