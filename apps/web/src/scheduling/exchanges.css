@@ -436,9 +436,7 @@
 /* A shift a leave's approval found in its way: an amber ring on the grid, steady, never blinking. */
 .sc-chip[data-flagged='true'],
 .sc-chip[data-flagged='true']:hover {
-  box-shadow:
-    inset 3px 0 0 var(--sc-color),
-    0 0 0 2px var(--nv-warning);
+  box-shadow: 0 0 0 2px var(--nv-warning);
 }
 
 @media (max-width: 520px) {

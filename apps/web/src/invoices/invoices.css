@@ -105,16 +105,17 @@
   }
 }
 
-/* A due date past: the chip says it in red, the row's edge too, so it is seen without reading. */
+/* A due date past: the chip says it in red and the row takes a faint tint of it, so it is seen without reading. No
+   coloured bar on the row's side (Charles's rule; recette 05/11). */
 .iv-chip--danger {
   color: var(--nv-danger);
   background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
 }
 .iv-doc[data-due='overdue'] {
-  box-shadow: inset 3px 0 0 var(--nv-danger);
+  background: color-mix(in srgb, var(--nv-danger) 6%, transparent);
 }
 .iv-doc[data-due='soon'] {
-  box-shadow: inset 3px 0 0 var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 6%, transparent);
 }
 
 /* ── Paie › Factures: how the list is read, by quinzaine or by member ── */
