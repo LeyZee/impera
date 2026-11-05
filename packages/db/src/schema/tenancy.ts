@@ -33,10 +33,19 @@ export const creators = pgTable(
     settings: jsonb('settings').notNull().default({}),
     /** `AgentHours` (packages/contracts, P3-14), validated on read and write; `null` reads as `DEFAULT_AGENT_HOURS`. */
     agentHours: jsonb('agent_hours'),
+    /**
+     * Her photo, copied into the media storage (CRM-07, ADR 0069 § 3): the object's key there, never the platform's
+     * address; `null` until one is copied.
+     */
+    avatarKey: text('avatar_key'),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex('creators_name_key_unique').on(t.nameKey),
+    check(
+      'creators_avatar_key_check',
+      sql`${t.avatarKey} is null or char_length(${t.avatarKey}) between 1 and 200`,
+    ),
     check(
       'creators_agent_hours_object_check',
       sql`${t.agentHours} is null or jsonb_typeof(${t.agentHours}) = 'object'`,

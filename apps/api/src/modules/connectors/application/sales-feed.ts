@@ -1,5 +1,6 @@
 import {
   calendarDayAt,
+  CreatorIdSchema,
   ok,
   err,
   payPeriodLastDay,
@@ -14,6 +15,11 @@ import {
   type SalesFeedCheckBody,
   type SalesFeedCheckReport,
   type SalesFeedLastCheck,
+  type ImportSalesFeedModelsBody,
+  type SalesFeedDismissedModel,
+  type SalesFeedImportCandidate,
+  type SalesFeedImportLineResult,
+  type SalesFeedImportResult,
   type SalesFeedModelLink,
   type SalesFeedOverview,
   type SalesFeedRefusal,
@@ -26,6 +32,7 @@ import {
   SalesFeedAccountUnprocessable,
   SalesFeedCheckDaysUnprocessable,
   SalesFeedDeliveryRefused,
+  SalesFeedListUnavailable,
   SalesFeedMemberUnprocessable,
   SalesFeedModelConflict,
   SalesFeedNotConnected,
@@ -34,6 +41,7 @@ import {
   SalesFeedWebhookNotFound,
   SalesFeedWebhookUrlUnprocessable,
 } from '../domain/errors';
+import { proposeImports } from '../domain/model-import';
 import type { Clock, JobLogger } from '../domain/ports';
 import {
   buildCheckReport,
@@ -116,6 +124,22 @@ export interface SalesFeeds {
     platform: Platform,
     platformChatterId: string,
     link: LinkSalesFeedChatterBody,
+    by: string | null,
+  ): Promise<SalesFeedOverview>;
+  /**
+   * « Importer la sélection » (CRM-07, ADR 0069): each line imported in its own transaction, from the platform's live
+   * list read now, never from what the client sent; a refused line does not stop the others.
+   */
+  importModels(
+    platform: Platform,
+    body: ImportSalesFeedModelsBody,
+    by: string | null,
+  ): Promise<SalesFeedImportResult>;
+  /** Sets a model aside from the import (`true`), or takes it back (`false`). */
+  dismissModel(
+    platform: Platform,
+    platformModelId: string,
+    dismissed: boolean,
     by: string | null,
   ): Promise<SalesFeedOverview>;
   /** Registers Impera's webhook at the platform (replacing one already there) and keeps its secret sealed. */
@@ -273,9 +297,28 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
     let listError: SalesFeedOverview['listError'] = feed === null ? status.lastErrorKind : null;
     const models: SalesFeedModelLink[] = [];
     const chatters: SalesFeedChatterLink[] = [];
+    let candidates: SalesFeedImportCandidate[] = [];
+    const dismissed: SalesFeedDismissedModel[] = [];
     if (feed !== null) {
       const [listedModels, listedChatters] = await Promise.all([feed.listModels(), feed.listChatters()]);
       if (listedModels.ok) {
+        const [creators, dismissals] = await Promise.all([ledger.creators(), ledger.dismissals(platform)]);
+        candidates = proposeImports({
+          models: listedModels.value,
+          linked: new Set(links.keys()),
+          dismissed: new Set(dismissals.keys()),
+          accounts: platformAccounts.map((account) => ({
+            creatorId: CreatorIdSchema.parse(account.creatorId),
+            handle: account.handle,
+          })),
+          creators,
+        });
+        for (const model of listedModels.value) {
+          const at = dismissals.get(model.platformModelId);
+          if (at !== undefined && !links.has(model.platformModelId)) {
+            dismissed.push({ model, dismissedAt: at.toISOString() });
+          }
+        }
         for (const model of listedModels.value) {
           models.push({
             platformModelId: model.platformModelId,
@@ -307,7 +350,7 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         quarantined: quarantined.get(id) ?? 0,
       });
     }
-    return { status, models, accounts, chatters, listError };
+    return { status, models, accounts, chatters, listError, candidates, dismissed };
   }
 
   /** Links each listed model to the one account of the platform with the same handle, when nothing links them yet. */
@@ -648,6 +691,33 @@ export function createSalesFeeds(deps: SalesFeedDeps): SalesFeeds {
         by,
       );
       if (linked === 'conflict') throw new SalesFeedModelConflict();
+      return overview(platform);
+    },
+
+    async importModels(platform, body, by) {
+      factoryOf(platform);
+      const feed = await liveFeed(platform);
+      if (feed === null) throw new SalesFeedNotConnected();
+      const listed = await feed.listModels();
+      if (!listed.ok) throw new SalesFeedListUnavailable();
+      const live = new Map(listed.value.map((model) => [model.platformModelId, model]));
+      const lines: SalesFeedImportLineResult[] = [];
+      // One after the other: each line is its own transaction, and a refused one leaves the others standing.
+      for (const line of body.lines) {
+        const model = live.get(line.platformModelId);
+        lines.push(
+          model === undefined
+            ? { platformModelId: line.platformModelId, outcome: 'refused', reason: 'not_listed' }
+            : await ledger.importModel(platform, model, line.action, by),
+        );
+      }
+      return { lines, overview: await overview(platform) };
+    },
+
+    async dismissModel(platform, platformModelId, dismissed, by) {
+      factoryOf(platform);
+      if (dismissed) await ledger.dismissModel(platform, platformModelId, by);
+      else await ledger.restoreModel(platform, platformModelId, by);
       return overview(platform);
     },
 

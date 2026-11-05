@@ -1,9 +1,11 @@
 import {
+  ImportSalesFeedModelsBodySchema,
   LinkSalesFeedChatterBodySchema,
   LinkSalesFeedModelBodySchema,
   PlatformSchema,
   SalesFeedCheckBodySchema,
   SalesFeedCheckReportSchema,
+  SalesFeedImportResultSchema,
   SalesFeedLastCheckSchema,
   SalesFeedListSchema,
   SalesFeedOverviewSchema,
@@ -27,6 +29,8 @@ const ChatterParamsSchema = PlatformParamsSchema.extend({ platformChatterId: opa
 const KEY_CALLS_PER_MINUTE = 10;
 /** A check calls the statistics twice; Reveal allows ten such calls a minute a key, 500 a day for the agency. */
 const CHECKS_PER_MINUTE = 3;
+/** An import reads the live list once and writes up to 100 lines: ten clicks a minute is far above a person’s pace. */
+const IMPORTS_PER_MINUTE = 10;
 /** The dashboard's export as text (2 MB) inside its JSON body. */
 const CHECK_BODY_LIMIT = 3 * 1024 * 1024;
 
@@ -127,6 +131,45 @@ export function createSalesFeedRoutes(
           request.params.platform,
           request.params.platformModelId,
           request.body.platformAccountId,
+          request.user?.id ?? null,
+        ),
+    );
+
+    app.post(
+      '/settings/sales-feeds/:platform/import',
+      {
+        // Creating creators is the owner's, password asked again (ADR 0069 § 6); each click reads the live list once.
+        preValidation: options.recentLogin,
+        config: { rateLimit: { max: IMPORTS_PER_MINUTE, timeWindow: '1 minute' } },
+        schema: {
+          params: PlatformParamsSchema,
+          body: ImportSalesFeedModelsBodySchema,
+          response: { 200: SalesFeedImportResultSchema },
+        },
+      },
+      (request) => feeds.importModels(request.params.platform, request.body, request.user?.id ?? null),
+    );
+
+    app.put(
+      '/settings/sales-feeds/:platform/models/:platformModelId/dismissal',
+      { schema: { params: ModelParamsSchema, response: { 200: SalesFeedOverviewSchema } } },
+      (request) =>
+        feeds.dismissModel(
+          request.params.platform,
+          request.params.platformModelId,
+          true,
+          request.user?.id ?? null,
+        ),
+    );
+
+    app.delete(
+      '/settings/sales-feeds/:platform/models/:platformModelId/dismissal',
+      { schema: { params: ModelParamsSchema, response: { 200: SalesFeedOverviewSchema } } },
+      (request) =>
+        feeds.dismissModel(
+          request.params.platform,
+          request.params.platformModelId,
+          false,
           request.user?.id ?? null,
         ),
     );
