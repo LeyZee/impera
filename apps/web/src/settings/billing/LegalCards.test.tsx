@@ -16,6 +16,7 @@ import {
   MANDATE_V2,
 } from '@/test/contractors';
 import { SCHEDULING_SETTINGS } from '@/test/pay';
+import { choose } from '@/test/select';
 
 /* Réglages › Facturation, its second half (EQ-06 lot 8c): the journal's accounts, the delays, the texts, the regimes. */
 
@@ -292,8 +293,8 @@ describe('Réglages › Facturation, régimes', () => {
     expect(writes).toEqual([]);
 
     type('Nom', 'Prestataire Bénin');
-    fireEvent.change(within(dialog()).getByLabelText('Ajouter un pays'), { target: { value: 'BJ' } });
-    fireEvent.change(within(dialog()).getByLabelText('Ajouter un pays'), { target: { value: 'MG' } });
+    choose(within(dialog()).getByRole('combobox', { name: 'Ajouter un pays' }), /Bénin/u);
+    choose(within(dialog()).getByRole('combobox', { name: 'Ajouter un pays' }), /Madagascar/u);
     expect(within(dialog()).getByRole('list', { name: 'Pays du régime' }).textContent).toContain(
       'Madagascar',
     );

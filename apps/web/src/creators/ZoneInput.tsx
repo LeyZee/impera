@@ -1,6 +1,7 @@
 import { type JSX } from 'react';
 
 import { cityOf } from '@/scheduling/time';
+import { Select, type SelectOption } from '@/shell/Select';
 
 /** Where a new creator lives unless the owner says otherwise. */
 export const DEFAULT_ZONE = 'Europe/Paris';
@@ -34,9 +35,14 @@ const OTHERS: readonly { readonly zone: string; readonly city: string }[] = Intl
   })
   .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
 
+const ZONE_OPTIONS: readonly SelectOption<string>[] = [
+  ...FIRST.map((one) => ({ value: one.zone, label: one.city, group: 'Les plus courantes' })),
+  ...OTHERS.map((one) => ({ value: one.zone, label: one.city, group: 'Toutes les villes' })),
+];
+
 /**
  * A creator's zone, chosen by city (« Paris », « Toronto (Montréal) ») with the zone kept behind it (CREA-27): never an
- * identifier to type. A zone she already has outside the list stays offered as it is. Used at creation and to move her.
+ * identifier to type. A zone she already has outside the list shows as it is. Used at creation and to move her.
  */
 export function ZoneInput({
   id,
@@ -49,32 +55,16 @@ export function ZoneInput({
   onChange: (zone: string) => void;
   invalid?: boolean;
 }): JSX.Element {
-  const known = value === '' || FIRST_ZONES.has(value) || OTHERS.some((one) => one.zone === value);
   return (
-    <select
+    <Select
       id={id}
-      className="nv-glass nv-field__control ps-input ps-select"
       value={value}
-      aria-invalid={invalid}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-    >
-      {known ? null : <option value={value}>{value}</option>}
-      <optgroup label="Les plus courantes">
-        {FIRST.map((one) => (
-          <option key={one.zone} value={one.zone}>
-            {one.city}
-          </option>
-        ))}
-      </optgroup>
-      <optgroup label="Toutes les villes">
-        {OTHERS.map((one) => (
-          <option key={one.zone} value={one.zone}>
-            {one.city}
-          </option>
-        ))}
-      </optgroup>
-    </select>
+      invalid={invalid}
+      options={ZONE_OPTIONS}
+      placeholder="Choisir une ville…"
+      searchLabel="Chercher une ville"
+      empty="Aucune ville ne correspond."
+      onChange={onChange}
+    />
   );
 }

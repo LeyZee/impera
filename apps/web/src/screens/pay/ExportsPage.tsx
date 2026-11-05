@@ -35,6 +35,7 @@ import { useMembers } from '@/screens/team/api';
 import { useBillingSettings } from '@/settings/billing/api';
 import { weightText } from '@/settings/billing/model';
 import '@/screens/team/team.css';
+import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /**
@@ -218,21 +219,16 @@ function Das2Panel({ today, nameOf }: { today: string; nameOf: (memberId: string
             <label className="nv-field__label" htmlFor={`${id}-year`}>
               Année des virements
             </label>
-            <select
+            <Select
               id={`${id}-year`}
-              className="nv-field__control nv-glass tm-select nv-num"
-              value={year}
-              onChange={(event) => {
-                setYear(Number(event.target.value));
+              className="nv-num"
+              value={String(year)}
+              options={years.map((one) => ({ value: String(one), label: String(one) }))}
+              onChange={(value) => {
+                setYear(Number(value));
                 setAsked(IDLE);
               }}
-            >
-              {years.map((one) => (
-                <option key={one} value={one}>
-                  {one}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
             {busy ? 'Préparation…' : 'Préparer le récapitulatif'}

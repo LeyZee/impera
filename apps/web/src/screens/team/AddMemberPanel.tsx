@@ -37,6 +37,7 @@ import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { cityOf } from '@/scheduling/time';
 import '@/shell/dialog.css';
+import { Select } from '@/shell/Select';
 import { useRevealAlerts } from '@/shell/reveal';
 
 const ZONES: readonly string[] = Intl.supportedValuesOf('timeZone');
@@ -511,29 +512,27 @@ function Where({ id, draft, problems, onChange }: StepProps): JSX.Element {
         label="Pays"
         hint="Il propose le fuseau et, plus tard, le régime de ses factures."
       >
-        <select
+        <Select
           id={`${id}-country`}
-          className="nv-field__control nv-glass tm-select"
           value={draft.country}
-          onChange={(event) => {
-            onChange({ country: event.target.value });
+          searchLabel="Chercher un pays"
+          empty="Aucun pays ne correspond."
+          options={[
+            ...FIRST_COUNTRIES.map((code) => ({
+              value: code,
+              label: `${countryFlag(code)}  ${countryName(code)}`,
+              group: 'Les plus fréquents',
+            })),
+            ...OTHER_COUNTRIES.map((country) => ({
+              value: country.code,
+              label: `${countryFlag(country.code)}  ${country.name}`,
+              group: 'Tous les pays',
+            })),
+          ]}
+          onChange={(country) => {
+            onChange({ country });
           }}
-        >
-          <optgroup label="Les plus fréquents">
-            {FIRST_COUNTRIES.map((code) => (
-              <option key={code} value={code}>
-                {`${countryFlag(code)}  ${countryName(code)}`}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Tous les pays">
-            {OTHER_COUNTRIES.map((country) => (
-              <option key={country.code} value={country.code}>
-                {`${countryFlag(country.code)}  ${country.name}`}
-              </option>
-            ))}
-          </optgroup>
-        </select>
+        />
       </Field>
       <Field
         id={draft.zoneOpen ? `${id}-zone` : undefined}

@@ -6,3 +6,6 @@ import { configure } from '@testing-library/dom';
  * Waiting longer changes no assertion: a screen that never shows what is asked still fails, only later.
  */
 configure({ asyncUtilTimeout: 5_000 });
+
+/* jsdom lays nothing out and has no `scrollIntoView`: the design system's list keeps its active choice in view with it. */
+if (typeof Element !== 'undefined') Element.prototype.scrollIntoView = (): void => undefined;

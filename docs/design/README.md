@@ -183,7 +183,7 @@ Tout élément cliquable a les quatre états ; un écran prend la classe qui con
 - **Sélection** : `select` (conversation ouverte, ligne active), `select-strong` (pouce d'un segment, onglet actif) ; une puce cochée (`aria-checked`) est remplie d'`ink`, comme une case `nv-check` cochée (qui importer, quels rapports).
 - **Désactivé** : opacité 0,4, sans ombre ni survol. Pendant un envoi, le bouton reste visible avec un libellé d'état.
 
-Classes communes : `nv-btn` (actions), `nv-chip` (un choix parmi quelques-uns), `nv-tap` (ligne, carte, élément de liste), `nv-lift` (carte flottante, pas un grand panneau), `nv-disclosure` (pli `<details>` avec titre `__title`, résumé `__sum` et contenu `__body`), `nv-enter` (entrée en fondu montant, décalée par `--nv-i`).
+Classes communes : `nv-btn` (actions), `nv-chip` (un choix parmi quelques-uns, cinq au plus), `nv-select` (un choix dans une liste plus longue : le composant `Select`, jamais un `<select>` du système), `nv-tap` (ligne, carte, élément de liste), `nv-lift` (carte flottante, pas un grand panneau), `nv-disclosure` (pli `<details>` avec titre `__title`, résumé `__sum` et contenu `__body`), `nv-enter` (entrée en fondu montant, décalée par `--nv-i`).
 
 Pastilles d'état (`nv-status--<état>`) : une par valeur de `conversations.state` (`data-model.md`) : `idle`, `pending`, `drafting` (respire), `awaiting-approval`, `sending` (respire), `human`, `paused`, `error`, plus `sale`. Libellés, qui disent qui a la main (section « Clarté ») : Rien à faire, Message reçu, L'agent écrit, À valider, Envoi en cours, Un humain répond, En pause, Erreur, Vente. « Erreur » (un envoi qui n'est pas parti) est en ambre, un avertissement : le rouge reste aux urgences.
 

@@ -551,16 +551,6 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
-.sv-voice select {
-  font: inherit;
-  font-size: 14px;
-  color: var(--nv-ink);
-  background: var(--nv-glass-fill-strong);
-  border: 0;
-  border-radius: var(--nv-radius-sm);
-  padding: 10px 12px;
-  min-height: var(--nv-target-min);
-}
 .sv-hint {
   margin: 0;
   font-size: 13px;

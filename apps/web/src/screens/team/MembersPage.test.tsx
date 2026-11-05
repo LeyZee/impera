@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MembersPage } from './MembersPage';
 import { parseTeamSearch } from './model';
 
+import { chooseValue } from '@/test/select';
 import { settingsOf } from '@/test/settings';
 
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
@@ -381,7 +382,7 @@ describe('adding a member', () => {
     await open();
     who();
     // The team name followed the first name; the zone follows the country.
-    fireEvent.change(await screen.findByLabelText('Pays'), { target: { value: 'MG' } });
+    chooseValue(await screen.findByRole('combobox', { name: 'Pays' }), 'MG');
     // The zone named by its city, never its IANA name (EQ-08).
     expect(screen.getByText(/là-bas en ce moment · Antananarivo/u)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
