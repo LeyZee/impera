@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import {
   CALENDAR_FEED_PREFIX,
+  CREATOR_REPLIES_EMOJI,
   CalendarLinkTokenSchema,
   PLATFORM_NAMES,
   type CalendarLinkChoice,
@@ -42,14 +43,14 @@ const uidOf = (memberId: string, creatorId: string, startsAt: Date): string =>
   `${createHash('sha256').update(`${memberId}|${creatorId}|${startsAt.toISOString()}`).digest('base64url')}@nirvana`;
 
 /**
- * « 💬 Kofi répond à tes fans », on Reveal (ADR 0045 § 5): the range and the name in the team, nothing else. Its id is
+ * « 👥 Kofi répond à tes fans », on Reveal (ADR 0045 § 5): the range and the name in the team, nothing else. Its id is
  * the shift's, hashed: a shift given to someone else is renamed in her calendar, not doubled.
  */
 const shiftEventOf = (shift: CreatorFeedShift): FeedEvent => ({
   uid: `${createHash('sha256').update(`shift|${shift.shiftId}`).digest('base64url')}@nirvana`,
   startsAt: shift.startsAt,
   endsAt: shift.endsAt,
-  summary: `💬 ${shift.displayName} répond à tes fans`,
+  summary: `${CREATOR_REPLIES_EMOJI} ${shift.displayName} répond à tes fans`,
   description: `Sur ${PLATFORM_NAMES[shift.platform]}`,
   free: true,
 });

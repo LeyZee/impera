@@ -1,4 +1,4 @@
-import type { CreatorAccountShift, CreatorAgenda } from '@impera/contracts';
+import { CREATOR_REPLIES_EMOJI, type CreatorAccountShift, type CreatorAgenda } from '@impera/contracts';
 import type { JSX, KeyboardEvent } from 'react';
 
 import { CATEGORY_EMOJI } from './category';
@@ -110,7 +110,7 @@ export function MonthView({
               ) : null}
               {names.length === 0 ? null : (
                 <span className="ag-month__fans" aria-hidden="true">
-                  💬 {names.join(', ')}
+                  {CREATOR_REPLIES_EMOJI} {names.join(', ')}
                 </span>
               )}
             </button>

@@ -226,10 +226,10 @@ describe('Lien de calendrier de la créatrice (CR-05 lot c2)', () => {
     expect(chosen.statusCode, chosen.body).toBe(200);
     expect(CalendarLinkStateSchema.parse(chosen.json()).link).toMatchObject({ withShifts: true });
     const lines = (await feed(path)).body.split('\r\n');
-    expect(lines).toContain('SUMMARY:💬 Kofi répond à tes fans');
+    expect(lines).toContain('SUMMARY:👥 Kofi répond à tes fans');
     expect(lines).toContain('DESCRIPTION:Sur Reveal');
     // A chatter's time, never hers: the shift leaves her free in her calendar, her own slots stay busy.
-    const shift = lines.indexOf('SUMMARY:💬 Kofi répond à tes fans');
+    const shift = lines.indexOf('SUMMARY:👥 Kofi répond à tes fans');
     expect(lines.slice(shift, lines.indexOf('END:VEVENT', shift))).toContain('TRANSP:TRANSPARENT');
     const shoot = lines.indexOf('SUMMARY:🎬 Tournage robe rouge');
     expect(lines.slice(shoot, lines.indexOf('END:VEVENT', shoot))).toContain('TRANSP:OPAQUE');
@@ -243,7 +243,7 @@ describe('Lien de calendrier de la créatrice (CR-05 lot c2)', () => {
     expect(lines.join('\n')).not.toContain('Kofi-compte');
 
     const renewed = await create('nora');
-    expect((await feed(renewed)).body).toContain('SUMMARY:💬 Kofi répond à tes fans');
+    expect((await feed(renewed)).body).toContain('SUMMARY:👥 Kofi répond à tes fans');
 
     expect(
       (await call('PATCH', '/v1/scheduling/calendar-link', 'nora', { withShifts: false })).statusCode,
