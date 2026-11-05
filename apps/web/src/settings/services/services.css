@@ -648,44 +648,85 @@
   }
 }
 
-/* Password asked again before a key changes (ADR 0016). */
+/*
+ * Password and code asked again before a key changes (ADR 0016) or Automatique turns on (reco 9). Three tiers: what
+ * the confirmation unlocks, in ink; the two fields, each with its label above, side by side when there is room and
+ * stacked otherwise; the actions under them. No shared box: each field is a plate of its own (`nv-field__control`).
+ */
 .sv-reauth {
   display: grid;
-  /* The column never grows past the panel: on a phone the fields wrap instead of running out of it. */
+  /* The column never grows past the panel: on a phone the fields stack instead of running out of it. */
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--nv-space-4);
 }
 .sv-reauth > .sv-self-start {
   justify-self: start;
 }
-@media (max-width: 639px) {
-  /* The password a field of its own line, the code and the buttons under it: no shared box to run out of. */
-  .sv-reauth .sv-key,
-  .sv-reauth .sv-key:focus-within {
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 8px;
-    padding: 0;
-    background: none;
-    box-shadow: none;
-  }
-  .sv-reauth .sv-key > input:first-child {
-    flex-basis: 100%;
-    min-height: 44px;
-    padding: 0 12px;
-    border-radius: var(--nv-radius-sm);
-    background: var(--nv-glass-fill);
-    box-shadow: inset 0 0 0 1px var(--nv-fill-track);
-  }
-  .sv-reauth .sv-key > input:first-child:focus {
-    box-shadow: var(--nv-shadow-focus);
-  }
-  .sv-reauth .sv-key[data-error='true'] > input:first-child {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 60%, transparent);
-  }
+.sv-reauth__head {
+  display: grid;
+  gap: var(--nv-space-1);
 }
-.sv-reauth__label {
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
+.sv-reauth__lead {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: 1.45;
   color: var(--nv-ink);
+  text-wrap: pretty;
+}
+.sv-reauth__note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.sv-reauth__form {
+  display: grid;
+  gap: var(--nv-space-4);
+  min-width: 0;
+}
+/* Side by side from 26rem of room, the password the wider; one column under it. */
+.sv-reauth__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  align-items: end;
+  gap: var(--nv-space-3);
+}
+.sv-reauth__fields > .nv-field {
+  min-width: 0;
+}
+/* In this grid the code's label may wrap: its field stays on the password's line through `align-items: end`. */
+.sv-reauth__fields .nv-code__label {
+  white-space: normal;
+}
+.sv-reauth__form[data-error='true'] .nv-field__control {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 60%, transparent);
+}
+.sv-reauth__form[data-error='true'] .sv-reauth__fields {
+  animation: sv-nudge var(--nv-dur-base) var(--nv-ease-out);
+}
+.sv-reauth__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+/* In a dialog: the fields stacked at full width, the actions at its foot on the right, « Confirmer » last. */
+.sv-reauth[data-layout='dialog'] .sv-reauth__fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sv-reauth[data-layout='dialog'] .sv-reauth__actions {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  padding-top: var(--nv-space-1);
+}
+/* Nothing to say yet: the message takes no room under the foot, yet stays in place for the live region. */
+.sv-reauth[data-layout='dialog'] .sv-msg[data-kind='none'] {
+  min-height: 0;
+  margin-top: calc(-1 * var(--nv-space-4));
+}
+@media (max-width: 639px) {
+  /* On a phone the two buttons share the line, each a full target. */
+  .sv-reauth__actions > .nv-btn {
+    flex: 1 1 0;
+  }
 }

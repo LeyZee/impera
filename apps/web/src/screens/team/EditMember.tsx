@@ -299,7 +299,8 @@ export function RatePanel({
                 className="nv-field__control nv-glass"
                 inputMode="decimal"
                 placeholder="12,5"
-                aria-label="Taux à la main"
+                // The field's own name, with its unit: the « % » beside it is hidden from a screen reader (EQP-15).
+                aria-label="Nouveau taux, en %"
                 aria-invalid={rate.trim() !== '' && typed === null}
                 value={rate}
                 onChange={(event) => {
