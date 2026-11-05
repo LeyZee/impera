@@ -1,17 +1,21 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 import { parseEncryptionKeys, withAdmin } from '@impera/db';
 
-import { secretOrNull } from '../config';
+import { mediaBucket, secretOrNull } from '../config';
 import { createConnectionStatePublisher } from '../connection-state';
 import { defineTask } from '../jobs';
 import {
+  createAvatarFetch,
   createConnectorsModule,
+  createS3AvatarStore,
   revealSalesFeed,
+  type AvatarPorts,
   type ConnectorRegistry,
   type ConnectorsDeps,
   type ConnectorsModule,
   type SalesFeedRegistry,
 } from '../modules/connectors';
+import { createFfmpegMediaTools, sniffMediaType } from '../modules/media';
 import { salesCheckReads } from '../modules/scheduling';
 
 import type { Routes, Shared, TasksOf } from './shared';
@@ -33,11 +37,17 @@ export function wireConnectors(
     readonly salesFeeds?: SalesFeedRegistry;
     /** Tests only: the connectors' clock. */
     readonly now?: () => Date;
+    /** Tests only: the photo copy's fetch and store (CRM-07 a2b). */
+    readonly avatars?: Pick<AvatarPorts, 'fetch' | 'store'>;
   },
 ): WiredConnectors {
   const { config, db, adminDb, logger, requireRole, recentLogin } = shared;
   const sessionKeys = secretOrNull(config.SESSION_ENCRYPTION_KEYS);
   const credentialKeys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
+  // Her photo, copied at her import (CRM-07 a2b): to the media bucket, re-encoded by ffmpeg as the drops are.
+  const bucket = mediaBucket(config);
+  const store = deps.avatars?.store ?? (bucket === null ? null : createS3AvatarStore(bucket));
+  const media = createFfmpegMediaTools();
   const module = createConnectorsModule({
     db,
     adminDb,
@@ -56,6 +66,15 @@ export function wireConnectors(
     detectedAccounts: (period) => withAdmin(adminDb, (tx) => salesCheckReads.detectedAccounts(tx, period)),
     // Reveal's register down or back (Telegram P3-12), told by the Telegram module.
     publishConnectionState: createConnectionStatePublisher(adminDb, deps.now),
+    avatars:
+      store === null
+        ? null
+        : {
+            fetch: deps.avatars?.fetch ?? createAvatarFetch(),
+            sniff: sniffMediaType,
+            toJpeg: (image) => media.toJpeg(image),
+            store,
+          },
     ...(deps.now !== undefined && { clock: { now: deps.now } }),
   });
   return {
@@ -92,11 +111,18 @@ export function wireConnectors(
         logger,
         (payload, context) => module.jobs.checkSales(payload, context.logger, `job:${context.jobId}`),
       ),
+      'connector.copy_avatar': defineTask(
+        'connector.copy_avatar',
+        JOB_PAYLOADS['connector.copy_avatar'],
+        logger,
+        (payload, context) => module.jobs.copyAvatar(payload, context.logger),
+      ),
     },
     routes: [
       module.routes,
       module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin }),
       module.salesFeedDeliveryRoutes,
+      module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
     ],
   };
 }
