@@ -1,9 +1,12 @@
 import {
   AvailabilityIdSchema,
+  CREATOR_AGENDA_DAYS_AHEAD,
+  CREATOR_AGENDA_DAYS_BACK,
   CreateAvailabilityBodySchema,
   CreateCreatorTaskBodySchema,
   CreatorTaskIdSchema,
   newId,
+  withinAgendaReach,
   type CreateAvailabilityBody,
   type CreateCreatorTaskBody,
   type CreatorTaskCategory,
@@ -91,12 +94,25 @@ export function whenOf(draft: TaskDraft, zone: string): CreatorTaskWhen {
 
 export type TaskProblem = 'title' | 'weekdays' | 'day';
 
+/** Whether a day typed in a form reads, and falls within her agenda's reach (CREA-14). */
+export const dayInReach = (day: string, now: number = Date.now()): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/u.test(day) && withinAgendaReach({ kind: 'day', day }, now);
+
+/** A day the date field lets through but her agenda does not reach, or that does not read. */
+export const OUT_OF_REACH = 'Choisis un jour entre il y a un an et dans deux ans.';
+
+/** The first and last days a date field offers: her agenda's reach, a day inside it at each end. */
+export function reachOf(now: number = Date.now()): { readonly min: string; readonly max: string } {
+  const at = (days: number): string => new Date(now + days * 86_400_000).toISOString().slice(0, 10);
+  return { min: at(1 - CREATOR_AGENDA_DAYS_BACK), max: at(CREATOR_AGENDA_DAYS_AHEAD - 1) };
+}
+
 /** What keeps the task from being saved, in the order of the form. */
-export function taskProblems(draft: TaskDraft): TaskProblem[] {
+export function taskProblems(draft: TaskDraft, now: number = Date.now()): TaskProblem[] {
   const problems: TaskProblem[] = [];
   if (draft.title.trim() === '') problems.push('title');
   if (draft.kind === 'routine' && draft.weekdays.length === 0) problems.push('weekdays');
-  if (draft.kind !== 'routine' && !/^\d{4}-\d{2}-\d{2}$/u.test(draft.day)) problems.push('day');
+  if (draft.kind !== 'routine' && !dayInReach(draft.day, now)) problems.push('day');
   return problems;
 }
 

@@ -5,6 +5,7 @@ import {
   defaultStart,
   dispoIds,
   firstMoment,
+  reachOf,
   spanOf,
   taskBodyOf,
   taskProblems,
@@ -95,5 +96,29 @@ describe('the moment a form opens on (CREA-09)', () => {
     expect(firstMoment(week, '2026-11-05', 23 * 60 + 10)).toEqual({ day: '2026-11-06', start: 10 * 60 });
     // A week to come: its Monday at 10 h.
     expect(firstMoment(week, '2026-10-30', 12 * 60)).toEqual({ day: '2026-11-02', start: 10 * 60 });
+  });
+});
+
+describe('the days a form takes (CREA-14)', () => {
+  const now = Date.parse('2026-11-05T12:00:00.000Z');
+  const draft = (day: string): TaskDraft => ({
+    title: 'Live',
+    category: 'live',
+    kind: 'day',
+    day,
+    start: 600,
+    end: 660,
+    weekdays: [],
+    purpose: '',
+    reminderMinutes: null,
+  });
+
+  it('refuses a day her agenda does not reach, and offers only the days it does', () => {
+    expect(taskProblems(draft('2026-11-20'), now)).toEqual([]);
+    expect(taskProblems(draft('1900-01-01'), now)).toEqual(['day']);
+    expect(taskProblems(draft('9999-12-31'), now)).toEqual(['day']);
+    const { min, max } = reachOf(now);
+    expect(taskProblems(draft(min), now)).toEqual([]);
+    expect(taskProblems(draft(max), now)).toEqual([]);
   });
 });

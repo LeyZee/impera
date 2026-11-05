@@ -4,7 +4,7 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { ShootBrief } from './ShootBrief';
 import { AGENDA_KEY, archiveTask, moveTask } from './api';
-import { spanOf } from './draft';
+import { dayInReach, OUT_OF_REACH, reachOf, spanOf } from './draft';
 import { whenWords } from './words';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
@@ -172,10 +172,11 @@ function MoveForm({
   const { unreadable, onUnreadable } = useUnreadableTimes();
   const [busy, setBusy] = useState(false);
   const [badDay, setBadDay] = useState(false);
+  const [reach] = useState(() => reachOf());
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
     if (unreadable) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(day)) {
+    if (!dayInReach(day)) {
       setBadDay(true);
       return;
     }
@@ -200,6 +201,8 @@ function MoveForm({
           type="date"
           className="nv-field__control nv-glass tm-date"
           value={day}
+          min={reach.min}
+          max={reach.max}
           data-autofocus
           aria-invalid={badDay ? 'true' : undefined}
           aria-describedby={badDay ? `${id}-day-error` : undefined}
@@ -210,7 +213,7 @@ function MoveForm({
         />
         {badDay ? (
           <p id={`${id}-day-error`} className="tm-hint tm-hint--error" role="alert">
-            Ce jour ne se lit pas : choisis-le dans le calendrier.
+            {OUT_OF_REACH}
           </p>
         ) : null}
       </div>

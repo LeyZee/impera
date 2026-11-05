@@ -157,6 +157,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       (await call('POST', '/v1/creator-space/tasks', 'nora', { ...task, title: 'Autre' })).statusCode,
     ).toBe(409);
     expect((await agenda()).tasks.map((one) => one.title)).toContain('Tournage robe rouge');
+    // CREA-14: never 1900 nor 9999.
+    for (const day of ['1900-01-01', '9999-12-31']) {
+      const far = { ...task, id: newId(CreatorTaskIdSchema), when: { kind: 'day', day } };
+      expect((await call('POST', '/v1/creator-space/tasks', 'nora', far)).statusCode).toBe(400);
+    }
     expect((await agenda('ines')).tasks).toEqual([]);
     // Ines cannot move it: for her it does not exist.
     expect(

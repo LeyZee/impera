@@ -89,6 +89,23 @@ export const CreatorTaskWhenSchema = When.refine(lastsAtMostADay, {
 }).refine(distinctWeekdays, { message: 'Chaque jour de la routine une seule fois' });
 export type CreatorTaskWhen = z.infer<typeof CreatorTaskWhenSchema>;
 
+/** How far her agenda is planned from now (CREA-14): a year back, two years ahead. Never 1900, never 9999. */
+export const CREATOR_AGENDA_DAYS_BACK = 366;
+export const CREATOR_AGENDA_DAYS_AHEAD = 2 * 366;
+const DAY_MS = 86_400_000;
+
+/** Whether a day or a start is within reach of `now`; a routine always is. Read in UTC: a day's slack is nothing here. */
+export function withinAgendaReach(when: CreatorTaskWhen, now: number = Date.now()): boolean {
+  if (when.kind === 'routine') return true;
+  const at = when.kind === 'day' ? Date.parse(`${when.day}T00:00:00.000Z`) : Date.parse(when.startsAt);
+  return at >= now - CREATOR_AGENDA_DAYS_BACK * DAY_MS && at <= now + CREATOR_AGENDA_DAYS_AHEAD * DAY_MS;
+}
+
+/** A `when` sent to be planned (a task, a move, a suggestion, an acceptance): within reach of today. */
+export const PlannedWhenSchema = CreatorTaskWhenSchema.refine((when) => withinAgendaReach(when), {
+  message: 'Une date entre il y a un an et dans deux ans',
+});
+
 /** One of her tasks, as she reads it. `essential` marks the agency's routine she accepted: it counts for her streak. */
 export const CreatorTaskSchema = z.strictObject({
   id: CreatorTaskIdSchema,
@@ -115,7 +132,7 @@ export type CreatorTask = z.infer<typeof CreatorTaskSchema>;
  */
 export const CreateCreatorTaskBodySchema = z.strictObject({
   id: CreatorTaskIdSchema,
-  when: CreatorTaskWhenSchema,
+  when: PlannedWhenSchema,
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable().default(null),
@@ -126,7 +143,7 @@ export type CreateCreatorTaskBody = z.infer<typeof CreateCreatorTaskBodySchema>;
 /** `PATCH /v1/creator-space/tasks/:id` (creator): moved, renamed, or its reminder changed. Never its `essential`. */
 export const UpdateCreatorTaskBodySchema = z
   .strictObject({
-    when: CreatorTaskWhenSchema,
+    when: PlannedWhenSchema,
     category: CreatorTaskCategorySchema,
     title: CreatorTaskTitleSchema,
     purpose: CreatorTaskPurposeSchema.nullable(),
@@ -212,7 +229,7 @@ export type CreatorSuggestion = z.infer<typeof CreatorSuggestionSchema>;
  * `POST /v1/creator-space/suggestions/:id/accept` (creator): as it is, or moved (`when`, required when undated). Moved, it
  * keeps its kind: a timed suggestion stays timed, a routine stays a routine (422 `creator_suggestion_kind_unprocessable`).
  */
-export const AcceptSuggestionBodySchema = z.strictObject({ when: CreatorTaskWhenSchema.optional() });
+export const AcceptSuggestionBodySchema = z.strictObject({ when: PlannedWhenSchema.optional() });
 export type AcceptSuggestionBody = z.infer<typeof AcceptSuggestionBodySchema>;
 
 /** `POST /v1/creator-space/suggestions/:id/decline` (creator): with a reason if she likes. */
@@ -273,7 +290,7 @@ export const SuggestionOriginSchema = z.enum(SUGGESTION_ORIGINS);
  */
 export const CreateSuggestionBodySchema = z.strictObject({
   id: SuggestionIdSchema,
-  when: CreatorTaskWhenSchema,
+  when: PlannedWhenSchema,
   category: CreatorTaskCategorySchema,
   title: CreatorTaskTitleSchema,
   purpose: CreatorTaskPurposeSchema.nullable().default(null),
