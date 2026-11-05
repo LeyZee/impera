@@ -9,6 +9,7 @@ import {
   SUGGESTION_ID_CONFLICT,
   SUGGESTION_KIND_UNPROCESSABLE,
   SUGGESTION_NOT_FOUND,
+  SUGGESTION_PAST_UNPROCESSABLE,
   SUGGESTION_UNDATED_UNPROCESSABLE,
 } from '@impera/contracts';
 
@@ -66,6 +67,13 @@ export class SuggestionNotFound extends DomainError {
 export class SuggestionUndated extends DomainError {
   constructor() {
     super(SUGGESTION_UNDATED_UNPROCESSABLE, 'Choisis d’abord un moment pour cette tâche');
+  }
+}
+
+/** Placed, or kept, at a moment already over: it would land in her past as a task she missed (CREA-09). */
+export class SuggestionInPast extends DomainError {
+  constructor() {
+    super(SUGGESTION_PAST_UNPROCESSABLE, 'Ce moment est déjà passé : choisis-en un à venir');
   }
 }
 

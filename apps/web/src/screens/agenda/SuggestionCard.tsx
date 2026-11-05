@@ -1,4 +1,9 @@
-import { CREATOR_TASK_CATEGORY_LABELS, type CreatorAgenda, type CreatorSuggestion } from '@impera/contracts';
+import {
+  CREATOR_TASK_CATEGORY_LABELS,
+  SUGGESTION_PAST_UNPROCESSABLE,
+  type CreatorAgenda,
+  type CreatorSuggestion,
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type JSX } from 'react';
 
@@ -51,7 +56,9 @@ export function SuggestionCard({
       setFailed(
         outcome.kind === 'failed'
           ? 'Pas de réseau : réessaie dans un moment.'
-          : 'Cette proposition n’est plus là. Ton agenda est relu.',
+          : outcome.code === SUGGESTION_PAST_UNPROCESSABLE
+            ? 'Ce moment est déjà passé : tu peux répondre « Non merci ».'
+            : 'Cette proposition n’est plus là. Ton agenda est relu.',
       );
       void client.invalidateQueries({ queryKey: AGENDA_KEY });
     });

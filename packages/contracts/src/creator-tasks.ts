@@ -318,6 +318,8 @@ export const SUGGESTION_NOT_FOUND = 'creator_suggestion_not_found';
 export const SUGGESTION_DECIDED_CONFLICT = 'creator_suggestion_decided_conflict';
 export const SUGGESTION_UNDATED_UNPROCESSABLE = 'creator_suggestion_undated_unprocessable';
 export const SUGGESTION_KIND_UNPROCESSABLE = 'creator_suggestion_kind_unprocessable';
+/** Accepted at a moment already over: a suggestion never goes into her past (CREA-09). */
+export const SUGGESTION_PAST_UNPROCESSABLE = 'creator_suggestion_past_unprocessable';
 export const SUGGESTION_ID_CONFLICT = 'creator_suggestion_id_conflict';
 export const SUGGESTION_DECLINED_RECENTLY_CONFLICT = 'creator_suggestion_declined_recently_conflict';
 

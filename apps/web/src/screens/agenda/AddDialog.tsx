@@ -6,6 +6,7 @@ import { AGENDA_KEY, createAvailability, createTask } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import {
   availabilityBodiesOf,
+  defaultStart,
   dispoIds,
   newTaskId,
   taskBodyOf,
@@ -19,7 +20,7 @@ import {
 import { whenWords } from './words';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
-import { clockOf, longDay, weekdayOf } from '@/scheduling/time';
+import { clockOf, dayOf, longDay, minuteOf, weekdayOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
@@ -211,7 +212,8 @@ export function AddDialog({
   onClose: () => void;
 }): JSX.Element {
   const [what, setWhat] = useState<'task' | 'dispo'>('task');
-  const start = preset.start ?? 10 * 60;
+  const [opened] = useState(() => new Date());
+  const start = preset.start ?? defaultStart(preset.day, dayOf(opened, zone), minuteOf(opened, zone));
   const end = preset.end ?? (start + 60) % 1440;
   return (
     <Dialog title="Ajouter" className="ag-scope" onClose={onClose}>

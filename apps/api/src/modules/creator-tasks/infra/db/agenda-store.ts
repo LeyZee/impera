@@ -26,6 +26,7 @@ import {
   CreatorTaskNotFound,
   CreatorTickDayUnprocessable,
   CreatorTickLateUnprocessable,
+  SuggestionInPast,
   SuggestionKindChanged,
   SuggestionNotFound,
   SuggestionUndated,
@@ -107,6 +108,13 @@ function dayOfTask(when: CreatorTaskWhen, zone: string, fallback: string): strin
   if (when.kind === 'timed') return calendarDayIn(new Date(when.startsAt), zone);
   if (when.kind === 'day') return when.day;
   return fallback;
+}
+
+/** Whether a moment is over: a timed one ended, a day before her today. A routine is never over. */
+function isOver(when: CreatorTaskWhen, zone: string, now: Date): boolean {
+  if (when.kind === 'timed') return Date.parse(when.endsAt) <= now.getTime();
+  if (when.kind === 'day') return when.day < calendarDayIn(now, zone);
+  return false;
 }
 
 async function zoneOf(tx: Transaction, creatorId: string): Promise<string> {
@@ -397,6 +405,7 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
         // Moved, never changed in kind: what is essential is what the agency proposed as her routine.
         if (when.kind !== row.kind) throw new SuggestionKindChanged();
         const zone = await zoneOf(tx, creatorId);
+        if (isOver(when, zone, now)) throw new SuggestionInPast();
         const [task] = await tx
           .insert(tasks)
           .values({

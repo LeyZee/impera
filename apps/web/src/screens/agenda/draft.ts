@@ -42,6 +42,33 @@ export interface AvailabilityDraft {
   readonly end: number;
 }
 
+const MORNING = 10 * 60;
+const LAST_HOUR = 23 * 60;
+
+/**
+ * The hour a form starts at on `day` (CREA-09): 10 h, or on her today the next full hour when 10 h is past, never
+ * later than 23 h.
+ */
+export function defaultStart(day: string, today: string, nowMinute: number): number {
+  if (day !== today) return MORNING;
+  const nextHour = (Math.floor(nowMinute / 60) + 1) * 60;
+  return Math.min(Math.max(nextHour, MORNING), LAST_HOUR);
+}
+
+/**
+ * Where « Choisir un moment » opens (CREA-09): the first day of the suggestion's week still ahead, today while a full
+ * hour is left in it, at its default hour; the last day of the week when none is left.
+ */
+export function firstMoment(
+  days: readonly string[],
+  today: string,
+  nowMinute: number,
+): { readonly day: string; readonly start: number } {
+  const ahead = days.filter((day) => day > today || (day === today && nowMinute < LAST_HOUR));
+  const day = ahead[0] ?? days.at(-1) ?? today;
+  return { day, start: defaultStart(day, today, nowMinute) };
+}
+
 /** A timed span of her day: the end on the next day when it is at or before the start. */
 export function spanOf(
   day: string,

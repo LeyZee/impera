@@ -333,6 +333,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       when: { kind: 'day', day: today },
     });
     expect(toDay.statusCode).toBe(422);
+    // CREA-09: never into her past.
+    const past = await call('POST', `/v1/creator-space/suggestions/${dated.id}/accept`, 'nora', {
+      when: { kind: 'day', day: addDays(today, -1) },
+    });
+    expect(past.json()).toMatchObject({ error: { code: 'creator_suggestion_past_unprocessable' } });
     // Moved within its kind, it is accepted.
     const moved = await call('POST', `/v1/creator-space/suggestions/${dated.id}/accept`, 'nora', {
       when: { kind: 'day', day: addDays(nextWednesday, 1) },
