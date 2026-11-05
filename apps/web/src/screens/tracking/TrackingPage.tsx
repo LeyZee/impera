@@ -502,7 +502,10 @@ function Row({
             <span className="tr-row__pseudo">{name}</span>
             {/* What it counts: his messages since the last answer, which reading does not lower (CHAT-13). */}
             {conversation.unreadCount > 0 ? (
-              <span className="tr-unread nv-num" aria-label={`${String(conversation.unreadCount)} sans réponse`}>
+              <span
+                className="tr-unread nv-num"
+                aria-label={`${String(conversation.unreadCount)} sans réponse`}
+              >
                 {conversation.unreadCount}
               </span>
             ) : null}
