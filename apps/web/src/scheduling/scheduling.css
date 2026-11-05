@@ -60,11 +60,13 @@
 .sc-week {
   display: flex;
   align-items: center;
-  gap: var(--nv-space-1);
+  gap: var(--nv-space-2);
   min-width: 0;
 }
+/* The dates breathe between their arrows (recette #561, Charles: « trop collé au bouton »). */
 .sc-week__label {
   margin: 0;
+  padding-inline: var(--nv-space-1);
   min-width: 13ch;
   text-align: center;
   font-size: var(--nv-text-callout);

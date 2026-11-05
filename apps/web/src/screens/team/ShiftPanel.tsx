@@ -9,6 +9,7 @@ import {
 } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
+import { DayField } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { createShift, createTemplate, useRefreshPlanning, type Refusal } from '@/scheduling/api';
 import { accountLine, ERROR_MESSAGES, type Fill } from '@/scheduling/model';
@@ -113,6 +114,7 @@ export function ShiftPanel({
   const [to, setTo] = useState(inputOf(given?.endMinute ?? slots[first.slot]?.endMinute ?? 360));
   const [weekly, setWeekly] = useState(false);
   const times = useUnreadableTimes();
+  const [dayUnreadable, setDayUnreadable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
 
@@ -127,7 +129,7 @@ export function ShiftPanel({
   // A template keeps an hour aside, so a change of time never stretches its shifts past a day (contracts).
   const tooLong = weekly && minutes > SHIFT_TEMPLATE_MAX_MINUTES;
   const hoursFit = hoursOk && !tooLong;
-  const dayOk = /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= today;
+  const dayOk = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= today;
   // A single shift lasts what its two instants span: 5 h for 0 h – 6 h the night the clocks go forward. A template
   // keeps its wall-clock hours, whatever the week.
   const lasts =
@@ -137,6 +139,9 @@ export function ShiftPanel({
       : minutes * 60_000;
   // The night the clocks go back, 2 h 30 – 2 h spans 24 h 30: more than a shift may last.
   const tooLongOnce = !weekly && lasts > SHIFT_MAX_MINUTES * 60_000;
+  // 2 h – 2 h 45 the night the clocks go forward: both ends fall on 3 h, nothing is left to work (relecture #561).
+  const vanishes = !weekly && hoursOk && dayOk && lasts <= 0;
+  const onceOk = !tooLongOnce && !vanishes;
   // An hour the clocks skip the night they go forward (2 h 30 the last Sunday of March in Paris) does not exist: the
   // shift starts or ends at the first one after it, as saved. The summary says the hours that will be, and why
   // they moved (recette EQP-11). A template keeps its wall-clock hours.
@@ -157,8 +162,7 @@ export function ShiftPanel({
           : null;
   // No shift before the member's first day (the server reads it in their zone, the panel in the agency's).
   const notJoined = chosen !== null && dayOk && day < chosen.joinedOn;
-  const ready =
-    account !== null && chosen !== null && hoursFit && !tooLongOnce && dayOk && !notJoined && !busy;
+  const ready = account !== null && chosen !== null && hoursFit && onceOk && dayOk && !notJoined && !busy;
 
   const submit = async (): Promise<void> => {
     if (!ready) return;
@@ -209,47 +213,55 @@ export function ShiftPanel({
           void submit();
         }}
       >
-        <div className="nv-field tm-field">
-          <label className="nv-field__label" htmlFor={`${id}-account`}>
-            Compte
-          </label>
-          <select
-            id={`${id}-account`}
-            className="nv-field__control nv-glass tm-select"
-            value={accountId}
-            data-autofocus
-            onChange={(event) => {
-              setAccountId(event.target.value);
-              setMemberId('');
-            }}
-          >
+        {/* Accounts and members are few: chips, one tap each, never a list of the system (recette #561). */}
+        <fieldset className="sc-fieldset">
+          <legend className="nv-field__label">Compte</legend>
+          <div className="tm-choices" role="radiogroup" aria-label="Compte">
             {accounts.map((one) => (
-              <option key={one.id} value={one.id}>
-                {one.creatorName} · {accountLine(one)}
-              </option>
+              <button
+                key={one.id}
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={one.id === accountId}
+                data-autofocus={one.id === accountId ? true : undefined}
+                onClick={() => {
+                  setAccountId(one.id);
+                  setMemberId('');
+                }}
+              >
+                {one.creatorName}
+                <span className="tm-chip__more">{accountLine(one)}</span>
+              </button>
             ))}
-          </select>
-        </div>
+          </div>
+        </fieldset>
 
-        <div className="nv-field tm-field" data-invalid={eligible.length === 0 ? 'true' : undefined}>
-          <label className="nv-field__label" htmlFor={`${id}-member`}>
-            Membre
-          </label>
-          <select
-            id={`${id}-member`}
-            className="nv-field__control nv-glass tm-select"
-            value={chosen?.id ?? ''}
-            disabled={eligible.length === 0}
-            onChange={(event) => {
-              setMemberId(event.target.value);
-            }}
-          >
-            {eligible.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.displayName}
-              </option>
-            ))}
-          </select>
+        <fieldset className="sc-fieldset" data-invalid={eligible.length === 0 ? 'true' : undefined}>
+          <legend className="nv-field__label">Membre</legend>
+          {eligible.length === 0 ? null : (
+            <div className="tm-choices" role="radiogroup" aria-label="Membre">
+              {eligible.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  role="radio"
+                  className="nv-chip"
+                  aria-checked={member.id === chosen?.id}
+                  onClick={() => {
+                    setMemberId(member.id);
+                  }}
+                >
+                  <span
+                    className="sc-swatch"
+                    style={member.color === null ? undefined : { '--sc-color': member.color }}
+                    aria-hidden="true"
+                  />
+                  {member.displayName}
+                </button>
+              ))}
+            </div>
+          )}
           {members === null ? (
             <span className="tm-hint tm-hint--error">
               L’équipe n’a pas pu être lue. Réessaie dans un instant.
@@ -260,29 +272,29 @@ export function ShiftPanel({
               {account?.creatorName ?? 'cette créatrice'}.
             </span>
           ) : null}
-        </div>
+        </fieldset>
 
         <div className="nv-field tm-field" data-invalid={dayOk && !notJoined ? undefined : 'true'}>
           <label className="nv-field__label" htmlFor={`${id}-day`}>
             {weekly ? 'À partir du' : 'Jour'}
           </label>
-          <input
+          <DayField
             id={`${id}-day`}
-            type="date"
-            className="nv-field__control nv-glass tm-date"
+            className="tm-date"
             value={day}
-            min={today}
-            aria-invalid={!dayOk || notJoined}
-            onChange={(event) => {
-              setDay(event.target.value);
-            }}
+            today={today}
+            invalid={!dayOk || notJoined}
+            onChange={setDay}
+            onUnreadable={setDayUnreadable}
           />
           <span className={dayOk && !notJoined ? 'tm-hint' : 'tm-hint tm-hint--error'}>
-            {!dayOk
-              ? 'Un jour, aujourd’hui au plus tôt.'
-              : notJoined
-                ? `${chosen.displayName} arrive le ${longDay(chosen.joinedOn)} : un jour à partir de son arrivée.`
-                : longDay(day).replace(/^./u, (letter) => letter.toUpperCase())}
+            {dayUnreadable
+              ? 'Un jour comme 28/03/2027, ou 28/3.'
+              : !dayOk
+                ? 'Un jour, aujourd’hui au plus tôt.'
+                : notJoined
+                  ? `${chosen.displayName} arrive le ${longDay(chosen.joinedOn)} : un jour à partir de son arrivée.`
+                  : longDay(day).replace(/^./u, (letter) => letter.toUpperCase())}
           </span>
         </div>
 
@@ -341,7 +353,7 @@ export function ShiftPanel({
               </label>
             </div>
           ) : null}
-          <span className={hoursFit && !tooLongOnce ? 'tm-hint' : 'tm-hint tm-hint--error'}>
+          <span className={hoursFit && onceOk ? 'tm-hint' : 'tm-hint tm-hint--error'}>
             {unreadable
               ? 'Une heure sur 24 heures : 22, 2230 ou 22:30.'
               : !hoursOk
@@ -350,10 +362,12 @@ export function ShiftPanel({
                   ? 'Un modèle de shift dure 23 heures au plus.'
                   : tooLongOnce
                     ? `${lengthOf(lasts)} cette nuit-là, à cause du changement d’heure : un shift dure 24 h au plus.`
-                    : // The hours and how long they last on one line (EQ-23): « 5 h – 11 h · 6 h ».
-                      `${clockOf(moved?.start ?? startMinute)} – ${clockOf(moved?.end ?? endMinute)} · ${lengthOf(lasts)}${crosses ? ', jusqu’au lendemain' : ''}.`}
+                    : vanishes
+                      ? 'Ces heures n’existent pas cette nuit-là, à cause du changement d’heure.'
+                      : // The hours and how long they last on one line (EQ-23): « 5 h – 11 h · 6 h ».
+                        `${clockOf(moved?.start ?? startMinute)} – ${clockOf(moved?.end ?? endMinute)} · ${lengthOf(lasts)}${crosses ? ', jusqu’au lendemain' : ''}.`}
           </span>
-          {hoursFit && !tooLongOnce && skipped !== null ? (
+          {hoursFit && onceOk && skipped !== null ? (
             <p className="tm-warn nv-swap" role="status">
               {skipped}
             </p>

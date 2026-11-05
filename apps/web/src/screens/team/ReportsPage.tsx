@@ -29,13 +29,11 @@ import {
   mergeLists,
   periodAt,
   periodSums,
-  periodTitle,
   previousPeriod,
   READ_AGAIN,
   REPORT_ERRORS,
   signedAmountText,
   STATUS_TONES,
-  followingPeriod,
   lateFor,
   lateLines,
   nudgeText,
@@ -47,6 +45,7 @@ import { accountLine, swapShiftLine } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /** The correction panel the agency opens on a validated report, for its shift. */
@@ -766,41 +765,16 @@ function PeriodPanel({
   onPeriod: (period: PayPeriod | null) => void;
   onCorrect: (line: ShiftLine, memberName: string) => void;
 }): JSX.Element {
+  // The period is the panel's title, as on Paie: « Quinzaine » above it, the arrows on its right (recette #561, Charles:
+  // the dates were too close to the arrows, the label under them on a phone).
+  const title = period === null ? undefined : <PeriodHeading period={period} />;
   const nav =
     period === null ? null : (
-      <div className="sc-week" role="group" aria-label="Quinzaine">
-        <button
-          type="button"
-          className="sc-arrow"
-          aria-label="Quinzaine précédente"
-          onClick={() => {
-            onPeriod(previousPeriod(period));
-          }}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="m10 3.5-4.5 4.5 4.5 4.5" />
-          </svg>
-        </button>
-        <p className="sc-week__label nv-swap" key={period} aria-live="polite">
-          {periodTitle(period)}
-        </p>
-        <button
-          type="button"
-          className="sc-arrow"
-          aria-label="Quinzaine suivante"
-          disabled={current !== null && period >= current}
-          onClick={() => {
-            onPeriod(followingPeriod(period));
-          }}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="m6 3.5 4.5 4.5-4.5 4.5" />
-          </svg>
-        </button>
+      <div className="rp-period__nav">
         {current !== null && period !== current ? (
           <button
             type="button"
-            className="nv-btn nv-btn--plain nv-btn--sm sc-week__back nv-swap"
+            className="nv-btn nv-btn--plain nv-btn--sm nv-swap"
             onClick={() => {
               onPeriod(null);
             }}
@@ -808,12 +782,13 @@ function PeriodPanel({
             Cette quinzaine
           </button>
         ) : null}
+        <PeriodArrows period={period} current={current} onPeriod={onPeriod} />
       </div>
     );
 
   if (isError) {
     return (
-      <Panel className="rp-period" eyebrow="Quinzaine" actions={nav}>
+      <Panel className="rp-period" eyebrow="Quinzaine" title={title} actions={nav}>
         <div className="rp-sec">
           <div className="sc-empty">
             <p className="tm-warn">Le serveur ne répond pas : la quinzaine n’a pas pu être lue.</p>
@@ -827,7 +802,7 @@ function PeriodPanel({
   }
   if (list === undefined || period === null) {
     return (
-      <Panel className="rp-period" eyebrow="Quinzaine" actions={nav}>
+      <Panel className="rp-period" eyebrow="Quinzaine" title={title} actions={nav}>
         <div className="rp-sec">
           <div className="sc-skeleton sc-skeleton--short" aria-hidden="true">
             <i />
@@ -848,7 +823,7 @@ function PeriodPanel({
   );
 
   return (
-    <Panel className="rp-period nv-enter" eyebrow="Quinzaine" actions={nav}>
+    <Panel className="rp-period nv-enter" eyebrow="Quinzaine" title={title} actions={nav}>
       <div className="rp-sec">
         {focus !== null && !byMember.has(focus) ? (
           <p className="rp-mine__empty">Pas de shift de {focusName ?? 'ce membre'} sur cette quinzaine.</p>

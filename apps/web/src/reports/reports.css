@@ -382,6 +382,33 @@
   font-size: var(--nv-text-footnote);
 }
 
+/* A period's head: « Quinzaine » over the period, its arrows on its right, centred on the title; on a phone that has
+   no room for both, they go under it, on its left edge (recette #561). */
+.rp-period > .nv-panel__head {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--nv-space-3);
+}
+.rp-period__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  flex: none;
+  margin-left: auto;
+}
+@media (max-width: 480px) {
+  .rp-period > .nv-panel__head > :first-child {
+    flex-basis: 100%;
+  }
+  .rp-period__nav {
+    margin-left: 0;
+  }
+  /* The arrows first, on the title's own edge; « Cette quinzaine » after them. */
+  .rp-period__nav > .sc-week {
+    order: -1;
+  }
+}
+
 /* The body of a panel under its eyebrow, at the head's own inset. */
 .rp-sec {
   display: flex;
