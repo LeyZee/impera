@@ -3,6 +3,7 @@ import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
+import { ChipFace } from './CreatorFace';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { SetupCard } from './SetupCard';
@@ -234,6 +235,7 @@ export function CreatorsPage({
                       if (creator.id !== selected) onCreator(creator.id);
                     }}
                   >
+                    <ChipFace creator={creator} />
                     {creator.displayName}
                   </button>
                 ))}
