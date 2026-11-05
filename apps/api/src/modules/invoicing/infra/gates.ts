@@ -1,4 +1,5 @@
-import { sql, type Transaction } from '@impera/db';
+import { EVENT_PAYLOADS, type InvoiceNotIssuedReason } from '@impera/contracts';
+import { and, eq, inArray, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { AfterValidation, PayoutGate, PayoutVerdict } from '../../payroll';
@@ -37,7 +38,37 @@ export const payoutGate: PayoutGate = {
       .then((result) => z.array(z.object({ count: z.number().int() })).parse(result.rows));
     return open?.count ?? 0;
   },
+
+  // Through the events' partial index, by member: the newest said wins, its invoice's before a credit note's of the same
+  // run. A rerun says only a new reason (`publishNotIssued`), so the newest is the one in force.
+  async notIssuedReasonsUnscoped(adminTx, statements) {
+    const reasons = new Map<string, InvoiceNotIssuedReason>();
+    if (statements.length === 0) return reasons;
+    const wanted = new Set(statements.map((one) => one.statementId));
+    const rows = await adminTx
+      .select({ payload: domainEvents.payload })
+      .from(domainEvents)
+      .where(
+        and(
+          eq(domainEvents.type, 'invoice_not_issued'),
+          inArray(sql<string>`${domainEvents.payload}->>'memberId'`, [
+            ...new Set(statements.map((one) => one.memberId)),
+          ]),
+        ),
+      )
+      .orderBy(
+        sql`${domainEvents.createdAt} desc, (${domainEvents.payload}->>'document' = 'invoice') desc, ${domainEvents.id} desc`,
+      );
+    for (const row of rows) {
+      const said = EVENT_PAYLOADS.invoice_not_issued.parse(row.payload);
+      if (wanted.has(said.statementId) && !reasons.has(said.statementId))
+        reasons.set(said.statementId, said.reason);
+    }
+    return reasons;
+  },
 };
+
+const { domainEvents } = schema;
 
 /** The invoices' part of `AfterValidation` (ADR 0047 § 1): their issue and their settlement, in pay's transaction. */
 export const invoicesAfterValidation: Pick<AfterValidation, 'issueInvoices' | 'settleDocuments'> = {

@@ -214,6 +214,7 @@ export function statementOf(
     paidBy: null,
     payment: null,
     payoutBlock: null,
+    notIssuedReason: null,
     ...patch,
   });
 }

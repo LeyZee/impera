@@ -73,3 +73,6 @@ Coordonnées de paiement, transmission à une plateforme agréée, notifications
 
 ## Résultat
 Terminée le 02/11/2026. Les compléments d'API d'Équipe (#368 à #373, #375) et les quatre PR d'écrans d'Extension (#374, #376, #377, #378) sont dans `main`. Équipe a relu chaque écran et chaque montant avant la fusion : aucun écran ne recalcule une échéance, un état, un règlement, un blocage ni un montant. Choix d'Équipe du 02/11 : le choix (a), l'attestation de résidence hors convention (voir plus haut) ; la partie « propriétaire » d'Aujourd'hui va sur son Dashboard, puisqu'il n'a pas d'Aujourd'hui (ADR 0024).
+
+## Notes de session
+- 2026-11-05 (fil Équipe, recette EQP-04) : un versement bloqué dit pourquoi. Le relevé porte `notIssuedReason` (la dernière raison d'`invoice_not_issued` pour lui, lue par `PayoutGate.notIssuedReasonsUnscoped` dans une transaction admin, puisque ces événements sont ceux de l'agence). Commissions ne dit plus « Le versement suit » : un encart ambre dit ce qui manque et mène à Moi › Dossier quand c'est au membre d'agir ; Quinzaine et le relevé nomment la pièce et mènent le propriétaire à son dossier ou à Réglages › Facturation ; Factures liste « relevés validés sans facture ».

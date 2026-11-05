@@ -145,8 +145,18 @@ function renderPage(user: Me, initial = '/paie/quinzaine'): void {
       );
     },
   });
+  const file = createRoute({
+    getParentRoute: () => root,
+    path: '/equipe/membres/$memberId/dossier',
+    component: () => null,
+  });
+  const billing = createRoute({
+    getParentRoute: () => root,
+    path: '/reglages/facturation',
+    component: () => null,
+  });
   const router = createRouter({
-    routeTree: root.addChildren([page]),
+    routeTree: root.addChildren([page, file, billing]),
     history: createMemoryHistory({ initialEntries: [initial] }),
   });
   render(
@@ -766,6 +776,71 @@ describe('Paie › Quinzaine', () => {
     const dialog = await screen.findByRole('dialog');
     expect(text(dialog)).toContain('Versement bloqué : attestation de résidence 2026 absente.');
     expect(within(dialog).queryByRole('button', { name: 'Marquer payé' })).toBeNull();
+  });
+
+  it('names what holds an invoice back, and leads the owner to where it is settled (recette EQP-04)', async () => {
+    const validatedAt = '2026-11-02T08:41:00.000Z';
+    const held = (reason: 'no_mandate' | 'agency_missing') => ({
+      status: 'validated' as const,
+      payableMinor: 10_000,
+      totalMinor: 10_000,
+      validatedAt,
+      payoutBlock: { reason: 'documents_not_issued' as const, year: null },
+      notIssuedReason: reason,
+    });
+    periods[OCT2] = periodOf(
+      OCT2,
+      [statementOf(THEO, OCT2, held('no_mandate')), statementOf(BASILE, OCT2, held('agency_missing'))],
+      { closing: { period: OCT2, exchangeRates: [], closedBy: OWNER_USER, closedAt: validatedAt } },
+    );
+    renderPage(OWNER);
+    await waitFor(() => row('Théo'));
+    expect(text(row('Théo'))).toContain(
+      'Versement bloqué : facture pas encore émise, le membre n’a pas encore accepté son mandat de facturation.',
+    );
+    expect(within(row('Théo')).getByRole('link', { name: 'Ouvrir son dossier' }).getAttribute('href')).toBe(
+      `/equipe/membres/${THEO.id}/dossier`,
+    );
+    // What is the agency's is settled in Réglages › Facturation.
+    expect(
+      within(row('Basile')).getByRole('link', { name: 'Ouvrir Réglages › Facturation' }).getAttribute('href'),
+    ).toBe('/reglages/facturation');
+    // The statement says it in its foot, with the same way to settle it.
+    fireEvent.click(within(row('Théo')).getByRole('button', { name: 'Théo' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(text(dialog)).toContain('le membre n’a pas encore accepté son mandat de facturation.');
+    expect(within(dialog).getByRole('link', { name: 'Ouvrir son dossier' })).toBeTruthy();
+  });
+
+  it('tells a manager why a transfer waits, the way to settle it being the owner’s (recette EQP-04)', async () => {
+    periods[OCT2] = periodOf(
+      OCT2,
+      [
+        statementOf(THEO, OCT2, {
+          status: 'validated',
+          canValidate: false,
+          payableMinor: 10_000,
+          totalMinor: 10_000,
+          validatedAt: '2026-11-02T08:41:00.000Z',
+          payoutBlock: { reason: 'documents_not_issued', year: null },
+          notIssuedReason: 'identity_unverified',
+        }),
+      ],
+      {
+        closing: {
+          period: OCT2,
+          exchangeRates: null,
+          closedBy: OWNER_USER,
+          closedAt: '2026-11-02T08:41:00.000Z',
+        },
+      },
+    );
+    renderPage(IRIS_ME, `/paie/quinzaine?quinzaine=${OCT2}`);
+    await waitFor(() => row('Théo'));
+    expect(text(row('Théo'))).toContain(
+      'Versement bloqué : facture pas encore émise, son identité attend la vérification du propriétaire dans son dossier.',
+    );
+    expect(within(row('Théo')).queryByRole('link')).toBeNull();
   });
 
   it('never offers a manager to mark a statement paid', async () => {

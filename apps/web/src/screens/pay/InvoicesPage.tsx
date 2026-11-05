@@ -6,13 +6,14 @@ import { AnswerDialog, DetailDialog, InvoiceRow, SettleDialog } from './InvoiceR
 import { InvoiceYears } from './InvoiceYears';
 import { PayNav } from './PayNav';
 import { useAgencyToday, useCurrentPeriod } from './data';
-import { Empty, Loading, PeriodArrows, Unreachable } from './parts';
+import { Empty, Loading, PayoutHoldLine, PeriodArrows, Unreachable } from './parts';
 
 import { useInvoices, useInvoiceYears } from '@/invoices/api';
+import { usePayPeriod } from '@/payroll/api';
 import '@/payroll/pay.css';
 import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
-import { periodTitle, previousPeriod } from '@/reports/model';
+import { amountText, periodTitle, previousPeriod } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
@@ -130,6 +131,7 @@ export function InvoicesPage({
             </Waiting>
           </>
         )}
+        {period === null ? null : <AwaitingInvoices period={period} owner={owner} nameOf={nameOf} />}
         <Panel
           className="nv-enter iv-docs"
           eyebrow="Documents"
@@ -248,6 +250,51 @@ export function InvoicesPage({
  * A list of what waits (contests, due dates): shown only when something waits, never an empty plate; a server that
  * does not answer is said, never taken for « nothing ».
  */
+/**
+ * The quinzaine's validated statements whose invoice is not issued (recette EQP-04): who, what waits to be paid, why,
+ * and for the owner where to settle it. Without them, an empty list of documents read as « nothing to do ». Nothing
+ * while none waits, nor while the period is unread: the documents' panel below says a server that does not answer.
+ */
+function AwaitingInvoices({
+  period,
+  owner,
+  nameOf,
+}: {
+  period: PayPeriod;
+  owner: boolean;
+  nameOf: (memberId: string) => string;
+}): JSX.Element | null {
+  const read = usePayPeriod(period);
+  const statements = read.data?.period === period ? read.data.statements : [];
+  const held = statements.filter((one) => one.payoutBlock?.reason === 'documents_not_issued');
+  if (held.length === 0) return null;
+  const many = held.length > 1;
+  return (
+    <Panel
+      className="nv-enter"
+      eyebrow="En attente de facture"
+      title={`${String(held.length)} relevé${many ? 's' : ''} validé${many ? 's' : ''} sans facture`}
+    >
+      <ul className="iv-list">
+        {held.map((statement, index) => (
+          <li key={statement.id} className="nv-enter" style={{ '--nv-i': Math.min(index, 8) }}>
+            <article className="iv-doc">
+              <div className="iv-doc__main">
+                <p className="iv-doc__name">{nameOf(statement.memberId)}</p>
+                <PayoutHoldLine statement={statement} owner={owner} className="iv-doc__sub" />
+              </div>
+              <p className="iv-doc__amount nv-num">
+                {amountText(statement.payableMinor, 'EUR')}
+                <small>à verser</small>
+              </p>
+            </article>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
 function Waiting({
   query,
   title,

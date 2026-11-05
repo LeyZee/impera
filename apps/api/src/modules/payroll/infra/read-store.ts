@@ -28,6 +28,7 @@ import {
   penaltyCovers,
   UserIdSchema,
   type EarningsBase,
+  type InvoiceNotIssuedReason,
   type PayoutBlock,
   type PayPeriod,
   type StatementCountedSales,
@@ -268,6 +269,18 @@ export function createDrizzlePayrollReadStore(
           if (payout === undefined || !toPay.includes(row)) return null;
           return payout.kind === 'blocked' ? { reason: payout.reason, year: payout.year } : null;
         };
+        // Why their documents are not issued (recette EQP-04): what is left to do, said on the statement. Only the
+        // statements read above, under the reader's policies; only a reason comes out.
+        const unissued = toPay.filter((row) => payoutBlockOf(row)?.reason === 'documents_not_issued');
+        const notIssued =
+          unissued.length === 0
+            ? new Map<string, InvoiceNotIssuedReason>()
+            : await withAdmin(adminDb, (admin) =>
+                gate.notIssuedReasonsUnscoped(
+                  admin,
+                  unissued.map((row) => ({ memberId: row.memberId, statementId: row.id })),
+                ),
+              );
 
         const statements: StoredStatement[] = statementRows.map((row) => {
           if (window === null) throw new Error(`Statement ${row.id} without its period`);
@@ -343,6 +356,7 @@ export function createDrizzlePayrollReadStore(
                       sentMinor: row.sentMinor,
                     }),
               payoutBlock: payoutBlockOf(row),
+              notIssuedReason: notIssued.get(row.id) ?? null,
             },
             team: {
               netMinor: row.teamNetMinor,
