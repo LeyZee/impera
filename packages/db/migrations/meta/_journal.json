@@ -708,6 +708,13 @@
       "when": 1793903976322,
       "tag": "0113_content_media_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1793904710582,
+      "tag": "0115_heavy_videos",
+      "breakpoints": true
     }
   ]
 }

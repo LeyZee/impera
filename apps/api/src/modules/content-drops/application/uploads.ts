@@ -11,7 +11,15 @@ import {
   ContentDropUploadUnprocessable,
   UnreadableFile,
 } from '../domain/errors';
-import type { CleanedFile, DropFileTarget, DropStorage, FileCleaner, ReceiptStore } from '../domain/ports';
+import type {
+  CleanedFile,
+  DropFileTarget,
+  DropStorage,
+  FileCleaner,
+  ReceiptStore,
+  ReceiptTask,
+  ScratchRoom,
+} from '../domain/ports';
 import { holds, sniff } from '../domain/sniff';
 import { completionRefusal, partsSplit, rawKeyOf } from '../domain/upload';
 
@@ -95,6 +103,7 @@ export async function finishUpload(
 /** Said when the bytes are not of the type declared (a renamed file), or cannot be read at all. */
 const NOT_WHAT_IT_SAYS = 'Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie';
 const UNREADABLE = 'Ce fichier ne se lit pas : renvoie-le depuis ta galerie';
+const UNREADABLE_VIDEO = 'Ce fichier n’est pas une vidéo qu’on sait lire : exporte-la en MP4';
 /** Said when the raw file is gone before its cleaning (24 hours, the storage's rule). */
 const GONE = 'Ce fichier n’est pas arrivé à temps : renvoie-le';
 
@@ -123,12 +132,22 @@ async function headOf(path: string): Promise<Uint8Array> {
   }
 }
 
+/**
+ * The room the job needs in its folder before it starts (ADR 0070 § 4): the raw file, its cleaned copy, and a margin
+ * for a conversion that comes out heavier.
+ */
+const ROOM_FACTOR = 2.5;
+/** A machine short of disk takes the file again this much later, until there is room or the raw file is gone. */
+const SHORT_OF_DISK_DELAY_MS = 15 * 60_000;
+
 export interface ReceiptDeps {
   readonly storage: DropStorage;
   readonly receipts: ReceiptStore;
   readonly cleaner: FileCleaner;
   /** Where the job writes the raw and the cleaned file, each in its own folder erased after. */
   readonly scratchDir: string;
+  /** The room on the disk of `scratchDir`, taken before the download. */
+  readonly room: ScratchRoom;
 }
 
 /**
@@ -138,12 +157,17 @@ export interface ReceiptDeps {
  * library, or a duplicate of the one she already gave; the raw file is erased either way. A drop withdrawn meanwhile
  * has its raw file erased at once. Replayable: each step starts from the file's state, a medium is written under its
  * fingerprint. A storage or an ffmpeg that does not answer throws, and the job retries.
+ *
+ * A video neither in H.264 nor in HEVC is handed over to `content_drops.convert_file` (ADR 0070 § 3), which runs this
+ * same receipt in the queue where conversions pass one at a time: the receipt never waits for it. Either job checks
+ * the room on disk first, and comes back later when there is not enough (ADR 0070 § 4).
  */
 export async function receiveFile(
   deps: ReceiptDeps,
   fileId: string,
   now: Date,
   correlationId: string,
+  task: ReceiptTask = 'content_drops.receive_file',
 ): Promise<void> {
   const { storage, receipts } = deps;
   const target = await receipts.pending(fileId);
@@ -166,11 +190,20 @@ export async function receiveFile(
     return;
   }
 
-  const dir = await mkdtemp(join(deps.scratchDir, 'impera-drop-'));
+  const release = await deps.room.take(Math.ceil(ROOM_FACTOR * target.bytes));
+  if (release === null) {
+    if ((await storage.sizeOf(key)) === null) return refuse(GONE);
+    await receipts.enqueue(task, target, correlationId, new Date(now.getTime() + SHORT_OF_DISK_DELAY_MS));
+    return;
+  }
+  const kind = kindOfMime(target.mime);
+  const unreadable = kind === 'video' ? UNREADABLE_VIDEO : UNREADABLE;
+  let dir: string | null = null;
   try {
+    dir = await mkdtemp(join(deps.scratchDir, 'impera-drop-'));
     const raw = join(dir, 'raw');
     const out = join(dir, 'clean');
-    if (!(await storage.download(key, raw))) {
+    if (!(await storage.download(key, raw, target.bytes))) {
       await refuse(GONE);
       return;
     }
@@ -181,15 +214,21 @@ export async function receiveFile(
     }
     let cleaned: CleanedFile;
     try {
+      if (
+        task === 'content_drops.receive_file' &&
+        (await deps.cleaner.needsConversion(raw, family, target.mime))
+      ) {
+        await receipts.enqueue('content_drops.convert_file', target, correlationId, null);
+        return;
+      }
       cleaned = await deps.cleaner.clean(raw, out, family, target.mime);
     } catch (error) {
       if (error instanceof UnreadableFile) {
-        await refuse(UNREADABLE);
+        await refuse(unreadable);
         return;
       }
       throw error;
     }
-    const kind = kindOfMime(target.mime);
     if ((kind === 'video' && !cleaned.hasVideo) || (kind === 'audio' && !cleaned.hasAudio)) {
       await refuse(NOT_WHAT_IT_SAYS);
       return;
@@ -208,14 +247,14 @@ export async function receiveFile(
     const storageKey = mediaKeyOf(target.creatorId, sha256);
     // A medium she already holds is not written again: the file becomes its duplicate. Erased, it is written again.
     const uploaded = (await receipts.knownMedia(target.creatorId, sha256)) === null;
-    if (uploaded) await storage.upload(storageKey, out, target.mime, sha256);
+    if (uploaded) await storage.upload(storageKey, out, cleaned.mime, sha256);
     await receipts.settle(
       fileId,
       {
         state: 'kept',
         media: {
           kind,
-          mime: target.mime,
+          mime: cleaned.mime,
           bytes,
           sha256,
           storageKey,
@@ -228,7 +267,8 @@ export async function receiveFile(
     );
     await storage.remove(key);
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    if (dir !== null) await rm(dir, { recursive: true, force: true });
+    release();
   }
 }
 
