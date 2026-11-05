@@ -19,7 +19,9 @@ describe('initialOf', () => {
   it('takes the first letter, past what is not one (recette 05/11, PRO-17)', () => {
     expect(initialOf('<b>Fan</b><script>alert(1)</script>')).toBe('B');
     expect(initialOf('« Élodie »')).toBe('É');
-    expect(initialOf('💋 Dashboard-Fan 1')).toBe('D');
+    // An emoji stays the initial, whole: Suivi shows a pseudo's own.
+    expect(initialOf('💋 Dashboard-Fan 1')).toBe('💋');
+    expect(initialOf('→ 👍🏽 Théo')).toBe('👍🏽');
   });
 });
 
