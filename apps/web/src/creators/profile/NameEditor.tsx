@@ -115,7 +115,7 @@ export function NameEditor({
       <Field
         label="Prénom ou pseudo"
         id={`${id}-name`}
-        hint="Celui que voient ses fans et toute l’équipe. Son pseudo Reveal et sa persona ne changent pas."
+        hint="Celui que lit toute l’équipe dans Impera. Son pseudo Reveal et sa persona ne changent pas."
       >
         <input
           id={`${id}-name`}
@@ -123,13 +123,18 @@ export function NameEditor({
           value={name}
           maxLength={80}
           aria-invalid={nameRefused}
+          aria-describedby={noLetter ? `${id}-no-letter` : undefined}
           onChange={(event) => {
             setName(event.target.value);
             setProblem(null);
           }}
         />
       </Field>
-      {noLetter ? <p className="ps-error">Le nom doit contenir au moins une lettre.</p> : null}
+      {noLetter ? (
+        <p className="ps-error" id={`${id}-no-letter`}>
+          Le nom doit contenir au moins une lettre.
+        </p>
+      ) : null}
       {problem === null ? null : (
         <p className="ps-error" role="alert">
           {PROBLEMS[problem]}

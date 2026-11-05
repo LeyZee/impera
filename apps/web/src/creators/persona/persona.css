@@ -434,7 +434,6 @@
 /* The mark stands apart from the words: a narrow space read as glued to them (PRO-14 a, captures). */
 .ps-error::before {
   content: '!';
-  display: inline-block;
   margin-inline-end: 0.45em;
 }
 .ps-field[data-invalid='true'] .nv-field__control,
