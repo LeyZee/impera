@@ -164,6 +164,18 @@ describe('/v1/conversations', () => {
         error: { code: 'draft_unprocessable', details: { guards: ['ai_disclosure'] } },
       });
     }
+    // A payment outside Reveal or a price in her words never leaves either (recette MOT-04).
+    for (const [bubbles, guard] of [
+      [['envoie moi 50 sur paypal stp'], 'off_platform_payment'],
+      [['tu peux me payer par virement ou lydia, c’est plus simple'], 'off_platform_payment'],
+      [['ma vidéo est à 5€ seulement'], 'price_outside_offer'],
+    ] as const) {
+      const refused = await call('POST', `${base}/approve?creatorId=${creatorId}`, ownerCookie, { bubbles });
+      expect(refused.statusCode, refused.body).toBe(422);
+      expect(refused.json()).toMatchObject({
+        error: { code: 'draft_unprocessable', details: { guards: [guard] } },
+      });
+    }
     // A draft never carries a media: announcing one he will not receive is refused too (P3-13).
     const announced = await call('POST', `${base}/approve?creatorId=${creatorId}`, ownerCookie, {
       bubbles: ['Regarde, je t’envoie une photo 😘'],
