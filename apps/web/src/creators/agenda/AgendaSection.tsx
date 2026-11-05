@@ -8,6 +8,7 @@ import {
   followedOf,
   groupsOf,
   newSuggestionId,
+  proposalSlotOf,
   suggestionBodyOf,
   summaryOf,
   type Followed,
@@ -269,16 +270,19 @@ function ProposeDialog({
 }): JSX.Element {
   const id = useId();
   const client = useQueryClient();
-  const [draft, setDraft] = useState<TaskDraft>({
-    title: '',
-    category: 'shoot',
-    kind: 'timed',
-    day,
-    start: 18 * 60,
-    end: 19 * 60,
-    weekdays: [weekdayOf(day)],
-    purpose: '',
-    reminderMinutes: null,
+  const [draft, setDraft] = useState<TaskDraft>(() => {
+    const slot = proposalSlotOf(day, new Date(), zone);
+    return {
+      title: '',
+      category: 'shoot',
+      kind: 'timed',
+      day: slot.day,
+      start: slot.start,
+      end: slot.end,
+      weekdays: [weekdayOf(slot.day)],
+      purpose: '',
+      reminderMinutes: null,
+    };
   });
   const [suggestionId] = useState(newSuggestionId);
   const [tried, setTried] = useState(false);
