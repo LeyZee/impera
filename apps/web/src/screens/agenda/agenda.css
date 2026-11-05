@@ -1280,6 +1280,8 @@
   max-height: 680px;
   overflow: auto;
   overscroll-behavior: contain;
+  /* The rows on top grow when « fans » arrives: the browser must not push the hours down to « keep » its place. */
+  overflow-anchor: none;
 }
 .ag-wk__head,
 .ag-wk__all,
@@ -1740,8 +1742,20 @@ summary.ag-brief__title:focus-visible {
   font-size: var(--nv-text-caption);
   color: var(--nv-ink-faint);
 }
-.ag-wk__fans .ag-replies--short {
-  margin-top: 0;
+.ag-replies__one {
+  white-space: nowrap;
+}
+.ag-replies--cell {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-muted);
+}
+.ag-replies--cell li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ag-month__fans {
   margin-top: auto;
@@ -1751,12 +1765,4 @@ summary.ag-brief__title:focus-visible {
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--nv-ink-faint);
-}
-.ag-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
