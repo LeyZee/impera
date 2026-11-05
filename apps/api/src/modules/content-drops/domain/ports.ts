@@ -7,10 +7,12 @@ import type {
   CreatorContent,
   DropCategory,
   DropFileState,
+  DropMediaKind,
   DropMime,
   DropState,
 } from '@impera/contracts';
 
+import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
 
 /**
@@ -42,6 +44,22 @@ export interface DropFileTarget {
   readonly dropState: DropState;
 }
 
+/** A file cleaned, ready to enter her library: its storage key is named by its fingerprint. */
+interface CleanedMedia {
+  readonly kind: DropMediaKind;
+  readonly mime: DropMime;
+  readonly bytes: number;
+  readonly sha256: string;
+  readonly storageKey: string;
+  readonly durationMs: number | null;
+}
+
+/** What becomes of a file: received (raw, whole), refused with its sentence, or kept once cleaned. */
+export type FileOutcome =
+  | { readonly state: 'received' }
+  | { readonly state: 'refused'; readonly refusal: string }
+  | { readonly state: 'kept'; readonly media: CleanedMedia };
+
 /**
  * A content request asked by an idea of the trend watch (VEI-01 d2): the shoot she accepted in her agenda. Its id is
  * the idea's, its reason the idea's title (80 characters at most), due on the day of her shoot. Never a script: a
@@ -55,20 +73,20 @@ export interface IdeaContentRequest {
   readonly reason: string;
 }
 
-/** What the receipt job finds of a file (`withAdmin`): `null` when it is not there. */
+/** What the receipt job finds of a file and writes of it (`withAdmin`). */
 export interface ReceiptStore {
-  pending(fileId: string): Promise<DropFileTarget | null>;
+  /** The file, its drop and the drop's category; `null` when it is not there. */
+  pending(fileId: string): Promise<(DropFileTarget & { readonly category: DropCategory }) | null>;
+  /** The medium of her library with this fingerprint, `null` when she has none. */
+  knownMedia(creatorId: string, sha256: string): Promise<string | null>;
   /**
-   * The file received, or refused with its sentence, if it still waits; the drop received with it when no file of it
-   * waits any more and it was still sending, with `content_drop_received`. One transaction, the drop locked first.
+   * The file moved on, in one transaction, the drop locked first; a file already past the state it moves from is
+   * left as it is. Received only from `awaiting`; refused from `awaiting` or `received`; kept from `received`, as a new
+   * medium of her library or as a duplicate of the one with its fingerprint. The drop follows: received with
+   * `content_drop_received` when none of its files waits for its bytes any more, then ready when every file is
+   * settled and one was kept, blocked when all were refused.
    */
-  settle(
-    fileId: string,
-    outcome: { readonly state: 'received' } | { readonly state: 'refused'; readonly refusal: string },
-    now: Date,
-    /** The request that sent its last file, carried to `content_drop_received`. */
-    correlationId: string,
-  ): Promise<void>;
+  settle(fileId: string, outcome: FileOutcome, now: Date, correlationId: string): Promise<void>;
 }
 
 /**
@@ -91,6 +109,10 @@ export interface DropStorage {
   /** The size of the object at `key`, `null` when there is none. */
   sizeOf(key: string): Promise<number | null>;
   remove(key: string): Promise<void>;
+  /** The object at `key` written to the local file `path`; `false` when there is none. */
+  download(key: string, path: string): Promise<boolean>;
+  /** The local file `path` written at `key`, signed with its fingerprint, in parts when it is large. */
+  upload(key: string, path: string, mime: DropMime, sha256: string): Promise<void>;
 }
 
 /** The agency's side (`withTenantMember`): the owner and an active manager; a chatter is refused before any read. */
@@ -115,4 +137,21 @@ export interface AgencyContentStore {
     fileId: string,
     correlationId: string,
   ): Promise<ContentDrop>;
+}
+
+/** A file as the cleaning leaves it (`FileCleaner`): the size it shows at, its length, the streams it holds. */
+export interface CleanedFile {
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly durationMs: number | null;
+  readonly hasVideo: boolean;
+  readonly hasAudio: boolean;
+}
+
+/**
+ * Its metadata removed (ADR 0055 § 3), from the raw file at `raw` into `out`, by the family its bytes are of. Throws
+ * `UnreadableFile` when the file cannot be followed: it is refused rather than kept half cleaned.
+ */
+export interface FileCleaner {
+  clean(raw: string, out: string, family: FileFamily, mime: DropMime): Promise<CleanedFile>;
 }
