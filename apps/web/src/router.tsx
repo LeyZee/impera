@@ -39,8 +39,6 @@ import { MyPlanningPage, type MyPlanningSearch } from './screens/planning/MyPlan
 import { CreatorSalesPage } from './screens/sales/CreatorSalesPage';
 import { parseSalesSearch } from './screens/sales/view';
 import {
-  DevicesPage,
-  AgentModePage,
   AiModelsPage,
   AlertsPage,
   BackupsPage,
@@ -63,9 +61,7 @@ import { SuiviNav } from './screens/tracking/SuiviNav';
 import { TrackingPage } from './screens/tracking/TrackingPage';
 import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
-import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
-import { TestsPage } from './screens/train/TestsPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
@@ -659,12 +655,26 @@ const playground = createRoute({
   path: '/playground',
   component: PlaygroundPage,
 });
+/*
+ * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
+ * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
+ */
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
-  component: CorrectionsPage,
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/entrainer/playground', replace: true });
+  },
 });
-const tests = createRoute({ getParentRoute: () => train, path: '/tests', component: TestsPage });
+const tests = createRoute({
+  getParentRoute: () => train,
+  path: '/tests',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/entrainer/playground', replace: true });
+  },
+});
 
 const settings = createRoute({
   getParentRoute: () => rootRoute,
@@ -738,7 +748,15 @@ const alerts = createRoute({
   },
   component: AlertsPage,
 });
-const devices = createRoute({ getParentRoute: () => settings, path: '/appareils', component: DevicesPage });
+// Appareils has no screen yet (it comes with the extension's), hence no tab: its address leads to Réglages (PRO-25).
+const devices = createRoute({
+  getParentRoute: () => settings,
+  path: '/appareils',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/reglages', replace: true });
+  },
+});
 const backups = createRoute({
   getParentRoute: () => settings,
   path: '/sauvegardes',
@@ -790,7 +808,15 @@ const settingsSecurity = createRoute({
     return <SecurityPage userId={user.id} />;
   },
 });
-const agentMode = createRoute({ getParentRoute: () => settings, path: '/mode', component: AgentModePage });
+// The agent's mode changes at the top of the Dashboard: the old address leads to Réglages, not to an orphan line (PRO-25).
+const agentMode = createRoute({
+  getParentRoute: () => settings,
+  path: '/mode',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/reglages', replace: true });
+  },
+});
 
 /** /aide/installer (CR-01): open to every role, outside the rail (no section, so the guard lets it through). */
 const installHelp = createRoute({
