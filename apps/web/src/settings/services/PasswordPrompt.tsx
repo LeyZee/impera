@@ -54,20 +54,26 @@ export function PasswordPrompt({
   lead = 'Pour toucher à une clé, confirme ton mot de passe et ton code.',
   note,
   passkey = true,
+  layout = 'inline',
 }: {
   onConfirmed: () => void;
   onCancel: () => void;
   /** Told while the password is being checked, so a sheet around the prompt does not close meanwhile. */
   onBusyChange?: (isBusy: boolean) => void;
-  /** What the password unlocks, said before the field; a key by default. */
-  lead?: string;
-  /** One more line under the lead (« Ta clé est gardée… »). */
+  /** What the password unlocks, said before the field; a key by default. Null where a dialog's lead already says it. */
+  lead?: string | null;
+  /** One more line under the lead (« Ta clé est gardée… »), or under the fields in a dialog. */
   note?: string;
   /**
    * Whether a passkey gesture may confirm too: false where only the password and the code count (adding a key), or
    * the key being removed, which only another key may confirm.
    */
   passkey?: boolean | { readonly excluding: string };
+  /**
+   * Inline, in a section or a sheet: small buttons on the left, under the fields. In a dialog (`Dialog`), the fields
+   * take the width and the buttons sit at the foot on the right, « Confirmer » as the dialog's one neon (reco 9).
+   */
+  layout?: 'inline' | 'dialog';
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
   const codeInput = useRef<HTMLInputElement>(null);
@@ -136,9 +142,11 @@ export function PasswordPrompt({
   }
 
   const isExpired = failure === 'session_expired';
+  const inDialog = layout === 'dialog';
   return (
     <div
       className="sv-reauth"
+      data-layout={layout}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return;
         // Handled here so that Escape leaves the prompt only, not the sheet around it.
@@ -146,42 +154,57 @@ export function PasswordPrompt({
         if (!isBusy) onCancel();
       }}
     >
-      <p className="sv-muted">{lead}</p>
-      {note === undefined ? null : <p className="sv-muted">{note}</p>}
-      <label className="sv-reauth__label" htmlFor={fieldId}>
-        Mot de passe
-      </label>
+      {lead === null ? null : (
+        <div className="sv-reauth__head">
+          <p className="sv-reauth__lead">{lead}</p>
+          {note === undefined || inDialog ? null : <p className="sv-reauth__note">{note}</p>}
+        </div>
+      )}
       <form
-        className="sv-key"
+        className="sv-reauth__form"
         data-error={failure !== null}
         onSubmit={(event) => {
           event.preventDefault();
           void confirm(input.current?.value ?? '', codeInput.current?.value ?? '');
         }}
       >
-        <input
-          ref={input}
-          id={fieldId}
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={failure !== null}
-          aria-describedby="sv-reauth-msg"
-          // Read-only rather than disabled while checking: the field keeps the focus, so Escape stays here.
-          readOnly={isBusy}
-          disabled={isExpired}
-        />
-        <CodeInput ref={codeInput} disabled={isBusy || isExpired} invalid={failure !== null} />
-        <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={isBusy || isExpired}>
-          Confirmer
-        </button>
-        <button
-          type="button"
-          className="nv-btn nv-btn--plain nv-btn--sm"
-          disabled={isBusy}
-          onClick={onCancel}
-        >
-          Annuler
-        </button>
+        <div className="sv-reauth__fields">
+          <label className="nv-field sv-reauth__password" htmlFor={fieldId}>
+            <span className="nv-field__label">Mot de passe</span>
+            <input
+              ref={input}
+              id={fieldId}
+              className="nv-field__control nv-glass"
+              type="password"
+              autoComplete="current-password"
+              aria-invalid={failure !== null}
+              aria-describedby="sv-reauth-msg"
+              // Read-only rather than disabled while checking: the field keeps the focus, so Escape stays here.
+              readOnly={isBusy}
+              disabled={isExpired}
+            />
+          </label>
+          <CodeInput ref={codeInput} disabled={isBusy || isExpired} invalid={failure !== null} />
+        </div>
+        {inDialog && note !== undefined ? <p className="sv-reauth__note">{note}</p> : null}
+        <div className="sv-reauth__actions">
+          <button
+            type="submit"
+            className={inDialog ? 'nv-btn nv-btn--neon' : 'nv-btn nv-btn--soft nv-btn--sm'}
+            disabled={isBusy || isExpired}
+            aria-busy={isBusy}
+          >
+            {isBusy ? 'Vérification…' : 'Confirmer'}
+          </button>
+          <button
+            type="button"
+            className={inDialog ? 'nv-btn nv-btn--plain' : 'nv-btn nv-btn--plain nv-btn--sm'}
+            disabled={isBusy}
+            onClick={onCancel}
+          >
+            Annuler
+          </button>
+        </div>
       </form>
       {hasPasskey && !isExpired ? (
         <button

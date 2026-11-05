@@ -13,6 +13,12 @@ export interface CreatorDirectory {
    */
   setTimezone(id: CreatorId, timezone: string, userId: string): Promise<CreatorSummary | null>;
   /**
+   * Renames her (ADR 0071 § 1), audited with the owner (`creator.rename`, the name before and after). Only her name
+   * changes: her platform handles and her persona stay as they are. Unchanged, nothing is written. `null` when she does
+   * not exist; `CreatorNameConflict` when another creator has this name.
+   */
+  rename(id: CreatorId, displayName: string, userId: string): Promise<CreatorSummary | null>;
+  /**
    * Her hours (P3-14) on her clock; `null` when she does not exist. No setting, or one that no longer reads as
    * `AgentHours` (`invalidStored`), reads as the defaults: today's behaviour, never a silent stop.
    */
