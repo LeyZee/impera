@@ -928,7 +928,7 @@ function SelectAll({
   return (
     <div className="py-allrow">
       <label className="rp-all" htmlFor={`${id}-all`}>
-        <input id={`${id}-all`} type="checkbox" className="rp-check" checked={all} onChange={onAll} />
+        <input id={`${id}-all`} type="checkbox" className="nv-check" checked={all} onChange={onAll} />
         Tout sélectionner
         <span className="rp-all__count nv-num">
           {String(chosen)} sur {String(of)}
@@ -1023,7 +1023,7 @@ function MemberRow({
           <input
             id={`${id}-pick`}
             type="checkbox"
-            className="rp-check"
+            className="nv-check"
             checked={checked || sending}
             disabled={!pick || sending}
             aria-label={`Sélectionner le relevé de ${member.name}`}

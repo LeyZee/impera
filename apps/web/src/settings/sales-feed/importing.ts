@@ -7,7 +7,10 @@ import type {
   SalesFeedImportCandidate,
   SalesFeedImportLineResult,
   SalesFeedImportRefusal,
+  SalesFeedNewModels,
 } from '@impera/contracts';
+
+import { platformName } from './shown';
 
 /*
  * « N créatrices trouvées sur Reveal » (CRM-07, ADR 0069): what the review block shows and sends, kept apart from
@@ -164,3 +167,17 @@ export const foundTitle = (n: number, platform: string): string =>
   n === 0
     ? `Aucune nouvelle créatrice sur ${platform}`
     : `${count(n, 'créatrice trouvée', 'créatrices trouvées')} sur ${platform}`;
+
+/**
+ * The count on Réglages › Ventes, in words (ADR 0069 § 5: « 1 nouvelle créatrice sur Reveal »): by platform, `null`
+ * when none waits. Said on hover and to a screen reader; the tab shows the number.
+ */
+export function newModelsLabel(newModels: SalesFeedNewModels): string | null {
+  if (newModels.total === 0) return null;
+  return newModels.byPlatform
+    .map(
+      ({ platform, count }) =>
+        `${String(count)} ${count > 1 ? 'nouvelles créatrices' : 'nouvelle créatrice'} sur ${platformName(platform)}`,
+    )
+    .join(', ');
+}

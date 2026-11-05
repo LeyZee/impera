@@ -6,6 +6,7 @@ import {
   SalesFeedImportResultSchema,
   SalesFeedLastCheckSchema,
   SalesFeedListSchema,
+  SalesFeedNewModelsSchema,
   SalesFeedOverviewSchema,
   SalesFeedRefusalSchema,
   SalesFeedStatusSchema,
@@ -16,10 +17,12 @@ import {
   type SalesFeedCheckReport,
   type SalesFeedImportResult,
   type SalesFeedLastCheck,
+  type SalesFeedNewModels,
   type SalesFeedOverview,
   type SalesFeedRefusal,
   type SalesFeedStatus,
 } from '@impera/contracts';
+import { queryOptions } from '@tanstack/react-query';
 
 import { ReauthRequired, ServicesError } from '@/settings/services/api';
 
@@ -111,6 +114,21 @@ export async function fetchFeeds(): Promise<SalesFeedStatus[]> {
 export async function fetchOverview(platform: Platform): Promise<SalesFeedOverview> {
   return parsed(await call(`/${platform}`), (body) => SalesFeedOverviewSchema.parse(body));
 }
+
+/**
+ * How many models the platforms listed last with no link and not set aside (CRM-07 b2, ADR 0069 § 5): the count on
+ * Réglages › Ventes. Read in the base, never at the platform; a failure shows no count rather than a wrong one.
+ */
+export async function fetchNewModels(): Promise<SalesFeedNewModels> {
+  return parsed(await call('/new-models'), (body) => SalesFeedNewModelsSchema.parse(body));
+}
+
+export const newModelsQuery = queryOptions({
+  queryKey: ['sales-feeds', 'new-models'],
+  queryFn: fetchNewModels,
+  retry: false,
+  staleTime: 60_000,
+});
 
 export type FeedResult = { ok: true; status: SalesFeedStatus } | { ok: false; refusal: SalesFeedRefusal };
 

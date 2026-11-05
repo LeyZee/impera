@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { Outlet } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
@@ -7,6 +8,8 @@ import { BackupsSection } from '@/settings/backups/BackupsSection';
 import { BillingSection } from '@/settings/billing/BillingSection';
 import { PayRulesSection } from '@/settings/pay/PayRulesSection';
 import { SalesFeedSection } from '@/settings/sales-feed/SalesFeedSection';
+import { newModelsQuery } from '@/settings/sales-feed/api';
+import { newModelsLabel } from '@/settings/sales-feed/importing';
 import { ServicesSection } from '@/settings/services/ServicesSection';
 import { TelegramSection } from '@/settings/telegram/TelegramSection';
 import type { TelegramTab } from '@/settings/telegram/search';
@@ -18,6 +21,7 @@ import { screenLabel, type ScreenPath } from '@/shell/nav';
  * everyone's, lives in the account's menu (NAV-03). The AI keys, the platforms' sales feeds (CRM-01), the bots and
  * groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what each invoice prints (EQ-06), the
  * backups (ADR 0028) and the security of every account (SEC-04).
+ * Ventes carries the count of the creators found on the platforms and not imported yet (CRM-07 b2, ADR 0069 § 5).
  */
 const TABS: readonly SubNavItem[] = (
   [
@@ -33,13 +37,21 @@ const TABS: readonly SubNavItem[] = (
 ).map((to) => ({ to, label: screenLabel(to) }));
 
 export function SettingsLayout(): JSX.Element {
+  // A count read in the base: a failure or a wait shows the tab bare, never a wrong number.
+  const newModels = useQuery(newModelsQuery).data;
+  const countLabel = newModels === undefined ? null : newModelsLabel(newModels);
+  const tabs = TABS.map((item) =>
+    item.to === '/reglages/ventes' && newModels !== undefined && countLabel !== null
+      ? { ...item, count: newModels.total, countLabel }
+      : item,
+  );
   // « Se déconnecter » lives in the account's menu, on the phone too (NAV-02, NAV-04).
   return (
     <Page>
       <PageHeader
         title="Réglages"
         lead="Ce qui règle le CRM pour toute l’agence."
-        actions={<SubNav label="Réglages" items={TABS} />}
+        actions={<SubNav label="Réglages" items={tabs} />}
       />
       <Outlet />
     </Page>

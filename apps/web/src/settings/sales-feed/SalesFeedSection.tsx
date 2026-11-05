@@ -1,4 +1,5 @@
 import type { Platform, SalesFeedOverview, SalesFeedStatus } from '@impera/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { CheckPanel } from './CheckPanel';
@@ -11,6 +12,7 @@ import {
   disconnectWebhook,
   fetchFeeds,
   fetchOverview,
+  newModelsQuery,
   type FeedResult,
 } from './api';
 import { platformName, shownOf, type Notice } from './shown';
@@ -128,6 +130,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
   const [notice, setNotice] = useState<Notice | null>(null);
   /** Only the latest refresh may land: an older answer arriving late would show a stale state. */
   const latest = useRef(0);
+  const client = useQueryClient();
 
   const refresh = useCallback(async (): Promise<void> => {
     latest.current += 1;
@@ -159,6 +162,12 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Each read of the panel (an import, a model set aside or linked, the refresh) reads the tab's count again with it.
+  const overview = load.kind === 'ready' ? load.value : null;
+  useEffect(() => {
+    if (overview !== null) void client.invalidateQueries({ queryKey: newModelsQuery.queryKey });
+  }, [overview, client]);
 
   const isIdle = !isKeyOpen && !isConfirmingRemove && pending === null && busy === null;
   useEffect(() => {
