@@ -10,7 +10,7 @@
   border-radius: inherit;
 }
 
-/* In a chip, before her name: a small round photo, the chip's left padding narrowed to keep it centred. */
+/* In a chip, before her name: a small round photo, or her initial, the chip's left padding narrowed to keep it centred. */
 .cr-chip-face {
   flex: none;
   width: 22px;
@@ -19,4 +19,13 @@
   border-radius: var(--nv-radius-full);
   object-fit: cover;
   box-shadow: 0 0 0 1px var(--nv-plate-edge);
+}
+.cr-chip-face--initial {
+  display: grid;
+  place-items: center;
+  background: var(--nv-fill-track);
+  color: var(--nv-ink-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
 }

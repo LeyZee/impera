@@ -56,14 +56,16 @@ describe('ChipFace', () => {
     expect(img?.getAttribute('alt')).toBe('');
   });
 
-  it('shows nothing without a photo, or when it does not load', () => {
+  it('shows her initial in the same disc without a photo, or when it does not load', () => {
     const none = render(<ChipFace creator={{ ...lea, hasAvatar: false }} />);
-    expect(none.container.innerHTML).toBe('');
+    expect(none.container.querySelector('img')).toBeNull();
+    expect(none.container.querySelector('.cr-chip-face--initial')?.textContent).toBe('L');
     none.unmount();
     const { container } = render(<ChipFace creator={lea} />);
     const img = container.querySelector('img');
     if (img === null) throw new Error('no photo');
     fireEvent.error(img);
-    expect(container.innerHTML).toBe('');
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.cr-chip-face--initial')?.getAttribute('aria-hidden')).toBe('true');
   });
 });

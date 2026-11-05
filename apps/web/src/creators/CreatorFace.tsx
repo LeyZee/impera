@@ -41,10 +41,19 @@ export function CreatorFace({ creator, className }: { creator: Face; className: 
   );
 }
 
-/** Her photo in a chip, before her name; nothing when she has none: a chip of initials would say her name twice. */
-export function ChipFace({ creator }: { creator: Face }): JSX.Element | null {
+/**
+ * Her face in a chip, before her name: her photo, or her initial in a disc of the same size when she has none or it
+ * does not load, so that a row of chips keeps one rhythm (captures de #563).
+ */
+export function ChipFace({ creator }: { creator: Face }): JSX.Element {
   const [failed, setFailed] = useState<string | null>(null);
-  if (creator.hasAvatar !== true || failed === creator.id) return null;
+  if (creator.hasAvatar !== true || failed === creator.id) {
+    return (
+      <span className="cr-chip-face cr-chip-face--initial" aria-hidden="true">
+        {initialOf(creator.displayName)}
+      </span>
+    );
+  }
   return (
     <img
       className="cr-chip-face"

@@ -243,7 +243,7 @@ export function CreatorsPage({
             ) : null}
             {isOwner && !showForm && query.isSuccess ? (
               // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
-              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
+              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm cr-agency-first">
                 Structures de script
               </Link>
             ) : null}
