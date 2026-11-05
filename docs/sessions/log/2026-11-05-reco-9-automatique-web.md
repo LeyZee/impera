@@ -6,3 +6,5 @@ Décisions : la demande est une question, pas une erreur : rien dans le coin du 
 Découvertes : aucune.
 Candidats à suppression : aucun.
 Vérifié : `DashboardPage.test.tsx` (2 nouveaux : confirmé puis renvoyé, annulé sans rien changer) ; captures Nuit et Jour, ordinateur et téléphone, hors dépôt (`recette/2026-11-05/corrections/extension/reco9-automatique/`).
+
+**Refonte après captures (22h40)** : sur retour de Charles (« refais vraiment le design »), la saisie mot de passe + code partagée (`PasswordPrompt`) est redessinée : deux champs `nv-field` à part entière, libellé au-dessus, côte à côte quand la place le permet et empilés sinon ; boutons alignés (pleine largeur à deux sur téléphone) ; chiffres du code en Geist à chasse fixe, espacés, au lieu du mono. Dans une fenêtre (`layout="dialog"`), l’explication passe sous le titre, les champs prennent la largeur et « Confirmer » est le néon du pied, à droite.

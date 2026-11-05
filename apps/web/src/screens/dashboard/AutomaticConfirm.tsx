@@ -19,9 +19,15 @@ export function AutomaticConfirm({
 }): JSX.Element {
   const [busy, setBusy] = useState(false);
   return (
-    <Dialog title="Passer en Automatique" busy={busy} onClose={onCancel}>
+    <Dialog
+      title="Passer en Automatique"
+      lead={`L’agent répondra seul aux fans de ${creatorName}, sans validation. Pour l’activer, confirme ton mot de passe et ton code.`}
+      busy={busy}
+      onClose={onCancel}
+    >
       <PasswordPrompt
-        lead={`Pour que l’agent réponde seul aux fans de ${creatorName}, confirme ton mot de passe et ton code.`}
+        layout="dialog"
+        lead={null}
         note="Arrêt et Copilote ne demandent rien."
         onConfirmed={onConfirmed}
         onCancel={onCancel}

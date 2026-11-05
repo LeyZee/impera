@@ -114,7 +114,7 @@ describe('the password prompt', () => {
       />,
     );
     expect(screen.getByLabelText('Mot de passe').getAttribute('type')).toBe('password');
-    expect(screen.getByText('Mot de passe').tagName).toBe('LABEL');
+    expect(screen.getByText('Mot de passe').closest('label')).not.toBeNull();
     expect(screen.getByText('Ta clé est gardée, elle sera vérifiée juste après.')).toBeTruthy();
   });
 });
