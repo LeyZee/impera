@@ -181,11 +181,12 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
       /\b(rien a payer|pas besoin (de payer|d'argent|de sous)|(t'?as|tu (n'?)?as) (rien|pas) a payer)\b(?! pour (me |te )?(parler|discuter|ecrire))/,
   },
   // A payment outside the platform (recette MOT-04): Reveal is the only till, as it is the only inbox. Even her refusal
-  // (« pas de paypal 😘 ») names the means, so it is blocked too, like a contact.
+  // (« pas de paypal 😘 ») names the means, so it is blocked too, like a contact. « Wise » counts only as a means
+  // (« par Wise », « wise transfer »): « that's wise » to an English-speaking fan is innocent (review of #529).
   {
     code: 'off_platform_payment',
     pattern:
-      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
+      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|(par|sur|via|avec|mon|ton|en|on|by|through|my|your) wise|wise (transfer|account|compte|tag)|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
   },
   // A price is the script's, set in code and carried by the offer itself: never a sum in her words (recette MOT-04,
   // Charles 05/11). Her thanks for a tip (« merci pour les 20 € 🥰 ») pass.

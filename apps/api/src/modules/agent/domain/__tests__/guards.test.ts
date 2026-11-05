@@ -202,10 +202,15 @@ describe('voice guards', () => {
       ['Tu peux m’envoyer une carte cadeau ?'],
       ['Tu paies en crypto', 'ou en btc ?'],
       ['Mon P4yP4l c’est mon prénom'],
+      ['Tu peux passer par Wise'],
+      ['send it with a wise transfer'],
     ]) {
       expect(codes(bubbles), bubbles.join(' / ')).toContain('off_platform_payment');
     }
     expect(codes(['Une vraie pepite cette vidéo 💎'])).toEqual([]);
+    // « Wise » the word, not the bank, to an English-speaking fan.
+    expect(codes(['That’s wise of you 😏'])).toEqual([]);
+    expect(codes(['wise choice babe'])).toEqual([]);
   });
 
   it('blocks a price in her words, the offer carries it; her thanks for a tip pass (recette MOT-04)', () => {
