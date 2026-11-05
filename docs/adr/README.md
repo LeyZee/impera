@@ -91,3 +91,4 @@ Date : AAAA-MM-JJ
 | 0066 | Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret | accepted (précise 0008 et 0062 § 8) |
 | 0067 | L'équipe installe l'extension depuis le CRM, puis depuis le Chrome Web Store en « non répertoriée » | accepted (précise 0066 et 0027) |
 | 0069 | Les créatrices s'importent depuis Reveal par une revue du propriétaire, jamais en silence | accepted (précise 0050 § 3 et 0054) |
+| 0070 | Une vidéo déposée pèse jusqu'à 10 Go et vient dans tout format courant ; ce que les plateformes ne lisent pas est converti en MP4 | accepted (précise 0055 § 2 et § 3) |
