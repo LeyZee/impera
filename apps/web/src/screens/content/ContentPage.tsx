@@ -487,6 +487,7 @@ function RefuseDialog({
             rows={3}
             maxLength={200}
             value={reason}
+            disabled={busy}
             onChange={(event) => {
               setReason(event.target.value);
             }}
