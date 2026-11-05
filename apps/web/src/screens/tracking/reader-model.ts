@@ -16,7 +16,7 @@ import { euros } from './flags-model';
 
 import { CAUSE_LABELS } from '@/agent/causes';
 import { GUARD_LABELS } from '@/agent/guards';
-import { addDays, clockAt, dayOf, weekdayOf } from '@/scheduling/time';
+import { addDays, clockAt, dayMonth, dayOf, weekdayOf } from '@/scheduling/time';
 
 /*
  * The reader of Suivi in words: the thread in reading order, the agent's notes where it stopped or a human stepped
@@ -45,8 +45,16 @@ export type ThreadItem =
       readonly media: readonly { readonly label: string; readonly description: string | null }[];
       /** A paid media: its price, and whether he bought it. */
       readonly ppv: { readonly price: string; readonly isPaid: boolean } | null;
+      /** When it was written on the platform (ISO): the reader says it under a run of bubbles (CHAT-24). */
+      readonly at: string;
     }
-  | { readonly kind: 'note'; readonly id: string; readonly text: string };
+  | {
+      readonly kind: 'note';
+      readonly id: string;
+      readonly text: string;
+      /** The agent stepped back or a send failed: a person must read it, it stands out of the thread (CHAT-24). */
+      readonly strong: boolean;
+    };
 
 /** A media named by its kind in the thread: « Photo », not « Média ». */
 const MEDIA_LABELS: Readonly<Record<MessageView['media'][number]['kind'], string>> = {
@@ -156,6 +164,7 @@ export function threadOf(
         media: message.media.map((m) => ({ label: MEDIA_LABELS[m.kind], description: m.description })),
         ppv:
           message.priceMinor === null ? null : { price: euros(message.priceMinor), isPaid: message.isPaid },
+        at: message.platformCreatedAt,
       },
     });
   }
@@ -171,11 +180,41 @@ export function threadOf(
     if (text !== null)
       timed.push({
         at: Date.parse(event.createdAt),
-        item: { kind: 'note', id: `e${String(event.seq)}`, text },
+        item: {
+          kind: 'note',
+          id: `e${String(event.seq)}`,
+          text,
+          strong: event.type === 'handoff_requested' || event.type === 'send_failed',
+        },
       });
   }
   // Stable: a message and a note at the same instant keep the message first.
   return timed.sort((a, b) => a.at - b.at).map((t) => t.item);
+}
+
+/**
+ * When a message was written, as a messenger says it under a run of bubbles (CHAT-24): « 14 h 32 » today,
+ * « hier, 14 h 32 », else « mar. 3 nov., 14 h 32 », in the reader's own clock.
+ */
+export function messageTime(at: string, now: Date, timeZone: string = viewerZone()): string {
+  const day = dayOf(at, timeZone);
+  const today = dayOf(now, timeZone);
+  const clock = clockAt(at, timeZone);
+  if (day === today) return clock;
+  if (day === addDays(today, -1)) return `hier, ${clock}`;
+  return `${dayMonth(day)}, ${clock}`;
+}
+
+/**
+ * Whether the item closes a run of bubbles from the same side: the time goes under the last one only, never under
+ * each (CHAT-24). A note or the other side's bubble ends a run, and so does a pause of more than 10 minutes.
+ */
+export function endsRun(items: readonly ThreadItem[], index: number): boolean {
+  const item = items[index];
+  if (item?.kind !== 'message') return false;
+  const next = items[index + 1];
+  if (next?.kind !== 'message' || next.from !== item.from) return true;
+  return Date.parse(next.at) - Date.parse(item.at) > 10 * 60_000;
 }
 
 /**
@@ -224,6 +263,24 @@ export function draftsOf(read: {
   return { state, sending, failed };
 }
 
+/** The refusal of a send while the emergency stop is on: the reader says it at its top, in the reader's words. */
+export const KILL_SWITCH_CODE = 'kill_switch_conflict';
+
+/** Whether this refusal is the emergency stop (CHAT-07). */
+export function isStopped(body: unknown): boolean {
+  const error = ApiErrorSchema.safeParse(body);
+  return error.success && error.data.error.code === KILL_SWITCH_CODE;
+}
+
+/**
+ * The emergency stop, said to whoever reads (CHAT-07): the owner lifts it on the Dashboard; a team member has no
+ * Dashboard, he is told to warn the agency.
+ */
+export const stoppedText = (routedOnly: boolean): string =>
+  routedOnly
+    ? 'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.'
+    : 'L’arrêt d’urgence est actif : rien ne part tant qu’il n’est pas levé sur le Dashboard.';
+
 /** The codes a refusal names; one this screen does not know yet is left out, never shown raw. */
 const GuardsSchema = z.object({ guards: z.array(z.string()) });
 
@@ -245,7 +302,7 @@ export function decisionError(status: number, body: unknown): string {
   }
   if (code === 'persona_inactive_unprocessable')
     return 'Ce message ne peut pas partir : cette créatrice n’a pas de persona active. Active une version dans Créatrices › Persona.';
-  if (code === 'kill_switch_conflict')
+  if (code === KILL_SWITCH_CODE)
     return 'L’arrêt est actif : rien ne part tant qu’il n’est pas levé sur le Dashboard.';
   if (code === 'session_expired_conflict')
     return 'La session Reveal a expiré : rien ne part tant qu’elle n’est pas reconnectée depuis l’extension.';

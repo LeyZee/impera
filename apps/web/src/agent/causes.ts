@@ -9,7 +9,7 @@ export const CAUSE_LABELS: Readonly<Record<HandoffCause, string>> = {
   manipulation: 'Manipulation',
   guard: 'Réponse bloquée',
   budget: 'Plafond IA atteint',
-  keyword: 'Mot d’alerte',
+  keyword: 'Mot surveillé',
   llm_unavailable: 'IA indisponible',
   other: 'À reprendre',
   custom_alert: 'Alerte personnalisée',

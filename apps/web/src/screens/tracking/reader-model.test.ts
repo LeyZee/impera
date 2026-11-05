@@ -9,7 +9,18 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { decisionError, draftsOf, isOutdated, threadOf, todoLabel, whyHuman } from './reader-model';
+import {
+  decisionError,
+  draftsOf,
+  endsRun,
+  isOutdated,
+  isStopped,
+  messageTime,
+  stoppedText,
+  threadOf,
+  todoLabel,
+  whyHuman,
+} from './reader-model';
 
 /* Invented messages: no real fan. */
 const CONVERSATION = '0192f3a0-0000-7000-8000-000000000001';
@@ -358,5 +369,57 @@ describe('todoLabel', () => {
     expect(todoLabel(todo('send_failed'))).toBe('Envoi échoué');
     expect(todoLabel(todo('awaiting_approval'))).toBe('Brouillon à valider');
     expect(todoLabel(todo('unanswered'))).toBe('Sans réponse');
+  });
+});
+
+describe('the times and notes of the thread (CHAT-24)', () => {
+  it('says when a message was written as a messenger does, in the reader’s clock', () => {
+    const now = new Date('2026-11-05T15:00:00Z');
+    expect(messageTime('2026-11-05T13:32:00Z', now, 'Europe/Paris')).toBe('14\u00a0h\u00a032');
+    expect(messageTime('2026-11-04T21:00:00Z', now, 'Europe/Paris')).toBe('hier, 22\u00a0h');
+    expect(messageTime('2026-11-01T09:05:00Z', now, 'Europe/Paris')).toBe('dim. 1er nov., 10\u00a0h\u00a005');
+  });
+
+  it('puts the time under the last bubble of a run only: the other side, a note or ten minutes end it', () => {
+    const items = threadOf(
+      {
+        messages: [
+          message(30, { direction: 'outbound', author: 'ai', text: 'Réponse' }),
+          message(25, { text: 'Plus tard' }),
+          message(2, { text: 'Deux' }),
+          message(1, { text: 'Un' }),
+        ],
+        events: [],
+      },
+      'Europe/Paris',
+    );
+    expect(items.map((_, i) => endsRun(items, i))).toEqual([false, true, true, true]);
+  });
+
+  it('makes the agent’s handoff and a failed send stand out of the thread, never the quiet notes', () => {
+    const items = threadOf({
+      messages: [message(1)],
+      events: [
+        event(2, 2, {
+          type: 'handoff_requested',
+          payload: { conversationId: CONVERSATION, cause: 'keyword' },
+        }),
+        event(3, 3, { type: 'takeover_ended', payload: { conversationId: CONVERSATION } }),
+      ],
+    });
+    expect(items.flatMap((i) => (i.kind === 'note' ? [[i.text, i.strong]] : []))).toEqual([
+      ['L’agent passe la main (Mot surveillé)', true],
+      ['La main revient à l’agent', false],
+    ]);
+  });
+
+  it('tells the emergency stop apart, in the words of whoever reads (CHAT-07)', () => {
+    expect(isStopped(apiError('kill_switch_conflict'))).toBe(true);
+    expect(isStopped(apiError('draft_conflict'))).toBe(false);
+    expect(isStopped(null)).toBe(false);
+    expect(stoppedText(true)).toBe(
+      'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
+    );
+    expect(stoppedText(false)).toContain('Dashboard');
   });
 });
