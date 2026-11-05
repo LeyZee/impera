@@ -206,7 +206,15 @@ function Editor({
   const panelRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
 
-  const issues = useMemo(() => [...validate(draft), ...stillRefused(refused, draft)], [draft, refused]);
+  // Checked on the date the save will write (`localDay()`), never the draft's older one: a creator who came of age since
+  // the last version is not refused on screen while the server takes her (recette PRO-04).
+  const issues = useMemo(
+    () => [
+      ...validate({ ...draft, meta: { ...draft.meta, created_at: localDay() } }),
+      ...stillRefused(refused, draft),
+    ],
+    [draft, refused],
+  );
   const completion = useMemo(() => withIssues(draftCompletion(draft), issues), [draft, issues]);
   const changed = useMemo(() => changedFields(saved, draft), [saved, draft]);
   // A persona never written, nothing typed yet: what is still to fill reads as a step, not as faults in amber (CREA-13).

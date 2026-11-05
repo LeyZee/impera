@@ -65,6 +65,8 @@ export const PERSONA_BOUNDS = {
 
 export const ADDITIONAL_INFO_MAX = 6000;
 export const MIN_CREATOR_AGE = 18;
+/** Past this age on the date of the version, a date of birth is a typo (1890), never a creator (recette, reco 22). */
+export const MAX_CREATOR_AGE = 100;
 
 /** French labels of every choice list: the dashboard renders these, never its own copy. */
 export const PERSONA_OPTIONS = {
@@ -495,6 +497,16 @@ export const PersonaSchema = z
       ageOn(p.details.date_of_birth, p.meta.created_at) >= MIN_CREATOR_AGE,
     {
       message: `La créatrice doit avoir au moins ${String(MIN_CREATOR_AGE)} ans à la date de la version`,
+      path: ['details', 'date_of_birth'],
+    },
+  )
+  .refine(
+    (p) =>
+      !ISO_DATE.test(p.details.date_of_birth) ||
+      !ISO_DATE.test(p.meta.created_at) ||
+      ageOn(p.details.date_of_birth, p.meta.created_at) < MAX_CREATOR_AGE,
+    {
+      message: `Plus de ${String(MAX_CREATOR_AGE)} ans : vérifie l’année de naissance`,
       path: ['details', 'date_of_birth'],
     },
   );
