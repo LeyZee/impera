@@ -115,3 +115,9 @@ export function personaLabel(state: PlaygroundState): string {
   const { name, played } = state.persona;
   return played === null ? `Persona fictive : ${name}` : `Persona : ${name} · v${played.version}`;
 }
+
+/** The same in short, for a phone's header where the long one was cut (« Person… », PRO-21 captures). */
+export function personaShort(state: PlaygroundState): string {
+  const { name, played } = state.persona;
+  return played === null ? `${name}, fictive` : `${name} · v${played.version}`;
+}

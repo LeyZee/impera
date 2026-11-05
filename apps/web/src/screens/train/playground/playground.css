@@ -181,13 +181,15 @@
 .pg-who > .nv-eyebrow {
   margin: 0;
 }
-.pg-who__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+.pg-who__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.pg-who__row:has(> :only-child) {
-  grid-template-columns: minmax(0, 1fr);
+.pg-who__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .pg-who__activate {
   align-self: flex-start;
@@ -1031,6 +1033,10 @@
   .pg-top__t {
     flex-basis: 0;
   }
+  /* His initial repeats his name beside it: its room goes to the persona's line, cut to « Person… » (PRO-21). */
+  .pg-top > .nv-avatar {
+    display: none;
+  }
   .pg-top .nv-btn {
     padding-inline: 10px;
   }
@@ -1101,9 +1107,11 @@
   .pg-bar {
     display: none;
   }
+  /* Opaque: through the glass, the conversation and the composer read under the choices (PRO-21 captures). */
   .pg-setup.is-sheet {
     position: absolute;
     z-index: 8;
+    background: var(--nv-surface-raised);
     top: 18cqh;
     left: 0;
     right: 0;

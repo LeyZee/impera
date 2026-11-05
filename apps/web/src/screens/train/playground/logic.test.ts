@@ -14,6 +14,7 @@ import {
   needsAttention,
   percent,
   personaLabel,
+  personaShort,
   rateTone,
   scriptsHint,
   stepOf,
@@ -181,6 +182,7 @@ describe('stepOf', () => {
 
   it('names whom she speaks as: the invented persona, or a creator and her version (PRO-21)', () => {
     expect(personaLabel(state())).toBe('Persona fictive : Elena');
+    expect(personaShort(state())).toBe('Elena, fictive');
     const played = {
       ...state(),
       persona: {
@@ -193,6 +195,7 @@ describe('stepOf', () => {
       },
     };
     expect(personaLabel(played)).toBe('Persona : Mia · v0.0.3');
+    expect(personaShort(played)).toBe('Mia · v0.0.3');
   });
 });
 

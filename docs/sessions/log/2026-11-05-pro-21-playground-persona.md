@@ -8,3 +8,5 @@
   - l'en-tête dit « Persona : Mia · v0.0.3 » au lieu de « Persona fictive » quand une créatrice est jouée.
 - Tests : `persona-versions.integration.test.ts`, `playground-service.test.ts`, `routes.test.ts` (playground), `PersonaPicker.test.tsx`.
 - Découvertes : les corrections du playground servent d'exemples de voix à toutes les créatrices, quelle que soit la persona jouée (`voiceExamples(records)` ne filtre pas par créatrice). À trancher avant d'entraîner plusieurs créatrices.
+
+**Après les captures** : les menus Persona et Version deviennent des pastilles du design system (un menu natif coupait « en vigueur ») ; une version activée s'affiche aussitôt en vigueur ; sur téléphone, le panneau « Mise en situation » est opaque et l'en-tête dit « Mia · v0.0.3 » en court, l'initiale du fan laissant sa place.

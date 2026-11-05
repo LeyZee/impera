@@ -6,7 +6,7 @@ import {
   type PlaygroundState,
 } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX } from 'react';
+import { useId, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import type { Playground } from './usePlayground';
 
@@ -18,6 +18,79 @@ import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 const INVENTED = '';
 
 const overviewKey = (creatorId: CreatorId): readonly unknown[] => ['playground-persona', creatorId];
+
+/** Arrow keys of a radio group and the way they move. */
+const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
+interface ChipOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * One choice among a few, as the design system draws it: chips in a radio group, the arrows moving the choice, as
+ * Créatrices and the Dashboard do. A chip wraps and never cuts its words, where a native menu cut « en vigueur ».
+ */
+function Chips({
+  label,
+  options,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  options: readonly ChipOption[];
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const id = useId();
+  const ref = useRef<HTMLDivElement>(null);
+  const index = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const step = STEPS[event.key];
+    if (step === undefined || disabled) return;
+    event.preventDefault();
+    const next = (index + step + options.length) % options.length;
+    ref.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
+    const option = options[next];
+    if (option !== undefined && option.value !== value) onChange(option.value);
+  };
+  return (
+    <div className="pg-who__field">
+      <span className="nv-field__label" id={`${id}-label`}>
+        {label}
+      </span>
+      <div
+        className="pg-who__chips"
+        role="radiogroup"
+        aria-labelledby={`${id}-label`}
+        ref={ref}
+        onKeyDown={onKeyDown}
+      >
+        {options.map((option, i) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            className="nv-chip"
+            aria-checked={option.value === value}
+            tabIndex={i === index ? 0 : -1}
+            disabled={disabled}
+            onClick={() => {
+              if (option.value !== value) onChange(option.value);
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** `GET /v1/creators/:id/persona`: her versions, newest first, the active one marked. */
 async function fetchOverview(creatorId: CreatorId): Promise<PersonaOverview> {
@@ -92,6 +165,13 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
     );
     if (result === 'activated') {
       setDone(`Version ${current.version} activée : ses prochains brouillons l’écrivent avec elle.`);
+      // The screen says it at once: the version heard is now the one in force, before the list is read again.
+      const activated = played.versionId;
+      client.setQueryData<PersonaOverview>(overviewKey(played.creatorId), (old) =>
+        old === undefined
+          ? old
+          : { ...old, versions: old.versions.map((v) => ({ ...v, isActive: v.id === activated })) },
+      );
       await client.invalidateQueries({ queryKey: overviewKey(played.creatorId) });
     } else if (result === 'reauth') setReauth(true);
     else if (result === 'conflict') {
@@ -109,48 +189,35 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
   return (
     <section className="pg-who" aria-label="Elle">
       <p className="nv-eyebrow">Elle</p>
-      <div className="pg-who__row">
-        <label className="nv-field pg-who__field">
-          <span className="nv-field__label">Persona</span>
-          <select
-            className="nv-field__control nv-glass"
-            value={played?.creatorId ?? INVENTED}
-            disabled={disabled}
-            onChange={(event) => void pickCreator(event.target.value)}
-          >
-            <option value={INVENTED}>
-              {played === null ? `Persona fictive (${state.persona.name})` : 'Persona fictive'}
-            </option>
-            {(creators.data ?? []).map((creator) => (
-              <option key={creator.id} value={creator.id}>
-                {creator.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
-        {played === null ? null : (
-          <label className="nv-field pg-who__field">
-            <span className="nv-field__label">Version</span>
-            <select
-              className="nv-field__control nv-glass"
-              value={played.versionId}
-              disabled={disabled || versions.length === 0}
-              onChange={(event) => {
-                const chosen = versions.find((v) => v.id === event.target.value);
-                if (chosen !== undefined) void play(played.creatorId, chosen.id);
-              }}
-            >
-              {versions.length === 0 ? <option value={played.versionId}>{played.version}</option> : null}
-              {versions.map((version) => (
-                <option key={version.id} value={version.id}>
-                  {version.version}
-                  {version.isActive ? ' · en vigueur' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
+      <Chips
+        label="Persona"
+        value={played?.creatorId ?? INVENTED}
+        disabled={disabled}
+        onChange={(value) => void pickCreator(value)}
+        options={[
+          { value: INVENTED, label: played === null ? `Fictive (${state.persona.name})` : 'Fictive' },
+          ...(creators.data ?? []).map((creator) => ({ value: creator.id, label: creator.displayName })),
+        ]}
+      />
+      {played === null ? null : (
+        <Chips
+          label="Version"
+          value={played.versionId}
+          disabled={disabled || versions.length === 0}
+          onChange={(value) => {
+            const chosen = versions.find((v) => v.id === value);
+            if (chosen !== undefined) void play(played.creatorId, chosen.id);
+          }}
+          options={
+            versions.length === 0
+              ? [{ value: played.versionId, label: played.version }]
+              : versions.map((version) => ({
+                  value: version.id,
+                  label: version.isActive ? `${version.version} · en vigueur` : version.version,
+                }))
+          }
+        />
+      )}
       <p className="pg-hint">
         {played === null
           ? 'Choisis une créatrice pour entendre sa persona avant ses fans. Changer recommence la conversation.'

@@ -51,6 +51,7 @@ const summary = (id: string, version: string, isActive: boolean) => ({
 /** Mia has 0.0.3 not yet active over 0.0.2 in force; Nina has no persona. */
 function serve(activate: { status: number; body: unknown } = { status: 200, body: {} }): unknown[] {
   const asked: unknown[] = [];
+  let active = LIVE;
   const json = (body: unknown, status = 200) =>
     Promise.resolve(new Response(JSON.stringify(body), { status }));
   vi.stubGlobal(
@@ -68,7 +69,7 @@ function serve(activate: { status: number; body: unknown } = { status: 200, body
         return json({
           creatorId: MIA,
           latest: null,
-          versions: [summary(DRAFT, '0.0.3', false), summary(LIVE, '0.0.2', true)],
+          versions: [summary(DRAFT, '0.0.3', active === DRAFT), summary(LIVE, '0.0.2', active === LIVE)],
         });
       }
       if (url === `/v1/creators/${NINA}/persona`)
@@ -76,6 +77,7 @@ function serve(activate: { status: number; body: unknown } = { status: 200, body
       if (url.endsWith('/activate') && init?.method === 'POST') {
         const body: unknown = JSON.parse(typeof init.body === 'string' ? init.body : '');
         asked.push({ url, body });
+        if (activate.status === 200) active = DRAFT;
         return json(activate.body, activate.status);
       }
       return json({}, 404);
@@ -165,17 +167,18 @@ describe('PersonaPicker (PRO-21)', () => {
   it('plays her version in force first, lets a version not yet active be heard, then activates it', async () => {
     const asked = serve();
     const { chosen } = show(BASE);
-    const persona = screen.getByLabelText('Persona');
-    expect(persona).toHaveProperty('value', '');
-    await screen.findByRole('option', { name: 'Mia' });
-    fireEvent.change(persona, { target: { value: MIA } });
+    // Chips of the design system, never a native menu that cuts « en vigueur » (PRO-21 captures).
+    expect(screen.getByRole('radiogroup', { name: 'Persona' })).toBeDefined();
+    expect(screen.getByRole('radio', { name: 'Fictive (Elena)' })).toHaveProperty('ariaChecked', 'true');
+    fireEvent.click(await screen.findByRole('radio', { name: 'Mia' }));
     await waitFor(() => {
       expect(chosen).toEqual([{ kind: 'version', creatorId: MIA, versionId: LIVE }]);
     });
     expect(await screen.findByText(/La version que lisent ses fans/u)).toBeDefined();
+    expect(screen.getByRole('radio', { name: '0.0.2 · en vigueur' })).toHaveProperty('ariaChecked', 'true');
     expect(screen.queryByRole('button', { name: 'Activer cette version' })).toBeNull();
 
-    fireEvent.change(screen.getByLabelText('Version'), { target: { value: DRAFT } });
+    fireEvent.click(screen.getByRole('radio', { name: '0.0.3' }));
     await waitFor(() => {
       expect(chosen.at(-1)).toEqual({ kind: 'version', creatorId: MIA, versionId: DRAFT });
     });
@@ -185,6 +188,10 @@ describe('PersonaPicker (PRO-21)', () => {
       'textContent',
       'Version 0.0.3 activée : ses prochains brouillons l’écrivent avec elle.',
     );
+    // Once activated, the screen says so everywhere: no « Pas encore active » left beside « activée ».
+    expect(screen.queryByText(/Pas encore active/u)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Activer cette version' })).toBeNull();
+    expect(screen.getByRole('radio', { name: '0.0.3 · en vigueur' })).toHaveProperty('ariaChecked', 'true');
     // The server is told which version this screen saw in force: another tab's change is refused, not overwritten.
     expect(asked).toEqual([
       {
@@ -193,7 +200,7 @@ describe('PersonaPicker (PRO-21)', () => {
       },
     ]);
 
-    fireEvent.change(screen.getByLabelText('Persona'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Fictive' }));
     await waitFor(() => {
       expect(chosen.at(-1)).toEqual({ kind: 'invented' });
     });
@@ -205,8 +212,7 @@ describe('PersonaPicker (PRO-21)', () => {
       body: { error: { code: 'reauthentication_forbidden', message: '', details: {}, requestId: 'r' } },
     });
     const { chosen } = show(BASE);
-    await screen.findByRole('option', { name: 'Nina' });
-    fireEvent.change(screen.getByLabelText('Persona'), { target: { value: NINA } });
+    fireEvent.click(await screen.findByRole('radio', { name: 'Nina' }));
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Nina n’a pas encore de persona : écris-la dans Créatrices.',
     );
