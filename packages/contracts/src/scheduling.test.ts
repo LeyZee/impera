@@ -275,6 +275,8 @@ describe('shifts and templates', () => {
 
   it('names the members away from the team, never one who is active (recette EQP-03)', () => {
     const empty = { settings, accounts: [], members: [], shifts: [], conflicts: [] };
+    // A planning read before the field, still in a cache: nobody away.
+    expect(PlanningSchema.parse(empty).away).toEqual([]);
     const away = PlanningSchema.parse({ ...empty, away: [{ memberId: MEMBER, status: 'suspended' }] }).away;
     expect(away).toEqual([{ memberId: MEMBER, status: 'suspended' }]);
     expect(

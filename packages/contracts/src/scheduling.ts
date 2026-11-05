@@ -510,8 +510,11 @@ export const PlanningSchema = z.object({
   members: z.array(PlanningMemberSchema),
   shifts: z.array(ShiftSchema),
   conflicts: z.array(PlanningConflictSchema),
-  /** The members of these shifts who are not at work, for the owner and an active manager; empty for a member. */
-  away: z.array(PlanningAwaySchema),
+  /**
+   * The members of these shifts who are not at work, for the owner and an active manager; empty for a member. Empty
+   * too in a planning read before the field existed, still in a cache (relecture Bilan).
+   */
+  away: z.array(PlanningAwaySchema).default([]),
 });
 export type Planning = z.infer<typeof PlanningSchema>;
 
