@@ -5,6 +5,7 @@ import { useState, type JSX } from 'react';
 import { AccessSection } from './AccessSection';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
+import { SetupCard } from './SetupCard';
 import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
@@ -260,6 +261,15 @@ export function CreatorsPage({
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
+        {/* What is left to set up, above every tab of her sheet; read again with each tab (CRM-07 b2). */}
+        {isOwner && current !== undefined && !showForm && query.isSuccess ? (
+          <SetupCard
+            key={`${current.id}:${shown}`}
+            creatorId={current.id}
+            creatorName={current.displayName}
+            timezone={current.timezone}
+          />
+        ) : null}
         {body()}
       </div>
     </Page>

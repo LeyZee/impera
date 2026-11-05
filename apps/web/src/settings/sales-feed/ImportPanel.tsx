@@ -324,7 +324,7 @@ function CandidateRow({
     <li className="sf-imp">
       <input
         type="checkbox"
-        className="sf-imp__pick"
+        className="nv-check"
         aria-label={`Importer ${label}`}
         checked={choice.selected}
         disabled={disabled}

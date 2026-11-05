@@ -626,6 +626,68 @@
   cursor: default;
 }
 
+/* ───────────── Check (a pick in a list: who to import, which reports) ───────────── */
+
+/* A soft square that fills with ink, its tick drawn: a selection, never the neon (`select`). The visual is 22px,
+   the target 44px around it. */
+.nv-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1.5px var(--nv-hairline);
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.nv-check::before {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+.nv-check::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  margin-top: -3px;
+  border-left: 2px solid var(--nv-void);
+  border-bottom: 2px solid var(--nv-void);
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.nv-check:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink-faint);
+}
+.nv-check:active:not(:disabled) {
+  transform: scale(0.9);
+}
+.nv-check:checked {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+.nv-check:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+.nv-check:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.nv-check:disabled {
+  opacity: 0.5;
+  background: transparent;
+  cursor: not-allowed;
+}
+
 .nv-list {
   display: flex;
   flex-direction: column;
@@ -2574,6 +2636,8 @@
   }
   .nv-btn,
   .nv-iconbtn,
+  .nv-check,
+  .nv-check::after,
   .nv-seg__thumb,
   .nv-tabbar__lens,
   .nv-switch::before,
@@ -2603,7 +2667,8 @@
     transition-duration: 1ms;
   }
   .nv-close:hover:not(:disabled),
-  .nv-close:active:not(:disabled) {
+  .nv-close:active:not(:disabled),
+  .nv-check:active:not(:disabled) {
     transform: none;
   }
 }
