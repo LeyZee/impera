@@ -29,6 +29,18 @@ export function canSend(check: SendCheck): boolean {
   return isApproved && check.conversationState === 'sending' && !isStale;
 }
 
+/**
+ * The fan's last message has no answer yet: nothing left after it. A follow-up (P3-10) answers no message, so a
+ * conversation whose last word is hers never counts as waiting.
+ */
+export function fanAwaitsAnswer(conversation: {
+  readonly lastInboundAt: Date | null;
+  readonly lastOutboundAt: Date | null;
+}): boolean {
+  const { lastInboundAt, lastOutboundAt } = conversation;
+  return lastInboundAt !== null && (lastOutboundAt === null || lastOutboundAt < lastInboundAt);
+}
+
 /** One key per bubble, so a retried send never posts the same bubble twice (invariant 4). */
 export function bubbleIdempotencyKey(draftId: string, index: number): string {
   return `${draftId}:${String(index)}`;

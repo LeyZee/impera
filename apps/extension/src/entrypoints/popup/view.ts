@@ -12,6 +12,8 @@ export type Screen =
   | { readonly kind: 'signed_out' }
   | { readonly kind: 'second_factor' }
   | { readonly kind: 'unreachable' }
+  /** The CRM answers, the API behind it does not: the same words as the CRM's own screen. */
+  | { readonly kind: 'server_down' }
   /** A deployed CRM whose address the browser has not allowed yet. */
   | { readonly kind: 'permission' }
   | { readonly kind: 'signed_in'; readonly me: Me; readonly place: Place }
@@ -82,6 +84,8 @@ function pillOf(screen: Screen): HTMLElement | null {
       return pill('idle', 'Déconnecté');
     case 'unreachable':
       return pill('error', 'Injoignable');
+    case 'server_down':
+      return pill('error', 'Indisponible');
     case 'second_factor':
       return pill('awaiting-approval', 'Code à activer');
     case 'permission':
@@ -321,6 +325,16 @@ function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElem
             button('Réessayer', actions.retry, { variant: 'soft', icon: 'rotate' }),
             button('Changer l’adresse', actions.editAddress, { variant: 'plain' }),
           ],
+        ),
+      ];
+    case 'server_down':
+      return [
+        notice(
+          'amber',
+          'alert',
+          'Le serveur ne répond pas',
+          'Le CRM est là, mais Impera ne répond pas : réessaie dans un instant.',
+          [button('Réessayer', actions.retry, { variant: 'soft', icon: 'rotate', wide: true })],
         ),
       ];
     case 'second_factor':

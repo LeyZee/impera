@@ -74,6 +74,13 @@ const CRON_JOBS: readonly CronJob[] = [
     options: { backfillPeriod: 0, maxAttempts: 1 },
   },
   { task: 'telegram.purge', match: '30 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  // Her drops' originals (CR-06 c, ADR 0044 § 2): unfinished sends refused after 24 h, the agency told 7 days before an
+  // original goes, the originals due erased, a withdrawn drop's within the hour. No backfill: the next run finds them.
+  {
+    task: 'content_drops.erase_originals',
+    match: '20 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.erase_originals'] },
+  },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   { task: 'fans.purge_facts', match: '45 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
   // The rate limiter's ended windows go, and the hashed IPs and accounts they counted with them (ADR 0027).

@@ -54,6 +54,11 @@ const configSchema = z
     IMPERA_INLINE_WORKER: flag,
     /** AI service keys pasted in the dashboard are sealed with these (ADR 0016), `v2:<base64>,v1:<base64>`. */
     CREDENTIALS_ENCRYPTION_KEYS: z.string().min(1).optional(),
+    /**
+     * `off` skips the check of known-breached passwords (ADR 0046 § 4) on a machine without access to its service, in
+     * development or a recette only (recette MOT-14); production refuses to start with it (below).
+     */
+    PASSWORD_BREACH_CHECK: z.enum(['on', 'off']).default('on'),
     /** Development only: AI service keys read from the environment, ignored in production (ADR 0016). Empty = unset. */
     LLM_XAI_API_KEY: optionalValue,
     LLM_GOOGLE_API_KEY: optionalValue,
@@ -92,6 +97,10 @@ const configSchema = z
     S3_BUCKET: optionalValue,
     S3_ACCESS_KEY_ID: optionalValue,
     S3_SECRET_ACCESS_KEY: optionalValue,
+  })
+  .refine((config) => config.NODE_ENV !== 'production' || config.PASSWORD_BREACH_CHECK === 'on', {
+    message: 'PASSWORD_BREACH_CHECK=off is for development only (ADR 0046 § 4)',
+    path: ['PASSWORD_BREACH_CHECK'],
   })
   .refine(
     // `.env.example` placeholders are long enough to pass `min(32)`; production must not start with one.

@@ -9,6 +9,8 @@ export type CrmSession =
   | { readonly kind: 'signed_out' }
   /** Signed in with the password, the code not active yet: only the CRM can finish it (ADR 0046). */
   | { readonly kind: 'second_factor_required' }
+  /** The CRM's server answers, but the API behind it does not (502, 503, 504): the address is right, wait. */
+  | { readonly kind: 'server_down' }
   /** No answer, or one that is not the CRM's: the address is wrong or the CRM is down. */
   | { readonly kind: 'unreachable' };
 
@@ -16,6 +18,9 @@ export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 
 /** A CRM that takes longer than this to say who is signed in is reported as unreachable. */
 const SESSION_TIMEOUT_MS = 6000;
+
+/** What the CRM's own server (Vite in development, nginx once deployed) answers when the API behind it is down. */
+const GATEWAY_DOWN = new Set([502, 503, 504]);
 
 async function errorCodeOf(response: Response): Promise<string | null> {
   const parsed = ApiErrorSchema.safeParse(await response.json().catch(() => null));
@@ -37,6 +42,7 @@ export async function readCrmSession(origin: string, fetchFn: Fetch = fetch): Pr
   if (response.status === 403 && (await errorCodeOf(response)) === SECOND_FACTOR_ERROR_CODE) {
     return { kind: 'second_factor_required' };
   }
+  if (GATEWAY_DOWN.has(response.status)) return { kind: 'server_down' };
   if (!response.ok) return { kind: 'unreachable' };
   const me = MeSchema.safeParse(await response.json().catch(() => null));
   return me.success ? { kind: 'signed_in', me: me.data } : { kind: 'unreachable' };

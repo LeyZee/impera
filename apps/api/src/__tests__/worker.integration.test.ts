@@ -173,6 +173,7 @@ describe('worker (Graphile, ADR 0006)', () => {
       isReady: false,
       checks: { database: false, migrations: false, worker: false },
       deadJobs: null,
+      orphanedJobs: null,
     });
     await unreachable.close();
   });

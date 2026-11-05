@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { eraseOriginals, type RetentionRun } from './application/retention';
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type { DropStorage, IdeaContentRequest } from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
+import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
@@ -23,6 +25,11 @@ export interface ContentDropsModule {
   readonly jobs: {
     /** `content_drops.receive_file`: her file whole in the storage, received (CR-06 b). */
     receiveFile(fileId: string, correlationId: string): Promise<void>;
+    /**
+     * `content_drops.erase_originals`, each hour (CR-06 c): unfinished sends refused after 24 h, the agency told 7 days
+     * before an original goes, the originals due erased. Counts only.
+     */
+    eraseOriginals(correlationId: string): Promise<RetentionRun>;
   };
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
@@ -68,6 +75,12 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
         receiveFile(
           { storage, receipts, cleaner, scratchDir: deps.scratchDir ?? tmpdir() },
           fileId,
+          clock(),
+          correlationId,
+        ),
+      eraseOriginals: (correlationId) =>
+        eraseOriginals(
+          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },
           clock(),
           correlationId,
         ),

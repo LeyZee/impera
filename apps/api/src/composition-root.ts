@@ -195,6 +195,16 @@ export interface AppOptions {
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
+/**
+ * The check of known-breached passwords (ADR 0046 § 4), or, with `PASSWORD_BREACH_CHECK=off` outside production (config
+ * refuses it there), none: every password passes, said once in amber at start (recette MOT-14).
+ */
+function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
+  if (config.PASSWORD_BREACH_CHECK === 'on') return createPwnedPasswordsCheck();
+  logger.warn('password breach check is off: development only (PASSWORD_BREACH_CHECK)');
+  return () => Promise.resolve(false);
+}
+
 export async function createApp(config: Config, logger: Logger, options: AppOptions = {}): Promise<App> {
   const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
   const adminDb = createDbClient(config.DATABASE_ADMIN_URL, { ...POOL_OPTIONS, max: 5 });
@@ -221,7 +231,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const jobs = await createJobQueue(adminDb.pool);
   const auth = createAuth(config, db.db, logger);
   const requireRole = createRequireRole(auth, db.db);
-  const passwordBreaches = options.passwordBreaches ?? createPwnedPasswordsCheck();
+  const passwordBreaches = options.passwordBreaches ?? breachCheckOf(config, logger);
   const shared: Shared = {
     config,
     logger,

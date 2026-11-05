@@ -69,6 +69,7 @@ export const JOB_NAMES = [
   'payroll.lock_payout_certificate',
   'media.describe',
   'content_drops.receive_file',
+  'content_drops.erase_originals',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -277,6 +278,12 @@ export const JOB_PAYLOADS = {
     fileId: ContentDropFileIdSchema,
     correlationId: z.string().min(1),
   }),
+  /**
+   * Each hour (CR-06 c, ADR 0044 § 2, ADR 0055 § 7): a send left unfinished for 24 hours is refused, the agency is told
+   * 7 days before an original goes, and the originals due are erased from the media storage (a withdrawn drop's at
+   * once). Replayable: each step moves only what is still due, and says each thing once.
+   */
+  'content_drops.erase_originals': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -366,6 +373,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
   // short outage of the storage; a file left waiting is sent again by her phone.
   'content_drops.receive_file': 9,
+  // Each hour: the next run is the retry.
+  'content_drops.erase_originals': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,

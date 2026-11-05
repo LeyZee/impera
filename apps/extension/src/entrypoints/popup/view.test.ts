@@ -87,6 +87,19 @@ describe('popup', () => {
     expect(actions.retry).toHaveBeenCalledOnce();
   });
 
+  it('says a CRM whose API is down like the CRM does, without sending to the address', () => {
+    const { root, actions } = draw({ kind: 'server_down' });
+    const notice = root.querySelector('.pp-notice--amber');
+    expect(notice?.textContent).toContain('Le serveur ne répond pas');
+    expect(notice?.textContent).not.toContain('adresse');
+    expect(root.querySelector('.nv-status--error')?.textContent).toContain('Indisponible');
+    expect([...root.querySelectorAll('.pp-notice button')].map((b) => b.textContent.trim())).toEqual([
+      'Réessayer',
+    ]);
+    buttonNamed(root, 'Réessayer').click();
+    expect(actions.retry).toHaveBeenCalledOnce();
+  });
+
   it('saves the address the person typed', () => {
     const { root, actions } = draw({ kind: 'address', draft: 'localhost:5173', error: null });
     const input = root.querySelector<HTMLInputElement>('#crm-address');
