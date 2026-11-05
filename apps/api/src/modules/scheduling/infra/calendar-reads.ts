@@ -6,7 +6,17 @@ import {
   TeamMemberStatusSchema,
   type CalendarView,
 } from '@impera/contracts';
-import { and, enterCreator, eq, schema, sql, SNAPSHOT_READ, withMember, type Database } from '@impera/db';
+import {
+  and,
+  enterCreator,
+  eq,
+  inArray,
+  schema,
+  sql,
+  SNAPSHOT_READ,
+  withMember,
+  type Database,
+} from '@impera/db';
 import { z } from 'zod';
 
 import type { CalendarReads, StoredAccount, StoredShift } from '../domain/ports';
@@ -58,9 +68,9 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
           );
           const agents = await tx.execute(sql`select * from public.calendar_agent()`);
           const settings = await settingsIn(tx, window, view === 'agency');
-          let agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null = null;
+          let agency: { accounts: StoredAccount[]; shifts: StoredShift[]; away: Set<string> } | null = null;
           if (view === 'agency') {
-            agency = { accounts: [], shifts: [] };
+            agency = { accounts: [], shifts: [], away: new Set() };
             for (const creatorId of creatorIds) {
               await enterCreator(tx, creatorId, creatorIds);
               const rows = await tx
@@ -83,6 +93,18 @@ export function createDrizzleCalendarReads(db: Database): CalendarReads {
                 })
                 .from(platformAccounts);
               agency.accounts.push(...accounts.map((row) => StoredAccountSchema.parse(row)));
+            }
+            // Who of them is not at work (recette EQP-03): the team's policy lets the agency read every member.
+            const named = [...new Set(agency.shifts.map((shift) => shift.memberId))];
+            const statuses =
+              named.length === 0
+                ? []
+                : await tx
+                    .select({ id: teamMembers.id, status: teamMembers.status })
+                    .from(teamMembers)
+                    .where(inArray(teamMembers.id, named));
+            for (const member of statuses) {
+              if (TeamMemberStatusSchema.parse(member.status) !== 'active') agency.away.add(member.id);
             }
           }
           return {

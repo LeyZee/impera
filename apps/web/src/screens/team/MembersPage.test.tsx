@@ -123,6 +123,7 @@ function serve(
                   members: [],
                   shifts: routes.shifts ?? [],
                   conflicts: [],
+                  away: [],
                 },
               };
       else if (path.endsWith('/notes')) reply = { status: 200, body: { notes: [] } };
@@ -620,14 +621,16 @@ describe('changing a member once added (EQ-10)', () => {
     const panel = await screen.findByRole('dialog', { name: 'Statut de Théo' });
     fireEvent.click(within(panel).getByRole('radio', { name: 'Suspendu' }));
     expect(panel.textContent).toContain('Théo garde sa connexion et ne voit plus que ses propres shifts');
-    const left = await within(panel).findByText(/2 shifts à venir restent au planning/u);
+    const left = await within(panel).findByText(/2 shifts à venir restent à son nom/u);
+    // Nobody holds them: the planning shows them to fill, no longer as filled (EQP-03).
+    expect(left.textContent).toContain('personne ne les tiendra, et le planning les montre à pourvoir.');
     expect(within(left).getByRole('link', { name: 'Voir ses shifts' }).getAttribute('href')).toBe(
       `/equipe/planning?membre=${THEO.id}`,
     );
     // Gone, the same count sits in the confirmation, beside what Impera does not do yet.
     fireEvent.click(within(panel).getByRole('radio', { name: 'Parti' }));
     const confirm = within(panel).getByRole('group', { name: 'Confirmer le départ' });
-    expect(await within(confirm).findByText(/2 shifts à venir restent au planning/u)).toBeDefined();
+    expect(await within(confirm).findByText(/2 shifts à venir restent à son nom/u)).toBeDefined();
     expect(confirm.textContent).toContain('Son compte membre sur Reveal est à retirer à la main.');
     // Pay settles his last fortnight now (EQ-14 lot 1): a carry-over is no longer left waiting.
     expect(confirm.textContent).toContain(

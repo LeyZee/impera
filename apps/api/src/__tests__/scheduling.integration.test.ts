@@ -420,6 +420,7 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     expect(all.accounts.map((account) => account.creatorName).toSorted()).toEqual(['Anna', 'Inès']);
     expect(all.members.map((member) => member.displayName).toSorted()).toEqual(['Basile', 'Théo']);
     expect(all.conflicts).toEqual([]);
+    expect(all.away).toEqual([]);
 
     const onlyInes = await planning(noraCookie, from, to, ines);
     expect(onlyInes.shifts.every((shift) => shift.creatorId === ines)).toBe(true);
@@ -438,6 +439,30 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
       owner,
     );
     expect([tooLong.statusCode, codeOf(tooLong)]).toEqual([400, 'planning_range_invalid']);
+  });
+
+  it('says to the planners which members of the week are not at work, never to a member (recette EQP-03)', async () => {
+    const from = parisInstant(parisDay(0), 0);
+    const to = parisInstant(parisDay(3), 0);
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'suspended' })
+      .where(eq(schema.teamMembers.id, theo.id));
+    try {
+      // His shift stays on the planning; the owner and an active manager learn that nobody holds it.
+      for (const cookie of [owner, noraCookie]) {
+        const read = await planning(cookie, from, to);
+        expect(read.shifts.some((shift) => shift.memberId === theo.id)).toBe(true);
+        expect(read.away).toEqual([{ memberId: theo.id, status: 'suspended' }]);
+      }
+      // A member never reads a colleague's status, nor his own here.
+      expect((await planning(basileCookie, from, to)).away).toEqual([]);
+    } finally {
+      await test.admin.db
+        .update(schema.teamMembers)
+        .set({ status: 'active' })
+        .where(eq(schema.teamMembers.id, theo.id));
+    }
   });
 
   it('moves a shift before it starts, and cancels it once', async () => {

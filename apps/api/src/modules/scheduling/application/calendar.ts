@@ -114,7 +114,11 @@ export function createCalendarService(
    * same snapshot read under the same policies as Planning.
    */
   function agencyOf(
-    planned: { readonly accounts: readonly StoredAccount[]; readonly shifts: readonly StoredShift[] },
+    planned: {
+      readonly accounts: readonly StoredAccount[];
+      readonly shifts: readonly StoredShift[];
+      readonly away: ReadonlySet<string>;
+    },
     window: { readonly from: Date; readonly to: Date },
     memberId: TeamMemberId | undefined,
     agents: readonly CreatorAgent[],
@@ -124,10 +128,12 @@ export function createCalendarService(
   ): NonNullable<Calendar['agency']> {
     const names = new Map(directory.map((creator) => [creator.id, creator]));
     const accounts = planned.accounts.filter((account) => askedCreator(account.creatorId));
+    // A member who is not at work holds no créneau (recette EQP-03): his shifts stay planned, their créneaux are to fill.
+    const held = planned.shifts.filter((shift) => !planned.away.has(shift.memberId));
     const { toFill, aiAlone } = slotsToFill({
       settings,
       accounts,
-      shifts: planned.shifts,
+      shifts: held,
       agents,
       window,
       now: now(),
@@ -147,7 +153,7 @@ export function createCalendarService(
       coverage: accounts.map((account) => ({
         platformAccountId: account.id,
         ...coverageOf(
-          planned.shifts.filter((shift) => shift.platformAccountId === account.id),
+          held.filter((shift) => shift.platformAccountId === account.id),
           agentOf.get(account.creatorId) ?? null,
           window,
         ),

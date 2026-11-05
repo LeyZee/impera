@@ -618,7 +618,8 @@ export interface CalendarReads {
   /**
    * One snapshot: the view, the shifts and the agent, the settings, and for `agency` alone the accounts and the shifts
    * of each, read creator by creator (`creatorIds`, the creators that exist) under the same policies as Planning, so
-   * that the créneaux to fill, the hours and the coverage agree with the shifts shown.
+   * that the créneaux to fill, the hours and the coverage agree with the shifts shown; with them, the members of those
+   * shifts who are not at work (`away`), whose shifts hold nothing (recette EQP-03).
    */
   read(
     actor: UserId,
@@ -629,7 +630,7 @@ export interface CalendarReads {
     settings: SchedulingSettings;
     shifts: CalendarRow[];
     agents: CreatorAgent[];
-    agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null;
+    agency: { accounts: StoredAccount[]; shifts: StoredShift[]; away: ReadonlySet<string> } | null;
   }>;
 }
 

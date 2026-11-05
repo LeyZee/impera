@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyPlanningPage } from './MyPlanningPage';
 
 import { ReopenProvider } from '@/reports/reopen';
+import type { MyAwayStatus } from '@/scheduling/model';
 import { settingsOf } from '@/test/settings';
 
 vi.mock('@/scheduling/time', async (importOriginal) => ({
@@ -239,6 +240,7 @@ function serve(
                   ]
                 : [],
             conflicts: [],
+            away: [],
           },
         };
       } else if (url.pathname === '/v1/scheduling/calendar') {
@@ -293,12 +295,12 @@ const refused = (code: string, details: Record<string, unknown> = {}): Reply => 
 const text = (element: Element | null | undefined): string =>
   (element?.textContent ?? '').replaceAll('\u00a0', ' ');
 
-function renderPage(): void {
+function renderPage(away: MyAwayStatus | null = null): void {
   const root = createRootRoute();
   const page = createRoute({
     getParentRoute: () => root,
     path: '/planning',
-    component: () => <MyPlanningPage userId={THEO_USER} />,
+    component: () => <MyPlanningPage userId={THEO_USER} away={away} />,
   });
   const router = createRouter({
     routeTree: root.addChildren([page]),
@@ -381,6 +383,17 @@ describe('the chatter’s Planning', () => {
     expect(details?.contains(wednesday)).toBe(false);
     expect(text(wednesday)).toContain('22 h – 4 h');
     expect(text(wednesday)).toContain('En poste');
+  });
+
+  it('says first that he is suspended, and no shift of his reads « En poste » (CHAT-09)', async () => {
+    vi.setSystemTime(new Date('2026-10-28T23:00:00Z'));
+    serve({ earlier: true, night: true });
+    renderPage('suspended');
+    const card = (await screen.findByRole('heading', { name: 'Ton accès est suspendu' })).closest('section');
+    expect(card?.textContent).toContain('Parle à ton responsable.');
+    const wednesday = await screen.findByRole('region', { name: 'Mercredi 28 octobre' });
+    expect(text(wednesday)).toContain('22 h – 4 h');
+    expect(text(wednesday)).not.toContain('En poste');
   });
 
   it('keeps a week gone by in its order, with no fold', async () => {

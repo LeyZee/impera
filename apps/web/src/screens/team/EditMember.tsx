@@ -400,7 +400,7 @@ const AWAY = (name: string): string =>
 /** The planning read ahead for a member's shifts still set: what make-shifts lays, four weeks, inside the read's six. */
 const AHEAD_DAYS = 42;
 
-/** His shifts still to come: nobody holds them once he is away or gone, and the planning counts them as filled. */
+/** His shifts still to come: nobody holds them once he is away or gone, and the planning shows them to fill (EQP-03). */
 function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
   const [range] = useState(() => {
     const from = new Date();
@@ -428,9 +428,8 @@ function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
   if (count === 0) return null;
   return (
     <p className="tm-warn nv-swap">
-      {count} shift{count > 1 ? 's' : ''} à venir {count > 1 ? 'restent' : 'reste'} au planning : personne ne{' '}
-      {count > 1 ? 'les' : 'le'} tiendra et {count > 1 ? 'ils comptent' : 'il compte'} comme pourvu
-      {count > 1 ? 's' : ''}.{' '}
+      {count} shift{count > 1 ? 's' : ''} à venir {count > 1 ? 'restent' : 'reste'} à son nom : personne ne{' '}
+      {count > 1 ? 'les' : 'le'} tiendra, et le planning {count > 1 ? 'les' : 'le'} montre à pourvoir.{' '}
       <Link to="/equipe/planning" search={{ membre: member.id }}>
         Voir ses shifts
       </Link>

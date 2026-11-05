@@ -525,6 +525,36 @@ button.sc-duty__one:active {
 .sc-chip__night {
   color: var(--nv-ink-faint);
 }
+/* A member away holds none of his shifts (EQP-03): the chip goes faint, outlined in amber, and says his status. */
+.sc-chip[data-away='true'] {
+  background: color-mix(in srgb, var(--sc-color) 6%, var(--nv-surface-raised));
+  outline: 1px dashed color-mix(in srgb, var(--nv-warning) 60%, transparent);
+  outline-offset: -1px;
+}
+/* Under way with nobody on it: no breathing edge, nobody is on shift. */
+.sc-chip[data-away='true'][data-phase='live'] {
+  box-shadow:
+    inset 3px 0 0 var(--sc-color),
+    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
+}
+.sc-chip[data-away='true'][data-phase='live']::after {
+  content: none;
+}
+.sc-chip[data-away='true']:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.sc-chip[data-away='true'] .sc-chip__name,
+.sc-chip[data-away='true'] .sc-chip__hours {
+  color: var(--nv-ink-muted);
+}
+.sc-chip__away {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 650;
+  color: var(--nv-warning);
+  white-space: nowrap;
+}
 .sc-chip__repeat {
   position: absolute;
   top: 7px;
@@ -1223,6 +1253,14 @@ button.sc-duty__one:active {
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+/* Away from the team (CHAT-09): the pause in amber, the one thing to know. */
+.sc-stack > .sc-off--away {
+  margin-bottom: var(--nv-space-4);
+}
+.sc-off--away .sc-off__icon {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-warning);
 }
 .sc-off__text {
   flex: 1 1 0;

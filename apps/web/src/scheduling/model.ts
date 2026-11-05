@@ -1,6 +1,7 @@
 import type {
   LeaveRequest,
   LeaveRequestStatus,
+  Me,
   MyShift,
   MyShifts,
   Planning,
@@ -14,6 +15,7 @@ import type {
   ShiftSwapRequest,
   ShiftSwapStatus,
   ShiftTemplate,
+  TeamMemberStatus,
 } from '@impera/contracts';
 import { seatsOf, slotWindowsOf } from '@impera/contracts';
 
@@ -635,6 +637,42 @@ export function dayStateOf(mine: MyShifts, now: Date): DayState {
     ? { kind: 'soon', shift: mine.next }
     : { kind: 'later', shift: mine.next };
 }
+
+/** The reader's status when he is away from the team: suspended, on leave, sick, travelling or gone. */
+export type MyAwayStatus = Exclude<TeamMemberStatus, 'active'>;
+
+/** The reader's status when away, `null` at work or outside the team (an owner): what is said first (CHAT-09). */
+export function myAwayOf(me: Pick<Me, 'team'>): MyAwayStatus | null {
+  const status = me.team?.status ?? 'active';
+  return status === 'active' ? null : status;
+}
+
+/**
+ * What a member away reads at the top of Aujourd'hui, Suivi and Planning, in one card (CHAT-09): his status, and that
+ * the server gives him none of his creators until he is back at work (`routedCreatorIds`, ADR 0024).
+ */
+export const MY_AWAY: Readonly<Record<MyAwayStatus, { readonly title: string; readonly text: string }>> = {
+  suspended: {
+    title: 'Ton accès est suspendu',
+    text: 'Tu n’as plus accès aux conversations de tes créatrices. Parle à ton responsable.',
+  },
+  on_leave: {
+    title: 'Tu es en congé',
+    text: 'Tes créatrices te reviennent quand ton responsable note ton retour.',
+  },
+  sick: {
+    title: 'Tu es noté malade',
+    text: 'Soigne-toi : tes créatrices te reviennent quand ton responsable note ton retour.',
+  },
+  travelling: {
+    title: 'Tu es en déplacement',
+    text: 'Tes créatrices te reviennent quand ton responsable note ton retour.',
+  },
+  left: {
+    title: 'Tu ne fais plus partie de l’équipe',
+    text: 'Ton accès aux créatrices est fermé. Pour toute question, écris à ton ancien responsable.',
+  },
+};
 
 /** Whether the member's creators are open in Impera now (ADR 0025): what Suivi says « Tu n'es pas en poste » about. */
 export function accessOpen(mine: MyShifts, now: Date): boolean {
