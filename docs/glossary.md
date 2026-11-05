@@ -5,6 +5,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Français (docs, UI) | Anglais (code) | Définition |
 |---|---|---|
 | Créatrice, modèle | `creator` | Le tenant. Une personne dont on gère les comptes et les conversations. « Modèle » dans Imperium ; ici on dit créatrice. |
+| Archivée (créatrice) | `creators.archived_at` | Une créatrice que le propriétaire a retirée sans rien supprimer (ADR 0071) : elle sort des listes, l'agent ne travaille plus pour elle et son espace est fermé ; son historique reste et la nomme, suivie de « archivée ». Elle se rouvre depuis la page Créatrices. |
 | Compte plateforme | `platform_account` | Le compte d'une créatrice sur une plateforme (Reveal, OnlyFans, Impera). |
 | Plateforme | `platform` | Reveal, OnlyFans, Instagram, Impera (la nôtre). Valeur d'enum, jamais une logique dans le cœur. |
 | Impera | `impera` (paquets `@impera/*`, variables `IMPERA_*`, plateforme `'impera'`) | Le nom du produit, celui de l'agence IMPERA. « Nirvana » est son ancien nom, jusqu'au 03/11/2026 (ADR 0062) : il reste dans l'historique et dans quelques identifiants techniques que personne ne voit, les rôles Postgres `nirvana_app` et `nirvana_admin`, la version de moteur de paie `nirvana-N` et le suffixe des UID de l'agenda. |

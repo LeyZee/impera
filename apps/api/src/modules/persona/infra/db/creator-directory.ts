@@ -76,12 +76,14 @@ export function createDrizzleCreatorDirectory(
         id: schema.creators.id,
         displayName: schema.creators.displayName,
         timezone: schema.creators.timezone,
+        avatarKey: schema.creators.avatarKey,
       };
       const query = db.select(columns).from(schema.creators);
       const rows = await (ids === 'all' ? query : query.where(inArray(schema.creators.id, [...ids]))).orderBy(
         schema.creators.displayName,
       );
-      return rows.map(toSummary);
+      // Her photo copied at her import (CRM-07 a2b): the page asks for it only when there is one.
+      return rows.map((row) => ({ ...toSummary(row), hasAvatar: row.avatarKey !== null }));
     },
 
     async create(input, userId) {

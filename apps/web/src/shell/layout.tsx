@@ -105,6 +105,8 @@ export interface SubNavItem {
    * action (EQ-04, PAIE-09).
    */
   readonly count?: number;
+  /** What the count is, for a screen reader and on hover (« 3 nouvelles créatrices sur Reveal »); the number alone otherwise. */
+  readonly countLabel?: string;
 }
 
 /** The thumb put under the active tab at once, with no slide. */
@@ -225,8 +227,15 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
                 })}
           >
             {item.label}
-            {item.count === undefined || item.count === 0 ? null : (
+            {item.count === undefined || item.count === 0 ? null : item.countLabel === undefined ? (
               <span className="nv-subnav__count">{item.count}</span>
+            ) : (
+              <>
+                <span className="nv-subnav__count" aria-hidden="true" title={item.countLabel}>
+                  {item.count}
+                </span>
+                <span className="sr-only">{`, ${item.countLabel}`}</span>
+              </>
             )}
           </Link>
         ))}

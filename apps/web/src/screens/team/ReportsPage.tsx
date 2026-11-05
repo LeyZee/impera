@@ -462,7 +462,7 @@ function ToValidate({
                 <input
                   id={`${id}-all`}
                   type="checkbox"
-                  className="rp-check"
+                  className="nv-check"
                   checked={all}
                   onChange={() => {
                     onSelect(all ? new Set() : new Set(reviewable.map((one) => one.id)));
@@ -585,7 +585,7 @@ function Review({
         <input
           id={`${id}-pick`}
           type="checkbox"
-          className="rp-check"
+          className="nv-check"
           checked={checked || held}
           disabled={!report.canReview || held}
           aria-label={`Sélectionner le rapport de ${member?.displayName ?? 'ce membre'}`}

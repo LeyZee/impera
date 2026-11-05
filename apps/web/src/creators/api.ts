@@ -4,6 +4,7 @@ import {
   CreatorListSchema,
   CreatorSummarySchema,
   MyPersonaSchema,
+  PersonaOverviewSchema,
   REAUTHENTICATION_ERROR_CODE,
   InvitationLinkCreatedSchema,
   type CreateCreatorInvitationLinkBody,
@@ -202,4 +203,22 @@ export async function createCreatorLink(
   } catch {
     return { kind: 'failed' };
   }
+}
+
+/** How many versions of her persona were ever stored, for « Pour démarrer » on her sheet (CRM-07 b2): the owner's. */
+export const personaVersionsKey = (creatorId: CreatorId) =>
+  ['creators', creatorId, 'persona-versions'] as const;
+
+export function usePersonaVersionCount(creatorId: CreatorId): UseQueryResult<number> {
+  return useQuery({
+    queryKey: personaVersionsKey(creatorId),
+    queryFn: async () => {
+      const response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/persona`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`GET /v1/creators/:id/persona: ${String(response.status)}`);
+      return PersonaOverviewSchema.parse(await response.json()).versions.length;
+    },
+    retry: 1,
+  });
 }

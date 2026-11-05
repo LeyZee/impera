@@ -30,7 +30,12 @@ import type { AccountingModule } from './modules/accounting';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
-import type { ConnectorRegistry, ConnectorsModule, SalesFeedRegistry } from './modules/connectors';
+import type {
+  AvatarPorts,
+  ConnectorRegistry,
+  ConnectorsModule,
+  SalesFeedRegistry,
+} from './modules/connectors';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
@@ -190,6 +195,11 @@ export interface AppOptions {
    * the system's otherwise.
    */
   readonly connectorsClock?: () => Date;
+  /**
+   * Tests plug the photo copy's fetch and store here (CRM-07 a2b): FakeReveal's addresses are invented and MinIO is not
+   * started for it; the platform's image server and the media bucket otherwise.
+   */
+  readonly creatorAvatars?: Pick<AvatarPorts, 'fetch' | 'store'>;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
 }
@@ -248,6 +258,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     registry: options.connectorRegistry ?? {},
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
+    ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });
   const providers = await wireProviders(shared);
   const alerts = wireAlerts(shared);
