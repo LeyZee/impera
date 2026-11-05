@@ -8,6 +8,7 @@ import {
   type EarningsSource,
   type PayPeriod,
   type ShiftReportStatus,
+  type TeamMemberId,
   type TeamScope,
 } from '@impera/contracts';
 
@@ -51,6 +52,19 @@ export interface RulesRow {
   readonly fromPeriod: PayPeriod;
   readonly currency: Currency;
   readonly earningsSource: EarningsSource;
+}
+
+/** The rules with what pay takes off a gross (VAT, the platform's commission), for the estimate of a report (reco 19). */
+export interface RatedRulesRow extends RulesRow {
+  readonly vatBps: number;
+  readonly platformFeeBps: number;
+}
+
+/** What pay's estimate of a report reads of its shift (reco 19): whose it is, its period and the rules in force then. */
+export interface ShiftFactsForPay {
+  readonly memberId: TeamMemberId;
+  readonly period: PayPeriod;
+  readonly rules: RatedRulesRow | null;
 }
 
 /**

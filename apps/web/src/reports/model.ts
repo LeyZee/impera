@@ -64,6 +64,26 @@ export const amountText = (minor: number, currency: Currency): string => money(m
 export const signedAmountText = (minor: number, currency: Currency): string =>
   money(minor, currency, 'exceptZero');
 
+/**
+ * The estimate under a report's amount (reco 19), in euros whatever the account declares in: what a report brings its
+ * member, what a correction adds to it or takes off. `memberName` when the agency corrects a member's report.
+ */
+export function estimateLine(
+  commissionMinor: number,
+  correcting: boolean,
+  memberName: string | null,
+): string {
+  if (correcting) {
+    const whose = memberName === null ? 'ta commission' : `la commission de ${memberName}`;
+    return `Effet estimé sur ${whose} : ${signedAmountText(commissionMinor, 'EUR')}`;
+  }
+  const whose = memberName === null ? 'Ta commission estimée' : `Commission estimée de ${memberName}`;
+  return `${whose} : ${amountText(commissionMinor, 'EUR')}`;
+}
+
+/** What the estimate leaves to the statement, said beside it. */
+export const ESTIMATE_LEAVES = 'avant paliers, objectifs, primes et malus';
+
 /** The figure an amount field shows back, without its currency: « 1234,56 ». */
 export const amountInput = (minor: number): string =>
   `${minor < 0 ? '-' : ''}${String(Math.trunc(Math.abs(minor) / 100))},${String(Math.abs(minor) % 100).padStart(2, '0')}`;

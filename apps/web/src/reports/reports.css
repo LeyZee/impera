@@ -119,6 +119,23 @@
 .rp-amount[data-invalid='true'] .rp-amount__input {
   box-shadow: inset 0 0 0 1.5px var(--nv-warning);
 }
+/* What the amount brings (reco 19): one quiet line under the hint, the figure in ink, the caveat after it. */
+.rp-estimate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--nv-space-2);
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-estimate__value {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.rp-estimate__leaves {
+  color: var(--nv-ink-muted);
+}
 
 .rp-incident {
   display: flex;

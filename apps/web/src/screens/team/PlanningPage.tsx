@@ -499,16 +499,21 @@ function Opened({
       />
     );
   }
-  if (open.kind === 'report')
+  if (open.kind === 'report') {
+    const { shiftId } = open;
     return (
       <ReportPanel
-        key={open.shiftId + (open.draft?.id ?? '')}
-        shiftId={open.shiftId}
+        key={shiftId + (open.draft?.id ?? '')}
+        shiftId={shiftId}
         draft={open.draft}
         from="/equipe/planning"
-        onClose={close}
+        onClose={() => {
+          // Back on the shift's sheet it was opened from, when the week still shows it (review of #553).
+          onOpen(planning.shifts.some((one) => one.id === shiftId) ? { kind: 'shift', id: shiftId } : null);
+        }}
       />
     );
+  }
   const shift = planning.shifts.find((one) => one.id === open.id);
   if (shift === undefined) return null;
   return (

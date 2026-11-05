@@ -53,8 +53,8 @@ import {
   isAgency,
   makerOf,
   shiftPeriod,
+  type RatedRulesRow,
   type Reader,
-  type RulesRow,
 } from '../domain/reports';
 import { addMinutes, wallClockToInstant } from '../domain/time';
 
@@ -66,7 +66,7 @@ import {
   memberColumns,
   ownMemberId,
   pgErrorOf,
-  RulesRowSchema,
+  RatedRulesRowSchema,
   shiftColumns,
   StoredAccountSchema,
   toMember,
@@ -172,17 +172,19 @@ async function shiftAsSeen(tx: Transaction, seen: StoredShift): Promise<StoredSh
   return shift;
 }
 
-/** The account's pay rules, every period. */
-async function rulesOf(tx: Transaction, platformAccountId: string): Promise<RulesRow[]> {
+/** The account's pay rules, every period, with what pay takes off a gross (the estimate of a report, reco 19). */
+async function rulesOf(tx: Transaction, platformAccountId: string): Promise<RatedRulesRow[]> {
   const rows = await tx
     .select({
       fromPeriod: accountPayRules.fromPeriod,
       currency: accountPayRules.currency,
       earningsSource: accountPayRules.earningsSource,
+      vatBps: accountPayRules.vatBps,
+      platformFeeBps: accountPayRules.platformFeeBps,
     })
     .from(accountPayRules)
     .where(eq(accountPayRules.platformAccountId, platformAccountId));
-  return rows.map((row) => RulesRowSchema.parse(row));
+  return rows.map((row) => RatedRulesRowSchema.parse(row));
 }
 
 const readerIn = async (tx: Transaction, userId: string, scope: TeamScope): Promise<Reader> => ({
