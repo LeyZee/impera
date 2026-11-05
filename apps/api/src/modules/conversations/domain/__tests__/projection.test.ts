@@ -29,6 +29,22 @@ describe('conversation projection', () => {
     expect(applyEvent(afterTwo, sent, at(3))).toMatchObject({ unreadCount: 0, lastOutboundAt: at(3) });
   });
 
+  it('leaves the conversation waiting when a stop expired the answer of a fan still unanswered (recette MOT-03)', () => {
+    const expired = (leavesFanWaiting: boolean) =>
+      EventBodySchema.parse({
+        type: 'draft_expired',
+        payload: {
+          draftId: DRAFT,
+          status: 'expired',
+          reason: 'Arrêt d’urgence à l’envoi',
+          ...(leavesFanWaiting && { leavesFanWaiting: true }),
+        },
+      });
+    const sending = { ...INITIAL_PROJECTION, state: 'sending' as const, lastInboundAt: at(1) };
+    expect(applyEvent(sending, expired(true), at(2)).state).toBe('pending');
+    expect(applyEvent(sending, expired(false), at(2)).state).toBe('idle');
+  });
+
   it('clears the routing when a human hands the conversation back', () => {
     const routed = { ...INITIAL_PROJECTION, state: 'human' as const, routedToUserId: USER };
     const released = EventBodySchema.parse({

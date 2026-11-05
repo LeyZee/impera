@@ -82,6 +82,9 @@ async function refresh(): Promise<void> {
     case 'second_factor_required':
       show({ kind: 'second_factor' });
       return;
+    case 'server_down':
+      show({ kind: 'server_down' });
+      return;
     case 'unreachable':
       show({ kind: 'unreachable' });
       return;

@@ -153,6 +153,7 @@ describe('voice guards (P3-13)', () => {
       ...read(['a', 'b', 'c', 'd', 'x'.repeat(300)]),
       ...read(['Envoie-moi des nudes', 'sale radin', 'rien à payer', 'je te fais un petit prix']),
       ...read(['tu me déçois', '*sourit*', 'j’ai besoin d’argent']),
+      ...read(['paye moi sur paypal', 'elle est à 5 €']),
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
       ...read(['Tu fais quoi de beau ce soir ?'], {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],

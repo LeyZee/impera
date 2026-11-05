@@ -44,11 +44,18 @@ describe('readCrmSession', () => {
 
   it.each([
     ['no answer', () => Promise.reject(new TypeError('Failed to fetch'))],
-    ['a server error', () => Promise.resolve(json(502, {}))],
+    ['a server error that is not a gateway', () => Promise.resolve(json(500, {}))],
     ['another 403', () => Promise.resolve(json(403, apiError('origin_forbidden')))],
     ['an answer that is not the contract', () => Promise.resolve(json(200, { hello: 'world' }))],
     ['a page that is not JSON', () => Promise.resolve(new Response('<html>', { status: 200 }))],
   ])('is unreachable on %s', async (_, fetchFn: Fetch) => {
     expect(await readCrmSession('http://localhost:5173', fetchFn)).toEqual({ kind: 'unreachable' });
+  });
+
+  it.each([502, 503, 504])('tells a CRM whose API is down (%i) from a wrong address', async (status) => {
+    const answer = new Response('<html>Bad Gateway</html>', { status });
+    expect(await readCrmSession('http://localhost:5173', () => Promise.resolve(answer))).toEqual({
+      kind: 'server_down',
+    });
   });
 });

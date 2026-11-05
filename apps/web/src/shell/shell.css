@@ -1362,7 +1362,7 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-faint);
 }
-/* /aide/extension (ADR 0067): what the extension offers, in tiles that answer the pointer; « Bientôt » stays quiet. */
+/* /aide/extension (ADR 0067): what the extension offers today, in tiles that answer the pointer. */
 .nv-help-ext__intro {
   display: grid;
   grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
@@ -1407,17 +1407,7 @@
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--nv-space-3);
-}
-/* An odd count: the last one takes the whole row, so the grid never ends on a hole. */
-.nv-help-ext__offer:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-}
-@media (max-width: 560px) {
-  .nv-help-ext__offers {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 .nv-help-ext__offer {
   display: grid;
@@ -1442,27 +1432,11 @@
     inset 0 0 0 1px var(--nv-glass-edge),
     var(--nv-shadow-lift);
 }
-.nv-help-ext__offer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-2);
-}
 .nv-help-ext__offer strong {
   font-size: var(--nv-text-body);
   line-height: var(--nv-text-body-leading);
   font-weight: 600;
   color: var(--nv-ink);
-}
-.nv-help-ext__soon {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-weight: 600;
-  color: var(--nv-ink-muted);
-  background: var(--nv-glass-fill-strong);
 }
 @media (prefers-reduced-motion: reduce) {
   .nv-help-ext__offer {

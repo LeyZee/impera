@@ -75,6 +75,11 @@ const draftPayload = z.object({
   editedBubbles: z.array(z.string()).optional(),
   /** Why a human rejected or the system expired it; kept for the evals (message-flow.md §3). */
   reason: z.string().min(1).max(500).optional(),
+  /**
+   * A draft expired by a kill switch or an expired session while the fan's last message was still unanswered: the
+   * conversation waits for an answer again, and the resume answers it (recette MOT-03). Absent everywhere else.
+   */
+  leavesFanWaiting: z.literal(true).optional(),
 });
 
 const factPayload = z.object({
