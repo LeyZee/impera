@@ -13,7 +13,15 @@ import {
   type ConversationRead,
   type Decision,
 } from './api';
-import { draftsOf, endsRun, messageTime, stoppedText, threadOf, whyHuman } from './reader-model';
+import {
+  draftsOf,
+  endsRun,
+  graveHandoffOf,
+  messageTime,
+  stoppedText,
+  threadOf,
+  whyHuman,
+} from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
 import { bubblesFromText, bubblesProblem, MODE_LABELS, situationOf } from './view';
 
@@ -168,8 +176,16 @@ function Loaded({
   const [outdated, setOutdated] = useState<string | null>(null);
 
   const [note, setNote] = useState('');
+  // A grave handoff (minor, consent, distress) is given back only after a second, explicit click (PRO-26).
+  const grave = isHuman ? graveHandoffOf(read) : null;
+  const [confirming, setConfirming] = useState(false);
 
   const toggleHand = async (): Promise<void> => {
+    if (grave !== null && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     setHand({ pending: true, error: null });
     setOutdated(null);
     const kept = note.trim();
@@ -316,7 +332,35 @@ function Loaded({
                   }}
                 />
               </label>
-              {handButton}
+              {confirming && grave !== null ? (
+                <div className="tr-hand__confirm" role="alert">
+                  <p>
+                    L’agent a passé la main pour « {grave} ». Rends-la seulement si tu as vérifié : il écrira
+                    à ce fan dès son prochain message.
+                  </p>
+                  <div className="tr-hand__confirm-actions">
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--plain nv-btn--sm"
+                      onClick={() => {
+                        setConfirming(false);
+                      }}
+                    >
+                      Garder la main
+                    </button>
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--destructive nv-btn--sm"
+                      disabled={hand.pending}
+                      onClick={() => void toggleHand()}
+                    >
+                      J’ai vérifié, rendre la main
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                handButton
+              )}
             </div>
           ) : null}
         </div>

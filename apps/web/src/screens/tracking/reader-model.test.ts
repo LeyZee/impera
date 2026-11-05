@@ -19,6 +19,7 @@ import {
   stoppedText,
   threadOf,
   todoLabel,
+  graveHandoffOf,
   whyHuman,
 } from './reader-model';
 
@@ -167,6 +168,21 @@ describe('threadOf', () => {
     ];
     expect(whyHuman({ events })).toBe('L’agent passe la main (Demande de rencontre)');
     expect(whyHuman({ events: [] })).toBeNull();
+  });
+
+  // Recette 05/11, PRO-26: giving back a grave handoff asks for a confirmation.
+  it('names a grave handoff while it is the latest change of hand, and only then', () => {
+    const minor = event(5, 9, {
+      type: 'handoff_requested',
+      payload: { conversationId: CONVERSATION, cause: 'minor' },
+    });
+    const meeting = event(5, 9, {
+      type: 'handoff_requested',
+      payload: { conversationId: CONVERSATION, cause: 'meeting' },
+    });
+    expect(graveHandoffOf({ events: [minor] })).toBe('Mineur possible');
+    expect(graveHandoffOf({ events: [meeting, minor] })).toBeNull();
+    expect(graveHandoffOf({ events: [] })).toBeNull();
   });
 
   it('says a person took the hand, not an old handoff the hand was given back for', () => {

@@ -309,6 +309,22 @@
   flex: 1 1 14rem;
   min-width: 0;
 }
+/* Giving back a grave handoff (minor, consent, distress): said in red, kept by default (PRO-26). */
+.tr-hand__confirm {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
+}
+.tr-hand__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
 /* The fan's sheet: one folded band, its line says what is inside; opened, his limits, what is left, his desire. */
 .tr-sheet {
   border-radius: var(--nv-radius-md);

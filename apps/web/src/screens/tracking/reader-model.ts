@@ -231,6 +231,21 @@ export function whyHuman(read: { readonly events: readonly ConversationEventView
   return null;
 }
 
+/** The handoffs a person must have checked before the agent writes again: a minor, no consent, distress. */
+const GRAVE_CAUSES: ReadonlySet<string> = new Set(['minor', 'non_consent', 'distress']);
+
+/**
+ * The grave reason the agent stepped back for, while it is still the latest change of hand: giving the hand back then
+ * asks for a confirmation (recette 05/11, PRO-26). `null` otherwise.
+ */
+export function graveHandoffOf(read: { readonly events: readonly ConversationEventView[] }): string | null {
+  const event = read.events.find(
+    (e) => e.type === 'handoff_requested' || e.type === 'takeover_started' || e.type === 'takeover_ended',
+  );
+  if (event?.type !== 'handoff_requested' || !GRAVE_CAUSES.has(event.payload.cause)) return null;
+  return CAUSE_LABELS[event.payload.cause];
+}
+
 /** The drafts sent, the one that failed for good, and the state, as the reader shows them. */
 export interface DraftsRead {
   readonly state: ConversationDetail['state'];
