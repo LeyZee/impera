@@ -451,13 +451,15 @@ describe('Équipe › Planning', () => {
     expect(
       within(cells[3] ?? row).getByRole('button', { name: /^À pourvoir : 12\sh – 18\sh, le jeudi 29/u }),
     ).toBeTruthy();
-    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now.
+    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now,
+    // said « maintenant », never at the minute (recette #564).
     const under = screen.getAllByRole('button', { name: /^Théo, 23\sh – 5\sh, .*suspendu, à pourvoir$/u });
     expect(under.length).toBeGreaterThan(0);
     for (const one of under) expect(one.getAttribute('aria-label')).not.toContain('en poste');
-    expect(
-      within(cells[2] ?? row).getByRole('button', { name: /^À pourvoir : 1\sh – 6\sh, le mercredi 28/u }),
-    ).toBeTruthy();
+    const now = within(cells[2] ?? row).getByRole('button', {
+      name: /^À pourvoir : maintenant – 6\sh, le mercredi 28/u,
+    });
+    expect(text(now.querySelector('.sc-slot__hours'))).toBe('maintenant – 6 h');
 
     fireEvent.click(chip);
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });

@@ -33,6 +33,11 @@
   color: var(--nv-warning);
   background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
 }
+/* « Parti »: a tint of ink with an edge, so it holds on the white plate of Jour too (recette #564). */
+.rp-chip--neutral {
+  background: var(--nv-fill-soft);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+}
 .rp-chip--neutral::before {
   display: none;
 }
@@ -400,8 +405,13 @@
   .rp-period > .nv-panel__head > :first-child {
     flex-basis: 100%;
   }
+  /* « Cette quinzaine » right after the arrows: its own padding is the space between them (recette #564). */
   .rp-period__nav {
+    gap: var(--nv-space-1);
     margin-left: 0;
+  }
+  .rp-period__nav > .nv-btn--plain {
+    padding-inline: var(--nv-space-3);
   }
   /* The arrows first, on the title's own edge; « Cette quinzaine » after them. */
   .rp-period__nav > .sc-week {
