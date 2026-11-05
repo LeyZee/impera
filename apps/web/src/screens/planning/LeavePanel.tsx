@@ -1,25 +1,40 @@
-import { LEAVE_MAX_DAYS, LeaveRequestIdSchema, newId } from '@impera/contracts';
+import { LEAVE_MAX_DAYS, LeaveRequestIdSchema, newId, type Shift } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
-import { askLeave, useRefreshPlanning, type Refusal } from '@/scheduling/api';
-import { ERROR_MESSAGES, leaveDaysLine, leaveLength, READ_AGAIN } from '@/scheduling/model';
-import { cityOf, daysFrom } from '@/scheduling/time';
+import { askLeave, usePlanning, useRefreshPlanning, type Refusal } from '@/scheduling/api';
+import {
+  ERROR_MESSAGES,
+  leaveDaysLine,
+  leaveLength,
+  phaseOf,
+  READ_AGAIN,
+  swapShiftLine,
+} from '@/scheduling/model';
+import { addDays, cityOf, daysFrom, zonedInstant } from '@/scheduling/time';
+import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 /**
  * « Demander un congé » (ADR 0031): whole days of the member's own zone, from today on, 31 at most, with a word for
- * the agency if they want. The request's id is made when the panel opens, so a retry records one request.
+ * the agency if they want. The request's id is made when the panel opens, so a retry records one request. His shifts
+ * on those days are said in amber before he sends it, each one ahead offered to a colleague from there (recette 05/11,
+ * CHAT-28): a leave approved later does not free them by itself.
  */
 export function LeavePanel({
   today,
   timeZone,
+  memberId,
+  onSwap,
   onClose,
 }: {
   /** Today in the member's zone: the first day it can start. */
   today: string;
   timeZone: string;
+  memberId: string;
+  /** « Échanger » on one of his shifts of those days: the leave closes, the exchange opens. */
+  onSwap: (shift: Shift, creatorName: string | undefined) => void;
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
@@ -36,6 +51,24 @@ export function LeavePanel({
   const length = firstOk && lastOk ? daysFrom(first, last) + 1 : 0;
   const tooLong = length > LEAVE_MAX_DAYS;
   const ready = firstOk && lastOk && !tooLong && !busy;
+  const now = useNow();
+  // His shifts on the days asked: the planning reads 42 days at most, a leave 31.
+  const planning = usePlanning(
+    {
+      from: zonedInstant(firstOk ? first : today, 0, timeZone).toISOString(),
+      to: zonedInstant(addDays(firstOk && lastOk && !tooLong ? last : today, 1), 0, timeZone).toISOString(),
+      creatorId: null,
+    },
+    firstOk && lastOk && !tooLong,
+  );
+  const clashes =
+    !firstOk || !lastOk || tooLong
+      ? []
+      : (planning.data?.shifts ?? [])
+          .filter((shift) => shift.memberId === memberId && phaseOf(shift, now) !== 'past')
+          .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const creatorOf = (shift: Shift): string | undefined =>
+    planning.data?.accounts.find((account) => account.id === shift.platformAccountId)?.creatorName;
 
   const submit = async (): Promise<void> => {
     if (!ready) return;
@@ -114,6 +147,36 @@ export function LeavePanel({
                 ? `Un congé dure ${String(LEAVE_MAX_DAYS)} jours au plus : demande-le en deux fois.`
                 : `${leaveDaysLine({ firstDay: first, lastDay: last })}, ${leaveLength({ firstDay: first, lastDay: last })}.`}
         </p>
+
+        {clashes.length === 0 ? null : (
+          <div className="sc-leave__clash nv-swap" role="status">
+            <p className="sc-leave__clash-head">
+              {clashes.length === 1
+                ? 'Tu as un shift ces jours-là : propose-le d’abord en échange.'
+                : `Tu as ${String(clashes.length)} shifts ces jours-là : propose-les d’abord en échange.`}
+            </p>
+            <ul className="sc-leave__clash-list">
+              {clashes.map((shift) => (
+                <li key={shift.id}>
+                  <span className="nv-num">
+                    {swapShiftLine(shift.startsAt, shift.endsAt, creatorOf(shift), timeZone)}
+                  </span>
+                  {phaseOf(shift, now) === 'later' ? (
+                    <button
+                      type="button"
+                      className="sc-link"
+                      onClick={() => {
+                        onSwap(shift, creatorOf(shift));
+                      }}
+                    >
+                      Échanger
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="nv-field tm-field">
           <label className="nv-field__label" htmlFor={`${id}-note`}>

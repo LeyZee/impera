@@ -49,7 +49,7 @@ export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | un
 
 type Open =
   | { readonly kind: 'leave' }
-  | { readonly kind: 'swap'; readonly shiftId: string }
+  | { readonly kind: 'swap'; readonly shift: Shift; readonly creatorName: string | undefined }
   | { readonly kind: 'report'; readonly shiftId: string; readonly draft: ReportDraft | null };
 
 /** A finished shift's report as its row says it: to make, or its status; `null` when its period is not read. */
@@ -132,8 +132,14 @@ export function MyPlanningPage({
   const [focus, setFocus] = useState<string | null>(null);
   const leaves = useLeaves(leaveRangeOf(today, zone));
   const swaps = useSwaps();
-  const opened =
-    open?.kind === 'swap' ? (planning.data?.shifts.find((shift) => shift.id === open.shiftId) ?? null) : null;
+  const swapOf = (shiftId: string): Open | null => {
+    const shift = planning.data?.shifts.find((one) => one.id === shiftId);
+    if (shift === undefined) return null;
+    const creatorName = planning.data?.accounts.find(
+      (account) => account.id === shift.platformAccountId,
+    )?.creatorName;
+    return { kind: 'swap', shift, creatorName };
+  };
   // A finished shift says where its report is, and makes it from here as Aujourd'hui does (EQ-19).
   const reports = useReportsOf(periodsOf(planning.data));
   useReopening('/planning', (what) => {
@@ -308,7 +314,7 @@ export function MyPlanningPage({
             offers={offersOf(swaps.data, me)}
             reports={reports.list}
             onSwap={(shiftId) => {
-              setOpen({ kind: 'swap', shiftId });
+              setOpen(swapOf(shiftId));
             }}
             onReport={(shiftId) => {
               setOpen({ kind: 'report', shiftId, draft: null });
@@ -333,6 +339,10 @@ export function MyPlanningPage({
           <LeavePanel
             today={dayOf(now, me.timeZone)}
             timeZone={me.timeZone}
+            memberId={me.id}
+            onSwap={(shift, creatorName) => {
+              setOpen({ kind: 'swap', shift, creatorName });
+            }}
             onClose={() => {
               setOpen(null);
             }}
@@ -349,18 +359,16 @@ export function MyPlanningPage({
             }}
           />
         ) : null}
-        {opened === null ? null : (
+        {open?.kind === 'swap' ? (
           <SwapPanel
-            shift={opened}
-            creatorName={
-              planning.data?.accounts.find((account) => account.id === opened.platformAccountId)?.creatorName
-            }
+            shift={open.shift}
+            creatorName={open.creatorName}
             zone={zone}
             onClose={() => {
               setOpen(null);
             }}
           />
-        )}
+        ) : null}
       </div>
     </Page>
   );

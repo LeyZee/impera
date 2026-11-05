@@ -225,6 +225,11 @@ function serve(
         weeks.push(url.searchParams.get('from') ?? '');
         const thisWeek = url.searchParams.get('from') === '2026-10-25T21:00:00.000Z';
         const lastWeek = state.lastWeek && url.searchParams.get('from') === '2026-10-18T21:00:00.000Z';
+        // Any other range (a leave's days): the week's shifts that touch it.
+        const from = url.searchParams.get('from') ?? '';
+        const to = url.searchParams.get('to') ?? '';
+        const touched = (one: Record<string, unknown>): boolean =>
+          new Date(String(one.endsAt)) > new Date(from) && new Date(String(one.startsAt)) < new Date(to);
         reply = {
           status: 200,
           body: {
@@ -246,7 +251,10 @@ function serve(
                     shift(106, '2026-10-20T06:00:00Z', '2026-10-20T12:00:00Z'),
                     shift(107, '2026-10-21T06:00:00Z', '2026-10-21T12:00:00Z'),
                   ]
-                : [],
+                : [
+                    shift(101, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z'),
+                    shift(102, '2026-10-29T16:00:00Z', '2026-10-29T22:00:00Z'),
+                  ].filter(touched),
             conflicts: [],
           },
         };
@@ -664,6 +672,28 @@ describe('the chatter’s Planning', () => {
     const { id: requestId, ...request } = CreateLeaveRequestBodySchema.parse(written[0]?.body);
     expect(requestId).not.toBe('');
     expect(request).toEqual({ firstDay: '2026-11-03', lastDay: '2026-11-05', note: 'Examens' });
+  });
+
+  it('says his shift on the days of a leave in amber, and offers it from there (CHAT-28)', async () => {
+    serve();
+    renderPage();
+    await screen.findByText('2 shifts · 12 h');
+    const ask = screen.getByRole('button', { name: 'Demander un congé' });
+    await waitFor(() => {
+      expect(ask.hasAttribute('disabled')).toBe(false);
+    });
+    fireEvent.click(ask);
+    const panel = await screen.findByRole('dialog', { name: 'Demander un congé' });
+    fireEvent.change(within(panel).getByLabelText('Premier jour'), { target: { value: '2026-10-29' } });
+    const clash = await within(panel).findByText(
+      'Tu as un shift ces jours-là : propose-le d’abord en échange.',
+    );
+    const warning = clash.parentElement;
+    expect(text(warning)).toContain('29 oct. · 19 h – 1 h · Nora Vidal');
+    if (warning === null) throw new Error('no warning');
+    fireEvent.click(within(warning).getByRole('button', { name: 'Échanger' }));
+    expect(await screen.findByRole('dialog', { name: 'Proposer un échange' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Demander un congé' })).toBe(null);
   });
 
   it('shows the leave of the week, and folds his leaves and swaps with a pending request to withdraw', async () => {
