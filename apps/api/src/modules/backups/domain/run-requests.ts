@@ -57,5 +57,5 @@ export function decideRequest(context: RequestContext, now: Date): RequestDecisi
 }
 
 /** A request the `backup` service has left waiting longer than it ever should (it checks every 30 seconds). */
-export const isStaleRequest = (requestedAt: Date, now: Date): boolean =>
+const isStaleRequest = (requestedAt: Date, now: Date): boolean =>
   now.getTime() - requestedAt.getTime() > BACKUP_REQUEST_STALE_MINUTES * 60_000;
