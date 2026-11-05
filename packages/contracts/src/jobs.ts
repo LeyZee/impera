@@ -69,6 +69,7 @@ export const JOB_NAMES = [
   'payroll.lock_payout_certificate',
   'media.describe',
   'content_drops.receive_file',
+  'content_drops.convert_file',
   'content_drops.erase_originals',
   'providers.check_credentials',
   'connector.read_sales',
@@ -279,6 +280,16 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * Her video in a format the platforms do not read, converted into an H.264 MP4 (ADR 0070 § 3), in the queue
+   * `content_drops:convert` where conversions pass one at a time: `content_drops.receive_file` hands it over and
+   * never waits for it. Then as a receipt: format checked, fingerprint, medium or duplicate, raw bytes erased.
+   */
+  'content_drops.convert_file': z.object({
+    creatorId: CreatorIdSchema,
+    fileId: ContentDropFileIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
    * Each hour (CR-06 c, ADR 0044 § 2, ADR 0055 § 7): a send left unfinished for 24 hours is refused, the agency is told
    * 7 days before an original goes, and the originals due are erased from the media storage (a withdrawn drop's at
    * once). Replayable: each step moves only what is still due, and says each thing once.
@@ -373,6 +384,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
   // short outage of the storage; a file left waiting is sent again by her phone.
   'content_drops.receive_file': 9,
+  // As a receipt: a storage out, a machine short of disk or a conversion killed by its time limit are retried.
+  'content_drops.convert_file': 9,
   // Each hour: the next run is the retry.
   'content_drops.erase_originals': 1,
   'providers.check_credentials': 1,

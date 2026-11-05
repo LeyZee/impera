@@ -164,7 +164,8 @@ describe('Agenda, the creator’s (CR-05)', () => {
     show('week');
     expect(await screen.findByRole('heading', { name: 'Sans date' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Choisir un moment' })).toBeDefined();
-    expect(screen.getAllByText(/Dispo pour l’agence/u).length).toBe(2);
+    // Wednesday's, Friday's 22 h – 2 h, and its end on Saturday from 0 h (CREA-02).
+    expect(screen.getAllByText(/Dispo pour l’agence/u).length).toBe(3);
     // The shooting sheet of a proposal, folded under its name until she opens it (VEI-01 d).
     const brief = screen.getByText('🎬 Fiche de tournage');
     expect(brief.tagName).toBe('SUMMARY');
