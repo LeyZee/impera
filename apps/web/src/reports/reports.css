@@ -50,30 +50,21 @@
   display: block;
   margin-top: 2px;
 }
-/* A notice's mark is a straight bar beside its text, from its first line to its last: an inset shadow on a rounded box
-   follows the corner and reads as a bracket. No overflow: hidden, so the glow of a button inside is never cut. */
+/* A notice reads by its tint and its title, never by a coloured bar on its side (Charles: no side bar on a card). A
+   hairline all round, tinted with its tone, sets it apart. No overflow: hidden, so the glow of a button inside is
+   never cut. */
 .rp-notice {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: var(--nv-space-4);
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
-}
-.rp-notice::before {
-  content: '';
-  position: absolute;
-  inset: var(--nv-space-4) auto var(--nv-space-4) 0;
-  width: 3px;
-  border-radius: 0 var(--nv-radius-full) var(--nv-radius-full) 0;
-  background: var(--nv-ink-faint);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
 .rp-notice[data-tone='warn'] {
   background: color-mix(in srgb, var(--nv-warning) 9%, var(--nv-glass-fill));
-}
-.rp-notice[data-tone='warn']::before {
-  background: var(--nv-warning);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 28%, transparent);
 }
 .rp-notice__title {
   margin: 0;
