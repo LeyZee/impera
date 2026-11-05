@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyProfilePage } from './MyProfilePage';
 
-import { IRIS, IRIS_ME, LEA_ONLYFANS, NORA_REVEAL, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
+import { LEA_ONLYFANS, NORA_REVEAL, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
 
 const NBSP = /[\u00a0\u202f]/gu;
 
