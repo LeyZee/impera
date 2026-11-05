@@ -1,20 +1,70 @@
-import type { CreatorTaskWhen } from '@impera/contracts';
-import { and, eq, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
+import type { CreatorTaskWhen, SuggestionFollowUp } from '@impera/contracts';
+import { and, eq, inArray, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import { addDays, calendarDayIn } from '../../../scheduling/pure';
 import { availabilityWindows, type Interval } from '../../domain/availability';
 import { SuggestionDeclinedRecently, SuggestionForbidden, SuggestionIdTaken } from '../../domain/errors';
 import { firstPlacement, placementOf } from '../../domain/placement';
 import type { AgencySuggestionStore } from '../../domain/ports';
-import { maySuggest, weekOf } from '../../domain/suggestions';
+import { doneDays, maySuggest, weekOf } from '../../domain/suggestions';
 
-import { agencySuggestionOf, availabilityOf, whenColumns } from './rows';
+import { agencySuggestionOf, availabilityOf, taskOf, whenColumns } from './rows';
 
 const tasks = schema.creatorTasks;
 const availabilities = schema.creatorAvailabilities;
 const suggestions = schema.creatorSuggestions;
+const ticks = schema.creatorTaskTicks;
 
 const readsTeam = (scope: string): boolean => scope === 'owner' || scope === 'agency';
+
+type SuggestionRow = typeof suggestions.$inferSelect;
+
+/**
+ * What became of the accepted ones among `rows` (CR-05 lot c): the task each became, read under her team's RLS, and
+ * the days she ticked it. A suggestion still to decide or declined has none.
+ */
+async function followUps(
+  tx: Transaction,
+  rows: readonly SuggestionRow[],
+): Promise<Map<string, SuggestionFollowUp>> {
+  const accepted = rows.filter((row) => row.state === 'accepted');
+  if (accepted.length === 0) return new Map();
+  const born = await tx
+    .select()
+    .from(tasks)
+    .where(
+      inArray(
+        tasks.suggestionId,
+        accepted.map((row) => row.id),
+      ),
+    );
+  const ticked =
+    born.length === 0
+      ? []
+      : await tx
+          .select({ taskId: ticks.taskId, day: ticks.day })
+          .from(ticks)
+          .where(
+            inArray(
+              ticks.taskId,
+              born.map((task) => task.id),
+            ),
+          );
+  const weeks = new Map(accepted.map((row) => [row.id, row.week]));
+  const out = new Map<string, SuggestionFollowUp>();
+  for (const row of born) {
+    const week = row.suggestionId === null ? undefined : weeks.get(row.suggestionId);
+    if (row.suggestionId === null || week === undefined) continue;
+    const task = taskOf(row);
+    const days = ticked.filter((tick) => tick.taskId === row.id).map((tick) => tick.day);
+    out.set(row.suggestionId, {
+      when: task.when,
+      doneDays: doneDays(task.when.kind, week, days),
+      removed: row.archivedAt !== null,
+    });
+  }
+  return out;
+}
 
 async function zoneOf(tx: Transaction, creatorId: string): Promise<string | null> {
   const [creator] = await tx
@@ -102,7 +152,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
         if (zone === null) throw new SuggestionForbidden();
         const [known] = await tx.select().from(suggestions).where(eq(suggestions.id, body.id));
         if (known !== undefined) {
-          const stored = agencySuggestionOf(known);
+          const stored = agencySuggestionOf(known, (await followUps(tx, [known])).get(known.id) ?? null);
           // A replay of the same suggestion answers it; anything else under its id is refused.
           if (
             stored.title !== body.title ||
@@ -153,7 +203,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
           .onConflictDoNothing()
           .returning();
         if (row === undefined) throw new SuggestionIdTaken();
-        return agencySuggestionOf(row);
+        return agencySuggestionOf(row, null);
       }),
 
     suggestShoot: (creatorId, userId, shoot, now) =>
@@ -163,7 +213,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
         if (zone === null) throw new SuggestionForbidden();
         const [known] = await tx.select().from(suggestions).where(eq(suggestions.id, shoot.id));
         if (known !== undefined) {
-          const stored = agencySuggestionOf(known);
+          const stored = agencySuggestionOf(known, (await followUps(tx, [known])).get(known.id) ?? null);
           // The same shoot replayed answers itself; anything else under its id is refused.
           if (stored.title !== shoot.title || stored.shootBrief !== shoot.shootBrief)
             throw new SuggestionIdTaken();
@@ -208,7 +258,7 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
           .onConflictDoNothing()
           .returning();
         if (row === undefined) throw new SuggestionIdTaken();
-        return agencySuggestionOf(row);
+        return agencySuggestionOf(row, null);
       }),
 
     list: (creatorId, userId, week) =>
@@ -219,7 +269,8 @@ export function createDrizzleSuggestionStore(db: Database): AgencySuggestionStor
           .from(suggestions)
           .where(eq(suggestions.week, weekOf(week)))
           .orderBy(suggestions.createdAt);
-        return { items: rows.map(agencySuggestionOf) };
+        const done = await followUps(tx, rows);
+        return { items: rows.map((row) => agencySuggestionOf(row, done.get(row.id) ?? null)) };
       }),
   };
 }
