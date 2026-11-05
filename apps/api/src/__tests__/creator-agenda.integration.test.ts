@@ -97,7 +97,11 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
     });
     cookies.owner = await signIn(server, 'owner@example.test', PASSWORD);
     for (const teamRole of ['manager', 'chatter'] as const) {
-      const member = await account(`${teamRole}@example.test`, { role: 'operator' });
+      // Both creators are on his list: a manager reaches only those (recette 05/11, reco 8).
+      const member = await account(`${teamRole}@example.test`, {
+        role: 'operator',
+        creatorIds: [nora, ines],
+      });
       await test.admin.db.insert(schema.teamMembers).values({
         id: newId(TeamMemberIdSchema),
         userId: member.userId,
