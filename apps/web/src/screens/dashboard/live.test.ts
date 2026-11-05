@@ -231,13 +231,37 @@ describe('fromApi', () => {
     expect(both.agent.lead).toContain('L’IA qui écrit attend aussi sa clé.');
   });
 
-  it('says jobs the worker gave up on in amber, and none when it could not count them', () => {
-    const stuck = fromApi(apiDashboard({ jobs: { dead: 3 } }));
+  it('names the jobs the worker gave up on in amber, and none when it could not count them', () => {
+    const stuck = fromApi(
+      apiDashboard({
+        jobs: {
+          dead: 3,
+          stuck: [
+            { label: 'Envoi des messages', count: 2, agency: false },
+            { label: 'Lecture des comptes Reveal', count: 1, agency: false },
+          ],
+        },
+      }),
+    );
     expect(card('activity', stuck)).toMatchObject({ tone: 'warn' });
-    expect(card('activity', stuck)?.rows).toContainEqual(['Tâches bloquées', '3, à regarder']);
+    expect(card('activity', stuck)?.rows).toContainEqual(['Envoi des messages', '2 bloquées']);
+    expect(card('activity', stuck)?.rows).toContainEqual(['Lecture des comptes Reveal', 'bloquée']);
     expect(stuck.agent.foldSummary).toContain('3 tâches bloquées');
+    const one = fromApi(
+      apiDashboard({ jobs: { dead: 1, stuck: [{ label: 'Envoi des messages', count: 1, agency: false }] } }),
+    );
+    expect(card('activity', one)?.sub).toBe('Bloqué : Envoi des messages');
     expect(card('activity')?.rows).toContainEqual(['Tâches bloquées', 'aucune']);
-    const unread = fromApi(apiDashboard({ jobs: { dead: null } }));
+    // The agency's pay, sent to the owner alone: named, never in her health (recette 05/11, PRO-10).
+    const agency = fromApi(
+      apiDashboard({
+        jobs: { dead: 0, stuck: [{ label: 'Taux de change du jour', count: 1, agency: true }] },
+      }),
+    );
+    expect(card('activity', agency)?.tone).toBe('ok');
+    expect(card('activity', agency)?.rows).toContainEqual(['Agence · Taux de change du jour', 'bloquée']);
+    expect(agency.agent.foldSummary).not.toContain('bloquée');
+    const unread = fromApi(apiDashboard({ jobs: { dead: null, stuck: [] } }));
     expect(card('activity', unread)?.rows).toContainEqual(['Tâches bloquées', 'pas lu']);
     expect(card('activity', unread)?.tone).toBe('ok');
     expect(unread.agent.foldSummary).not.toContain('bloquée');

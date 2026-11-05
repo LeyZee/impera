@@ -205,11 +205,16 @@ export const DashboardSchema = z.object({
     outagesLast7d: count,
   }),
   /**
-   * Stuck jobs for her or for no creator: given up on (attempts spent), or due for 15 minutes under a name no worker
-   * task takes. Work that will not happen until someone looks (operations.md). `null` when the count could not be read,
-   * and for a creator: jobs of no creator are the agency's (ADR 0023).
+   * Stuck jobs: given up on (attempts spent), or due for 15 minutes under a name no worker task takes. Work that will
+   * not happen until someone looks (operations.md). `dead` counts the ones that stop her agent: hers, and the reading
+   * of the Reveal accounts (`AGENT_SYSTEM_JOBS`); `null` when they could not be read. `stuck` names each, by its
+   * `JOB_LABELS`, with `agency` for a job of no creator that does not stop her: listed for the owner alone, never
+   * counted in her health (recette 05/11, PRO-10).
    */
-  jobs: z.object({ dead: count.nullable() }),
+  jobs: z.object({
+    dead: count.nullable(),
+    stuck: z.array(z.object({ label: z.string().min(1), count: count.min(1), agency: z.boolean() })),
+  }),
   replies: z.object({
     /** Median time between a fan's message and her answer, over the period. */
     medianReplyMinutes: z.number().nonnegative().nullable(),
