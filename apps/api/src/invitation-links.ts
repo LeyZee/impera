@@ -17,11 +17,13 @@ import {
   networkOf,
   newId,
   PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_DISTINCT,
   PASSWORD_MIN_LENGTH,
   TeamMemberIdSchema,
   UserIdSchema,
   type CreateCreatorInvitationLinkBody,
   type InvitationLinkPurpose,
+  isPasswordTooPlain,
   type PasswordInvalidReason,
 } from '@impera/contracts';
 import {
@@ -75,6 +77,7 @@ class PasswordInvalid extends DomainError {
     const message: Record<PasswordInvalidReason, string> = {
       too_short: `Mot de passe trop court (${String(PASSWORD_MIN_LENGTH)} caractères au moins)`,
       too_long: `Mot de passe trop long (${String(PASSWORD_MAX_LENGTH)} caractères au plus)`,
+      too_plain: `Mot de passe trop simple (${String(PASSWORD_MIN_LENGTH)} caractères hors espaces, dont ${String(PASSWORD_MIN_DISTINCT)} différents au moins)`,
       breached: 'Ce mot de passe circule dans des fuites de données connues, choisis-en un autre',
       refused: 'Ce mot de passe n’est pas accepté, choisis-en un autre',
     };
@@ -102,6 +105,7 @@ function hashOf(token: string): string {
 function passwordProblem(password: string): PasswordInvalidReason | null {
   if (password.length < PASSWORD_MIN_LENGTH) return 'too_short';
   if (password.length > PASSWORD_MAX_LENGTH) return 'too_long';
+  if (isPasswordTooPlain(password)) return 'too_plain';
   return null;
 }
 
