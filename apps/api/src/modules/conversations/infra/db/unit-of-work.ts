@@ -391,6 +391,12 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
 
     gate: {
       async blockedReason(conversation) {
+        // Archived, she speaks no more (ADR 0071 § 2): a rule of the code, before any switch.
+        const [creator] = await tx
+          .select({ archivedAt: schema.creators.archivedAt })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, conversation.creatorId));
+        if (creator !== undefined && creator.archivedAt !== null) return 'creator_archived';
         // The latest switch of each scope decides; a global one has no creator and stays visible (RLS).
         const switches = await tx.execute<{ active: boolean }>(sql`
           select distinct on (scope, scope_id) active

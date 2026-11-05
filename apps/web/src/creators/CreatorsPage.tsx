@@ -3,6 +3,7 @@ import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
+import { ArchivedCreators } from './ArchivedCreators';
 import { ChipFace } from './CreatorFace';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
@@ -278,6 +279,8 @@ export function CreatorsPage({
           />
         ) : null}
         {body()}
+        {/* The archived creators, folded at the foot of the sheet, the owner's alone (ADR 0071 § 2). */}
+        {isOwner && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
   );

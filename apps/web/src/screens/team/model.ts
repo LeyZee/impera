@@ -243,7 +243,8 @@ export function invitationState(
 const DAY = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', hour: 'numeric', minute: '2-digit' });
 
 /** « jeudi 15 h 00 », in the reader's own zone. */
-export const deadline = (at: Date): string => DAY.format(at).replace(':', ' h ');
+// Non-breaking spaces: « 21 h 00 » never splits at the end of a line (#562 captures).
+export const deadline = (at: Date): string => DAY.format(at).replace(':', '\u00a0h\u00a0');
 
 /** A refusal the screen words: the module's codes, and the role guard when a manager's access changed meanwhile. */
 export type TeamRefusalCode = TeamMemberErrorCode | 'role_forbidden';

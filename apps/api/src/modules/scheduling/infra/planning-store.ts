@@ -682,6 +682,32 @@ export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
         return settingsIn(tx, { from: now, to: now }, false);
       }),
 
+    plannedUnscoped: (creatorId, now, today) =>
+      withAdmin(adminDb, async (tx) => {
+        const [ahead] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(shifts)
+          .where(
+            and(
+              eq(shifts.creatorId, creatorId),
+              sql`${shifts.cancelledAt} is null and ${shifts.stoppedAt} is null`,
+              sql`${shifts.endsAt} > ${now}`,
+            ),
+          );
+        const [running] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(shiftTemplates)
+          .where(
+            and(
+              eq(shiftTemplates.creatorId, creatorId),
+              // Ended today (`endTemplate` writes today) or before its first day (the day before it), it makes
+              // nothing more: only a template still to make a day ahead keeps her planned (#562, Équipe's review).
+              sql`(${shiftTemplates.validUntil} is null or (${shiftTemplates.validUntil} > ${today} and ${shiftTemplates.validUntil} >= ${shiftTemplates.validFrom}))`,
+            ),
+          );
+        return { shiftsAhead: ahead?.count ?? 0, templatesRunning: running?.count ?? 0 };
+      }),
+
     runningTemplatesUnscoped: (today) =>
       withAdmin(adminDb, async (tx) => {
         const rows = await tx

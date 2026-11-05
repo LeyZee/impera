@@ -1,9 +1,31 @@
-import type { AgentHours, AgentHoursView, CreatorId, CreatorSummary, NewCreator } from '@impera/contracts';
+import type {
+  AgentHours,
+  AgentHoursView,
+  ArchivedCreator,
+  CreatorId,
+  CreatorSummary,
+  NewCreator,
+} from '@impera/contracts';
 
 /** The creators table, the tenant root: no RLS of its own, read and written by the application role. */
 export interface CreatorDirectory {
-  /** Every creator when `ids` is `'all'` (an owner), the given ones otherwise; ordered by name. */
+  /**
+   * Every creator when `ids` is `'all'`, the given ones otherwise, archived ones included: what her history reads
+   * (pay, reports, past shifts keep her name, ADR 0071 § 2). Ordered by name.
+   */
   list(ids: readonly CreatorId[] | 'all'): Promise<readonly CreatorSummary[]>;
+  /** `list` without the archived creators: what a list, a picker or a summary shows (ADR 0071 § 2). */
+  unarchived(ids: readonly CreatorId[] | 'all'): Promise<readonly CreatorSummary[]>;
+  /** The archived creators, the most recently archived first (ADR 0071 § 2). */
+  archived(): Promise<readonly ArchivedCreator[]>;
+  /**
+   * Archives her (ADR 0071 § 2), audited with the owner (`creator.archive`); nothing of hers is deleted. Already
+   * archived, nothing is written. `null` when she does not exist. Whether she is still planned is checked before, by
+   * the caller.
+   */
+  archive(id: CreatorId, userId: string): Promise<ArchivedCreator | null>;
+  /** Reopens her (`creator.restore`): she is listed again, her agent still off. `null` when she does not exist. */
+  restore(id: CreatorId, userId: string): Promise<CreatorSummary | null>;
   /** Audited with `userId`, the owner who added her from the dashboard; none from `pnpm creator:create`. */
   create(input: NewCreator, userId?: string): Promise<CreatorSummary>;
   /**
