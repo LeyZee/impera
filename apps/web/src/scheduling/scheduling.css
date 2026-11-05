@@ -407,7 +407,8 @@ button.sc-duty__one:active {
   border-bottom-right-radius: var(--nv-radius-xl);
 }
 
-/* A shift: its member's colour on the left edge, the name, the hours. */
+/* A shift: tinted with its member's colour, the name, the hours. No coloured bar on its side (Charles's rule;
+   recette 05/11). */
 .sc-chip {
   --sc-color: var(--nv-ink-faint);
   appearance: none;
@@ -419,13 +420,11 @@ button.sc-duty__one:active {
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 6px 8px 6px 10px;
+  padding: 6px 8px;
   border: 0;
   border-radius: var(--nv-radius-sm);
   background: color-mix(in srgb, var(--sc-color) 16%, var(--nv-surface-raised));
-  box-shadow:
-    inset 3px 0 0 var(--sc-color),
-    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
   color: var(--nv-ink);
   font: inherit;
   text-align: left;
@@ -439,7 +438,6 @@ button.sc-duty__one:active {
   background: color-mix(in srgb, var(--sc-color) 26%, var(--nv-surface-raised));
   transform: translateY(-1px);
   box-shadow:
-    inset 3px 0 0 var(--sc-color),
     inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 44%, transparent),
     var(--nv-shadow-lift);
 }
@@ -455,9 +453,7 @@ button.sc-duty__one:active {
   opacity: 0.35;
 }
 .sc-chip[data-phase='live'] {
-  box-shadow:
-    inset 3px 0 0 var(--sc-color),
-    inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 60%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 60%, transparent);
 }
 /* The shift under way: its edge breathes slowly in the member's colour, the grid's only moving sign (CR-12, Charles
    02/11 17h56). Opacity on a pseudo-element, so the compositor alone animates it; reduced motion keeps it still. */
@@ -524,6 +520,34 @@ button.sc-duty__one:active {
 }
 .sc-chip__night {
   color: var(--nv-ink-faint);
+}
+/* A member away holds none of his shifts (EQP-03): the chip goes faint, outlined in amber, and says his status. */
+.sc-chip[data-away='true'] {
+  background: color-mix(in srgb, var(--sc-color) 6%, var(--nv-surface-raised));
+  outline: 1px dashed color-mix(in srgb, var(--nv-warning) 60%, transparent);
+  outline-offset: -1px;
+}
+/* Under way with nobody on it: no breathing edge, nobody is on shift. */
+.sc-chip[data-away='true'][data-phase='live'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sc-color) 26%, transparent);
+}
+.sc-chip[data-away='true'][data-phase='live']::after {
+  content: none;
+}
+.sc-chip[data-away='true']:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.sc-chip[data-away='true'] .sc-chip__name,
+.sc-chip[data-away='true'] .sc-chip__hours {
+  color: var(--nv-ink-muted);
+}
+.sc-chip__away {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 650;
+  color: var(--nv-warning);
+  white-space: nowrap;
 }
 .sc-chip__repeat {
   position: absolute;
@@ -1223,6 +1247,14 @@ button.sc-duty__one:active {
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+/* Away from the team (CHAT-09): the pause in amber, the one thing to know. */
+.sc-stack > .sc-off--away {
+  margin-bottom: var(--nv-space-4);
+}
+.sc-off--away .sc-off__icon {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-warning);
 }
 .sc-off__text {
   flex: 1 1 0;

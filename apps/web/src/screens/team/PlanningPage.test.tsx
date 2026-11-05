@@ -77,12 +77,14 @@ const planning = (
   shifts: unknown[] = [night],
   accounts: unknown[] = ACCOUNTS,
   slotStartMinute = 0,
+  away: unknown[] = [],
 ): unknown => ({
   settings: settingsOf({ start: slotStartMinute }),
   accounts,
   members: [{ id: THEO, displayName: 'Théo', color: '#c2410c' }],
   shifts,
   conflicts,
+  away,
 });
 
 const template = {
@@ -401,6 +403,47 @@ describe('Équipe › Planning', () => {
     const day = within(panel).getByLabelText('Jour');
     if (!(day instanceof HTMLInputElement)) throw new Error('no day field');
     expect(day.value).toBe('2026-10-29');
+  });
+
+  it('leaves a suspended member’s shifts to fill: marked on the grid, counted, and said in the sheet (EQP-03)', async () => {
+    const thursday = {
+      ...night,
+      id: id(109),
+      startsAt: '2026-10-29T11:00:00Z',
+      endsAt: '2026-10-29T17:00:00Z',
+      templateId: null,
+    };
+    serve({
+      planning: planning([], [night, thursday], ACCOUNTS, 0, [{ memberId: THEO, status: 'suspended' }]),
+    });
+    renderPage();
+    const chip = await screen.findByRole(
+      'button',
+      { name: /^Théo, 12\sh – 18\sh, suspendu, à pourvoir$/u },
+      { timeout: 4_000 },
+    );
+    expect(chip.getAttribute('data-away')).toBe('true');
+    expect(chip.textContent).toContain('Suspendu');
+    // Nobody holds his two shifts: the week has as many places to fill as with none (a held Thursday would make 19).
+    expect(text(document.querySelector('.sc-grid__corner'))).toBe('2 shifts · 12 h · 20 places à pourvoir');
+    const row = screen.getByRole('row', { name: /Nora Vidal/u });
+    const cells = within(row).getAllByRole('cell');
+    expect(
+      within(cells[3] ?? row).getByRole('button', { name: /^À pourvoir : 12\sh – 18\sh, le jeudi 29/u }),
+    ).toBeTruthy();
+    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now.
+    const under = screen.getAllByRole('button', { name: /^Théo, 23\sh – 5\sh, .*suspendu, à pourvoir$/u });
+    expect(under.length).toBeGreaterThan(0);
+    for (const one of under) expect(one.getAttribute('aria-label')).not.toContain('en poste');
+    expect(
+      within(cells[2] ?? row).getByRole('button', { name: /^À pourvoir : 1\sh – 6\sh, le mercredi 28/u }),
+    ).toBeTruthy();
+
+    fireEvent.click(chip);
+    const sheet = await screen.findByRole('dialog', { name: 'Théo' });
+    expect(within(sheet).getByRole('status').textContent).toBe(
+      'Théo est suspendu : personne ne tiendra ce shift. Choisis un autre membre, ou annule-le.',
+    );
   });
 
   it('stacks the shifts at another hour than the agency’s: its créneaux would not line up', async () => {

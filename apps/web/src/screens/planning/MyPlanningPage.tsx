@@ -20,12 +20,13 @@ import { useReportsOf } from '@/reports/api';
 import { MEMBER_STATUS, periodAt, reportOf, STATUS_TONES } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
 import { useCalendar, useLeaves, usePlanning, useSwaps } from '@/scheduling/api';
 import { monthWindow, type CalendarSearch } from '@/scheduling/calendar';
 import '@/scheduling/exchanges.css';
-import { accountLine, leaveDaysLine, phaseOf, type Phase } from '@/scheduling/model';
+import { accountLine, leaveDaysLine, phaseOf, type MyAwayStatus, type Phase } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import {
   addDays,
@@ -78,10 +79,13 @@ function leaveRangeOf(today: string, zone: string): { from: string; to: string }
  */
 export function MyPlanningPage({
   userId,
+  away = null,
   search = {},
   onSearch = () => undefined,
 }: {
   userId: string;
+  /** His status when he is away from the team: said first, and no shift of his reads « En poste » (CHAT-09). */
+  away?: MyAwayStatus | null;
   /** What the address keeps (`?vue=equipe&affichage=mois&mois=…&semaine=…`), there again on return (CR-12). */
   search?: MyPlanningSearch;
   onSearch?: (next: MyPlanningSearch) => void;
@@ -165,6 +169,7 @@ export function MyPlanningPage({
       />
       {/* One body under the header: the page's grid gives its free height to that one. */}
       <div className="sc-stack">
+        {away === null ? null : <MyAwayCard status={away} />}
         <div className="cal-bar">
           <div className="tm-choices" role="radiogroup" aria-label="Planning affiché">
             <button
@@ -297,6 +302,7 @@ export function MyPlanningPage({
             zone={zone}
             today={today}
             now={now}
+            held={away === null}
             away={(leaves.data?.leaveRequests ?? []).filter(
               (leave) =>
                 (leave.status === 'approved' || leave.status === 'pending') &&
@@ -382,6 +388,7 @@ function Week({
   zone,
   today,
   now,
+  held,
   away,
   offers,
   reports,
@@ -393,6 +400,8 @@ function Week({
   zone: string;
   today: string;
   now: Date;
+  /** His shifts are his to hold: not while he is away from the team (CHAT-09). */
+  held: boolean;
   /** The reader's leaves that touch this week, approved or waiting. */
   away: readonly LeaveRequest[];
   offers: ReadonlyMap<string, readonly string[]>;
@@ -472,6 +481,7 @@ function Week({
               zone={zone}
               agency={agency}
               phase={phase}
+              held={held}
               offeredTo={offers.get(shift.id) ?? []}
               report={phase === 'past' ? reportFor(shift) : null}
               onSwap={onSwap}
@@ -530,6 +540,7 @@ function MyShiftRow({
   zone,
   agency,
   phase,
+  held,
   offeredTo,
   report,
   onSwap,
@@ -540,6 +551,8 @@ function MyShiftRow({
   zone: string;
   agency: string;
   phase: Phase;
+  /** His to hold: away from the team, a shift under way is not his « En poste » (CHAT-09). */
+  held: boolean;
   /** The colleagues an open proposal of this shift waits on. */
   offeredTo: readonly string[];
   report: RowReport;
@@ -576,7 +589,7 @@ function MyShiftRow({
         )}
       </div>
       {/* Only « En poste » says something the day and the row's place do not (EQ-18). */}
-      {phase === 'live' ? (
+      {phase === 'live' && held ? (
         <span className="nv-status sc-phase sc-phase--live">
           <span className="nv-dot nv-tone--ok nv-dot--live" />
           En poste

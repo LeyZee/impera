@@ -269,8 +269,19 @@ describe('shifts and templates', () => {
   });
 
   it('reads an empty planning', () => {
-    const empty = { settings, accounts: [], members: [], shifts: [], conflicts: [] };
+    const empty = { settings, accounts: [], members: [], shifts: [], conflicts: [], away: [] };
     expect(PlanningSchema.parse(empty).shifts).toEqual([]);
+  });
+
+  it('names the members away from the team, never one who is active (recette EQP-03)', () => {
+    const empty = { settings, accounts: [], members: [], shifts: [], conflicts: [] };
+    // A planning read before the field, still in a cache: nobody away.
+    expect(PlanningSchema.parse(empty).away).toEqual([]);
+    const away = PlanningSchema.parse({ ...empty, away: [{ memberId: MEMBER, status: 'suspended' }] }).away;
+    expect(away).toEqual([{ memberId: MEMBER, status: 'suspended' }]);
+    expect(
+      PlanningSchema.safeParse({ ...empty, away: [{ memberId: MEMBER, status: 'active' }] }).success,
+    ).toBe(false);
   });
 
   it('gives a chatter their own shifts, the accounts those are on, themselves alone and no conflict', () => {
@@ -282,6 +293,7 @@ describe('shifts and templates', () => {
       members: [{ id: MEMBER, displayName: 'Théo', color: '#c2410c' }],
       shifts: [{ ...shift, stoppedAt: null }],
       conflicts: [],
+      away: [],
     };
     const planning = PlanningSchema.parse(chatterPlanning);
     expect(planning.members.map((member) => member.id)).toEqual([MEMBER]);

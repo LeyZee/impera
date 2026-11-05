@@ -162,6 +162,15 @@ export function createSchedulingService(
         settings,
         accounts,
         members: read.members.filter((member) => named.has(member.id)).map(toPlanningMember),
+        // Who is not at work, for the agency alone (recette EQP-03): a member never reads a colleague's status.
+        away:
+          read.scope === 'self'
+            ? []
+            : read.members.flatMap((member) =>
+                named.has(member.id) && member.status !== 'active'
+                  ? [{ memberId: member.id, status: member.status }]
+                  : [],
+              ),
         shifts: shifts.map(toShiftDto),
         conflicts:
           read.scope === 'self'

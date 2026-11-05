@@ -4,8 +4,9 @@ import type { ComponentProps, JSX } from 'react';
 
 import { TrackingPage } from './TrackingPage';
 
+import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { useMyShifts } from '@/scheduling/api';
-import { accessOpen } from '@/scheduling/model';
+import { accessOpen, type MyAwayStatus } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { addDays, clockAt, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
@@ -16,9 +17,13 @@ import { Panel } from '@/shell/layout';
  * to its end margin. Outside, Suivi says so plainly, with his next shift, instead of an empty list. Only a handover he
  * took stays readable under it, until he gives it back.
  */
-export function ChatterTrackingPage(
-  props: Omit<ComponentProps<typeof TrackingPage>, 'offShift'>,
-): JSX.Element {
+export function ChatterTrackingPage({
+  away = null,
+  ...props
+}: Omit<ComponentProps<typeof TrackingPage>, 'offShift'> & {
+  /** His status when he is away from the team (suspended, on leave…): said first and alone (CHAT-09). */
+  away?: MyAwayStatus | null;
+}): JSX.Element {
   const mine = useMyShifts();
   const now = useNow();
   const off = mine.data !== undefined && !accessOpen(mine.data, now);
@@ -26,11 +31,13 @@ export function ChatterTrackingPage(
     <TrackingPage
       {...props}
       offShift={
-        off
-          ? (holdsHandover: boolean) => (
-              <OffShift next={mine.data.next} holdsHandover={holdsHandover} now={now} zone={readerZone()} />
-            )
-          : undefined
+        away !== null
+          ? () => <MyAwayCard status={away} />
+          : off
+            ? (holdsHandover: boolean) => (
+                <OffShift next={mine.data.next} holdsHandover={holdsHandover} now={now} zone={readerZone()} />
+              )
+            : undefined
       }
     />
   );
