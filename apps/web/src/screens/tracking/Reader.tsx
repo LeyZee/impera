@@ -173,7 +173,8 @@ function Loaded({
   const handButton = (
     <button
       type="button"
-      className="nv-btn nv-btn--soft nv-btn--sm"
+      // Taking over is a rare gesture beside the state, quiet so that it is not touched by chance (D-03).
+      className={`nv-btn nv-btn--sm ${isHuman ? 'nv-btn--soft' : 'nv-btn--plain'}`}
       disabled={hand.pending}
       onClick={() => void toggleHand()}
     >
@@ -207,6 +208,14 @@ function Loaded({
           </span>
           {canDecide && !isHuman ? handButton : null}
         </header>
+        {/* With the fan's name, never scrolled away: on a phone the top stays in view above the thread (D-03). */}
+        <FanSheet
+          creatorId={creatorId}
+          fanId={detail.fanId}
+          conversationId={detail.id}
+          desire={detail.desire}
+          canDecide={canDecide}
+        />
       </div>
       {stale ? (
         <p className="tr-warn tr-line">Le serveur ne répond pas : ce fil peut avoir changé depuis.</p>
@@ -247,13 +256,6 @@ function Loaded({
           ) : null}
         </div>
       ) : null}
-      <FanSheet
-        creatorId={creatorId}
-        fanId={detail.fanId}
-        conversationId={detail.id}
-        desire={detail.desire}
-        canDecide={canDecide}
-      />
       <div className="tr-reader__body" ref={bodyRef}>
         {read.isPartial ? (
           <p className="tr-more">Seuls les derniers messages sont affichés ; le reste se lit dans Reveal.</p>
@@ -285,6 +287,7 @@ function Loaded({
                   </span>
                 )}
                 {item.byHuman ? <span className="tr-ppv">Écrit par un humain</span> : null}
+                {item.byAgent ? <span className="tr-ppv">Automatique</span> : null}
               </div>
             ),
           )}

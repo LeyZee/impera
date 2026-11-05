@@ -50,8 +50,15 @@ export function useMyReports(now: Date): MyReports {
 }
 
 /**
- * Aujourd'hui's « Mes rapports » (EQ-03): what is left to do first, a report to make or one sent back, then the
- * period's figures and, folded, each report of it. The hero's own shift is left to the hero's button.
+ * The reports left to do, a report to make or one sent back, the oldest first; the hero's own shift is left to the
+ * hero's button. Aujourd'hui lists them in « À faire » with the rest of what waits (D-03).
+ */
+export const reportToDos = (list: ShiftReportList, heroShiftId: string | null): ReturnType<typeof toDoOf> =>
+  toDoOf(list).filter((one) => one.shift.id !== heroShiftId);
+
+/**
+ * Aujourd'hui's « Mes rapports » (EQ-03): the period's figures and, folded, each report of it. What is left to do is
+ * in « À faire » above it (D-03).
  */
 export function MyReportsCard({
   reports,
@@ -89,10 +96,11 @@ export function MyReportsCard({
     );
   }
   const accounts = new Map(list.accounts.map((account) => [account.id, account]));
-  const toDo = toDoOf(list).filter((one) => one.shift.id !== heroShiftId);
   const ofPeriod = list.reports.filter((one) => one.period === period);
   const sums = periodSums(ofPeriod);
   const lines = linesOf(list).filter((line) => line.report !== null && line.report.period === period);
+  // What is left to do lives in Aujourd'hui's « À faire »: an empty period says nothing more while a report waits there.
+  if (lines.length === 0 && sums.length === 0 && reportToDos(list, heroShiftId).length > 0) return null;
   // The folded list is shift by shift: its summary counts the reports, a correction waiting is said on its line.
   const made = ofPeriod.filter((one) => one.correctsId === null);
   const count = (status: ShiftReportStatus): number => made.filter((one) => one.status === status).length;
@@ -103,46 +111,10 @@ export function MyReportsCard({
   return (
     <Panel className="rp-mine nv-enter" eyebrow={`Mes rapports · quinzaine ${periodLine(period)}`}>
       <div className="rp-sec">
-        {toDo.length === 0 ? null : (
-          <ul className="rp-todo">
-            {toDo.map(({ shift, report }, index) => {
-              const account = accounts.get(shift.platformAccountId);
-              return (
-                <li key={shift.id} className="nv-enter" style={{ '--nv-i': index }}>
-                  <button
-                    type="button"
-                    className="rp-todo__one nv-tap"
-                    data-tone={report === null ? 'due' : 'warn'}
-                    onClick={() => {
-                      onOpen(shift.id);
-                    }}
-                  >
-                    <span className="rp-todo__mark" aria-hidden="true" />
-                    <span className="rp-todo__text">
-                      <span className="rp-todo__title">
-                        {report === null ? 'Rapport à faire' : 'Rapport renvoyé par l’agence'}
-                      </span>
-                      <span className="rp-todo__sub nv-num">
-                        {swapShiftLine(shift.startsAt, shift.endsAt, account?.creatorName, zone)}
-                      </span>
-                      {(report?.reviewNote ?? null) === null ? null : (
-                        <span className="rp-todo__note">« {report?.reviewNote} »</span>
-                      )}
-                    </span>
-                    <span className="rp-todo__go">{report === null ? 'Faire' : 'Reprendre'}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
         {sums.length === 0 ? (
-          toDo.length === 0 ? (
-            <p className="rp-mine__empty">
-              Pas encore de rapport cette quinzaine. Il se fait d’ici, à la fin de chaque shift.
-            </p>
-          ) : null
+          <p className="rp-mine__empty">
+            Pas encore de rapport cette quinzaine. Il se fait d’ici, à la fin de chaque shift.
+          </p>
         ) : (
           <div className="rp-figures">
             {sums.map((sum) => (

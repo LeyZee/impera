@@ -160,17 +160,6 @@ export function MyPlanningPage({
             ) : (
               <WeekNav monday={monday} thisMonday={mondayOf(today)} onMonday={setMonday} />
             )}
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft"
-              disabled={me === null}
-              aria-busy={members.isPending}
-              onClick={() => {
-                setOpen({ kind: 'leave' });
-              }}
-            >
-              Demander un congé
-            </button>
           </>
         }
       />
@@ -326,7 +315,15 @@ export function MyPlanningPage({
         )}
         {me === null ? null : (
           <div className="sc-folds">
-            {leaves.data === undefined ? null : <MyLeaves leaves={leaves.data.leaveRequests} now={now} />}
+            {leaves.data === undefined ? null : (
+              <MyLeaves
+                leaves={leaves.data.leaveRequests}
+                now={now}
+                onAsk={() => {
+                  setOpen({ kind: 'leave' });
+                }}
+              />
+            )}
             {swaps.data === undefined ? null : <MySwaps list={swaps.data} memberId={me.id} zone={zone} />}
           </div>
         )}

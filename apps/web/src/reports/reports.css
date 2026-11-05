@@ -428,19 +428,24 @@
   font: inherit;
   text-align: left;
 }
-.rp-todo__one[data-tone='warn'] {
+.rp-todo__one {
+  text-decoration: none;
+}
+/* Something to do is amber, never red: red stays for the urgencies (D-03). A report sent back is tinted too. */
+.rp-todo__one[data-tone='back'] {
   background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-glass-fill));
 }
 .rp-todo__mark {
   width: 10px;
   height: 10px;
   border-radius: var(--nv-radius-full);
-  background: var(--nv-neon);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-neon) 18%, transparent);
-}
-.rp-todo__one[data-tone='warn'] .rp-todo__mark {
   background: var(--nv-warning);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-warning) 18%, transparent);
+}
+/* A renewal still ahead: said, not pressing. */
+.rp-todo__one[data-tone='quiet'] .rp-todo__mark {
+  background: var(--nv-ink-faint);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nv-ink-faint) 18%, transparent);
 }
 .rp-todo__text {
   display: flex;

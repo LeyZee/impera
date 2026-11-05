@@ -135,9 +135,9 @@ describe('the desire score in the list (P3-12)', () => {
   it('ends the subline with the band in a word when it says something, never « neutre »', () => {
     expect(subline(conversation('1', { desire: { score: 45, band: 'playful' } }), NOW)).toEqual({
       text: 'Pas encore écrit',
-      band: 'joueur',
+      band: '😏 joueur',
     });
-    expect(subline(conversation('1', { desire: { score: 82, band: 'hot' } }), NOW).band).toBe('chaud');
+    expect(subline(conversation('1', { desire: { score: 82, band: 'hot' } }), NOW).band).toBe('🔥 chaud');
     expect(subline(conversation('1', { desire: { score: 12, band: 'neutral' } }), NOW).band).toBeNull();
   });
 

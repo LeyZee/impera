@@ -75,11 +75,14 @@ export const MODE_MEANINGS: Readonly<Record<ConversationMode, string>> = {
   auto: 'En automatique : l’agent répond seul.',
 };
 
+/** The emoji of a desire band that says something, before its word (D-03: a category is an emoji). */
+export const DESIRE_BAND_EMOJIS = { playful: '😏', hot: '🔥' } as const;
+
 /**
  * The line under the fan's name, short enough never to be cut: when he last wrote (« Il y a 14 min »), then the band of
- * his desire score in a word when it says something, « joueur » or « chaud » (P3-12); « neutre » goes without saying.
- * Never its number, never a colour: the list is no heat map. The mode is said in the reader and above the list, the
- * creator beside his pseudo.
+ * his desire score, its emoji and its word, when it says something, « 😏 joueur » or « 🔥 chaud » (P3-12, D-03);
+ * « neutre » goes without saying. Never its number, never a colour: the list is no heat map. The mode is said in the
+ * reader, the creator beside his pseudo.
  */
 export function subline(
   conversation: ConversationSummary,
@@ -91,7 +94,7 @@ export function subline(
     band:
       conversation.desire === null || conversation.desire.band === 'neutral'
         ? null
-        : DESIRE_BAND_LABELS[conversation.desire.band],
+        : `${DESIRE_BAND_EMOJIS[conversation.desire.band]} ${DESIRE_BAND_LABELS[conversation.desire.band]}`,
   };
 }
 

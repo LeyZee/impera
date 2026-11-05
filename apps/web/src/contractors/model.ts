@@ -216,6 +216,68 @@ export function fileReminders(
   return reminders;
 }
 
+/**
+ * One thing one's own file still asks for, as Aujourd'hui lists it beside the reports (D-03): a text to accept, a
+ * document the regime asks for and never filed or refused, or a renewal due. `go` is where it is done.
+ */
+export interface FileToDo {
+  readonly key: string;
+  readonly title: string;
+  readonly text: string;
+  readonly go: 'text' | 'document';
+}
+
+/**
+ * Everything one's own file waits on, in the file's order: the newest version of each text not accepted yet, then each
+ * document of the regime in force never filed or refused, then the renewals `fileReminders` gives. The file says the
+ * same in Moi › Dossier; Aujourd'hui gathers it so that nothing waiting on the invoices is found by chance.
+ */
+export function fileToDos(
+  file: Pick<ContractorFile, 'acceptances' | 'documents' | 'today'>,
+  regime: Pick<BillingRegime, 'documents' | 'withholding'> | null,
+  texts: readonly ContractText[],
+): FileToDo[] {
+  const toDos: FileToDo[] = [];
+  for (const kind of TEXT_KINDS) {
+    const standing = textStanding(kind, texts, file.acceptances);
+    if (standing.kind !== 'to_accept') continue;
+    toDos.push({
+      key: `text-${kind}`,
+      title: `${TEXT_NAMES[kind]} à accepter`,
+      text:
+        standing.before === null
+          ? `Version ${String(standing.text.version)}, à lire avant d’accepter.`
+          : `Nouvelle version ${String(standing.text.version)} : elle remplace celle que tu as acceptée.`,
+      go: 'text',
+    });
+  }
+  for (const kind of regime?.documents ?? []) {
+    const standing = documentStanding(kind, file.documents, file.today);
+    if (standing.kind === 'missing')
+      toDos.push({
+        key: `document-${kind}`,
+        title: `${DOCUMENT_NAMES[kind]} à déposer`,
+        text: 'Pas encore déposée.',
+        go: 'document',
+      });
+    else if (standing.kind === 'refused')
+      toDos.push({
+        key: `document-${kind}`,
+        title: `${DOCUMENT_NAMES[kind]} à redéposer`,
+        text: 'L’agence a refusé la dernière : dépose-en une nouvelle.',
+        go: 'document',
+      });
+  }
+  for (const reminder of fileReminders(file, regime))
+    toDos.push({
+      key: `reminder-${reminder.kind}`,
+      title: DOCUMENT_NAMES[reminder.kind],
+      text: reminder.text,
+      go: 'document',
+    });
+  return toDos;
+}
+
 /** A document's dates, as the file shows them: its issue, and the end it states. */
 export function documentDatesText(document: ContractorFileDocument): string {
   const issued = `délivrée le ${fullDay(document.issuedOn)}`;

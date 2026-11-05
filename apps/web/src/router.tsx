@@ -22,6 +22,7 @@ import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashb
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
+import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MySecurityPage } from './screens/me/MySecurityPage';
 import { CommissionsPage } from './screens/pay/CommissionsPage';
 import { EntriesPage } from './screens/pay/EntriesPage';
@@ -610,6 +611,15 @@ const meSecurity = createRoute({
   },
 });
 
+const mePreferences = createRoute({
+  getParentRoute: () => me,
+  path: '/preferences',
+  component: function MyPreferences() {
+    const { user, onSignOut } = rootRoute.useRouteContext();
+    return <MyPreferencesPage user={user} onSignOut={onSignOut} />;
+  },
+});
+
 // Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
 const accountSecurity = createRoute({
   getParentRoute: () => rootRoute,
@@ -804,7 +814,7 @@ const routeTree = rootRoute.addChildren([
   team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
-  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity]),
+  me.addChildren([meIndex, mePersona, meFile, meInvoices, meCalendar, meSecurity, mePreferences]),
   accountSecurity,
   settings.addChildren([
     settingsIndex,

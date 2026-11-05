@@ -18,6 +18,7 @@ import {
   type SetFanFlagBody,
   type TodosAcrossCreators,
 } from '@impera/contracts';
+import { queryOptions } from '@tanstack/react-query';
 
 import { flagError } from './flags-model';
 import { decisionError, isOutdated } from './reader-model';
@@ -241,3 +242,13 @@ export async function fetchTodosAcross(): Promise<TodosAcrossCreators> {
   if (!response.ok) throw new Error(`GET /v1/dashboard/todos: ${String(response.status)}`);
   return TodosAcrossCreatorsSchema.parse(await response.json());
 }
+
+/**
+ * « À traiter » as Suivi and Aujourd'hui read it: one key, one cadence, so both show the same queue. Under
+ * ['dashboard'], so a decision in the reader, which reads the Dashboard again, reads this queue again too.
+ */
+export const todosAcrossQuery = queryOptions({
+  queryKey: ['dashboard', 'todos-across'],
+  queryFn: fetchTodosAcross,
+  refetchInterval: 30_000,
+});
