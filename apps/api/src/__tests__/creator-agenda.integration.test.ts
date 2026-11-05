@@ -242,6 +242,14 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       AgencySuggestionSchema.parse((await suggest('owner', 15, 16, 'Live sur le tournage')).json()).when,
     ).toBeNull();
     expect((await suggest('chatter', 18, 19, 'Live du chatteur')).statusCode).toBe(403);
+    // CREA-16: the same task again, at the same moment or undated, while she has not answered: 409.
+    for (const [from, to] of [
+      [17, 18],
+      [10, 11],
+    ] as const)
+      expect((await suggest('owner', from, to, 'live du mercredi ')).json()).toMatchObject({
+        error: { code: 'creator_suggestion_open_conflict' },
+      });
     // She reads them without where they came from.
     const seen = (await agenda()).suggestions;
     expect(seen.map((one) => one.title).sort()).toEqual([

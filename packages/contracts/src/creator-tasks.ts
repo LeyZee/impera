@@ -339,6 +339,8 @@ export const SUGGESTION_KIND_UNPROCESSABLE = 'creator_suggestion_kind_unprocessa
 export const SUGGESTION_PAST_UNPROCESSABLE = 'creator_suggestion_past_unprocessable';
 export const SUGGESTION_ID_CONFLICT = 'creator_suggestion_id_conflict';
 export const SUGGESTION_DECLINED_RECENTLY_CONFLICT = 'creator_suggestion_declined_recently_conflict';
+/** The same task already waits for her answer that week, at the same moment or undated (CREA-16). */
+export const SUGGESTION_OPEN_CONFLICT = 'creator_suggestion_open_conflict';
 
 /** The answer of `POST /v1/creator-space/ticks`: how many ticks were new, and her streak now. */
 export const CreatorTicksResultSchema = z.strictObject({
