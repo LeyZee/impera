@@ -55,7 +55,7 @@ function HerDay({ now, today }: { now: Date; today: string }): JSX.Element {
   if (agenda === undefined)
     return read.isError ? (
       <ServerSilent
-        text="Ton agenda n’a pas pu être lu. Il reste dans Agenda tel que ton téléphone l’a gardé."
+        text="Ton agenda n’a pas pu être lu. Réessaie dans un instant."
         onRetry={() => {
           void read.refetch();
         }}
