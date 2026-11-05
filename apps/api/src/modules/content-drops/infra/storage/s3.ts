@@ -1,4 +1,6 @@
-import { DROP_PART_URL_SECONDS, type DropMime } from '@impera/contracts';
+import { open, stat } from 'node:fs/promises';
+
+import { DROP_PART_BYTES, DROP_PART_URL_SECONDS, type DropMime } from '@impera/contracts';
 import { AwsClient } from 'aws4fetch';
 
 import { ContentDropStorageUnavailable } from '../../domain/errors';
@@ -18,6 +20,10 @@ type FetchLike = (request: Request) => Promise<Response>;
 
 /** A storage that hangs is a storage that does not answer: the phone tries again, the job retries. */
 const REQUEST_TIMEOUT_MS = 30_000;
+/** A whole video of 500 Mo read by the job, at a bucket in the same region: minutes at most. */
+const DOWNLOAD_TIMEOUT_MS = 600_000;
+/** A file up to this size goes up in one PUT; above, in parts of `DROP_PART_BYTES`, read one at a time. */
+const SINGLE_PUT_BYTES = 2 * DROP_PART_BYTES;
 
 /** The provider's error code (`<Code>NoSuchUpload</Code>`), never its whole body. */
 async function errorCodeOf(response: Response): Promise<string> {
@@ -34,10 +40,11 @@ export function xmlText(fragment: string, name: string): string | null {
   if (found === undefined) return null;
   const named: Readonly<Record<string, string>> = { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' };
   return found.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/giu, (entity, body: string) => {
-    if (body.startsWith('#x') || body.startsWith('#X'))
-      return String.fromCodePoint(Number.parseInt(body.slice(2), 16));
-    if (body.startsWith('#')) return String.fromCodePoint(Number.parseInt(body.slice(1), 10));
-    return named[body] ?? entity;
+    if (!body.startsWith('#')) return named[body] ?? entity;
+    const hex = body.startsWith('#x') || body.startsWith('#X');
+    const point = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10);
+    // Past the last code point, fromCodePoint throws (Bilan on #512): such an entity stays as written.
+    return point <= 0x10ffff ? String.fromCodePoint(point) : entity;
   });
 }
 
@@ -67,11 +74,14 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
   const urlOf = (key: string, query = ''): string =>
     `${bucketUrl}/${key.split('/').map(encodeURIComponent).join('/')}${query === '' ? '' : `?${query}`}`;
 
-  const call = async (what: string, url: string, init: RequestInit): Promise<Response> => {
+  const call = async (
+    what: string,
+    url: string,
+    init: RequestInit,
+    timeout = REQUEST_TIMEOUT_MS,
+  ): Promise<Response> => {
     try {
-      return await send(
-        new Request(await client.sign(url, init), { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
-      );
+      return await send(new Request(await client.sign(url, init), { signal: AbortSignal.timeout(timeout) }));
     } catch (error) {
       throw new ContentDropStorageUnavailable(`${config.bucket}: no answer to ${what}`, { cause: error });
     }
@@ -89,7 +99,7 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
     }
   };
 
-  return {
+  const storage: DropStorage = {
     async openUpload(key) {
       const what = `the uploads of ${key}`;
       const response = await call(what, `${bucketUrl}?uploads&prefix=${encodeURIComponent(key)}`, {
@@ -199,6 +209,73 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       return length;
     },
 
+    async download(key, path) {
+      const what = `GET ${key}`;
+      const response = await call(what, urlOf(key), { method: 'GET' }, DOWNLOAD_TIMEOUT_MS);
+      if (response.status === 404) {
+        await response.body?.cancel();
+        return false;
+      }
+      if (!response.ok || response.body === null) return refused(what, response);
+      const out = await open(path, 'w');
+      try {
+        const reader = response.body.getReader();
+        for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+          await out.write(chunk.value);
+        }
+      } catch (error) {
+        throw new ContentDropStorageUnavailable(`${config.bucket}: ${what} cut off`, { cause: error });
+      } finally {
+        await out.close();
+      }
+      return true;
+    },
+
+    async upload(key, path, mime, sha256) {
+      const size = (await stat(path)).size;
+      const file = await open(path, 'r');
+      try {
+        const read = async (from: number, length: number): Promise<Uint8Array> => {
+          const buffer = new Uint8Array(length);
+          const { bytesRead } = await file.read(buffer, 0, length, from);
+          if (bytesRead !== length)
+            throw new Error(`${path}: ${String(bytesRead)} bytes read of ${String(length)}`);
+          return buffer;
+        };
+        if (size <= SINGLE_PUT_BYTES) {
+          const what = `PUT ${key}`;
+          const response = await call(what, urlOf(key), {
+            method: 'PUT',
+            body: await read(0, size),
+            headers: { 'content-type': mime, 'x-amz-content-sha256': sha256 },
+          });
+          await response.body?.cancel();
+          if (!response.ok) return await refused(what, response);
+          return;
+        }
+        const uploadId = await storage.startUpload(key, mime);
+        const parts: { number: number; etag: string }[] = [];
+        for (let number = 1; (number - 1) * DROP_PART_BYTES < size; number += 1) {
+          const from = (number - 1) * DROP_PART_BYTES;
+          const what = `part ${String(number)} of ${key}`;
+          const response = await call(
+            what,
+            urlOf(key, `partNumber=${String(number)}&uploadId=${encodeURIComponent(uploadId)}`),
+            { method: 'PUT', body: await read(from, Math.min(DROP_PART_BYTES, size - from)) },
+          );
+          await response.body?.cancel();
+          const etag = response.headers.get('etag');
+          if (!response.ok || etag === null) return await refused(what, response);
+          parts.push({ number, etag });
+        }
+        if ((await storage.completeUpload(key, uploadId, parts)) === 'refused') {
+          throw new ContentDropStorageUnavailable(`${config.bucket}: the parts of ${key} were refused`);
+        }
+      } finally {
+        await file.close();
+      }
+    },
+
     async remove(key) {
       const what = `DELETE ${key}`;
       const response = await call(what, urlOf(key), { method: 'DELETE' });
@@ -206,4 +283,5 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       if (!response.ok && response.status !== 404) return refused(what, response);
     },
   };
+  return storage;
 }

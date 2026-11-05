@@ -2,9 +2,9 @@
 
 Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle choisit, ses fichiers, une phrase facultative) et ce que l'agence lui **demande** (une catégorie, un jour, une raison, et pour un script sa structure). Le code ne devine jamais la catégorie : elle la choisit, l'agence peut la corriger.
 
-**Peut dépendre de.** Rien pour l'instant. Au lot b, `media` (la médiathèque, où chaque fichier nettoyé entre par son empreinte).
+**Peut dépendre de.** Rien. Il écrit lui-même la ligne `media_assets` d'un fichier gardé (rôle administrateur, empreinte unique par créatrice) ; la description par `sense` viendra avec la clé de vision.
 
-**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. Lot b1 : l'envoi des fichiers au bucket des médias, la reprise d'un envoi coupé, la réception par un job (migration 0109). Le nettoyage vient au lot b2, l'effacement daté au lot c, l'écran Contenu au lot d.
+**État.** Lot a : contrats (`packages/contracts`, `content-drops.ts`), tables et RLS (migration 0108), règles de format, routes. Lot b1 : l'envoi des fichiers au bucket des médias, la reprise d'un envoi coupé, la réception par un job (migration 0109). Lot b2 : le nettoyage de chaque fichier, son format vérifié, son entrée dans la médiathèque. L'effacement daté vient au lot c, l'écran Contenu au lot d.
 
 ## Qui lit, qui écrit (migration 0108)
 
@@ -25,6 +25,20 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 - `POST …/drops/:id/files/:fileId/complete` avec chaque morceau et son `ETag` : le bucket assemble le fichier, sa taille est comparée à celle que le téléphone avait annoncée (un brut d'une autre taille est effacé, 422 `content_drop_upload_unprocessable`), puis le job `content_drops.receive_file` est mis en file dans la même transaction. Rejoué, il répond le dépôt tel qu'il est.
 - Le job (rôle administrateur, seul à faire avancer un état) passe le fichier à « reçu », et le dépôt aussi quand c'était son dernier fichier en attente, avec l'événement `content_drop_received` (`dropId`, `requestId`) dans la même transaction : la veille y lit la demande née d'une idée (VEI-01 d). Un dépôt retiré pendant l'envoi a son brut effacé tout de suite.
 - Sans `S3_*`, chaque envoi répond 503 `content_drop_storage_unavailable` : rien n'est gardé en mémoire à la place. Un dépôt retiré ne prend plus de fichier (409 `content_drop_file_settled_conflict`).
+
+## Le nettoyage (lot b2)
+
+Le même job, une fois le fichier reçu, le télécharge dans un dossier temporaire, puis :
+
+- **lit ce qu'il est** par ses premiers octets (`domain/sniff.ts`), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
+- **retire ses métadonnées** (`infra/cleaning/`) :
+  - une photo octet par octet, sans la décoder ni la réencoder. JPEG : EXIF, XMP, commentaires et tout ce qui suit la fin de l'image (l'iPhone y met une seconde image avec son propre EXIF) ; l'orientation est réécrite seule dans un EXIF minimal ; le profil de couleur ICC, JFIF et Adobe restent. PNG : `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`. WebP : `EXIF`, `XMP ` et leurs drapeaux. HEIC : les items EXIF et XMP recouverts de zéros sur place, aucun décalage ne bouge ;
+  - une vidéo ou un vocal par ffmpeg, flux copiés sans réencodage dans un conteneur neuf : ni étiquettes globales (position ISO 6709, marque, modèle, logiciel, dates), ni celles des flux, ni chapitres, ni pistes de données (`mebx` d'Apple), ni ID3 ; la rotation, propriété du flux, reste ;
+- **vérifie le format sur le fichier nettoyé** (`probedFileRefusal` : sorte, verticalité après rotation, durée) ;
+- **prend l'empreinte du fichier nettoyé**, l'écrit sous `media/<créatrice>/<empreinte>` et crée le média de la médiathèque, ou marque le fichier « doublon » du média qu'elle a déjà donné ;
+- **efface le brut**, refusé ou gardé.
+
+Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au moins un est gardé, à « bloqué » (« Aucun fichier de ce dépôt n'a pu être gardé ») quand tous sont refusés. Un ffmpeg absent ou tué par son délai fait réessayer le job, jamais refuser le fichier.
 
 ## Routes
 

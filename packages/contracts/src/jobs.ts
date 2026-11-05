@@ -253,8 +253,9 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
-   * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared,
-   * then marks the file received, and its drop when it was the last one. One per file (job key), replayable.
+   * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared and
+   * marks the file received, then cleans it (metadata removed, format checked, fingerprint) into her library or finds
+   * it a duplicate, and erases the raw bytes; its drop follows. One per file (job key), replayable step by step.
    */
   'content_drops.receive_file': z.object({
     creatorId: CreatorIdSchema,

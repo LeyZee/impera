@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import {
   ContentDropFileIdSchema,
@@ -11,7 +11,7 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, inArray, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { AwsClient } from 'aws4fetch';
 import { runOnce } from 'graphile-worker';
@@ -30,7 +30,8 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
  * Her files sent straight to the media storage (CR-06 b, ADR 0055 § 3), against a real object store: MinIO in a
  * container, or the server named by `IMPERA_TEST_S3_URL` where Docker is not available (its user in
  * `IMPERA_TEST_S3_USER` and `IMPERA_TEST_S3_PASSWORD`). Each part goes up to the address the API signed, the send
- * resumes after a cut, and the receipt job marks the file and its drop received. Invented data only (ADR 0010).
+ * resumes after a cut, and the receipt job receives the file, cleans it (no position, no device left), keeps it in her
+ * library or finds it a duplicate, and erases the raw bytes. Invented data only (ADR 0010).
  */
 const IMAGE = 'coollabsio/minio:RELEASE.2025-10-15T17-29-55Z';
 const USER = process.env['IMPERA_TEST_S3_USER'] ?? 'impera-test';
@@ -39,6 +40,51 @@ const REGION = 'us-east-1';
 const ACCOUNT_PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 const MB = 1024 * 1024;
+const DEVICE = 'Telephone Invente 9';
+const PLACE = '48.8566N 2.3522E';
+
+const be16 = (n: number): number[] => [(n >> 8) & 0xff, n & 0xff];
+/**
+ * A JPEG of exactly `bytes` bytes, `width` × `height`, with the EXIF a phone writes (an invented device and a position
+ * as text): the cleaning follows its markers, never decodes it. `seed` makes two photos of one size differ.
+ */
+function jpegOf(bytes: number, width = 30, height = 40, seed = 0x11): Uint8Array {
+  const text = (value: string): number[] => [...Buffer.from(value, 'latin1')];
+  const segment = (marker: number, payload: number[]): number[] => [
+    0xff,
+    marker,
+    ...be16(payload.length + 2),
+    ...payload,
+  ];
+  const exif = segment(0xe1, [
+    ...text('Exif\0\0MM'),
+    0,
+    0x2a,
+    0,
+    0,
+    0,
+    8,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    ...text(`${DEVICE} ${PLACE}`),
+  ]);
+  const head = [
+    0xff,
+    0xd8,
+    ...exif,
+    ...segment(0xc0, [8, ...be16(height), ...be16(width), 1, 1, 0x11, 0]),
+    ...segment(0xda, [1, 1, 0, 0, 63, 0]),
+  ];
+  const out = new Uint8Array(bytes).fill(seed);
+  out.set(head);
+  out.set([0xff, 0xd9], bytes - 2);
+  return out;
+}
+const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () => {
   let container: StartedTestContainer | undefined;
@@ -143,10 +189,14 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     await container?.stop();
   });
 
-  /** A drop of one photo of `bytes`, by her or by the manager for her; its file and the file's bytes. */
-  async function dropOne(who: 'nora' | 'manager', bytes: number) {
-    const file = { id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes };
-    const drop = { id: newId(ContentDropIdSchema), category: 'feed_shoot', files: [file] };
+  /** A drop of one photo, by her or by the manager for her, in `category`; its file and the file's bytes. */
+  async function dropOne(
+    who: 'nora' | 'manager',
+    photo: Uint8Array,
+    category: 'feed_shoot' | 'instagram_story' = 'feed_shoot',
+  ) {
+    const file = { id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes: photo.length };
+    const drop = { id: newId(ContentDropIdSchema), category, files: [file] };
     const url = who === 'nora' ? '/v1/creator-space/drops' : `/v1/creators/${nora}/drops`;
     const response = await call('POST', url, who, drop);
     expect(response.statusCode, response.body).toBe(200);
@@ -154,7 +204,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       who === 'nora'
         ? `/v1/creator-space/drops/${drop.id}/files/${file.id}`
         : `/v1/creators/${nora}/drops/${drop.id}/files/${file.id}`;
-    return { dropId: drop.id, fileId: file.id, bytes: randomBytes(bytes), base };
+    return { dropId: drop.id, fileId: file.id, bytes: photo, base };
   }
 
   async function upload(base: string, who: keyof typeof cookies) {
@@ -189,8 +239,8 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     return { drop: drop?.state, files };
   };
 
-  it('sends her photo in parts, resumes after a cut, and the job receives it with its drop', async () => {
-    const { dropId, base, bytes } = await dropOne('nora', 9 * MB);
+  it('sends her photo in parts, resumes after a cut; the job cleans it, keeps it, erases the raw bytes', async () => {
+    const { dropId, fileId, base, bytes } = await dropOne('nora', jpegOf(9 * MB));
     const first = await upload(base, 'nora');
     expect(first).toMatchObject({ sent: false, partBytes: DROP_PART_BYTES, stored: [] });
     expect(first.missing.map((part) => [part.number, part.bytes])).toEqual([
@@ -217,24 +267,41 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     // Whole in the storage, under its raw prefix: nothing left to send.
     expect((await upload(base, 'nora')).sent).toBe(true);
     await receive();
-    expect(await rows(dropId)).toEqual({ drop: 'received', files: [{ state: 'received', refusal: null }] });
+    expect(await rows(dropId)).toEqual({ drop: 'ready', files: [{ state: 'kept', refusal: null }] });
+    // In her library under its fingerprint, the cleaned bytes: no device, no position; the raw bytes gone.
+    const [medium] = await test.admin.db
+      .select()
+      .from(schema.mediaAssets)
+      .where(eq(schema.mediaAssets.creatorId, nora));
+    expect(medium).toMatchObject({ kind: 'image', origin: 'creator', mime: 'image/jpeg' });
+    expect(medium?.storageKey).toBe(`media/${nora}/${medium?.sha256 ?? ''}`);
+    const stored = await s3.fetch(`${endpoint}/${bucket}/${medium?.storageKey ?? ''}`);
+    expect(stored.status).toBe(200);
+    const kept = new Uint8Array(await stored.arrayBuffer());
+    expect(sha(kept)).toBe(medium?.sha256);
+    expect(kept.length).toBe(medium?.bytes);
+    expect(Buffer.from(kept).toString('latin1')).not.toContain(DEVICE);
+    expect(Buffer.from(kept).toString('latin1')).not.toContain(PLACE);
+    expect(Buffer.from(bytes).toString('latin1')).toContain(PLACE);
+    const raw = await s3.fetch(`${endpoint}/${bucket}/incoming/${nora}/${fileId}`, { method: 'HEAD' });
+    expect(raw.status).toBe(404);
     // Once per drop, for the trend watch (VEI-01 d): the request that asked for it, none here.
     const events = await test.admin.db
       .select({ creatorId: schema.domainEvents.creatorId, payload: schema.domainEvents.payload })
       .from(schema.domainEvents)
       .where(eq(schema.domainEvents.type, 'content_drop_received'));
     expect(events).toEqual([{ creatorId: nora, payload: { dropId, requestId: null } }]);
-    // Replayed once received, « complete » answers the drop as it is.
+    // Replayed once kept, « complete » answers the drop as it is.
     const replay = await call('POST', `${base}/complete`, 'nora', { parts });
     expect(replay.statusCode).toBe(200);
-    expect(ContentDropSchema.parse(replay.json())).toMatchObject({ state: 'received' });
+    expect(ContentDropSchema.parse(replay.json())).toMatchObject({ state: 'ready' });
     expect((await upload(base, 'nora')).sent).toBe(true);
   });
 
   it('signs each address for its part’s exact size: a part cut otherwise is refused by the storage', async (context) => {
     // A store that does not check presigned signatures (moto, for the runs without Docker) cannot say it.
     if (process.env['IMPERA_TEST_S3_CHECKS_SIGNATURES'] === 'false') context.skip();
-    const { base, bytes } = await dropOne('nora', 9 * MB);
+    const { base, bytes } = await dropOne('nora', jpegOf(9 * MB));
     const plan = await upload(base, 'nora');
     const shorter = await put(plan.missing[0]?.url ?? '', bytes.subarray(0, MB));
     expect(shorter.status).toBe(403);
@@ -244,7 +311,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
   });
 
   it('refuses « complete » without every part, and a file whose stored size is not the one declared', async () => {
-    const { dropId, fileId, base, bytes } = await dropOne('nora', 9 * MB);
+    const { dropId, fileId, base, bytes } = await dropOne('nora', jpegOf(9 * MB));
     const plan = await upload(base, 'nora');
     const sent = await put(plan.missing[0]?.url ?? '', sliceOf(bytes, 1));
     const partial = await call('POST', `${base}/complete`, 'nora', {
@@ -276,7 +343,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
   });
 
   it('opens her file to her and to the agency, never to another creator nor a chatter', async () => {
-    const mine = await dropOne('nora', MB);
+    const mine = await dropOne('nora', jpegOf(MB, 30, 40, 0x22));
     const ines = await call(
       'POST',
       `/v1/creator-space/drops/${mine.dropId}/files/${mine.fileId}/upload`,
@@ -290,7 +357,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       'nora',
     );
     expect(other.json()).toMatchObject({ error: { code: 'content_drop_file_not_found' } });
-    const theirs = await dropOne('manager', MB);
+    const theirs = await dropOne('manager', jpegOf(MB, 30, 40, 0x33));
     const chatter = await call('POST', `${theirs.base}/upload`, 'chatter');
     expect(chatter.statusCode).toBe(403);
     // The manager sends the file of the drop the agency made for her, in one part.
@@ -302,11 +369,58 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     });
     expect(done.statusCode, done.body).toBe(200);
     await receive();
-    expect((await rows(theirs.dropId)).drop).toBe('received');
+    expect((await rows(theirs.dropId)).drop).toBe('ready');
+  });
+
+  /** Her file sent whole in one part and « complete » called, as her phone does for a small photo. */
+  async function sendWhole(one: { readonly base: string; readonly bytes: Uint8Array }) {
+    const plan = await upload(one.base, 'nora');
+    const sent = await put(plan.missing[0]?.url ?? '', one.bytes);
+    const done = await call('POST', `${one.base}/complete`, 'nora', {
+      parts: [{ number: 1, etag: sent.headers.get('etag') ?? '' }],
+    });
+    expect(done.statusCode, done.body).toBe(200);
+  }
+
+  it('finds a photo she already gave a duplicate, and refuses a landscape story with her sentence', async () => {
+    const photo = jpegOf(MB, 30, 40, 0x44);
+    const first = await dropOne('nora', photo);
+    await sendWhole(first);
+    await receive();
+    const again = await dropOne('nora', photo);
+    await sendWhole(again);
+    await receive();
+    expect(await rows(again.dropId)).toEqual({
+      drop: 'ready',
+      files: [{ state: 'duplicate', refusal: null }],
+    });
+    // Both files name the one medium of her library.
+    const media = await test.admin.db
+      .select({ id: schema.contentDropFiles.mediaAssetId })
+      .from(schema.contentDropFiles)
+      .where(inArray(schema.contentDropFiles.id, [first.fileId, again.fileId]));
+    expect(new Set(media.map((one) => one.id)).size).toBe(1);
+
+    // 40 wide, 30 high: a story stands upright.
+    const story = await dropOne('nora', jpegOf(MB, 40, 30, 0x55), 'instagram_story');
+    await sendWhole(story);
+    await receive();
+    expect(await rows(story.dropId)).toEqual({
+      drop: 'blocked',
+      files: [{ state: 'refused', refusal: '« Story Insta » : la photo doit être verticale' }],
+    });
+    // Bytes that are no photo, under a photo's name.
+    const fake = randomBytes(MB);
+    const renamed = await dropOne('nora', fake);
+    await sendWhole(renamed);
+    await receive();
+    expect((await rows(renamed.dropId)).files).toEqual([
+      { state: 'refused', refusal: 'Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie' },
+    ]);
   });
 
   it('takes no more bytes once her drop is withdrawn, and the job erases what had arrived', async () => {
-    const { dropId, fileId, base, bytes } = await dropOne('nora', MB);
+    const { dropId, fileId, base, bytes } = await dropOne('nora', jpegOf(MB, 30, 40, 0x22));
     const plan = await upload(base, 'nora');
     const sent = await put(plan.missing[0]?.url ?? '', bytes);
     const parts = [{ number: 1, etag: sent.headers.get('etag') ?? '' }];

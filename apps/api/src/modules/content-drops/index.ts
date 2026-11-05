@@ -1,9 +1,12 @@
 /** Public entry point of the `content-drops` module (CR-06, ADR 0044, ADR 0055). Other modules import this file only. */
+import { tmpdir } from 'node:os';
+
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { NO_STORAGE, receiveFile } from './application/uploads';
 import type { DropStorage } from './domain/ports';
+import { createFileCleaner } from './infra/cleaning/cleaner';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
@@ -32,6 +35,8 @@ export interface ContentDropsDeps {
   readonly requireRole: RequireRole;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
+  /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
+  readonly scratchDir?: string;
   /** Tests only: another clock than the server's. */
   readonly clock?: () => Date;
 }
@@ -39,6 +44,7 @@ export interface ContentDropsDeps {
 export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsModule {
   const storage = deps.storage ?? (deps.bucket === null ? NO_STORAGE : createS3DropStorage(deps.bucket));
   const receipts = createDrizzleReceiptStore(deps.adminDb);
+  const cleaner = createFileCleaner();
   const clock = deps.clock ?? (() => new Date());
   return {
     name: 'content-drops',
@@ -50,7 +56,13 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       clock,
     ),
     jobs: {
-      receiveFile: (fileId, correlationId) => receiveFile(storage, receipts, fileId, clock(), correlationId),
+      receiveFile: (fileId, correlationId) =>
+        receiveFile(
+          { storage, receipts, cleaner, scratchDir: deps.scratchDir ?? tmpdir() },
+          fileId,
+          clock(),
+          correlationId,
+        ),
     },
   };
 }

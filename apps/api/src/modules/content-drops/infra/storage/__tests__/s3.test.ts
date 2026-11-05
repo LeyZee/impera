@@ -12,6 +12,8 @@ describe('content-drops › the storage’s XML answers', () => {
     expect(xmlText('<Key>a&amp;b&lt;c</Key>', 'Key')).toBe('a&b<c');
     expect(xmlText('<Key>a&unknown;b</Key>', 'Key')).toBe('a&unknown;b');
     expect(xmlText('<Other>x</Other>', 'Key')).toBeNull();
+    // Past the last code point it stays as written, never throws (Bilan on #512).
+    expect(xmlText('<Key>a&#x110000;b&#99999999;</Key>', 'Key')).toBe('a&#x110000;b&#99999999;');
   });
 });
 

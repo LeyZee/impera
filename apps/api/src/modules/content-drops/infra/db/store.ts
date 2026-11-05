@@ -2,9 +2,12 @@ import {
   JOB_MAX_ATTEMPTS,
   AuditEntryIdSchema,
   EventIdSchema,
+  MediaAssetIdSchema,
+  type DropFileState,
   ContentDropFileIdSchema,
   ContentDropSchema,
   ContentRequestSchema,
+  DropCategorySchema,
   DropFileStateSchema,
   DropMimeSchema,
   DropStateSchema,
@@ -50,6 +53,7 @@ import type {
   AgencyContentStore,
   CreatorContentStore,
   DropFileTarget,
+  FileOutcome,
   ReceiptStore,
 } from '../../domain/ports';
 
@@ -498,6 +502,16 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
   };
 }
 
+/** The drop's sentence when none of its files could be kept (ADR 0055 § 6: blocked, in amber, with its reason). */
+const NOTHING_KEPT = 'Aucun fichier de ce dépôt n’a pu être gardé';
+
+/** The states each outcome moves a file from: a file already past them is left as it is (a replayed job). */
+const MOVES_FROM: Readonly<Record<FileOutcome['state'], readonly DropFileState[]>> = {
+  received: ['awaiting'],
+  refused: ['awaiting', 'received'],
+  kept: ['received'],
+};
+
 /**
  * The receipt job's side, as the admin role (`withAdmin`): the states of a drop move by the job only (0108's trigger
  * refuses them to the team, her policies to her).
@@ -508,44 +522,109 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
       withAdmin(adminDb, async (tx) => {
         const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
         if (file === undefined) return null;
-        return fileTargetIn(tx, file.dropId, fileId);
+        const drop = await readDrop(tx, file.dropId);
+        if (drop === undefined) return null;
+        return {
+          ...(await fileTargetIn(tx, file.dropId, fileId)),
+          category: DropCategorySchema.parse(drop.category),
+        };
+      }),
+    knownMedia: (creatorId, sha256) =>
+      withAdmin(adminDb, async (tx) => {
+        const [known] = await tx
+          .select({ id: schema.mediaAssets.id })
+          .from(schema.mediaAssets)
+          .where(and(eq(schema.mediaAssets.creatorId, creatorId), eq(schema.mediaAssets.sha256, sha256)));
+        return known?.id ?? null;
       }),
     settle: (fileId, outcome, now, correlationId) =>
       withAdmin(adminDb, async (tx) => {
-        const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
-        if (file === undefined) return;
+        const [seen] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
+        if (seen === undefined) return;
         // The drop first, as every writer of its files does: two receipts of one drop run one after the other.
-        const drop = await readDrop(tx, file.dropId, true);
-        if (drop === undefined) return;
-        await tx
-          .update(contentDropFiles)
-          .set({
-            state: outcome.state,
-            refusal: outcome.state === 'refused' ? outcome.refusal : null,
-            updatedAt: now,
-          })
-          .where(and(eq(contentDropFiles.id, fileId), eq(contentDropFiles.state, 'awaiting')));
-        if (drop.state !== 'uploading') return;
-        const [waiting] = await tx
-          .select({ id: contentDropFiles.id })
+        const drop = await readDrop(tx, seen.dropId, true);
+        if (drop === undefined || drop.state === 'withdrawn') return;
+        const [file] = await tx
+          .select()
           .from(contentDropFiles)
-          .where(and(eq(contentDropFiles.dropId, drop.id), eq(contentDropFiles.state, 'awaiting')))
-          .limit(1);
-        if (waiting !== undefined) return;
-        await tx
-          .update(contentDrops)
-          .set({ state: 'received', updatedAt: now })
-          .where(eq(contentDrops.id, drop.id));
-        // In the same transaction, once per drop: the drop was locked and still sending.
-        await tx.insert(schema.domainEvents).values({
-          id: newId(EventIdSchema),
-          creatorId: drop.creatorId,
-          type: 'content_drop_received',
-          payload: { dropId: drop.id, requestId: drop.requestId },
-          actor: 'system',
-          correlationId,
-          createdAt: now,
-        });
+          .where(eq(contentDropFiles.id, fileId))
+          .for('update');
+        if (file === undefined || !MOVES_FROM[outcome.state].includes(DropFileStateSchema.parse(file.state)))
+          return;
+        if (outcome.state === 'kept') {
+          const { media } = outcome;
+          // Her library holds each fingerprint once (ADR 0030 § 1): a file she already gave is a duplicate.
+          const inserted = await tx
+            .insert(schema.mediaAssets)
+            .values({
+              id: newId(MediaAssetIdSchema),
+              creatorId: drop.creatorId,
+              kind: media.kind,
+              origin: 'creator',
+              storageKey: media.storageKey,
+              mime: media.mime,
+              bytes: media.bytes,
+              durationMs: media.durationMs,
+              sha256: media.sha256,
+            })
+            .onConflictDoNothing()
+            .returning({ id: schema.mediaAssets.id });
+          const [known] = await tx
+            .select({ id: schema.mediaAssets.id })
+            .from(schema.mediaAssets)
+            .where(
+              and(
+                eq(schema.mediaAssets.creatorId, drop.creatorId),
+                eq(schema.mediaAssets.sha256, media.sha256),
+              ),
+            );
+          if (known === undefined) throw new Error(`media ${media.sha256} neither inserted nor found`);
+          await tx
+            .update(contentDropFiles)
+            .set({
+              state: inserted.length > 0 ? 'kept' : 'duplicate',
+              mediaAssetId: known.id,
+              updatedAt: now,
+            })
+            .where(eq(contentDropFiles.id, fileId));
+        } else {
+          await tx
+            .update(contentDropFiles)
+            .set({
+              state: outcome.state,
+              refusal: outcome.state === 'refused' ? outcome.refusal : null,
+              updatedAt: now,
+            })
+            .where(eq(contentDropFiles.id, fileId));
+        }
+
+        const states = (await filesOf(tx, [drop.id])).map((one) => one.state);
+        let state = drop.state;
+        if (state === 'uploading' && !states.includes('awaiting')) {
+          state = 'received';
+          await tx.update(contentDrops).set({ state, updatedAt: now }).where(eq(contentDrops.id, drop.id));
+          // In the same transaction, once per drop: the drop was locked and still sending.
+          await tx.insert(schema.domainEvents).values({
+            id: newId(EventIdSchema),
+            creatorId: drop.creatorId,
+            type: 'content_drop_received',
+            payload: { dropId: drop.id, requestId: drop.requestId },
+            actor: 'system',
+            correlationId,
+            createdAt: now,
+          });
+        }
+        if (state === 'received' && !states.includes('awaiting') && !states.includes('received')) {
+          const kept = states.some((one) => one === 'kept' || one === 'duplicate');
+          await tx
+            .update(contentDrops)
+            .set(
+              kept
+                ? { state: 'ready', updatedAt: now }
+                : { state: 'blocked', blockedReason: NOTHING_KEPT, updatedAt: now },
+            )
+            .where(eq(contentDrops.id, drop.id));
+        }
       }),
   };
 }
