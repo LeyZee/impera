@@ -1,5 +1,6 @@
 import type { ConnectionService, ConnectionSignal, JobPayload } from '@impera/contracts';
 import type { Database, EncryptionKey } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { OutboundSender } from '../conversations';
@@ -11,9 +12,11 @@ import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
 import { createConnectorSessions, type ConnectorSessions } from './application/sessions';
+import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
+import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
@@ -22,6 +25,7 @@ import {
   resealSalesFeedWebhookSecrets,
 } from './infra/db/sales-feed-webhooks';
 import { createDrizzleSalesLedger } from './infra/db/sales-ledger';
+import { createAvatarRoutes } from './infra/http/avatar-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
@@ -29,6 +33,9 @@ import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
 import { createSessionVault } from './infra/session-vault';
 
+export type { AvatarPorts } from './domain/avatar';
+export { createAvatarFetch } from './infra/avatar/fetch-avatar';
+export { createS3AvatarStore } from './infra/avatar/s3-avatar-store';
 export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
@@ -116,7 +123,11 @@ export interface ConnectorsModule {
       logger: JobLogger,
       correlationId: string,
     ): Promise<void>;
+    /** Her photo copied from the platform to the media bucket, after her import (CRM-07 a2b). */
+    copyAvatar(payload: JobPayload<'connector.copy_avatar'>, logger: JobLogger): Promise<void>;
   };
+  /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
+  readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
@@ -164,6 +175,12 @@ export interface ConnectorsDeps {
   ) => Promise<unknown>;
   readonly clock?: Clock;
   readonly random?: () => number;
+  /**
+   * Her photo's copy at import (CRM-07 a2b), wired by the composition root: the platform's image fetched, sniffed and
+   * re-encoded, kept in the media bucket. `null` without a bucket (`S3_*`): her initials stay. `creators.avatar_key`
+   * is the module's own.
+   */
+  readonly avatars?: Omit<AvatarPorts, 'records'> | null;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -175,6 +192,8 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   const resolver = createConnectorResolver({ accounts, vault, registry: deps.registry });
   const sessions = createConnectorSessions({ accounts, vault, clock });
   const accountJobs = { accounts, resolver, ingest: deps.ingest, clock };
+  const avatars: AvatarPorts | null =
+    deps.avatars == null ? null : { ...deps.avatars, records: createAvatarRecords(deps.adminDb) };
   const salesFeeds = createSalesFeeds({
     keys: deps.credentialKeys === null ? null : createSalesFeedKeyStore(deps.adminDb, deps.credentialKeys),
     ledger: createDrizzleSalesLedger(deps.db, deps.adminDb),
@@ -190,6 +209,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       if (service === null || deps.publishConnectionState === undefined) return;
       await deps.publishConnectionState(service, signal, correlationId);
     },
+    avatars,
   });
   return {
     name: 'connectors',
@@ -208,7 +228,9 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       reconcile: createReconcileJob(accountJobs),
       readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
+      copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
     },
+    avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
