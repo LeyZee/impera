@@ -30,6 +30,7 @@ import type {
 } from '@impera/contracts';
 
 import type { CreatorAgent } from './calendar';
+import type { FeedEvent } from './calendar-feed';
 import type { Reader, RulesRow } from './reports';
 import type { WorkingMember } from './shifts';
 
@@ -640,15 +641,32 @@ export interface CalendarLinkStore {
   /** The account's live link, if any: since when, never the token. */
   live(userId: UserId): Promise<{ createdAt: Date } | null>;
   /**
-   * A new link for a member of the team who has not left, revoking the live one, both in the audit log; `null` when
-   * the account is not such a member.
+   * A new link for a member of the team who has not left, or for a creator's own account (CR-05, ADR 0042 § 4),
+   * revoking the live one, both in the audit log; `null` when the account is neither.
    */
   replace(actor: Actor): Promise<{ token: string; createdAt: Date } | null>;
   /** Revokes the live link; whether there was one. */
   revoke(actor: Actor): Promise<boolean>;
-  /** The holder of a live link whose member has not left, found by the token's hash; `null` otherwise. */
-  holder(token: string): Promise<{ userId: UserId; memberId: TeamMemberId } | null>;
+  /**
+   * The holder of a live link, found by the token's hash: a member who has not left, or a creator's account that still
+   * opens her; `null` otherwise.
+   */
+  holder(token: string): Promise<CalendarLinkHolder | null>;
 }
+
+/** Whose link it is: a member's feed holds their shifts, a creator's her agenda (CR-05). */
+export type CalendarLinkHolder =
+  | { readonly kind: 'member'; readonly userId: UserId; readonly memberId: TeamMemberId }
+  | { readonly kind: 'creator'; readonly userId: UserId };
+
+/**
+ * A creator's agenda as her feed shows it (CR-05 lot c2, the `creator-tasks` module's `feedOf`): her tasks between
+ * two instants, read with her own rights, as events of the feed.
+ */
+export type CreatorAgendaFeed = (
+  userId: UserId,
+  window: { readonly from: Date; readonly to: Date },
+) => Promise<readonly FeedEvent[]>;
 
 /** A shift's mini feedback as stored (ADR 0050 § 10). */
 export interface StoredShiftFeedback {

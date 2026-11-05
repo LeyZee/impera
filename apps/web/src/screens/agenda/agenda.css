@@ -1633,3 +1633,15 @@
     transition: none;
   }
 }
+
+/* « Dans mon téléphone » (lot c2): a quiet line under her agenda, and its dialog's column. */
+.ag-foot {
+  display: flex;
+  justify-content: center;
+  margin: var(--nv-space-4) 0 0;
+}
+.ag-phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}

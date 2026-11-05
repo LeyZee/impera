@@ -37,6 +37,18 @@ function serve(online: () => boolean): Call[] {
           }),
         );
       }
+      if (url === '/v1/scheduling/calendar-link')
+        return Promise.resolve(
+          method === 'POST'
+            ? new Response(
+                JSON.stringify({
+                  path: `/v1/calendar-feed/${'a'.repeat(43)}.ics`,
+                  createdAt: '2026-11-04T12:00:00.000Z',
+                }),
+                { status: 201 },
+              )
+            : new Response(JSON.stringify({ link: null }), { status: 200 }),
+        );
       if (url === '/v1/creator-space/ticks')
         return Promise.resolve(
           new Response(JSON.stringify({ added: 1, streak: agendaOf().streak }), { status: 200 }),
@@ -135,6 +147,22 @@ describe('Agenda, the creator’s (CR-05)', () => {
     expect(await screen.findByRole('heading', { name: 'Sans date' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Choisir un moment' })).toBeDefined();
     expect(screen.getAllByText(/Dispo pour l’agence/u).length).toBe(2);
+  });
+
+  it('gives her agenda to the calendar of her phone, the address shown once', async () => {
+    const calls = serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    fireEvent.click(screen.getByRole('button', { name: /Mon agenda dans mon téléphone/u }));
+    expect(await screen.findByRole('dialog', { name: 'Mon agenda dans mon téléphone' })).toBeDefined();
+    expect(await screen.findByText(/Tes routines et tes fiches de tournage restent ici/u)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Créer mon lien' }));
+    const shown = await screen.findByLabelText('Ton lien de calendrier');
+    expect(shown.textContent).toBe(`http://localhost:3000/v1/calendar-feed/${'a'.repeat(43)}.ics`);
+    expect(screen.getByText(/quiconque l’a voit ton agenda/u)).toBeDefined();
+    expect(calls.some((call) => call.method === 'POST' && call.url === '/v1/scheduling/calendar-link')).toBe(
+      true,
+    );
   });
 
   it('offers « Une tâche » or « Une dispo » under « Ajouter »', async () => {

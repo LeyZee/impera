@@ -37,6 +37,19 @@ export const CREATOR_TASK_CATEGORY_LABELS: Readonly<Record<CreatorTaskCategory, 
   personal: 'Perso',
 };
 
+/**
+ * A category at a glance (Charles, 03/11): its emoji, on her screens and in front of a title in the calendar of her
+ * phone (her calendar link, CR-05 lot c2).
+ */
+export const CREATOR_TASK_CATEGORY_EMOJI: Readonly<Record<CreatorTaskCategory, string>> = {
+  shoot: '🎬',
+  live: '📡',
+  post: '🖼️',
+  socials: '💬',
+  appointment: '📅',
+  personal: '🌿',
+};
+
 export const CreatorTaskTitleSchema = z.string().trim().min(1).max(80);
 /** What the task is for, one sentence, never an invented figure (CR-05). */
 export const CreatorTaskPurposeSchema = z.string().trim().min(1).max(160);
