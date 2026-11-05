@@ -316,9 +316,9 @@ function renderPage(at = '/equipe/planning'): AnyRouter {
 
 const calendarReads: string[] = [];
 
-/** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048). */
+/** The agency's calendar: Théo's night, Nora's agent in `mode` day and night (ADR 0048); no account when `bare`. */
 const agencyCalendar =
-  (mode: 'auto' | 'copilot', slotStartMinute = 0) =>
+  (mode: 'auto' | 'copilot', slotStartMinute = 0, bare = false) =>
   (from: string, to: string): unknown => ({
     view: 'agency',
     settings: settingsOf({ start: slotStartMinute }),
@@ -335,13 +335,13 @@ const agencyCalendar =
       },
     ],
     agency: {
-      accounts: ACCOUNTS,
+      accounts: bare ? [] : ACCOUNTS,
       toFill: [],
       aiAlone: [],
       workload: [{ memberId: THEO, minutes: 360 }],
-      coverage: [
-        { platformAccountId: NORA_REVEAL, withAgent: 360, chatterAlone: 0, agentAlone: 9720, nobody: 0 },
-      ],
+      coverage: bare
+        ? []
+        : [{ platformAccountId: NORA_REVEAL, withAgent: 360, chatterAlone: 0, agentAlone: 9720, nobody: 0 }],
     },
   });
 
@@ -1139,6 +1139,33 @@ describe('Équipe › Planning', () => {
     expect(panel.textContent).toContain('6 h.');
   });
 
+  it('says the hour the clocks skip, and the hour the shift takes in its place (recette EQP-11)', async () => {
+    serve();
+    renderPage();
+    await screen.findByRole('row', { name: /Nora Vidal/u });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un shift' }));
+    const panel = await screen.findByRole('dialog', { name: 'Nouveau shift' });
+    fireEvent.change(within(panel).getByLabelText('Jour'), { target: { value: '2027-03-28' } });
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Autres heures' }));
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '02:30' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '06:00' } });
+    // 2 h 30 does not exist in Paris that night: the shift is saved from 3 h, which the summary says, never 2 h 30.
+    expect(text(panel)).toContain('3 h – 6 h · 3 h.');
+    expect(text(within(panel).getByRole('status'))).toBe(
+      '2 h 30 n’existe pas cette nuit-là, à cause du changement d’heure : le shift commence à 3 h.',
+    );
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '01:00' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '02:30' } });
+    expect(text(panel)).toContain('1 h – 3 h · 1 h.');
+    expect(text(within(panel).getByRole('status'))).toBe(
+      '2 h 30 n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à 3 h.',
+    );
+    // Every week, a template keeps its wall-clock hours: nothing moved to say.
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Chaque semaine' }));
+    expect(within(panel).queryByRole('status')).toBeNull();
+    expect(text(panel)).toContain('1 h – 2 h 30 · 1 h 30.');
+  });
+
   it('refuses a single shift of more than 24 h the night the clocks go back', async () => {
     serve();
     renderPage();
@@ -1254,6 +1281,18 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     const cover = screen.getByRole('region', { name: 'Couverture des comptes de la semaine' });
     expect(text(cover)).toContain('Nora Vidal, @nora sur Reveal');
     expect(text(cover)).toContain('IA seule 162 h');
+  });
+
+  it('says « Aucun compte à couvrir. » when the agency has no account, never a bare title (recette EQP-12)', async () => {
+    serve({ calendar: agencyCalendar('auto', 0, true) });
+    renderPage();
+    const cover = await screen.findByRole(
+      'region',
+      { name: 'Couverture des comptes de la semaine' },
+      { timeout: 4_000 },
+    );
+    expect(text(cover)).toBe('Couverture des comptes de la semaineAucun compte à couvrir.');
+    expect(cover.querySelector('ul')).toBeNull();
   });
 
   it('never says « IA seule » on a créneau that wants two chatters: the agent stands for none (ADR 0049 § 2)', async () => {

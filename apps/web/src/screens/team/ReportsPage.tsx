@@ -916,10 +916,11 @@ function MemberPeriod({
   const waiting = reports.filter((one) => one.status === 'submitted').length;
   const sentBack = reports.filter((one) => one.status === 'rejected').length;
   // What the member's period holds, said only where there is something: « 210,00 € validés · 1 à valider ». Only
-  // the shifts without a report are amber, not the money validated beside them (EQ-14).
+  // the shifts without a report are amber, not the money validated beside them (EQ-14). A report validated at 0 €
+  // still says « 0,00 € validés », never a blank row like a member without a shift (recette EQP-14).
   const summary = [
     ...sums
-      .filter((sum) => sum.validatedMinor !== 0)
+      .filter((sum) => sum.validated > 0)
       .map((sum) => `${amountText(sum.validatedMinor, sum.currency)} validés`),
     waiting === 0 ? null : `${String(waiting)} à valider`,
     sentBack === 0 ? null : `${String(sentBack)} renvoyé${sentBack > 1 ? 's' : ''}`,

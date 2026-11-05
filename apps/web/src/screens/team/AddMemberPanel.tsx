@@ -650,7 +650,7 @@ function Rate({
               className="nv-field__control nv-glass"
               inputMode="decimal"
               placeholder="12,5"
-              aria-label={presets.length === 0 ? undefined : 'Taux à la main'}
+              aria-label={presets.length === 0 ? undefined : 'Taux à la main, en %'}
               aria-invalid={problems.rate !== undefined}
               value={draft.rate}
               onChange={(event) => {
