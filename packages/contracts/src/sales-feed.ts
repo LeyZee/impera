@@ -401,7 +401,8 @@ export const SalesFeedImportLineResultSchema = z.discriminatedUnion('outcome', [
   z.object({
     platformModelId: z.string().min(1),
     outcome: z.enum(['created', 'linked', 'already_linked']),
-    creatorId: CreatorIdSchema.nullable(),
+    /** The creator the model counts for now: created, chosen, or the one it was already linked to. */
+    creatorId: CreatorIdSchema,
   }),
   z.object({
     platformModelId: z.string().min(1),
