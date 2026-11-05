@@ -30,8 +30,11 @@ const member = (displayName: string) =>
 
 describe('Avatar', () => {
   it('keeps an emoji or an accented letter whole in the initial', () => {
-    const { container, rerender } = render(<Avatar member={member('💋 Théo')} />);
+    const { container, rerender } = render(<Avatar member={member('💋')} />);
     expect(container.textContent).toBe('💋');
+    // A letter after the emoji is the initial (recette 05/11, PRO-17).
+    rerender(<Avatar member={member('💋 Théo')} />);
+    expect(container.textContent).toBe('T');
     rerender(<Avatar member={member('élodie')} />);
     expect(container.textContent).toBe('É');
   });

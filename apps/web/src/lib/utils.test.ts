@@ -11,9 +11,15 @@ describe('cn', () => {
 describe('initialOf', () => {
   it('takes the first character as seen, never half of an emoji (recette 28/10, M4)', () => {
     expect(initialOf('léa')).toBe('L');
-    expect(initialOf('💋 Dashboard-Fan 1')).toBe('💋');
-    expect(initialOf('👍🏽 Théo')).toBe('👍🏽');
+    expect(initialOf('💋')).toBe('💋');
+    expect(initialOf('👍🏽')).toBe('👍🏽');
     expect(initialOf('  ')).toBe('?');
+  });
+
+  it('takes the first letter, past what is not one (recette 05/11, PRO-17)', () => {
+    expect(initialOf('<b>Fan</b><script>alert(1)</script>')).toBe('B');
+    expect(initialOf('« Élodie »')).toBe('É');
+    expect(initialOf('💋 Dashboard-Fan 1')).toBe('D');
   });
 });
 

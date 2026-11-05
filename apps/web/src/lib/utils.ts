@@ -9,12 +9,14 @@ export function cn(...inputs: ClassValue[]): string {
 const graphemes = new Intl.Segmenter('fr', { granularity: 'grapheme' });
 
 /**
- * The letter of an avatar: the first character as the eye sees it, an emoji or an accented letter whole, never half
- * of one (`slice(0, 1)` cuts « 💋 » in two). « ? » for a name with nothing in it.
+ * The letter of an avatar: the first letter or digit of the name (« < », « « » or an emoji before it are skipped,
+ * recette 05/11, PRO-17), an accented letter whole. A name without any keeps its first character as the eye sees it,
+ * an emoji whole, never half of one (`slice(0, 1)` cuts « 💋 » in two). « ? » for a name with nothing in it.
  */
 export function initialOf(name: string): string {
-  const [first] = graphemes.segment(name.trim());
-  return first === undefined ? '?' : first.segment.toUpperCase();
+  const all = [...graphemes.segment(name.trim())];
+  const letter = all.find(({ segment }) => /^[\p{L}\p{N}]/u.test(segment)) ?? all[0];
+  return letter === undefined ? '?' : letter.segment.toUpperCase();
 }
 
 /**
