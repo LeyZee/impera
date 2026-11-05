@@ -72,6 +72,23 @@ export function maySuggest(candidate: TaskIdentity, week: string, declined: read
   );
 }
 
+/** A suggestion still waiting for her answer: its task, and its moment (`null` when it found no room). */
+export interface OpenSuggestion extends TaskIdentity {
+  readonly moment: string | null;
+}
+
+/**
+ * Whether a suggestion would repeat one that still waits for her answer that week (CREA-16): the same task at the same
+ * moment, or the same task where either found no room (both would end as cards to place). Another moment is another
+ * suggestion.
+ */
+export const repeatsOpen = (candidate: OpenSuggestion, open: readonly OpenSuggestion[]): boolean =>
+  open.some(
+    (one) =>
+      sameTask(one, candidate) &&
+      (one.moment === null || candidate.moment === null || one.moment === candidate.moment),
+  );
+
 /**
  * The days she ticked the task an accepted suggestion became, for the agency (CR-05 lot c): of the suggestion's week
  * for her routine, which comes back every week; every tick otherwise, a timed task or a task of a day being ticked on

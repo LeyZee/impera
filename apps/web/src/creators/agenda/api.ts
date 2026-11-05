@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   SUGGESTION_DECLINED_RECENTLY_CONFLICT,
   SUGGESTION_ID_CONFLICT,
+  SUGGESTION_OPEN_CONFLICT,
   type AgencySuggestion,
   type AgencySuggestionList,
   type CreateSuggestionBody,
@@ -42,6 +43,8 @@ export type SuggestOutcome =
   | { readonly kind: 'ok'; readonly suggestion: AgencySuggestion }
   /** 409: she declined this task this week or the week before. */
   | { readonly kind: 'declined_recently' }
+  /** 409: the same task already waits for her answer that week (CREA-16). */
+  | { readonly kind: 'open' }
   /** 409: the form's id already made another suggestion. */
   | { readonly kind: 'taken' }
   /** 403: not the owner nor an active manager of hers. */
@@ -53,6 +56,7 @@ export type SuggestOutcome =
 export const SUGGEST_ERRORS: Readonly<Record<Exclude<SuggestOutcome['kind'], 'ok'>, string>> = {
   declined_recently:
     'Elle a refusé cette tâche cette semaine ou la semaine dernière : on ne la lui repropose pas tout de suite.',
+  open: 'Cette tâche lui est déjà proposée cette semaine et attend sa réponse : rien n’a été envoyé.',
   taken: 'Cette proposition vient d’être envoyée avec d’autres valeurs. Ferme et recommence.',
   forbidden: 'Seuls le propriétaire et un manager actif proposent une tâche à une créatrice.',
   refused: 'Cette proposition ne passe pas telle quelle. Vérifie ce que tu as saisi : rien n’a été envoyé.',
@@ -73,6 +77,7 @@ export async function suggestTask(creatorId: CreatorId, body: CreateSuggestionBo
     const refusal = ApiErrorSchema.safeParse(await response.json().catch(() => null));
     const code = refusal.success ? refusal.data.error.code : null;
     if (code === SUGGESTION_DECLINED_RECENTLY_CONFLICT) return { kind: 'declined_recently' };
+    if (code === SUGGESTION_OPEN_CONFLICT) return { kind: 'open' };
     if (code === SUGGESTION_ID_CONFLICT) return { kind: 'taken' };
     return response.status >= 500 ? { kind: 'failed' } : { kind: 'refused' };
   } catch {

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { availabilityBodiesOf, dispoIds, spanOf, taskBodyOf, taskProblems, type TaskDraft } from './draft';
+import {
+  availabilityBodiesOf,
+  defaultStart,
+  dispoIds,
+  firstMoment,
+  reachOf,
+  spanOf,
+  taskBodyOf,
+  taskProblems,
+  type TaskDraft,
+} from './draft';
 
 const ZONE = 'Europe/Paris';
 const draft: TaskDraft = {
@@ -57,5 +67,58 @@ describe('« Ajouter » (CR-05)', () => {
     expect(availabilityBodiesOf(dispo, ZONE, idFor).map((body) => body.id)).toEqual(
       first.map((body) => body.id),
     );
+  });
+});
+
+describe('the moment a form opens on (CREA-09)', () => {
+  const week = [
+    '2026-11-02',
+    '2026-11-03',
+    '2026-11-04',
+    '2026-11-05',
+    '2026-11-06',
+    '2026-11-07',
+    '2026-11-08',
+  ];
+
+  it('starts another day at 10 h, today at the next full hour once 10 h is past', () => {
+    expect(defaultStart('2026-11-06', '2026-11-05', 18 * 60 + 40)).toBe(10 * 60);
+    expect(defaultStart('2026-11-05', '2026-11-05', 7 * 60)).toBe(10 * 60);
+    expect(defaultStart('2026-11-05', '2026-11-05', 18 * 60 + 40)).toBe(19 * 60);
+    expect(defaultStart('2026-11-05', '2026-11-05', 18 * 60)).toBe(19 * 60);
+    expect(defaultStart('2026-11-05', '2026-11-05', 23 * 60 + 30)).toBe(23 * 60);
+  });
+
+  it('places a suggestion on the first day of its week still ahead, never a day gone', () => {
+    // Thursday 5 at 18 h 40: today at 19 h, not Monday 2 at 10 h.
+    expect(firstMoment(week, '2026-11-05', 18 * 60 + 40)).toEqual({ day: '2026-11-05', start: 19 * 60 });
+    // Thursday at 23 h 10: no full hour left, Friday at 10 h.
+    expect(firstMoment(week, '2026-11-05', 23 * 60 + 10)).toEqual({ day: '2026-11-06', start: 10 * 60 });
+    // A week to come: its Monday at 10 h.
+    expect(firstMoment(week, '2026-10-30', 12 * 60)).toEqual({ day: '2026-11-02', start: 10 * 60 });
+  });
+});
+
+describe('the days a form takes (CREA-14)', () => {
+  const now = Date.parse('2026-11-05T12:00:00.000Z');
+  const draft = (day: string): TaskDraft => ({
+    title: 'Live',
+    category: 'live',
+    kind: 'day',
+    day,
+    start: 600,
+    end: 660,
+    weekdays: [],
+    purpose: '',
+    reminderMinutes: null,
+  });
+
+  it('refuses a day her agenda does not reach, and offers only the days it does', () => {
+    expect(taskProblems(draft('2026-11-20'), now)).toEqual([]);
+    expect(taskProblems(draft('1900-01-01'), now)).toEqual(['day']);
+    expect(taskProblems(draft('9999-12-31'), now)).toEqual(['day']);
+    const { min, max } = reachOf(now);
+    expect(taskProblems(draft(min), now)).toEqual([]);
+    expect(taskProblems(draft(max), now)).toEqual([]);
   });
 });

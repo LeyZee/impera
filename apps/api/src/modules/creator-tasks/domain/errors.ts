@@ -9,6 +9,8 @@ import {
   SUGGESTION_ID_CONFLICT,
   SUGGESTION_KIND_UNPROCESSABLE,
   SUGGESTION_NOT_FOUND,
+  SUGGESTION_OPEN_CONFLICT,
+  SUGGESTION_PAST_UNPROCESSABLE,
   SUGGESTION_UNDATED_UNPROCESSABLE,
 } from '@impera/contracts';
 
@@ -69,11 +71,28 @@ export class SuggestionUndated extends DomainError {
   }
 }
 
+/** Placed, or kept, at a moment already over: it would land in her past as a task she missed (CREA-09). */
+export class SuggestionInPast extends DomainError {
+  constructor() {
+    super(SUGGESTION_PAST_UNPROCESSABLE, 'Ce moment est déjà passé : choisis-en un à venir');
+  }
+}
+
 export class SuggestionDeclinedRecently extends DomainError {
   constructor() {
     super(
       SUGGESTION_DECLINED_RECENTLY_CONFLICT,
       'Elle a refusé cette tâche cette semaine ou la semaine d’avant : elle ne revient pas tout de suite',
+    );
+  }
+}
+
+/** The same task already waits for her answer that week (CREA-16): a second card would be noise. */
+export class SuggestionAlreadyOpen extends DomainError {
+  constructor() {
+    super(
+      SUGGESTION_OPEN_CONFLICT,
+      'Cette tâche lui est déjà proposée cette semaine : elle n’a pas encore répondu',
     );
   }
 }
