@@ -30,6 +30,7 @@ import {
   followUpsSummary,
   hoursLabel,
   issuesOf,
+  isPlaceholder,
   localDay,
   localTime,
   minutesLabel,
@@ -40,6 +41,7 @@ import {
   type FieldIssue,
 } from './model';
 
+import { DayField } from '@/creators/DayField';
 import { cityOf } from '@/scheduling/time';
 
 /**
@@ -149,10 +151,9 @@ export function DetailsTab({
             hint={ageLine(d.date_of_birth)}
             path="details.date_of_birth"
           >
-            <TextInput
+            <DayField
               id={`${id}-dob`}
-              type="date"
-              value={d.date_of_birth}
+              value={isPlaceholder(d.date_of_birth) ? '' : d.date_of_birth}
               onChange={(v) => {
                 set('date_of_birth', v);
               }}

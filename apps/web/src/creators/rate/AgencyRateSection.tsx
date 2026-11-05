@@ -7,6 +7,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
+import { DayField } from '../DayField';
 import { Field } from '../persona/fields';
 
 import {
@@ -231,17 +232,14 @@ function RateSheet({
                   : 'Demain au plus tôt : les ventes déjà faites gardent leur pourcentage.'
               }
             >
-              <input
+              <DayField
                 id={`${id}-day`}
-                type="date"
-                className="nv-glass nv-field__control ps-input"
-                min={earliest}
                 value={fromDay}
                 disabled={saving}
-                aria-invalid={dayWrong}
-                aria-describedby={dayWrong ? `${id}-day-error` : undefined}
-                onChange={(event) => {
-                  setFromDay(event.target.value);
+                invalid={dayWrong}
+                describedBy={dayWrong ? `${id}-day-error` : undefined}
+                onChange={(day) => {
+                  setFromDay(day);
                   edit();
                 }}
               />
