@@ -16,6 +16,7 @@ import {
   RecordBlindTestBodySchema,
   RejectDraftBodySchema,
   SetAgentModeBodySchema,
+  SendingStopSchema,
   SetModeBodySchema,
   ReleaseBodySchema,
   TakeoverBodySchema,
@@ -110,6 +111,21 @@ export function createConversationRoutes(
     const confirmAutomatic = async (request: FastifyRequest, reply: FastifyReply, mode: string) => {
       if (mode === 'auto') await guards.recentLogin.call(app, request, reply);
     };
+
+    // Whether the emergency stop holds her messages (recette CHAT-07): whoever lists her conversations reads it, a
+    // chatter for a creator routed to him too, so that Suivi says it before a decision.
+    app.get(
+      '/conversations/stop',
+      { ...read, schema: { querystring: CreatorQuerySchema, response: { 200: SendingStopSchema } } },
+      async (request) => {
+        const { creatorId } = request.query;
+        const user = signedIn(request);
+        if (!readsWholeCreator(user, creatorId) && !user.routedCreatorIds.includes(creatorId)) {
+          throw new CreatorForbidden();
+        }
+        return { stopped: await reader.sendingStopped(creatorId) };
+      },
+    );
 
     app.get(
       '/conversations',

@@ -774,3 +774,13 @@
 .tr-draft .nv-draft-panel__actions > .nv-btn--neon {
   flex-grow: 1.6;
 }
+/* The emergency stop, said above the list before any decision (recette CHAT-07). */
+.tr-stop__in {
+  margin: 0;
+  padding: 14px 18px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}

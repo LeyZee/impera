@@ -28,6 +28,8 @@ import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '
 
 import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toStoredEvent } from './rows';
 
+const SwitchRowsSchema = z.array(z.object({ active: z.boolean() }));
+
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 /** The states where the agent answers him again after a failed send; once a human holds it or it rests, it is theirs. */
 const AGENT_ANSWERING: readonly ConversationState[] = ['pending', 'drafting', 'awaiting_approval', 'sending'];
@@ -155,6 +157,17 @@ export function createDrizzleConversationReader(
   mediaDescriptions: MediaDescriptions,
 ): ConversationReader {
   return {
+    // The same latest-switch-per-scope rule as the send gate (unit-of-work `blockedReason`), without the conversation.
+    sendingStopped: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const switches = await tx.execute(sql`
+          select distinct on (scope, scope_id) active
+          from kill_switches
+          where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
+          order by scope, scope_id, set_at desc`);
+        return SwitchRowsSchema.parse(switches.rows).some((row) => row.active);
+      }),
+
     list: (creatorId, page, routedTo) =>
       withTenant(db, creatorId, async (tx) => {
         const after = decodeCursor(page.cursor);

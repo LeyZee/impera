@@ -597,6 +597,8 @@ export interface ConversationReader {
    * without such a conversation.
    */
   desireCurve(creatorId: CreatorId, id: ConversationId): Promise<DesireCurve | null>;
+  /** Whether the latest global or creator-wide emergency stop of hers is on (recette CHAT-07). */
+  sendingStopped(creatorId: CreatorId): Promise<boolean>;
 }
 
 /** Her own alerts' names, archived ones too (`alerts` module's adapter): the history names an alert as it was. */

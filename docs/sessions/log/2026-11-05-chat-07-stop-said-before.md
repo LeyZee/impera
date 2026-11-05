@@ -1,0 +1,6 @@
+# 2026-11-05 · CHAT-07 : l'arrêt d'urgence est dit avant le geste
+
+- Fiche : recette du 05/11, CHAT-07 (Charles, « attaque tous les constats »).
+- Fait : `GET /v1/conversations/stop?creatorId=` répond `{ stopped }`, avec la même règle que la porte d'envoi (dernier interrupteur global ou de la créatrice). Il est lisible par quiconque lit ses conversations, y compris un chatteur à qui une conversation est routée ; hors périmètre, la réponse est 403. Suivi affiche un bandeau ambre au-dessus de la liste tant que l'arrêt tient, en nommant les créatrices quand il en suit plusieurs. Pour le propriétaire : « Rien ne part tant qu'il n'est pas levé sur le Dashboard. » Pour les autres : « L'agence a tout arrêté : rien ne part pour l'instant. Préviens ton responsable si ça dure. » Le brouillon n'offre plus Valider ni Retoucher et dit qu'il attend la levée. Le refus 409 dit seulement que l'arrêt est actif, sans renvoyer au Dashboard.
+- Tests : `agent-mode.integration.test.ts` (arrêt de la créatrice, arrêt global, levée, opérateur hors liste) ; `TrackingPage.test.tsx` (bandeau, brouillon bloqué, rien envoyé) ; `reader-model.test.ts`.
+- Découvertes : un arrêt posé sur une seule conversation n'est pas dans le bandeau ; la porte d'envoi le refuse toujours au clic.

@@ -35,6 +35,13 @@ export function pageOf<T extends z.ZodType>(
 export const ConversationDesireSchema = z.object({ score: DesireScoreSchema, band: DesireBandSchema });
 export type ConversationDesire = z.infer<typeof ConversationDesireSchema>;
 
+/**
+ * `GET /v1/conversations/stop`: whether the emergency stop holds every message of this creator (global, or hers), so
+ * that Suivi says it before a decision rather than after (recette CHAT-07). A stop on one conversation is not here.
+ */
+export const SendingStopSchema = z.object({ stopped: z.boolean() });
+export type SendingStop = z.infer<typeof SendingStopSchema>;
+
 export const ConversationSummarySchema = z.object({
   id: ConversationIdSchema,
   fanId: FanIdSchema,

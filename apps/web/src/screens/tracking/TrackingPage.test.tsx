@@ -116,6 +116,8 @@ function serve(routes: {
   messages?: unknown[];
   /** « À traiter » across creators; the Dashboard's todos, named after its creator, when not given. */
   todos?: Reply | (() => Reply);
+  /** The emergency stop holds her messages (recette CHAT-07); off when not given. */
+  stopped?: boolean;
 }): Posted[] {
   const posted: Posted[] = [];
   vi.stubGlobal(
@@ -147,6 +149,8 @@ function serve(routes: {
         reply = routes.flagsRefused === true ? { status: 403 } : flagsView(routes.flags?.before);
       } else if (path === '/v1/creators') {
         reply = typeof routes.creators === 'function' ? routes.creators() : routes.creators;
+      } else if (path === '/v1/conversations/stop') {
+        reply = { status: 200, body: { stopped: routes.stopped ?? false } };
       } else if (path === '/v1/conversations') {
         reply = { status: 200, body: routes.conversations?.[url.searchParams.get('creatorId') ?? ''] };
       } else if (path === '/v1/dashboard/todos') {
@@ -625,6 +629,18 @@ describe('the reader of Suivi', () => {
     await waitFor(() => {
       expect(queueReads()).toBeGreaterThan(before);
     });
+  });
+
+  it('says the emergency stop above the list, and keeps the draft from Valider while it holds (recette CHAT-07)', async () => {
+    const posted = serve({ ...withDraft, stopped: true, detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    expect(
+      (await screen.findByText(/L’arrêt d’urgence est actif\./u)).closest('[role="status"]')?.textContent,
+    ).toContain('Préviens ton responsable si ça dure.');
+    const draft = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(draft).getByText(/attend qu’il soit levé/u)).toBeDefined();
+    expect(within(draft).queryByRole('button', { name: 'Valider' })).toBeNull();
+    expect(posted).toEqual([]);
   });
 
   it('sends the retouched bubbles, one per line', async () => {

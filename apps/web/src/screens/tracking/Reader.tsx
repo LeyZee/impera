@@ -43,6 +43,7 @@ export function Reader({
   conversationId,
   canDecide,
   routedOnly = false,
+  stopAhead = false,
   onClose,
   onReleased,
   backLabel = 'Toutes les conversations',
@@ -53,6 +54,8 @@ export function Reader({
   canDecide: boolean;
   /** A member who reads only the conversations routed to him (a chatter): see `TrackingPage`. */
   routedOnly?: boolean;
+  /** The stop already holds her messages (recette CHAT-07): Valider waits, the banner above the list says why. */
+  stopAhead?: boolean;
   onClose: () => void;
   /**
    * The hand was given back by a member who reads only what is routed to him: the conversation is no longer his, the
@@ -119,6 +122,7 @@ export function Reader({
           creatorId={creatorId}
           canDecide={canDecide}
           routedOnly={routedOnly}
+          stopAhead={stopAhead}
           settle={settle}
           released={released}
         />
@@ -134,6 +138,7 @@ function Loaded({
   creatorId,
   canDecide,
   routedOnly,
+  stopAhead,
   settle,
   released,
 }: {
@@ -145,6 +150,7 @@ function Loaded({
   creatorId: string;
   canDecide: boolean;
   routedOnly: boolean;
+  stopAhead: boolean;
   settle: () => Promise<void>;
   /** Set for a member who reads only his routed conversations: a hand given back closes the reader. */
   released: ((fan: string) => void) | undefined;
@@ -451,7 +457,7 @@ function Loaded({
             draft={pending}
             creatorId={creatorId}
             conversationId={detail.id}
-            blocked={!canDecide ? 'reader' : isHuman ? 'human' : null}
+            blocked={!canDecide ? 'reader' : isHuman ? 'human' : stopAhead ? 'stopped' : null}
             stopped={stopped}
             decided={decided}
           />
@@ -514,8 +520,11 @@ function DraftPanel({
   draft: DraftView;
   creatorId: string;
   conversationId: string;
-  /** Why this person cannot decide now: a human has the hand, or she only reads (a creator); null when she can. */
-  blocked: 'human' | 'reader' | null;
+  /**
+   * Why this person cannot decide now: a human has the hand, she only reads (a creator), or the stop already holds
+   * every message (recette CHAT-07); null when she can.
+   */
+  blocked: 'human' | 'reader' | 'stopped' | null;
   /**
    * The emergency stop refused the last decision (said at the top of the reader, CHAT-07): Valider stays, since only
    * the server knows when it is lifted; its own sentence is not said twice.
@@ -595,6 +604,10 @@ function DraftPanel({
         </p>
       ) : blocked === 'reader' ? (
         <p className="nv-draft-panel__brief">Tu lis seulement : l’équipe décide.</p>
+      ) : blocked === 'stopped' ? (
+        <p className="nv-draft-panel__brief">
+          L’arrêt est actif : ce brouillon attend qu’il soit levé pour être validé.
+        </p>
       ) : step === 'rejecting' ? (
         <div className="nv-draft-panel__actions">
           <button
