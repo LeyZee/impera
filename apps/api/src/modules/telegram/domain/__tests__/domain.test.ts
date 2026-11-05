@@ -17,7 +17,7 @@ import { nextBatch, type Pending } from '../batch';
 import { classify, connectionReminder } from '../classify';
 import { chatsFor, computeCoverage } from '../coverage';
 import { mayRemoveChat } from '../membership';
-import { describeTelegramError } from '../messages';
+import { describeTelegramError, describeTokenCheckFailure } from '../messages';
 import { MAX_TEXT, escapeHtml, joinTexts, renderClosedBy, renderNotice } from '../render';
 import { eveningDigestText, saleRings, saleSettingsFor } from '../sales';
 import { eveningDigestOf, morningDigestKey, nightOf, retryDelayMs, shouldRetry } from '../schedule';
@@ -965,5 +965,18 @@ describe('mayRemoveChat (REG-28)', () => {
     expect(mayRemoveChat('left')).toBe(true);
     expect(mayRemoveChat('kicked')).toBe(true);
     expect(mayRemoveChat('member')).toBe(false);
+  });
+});
+
+describe('a pasted token that could not be checked (recette 05/11, PRO-07)', () => {
+  it('says nothing was kept, never that Impera retries by itself', () => {
+    const unchecked = describeTokenCheckFailure('unreachable');
+    expect(unchecked.kind).toBe('unreachable');
+    expect(unchecked.message).toContain('le jeton n’a pas pu être vérifié');
+    expect(unchecked.message).not.toContain('réessaie tout seul');
+    expect(describeTokenCheckFailure('unauthorized')).toEqual({
+      kind: 'token_refused',
+      message: describeTelegramError('token_refused'),
+    });
   });
 });
