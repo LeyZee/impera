@@ -53,15 +53,21 @@ describe('ExtensionPage', () => {
     expect(screen.getByText(/marche sur ordinateur/u)).toBeTruthy();
   });
 
-  it('says what is not there yet', () => {
+  it('says what is not there yet in one line at the foot, not among what the extension does (PRO-24)', () => {
     renderAs(CHROME);
-    expect(screen.getAllByText('Bientôt')).toHaveLength(2);
+    expect(screen.queryByText('Bientôt')).toBeNull();
+    expect(
+      screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent),
+    ).toContain('Tes raccourcis');
+    expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u).textContent).toContain(
+      'la veille Instagram',
+    );
   });
 
   it('keeps the trend watch for those who do it', () => {
     renderAs(CHROME, false);
-    expect(screen.queryByText('La veille Instagram')).toBeNull();
-    expect(screen.getByText('Le fan sous les yeux')).toBeTruthy();
+    expect(screen.queryByText(/veille Instagram/u)).toBeNull();
+    expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u)).toBeTruthy();
   });
 
   it('tells the popup nothing on localhost, its default address', () => {
