@@ -37,6 +37,17 @@ describe('her day (CR-05)', () => {
     expect(planOf(agendaOf(), '2026-11-06').todo.map((item) => item.task.id)).toEqual([stretch.id]);
   });
 
+  it('keeps a routine from the day it entered her agenda, in her zone, never before (CREA-08)', () => {
+    // Created Wednesday 4 at 0 h 30 in Paris (Tuesday 23 h 30 UTC): due Wednesday, not Monday.
+    const routine = { ...stretch, createdAt: '2026-11-03T23:30:00.000Z' };
+    const agenda = agendaOf({ tasks: [routine] });
+    expect(planOf(agenda, '2026-11-02').todo).toEqual([]);
+    expect(planOf(agenda, WEDNESDAY).todo.map((item) => item.task.id)).toEqual([stretch.id]);
+    expect(planOf(agenda, '2026-11-06').todo.map((item) => item.task.id)).toEqual([stretch.id]);
+    // Kept on her phone from before the date was sent: due on its weekdays as before.
+    expect(planOf(agendaOf({ tasks: [stretch] }), '2026-11-02').todo).toHaveLength(1);
+  });
+
   it('reads a night dispo to the next day, on its weekday', () => {
     expect(windowsOn(agendaOf().availabilities, '2026-11-06', 'Europe/Paris')).toEqual([
       expect.objectContaining({ start: 22 * 60, end: 26 * 60 }),

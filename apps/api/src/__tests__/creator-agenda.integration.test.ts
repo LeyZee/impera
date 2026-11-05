@@ -200,6 +200,9 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
       when: { kind: 'routine', weekdays: [1, 2, 3, 4, 5, 6, 7] },
     };
     expect((await call('POST', '/v1/creator-space/tasks', 'nora', daily)).statusCode).toBe(200);
+    // CREA-08: her agenda says when it entered it, from which day her phone counts it due.
+    const created = (await agenda()).tasks.find((one) => one.id === daily.id)?.createdAt;
+    expect(Math.abs(Date.now() - Date.parse(created ?? ''))).toBeLessThan(60_000);
     const ahead = await call('POST', '/v1/creator-space/ticks', 'nora', {
       ticks: [{ ...tick, taskId: daily.id, day: addDays(today, 1) }],
     });

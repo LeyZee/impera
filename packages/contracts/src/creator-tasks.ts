@@ -101,6 +101,11 @@ export const CreatorTaskSchema = z.strictObject({
   essential: z.boolean(),
   /** Minutes before a timed task she wants a reminder, `null` for none. */
   reminderMinutes: z.number().int().min(0).max(1440).nullable(),
+  /**
+   * When the task entered her agenda: a routine is due only from that day, in her zone (CREA-08). `null` for an
+   * agenda kept on her phone from before it was sent, read as always due.
+   */
+  createdAt: z.iso.datetime().nullable().default(null),
 });
 export type CreatorTask = z.infer<typeof CreatorTaskSchema>;
 

@@ -56,10 +56,14 @@ export interface DayPlan {
 const done = (ticks: readonly CreatorTick[], taskId: string, day: string): boolean =>
   ticks.some((tick) => tick.taskId === taskId && tick.day === day);
 
-/** Whether a task is due on one of her days: its day, the day it starts, or one of its weekdays. */
+/**
+ * Whether a task is due on one of her days: its day, the day it starts, or one of its weekdays from the day it entered
+ * her agenda (CREA-08), never before: a day before it existed is not a day she missed.
+ */
 export function dueOn(task: CreatorTask, day: string, zone: string): boolean {
   if (task.when.kind === 'day') return task.when.day === day;
   if (task.when.kind === 'timed') return dayOf(task.when.startsAt, zone) === day;
+  if (task.createdAt !== null && dayOf(task.createdAt, zone) > day) return false;
   return task.when.weekdays.includes(weekdayOf(day));
 }
 
