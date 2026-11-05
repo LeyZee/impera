@@ -297,16 +297,43 @@ async function createCreatorLinkUnscoped(
     // Written as Better Auth looks it up at sign-in, trimmed and in lower case (Bilan, #473).
     const email = body.purpose === 'invitation' ? body.email.trim().toLowerCase() : null;
     let userId: string;
-    if (existing !== undefined) {
-      if (email !== null && existing.email.trim().toLowerCase() !== email) throw new CreatorAccountConflict();
-      userId = existing.id;
-    } else {
-      if (email === null) throw new CreatorAccountNotFound();
+    // An e-mail another account already has is never hers.
+    const refuseTaken = async (address: string): Promise<void> => {
       const [taken] = await tx
         .select({ id: schema.user.id })
         .from(schema.user)
-        .where(sql`lower(${schema.user.email}) = ${email}`);
+        .where(sql`lower(${schema.user.email}) = ${address}`);
       if (taken !== undefined) throw new AccountEmailConflict();
+    };
+    if (existing !== undefined) {
+      userId = existing.id;
+      if (email !== null && existing.email.trim().toLowerCase() !== email) {
+        // Another e-mail: a typo corrected while her access has never been used (ADR 0071 § 3), never once her
+        // password is chosen, which is how she signs in.
+        const [password] = await tx
+          .select({ userId: schema.account.userId })
+          .from(schema.account)
+          .where(and(eq(schema.account.userId, existing.id), eq(schema.account.providerId, 'credential')));
+        if (password !== undefined) throw new CreatorAccountConflict();
+        await refuseTaken(email);
+        await tx
+          .update(schema.user)
+          .set({ email, updatedAt: new Date() })
+          .where(eq(schema.user.id, existing.id));
+        // The addresses stay out of the journal: who changed it, for which creator, and when.
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: input.ownerId,
+          action: 'creator_account.email',
+          entity: 'user',
+          entityId: existing.id,
+          ip: input.ip,
+          details: { creatorId: input.creatorId },
+        });
+      }
+    } else {
+      if (email === null) throw new CreatorAccountNotFound();
+      await refuseTaken(email);
       userId = newId(UserIdSchema);
       await tx.insert(schema.user).values({
         id: userId,

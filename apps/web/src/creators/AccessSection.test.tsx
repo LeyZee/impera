@@ -106,6 +106,34 @@ describe('AccessSection (CR-02)', () => {
     expect(sent).toEqual([{ purpose: 'invitation', email: 'nora@example.test' }]);
   });
 
+  it('corrects her e-mail before her first sign-in, never after (ADR 0071 § 3)', async () => {
+    const sent = serve([
+      { email: 'nora@exmaple.test', invitationPending: true, invitationExpiresAt: LINK.expiresAt },
+      { email: 'nora@example.test', invitationPending: true, invitationExpiresAt: LINK.expiresAt },
+    ]);
+    show();
+    const field = await screen.findByLabelText('Son e-mail');
+    expect(field).toHaveProperty('value', 'nora@exmaple.test');
+    expect(screen.queryByText(/ancien lien cessera de marcher/u)).toBeNull();
+    fireEvent.change(field, { target: { value: 'nora@example' } });
+    const make = screen.getByRole('button', { name: 'Corriger et créer son lien' });
+    expect(make).toHaveProperty('disabled', true);
+    fireEvent.change(field, { target: { value: ' nora@example.test ' } });
+    expect(screen.getByText(/ancien lien cessera de marcher/u)).toBeDefined();
+    fireEvent.click(make);
+    await screen.findByRole('textbox', { name: 'Lien à envoyer' });
+    expect(sent).toEqual([{ purpose: 'invitation', email: 'nora@example.test' }]);
+    await waitFor(() => {
+      expect(screen.getByLabelText('Son e-mail')).toHaveProperty('value', 'nora@example.test');
+    });
+
+    cleanup();
+    serve([{ email: 'nora@example.test', invitationPending: false, invitationExpiresAt: null }]);
+    show();
+    await screen.findByText(/Elle se connecte avec nora@example.test/u);
+    expect(screen.queryByLabelText('Son e-mail')).toBeNull();
+  });
+
   it('says a refusal in its own words, and asks for the password when the sign-in is not recent', async () => {
     serve([null], { status: 409, body: refusal('account_email_conflict') });
     show();

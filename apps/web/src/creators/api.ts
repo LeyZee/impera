@@ -309,7 +309,8 @@ export function useCreatorAccount(creatorId: CreatorId): UseQueryResult<CreatorA
 const LINK_REFUSALS: Partial<Record<InvitationLinkErrorCode, string>> = {
   creator_not_found: 'Cette créatrice n’existe plus. Recharge la page.',
   creator_account_not_found: 'Elle n’a pas encore de compte : crée d’abord son lien d’invitation.',
-  creator_account_conflict: 'Son compte existe déjà avec un autre e-mail : son lien garde celui-là.',
+  creator_account_conflict:
+    'Elle a déjà choisi son mot de passe avec son e-mail : il ne se change plus d’ici.',
   account_email_conflict: 'Un autre compte utilise déjà cet e-mail.',
 };
 
