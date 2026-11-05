@@ -21,6 +21,7 @@ import { createDrizzleColleagueReads } from './infra/colleague-reads';
 import {
   createCreatorOnDutyRoutes,
   createDrizzleCreatorAccountShifts,
+  createDrizzleCreatorShiftsFeed,
   createDrizzleCreatorOnDuty,
 } from './infra/creator-on-duty';
 import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
@@ -162,6 +163,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       calendarReads,
       deps.creators,
       deps.creatorAgendaFeed,
+      createDrizzleCreatorShiftsFeed(deps.db),
       now,
     ),
     leaves: createLeaveService(

@@ -597,6 +597,11 @@ export const calendarLinks = pgTable(
       .references(() => user.id),
     /** SHA-256 of the token, base64url. */
     tokenHash: text('token_hash').notNull().unique(),
+    /**
+     * A creator's link also gives her accounts' shifts (ADR 0045 § 5, CR-05): her choice, kept when she makes a new
+     * address. Always false on a member's link, whose feed is his shifts anyway.
+     */
+    withShifts: boolean('with_shifts').notNull().default(false),
     createdAt: createdAt(),
     revokedAt: timestampTz('revoked_at'),
   },

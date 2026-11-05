@@ -1,7 +1,10 @@
 import {
+  AGENT_SYSTEM_JOBS,
   asPercent,
   ConversationIdSchema,
   FanIdSchema,
+  JOB_LABELS,
+  JobNameSchema,
   LIVE_TARGET,
   liveRate,
   replyOpenedAt,
@@ -220,8 +223,8 @@ export function assembleDashboard(input: {
   readonly budget: BudgetReading;
   /** From the gateway's health: a voice model answers, and whether any key exists for it (main or fallback). */
   readonly voice: VoiceHealth;
-  /** Jobs the worker gave up on, hers or of no creator; `null` when unreadable. */
-  readonly deadJobs: number | null;
+  /** Stuck jobs, hers or of no creator, as `stuckJobsOf` reads them for whoever asks. */
+  readonly jobs: Dashboard['jobs'];
   /** Undefined when Telegram is off. */
   readonly telegram: TelegramReading | undefined;
   /**
@@ -263,7 +266,7 @@ export function assembleDashboard(input: {
       medianWriteMs: facts.voice.medianWriteMs === null ? null : Math.round(facts.voice.medianWriteMs),
       outagesLast7d: facts.voice.outageHoursLast7d,
     },
-    jobs: { dead: input.deadJobs },
+    jobs: input.jobs,
     replies: {
       medianReplyMinutes:
         facts.replies.medianReplyMinutes === null
@@ -301,4 +304,34 @@ export function assembleDashboard(input: {
     },
     revealSales: input.revealSales,
   };
+}
+
+/** A stuck task of the queue: hers or of no creator, and how many. */
+export interface StuckJobsRow {
+  readonly task: string;
+  readonly hers: boolean;
+  readonly count: number;
+}
+
+/**
+ * Her stuck jobs as the Dashboard says them (recette 05/11, PRO-10): each named by `JOB_LABELS`, never its identifier.
+ * Her own jobs and the reading of the Reveal accounts (`AGENT_SYSTEM_JOBS`) count in her agent's health; any other job
+ * of no creator is the agency's: listed for the owner alone (`agency`), never counted for her. `null` rows (unread):
+ * `dead` is `null` and nothing is named.
+ */
+export function stuckJobsOf(rows: readonly StuckJobsRow[] | null, isOwner: boolean): Dashboard['jobs'] {
+  if (rows === null) return { dead: null, stuck: [] };
+  const named = new Map<string, { label: string; count: number; agency: boolean }>();
+  let dead = 0;
+  for (const row of rows) {
+    const job = JobNameSchema.safeParse(row.task);
+    const stopsHer = row.hers || (job.success && AGENT_SYSTEM_JOBS.includes(job.data));
+    if (!stopsHer && !isOwner) continue;
+    if (stopsHer) dead += row.count;
+    const label = job.success ? JOB_LABELS[job.data] : 'Tâche inconnue du serveur';
+    const key = `${label}:${String(!stopsHer)}`;
+    const seen = named.get(key);
+    named.set(key, { label, count: (seen?.count ?? 0) + row.count, agency: !stopsHer });
+  }
+  return { dead, stuck: [...named.values()] };
 }

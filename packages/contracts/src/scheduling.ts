@@ -11,6 +11,7 @@ import {
   TeamMemberIdSchema,
 } from './ids';
 import { TimezoneSchema } from './persona';
+import { TeamMemberStatusSchema } from './team';
 import { CalendarDaySchema, MemberColorSchema } from './team-members';
 
 /**
@@ -493,12 +494,27 @@ export const PlanningQuerySchema = z.object({
 });
 export type PlanningQuery = z.infer<typeof PlanningQuerySchema>;
 
+/**
+ * A member of the planning who is not at work (ADR 0024, recette EQP-03): on leave, sick, travelling, suspended or
+ * gone. His shifts stay on the planning, nobody holds them: their créneaux are to fill.
+ */
+export const PlanningAwaySchema = z.object({
+  memberId: TeamMemberIdSchema,
+  status: TeamMemberStatusSchema.exclude(['active']),
+});
+export type PlanningAway = z.infer<typeof PlanningAwaySchema>;
+
 export const PlanningSchema = z.object({
   settings: SchedulingSettingsSchema,
   accounts: z.array(PlanningAccountSchema),
   members: z.array(PlanningMemberSchema),
   shifts: z.array(ShiftSchema),
   conflicts: z.array(PlanningConflictSchema),
+  /**
+   * The members of these shifts who are not at work, for the owner and an active manager; empty for a member. Empty
+   * too in a planning read before the field existed, still in a cache (relecture Bilan).
+   */
+  away: z.array(PlanningAwaySchema).default([]),
 });
 export type Planning = z.infer<typeof PlanningSchema>;
 
@@ -879,7 +895,8 @@ export type AnswerShiftSwapRequestBody = z.infer<typeof AnswerShiftSwapRequestBo
  * was cancelled, or changed hands or hours since the proposal ; `shift_swap_revert_conflict` 409, an accepted swap that can no
  * longer go back ; `shift_swap_self_invalid` 400, a swap with oneself ; `calendar_link_forbidden` 403, a calendar link
  * asked by an account that is not a member of the team, or who left ; `calendar_feed_not_found` 404, a calendar feed
- * whose link is unknown, revoked or whose member left, one same answer for the three.
+ * whose link is unknown, revoked or whose member left, one same answer for the three ; `calendar_link_not_found` 404, a
+ * creator's choice about a link that is not there (none made, or stopped).
  */
 export const SCHEDULING_ERROR_CODES = [
   'shift_not_found',
@@ -914,6 +931,7 @@ export const SCHEDULING_ERROR_CODES = [
   'shift_swap_self_invalid',
   'calendar_link_forbidden',
   'calendar_feed_not_found',
+  'calendar_link_not_found',
   'slot_version_not_found',
   'slot_version_conflict',
   'slot_version_effective_conflict',

@@ -15,6 +15,7 @@ import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
 import { parseCalendarSearch } from './scheduling/calendar';
+import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { ContentPage } from './screens/content/ContentPage';
@@ -188,9 +189,9 @@ const tracking = createRoute({
       canDecide: user.role !== 'creator',
       canAddCreator: canOpen(rail, '/creatrices'),
     };
-    // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so.
+    // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so; away, it says that (CHAT-09).
     return rail.kind === 'chatter' ? (
-      <ChatterTrackingPage {...props} />
+      <ChatterTrackingPage {...props} away={myAwayOf(user)} />
     ) : (
       <TrackingPage {...props} nav={<SuiviNav />} />
     );
@@ -313,6 +314,7 @@ const myPlanning = createRoute({
     return (
       <MyPlanningPage
         userId={user.id}
+        away={myAwayOf(user)}
         search={search}
         onSearch={(next) => void navigate({ search: next, replace: true })}
       />

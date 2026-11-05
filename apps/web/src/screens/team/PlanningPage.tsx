@@ -2,6 +2,7 @@ import type {
   CalendarAgent,
   OnDuty,
   Planning,
+  PlanningAway,
   ShiftReportList,
   ShiftTemplate,
   TeamMember,
@@ -14,6 +15,7 @@ import { ShiftSheet } from './ShiftSheet';
 import { OnLeave, PendingLeaves, TeamSwaps, type InTheWay } from './TeamExchanges';
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
+import { STATUS_LABELS } from './model';
 import { Unread } from './parts';
 import './team.css';
 
@@ -812,11 +814,14 @@ function Grid({
   );
   // The créneaux are the agency's: they line up at its hour, not at another one (EQ-01).
   const lined = zone === planning.settings.timeZone;
+  // A member away (suspended, on leave, gone) holds none of his shifts: they stay drawn, and their places are to fill.
+  const away = new Map(planning.away.map((one) => [one.memberId, one.status]));
+  const held = planning.shifts.filter((shift) => !away.has(shift.memberId));
   const slotted = rows.map((row) =>
     lined
       ? slotRowOf(
           row,
-          planning.shifts.filter((shift) => shift.platformAccountId === row.account.id),
+          held.filter((shift) => shift.platformAccountId === row.account.id),
           days,
           planning.settings,
           now,
@@ -828,7 +833,7 @@ function Grid({
     const cells = slotted[index];
     const agent = agents?.get(row.account.creatorId) ?? null;
     if (cells === null || cells === undefined || agent === null) return null;
-    const spans = planning.shifts
+    const spans = held
       .filter((shift) => shift.platformAccountId === row.account.id)
       .map((shift) => ({ from: Date.parse(shift.startsAt), to: Date.parse(shift.endsAt) }));
     return new Map(
@@ -951,6 +956,7 @@ function Grid({
                 focus={focus}
                 flagged={flagged}
                 incidents={incidents}
+                away={away}
                 onAdd={onAdd}
                 onShow={onShow}
               />
@@ -979,6 +985,8 @@ function Grid({
   );
 }
 
+type AwayStatus = PlanningAway['status'];
+
 /** A créneau with a stretch ahead and nobody on it: a dashed amber « À pourvoir » that opens a shift on that stretch. */
 const isOpen = (slot: SlotCell): boolean => slot.open !== null;
 
@@ -998,6 +1006,7 @@ function Cell({
   focus,
   flagged,
   incidents,
+  away,
   onAdd,
   onShow,
 }: {
@@ -1020,6 +1029,8 @@ function Cell({
   focus: string | null;
   flagged: ReadonlySet<string>;
   incidents: ReadonlyMap<string, readonly string[]>;
+  /** The members away, by their status: their shifts are held by nobody. */
+  away: ReadonlyMap<string, AwayStatus>;
   onAdd: (start: ShiftStart) => void;
   onShow: (shiftId: string) => void;
 }): JSX.Element {
@@ -1034,6 +1045,7 @@ function Cell({
       muted={focus !== null && chip.shift.memberId !== focus}
       flagged={flagged.has(chip.shift.id)}
       incident={incidents.has(chip.shift.id)}
+      away={away.get(chip.shift.memberId) ?? null}
       onShow={onShow}
     />
   );
@@ -1204,6 +1216,7 @@ function ShiftChip({
   muted,
   flagged,
   incident,
+  away,
   onShow,
 }: {
   chip: Chip;
@@ -1218,6 +1231,8 @@ function ShiftChip({
   flagged: boolean;
   /** Its report says something went wrong. */
   incident: boolean;
+  /** Its member's status when he is away: nobody holds it. */
+  away: AwayStatus | null;
   onShow: (shiftId: string) => void;
 }): JSX.Element {
   const { shift, member } = chip;
@@ -1225,6 +1240,8 @@ function ShiftChip({
   const name = member?.displayName ?? 'Un membre';
   // Read again on the next day, it ends there: no « +1 ».
   const overnight = chip.overnight && !earlier;
+  // Under way with nobody on it (EQP-03): neither « en poste » nor the time left.
+  const onShift = phase === 'live' && away === null;
   return (
     <button
       type="button"
@@ -1233,13 +1250,14 @@ function ShiftChip({
       data-muted={muted ? 'true' : undefined}
       data-flagged={flagged ? 'true' : undefined}
       data-incident={incident ? 'true' : undefined}
+      data-away={away === null ? undefined : 'true'}
       data-repeat={shift.templateId === null ? undefined : 'true'}
       data-color={member?.color === null || member === null ? undefined : 'true'}
       style={member?.color === null || member === null ? undefined : { '--sc-color': member.color }}
       data-carried={carried ? 'true' : undefined}
       tabIndex={carried ? -1 : undefined}
       aria-hidden={carried ? 'true' : undefined}
-      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${phase === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}`}
+      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${onShift ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}${away === null || phase === 'past' ? '' : `, ${STATUS_LABELS[away].toLowerCase()}, à pourvoir`}`}
       onClick={() => {
         onShow(shift.id);
       }}
@@ -1255,7 +1273,13 @@ function ShiftChip({
         {overnight ? <span className="sc-chip__night"> +1</span> : null}
       </span>
       {/* The shift under way: its edge breathes in the member's colour (CSS) and says what is left. */}
-      {phase === 'live' ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
+      {onShift ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
+      {/* Nobody holds it (EQP-03): said in words, its places counted « à pourvoir ». Gone by, it is only history. */}
+      {away === null || phase === 'past' ? null : (
+        <span className="sc-chip__away" aria-hidden="true">
+          {STATUS_LABELS[away]}
+        </span>
+      )}
       {shift.templateId === null ? null : <RepeatIcon className="sc-chip__repeat" titled />}
     </button>
   );

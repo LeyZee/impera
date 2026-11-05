@@ -4,6 +4,10 @@ import {
   CreatorIdSchema,
   CreatorTaskIdSchema,
   newId,
+  PlatformAccountIdSchema,
+  ShiftIdSchema,
+  TeamMemberIdSchema,
+  UserIdSchema,
   type CreatorId,
 } from '@impera/contracts';
 import { eq, schema } from '@impera/db';
@@ -36,7 +40,12 @@ describe('Lien de calendrier de la créatrice (CR-05 lot c2)', () => {
   const today = calendarDayIn(new Date(), PARIS);
   const at = (day: string, hour: number) => wallClockToInstant(day, hour * 60, PARIS).toISOString();
 
-  const call = (method: 'GET' | 'POST' | 'DELETE', url: string, who: keyof typeof cookies, body?: object) =>
+  const call = (
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    url: string,
+    who: keyof typeof cookies,
+    body?: object,
+  ) =>
     server.inject({
       method,
       url,
@@ -88,12 +97,48 @@ describe('Lien de calendrier de la créatrice (CR-05 lot c2)', () => {
       await test.admin.db
         .insert(schema.creators)
         .values({ id, nameKey: id, displayName: label, timezone: PARIS });
-    await createOwner(app.auth, app.db.db, {
+    const { userId: ownerId } = await createOwner(app.auth, app.db.db, {
       email: 'owner@example.test',
       name: 'Owner',
       password: PASSWORD,
     });
     cookies.owner = await signIn(server, 'owner@example.test', PASSWORD);
+    // Who answers her fans tomorrow (ADR 0045 § 5): Kofi on Nora's Reveal account, Yao on Ines's.
+    const tomorrow = addDays(today, 1);
+    for (const [creatorId, name] of [
+      [nora, 'Kofi'],
+      [ines, 'Yao'],
+    ] as const) {
+      const accountId = newId(PlatformAccountIdSchema);
+      await test.admin.db
+        .insert(schema.platformAccounts)
+        .values({ id: accountId, creatorId, platform: 'reveal', handle: `${name}-compte` });
+      const userId = newId(UserIdSchema);
+      const memberId = newId(TeamMemberIdSchema);
+      await test.admin.db.insert(schema.user).values({ id: userId, name, email: `${name}@example.test` });
+      await test.admin.db.insert(schema.teamMembers).values({
+        id: memberId,
+        userId,
+        teamRole: 'chatter',
+        firstName: name,
+        lastName: 'Inventé',
+        displayName: name,
+        country: 'BJ',
+        timeZone: 'Africa/Porto-Novo',
+        joinedOn: '2026-09-01',
+        status: 'active',
+      });
+      await test.admin.db.insert(schema.shifts).values({
+        id: newId(ShiftIdSchema),
+        creatorId,
+        platformAccountId: accountId,
+        memberId,
+        startsAt: new Date(at(tomorrow, 18)),
+        endsAt: new Date(at(tomorrow, 22)),
+        createdBy: ownerId,
+        updatedBy: ownerId,
+      });
+    }
     cookies.nora = await account('nora@example.test', { role: 'creator', creatorIds: [nora] });
     cookies.ines = await account('ines@example.test', { role: 'creator', creatorIds: [ines] });
   });
@@ -167,5 +212,50 @@ describe('Lien de calendrier de la créatrice (CR-05 lot c2)', () => {
     const stopped = await feed(second);
     expect(stopped.statusCode).toBe(404);
     expect(stopped.json()).toMatchObject({ error: { code: 'calendar_feed_not_found' } });
+  });
+
+  it('adds who answers her fans when she chooses it, keeps her choice on a new address, and is hers alone', async () => {
+    const path = await create('nora');
+    const before = await feed(path);
+    expect(before.body).not.toContain('répond à tes fans');
+    expect(
+      CalendarLinkStateSchema.parse((await call('GET', '/v1/scheduling/calendar-link', 'nora')).json()).link,
+    ).toMatchObject({ withShifts: false });
+
+    const chosen = await call('PATCH', '/v1/scheduling/calendar-link', 'nora', { withShifts: true });
+    expect(chosen.statusCode, chosen.body).toBe(200);
+    expect(CalendarLinkStateSchema.parse(chosen.json()).link).toMatchObject({ withShifts: true });
+    const lines = (await feed(path)).body.split('\r\n');
+    expect(lines).toContain('SUMMARY:💬 Kofi répond à tes fans');
+    expect(lines).toContain('DESCRIPTION:Sur Reveal');
+    // A chatter's time, never hers: the shift leaves her free in her calendar, her own slots stay busy.
+    const shift = lines.indexOf('SUMMARY:💬 Kofi répond à tes fans');
+    expect(lines.slice(shift, lines.indexOf('END:VEVENT', shift))).toContain('TRANSP:TRANSPARENT');
+    const shoot = lines.indexOf('SUMMARY:🎬 Tournage robe rouge');
+    expect(lines.slice(shoot, lines.indexOf('END:VEVENT', shoot))).toContain('TRANSP:OPAQUE');
+    expect(lines).toContain(
+      `DTSTART:${at(addDays(today, 1), 18)
+        .replace(/[-:]/gu, '')
+        .replace(/\.\d{3}/u, '')}`,
+    );
+    // Only a name in the team and a range: never another creator's shift, never a handle.
+    expect(lines.join('\n')).not.toContain('Yao');
+    expect(lines.join('\n')).not.toContain('Kofi-compte');
+
+    const renewed = await create('nora');
+    expect((await feed(renewed)).body).toContain('SUMMARY:💬 Kofi répond à tes fans');
+
+    expect(
+      (await call('PATCH', '/v1/scheduling/calendar-link', 'nora', { withShifts: false })).statusCode,
+    ).toBe(200);
+    expect((await feed(renewed)).body).not.toContain('répond à tes fans');
+
+    expect(
+      (await call('PATCH', '/v1/scheduling/calendar-link', 'owner', { withShifts: true })).statusCode,
+    ).toBe(403);
+    // Ines stopped her link above: there is nothing to choose for.
+    const none = await call('PATCH', '/v1/scheduling/calendar-link', 'ines', { withShifts: true });
+    expect(none.statusCode).toBe(404);
+    expect(none.json()).toMatchObject({ error: { code: 'calendar_link_not_found' } });
   });
 });

@@ -26,6 +26,8 @@ export type FeedEvent = {
   readonly uid: string;
   readonly summary: string;
   readonly description: string;
+  /** Someone else's time shown in hers (« Qui répond à tes fans »): it never makes her busy. */
+  readonly free?: boolean;
 } & ({ readonly startsAt: Date; readonly endsAt: Date } | { readonly day: string });
 
 /** `20261103T120000Z`. */
@@ -94,8 +96,9 @@ export function icsOf(input: { name: string; events: readonly FeedEvent[]; stamp
         : [`DTSTART:${utc(event.startsAt)}`, `DTEND:${utc(event.endsAt)}`]),
       `SUMMARY:${escapeText(event.summary)}`,
       `DESCRIPTION:${escapeText(event.description)}`,
-      // A whole day is something to do that day, never time taken: it leaves her free in her calendar.
-      'day' in event ? 'TRANSP:TRANSPARENT' : 'TRANSP:OPAQUE',
+      // A whole day is something to do that day, never time taken, and a shift of her accounts is a chatter's time:
+      // both leave her free in her calendar.
+      'day' in event || event.free === true ? 'TRANSP:TRANSPARENT' : 'TRANSP:OPAQUE',
       'END:VEVENT',
     );
   }

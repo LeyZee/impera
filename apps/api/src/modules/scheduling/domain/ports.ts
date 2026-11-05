@@ -618,7 +618,8 @@ export interface CalendarReads {
   /**
    * One snapshot: the view, the shifts and the agent, the settings, and for `agency` alone the accounts and the shifts
    * of each, read creator by creator (`creatorIds`, the creators that exist) under the same policies as Planning, so
-   * that the créneaux to fill, the hours and the coverage agree with the shifts shown.
+   * that the créneaux to fill, the hours and the coverage agree with the shifts shown; with them, the members of those
+   * shifts who are not at work (`away`), whose shifts hold nothing (recette EQP-03).
    */
   read(
     actor: UserId,
@@ -629,7 +630,7 @@ export interface CalendarReads {
     settings: SchedulingSettings;
     shifts: CalendarRow[];
     agents: CreatorAgent[];
-    agency: { accounts: StoredAccount[]; shifts: StoredShift[] } | null;
+    agency: { accounts: StoredAccount[]; shifts: StoredShift[]; away: ReadonlySet<string> } | null;
   }>;
 }
 
@@ -638,15 +639,18 @@ export interface CalendarReads {
  * reach). The token is made, hashed and compared here, and leaves only from `replace`.
  */
 export interface CalendarLinkStore {
-  /** The account's live link, if any: since when, never the token. */
-  live(userId: UserId): Promise<{ createdAt: Date } | null>;
+  /** The account's live link, if any: since when and her choice of shifts, never the token. */
+  live(userId: UserId): Promise<{ createdAt: Date; withShifts: boolean } | null>;
   /**
    * A new link for a member of the team who has not left, or for a creator's own account (CR-05, ADR 0042 § 4),
-   * revoking the live one, both in the audit log; `null` when the account is neither.
+   * revoking the live one, both in the audit log, and keeping her choice of shifts; `null` when the account is
+   * neither.
    */
   replace(actor: Actor): Promise<{ token: string; createdAt: Date } | null>;
   /** Revokes the live link; whether there was one. */
   revoke(actor: Actor): Promise<boolean>;
+  /** Her choice of shifts on her live link (ADR 0045 § 5), in the audit log; `null` when there is no live link. */
+  choose(actor: Actor, withShifts: boolean): Promise<{ createdAt: Date; withShifts: boolean } | null>;
   /**
    * The holder of a live link, found by the token's hash: a member who has not left, or a creator's account that still
    * opens her; `null` otherwise.
@@ -657,7 +661,22 @@ export interface CalendarLinkStore {
 /** Whose link it is: a member's feed holds their shifts, a creator's her agenda (CR-05). */
 export type CalendarLinkHolder =
   | { readonly kind: 'member'; readonly userId: UserId; readonly memberId: TeamMemberId }
-  | { readonly kind: 'creator'; readonly userId: UserId };
+  | { readonly kind: 'creator'; readonly userId: UserId; readonly withShifts: boolean };
+
+/** One shift of her accounts in her calendar link (ADR 0045 § 5): who answers her fans, where, and when. */
+export interface CreatorFeedShift {
+  readonly shiftId: string;
+  readonly displayName: string;
+  readonly platform: Platform;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+}
+
+/** Her accounts' shifts over the feed's window, read with her own rights (`creator_on_duty`). */
+export type CreatorShiftsFeed = (
+  userId: UserId,
+  window: { readonly from: Date; readonly to: Date },
+) => Promise<readonly CreatorFeedShift[]>;
 
 /**
  * A creator's agenda as her feed shows it (CR-05 lot c2, the `creator-tasks` module's `feedOf`): her tasks between
