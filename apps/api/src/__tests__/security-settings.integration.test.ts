@@ -164,6 +164,22 @@ describe('Réglages › Sécurité (ADR 0046 § 7, SEC-04)', () => {
     expect(await trustedDevicesOf(userId)).toEqual([]);
   });
 
+  it('keeps the trusted device of the browser that closes the others (recette 05/11, reco 24)', async () => {
+    const tess = account('tess');
+    const { userId } = await createOwner(app.auth, app.db.db, tess);
+    await signIn(server, tess.email, tess.password);
+    await signInFrom(tess.email, tess.password, PHONE, true);
+    const [phoneDevice] = await trustedDevicesOf(userId);
+    const laptop = await signInFrom(tess.email, tess.password, LAPTOP, true);
+    const devices = await trustedDevicesOf(userId);
+    expect(devices).toHaveLength(2);
+    const kept = devices.find((device) => device.id !== phoneDevice?.id);
+
+    const closed = await request('POST', '/v1/auth/sessions/close-others', laptop);
+    expect(closed.json()).toMatchObject({ trustedDevices: 1 });
+    expect(await trustedDevicesOf(userId)).toEqual([kept]);
+  });
+
   it('gives ten new backup codes against the password and a code; the old ones stop working', async () => {
     const pia = account('pia');
     const { userId } = await createOwner(app.auth, app.db.db, pia);
