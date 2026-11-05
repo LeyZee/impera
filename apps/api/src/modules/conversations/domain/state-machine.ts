@@ -11,6 +11,7 @@ export type ConversationCommand =
   | 'approve'
   | 'reject'
   | 'expire'
+  | 'expire_unanswered'
   | 'send_verified'
   | 'send_failed_final'
   | 'takeover'
@@ -38,6 +39,9 @@ const TRANSITIONS: Readonly<Record<ConversationCommand, Transitions>> = {
   reject: { awaiting_approval: 'idle' },
   // A draft that is no longer valid; a fan message that caused it already moved the conversation to pending.
   expire: { awaiting_approval: 'idle', pending: 'pending', sending: 'idle' },
+  // A switch or an expired session stopped the answer before it left: the fan still waits, so does the conversation,
+  // and the resume answers it like any fan who wrote during the stop (recette MOT-03).
+  expire_unanswered: { awaiting_approval: 'pending', pending: 'pending', sending: 'pending' },
   send_verified: { sending: 'idle', pending: 'pending' },
   send_failed_final: { sending: 'error', pending: 'error' },
   // From `human` too: a chatter takes a conversation the engine handed over, which closes its alert (ADR 0020).
