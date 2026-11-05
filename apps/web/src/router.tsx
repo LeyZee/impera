@@ -813,7 +813,11 @@ const extensionHelp = createRoute({
 const notifications = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notifications',
-  component: NotificationsPage,
+  component: function Notifications() {
+    const { user } = rootRoute.useRouteContext();
+    // The creator has no shift (ADR 0049 § 4): her words never speak of one (CREA-12).
+    return <NotificationsPage creator={user.role === 'creator'} />;
+  },
 });
 
 const routeTree = rootRoute.addChildren([

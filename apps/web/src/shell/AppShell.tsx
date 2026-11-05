@@ -29,6 +29,7 @@ import {
 
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
+import { useOnline } from '@/pwa/online';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
 
@@ -118,6 +119,11 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
     };
   }, [said]);
 
+  // No network (CREA-04): a pill above the tab bar, out of the page's way, on every screen but her agenda, which says
+  // it in its own words with the ticks that wait (CREA-24). Hers takes her to it: it is what stays readable.
+  const online = useOnline();
+  const offline = !online && !pathname.startsWith('/agenda');
+
   // The hold outlives the screens: a report sent on leaving Aujourd'hui says its refusal in Suivi, and « Rouvrir »
   // takes the reader back to it (EQ-03).
   return (
@@ -137,6 +143,22 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
           </RailNav>
           <Stage key={current ?? 'none'} pathname={pathname} stage={main} />
           <InstallNudge />
+          {/* Always there, empty when silent: a screen reader announces what comes into a region it already knows. */}
+          {offline ? (
+            <p className="nv-offline nv-glass nv-glass--thick" role="status">
+              <span className="nv-dot nv-tone--warn" aria-hidden="true" />
+              {user.role === 'creator' ? (
+                <>
+                  <span>Hors ligne : ton agenda reste consultable.</span>
+                  <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm">
+                    Ouvrir l’agenda
+                  </Link>
+                </>
+              ) : (
+                <span>Hors ligne : Impera revient dès que le réseau revient.</span>
+              )}
+            </p>
+          ) : null}
           {/* Always there, empty when silent: a screen reader announces what comes into a region it already knows. */}
           <p className="nv-notice-region" role="status">
             {said === null ? null : (

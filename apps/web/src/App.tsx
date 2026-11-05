@@ -11,7 +11,9 @@ import { WelcomePage } from './auth/WelcomePage';
 import { linkPageOf } from './auth/api';
 import { readSession, signOut } from './auth/session';
 import { forgetDevice } from './pwa/device';
+import { keepSession, keptSession } from './pwa/keptSession';
 import { listenForNotificationOpens } from './pwa/notificationOpen';
+import { isOnline } from './pwa/online';
 import { refreshPushSubscription, turnOffPush } from './pwa/push';
 import { createAppRouter, type RouterContext } from './router';
 import { railOf } from './shell/nav';
@@ -23,7 +25,9 @@ type Session =
   | { status: 'signed_out' }
   /** Signed in with the password, the code not active yet: the activation is the only screen (ADR 0046). */
   | { status: 'second_factor_required' }
-  | { status: 'signed_in'; user: Me };
+  | { status: 'signed_in'; user: Me }
+  /** No network, and the creator's session kept on this device: her app opens on what it kept (CREA-04). */
+  | { status: 'offline'; user: Me; attempt: number };
 
 /**
  * When the app asks again while the server does not answer: quickly at first (a local server still starting), then
@@ -49,7 +53,10 @@ export function App(): JSX.Element {
         // No session any more (signed out here, revoked or expired elsewhere): the device forgets what it kept.
         if (current.kind === 'signed_out') void forgetDevice();
         // Signed in: the device's subscription is told to the server again, renewed if the server's key changed.
-        if (current.kind === 'signed_in') void refreshPushSubscription();
+        if (current.kind === 'signed_in') {
+          void refreshPushSubscription();
+          keepSession(current.user);
+        }
         setSession(
           current.kind === 'signed_in'
             ? { status: 'signed_in', user: current.user }
@@ -57,10 +64,16 @@ export function App(): JSX.Element {
         );
       },
       () => {
-        setSession((before) => ({
-          status: 'unreachable',
-          attempt: before.status === 'unreachable' ? before.attempt + 1 : 0,
-        }));
+        setSession((before) => {
+          const attempt =
+            before.status === 'unreachable' || before.status === 'offline' ? before.attempt + 1 : 0;
+          // No network: her kept session opens her app; « Le serveur ne répond pas » only with a network (CREA-04).
+          const kept = isOnline() ? null : keptSession();
+          if (kept !== null) return { status: 'offline', user: kept, attempt };
+          // Back on the network while it was open offline: it stays open, and asks again.
+          if (before.status === 'offline') return { ...before, attempt };
+          return { status: 'unreachable', attempt };
+        });
       },
     );
   }, []);
@@ -79,10 +92,13 @@ export function App(): JSX.Element {
     if (linkPage === null) refresh();
   }, [linkPage, refresh]);
   useEffect(() => {
-    if (session.status !== 'unreachable') return undefined;
+    if (session.status !== 'unreachable' && session.status !== 'offline') return undefined;
     const timer = setTimeout(refresh, RETRY_MS[Math.min(session.attempt, RETRY_MS.length - 1)]);
+    // The network is back: asked at once, not at the next try.
+    addEventListener('online', refresh);
     return () => {
       clearTimeout(timer);
+      removeEventListener('online', refresh);
     };
   }, [session, refresh]);
 
@@ -119,7 +135,8 @@ export function App(): JSX.Element {
   }
   return (
     <>
-      <SignedIn user={session.user} onSignOut={leave} />
+      {/* The same user kept offline then read again keeps the same app: only another user makes a new one. */}
+      <SignedIn key={JSON.stringify(session.user)} user={session.user} onSignOut={leave} />
       {signOutFailed ? (
         <p className="nv-signout-failed nv-glass nv-glass--thick" role="alert">
           La déconnexion n’a pas abouti : réessaie.
