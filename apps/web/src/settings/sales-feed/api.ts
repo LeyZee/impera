@@ -3,15 +3,18 @@ import {
   REAUTHENTICATION_ERROR_CODE,
   SalesFeedCheckReportSchema,
   SalesFeedErrorCodeSchema,
+  SalesFeedImportResultSchema,
   SalesFeedLastCheckSchema,
   SalesFeedListSchema,
   SalesFeedOverviewSchema,
   SalesFeedRefusalSchema,
   SalesFeedStatusSchema,
+  type ImportSalesFeedModelsBody,
   type LinkSalesFeedChatterBody,
   type Platform,
   type SalesFeedCheckBody,
   type SalesFeedCheckReport,
+  type SalesFeedImportResult,
   type SalesFeedLastCheck,
   type SalesFeedOverview,
   type SalesFeedRefusal,
@@ -201,4 +204,33 @@ export async function runCheck(platform: Platform, body: SalesFeedCheckBody): Pr
  */
 export async function fetchLastCheck(platform: Platform): Promise<SalesFeedLastCheck> {
   return parsed(await call(`/${platform}/check`), (body) => SalesFeedLastCheckSchema.parse(body));
+}
+
+/**
+ * « Importer la sélection » (CRM-07, ADR 0069): only the models' identifiers and the owner's choices go up; the server
+ * reads the platform's list again and answers line by line, with the overview after. A sign-in too old for it is a
+ * `ReauthRequired`; a list the platform does not give, `SalesFeedRefused` with the server's sentence.
+ */
+export async function importModels(
+  platform: Platform,
+  body: ImportSalesFeedModelsBody,
+): Promise<SalesFeedImportResult> {
+  const response = await call(`/${platform}/import`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+  return parsed(response, (json) => SalesFeedImportResultSchema.parse(json));
+}
+
+/** Dismisses a model from the import (`true`), or takes it back (`false`): it then shows among the others again. */
+export async function setDismissal(
+  platform: Platform,
+  platformModelId: string,
+  dismissed: boolean,
+): Promise<SalesFeedOverview> {
+  const response = await call(`/${platform}/models/${encodeURIComponent(platformModelId)}/dismissal`, {
+    method: dismissed ? 'PUT' : 'DELETE',
+  });
+  return parsed(response, (body) => SalesFeedOverviewSchema.parse(body));
 }

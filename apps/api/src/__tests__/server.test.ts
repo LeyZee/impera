@@ -18,6 +18,7 @@ const READY: Readiness = {
   isReady: true,
   checks: { database: true, migrations: true, worker: true },
   deadJobs: 0,
+  orphanedJobs: 0,
 };
 
 class ConversationNotFound extends DomainError {}
@@ -73,7 +74,7 @@ describe('health and readiness', () => {
   it('answers /ready 200 when every check passes and 503 otherwise, with the checks', async () => {
     const ready = await (await server()).inject({ method: 'GET', url: '/ready' });
     expect(ready.statusCode).toBe(200);
-    expect(ready.json()).toEqual({ status: 'ready', checks: READY.checks, deadJobs: 0 });
+    expect(ready.json()).toEqual({ status: 'ready', checks: READY.checks, deadJobs: 0, orphanedJobs: 0 });
 
     const down: Readiness = {
       isReady: false,
@@ -82,7 +83,12 @@ describe('health and readiness', () => {
     };
     const notReady = await (await server({ readiness: down })).inject({ method: 'GET', url: '/ready' });
     expect(notReady.statusCode).toBe(503);
-    expect(notReady.json()).toEqual({ status: 'not_ready', checks: down.checks, deadJobs: null });
+    expect(notReady.json()).toEqual({
+      status: 'not_ready',
+      checks: down.checks,
+      deadJobs: null,
+      orphanedJobs: null,
+    });
   });
 });
 
@@ -319,6 +325,14 @@ describe('loadConfig', () => {
     const placeholder = { AUTH_SECRET: 'replace-with-openssl-rand-base64-32' };
     expect(testConfig(placeholder).AUTH_SECRET).toBe(placeholder.AUTH_SECRET);
     expect(() => testConfig({ ...placeholder, NODE_ENV: 'production' })).toThrow(/AUTH_SECRET/);
+  });
+
+  it('skips the breached-password check outside production only (recette MOT-14)', () => {
+    expect(testConfig({}).PASSWORD_BREACH_CHECK).toBe('on');
+    expect(testConfig({ PASSWORD_BREACH_CHECK: 'off' }).PASSWORD_BREACH_CHECK).toBe('off');
+    expect(() => testConfig({ PASSWORD_BREACH_CHECK: 'off', NODE_ENV: 'production' })).toThrow(
+      /PASSWORD_BREACH_CHECK/,
+    );
   });
 
   it('takes an AI key left empty in .env as unset', () => {

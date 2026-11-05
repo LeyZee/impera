@@ -18,7 +18,11 @@ import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/age
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
 import { createDrizzleCalendarReads } from './infra/calendar-reads';
 import { createDrizzleColleagueReads } from './infra/colleague-reads';
-import { createCreatorOnDutyRoutes, createDrizzleCreatorOnDuty } from './infra/creator-on-duty';
+import {
+  createCreatorOnDutyRoutes,
+  createDrizzleCreatorAccountShifts,
+  createDrizzleCreatorOnDuty,
+} from './infra/creator-on-duty';
 import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
 import { createDrizzleLeaveStore } from './infra/leave-store';
 import {
@@ -198,8 +202,13 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     },
     routes: (requireRole) => async (app, options) => {
       await createSchedulingRoutes(services, requireRole)(app, options);
-      // Her « qui est en poste » (CR-02): the creator's own door, never the team's routes.
-      await createCreatorOnDutyRoutes(createDrizzleCreatorOnDuty(deps.db), requireRole, now)(app, options);
+      // Her « qui est en poste » (CR-02) and her accounts' shifts in her Agenda (CR-05 c3): the creator's own door,
+      // never the team's routes.
+      await createCreatorOnDutyRoutes(
+        { onDuty: createDrizzleCreatorOnDuty(deps.db), shifts: createDrizzleCreatorAccountShifts(deps.db) },
+        requireRole,
+        now,
+      )(app, options);
     },
     jobs: {
       makeShifts: (logger) => makeShifts(admin, logger, now()),

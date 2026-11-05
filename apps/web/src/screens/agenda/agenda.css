@@ -1280,6 +1280,8 @@
   max-height: 680px;
   overflow: auto;
   overscroll-behavior: contain;
+  /* The rows on top grow when « fans » arrives: the browser must not push the hours down to « keep » its place. */
+  overflow-anchor: none;
 }
 .ag-wk__head,
 .ag-wk__all,
@@ -1288,12 +1290,15 @@
   grid-template-columns: 48px repeat(7, minmax(0, 1fr));
   min-width: 760px;
 }
-.ag-wk__head {
+.ag-wk__top {
   position: sticky;
   top: 0;
   z-index: 3;
+  min-width: 760px;
   background: var(--nv-plate);
   backdrop-filter: blur(16px);
+}
+.ag-wk__head {
   border-bottom: 1px solid var(--nv-hairline);
 }
 .ag-wk__day {
@@ -1706,11 +1711,58 @@ summary.ag-brief__title:focus-visible {
 /* « Dans mon téléphone » (lot c2): a quiet line under her agenda, and its dialog's column. */
 .ag-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: var(--nv-space-2);
   margin: var(--nv-space-4) 0 0;
 }
 .ag-phone {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
+}
+
+/* ── « Qui répond à tes fans » (CR-05 c3): her accounts' shifts, discreet, never on the frieze ──────────────────── */
+.ag-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--nv-space-3);
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.ag-replies p {
+  margin: 0;
+}
+.ag-replies__who {
+  color: var(--nv-ink);
+}
+.ag-replies--short {
+  margin-top: 2px;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.ag-replies__one {
+  white-space: nowrap;
+}
+.ag-replies--cell {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-muted);
+}
+.ag-replies--cell li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-month__fans {
+  margin-top: auto;
+  padding-left: 7px;
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--nv-ink-faint);
 }

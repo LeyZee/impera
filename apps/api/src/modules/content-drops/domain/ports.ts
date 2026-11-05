@@ -52,6 +52,11 @@ interface CleanedMedia {
   readonly sha256: string;
   readonly storageKey: string;
   readonly durationMs: number | null;
+  /**
+   * Whether this receipt wrote the bytes under `storageKey`: it skips them when she already holds the medium. A
+   * medium erased meanwhile is held again only by bytes written (relecture Bilan de #525).
+   */
+  readonly uploaded: boolean;
 }
 
 /** What becomes of a file: received (raw, whole), refused with its sentence, or kept once cleaned. */
@@ -77,7 +82,7 @@ export interface IdeaContentRequest {
 export interface ReceiptStore {
   /** The file, its drop and the drop's category; `null` when it is not there. */
   pending(fileId: string): Promise<(DropFileTarget & { readonly category: DropCategory }) | null>;
-  /** The medium of her library with this fingerprint, `null` when she has none. */
+  /** The medium of her library with this fingerprint whose original is held, `null` when none (or erased, CR-06 c). */
   knownMedia(creatorId: string, sha256: string): Promise<string | null>;
   /**
    * The file moved on, in one transaction, the drop locked first; a file already past the state it moves from is
@@ -113,6 +118,42 @@ export interface DropStorage {
   download(key: string, path: string): Promise<boolean>;
   /** The local file `path` written at `key`, signed with its fingerprint, in parts when it is large. */
   upload(key: string, path: string, mime: DropMime, sha256: string): Promise<void>;
+}
+
+/** An original she dropped that leaves the storage now: at its date (`due`), or with every drop it came in by withdrawn. */
+export interface DueOriginal {
+  readonly mediaAssetId: string;
+  readonly creatorId: string;
+  readonly storageKey: string;
+  readonly reason: 'due' | 'withdrawn';
+  /** The day (UTC) it was kept until. */
+  readonly erasedOn: string;
+}
+
+/**
+ * What `content_drops.erase_originals` reads and writes (`withAdmin`, CR-06 c). An original is one a drop kept: a file
+ * of hers in the `kept` state names it. Each notice is said once per medium and date (a unique index of 0113).
+ */
+export interface RetentionStore {
+  /** The files still waiting for their bytes in a drop that began sending before `before`. */
+  abandonedFiles(before: Date): Promise<string[]>;
+  /** `content_media_expiring` for each original still held that goes before `until` and after `now`; how many. */
+  announce(now: Date, until: Date, correlationId: string): Promise<number>;
+  /** The originals still held that go now, by date or because each drop they came in by was withdrawn. */
+  dueOriginals(now: Date): Promise<DueOriginal[]>;
+  /**
+   * The original erased by `remove`, then marked with `content_media_erased`, under the medium's row lock that a
+   * receipt also takes (relecture Bilan de #525): checked again under it, an original given again meanwhile, or
+   * already marked, is left as it is (`false`). A `remove` that throws leaves it held and unmarked.
+   */
+  erase(
+    original: DueOriginal,
+    now: Date,
+    correlationId: string,
+    remove: (key: string) => Promise<void>,
+  ): Promise<boolean>;
+  /** `content_media_erase_failed`, once per medium and date: the next run tries again. */
+  eraseFailed(original: DueOriginal, now: Date, correlationId: string): Promise<void>;
 }
 
 /** The agency's side (`withTenantMember`): the owner and an active manager; a chatter is refused before any read. */

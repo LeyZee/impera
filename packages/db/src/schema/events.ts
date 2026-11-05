@@ -39,6 +39,11 @@ export const domainEvents = pgTable(
     uniqueIndex('domain_events_sales_feed_mismatch_unique')
       .on(sql`(${t.payload}->>'platform')`, sql`(${t.payload}->>'from')`)
       .where(sql`${t.type} = 'sales_feed_mismatch'`),
+    // Once per medium, type and date (CR-06 c): `content_drops.erase_originals` runs each hour and says each thing
+    // once; a medium given again after its erasure gets a new date. Its erasure is said once by the row it marks.
+    uniqueIndex('domain_events_content_media_unique')
+      .on(sql`(${t.payload}->>'mediaAssetId')`, t.type, sql`(${t.payload}->>'erasedOn')`)
+      .where(sql`${t.type} in ('content_media_expiring', 'content_media_erase_failed')`),
     // Once per account, fortnight and currency (CRM-04 lot d3): the job that publishes it may run again.
     uniqueIndex('domain_events_agency_share_mismatch_unique')
       .on(

@@ -30,12 +30,21 @@ export const mediaAssets = pgTable(
     rights: jsonb('rights').notNull().default({}),
     /** Fan media expire (security.md: 30 days by default); creator media follow their rights. */
     expiresAt: timestampTz('expires_at'),
+    /**
+     * When its original left the storage (CR-06 c, ADR 0044 § 2): the row stays, with its fingerprint, length, type and
+     * description; `storage_key` then names nothing.
+     */
+    erasedAt: timestampTz('erased_at'),
     createdAt: createdAt(),
   },
   (t) => [
     enumCheck('media_assets', t.kind, MEDIA_KINDS),
     enumCheck('media_assets', t.origin, MEDIA_ORIGINS),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
+    // The originals still held with a date (CR-06 c): `content_drops.erase_originals` reads them each hour.
+    index('media_assets_due_idx')
+      .on(t.expiresAt)
+      .where(sql`${t.erasedAt} is null and ${t.expiresAt} is not null`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],
