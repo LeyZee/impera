@@ -1,12 +1,14 @@
 /** Public entry point of the `trends` module (VEI-01, ADR 0060). Other modules import this file only. */
-import type { CreatorId, PersonaLimits } from '@impera/contracts';
+import type { CreatorId, JobPayload, PersonaLimits } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import type { ContentDropsModule, IdeaContentRequest } from '../content-drops';
 import type { CreatorTasksModule } from '../creator-tasks';
 
-import { createDrizzleIdeaStore } from './infra/db/idea-store';
+import { followDecision } from './application/follow';
+import { createDrizzleIdeaFollowStore, createDrizzleIdeaStore } from './infra/db/idea-store';
 import { createDrizzleExtensionLinkStore } from './infra/db/link-store';
 import { createDrizzleReadingStore } from './infra/db/reading-store';
 import { createDrizzleSignalStore } from './infra/db/signal-store';
@@ -20,6 +22,10 @@ export interface TrendsModule {
    * and « Idées du jour » under `/creators/:creatorId/ideas`.
    */
   readonly routes: FastifyPluginAsyncZod;
+  readonly jobs: {
+    /** `creator_tasks.suggestion_decided`: her gesture on an idea's shoot, its content request or its decline (VEI-01 d2). */
+    followDecision(decision: JobPayload<'creator_tasks.suggestion_decided'>): Promise<void>;
+  };
 }
 
 export interface TrendsDeps {
@@ -34,9 +40,15 @@ export interface TrendsDeps {
   readonly limitsOf: (creatorId: CreatorId) => Promise<PersonaLimits | null>;
   /** The agenda's door for a validated idea (VEI-01 d): the trend watch writes no table of hers. */
   readonly agenda: Pick<CreatorTasksModule, 'suggestShoot'>;
+  /** The content request's door for a shoot she accepted (VEI-01 d2). */
+  readonly contentDrops: Pick<ContentDropsModule, 'requestFromIdea'>;
 }
 
 export function createTrendsModule(deps: TrendsDeps): TrendsModule {
+  const follow = {
+    ideas: createDrizzleIdeaFollowStore(deps.adminDb),
+    requestFromIdea: (request: IdeaContentRequest) => deps.contentDrops.requestFromIdea(request),
+  };
   return {
     name: 'trends',
     routes: createTrendRoutes(
@@ -53,5 +65,8 @@ export function createTrendsModule(deps: TrendsDeps): TrendsModule {
       },
       deps.requireRole,
     ),
+    jobs: {
+      followDecision: (decision) => followDecision(follow, decision),
+    },
   };
 }

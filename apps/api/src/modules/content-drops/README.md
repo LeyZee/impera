@@ -26,6 +26,10 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 - Le job (rôle administrateur, seul à faire avancer un état) passe le fichier à « reçu », et le dépôt aussi quand c'était son dernier fichier en attente, avec l'événement `content_drop_received` (`dropId`, `requestId`) dans la même transaction : la veille y lit la demande née d'une idée (VEI-01 d). Un dépôt retiré pendant l'envoi a son brut effacé tout de suite.
 - Sans `S3_*`, chaque envoi répond 503 `content_drop_storage_unavailable` : rien n'est gardé en mémoire à la place. Un dépôt retiré ne prend plus de fichier (409 `content_drop_file_settled_conflict`).
 
+## Une demande née d'une idée (VEI-01 d2)
+
+`requestFromIdea` (index du module) écrit au rôle admin la demande d'un tournage qu'elle a accepté depuis une idée de la veille : origine `idea`, sans auteur (`content_requests_author_check`), sous l'identifiant de l'idée, rejouable (`on conflict do nothing`). Seul le job `creator_tasks.suggestion_decided` de la veille l'appelle.
+
 ## Routes
 
 - `GET /v1/creator-space/content` (créatrice) : ses demandes (la plus proche d'abord) et ses 100 derniers dépôts non retirés.

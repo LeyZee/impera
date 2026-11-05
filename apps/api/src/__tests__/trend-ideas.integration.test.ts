@@ -5,7 +5,9 @@ import {
   CreatorAgendaSchema,
   CreatorIdSchema,
   CreatorTaskSchema,
+  JOB_PAYLOADS,
   newId,
+  SuggestionIdSchema,
   TeamMemberIdSchema,
   TrendSignalIdSchema,
   ValidatedContentIdeaSchema,
@@ -13,7 +15,7 @@ import {
   type CreatorId,
   type DropCategory,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -262,6 +264,76 @@ describe('/v1/creators/:creatorId/ideas', () => {
     expect(CreatorTaskSchema.parse(accepted.json())).toMatchObject({
       shootBrief: 'Une vidéo de 20 secondes, bougies.',
       category: 'shoot',
+    });
+  });
+
+  it('asks the content of the shoot she accepts for its day, declines the idea of the one she declines; replayed, nothing more', async () => {
+    /** The announcement her gesture enqueued, as the worker would read it. */
+    const decisionOf = async (suggestionId: string) => {
+      const result = await test.admin.db.execute(sql`
+        select j.payload from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+         where t.identifier = 'creator_tasks.suggestion_decided'
+           and j.key = ${`creator_tasks.suggestion_decided:${suggestionId}`}`);
+      const [row] = z.array(z.object({ payload: z.unknown() })).parse(result.rows);
+      return JOB_PAYLOADS['creator_tasks.suggestion_decided'].parse(row?.payload);
+    };
+    const ideaOf = async (ideaId: string) =>
+      (
+        await test.admin.db
+          .select({ state: schema.contentIdeas.state, requestId: schema.contentIdeas.requestId })
+          .from(schema.contentIdeas)
+          .where(eq(schema.contentIdeas.id, ideaId))
+      )[0];
+
+    const yes = await seedIdea(nora, { title: 'Robe verte au jardin', category: 'feed_shoot' });
+    const { suggestion } = ValidatedContentIdeaSchema.parse(
+      (await validate(cookies.manager, nora, yes)).json(),
+    );
+    if (suggestion.when?.kind !== 'timed') throw new Error('a timed suggestion');
+    const shootDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(
+      new Date(suggestion.when.startsAt),
+    );
+    const accepted = await call('POST', `/v1/creator-space/suggestions/${yes}/accept`, cookies.nora, {});
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    const decided = await decisionOf(yes);
+    expect(decided).toMatchObject({ state: 'accepted', day: shootDay });
+    await app.modules.trends.jobs.followDecision(decided);
+    await app.modules.trends.jobs.followDecision(decided);
+    const requests = await test.admin.db
+      .select()
+      .from(schema.contentRequests)
+      .where(eq(schema.contentRequests.creatorId, nora));
+    expect(requests.filter((one) => one.id === String(yes))).toEqual([
+      expect.objectContaining({
+        category: 'feed_shoot',
+        dueOn: shootDay,
+        reason: 'Robe verte au jardin',
+        origin: 'idea',
+        state: 'open',
+        createdBy: null,
+      }),
+    ]);
+    expect(await ideaOf(yes)).toEqual({ state: 'suggested', requestId: String(yes) });
+
+    const no = await seedIdea(nora, { title: 'Bain moussant' });
+    await validate(cookies.owner, nora, no);
+    const declined = await call('POST', `/v1/creator-space/suggestions/${no}/decline`, cookies.nora, {});
+    expect(declined.statusCode, declined.body).toBe(204);
+    await app.modules.trends.jobs.followDecision(await decisionOf(no));
+    expect(await ideaOf(no)).toEqual({ state: 'declined', requestId: null });
+    const none = await test.admin.db
+      .select({ id: schema.contentRequests.id })
+      .from(schema.contentRequests)
+      .where(eq(schema.contentRequests.id, no));
+    expect(none).toEqual([]);
+
+    // A suggestion that no idea became: the trend watch has nothing to do with it.
+    await app.modules.trends.jobs.followDecision({
+      creatorId: nora,
+      suggestionId: newId(SuggestionIdSchema),
+      state: 'accepted',
+      day: shootDay,
     });
   });
 

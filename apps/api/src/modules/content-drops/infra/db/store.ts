@@ -50,6 +50,7 @@ import type {
   AgencyContentStore,
   CreatorContentStore,
   DropFileTarget,
+  IdeaContentRequest,
   ReceiptStore,
 } from '../../domain/ports';
 
@@ -496,6 +497,28 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
     markSent: (creatorId, userId, dropId, fileId, correlationId) =>
       asTeam(creatorId, userId, (tx) => markSentIn(tx, dropId, fileId, correlationId)),
   };
+}
+
+/**
+ * A request born of an idea of the trend watch (VEI-01 d2), written by its job under the owner's role: origin `idea`,
+ * no author (`content_requests_author_check`), under the idea's own id, so that a replay writes nothing more.
+ */
+export async function requestFromIdea(adminDb: Database, request: IdeaContentRequest): Promise<void> {
+  await withAdmin(adminDb, async (tx) => {
+    await tx
+      .insert(contentRequests)
+      .values({
+        id: request.id,
+        creatorId: request.creatorId,
+        category: request.category,
+        dueOn: request.dueOn,
+        reason: request.reason,
+        structureId: null,
+        origin: 'idea',
+        createdBy: null,
+      })
+      .onConflictDoNothing({ target: contentRequests.id });
+  });
 }
 
 /**
