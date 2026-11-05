@@ -419,6 +419,16 @@ export const DROP_PART_BYTES = 8 * 1024 * 1024;
 /** How long an address to send a part keeps (an hour): the phone asks again for the parts still missing. */
 export const DROP_PART_URL_SECONDS = 3600;
 
+/** A send unfinished this many hours after the drop is refused (CR-06 c): the storage drops its raw parts after a day. */
+export const DROP_UPLOAD_HOURS = 24;
+
+/**
+ * An original with no planned exit is kept a year after it was kept, then erased (ADR 0055 § 7, Charles 03/11/2026);
+ * the agency is told `DROP_ERASE_NOTICE_DAYS` before. A planned exit (PUB-01) will move it to the exit and 30 days.
+ */
+export const DROP_KEPT_DAYS = 365;
+export const DROP_ERASE_NOTICE_DAYS = 7;
+
 /** The number of parts a file of `bytes` goes up in. */
 export const dropPartCount = (bytes: number): number => Math.max(1, Math.ceil(bytes / DROP_PART_BYTES));
 

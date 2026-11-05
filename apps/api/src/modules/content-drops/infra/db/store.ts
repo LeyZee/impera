@@ -48,6 +48,7 @@ import {
   ContentRequestIdConflict,
   ContentRequestNotFound,
   ContentRequestStructureUnprocessable,
+  MediumErasedMeanwhile,
 } from '../../domain/errors';
 import type {
   AgencyContentStore,
@@ -57,6 +58,7 @@ import type {
   IdeaContentRequest,
   ReceiptStore,
 } from '../../domain/ports';
+import { keptUntil } from '../../domain/retention';
 
 const { auditLog, contentDropFiles, contentDrops, contentRequests } = schema;
 
@@ -557,7 +559,14 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
         const [known] = await tx
           .select({ id: schema.mediaAssets.id })
           .from(schema.mediaAssets)
-          .where(and(eq(schema.mediaAssets.creatorId, creatorId), eq(schema.mediaAssets.sha256, sha256)));
+          .where(
+            and(
+              eq(schema.mediaAssets.creatorId, creatorId),
+              eq(schema.mediaAssets.sha256, sha256),
+              // Erased (CR-06 c), its bytes are no longer held: they are written again.
+              sql`${schema.mediaAssets.erasedAt} is null`,
+            ),
+          );
         return known?.id ?? null;
       }),
     settle: (fileId, outcome, now, correlationId) =>
@@ -576,6 +585,8 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
           return;
         if (outcome.state === 'kept') {
           const { media } = outcome;
+          // Kept a year from today while no exit is planned (CR-06 c, ADR 0055 § 7).
+          const until = keptUntil(now);
           // Her library holds each fingerprint once (ADR 0030 § 1): a file she already gave is a duplicate.
           const inserted = await tx
             .insert(schema.mediaAssets)
@@ -589,23 +600,41 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
               bytes: media.bytes,
               durationMs: media.durationMs,
               sha256: media.sha256,
+              expiresAt: until,
             })
             .onConflictDoNothing()
             .returning({ id: schema.mediaAssets.id });
           const [known] = await tx
-            .select({ id: schema.mediaAssets.id })
+            .select({ id: schema.mediaAssets.id, erasedAt: schema.mediaAssets.erasedAt })
             .from(schema.mediaAssets)
             .where(
               and(
                 eq(schema.mediaAssets.creatorId, drop.creatorId),
                 eq(schema.mediaAssets.sha256, media.sha256),
               ),
-            );
+            )
+            .for('update');
           if (known === undefined) throw new Error(`media ${media.sha256} neither inserted nor found`);
+          // Given again, it is a new drop: its original is held a year from today. Erased already, the bytes this
+          // job just wrote under its key are its original again, and this file the one that kept it.
+          const revived = inserted.length === 0 && known.erasedAt !== null;
+          // Erased after this job found it held: the bytes it skipped are gone, the retry writes them again.
+          if (revived && !media.uploaded)
+            throw new MediumErasedMeanwhile(`media ${known.id} erased meanwhile`);
+          // A medium of her library that came another way than a drop (no date) is left as it is.
+          if (inserted.length === 0)
+            await tx
+              .update(schema.mediaAssets)
+              .set({
+                expiresAt: sql`case when ${schema.mediaAssets.expiresAt} is null then null
+                  else greatest(${schema.mediaAssets.expiresAt}, ${until}) end`,
+                ...(revived ? { erasedAt: null, storageKey: media.storageKey } : {}),
+              })
+              .where(eq(schema.mediaAssets.id, known.id));
           await tx
             .update(contentDropFiles)
             .set({
-              state: inserted.length > 0 ? 'kept' : 'duplicate',
+              state: inserted.length > 0 || revived ? 'kept' : 'duplicate',
               mediaAssetId: known.id,
               updatedAt: now,
             })
