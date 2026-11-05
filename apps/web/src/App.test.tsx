@@ -130,6 +130,9 @@ describe('App without a network (CREA-04)', () => {
     render(<App />);
     expect(await screen.findByRole('button', { name: /Nora/u })).toBeDefined();
     expect(screen.queryByText('ne répond pas')).toBeNull();
+    // Out of her agenda, a pill says it and takes her there: what stays readable.
+    expect(await screen.findByText('Hors ligne : ton agenda reste consultable.')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Ouvrir l’agenda' }).getAttribute('href')).toBe('/agenda');
   });
 
   it('says there is no network, not that the server is silent, with nothing kept', async () => {
