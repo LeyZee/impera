@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, type JSX, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useRevealAlerts } from './reveal';
+
 import { cn } from '@/lib/utils';
 
 import './dialog.css';
@@ -9,6 +11,9 @@ import './dialog.css';
  * The app's floating panel, born on the planning (a new shift, one shift) and used by every screen since: the one
  * glass of the screen, modal, its focus kept inside, closed by Échap, by a tap outside or by its ×, and the focus
  * given back to what opened it. Its styles are `dialog.css`, beside it.
+ *
+ * The glass does not scroll: its content does, inside it (`tm-dialog__scroll`), so the glass's rim stays on the edge of
+ * the panel instead of crossing what scrolls; and a message about what failed is brought into view when it appears.
  */
 export function Dialog({
   title,
@@ -29,6 +34,8 @@ export function Dialog({
 }): JSX.Element {
   const id = useId();
   const dialog = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  useRevealAlerts(scroller);
 
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -83,18 +90,20 @@ export function Dialog({
         aria-labelledby={`${id}-title`}
         onKeyDown={onKeyDown}
       >
-        <header className="tm-dialog__head">
-          <div className="tm-dialog__title">
-            <h2 id={`${id}-title`}>{title}</h2>
-            {lead === undefined ? null : <p>{lead}</p>}
-          </div>
-          <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m4 4 8 8M12 4l-8 8" />
-            </svg>
-          </button>
-        </header>
-        {children}
+        <div ref={scroller} className="tm-dialog__scroll">
+          <header className="tm-dialog__head">
+            <div className="tm-dialog__title">
+              <h2 id={`${id}-title`}>{title}</h2>
+              {lead === undefined ? null : <p>{lead}</p>}
+            </div>
+            <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 4 8 8M12 4l-8 8" />
+              </svg>
+            </button>
+          </header>
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

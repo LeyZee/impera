@@ -1103,7 +1103,7 @@
 
 /* A statement opened: its name and amount on top, its gestures at the bottom, only the path of the money scrolls in
    between, and the glass behind the whole height. */
-.py-dialog:has(.py-read) {
+.py-dialog:has(.py-read) .tm-dialog__scroll {
   overflow: hidden;
 }
 .py-read {
