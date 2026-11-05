@@ -212,6 +212,10 @@ export interface DeclaredDropFile {
 }
 
 /** Why a declared file does not go up for this category, in her words; `null` when it may go. */
+/** A weight as she reads it: « 30 Mo », « 10 Go ». */
+const weightFr = (bytes: number): string =>
+  bytes >= 1024 * MB ? `${String(bytes / (1024 * MB))} Go` : `${String(bytes / MB)} Mo`;
+
 export function declaredFileRefusal(category: DropCategory, file: DeclaredDropFile): string | null {
   const kind = kindOfMime(file.mime);
   const { kinds } = DROP_FORMAT_RULES[category];
@@ -219,7 +223,7 @@ export function declaredFileRefusal(category: DropCategory, file: DeclaredDropFi
     return `${quoted(category)} prend seulement ${joinedFr(kinds.map((k) => KIND_PLURALS[k]))}`;
   }
   if (file.bytes > DROP_MAX_BYTES[kind]) {
-    return `${KIND_SINGULARS[kind]} fait au plus ${String(DROP_MAX_BYTES[kind] / MB)} Mo`;
+    return `${KIND_SINGULARS[kind]} fait au plus ${weightFr(DROP_MAX_BYTES[kind])}`;
   }
   return null;
 }
@@ -423,7 +427,7 @@ export const CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE = 'content_request_structur
 
 /**
  * The size of each part a file goes up in (CR-06 b), the last one shorter: 8 Mio, so that a cut on a phone costs at
- * most 8 Mio, and a video of 500 Mo takes 63 parts (S3 asks at least 5 Mio a part, at most 10 000 parts).
+ * most 8 Mio, and the heaviest video, 10 Gio, takes 1 280 parts (S3 asks at least 5 Mio a part, at most 10 000).
  */
 export const DROP_PART_BYTES = 8 * 1024 * 1024;
 
