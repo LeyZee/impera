@@ -8,9 +8,16 @@ import { createDrizzleFactPurge } from './infra/fact-purge';
 import { createDrizzleFactStore } from './infra/fact-store';
 import { createDrizzleFanStore } from './infra/fan-store';
 import { createDrizzleFlagStore } from './infra/flag-store';
-import { createFlagRoutes, createKycRoutes, type RequireRole } from './infra/http/flag-routes';
+import {
+  createFlagRoutes,
+  createKycRoutes,
+  noFanRouted,
+  type FanRoutedTo,
+  type RequireRole,
+} from './infra/http/flag-routes';
 
 export type { FactProposal } from './domain/facts';
+export type { FanRoutedTo } from './infra/http/flag-routes';
 
 /** Public entry point of the `fans` module (ADR 0002). Other modules import this file only. */
 export interface FansModule extends FansService {
@@ -22,9 +29,10 @@ export interface FansModule extends FansService {
   /**
    * Mounted under `/v1` by the server: `/fans/:id/flags`, read by the dashboard and set by a chatter, and
    * `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
-   * request; all of them when she has none, or without it).
+   * request; all of them when she has none, or without it). `fanRoutedTo` (the `conversations` module) lets a member
+   * whose scope is `self` read, never write, the sheet of a fan routed to him (ADR 0025).
    */
-  routes(requireRole: RequireRole, kycSlotsOf?: KycSlotsOf): FastifyPluginAsyncZod;
+  routes(requireRole: RequireRole, kycSlotsOf?: KycSlotsOf, fanRoutedTo?: FanRoutedTo): FastifyPluginAsyncZod;
 }
 
 /** Her persona's canvas lines (P5-01), in her order; `null` when she has no active persona version. */
@@ -48,14 +56,15 @@ export function createFansModule(deps: FansDeps): FansModule {
     name: 'fans',
     ...service,
     routes:
-      (requireRole, kycSlotsOf = () => Promise.resolve(null)) =>
+      (requireRole, kycSlotsOf = () => Promise.resolve(null), fanRoutedTo = noFanRouted) =>
       async (app) => {
-        await app.register(createFlagRoutes(service, requireRole));
+        await app.register(createFlagRoutes(service, requireRole, undefined, fanRoutedTo));
         await app.register(
           createKycRoutes(
             service,
             requireRole,
             async (creatorId) => (await kycSlotsOf(creatorId)) ?? KycSlotSchema.options,
+            fanRoutedTo,
           ),
         );
       },

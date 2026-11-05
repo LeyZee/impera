@@ -578,6 +578,11 @@ export interface ConversationReader {
   list(creatorId: CreatorId, page: PageRequest, routedTo?: UserId): Promise<Page<ConversationSummary>>;
   /** Whether the conversation is routed to that account: the only way a member whose scope is `self` reaches it. */
   isRoutedTo(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<boolean>;
+  /**
+   * Whether a conversation of this fan is routed to that account: the fan's sheet (his limits, what is left to learn)
+   * is read, never written, by the member who holds it (ADR 0025, recette 05/11 CHAT-03).
+   */
+  isFanRoutedTo(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
   get(creatorId: CreatorId, id: ConversationId): Promise<ConversationDetail | null>;
   /** `null` when the creator has no such conversation, as for `get`: never an empty page that hides it. */
   messages(creatorId: CreatorId, id: ConversationId, page: PageRequest): Promise<Page<MessageView> | null>;

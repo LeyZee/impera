@@ -7,6 +7,7 @@ import {
   SetFanFlagBodySchema,
   UserIdSchema,
   type CreatorId,
+  type FanId,
   type KycSlot,
   type UserId,
   type UserRole,
@@ -40,13 +41,44 @@ function actorFor(request: FastifyRequest, creatorId: CreatorId): UserId {
 }
 
 /**
+ * Whether a conversation of this fan is routed to that account (`conversations`, by the composition root): the only
+ * way a member whose scope is `self` reads a fan (ADR 0024).
+ */
+export type FanRoutedTo = (creatorId: CreatorId, fanId: FanId, userId: UserId) => Promise<boolean>;
+
+/** Nothing is routed: without the `conversations` module, only the whole creator reads a fan. */
+export const noFanRouted: FanRoutedTo = () => Promise.resolve(false);
+
+/**
+ * The signed-in user, allowed to READ this fan's sheet: the whole creator as for a change, or (a chatter, scope `self`)
+ * a conversation of this fan routed to him: what he cannot write to the fan must be in front of him (ADR 0025 « la
+ * fiche du fan » of his conversations, EQ-13 « ses Limites du fan (en lecture) », recette 05/11 CHAT-03). Never a write.
+ */
+async function readerFor(
+  request: FastifyRequest,
+  creatorId: CreatorId,
+  fanId: FanId,
+  routedTo: FanRoutedTo,
+): Promise<UserId> {
+  const { user } = request;
+  if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+  if (user.role === 'owner' || user.creatorIds.includes(creatorId)) return UserIdSchema.parse(user.id);
+  if (!user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
+  const userId = UserIdSchema.parse(user.id);
+  if (!(await routedTo(creatorId, fanId, userId))) throw new CreatorForbidden();
+  return userId;
+}
+
+/**
  * `/v1/fans/:id/flags` (P3-02): the owner or a chatter reads a fan's limits, and sets or lifts one; the session's
- * user is the author of the `fan_flag_set` or `fan_flag_cleared` event.
+ * user is the author of the `fan_flag_set` or `fan_flag_cleared` event. A member whose scope is `self` reads them for
+ * a fan whose conversation is routed to him, and changes none.
  */
 export function createFlagRoutes(
   fans: FansService,
   requireRole: RequireRole,
   now: () => Date = () => new Date(),
+  routedTo: FanRoutedTo = noFanRouted,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
@@ -62,7 +94,7 @@ export function createFlagRoutes(
       },
       async (request) => {
         const { creatorId } = request.query;
-        const actor = actorFor(request, creatorId);
+        const actor = await readerFor(request, creatorId, request.params.id, routedTo);
         return { fanId: request.params.id, ...(await fans.flagsFor(creatorId, request.params.id, actor)) };
       },
     );
@@ -104,12 +136,14 @@ export function createFlagRoutes(
 /**
  * `GET /v1/fans/:id/kyc` (P5-01): what she has still to learn about him, among the canvas lines `slotsOf` gives (her
  * active persona's, in her order, read at each request), for the line « À apprendre » of the Suivi. Read like his
- * limits, by the owner and the chatters only; a fan unknown to this creator is 404 `fan_not_found`.
+ * limits, by the owner and the chatters only (a member whose scope is `self`, for a fan routed to him); a fan unknown
+ * to this creator is 404 `fan_not_found`.
  */
 export function createKycRoutes(
   fans: FansService,
   requireRole: RequireRole,
   slotsOf: (creatorId: CreatorId) => Promise<readonly KycSlot[]>,
+  routedTo: FanRoutedTo = noFanRouted,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.get(
@@ -125,8 +159,8 @@ export function createKycRoutes(
       },
       async (request) => {
         const { creatorId } = request.query;
-        actorFor(request, creatorId);
         const fanId = request.params.id;
+        await readerFor(request, creatorId, fanId, routedTo);
         if ((await fans.getFan(creatorId, fanId)) === null) throw new FanNotFound();
         return { fanId, toLearn: await fans.kycToLearn(creatorId, fanId, await slotsOf(creatorId)) };
       },
