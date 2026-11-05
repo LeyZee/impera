@@ -3,6 +3,7 @@ import type {
   CreatorAgencyRateId,
   CalendarView,
   CreatorId,
+  CreatorPlanned,
   CreatorSummary,
   Currency,
   EarningsSource,
@@ -237,6 +238,11 @@ export interface PlanningAdmin {
   settingsUnscoped(): Promise<SchedulingSettings>;
   /** The templates running on `today` (a calendar day in the grid's zone), for the job. */
   runningTemplatesUnscoped(today: string): Promise<ShiftTemplateId[]>;
+  /**
+   * What still plans someone on her at `now` (ADR 0071 § 2, before she is archived): her shifts not over, neither
+   * cancelled nor stopped, and her templates running on `today` or later (a calendar day in the grid's zone).
+   */
+  plannedUnscoped(creatorId: CreatorId, now: Date, today: string): Promise<CreatorPlanned>;
   /**
    * One template's shifts ahead, in a transaction of its own with the template locked as `endTemplate` locks it: none
    * once it has ended, or while its member is not `active` on its creator; how many were new.

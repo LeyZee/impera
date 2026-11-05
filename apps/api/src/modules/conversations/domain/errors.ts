@@ -85,6 +85,7 @@ export class DraftConflict extends DomainError {
 }
 
 const BLOCKED_MESSAGES: Readonly<Record<BlockedReason, string>> = {
+  creator_archived: 'Cette créatrice est archivée : rien ne part en son nom',
   kill_switch: 'Arrêt d’urgence actif : rien ne part tant qu’il n’est pas levé',
   session_expired: 'La session de la plateforme a expiré : rien ne part tant qu’elle n’est pas reconnectée',
 };
@@ -98,6 +99,7 @@ export class SendBlocked extends DomainError {
 
 /** Why a draft stopped before its send, in the words of its `draft_expired` event. */
 export const BLOCKED_EXPIRY_REASONS: Readonly<Record<BlockedReason, string>> = {
+  creator_archived: 'Créatrice archivée à l’envoi',
   kill_switch: 'Arrêt d’urgence à l’envoi',
   session_expired: 'Session de la plateforme expirée à l’envoi',
 };

@@ -419,6 +419,8 @@ export function createPostgresTelegramStore(deps: TelegramStoreDeps): {
             timezone: schema.creators.timezone,
           })
           .from(schema.creators)
+          // An archived creator is out of the summaries and the settings (ADR 0071 § 2).
+          .where(sql`${schema.creators.archivedAt} is null`)
           .orderBy(schema.creators.createdAt),
       );
       return rows.map((row) => ({ ...row, id: CreatorIdSchema.parse(row.id) }));

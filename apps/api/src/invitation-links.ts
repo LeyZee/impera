@@ -111,12 +111,50 @@ function passwordProblem(password: string): PasswordInvalidReason | null {
 
 /**
  * A link still usable: not used, not replaced, not expired, and, for a member's, its member has not left. A creator's
- * own account (CR-02) has no member: its link names the account itself (`user_id`).
+ * own account (CR-02) has no member: its link names the account itself (`user_id`), and dies with her archiving
+ * (ADR 0071 § 2), which also revokes it.
  */
 const usable = sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null
   and ${schema.invitationLinks.expiresAt} > now()
   and (${schema.invitationLinks.memberId} is null or exists (
-    select 1 from ${schema.teamMembers} m where m.id = ${schema.invitationLinks.memberId} and m.status <> 'left'))`;
+    select 1 from ${schema.teamMembers} m where m.id = ${schema.invitationLinks.memberId} and m.status <> 'left'))
+  and not exists (
+    select 1 from ${schema.user} u join ${schema.creators} c on c.id = any(u.creator_ids)
+    where u.id = ${schema.invitationLinks.userId} and u.role = 'creator' and c.archived_at is not null)`;
+
+/**
+ * Her archiving (ADR 0071 § 2): the live links of her own account are revoked, each audited with the owner. A link
+ * out stays dead when she is reopened: her space reopens by a new one. Returns how many were revoked.
+ */
+export async function revokeCreatorLinksUnscoped(
+  adminDb: Database,
+  input: { creatorId: string; ownerId: string },
+): Promise<number> {
+  return withAdmin(adminDb, async (tx) => {
+    const revoked = await tx
+      .update(schema.invitationLinks)
+      .set({ revokedAt: sql`now()` })
+      .where(
+        and(
+          sql`${schema.invitationLinks.userId} in (select u.id from ${schema.user} u
+            where u.role = 'creator' and u.creator_ids = array[${input.creatorId}]::uuid[])`,
+          sql`${schema.invitationLinks.usedAt} is null and ${schema.invitationLinks.revokedAt} is null`,
+        ),
+      )
+      .returning({ id: schema.invitationLinks.id });
+    for (const link of revoked) {
+      await tx.insert(schema.auditLog).values({
+        id: newId(AuditEntryIdSchema),
+        userId: input.ownerId,
+        action: 'invitation_link.revoke',
+        entity: 'invitation_link',
+        entityId: link.id,
+        details: { creatorId: input.creatorId, reason: 'creator_archived' },
+      });
+    }
+    return revoked.length;
+  });
+}
 
 /** The account a link opens: its member's, or the creator's account it names. */
 const accountOfLink = sql<string>`coalesce(${schema.invitationLinks.userId},
@@ -240,11 +278,12 @@ async function createCreatorLinkUnscoped(
   return withAdmin(adminDb, async (tx) => {
     // Her row is the lock: two links asked at once, or two accounts made at once, follow one another.
     const [creator] = await tx
-      .select({ displayName: schema.creators.displayName })
+      .select({ displayName: schema.creators.displayName, archivedAt: schema.creators.archivedAt })
       .from(schema.creators)
       .where(eq(schema.creators.id, input.creatorId))
       .for('update');
-    if (creator === undefined) throw new CreatorNotFound();
+    // An archived creator has no space to open (ADR 0071 § 2): reopened first, then a new link.
+    if (creator?.archivedAt !== null) throw new CreatorNotFound();
     const [existing] = await tx
       .select({ id: schema.user.id, email: schema.user.email })
       .from(schema.user)

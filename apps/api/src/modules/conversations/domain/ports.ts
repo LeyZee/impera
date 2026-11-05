@@ -229,7 +229,8 @@ interface JobEnqueuer {
 }
 
 /** Reasons the bot must not answer now (message-flow.md §6), read fresh by each job. */
-export type BlockedReason = 'kill_switch' | 'session_expired';
+/** `creator_archived`: her archiving stops the agent by code, whatever the switches say (ADR 0071 § 2). */
+export type BlockedReason = 'creator_archived' | 'kill_switch' | 'session_expired';
 
 interface RespondGate {
   blockedReason(conversation: ConversationKey): Promise<BlockedReason | null>;

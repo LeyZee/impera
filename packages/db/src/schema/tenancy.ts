@@ -38,6 +38,11 @@ export const creators = pgTable(
      * address; `null` until one is copied.
      */
     avatarKey: text('avatar_key'),
+    /**
+     * When the owner archived her (ADR 0071 § 2): out of every list, the agent stopped for her by the code, her space
+     * closed; nothing of hers is deleted. `null` while she is active; set back to `null` when she is reopened.
+     */
+    archivedAt: timestampTz('archived_at'),
     createdAt: createdAt(),
   },
   (t) => [
