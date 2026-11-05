@@ -30,6 +30,15 @@ export const STATUS_LABELS: Readonly<Record<TeamMemberStatus, string>> = {
   left: 'Parti',
 };
 
+/** A member away, in a sentence: « Théo est suspendu ». */
+export const AWAY_WORDS: Readonly<Record<Exclude<TeamMemberStatus, 'active'>, string>> = {
+  on_leave: 'en congé',
+  sick: 'malade',
+  travelling: 'en déplacement',
+  suspended: 'suspendu',
+  left: 'parti',
+};
+
 /** A status's tone: green at work, quiet while away, amber when suspended. Red stays for urgencies. */
 export type StatusTone = 'ok' | 'away' | 'warn' | 'gone';
 export const STATUS_TONES: Readonly<Record<TeamMemberStatus, StatusTone>> = {

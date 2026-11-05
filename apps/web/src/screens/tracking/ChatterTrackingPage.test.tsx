@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatterTrackingPage } from './ChatterTrackingPage';
 
+import type { MyAwayStatus } from '@/scheduling/model';
+
 vi.mock('@/scheduling/time', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/scheduling/time')>()),
   readerZone: () => 'Europe/Paris',
@@ -73,13 +75,19 @@ function serve(shifts: unknown, handover = false): void {
   );
 }
 
-function renderPage(): void {
+function renderPage(away: MyAwayStatus | null = null): void {
   const root = createRootRoute();
   const page = createRoute({
     getParentRoute: () => root,
     path: '/suivi',
     component: () => (
-      <ChatterTrackingPage selected={null} onSelect={() => undefined} canDecide canAddCreator={false} />
+      <ChatterTrackingPage
+        selected={null}
+        onSelect={() => undefined}
+        canDecide
+        canAddCreator={false}
+        away={away}
+      />
     ),
   });
   const router = createRouter({
@@ -142,5 +150,16 @@ describe('Suivi of a chatter (EQ-13)', () => {
     renderPage();
     expect(await screen.findByText('Rien pour toi pour l’instant')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Tu n’es pas en poste' })).toBeNull();
+  });
+
+  it('says first and alone that he is suspended, never « Tu n’es pas en poste » (CHAT-09)', async () => {
+    serve({ current: null, next: tomorrow, ended: null });
+    renderPage('suspended');
+    const card = await screen.findByRole('heading', { name: 'Ton accès est suspendu' });
+    expect(card.closest('section')?.textContent).toContain(
+      'Tu n’as plus accès aux conversations de tes créatrices. Parle à ton responsable.',
+    );
+    expect(screen.queryByRole('heading', { name: 'Tu n’es pas en poste' })).toBeNull();
+    expect(screen.queryByText('Rien pour toi pour l’instant')).toBeNull();
   });
 });

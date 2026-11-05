@@ -143,23 +143,25 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
           </RailNav>
           <Stage key={current ?? 'none'} pathname={pathname} stage={main} />
           <InstallNudge />
-          {/* Always there, empty when silent: a screen reader announces what comes into a region it already knows. */}
-          {offline ? (
-            <p className="nv-offline nv-glass nv-glass--thick" role="status">
-              <span className="nv-dot nv-tone--warn" aria-hidden="true" />
-              {user.role === 'creator' ? (
-                <>
-                  <span>Hors ligne : ton agenda reste consultable.</span>
-                  <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm">
-                    Ouvrir l’agenda
-                  </Link>
-                </>
-              ) : (
-                <span>Hors ligne : Impera revient dès que le réseau revient.</span>
-              )}
-            </p>
-          ) : null}
-          {/* Always there, empty when silent: a screen reader announces what comes into a region it already knows. */}
+          {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
+              already knows. */}
+          <div className="nv-offline-region" role="status">
+            {offline ? (
+              <p className="nv-offline nv-glass nv-glass--thick">
+                <span className="nv-dot nv-tone--warn" aria-hidden="true" />
+                {user.role === 'creator' ? (
+                  <>
+                    <span>Hors ligne : ton agenda reste consultable.</span>
+                    <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm">
+                      Ouvrir l’agenda
+                    </Link>
+                  </>
+                ) : (
+                  <span>Hors ligne : Impera revient dès que le réseau revient.</span>
+                )}
+              </p>
+            ) : null}
+          </div>
           <p className="nv-notice-region" role="status">
             {said === null ? null : (
               <span className="nv-notice nv-glass nv-glass--thick" key={said.at}>

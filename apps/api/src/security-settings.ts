@@ -44,6 +44,7 @@ import {
   ReauthenticationRequired,
   SessionUnauthenticated,
   sessionOf,
+  trustedDeviceIdentifier,
   type Auth,
   type RequireRole,
 } from './auth';
@@ -53,7 +54,8 @@ import { recordRefusal } from './security-alerts';
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): each person sees and closes their own sessions and gets new backup
  * codes; the owner sees, per account, whether its second factor is active, and closes all its sessions. Closing every
- * other session forgets the trusted devices too (§ 3). Nothing here shows a full address: a network, never more.
+ * other session forgets the other trusted devices too (§ 3), never this browser's. Nothing here shows a full address: a
+ * network, never more.
  */
 
 /** New backup codes per account: the password and a code each time, a guess stays slow. Bounds of its own. */
@@ -204,14 +206,19 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
       },
     );
 
-    // Every session but this one, and every trusted device: a stolen phone is signed out and asks for the code again.
+    // Every session but this one, and every trusted device but this browser's: a stolen phone is signed out and asks for
+    // the code again, this device keeps skipping it (recette 05/11, reco 24).
     app.post(
       '/auth/sessions/close-others',
       { preValidation: anyone, schema: { response: { 200: ClosedSessionsSchema } } },
       async (request): Promise<ClosedSessions> => {
         const { userId, sessionId } = await signedIn(request);
+        const thisDevice = await trustedDeviceIdentifier(auth, request);
         return withAdmin(adminDb, async (tx) => {
-          const closed = await revokeSignIns(tx, userId, { keepSessionId: sessionId });
+          const closed = await revokeSignIns(tx, userId, {
+            keepSessionId: sessionId,
+            ...(thisDevice !== undefined && { keepTrustedDevice: thisDevice }),
+          });
           await audit(tx, {
             userId,
             action: 'auth.sessions_revoked',

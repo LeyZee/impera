@@ -9,6 +9,8 @@ import type {
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
 
+import { AWAY_WORDS } from './model';
+
 import { AGENCY_STATUS, amountText, periodAt, reportOf, STATUS_TONES, validatedTotal } from '@/reports/model';
 import '@/reports/reports.css';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
@@ -76,6 +78,8 @@ export function ShiftSheet({
   const record = members.find((member) => member.id === shift.memberId) ?? null;
   const template = templates.find((one) => one.id === shift.templateId) ?? null;
   const phase = phaseOf(shift, now);
+  // His status when he is away: nobody holds the shift (EQP-03).
+  const away = planning.away.find((one) => one.memberId === shift.memberId)?.status ?? null;
   const report = reports === null ? null : reportOf(reports, shift.id);
   const corrected = reports?.some((one) => one.correctsId !== null && one.status === 'validated') ?? false;
   const startDay = dayOf(shift.startsAt, agency);
@@ -184,10 +188,22 @@ export function ShiftSheet({
             </p>
           </div>
           <span className={`nv-status sc-phase sc-phase--${phase}`}>
-            <span className={`nv-dot${phase === 'live' ? ' nv-tone--ok nv-dot--live' : ''}`} />
-            {PHASE_LABELS[phase]}
+            <span
+              className={`nv-dot${phase === 'live' && away === null ? ' nv-tone--ok nv-dot--live' : ''}`}
+            />
+            {/* Under way with its member away: nobody is « en poste » (EQP-03). */}
+            {phase === 'live' && away !== null ? 'En cours' : PHASE_LABELS[phase]}
           </span>
         </div>
+        {away === null || phase === 'past' ? null : (
+          <p className="tm-warn sc-sheet__away" role="status">
+            {shown?.displayName ?? 'Ce membre'} est {AWAY_WORDS[away]} : personne ne{' '}
+            {phase === 'live' ? 'tient ce shift en ce moment' : 'tiendra ce shift'}.{' '}
+            {phase === 'live'
+              ? 'Arrête-le, puis ouvre un shift à un autre membre.'
+              : 'Choisis un autre membre, ou annule-le.'}
+          </p>
+        )}
         <ul className="sc-sheet__facts">
           {differs ? (
             <li>

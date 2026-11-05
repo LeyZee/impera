@@ -131,7 +131,9 @@ describe('App without a network (CREA-04)', () => {
     expect(await screen.findByRole('button', { name: /Nora/u })).toBeDefined();
     expect(screen.queryByText('ne répond pas')).toBeNull();
     // Out of her agenda, a pill says it and takes her there: what stays readable.
-    expect(await screen.findByText('Hors ligne : ton agenda reste consultable.')).toBeDefined();
+    const pill = await screen.findByText('Hors ligne : ton agenda reste consultable.');
+    // Said in a region that was there before it: a screen reader announces it.
+    expect(pill.closest('[role="status"]')?.className).toBe('nv-offline-region');
     expect(screen.getByRole('link', { name: 'Ouvrir l’agenda' }).getAttribute('href')).toBe('/agenda');
   });
 

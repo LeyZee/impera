@@ -6,6 +6,7 @@ import {
   type JSX,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from 'react';
 
 import type { AddPreset } from './AddDialog';
@@ -113,11 +114,7 @@ export function DayView({
         <section className="ag-sec">
           <div className="ag-sec__head">
             <h2>Programme</h2>
-            <span className="ag-count">
-              {plan.timed.length === 0
-                ? 'libre'
-                : `${String(plan.timed.length)} ${plan.timed.length > 1 ? 'tâches' : 'tâche'} à heure`}
-            </span>
+            <span className="ag-count">{timedCount(plan)}</span>
           </div>
           {proposed.length === 0 ? null : (
             <p className="ag-proposed-note">
@@ -139,6 +136,13 @@ export function DayView({
       </div>
     </div>
   );
+}
+
+/** « 2 tâches à heure », her own: one carried from yesterday is counted on its first day, as in the ring. */
+function timedCount(plan: DayPlan): string {
+  const own = ownTimed(plan).length;
+  if (own > 0) return `${String(own)} ${own > 1 ? 'tâches' : 'tâche'} à heure`;
+  return plan.timed.length === 0 ? 'libre' : '';
 }
 
 /** The seven days of her week, a dot per thing planned; ← and → move a day, Début and Fin to the ends. */
@@ -218,17 +222,23 @@ const ringDash = (share: number): string => {
   return `${(length * share).toFixed(1)} ${length.toFixed(1)}`;
 };
 
-/** Where her day stands: done out of all, where to start, and what is now or next. Her streak beside it. */
-function Glance({
+/**
+ * Where her day stands: done out of all, where to start, and what is now or next. Her streak beside it. Aujourd'hui
+ * shows the same, read only, with its way into Agenda under it (CREA-19).
+ */
+export function Glance({
   plan,
   agenda,
   now,
   nowMinute,
+  children,
 }: {
   plan: DayPlan;
   agenda: CreatorAgenda;
   now: Date;
   nowMinute: number | null;
+  /** What closes the glance, at its foot. */
+  children?: ReactNode;
 }): JSX.Element {
   const { done, total } = progressOf(plan);
   const left = total - done;
@@ -327,6 +337,7 @@ function Glance({
       {streak.atRisk ? (
         <p className="ag-glance__risk">Coche ta routine aujourd’hui pour garder ta série.</p>
       ) : null}
+      {children}
     </section>
   );
 }

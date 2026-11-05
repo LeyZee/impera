@@ -4,6 +4,7 @@ import {
   DROP_CATEGORY_LABELS,
   declaredFileRefusal,
   dropCountRefusal,
+  kindOfMime,
   type ContentDrop,
   type ContentDropFileId,
   type ContentRequest,
@@ -12,6 +13,7 @@ import {
 } from '@impera/contracts';
 import { useRef, useState, type JSX } from 'react';
 
+import { Thumb } from './Thumb';
 import { Refused, createDrop } from './api';
 import {
   CATEGORY_EMOJIS,
@@ -20,6 +22,8 @@ import {
   UNKNOWN_TYPE,
   acceptOf,
   mimeOf,
+  moved,
+  sameFile,
   weightOf,
 } from './model';
 
@@ -121,7 +125,12 @@ export function DropSheet({
           onChange={(event) => {
             const picked = [...(event.target.files ?? [])];
             event.target.value = '';
-            setChosen((list) => [...list, ...picked.map((file) => chosenOf(category, file))]);
+            setChosen((list) => [
+              ...list,
+              ...picked
+                .filter((file) => !list.some((item) => sameFile(item.file, file)))
+                .map((file) => chosenOf(category, file)),
+            ]);
           }}
         />
         <button
@@ -135,8 +144,14 @@ export function DropSheet({
 
         {chosen.length === 0 ? null : (
           <ul className="ct-chosen">
-            {chosen.map((item) => (
+            {chosen.map((item, index) => (
               <li key={item.id} className="ct-chosen__item">
+                <span className="ct-chosen__visual">
+                  <Thumb file={item.file} kind={item.mime === null ? null : kindOfMime(item.mime)} />
+                  <span className="ct-chosen__rank nv-num" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                </span>
                 <div className="ct-chosen__text">
                   <span className="ct-chosen__name">{item.file.name}</span>
                   <span
@@ -147,6 +162,32 @@ export function DropSheet({
                     {item.refusal ?? weightOf(item.file.size)}
                   </span>
                 </div>
+                {chosen.length > 1 ? (
+                  <span className="ct-chosen__move">
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--plain nv-btn--sm"
+                      aria-label={`Monter ${item.file.name}`}
+                      disabled={busy || index === 0}
+                      onClick={() => {
+                        setChosen((list) => moved(list, index, -1));
+                      }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--plain nv-btn--sm"
+                      aria-label={`Descendre ${item.file.name}`}
+                      disabled={busy || index === chosen.length - 1}
+                      onClick={() => {
+                        setChosen((list) => moved(list, index, 1));
+                      }}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   className="nv-btn nv-btn--plain nv-btn--sm"
@@ -156,7 +197,7 @@ export function DropSheet({
                     setChosen((list) => list.filter((other) => other.id !== item.id));
                   }}
                 >
-                  Enlever
+                  ✕
                 </button>
               </li>
             ))}
@@ -165,8 +206,8 @@ export function DropSheet({
         {countRefusal === null ? null : <p className="ct-warn">{countRefusal}</p>}
         {total > HEAVY_BYTES ? (
           <p className="ct-note">
-            {weightOf(total)} à envoyer : garde l’écran allumé, en Wi-Fi si tu peux. Si ça coupe, ça reprend
-            où ça s’est arrêté.
+            {weightOf(total)} à envoyer : garde l’écran allumé, en Wi-Fi si tu peux. Si le réseau coupe, ça
+            reprend tout seul ; si la page se ferme, touche « Reprendre » sur le dépôt.
           </p>
         ) : null}
 

@@ -11,6 +11,7 @@ import {
   TeamMemberIdSchema,
 } from './ids';
 import { TimezoneSchema } from './persona';
+import { TeamMemberStatusSchema } from './team';
 import { CalendarDaySchema, MemberColorSchema } from './team-members';
 
 /**
@@ -493,12 +494,27 @@ export const PlanningQuerySchema = z.object({
 });
 export type PlanningQuery = z.infer<typeof PlanningQuerySchema>;
 
+/**
+ * A member of the planning who is not at work (ADR 0024, recette EQP-03): on leave, sick, travelling, suspended or
+ * gone. His shifts stay on the planning, nobody holds them: their créneaux are to fill.
+ */
+export const PlanningAwaySchema = z.object({
+  memberId: TeamMemberIdSchema,
+  status: TeamMemberStatusSchema.exclude(['active']),
+});
+export type PlanningAway = z.infer<typeof PlanningAwaySchema>;
+
 export const PlanningSchema = z.object({
   settings: SchedulingSettingsSchema,
   accounts: z.array(PlanningAccountSchema),
   members: z.array(PlanningMemberSchema),
   shifts: z.array(ShiftSchema),
   conflicts: z.array(PlanningConflictSchema),
+  /**
+   * The members of these shifts who are not at work, for the owner and an active manager; empty for a member. Empty
+   * too in a planning read before the field existed, still in a cache (relecture Bilan).
+   */
+  away: z.array(PlanningAwaySchema).default([]),
 });
 export type Planning = z.infer<typeof PlanningSchema>;
 

@@ -131,6 +131,16 @@ describe('PersonaSchema', () => {
     expect(withChange((p) => (p.details.date_of_birth = '2008-10-17')).success).toBe(true);
   });
 
+  it('refuses a date of birth 100 years or more before the version (reco 22)', () => {
+    expect(issuePaths(withChange((p) => (p.details.date_of_birth = '1890-01-01')))).toEqual([
+      'details.date_of_birth',
+    ]);
+    expect(issuePaths(withChange((p) => (p.details.date_of_birth = '1926-10-17')))).toEqual([
+      'details.date_of_birth',
+    ]);
+    expect(withChange((p) => (p.details.date_of_birth = '1926-10-18')).success).toBe(true);
+  });
+
   it('refuses an unknown time zone', () => {
     expect(issuePaths(withChange((p) => (p.details.timezone = 'Europe/Atlantis')))).toEqual([
       'details.timezone',
