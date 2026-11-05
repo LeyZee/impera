@@ -1294,6 +1294,58 @@
   }
 }
 
+/*
+ * Hors ligne (CREA-04): a pill above the phone's tab bar, out of the page's way, for as long as the network is gone.
+ * Amber, a warning; the page keeps room for it so nothing hides under it.
+ */
+.nv-offline.nv-glass {
+  --_radius: 999px;
+  position: fixed;
+  z-index: 27;
+  left: max(14px, env(safe-area-inset-left, 0px));
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--nv-above-tabbar) + 12px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 8px 8px 8px 16px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink);
+  animation: nv-more-fade var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.nv-offline > span:not(.nv-dot) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nv-offline:not(:has(.nv-btn)) {
+  padding-right: 16px;
+}
+.nv-offline .nv-btn {
+  flex: none;
+}
+@media (max-width: 820px) {
+  .nv-app:has(.nv-offline) {
+    --nv-tabbar-room: calc(110px + 56px + env(safe-area-inset-bottom, 0px));
+  }
+  /* The install card goes first: it waits for the network anyway. */
+  .nv-app:has(.nv-offline) .nv-install {
+    display: none;
+  }
+}
+@media (min-width: 821px) {
+  .nv-offline.nv-glass {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    max-width: 420px;
+  }
+}
+
 /* On a computer, quiet cards in the corner, out of the screen's way; the update above the install card. */
 @media (min-width: 821px) {
   .nv-update.nv-glass,

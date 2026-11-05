@@ -163,7 +163,18 @@ function ThisDevice(): JSX.Element {
   );
 }
 
-function QuietHours({ saved }: { saved: NotificationPreferences }): JSX.Element {
+/** What quiet hours and the daily cap leave out, in the words of the reader: the creator has no shift (CREA-12). */
+const QUIET_WORDS = {
+  team: 'Rien ne sonne. Un récapitulatif t’attend à la fin. Le début de ton propre shift sonne quand même.',
+  creator: 'Rien ne sonne. Un récapitulatif t’attend à la fin.',
+} as const;
+const CAP_WORDS = {
+  team: 'Rappels, routine, équipe. Les ventes et le début de ton shift ne comptent pas.',
+  creator: 'Rappels et routine. Tes ventes ne comptent pas.',
+} as const;
+
+function QuietHours({ saved, creator }: { saved: NotificationPreferences; creator: boolean }): JSX.Element {
+  const words = creator ? 'creator' : 'team';
   const client = useQueryClient();
   const [draft, setDraft] = useState(saved);
   // Its own switch (recette 05/11, PRO-01): start equal to end while an hour is typed is a range to correct, never
@@ -210,10 +221,7 @@ function QuietHours({ saved }: { saved: NotificationPreferences }): JSX.Element 
         <label className="nv-notif__row">
           <span className="nv-notif__label">
             <strong>Heures calmes</strong>
-            <span className="nv-notif__hint">
-              Rien ne sonne. Un récapitulatif t’attend à la fin. Le début de ton propre shift sonne quand
-              même.
-            </span>
+            <span className="nv-notif__hint">{QUIET_WORDS[words]}</span>
           </span>
           <input
             type="checkbox"
@@ -268,9 +276,7 @@ function QuietHours({ saved }: { saved: NotificationPreferences }): JSX.Element 
         <div className="nv-notif__row">
           <span className="nv-notif__label">
             <strong>Au plus par jour</strong>
-            <span className="nv-notif__hint">
-              Rappels, routine, équipe. Les ventes et le début de ton shift ne comptent pas.
-            </span>
+            <span className="nv-notif__hint">{CAP_WORDS[words]}</span>
           </span>
           <div className="nv-notif__stepper" role="group" aria-label="Notifications au plus par jour">
             <button
@@ -328,7 +334,7 @@ function QuietHours({ saved }: { saved: NotificationPreferences }): JSX.Element 
   );
 }
 
-export function NotificationsPage(): JSX.Element {
+export function NotificationsPage({ creator = false }: { creator?: boolean }): JSX.Element {
   const preferences = useQuery(preferencesQuery);
   return (
     <Page>
@@ -344,7 +350,7 @@ export function NotificationsPage(): JSX.Element {
             </PanelSection>
           </Panel>
         ) : (
-          <QuietHours key={JSON.stringify(preferences.data)} saved={preferences.data} />
+          <QuietHours key={JSON.stringify(preferences.data)} saved={preferences.data} creator={creator} />
         )}
       </div>
     </Page>

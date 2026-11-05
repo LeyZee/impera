@@ -58,7 +58,7 @@ export interface ScriptStructureStore {
    * frozen, or `null` for an unknown or archived structure.
    */
   freeze(id: ScriptStructureId, userId: string): Promise<ScriptStructureVersion | null>;
-  /** Her queue in order, `null` for a creator who does not exist. */
+  /** Her queue in order; `null` for a creator who does not exist, or for a reader other than the owner and an active manager. */
   queue(creatorId: CreatorId, userId: string): Promise<readonly QueuedStructure[] | null>;
   /**
    * Replaces her queue with these structures, in this order, audited. `unprocessable` names the structures that are

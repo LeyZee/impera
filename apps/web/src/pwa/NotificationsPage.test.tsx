@@ -59,10 +59,14 @@ function serve(testStatus = 200): Call[] {
   return calls;
 }
 
-function renderPage(): void {
+function renderPage(creator = false): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rootRoute = createRootRoute();
-  const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component: NotificationsPage });
+  const page = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/',
+    component: () => <NotificationsPage creator={creator} />,
+  });
   const install = createRoute({
     getParentRoute: () => rootRoute,
     path: '/aide/installer',
@@ -198,6 +202,15 @@ describe('Notifications, when it rings', () => {
     await waitFor(() => {
       expect(save()).toHaveProperty('disabled', true);
     });
+  });
+
+  it('never speaks of a shift to the creator, who has none (CREA-12)', async () => {
+    serve();
+    deviceIs('unsupported');
+    renderPage(true);
+    expect(await screen.findByText('Rien ne sonne. Un récapitulatif t’attend à la fin.')).toBeTruthy();
+    expect(screen.getByText('Rappels et routine. Tes ventes ne comptent pas.')).toBeTruthy();
+    expect(screen.queryByText(/shift/u)).toBeNull();
   });
 
   it('switches quiet hours off as start equal to end', async () => {

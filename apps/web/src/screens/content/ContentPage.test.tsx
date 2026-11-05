@@ -174,4 +174,37 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(within(section).getByRole('button', { name: 'Reprendre' })).toBeDefined();
     expect(within(section).getByText('En envoi')).toBeDefined();
   });
+
+  it('keeps the files in the order she sets: numbered, moved up or down, sent in that order', async () => {
+    const calls = serve({ requests: [], drops: [] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
+    const dialog = screen.getByRole('dialog');
+    const input = dialog.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    const first = new File(['a'], 'IMG_1.HEIC', { type: '' });
+    pick(input, [
+      first,
+      new File(['bb'], 'IMG_2.HEIC', { type: '' }),
+      new File(['ccc'], 'IMG_3.HEIC', { type: '' }),
+    ]);
+    // The same file picked again goes once.
+    pick(input, [first]);
+    const names = (): (string | null)[] =>
+      [...dialog.querySelectorAll('.ct-chosen__name')].map((name) => name.textContent);
+    expect(names()).toEqual(['IMG_1.HEIC', 'IMG_2.HEIC', 'IMG_3.HEIC']);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Monter IMG_3.HEIC' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Monter IMG_3.HEIC' }));
+    expect(names()).toEqual(['IMG_3.HEIC', 'IMG_1.HEIC', 'IMG_2.HEIC']);
+    expect(within(dialog).getByRole('button', { name: 'Monter IMG_3.HEIC' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.method === 'POST')).toBe(true);
+    });
+    const drop = calls.find((call) => call.method === 'POST');
+    expect(drop?.body).toMatchObject({ files: [{ bytes: 3 }, { bytes: 1 }, { bytes: 2 }] });
+  });
 });

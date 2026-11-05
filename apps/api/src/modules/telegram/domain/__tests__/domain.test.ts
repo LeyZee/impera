@@ -147,6 +147,34 @@ describe('classification (ADR 0020 §2)', () => {
     });
   });
 
+  it('says a linked model gone or banned, in Important, without her name (CRM-07 a2)', () => {
+    const gone = classify({
+      kind: 'sales_feed_model',
+      platform: 'reveal',
+      change: 'gone',
+      platformModelId: 'model_x',
+    });
+    expect(gone).toEqual({
+      kind: 'notice',
+      topic: 'important',
+      threadKey: 'sales_feed_model:reveal:model_x:gone',
+      title: 'Important',
+      body: 'Ventes Reveal : une créatrice reliée n’apparaît plus dans la liste des modèles de Reveal. Rien n’est supprimé : regarde sa fiche et ses ventes.',
+      link: { label: 'Ouvrir Ventes', path: '/reglages/ventes' },
+    });
+    expect(
+      classify({
+        kind: 'sales_feed_model',
+        platform: 'reveal',
+        change: 'banned',
+        platformModelId: 'model_x',
+      }),
+    ).toMatchObject({
+      threadKey: 'sales_feed_model:reveal:model_x:banned',
+      body: 'Ventes Reveal : une créatrice reliée est marquée bannie par Reveal. Rien n’est supprimé : regarde sa fiche et ses ventes.',
+    });
+  });
+
   it('tells the owner her share strays from the percentage, to the groups for all, once, no amount (CRM-04 d3)', () => {
     const creatorId = CreatorIdSchema.parse('018f3e5c-0000-7000-8000-0000000000c1');
     expect(

@@ -468,6 +468,17 @@
 .ag-check[aria-pressed='true'] {
   background: var(--ag-c, var(--nv-ink-muted));
 }
+/* A tick kept on her phone until the network is back (CREA-24): amber, a warning, never red. */
+.ag-check[data-waiting]::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--nv-warning);
+}
 .ag-check[aria-pressed='true'] svg {
   stroke-dashoffset: 0;
 }

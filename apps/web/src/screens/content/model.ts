@@ -96,6 +96,27 @@ export function acceptOf(category: DropCategory): string {
   return parts.join(',');
 }
 
+/**
+ * Her files in the order she wants them (Charles, 05/11: « une suite de médias précise »): the item at `index` moved
+ * one place up (`-1`) or down (`+1`); the list unchanged at either end. The drop keeps this order, file by file.
+ */
+export function moved<T>(list: readonly T[], index: number, step: -1 | 1): T[] {
+  const target = index + step;
+  const item = list[index];
+  const other = list[target];
+  if (item === undefined || other === undefined) return [...list];
+  const next = [...list];
+  next[index] = other;
+  next[target] = item;
+  return next;
+}
+
+/** The same file picked twice (same name, weight and date): it goes once. */
+export const sameFile = (
+  a: { readonly name: string; readonly size: number; readonly lastModified: number },
+  b: { readonly name: string; readonly size: number; readonly lastModified: number },
+): boolean => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+
 /** Said when a file is of no type we take, whatever its category. */
 export const UNKNOWN_TYPE = 'Ce type de fichier n’est pas pris : choisis une photo, une vidéo ou un vocal';
 

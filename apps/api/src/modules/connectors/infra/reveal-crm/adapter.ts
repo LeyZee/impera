@@ -273,6 +273,7 @@ export function createRevealSalesFeed(options: RevealSalesFeedOptions): Platform
           displayName: model.displayName,
           isActive: model.isActive,
           status: MODEL_STATUSES.get(model.status) ?? 'other',
+          rawStatus: model.status,
           avatarUrl: httpsUrl(model.avatarUrl),
         })),
       };
