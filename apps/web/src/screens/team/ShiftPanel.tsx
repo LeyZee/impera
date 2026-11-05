@@ -19,6 +19,7 @@ import {
   inputOf,
   lengthOf,
   longDay,
+  minuteOf,
   minuteOfInput,
   weekdayOf,
   zonedInstant,
@@ -136,6 +137,24 @@ export function ShiftPanel({
       : minutes * 60_000;
   // The night the clocks go back, 2 h 30 – 2 h spans 24 h 30: more than a shift may last.
   const tooLongOnce = !weekly && lasts > SHIFT_MAX_MINUTES * 60_000;
+  // An hour the clocks skip the night they go forward (2 h 30 the last Sunday of March in Paris) does not exist: the
+  // shift starts or ends at the first one after it, as saved. The summary says the hours that will be, and why
+  // they moved (recette EQP-11). A template keeps its wall-clock hours.
+  const moved =
+    hoursOk && dayOk && !weekly
+      ? {
+          start: minuteOf(zonedInstant(day, startMinute, zone), zone),
+          end: minuteOf(zonedInstant(crosses ? addDays(day, 1) : day, endMinute, zone), zone),
+        }
+      : null;
+  const skipped =
+    moved === null || !hoursOk
+      ? null
+      : moved.start !== startMinute
+        ? `${clockOf(startMinute)} n’existe pas cette nuit-là, à cause du changement d’heure : le shift commence à ${clockOf(moved.start)}.`
+        : moved.end !== endMinute
+          ? `${clockOf(endMinute)} n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à ${clockOf(moved.end)}.`
+          : null;
   // No shift before the member's first day (the server reads it in their zone, the panel in the agency's).
   const notJoined = chosen !== null && dayOk && day < chosen.joinedOn;
   const ready =
@@ -332,8 +351,13 @@ export function ShiftPanel({
                   : tooLongOnce
                     ? `${lengthOf(lasts)} cette nuit-là, à cause du changement d’heure : un shift dure 24 h au plus.`
                     : // The hours and how long they last on one line (EQ-23): « 5 h – 11 h · 6 h ».
-                      `${clockOf(startMinute)} – ${clockOf(endMinute)} · ${lengthOf(lasts)}${crosses ? ', jusqu’au lendemain' : ''}.`}
+                      `${clockOf(moved?.start ?? startMinute)} – ${clockOf(moved?.end ?? endMinute)} · ${lengthOf(lasts)}${crosses ? ', jusqu’au lendemain' : ''}.`}
           </span>
+          {hoursFit && !tooLongOnce && skipped !== null ? (
+            <p className="tm-warn nv-swap" role="status">
+              {skipped}
+            </p>
+          ) : null}
         </fieldset>
 
         {/* A shift filled for someone on leave is that one occurrence: their template stays theirs. */}

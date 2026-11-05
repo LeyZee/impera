@@ -658,7 +658,7 @@ function Summary({
     <>
       <Chip chip={phaseChip(summary)} />
       {/* The period ends at midnight after its last day: the day it is over, never « le 31 à minuit » (EQP-13). */}
-      <span>depuis le {longDay(addDays(lastDay, 1))} à 0 h</span>
+      <span>depuis le {longDay(addDays(lastDay, 1))} à 0&nbsp;h</span>
     </>
   );
 
