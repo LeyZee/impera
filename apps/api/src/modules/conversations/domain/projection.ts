@@ -8,6 +8,7 @@ import {
   type UserId,
 } from '@impera/contracts';
 
+import { fanAwaitsAnswer } from './rules';
 import { MAX_SEND_ATTEMPTS, nextState, type ConversationCommand } from './state-machine';
 
 /** The columns of `conversations` that are projections of the journal (ADR 0007). */
@@ -77,7 +78,10 @@ export function applyEvent(
   event: EventBody,
   at: Date,
 ): ConversationProjection {
-  const command = commandFor(event);
+  // A draft refused while he still waits: the conversation stays with the person who refused it, who answers in
+  // Reveal; the agent does not try again on its own (recette CHAT-25, Charles 05/11). A refused follow-up rests.
+  const command =
+    event.type === 'draft_rejected' && fanAwaitsAnswer(projection) ? 'reject_unanswered' : commandFor(event);
   const state =
     command === null ? projection.state : (nextState(projection.state, command) ?? projection.state);
   if (event.type === 'message_received' && event.payload.direction === 'inbound') {

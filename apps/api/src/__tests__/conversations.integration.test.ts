@@ -281,11 +281,14 @@ describe('conversations module (P0-05)', () => {
     await expect(
       conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] }),
     ).rejects.toMatchObject({ code: 'draft_conflict' });
+    expect(await events(conversationId)).toEqual(before);
+    // Refused while the fan waits: the conversation stays with the human who refused (recette CHAT-25).
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'human' });
+    await conversations.release(command(conversationId));
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
     await expect(conversations.release(command(conversationId))).rejects.toMatchObject({
       code: 'transition_conflict',
     });
-    expect(await events(conversationId)).toEqual(before);
-    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
   });
 
   it('writes no state without its event: a failure later in the transaction undoes both', async () => {
@@ -458,6 +461,7 @@ describe('conversations module (P0-05)', () => {
     await ingest('c-rebuild');
     let draftId = await respond(conversationId);
     await conversations.rejectDraft({ ...command(conversationId), draftId, reason: 'Non' });
+    await conversations.release(command(conversationId));
     clock.advance(1);
     await ingest('c-rebuild');
     draftId = await respond(conversationId);

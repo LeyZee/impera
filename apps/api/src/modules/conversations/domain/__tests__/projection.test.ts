@@ -45,6 +45,17 @@ describe('conversation projection', () => {
     expect(applyEvent(sending, expired(false), at(2)).state).toBe('idle');
   });
 
+  it('keeps a refused answer with the human while he waits, a refused follow-up at rest (recette CHAT-25)', () => {
+    const rejected = EventBodySchema.parse({
+      type: 'draft_rejected',
+      payload: { draftId: DRAFT, status: 'rejected', reason: 'Trop direct' },
+    });
+    const waiting = { ...INITIAL_PROJECTION, state: 'awaiting_approval' as const, lastInboundAt: at(1) };
+    expect(applyEvent(waiting, rejected, at(2)).state).toBe('human');
+    const followUp = { ...waiting, lastOutboundAt: at(2) };
+    expect(applyEvent(followUp, rejected, at(3)).state).toBe('idle');
+  });
+
   it('clears the routing when a human hands the conversation back', () => {
     const routed = { ...INITIAL_PROJECTION, state: 'human' as const, routedToUserId: USER };
     const released = EventBodySchema.parse({
