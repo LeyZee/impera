@@ -458,6 +458,22 @@ function signInAccountKey(request: FastifyRequest): string {
   return parsed.success ? `sign-in:${parsed.data.email.trim().toLowerCase()}` : `ip:${request.ip}`;
 }
 
+/**
+ * The `verification` identifier of the trusted device this browser holds (`trust-device-…`), read from its cookie
+ * `<token>!<identifier>.<signature>`; `undefined` without one. The identifier is random and only ever in this cookie;
+ * whoever reads it still checks the row's account.
+ */
+export async function trustedDeviceIdentifier(
+  auth: Auth,
+  request: FastifyRequest,
+): Promise<string | undefined> {
+  const context = await auth.$context;
+  const identifier = cookieOf(request, context.createAuthCookie(TRUST_DEVICE_COOKIE).name)
+    ?.split('!')[1]
+    ?.split('.')[0];
+  return identifier?.startsWith('trust-device-') === true ? identifier : undefined;
+}
+
 /** The value of a cookie of the request, or `undefined`. */
 function cookieOf(request: FastifyRequest, name: string): string | undefined {
   for (const pair of (request.headers.cookie ?? '').split(';')) {
@@ -753,11 +769,8 @@ export function createAuthRoutes(
     const trustedDeviceOf = async (request: FastifyRequest): Promise<boolean> => {
       const asked = SignInBodySchema.safeParse(request.body);
       if (!asked.success) return false;
-      const context = await auth.$context;
-      const cookie = cookieOf(request, context.createAuthCookie(TRUST_DEVICE_COOKIE).name);
-      // `<token>!<identifier>.<signature>`: the identifier is the row's, random, never shown but in this cookie.
-      const identifier = cookie?.split('!')[1]?.split('.')[0];
-      if (identifier?.startsWith('trust-device-') !== true) return false;
+      const identifier = await trustedDeviceIdentifier(auth, request);
+      if (identifier === undefined) return false;
       const [row] = await db
         .select({ id: schema.verification.id })
         .from(schema.verification)
