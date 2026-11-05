@@ -1,4 +1,5 @@
 import {
+  CreatorAccountShiftsSchema,
   CreatorIdSchema,
   CreatorOnDutyListSchema,
   newId,
@@ -35,13 +36,17 @@ describe('GET /v1/creator-space/on-duty', () => {
   let creatorCookie: string;
   let operatorCookie: string;
 
-  async function get(cookie: string) {
-    return server.inject({
-      method: 'GET',
-      url: '/v1/creator-space/on-duty',
-      headers: { cookie, origin: DASHBOARD_ORIGIN },
-    });
+  let base = 0;
+
+  async function get(cookie: string, url = '/v1/creator-space/on-duty') {
+    return server.inject({ method: 'GET', url, headers: { cookie, origin: DASHBOARD_ORIGIN } });
   }
+
+  const shiftsUrl = (from: number, to: number): string =>
+    `/v1/creator-space/shifts?${new URLSearchParams({
+      from: new Date(base + from * HOUR).toISOString(),
+      to: new Date(base + to * HOUR).toISOString(),
+    }).toString()}`;
 
   async function account(email: string, set: { role: 'creator' | 'operator'; creatorIds: string[] }) {
     const { userId } = await createOwner(app.auth, app.db.db, { email, name: email, password: PASSWORD });
@@ -99,7 +104,7 @@ describe('GET /v1/creator-space/on-duty', () => {
       members.set(name, memberId);
     }
     const minute = 60_000;
-    const base = Math.floor(Date.now() / minute) * minute;
+    base = Math.floor(Date.now() / minute) * minute;
     const shift = (name: string, creator: typeof nora, from: number, to: number, cancelled = false) => ({
       id: newId(ShiftIdSchema),
       creatorId: creator.creatorId,
@@ -149,5 +154,38 @@ describe('GET /v1/creator-space/on-duty', () => {
     const response = await get(operatorCookie);
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ error: { code: 'role_forbidden' } });
+  });
+
+  describe('GET /v1/creator-space/shifts (CR-05 c3)', () => {
+    it('gives her accounts’ shifts that overlap the range, with the platform, by start', async () => {
+      const response = await get(creatorCookie, shiftsUrl(0, 48));
+      expect(response.statusCode, response.body).toBe(200);
+      const body = CreatorAccountShiftsSchema.parse(response.json());
+      // Kofi's shift started before the range and overlaps it; the cancelled one, the sick member's and the other
+      // creator's are not hers to see.
+      expect(body.shifts.map((s) => [s.displayName, s.platform])).toEqual([
+        ['Kofi', 'reveal'],
+        ['Awa', 'reveal'],
+        ['Kofi', 'reveal'],
+      ]);
+      expect(response.body).not.toMatch(/"memberId"|"color"|"status"|"rate|"handle"/u);
+    });
+
+    it('leaves out a shift that ends when the range starts', async () => {
+      const response = await get(creatorCookie, shiftsUrl(2, 5));
+      expect(response.statusCode, response.body).toBe(200);
+      expect(CreatorAccountShiftsSchema.parse(response.json()).shifts).toEqual([]);
+    });
+
+    it('refuses a range longer than 43 days, or upside down', async () => {
+      expect((await get(creatorCookie, shiftsUrl(0, 44 * 24))).statusCode).toBe(400);
+      expect((await get(creatorCookie, shiftsUrl(5, 1))).statusCode).toBe(400);
+    });
+
+    it('is for a creator’s account only', async () => {
+      const response = await get(operatorCookie, shiftsUrl(0, 24));
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ error: { code: 'role_forbidden' } });
+    });
   });
 });

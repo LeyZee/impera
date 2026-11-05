@@ -1,7 +1,12 @@
 import {
+  CreatorAccountShiftsQuerySchema,
+  CreatorAccountShiftsSchema,
   CreatorOnDutyListSchema,
   DomainError,
+  PlatformSchema,
   UserIdSchema,
+  type CreatorAccountShifts,
+  type CreatorAccountShiftsQuery,
   type CreatorOnDutyList,
   type UserId,
 } from '@impera/contracts';
@@ -60,25 +65,87 @@ export function createDrizzleCreatorOnDuty(db: Database) {
   };
 }
 
-/** `GET /v1/creator-space/on-duty` (creator only): who chats for her now, and in the next 24 hours. */
+/**
+ * The shifts of her accounts over a range (CR-05 c3, ADR 0045 § 1), for « Qui répond à tes fans » in her Agenda: the
+ * same view and the same door as « qui est en poste », with the platform of the account. A member who is not active
+ * is not there: he does not answer her fans.
+ */
+export function createDrizzleCreatorAccountShifts(db: Database) {
+  return async (userId: UserId, range: CreatorAccountShiftsQuery): Promise<CreatorAccountShifts> => {
+    const rows = await withCreatorAccount(db, userId, (tx) =>
+      tx
+        .select({
+          displayName: schema.creatorOnDuty.displayName,
+          platform: schema.platformAccounts.platform,
+          startsAt: schema.creatorOnDuty.startsAt,
+          endsAt: schema.creatorOnDuty.endsAt,
+        })
+        .from(schema.creatorOnDuty)
+        .innerJoin(
+          schema.platformAccounts,
+          eq(schema.platformAccounts.id, schema.creatorOnDuty.platformAccountId),
+        )
+        .where(
+          and(
+            sql`${schema.creatorOnDuty.endsAt} > ${range.from}::timestamptz`,
+            sql`${schema.creatorOnDuty.startsAt} < ${range.to}::timestamptz`,
+          ),
+        )
+        .orderBy(schema.creatorOnDuty.startsAt, schema.creatorOnDuty.displayName),
+    );
+    return {
+      shifts: rows.map((row) => ({
+        displayName: row.displayName,
+        platform: PlatformSchema.parse(row.platform),
+        startsAt: row.startsAt.toISOString(),
+        endsAt: row.endsAt.toISOString(),
+      })),
+    };
+  };
+}
+
+export interface CreatorOnDutyReads {
+  readonly onDuty: (userId: UserId, now: Date) => Promise<CreatorOnDutyList>;
+  readonly shifts: (userId: UserId, range: CreatorAccountShiftsQuery) => Promise<CreatorAccountShifts>;
+}
+
+/**
+ * Her doors to the team's calendar (creator only): `GET /v1/creator-space/on-duty`, who chats for her now and in the
+ * next 24 hours; `GET /v1/creator-space/shifts`, her accounts' shifts over a range of her Agenda.
+ */
 export function createCreatorOnDutyRoutes(
-  read: (userId: UserId, now: Date) => Promise<CreatorOnDutyList>,
+  reads: CreatorOnDutyReads,
   requireRole: RequireRole,
   now: () => Date,
 ): FastifyPluginAsyncZod {
   return (app) => {
+    const asCreator = async <T>(
+      userId: string | undefined,
+      run: (userId: UserId) => Promise<T>,
+    ): Promise<T> => {
+      if (userId === undefined) throw new DomainError('session_unauthenticated', 'Connexion requise');
+      try {
+        return await run(UserIdSchema.parse(userId));
+      } catch (error) {
+        if (error instanceof NotACreatorAccount) throw new CreatorAccountForbidden();
+        throw error;
+      }
+    };
     app.get(
       '/creator-space/on-duty',
       { preValidation: requireRole('creator'), schema: { response: { 200: CreatorOnDutyListSchema } } },
-      async (request) => {
-        if (request.user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
-        try {
-          return await read(UserIdSchema.parse(request.user.id), now());
-        } catch (error) {
-          if (error instanceof NotACreatorAccount) throw new CreatorAccountForbidden();
-          throw error;
-        }
+      (request) => asCreator(request.user?.id, (userId) => reads.onDuty(userId, now())),
+    );
+    app.get(
+      '/creator-space/shifts',
+      {
+        preValidation: requireRole('creator'),
+        schema: {
+          querystring: CreatorAccountShiftsQuerySchema,
+          response: { 200: CreatorAccountShiftsSchema },
+        },
       },
+      (request) => asCreator(request.user?.id, (userId) => reads.shifts(userId, request.query)),
     );
     return Promise.resolve();
   };

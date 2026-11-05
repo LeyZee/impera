@@ -1,12 +1,18 @@
-import { CREATOR_TASK_CATEGORY_LABELS, type CreatorAgenda } from '@impera/contracts';
+import {
+  CREATOR_TASK_CATEGORY_LABELS,
+  type CreatorAccountShift,
+  type CreatorAgenda,
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
 import type { DayActions } from './DayView';
+import { ShortReplies } from './ReplyLines';
 import { SuggestionCard } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
 import { CategoryMark } from './category';
 import { planOf, undatedOf, type DayWindow } from './model';
+import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, weekOf } from '@/scheduling/time';
 
@@ -19,11 +25,14 @@ const WEEKDAY_SHORT = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'] as const
 export function WeekList({
   agenda,
   monday,
+  shifts,
   onOpenDay,
   ...actions
 }: {
   agenda: CreatorAgenda;
   monday: string;
+  /** Her accounts' shifts, a discreet line under each day. */
+  shifts: readonly CreatorAccountShift[];
   onOpenDay: (day: string) => void;
 } & DayActions): JSX.Element {
   const undated = undatedOf(agenda);
@@ -134,6 +143,7 @@ export function WeekList({
                 {plan.windows.map((window) => (
                   <Dispo key={window.id} window={window} />
                 ))}
+                <ShortReplies lines={repliesOn(shifts, day, agenda.timeZone)} />
               </div>
             </li>
           );

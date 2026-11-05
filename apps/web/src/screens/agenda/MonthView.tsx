@@ -1,8 +1,9 @@
-import type { CreatorAgenda } from '@impera/contracts';
+import type { CreatorAccountShift, CreatorAgenda } from '@impera/contracts';
 import type { JSX, KeyboardEvent } from 'react';
 
 import { CATEGORY_EMOJI } from './category';
 import { monthDays, monthLinesOf, monthOf } from './grid';
+import { repliesOn } from './replies';
 
 import { addDays, clockOf, dayNumber, longDay } from '@/scheduling/time';
 
@@ -18,10 +19,13 @@ const LINES_SHOWN = 3;
 export function MonthView({
   agenda,
   day,
+  shifts,
   onOpenDay,
 }: {
   agenda: CreatorAgenda;
   day: string;
+  /** Her accounts' shifts: the names of who answers her fans, at the foot of each day. */
+  shifts: readonly CreatorAccountShift[];
   onOpenDay: (day: string) => void;
 }): JSX.Element {
   const days = monthDays(day);
@@ -59,6 +63,14 @@ export function MonthView({
         {days.map((one) => {
           const lines = monthLinesOf(agenda, one);
           const rest = lines.length - LINES_SHOWN;
+          // Names only, in the same order every day, so that the month reads at a glance.
+          const names = [
+            ...new Set(
+              repliesOn(shifts, one, agenda.timeZone).flatMap((line) =>
+                line.replies.map((reply) => reply.name),
+              ),
+            ),
+          ].sort((a, b) => a.localeCompare(b, 'fr'));
           return (
             <button
               key={one}
@@ -69,7 +81,7 @@ export function MonthView({
               data-out={one.slice(0, 7) === month ? undefined : 'true'}
               data-today={one === agenda.today ? 'true' : undefined}
               tabIndex={one === day || (day.slice(0, 7) !== one.slice(0, 7) && one === days[0]) ? 0 : -1}
-              aria-label={`${longDay(one)} : ${lines.length === 0 ? 'rien de prévu' : lines.map((line) => line.title).join(', ')}`}
+              aria-label={`${longDay(one)} : ${lines.length === 0 ? 'rien de prévu' : lines.map((line) => line.title).join(', ')}${names.length === 0 ? '' : `. Qui répond à tes fans : ${names.join(', ')}`}`}
               onClick={() => {
                 onOpenDay(one);
               }}
@@ -96,6 +108,11 @@ export function MonthView({
                   +{rest}
                 </span>
               ) : null}
+              {names.length === 0 ? null : (
+                <span className="ag-month__fans" aria-hidden="true">
+                  💬 {names.join(', ')}
+                </span>
+              )}
             </button>
           );
         })}
