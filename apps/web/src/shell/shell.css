@@ -360,6 +360,10 @@
   transform-origin: 15.5px 15px;
   animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
 }
+/* Contenu: the drop's arrow goes up. */
+.is-playing .nav-up {
+  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
 /* Équipe: the three hop, one after the other. */
 .is-playing :is(.nav-t1, .nav-t2, .nav-t3) {
   animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;

@@ -23,7 +23,7 @@ import {
   whyHuman,
 } from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
-import { bubblesFromText, bubblesProblem, MODE_LABELS, situationOf } from './view';
+import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, situationOf } from './view';
 
 import { initialOf } from '@/lib/utils';
 
@@ -277,7 +277,8 @@ function Loaded({
             <span className="tr-reader__state">
               <span className={`nv-status ${situation.pill}`}>
                 <span className="nv-status__dot" />
-                {situation.label}
+                {/* The reader has room for what to do about a send that failed (#537, CHAT-12). */}
+                {drafts.state === 'error' ? READER_STATE_LABELS.error : situation.label}
               </span>
               <span className="nv-meta">{MODE_LABELS[detail.mode]}</span>
             </span>

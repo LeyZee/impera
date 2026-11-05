@@ -921,6 +921,8 @@ describe('the reader of Suivi', () => {
     renderPage(OPEN);
     expect(await screen.findByText('Coucou toi, tu es là ?')).toBeDefined();
     expect(screen.getByText('N’est pas parti : à envoyer dans Reveal')).toBeDefined();
+    // The reader's pill says what to do; the list keeps a short pill that fits a phone's row.
+    expect(screen.getByText('Pas parti : à envoyer dans Reveal')).toBeDefined();
     expect(
       screen.getByText('L’envoi a échoué, rien n’est parti : l’envoi est désactivé pour ce compte Reveal'),
     ).toBeDefined();
