@@ -111,7 +111,7 @@ describe('Réglages › Sauvegardes', () => {
     expect(button).toHaveProperty('disabled', true);
     expect(screen.getByText('Il faut d’abord une sauvegarde réussie à restaurer.')).toBeTruthy();
     // The missing copy leads the page, the restore test steps back (recette 05/11, PRO-19).
-    expect(button.closest('section')?.dataset.first).toBe('copy');
+    expect(button.closest('section')?.getAttribute('data-first')).toBe('copy');
   });
 
   it('says the server does not answer, after one quiet retry, and tries again', async () => {

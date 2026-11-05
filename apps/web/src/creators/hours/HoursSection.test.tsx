@@ -225,7 +225,7 @@ describe('Créatrices › Heures (P3-14)', () => {
     fireEvent.blur(start);
     expect(within(line).queryByText(/jusqu’au lendemain/u)).toBeNull();
     expect(within(line).getByText('Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30')).toBeDefined();
-    expect(line.dataset.invalid).toBe('true');
+    expect(line.getAttribute('data-invalid')).toBe('true');
     fireEvent.change(start, { target: { value: '23:00' } });
     expect(within(line).queryByText('Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30')).toBeNull();
   });
