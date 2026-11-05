@@ -93,3 +93,4 @@ Date : AAAA-MM-JJ
 | 0068 | Mot de passe oublié du propriétaire (Telegram, puis e-mail) et QR code de la validation en deux étapes | accepted (précise 0016, 0020 et 0046) |
 | 0069 | Les créatrices s'importent depuis Reveal par une revue du propriétaire, jamais en silence | accepted (précise 0050 § 3 et 0054) |
 | 0070 | Une vidéo déposée pèse jusqu'à 10 Go et vient dans tout format courant ; ce que les plateformes ne lisent pas est converti en MP4 | accepted (précise 0055 § 2 et § 3) |
+| 0071 | Une créatrice se renomme et s'archive, sans rien supprimer, et l'e-mail d'un accès pas encore utilisé se corrige | accepted (précise 0042 § 1 et 0069 § 5) |
