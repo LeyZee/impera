@@ -16,11 +16,12 @@
   --nv-void: #060508;
   --nv-abyss: #0c0a0d;
   --nv-surface-raised: #17131a;
+  /* A message that left: a desaturated mauve, never the neon, which stays for urgencies and the one action (D-03,
+     chosen by Charles on captures). Quieter than red and amber; ink reads on it at AA. */
+  --nv-bubble-sent: #3b3048;
 
   /* Text */
   --nv-ink: #f8f3f4;
-  /* A message that left: warm grey, never the neon, which stays for urgencies and the one action (D-03). */
-  --nv-bubble-sent: #3b3048;
   --nv-ink-muted: #bfb4b9;
   --nv-ink-faint: #9b9197;
 
@@ -108,9 +109,9 @@
   --nv-void: #f6f1f3;
   --nv-abyss: #efe7ea;
   --nv-surface-raised: #ffffff;
+  --nv-bubble-sent: #e6dcef;
 
   --nv-ink: #1b1016;
-  --nv-bubble-sent: #e6dcef;
   --nv-ink-muted: #5e5157;
   --nv-ink-faint: #6e6268;
 
