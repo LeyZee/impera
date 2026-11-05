@@ -13,7 +13,7 @@ import {
 } from 'react';
 
 import { Reader } from './Reader';
-import { fetchConversations, fetchTodosAcross } from './api';
+import { fetchConversations, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
   duration,
@@ -85,13 +85,8 @@ export function TrackingPage({
       refetchInterval: REFRESH_MS,
     })),
   });
-  // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09). Under ['dashboard'], so a
-  // decision in the reader, which reads the Dashboard again, reads this queue again too.
-  const queue = useQuery({
-    queryKey: ['dashboard', 'todos-across'],
-    queryFn: fetchTodosAcross,
-    refetchInterval: REFRESH_MS,
-  });
+  // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09).
+  const queue = useQuery(todosAcrossQuery);
   const now = useNow();
   const [order, setOrder] = useState<ListOrder>(readListOrder);
   const [search, setSearch] = useState('');

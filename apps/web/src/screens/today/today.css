@@ -1,0 +1,27 @@
+/* Aujourd'hui of a chatter (D-03): « À faire » in one list, and the hero's way into Suivi. */
+
+/* The line says what and when in full: a creator's name is never cut. */
+.td-todo__sub {
+  white-space: normal;
+}
+/* « Ouvrir Suivi » carries what waits there, as a pill inside the button. */
+.td-suivi__count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-left: var(--nv-space-2);
+  padding: 0 var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+.td-urgent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  color: var(--nv-danger);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}

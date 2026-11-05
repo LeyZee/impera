@@ -4,10 +4,12 @@ import {
   type MyShift,
   type ShiftReport,
 } from '@impera/contracts';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
-import { Paperwork } from './Paperwork';
+import { TodoCard } from './TodoCard';
+import './today.css';
 
 import { MyReportsCard, useMyReports, type MyReports } from '@/reports/MyReports';
 import { ReportPanel } from '@/reports/ReportPanel';
@@ -15,7 +17,7 @@ import { MEMBER_STATUS, reportOf, STATUS_TONES } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
 import { useMyShifts } from '@/scheduling/api';
-import { accountLine, dayStateOf, platformName, progressOf, type DayState } from '@/scheduling/model';
+import { accountLine, dayStateOf, progressOf, type DayState } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import {
   clockAt,
@@ -28,6 +30,7 @@ import {
   untilOf,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { todosAcrossQuery } from '@/screens/tracking/api';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
@@ -55,11 +58,8 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
 
   return (
     <Page>
-      <PageHeader
-        eyebrow={longDay(today)}
-        title="Aujourd’hui"
-        lead="Ton shift, où aller et jusqu’à quand, puis tes rapports à faire."
-      />
+      {/* The title and the day say it all: no sentence under them (D-03). */}
+      <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" />
       {mine.isError ? (
         <ServerSilent
           text="Tes shifts n’ont pas pu être lus. Rien ici n’est à jour en attendant."
@@ -146,8 +146,8 @@ function Day({
           if (heroShift !== null) onReport(heroShift.id);
         }}
       />
+      <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} onOpen={onReport} />
-      <Paperwork user={user} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       <Link to="/planning" className="sc-more">
         Tout mon planning
@@ -204,6 +204,10 @@ function Hero({
   }
   const { shift } = state;
   const left = new Date(shift.endsAt).getTime() - now.getTime();
+  // What waits in Suivi, said on the way in: the shift's one job is there (D-03). Nothing before Suivi opens.
+  const queue = useQuery({ ...todosAcrossQuery, enabled: state.kind !== 'later' });
+  const waiting = queue.data?.items.length ?? 0;
+  const urgent = queue.data?.items.filter((item) => item.tone === 'bad').length ?? 0;
   const toStart = new Date(shift.startsAt).getTime() - now.getTime();
   return (
     <Panel className={`sc-hero sc-hero--${state.kind} nv-enter`}>
@@ -253,6 +257,12 @@ function Hero({
         </div>
       ) : null}
       <p className="sc-hero__note">{noteOf(state, zone)}</p>
+      {urgent === 0 || state.kind === 'later' ? null : (
+        <p className="td-urgent">
+          <span className="nv-dot nv-tone--bad" aria-hidden="true" />
+          {urgent === 1 ? '1 urgence à traiter d’abord' : `${String(urgent)} urgences à traiter d’abord`}
+        </p>
+      )}
       {state.kind === 'later' ? null : (
         <div className="sc-hero__actions">
           {report.kind === 'due' ? (
@@ -260,8 +270,18 @@ function Hero({
               Faire mon rapport
             </button>
           ) : null}
-          <Link to="/suivi" className="nv-btn nv-btn--soft">
+          {/* The report, when due, takes the light; otherwise Suivi does, the shift's work being there. */}
+          <Link
+            to="/suivi"
+            className={`nv-btn ${report.kind === 'due' ? 'nv-btn--soft' : 'nv-btn--neon'}`}
+            aria-label={waiting === 0 ? 'Ouvrir Suivi' : `Ouvrir Suivi, ${String(waiting)} à traiter`}
+          >
             Ouvrir Suivi
+            {waiting === 0 ? null : (
+              <span className="td-suivi__count nv-num" aria-hidden="true">
+                {waiting} à traiter
+              </span>
+            )}
           </Link>
           {report.kind === 'made' ? (
             <button type="button" className="rp-hero__made nv-tap" onClick={onReport}>
@@ -281,19 +301,18 @@ function Hero({
   );
 }
 
-/** What the state means for Impera: when the creator's conversations open and close (ADR 0025). */
+/** When Suivi opens and closes for the creator (ADR 0025), in one line: the account line already says the platform. */
 function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): string {
   const { shift } = state;
-  const name = shift.creatorName;
   switch (state.kind) {
     case 'on':
-      return `Tu chattes sur ${platformName(shift.platform)}. Dans Impera, les conversations de ${name} restent ouvertes jusqu’à ${clockAt(shift.accessEndsAt, zone)}.`;
+      return `Suivi reste ouvert jusqu’à ${clockAt(shift.accessEndsAt, zone)}.`;
     case 'ended':
-      return `Les conversations de ${name} restent ouvertes dans Suivi jusqu’à ${clockAt(shift.accessEndsAt, zone)}, le temps de finir.`;
+      return `Suivi reste ouvert jusqu’à ${clockAt(shift.accessEndsAt, zone)}, le temps de finir.`;
     case 'soon':
-      return `Les conversations de ${name} sont déjà ouvertes dans Suivi. Ton shift commence à ${clockAt(shift.startsAt, zone)}.`;
+      return `Suivi est déjà ouvert. Ton shift commence à ${clockAt(shift.startsAt, zone)}.`;
     case 'later':
-      return `Les conversations de ${name} s’ouvriront dans Suivi à ${clockAt(shift.accessStartsAt, zone)}.`;
+      return `Suivi s’ouvrira à ${clockAt(shift.accessStartsAt, zone)}.`;
   }
 }
 

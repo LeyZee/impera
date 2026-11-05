@@ -3,10 +3,7 @@ import { useRef, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'reac
 
 import { followedOf, useFollowedCreatorId } from '@/agent/followed';
 import { useCreators } from '@/creators/api';
-import { fetchTodosAcross } from '@/screens/tracking/api';
-
-/** As Suivi reads « À traiter » of every creator: the same query, read again at the same pace. */
-const REFRESH_MS = 30_000;
+import { todosAcrossQuery } from '@/screens/tracking/api';
 
 /** Arrow keys of the radio group and the way they move. */
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
@@ -22,12 +19,7 @@ export function CreatorPicker(): JSX.Element | null {
   const { chosen, follow } = useFollowedCreatorId();
   const ref = useRef<HTMLDivElement>(null);
   const several = creators.length >= 2;
-  const queue = useQuery({
-    queryKey: ['dashboard', 'todos-across'],
-    queryFn: fetchTodosAcross,
-    refetchInterval: REFRESH_MS,
-    enabled: several,
-  });
+  const queue = useQuery({ ...todosAcrossQuery, enabled: several });
   if (!several) return null;
   // Unread, the chips would say nothing of the others' urgencies, as if there were none: the line under them says so.
   const unread = queue.isError && queue.data === undefined;
