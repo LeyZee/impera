@@ -145,6 +145,25 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     });
   });
 
+  it('gives the owner her Profil, where her name is changed, and keeps it from anyone else (ADR 0071)', async () => {
+    await serve([ANNA]);
+    const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);
+    const views = await screen.findByRole('navigation', { name: 'Fiche de la créatrice' });
+    fireEvent.click(within(views).getByRole('link', { name: 'Profil' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'profil', creatrice: ANNA.id });
+    });
+    expect(await screen.findByText('Nom : Anna')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Renommer' })).toBeDefined();
+
+    cleanup();
+    await serve([ANNA]);
+    const other = renderAt(operator, `/creatrices?onglet=profil&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+  });
+
   it('asks before dropping changes not saved, and stays when told to', async () => {
     await serve([ANNA, BEA]);
     const router = renderAt(owner, `/creatrices?creatrice=${ANNA.id}`);

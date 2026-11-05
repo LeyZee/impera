@@ -1,0 +1,7 @@
+/* Créatrices › Profil (ADR 0071): one plate as wide as the form it opens, so that « Renommer » never makes it jump. */
+.cr-profile {
+  width: 100%;
+  max-width: 720px;
+  padding-top: 18px;
+  gap: 12px;
+}

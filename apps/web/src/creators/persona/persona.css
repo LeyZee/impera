@@ -431,8 +431,10 @@
   color: var(--nv-warning);
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
+/* The mark stands apart from the words: a narrow space read as glued to them (PRO-14 a, captures). */
 .ps-error::before {
-  content: '!\202F';
+  content: '!';
+  margin-inline-end: 0.45em;
 }
 .ps-field[data-invalid='true'] .nv-field__control,
 .ps-input[aria-invalid='true'] {

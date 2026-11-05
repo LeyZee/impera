@@ -2,6 +2,7 @@ import {
   AgentHoursSchema,
   AuditEntryIdSchema,
   canonicalTimezone,
+  CreatorDisplayNameSchema,
   CreatorIdSchema,
   creatorNameKey,
   DEFAULT_AGENT_HOURS,
@@ -173,6 +174,42 @@ export function createDrizzleCreatorDirectory(
         });
         return toSummary({ ...current, timezone: zone });
       });
+    },
+
+    async rename(id, displayName, userId) {
+      const name = CreatorDisplayNameSchema.parse(displayName);
+      try {
+        return await db.transaction(async (tx) => {
+          // Locked: two renames at once each read the name the other left, and the audit says from what to what.
+          const [current] = await tx
+            .select({
+              id: schema.creators.id,
+              displayName: schema.creators.displayName,
+              timezone: schema.creators.timezone,
+            })
+            .from(schema.creators)
+            .where(eq(schema.creators.id, id))
+            .for('update');
+          if (current === undefined) return null;
+          if (current.displayName === name) return toSummary(current);
+          await tx
+            .update(schema.creators)
+            .set({ displayName: name, nameKey: creatorNameKey(name) })
+            .where(eq(schema.creators.id, id));
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId,
+            action: 'creator.rename',
+            entity: 'creator',
+            entityId: id,
+            details: { from: current.displayName, to: name },
+          });
+          return toSummary({ ...current, displayName: name });
+        });
+      } catch (error) {
+        if (isNameTaken(error)) throw new CreatorNameConflict();
+        throw error;
+      }
     },
 
     async agentHours(id) {

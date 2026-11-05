@@ -53,10 +53,15 @@ export const NewCreatorSchema = z.object({
 export type NewCreator = z.input<typeof NewCreatorSchema>;
 
 /**
- * `PATCH /v1/creators/:creatorId` (owner only, a recent sign-in): her zone, and nothing else. A wrong zone at her
- * creation is no longer final; her name stays as it was made.
+ * `PATCH /v1/creators/:creatorId` (owner only, a recent sign-in): her zone, her name, or both (ADR 0071 § 1). Neither a
+ * wrong zone nor a typo in her name is final; her name stays unique (`creatorNameKey`). Her platform handles and her
+ * persona are never changed from here.
  */
-export const UpdateCreatorBodySchema = z.strictObject({ timezone: TimezoneSchema });
+export const UpdateCreatorBodySchema = z
+  .strictObject({ timezone: TimezoneSchema.optional(), displayName: CreatorDisplayNameSchema.optional() })
+  .refine((body) => body.timezone !== undefined || body.displayName !== undefined, {
+    message: 'Rien à changer',
+  });
 export type UpdateCreatorBody = z.infer<typeof UpdateCreatorBodySchema>;
 
 /**

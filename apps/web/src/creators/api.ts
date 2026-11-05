@@ -154,6 +154,54 @@ export async function moveCreator(creatorId: string, timezone: string): Promise<
   return { kind: 'failed' };
 }
 
+export type RenameResult =
+  | { readonly kind: 'renamed'; readonly creator: CreatorSummary }
+  /** 400: the name is not taken as it is (no letter). */
+  | { readonly kind: 'invalid' }
+  /** 409 `creator_name_conflict`: another creator has this name, case, accents and spaces aside. */
+  | { readonly kind: 'name_taken' }
+  /** 403 `reauthentication_forbidden`: the sign-in is over 10 minutes old, the password is asked again. */
+  | { readonly kind: 'reauth' }
+  /** Any other 403: only the owner renames a creator. */
+  | { readonly kind: 'forbidden' }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'expired' }
+  | { readonly kind: 'failed' };
+
+/**
+ * `PATCH /v1/creators/:creatorId` with her name (owner only, a recent sign-in, ADR 0071 § 1): only her name changes,
+ * never her platform handles nor her persona. Answers her as stored.
+ */
+export async function renameCreator(creatorId: string, displayName: string): Promise<RenameResult> {
+  let response: Response;
+  try {
+    response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ displayName }),
+    });
+  } catch {
+    return { kind: 'failed' };
+  }
+  if (response.ok) {
+    const creator = CreatorSummarySchema.safeParse(await response.json().catch(() => null));
+    return creator.success ? { kind: 'renamed', creator: creator.data } : { kind: 'failed' };
+  }
+  if (response.status === 400) return { kind: 'invalid' };
+  if (response.status === 401) return { kind: 'expired' };
+  if (response.status === 404) return { kind: 'not_found' };
+  const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  const code = error.data?.error.code;
+  if (response.status === 409 && code === ('creator_name_conflict' satisfies CreatorErrorCode)) {
+    return { kind: 'name_taken' };
+  }
+  if (response.status === 403) {
+    return code === REAUTHENTICATION_ERROR_CODE ? { kind: 'reauth' } : { kind: 'forbidden' };
+  }
+  return { kind: 'failed' };
+}
+
 /** Her own account, for the Accès tab of her sheet (CR-02): the owner's alone. */
 export const creatorAccountKey = (creatorId: CreatorId) => ['creators', creatorId, 'account'] as const;
 
