@@ -39,15 +39,20 @@ function refusal(code: string, details: Record<string, unknown> = {}) {
 type Answer = readonly [number, unknown] | 'offline';
 
 /**
- * The two routes; each answers its turns in order, the last one for good. `/v1/me` answers `me`, no session (401)
+ * The two routes; each answers its turns in order, the last one for good. `/v1/session` answers `me`, no session (401)
  * unless told otherwise.
  */
 function serve(routes: { inspect?: Answer[]; redeem?: Answer[]; me?: Answer }) {
   const fake = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
-    if (url === '/v1/me') {
+    if (url === '/v1/session') {
       const me = routes.me ?? ([401, {}] as const);
       if (me === 'offline') return Promise.reject(new TypeError('Failed to fetch'));
-      return Promise.resolve(new Response(JSON.stringify(me[1]), { status: me[0] }));
+      // 401 here stands for « no session », which the route answers with 200.
+      return Promise.resolve(
+        me[0] === 401
+          ? Response.json({ state: 'signed_out' })
+          : Response.json({ state: 'signed_in', me: me[1] }, { status: me[0] }),
+      );
     }
     const turns = (url.endsWith('/inspect') ? routes.inspect : routes.redeem) ?? [];
     const next = turns.length > 1 ? turns.shift() : turns[0];
@@ -312,7 +317,7 @@ describe('another account signed in on this browser', () => {
       open('welcome');
       await screen.findByRole('heading', { name: 'Bienvenue, Théo' });
       await vi.waitFor(() => {
-        expect(fake.mock.calls.map(([url]) => url)).toContain('/v1/me');
+        expect(fake.mock.calls.map(([url]) => url)).toContain('/v1/session');
       });
       expect(screen.queryByText(/Ce navigateur est connecté/u)).toBeNull();
       cleanup();

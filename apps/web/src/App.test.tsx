@@ -8,11 +8,15 @@ import { forgetTakenToken } from './auth/api';
 import { railOf } from './shell/nav';
 import { OWNER } from './test/pay';
 
-/** A fake `/v1/me` that answers each status in turn, the last one for good. */
-function serveMe(...statuses: number[]): ReturnType<typeof vi.fn> {
+const SIGNED_OUT = 'signed out';
+
+/** A fake `/v1/session` that answers each in turn, the last one for good: no session, or a failing status. */
+function serveMe(...answers: (typeof SIGNED_OUT | number)[]): ReturnType<typeof vi.fn> {
   const fake = vi.fn(() => {
-    const status = statuses.length > 1 ? (statuses.shift() ?? 401) : (statuses[0] ?? 401);
-    return Promise.resolve(new Response('{}', { status }));
+    const answer = answers.length > 1 ? (answers.shift() ?? SIGNED_OUT) : (answers[0] ?? SIGNED_OUT);
+    return Promise.resolve(
+      answer === SIGNED_OUT ? Response.json({ state: 'signed_out' }) : new Response('{}', { status: answer }),
+    );
   });
   vi.stubGlobal('fetch', fake);
   return fake;
@@ -37,12 +41,12 @@ describe('App before any session', () => {
   });
 
   it('asks to sign in only when the server says there is no session', async () => {
-    serveMe(401);
+    serveMe(SIGNED_OUT);
     render(<App />);
     expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
   });
 
-  it('forgets what the device kept of Impera when there is no session (a 401, a sign-out made elsewhere)', async () => {
+  it('forgets what the device kept of Impera when there is no session (a sign-out made elsewhere)', async () => {
     const deleted: string[] = [];
     vi.stubGlobal('caches', {
       keys: () => Promise.resolve(['impera-shell-v1', 'impera-assets-v1']),
@@ -51,7 +55,7 @@ describe('App before any session', () => {
         return Promise.resolve(true);
       },
     });
-    serveMe(401);
+    serveMe(SIGNED_OUT);
     render(<App />);
     await screen.findByLabelText('Mot de passe');
     expect(deleted).toEqual(['impera-shell-v1', 'impera-assets-v1']);
@@ -59,7 +63,7 @@ describe('App before any session', () => {
 
   it('says the server does not answer instead of asking to sign in, and asks again on its own', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const fetch = serveMe(502, 502, 502, 401);
+    const fetch = serveMe(502, 502, 502, SIGNED_OUT);
     render(<App />);
     expect(await screen.findByText('ne répond pas')).toBeDefined();
     expect(screen.queryByLabelText('Mot de passe')).toBeNull();
@@ -116,11 +120,13 @@ describe('App on an invitation link', () => {
     expiresAt: '2026-10-30T15:00:00.000Z',
   };
 
-  function serveLink(): Mock<(url: string) => Promise<Response>> {
+  function serveLink(
+    purpose: 'invitation' | 'reset' = 'invitation',
+  ): Mock<(url: string) => Promise<Response>> {
     const fake = vi.fn((url: string) => {
-      if (url.endsWith('/inspect')) return Promise.resolve(Response.json(preview));
+      if (url.endsWith('/inspect')) return Promise.resolve(Response.json({ ...preview, purpose }));
       if (url.endsWith('/redeem')) return Promise.resolve(Response.json(theo));
-      if (url === '/v1/me') return Promise.resolve(Response.json(theo));
+      if (url === '/v1/session') return Promise.resolve(Response.json({ state: 'signed_in', me: theo }));
       return Promise.resolve(new Response('{}', { status: 404 }));
     });
     vi.stubGlobal('fetch', fake);
@@ -135,13 +141,13 @@ describe('App on an invitation link', () => {
     await vi.waitFor(() => {
       expect(fake.mock.calls.map(([url]) => url).toSorted()).toEqual([
         '/v1/invitation-links/inspect',
-        '/v1/me',
+        '/v1/session',
       ]);
     });
   });
 
   it('opens the new password page on its own address', async () => {
-    serveLink();
+    serveLink('reset');
     window.history.replaceState(null, '', `/nouveau-mot-de-passe#t=${TOKEN}`);
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Nouveau mot de passe' })).toBeDefined();
@@ -158,7 +164,7 @@ describe('App on an invitation link', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Entrer' }));
     // The page read the session once to warn; the app reads the new one after redeem.
     await vi.waitFor(() => {
-      expect(fake.mock.calls.filter(([url]) => url === '/v1/me')).toHaveLength(2);
+      expect(fake.mock.calls.filter(([url]) => url === '/v1/session')).toHaveLength(2);
     });
     expect(window.location.pathname).toBe(railOf(theo).home);
     expect(screen.queryByRole('heading', { name: 'Bienvenue, Théo' })).toBeNull();
@@ -169,8 +175,8 @@ describe('App on an invitation link', () => {
       'fetch',
       vi.fn((url: string) =>
         Promise.resolve(
-          url === '/v1/me'
-            ? new Response('{}', { status: 401 })
+          url === '/v1/session'
+            ? Response.json({ state: 'signed_out' })
             : Response.json(
                 {
                   error: { code: 'invitation_link_not_found', message: 'Lien', details: {}, requestId: 'r1' },
@@ -210,7 +216,7 @@ describe('App signing out', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: string) => {
-        if (input === '/v1/me') return Promise.resolve(new Response(JSON.stringify(owner), { status: 200 }));
+        if (input === '/v1/session') return Promise.resolve(Response.json({ state: 'signed_in', me: owner }));
         if (input === '/v1/auth/sign-out')
           return Promise.resolve(new Response('{}', { status: signOutStatus }));
         // The screens stay on their loading state: only the way out is under test.
@@ -226,6 +232,109 @@ describe('App signing out', () => {
     signOutStatus = 200;
     fireEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }));
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('App when the session ends while it is open (recette 05/11, SEC-01)', () => {
+  const owner: Me = {
+    id: 'u1',
+    email: 'owner@example.test',
+    name: 'Nora',
+    role: 'owner',
+    creatorIds: [],
+    routedCreatorIds: [],
+    team: null,
+    teamScope: 'owner',
+  };
+  const gone = () =>
+    Response.json(
+      {
+        error: { code: 'session_unauthenticated', message: 'Connexion requise', details: {}, requestId: 'r' },
+      },
+      { status: 401 },
+    );
+
+  function serveSession(session: () => Promise<Response>, screens: () => Promise<Response>): Mock {
+    vi.stubGlobal('scrollTo', vi.fn());
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    );
+    const fake = vi.fn((input: string) => (input === '/v1/session' ? session() : screens()));
+    vi.stubGlobal('fetch', fake);
+    return fake;
+  }
+
+  it('goes back to the sign-in page at the first 401 of a screen, says why, and forgets the device', async () => {
+    const deleted: string[] = [];
+    vi.stubGlobal('caches', {
+      keys: () => Promise.resolve(['impera-shell-v1']),
+      delete: (key: string) => {
+        deleted.push(key);
+        return Promise.resolve(true);
+      },
+    });
+    let isOpen = true;
+    // The screens wait until the session is closed elsewhere, then every call answers 401.
+    let close: () => void = () => undefined;
+    const closed = new Promise<void>((resolve) => {
+      close = resolve;
+    });
+    const fake = serveSession(
+      () =>
+        Promise.resolve(Response.json(isOpen ? { state: 'signed_in', me: owner } : { state: 'signed_out' })),
+      () => closed.then(gone),
+    );
+    render(<App />);
+    await screen.findByRole('button', { name: /Nora/u });
+    isOpen = false;
+    close();
+    expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Ta session a pris fin. Reconnecte-toi pour continuer.',
+    );
+    expect(deleted).toEqual(['impera-shell-v1']);
+    // Many screens answered 401 at once: the session was read again once, not once per answer, and no more.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fake.mock.calls.filter(([url]) => url === '/v1/session').length).toBeLessThanOrEqual(3);
+    // Signed out, the app no longer watches the answers: fetch is the browser's again.
+    expect(window.fetch === fake).toBe(true);
+  });
+
+  it('stays on the screen when the session is still open, or cannot be read', async () => {
+    let session = () => Promise.resolve(Response.json({ state: 'signed_in', me: owner }));
+    serveSession(
+      () => session(),
+      () => Promise.resolve(gone()),
+    );
+    render(<App />);
+    await screen.findByRole('button', { name: /Nora/u });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
+    // Offline: the agenda kept on the device stays readable, the screens say the network their own way.
+    session = () => Promise.reject(new TypeError('Failed to fetch'));
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
+    expect(screen.getByRole('button', { name: /Nora/u })).toBeDefined();
+  });
+
+  it('reads the session again when the app is shown again, and signs out a session that expired meanwhile', async () => {
+    let isOpen = true;
+    serveSession(
+      () =>
+        Promise.resolve(Response.json(isOpen ? { state: 'signed_in', me: owner } : { state: 'signed_out' })),
+      () => new Promise<Response>(() => undefined),
+    );
+    render(<App />);
+    await screen.findByRole('button', { name: /Nora/u });
+    isOpen = false;
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(await screen.findByText('Ta session a pris fin. Reconnecte-toi pour continuer.')).toBeDefined();
   });
 });
 
@@ -258,8 +367,8 @@ describe('App on the screens of a contractor’s file', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: string) =>
-        input === '/v1/me'
-          ? Promise.resolve(Response.json(me))
+        input === '/v1/session'
+          ? Promise.resolve(Response.json({ state: 'signed_in', me }))
           : // The screens stay on their loading state: only where each address leads is under test.
             new Promise<Response>(() => undefined),
       ),

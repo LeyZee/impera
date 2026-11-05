@@ -1,7 +1,6 @@
 import {
   ApiErrorSchema,
-  MeSchema,
-  SECOND_FACTOR_ERROR_CODE,
+  DashboardSessionSchema,
   SecondFactorSetupSchema,
   SignInAnswerSchema,
   type Me,
@@ -35,15 +34,16 @@ export type CurrentSession =
   /** Signed in with the password, the second factor not active yet: the activation is the only screen (ADR 0046). */
   | { readonly kind: 'second_factor_required' };
 
-/** The session as the app opens it: who is signed in, nobody, or an account that must activate its code first. */
+/**
+ * The session as the app opens it: who is signed in, nobody, or an account that must activate its code first. Read
+ * from `GET /v1/session`, which answers 200 in every case: a page opened without a session logs no failed request
+ * (recette 05/11, SEC-13). Throws when the server does not answer, which is not the same as « no session ».
+ */
 export async function readSession(): Promise<CurrentSession> {
-  const response = await fetch('/v1/me', { credentials: 'include' });
-  if (response.status === 401) return { kind: 'signed_out' };
-  if (response.status === 403 && (await errorCodeOf(response)) === SECOND_FACTOR_ERROR_CODE) {
-    return { kind: 'second_factor_required' };
-  }
-  if (!response.ok) throw new Error(`GET /v1/me: ${String(response.status)}`);
-  return { kind: 'signed_in', user: MeSchema.parse(await response.json()) };
+  const response = await fetch('/v1/session', { credentials: 'include' });
+  if (!response.ok) throw new Error(`GET /v1/session: ${String(response.status)}`);
+  const answer = DashboardSessionSchema.parse(await response.json());
+  return answer.state === 'signed_in' ? { kind: 'signed_in', user: answer.me } : { kind: answer.state };
 }
 
 /** The signed-in user with his team role and scope (ADR 0024), or `null` when no session opens the dashboard. */

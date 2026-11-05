@@ -48,9 +48,17 @@ function fieldOf(form: FormData, name: string): string {
  * gesture also offers a passkey (ADR 0053): one gesture, no password, no code; after a sign-in by the code, a device
  * that holds keys is asked once whether to add one.
  */
-export function SignInPage({ onSignedIn }: { onSignedIn: () => void }): JSX.Element {
+export function SignInPage({
+  onSignedIn,
+  notice = null,
+}: {
+  onSignedIn: () => void;
+  /** Why the page is shown again, when the session ended while the app was open (recette 05/11, SEC-01). */
+  notice?: string | null;
+}): JSX.Element {
   const [step, setStep] = useState<'password' | 'code' | 'offer'>('password');
-  const [error, setError] = useState<string | null>(null);
+  // The notice stands in the error's place until the first try, which says its own.
+  const [error, setError] = useState<string | null>(notice);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [withPasskey] = useState(canUsePasskeys);
 

@@ -25,14 +25,14 @@ describe('dashboard session', () => {
       team: null,
       teamScope: 'owner',
     };
-    answer(200, user);
+    answer(200, { state: 'signed_in', me: user });
     expect(await fetchCurrentUser()).toEqual(user);
-    answer(401);
+    answer(200, { state: 'signed_out' });
     expect(await fetchCurrentUser()).toBeNull();
   });
 
-  it('refuses a /v1/me answer that does not match the contract', async () => {
-    answer(200, { id: 'u1', role: 'admin' });
+  it('refuses a /v1/session answer that does not match the contract', async () => {
+    answer(200, { state: 'signed_in', me: { id: 'u1', role: 'admin' } });
     await expect(fetchCurrentUser()).rejects.toThrow();
   });
 
@@ -55,11 +55,12 @@ describe('dashboard session', () => {
   });
 
   it('opens the activation, and only it, for an account whose code is not active yet', async () => {
-    answer(403, { error: { code: 'second_factor_forbidden', message: 'x', details: {}, requestId: 'r' } });
+    answer(200, { state: 'second_factor_required' });
     expect(await readSession()).toEqual({ kind: 'second_factor_required' });
     expect(await fetchCurrentUser()).toBeNull();
-    answer(403, { error: { code: 'role_forbidden', message: 'x', details: {}, requestId: 'r' } });
-    await expect(readSession()).rejects.toThrow('GET /v1/me: 403');
+    // A server that does not answer is not « no session ».
+    answer(502);
+    await expect(readSession()).rejects.toThrow('GET /v1/session: 502');
   });
 
   it('sends the code of a sign-in to the right check, and tells its refusals apart', async () => {

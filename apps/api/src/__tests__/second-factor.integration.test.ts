@@ -101,6 +101,13 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
       expect(response.statusCode).toBe(403);
       expect(codeOf(response)).toBe('second_factor_forbidden');
     }
+    // The dashboard's first read answers 200 all the same, and tells the activation apart (recette 05/11, SEC-13).
+    const pending = await get('/v1/session', cookie);
+    expect(pending.statusCode).toBe(200);
+    expect(pending.json()).toEqual({ state: 'second_factor_required' });
+    const anonymous = await get('/v1/session', '');
+    expect(anonymous.statusCode).toBe(200);
+    expect(anonymous.json()).toEqual({ state: 'signed_out' });
     const wrongPassword = await post('/v1/auth/two-factor/enable', { password: 'not the password' }, cookie);
     expect(wrongPassword.statusCode).toBe(401);
     expect(codeOf(wrongPassword)).toBe('password_unauthenticated');
@@ -134,6 +141,12 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     const first = await signInWithoutCode(server, bea.email, bea.password);
     const { cookie } = await activateSecondFactor(server, bea.email, bea.password, first);
     expect((await get('/v1/me', cookie)).statusCode).toBe(200);
+    expect((await get('/v1/session', cookie)).json<{ state: string; me: { email: string } }>()).toMatchObject(
+      {
+        state: 'signed_in',
+        me: { email: bea.email, role: 'owner' },
+      },
+    );
     // The activation asked for the password and a code: a sensitive action right after passes.
     expect((await removeKey(cookie)).statusCode).toBe(200);
     // Active: no second secret, and no code checked on the session without the password.
