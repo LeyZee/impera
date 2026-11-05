@@ -135,6 +135,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
+  'connector.copy_avatar': 'Copie de la photo d’une créatrice',
   'telegram.scan': 'Alertes Telegram',
   'telegram.flush_chat': 'Envoi des messages Telegram',
   'telegram.dispatch_polls': 'Lecture de Telegram',
