@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CreatorTaskSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,7 +36,7 @@ interface Call {
   readonly body: unknown;
 }
 
-function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS): Call[] {
+function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS, agenda = agendaOf()): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
     'fetch',
@@ -44,7 +45,7 @@ function serve(online: () => boolean, shifts: readonly unknown[] = SHIFTS): Call
       calls.push({ method, url, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined });
       if (!online()) return Promise.reject(new TypeError('Failed to fetch'));
       if (url.startsWith('/v1/creator-space/agenda'))
-        return Promise.resolve(new Response(JSON.stringify(agendaOf()), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify(agenda), { status: 200 }));
       if (method === 'PATCH' && url === `/v1/creator-space/tasks/${shoot.id}`) {
         const change: unknown = calls.at(-1)?.body;
         return Promise.resolve(
@@ -121,6 +122,19 @@ describe('Agenda, the creator’s (CR-05)', () => {
     expect(screen.getByText(/12/u, { selector: '.ag-streak b' })).toBeDefined();
     // Two words only: never « créneau », which belongs to the shifts (ADR 0049).
     expect(document.body.textContent).not.toMatch(/créneau/iu);
+  });
+
+  it('counts in « Programme » her tasks at an hour of the day, not the one carried from yesterday', async () => {
+    const late = CreatorTaskSchema.parse({
+      ...shoot,
+      id: '01936f00-0000-7000-8000-000000000099',
+      title: 'Soirée photo',
+      when: { kind: 'timed', startsAt: '2026-11-03T22:00:00.000Z', endsAt: '2026-11-04T01:00:00.000Z' },
+    });
+    serve(() => true, SHIFTS, agendaOf({ tasks: [...agendaOf().tasks, late] }));
+    show();
+    expect(await screen.findByText('Soirée photo')).toBeDefined();
+    expect(screen.getByText('2 tâches à heure')).toBeDefined();
   });
 
   it('ticks offline, keeps it, and sends it when the network comes back', async () => {

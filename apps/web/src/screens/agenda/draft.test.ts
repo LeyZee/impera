@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { draftWhen } from './AddDialog';
 import {
   availabilityBodiesOf,
   defaultStart,
@@ -26,6 +27,17 @@ const draft: TaskDraft = {
 };
 
 describe('« Ajouter » (CR-05)', () => {
+  it('previews no day her agenda does not reach: what to choose instead (CREA-14)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
+    try {
+      expect(draftWhen({ ...draft, kind: 'day', day: '2099-01-01' }, ZONE)).toBe('Choisis le jour');
+      expect(draftWhen({ ...draft, kind: 'day' }, ZONE)).toMatch(/4 novembre/u);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reads an end at or before the start as the next day, in her zone', () => {
     expect(spanOf('2026-11-04', 22 * 60, 60, ZONE)).toEqual({
       startsAt: '2026-11-04T21:00:00.000Z',
