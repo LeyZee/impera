@@ -18,7 +18,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from './ids';
-import { PayoutBlockSchema } from './invoices';
+import { InvoiceNotIssuedReasonSchema, PayoutBlockSchema } from './invoices';
 import { CurrencySchema, PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
 import { EarningsBaseSchema } from './pay-rules';
@@ -743,6 +743,12 @@ export const CommissionStatementSchema = z.object({
    * a validated statement with something to pay, `null` otherwise and when nothing stops it.
    */
   payoutBlock: PayoutBlockSchema.nullable(),
+  /**
+   * With a `documents_not_issued` block, why a document it pays is not issued, as the invoicing said it last
+   * (`invoice_not_issued`, EQ-06): what the member or the owner has left to do (recette EQP-04). `null` otherwise, and
+   * while the invoicing has said nothing for it yet.
+   */
+  notIssuedReason: InvoiceNotIssuedReasonSchema.nullable(),
 });
 export type CommissionStatement = z.infer<typeof CommissionStatementSchema>;
 

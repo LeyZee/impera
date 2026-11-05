@@ -30,6 +30,7 @@ import {
   Gauge,
   Loading,
   LockIcon,
+  PayoutHoldLine,
   PeriodArrows,
   PeriodHeading,
   Swatch,
@@ -59,7 +60,6 @@ import {
   memberFacts,
   momentAt,
   opensOn,
-  payoutBlockText,
   payRefusalText,
   periodHeadOf,
   phaseChip,
@@ -484,6 +484,7 @@ function PeriodView({
                         statement.payableMinor > 0 &&
                         statement.payoutBlock === null
                       }
+                      canSettle={owner}
                       onCheck={(on) => {
                         setUnchecked((was) => {
                           const next = new Set(was);
@@ -961,6 +962,7 @@ function MemberRow({
   who,
   refusal,
   canPay,
+  canSettle,
   onCheck,
   onOpen,
 }: {
@@ -979,6 +981,8 @@ function MemberRow({
   who: (userId: string) => string;
   refusal: { readonly refusal: PayRefusal; readonly text: string } | null;
   canPay: boolean;
+  /** The owner: a transfer that waits leads to where it is settled (recette EQP-04). */
+  canSettle: boolean;
   onCheck: (on: boolean) => void;
   onOpen: (paying: boolean) => void;
 }): JSX.Element {
@@ -1050,9 +1054,7 @@ function MemberRow({
           {memberFacts(statement).map((fact) => ` · ${fact}`)}
         </p>
         {carry === null ? null : <p className="py-member__line">{carry}</p>}
-        {statement.payoutBlock === null ? null : (
-          <p className="py-member__line">{payoutBlockText(statement.payoutBlock)}</p>
-        )}
+        <PayoutHoldLine statement={statement} owner={canSettle} className="py-member__line" />
         {locked ? (
           <p className="rp-review__locked">Ton relevé : un autre membre de l’agence le valide.</p>
         ) : null}
