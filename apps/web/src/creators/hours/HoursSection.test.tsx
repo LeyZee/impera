@@ -206,12 +206,28 @@ describe('Créatrices › Heures (P3-14)', () => {
     fireEvent.blur(start);
     expect(start).toHaveProperty('value', '25:00');
     expect(start.getAttribute('aria-invalid')).toBe('true');
-    expect(screen.getByText('Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30')).toBeDefined();
+    expect(screen.getAllByText('Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30')).toHaveLength(2);
     expect(save()).toHaveProperty('disabled', true);
     fireEvent.change(start, { target: { value: '23:00' } });
     fireEvent.blur(start);
     expect(start).toHaveProperty('value', '23:00');
     expect(save()).toHaveProperty('disabled', false);
+  });
+
+  it('says an unreadable hour on its own line, instead of the summary of the hours before (recette 05/11, PRO-15)', async () => {
+    serve({});
+    renderSection();
+    const start = await screen.findByLabelText('Heures calmes : début');
+    const line = start.closest('.hr-range');
+    if (!(line instanceof HTMLElement)) throw new Error('no line');
+    expect(within(line).queryByText(/jusqu’au lendemain/u)).not.toBeNull();
+    fireEvent.change(start, { target: { value: '25:00' } });
+    fireEvent.blur(start);
+    expect(within(line).queryByText(/jusqu’au lendemain/u)).toBeNull();
+    expect(within(line).getByText('Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30')).toBeDefined();
+    expect(line.dataset.invalid).toBe('true');
+    fireEvent.change(start, { target: { value: '23:00' } });
+    expect(within(line).queryByText('Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30')).toBeNull();
   });
 
   it('warns when no follow-up could ever go out, in amber, without blocking', async () => {

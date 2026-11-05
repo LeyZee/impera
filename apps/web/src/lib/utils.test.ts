@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cn, initialOf } from './utils';
+import { cn, deOf, initialOf } from './utils';
 
 describe('cn', () => {
   it('keeps the last conflicting Tailwind utility', () => {
@@ -14,5 +14,15 @@ describe('initialOf', () => {
     expect(initialOf('💋 Dashboard-Fan 1')).toBe('💋');
     expect(initialOf('👍🏽 Théo')).toBe('👍🏽');
     expect(initialOf('  ')).toBe('?');
+  });
+});
+
+describe('deOf', () => {
+  it('elides « de » before a vowel, accented or not (recette 05/11, PRO-16)', () => {
+    expect(deOf('Anastasia-Maria')).toBe('d’Anastasia-Maria');
+    expect(deOf('Émilie')).toBe('d’Émilie');
+    expect(deOf('Yvonne')).toBe('d’Yvonne');
+    expect(deOf('Yasmine')).toBe('de Yasmine');
+    expect(deOf('Léa')).toBe('de Léa');
   });
 });

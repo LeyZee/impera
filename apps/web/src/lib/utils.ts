@@ -17,6 +17,15 @@ export function initialOf(name: string): string {
   return first === undefined ? '?' : first.segment.toUpperCase();
 }
 
+/**
+ * « de Léa », « d’Anastasia » : « de » before a name, elided before a vowel (« Yvonne » too, not « Yasmine »). The
+ * name is given as written; an h is left alone, since French cannot tell a mute one from the spelling.
+ */
+export function deOf(name: string): string {
+  const bare = name.trim().normalize('NFD');
+  return /^(?:[aeiou]|y[^aeiouy])/iu.test(bare) ? `d’${name.trim()}` : `de ${name.trim()}`;
+}
+
 /** `?membre=<id>` of an address when it holds a member's id, nothing otherwise: a broken link opens the page as is. */
 export function memberOf(search: Record<string, unknown>): { membre?: string } {
   const { membre } = search;
