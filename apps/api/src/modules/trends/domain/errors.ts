@@ -1,4 +1,8 @@
 import {
+  CONTENT_IDEA_DECIDED_CONFLICT,
+  CONTENT_IDEA_FORBIDDEN,
+  CONTENT_IDEA_GUARD_UNPROCESSABLE,
+  CONTENT_IDEA_NOT_FOUND,
   DomainError,
   TREND_CAPTURE_READING_NOT_FOUND,
   TREND_CAPTURE_VISION_UNAVAILABLE,
@@ -68,5 +72,39 @@ export class TrendWatchBudgetLimited extends DomainError {
 export class TrendCaptureVisionUnavailable extends DomainError {
   constructor() {
     super(TREND_CAPTURE_VISION_UNAVAILABLE, 'La description des captures est indisponible pour le moment');
+  }
+}
+
+/** No idea of hers of that id (none, or another creator's). */
+export class ContentIdeaNotFound extends DomainError {
+  constructor() {
+    super(CONTENT_IDEA_NOT_FOUND, 'Idée introuvable');
+  }
+}
+
+/** « Idées du jour » is the owner's and an active manager's: a chatter, or a manager who left, is refused. */
+export class ContentIdeaForbidden extends DomainError {
+  constructor() {
+    super(CONTENT_IDEA_FORBIDDEN, 'Les idées du jour sont réservées au propriétaire et aux managers');
+  }
+}
+
+/** The other gesture on an idea already decided: a refused idea is never validated, a validated one never refused. */
+export class ContentIdeaDecided extends DomainError {
+  constructor() {
+    super(CONTENT_IDEA_DECIDED_CONFLICT, 'Cette idée a déjà été décidée');
+  }
+}
+
+/** The idea, as corrected, breaks one of the code's guards (ADR 0060 § 4): it does not leave for her agenda. */
+export class ContentIdeaGuarded extends DomainError {
+  constructor(reason: 'no_persona' | 'limit' | 'nudity' | 'instagram_guard') {
+    const messages = {
+      no_persona: 'Sans persona active, aucune idée ne part chez elle',
+      limit: 'Cette idée touche une de ses limites : corrige-la ou refuse-la',
+      nudity: 'Cette idée parle de nu pour une sortie publique : corrige-la ou refuse-la',
+      instagram_guard: 'Cette idée enfreint la garde Instagram : corrige-la ou refuse-la',
+    };
+    super(CONTENT_IDEA_GUARD_UNPROCESSABLE, messages[reason], { details: { reason } });
   }
 }

@@ -336,7 +336,11 @@ export const ContentDropRefusalsSchema = z.strictObject({
 /** `PATCH /v1/creators/:creatorId/drops/:id` (owner, operator): her category corrected (ADR 0055 § 1), at the journal. */
 export const CorrectDropCategoryBodySchema = z.strictObject({ category: DropCategorySchema });
 
-export const CONTENT_REQUEST_ORIGINS = ['agency', 'stock', 'cadence'] as const;
+/**
+ * Where a request comes from (ADR 0055 § 4): by hand (`agency`, its author), the stock, the scripts' cadence, or a
+ * suggestion born of an idea that she accepted (`idea`, ADR 0060 § 5, VEI-01 d), the last three with no author.
+ */
+export const CONTENT_REQUEST_ORIGINS = ['agency', 'stock', 'cadence', 'idea'] as const;
 export const ContentRequestOriginSchema = z.enum(CONTENT_REQUEST_ORIGINS);
 
 /**
