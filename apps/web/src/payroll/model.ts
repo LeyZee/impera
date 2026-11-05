@@ -18,6 +18,7 @@ import {
   type Currency,
   type ExchangeRate,
   type ForeignCurrency,
+  type InvoiceNotIssuedReason,
   type PaymentMethod,
   PayoutBlockSchema,
   type PayoutBlock,
@@ -111,9 +112,137 @@ function carryChip(statement: CommissionStatement): PayChip | null {
  * are not all issued yet, or under a tax treaty, the contractor's tax residence certificate of the transfer's year is
  * missing or waits for the owner's check.
  */
-export function payoutBlockText(block: PayoutBlock): string {
-  if (block.reason === 'documents_not_issued') return 'Versement bloqué : facture ou avoir pas encore émis.';
+export function payoutBlockText(
+  block: PayoutBlock,
+  reason: InvoiceNotIssuedReason | null = null,
+  /** The owner checks the file: « ta vérification » to him, « celle du propriétaire » to a manager. */
+  owner = true,
+): string {
+  if (block.reason === 'documents_not_issued') {
+    if (reason === null) return 'Versement bloqué : facture ou avoir pas encore émis.';
+    const why = NOT_ISSUED_FOR_AGENCY[reason](owner ? 'ta vérification' : 'la vérification du propriétaire');
+    return `Versement bloqué : ${reason === 'no_invoice_to_credit' ? 'avoir pas encore émis' : 'facture pas encore émise'}, ${why}.`;
+  }
   return `Versement bloqué : attestation de résidence ${block.year ?? ''} ${block.reason === 'tax_residence_missing' ? 'absente' : 'à vérifier'}.`;
+}
+
+/**
+ * Why the invoicing held a document back (`invoice_not_issued`), as the owner settles it (recette EQP-04): what is
+ * missing and where, the member never named (the row already does). `check` is who checks the file: the owner reads
+ * « ta vérification », a manager « la vérification du propriétaire ».
+ */
+const NOT_ISSUED_FOR_AGENCY: Readonly<Record<InvoiceNotIssuedReason, (check: string) => string>> = {
+  no_mandate: () => 'le membre n’a pas encore accepté son mandat de facturation',
+  no_regime: () => 'aucun régime de facturation ne lui est donné',
+  regime_not_validated: () => 'son régime de facturation attend la validation du comptable',
+  regime_country_mismatch: () => 'son régime de facturation n’est pas celui du pays de sa fiche',
+  identity_incomplete: () => 'son identité est incomplète dans son dossier',
+  identity_unverified: (check) => `son identité attend ${check} dans son dossier`,
+  tax_residence_missing: () => 'son attestation de résidence fiscale manque',
+  tax_residence_unverified: (check) => `son attestation de résidence fiscale attend ${check}`,
+  prefix_missing: () => 'son préfixe de factures n’est pas posé',
+  agency_missing: () => 'l’identité de l’agence n’est pas remplie dans Réglages › Facturation',
+  no_invoice_to_credit: () => 'aucune facture ne peut le prendre entier, à voir avec le comptable',
+};
+
+/**
+ * Where the owner settles a transfer that waits: the member's file, or Réglages › Facturation for what is the agency's
+ * (its identity, a regime the accountant validates). `null` when there is nothing to open (a credit note to see with
+ * the accountant).
+ */
+export function payoutBlockPlace(
+  block: PayoutBlock,
+  reason: InvoiceNotIssuedReason | null,
+): 'file' | 'billing' | null {
+  if (block.reason !== 'documents_not_issued') return 'file';
+  if (reason === 'agency_missing' || reason === 'regime_not_validated') return 'billing';
+  return reason === 'no_invoice_to_credit' ? null : 'file';
+}
+
+/** A transfer that waits, as the member reads it (recette EQP-04): why, and whether the next step is theirs. */
+export interface MyPayoutHold {
+  readonly title: string;
+  readonly text: string;
+  /** Theirs to do, in Moi › Dossier; `false` when the agency does it. */
+  readonly yours: boolean;
+}
+
+/** Why the invoicing held the member's invoice back, in the second person: what is left, and who does it. */
+const NOT_ISSUED_FOR_MEMBER: Readonly<
+  Record<InvoiceNotIssuedReason, { readonly text: string; readonly yours: boolean }>
+> = {
+  no_mandate: {
+    text: 'L’agence l’émet pour toi dès que tu acceptes ton mandat de facturation, dans Moi › Dossier.',
+    yours: true,
+  },
+  identity_incomplete: {
+    text: 'Il manque des informations à ton identité : complète-la dans Moi › Dossier, l’agence émet ensuite ta facture.',
+    yours: true,
+  },
+  identity_unverified: {
+    text: 'Ton dossier est rempli : l’agence le vérifie, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  no_regime: {
+    text: 'L’agence choisit ton régime de facturation, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  regime_not_validated: {
+    text: 'L’agence fait valider ton régime de facturation, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  regime_country_mismatch: {
+    text: 'Ton pays a changé : l’agence met ton régime de facturation à jour, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  prefix_missing: {
+    text: 'L’agence finit de régler ta facturation, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  agency_missing: {
+    text: 'L’agence finit de régler sa facturation, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  tax_residence_missing: {
+    text: 'Dépose ton attestation de résidence fiscale dans Moi › Dossier : l’agence émet ensuite ta facture.',
+    yours: true,
+  },
+  tax_residence_unverified: {
+    text: 'L’agence vérifie ton attestation de résidence fiscale, puis émet ta facture. Rien à faire de ton côté.',
+    yours: false,
+  },
+  no_invoice_to_credit: {
+    text: 'Un avoir de ta quinzaine se règle avec le comptable de l’agence. Rien à faire de ton côté.',
+    yours: false,
+  },
+};
+
+/**
+ * A transfer that waits, said to the member instead of « Le versement suit » (recette EQP-04, ADR 0041 § 4): nothing
+ * leaves before their invoice is issued, nor under a tax treaty before the owner accepts their certificate of the year.
+ * Without a reason said yet, it sends them to their file, where anything left to do is listed.
+ */
+export function myPayoutHold(block: PayoutBlock, reason: InvoiceNotIssuedReason | null): MyPayoutHold {
+  const year = block.year === null ? '' : ` ${block.year}`;
+  if (block.reason === 'tax_residence_missing')
+    return {
+      title: `Ton versement attend ton attestation de résidence fiscale${year}`,
+      text: 'Dépose-la dans Moi › Dossier : l’agence la vérifie, puis fait ton virement.',
+      yours: true,
+    };
+  if (block.reason === 'tax_residence_unverified')
+    return {
+      title: 'Ton versement attend la vérification de ton attestation',
+      text: `L’agence vérifie ton attestation de résidence fiscale${year}, puis fait ton virement. Rien à faire de ton côté.`,
+      yours: false,
+    };
+  if (reason === null)
+    return {
+      title: 'Ton versement attend ta facture',
+      text: 'L’agence l’émet dès que ton dossier est complet et ton mandat de facturation accepté : regarde dans Moi › Dossier s’il te reste quelque chose à faire.',
+      yours: true,
+    };
+  return { title: 'Ton versement attend ta facture', ...NOT_ISSUED_FOR_MEMBER[reason] };
 }
 
 /** A transfer that waits, amber: shown before the owner makes it in WorldRemit (ADR 0041 § 4). */
@@ -1291,6 +1420,8 @@ export interface MyStatementWords {
   readonly since: string;
   readonly label: string;
   readonly notes: readonly string[];
+  /** A validated transfer that waits, and why (recette EQP-04); `null` when nothing stops it. */
+  readonly hold: MyPayoutHold | null;
 }
 
 /**
@@ -1327,17 +1458,25 @@ export function myStatementWords(
       notes: withCarry([
         `Payé le ${longDay(payment.paidOn)}${PAID_BY[payment.method]}${payment.reference === null ? '' : `, référence ${payment.reference}`}.`,
       ]),
+      hold: null,
     };
-  if (statement.validatedAt !== null)
+  if (statement.validatedAt !== null) {
+    // A transfer that waits never reads « Le versement suit » (recette EQP-04): the hold says why, and what is left.
+    const hold =
+      statement.payableMinor === 0 || statement.payoutBlock === null
+        ? null
+        : myPayoutHold(statement.payoutBlock, statement.notIssuedReason);
     return {
       since: `le ${dayAt(statement.validatedAt, zone)}`,
       label: statement.payableMinor === 0 ? 'Ce que tu touches' : 'Ce que tu vas toucher',
       notes: withCarry([
-        statement.payableMinor === 0
+        statement.payableMinor === 0 || hold !== null
           ? `Validé le ${momentAt(statement.validatedAt, zone)}.`
           : `Validé le ${momentAt(statement.validatedAt, zone)}. ${delay ?? 'Le versement suit.'}`,
       ]),
+      hold,
     };
+  }
   const computed = computedText(statement.computedAt, zone, now);
   const basis = basisWords(statement.lines);
   if (!ended)
@@ -1347,6 +1486,7 @@ export function myStatementWords(
       notes: withCarry([
         `Calculé ${computed} sur ${basis}. ${delay ?? 'Le versement suit la validation de la quinzaine.'}`,
       ]),
+      hold: null,
     };
   return {
     since: `depuis le ${dayMonthText(opensOn(statement.window))}`,
@@ -1356,6 +1496,7 @@ export function myStatementWords(
         payoutDelayBusinessDays === null ? '' : `, en général ${payoutDelayText(payoutDelayBusinessDays)}`
       }.`,
     ]),
+    hold: null,
   };
 }
 

@@ -29,6 +29,12 @@ export function wireContentDrops(shared: Shared): WiredContentDrops {
         shared.logger,
         (payload) => module.jobs.receiveFile(payload.fileId, payload.correlationId),
       ),
+      'content_drops.convert_file': defineTask(
+        'content_drops.convert_file',
+        JOB_PAYLOADS['content_drops.convert_file'],
+        shared.logger,
+        (payload) => module.jobs.convertFile(payload.fileId, payload.correlationId),
+      ),
       'content_drops.erase_originals': defineTask(
         'content_drops.erase_originals',
         JOB_PAYLOADS['content_drops.erase_originals'],

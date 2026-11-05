@@ -1,4 +1,9 @@
+import { execFile } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import {
   ContentDropFileIdSchema,
@@ -197,8 +202,9 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     who: 'nora' | 'manager',
     photo: Uint8Array,
     category: 'feed_shoot' | 'instagram_story' = 'feed_shoot',
+    mime = 'image/jpeg',
   ) {
-    const file = { id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes: photo.length };
+    const file = { id: newId(ContentDropFileIdSchema), mime, bytes: photo.length };
     const drop = { id: newId(ContentDropIdSchema), category, files: [file] };
     const url = who === 'nora' ? '/v1/creator-space/drops' : `/v1/creators/${nora}/drops`;
     const response = await call('POST', url, who, drop);
@@ -439,6 +445,41 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     const key = `incoming/${nora}/${fileId}`;
     expect((await s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'HEAD' })).status).toBe(404);
     expect(await rows(dropId)).toEqual({ drop: 'withdrawn', files: [{ state: 'awaiting', refusal: null }] });
+  });
+
+  it('hands her WebM over to the conversion queue, which keeps it as an H.264 MP4 (ADR 0070)', async () => {
+    // Two seconds of VP9 made by ffmpeg, tagged with an invented device: no real video.
+    const dir = await mkdtemp(join(tmpdir(), 'impera-webm-'));
+    const path = join(dir, 'clip.webm');
+    await promisify(execFile)('ffmpeg', [
+      ...['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=10', '-t', '2'],
+      ...['-c:v', 'libvpx-vp9', '-b:v', '200k', '-metadata', `title=${DEVICE}`, path],
+    ]);
+    const webm = new Uint8Array(await readFile(path));
+    await rm(dir, { recursive: true, force: true });
+    const clip = await dropOne('nora', webm, 'feed_shoot', 'video/webm');
+    await sendWhole(clip);
+    await receive();
+    // Received, not yet kept: the conversion waits in its own queue, one at a time.
+    expect((await rows(clip.dropId)).files).toEqual([{ state: 'received', refusal: null }]);
+    const queued = await test.admin.db.execute<{ task_identifier: string; queue_name: string | null }>(
+      sql`select task_identifier, queue_name from graphile_worker.jobs where key = ${`content_drops.convert_file:${clip.fileId}`}`,
+    );
+    expect(queued.rows).toEqual([
+      { task_identifier: 'content_drops.convert_file', queue_name: 'content_drops:convert' },
+    ]);
+    await runOnce({
+      pgPool: test.admin.pool,
+      taskList: { 'content_drops.convert_file': app.tasks['content_drops.convert_file'] },
+    });
+    expect(await rows(clip.dropId)).toEqual({ drop: 'ready', files: [{ state: 'kept', refusal: null }] });
+    const medium = await mediumOf(clip.fileId);
+    expect(medium).toMatchObject({ kind: 'video', mime: 'video/mp4', durationMs: 2000 });
+    const stored = await s3.fetch(`${endpoint}/${bucket}/${medium.storageKey}`);
+    const kept = Buffer.from(await stored.arrayBuffer());
+    expect(kept.subarray(4, 8).toString('latin1')).toBe('ftyp');
+    expect(kept.toString('latin1').includes(DEVICE)).toBe(false);
+    expect(await held(`incoming/${nora}/${clip.fileId}`)).toBe(404);
   });
 
   /** `content_drops.erase_originals` once, as the hourly cron would enqueue it (CR-06 c). */

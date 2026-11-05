@@ -1,0 +1,51 @@
+/*
+ * Moi › Persona, the creator's sheet in reading (recette CREA-01). Its own classes, `mp-`, so that a change to the
+ * agency's persona screen (`ps-head`…) never moves her page. Plates, never glass: it is content.
+ */
+.mp-block {
+  --_radius: var(--nv-radius-xl);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.mp-block__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+}
+/* Label in a narrow faint column, value in ink: each block reads at a glance. */
+.mp-fields {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 1fr;
+  row-gap: var(--nv-space-2);
+  column-gap: var(--nv-space-4);
+}
+.mp-fields__row {
+  display: contents;
+}
+.mp-fields dt {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-body-leading);
+}
+.mp-fields dd {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  overflow-wrap: anywhere;
+}
+/* A phone: label above its value. */
+@media (max-width: 640px) {
+  .mp-fields {
+    grid-template-columns: 1fr;
+    row-gap: 0;
+  }
+  .mp-fields__row + .mp-fields__row dt {
+    margin-top: var(--nv-space-3);
+  }
+}

@@ -1,5 +1,6 @@
 import {
   BonusIdSchema,
+  INVOICE_NOT_ISSUED_REASONS,
   CarryOverIdSchema,
   CommissionStatementIdSchema,
   newId,
@@ -49,10 +50,12 @@ import {
   missedRateDays,
   rateOverdue,
   myBlockedText,
+  myPayoutHold,
   myStatementWords,
   parsePaySearch,
   parseTarget,
   periodHeadOf,
+  payoutBlockPlace,
   payoutBlockText,
   payRefusalText,
   payoutDelayText,
@@ -168,6 +171,7 @@ const statement = (patch: Partial<CommissionStatement> = {}): CommissionStatemen
   paidBy: null,
   payment: null,
   payoutBlock: null,
+  notIssuedReason: null,
   ...patch,
 });
 
@@ -231,6 +235,65 @@ describe('a statement’s marks', () => {
     expect(payoutBlockText({ reason: 'documents_not_issued', year: null })).toBe(
       'Versement bloqué : facture ou avoir pas encore émis.',
     );
+  });
+
+  it('names what holds an invoice back, and where the owner settles it (recette EQP-04)', () => {
+    const documents = { reason: 'documents_not_issued', year: null } as const;
+    expect(payoutBlockText(documents, 'no_mandate')).toBe(
+      'Versement bloqué : facture pas encore émise, le membre n’a pas encore accepté son mandat de facturation.',
+    );
+    expect(payoutBlockText(documents, 'identity_unverified')).toBe(
+      'Versement bloqué : facture pas encore émise, son identité attend ta vérification dans son dossier.',
+    );
+    // A manager reads that the owner checks it.
+    expect(payoutBlockText(documents, 'identity_unverified', false)).toBe(
+      'Versement bloqué : facture pas encore émise, son identité attend la vérification du propriétaire dans son dossier.',
+    );
+    // Whatever the reason, a manager is never told « ta » (the owner checks the file, not him).
+    for (const reason of INVOICE_NOT_ISSUED_REASONS) {
+      expect(payoutBlockText(documents, reason, false)).not.toMatch(/\b(ta|ton|tes)\b/u);
+    }
+    expect(payoutBlockText(documents, 'no_invoice_to_credit')).toBe(
+      'Versement bloqué : avoir pas encore émis, aucune facture ne peut le prendre entier, à voir avec le comptable.',
+    );
+    // His file for what is his; Réglages › Facturation for the agency's; nothing to open for the accountant's.
+    expect(payoutBlockPlace(documents, 'no_mandate')).toBe('file');
+    expect(payoutBlockPlace(documents, 'prefix_missing')).toBe('file');
+    expect(payoutBlockPlace(documents, null)).toBe('file');
+    expect(payoutBlockPlace(documents, 'agency_missing')).toBe('billing');
+    expect(payoutBlockPlace(documents, 'regime_not_validated')).toBe('billing');
+    expect(payoutBlockPlace(documents, 'no_invoice_to_credit')).toBeNull();
+    expect(payoutBlockPlace({ reason: 'tax_residence_unverified', year: '2027' }, null)).toBe('file');
+  });
+
+  it('tells the member why their transfer waits, and whether the next step is theirs (recette EQP-04)', () => {
+    const documents = { reason: 'documents_not_issued', year: null } as const;
+    expect(myPayoutHold(documents, 'no_mandate')).toEqual({
+      title: 'Ton versement attend ta facture',
+      text: 'L’agence l’émet pour toi dès que tu acceptes ton mandat de facturation, dans Moi › Dossier.',
+      yours: true,
+    });
+    expect(myPayoutHold(documents, 'identity_incomplete').yours).toBe(true);
+    expect(myPayoutHold(documents, 'identity_unverified')).toMatchObject({
+      text: 'Ton dossier est rempli : l’agence le vérifie, puis émet ta facture. Rien à faire de ton côté.',
+      yours: false,
+    });
+    expect(myPayoutHold(documents, 'agency_missing').yours).toBe(false);
+    // No reason said yet: their file says what is left, if anything.
+    expect(myPayoutHold(documents, null)).toMatchObject({
+      title: 'Ton versement attend ta facture',
+      yours: true,
+    });
+    expect(myPayoutHold({ reason: 'tax_residence_missing', year: '2027' }, null)).toEqual({
+      title: 'Ton versement attend ton attestation de résidence fiscale 2027',
+      text: 'Dépose-la dans Moi › Dossier : l’agence la vérifie, puis fait ton virement.',
+      yours: true,
+    });
+    expect(myPayoutHold({ reason: 'tax_residence_unverified', year: '2027' }, null)).toEqual({
+      title: 'Ton versement attend la vérification de ton attestation',
+      text: 'L’agence vérifie ton attestation de résidence fiscale 2027, puis fait ton virement. Rien à faire de ton côté.',
+      yours: false,
+    });
   });
 
   it('leaves out of a row the stage every row shares, and says what its amount is', () => {
@@ -1243,6 +1306,25 @@ describe('Commissions, as the member reads them', () => {
     });
     const bare = statement({ ...paid, payment: { ...payment, reference: null } });
     expect(words(bare, true).notes).toEqual(['Payé le mardi 17 novembre par WorldRemit.']);
+  });
+
+  it('never says « Le versement suit » while the transfer waits, and says why (recette EQP-04)', () => {
+    const sameDay = new Date('2026-11-17T10:00:00Z');
+    const held = statement({
+      status: 'validated',
+      validatedAt: '2026-11-16T09:41:00.000Z',
+      payoutBlock: { reason: 'documents_not_issued', year: null },
+      notIssuedReason: 'no_mandate',
+    });
+    const said = myStatementWords(held, true, sameDay, 3);
+    expect(said.notes.map(plain)).toEqual(['Validé le lundi 16 novembre à 10 h 41.']);
+    expect(said.hold).toEqual(myPayoutHold({ reason: 'documents_not_issued', year: null }, 'no_mandate'));
+    // Nothing stops it: the usual words, and no hold.
+    const free = statement({ status: 'validated', validatedAt: '2026-11-16T09:41:00.000Z' });
+    expect(myStatementWords(free, true, sameDay).hold).toBeNull();
+    expect(myStatementWords(free, true, sameDay).notes.map(plain)).toEqual([
+      'Validé le lundi 16 novembre à 10 h 41. Le versement suit.',
+    ]);
   });
 
   it('says a statement is computed on the sales read once an account is on the platform’s net (CRM-03)', () => {

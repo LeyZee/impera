@@ -10,7 +10,7 @@ import { useId, useState, type JSX } from 'react';
 
 import { EntryForm, type EntryAdded } from './EntryForm';
 import { useCfaFrancs, type PayNames } from './data';
-import { Chip, Delta, MoneyPath, Swatch } from './parts';
+import { Chip, Delta, MoneyPath, PayoutHoldLine, Swatch } from './parts';
 
 import { payStatement, useLatestPayPeriod, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
@@ -20,7 +20,6 @@ import {
   fcfaText,
   momentAt,
   PAID_BY,
-  payoutBlockText,
   payRefusalText,
   rateText,
   shortHash,
@@ -291,7 +290,7 @@ function Foot({
       : statement.status === 'validated' && statement.validatedAt !== null
         ? `Validé le ${momentAt(statement.validatedAt, zone)}${
             statement.validatedBy === null ? '' : ` par ${who(statement.validatedBy)}`
-          }.${statement.payableMinor === 0 ? ' Rien à verser : le total part en report.' : blocked !== null ? ` ${payoutBlockText(blocked)}` : owner ? '' : ' Le propriétaire le marque payé une fois le transfert fait.'}`
+          }.${statement.payableMinor === 0 ? ' Rien à verser : le total part en report.' : blocked !== null ? '' : owner ? '' : ' Le propriétaire le marque payé une fois le transfert fait.'}`
         : own
           ? 'Ton relevé : un autre membre de l’agence le valide.'
           : statement.status === 'draft'
@@ -300,6 +299,7 @@ function Foot({
   return (
     <div className="py-dialog__foot">
       <p className="py-quiet">{said}</p>
+      {blocked === null ? null : <PayoutHoldLine statement={statement} owner={owner} className="py-quiet" />}
       <button type="button" className="nv-btn nv-btn--plain" onClick={onClose}>
         Fermer
       </button>
