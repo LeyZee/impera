@@ -164,7 +164,7 @@ describe('voice guards', () => {
     expect(codes(['T’inquiète, t’as rien à payer'])).toContain('payment_lie');
     expect(codes(['Pas besoin d’argent avec moi'])).toContain('payment_lie');
     expect(codes(['T’as rien à payer pour me parler 😌'])).toEqual([]);
-    expect(codes(['Cette vidéo est à 6 €, tu l’ouvres en touchant le cadenas'])).toEqual([]);
+    expect(codes(['Cette vidéo, tu l’ouvres en touchant le cadenas'])).toEqual([]);
   });
 
   it('blocks a discount or a negotiation, and lets her refusal of one through', () => {
@@ -184,12 +184,47 @@ describe('voice guards', () => {
     for (const bubble of [
       'Je fais pas de promo moi 😌',
       'Pas de réduc avec moi, c’est mon prix',
-      'Cette vidéo est à 6 €, tu l’ouvres en touchant le cadenas',
+      'Cette vidéo, tu l’ouvres en touchant le cadenas',
       'Je finis à 18 h au lieu de 20 h ce soir',
       'J’ai -10 % de batterie, je vais devoir te laisser',
       'Il fait -5 % de moral ce matin 😅',
     ]) {
       expect(codes([bubble])).toEqual([]);
+    }
+  });
+
+  it('blocks a payment outside the platform, whatever the means (recette MOT-04)', () => {
+    for (const bubbles of [
+      ['envoie moi 50€ sur paypal stp'],
+      ['tu peux me payer par virement ou lydia, c’est plus simple'],
+      ['Je te donne mon IBAN 😘'],
+      ['Un Revolut ça marche aussi'],
+      ['Tu peux m’envoyer une carte cadeau ?'],
+      ['Tu paies en crypto', 'ou en btc ?'],
+      ['Mon P4yP4l c’est mon prénom'],
+    ]) {
+      expect(codes(bubbles), bubbles.join(' / ')).toContain('off_platform_payment');
+    }
+    expect(codes(['Une vraie pepite cette vidéo 💎'])).toEqual([]);
+  });
+
+  it('blocks a price in her words, the offer carries it; her thanks for a tip pass (recette MOT-04)', () => {
+    for (const bubble of [
+      'ma vidéo est à 5€ seulement',
+      'Elle est à 9,99 € ce soir',
+      'Pour 20 euros tu as tout',
+      'C’est que 15 balles 😏',
+      '$10 and it is yours',
+    ]) {
+      expect(codes([bubble]), bubble).toContain('price_outside_offer');
+    }
+    for (const bubble of [
+      'Merci pour les 20 € mon cœur 🥰',
+      'Je fais 52 kg pour 1m65',
+      'Il est 20 h, je file sous la douche',
+      'J’ai eu 3 likes en 5 minutes 😅',
+    ]) {
+      expect(codes([bubble]), bubble).toEqual([]);
     }
   });
 

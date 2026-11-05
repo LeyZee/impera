@@ -31,6 +31,9 @@ export const GUARD_CODES = [
   'fake_emergency',
   'repetition',
   'closed_question_streak',
+  // Recette 05/11, MOT-04 (Charles, « go recos »).
+  'off_platform_payment',
+  'price_outside_offer',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;
