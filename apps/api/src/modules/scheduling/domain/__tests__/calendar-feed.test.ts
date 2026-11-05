@@ -87,7 +87,7 @@ describe('calendar feed (CR-12, RFC 5545)', () => {
           uid: 'shift-1@impera',
           startsAt: new Date('2026-11-06T17:00:00.000Z'),
           endsAt: new Date('2026-11-06T21:00:00.000Z'),
-          summary: '💬 Kofi répond à tes fans',
+          summary: '👥 Kofi répond à tes fans',
           description: 'Sur Reveal',
           free: true,
         },

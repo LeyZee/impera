@@ -570,6 +570,12 @@ export const CreatorAccountShiftSchema = z.strictObject({
 });
 export type CreatorAccountShift = z.infer<typeof CreatorAccountShiftSchema>;
 
+/**
+ * « Qui répond à tes fans » at a glance, on her screens and in the calendar of her phone (Charles, 05/11): never one of
+ * her categories' emojis (`CREATOR_TASK_CATEGORY_EMOJI`), so that a shift never reads as one of her tasks.
+ */
+export const CREATOR_REPLIES_EMOJI = '👥';
+
 /** The widest read: the 42 days of her month, and one more for a change of clock. */
 export const CREATOR_SHIFTS_MAX_DAYS = 43;
 

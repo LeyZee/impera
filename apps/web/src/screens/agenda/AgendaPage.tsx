@@ -1,9 +1,10 @@
-import type {
-  CreatorAccountShift,
-  CreatorAgenda,
-  CreatorSuggestion,
-  CreatorTask,
-  CreatorTaskWhen,
+import {
+  CREATOR_REPLIES_EMOJI,
+  type CreatorAccountShift,
+  type CreatorAgenda,
+  type CreatorSuggestion,
+  type CreatorTask,
+  type CreatorTaskWhen,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type JSX } from 'react';
@@ -282,7 +283,8 @@ export function AgendaPage({
                 setRepliesShown(!repliesShown);
               }}
             >
-              💬 {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
+              {CREATOR_REPLIES_EMOJI}{' '}
+              {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
             </button>
           )}
           <button
