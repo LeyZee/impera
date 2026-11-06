@@ -7,6 +7,8 @@ import { z } from 'zod';
 
 import { ZoneEditor } from './ZoneEditor';
 
+import { chooseValue } from '@/test/select';
+
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/settings/services/api')>()),
@@ -45,7 +47,7 @@ function serve(...replies: { status: number; body?: unknown }[]) {
 /** Opens the field, picks `zone` (a city, its zone behind it) and saves. */
 function move(zone: string): void {
   fireEvent.click(screen.getByRole('button', { name: 'Changer de fuseau' }));
-  fireEvent.change(screen.getByLabelText('Fuseau'), { target: { value: zone } });
+  chooseValue(screen.getByRole('combobox', { name: 'Fuseau' }), zone);
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le fuseau' }));
 }
 
@@ -87,13 +89,12 @@ describe('ZoneEditor', () => {
     });
   });
 
-  it('cannot save her own zone again, nor an empty one', () => {
+  it('cannot save her own zone again', () => {
     serve();
     fireEvent.click(screen.getByRole('button', { name: 'Changer de fuseau' }));
     const saveZone = screen.getByRole('button', { name: 'Enregistrer le fuseau' });
     expect(saveZone).toHaveProperty('disabled', true);
-    fireEvent.change(screen.getByLabelText('Fuseau'), { target: { value: '  ' } });
-    expect(saveZone).toHaveProperty('disabled', true);
+    expect(screen.getByRole('combobox', { name: 'Fuseau' }).textContent).toBe('Paris');
   });
 
   it('asks for the password when the sign-in is too old, then saves again', async () => {

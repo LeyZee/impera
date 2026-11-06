@@ -155,8 +155,8 @@ describe('« N créatrices trouvées sur Reveal » (CRM-07)', () => {
       false,
     );
     expect(screen.getByText('En attente chez Reveal')).toBeDefined();
-    const zoe = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Que faire de Zoé (@zoe)' });
-    expect(zoe.value).toBe(`link:${ZOE}`);
+    const zoe = screen.getByRole('combobox', { name: 'Que faire de Zoé (@zoe)' });
+    expect(zoe.textContent).toBe('Relier à Zoé');
     expect(screen.getByText('Même pseudo qu’un compte de Zoé')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Importer la sélection (2)' })).toBeDefined();
     // Her photo stays at the platform: no image is loaded from elsewhere.

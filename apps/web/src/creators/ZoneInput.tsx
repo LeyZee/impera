@@ -1,6 +1,7 @@
 import { type JSX } from 'react';
 
 import { cityOf } from '@/scheduling/time';
+import { Select, type SelectOption } from '@/shell/Select';
 
 /** Where a new creator lives unless the owner says otherwise. */
 export const DEFAULT_ZONE = 'Europe/Paris';
@@ -25,18 +26,38 @@ const FIRST: readonly { readonly zone: string; readonly city: string }[] = [
 ];
 const FIRST_ZONES: ReadonlySet<string> = new Set(FIRST.map((one) => one.zone));
 
-/** « Tokyo · Asia »: a city read as one, its region beside it, for every other zone the browser knows. */
+/** The regions of the zones, in French: « Monterrey · Amérique », never « · America » (recette #566). */
+const REGIONS: ReadonlyMap<string, string> = new Map([
+  ['Africa', 'Afrique'],
+  ['America', 'Amérique'],
+  ['Antarctica', 'Antarctique'],
+  ['Arctic', 'Arctique'],
+  ['Asia', 'Asie'],
+  ['Atlantic', 'Atlantique'],
+  ['Australia', 'Australie'],
+  ['Europe', 'Europe'],
+  ['Indian', 'océan Indien'],
+  ['Pacific', 'Pacifique'],
+]);
+
+/** « Tokyo · Asie »: a city read as one, its region beside it, for every other zone the browser knows. */
 const OTHERS: readonly { readonly zone: string; readonly city: string }[] = Intl.supportedValuesOf('timeZone')
   .filter((zone) => !FIRST_ZONES.has(zone))
   .map((zone) => {
     const region = zone.includes('/') ? zone.split('/')[0] : undefined;
-    return { zone, city: region === undefined ? cityOf(zone) : `${cityOf(zone)} · ${region}` };
+    const named = region === undefined ? undefined : (REGIONS.get(region) ?? region);
+    return { zone, city: named === undefined ? cityOf(zone) : `${cityOf(zone)} · ${named}` };
   })
   .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
 
+const ZONE_OPTIONS: readonly SelectOption<string>[] = [
+  ...FIRST.map((one) => ({ value: one.zone, label: one.city, group: 'Les plus courantes' })),
+  ...OTHERS.map((one) => ({ value: one.zone, label: one.city, group: 'Toutes les villes' })),
+];
+
 /**
  * A creator's zone, chosen by city (« Paris », « Toronto (Montréal) ») with the zone kept behind it (CREA-27): never an
- * identifier to type. A zone she already has outside the list stays offered as it is. Used at creation and to move her.
+ * identifier to type. A zone she already has outside the list shows as it is. Used at creation and to move her.
  */
 export function ZoneInput({
   id,
@@ -49,32 +70,16 @@ export function ZoneInput({
   onChange: (zone: string) => void;
   invalid?: boolean;
 }): JSX.Element {
-  const known = value === '' || FIRST_ZONES.has(value) || OTHERS.some((one) => one.zone === value);
   return (
-    <select
+    <Select
       id={id}
-      className="nv-glass nv-field__control ps-input ps-select"
       value={value}
-      aria-invalid={invalid}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-    >
-      {known ? null : <option value={value}>{value}</option>}
-      <optgroup label="Les plus courantes">
-        {FIRST.map((one) => (
-          <option key={one.zone} value={one.zone}>
-            {one.city}
-          </option>
-        ))}
-      </optgroup>
-      <optgroup label="Toutes les villes">
-        {OTHERS.map((one) => (
-          <option key={one.zone} value={one.zone}>
-            {one.city}
-          </option>
-        ))}
-      </optgroup>
-    </select>
+      invalid={invalid}
+      options={ZONE_OPTIONS}
+      placeholder="Choisir une ville…"
+      searchLabel="Chercher une ville"
+      empty="Aucune ville ne correspond."
+      onChange={onChange}
+    />
   );
 }

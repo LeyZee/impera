@@ -620,9 +620,6 @@
   font-weight: 500;
   opacity: 0.72;
 }
-.tm-select {
-  cursor: pointer;
-}
 .tm-date {
   max-width: 220px;
 }

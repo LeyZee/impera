@@ -30,6 +30,7 @@ import { accountLine } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
+import { Select } from '@/shell/Select';
 
 type Entry = AccountPayRulesList['accounts'][number];
 
@@ -354,22 +355,19 @@ function RulesPanel({
                 Les prochaines quinzaines ont déjà leurs règles : rien à poser avant elles.
               </p>
             ) : (
-              <select
+              <Select
                 id={`${id}-from`}
-                className="nv-field__control nv-glass tm-select"
                 value={fromPeriod ?? ''}
-                data-autofocus
-                onChange={(event) => {
-                  setFromPeriod(periods.find((period) => period === event.target.value) ?? null);
+                autofocus
+                options={periods.map((period) => ({
+                  value: period,
+                  label: periodLine(period),
+                  ...(period === currentPeriod ? { hint: 'en cours' } : {}),
+                }))}
+                onChange={(value) => {
+                  setFromPeriod(periods.find((period) => period === value) ?? null);
                 }}
-              >
-                {periods.map((period) => (
-                  <option key={period} value={period}>
-                    {periodLine(period)}
-                    {period === currentPeriod ? ' (en cours)' : ''}
-                  </option>
-                ))}
-              </select>
+              />
             )}
             <p className="tm-hint">
               {first

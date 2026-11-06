@@ -24,6 +24,7 @@ import { invoiceRefusalText } from '@/invoices/model';
 import { countryFlag, countryName } from '@/lib/country';
 import { FIRST_COUNTRIES, OTHER_COUNTRIES } from '@/screens/team/model';
 import { Dialog } from '@/shell/Dialog';
+import { Select } from '@/shell/Select';
 
 /** What the code prints on every invoice already: a regime's mentions never say it again. */
 export const PRINTED_BY_CODE =
@@ -129,33 +130,30 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
           <label className="sr-only" htmlFor={`${id}-country`}>
             Ajouter un pays
           </label>
-          <select
+          <Select
             id={`${id}-country`}
-            className="nv-field__control nv-glass tm-select"
             value=""
-            aria-describedby={`${id}-countries-hint`}
-            onChange={(event) => {
-              const code = event.target.value;
-              if (code !== '' && !draft.countries.includes(code))
+            placeholder="Ajouter un pays…"
+            searchLabel="Chercher un pays"
+            empty="Aucun pays ne correspond."
+            describedBy={`${id}-countries-hint`}
+            options={[
+              ...FIRST_COUNTRIES.filter((code) => !draft.countries.includes(code)).map((code) => ({
+                value: code,
+                label: `${countryFlag(code)}  ${countryName(code)}`,
+                group: 'Les plus fréquents',
+              })),
+              ...OTHER_COUNTRIES.filter((one) => !draft.countries.includes(one.code)).map((one) => ({
+                value: one.code,
+                label: `${countryFlag(one.code)}  ${one.name}`,
+                group: 'Tous les pays',
+              })),
+            ]}
+            onChange={(code) => {
+              if (!draft.countries.includes(code))
                 change({ ...draft, countries: [...draft.countries, code] });
             }}
-          >
-            <option value="">Ajouter un pays…</option>
-            <optgroup label="Les plus fréquents">
-              {FIRST_COUNTRIES.filter((code) => !draft.countries.includes(code)).map((code) => (
-                <option key={code} value={code}>
-                  {`${countryFlag(code)}  ${countryName(code)}`}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Tous les pays">
-              {OTHER_COUNTRIES.filter((one) => !draft.countries.includes(one.code)).map((one) => (
-                <option key={one.code} value={one.code}>
-                  {`${countryFlag(one.code)}  ${one.name}`}
-                </option>
-              ))}
-            </optgroup>
-          </select>
+          />
           {hint('countries', 'Chaque prestataire reçoit un régime de son pays.')}
         </fieldset>
 

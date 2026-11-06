@@ -12,6 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AlertHistoryPage } from './AlertHistoryPage';
 
+import { chooseValue, openList } from '@/test/select';
+
 /* Invented creators and fans: no real person. */
 const NORA = '0192f3a0-0000-7000-8000-0000000000c1';
 const LEA = '0192f3a0-0000-7000-8000-0000000000c2';
@@ -206,7 +208,7 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     });
     renderPage();
     await lines();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Alerte' }), { target: { value: GROUP } });
+    chooseValue(screen.getByRole('combobox', { name: 'Alerte' }), GROUP);
     await waitFor(() => {
       expect(triggerReads(calls).some((call) => call.query['alert'] === GROUP)).toBe(true);
     });
@@ -229,7 +231,7 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
         : Promise.resolve(new Response(null, { status: 500 })),
     );
     vi.stubGlobal('fetch', fetch);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Alerte' }), { target: { value: GROUP } });
+    chooseValue(screen.getByRole('combobox', { name: 'Alerte' }), GROUP);
     await waitFor(() => {
       expect(fetch).toHaveBeenCalled();
     });
@@ -245,13 +247,11 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     await waitFor(() => {
       expect(triggerReads(calls).filter((call) => call.query['seen'] === 'false')).toHaveLength(2);
     });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Alerte' }), {
-      target: { value: 'identity_doubt' },
-    });
+    chooseValue(screen.getByRole('combobox', { name: 'Alerte' }), 'identity_doubt');
     await waitFor(() => {
       expect(triggerReads(calls).some((call) => call.query['alert'] === 'identity_doubt')).toBe(true);
     });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Créatrice' }), { target: { value: LEA } });
+    chooseValue(screen.getByRole('combobox', { name: 'Créatrice' }), LEA);
     await waitFor(async () => {
       expect(await lines()).toHaveLength(1);
     });
@@ -263,9 +263,9 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     renderPage();
     await lines();
     const filter = screen.getByRole('combobox', { name: 'Alerte' });
-    expect(within(filter).getByRole('option', { name: 'Vidéo perso' })).toBeTruthy();
-    fireEvent.change(filter, { target: { value: 'keyword' } });
-    expect(within(filter).getByRole('option', { name: 'Vidéo perso' })).toBeTruthy();
+    expect(within(openList(filter)).getByRole('option', { name: 'Vidéo perso' })).toBeTruthy();
+    chooseValue(filter, 'keyword');
+    expect(within(openList(filter)).getByRole('option', { name: 'Vidéo perso' })).toBeTruthy();
   });
 
   it('reads the next page of a creator on « Voir plus », from her cursor', async () => {

@@ -14,6 +14,7 @@ import { ExportsPage } from './ExportsPage';
 
 import { BILLING_SETTINGS } from '@/test/billing';
 import { MEMBERS, OCT1, OCT2, OWNER, SCHEDULING_SETTINGS, THEO, LOU } from '@/test/pay';
+import { choose } from '@/test/select';
 
 /*
  * The journal's bytes as the API makes them: ISO 8859-15, where « € » is 0xA4, « é » 0xE9 and « œ » 0xBD, lines ended
@@ -269,7 +270,7 @@ describe('Paie › Exports', () => {
     renderPage();
     const panel = await waitFor(() => panelOf('Récapitulatif DAS2'));
     // The year just ended first: it is the one declared in the spring.
-    expect(within(panel).getByLabelText('Année des virements')).toHaveProperty('value', '2025');
+    expect(within(panel).getByRole('combobox', { name: 'Année des virements' }).textContent).toBe('2025');
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le récapitulatif' }));
     await within(panel).findByText(DAS2.fileName);
     expect(reads).toEqual(['/v1/payroll/accounting/das2?year=2025']);
@@ -302,7 +303,7 @@ describe('Paie › Exports', () => {
     };
     renderPage();
     const panel = await waitFor(() => panelOf('Récapitulatif DAS2'));
-    fireEvent.change(within(panel).getByLabelText('Année des virements'), { target: { value: '2024' } });
+    choose(within(panel).getByRole('combobox', { name: 'Année des virements' }), '2024');
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le récapitulatif' }));
     expect(
       (await within(panel).findByText(/^Personne n’a reçu plus de 2/u)).textContent.replace(
