@@ -385,6 +385,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     allCreatorIds: persona.allCreatorIds,
     conversations: conversations.module,
     payroll: payroll.module,
+    scheduling: scheduling.module,
     telegram: telegram.module,
     jobNames: () => Object.keys(tasks),
   });
