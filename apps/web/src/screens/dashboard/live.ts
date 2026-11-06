@@ -11,6 +11,7 @@ import type { AgencyState, AgentState, Dashboard, Fan, RevealSales, RevealSeller
 import { CAUSE_LABELS } from '@/agent/causes';
 import { percent } from '@/agent/mode';
 import { fansWaiting, queueEntries, type QueueEntry } from '@/agent/queue';
+import { frenchSpaces } from '@/lib/utils';
 import { platformName } from '@/scheduling/model';
 import { cityOf, clockAt, lengthOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
 import { telegramNightOf } from '@/settings/telegram/NightBanner';
@@ -385,7 +386,7 @@ function todoOf(todo: DashboardTodo, timeZone: string): Todo {
     tone: todo.tone,
     kind: KIND_LABEL[todo.kind],
     title: todo.title,
-    why: todo.why,
+    why: frenchSpaces(todo.why),
     waiting: `depuis ${lengthOf(todo.waitingMinutes * 60_000)}`,
     late: todo.waitingMinutes > LATE_MINUTES,
     at: `Reçu à ${clockAt(todo.at, timeZone)}`,

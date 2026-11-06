@@ -38,7 +38,7 @@ import './tracking.css';
 
 import { fansWaiting, queueEntries, type QueueEntry } from '@/agent/queue';
 import { useCreators } from '@/creators/api';
-import { initialOf } from '@/lib/utils';
+import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
@@ -526,7 +526,7 @@ function QueueRow({
             <span className="tr-cause"> · {todoLabel(todo)}</span>
             {withCreator ? <span className="tr-cause"> · {todo.creatorName}</span> : null}
           </span>
-          <span className="nv-convo__preview tr-why">{todo.why}</span>
+          <span className="nv-convo__preview tr-why">{frenchSpaces(todo.why)}</span>
         </span>
         <span className="nv-convo__side tr-wait">{duration(todo.waitingMinutes)}</span>
       </button>
@@ -567,7 +567,7 @@ function QueueGroupRow({
               <span className="tr-cause"> · {oldest.creatorName}</span>
             ) : null}
           </span>
-          <span className="nv-convo__preview tr-why">{oldest.why}</span>
+          <span className="nv-convo__preview tr-why">{frenchSpaces(oldest.why)}</span>
         </span>
         <span className="nv-convo__side tr-wait">{duration(oldest.waitingMinutes)}</span>
       </button>
