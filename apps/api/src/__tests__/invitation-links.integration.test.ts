@@ -53,15 +53,18 @@ describe('invitation links (EQ-10)', () => {
     });
   const codeOf = (response: { json: () => unknown }) => ErrorBodySchema.parse(response.json()).error;
 
-  /** An invented chatter: his account (no password yet) and his record. */
-  async function addMember(email: string): Promise<{ memberId: string; userId: string }> {
+  /** An invented chatter (or manager): his account (no password yet) and his record. */
+  async function addMember(
+    email: string,
+    teamRole: 'chatter' | 'manager' = 'chatter',
+  ): Promise<{ memberId: string; userId: string }> {
     const userId = newId(UserIdSchema);
     const memberId = newId(TeamMemberIdSchema);
     await test.admin.db.insert(schema.user).values({ id: userId, name: 'Théo', email, role: 'operator' });
     await test.admin.db.insert(schema.teamMembers).values({
       id: memberId,
       userId,
-      teamRole: 'chatter',
+      teamRole,
       firstName: 'Théo',
       lastName: 'Inventé',
       displayName: 'Théo',
@@ -297,6 +300,93 @@ describe('invitation links (EQ-10)', () => {
     expect(
       (await post('/v1/invitation-links/redeem', { token: link.token, password: PASSWORD })).statusCode,
     ).toBe(404);
+  });
+
+  it('lets an active manager make the invitation link of a chatter, and nothing more (ADR 0076 § 3)', async () => {
+    const basile = await addMember('basile@example.test', 'manager');
+    await post('/v1/invitation-links/redeem', {
+      token: (await newLink(basile.memberId)).token,
+      password: PASSWORD,
+    });
+    const manager = await signIn(server, 'basile@example.test', PASSWORD);
+    const ask = (memberId: string, purpose: 'invitation' | 'reset', cookie = manager) =>
+      post(`/v1/team/members/${memberId}/invitation-link`, { purpose }, { cookie });
+
+    // The chatter he invited from Reveal: the link to choose his first password.
+    const lou = await addMember('lou@example.test');
+    const made = await ask(lou.memberId, 'invitation');
+    expect(made.statusCode).toBe(200);
+    const created = await test.admin.db
+      .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'invitation_link.create'));
+    expect(created).toContainEqual({
+      userId: basile.userId,
+      details: { purpose: 'invitation', memberId: lou.memberId, replaced: 0 },
+    });
+
+    // A reset gives an account that has a password: the owner's alone.
+    const reset = await ask(lou.memberId, 'reset');
+    expect(reset.statusCode).toBe(403);
+    expect(codeOf(reset).code).toBe('role_forbidden');
+    // Another manager's account is not his to open.
+    const iris = await addMember('iris@example.test', 'manager');
+    const colleague = await ask(iris.memberId, 'invitation');
+    expect(colleague.statusCode).toBe(403);
+    expect(codeOf(colleague).code).toBe('role_forbidden');
+
+    // Once Lou has chosen his password, an invitation would replace it.
+    const token = new URL(made.json<{ url: string }>().url).hash.slice('#t='.length);
+    expect((await post('/v1/invitation-links/redeem', { token, password: PASSWORD })).statusCode).toBe(200);
+    const chosen = await ask(lou.memberId, 'invitation');
+    expect(chosen.statusCode).toBe(409);
+    expect(codeOf(chosen).code).toBe('password_chosen_conflict');
+
+    // A chatter makes no link, nor a manager who is not active.
+    const asChatter = await ask(
+      iris.memberId,
+      'invitation',
+      await signIn(server, 'lou@example.test', PASSWORD),
+    );
+    expect(asChatter.statusCode).toBe(403);
+    expect(codeOf(asChatter).code).toBe('role_forbidden');
+    // Refused before any member is looked up: no one else learns whether one exists.
+    const unknown = await ask(
+      newId(TeamMemberIdSchema),
+      'invitation',
+      await signIn(server, 'lou@example.test', PASSWORD),
+    );
+    expect(codeOf(unknown).code).toBe('role_forbidden');
+    const noe = await addMember('noe@example.test');
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'suspended' })
+      .where(eq(schema.teamMembers.userId, basile.userId));
+    expect((await ask(noe.memberId, 'invitation')).statusCode).toBe(403);
+  });
+
+  it('never lets an invitation replace a password already chosen, whoever made the link', async () => {
+    const { memberId, userId } = await addMember('late@example.test');
+    const { token } = await newLink(memberId);
+    // His password chosen meanwhile (another way than this link): the invitation no longer opens his account.
+    const context = await app.auth.$context;
+    await context.internalAdapter.linkAccount({
+      userId,
+      providerId: 'credential',
+      accountId: userId,
+      password: await context.password.hash(PASSWORD),
+    });
+    const inspected = await post('/v1/invitation-links/inspect', { token });
+    expect(codeOf(inspected).code).toBe('invitation_link_not_found');
+    const redeemed = await post('/v1/invitation-links/redeem', { token, password: `${PASSWORD} autre` });
+    expect(redeemed.statusCode).toBe(404);
+    expect(codeOf(redeemed).code).toBe('invitation_link_not_found');
+    await expect(signIn(server, 'late@example.test', `${PASSWORD} autre`)).rejects.toThrow(/Sign-in failed/);
+    const [link] = await test.admin.db
+      .select({ usedAt: schema.invitationLinks.usedAt })
+      .from(schema.invitationLinks)
+      .where(eq(schema.invitationLinks.memberId, memberId));
+    expect(link?.usedAt).toBeNull();
   });
 
   it('ends every open session of a member who chooses a new password, and resets his code', async () => {
