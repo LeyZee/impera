@@ -5,7 +5,7 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 import { acceptSuggestion, AGENDA_KEY, declineSuggestion } from './api';
 import { firstMoment, spanOf } from './draft';
 
-import { DayField } from '@/scheduling/DayField';
+import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, clockOf, dayOf, inputOfDay, longDay, minuteOf, weekOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
@@ -113,6 +113,7 @@ export function PlaceDialog({
   const dayOk = day >= lowest && day <= highest;
   // What is not a day is said once its field is left; the button stays off until it reads (recette des dates).
   const [dayUnreadable, setDayUnreadable] = useState(false);
+  const [noSuchDay, setNoSuchDay] = useState(false);
   const [dayLeft, setDayLeft] = useState(false);
   const dayTold = dayLeft && dayUnreadable;
   const submit = (event: SyntheticEvent): void => {
@@ -154,22 +155,24 @@ export function PlaceDialog({
           </label>
           <DayField
             id={`${id}-day`}
-            className="tm-date"
             value={day}
             today={lowest}
             autofocus
             invalid={!dayOk}
             describedBy={`${id}-day-hint`}
             onChange={setDay}
-            onUnreadable={(bad) => {
+            onUnreadable={(bad, none) => {
               setDayUnreadable(bad);
+              setNoSuchDay(none);
               onUnreadable('day', bad);
             }}
           />
           <p id={`${id}-day-hint`} className={dayOk && !dayTold ? 'tm-hint' : 'tm-hint tm-hint--error'}>
-            {dayTold
-              ? `Un jour comme ${inputOfDay(lowest)}, du ${longDay(lowest)} au ${longDay(highest)}.`
-              : `Du ${longDay(lowest)} au ${longDay(highest)}.`}
+            {dayTold && noSuchDay
+              ? `${NO_SUCH_DAY} Du ${longDay(lowest)} au ${longDay(highest)}.`
+              : dayTold
+                ? `Un jour comme ${inputOfDay(lowest)}, du ${longDay(lowest)} au ${longDay(highest)}.`
+                : `Du ${longDay(lowest)} au ${longDay(highest)}.`}
           </p>
         </div>
         <div className="nv-field tm-field">

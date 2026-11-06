@@ -21,7 +21,7 @@ import {
 } from './draft';
 import { whenWords } from './words';
 
-import { DayField } from '@/scheduling/DayField';
+import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, dayOf, longDay, minuteOf, weekdayOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
@@ -194,6 +194,7 @@ export function AgendaDay({
 }): JSX.Element {
   const id = useId();
   const [unreadable, setUnreadable] = useState(false);
+  const [noSuchDay, setNoSuchDay] = useState(false);
   // Said once the field is left, not only after « Ajouter », which stays off until the day reads (recette des dates).
   const [left, setLeft] = useState(false);
   const told = (tried || left) && unreadable;
@@ -213,19 +214,19 @@ export function AgendaDay({
       </label>
       <DayField
         id={id}
-        className="tm-date"
         value={value}
         invalid={shown}
         describedBy={shown ? `${id}-error` : undefined}
         onChange={onChange}
-        onUnreadable={(bad) => {
+        onUnreadable={(bad, none) => {
           setUnreadable(bad);
+          setNoSuchDay(none);
           onUnreadable('day', bad);
         }}
       />
       {shown ? (
         <p id={`${id}-error`} className="tm-hint tm-hint--error" role="alert">
-          {told ? 'Un jour comme 28/03/2027, ou 28/3.' : OUT_OF_REACH}
+          {told ? (noSuchDay ? NO_SUCH_DAY : 'Un jour comme 28/03/2027, ou 28/3.') : OUT_OF_REACH}
         </p>
       ) : null}
     </div>

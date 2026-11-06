@@ -12,6 +12,7 @@ import {
   fullDay,
   inputOf,
   inputOfDay,
+  isDayShaped,
   lengthOf,
   longDay,
   minuteOf,
@@ -176,5 +177,19 @@ describe('cities', () => {
     expect(cityOf('Africa/Lome')).toBe('Lomé');
     expect(cityOf('America/Toronto')).toBe('Toronto');
     expect(cityOf('America/New_York')).toBe('New York');
+  });
+});
+
+describe('isDayShaped', () => {
+  // Relecture des captures (#575): « 31/02 » is written as a day; the form says it does not exist, not how to write one.
+  it('tells a day no calendar has from a text that is no day', () => {
+    expect(['31/02', '3102', '31/02/2027', '2027-02-31', '29/2/27'].map(isDayShaped)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(['demain', '31', '31/', '1/2/3/4'].map(isDayShaped)).toEqual([false, false, false, false]);
   });
 });

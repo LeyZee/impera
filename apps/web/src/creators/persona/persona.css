@@ -239,6 +239,13 @@
 .ps-tabs__bar::-webkit-scrollbar {
   display: none;
 }
+/* The bar scrolls, so it clips: the thumb's shadow stays inside its padding, never cut into a grey rectangle around
+   the lit tab (relecture des captures, #575). */
+.ps-tabs__bar .nv-subnav__thumb {
+  box-shadow:
+    inset 0 1px 0 var(--nv-glass-edge),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
 /* More tabs past an edge: that edge fades instead of cutting a tab in two, and a chevron sits on it (CREA-01). */
 .ps-tabs[data-more='end'] .ps-tabs__bar {
   mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);

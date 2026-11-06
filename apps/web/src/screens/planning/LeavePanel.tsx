@@ -1,7 +1,7 @@
 import { LEAVE_MAX_DAYS, LeaveRequestIdSchema, newId } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
-import { DayField } from '@/scheduling/DayField';
+import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { askLeave, useRefreshPlanning, type Refusal } from '@/scheduling/api';
 import { ERROR_MESSAGES, leaveDaysLine, leaveLength, READ_AGAIN } from '@/scheduling/model';
@@ -38,7 +38,28 @@ export function LeavePanel({
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
 
-  const { unreadable, onUnreadable } = useUnreadableTimes();
+  const { unreadable, isUnreadable, onUnreadable } = useUnreadableTimes();
+  // Written as a day the calendar has not (« 31/02 »): said so, not how to write one.
+  const [noSuch, setNoSuch] = useState<ReadonlySet<string>>(() => new Set());
+  const told = (field: 'first' | 'last') => (bad: boolean, noSuchDay: boolean) => {
+    onUnreadable(field, bad);
+    setNoSuch((before) => {
+      if (before.has(field) === noSuchDay) return before;
+      const after = new Set(before);
+      if (noSuchDay) after.add(field);
+      else after.delete(field);
+      return after;
+    });
+  };
+  // A day that cannot be read is said under its own field, once left (relecture des captures, #575).
+  const fault = (field: 'first' | 'last'): string | null =>
+    typing || !isUnreadable(field)
+      ? null
+      : noSuch.has(field)
+        ? NO_SUCH_DAY
+        : 'Un jour comme 28/03/2027, ou 28/3.';
+  const firstFault = fault('first');
+  const lastFault = fault('last');
   const firstOk = DAY.test(first) && first >= today;
   const lastOk = DAY.test(last) && last >= first;
   const length = firstOk && lastOk ? daysFrom(first, last) + 1 : 0;
@@ -90,16 +111,19 @@ export function LeavePanel({
             </label>
             <DayField
               id={`${id}-first`}
-              className="tm-date"
               value={first}
               today={today}
               autofocus
               invalid={!firstOk}
+              describedBy={firstFault === null ? undefined : `${id}-first-fault`}
               onChange={setFirst}
-              onUnreadable={(bad) => {
-                onUnreadable('first', bad);
-              }}
+              onUnreadable={told('first')}
             />
+            {firstFault === null ? null : (
+              <p id={`${id}-first-fault`} className="tm-hint tm-hint--error">
+                {firstFault}
+              </p>
+            )}
           </div>
           <div className="nv-field tm-field" data-invalid={lastOk && !tooLong ? undefined : 'true'}>
             <label className="nv-field__label" htmlFor={`${id}-last`}>
@@ -107,34 +131,38 @@ export function LeavePanel({
             </label>
             <DayField
               id={`${id}-last`}
-              className="tm-date"
               value={last}
               today={firstOk ? first : today}
               invalid={!lastOk || tooLong}
+              describedBy={lastFault === null ? undefined : `${id}-last-fault`}
               onChange={setLastOwn}
-              onUnreadable={(bad) => {
-                onUnreadable('last', bad);
-              }}
+              onUnreadable={told('last')}
             />
+            {lastFault === null ? null : (
+              <p id={`${id}-last-fault`} className="tm-hint tm-hint--error">
+                {lastFault}
+              </p>
+            )}
           </div>
         </div>
-        <p
-          className={
-            ready || busy || (unreadable && typing)
-              ? 'tm-hint sc-leave__sum'
-              : 'tm-hint tm-hint--error sc-leave__sum'
-          }
-        >
-          {unreadable
-            ? 'Des jours comme 28/03/2027, ou 28/3.'
-            : !firstOk
-              ? 'Un congé commence aujourd’hui au plus tôt.'
-              : !lastOk
-                ? 'Le dernier jour vient après le premier.'
-                : tooLong
-                  ? `Un congé dure ${String(LEAVE_MAX_DAYS)} jours au plus : demande-le en deux fois.`
-                  : `${leaveDaysLine({ firstDay: first, lastDay: last })}, ${leaveLength({ firstDay: first, lastDay: last })}.`}
-        </p>
+        {/* Once a day that cannot be read is left, its own field says it: the line of the leave steps aside. */}
+        {unreadable && !typing ? null : (
+          <p
+            className={
+              ready || busy || unreadable ? 'tm-hint sc-leave__sum' : 'tm-hint tm-hint--error sc-leave__sum'
+            }
+          >
+            {unreadable
+              ? 'Des jours comme 28/03/2027, ou 28/3.'
+              : !firstOk
+                ? 'Un congé commence aujourd’hui au plus tôt.'
+                : !lastOk
+                  ? 'Le dernier jour vient après le premier.'
+                  : tooLong
+                    ? `Un congé dure ${String(LEAVE_MAX_DAYS)} jours au plus : demande-le en deux fois.`
+                    : `${leaveDaysLine({ firstDay: first, lastDay: last })}, ${leaveLength({ firstDay: first, lastDay: last })}.`}
+          </p>
+        )}
 
         <div className="nv-field tm-field">
           <label className="nv-field__label" htmlFor={`${id}-note`}>

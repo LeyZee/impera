@@ -261,14 +261,23 @@ export function minuteOfInput(text: string): number | null {
  * `<input type="date">`, which Chromium writes in the system's language, « 03/28/2027 » on a machine in English
  * (recette #561), as it does the hours.
  */
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
+const PACKED_DAY = /^(\d{2})(\d{2})(\d{2}|\d{4})?$/u;
+const WRITTEN_DAY = /^(\d{1,2})[\s./-]+(\d{1,2})(?:[\s./-]+(\d{2}|\d{4}))?$/u;
+
+/**
+ * Written as a day is written (« 31/02 », « 3102 », « 31/02/2027 »), whether or not the calendar has it: a day field
+ * that cannot read it then says the day does not exist, not how to write one (recette des captures, #575).
+ */
+export const isDayShaped = (text: string): boolean => {
+  const typed = text.trim();
+  return ISO_DAY.test(typed) || PACKED_DAY.test(typed) || WRITTEN_DAY.test(typed);
+};
+
 export function dayOfInput(text: string, today: string, toward: DayToward = 'ahead'): string | null {
   const typed = text.trim();
-  const iso = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(typed);
-  const parts =
-    iso === null
-      ? (/^(\d{2})(\d{2})(\d{2}|\d{4})?$/u.exec(typed) ??
-        /^(\d{1,2})[\s./-]+(\d{1,2})(?:[\s./-]+(\d{2}|\d{4}))?$/u.exec(typed))
-      : null;
+  const iso = ISO_DAY.exec(typed);
+  const parts = iso === null ? (PACKED_DAY.exec(typed) ?? WRITTEN_DAY.exec(typed)) : null;
   if (iso === null && parts === null) return null;
   const day = Number(iso?.[3] ?? parts?.[1]);
   const month = Number(iso?.[2] ?? parts?.[2]);

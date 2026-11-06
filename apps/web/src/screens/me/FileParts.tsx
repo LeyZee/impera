@@ -39,7 +39,7 @@ import '@/contractors/contractors.css';
 import type { InvoiceOutcome, InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryName } from '@/lib/country';
-import { DayField } from '@/scheduling/DayField';
+import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { weightText } from '@/settings/billing/model';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
@@ -513,6 +513,9 @@ export function UploadDialog({
   const problem = chosen === null ? null : fileProblem(chosen.file);
   const [issuedUnreadable, setIssuedUnreadable] = useState(false);
   const [untilUnreadable, setUntilUnreadable] = useState(false);
+  // Written as a day the calendar has not (« 31/02 »): said so, not how to write one.
+  const [issuedNoSuch, setIssuedNoSuch] = useState(false);
+  const [untilNoSuch, setUntilNoSuch] = useState(false);
   const issuedOk = !issuedUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(issuedOn) && issuedOn <= today;
   const untilOk =
     !untilUnreadable &&
@@ -541,10 +544,7 @@ export function UploadDialog({
       onClose={onClose}
     >
       <form className="tm-dialog__body" noValidate onSubmit={submit}>
-        <div
-          className="nv-field tm-field"
-          data-invalid={touched && (chosen === null || problem !== null) ? 'true' : undefined}
-        >
+        <div className="nv-field tm-field">
           <span className="nv-field__label" id={`${id}-file-label`}>
             Le fichier
           </span>
@@ -598,11 +598,16 @@ export function UploadDialog({
             }}
             today={today}
             toward="past"
-            onUnreadable={setIssuedUnreadable}
+            onUnreadable={(bad, noSuchDay) => {
+              setIssuedUnreadable(bad);
+              setIssuedNoSuch(noSuchDay);
+            }}
           />
           <p id={`${id}-issued-hint`} className={touched && !issuedOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
             {touched && issuedUnreadable
-              ? 'Un jour comme 12/05/2026, ou 12/5.'
+              ? issuedNoSuch
+                ? NO_SUCH_DAY
+                : 'Un jour comme 12/05/2026, ou 12/5.'
               : touched && !issuedOk
                 ? 'La date écrite sur la pièce, au plus tard aujourd’hui.'
                 : kind === 'tax_residence'
@@ -624,11 +629,16 @@ export function UploadDialog({
                 setValidUntil(next);
               }}
               optional
-              onUnreadable={setUntilUnreadable}
+              onUnreadable={(bad, noSuchDay) => {
+                setUntilUnreadable(bad);
+                setUntilNoSuch(noSuchDay);
+              }}
             />
             <p id={`${id}-until-hint`} className={touched && !untilOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
               {touched && untilUnreadable
-                ? 'Un jour comme 12/11/2026, ou rien.'
+                ? untilNoSuch
+                  ? NO_SUCH_DAY
+                  : 'Un jour comme 12/11/2026, ou rien.'
                 : touched && !untilOk
                   ? 'La fin suit la date de délivrance.'
                   : 'Sans fin écrite, elle tient six mois à partir de sa délivrance.'}
