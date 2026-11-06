@@ -1,6 +1,6 @@
 # 0065. La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans
 
-Statut : accepted (Charles, 06/11/2026 12h13, « ok 0065 », chat du projet ; signature des messages de l'IA choisie par Charles le 03/11 à 16h20 : « Automatique »)
+Statut : accepted (Charles, 06/11/2026 12h13, « ok 0065 », chat du projet ; signature des messages de l'IA choisie par Charles le 03/11 à 16h20 : « Automatique ») ; § 2, les mots « avec au survol ou au toucher le nombre et la part de chaque case » remplacés par l'ADR 0074 (la part seule), qui précise aussi le § 3 et le § 4
 Date : 2026-11-03
 Remplace : dans l'ADR 0042 § 2, la phrase « l'auteur d'un message envoyé (chatteur ou agent, ADR 0021). Elle voit le message, jamais qui l'a écrit. » ; dans l'ADR 0063 § 3, les mots « sans jamais voir qui a écrit un message (ADR 0021) ».
 Précise : l'ADR 0063 § 2 (les tranches et le seuil des chiffres sur sa base).

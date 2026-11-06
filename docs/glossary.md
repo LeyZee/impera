@@ -45,6 +45,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Mode copilote | `copilot` | Le bot propose, un humain approuve. |
 | Mode auto | `auto` | Le bot envoie seul pour les catégories autorisées. |
 | Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred`. |
+| Qui sont tes fans | `fanInsights`, `GET /v1/creator-space/fan-insights` | Le panneau de la créatrice en tête de Ventes : des parts sur l'ensemble de ses fans, jamais un nombre par case ni un fan seul, tirées de leurs faits déclarés, arrêtées à minuit, et une case ne s'affiche qu'au-delà du seuil (ADR 0065, ADR 0074). |
+| Famille de métiers | `jobFamily` | La case dans laquelle se range un métier dit par un fan, par des mots-clés écrits dans le code (Santé et soin, Étudiant…) ; ce qui ne se reconnaît pas va dans « Autres » (ADR 0074 § 5). |
 | Note du chatteur | `operator_note` | Ce qu'un chatteur veut qu'elle retienne d'un fan, laissé en rendant la main ; gardé comme un fait de cette catégorie, jamais proposé par un modèle. |
 | Résumé fan | `fan_summary` | Résumé opérationnel régénéré. |
 | Slot KYC | `kyc_slot` | Une information qu'on cherche à apprendre : une ligne du canevas de notes de Reveal (Prénom, Localisation, Âge, Métier, Passions, Envies, Situation), liste fermée `KycSlotSchema`. |
