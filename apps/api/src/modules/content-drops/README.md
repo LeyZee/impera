@@ -64,7 +64,7 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 - Un bucket qui refuse ou ne répond pas laisse l'original en place et le dit une fois en ambre (`content_media_erase_failed`) ; l'heure suivante réessaie. Aucun événement ne porte de nom ni de contenu, seulement l'identifiant du média.
 - Redonné après son effacement, le même média reprend un original (le fichier nettoyé est réécrit sous sa clé) et une nouvelle date d'un an. Redonné avant, sa date est repoussée à un an à partir du nouveau dépôt.
 
-## Le script déposé emplacement par emplacement (SC-02 lot b1, migration 0123)
+## Le script déposé emplacement par emplacement (SC-02 lot b1, migration 0122)
 
 Un script se dépose depuis sa demande, qui porte la version figée de sa structure (la cadence la fige ; une demande faite à la main par l'agence la fige aussi, au moment de la demander). Le dépôt commence vide dans l'état `filling` ; ses emplacements sont lus dans la version figée (`scriptSlots`, contrats) : chaque segment dans l'ordre, chaque série d'une étape à variantes en entier (`E2A`, puis `E2B`), chaque emplacement à sa place. Un emplacement se nomme `<segment>:<série>:<rang>` (`slot_key`) et garde sa position dans le script.
 

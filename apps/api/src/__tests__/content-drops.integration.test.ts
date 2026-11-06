@@ -213,7 +213,20 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
         version: 1,
         name: 'La douche',
         moment: 'night',
-        segments: [],
+        segments: [
+          {
+            kind: 'stage',
+            key: 'douche',
+            name: 'Douche',
+            intention: 'Elle se dévoile',
+            access: 'paid',
+            mood: null,
+            outfit: null,
+            place: null,
+            mediaSlots: [{ kind: 'image', optional: false, hint: null }],
+            variants: [],
+          },
+        ],
         updatedBy: owner?.id ?? '',
       })
       .returning({ id: schema.scriptStructureVersions.id });

@@ -316,7 +316,7 @@ export const contentDropFiles = pgTable(
       )`,
     }),
     // She replaces a slot's file while she fills her script: only its `replaced_at` (the column grant, migration
-    // 0123), once.
+    // 0122), once.
     pgPolicy('creator_replace', {
       for: 'update',
       using: sql`${hers(t.creatorId)} and ${t.slotKey} is not null and ${t.replacedAt} is null and exists (

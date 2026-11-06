@@ -28,4 +28,4 @@ Nomenclature et export (SC-03), descriptions (SC-04).
 
 ## Notes de session
 - 05/11/2026, lot a (migration 0121) : cadence, version figée sur la demande, job horaire. Reste : lot b (emplacements du dépôt de script, parcours carton par carton, captures), rappels de l'ADR 0055 § 4, `touchesTerm`, l'écran d'agence de la cadence (ambre).
-- 06/11/2026, lot b1 (migration 0123) : API du dépôt de script par emplacements (début, reprise, remplissage, remplacement, envoi), durée vérifiée sur le fichier nettoyé, original d'un fichier remplacé effacé. Reste : lot b2 (parcours PWA, route créatrice des cartons de sa version figée, captures Nuit et Jour), rappels de l'ADR 0055 § 4, `touchesTerm`, écran d'agence de la cadence.
+- 06/11/2026, lot b1 (migration 0122) : API du dépôt de script par emplacements (début, reprise, remplissage, remplacement, envoi), durée vérifiée sur le fichier nettoyé, original d'un fichier remplacé effacé. Reste : lot b2 (parcours PWA, route créatrice des cartons de sa version figée, captures Nuit et Jour), rappels de l'ADR 0055 § 4, `touchesTerm`, écran d'agence de la cadence.
