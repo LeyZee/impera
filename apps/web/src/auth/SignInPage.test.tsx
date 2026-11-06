@@ -10,12 +10,33 @@ afterEach(() => {
 });
 
 describe('SignInPage', () => {
-  it('points a forgotten password to whoever manages the access, a wording the owner can read too', () => {
+  it('points a forgotten password to its own page (SEC-05 lot 3)', () => {
     render(<SignInPage onSignedIn={() => undefined} />);
-    expect(
-      screen.getByText('Mot de passe oublié ? Demande un nouveau lien à la personne qui gère ton accès.'),
-    ).toBeDefined();
-    expect(screen.queryByText(/ton responsable/u)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Mot de passe oublié ?' }).getAttribute('href')).toBe(
+      '/mot-de-passe-oublie',
+    );
+  });
+
+  it('says a new password is saved until the first try, in a calm tone, not as an error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('{}', { status: 401 }))),
+    );
+    render(
+      <SignInPage
+        onSignedIn={() => undefined}
+        confirmation="Mot de passe changé, connecte-toi. Ton code à 6 chiffres reste demandé."
+      />,
+    );
+    expect(screen.getByRole('status').textContent).toBe(
+      'Mot de passe changé, connecte-toi. Ton code à 6 chiffres reste demandé.',
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'a@example.test' } });
+    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'x' } });
+    fireEvent.submit(screen.getByLabelText('Mot de passe').closest('form') ?? document.body);
+    expect(await screen.findByText('E-mail ou mot de passe incorrect.')).toBeDefined();
+    expect(screen.queryByText(/Mot de passe changé/u)).toBeNull();
   });
 
   it('says how long to wait after too many attempts: the window lasts 15 minutes', async () => {

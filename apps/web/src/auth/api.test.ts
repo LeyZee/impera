@@ -46,6 +46,7 @@ describe('linkPageOf', () => {
     expect(linkPageOf('/bienvenue')).toBe('invitation');
     expect(linkPageOf('/bienvenue/')).toBe('invitation');
     expect(linkPageOf('/nouveau-mot-de-passe')).toBe('reset');
+    expect(linkPageOf('/mot-de-passe-oublie')).toBe('forgotten');
     expect(linkPageOf('/')).toBeNull();
     expect(linkPageOf('/suivi')).toBeNull();
   });

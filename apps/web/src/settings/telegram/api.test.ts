@@ -1,5 +1,6 @@
 import {
   REAUTHENTICATION_ERROR_CODE,
+  TELEGRAM_LINK_NO_BOT_UNPROCESSABLE,
   TelegramBotIdSchema,
   TelegramChatIdSchema,
   newId,
@@ -9,13 +10,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReauthRequired } from '../services/api';
 
 import {
+  LinkRateLimited,
+  LinkUnavailable,
   TelegramForbidden,
   TelegramOff,
   addBot,
   fetchOverview,
+  fetchPrivateLink,
   removeBot,
   removeChat,
+  requestLinkCode,
   saveRoutes,
+  unlinkPrivateChat,
 } from './api';
 
 /** A refusal in the common body, its kind in `details` (MOT-13). */
@@ -120,5 +126,55 @@ describe('Telegram API client', () => {
     expect(await removeChat(id)).toBe('still_member');
     answer(500, null);
     await expect(removeChat(id)).rejects.toThrow();
+  });
+});
+
+describe('the private chat link (SEC-05 lot 2)', () => {
+  const linked = { linked: true, botUsername: 'demo_bot', linkedAt: '2026-11-06T05:40:00.000Z' };
+  const unlinked = { linked: false, botUsername: null, linkedAt: null };
+
+  it('reads the link of the signed-in account, never a chat id', async () => {
+    answer(200, linked);
+    expect(await fetchPrivateLink()).toEqual(linked);
+    expect(calls[0]?.url).toBe('/v1/auth/telegram-link');
+  });
+
+  it('is not served to a creator, nor on a server without Telegram', async () => {
+    answer(403, { error: { code: 'role_forbidden', message: 'Interdit', details: {}, requestId: 'r' } });
+    await expect(fetchPrivateLink()).rejects.toBeInstanceOf(LinkUnavailable);
+    answer(404, { error: { code: 'not_found', message: 'Introuvable', details: {}, requestId: 'r' } });
+    await expect(fetchPrivateLink()).rejects.toBeInstanceOf(LinkUnavailable);
+  });
+
+  it('asks a code, the password again when the sign-in is old, and says when no bot can take it', async () => {
+    const code = {
+      code: 'ABCDEFGH23',
+      botUsername: 'demo_bot',
+      url: 'https://t.me/demo_bot?start=ABCDEFGH23',
+      expiresAt: '2026-11-06T05:50:00.000Z',
+    };
+    answer(200, code);
+    expect(await requestLinkCode()).toEqual(code);
+    expect(calls[0]?.url).toBe('/v1/auth/telegram-link/code');
+    expect(calls[0]?.init?.method).toBe('POST');
+
+    answer(403, {
+      error: { code: REAUTHENTICATION_ERROR_CODE, message: 'Confirme', details: {}, requestId: 'r' },
+    });
+    await expect(requestLinkCode()).rejects.toBeInstanceOf(ReauthRequired);
+
+    answer(422, {
+      error: { code: TELEGRAM_LINK_NO_BOT_UNPROCESSABLE, message: 'Aucun bot', details: {}, requestId: 'r' },
+    });
+    expect(await requestLinkCode()).toBe('no_bot');
+
+    answer(429, { error: { code: 'rate_limited', message: 'Trop', details: {}, requestId: 'r' } });
+    await expect(requestLinkCode()).rejects.toBeInstanceOf(LinkRateLimited);
+  });
+
+  it('unlinks, and answers the state after', async () => {
+    answer(200, unlinked);
+    expect(await unlinkPrivateChat()).toEqual(unlinked);
+    expect(calls[0]?.init?.method).toBe('DELETE');
   });
 });

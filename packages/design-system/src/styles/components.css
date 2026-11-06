@@ -1183,6 +1183,17 @@
 .nv-field__control[aria-invalid='true']:not(:focus) {
   box-shadow: inset 0 0 0 1px var(--nv-warning);
 }
+/* A value shown in a form but not to be typed (the account's address above a new password): text, not a plate, so
+   nobody tries to change it. It stays an input so password managers read it. */
+.nv-field__control--readonly,
+.nv-field__control--readonly:focus {
+  background: transparent;
+  box-shadow: none;
+  min-height: 0;
+  padding: 2px 0;
+  color: var(--nv-ink-muted);
+  cursor: default;
+}
 
 /* ───────────── Fan facts (memory) ───────────── */
 
