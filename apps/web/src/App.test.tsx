@@ -251,6 +251,47 @@ describe('App on an invitation link', () => {
   });
 });
 
+describe('App and a forgotten password (SEC-05 lot 3)', () => {
+  it('opens its page on its own address, and says on the sign-in page that the password is changed', async () => {
+    const fake = vi.fn((url: string) =>
+      Promise.resolve(
+        url === '/v1/session'
+          ? Response.json({ state: 'signed_out' })
+          : url.endsWith('/inspect')
+            ? Response.json({ email: 'theo@example.test', expiresAt: '2026-11-06T15:40:00.000Z' })
+            : new Response(null, { status: 204 }),
+      ),
+    );
+    vi.stubGlobal('fetch', fake);
+    window.history.replaceState(null, '', '/mot-de-passe-oublie#t=lien-invente-pour-les-tests');
+    render(<App />);
+    fireEvent.change(await screen.findByLabelText('Nouveau mot de passe'), {
+      target: { value: 'une phrase que je retiens' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(
+      await screen.findByText(
+        (_, node) =>
+          node?.getAttribute('role') === 'status' &&
+          node.textContent === 'Mot de passe changé, connecte-toi. Ton code à 6\u00a0chiffres reste demandé.',
+      ),
+    ).toBeDefined();
+    // The address is filled in, and the password is asked first.
+    expect(screen.getByLabelText('E-mail')).toHaveProperty('value', 'theo@example.test');
+    expect(document.activeElement).toBe(screen.getByLabelText('Mot de passe'));
+    expect(window.location.pathname).toBe('/');
+  });
+
+  it('opens the request form without a link, and goes back to the sign-in page without a word', async () => {
+    serveMe(SIGNED_OUT);
+    window.history.replaceState(null, '', '/mot-de-passe-oublie');
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Retour à la connexion' }));
+    expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
 describe('App signing out', () => {
   const owner: Me = {
     id: 'u1',

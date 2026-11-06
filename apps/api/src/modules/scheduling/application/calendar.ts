@@ -25,7 +25,7 @@ import type {
   StoredAccount,
   StoredShift,
 } from '../domain/ports';
-import { assertPlanningRange } from '../domain/shifts';
+import { assertPlanningRange, plansCreator } from '../domain/shifts';
 
 import { toPlanningAccount } from './dto';
 
@@ -60,9 +60,11 @@ export function createCalendarService(
         directory.map((creator) => creator.id),
       );
       const { settings } = read;
-      // The filters narrow what is sent back; the database already decided what the reader may read.
+      // The filters narrow what is sent back; the database already decided what the reader may read, and a manager is
+      // shown the creators he plans (Charles, 06/11).
       const askedCreator = (creatorId: CreatorId) =>
-        query.creatorId === undefined || creatorId === query.creatorId;
+        (query.creatorId === undefined || creatorId === query.creatorId) &&
+        plansCreator(read.planned, creatorId);
       const asked = (row: CalendarRow) =>
         askedCreator(row.creatorId) && (query.memberId === undefined || row.memberId === query.memberId);
       const shifts = read.shifts.filter(asked);

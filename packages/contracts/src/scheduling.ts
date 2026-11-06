@@ -336,7 +336,9 @@ export const ShiftSchema = z.object({
 export type Shift = z.infer<typeof ShiftSchema>;
 
 /**
- * `POST /v1/scheduling/shifts` (owner, active manager) → 201 `ShiftSchema`. The member is `active`, works on this
+ * `POST /v1/scheduling/shifts` (owner, active manager) → 201 `ShiftSchema`. A manager plans the creators of his list
+ * only (Charles, 06/11): 404 `creator_not_found` on any other, and `shift_not_found` or `shift_template_not_found`
+ * for a shift or template of hers. The member is `active`, works on this
  * creator and is not on an approved leave then (409 `member_on_leave_conflict`), the account is hers, both instants
  * fall on a minute, the shift lasts `SHIFT_MAX_MINUTES` at most and ends after now. A member is never on two shifts at
  * once, and an account never has two members at once: either answers 409 with the shift in the way.
@@ -398,7 +400,10 @@ export const ShiftTemplateSchema = z.object({
 });
 export type ShiftTemplate = z.infer<typeof ShiftTemplateSchema>;
 
-/** `GET /v1/scheduling/shift-templates` (owner, active manager): the templates still running, of every creator. */
+/**
+ * `GET /v1/scheduling/shift-templates` (owner, active manager): the templates still running, of every creator for the
+ * owner, of those of his list for a manager.
+ */
 export const ShiftTemplateListSchema = z.object({ templates: z.array(ShiftTemplateSchema) });
 
 /**
@@ -487,8 +492,10 @@ export type PlanningConflict = z.infer<typeof PlanningConflictSchema>;
 
 /**
  * `GET /v1/scheduling/planning?from=…&to=…[&creatorId=…]`: the shifts that overlap [`from`, `to`), at most
- * `PLANNING_MAX_DAYS`. The owner and an active manager read every creator: every account, every member named by a
- * shift or a template, and the conflicts. Any other member (a chatter, a manager who is not `active`) reads their own
+ * `PLANNING_MAX_DAYS`. The owner reads every creator, an active manager those of his list (Charles, 06/11: several
+ * managers may be assigned to one model): every account, every member named by a shift or a template, and the
+ * conflicts, where a shift in the way may be on a creator he is not shown (its id then names nothing he can open).
+ * Any other member (a chatter, a manager who is not `active`) reads their own
  * shifts only: `shifts` holds theirs, `accounts` the accounts those shifts are on, `members` themselves alone, and
  * `conflicts` stays empty. A colleague's name never reaches a chatter through the planning.
  */
@@ -524,8 +531,8 @@ export const PlanningSchema = z.object({
 export type Planning = z.infer<typeof PlanningSchema>;
 
 /**
- * Who is on shift right now on one account (`GET /v1/scheduling/on-duty`, owner and active manager): `onShift`, without
- * the margin.
+ * Who is on shift right now on one account (`GET /v1/scheduling/on-duty`, owner and active manager, on the creators
+ * he plans): `onShift`, without the margin.
  */
 export const OnDutySchema = z.object({
   creatorId: CreatorIdSchema,

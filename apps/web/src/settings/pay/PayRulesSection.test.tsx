@@ -219,9 +219,9 @@ describe('Réglages › Règles de paie', () => {
     if (minimum === null) throw new Error('No minimum');
     fireEvent.click(await within(minimum).findByRole('button', { name: 'Changer' }));
     const dialog = screen.getByRole('dialog', { name: 'Minimum de versement' });
-    fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '60000' } });
+    fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '5000,01' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
-    expect(plain(within(dialog).getByText(/^Au plus/u).textContent)).toBe('Au plus 50 000,00 €.');
+    expect(plain(within(dialog).getByText(/^Au plus/u).textContent)).toBe('Au plus 5 000,00 €.');
     fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '12,345' } });
     expect(within(dialog).getByText('Un montant en euros, deux décimales au plus.')).toBeTruthy();
   });

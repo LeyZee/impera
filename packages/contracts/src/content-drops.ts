@@ -2,10 +2,12 @@ import { z } from 'zod';
 
 import { ContentDropFileIdSchema, ContentDropIdSchema, ContentRequestIdSchema } from './ids';
 import {
+  ScriptSegmentKeySchema,
   ScriptSegmentSchema,
   ScriptSlotKeySchema,
   ScriptStructureIdSchema,
   ScriptStructureVersionIdSchema,
+  ScriptVariantLetterSchema,
   type MediaSlot,
 } from './scripts';
 
@@ -368,6 +370,13 @@ export const ScriptSlotParamsSchema = z.strictObject({
   slotKey: ScriptSlotKeySchema,
 });
 
+/** `GET …/script-drops/:dropId/cards/:segmentKey`: a card of her script, its series for a stage with variants. */
+export const ScriptDropCardParamsSchema = z.strictObject({
+  dropId: ContentDropIdSchema,
+  segmentKey: ScriptSegmentKeySchema,
+});
+export const ScriptDropCardQuerySchema = z.strictObject({ variant: ScriptVariantLetterSchema.optional() });
+
 /**
  * Her script drop as her flow reads it (ADR 0056 § 4): the drop, and the frozen version she shoots, its segments as the
  * cards show them. Never the agency's library: only the version of her request.
@@ -499,6 +508,8 @@ export const CONTENT_DROP_FORBIDDEN = 'content_drop_forbidden';
 export const CONTENT_DROP_SLOT_NOT_FOUND = 'content_drop_slot_not_found';
 /** « Envoyer le script » with a required slot still empty: `details.slotKeys`. */
 export const CONTENT_DROP_SLOTS_UNPROCESSABLE = 'content_drop_slots_unprocessable';
+/** A card her script does not have: a segment or a series not in its frozen version (SC-02 lot b2). */
+export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
 export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';

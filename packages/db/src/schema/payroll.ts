@@ -10,6 +10,7 @@ import {
   PAY_TARGET_MAX_MINOR,
   PAYMENT_METHODS,
   PAYMENT_REFERENCE_MAX,
+  PAYOUT_MINIMUM_MAX_MINOR,
   PAYOUT_DELAY_MAX_BUSINESS_DAYS,
   PENALTY_KINDS,
   PlatformSchema,
@@ -65,6 +66,7 @@ const periodCheck = (name: string, period: PgColumn): ReturnType<typeof check> =
   check(name, sql`extract(day from ${period}) in (1, 16)`);
 
 const amountMax = sql.raw(String(PAY_AMOUNT_MAX_MINOR));
+const payoutMinimumMax = sql.raw(String(PAYOUT_MINIMUM_MAX_MINOR));
 const referenceMax = sql.raw(String(PAYMENT_REFERENCE_MAX));
 const targetMax = sql.raw(String(PAY_TARGET_MAX_MINOR));
 const payoutDelayMax = sql.raw(String(PAYOUT_DELAY_MAX_BUSINESS_DAYS));
@@ -211,7 +213,7 @@ export const payrollSettings = pgTable(
   },
   (t) => [
     check('payroll_settings_single_check', sql`${t.id} = 1`),
-    check('payroll_settings_minimum_check', sql`${t.minimumPayoutMinor} between 0 and ${amountMax}`),
+    check('payroll_settings_minimum_check', sql`${t.minimumPayoutMinor} between 0 and ${payoutMinimumMax}`),
     check(
       'payroll_settings_payout_delay_check',
       sql`${t.payoutDelayBusinessDays} is null or ${t.payoutDelayBusinessDays} between 1 and ${payoutDelayMax}`,
@@ -246,7 +248,7 @@ export const payoutMinimums = pgTable(
   },
   (t) => [
     periodCheck('payout_minimums_period_check', t.fromPeriod),
-    check('payout_minimums_minimum_check', sql`${t.minimumPayoutMinor} between 0 and ${amountMax}`),
+    check('payout_minimums_minimum_check', sql`${t.minimumPayoutMinor} between 0 and ${payoutMinimumMax}`),
     index('payout_minimums_period_idx').on(t.fromPeriod),
     pgPolicy('team_read', { for: 'select', using: anyMember }),
     pgPolicy('owner_insert', {
