@@ -226,11 +226,15 @@ if (!stagedOnly) {
     errors.push(
       '.github/workflows/ci.yml: the nightly-evals job must fail when the evals fail (no continue-on-error)',
     );
-  // The evals are skipped only when the xAI key is absent (« nightly vert », 06/11): the key read from the secret, and
-  // no other condition on the job or its steps.
-  if (!/^ {6}HAS_XAI_KEY: \$\{\{ secrets\.LLM_XAI_API_KEY != '' \}\}[ \t]*$/m.test(nightly))
+  // The evals are skipped only when the xAI key is absent (« nightly vert », 06/11): the key read once from the secret,
+  // at the job's level, and no other condition on the job or its steps.
+  const keys = [...nightly.matchAll(/^\s*HAS_XAI_KEY:\s*(.*?)\s*$/gm)];
+  if (
+    keys.length !== 1 ||
+    !/^ {6}HAS_XAI_KEY: \$\{\{ secrets\.LLM_XAI_API_KEY != '' \}\}[ \t]*$/m.test(nightly)
+  )
     errors.push(
-      ".github/workflows/ci.yml: the nightly-evals job must read HAS_XAI_KEY from the secret, as `${{ secrets.LLM_XAI_API_KEY != '' }}`",
+      ".github/workflows/ci.yml: the nightly-evals job must read HAS_XAI_KEY once, from the secret, as `${{ secrets.LLM_XAI_API_KEY != '' }}`",
     );
   const allowed = new Set([
     "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
@@ -242,6 +246,14 @@ if (!stagedOnly) {
       errors.push(
         `.github/workflows/ci.yml: the nightly-evals job skips its evals only without the xAI key, not on \`${condition ?? ''}\``,
       );
+  // `pnpm probe` and `pnpm evals` run whenever the key is there: no condition but the key's own.
+  for (const step of nightly.split(/^(?= {6}- )/m))
+    if (/^ +(?:- )?run: pnpm (?:probe|evals)[ \t]*$/m.test(step))
+      for (const [, condition] of step.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
+        if (condition !== "env.HAS_XAI_KEY == 'true'")
+          errors.push(
+            `.github/workflows/ci.yml: the nightly-evals job runs \`pnpm probe\` and \`pnpm evals\` whenever the xAI key is set, not on \`${condition ?? ''}\``,
+          );
 }
 
 // 9. The session journal: one file per session, and the index of LOG.md stays frozen

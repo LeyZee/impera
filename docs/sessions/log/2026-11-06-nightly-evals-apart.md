@@ -9,10 +9,11 @@
   - Avec la clé, rien ne change : une évaluation qui échoue rend la nuit rouge.
 - `scripts/check-repo.mjs`, règle 7 :
   - elle lit le job `nightly-evals` ;
-  - elle exige que `HAS_XAI_KEY` vienne du secret ;
+  - elle exige que `HAS_XAI_KEY` soit lu une seule fois, du secret, au niveau du job ;
   - elle refuse toute autre condition que celle de la clé (ou celle du planning sur le job) ;
+  - elle exige que les étapes `pnpm probe` et `pnpm evals` ne portent que `== 'true'` : la condition inverse est réservée à l'étape qui annonce le saut (relecture d'Agent) ;
   - elle refuse toujours qu'on retire `pnpm probe` ou `pnpm evals`, ou qu'on y mette `continue-on-error`.
-  - Vérifié à la main : `HAS_XAI_KEY: false` et `if: false` donnent chacun une erreur.
+  - Vérifié à la main : `HAS_XAI_KEY: false`, `if: false`, `!= 'true'` sur `pnpm evals` et un `HAS_XAI_KEY` redéfini sur une étape donnent chacun une erreur.
 - Docs : `write-an-eval.md` § 6 et `testing.md` disent la nouvelle garde.
 
 ## Reste
