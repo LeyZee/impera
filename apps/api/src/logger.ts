@@ -33,8 +33,16 @@ interface LoggedError {
   readonly stack: string;
 }
 
-function ownCode(error: Error): string | undefined {
-  return 'code' in error && typeof error.code === 'string' ? error.code : undefined;
+const MAX_CAUSES = 5;
+
+/** The first code in the error's cause chain (`ECONNRESET` under a Drizzle error): a code, never a value. */
+function chainCode(error: Error): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < MAX_CAUSES && current instanceof Error; depth += 1) {
+    if ('code' in current && typeof current.code === 'string') return current.code;
+    current = current.cause;
+  }
+  return undefined;
 }
 
 /**
@@ -46,7 +54,7 @@ function ownCode(error: Error): string | undefined {
  */
 function loggedError(value: unknown): unknown {
   if (!(value instanceof Error)) return typeof value === 'string' ? withoutNul(value) : value;
-  const code = postgresCode(value) ?? ownCode(value);
+  const code = postgresCode(value) ?? chainCode(value);
   const frames = (value.stack ?? '').split('\n').filter((line) => line.startsWith('    at '));
   return {
     type: value.name,

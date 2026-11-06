@@ -118,8 +118,10 @@ export function jsonWithoutNul(value: unknown): unknown {
 export function storableError(error: unknown): Error {
   if (!(error instanceof Error)) return new Error(withoutNul(String(error)));
   const code = postgresCode(error);
-  if (code === undefined && !error.message.includes('\u0000')) return error;
-  // Drizzle writes « Failed query: <sql>\nparams: <values> »: the query helps, the values are someone's data.
+  // Drizzle writes « Failed query: <sql>\nparams: <values> »: the query helps, the values are someone's data. Cut
+  // whatever the cause, a connection reset in the middle of a query included (relecture #585).
+  const hasParams = error.message.includes('\nparams:');
+  if (code === undefined && !hasParams && !error.message.includes('\u0000')) return error;
   const query = withoutNul(error.message.split('\nparams:')[0] ?? '');
   const message = code === undefined ? query : `${query} [SQLSTATE ${code}]`;
   const safe = new Error(message);

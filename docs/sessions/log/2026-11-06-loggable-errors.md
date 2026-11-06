@@ -15,7 +15,8 @@
 
 ## Reste
 
-- Rien. Les appels qui passent déjà `error.name` restent valables : une chaîne passe telle quelle.
+- Relecture Médias : `storableError` coupe maintenant `\nparams:` même sans SQLSTATE (requête coupée par le réseau, cause `ECONNRESET`), ce qui protège aussi `last_error` ; le code journalisé est cherché dans la chaîne des causes.
+- Rien d’autre. Les appels qui passent déjà `error.name` restent valables : une chaîne passe telle quelle.
 
 ## Découvertes
 

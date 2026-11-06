@@ -60,6 +60,25 @@ describe('logged errors (relecture #584): name, message and code, never someoneâ
     expect(logged.stack).toMatch(/^ {4}at /u);
   });
 
+  it('cuts the values of a query cut by the network, whose cause is no Postgres error (relecture #585)', () => {
+    const { logger, lines } = memoryLogger();
+    const reset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+    logger.warn(
+      {
+        err: new Error('Failed query: select * from fans where pseudo = $1\nparams: FanPseudo', {
+          cause: reset,
+        }),
+      },
+      'a job failed',
+    );
+    const [line] = lines();
+    expect(JSON.stringify(line)).not.toContain('FanPseudo');
+    expect(line?.['err']).toMatchObject({
+      message: 'Failed query: select * from fans where pseudo = $1',
+      code: 'ECONNRESET',
+    });
+  });
+
   it('keeps a network code, and a name already reduced to a string', () => {
     const { logger, lines } = memoryLogger();
     logger.warn({ err: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }) }, 'down');
