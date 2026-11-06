@@ -10,9 +10,8 @@ import {
   PERSONA_ERROR_CODES,
   PersonaOverviewSchema,
   PersonaSampleReplyUnprocessableDetailsSchema,
-  TYPICAL_RESPONSES_MAX_LINES,
 } from './persona-api';
-import { personaSheetFromV1 } from './persona-sheet';
+import { personaSheetFromV1, TYPICAL_RESPONSES_MAX_LINES } from './persona-sheet';
 
 const demo = (): unknown =>
   parse(readFileSync(fileURLToPath(new URL('../../../personas/demo/v0.1.0.yaml', import.meta.url)), 'utf8'));

@@ -115,6 +115,14 @@ describe('PersonaV2Schema', () => {
     expect(issuePaths({ ...demo(), sheet: { ...demo().sheet, avoid_topics: null } })).toEqual(['sheet']);
   });
 
+  it('refuses « Réponses typiques » past 200 lines: a line past them would reach the model unchecked', () => {
+    const p = demo();
+    p.sheet.conversation.typical_responses = Array.from({ length: 201 }, () => 'ok').join('\n');
+    expect(issuePaths(p)).toEqual(['sheet.conversation.typical_responses']);
+    p.sheet.conversation.typical_responses = Array.from({ length: 200 }, () => 'ok').join('\n');
+    expect(issuePaths(p)).toEqual([]);
+  });
+
   it('keeps the guards’ word lists in the agent’s settings, with the same checks', () => {
     const p = demo();
     p.agent.rules.never_say = ['?'];
@@ -180,6 +188,15 @@ describe('personaSheetFromV1 (ADR 0079 § 5)', () => {
     ]);
     expect(persona.sheet.conversation.roleplaying_description).toContain('Objectifs : ');
     expect(persona.sheet.intimacy.no_go_zones).toContain('Ne fait jamais : Rencontrer un fan');
+  });
+
+  it('says when it cuts an answer to its question’s length', () => {
+    const { persona, moved } = personaSheetFromV1({ ...v1(), additional_info: 'x'.repeat(6000) });
+    expect(persona.sheet.conversation.roleplaying_description).toHaveLength(4000);
+    expect(moved).toContainEqual({
+      from: 'Texte coupé à 4000 caractères',
+      to: { section: 'conversation', key: 'roleplaying_description' },
+    });
   });
 
   it('says no move for a value left empty', () => {

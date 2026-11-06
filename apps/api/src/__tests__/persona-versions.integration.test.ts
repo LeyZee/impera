@@ -111,7 +111,7 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     const overview = (await get(anna, owner)).json<PersonaOverview>();
     expect(overview.versions.map((v) => v.version)).toEqual(['0.1.1', '0.1.0']);
     expect(overview.latest?.summary.version).toBe('0.1.1');
-    expect(overview.latest?.persona).toEqual(demo());
+    expect(overview.latest?.persona).toEqual(withVersion(demo(), '0.1.1'));
     // The dashboard edits format 2: the format-1 version opens converted, saying what moved (ADR 0079 § 5).
     expect(overview.latest?.draft.sheet.identity.nickname).toBe(demo().details.first_name);
     expect(overview.latest?.moved.map((m) => m.from)).toContain('Origine');

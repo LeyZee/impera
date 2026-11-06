@@ -17,6 +17,7 @@ import {
   PersonaSheetSchema,
   PersonaV2Schema,
   StoredPersonaSchema,
+  TYPICAL_RESPONSES_MAX_LINES,
 } from './persona-sheet';
 
 /** Hex SHA-256 of a persona's canonical JSON (keys sorted): two equal personas have the same hash. */
@@ -135,9 +136,6 @@ export const PERSONA_ERROR_CODES = [
   'persona_sample_reply_unprocessable',
 ] as const;
 export type PersonaErrorCode = (typeof PERSONA_ERROR_CODES)[number];
-
-/** Lines of « Réponses typiques » read as sample replies at most: one per line, as many as its length allows. */
-export const TYPICAL_RESPONSES_MAX_LINES = 200;
 
 /**
  * A refused sample reply, never its text: its place in `sample_replies` (format 1), or its line in « Réponses

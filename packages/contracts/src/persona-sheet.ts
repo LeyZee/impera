@@ -187,6 +187,8 @@ export const PERSONA_SHEET_QUESTION_COUNT = PERSONA_SHEET.reduce((n, s) => n + s
 /** Lengths of the free answers: Desirali's one-line fields often hold paragraphs, so both are generous. */
 export const SHEET_SHORT_MAX = 1000;
 export const SHEET_LONG_MAX = 4000;
+/** Lines of « Réponses typiques » at most: each one is checked by the hard guards. */
+export const TYPICAL_RESPONSES_MAX_LINES = 200;
 
 /** Bounds of the four numbers of the sheet. */
 export const PERSONA_SHEET_BOUNDS = {
@@ -254,8 +256,14 @@ export const PersonaConversationSchema = z.strictObject({
   compliment_description: long,
   flirt_description: long,
   common_expressions: long,
-  /** Checked against the hard guards when a version is stored, like the sample replies of format 1. */
-  typical_responses: long,
+  /**
+   * One answer per line, each checked against the hard guards when a version is stored, like the sample replies of
+   * format 1: past `TYPICAL_RESPONSES_MAX_LINES` lines, a line would reach the model unchecked, so it is refused.
+   */
+  typical_responses: long.refine(
+    (text) => text === null || text.split('\n').length <= TYPICAL_RESPONSES_MAX_LINES,
+    { message: `${String(TYPICAL_RESPONSES_MAX_LINES)} lignes au plus` },
+  ),
 });
 
 export const PersonaRelationshipsSchema = z.strictObject({
@@ -426,10 +434,6 @@ const lines = (...parts: readonly (string | null | undefined)[]): string | null 
   return kept.length === 0 ? null : kept.join('\n');
 };
 
-/** Cuts an answer to its field's length: a format-1 version never holds that much, but a draft must parse. */
-const fit = (value: string | null, max: number): string | null =>
-  value === null ? null : value.length <= max ? value : value.slice(0, max).trimEnd();
-
 /**
  * A format-1 version as a format-2 draft (ADR 0079 § 5), never stored by itself: the screen opens it, the owner saves
  * it as a new version. Every value lands in a question; those with no question of their own go to the nearest one and
@@ -440,6 +444,20 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
   const move = <T>(from: string, section: PersonaSheetSectionKey, key: string, value: T): T => {
     if (value !== null && value !== undefined && value !== '') moved.push({ from, to: { section, key } });
     return value;
+  };
+  /**
+   * Cuts an answer to its question's length, so that the draft parses (« Infos en plus » took 6 000 characters), and
+   * says so in `moved`: nothing is lost in silence.
+   */
+  const fit = (
+    section: PersonaSheetSectionKey,
+    key: string,
+    value: string | null,
+    max: number,
+  ): string | null => {
+    if (value === null || value.length <= max) return value;
+    moved.push({ from: `Texte coupé à ${String(max)} caractères`, to: { section, key } });
+    return value.slice(0, max).trimEnd();
   };
   const d = v1.details;
   const w = v1.writing_style;
@@ -513,7 +531,7 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
     meta: { ...v1.meta, schema: 2 },
     sheet: {
       identity: {
-        physical_description: fit(origin, SHEET_LONG_MAX),
+        physical_description: fit('identity', 'physical_description', origin, SHEET_LONG_MAX),
         shoe_size: d.shoe_size_eu === null ? null : String(d.shoe_size_eu),
         birth_date: d.date_of_birth,
         height_m: d.height_cm === null ? null : d.height_cm / 100,
@@ -521,25 +539,25 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
         country: null,
         city: null,
         nickname: d.first_name,
-        job: fit(v1.lifestyle?.occupation ?? null, SHEET_SHORT_MAX),
+        job: fit('identity', 'job', v1.lifestyle?.occupation ?? null, SHEET_SHORT_MAX),
         eye_color: d.eyes === null ? null : labelOf(PERSONA_OPTIONS.eyes, d.eyes),
         hair_color: d.hair === null ? null : labelOf(PERSONA_OPTIONS.hair, d.hair),
         breast_size: d.bra === null ? null : `${String(d.bra.band)}${d.bra.cup}`,
-        place_of_life: fit(v1.lifestyle?.area ?? null, SHEET_SHORT_MAX),
+        place_of_life: fit('identity', 'place_of_life', v1.lifestyle?.area ?? null, SHEET_SHORT_MAX),
         spoken_languages: [...d.languages],
       },
       lifestyle: {
         smoking_habit: null,
         drinking_habit: null,
         traveling: null,
-        routines: fit(v1.lifestyle?.routine ?? null, SHEET_LONG_MAX),
+        routines: fit('lifestyle', 'routines', v1.lifestyle?.routine ?? null, SHEET_LONG_MAX),
         pets: null,
         dream_car: null,
       },
       preferences: {
         favorite_color: null,
         least_favorite_color: null,
-        passions: fit(lines(joined(d.hobbies), likes), SHEET_LONG_MAX),
+        passions: fit('preferences', 'passions', lines(joined(d.hobbies), likes), SHEET_LONG_MAX),
         favorite_dishes: null,
         least_liked_dishes: null,
         religion: null,
@@ -550,20 +568,35 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
         favorite_books: null,
       },
       conversation: {
-        roleplaying_description: fit(leftovers, SHEET_LONG_MAX),
-        favourite_emojis: fit(joined(w?.emojis_preferred, ' '), SHEET_SHORT_MAX),
-        conversation_description: fit(personality, SHEET_LONG_MAX),
-        spelling_description: fit(lines(languageStyle, writing), SHEET_LONG_MAX),
+        roleplaying_description: fit('conversation', 'roleplaying_description', leftovers, SHEET_LONG_MAX),
+        favourite_emojis: fit(
+          'conversation',
+          'favourite_emojis',
+          joined(w?.emojis_preferred, ' '),
+          SHEET_SHORT_MAX,
+        ),
+        conversation_description: fit(
+          'conversation',
+          'conversation_description',
+          personality,
+          SHEET_LONG_MAX,
+        ),
+        spelling_description: fit(
+          'conversation',
+          'spelling_description',
+          lines(languageStyle, writing),
+          SHEET_LONG_MAX,
+        ),
         compliment_description: null,
         flirt_description: null,
         common_expressions: null,
-        typical_responses: fit(lines(...replies), SHEET_LONG_MAX),
+        typical_responses: fit('conversation', 'typical_responses', lines(...replies), SHEET_LONG_MAX),
       },
       relationships: {
         relationship_status: null,
         kids_status: null,
         body_count: null,
-        turn_ons: fit(joined(v1.intimate?.turn_ons), SHEET_LONG_MAX),
+        turn_ons: fit('relationships', 'turn_ons', joined(v1.intimate?.turn_ons), SHEET_LONG_MAX),
         turn_offs: null,
         ideal_man: null,
         ideal_date: null,
@@ -571,15 +604,20 @@ export function personaSheetFromV1(v1: Persona): ConvertedPersona {
       intimacy: {
         libido_level: null,
         domination_preference: null,
-        style_in_private: fit(v1.intimate?.sexting_style ?? null, SHEET_SHORT_MAX),
+        style_in_private: fit(
+          'intimacy',
+          'style_in_private',
+          v1.intimate?.sexting_style ?? null,
+          SHEET_SHORT_MAX,
+        ),
         sex_toys: null,
         squirting: null,
         cum: null,
         kinks: null,
         fetichism: null,
         favorite_positions: null,
-        fantasies: fit(joined(v1.intimate?.fantasies, '\n'), SHEET_LONG_MAX),
-        no_go_zones: fit(limitsText, SHEET_LONG_MAX),
+        fantasies: fit('intimacy', 'fantasies', joined(v1.intimate?.fantasies, '\n'), SHEET_LONG_MAX),
+        no_go_zones: fit('intimacy', 'no_go_zones', limitsText, SHEET_LONG_MAX),
       },
       boundaries: { off_limits: null },
     },
