@@ -7,7 +7,13 @@ import type { TelegramApi } from './application/api';
 import { connectionReminders } from './application/connections';
 import { flushChat, type FlushDeps } from './application/flush';
 import { dispatchPolls, pollBot } from './application/poll';
-import { issueLinkCode, privateLinkOf } from './application/private-link';
+import {
+  hasPrivateLink,
+  issueLinkCode,
+  privateLinkOf,
+  sendPrivate,
+  type PrivateSendOutcome,
+} from './application/private-link';
 import { eveningDigest, saleSettings, saveSaleSettings } from './application/sales';
 import { scanEvents } from './application/scan';
 import {
@@ -87,8 +93,15 @@ export interface TelegramModule extends TelegramApi {
   readonly start: () => Promise<ResealReport>;
   /** `/v1/settings/telegram`, behind the guards given here. */
   readonly routes: (options: TelegramRoutesOptions) => FastifyPluginAsyncZod;
+  /** An account's private chat (ADR 0068 § 4): whether it is linked, and the reset link sent there (`auth`). */
+  readonly privateChat: PrivateChat;
   /** `/v1/auth/telegram-link` (ADR 0068 § 4), the signed-in account's own private chat. */
   readonly privateLinkRoutes: (options: PrivateLinkRoutesOptions) => FastifyPluginAsyncZod;
+}
+
+interface PrivateChat {
+  has(userId: string): Promise<boolean>;
+  send(userId: string, text: string): Promise<PrivateSendOutcome>;
 }
 
 export function createTelegramModule(deps: TelegramDeps): TelegramModule {
@@ -105,6 +118,14 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     unlink: async (userId) => {
       await privateLinks?.removeLink(userId);
     },
+  };
+  const privateChat: PrivateChat = {
+    has: (userId) =>
+      privateLinks === undefined ? Promise.resolve(false) : hasPrivateLink({ ...base, privateLinks }, userId),
+    send: (userId, text) =>
+      privateLinks === undefined
+        ? Promise.resolve('no_link')
+        : sendPrivate({ ...base, privateLinks }, userId, text),
   };
   const api: TelegramApi = {
     overview: () => overview(base),
@@ -146,6 +167,7 @@ export function createTelegramModule(deps: TelegramDeps): TelegramModule {
     },
     start: () => deps.resealTokens?.() ?? Promise.resolve({ rewritten: 0, unreadable: [] }),
     routes: (options) => createTelegramRoutes(api, options),
+    privateChat,
     privateLinkRoutes: (options) => createPrivateLinkRoutes(linking, options),
   };
 }
