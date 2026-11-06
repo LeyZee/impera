@@ -94,11 +94,11 @@ export function CheckPanel({
   }, [platform]);
 
   const range: DayRange = choice === 'custom' ? custom : fortnights[choice];
-  const { unreadable, onUnreadable } = useUnreadableTimes();
-  const problem =
-    choice === 'custom' && unreadable
-      ? 'Deux jours comme 01/10/2026, ou 1/10.'
-      : rangeProblem(range, lastOver);
+  const { unreadable, isUnreadable, onUnreadable } = useUnreadableTimes();
+  // A day that cannot be read is said under its own field; the period's own rule waits until both are days.
+  const typing = choice === 'custom' && unreadable;
+  const problem = typing ? null : rangeProblem(range, lastOver);
+  const blocked = typing || problem !== null;
 
   const choose = (file: File | undefined): void => {
     setFileProblem(null);
@@ -124,7 +124,7 @@ export function CheckPanel({
   };
 
   const check = (): void => {
-    if (problem !== null || isBusy) return;
+    if (blocked || isBusy) return;
     setNotice(null);
     setIsBusy(true);
     const lead = 'La vérification n’a pas eu lieu.';
@@ -216,6 +216,7 @@ export function CheckPanel({
                   id={`${id}-from`}
                   value={custom.from}
                   disabled={isBusy}
+                  describedBy={isUnreadable('from') ? `${id}-from-error` : undefined}
                   onChange={(next) => {
                     setCustom({ ...custom, from: next });
                   }}
@@ -225,6 +226,11 @@ export function CheckPanel({
                     onUnreadable('from', bad);
                   }}
                 />
+                {isUnreadable('from') ? (
+                  <p id={`${id}-from-error`} className="sf-warn">
+                    Un jour comme 01/10/2026.
+                  </p>
+                ) : null}
               </div>
               <div className="nv-field">
                 <label className="nv-field__label" htmlFor={`${id}-to`}>
@@ -234,6 +240,7 @@ export function CheckPanel({
                   id={`${id}-to`}
                   value={custom.to}
                   disabled={isBusy}
+                  describedBy={isUnreadable('to') ? `${id}-to-error` : undefined}
                   onChange={(next) => {
                     setCustom({ ...custom, to: next });
                   }}
@@ -243,6 +250,11 @@ export function CheckPanel({
                     onUnreadable('to', bad);
                   }}
                 />
+                {isUnreadable('to') ? (
+                  <p id={`${id}-to-error`} className="sf-warn">
+                    Un jour comme 01/10/2026.
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -314,7 +326,7 @@ export function CheckPanel({
         </div>
 
         <div className="sf-check__act">
-          <button type="submit" className="nv-btn nv-btn--soft" disabled={problem !== null || isBusy}>
+          <button type="submit" className="nv-btn nv-btn--soft" disabled={blocked || isBusy}>
             {isBusy ? 'Vérification…' : 'Vérifier ces jours'}
           </button>
         </div>

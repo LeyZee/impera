@@ -266,6 +266,19 @@ describe('Paie › Exports', () => {
     expect(reads).toEqual([]);
   });
 
+  // Relecture des captures (#569): a day that is no day is said under its own field, and nothing is asked.
+  it('says under its own field a day it cannot read, and sends nothing', async () => {
+    renderPage();
+    const panel = await waitFor(() => panelOf('Journal des prestataires'));
+    const from = within(panel).getByLabelText('Du');
+    fireEvent.change(from, { target: { value: '31/02' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le journal' }));
+    const said = within(panel).getByText('Un jour comme 01/01/2026.');
+    expect(from.getAttribute('aria-describedby')?.split(' ')).toContain(said.id);
+    expect(within(panel).getByLabelText('Au').getAttribute('aria-describedby')).not.toContain(said.id);
+    expect(reads).toEqual([]);
+  });
+
   it('shows the DAS2’s beneficiaries in clear, their warnings in amber, and saves the CSV as it came', async () => {
     renderPage();
     const panel = await waitFor(() => panelOf('Récapitulatif DAS2'));

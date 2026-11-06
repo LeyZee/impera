@@ -23,7 +23,8 @@ vi.mock('@impera/design-system', async (importOriginal) => ({
 let setItems: (items: readonly SubNavItem[]) => void = () => undefined;
 /** What the sub-nav watches for a change of size, and what it is told then. */
 const watched = new Set<Element>();
-let resized: () => void = () => undefined;
+type Sized = readonly { target: Element; contentRect: { width: number } }[];
+let resized: (entries: Sized) => void = () => undefined;
 
 function renderNav(first: readonly SubNavItem[]): void {
   const root = createRootRoute();
@@ -53,7 +54,7 @@ beforeEach(() => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
-      constructor(told: () => void) {
+      constructor(told: (entries: Sized) => void) {
         resized = told;
       }
       observe = (target: Element): void => {
@@ -95,9 +96,32 @@ describe('SubNav', () => {
     Object.defineProperty(nav, 'clientWidth', { configurable: true, value: 358 });
     Object.defineProperty(nav, 'scrollWidth', { configurable: true, value: 420 });
     act(() => {
-      resized();
+      resized([]);
     });
     expect(nav.dataset['more']).toBe('end');
+  });
+
+  // Relecture des captures (#569): the font once loaded, or a count drawn outside the list, widened a tab and the
+  // glass stayed where the lit tab had been.
+  it('puts its glass back under the lit tab when a tab changes width, not at its first size', async () => {
+    renderNav([
+      { to: '/paie/quinzaine', label: 'Quinzaine' },
+      { to: '/paie/releves', label: 'Relevés' },
+    ]);
+    const lit = await screen.findByRole('link', { name: 'Quinzaine' });
+    const other = screen.getByRole('link', { name: 'Relevés' });
+    placeTabBarLens.mockClear();
+    act(() => {
+      resized([
+        { target: lit, contentRect: { width: 90 } },
+        { target: other, contentRect: { width: 70 } },
+      ]);
+    });
+    expect(placeTabBarLens).not.toHaveBeenCalled();
+    act(() => {
+      resized([{ target: other, contentRect: { width: 84 } }]);
+    });
+    expect(placeTabBarLens).toHaveBeenCalledWith(screen.getByRole('navigation', { name: 'Paie' }), lit);
   });
 
   it('slides from the tab just left when a sub-tab draws the sub-nav anew', async () => {

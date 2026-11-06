@@ -76,6 +76,7 @@ export function TimeField({
 /** The time and day fields of one form that hold what is not an hour or a day: while there is one, the form does not save. */
 export function useUnreadableTimes(): {
   unreadable: boolean;
+  isUnreadable: (field: string) => boolean;
   onUnreadable: (field: string, unreadable: boolean) => void;
 } {
   const [fields, setFields] = useState<ReadonlySet<string>>(() => new Set());
@@ -88,5 +89,6 @@ export function useUnreadableTimes(): {
       return after;
     });
   }, []);
-  return { unreadable: fields.size > 0, onUnreadable };
+  const isUnreadable = useCallback((field: string) => fields.has(field), [fields]);
+  return { unreadable: fields.size > 0, isUnreadable, onUnreadable };
 }
