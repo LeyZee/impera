@@ -545,21 +545,33 @@ export function UploadDialog({
           className="nv-field tm-field"
           data-invalid={touched && (chosen === null || problem !== null) ? 'true' : undefined}
         >
-          <label className="nv-field__label" htmlFor={`${id}-file`}>
+          <span className="nv-field__label" id={`${id}-file-label`}>
             Le fichier
-          </label>
-          <input
-            id={`${id}-file`}
-            type="file"
-            className="nv-field__control nv-glass cf-file"
-            accept={ACCEPTED_FILES}
-            aria-describedby={`${id}-file-hint`}
-            data-autofocus
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              setChosen(file === undefined ? null : { file, key: crypto.randomUUID() });
-            }}
-          />
+          </span>
+          <div className="cf-pick">
+            {/* The browser's own file button speaks its language, not the page's: a pill of ours over the input. */}
+            <label
+              className="nv-btn nv-btn--soft nv-btn--sm cf-file"
+              data-invalid={touched && (chosen === null || problem !== null) ? 'true' : undefined}
+            >
+              <input
+                id={`${id}-file`}
+                type="file"
+                accept={ACCEPTED_FILES}
+                aria-labelledby={`${id}-file-label`}
+                aria-describedby={`${id}-file-hint`}
+                data-autofocus
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  setChosen(file === undefined ? null : { file, key: crypto.randomUUID() });
+                }}
+              />
+              <span aria-hidden="true">
+                {chosen === null ? 'Choisir le fichier' : 'Choisir un autre fichier'}
+              </span>
+            </label>
+            {chosen === null ? null : <span className="cf-picked">{chosen.file.name}</span>}
+          </div>
           <p
             id={`${id}-file-hint`}
             className={

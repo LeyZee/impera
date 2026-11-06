@@ -194,9 +194,20 @@ export function AgendaDay({
 }): JSX.Element {
   const id = useId();
   const [unreadable, setUnreadable] = useState(false);
-  const shown = invalid || (tried && unreadable);
+  // Said once the field is left, not only after « Ajouter », which stays off until the day reads (recette des dates).
+  const [left, setLeft] = useState(false);
+  const told = (tried || left) && unreadable;
+  const shown = invalid || told;
   return (
-    <div className="nv-field tm-field">
+    <div
+      className="nv-field tm-field"
+      onFocus={() => {
+        setLeft(false);
+      }}
+      onBlur={() => {
+        setLeft(true);
+      }}
+    >
       <label className="nv-field__label" htmlFor={id}>
         Jour
       </label>
@@ -214,7 +225,7 @@ export function AgendaDay({
       />
       {shown ? (
         <p id={`${id}-error`} className="tm-hint tm-hint--error" role="alert">
-          {tried && unreadable ? 'Un jour comme 28/03/2027, ou 28/3.' : OUT_OF_REACH}
+          {told ? 'Un jour comme 28/03/2027, ou 28/3.' : OUT_OF_REACH}
         </p>
       ) : null}
     </div>

@@ -175,7 +175,9 @@ function MoveForm({
   const [badDay, setBadDay] = useState(false);
   const [tried, setTried] = useState(false);
   const [dayUnreadable, setDayUnreadable] = useState(false);
-  const dayWrong = badDay || (tried && dayUnreadable);
+  // What is not a day is said once its field is left, the button staying off until it reads (recette des dates).
+  const [dayLeft, setDayLeft] = useState(false);
+  const dayWrong = badDay || ((tried || dayLeft) && dayUnreadable);
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
@@ -196,7 +198,15 @@ function MoveForm({
   };
   return (
     <form className="tm-dialog__body" noValidate onSubmit={submit}>
-      <div className="nv-field tm-field">
+      <div
+        className="nv-field tm-field"
+        onFocus={() => {
+          setDayLeft(false);
+        }}
+        onBlur={() => {
+          setDayLeft(true);
+        }}
+      >
         <label className="nv-field__label" htmlFor={`${id}-day`}>
           Jour
         </label>
@@ -223,16 +233,19 @@ function MoveForm({
         ) : null}
       </div>
       {timed ? (
-        <div className="ag-hours">
-          <div className="nv-field tm-field">
-            <span className="nv-field__label">Début</span>
-            <TimeField value={start} label="Début" onChange={setStart} onUnreadable={onUnreadable} />
+        // Début and Fin side by side, as in « Ajouter » (recette des dates).
+        <div className="nv-field tm-field">
+          <div className="tm-pair">
+            <label className="nv-field tm-field">
+              <span className="nv-field__label">Début</span>
+              <TimeField value={start} label="Début" onChange={setStart} onUnreadable={onUnreadable} />
+            </label>
+            <label className="nv-field tm-field">
+              <span className="nv-field__label">Fin</span>
+              <TimeField value={end} label="Fin" onChange={setEnd} onUnreadable={onUnreadable} />
+            </label>
           </div>
-          <div className="nv-field tm-field">
-            <span className="nv-field__label">Fin</span>
-            <TimeField value={end} label="Fin" onChange={setEnd} onUnreadable={onUnreadable} />
-            {end <= start ? <p className="tm-hint nv-num">Jusqu’à {clockOf(end)} le lendemain.</p> : null}
-          </div>
+          {end <= start ? <p className="tm-hint nv-num">Jusqu’à {clockOf(end)} le lendemain.</p> : null}
         </div>
       ) : null}
       <div className="tm-dialog__foot">

@@ -11,7 +11,7 @@ import {
 
 import type { AddPreset } from './AddDialog';
 import { DayReplies } from './ReplyLines';
-import { SuggestionCard } from './SuggestionCard';
+import { SuggestionCard, UndatedSuggestions } from './SuggestionCard';
 import { useWaiting } from './api';
 import { CATEGORY_EMOJI, CategoryMark } from './category';
 import { timedSuggestionsOf } from './grid';
@@ -84,6 +84,9 @@ export function DayView({
       <DayStrip agenda={agenda} monday={monday} day={day} onDay={onDay} />
       <Glance plan={plan} agenda={agenda} now={now} nowMinute={nowMinute} />
       {wide ? <Frieze plan={plan} nowMinute={nowMinute} onTask={actions.onTask} /> : null}
+      {isToday ? (
+        <UndatedSuggestions agenda={agenda} onDecline={actions.onDecline} onPlace={actions.onPlace} />
+      ) : null}
       {cards.length === 0 ? null : (
         <section className="ag-sec" aria-label="Propositions de l’agence">
           {cards.map((suggestion) => (
