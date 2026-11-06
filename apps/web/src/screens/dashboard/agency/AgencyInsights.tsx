@@ -841,7 +841,7 @@ export function AgencyInsightsPanel({
         sub={shown === 'day' ? `${DAILY_SUB.day}, ${zoneLabel(insights.timeZone)}` : DAILY_SUB[shown]}
         index={next()}
       >
-        <Daily insights={insights} tip={tip} />
+        <Daily key={insights.period} insights={insights} tip={tip} />
       </Section>
 
       <div className="ins-pair nv-enter" style={{ '--nv-i': next() }}>
