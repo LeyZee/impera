@@ -399,6 +399,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     telegram: telegram.module,
     jobNames: () => Object.keys(tasks),
+    salesFeeds: connectors.module.salesFeedStates,
   });
 
   const modules: Modules = {

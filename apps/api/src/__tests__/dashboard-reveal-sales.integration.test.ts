@@ -118,7 +118,12 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_ADMIN_URL: test.adminUrl });
+    const config = testConfig({
+      DATABASE_URL: test.appUrl,
+      DATABASE_ADMIN_URL: test.adminUrl,
+      // The sales feeds' key store, for the stopped reading (AGT-11); no key is ever saved here.
+      CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
+    });
     app = await createApp(config, createLogger(config));
     server = await buildServer({
       config,
@@ -235,5 +240,28 @@ describe('GET /v1/dashboard, the sales read in the register (CRM-04 lot c)', () 
     await dashboard('owner', creatorId, 'month');
     await dashboard('manager', creatorId, 'week');
     expect(await statements()).toEqual(before);
+  });
+
+  it('names a stopped reading on the panel, as Réglages › Ventes says it (AGT-11)', async () => {
+    expect((await dashboard('owner', creatorId)).revealSales?.stopped).toEqual([]);
+    // A key the platform refused (a 401: revoked): kept, reading stopped until it is connected again (ADR 0050 § 3).
+    await test.admin.db.insert(schema.salesFeedCredentials).values({
+      platform: 'reveal',
+      keyCiphertext: Buffer.from('no key opens this'),
+      keyVersion: 'v1',
+      state: 'needs_reconnect',
+      lastErrorKind: 'unauthorized',
+      verifiedAt: new Date('2026-11-01T08:00:00Z'),
+    });
+    try {
+      for (const who of ['owner', 'manager'] as const) {
+        const stopped = (await dashboard(who, creatorId)).revealSales?.stopped;
+        expect(stopped?.map((feed) => feed.platform)).toEqual(['reveal']);
+        expect(stopped?.[0]?.message).toMatch(/arrêtée/u);
+      }
+      expect((await dashboard('operator', creatorId)).revealSales).toBeNull();
+    } finally {
+      await test.admin.db.delete(schema.salesFeedCredentials);
+    }
   });
 });

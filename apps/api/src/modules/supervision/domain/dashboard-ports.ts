@@ -132,6 +132,14 @@ export interface RevealSalesReading {
   readonly names: ReadonlyMap<string, string> | null;
 }
 
+/** A platform's feed as Réglages › Ventes shows it (the connectors' `salesFeeds.list`, by the composition root). */
+export interface SalesFeedState {
+  readonly platform: Platform;
+  readonly state: 'not_connected' | 'connected' | 'needs_reconnect';
+  readonly message: string;
+  readonly lastReadAt: string | null;
+}
+
 export interface RevealSalesView {
   /**
    * Her sales totals from `from` to `to` (days, both included), read as `userId`; undefined while none of her accounts
