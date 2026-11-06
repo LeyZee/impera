@@ -52,7 +52,10 @@ export function wireScripts(
         JOB_PAYLOADS['scripts.ask_scripts'],
         shared.logger,
         async (_payload, context) => {
-          context.logger.info(await module.jobs.askScripts(now()), 'scripts: the scripts due asked');
+          const run = await module.jobs.askScripts(now(), (creatorId, error) => {
+            context.logger.warn({ err: error, creatorId }, 'scripts: a creator’s script could not be asked');
+          });
+          context.logger.info(run, 'scripts: the scripts due asked');
         },
       ),
     },

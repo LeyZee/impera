@@ -238,3 +238,33 @@ export const invitationLinks = pgTable(
       .where(sql`${t.usedAt} is null and ${t.revokedAt} is null`),
   ],
 );
+
+/**
+ * « Mot de passe oublié » (SEC-05 lot 3, ADR 0068 § 3): a link the account asked for itself, sent to its private
+ * Telegram chat, 15 minutes, used once. Unlike a reset link of EQ-10 it never touches the second factor. Only the
+ * token's SHA-256 is kept; read and written by the admin role only (RLS forced, no policy, revoked from `nirvana_app`).
+ */
+export const passwordResetLinks = pgTable(
+  'password_reset_links',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id),
+    /** SHA-256 of the token, base64url. */
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestampTz('expires_at').notNull(),
+    usedAt: timestampTz('used_at'),
+    /** Set when a newer link replaces this one. */
+    revokedAt: timestampTz('revoked_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('password_reset_links_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
+    check('password_reset_links_one_end_check', sql`${t.usedAt} is null or ${t.revokedAt} is null`),
+    uniqueIndex('password_reset_links_live_unique')
+      .on(t.userId)
+      .where(sql`${t.usedAt} is null and ${t.revokedAt} is null`),
+    index('password_reset_links_user_created_idx').on(t.userId, t.createdAt),
+  ],
+);

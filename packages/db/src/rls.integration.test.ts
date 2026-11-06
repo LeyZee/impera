@@ -262,6 +262,50 @@ describe('database (RLS, constraints, migrations)', () => {
     },
   );
 
+  /** B's rows of `table` as the owner reads them: what a write under A must leave as it is. */
+  const fingerprint = async (table: (typeof TENANT_TABLES)[keyof typeof TENANT_TABLES]) => {
+    const result = await test.admin.db.execute(
+      sql`select count(*)::int as n, md5(coalesce(string_agg(t::text, ',' order by t::text), '')) as hash
+            from ${table} t where t.creator_id = ${b.creatorId}`,
+    );
+    return result.rows[0];
+  };
+
+  it.each(Object.entries(TENANT_TABLES))(
+    '%s: a creator changes and removes none of another one’s rows (audit des tests d’isolation, 06/11)',
+    async (_, table) => {
+      const before = await fingerprint(table);
+      expect(before?.['n']).not.toBe(0);
+      const touch = async (statement: ReturnType<typeof sql>) => {
+        const reason = await failure(
+          withTenant(test.app.db, a.creatorId, async (tx) => {
+            const result = await tx.execute(statement);
+            expect(result.rowCount ?? 0).toBe(0);
+          }),
+        );
+        // Not granted at all is as good: the role cannot try.
+        if (reason !== 'no error') expect(reason).toMatch(/permission denied/u);
+      };
+      await touch(sql`update ${table} set creator_id = creator_id where creator_id = ${b.creatorId}`);
+      await touch(sql`delete from ${table} where creator_id = ${b.creatorId}`);
+      expect(await fingerprint(table)).toEqual(before);
+    },
+  );
+
+  it('every table with row-level security forces it, so a policy holds for its owner too (audit RLS, 06/11)', async () => {
+    const result = await test.admin.db.execute(sql`
+      select c.relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relrowsecurity and not c.relforcerowsecurity
+       order by 1`);
+    expect(result.rows).toEqual([]);
+  });
+
+  it('the application cannot delete a creator: she is archived, never deleted (ADR 0071)', async () => {
+    expect(await failure(test.app.db.delete(s.creators).where(eq(s.creators.id, a.creatorId)))).toMatch(
+      /permission denied/,
+    );
+  });
+
   it('the global kill switch is visible to every creator', async () => {
     const rows = await withTenant(test.app.db, b.creatorId, (tx) => tx.select().from(s.killSwitches));
     expect(rows.map((r) => r.scope).sort()).toEqual(['creator', 'global']);

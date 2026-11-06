@@ -1090,3 +1090,121 @@
 }
 
 /* A zone chosen by city (CREA-27). */
+
+/*
+ * The corrections she proposed (recette CREA-01 b), above the tabs for the owner and a manager: a plate like the head,
+ * each correction on its own line, its section a link to its tab, « Traitée » at its end.
+ */
+.ps-corrections {
+  --_radius: var(--nv-radius-xl);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.ps-corrections__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.ps-corrections__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+}
+.ps-corrections__count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.ps-corrections__count .ps-dot {
+  width: 7px;
+  height: 7px;
+  /* No halo: the pastille stays on the text's edge. */
+  box-shadow: none;
+}
+.ps-corrections__lead {
+  margin-top: calc(-1 * var(--nv-space-2));
+}
+.ps-corrections__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.ps-corrections__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3) 0;
+  border-top: 1px solid var(--nv-plate-edge);
+}
+/* Section and day, then « Marquer traitée » at the end of the same line: the text below reads alone. */
+.ps-corrections__meta {
+  margin: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.ps-corrections__section {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.ps-corrections__section:hover,
+.ps-corrections__section:focus-visible {
+  text-decoration-color: currentColor;
+}
+.ps-corrections__text {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ps-corrections__meta > .ps-corrections__done {
+  flex: none;
+  margin-inline-start: auto;
+}
+.ps-corrections__done[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+.ps-corrections__problem {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+@media (max-width: 640px) {
+  .ps-corrections {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .ps-corrections__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

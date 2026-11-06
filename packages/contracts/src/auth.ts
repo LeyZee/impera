@@ -29,14 +29,30 @@ export const REAUTHENTICATION_ERROR_CODE = 'reauthentication_forbidden';
 const GivenPasswordSchema = z.string().min(1).max(512);
 
 /**
+ * The letters a backup code is drawn from (SEC-08): Crockford's base 32, capitals and digits without I, L, O nor U, so
+ * a code copied by hand on paper reads one way only.
+ */
+export const BACKUP_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/**
+ * A backup code as it is compared (SEC-08): capitals, and the letters a hand mistakes for digits read as those digits
+ * (O as 0, I and L as 1). Applied to the typed code and to the stored ones alike, so the codes made before keep working.
+ */
+export function normalizeBackupCode(code: string): string {
+  return code.toUpperCase().replace(/O/gu, '0').replace(/[IL]/gu, '1');
+}
+
+/**
  * A code of the second factor (ADR 0046): the 6 digits of the authenticator app, or a backup code (two groups of 5
- * letters and digits). Spaces a person types or pastes are dropped; letters keep their case.
+ * letters and digits). Spaces a person types or pastes are dropped; a backup code is read whatever its case
+ * (`normalizeBackupCode`).
  */
 export const SecondFactorCodeSchema = z
   .string()
   .max(32)
   .transform((code) => code.replace(/\s+/gu, ''))
-  .pipe(z.string().regex(/^(?:\d{6}|[A-Za-z0-9]{5}-[A-Za-z0-9]{5})$/u));
+  .pipe(z.string().regex(/^(?:\d{6}|[A-Za-z0-9]{5}-[A-Za-z0-9]{5})$/u))
+  .transform((code) => (code.includes('-') ? normalizeBackupCode(code) : code));
 export type SecondFactorCode = z.infer<typeof SecondFactorCodeSchema>;
 
 /** Whether a code is a backup code rather than the authenticator's. */

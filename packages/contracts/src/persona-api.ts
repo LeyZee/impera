@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { GuardCodeSchema } from './guards';
-import { CreatorIdSchema, PersonaVersionIdSchema } from './ids';
+import { CreatorIdSchema, PersonaCorrectionIdSchema, PersonaVersionIdSchema } from './ids';
 import {
   PersonaDetailsSchema,
   PersonaIntimateSchema,
@@ -127,3 +127,79 @@ export const PersonaSampleReplyUnprocessableDetailsSchema = z.strictObject({
 export type PersonaSampleReplyUnprocessableDetails = z.infer<
   typeof PersonaSampleReplyUnprocessableDetailsSchema
 >;
+
+/**
+ * The sections of her sheet a correction names (recette CREA-01 b): the blocks she reads, in the order she reads them.
+ * Her sample replies are read under her way of writing, and corrected there.
+ */
+export const PERSONA_CORRECTION_SECTIONS = [
+  'details',
+  'limits',
+  'lifestyle',
+  'tastes',
+  'intimate',
+  'writing_style',
+] as const;
+export const PersonaCorrectionSectionSchema = z.enum(PERSONA_CORRECTION_SECTIONS);
+export type PersonaCorrectionSection = z.infer<typeof PersonaCorrectionSectionSchema>;
+
+/** `open` until the agency marks it handled (`done`): it then changed her sheet, or talked it over with her. */
+export const PERSONA_CORRECTION_STATES = ['open', 'done'] as const;
+export const PersonaCorrectionStateSchema = z.enum(PERSONA_CORRECTION_STATES);
+export type PersonaCorrectionState = z.infer<typeof PersonaCorrectionStateSchema>;
+
+/** What she writes in one correction: a few sentences, never a new sheet. */
+export const PERSONA_CORRECTION_TEXT_MAX = 600;
+
+/** Her open corrections at once: past this, the agency has not read the ones before (429 `persona_corrections_limited`). */
+export const PERSONA_CORRECTIONS_OPEN_MAX = 20;
+
+/**
+ * A correction she proposed from Moi › Persona (recette CREA-01 b, Charles 05/11 « go recos »): she reads her sheet, the
+ * agency changes it. Never deleted; the agency marks it handled.
+ */
+export const PersonaCorrectionSchema = z.strictObject({
+  id: PersonaCorrectionIdSchema,
+  section: PersonaCorrectionSectionSchema,
+  text: z.string().min(1).max(PERSONA_CORRECTION_TEXT_MAX),
+  state: PersonaCorrectionStateSchema,
+  createdAt: z.iso.datetime(),
+  doneAt: z.iso.datetime().nullable(),
+});
+export type PersonaCorrection = z.infer<typeof PersonaCorrectionSchema>;
+
+/** `GET /v1/creators/:creatorId/persona/corrections`: hers (to her, or to the owner and a manager), newest first. */
+export const PersonaCorrectionListSchema = z.strictObject({
+  corrections: z.array(PersonaCorrectionSchema),
+});
+export type PersonaCorrectionList = z.infer<typeof PersonaCorrectionListSchema>;
+
+/**
+ * `POST /v1/creators/:creatorId/persona/corrections`, the creator only → 201 `PersonaCorrection`. `id` is chosen once
+ * per form: sent twice (double tap, retry), the server answers the correction it already stored.
+ */
+export const ProposePersonaCorrectionBodySchema = z.strictObject({
+  id: PersonaCorrectionIdSchema,
+  section: PersonaCorrectionSectionSchema,
+  text: z.string().trim().min(1).max(PERSONA_CORRECTION_TEXT_MAX),
+});
+export type ProposePersonaCorrectionBody = z.infer<typeof ProposePersonaCorrectionBodySchema>;
+
+/** `POST /v1/creators/:creatorId/persona/corrections/:correctionId/done`, the owner only → 200 `PersonaCorrection`. */
+export const PersonaCorrectionParamsSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  correctionId: PersonaCorrectionIdSchema,
+});
+export type PersonaCorrectionParams = z.infer<typeof PersonaCorrectionParamsSchema>;
+
+/**
+ * The error codes of her corrections: `persona_corrections_limited` 429, she has `PERSONA_CORRECTIONS_OPEN_MAX` open
+ * already ; `persona_correction_conflict` 409, this id already holds another correction ; `persona_correction_not_found`
+ * 404, no correction of hers has this id. Nothing is stored on any of them.
+ */
+export const PERSONA_CORRECTION_ERROR_CODES = [
+  'persona_corrections_limited',
+  'persona_correction_conflict',
+  'persona_correction_not_found',
+] as const;
+export type PersonaCorrectionErrorCode = (typeof PERSONA_CORRECTION_ERROR_CODES)[number];

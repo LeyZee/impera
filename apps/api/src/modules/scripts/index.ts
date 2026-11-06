@@ -1,5 +1,5 @@
 /** Public entry point of the `scripts` module (SC-01, ADR 0056). Other modules import this file only. */
-import type { ScriptStructureVersion } from '@impera/contracts';
+import type { CreatorId, ScriptStructureVersion } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -22,8 +22,11 @@ export interface ScriptsModule {
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
   readonly routes: FastifyPluginAsyncZod;
   readonly jobs: {
-    /** `scripts.ask_scripts`, each hour (SC-02): the scripts due asked of each creator. Counts only. */
-    askScripts(now: Date): Promise<AskScriptsRun>;
+    /**
+     * `scripts.ask_scripts`, each hour (SC-02): the scripts due asked of each creator. Counts only; `onFailure` hears
+     * each creator whose run failed, with its cause, for the log.
+     */
+    askScripts(now: Date, onFailure?: (creatorId: CreatorId, error: unknown) => void): Promise<AskScriptsRun>;
   };
 }
 
@@ -59,7 +62,16 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       { store: cadences, requests: deps.requests },
     ),
     jobs: {
-      askScripts: (now) => askScripts({ cadences, requests: deps.requests, limitsOf: deps.limitsOf }, now),
+      askScripts: (now, onFailure) =>
+        askScripts(
+          {
+            cadences,
+            requests: deps.requests,
+            limitsOf: deps.limitsOf,
+            ...(onFailure === undefined ? {} : { onFailure }),
+          },
+          now,
+        ),
     },
   };
 }

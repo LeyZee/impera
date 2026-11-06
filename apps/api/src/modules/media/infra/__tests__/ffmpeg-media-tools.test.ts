@@ -94,7 +94,37 @@ describe('ffmpeg media tools', () => {
 
   it('refuses a container outside the formats a phone sends', async () => {
     const bmp = make('pixel.bmp', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64', '-frames:v', '1');
-    await expect(tools.toJpeg(bmp)).rejects.toThrow(/whitelist/);
+    const refusal = await tools.toJpeg(bmp).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    const message = refusal instanceof Error ? refusal.message : '';
+    expect(message).toMatch(/whitelist/u);
+    // Short enough for `last_error`, which keeps 300 characters: the cause is never cut there.
+    expect(message.length).toBeLessThanOrEqual(300);
+  });
+
+  it('fails without quoting the file’s own metadata, only the binary, its exit and its last line', async () => {
+    // A file with sound and no picture: keyframes fails after ffmpeg printed the input's metadata on stderr.
+    const sound = make(
+      'sound.mp4',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=duration=1',
+      '-metadata',
+      'title=TitreDeLaCreatrice',
+      '-c:a',
+      'aac',
+    );
+    const failure = await tools.keyframes(sound, 4).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    const message = failure instanceof Error ? failure.message : '';
+    expect(message).toMatch(/^ffmpeg failed \(exit \d+\)/u);
+    expect(message).not.toContain('TitreDeLaCreatrice');
   });
 
   it('kills a call that runs past its time', async () => {
@@ -110,7 +140,12 @@ describe('ffmpeg media tools', () => {
       '-pix_fmt',
       'yuv420p',
     );
-    await expect(hurried.keyframes(video, 4)).rejects.toMatchObject({ killed: true, signal: 'SIGKILL' });
+    const timedOut = await hurried.keyframes(video, 4).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(timedOut).toMatchObject({ killed: true, signal: 'SIGKILL' });
+    expect(timedOut instanceof Error ? timedOut.message : '').toContain('timed out');
   });
 });
 
