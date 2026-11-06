@@ -43,7 +43,7 @@ const BASE: PlaygroundState = {
   rejectReasons: [{ id: 'sounds_ai', label: 'sonne IA' }],
   sessionCostEur: 0,
   voice: { reachable: true },
-  persona: { name: 'Elena' },
+  persona: { name: 'Elena', played: null },
   pending: null,
 };
 
@@ -173,7 +173,7 @@ describe('Playground', () => {
   it('names the persona it plays in the header too, where a phone hides the bar (M13)', async () => {
     answer = serve(BASE);
     open();
-    const header = await screen.findByText('Persona fictive : Elena', { selector: '.pg-top__persona' });
+    const header = await screen.findByText('Elena, fictive', { selector: '.pg-top__persona' });
     expect(header.closest('.pg-top')).toBeTruthy();
   });
 

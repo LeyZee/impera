@@ -11,8 +11,8 @@ import {
 describe('playground contracts', () => {
   it('names the persona it plays, never with an empty name', () => {
     const persona = PlaygroundStateSchema.shape.persona;
-    expect(persona.parse({ name: 'Elena' })).toEqual({ name: 'Elena' });
-    expect(persona.safeParse({ name: '' }).success).toBe(false);
+    expect(persona.parse({ name: 'Elena', played: null })).toEqual({ name: 'Elena', played: null });
+    expect(persona.safeParse({ name: '', played: null }).success).toBe(false);
   });
 
   it('takes a fan media as a kind and a few words, flags optional', () => {

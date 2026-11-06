@@ -105,3 +105,19 @@ export function fanMessageCount(state: PlaygroundState): number {
 /** What the playground's rate says, and what it does not (ADR 0010, 0019). */
 export const FICTIONAL =
   'Ce taux calibre la voix sur la persona fictive du Playground, pas sur celle d’une créatrice.';
+
+/** With a creator's version: her answers are tried before a real fan reads them, and the ratings are hers (PRO-21). */
+export const PLAYED =
+  'Ses réponses avec cette version, avant qu’un vrai fan ne les lise. Les notes vont à cette créatrice ; le taux reste celui de la voix.';
+
+/** Whom the answers speak as: « Persona fictive : Elena », or her name and the version played (PRO-21). */
+export function personaLabel(state: PlaygroundState): string {
+  const { name, played } = state.persona;
+  return played === null ? `Persona fictive : ${name}` : `Persona : ${name} · v${played.version}`;
+}
+
+/** The same in short, for a phone's header where the long one was cut (« Person… », PRO-21 captures). */
+export function personaShort(state: PlaygroundState): string {
+  const { name, played } = state.persona;
+  return played === null ? `${name}, fictive` : `${name} · v${played.version}`;
+}

@@ -1,4 +1,9 @@
-import type { PlaygroundAnswer as Answer, PlaygroundState } from '@impera/contracts';
+import {
+  CreatorIdSchema,
+  PersonaVersionIdSchema,
+  type PlaygroundAnswer as Answer,
+  type PlaygroundState,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,6 +13,8 @@ import {
   money,
   needsAttention,
   percent,
+  personaLabel,
+  personaShort,
   rateTone,
   scriptsHint,
   stepOf,
@@ -142,7 +149,7 @@ describe('handoffReasons', () => {
 
 describe('stepOf', () => {
   const state = (pending: Answer | null = null): PlaygroundState => ({
-    persona: { name: 'Elena' },
+    persona: { name: 'Elena', played: null },
     presets: [],
     presetId: null,
     situation: {
@@ -171,6 +178,24 @@ describe('stepOf', () => {
       'handoff',
     );
     expect(stepOf(state(answer()), 'lesson', false)).toBe('lesson');
+  });
+
+  it('names whom she speaks as: the invented persona, or a creator and her version (PRO-21)', () => {
+    expect(personaLabel(state())).toBe('Persona fictive : Elena');
+    expect(personaShort(state())).toBe('Elena, fictive');
+    const played = {
+      ...state(),
+      persona: {
+        name: 'Mia',
+        played: {
+          creatorId: CreatorIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c1'),
+          versionId: PersonaVersionIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e3'),
+          version: '0.0.3',
+        },
+      },
+    };
+    expect(personaLabel(played)).toBe('Persona : Mia · v0.0.3');
+    expect(personaShort(played)).toBe('Mia · v0.0.3');
   });
 });
 

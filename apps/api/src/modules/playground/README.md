@@ -7,6 +7,7 @@
 **Règles propres.**
 
 - Une session par utilisateur, en mémoire : un redémarrage la vide.
+- La persona jouée (recette PRO-21) : la persona fictive (`PLAYGROUND_PERSONA_PATH`) au départ, ou une version d'une créatrice, active ou pas, choisie par `POST /v1/playground/persona` (`{ kind: 'invented' }` ou `{ kind: 'version', creatorId, versionId }`), lue par le port `personaVersion` (`persona.versions.version`) comme ses brouillons lisent sa version active. Le choix recommence la conversation ; refusé pendant une réponse (409 `answer_in_progress_conflict`) ; version inconnue d'elle : 404 `playground_persona_not_found`, et la session reste telle quelle. L'état dit `persona.played` ; les notes qui suivent vont à cette créatrice. L'activation reste celle de `persona` (propriétaire, connexion récente).
 - Les notes vont au magasin d'`agent`, en JSONL hors dépôt (`IMPERA_TRAINING_DIR`), tant qu'il n'y a pas de table. Le taux est commun à tous, puisqu'il mesure le bot.
 - Les libellés des gardes, des pièges et des raisons sont écrits ici, en français : l'écran les affiche tels quels.
 - Un média saisi (type plus quelques mots) est complété sans rien supposer : intensité non visible, aucune anatomie. Ses alertes servent à tester le relais humain.

@@ -153,4 +153,21 @@ describe('Select', () => {
     rerender(<Select id="a" value="" options={LOOSE} onChange={vi.fn()} />);
     expect(screen.getByRole('combobox').textContent).toContain('Choisir…');
   });
+
+  // Relecture de #568: greyed while the choice is sent, the field kept the focus it was given back, or dropped it.
+  it('keeps its focus when it greys, and opens nothing while grey', () => {
+    const options: SelectOption<string>[] = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Bêta' },
+    ];
+    const { rerender } = render(<Select id="grey" value="a" options={options} onChange={() => undefined} />);
+    const field = screen.getByRole('combobox');
+    field.focus();
+    rerender(<Select id="grey" value="a" options={options} disabled onChange={() => undefined} />);
+    expect(document.activeElement).toBe(field);
+    expect(field.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(field);
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
 });
