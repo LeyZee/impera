@@ -516,11 +516,19 @@ export function UploadDialog({
   // Written as a day the calendar has not (« 31/02 »): said so, not how to write one.
   const [issuedNoSuch, setIssuedNoSuch] = useState(false);
   const [untilNoSuch, setUntilNoSuch] = useState(false);
+  // An unreadable day is said once its field is left, as in the agenda and the planning, not only after « Déposer ».
+  const [issuedLeft, setIssuedLeft] = useState(false);
+  const [untilLeft, setUntilLeft] = useState(false);
   const issuedOk = !issuedUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(issuedOn) && issuedOn <= today;
   const untilOk =
     !untilUnreadable &&
     (validUntil === '' || (/^\d{4}-\d{2}-\d{2}$/u.test(validUntil) && validUntil > issuedOn));
   const ready = chosen !== null && problem === null && issuedOk && untilOk;
+  const fileShown = touched && (chosen === null || problem !== null);
+  const issuedTold = (touched || issuedLeft) && issuedUnreadable;
+  const issuedShown = issuedTold || (touched && !issuedOk);
+  const untilTold = (touched || untilLeft) && untilUnreadable;
+  const untilShown = untilTold || (touched && !untilOk);
 
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
@@ -552,7 +560,7 @@ export function UploadDialog({
             {/* The browser's own file button speaks its language, not the page's: a pill of ours over the input. */}
             <label
               className="nv-btn nv-btn--soft nv-btn--sm cf-file"
-              data-invalid={touched && (chosen === null || problem !== null) ? 'true' : undefined}
+              data-invalid={fileShown ? 'true' : undefined}
             >
               <input
                 id={`${id}-file`}
@@ -560,6 +568,7 @@ export function UploadDialog({
                 accept={ACCEPTED_FILES}
                 aria-labelledby={`${id}-file-label`}
                 aria-describedby={`${id}-file-hint`}
+                aria-invalid={fileShown ? true : undefined}
                 data-autofocus
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -572,26 +581,30 @@ export function UploadDialog({
             </label>
             {chosen === null ? null : <span className="cf-picked">{chosen.file.name}</span>}
           </div>
-          <p
-            id={`${id}-file-hint`}
-            className={
-              touched && (chosen === null || problem !== null) ? 'tm-hint tm-hint--error' : 'tm-hint'
-            }
-          >
+          <p id={`${id}-file-hint`} className={fileShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
             {problem ??
               (touched && chosen === null
                 ? 'Choisis le fichier de la pièce.'
                 : `Un PDF, ou une photo nette en JPEG ou en PNG, ${weightText(CONTRACTOR_DOCUMENT_MAX_BYTES)} au plus.`)}
           </p>
         </div>
-        <div className="nv-field tm-field" data-invalid={touched && !issuedOk ? 'true' : undefined}>
+        <div
+          className="nv-field tm-field"
+          data-invalid={issuedShown ? 'true' : undefined}
+          onFocus={() => {
+            setIssuedLeft(false);
+          }}
+          onBlur={() => {
+            setIssuedLeft(true);
+          }}
+        >
           <label className="nv-field__label" htmlFor={`${id}-issued`}>
             Délivrée le
           </label>
           <DayField
             id={`${id}-issued`}
             value={issuedOn}
-            invalid={touched && !issuedOk}
+            invalid={issuedShown}
             describedBy={`${id}-issued-hint`}
             onChange={(next) => {
               setIssuedOn(next);
@@ -603,8 +616,8 @@ export function UploadDialog({
               setIssuedNoSuch(noSuchDay);
             }}
           />
-          <p id={`${id}-issued-hint`} className={touched && !issuedOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {touched && issuedUnreadable
+          <p id={`${id}-issued-hint`} className={issuedShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+            {issuedTold
               ? issuedNoSuch
                 ? NO_SUCH_DAY
                 : 'Un jour comme 12/05/2026, ou 12/5.'
@@ -616,14 +629,23 @@ export function UploadDialog({
           </p>
         </div>
         {kind === 'tax_residence' ? null : (
-          <div className="nv-field tm-field" data-invalid={touched && !untilOk ? 'true' : undefined}>
+          <div
+            className="nv-field tm-field"
+            data-invalid={untilShown ? 'true' : undefined}
+            onFocus={() => {
+              setUntilLeft(false);
+            }}
+            onBlur={() => {
+              setUntilLeft(true);
+            }}
+          >
             <label className="nv-field__label" htmlFor={`${id}-until`}>
               Valable jusqu’au <span className="cf-quiet">(si elle le dit)</span>
             </label>
             <DayField
               id={`${id}-until`}
               value={validUntil}
-              invalid={touched && !untilOk}
+              invalid={untilShown}
               describedBy={`${id}-until-hint`}
               onChange={(next) => {
                 setValidUntil(next);
@@ -634,8 +656,8 @@ export function UploadDialog({
                 setUntilNoSuch(noSuchDay);
               }}
             />
-            <p id={`${id}-until-hint`} className={touched && !untilOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-              {touched && untilUnreadable
+            <p id={`${id}-until-hint`} className={untilShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+              {untilTold
                 ? untilNoSuch
                   ? NO_SUCH_DAY
                   : 'Un jour comme 12/11/2026, ou rien.'

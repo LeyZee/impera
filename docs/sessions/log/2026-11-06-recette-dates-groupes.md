@@ -14,6 +14,7 @@
   - Ajouter (agenda) : titre et explication en haut des deux cartes « Une tâche » et « Une dispo ».
   - Le halo d'une pastille d'état première sur sa ligne (« À régler », « 1 modification ») s'aligne sur le bord du contenu de sa carte.
   - Sur téléphone, le fondu d'une barre d'onglets qui défile (Paie) est plus long et ses 20 derniers pixels sont vides : plus de mot coupé (« Expor… »), seulement l'amorce de l'onglet suivant (vu dans les captures de #573).
+- **Relecture d'Équipe** : Moi › Dossier dit un jour illisible dès que son champ est quitté, comme l'agenda et le planning (plus seulement après « Déposer ») ; le champ de fichier refusé porte `aria-invalid`.
 - **Captures** : `/mnt/project-files/recette/2026-11-06/extension/dates-groupes/lot1/` et `lot2/`, refaites dans `lot1/v2/` et `lot2/v2/`, puis `lot1/v3/` (halo des pastilles, onglets de Paie sur téléphone).
 - **Reste** : rien.
 - **Découvertes** : les cases radio « Les jours » de la vérification des ventes (Réglages › Ventes) sont encore natives. Les autres formulaires à champ jour disent encore « Un jour comme … » pour « 31/02 » ; `NO_SUCH_DAY` est prêt pour eux. Le design system ne grise pas `.nv-btn[aria-disabled='true']` (vu en relisant #574).
