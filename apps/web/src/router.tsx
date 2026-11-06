@@ -138,15 +138,18 @@ const creators = createRoute({
   // Her hours (P3-14), her access (CR-02) and the agency's percentage (CR-04) are the owner's alone, her agenda (CR-05)
   // the owner's and an active manager's, who opens nothing else: anyone lands on their first sheet, never on a page
   // the server would refuse.
-  beforeLoad: ({ context, search }) => {
+  beforeLoad: ({ context, search, location }) => {
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
     if (first !== undefined && !sheets.includes(sheetOf(search))) {
+      // A word brought by an earlier guard (Structures sends here) goes on with this second step.
+      const notice = location.state.notice;
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
         search: creatorsSearch(first, search.creatrice ?? null),
         replace: true,
+        ...(notice === undefined ? {} : { state: { notice } }),
       });
     }
   },
@@ -174,7 +177,7 @@ const scriptStructures = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/creatrices', replace: true });
+      throw redirect({ to: '/creatrices', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: StructuresPage,
@@ -215,7 +218,7 @@ const trackingAlerts = createRoute({
   beforeLoad: ({ context }) => {
     if (railOf(context.user).kind === 'chatter') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/suivi', replace: true });
+      throw redirect({ to: '/suivi', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: function TrackingAlerts() {
@@ -602,7 +605,7 @@ const meIndex = createRoute({
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/moi/persona', replace: true });
+    throw redirect({ to: '/moi/persona', replace: true, state: { notice: NOT_YOURS } });
   }
 };
 const mePersona = createRoute({
@@ -611,7 +614,7 @@ const mePersona = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'creator') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/moi/profil', replace: true });
+      throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: MyPersonaPage,
@@ -642,7 +645,7 @@ const meInvoices = createRoute({
     creatorAway({ context });
     if (context.user.teamScope !== 'agency') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/commissions/factures', replace: true });
+      throw redirect({ to: '/commissions/factures', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: function MyOwnInvoices() {
@@ -742,7 +745,7 @@ const aiModels = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: AiModelsPage,
@@ -754,7 +757,7 @@ const salesFeeds = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: SalesFeedPage,
@@ -766,7 +769,7 @@ const telegram = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   validateSearch: parseTelegramSearch,
@@ -788,7 +791,7 @@ const alerts = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: AlertsPage,
@@ -809,7 +812,7 @@ const backups = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: BackupsPage,
@@ -821,7 +824,7 @@ const payRules = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: PayRulesPage,
@@ -833,7 +836,7 @@ const billing = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: BillingPage,
@@ -845,7 +848,7 @@ const settingsSecurity = createRoute({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/reglages', replace: true });
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: function Security() {

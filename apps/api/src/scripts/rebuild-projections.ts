@@ -10,6 +10,9 @@ import { createApp } from '../composition-root';
 import { loadConfig } from '../config';
 import { createLogger } from '../logger';
 
+import { requireArguments } from './command-line';
+
+requireArguments('Usage: pnpm db:rebuild-projections <conversationId>', { positionals: true });
 const parsed = ConversationIdSchema.safeParse(process.argv[2]);
 if (!parsed.success) {
   console.error('Usage: pnpm db:rebuild-projections <conversationId>');

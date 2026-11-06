@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
 /** `1`/`true` or `0`/`false`, as written in an `.env` file. */
-const flag = z
-  .enum(['1', '0', 'true', 'false'])
-  .default('0')
-  .transform((value) => value === '1' || value === 'true');
+// Empty counts as unset, as `KEY=` in a .env does for every optional variable (recette 07/11, BIL-02).
+const flag = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z
+    .enum(['1', '0', 'true', 'false'])
+    .default('0')
+    .transform((value) => value === '1' || value === 'true'),
+);
 
 /**
  * An optional secret, or `null` when unset or still the `.env.example` placeholder (`replace-…`): in development

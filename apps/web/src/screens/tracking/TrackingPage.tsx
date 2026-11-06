@@ -580,7 +580,9 @@ function Row({
               </span>
             ) : null}
             {creatorName === undefined ? null : (
-              <span className="nv-tag nv-tag--declared tr-row__creator">{creatorName}</span>
+              <span className="nv-tag nv-tag--declared tr-row__creator" title={creatorName}>
+                {creatorName}
+              </span>
             )}
           </span>
           <span className="nv-convo__preview">

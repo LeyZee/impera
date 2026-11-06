@@ -39,6 +39,8 @@ interface ExportEntry {
 
 export interface ScriptExportPlan {
   readonly folder: string;
+  /** The moment the script is shot as: its folder's name, its sheet and each of its cards say it (recette MED-05). */
+  readonly moment: ShotMoment;
   /** The sheet first (`00-fiche.txt`), then each entry in the script's order. */
   readonly sheetPath: string;
   readonly sheet: string;
@@ -78,8 +80,11 @@ const ACCESS: Readonly<Record<'free' | 'paid', string>> = { free: 'GRATUIT', pai
  * each series' hint, and the files in their order. The texts and the prices are not in it yet: they come with the
  * sales texts (SC-05) and the agency's price grid (P6-01), never invented here.
  */
+const SHEET_MOMENTS: Readonly<Record<ShotMoment, string>> = { day: 'Jour', night: 'Nuit' };
+
 function sheetOf(
   folder: string,
+  moment: ShotMoment,
   name: string,
   segments: readonly ScriptSegment[],
   paths: readonly {
@@ -91,6 +96,7 @@ function sheetOf(
   const lines = [
     `Script ${folder}`,
     `Structure : ${name}`,
+    `Moment : ${SHEET_MOMENTS[moment]}`,
     '',
     'À recopier dans Reveal, dans cet ordre.',
     '',
@@ -165,8 +171,9 @@ export function scriptExportPlan(input: {
   const sheetPath = `${folder}/00-fiche.txt`;
   return {
     folder,
+    moment: input.moment,
     sheetPath,
-    sheet: sheetOf(folder, input.version.name, input.version.segments, named),
+    sheet: sheetOf(folder, input.moment, input.version.name, input.version.segments, named),
     entries,
   };
 }

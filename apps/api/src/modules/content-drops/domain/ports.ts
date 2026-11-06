@@ -42,10 +42,11 @@ export interface CreatorContentStore {
   markSent(userId: string, dropId: string, fileId: string, correlationId: string): Promise<ContentDrop>;
 }
 
-/** Her script drop and the frozen version it shoots. */
+/** Her script drop, the frozen version it shoots and the moment its request fixed (`null` before SC-03 c2). */
 export interface StartedScript {
   readonly drop: ContentDrop;
   readonly versionId: string;
+  readonly moment: ShotMoment | null;
 }
 
 /**
@@ -88,13 +89,22 @@ export interface ScriptVersions {
     readonly moment: ScriptMoment;
     readonly segments: readonly ScriptSegment[];
   } | null>;
-  /** A card of a frozen version, its SVG; `null` for a segment or series it does not have. */
-  card(versionId: string, segmentKey: string, variant: ScriptVariantLetter | null): Promise<string | null>;
+  /**
+   * A card of a frozen version, its SVG; `null` for a segment or series it does not have. It says `moment`, the one
+   * her request fixed (recette MED-05); `null`, a script asked before SC-03 c2, keeps the structure's.
+   */
+  card(
+    versionId: string,
+    segmentKey: string,
+    variant: ScriptVariantLetter | null,
+    moment: ShotMoment | null,
+  ): Promise<string | null>;
   /** The same card as the folder's PNG (SC-03): what goes at `00` of its series. */
   folderCard(
     versionId: string,
     segmentKey: string,
     variant: ScriptVariantLetter | null,
+    moment: ShotMoment | null,
   ): Promise<Uint8Array | null>;
   /**
    * The latest version of a structure frozen for a request the agency asks by hand, by the one who asks; `null` for a
