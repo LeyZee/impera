@@ -743,6 +743,13 @@
       "when": 1793923026487,
       "tag": "0121_script_cadences",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1793932376255,
+      "tag": "0123_script_drop_slots",
+      "breakpoints": true
     }
   ]
 }

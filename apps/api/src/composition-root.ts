@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { JOB_PAYLOADS, ScriptStructureIdSchema } from '@impera/contracts';
 import { createDbClient, type Database, type DbClient } from '@impera/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -290,7 +290,16 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const notifications = wireNotifications(shared);
   const creatorTasks = wireCreatorTasks(shared, { notifications: notifications.module });
   const scheduling = wireScheduling(shared, { persona: persona.module, creatorTasks: creatorTasks.module });
-  const contentDrops = wireContentDrops(shared);
+  // Late bound: her script drop reads the library's frozen versions, and the library asks her scripts through her content.
+  const contentDrops = wireContentDrops(shared, {
+    scriptVersions: {
+      frozen: (versionId) => scripts.module.frozenVersion(versionId),
+      freeze: async (structureId, userId) => {
+        const id = ScriptStructureIdSchema.safeParse(structureId);
+        return id.success ? ((await scripts.module.structures.freeze(id.data, userId))?.id ?? null) : null;
+      },
+    },
+  });
   const scripts = wireScripts(shared, {
     persona: persona.module,
     contentDrops: contentDrops.module,

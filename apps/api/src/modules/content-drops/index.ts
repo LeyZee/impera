@@ -6,10 +6,17 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { eraseOriginals, type RetentionRun } from './application/retention';
 import { NO_STORAGE, receiveFile } from './application/uploads';
-import type { AskedScript, DropStorage, IdeaContentRequest, ScriptContentRequest } from './domain/ports';
+import type {
+  AskedScript,
+  DropStorage,
+  IdeaContentRequest,
+  ScriptContentRequest,
+  ScriptVersions,
+} from './domain/ports';
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
+import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
@@ -48,7 +55,7 @@ export interface ContentDropsModule {
   };
 }
 
-export type { IdeaContentRequest } from './domain/ports';
+export type { IdeaContentRequest, ScriptVersions } from './domain/ports';
 
 export interface ContentDropsDeps {
   /** Application role: her own account's RLS, or the team's. */
@@ -58,6 +65,8 @@ export interface ContentDropsDeps {
   /** The media bucket (`S3_*`); `null` when unset: every send answers 503 `content_drop_storage_unavailable`. */
   readonly bucket: MediaBucketConfig | null;
   readonly requireRole: RequireRole;
+  /** The library's frozen versions (`scripts`, wired by the composition root): what her script drop shoots. */
+  readonly scriptVersions: ScriptVersions;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
   /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
@@ -79,6 +88,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       createDrizzleCreatorContentStore(deps.db),
       createDrizzleAgencyContentStore(deps.db),
       storage,
+      { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
       deps.requireRole,
       clock,
     ),

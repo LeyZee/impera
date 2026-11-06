@@ -12,7 +12,11 @@ import {
   CreatorIdSchema,
   DomainError,
   DropFileUploadSchema,
+  FillScriptSlotBodySchema,
   RefuseContentRequestBodySchema,
+  ScriptDropSchema,
+  ScriptSlotParamsSchema,
+  StartScriptDropBodySchema,
   type UserRole,
 } from '@impera/contracts';
 import { NotACreatorAccount } from '@impera/db';
@@ -20,6 +24,13 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import {
+  fillScriptSlot,
+  readScriptDrop,
+  startScriptDrop,
+  submitScriptDrop,
+  type ScriptDropDeps,
+} from '../../application/script-drops';
 import { finishUpload, uploadOf } from '../../application/uploads';
 import type { AgencyContentStore, CreatorContentStore, DropStorage } from '../../domain/ports';
 
@@ -58,6 +69,7 @@ const CreatorFileParamsSchema = z.object({
   fileId: ContentDropFileIdSchema,
 });
 const CreatorRequestParamsSchema = z.object({ creatorId: CreatorIdSchema, id: ContentRequestIdSchema });
+const ScriptDropParamsSchema = z.object({ dropId: ContentDropIdSchema });
 
 /**
  * Her content under `/v1/creator-space` (creator, CR-06), and the agency's under `/v1/creators/:creatorId` (owner,
@@ -68,6 +80,7 @@ export function createContentDropRoutes(
   creator: CreatorContentStore,
   agency: AgencyContentStore,
   storage: DropStorage,
+  scripts: ScriptDropDeps,
   requireRole: RequireRole,
   clock: () => Date = () => new Date(),
 ): FastifyPluginAsyncZod {
@@ -137,6 +150,52 @@ export function createContentDropRoutes(
           await finishUpload(storage, await creator.fileTarget(userId, id, fileId), request.body.parts);
           return creator.markSent(userId, id, fileId, request.id);
         }),
+    );
+
+    // Her script, slot by slot (SC-02 lot b, ADR 0056 § 4): begun from her request, each slot's file declared as she
+    // chooses it (its bytes go up by the routes above), then « Envoyer le script ».
+    app.post(
+      '/creator-space/content/script-drops',
+      { ...creatorOnly, schema: { body: StartScriptDropBodySchema, response: { 200: ScriptDropSchema } } },
+      (request) => asCreator(() => startScriptDrop(scripts, signedIn(request.user), request.body)),
+    );
+
+    app.get(
+      '/creator-space/content/script-drops/:dropId',
+      { ...creatorOnly, schema: { params: ScriptDropParamsSchema, response: { 200: ScriptDropSchema } } },
+      (request) => asCreator(() => readScriptDrop(scripts, signedIn(request.user), request.params.dropId)),
+    );
+
+    app.put(
+      '/creator-space/content/script-drops/:dropId/slots/:slotKey',
+      {
+        ...creatorOnly,
+        schema: {
+          params: ScriptSlotParamsSchema,
+          body: FillScriptSlotBodySchema,
+          response: { 200: ContentDropSchema },
+        },
+      },
+      (request) =>
+        asCreator(() =>
+          fillScriptSlot(
+            scripts,
+            signedIn(request.user),
+            request.params.dropId,
+            request.params.slotKey,
+            request.body,
+            clock(),
+          ),
+        ),
+    );
+
+    app.post(
+      '/creator-space/content/script-drops/:dropId/submit',
+      { ...creatorOnly, schema: { params: ScriptDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        asCreator(() =>
+          submitScriptDrop(scripts, signedIn(request.user), request.params.dropId, clock(), request.id),
+        ),
     );
 
     app.get(
@@ -228,7 +287,13 @@ export function createContentDropRoutes(
           response: { 200: ContentRequestSchema },
         },
       },
-      (request) => agency.ask(request.params.creatorId, signedIn(request.user), request.body),
+      (request) => {
+        const userId = signedIn(request.user);
+        // A script asked by hand shoots a frozen version too (SC-02 lot b), frozen by the one who asks.
+        return agency.ask(request.params.creatorId, userId, request.body, (structureId) =>
+          scripts.versions.freeze(structureId, userId),
+        );
+      },
     );
 
     app.delete(

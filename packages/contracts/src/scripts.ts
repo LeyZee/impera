@@ -247,6 +247,52 @@ export function scriptSegmentCodes(segments: readonly ScriptSegment[]): ScriptSe
   });
 }
 
+/**
+ * One slot of a script drop (SC-02 lot b, ADR 0056 § 4): a media slot of a segment, for one series of a stage with
+ * variants (each series is shot whole: `E1A`, `E1B`, ADR 0056 § 5). Its key, `<segment>:<series>:<rank>`, names it in
+ * the drop; its position is its place in the script, which a file keeps when it is replaced.
+ */
+export const ScriptSlotKeySchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}:[ABC]?:\d{1,2}$/);
+export type ScriptSlotKey = z.infer<typeof ScriptSlotKeySchema>;
+
+export interface ScriptSlot {
+  readonly key: ScriptSlotKey;
+  readonly segmentKey: string;
+  readonly variant: ScriptVariantLetter | null;
+  /** 0 for the segment's first slot. */
+  readonly rank: number;
+  /** Its place among every slot of the script, from 0. */
+  readonly position: number;
+  /** The segment's code with the series (`E1A`, `P12`). */
+  readonly code: string;
+  readonly slot: MediaSlot;
+}
+
+/** The slots of a script in its order: each segment's, each series of a stage in turn, each slot in its order. */
+export function scriptSlots(segments: readonly ScriptSegment[]): ScriptSlot[] {
+  const codes = new Map(scriptSegmentCodes(segments).map((entry) => [entry.key, entry.code]));
+  const slots: ScriptSlot[] = [];
+  for (const segment of segments) {
+    const series: readonly (ScriptVariantLetter | null)[] =
+      segment.kind === 'stage' && segment.variants.length > 0
+        ? segment.variants.map((variant) => variant.letter)
+        : [null];
+    for (const variant of series)
+      segment.mediaSlots.forEach((slot, rank) => {
+        slots.push({
+          key: `${segment.key}:${variant ?? ''}:${String(rank)}`,
+          segmentKey: segment.key,
+          variant,
+          rank,
+          position: slots.length,
+          code: `${codes.get(segment.key) ?? '?'}${variant ?? ''}`,
+          slot,
+        });
+      });
+  }
+  return slots;
+}
+
 /** The segments, refused with the faults' messages at their place. */
 export const ScriptSegmentsSchema = z
   .array(ScriptSegmentSchema)

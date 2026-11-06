@@ -1,4 +1,5 @@
 /** Public entry point of the `scripts` module (SC-01, ADR 0056). Other modules import this file only. */
+import type { ScriptStructureVersion } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -7,12 +8,15 @@ import type { LimitsOf, RasterizeCard, ScriptRequests, ScriptStructureStore } fr
 import { createCardRasterizer } from './infra/card-rasterizer';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
+import { createFrozenVersionReader } from './infra/db/version-reader';
 import { createScriptRoutes, type RequireRole } from './infra/http/routes';
 
 export interface ScriptsModule {
   readonly name: 'scripts';
   /** The agency's structures and each creator's queue; `freeze` is what a request (SC-02) will call. */
   readonly structures: ScriptStructureStore;
+  /** A frozen version by its id, whoever reads it (SC-02 lot b): what her script drop shoots. `null` when not frozen. */
+  frozenVersion(versionId: string): Promise<ScriptStructureVersion | null>;
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
   readonly routes: FastifyPluginAsyncZod;
   readonly jobs: {
@@ -43,6 +47,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
   return {
     name: 'scripts',
     structures,
+    frozenVersion: createFrozenVersionReader(deps.adminDb),
     routes: createScriptRoutes(
       structures,
       deps.limitsOf,

@@ -17,6 +17,7 @@ import {
   integer,
   pgPolicy,
   pgTable,
+  smallint,
   text,
   unique,
   uniqueIndex,
@@ -111,12 +112,17 @@ export const contentRequests = pgTable(
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('team_insert', {
       for: 'insert',
-      // A script asked of her is one of the library's, kept for no one else and not archived (Bilan, #506).
+      // A script asked of her is one of the library's, kept for no one else and not archived (Bilan, #506), and the
+      // version asked a frozen one of that structure (SC-02 lot b).
       withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}
         and (${t.structureId} is null or exists (
           select 1 from script_structures s
            where s.id = ${t.structureId} and s.archived_at is null
              and (s.reserved_creator_id is null or s.reserved_creator_id = ${t.creatorId})
+        ))
+        and (${t.structureVersionId} is null or exists (
+          select 1 from script_structure_versions v
+           where v.id = ${t.structureVersionId} and v.structure_id = ${t.structureId} and v.frozen_at is not null
         ))`,
     }),
     // The agency cancels an open request; her refusal stays hers.
@@ -192,9 +198,11 @@ export const contentDrops = pgTable(
     index('content_drops_creator_created_idx').on(t.creatorId, t.createdAt),
     pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
     // Her drop, by her, sending; from a request only if it is hers, open, of this category.
+    // A script may begin empty, filled slot by slot (SC-02 lot b): only hers, from her request.
     pgPolicy('creator_insert', {
       for: 'insert',
-      withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.state} = 'uploading'
+      withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser}
+        and (${t.state} = 'uploading' or (${t.state} = 'filling' and ${t.category} = 'script'))
         and ${t.correctedFrom} is null and (${t.requestId} is null or exists (
           select 1 from content_requests r
            where r.id = ${t.requestId} and r.creator_id = ${t.creatorId} and r.state = 'open' and r.category = ${t.category}
@@ -202,7 +210,7 @@ export const contentDrops = pgTable(
     }),
     pgPolicy('creator_withdraw', {
       for: 'update',
-      using: sql`${hers(t.creatorId)} and ${t.state} in ('uploading', 'received', 'ready', 'blocked')`,
+      using: sql`${hers(t.creatorId)} and ${t.state} in ('filling', 'uploading', 'received', 'ready', 'blocked')`,
       withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'withdrawn' and ${t.withdrawnBy} = ${currentUser}`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
@@ -242,6 +250,16 @@ export const contentDropFiles = pgTable(
     state: enumText('state').notNull().default('awaiting'),
     refusal: text('refusal'),
     mediaAssetId: uuid('media_asset_id').references(() => mediaAssets.id),
+    /** The slot of her script it fills (`ScriptSlotKey`, SC-02 lot b); `null` outside a script. */
+    slotKey: text('slot_key'),
+    /** A video or vocal slot's lengths, copied from the slot when the file is declared: checked once cleaned. */
+    minSeconds: smallint('min_seconds'),
+    maxSeconds: smallint('max_seconds'),
+    /**
+     * When another file took its slot, before she sent her script: it leaves every view, keeps its row, and its
+     * medium goes as a withdrawn drop's does (CR-06 c).
+     */
+    replacedAt: timestampTz('replaced_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -249,7 +267,15 @@ export const contentDropFiles = pgTable(
     enumCheck('content_drop_files', t.kind, DROP_MEDIA_KINDS),
     enumCheck('content_drop_files', t.mime, DROP_MIME_TYPES),
     enumCheck('content_drop_files', t.state, DROP_FILE_STATES),
-    check('content_drop_files_position_check', sql`${t.position} between 0 and 59`),
+    // A script holds up to 24 segments of 12 slots in 3 series: 864 places.
+    check('content_drop_files_position_check', sql`${t.position} between 0 and 999`),
+    check(
+      'content_drop_files_slot_check',
+      sql`(${t.slotKey} is null or char_length(${t.slotKey}) between 4 and 40)
+        and (${t.minSeconds} is null) = (${t.maxSeconds} is null)
+        and (${t.minSeconds} is null or (${t.slotKey} is not null and ${t.minSeconds} between 1 and ${t.maxSeconds}))
+        and (${t.replacedAt} is null or ${t.slotKey} is not null)`,
+    ),
     // The heaviest file of each kind (`DROP_MAX_BYTES`, ADR 0070 § 1): 10 Gio for a video, 30 Mo for a photo or a vocal.
     check(
       'content_drop_files_bytes_check',
@@ -263,7 +289,13 @@ export const contentDropFiles = pgTable(
       'content_drop_files_media_check',
       sql`(${t.state} in ('kept', 'duplicate')) = (${t.mediaAssetId} is not null)`,
     ),
-    unique('content_drop_files_position_unique').on(t.dropId, t.position),
+    // One live file per place and per slot; a replaced one keeps its row beside its successor.
+    uniqueIndex('content_drop_files_position_unique')
+      .on(t.dropId, t.position)
+      .where(sql`${t.replacedAt} is null`),
+    uniqueIndex('content_drop_files_slot_unique')
+      .on(t.dropId, t.slotKey)
+      .where(sql`${t.slotKey} is not null and ${t.replacedAt} is null`),
     foreignKey({
       name: 'content_drop_files_drop_fk',
       columns: [t.dropId, t.creatorId],
@@ -275,12 +307,22 @@ export const contentDropFiles = pgTable(
       .on(t.mediaAssetId)
       .where(sql`${t.mediaAssetId} is not null`),
     pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
-    // A file joins only a drop of hers still sending, and waits for its bytes.
+    // A file joins only a drop of hers still sending or being filled, and waits for its bytes.
     pgPolicy('creator_insert', {
       for: 'insert',
-      withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'awaiting' and exists (
-        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId} and d.state = 'uploading'
+      withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'awaiting' and ${t.replacedAt} is null and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('uploading', 'filling')
       )`,
+    }),
+    // She replaces a slot's file while she fills her script: only its `replaced_at` (the column grant, migration
+    // 0123), once.
+    pgPolicy('creator_replace', {
+      for: 'update',
+      using: sql`${hers(t.creatorId)} and ${t.slotKey} is not null and ${t.replacedAt} is null and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId} and d.state = 'filling'
+      )`,
+      withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('team_insert', {
