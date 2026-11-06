@@ -5,8 +5,12 @@ import {
   CreatorIdSchema,
   DomainError,
   MyPersonaSchema,
+  PersonaCorrectionListSchema,
+  PersonaCorrectionParamsSchema,
+  PersonaCorrectionSchema,
   PersonaOverviewSchema,
   PersonaVersionSummarySchema,
+  ProposePersonaCorrectionBodySchema,
   type CreatorId,
   type CurrentUser,
 } from '@impera/contracts';
@@ -14,6 +18,7 @@ import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import type { PersonaCorrectionStore } from '../../domain/corrections';
 import { sheetOf } from '../../domain/sheet';
 import type { PersonaVersionStore } from '../../domain/versions';
 
@@ -41,6 +46,7 @@ function actorFor(request: FastifyRequest, creatorId: CreatorId): CurrentUser {
  */
 export function createPersonaRoutes(
   store: PersonaVersionStore,
+  corrections: PersonaCorrectionStore,
   requireRole: RequireRole,
   recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
@@ -111,6 +117,55 @@ export function createPersonaRoutes(
         const { creatorId, versionId } = request.params;
         const user = actorFor(request, creatorId);
         return store.activate(creatorId, versionId, request.body.expectedActive, user.id);
+      },
+    );
+
+    app.get(
+      '/creators/:creatorId/persona/corrections',
+      {
+        // Hers to her; to the owner and an active manager, on her persona (a chatter, closed by her policies or by his list, reads none).
+        preValidation: requireRole('owner', 'operator', 'creator'),
+        schema: { params: CreatorParamsSchema, response: { 200: PersonaCorrectionListSchema } },
+      },
+      async (request) => {
+        const { creatorId } = request.params;
+        const user = actorFor(request, creatorId);
+        const list =
+          user.role === 'creator'
+            ? await corrections.mine(user.id)
+            : await corrections.list(creatorId, user.id);
+        return { corrections: [...list] };
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/persona/corrections',
+      {
+        // She reads her sheet and proposes, the agency changes it (recette CREA-01 b, Charles 05/11 « go recos »).
+        preValidation: requireRole('creator'),
+        schema: {
+          params: CreatorParamsSchema,
+          body: ProposePersonaCorrectionBodySchema,
+          response: { 201: PersonaCorrectionSchema },
+        },
+      },
+      async (request, reply) => {
+        const user = actorFor(request, request.params.creatorId);
+        return reply.code(201).send(await corrections.propose(user.id, request.body));
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/persona/corrections/:correctionId/done',
+      {
+        // The owner, who alone changes her persona, says he handled it.
+        preValidation: requireRole('owner'),
+        schema: { params: PersonaCorrectionParamsSchema, response: { 200: PersonaCorrectionSchema } },
+      },
+      async (request) => {
+        const { creatorId, correctionId } = request.params;
+        const user = actorFor(request, creatorId);
+        return corrections.markDone(creatorId, correctionId, user.id);
       },
     );
     return Promise.resolve();

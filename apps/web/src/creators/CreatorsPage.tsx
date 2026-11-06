@@ -175,6 +175,7 @@ export function CreatorsPage({
         creatorId={selected}
         canSave={isOwner}
         isOwner={isOwner}
+        readsCorrections={user.teamScope === 'owner' || user.teamScope === 'agency'}
         creatorName={current?.displayName ?? null}
         timezone={current?.timezone ?? null}
         onDirty={setDirty}

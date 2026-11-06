@@ -8,6 +8,7 @@ import { PersonaSampleReplyUnprocessable } from './domain/errors';
 import type { CreatorDirectory } from './domain/ports';
 import type { PersonaVersionStore } from './domain/versions';
 import { createDrizzleCreatorDirectory } from './infra/db/creator-directory';
+import { createDrizzlePersonaCorrectionStore } from './infra/db/persona-correction-store';
 import { createDrizzlePersonaVersionStore } from './infra/db/persona-version-store';
 import { createPersonaRoutes } from './infra/http/persona-routes';
 import {
@@ -26,7 +27,7 @@ export interface PersonaModule {
    * the port the agent writes with (her active version, read at each draft), wired by the composition root.
    */
   readonly versions: PersonaVersionStore;
-  /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions. */
+  /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions and her corrections. */
   readonly routes: FastifyPluginAsyncZod;
   /**
    * `/creators/archived`, `/creators/:creatorId/archive` and `…/restore` (ADR 0071 § 2), mounted by the composition
@@ -81,7 +82,8 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
   // Checked again on activation: a version saved before a guard changed is not activated as it is (P5-01).
   const stored = createDrizzlePersonaVersionStore(deps.db, check);
   const versions = check === undefined ? stored : withSampleReplyCheck(stored, check);
-  const personaRoutes = createPersonaRoutes(versions, deps.requireRole, deps.recentLogin);
+  const corrections = createDrizzlePersonaCorrectionStore(deps.db);
+  const personaRoutes = createPersonaRoutes(versions, corrections, deps.requireRole, deps.recentLogin);
   return {
     name: 'persona',
     creators,

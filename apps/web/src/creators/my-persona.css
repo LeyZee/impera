@@ -49,3 +49,98 @@
     margin-top: var(--nv-space-3);
   }
 }
+
+/*
+ * « Proposer une correction » at the foot of each block (recette CREA-01 b): set off from the sheet by a hairline, her
+ * corrections first, then the button or the form. Nothing coloured on the side: a pastille says where each one is.
+ */
+.mp-correct {
+  margin-top: var(--nv-space-2);
+  padding-top: var(--nv-space-4);
+  border-top: 1px solid var(--nv-plate-edge);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.mp-correct__open {
+  align-self: flex-start;
+}
+.mp-correct__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.mp-correct__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.mp-correct__text {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.mp-correct__meta {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.mp-correct__meta .ps-dot {
+  width: 7px;
+  height: 7px;
+  /* No halo: the pastille stays on the text's edge. */
+  box-shadow: none;
+}
+.mp-correct__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.mp-correct__field {
+  /* No native handle: the field grows with what she writes, up to a few lines, then scrolls. */
+  resize: none;
+  field-sizing: content;
+  min-height: 88px;
+  max-height: 240px;
+}
+.mp-correct__hint {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.mp-correct__count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.mp-correct__problem {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.mp-correct__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+/* Greyed like `.nv-btn:disabled`: an empty field or a send under way keeps its focus (aria-disabled), never its look. */
+.mp-correct__actions .nv-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}

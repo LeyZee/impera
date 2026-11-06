@@ -2,6 +2,7 @@ import {
   DomainError,
   type CreatorErrorCode,
   type CreatorPlanned,
+  type PersonaCorrectionErrorCode,
   type PersonaErrorCode,
   type PersonaSampleReplyFault,
   type PersonaSampleReplyUnprocessableDetails,
@@ -78,5 +79,29 @@ export class PersonaSampleReplyUnprocessable extends DomainError {
         } satisfies PersonaSampleReplyUnprocessableDetails,
       },
     );
+  }
+}
+
+/** She has `PERSONA_CORRECTIONS_OPEN_MAX` corrections the agency has not handled yet (429): nothing is stored. */
+export class PersonaCorrectionsLimited extends DomainError {
+  constructor() {
+    super(
+      'persona_corrections_limited' satisfies PersonaCorrectionErrorCode,
+      'Trop de corrections attendent déjà l’agence',
+    );
+  }
+}
+
+/** This id already holds another correction (409): a form sent again with a changed text. Nothing is stored. */
+export class PersonaCorrectionConflict extends DomainError {
+  constructor() {
+    super('persona_correction_conflict' satisfies PersonaCorrectionErrorCode, 'Cette correction existe déjà');
+  }
+}
+
+/** No correction of hers has this id (404). */
+export class PersonaCorrectionNotFound extends DomainError {
+  constructor() {
+    super('persona_correction_not_found' satisfies PersonaCorrectionErrorCode, 'Correction introuvable');
   }
 }
