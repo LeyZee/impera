@@ -477,9 +477,23 @@ function Week({
   const earlier = byDay.filter(isGone);
   const ahead = byDay.filter((one) => !isGone(one));
   const earlierCount = earlier.reduce((sum, { shifts }) => sum + shifts.length, 0);
-  const toDo = earlier
+  const pastReports = earlier
     .flatMap(({ shifts }) => shifts)
-    .filter((shift) => phaseOf(shift, now) === 'past' && reportFor(shift)?.kind === 'todo').length;
+    .filter((shift) => phaseOf(shift, now) === 'past')
+    .map(reportFor);
+  const toDo = pastReports.filter((one) => one?.kind === 'todo').length;
+  // A gap with the platform that waits for him is said on the fold too (ADR 0073 § 5).
+  const toExplain = pastReports.filter((one) => one?.kind === 'made' && gapWaits(one.report, now)).length;
+  const foldSum = [
+    toDo === 0 ? null : toDo === 1 ? '1 rapport à faire' : `${String(toDo)} rapports à faire`,
+    toExplain === 0
+      ? null
+      : toExplain === 1
+        ? '1 écart à expliquer'
+        : `${String(toExplain)} écarts à expliquer`,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
   const daySection = ({ day, shifts }: { day: string; shifts: Shift[] }, index: number): JSX.Element => (
     <section
       key={day}
@@ -542,11 +556,7 @@ function Week({
         <details className="nv-disclosure nv-plate sc-fold sc-mine__earlier">
           <summary>
             <span className="nv-disclosure__title">Plus tôt cette semaine ({earlierCount})</span>
-            {toDo === 0 ? null : (
-              <span className="nv-disclosure__sum">
-                {toDo === 1 ? '1 rapport à faire' : `${String(toDo)} rapports à faire`}
-              </span>
-            )}
+            {foldSum === '' ? null : <span className="nv-disclosure__sum">{foldSum}</span>}
           </summary>
           <div className="nv-disclosure__body sc-mine">{earlier.map(daySection)}</div>
         </details>

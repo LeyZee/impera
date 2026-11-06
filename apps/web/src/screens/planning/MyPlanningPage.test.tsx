@@ -439,6 +439,9 @@ describe('the chatter’s Planning', () => {
     serve({ earlier: true, gap: true });
     renderPage();
     const fold = await screen.findByText('Plus tôt cette semaine (2)');
+    await waitFor(() => {
+      expect(text(fold.closest('summary'))).toContain('1 rapport à faire · 1 écart à expliquer');
+    });
     const tuesday = within(fold.closest('details') ?? document.body).getByRole('region', {
       name: 'Mardi 27 octobre',
     });

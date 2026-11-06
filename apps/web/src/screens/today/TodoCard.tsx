@@ -76,9 +76,11 @@ export function TodoCard({
                 report === null ? (
                   'Rapport à faire'
                 ) : gap !== null ? (
+                  // The amount inside the sentence: a line that breaks never leaves a « · » alone at its end.
                   <>
-                    Écart avec {account === undefined ? 'la plateforme' : platformName(account.platform)} ·{' '}
-                    <span className="nv-num">{signedAmountText(gap.gapMinor, report.amount.currency)}</span>
+                    Écart de{' '}
+                    <span className="nv-num">{signedAmountText(gap.gapMinor, report.amount.currency)}</span>{' '}
+                    avec {account === undefined ? 'la plateforme' : platformName(account.platform)}
                   </>
                 ) : (
                   'Rapport renvoyé par l’agence'

@@ -631,6 +631,13 @@ function Review({
           {account === undefined ? null : `${account.creatorName} · ${accountLine(account)} · `}
           {shift === undefined ? null : swapShiftLine(shift.startsAt, shift.endsAt, undefined, zone)}
         </p>
+        {report.comment === null ? null : <p className="rp-review__quote">« {report.comment} »</p>}
+        {report.incident === null ? null : (
+          <p className="rp-review__incident">
+            <span className="rp-review__flag">Incident</span> {report.incident}
+          </p>
+        )}
+        {/* After its member's words, what the platform read: the figure, the explanation, until when it waits. */}
         <ReviewCheck
           report={report}
           platform={account === undefined ? 'la plateforme' : platformName(account.platform)}
@@ -639,12 +646,6 @@ function Review({
           today={dayOf(now, zone)}
           zone={zone}
         />
-        {report.comment === null ? null : <p className="rp-review__quote">« {report.comment} »</p>}
-        {report.incident === null ? null : (
-          <p className="rp-review__incident">
-            <span className="rp-review__flag">Incident</span> {report.incident}
-          </p>
-        )}
         {report.canReview ? null : (
           <p className="rp-review__locked">
             {correction && report.byAgency

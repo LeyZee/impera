@@ -339,7 +339,7 @@ function CheckNote({
   return (
     <div className="rp-notice nv-enter" data-tone="warn">
       <p className="rp-notice__title">
-        Écart avec {platform} · <span className="nv-num">{signedAmountText(check.gapMinor, currency)}</span>
+        Écart de <span className="nv-num">{signedAmountText(check.gapMinor, currency)}</span> avec {platform}
       </p>
       <p className="rp-notice__text">
         Tu déclares <span className="nv-num">{amountText(report.amount.amountMinor, currency)}</span>,{' '}

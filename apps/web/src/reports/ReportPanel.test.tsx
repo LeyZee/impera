@@ -545,8 +545,8 @@ describe('Mon rapport against Reveal (ADR 0073)', () => {
     };
     renderPage();
 
-    const todo = await screen.findByRole('button', { name: /Écart avec Reveal/u });
-    expect(todo.textContent.replaceAll(' ', ' ')).toContain('Écart avec Reveal · +10,00 €');
+    const todo = await screen.findByRole('button', { name: /Écart de .* avec Reveal/u });
+    expect(todo.textContent.replaceAll(' ', ' ')).toContain('Écart de +10,00 € avec Reveal');
     expect(todo.textContent).toContain('Expliquer');
     fireEvent.click(todo);
     const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
@@ -580,7 +580,7 @@ describe('Mon rapport against Reveal (ADR 0073)', () => {
     fireEvent.click(await screen.findByText('Tous mes rapports'));
     const chip = await screen.findByRole('button', { name: /En attente/u });
     expect(chip.textContent).not.toContain('Écart');
-    expect(screen.queryByRole('button', { name: /Écart avec Reveal/u })).toBe(null);
+    expect(screen.queryByRole('button', { name: /Écart de .* avec Reveal/u })).toBe(null);
     fireEvent.click(chip);
     const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
     expect(dialog.textContent).toContain('Ton explication est envoyée : l’agence décide.');
