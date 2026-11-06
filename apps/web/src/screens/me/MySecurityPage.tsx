@@ -21,12 +21,14 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
         lead={
           user.role === 'creator'
             ? 'Les appareils où ton compte est ouvert, et tes codes de secours.'
-            : 'Les appareils où ton compte est ouvert, tes codes de secours et ton chat Telegram.'
+            : user.teamScope === 'agency'
+              ? 'Les appareils où ton compte est ouvert, tes codes de secours, ton chat Telegram et l’extension de veille.'
+              : 'Les appareils où ton compte est ouvert, tes codes de secours et ton chat Telegram.'
         }
         actions={<MeNav manager={user.teamScope === 'agency'} creator={user.role === 'creator'} />}
       />
       <div className="flex flex-col gap-4">
-        <SecuritySection />
+        <SecuritySection extensionLinks={user.teamScope === 'agency'} />
         {user.role === 'creator' ? null : (
           <PrivateChat
             owner={false}
