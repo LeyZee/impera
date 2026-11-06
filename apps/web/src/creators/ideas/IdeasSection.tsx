@@ -1,5 +1,4 @@
 import {
-  DROP_CATEGORIES,
   DROP_CATEGORY_LABELS,
   TREND_FORMATS,
   instagramPostOf,
@@ -17,6 +16,7 @@ import {
   IDEA_STATE_LABELS,
   IDEA_STATE_TONES,
   SIGNAL_SOURCE_LABELS,
+  correctableCategories,
   correctionOf,
   draftOf,
   draftProblems,
@@ -303,7 +303,7 @@ function IdeaCard({
               <Select<DropCategory>
                 id={`${id}-c`}
                 value={draft.category}
-                options={DROP_CATEGORIES.map((category) => ({
+                options={correctableCategories(idea.category).map((category) => ({
                   value: category,
                   label: `${CATEGORY_EMOJIS[category]} ${DROP_CATEGORY_LABELS[category]}`,
                 }))}

@@ -1,7 +1,15 @@
 import { ContentIdeaOfDaySchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { correctionOf, draftOf, draftProblems, metricsLine, shootLength, slashDay } from './model';
+import {
+  correctableCategories,
+  correctionOf,
+  draftOf,
+  draftProblems,
+  metricsLine,
+  shootLength,
+  slashDay,
+} from './model';
 
 /** An invented idea, with an invented trend. */
 const IDEA = ContentIdeaOfDaySchema.parse({
@@ -88,5 +96,14 @@ describe('a corrected idea', () => {
       title: '80 caractères au plus : c’est le titre de son agenda.',
       shootMinutes: 'Entre 1 et 600 minutes.',
     });
+  });
+});
+
+describe('the categories of a correction', () => {
+  it('never offers « Script »: a script comes from the agency’s structures (ADR 0056)', () => {
+    expect(correctableCategories('feed_shoot')).not.toContain('script');
+    expect(correctableCategories('feed_shoot')).toContain('feed_shoot');
+    // An idea that already says it keeps it shown.
+    expect(correctableCategories('script')).toContain('script');
   });
 });
