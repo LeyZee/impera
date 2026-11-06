@@ -293,8 +293,8 @@ export function PrivateChat({
         <div className="pc-nobot">
           <p className="pc-lead">
             {owner
-              ? 'Aucun bot Telegram n’est branché : ajoute-le d’abord dans « Bots et groupes ».'
-              : 'Aucun bot Telegram n’est branché pour l’agence : demande au propriétaire de l’ajouter.'}
+              ? 'Aucun bot Telegram ne fonctionne : ajoute-en un, ou répare le tien, dans « Bots et groupes ».'
+              : 'Aucun bot Telegram ne fonctionne pour l’agence : demande au propriétaire de s’en occuper.'}
           </p>
           {owner && onAddBot !== undefined ? (
             <button type="button" className="nv-btn nv-btn--soft nv-btn--sm pc-start" onClick={onAddBot}>

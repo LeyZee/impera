@@ -128,7 +128,7 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
 
     renderChat(false);
     fireEvent.click(await screen.findByRole('button', { name: 'Lier mon Telegram' }));
-    expect(await screen.findByText(/demande au propriétaire de l’ajouter/u)).toBeTruthy();
+    expect(await screen.findByText(/demande au propriétaire de s’en occuper/u)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Bots et groupes' })).toBeNull();
   });
 

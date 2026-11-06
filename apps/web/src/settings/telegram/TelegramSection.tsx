@@ -364,13 +364,15 @@ function HealthStrip({
         <span className="tg-state-dot" data-tone={health.tone} />
         <b>{health.label}</b>
       </span>
-      {/* The counts stay on a wide screen; a phone keeps the state and the last send (telegram.css). */}
-      <span className="tg-health__sep tg-health__count" />
-      <span className="tg-health__item tg-health__count">
-        <b>{health.botCount}</b> {health.botCount > 1 ? 'bots' : 'bot'}
-      </span>
-      <span className="tg-health__item tg-health__count">
-        <b>{health.groupCount}</b> {health.groupCount > 1 ? 'groupes' : 'groupe'}
+      <span className="tg-health__sep" />
+      {/* The two counts move to the next line together when the strip wraps (a phone), never one apart. */}
+      <span className="tg-health__counts">
+        <span className="tg-health__item">
+          <b>{health.botCount}</b> {health.botCount > 1 ? 'bots' : 'bot'}
+        </span>
+        <span className="tg-health__item">
+          <b>{health.groupCount}</b> {health.groupCount > 1 ? 'groupes' : 'groupe'}
+        </span>
       </span>
       {health.lastSentAt === null ? null : (
         <>

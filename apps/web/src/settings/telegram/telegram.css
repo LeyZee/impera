@@ -127,6 +127,11 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.tg-health__counts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
 .tg-health__sep {
   width: 1px;
   height: 18px;
