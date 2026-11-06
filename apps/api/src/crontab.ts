@@ -151,6 +151,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '*/5 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_reports'] },
   },
+  // The member of a shift ended without its report is reminded on his phone (ADR 0077): 15 minutes after its end, then
+  // 12 hours after, each within its window. Each reminder rings once; no backfill, the next run finds them all.
+  {
+    task: 'scheduling.remind_reports',
+    match: '*/5 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.remind_reports'] },
+  },
   // A role dated for a 1st or a 16th becomes the member's on that day (Charles, 28/10): each record takes the role in
   // force today, before the hour's recalculation. A run missed is caught up by the next one, no backfill.
   {

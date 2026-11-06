@@ -127,7 +127,7 @@ export const notificationDeliveries = pgTable(
     ),
     check(
       'notification_deliveries_reason_check',
-      sql`${t.reason} in ('sale', 'own_shift_start', 'reminder', 'routine', 'streak', 'team')`,
+      sql`${t.reason} in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team')`,
     ),
     pgPolicy('own_rows', {
       for: 'all',

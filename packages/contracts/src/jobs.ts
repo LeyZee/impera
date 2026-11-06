@@ -54,6 +54,7 @@ export const JOB_NAMES = [
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
   'scheduling.check_reports',
+  'scheduling.remind_reports',
   'team.apply_roles',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -118,6 +119,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
+  'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'team.apply_roles': 'Rôles de l’équipe',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
@@ -250,6 +252,12 @@ export const JOB_PAYLOADS = {
    */
   'scheduling.check_agency_shares': z.object({}),
   'scheduling.check_reports': z.object({}),
+  /**
+   * Every five minutes (ADR 0077): the member of a shift ended without its report is reminded on his phone, 15 minutes
+   * after its end, then 12 hours after. Each reminder rings once (`notification_deliveries`); a run missed is caught by
+   * the next one within its window, never later.
+   */
+  'scheduling.remind_reports': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -451,6 +459,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
   'scheduling.check_agency_shares': 3,
   'scheduling.check_reports': 1,
+  // Every five minutes, and each reminder rings once: the next run is the retry.
+  'scheduling.remind_reports': 1,
   'team.apply_roles': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
   'payroll.recalculate': 5,
