@@ -65,8 +65,8 @@ export const RevealChattersSchema = z.object({
       lastName: z.string(),
       /** An agency member's login e-mail, `null` for a provider's team; absent reads as `null` (ADR 0076). */
       email: z.string().max(320).nullable().optional(),
-      /** The platform's role, never a right in Impera (ADR 0076 § 3); absent reads as empty. */
-      role: z.string().max(64).optional(),
+      /** The platform's role, never a right in Impera (ADR 0076 § 3); absent or `null` reads as empty. */
+      role: z.string().max(64).nullable().optional(),
       isBot: z.boolean(),
       isExternal: z.boolean(),
       removedAt: z.iso.datetime({ offset: true }).nullable(),

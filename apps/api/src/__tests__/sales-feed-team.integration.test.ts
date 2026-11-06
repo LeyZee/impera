@@ -34,7 +34,7 @@ interface WireChatter {
   firstName: string;
   lastName: string;
   email: string | null;
-  role: string;
+  role: string | null;
   isBot: boolean;
   isExternal: boolean;
   removedAt: string | null;
@@ -67,6 +67,8 @@ const TEAM: readonly WireChatter[] = [
   account('chatter_presta', { firstName: 'Presta', lastName: 'Externe', isExternal: true }),
   account('chatter_new', { firstName: 'Nouveau', lastName: 'Venu', email: 'nouveau@recette.test' }),
   account('chatter_bot', { firstName: 'bot', lastName: '' }),
+  // Reveal sends no role for some accounts.
+  account('chatter_norole', { firstName: 'Sans', lastName: 'Rôle', role: null }),
 ];
 
 /** The ADR 0076 review of the platform's team, through the real app, FakeReveal's list replaced by the test's. */
@@ -82,10 +84,16 @@ describe('team imported from the platform after review (ADR 0076)', () => {
   let lea: TeamMemberId;
   let max: TeamMemberId;
   let listed: WireChatter[] = [...TEAM];
+  let listFails = false;
+  let listReads = 0;
 
-  /** FakeReveal, but `/v1/chatters` answers the list the test sets. */
+  /** FakeReveal, but `/v1/chatters` answers the list the test sets, or fails when it says so. */
   const fetchWith: SalesFeedFetch = async (url, init) => {
     if (new URL(url).pathname === '/v1/chatters') {
+      listReads += 1;
+      if (listFails) {
+        return { status: 503, headers: { get: () => 'text/plain' }, text: () => Promise.resolve('down') };
+      }
       const body = JSON.stringify({ data: listed });
       return { status: 200, headers: { get: () => 'application/json' }, text: () => Promise.resolve(body) };
     }
@@ -208,10 +216,11 @@ describe('team imported from the platform after review (ADR 0076)', () => {
       preselected: false,
     });
     // Every account but the API key's bot is new.
-    expect(overview.newCount).toBe(5);
+    expect(overview.newCount).toBe(6);
+    expect(rowOf(overview, 'chatter_norole')?.chatter.role).toBe('');
     expect(await test.admin.db.select().from(schema.salesFeedChatters)).toEqual([]);
     const counts = TeamImportCountsSchema.parse((await api('GET', '/team/counts', manager)).json());
-    expect(counts).toEqual({ newCount: 5, removalCount: 0, abnormalRead: false });
+    expect(counts).toEqual({ newCount: 6, removalCount: 0, abnormalRead: false });
   });
 
   it('lets a manager confirm the batch, never on his own record nor a provider to a member', async () => {
@@ -298,6 +307,54 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     expect(linked.statusCode).toBe(409);
   });
 
+  it('refuses a chatter before any reading of the platform, and an account no key links', async () => {
+    const before = listReads;
+    const batch = await api('POST', '/team/links', chatter, {
+      items: [{ platformChatterId: 'chatter_new', link: { kind: 'none' } }],
+    });
+    expect(batch.statusCode).toBe(403);
+    expect((await api('PUT', '/team/chatter_new/dismissal', chatter, { dismissed: true })).statusCode).toBe(
+      403,
+    );
+    expect(listReads).toBe(before);
+
+    const refused = await api('POST', '/team/links', owner, {
+      items: [
+        { platformChatterId: 'chatter_presta', link: { kind: 'agent' } },
+        { platformChatterId: 'chatter_new', link: { kind: 'member', memberId: newId(TeamMemberIdSchema) } },
+      ],
+    });
+    expect(refused.statusCode, refused.body).toBe(200);
+    expect(
+      TeamImportLinksResultSchema.parse(refused.json()).results.map((row) =>
+        row.ok ? 'ok' : row.error.kind,
+      ),
+    ).toEqual(['external_no_agent', 'member_unknown']);
+    const [presta] = await test.admin.db
+      .select()
+      .from(schema.salesFeedChatters)
+      .where(eq(schema.salesFeedChatters.platformChatterId, 'chatter_presta'));
+    expect(presta).toBeUndefined();
+  });
+
+  it('confirms nothing while the platform does not answer its list', async () => {
+    listFails = true;
+    try {
+      const response = await api('POST', '/team/links', owner, {
+        items: [{ platformChatterId: 'chatter_new', link: { kind: 'none' } }],
+      });
+      expect(response.statusCode, response.body).toBe(503);
+      expect(response.json()).toMatchObject({ error: { code: 'sales_feed_list_unavailable' } });
+    } finally {
+      listFails = false;
+    }
+    const [none] = await test.admin.db
+      .select()
+      .from(schema.salesFeedChatters)
+      .where(eq(schema.salesFeedChatters.platformChatterId, 'chatter_new'));
+    expect(none).toBeUndefined();
+  });
+
   it('makes a removal an alert as long as it lasts, and never believes an empty list', async () => {
     const counts = async () => TeamImportCountsSchema.parse((await api('GET', '/team/counts', owner)).json());
     listed = TEAM.map((one) =>
@@ -310,6 +367,16 @@ describe('team imported from the platform after review (ADR 0076)', () => {
       absent: false,
     });
     expect((await counts()).removalCount).toBe(1);
+    // `team` reads the same warning for the member's page, the manager too.
+    expect(await app.modules.connectors.teamRemovals(managerUser)).toEqual([
+      {
+        platform: 'reveal',
+        platformChatterId: 'chatter_lea',
+        memberId: lea,
+        removedAt: '2026-11-05T10:00:00.000Z',
+        absent: false,
+      },
+    ]);
 
     // Gone from the list after a believed reading: still one alert, its link kept.
     listed = TEAM.filter((one) => one.chatterId !== 'chatter_lea');
@@ -328,5 +395,20 @@ describe('team imported from the platform after review (ADR 0076)', () => {
     const returned = await overviewAs(owner);
     expect(rowOf(returned, 'chatter_lea')?.removal).toBeNull();
     expect(await counts()).toMatchObject({ removalCount: 0, abnormalRead: false });
+    expect(await app.modules.connectors.teamRemovals(managerUser)).toEqual([]);
+  });
+
+  it('does not believe an empty first reading when accounts are already linked', async () => {
+    await test.admin.db.delete(schema.salesFeedTeamReadings);
+    listed = [];
+    try {
+      await overviewAs(owner);
+      expect(TeamImportCountsSchema.parse((await api('GET', '/team/counts', owner)).json())).toMatchObject({
+        removalCount: 0,
+        abnormalRead: true,
+      });
+    } finally {
+      listed = [...TEAM];
+    }
   });
 });

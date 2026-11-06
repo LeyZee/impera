@@ -10,6 +10,7 @@ import {
   type TeamImportRow,
   type TeamImportSuggestion,
   type TeamMemberId,
+  type TeamPlatformRemoval,
 } from '@impera/contracts';
 
 /**
@@ -73,7 +74,11 @@ export function proposeFor(chatter: PlatformChatter, inputs: SuggestionInputs): 
       };
     }
   }
-  if (inputs.sessionChatterId !== null && chatter.platformChatterId === inputs.sessionChatterId) {
+  if (
+    !chatter.isExternal &&
+    inputs.sessionChatterId !== null &&
+    chatter.platformChatterId === inputs.sessionChatterId
+  ) {
     return { suggestion: { kind: 'agent', match: 'session' }, preselected: true };
   }
   if (chatter.isBot) return { suggestion: { kind: 'none' }, preselected: true };
@@ -91,7 +96,7 @@ export function proposeFor(chatter: PlatformChatter, inputs: SuggestionInputs): 
       preselected: named.length === 1,
     };
   }
-  if (inputs.sessionChatterId === null && isBotName(chatter)) {
+  if (!chatter.isExternal && inputs.sessionChatterId === null && isBotName(chatter)) {
     return { suggestion: { kind: 'agent', match: 'name' }, preselected: false };
   }
   if (!chatter.isExternal && chatter.email !== null) {
@@ -102,29 +107,34 @@ export function proposeFor(chatter: PlatformChatter, inputs: SuggestionInputs): 
 
 export interface RowRights {
   readonly chatter: PlatformChatter;
-  /** The member the account is linked to now, `null` when none. */
-  readonly linkedMemberId: TeamMemberId | null;
-  readonly dismissed: boolean;
+  /** The link in place, `null` when none. */
+  readonly link: TeamLink | null;
+  /** The platform lists the account now; a linked account it no longer lists can only lose its link. */
+  readonly listed: boolean;
 }
 
 /**
- * What a viewer may do on a row (ADR 0076 § 2, § 3, § 4). The owner does everything but invite a provider. A manager
- * does nothing on a row linked to his own record, never links a provider to a member, and invites only an agency
- * member with an e-mail; the server checks again on each write, whatever the screen sent.
+ * What a viewer may do on a row (ADR 0076 § 2, § 3, § 4). The owner does everything but invite a provider or give it to
+ * the agent. A manager does nothing on a row linked to his own record and never links a provider to a member. Only a
+ * row with no link at all is invited or dismissed. A linked account the platform no longer lists can only be set to
+ * « Personne ». The server checks again on each write, whatever the screen sent.
  */
 export function actionsFor(row: RowRights, viewer: TeamImportViewer): TeamImportAction[] {
-  if (viewer.kind === 'manager' && row.linkedMemberId === viewer.memberId) return [];
+  if (viewer.kind === 'manager' && row.link?.kind === 'member' && row.link.memberId === viewer.memberId)
+    return [];
+  if (!row.listed) return row.link === null ? [] : ['link_none'];
+  const external = row.chatter.isExternal;
   const actions: TeamImportAction[] = [];
-  if (viewer.kind === 'owner' || !row.chatter.isExternal) actions.push('link_member');
-  actions.push('link_agent', 'link_none');
-  if (row.linkedMemberId === null && !row.chatter.isExternal && row.chatter.email !== null) {
-    actions.push('invite');
-  }
-  if (row.linkedMemberId === null) actions.push('dismiss');
+  if (viewer.kind === 'owner' || !external) actions.push('link_member');
+  // A provider's account is linked to a member or to nobody, never to the agent (§ 2).
+  if (!external) actions.push('link_agent');
+  actions.push('link_none');
+  if (row.link === null && !external && row.chatter.email !== null) actions.push('invite');
+  if (row.link === null) actions.push('dismiss');
   return actions;
 }
 
-export type LinkRefusal = 'own_link' | 'external_owner_only';
+export type LinkRefusal = 'own_link' | 'external_owner_only' | 'external_no_agent';
 
 /**
  * Whether a viewer may move an account's link from `before` to `after` (ADR 0076 § 2, § 4): `null` when he may. The
@@ -136,6 +146,8 @@ export function linkRefusal(
   before: TeamMemberId | null,
   after: { readonly kind: 'member'; readonly memberId: string } | { readonly kind: 'agent' | 'none' },
 ): LinkRefusal | null {
+  // A provider's account never goes to the agent, whoever asks (§ 2): its sales are not the agent's.
+  if (after.kind === 'agent' && chatter.isExternal) return 'external_no_agent';
   if (viewer.kind === 'owner') return null;
   if (before === viewer.memberId) return 'own_link';
   if (after.kind === 'member' && after.memberId === viewer.memberId) return 'own_link';
@@ -218,7 +230,7 @@ export function teamImportOverview(context: TeamImportContext, live: LiveTeam): 
     live.chatters === null
       ? []
       : [...context.links.keys()].filter((id) => !seen.has(id)).map((id) => goneChatter(id));
-  const rows = [...listed, ...gone].map((chatter) => rowOf(chatter, context, live, members));
+  const rows = [...listed, ...gone].map((chatter) => rowOf(chatter, context, live, members, seen));
   return {
     rows,
     newCount: rows.filter(
@@ -236,6 +248,7 @@ function rowOf(
   context: TeamImportContext,
   live: LiveTeam,
   members: ReadonlyMap<TeamMemberId, ReviewedMember>,
+  seen: ReadonlySet<string>,
 ): TeamImportRow {
   const id = chatter.platformChatterId;
   const link = context.links.get(id);
@@ -273,10 +286,7 @@ function rowOf(
     dismissedAt: dismissed ? (review.decidedAt?.toISOString() ?? null) : null,
     suggestion: proposal?.suggestion ?? null,
     preselected: proposal?.preselected ?? false,
-    actions: actionsFor(
-      { chatter, linkedMemberId: link?.kind === 'member' ? link.memberId : null, dismissed },
-      context.viewer,
-    ),
+    actions: actionsFor({ chatter, link: link ?? null, listed: seen.has(id) }, context.viewer),
     models,
     modelGap: {
       inImperaOnly:
@@ -315,6 +325,10 @@ export interface TeamLinkRequest {
 
 /** The review's base, each call in the viewer's own `withMember`; `null` (or `forbidden`) for anyone but the owner or an active manager. */
 export interface TeamImportStore {
+  /** Who reads the review, checked before the platform is asked or anything is written; `null` for anyone else. */
+  viewer(userId: string): Promise<TeamImportViewer | null>;
+  /** Each active member linked to an account removed or gone on a platform (§ 5), for Équipe; empty for anyone else. */
+  removals(userId: string): Promise<TeamPlatformRemoval[]>;
   context(userId: string, platform: Platform): Promise<TeamImportContext | null>;
   /** What a successful reading of the list saw (§ 5): each account's state, the absent ones, and the reading believed or not. */
   recordReading(platform: Platform, listed: readonly PlatformChatter[], now: Date): Promise<void>;

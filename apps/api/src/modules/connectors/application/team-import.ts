@@ -7,9 +7,10 @@ import type {
   TeamImportLinksResult,
   TeamImportOverview,
   TeamImportRowErrorKind,
+  TeamPlatformRemoval,
 } from '@impera/contracts';
 
-import { SalesFeedTeamForbidden, SalesFeedTeamLinked } from '../domain/errors';
+import { SalesFeedTeamForbidden, SalesFeedTeamLinked, SalesFeedTeamListUnavailable } from '../domain/errors';
 import type { Clock } from '../domain/ports';
 import { errorKindOf, type PlatformSalesFeed } from '../domain/sales-feed';
 import {
@@ -42,11 +43,14 @@ export interface TeamImport {
   ): Promise<TeamImportOverview>;
   /** What a successful reading of the list saw, kept for the badges and the removal alerts (§ 5, § 6). */
   recordReading(platform: Platform, feed: PlatformSalesFeed): Promise<void>;
+  /** Each active member linked to an account removed or gone on a platform (§ 5): Équipe shows them. */
+  removals(userId: string): Promise<TeamPlatformRemoval[]>;
 }
 
 const ROW_ERRORS: Readonly<Record<TeamImportRowErrorKind, string>> = {
   own_link: 'Le lien vers ta propre fiche est au propriétaire',
   external_owner_only: 'Relier le compte d’un prestataire à un membre est réservé au propriétaire',
+  external_no_agent: 'Le compte d’un prestataire se relie à un membre ou à personne, jamais à l’agent',
   not_listed: 'Ce compte n’est plus dans la liste de la plateforme',
   member_unknown: 'Ce membre n’existe pas ou est parti',
 };
@@ -57,7 +61,13 @@ export const teamLinkOf = (link: LinkSalesFeedChatterBody): TeamLinkRequest['lin
 export function createTeamImport(deps: TeamImportDeps): TeamImport {
   const { store, clock } = deps;
 
+  /** The owner or an active manager, checked before the platform is asked or anything is written (§ 8). */
+  async function allowed(userId: string): Promise<void> {
+    if ((await store.viewer(userId)) === null) throw new SalesFeedTeamForbidden();
+  }
+
   async function read(platform: Platform, userId: string): Promise<TeamImportOverview> {
+    await allowed(userId);
     const { feed, error } = await deps.live(platform);
     let live: LiveTeam = { chatters: null, handles: new Map(), listError: error, sessionChatterId: null };
     if (feed !== null) {
@@ -87,12 +97,16 @@ export function createTeamImport(deps: TeamImportDeps): TeamImport {
     },
 
     async link(platform, userId, body) {
+      await allowed(userId);
       const { feed } = await deps.live(platform);
       const listed = feed === null ? null : await feed.listChatters();
-      const live = new Map(
-        listed?.ok === true ? listed.value.map((chatter) => [chatter.platformChatterId, chatter]) : [],
+      // Without the live list, nothing says whether an account is a provider's: the batch waits for it (503).
+      if (listed?.ok !== true) throw new SalesFeedTeamListUnavailable();
+      const live = new Map(listed.value.map((chatter) => [chatter.platformChatterId, chatter]));
+      // An account the platform no longer lists can still lose its link (« Personne »), never get one.
+      const known = body.items.filter(
+        (item) => live.has(item.platformChatterId) || item.link.kind === 'none',
       );
-      const known = body.items.filter((item) => live.has(item.platformChatterId));
       const outcomes = await store.link(
         userId,
         platform,
@@ -120,11 +134,14 @@ export function createTeamImport(deps: TeamImportDeps): TeamImport {
     },
 
     async dismiss(platform, userId, platformChatterId, dismissed) {
+      await allowed(userId);
       const done = await store.dismiss(userId, platform, platformChatterId, dismissed);
       if (done === 'forbidden') throw new SalesFeedTeamForbidden();
       if (done === 'linked') throw new SalesFeedTeamLinked();
       return read(platform, userId);
     },
+
+    removals: (userId) => store.removals(userId),
 
     async recordReading(platform, feed) {
       const chatters = await feed.listChatters();

@@ -4,10 +4,12 @@ import {
   AuditEntryIdSchema,
   CreatorIdSchema,
   newId,
+  PlatformSchema,
   TeamMemberIdSchema,
   type Platform,
   type TeamImportCounts,
   type TeamMemberId,
+  type TeamPlatformRemoval,
 } from '@impera/contracts';
 import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
@@ -160,6 +162,44 @@ async function linkIn(
  */
 export function createDrizzleTeamImportStore(db: Database): TeamImportStore {
   return {
+    viewer: (userId) => withMember(db, userId, (tx, scope) => viewerIn(tx, userId, scope)),
+
+    removals: (userId) =>
+      withMember(db, userId, async (tx, scope): Promise<TeamPlatformRemoval[]> => {
+        if ((await viewerIn(tx, userId, scope)) === null) return [];
+        const rows = await tx
+          .select({
+            platform: reviews.platform,
+            platformChatterId: reviews.platformChatterId,
+            memberId: chatters.memberId,
+            removedAt: reviews.platformRemovedAt,
+            absentSince: reviews.absentSince,
+          })
+          .from(reviews)
+          .innerJoin(
+            chatters,
+            and(
+              eq(chatters.platform, reviews.platform),
+              eq(chatters.platformChatterId, reviews.platformChatterId),
+            ),
+          )
+          .innerJoin(schema.teamMembers, eq(schema.teamMembers.id, chatters.memberId))
+          .where(
+            and(
+              sql`${schema.teamMembers.status} <> 'left'`,
+              sql`(${reviews.platformRemovedAt} is not null or ${reviews.absentSince} is not null)`,
+            ),
+          )
+          .orderBy(reviews.platform, reviews.platformChatterId);
+        return rows.map((row) => ({
+          platform: PlatformSchema.parse(row.platform),
+          platformChatterId: row.platformChatterId,
+          memberId: TeamMemberIdSchema.parse(row.memberId),
+          removedAt: row.removedAt?.toISOString() ?? null,
+          absent: row.absentSince !== null,
+        }));
+      }),
+
     context: (userId, platform) =>
       withMember(db, userId, async (tx, scope): Promise<TeamImportContext | null> => {
         const viewer = await viewerIn(tx, userId, scope);
@@ -246,7 +286,13 @@ export function createDrizzleTeamImportStore(db: Database): TeamImportStore {
         // One reading at a time per platform: the previous count decides whether this one is believed.
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`sales_feed_team:${platform}`}))`);
         const [previous] = await tx.select().from(readings).where(eq(readings.platform, platform));
-        const abnormal = isAbnormalReading(listed.length, previous?.listed ?? 0);
+        // The first reading has no count before it: the accounts already linked stand for it, so that a first list
+        // that comes back empty is not believed and puts no linked member in alert (relecture Extension de #626).
+        const [linkedBefore] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(chatters)
+          .where(eq(chatters.platform, platform));
+        const abnormal = isAbnormalReading(listed.length, previous?.listed ?? linkedBefore?.count ?? 0);
         for (const chatter of listed) {
           const seen = {
             platformRemovedAt: chatter.removedAt === null ? null : new Date(chatter.removedAt),

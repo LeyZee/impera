@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { PlatformSchema } from './enums';
 import { CreatorIdSchema, TeamMemberIdSchema } from './ids';
 import {
   LinkSalesFeedChatterBodySchema,
@@ -57,6 +58,16 @@ export const TeamImportRemovalSchema = z.object({
   absent: z.boolean(),
 });
 export type TeamImportRemoval = z.infer<typeof TeamImportRemovalSchema>;
+
+/**
+ * A member's removal as Équipe shows it (§ 5: a pastille on his line of Membres, an amber line on his card): the
+ * platform's account it comes from, read by the connectors module for the owner and the active managers.
+ */
+export const TeamPlatformRemovalSchema = TeamImportRemovalSchema.extend({
+  platform: PlatformSchema,
+  platformChatterId: z.string().min(1),
+});
+export type TeamPlatformRemoval = z.infer<typeof TeamPlatformRemovalSchema>;
 
 export const TeamImportRowSchema = z.object({
   chatter: PlatformChatterSchema,
@@ -123,6 +134,8 @@ export const TeamImportRowErrorKindSchema = z.enum([
   'own_link',
   /** A provider's account (`isExternal`) linked to a member: the owner's (§ 2, « ok prestataire-proprio »). */
   'external_owner_only',
+  /** A provider's account given to the agent: it is linked to a member or to nobody (§ 2). */
+  'external_no_agent',
   /** No longer in the platform's list. */
   'not_listed',
   /** No such team member, or one who left. */

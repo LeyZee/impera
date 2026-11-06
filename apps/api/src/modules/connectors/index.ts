@@ -1,4 +1,4 @@
-import type { ConnectionService, ConnectionSignal, JobPayload } from '@impera/contracts';
+import type { ConnectionService, ConnectionSignal, JobPayload, TeamPlatformRemoval } from '@impera/contracts';
 import type { Database, EncryptionKey } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -146,6 +146,11 @@ export interface ConnectorsModule {
    * transaction, under the policies of migration 0132.
    */
   readonly invitationChatterLinks: typeof invitationChatterLinks;
+  /**
+   * The members still in the team whose platform account was removed or is absent from the list (ADR 0076 § 5), as
+   * this viewer may see them: `team` shows the warning on the member's page. Read from the base, never the platform.
+   */
+  readonly teamRemovals: (userId: string) => Promise<TeamPlatformRemoval[]>;
   /** `/v1/webhooks/sales-feeds/:platform`: public, each delivery checked against its webhook's secret. */
   readonly salesFeedDeliveryRoutes: FastifyPluginAsyncZod;
 }
@@ -251,6 +256,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (guard) => createSalesFeedTeamRoutes(salesFeeds.team, guard),
     invitationChatterLinks,
+    teamRemovals: (userId) => salesFeeds.team.removals(userId),
     salesFeedDeliveryRoutes: createSalesFeedDeliveryRoutes(salesFeeds),
   };
 }

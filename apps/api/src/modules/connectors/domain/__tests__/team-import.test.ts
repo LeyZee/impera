@@ -121,29 +121,50 @@ describe('proposeFor', () => {
 
 describe('actionsFor', () => {
   const manager = { kind: 'manager', memberId: MANAGER } as const;
+  const lea = { kind: 'member', memberId: LEA } as const;
 
   it('gives the owner every action on an agency member without a link', () => {
-    expect(
-      actionsFor({ chatter: chatter(), linkedMemberId: null, dismissed: false }, { kind: 'owner' }),
-    ).toEqual(['link_member', 'link_agent', 'link_none', 'invite', 'dismiss']);
+    expect(actionsFor({ chatter: chatter(), link: null, listed: true }, { kind: 'owner' })).toEqual([
+      'link_member',
+      'link_agent',
+      'link_none',
+      'invite',
+      'dismiss',
+    ]);
   });
 
   it('gives a manager nothing on a row linked to his own record', () => {
-    expect(actionsFor({ chatter: chatter(), linkedMemberId: MANAGER, dismissed: false }, manager)).toEqual(
-      [],
-    );
+    expect(
+      actionsFor({ chatter: chatter(), link: { kind: 'member', memberId: MANAGER }, listed: true }, manager),
+    ).toEqual([]);
   });
 
-  it('keeps a provider’s link to a member for the owner', () => {
+  it('never offers the agent for a provider, and keeps his link to a member for the owner', () => {
     const external = chatter({ isExternal: true, email: null });
-    expect(actionsFor({ chatter: external, linkedMemberId: null, dismissed: false }, manager)).toEqual([
-      'link_agent',
+    expect(actionsFor({ chatter: external, link: null, listed: true }, manager)).toEqual([
       'link_none',
       'dismiss',
     ]);
-    expect(
-      actionsFor({ chatter: external, linkedMemberId: null, dismissed: false }, { kind: 'owner' }),
-    ).toContain('link_member');
+    expect(actionsFor({ chatter: external, link: null, listed: true }, { kind: 'owner' })).toEqual([
+      'link_member',
+      'link_none',
+      'dismiss',
+    ]);
+  });
+
+  it('neither invites nor sets aside an account already linked, to the agent or a member', () => {
+    for (const link of [{ kind: 'agent' } as const, lea]) {
+      const actions = actionsFor({ chatter: chatter(), link, listed: true }, { kind: 'owner' });
+      expect(actions).not.toContain('invite');
+      expect(actions).not.toContain('dismiss');
+    }
+  });
+
+  it('only unlinks an account gone from the list, and offers nothing on one never linked', () => {
+    expect(actionsFor({ chatter: chatter(), link: lea, listed: false }, { kind: 'owner' })).toEqual([
+      'link_none',
+    ]);
+    expect(actionsFor({ chatter: chatter(), link: null, listed: false }, { kind: 'owner' })).toEqual([]);
   });
 });
 
@@ -159,6 +180,12 @@ describe('linkRefusal', () => {
   it('refuses a manager a link to his own record, and moving one away from it', () => {
     expect(linkRefusal(manager, chatter(), null, { kind: 'member', memberId: MANAGER })).toBe('own_link');
     expect(linkRefusal(manager, chatter(), MANAGER, { kind: 'none' })).toBe('own_link');
+  });
+
+  it('never links a provider to the agent, not even for the owner', () => {
+    const external = chatter({ isExternal: true });
+    expect(linkRefusal({ kind: 'owner' }, external, null, { kind: 'agent' })).toBe('external_no_agent');
+    expect(linkRefusal(manager, external, null, { kind: 'agent' })).toBe('external_no_agent');
   });
 
   it('refuses a manager a provider linked to a member, not set to nobody', () => {
