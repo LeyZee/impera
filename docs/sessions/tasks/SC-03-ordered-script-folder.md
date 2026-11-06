@@ -13,12 +13,12 @@ ADR 0056 (§ 5 et § 7), ADR 0044 § 2 (effacement), le stockage objet de CR-06.
 ## À faire
 - [x] Domaine pur (lot a, `content-drops/domain/script-naming.ts`) : nom de dossier `S<nnn>-<moment>-<thème>`, nom de fichier `<pp>-<code>-<ii>-<sorte>.<ext>`, slug ASCII ; test : l'ordre alphabétique égale l'ordre du script pour des structures avec ponts et variantes.
 - [x] Numéro de script sans trou par créatrice, donné à l'envoi (lot b, migration 0128).
-- [x] Le moment d'une structure « les deux » : « ok alternance » le 06/11 (lot c2a, migration 0131).
+- [x] Le moment d'une structure « les deux » : « ok alternance » le 06/11 (lot c2a, migration 0130).
 - [x] Cartons PNG en `00` de chaque série (lot c1) ; toujours mis pour l'instant.
 - [ ] Le réglage par créatrice des cartons dans le dossier (activé par défaut).
 - [x] Export ZIP dans l'ordre, en flux, et fiche à recopier (étapes, intentions, séries et fichiers) (lot c1, `GET /v1/creators/:creatorId/drops/:id/script-export`).
 - [ ] Textes validés (SC-05) et prix de la grille (P6-01) dans la fiche.
-- [x] Export confirmé par l'équipe, qui fait partir les 30 jours (lot c2a, migration 0131).
+- [x] Export confirmé par l'équipe, qui fait partir les 30 jours (lot c2a, migration 0130).
 - [ ] L'écran de l'agence : télécharger, cocher la fiche, confirmer (lot c2b, captures avant fusion).
 
 ## Critères d'acceptation
