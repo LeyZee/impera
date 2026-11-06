@@ -750,6 +750,13 @@
       "when": 1793932376255,
       "tag": "0122_script_drop_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1793940598374,
+      "tag": "0123_telegram_private_links",
+      "breakpoints": true
     }
   ]
 }

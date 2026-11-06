@@ -6,14 +6,19 @@ import type {
   Clock,
   DeliveriesStore,
   NotificationChannel,
+  PrivateLinksStore,
   UpdatesBatch,
 } from '../domain/ports';
+
+import { applyStart } from './private-link';
 
 export interface PollDeps {
   readonly bots: BotsStore;
   readonly deliveries: DeliveriesStore;
   readonly channel: NotificationChannel;
   readonly clock: Clock;
+  /** ADR 0068 § 4: without it, a `/start <code>` is read past like any other message. */
+  readonly privateLinks?: PrivateLinksStore;
 }
 
 /** The long poll while the screen waits for the bot to enter a group (ADR 0020 §6). */
@@ -21,7 +26,7 @@ export const LISTEN_SECONDS = 20;
 
 /**
  * `telegram.poll_updates`, in the serial queue of the bot: one reader per token, so our own jobs never cut each
- * other off (409). Reads only membership facts: the bot never acts on a message (ADR 0020 §13).
+ * other off (409). Reads membership facts; the one message it acts on is `/start <code>` in private (ADR 0068 § 4, ADR 0020 §13).
  */
 export async function pollBot(deps: PollDeps, botId: TelegramBotId, waitSeconds: number): Promise<void> {
   const bot = await deps.bots.findBot(botId);
@@ -44,7 +49,14 @@ export async function pollBot(deps: PollDeps, botId: TelegramBotId, waitSeconds:
         return;
     }
   }
-  await deps.bots.applyUpdates(bot.id, foldUpdates(bot.updatesOffset, result.value), deps.clock.now());
+  const batch = foldUpdates(bot.updatesOffset, result.value);
+  // Before the offset moves: a crash in between reads the code again, already taken, rather than losing the link.
+  if (deps.privateLinks !== undefined) {
+    const links = { ...deps, privateLinks: deps.privateLinks };
+    const token = bot.token;
+    for (const start of batch.starts) await applyStart(links, { ...bot, token }, start);
+  }
+  await deps.bots.applyUpdates(bot.id, batch, deps.clock.now());
 }
 
 /** Folds a batch, in order: the latest fact about a group wins. Private chats are not groups and are dropped. */
@@ -53,6 +65,7 @@ export function foldUpdates(offset: number, updates: readonly ChannelUpdate[]): 
   const chats = new Map<string, UpdatesBatch['chats'][number]>();
   const migrations: { fromChatId: string; toChatId: string }[] = [];
   const titles = new Map<string, string>();
+  const starts: { telegramChatId: string; code: string }[] = [];
   for (const update of updates) {
     nextOffset = Math.max(nextOffset, update.updateId + 1);
     switch (update.kind) {
@@ -72,6 +85,9 @@ export function foldUpdates(offset: number, updates: readonly ChannelUpdate[]): 
       case 'title':
         titles.set(update.telegramChatId, update.title);
         break;
+      case 'start':
+        starts.push({ telegramChatId: update.telegramChatId, code: update.code });
+        break;
       case 'other':
         break;
     }
@@ -81,6 +97,7 @@ export function foldUpdates(offset: number, updates: readonly ChannelUpdate[]): 
     chats: [...chats.values()],
     migrations,
     titles: [...titles].map(([telegramChatId, title]) => ({ telegramChatId, title })),
+    starts,
   };
 }
 
