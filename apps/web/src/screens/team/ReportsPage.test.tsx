@@ -578,6 +578,7 @@ describe('Équipe › Rapports', () => {
     expect(alert.textContent).toContain('Correction non envoyée');
     fireEvent.click(within(alert).getByRole('button', { name: 'Rouvrir' }));
     const again = await screen.findByRole('dialog', { name: 'Corriger le rapport de Théo' });
-    expect(within(again).getByDisplayValue('-20')).toBeTruthy();
+    // Typed « -20 », kept with the true minus sign the field writes (captures of #591).
+    expect(within(again).getByDisplayValue('−20')).toBeTruthy();
   });
 });

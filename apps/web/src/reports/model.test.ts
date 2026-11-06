@@ -115,7 +115,7 @@ describe('an amount typed in a report', () => {
 
   it('shows back what was typed, and reads in its currency', () => {
     expect(amountInput(123_456)).toBe('1234,56');
-    expect(amountInput(-3_005)).toBe('-30,05');
+    expect(amountInput(-3_005)).toBe('−30,05');
     expect(plain(amountText(123_456, 'EUR'))).toBe('1 234,56 €');
     expect(plain(amountText(8_000, 'USD'))).toBe('80,00 $US');
     expect(plain(amountText(-3_000, 'EUR'))).toBe('−30,00 €');

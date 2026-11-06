@@ -8,6 +8,11 @@ Fait :
 - Écran : sous le montant de « Faire mon rapport », une ligne calme « Ta commission estimée : 8,03 € · avant paliers, objectifs, primes et malus ». Pour une correction, « Effet estimé sur ta commission : −0,80 € ». Quand l'agence corrige, la ligne porte le nom du membre. Le montant est demandé après 300 ms sans frappe. La dernière réponse reste affichée tant que la suivante n'est pas arrivée. Rien ne s'affiche sur un montant invalide, sur `null` ou sur une erreur.
 - Relecture de #553 (optionnel) : fermer le panneau ouvert depuis la fiche d'un shift dans Équipe › Planning ramène sur la fiche.
 - Le panneau s'intitule « Corriger mon rapport » dès « Ajouter une correction », plus seulement quand une correction est rouverte (vu sur les captures).
+- Défauts des captures de #591, corrigés le 06/11 :
+  - le champ d'une correction écrit le vrai signe moins (« −15 »), comme son aide et l'estimation ;
+  - l'estimation met toujours sa réserve (« avant paliers… ») sur sa propre ligne, rapport comme correction ;
+  - la carte « Signaler un incident » a un fond discret à elle, visible en Jour ;
+  - les notes (`.sc-note`, partout dans Équipe) n'ont plus la poignée native.
 
 Décisions :
 

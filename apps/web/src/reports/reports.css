@@ -119,12 +119,12 @@
 .rp-amount[data-invalid='true'] .rp-amount__input {
   box-shadow: inset 0 0 0 1.5px var(--nv-warning);
 }
-/* What the amount brings (reco 19): one quiet line under the hint, the figure in ink, the caveat after it. */
+/* What the amount brings (reco 19), under the hint: the figure in ink, then the caveat on its own line, whatever the
+ * width, so a report and a correction take one shape (captures of #591). */
 .rp-estimate {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: var(--nv-space-2);
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
@@ -143,14 +143,15 @@
   gap: var(--nv-space-3);
   padding: var(--nv-space-3) var(--nv-space-4);
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  /* A discreet ground of its own: the glass fill vanishes on a dialog in Jour (captures of #591). */
+  background: var(--nv-fill-soft);
   transition: background-color var(--nv-dur-base) var(--nv-ease-out);
 }
 .rp-incident:hover {
-  background: var(--nv-plate-hover);
+  background: var(--nv-fill-track);
 }
 .rp-incident[data-on='true'] {
-  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-glass-fill));
+  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-fill-soft));
 }
 .rp-incident__row {
   display: flex;

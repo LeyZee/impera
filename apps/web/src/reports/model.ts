@@ -84,9 +84,9 @@ export function estimateLine(
 /** What the estimate leaves to the statement, said beside it. */
 export const ESTIMATE_LEAVES = 'avant paliers, objectifs, primes et malus';
 
-/** The figure an amount field shows back, without its currency: « 1234,56 ». */
+/** The figure an amount field shows back, without its currency: « 1234,56 », « −30,05 » with the true minus sign. */
 export const amountInput = (minor: number): string =>
-  `${minor < 0 ? '-' : ''}${String(Math.trunc(Math.abs(minor) / 100))},${String(Math.abs(minor) % 100).padStart(2, '0')}`;
+  `${minor < 0 ? '−' : ''}${String(Math.trunc(Math.abs(minor) / 100))},${String(Math.abs(minor) % 100).padStart(2, '0')}`;
 
 /** The symbol beside an amount field. */
 export const CURRENCY_SIGNS: Readonly<Record<Currency, string>> = { EUR: '€', USD: '$' };

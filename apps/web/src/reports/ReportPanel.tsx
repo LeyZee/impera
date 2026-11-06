@@ -546,7 +546,8 @@ function Form({
             aria-invalid={touched && amountProblem !== null}
             aria-describedby={`${id}-amount-hint`}
             onChange={(event) => {
-              setAmount(event.target.value);
+              // The true minus sign, as in the hint and the estimate: « −15 », never « -15 » (captures of #591).
+              setAmount(event.target.value.replace(/-/gu, '−'));
             }}
             onBlur={() => {
               if (amount !== '') setTouched(true);

@@ -506,4 +506,20 @@ describe('Mes rapports', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Ajouter une correction' }));
     expect(await screen.findByRole('dialog', { name: 'Corriger mon rapport' })).toBeTruthy();
   });
+
+  it('writes the true minus sign in a correction, as its hint and its estimate do (captures of #591)', async () => {
+    served.reports = [report({ status: 'validated', reviewedAt: '2026-10-26T08:00:00.000Z' })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Mon rapport' })).getByRole('button', {
+        name: 'Ajouter une correction',
+      }),
+    );
+    const correcting = await screen.findByRole('dialog', { name: 'Corriger mon rapport' });
+    const amount = within(correcting).getByLabelText('À ajouter ou retirer');
+    fireEvent.change(amount, { target: { value: '-15' } });
+    expect(amount).toHaveProperty('value', '−15');
+  });
 });
