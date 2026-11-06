@@ -11,6 +11,8 @@ Le bouton PDF d'une facture est `aria-disabled` pendant sa lecture et une fois s
 
 Le pli « 1 congé à valider » d'Équipe › Planning s'ouvre de nouveau en colonne : le résumé en haut, les congés dessous. Il portait `.sc-decide`, que #546 a donné ensuite à « À décider » sur l'Aujourd'hui de la créatrice, une ligne flexible qui posait le résumé à côté des congés et les coupait sur téléphone. Il prend sa propre classe, `.sc-fold--decide`.
 
+« Attribuer un régime » (dossier d'un membre) propose les régimes de son pays en puces, jusqu'à cinq, comme le veut le design system (`nv-chip` pour quelques choix, `Select` au-delà). Au-delà de cinq, la liste d'Extension (#566) reste. Le mot sous les puces commence par une majuscule, puisque c'est une phrase à lui seul. Un choix refait ne tire pas de nouvelle clé d'idempotence.
+
 Pas fait : rien.
 
 Décisions : un état se dit par une pastille, un mot ou un anneau, jamais par un bord coloré. Deux traits restent, parce qu'ils ne portent ni couleur ni état : le trait neutre de la citation (« Désignation de la prestation ») et les filets neutres des étapes d'une facture.
@@ -20,5 +22,5 @@ Découvertes : quand l'agent répond aussi pendant un shift, un trait violet de 
 Candidats à suppression : aucun ; le banc de captures de `.scratch/` reste jusqu'à la dernière PR de la série.
 
 Vérifié :
-- tests : `MyInvoicesPage` (focus gardé, `aria-disabled` sans `disabled`, un clic sur un PDF perdu ne relit rien), `MyFilePage`, `LegalCards`, `PlanningPage` (le pli des congés n'a jamais `.sc-decide`) ;
+- tests : `MyInvoicesPage` (focus gardé, `aria-disabled` sans `disabled`, un clic sur un PDF perdu ne relit rien), `MyFilePage`, `LegalCards`, `PlanningPage` (le pli des congés n'a jamais `.sc-decide`), `MemberFilePage` (deux régimes en puces, six dans la liste) ;
 - captures Nuit et Jour, ordinateur et téléphone, dans `/mnt/project-files/recette/2026-11-05/corrections/equipe/pastilles-seulement/`.
