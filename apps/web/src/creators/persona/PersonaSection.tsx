@@ -18,6 +18,7 @@ import {
 
 import { SaveBar, useOnScreen } from '../SaveBar';
 
+import { CorrectionsPanel } from './CorrectionsPanel';
 import {
   InDepthTab,
   IntimateTab,
@@ -77,6 +78,7 @@ export function PersonaSection({
   creatorId,
   canSave,
   isOwner = false,
+  readsCorrections = false,
   timezone,
   creatorName = null,
   onDirty = ignore,
@@ -87,6 +89,8 @@ export function PersonaSection({
   canSave: boolean;
   /** Only the owner reaches Heures d'activité and Réglages: the others read where a setting lives, without a link. */
   isOwner?: boolean;
+  /** The owner and an active manager read the corrections she proposed (CREA-01 b); the owner marks them handled. */
+  readsCorrections?: boolean;
   timezone: string | null;
   /** Her name in Impera, which a persona not written yet takes as its first name. */
   creatorName?: string | null;
@@ -126,6 +130,8 @@ export function PersonaSection({
       creatorId={creatorId}
       canSave={canSave}
       isOwner={isOwner}
+      readsCorrections={readsCorrections}
+      creatorName={creatorName}
       timezone={timezone}
       notice={notice}
       tab={tab}
@@ -164,6 +170,8 @@ function Editor({
   creatorId,
   canSave,
   isOwner,
+  readsCorrections,
+  creatorName,
   timezone,
   notice,
   tab,
@@ -178,6 +186,8 @@ function Editor({
   creatorId: string | null;
   canSave: boolean;
   isOwner: boolean;
+  readsCorrections: boolean;
+  creatorName: string | null;
   timezone: string | null;
   notice: string | null;
   tab: TabId;
@@ -437,6 +447,16 @@ function Editor({
             }}
             onCancel={() => {
               setReauth(false);
+            }}
+          />
+        ) : null}
+        {creatorId !== null && readsCorrections ? (
+          <CorrectionsPanel
+            creatorId={creatorId}
+            creatorName={creatorName}
+            canMark={isOwner}
+            onShowSection={(section) => {
+              select(tabOf(section));
             }}
           />
         ) : null}
