@@ -258,6 +258,34 @@ export interface UpdatesBatch {
   readonly migrations: readonly { readonly fromChatId: string; readonly toChatId: string }[];
   /** A group renamed: only the title of a group already known changes. */
   readonly titles: readonly { readonly telegramChatId: string; readonly title: string }[];
+  /** `/start <code>` in private chats, in order (ADR 0068 § 4); applied apart, before the offset moves. */
+  readonly starts: readonly { readonly telegramChatId: string; readonly code: string }[];
+}
+
+/** An account's private chat with a bot (ADR 0068 § 4), for its reset link alone. */
+interface PrivateLink {
+  readonly botId: TelegramBotId;
+  readonly telegramChatId: string;
+  readonly linkedAt: Date;
+}
+
+/** The private links and their one-time codes, as the admin role (ADR 0068 § 4); each change writes `audit_log`. */
+export interface PrivateLinksStore {
+  /** Replaces the account's pending code by this one (its SHA-256 alone), valid until `expiresAt`. */
+  issueCode(userId: string, codeHash: string, expiresAt: Date): Promise<void>;
+  /**
+   * In one transaction: takes the code (gone whatever happens next) and, if it was still valid at `now`, links its
+   * account to this chat of this bot, replacing an earlier link. The account, or null for a code unknown or expired.
+   */
+  claimCode(
+    codeHash: string,
+    botId: TelegramBotId,
+    telegramChatId: string,
+    now: Date,
+  ): Promise<string | null>;
+  findLink(userId: string): Promise<PrivateLink | null>;
+  /** False when the account had no link. */
+  removeLink(userId: string): Promise<boolean>;
 }
 
 export type ChannelFailure =
@@ -294,6 +322,13 @@ export type ChannelUpdate =
       readonly updateId: number;
       readonly telegramChatId: string;
       readonly title: string;
+    }
+  | {
+      /** `/start <code>` in a private chat (ADR 0068 § 4): the only message the bot acts on. */
+      readonly kind: 'start';
+      readonly updateId: number;
+      readonly telegramChatId: string;
+      readonly code: string;
     }
   | { readonly kind: 'other'; readonly updateId: number };
 
