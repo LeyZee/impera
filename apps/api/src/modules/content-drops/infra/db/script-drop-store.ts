@@ -1,4 +1,11 @@
-import { AuditEntryIdSchema, kindOfMime, newId, slotLengths, type ContentDrop } from '@impera/contracts';
+import {
+  AuditEntryIdSchema,
+  kindOfMime,
+  newId,
+  ShotMomentSchema,
+  slotLengths,
+  type ContentDrop,
+} from '@impera/contracts';
 import {
   and,
   eq,
@@ -25,12 +32,12 @@ import { follow, pgErrorOf, readDrop, readRequest, viewOf } from './store';
 
 const { contentDropFiles, contentDrops } = schema;
 
-/** The frozen version her drop shoots: its request's (SC-02 lot a). */
-async function versionOf(tx: Transaction, requestId: string | null): Promise<string> {
+/** The frozen version her drop shoots and the moment it is shot at: its request's (SC-02 lot a, SC-03 c2). */
+async function versionOf(tx: Transaction, requestId: string | null): Promise<Omit<StartedScript, 'drop'>> {
   if (requestId === null) throw new ContentDropScriptUnprocessable();
   const request = await readRequest(tx, requestId);
   if (request?.structureVersionId == null) throw new ContentDropScriptUnprocessable();
-  return request.structureVersionId;
+  return { versionId: request.structureVersionId, moment: ShotMomentSchema.nullable().parse(request.moment) };
 }
 
 /** Her script drop, as her account reads it; refused when it is not a script. */
@@ -38,7 +45,7 @@ async function startedIn(tx: Transaction, dropId: string): Promise<StartedScript
   const row = await readDrop(tx, dropId);
   if (row === undefined) throw new ContentDropNotFound();
   if (row.category !== 'script') throw new ContentDropScriptUnprocessable();
-  return { drop: await viewOf(tx, row), versionId: await versionOf(tx, row.requestId) };
+  return { drop: await viewOf(tx, row), ...(await versionOf(tx, row.requestId)) };
 }
 
 /**

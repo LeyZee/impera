@@ -93,8 +93,8 @@ export async function scriptDropCard(
   segmentKey: string,
   variant: ScriptVariantLetter | null,
 ): Promise<string> {
-  const { versionId } = await deps.store.read(userId, dropId);
-  const svg = await deps.versions.card(versionId, segmentKey, variant);
+  const { versionId, moment } = await deps.store.read(userId, dropId);
+  const svg = await deps.versions.card(versionId, segmentKey, variant, moment);
   if (svg === null) throw new ContentDropCardNotFound();
   return svg;
 }

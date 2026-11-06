@@ -55,7 +55,7 @@ async function* archiveChunks(
   yield* drained();
   for (const { path, source } of plan.entries) {
     if (source.kind === 'card') {
-      const png = await deps.versions.folderCard(versionId, source.segmentKey, source.variant);
+      const png = await deps.versions.folderCard(versionId, source.segmentKey, source.variant, plan.moment);
       if (png === null) throw new ContentDropCardNotFound();
       open(path).push(png, true);
       yield* drained();

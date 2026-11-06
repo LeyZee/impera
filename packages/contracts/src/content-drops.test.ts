@@ -22,6 +22,13 @@ describe('the format of a drop, read from the file and never from the image (ADR
     expect(declaredFileRefusal('mass_dm', { mime: 'audio/x-m4a', bytes: MB })).toBeNull();
   });
 
+  it('refuses an empty file on her phone, before the server reads it as a lost connection (recette MED-01)', () => {
+    expect(declaredFileRefusal('reveal_story', { mime: 'image/jpeg', bytes: 0 })).toBe(
+      'Ce fichier est vide : choisis-le à nouveau dans ta galerie',
+    );
+    expect(declaredFileRefusal('reveal_story', { mime: 'image/jpeg', bytes: 1 })).toBeNull();
+  });
+
   it('a vocal goes only to a relance or a script', () => {
     const takesVocals = DROP_CATEGORIES.filter((category) =>
       DROP_FORMAT_RULES[category].kinds.includes('audio'),

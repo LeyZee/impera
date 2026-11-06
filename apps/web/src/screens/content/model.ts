@@ -194,6 +194,24 @@ export function remainingOf(seconds: number): string {
 }
 
 /** What a file's line says, from its state on the server and, while it goes up here, its progress. */
+/**
+ * When a script asked of her is shot, as its request fixed (SC-03, « ok alternance »): on her card, before she begins,
+ * as the agency reads it in Créatrices › Scripts (recette MED-05). `null` (a script asked before) says nothing.
+ */
+export function shotMomentOf(request: ContentRequest): string | null {
+  if (request.category !== 'script' || request.moment === null) return null;
+  return request.moment === 'night' ? '🌙 Nuit' : '☀️ Jour';
+}
+
+/**
+ * The files of a settled drop (ready or blocked) that were refused, in their order: each keeps its line and its
+ * reason on her card (recette MED-03). A replaced file is out of the drop and never shown.
+ */
+export function refusedOf(drop: ContentDrop): ContentDropFile[] {
+  if (drop.state !== 'ready' && drop.state !== 'blocked') return [];
+  return drop.files.filter((file) => file.state === 'refused');
+}
+
 export function fileLine(file: ContentDropFile, live: LiveSend | undefined): string {
   if (file.state === 'awaiting') {
     if (live === undefined || live.phase === 'failed') return 'Envoi interrompu';
@@ -217,7 +235,9 @@ export const HEAVY_BYTES = 1_000_000_000;
 /** « 1,2 Go », « 340 Mo »: a weight as she reads it. */
 export function weightOf(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1).replace('.', ',')} Go`;
-  return `${String(Math.max(1, Math.round(bytes / 1_000_000)))} Mo`;
+  if (bytes >= 999_500) return `${String(Math.round(bytes / 1_000_000))} Mo`;
+  // Under a megabyte, in Ko: a photo of 9 Ko is not « 1 Mo », an empty file is not either (recette MED-02).
+  return `${String(Math.round(bytes / 1000))} Ko`;
 }
 
 const DAY_MS = 86_400_000;

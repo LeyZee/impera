@@ -1,5 +1,5 @@
 /** Public entry point of the `scripts` module (SC-01, ADR 0056). Other modules import this file only. */
-import type { CreatorId, ScriptStructureVersion, ScriptVariantLetter } from '@impera/contracts';
+import type { CreatorId, ScriptStructureVersion, ScriptVariantLetter, ShotMoment } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -20,12 +20,14 @@ export interface ScriptsModule {
   frozenVersion(versionId: string): Promise<ScriptStructureVersion | null>;
   /**
    * A card of a frozen version, as the SVG her script shows (SC-02 lot b2): the same drawing as the library's, never
-   * rasterised. `null` for a version not frozen, or a segment or series it does not have.
+   * rasterised. `null` for a version not frozen, or a segment or series it does not have. `moment`, the one her request
+   * fixed, is what the card says; `null` keeps the structure's.
    */
   frozenCard(
     versionId: string,
     segmentKey: string,
     variant: ScriptVariantLetter | null,
+    moment: ShotMoment | null,
   ): Promise<string | null>;
   /**
    * A card of a frozen version as the folder's PNG (SC-03, ADR 0056 § 3): the `folder` format, rasterised, which goes
@@ -35,6 +37,7 @@ export interface ScriptsModule {
     versionId: string,
     segmentKey: string,
     variant: ScriptVariantLetter | null,
+    moment: ShotMoment | null,
   ): Promise<Uint8Array | null>;
   /** The latest version frozen for a script asked by hand (SC-02 lot b), by an owner or a manager; `null` when archived. */
   freezeForRequest(structureId: string, userId: string): Promise<string | null>;
@@ -74,16 +77,16 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
     name: 'scripts',
     structures,
     frozenVersion,
-    frozenCard: async (versionId, segmentKey, variant) => {
+    frozenCard: async (versionId, segmentKey, variant, moment) => {
       const version = await frozenVersion(versionId);
       if (version === null) return null;
-      const content = cardContent(version, segmentKey, variant === null ? {} : { variant });
+      const content = cardContent(version, segmentKey, variant === null ? { moment } : { variant, moment });
       return content === null ? null : cardSvg(content, 'card');
     },
-    frozenFolderCard: async (versionId, segmentKey, variant) => {
+    frozenFolderCard: async (versionId, segmentKey, variant, moment) => {
       const version = await frozenVersion(versionId);
       if (version === null) return null;
-      const content = cardContent(version, segmentKey, variant === null ? {} : { variant });
+      const content = cardContent(version, segmentKey, variant === null ? { moment } : { variant, moment });
       return content === null ? null : rasterize(cardSvg(content, 'folder'));
     },
     freezeForRequest: createRequestFreezer(deps.adminDb),

@@ -8,6 +8,7 @@ import {
   type ScriptMoment,
   type ScriptStructureVersion,
   type ScriptVariantLetter,
+  type ShotMoment,
 } from '@impera/contracts';
 
 /**
@@ -126,7 +127,7 @@ export function shootSummary(slots: readonly MediaSlot[]): string {
 export function cardContent(
   version: Pick<ScriptStructureVersion, 'name' | 'moment' | 'color' | 'segments'>,
   key: string,
-  options: { readonly variant?: ScriptVariantLetter } = {},
+  options: { readonly variant?: ScriptVariantLetter; readonly moment?: ShotMoment | null } = {},
 ): CardContent | null {
   const codes = new Map(scriptSegmentCodes(version.segments).map((code) => [code.key, code.code]));
   const segment = version.segments.find((candidate) => candidate.key === key);
@@ -136,9 +137,12 @@ export function cardContent(
     const stage = version.segments.find((candidate) => candidate.key === stageKey);
     return stage?.kind === 'stage' ? stage.name : `Étape ${number(stageKey)}`;
   };
+  // Her script is shot Jour or Nuit as its request fixed (SC-03, « ok alternance »): its cards say that moment, never
+  // the « both » of the structure (recette MED-05). Without one (the library, a script asked before), the structure's.
+  const moment = options.moment ?? version.moment;
   const common = {
-    moment: MOMENT_LABELS[version.moment],
-    momentKey: version.moment,
+    moment: MOMENT_LABELS[moment],
+    momentKey: moment,
     structureName: version.name,
     color: version.color,
   };
@@ -220,6 +224,21 @@ const escape = (text: string): string =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&apos;');
+
+/**
+ * A text without its emoji, for a card that is rasterised (the folder's PNG, the thumbnail): the card fonts (Geist,
+ * Instrument Serif) have no emoji, and the rasteriser would draw an empty box in its place (recette MED-06). Her phone
+ * draws the SVG itself, with the device's emoji: the `card` format keeps them.
+ */
+export function withoutEmoji(text: string): string {
+  return text
+    .replace(
+      /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\u{FE0F}|\u{200D}|\p{Emoji_Modifier})+/gu,
+      '',
+    )
+    .replace(/ {2,}/gu, ' ')
+    .trim();
+}
 
 /**
  * Words cut into lines of `width` characters at most, `lines` lines at most, the last one ending in « … » when the
@@ -316,7 +335,8 @@ const inkOf = (color: ScriptColor): string => scriptCardInk(color) ?? SCRIPT_CAR
 export function cardSvg(content: CardContent, format: CardFormat): string {
   const ink = inkOf(content.color);
   const parts: string[] = [];
-  const text = (x: number, y: number, value: string, style: TextStyle): void => {
+  const text = (x: number, y: number, written: string, style: TextStyle): void => {
+    const value = format === 'card' ? written : withoutEmoji(written);
     parts.push(
       `<text x="${String(x)}" y="${String(y)}" font-family="${style.family}" font-size="${String(style.size)}"` +
         ` font-weight="${String(style.weight ?? 400)}" fill="${style.fill ?? ink}"` +

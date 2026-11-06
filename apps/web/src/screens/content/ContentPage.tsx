@@ -25,6 +25,8 @@ import {
   onTheirWay,
   openRequests,
   published,
+  refusedOf,
+  shotMomentOf,
   stateTone,
   type LiveSend,
 } from './model';
@@ -247,6 +249,7 @@ function RequestCard({
   onOpenScript: (dropId: ContentDropId) => void;
 }): JSX.Element {
   const due = dueOf(request.dueOn, today);
+  const moment = shotMomentOf(request);
   // A script asked with its version is shot card by card; one asked before (no version) is dropped as before.
   const scripted = request.category === 'script' && request.structureVersionId !== null;
   const [dropId] = useState(() => ContentDropIdSchema.parse(crypto.randomUUID()));
@@ -260,7 +263,9 @@ function RequestCard({
         </span>
         <span className="ct-card__titles">
           <span className="ct-card__name">{DROP_CATEGORY_LABELS[request.category]}</span>
-          <span className={due.late ? 'ct-due ct-due--late' : 'ct-due'}>{due.text}</span>
+          <span className={due.late ? 'ct-due ct-due--late' : 'ct-due'}>
+            {moment === null ? due.text : `${due.text} · ${moment}`}
+          </span>
         </span>
       </div>
       <p className="ct-card__why">{request.reason}</p>
@@ -349,6 +354,14 @@ function DropCard({
             <FileLine key={file.id} drop={drop} file={file} live={sends.get(file.id)} onSettled={onSettled} />
           ))}
         </ul>
+      ) : refusedOf(drop).length > 0 ? (
+        // Ready or blocked, each refused file keeps its line and its reason: she knows what to shoot again and why,
+        // never only « Aucun fichier n'a pu être gardé » (recette MED-03).
+        <ul className="ct-files">
+          {refusedOf(drop).map((file) => (
+            <FileLine key={file.id} drop={drop} file={file} live={undefined} onSettled={onSettled} />
+          ))}
+        </ul>
       ) : null}
       {drop.state === 'filling' && !confirming ? (
         <div className="ct-card__foot">
@@ -373,7 +386,7 @@ function DropCard({
             Continuer
           </button>
         </div>
-      ) : WITHDRAWABLE_DROP_STATES.has(drop.state) && !sending ? (
+      ) : WITHDRAWABLE_DROP_STATES.has(drop.state) && drop.exportedAt === null && !sending ? (
         <div className="ct-card__actions">
           {confirming ? (
             <>

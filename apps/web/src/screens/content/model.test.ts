@@ -12,8 +12,10 @@ import {
   onTheirWay,
   openRequests,
   published,
+  refusedOf,
   remainingOf,
   sameFile,
+  shotMomentOf,
   stateTone,
   weightOf,
 } from './model';
@@ -88,8 +90,31 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
   it('says weights and times as she reads them', () => {
     expect(weightOf(340_000_000)).toBe('340 Mo');
     expect(weightOf(1_200_000_000)).toBe('1,2 Go');
+    // Under a megabyte, in Ko: never « 1 Mo » for a photo of 9 Ko or an empty file (recette MED-02).
+    expect(weightOf(8_894)).toBe('9 Ko');
+    expect(weightOf(0)).toBe('0 Ko');
+    expect(weightOf(999_600)).toBe('1 Mo');
     expect(remainingOf(42)).toBe('40 s');
     expect(remainingOf(3900)).toBe('1 h 05');
+  });
+
+  it('keeps each refused file of a settled drop, with its reason, and only then (recette MED-03)', () => {
+    const refused = fileOf({
+      state: 'refused',
+      refusal: '« Feed · Vidéo short » : la vidéo doit être verticale',
+    });
+    const kept = fileOf({ state: 'kept' });
+    expect(refusedOf(dropOf({ state: 'blocked', files: [refused] }))).toEqual([refused]);
+    expect(refusedOf(dropOf({ state: 'ready', files: [kept, refused] }))).toEqual([refused]);
+    expect(refusedOf(dropOf({ state: 'ready', files: [kept] }))).toEqual([]);
+    expect(refusedOf(dropOf({ state: 'uploading', files: [refused] }))).toEqual([]);
+  });
+
+  it('says when a script asked of her is shot, as its request fixed (recette MED-05)', () => {
+    expect(shotMomentOf(requestOf({ category: 'script', moment: 'night' }))).toBe('🌙 Nuit');
+    expect(shotMomentOf(requestOf({ category: 'script', moment: 'day' }))).toBe('☀️ Jour');
+    expect(shotMomentOf(requestOf({ category: 'script', moment: null }))).toBeNull();
+    expect(shotMomentOf(requestOf({ category: 'feed_shoot', moment: null }))).toBeNull();
   });
 
   it('says when a request is due, and since when it is late', () => {
