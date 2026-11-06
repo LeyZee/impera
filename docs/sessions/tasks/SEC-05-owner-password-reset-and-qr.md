@@ -3,7 +3,7 @@ Statut : in progress, lot 2 en PR (ADR 0068 acceptée par Charles le 05/11/2026,
 Phase : exploitation
 Dépend de : ADR 0068, ADR 0046, ADR 0020 (bot de l'agence), EQ-10 (liens d'invitation et de réinitialisation)
 Branche : claude/project-thread-a8l1w6 (fil Bilan)
-Propriétaires : Bilan (auth, telegram, migration 0124 attribuée par le coordinateur) ; Extension écrit les écrans (QR, « Mot de passe oublié » de la page de connexion, page d'arrivée du lien par `LinkPage` et `NewPasswordPage`, Réglages › Telegram) ; QR en SVG en ligne, sombre sur fond blanc fixe avec une marge de 4 modules, même en Nuit ; sur téléphone, le bouton `otpauth` et la clé avant le QR
+Propriétaires : Bilan (auth, telegram, migration 0123, fixée à l’arrivée sur main) ; Extension écrit les écrans (QR, « Mot de passe oublié » de la page de connexion, page d'arrivée du lien par `LinkPage` et `NewPasswordPage`, Réglages › Telegram) ; QR en SVG en ligne, sombre sur fond blanc fixe avec une marge de 4 modules, même en Nuit ; sur téléphone, le bouton `otpauth` et la clé avant le QR
 
 ## Objectif (1 phrase)
 
@@ -19,7 +19,7 @@ Le propriétaire retrouve l'accès sans terminal, par un lien reçu en privé su
 Lot 1 : QR code
 - [ ] QR de l'adresse `otpauth` dessiné dans le navigateur, à côté de la clé ; encodeur dans le dépôt ou bibliothèque ancienne en quarantaine de 14 jours ; aucun appel externe ; disparaît après confirmation.
 
-Lot 2 : liaison Telegram privée (migration 0124, numéro fixé à l'arrivée sur main)
+Lot 2 : liaison Telegram privée (migration 0123)
 - [x] API, connexion récente exigée : code à usage unique, 10 minutes, à envoyer au bot par `/start <code>` ; seule l'empreinte du code est gardée (`/v1/auth/telegram-link`, propriétaire et équipe). Écran de Réglages › Telegram : Extension.
 - [x] Le bot garde l'identifiant du chat privé du compte, en rôle admin, pour ce seul usage ; délier possible ; audit.
 
