@@ -22,6 +22,7 @@ export const requestOf = (fields: Partial<ContentRequest> = {}): ContentRequest 
     dueOn: '2026-11-07',
     reason: 'Une séance en lingerie noire pour le feed',
     structureId: null,
+    structureVersionId: null,
     origin: 'agency',
     state: 'open',
     refusalReason: null,

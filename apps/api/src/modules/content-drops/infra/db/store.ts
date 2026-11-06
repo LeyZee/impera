@@ -6,6 +6,7 @@ import {
   type DropFileState,
   ContentDropFileIdSchema,
   ContentDropSchema,
+  ContentRequestIdSchema,
   ContentRequestSchema,
   DropCategorySchema,
   DropFileStateSchema,
@@ -55,7 +56,9 @@ import type {
   CreatorContentStore,
   DropFileTarget,
   FileOutcome,
+  AskedScript,
   IdeaContentRequest,
+  ScriptContentRequest,
   ReceiptStore,
 } from '../../domain/ports';
 import { keptUntil } from '../../domain/retention';
@@ -116,6 +119,7 @@ function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
     dueOn: row.dueOn,
     reason: row.reason,
     structureId: row.structureId,
+    structureVersionId: row.structureVersionId,
     origin: row.origin,
     state: row.state,
     refusalReason: row.refusalReason,
@@ -534,6 +538,48 @@ export async function requestFromIdea(adminDb: Database, request: IdeaContentReq
         createdBy: null,
       })
       .onConflictDoNothing({ target: contentRequests.id });
+  });
+}
+
+/**
+ * The script the cadence asks of her (SC-02, ADR 0056 § 2), written by `scripts.ask_scripts` under the owner's role:
+ * origin `cadence`, no author, with the version frozen for it. One per due day (`content_requests_cadence_unique`): a
+ * replay writes nothing more.
+ */
+export async function requestScript(adminDb: Database, request: ScriptContentRequest): Promise<void> {
+  await withAdmin(adminDb, async (tx) => {
+    await tx
+      .insert(contentRequests)
+      .values({
+        id: newId(ContentRequestIdSchema),
+        creatorId: request.creatorId,
+        category: 'script',
+        dueOn: request.dueOn,
+        reason: request.reason,
+        structureId: request.structureId,
+        structureVersionId: request.structureVersionId,
+        origin: 'cadence',
+        createdBy: null,
+      })
+      .onConflictDoNothing();
+  });
+}
+
+/** Her last script asked by the cadence, whatever became of it; `null` before the first. */
+export async function lastScriptRequest(adminDb: Database, creatorId: string): Promise<AskedScript | null> {
+  return withAdmin(adminDb, async (tx) => {
+    const [row] = await tx
+      .select({
+        dueOn: contentRequests.dueOn,
+        structureId: contentRequests.structureId,
+        createdAt: contentRequests.createdAt,
+      })
+      .from(contentRequests)
+      .where(and(eq(contentRequests.creatorId, creatorId), eq(contentRequests.origin, 'cadence')))
+      .orderBy(sql`${contentRequests.dueOn} desc`)
+      .limit(1);
+    if (row?.structureId == null) return null;
+    return { dueOn: row.dueOn, structureId: row.structureId, askedAt: row.createdAt };
   });
 }
 

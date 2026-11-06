@@ -78,6 +78,22 @@ export interface IdeaContentRequest {
   readonly reason: string;
 }
 
+/** A script the cadence asks of her (SC-02): the structure and the version frozen for it, due on her day. */
+export interface ScriptContentRequest {
+  readonly creatorId: string;
+  readonly dueOn: string;
+  readonly reason: string;
+  readonly structureId: string;
+  readonly structureVersionId: string;
+}
+
+/** Her last script asked by the cadence: its due day, its structure, when it was asked. */
+export interface AskedScript {
+  readonly dueOn: string;
+  readonly structureId: string;
+  readonly askedAt: Date;
+}
+
 /** What the receipt job finds of a file and writes of it (`withAdmin`). */
 export interface ReceiptStore {
   /** The file, its drop and the drop's category; `null` when it is not there. */

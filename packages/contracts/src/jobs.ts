@@ -71,6 +71,7 @@ export const JOB_NAMES = [
   'content_drops.receive_file',
   'content_drops.convert_file',
   'content_drops.erase_originals',
+  'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -132,6 +133,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.receive_file': 'Réception des fichiers de contenu',
   'content_drops.convert_file': 'Conversion des vidéos',
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
+  'scripts.ask_scripts': 'Demandes de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
@@ -361,6 +363,11 @@ export const JOB_PAYLOADS = {
    * once). Replayable: each step moves only what is still due, and says each thing once.
    */
   'content_drops.erase_originals': z.object({}),
+  /**
+   * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
+   * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
+   */
+  'scripts.ask_scripts': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -464,6 +471,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.convert_file': 9,
   // Each hour: the next run is the retry.
   'content_drops.erase_originals': 1,
+  // Each hour: the next run is the retry.
+  'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
