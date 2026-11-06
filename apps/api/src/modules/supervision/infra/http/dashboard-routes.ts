@@ -1,4 +1,6 @@
 import {
+  AgencyInsightsQuerySchema,
+  AgencyInsightsSchema,
   CreatorIdSchema,
   DashboardQuerySchema,
   DashboardSchema,
@@ -13,6 +15,7 @@ import { startOfLocalDay } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { agencyInsights, agencyRange, type AgencyCreatorRead } from '../../domain/agency-insights';
 import {
   assembleDashboard,
   creatorQueue,
@@ -32,6 +35,7 @@ import type {
   VoiceVersion,
 } from '../../domain/dashboard-ports';
 import { revealSalesPanel, salesDays } from '../../domain/reveal-sales';
+import type { AgencyInsightsReader } from '../views/agency-insights-reader';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
@@ -55,6 +59,10 @@ export interface DashboardRouteDeps {
   readonly telegram?: TelegramView;
   /** Every creator, for the owner's « À traiter » across creators (`persona` module, by the composition root). */
   readonly allCreatorIds: () => Promise<readonly CreatorId[]>;
+  /** The agency's insights, read creator by creator in the registers (ADR 0078). */
+  readonly agency: AgencyInsightsReader;
+  /** The zone the agency's days are counted in: the platforms' (Reveal's, Europe/Paris). */
+  readonly agencyTimeZone: string;
   readonly now?: () => Date;
 }
 
@@ -119,6 +127,56 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           automatic,
           revealSales: sales === undefined ? null : revealSalesPanel({ ...sales, rate: usdRate }),
         });
+      },
+    );
+
+    app.get(
+      '/dashboard/agency',
+      {
+        // The agency's figures: the owner's and an active manager's (ADR 0078 § 1). A creator never reads them, and a
+        // scope of one's own reads none, checked creator by creator in the reader.
+        preValidation: deps.requireRole('owner', 'operator'),
+        schema: { querystring: AgencyInsightsQuerySchema, response: { 200: AgencyInsightsSchema } },
+      },
+      async (request) => {
+        const { period, creatorId } = request.query;
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const userId = UserIdSchema.parse(user.id);
+        const every = await deps.allCreatorIds();
+        let asked: readonly CreatorId[];
+        if (creatorId !== undefined) {
+          if (user.role !== 'owner' && !user.creatorIds.includes(creatorId)) {
+            throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
+          }
+          asked = [creatorId];
+        } else {
+          // The agency's order (Créatrices), restricted to the account's own list for anyone but the owner.
+          asked = user.role === 'owner' ? every : every.filter((id) => user.creatorIds.includes(id));
+        }
+        const now = (deps.now ?? (() => new Date()))();
+        const range = agencyRange(period, now, deps.agencyTimeZone);
+        // One tenant transaction per creator (RLS), one after the other: a read holds one connection of the pool.
+        const reads: AgencyCreatorRead[] = [];
+        let outOfScope = 0;
+        for (const id of asked) {
+          const answer = await deps.agency.read(id, userId, range);
+          if (answer.kind === 'out_of_scope') outOfScope += 1;
+          if (answer.kind === 'read') reads.push(answer.read);
+        }
+        // Nothing read with the team's scope: these figures are not his (ADR 0043 § 7).
+        if (user.role !== 'owner' && (asked.length === 0 || outOfScope === asked.length)) {
+          throw new DomainError(
+            'creator_forbidden',
+            'Les chiffres de l’agence ne sont pas dans ton périmètre',
+          );
+        }
+        const [first] = reads;
+        const [names, rate] = await Promise.all([
+          first === undefined ? new Map<string, string>() : deps.agency.memberNames(first.creatorId, userId),
+          deps.usdRate.latest(userId),
+        ]);
+        return agencyInsights({ period, range, creators: reads, names, rate });
       },
     );
 

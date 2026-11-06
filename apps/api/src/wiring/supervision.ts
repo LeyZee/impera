@@ -2,7 +2,7 @@ import type { CreatorId } from '@impera/contracts';
 import type { RoleHealth } from '@impera/llm';
 
 import type { AppLlm } from '../llm';
-import { salesFeedTotals } from '../modules/connectors';
+import { salesFeedTimeZone, salesFeedTotals } from '../modules/connectors';
 import type { ConversationsModule } from '../modules/conversations';
 import type { PayrollModule } from '../modules/payroll';
 import { createSupervisionModule, type SupervisionModule } from '../modules/supervision';
@@ -42,6 +42,7 @@ export function wireSupervision(
     allCreatorIds: deps.allCreatorIds,
     // The one sum of the register (CRM-04 lot a): the sales panel reads it, never sums again.
     salesTotalsOf: salesFeedTotals.totalsOf,
+    salesTimeZone: salesFeedTimeZone,
     automatic: { read: (creatorId) => conversations.automaticLock(creatorId) },
     // The best fans in euros: dollars at pay's last ECB rate known (ADR 0033), read as whoever reads the Dashboard.
     usdRate: {
