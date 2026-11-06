@@ -127,7 +127,8 @@ const VIEWS_WORDS = new RegExp(String.raw`^(?:${COUNT})\s*(?:vues?|views?|lectur
 
 const LIKE_ICON = /^(?:j[’']aime|like)$/iu;
 const COMMENT_ICON = /^(?:commenter|comment)$/iu;
-const VIEW_ICON = /(?:vue|view|lecture|play)/iu;
+// « Icône du nombre de vues », « View count icon », or a bare play icon; never « Lecture audio » nor « Preview ».
+const VIEW_ICON = /\b(?:vues?|views?|plays)\b|^(?:lecture|play)$/iu;
 
 function metricsIn(root: Element): TrendMetrics {
   return {

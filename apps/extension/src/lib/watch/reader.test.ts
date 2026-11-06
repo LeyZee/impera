@@ -173,6 +173,23 @@ describe('readTile on a profile’s Reels tab', () => {
     ]);
   });
 
+  it('reads views only next to a views icon, never next to the sound or a preview', () => {
+    const tile = (label: string): Element | undefined =>
+      tilesOf(
+        page(
+          `<main><a href="/atelier.lune/reel/${CODE}/"><span><svg aria-label="${label}"></svg></span><span>3 k</span></a></main>`,
+        ),
+      )[0];
+    const viewsNextTo = (label: string): number | null | undefined => {
+      const found = tile(label);
+      return found === undefined ? undefined : readTile(found, reelsTab)?.metrics.views;
+    };
+    expect(viewsNextTo('View count icon')).toBe(3_000);
+    expect(viewsNextTo('Lecture')).toBe(3_000);
+    expect(viewsNextTo('Lecture audio')).toBeNull();
+    expect(viewsNextTo('Preview')).toBeNull();
+  });
+
   it('reads no views off another tab', () => {
     const [tile] = tilesOf(doc);
     if (tile === undefined) throw new Error('no tile');
