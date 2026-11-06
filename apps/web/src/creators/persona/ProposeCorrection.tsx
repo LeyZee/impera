@@ -73,11 +73,14 @@ export function ProposeCorrection({
     returning.current = false;
   }, [open]);
 
-  const close = (): void => {
+  /** Closes the form; `keep` leaves what she typed for when she opens it again (Échap), else it starts afresh. */
+  const close = (keep = false): void => {
     setOpen(false);
-    setText('');
     setProblem(null);
-    setId(newId(PersonaCorrectionIdSchema));
+    if (!keep) {
+      setText('');
+      setId(newId(PersonaCorrectionIdSchema));
+    }
     returning.current = true;
   };
 
@@ -148,12 +151,12 @@ export function ProposeCorrection({
                 setText(event.target.value);
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Escape') close();
+                if (event.key === 'Escape') close(true);
               }}
             />
           </label>
           <p className="mp-correct__hint">
-            L’agence lit ta correction et met ta fiche à jour.
+            L’agence met ta fiche à jour.
             <span className="mp-correct__count">
               {text.length} / {PERSONA_CORRECTION_TEXT_MAX}
             </span>
@@ -164,7 +167,13 @@ export function ProposeCorrection({
             </p>
           )}
           <div className="mp-correct__actions">
-            <button type="button" className="nv-btn nv-btn--plain" onClick={close}>
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain"
+              onClick={() => {
+                close();
+              }}
+            >
               Annuler
             </button>
             <button

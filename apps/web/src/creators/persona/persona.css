@@ -1141,20 +1141,15 @@
 }
 .ps-corrections__item {
   display: flex;
-  align-items: center;
-  gap: var(--nv-space-4);
+  flex-direction: column;
+  gap: var(--nv-space-1);
   padding: var(--nv-space-3) 0;
   border-top: 1px solid var(--nv-plate-edge);
 }
-.ps-corrections__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-1);
-}
+/* Section and day, then « Marquer traitée » at the end of the same line: the text below reads alone. */
 .ps-corrections__meta {
   margin: 0;
+  min-height: 32px;
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
@@ -1187,12 +1182,19 @@
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
-.ps-corrections__done {
+.ps-corrections__meta > .ps-corrections__done {
   flex: none;
+  margin-inline-start: auto;
+}
+.ps-corrections__done[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 .ps-corrections__problem {
   margin: 0;
-  color: var(--nv-danger);
+  color: var(--nv-warning);
   font-size: var(--nv-text-footnote);
 }
 @media (max-width: 640px) {
@@ -1200,12 +1202,8 @@
     padding-left: 16px;
     padding-right: 16px;
   }
-  .ps-corrections__head,
-  .ps-corrections__item {
+  .ps-corrections__head {
     flex-direction: column;
     align-items: stretch;
-  }
-  .ps-corrections__done {
-    align-self: flex-start;
   }
 }

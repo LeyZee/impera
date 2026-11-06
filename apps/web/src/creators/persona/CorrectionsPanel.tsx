@@ -1,6 +1,6 @@
 import type { PersonaCorrection, PersonaCorrectionSection } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX } from 'react';
+import { useId, useState, type JSX } from 'react';
 
 import { CORRECTION_SECTION_LABELS, correctionsKey, markCorrectionDone, useCorrections } from './corrections';
 
@@ -23,6 +23,7 @@ export function CorrectionsPanel({
   onShowSection: (section: PersonaCorrectionSection) => void;
 }): JSX.Element | null {
   const client = useQueryClient();
+  const titleId = useId();
   const corrections = useCorrections(creatorId);
   const [marking, setMarking] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -47,9 +48,9 @@ export function CorrectionsPanel({
 
   const who = creatorName === null || creatorName.trim() === '' ? 'la créatrice' : creatorName;
   return (
-    <section className="nv-plate ps-corrections" aria-labelledby="ps-corrections-title">
+    <section className="nv-plate ps-corrections" aria-labelledby={titleId}>
       <header className="ps-corrections__head">
-        <h3 className="ps-corrections__title" id="ps-corrections-title">
+        <h3 className="ps-corrections__title" id={titleId}>
           Corrections proposées par {who}
         </h3>
         <span className="ps-corrections__count">
@@ -63,34 +64,32 @@ export function CorrectionsPanel({
       <ul className="ps-corrections__list">
         {open.map((one) => (
           <li key={one.id} className="ps-corrections__item">
-            <div className="ps-corrections__body">
-              <p className="ps-corrections__meta">
-                <button
-                  type="button"
-                  className="ps-corrections__section"
-                  onClick={() => {
-                    onShowSection(one.section);
-                  }}
-                >
-                  {CORRECTION_SECTION_LABELS[one.section].agency}
-                </button>
-                <span aria-hidden="true">·</span>
-                <span>{`Le ${DAY.format(new Date(one.createdAt))}`}</span>
-              </p>
-              <p className="ps-corrections__text">{one.text}</p>
-            </div>
-            {canMark ? (
+            <div className="ps-corrections__meta">
               <button
                 type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm ps-corrections__done"
-                aria-disabled={marking !== null ? true : undefined}
+                className="ps-corrections__section"
                 onClick={() => {
-                  void mark(one);
+                  onShowSection(one.section);
                 }}
               >
-                {marking === one.id ? 'Un instant…' : 'Traitée'}
+                {CORRECTION_SECTION_LABELS[one.section].agency}
               </button>
-            ) : null}
+              <span aria-hidden="true">·</span>
+              <span>{`Le ${DAY.format(new Date(one.createdAt))}`}</span>
+              {canMark ? (
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--soft nv-btn--sm ps-corrections__done"
+                  aria-disabled={marking !== null ? true : undefined}
+                  onClick={() => {
+                    void mark(one);
+                  }}
+                >
+                  {marking === one.id ? 'Un instant…' : 'Marquer traitée'}
+                </button>
+              ) : null}
+            </div>
+            <p className="ps-corrections__text">{one.text}</p>
           </li>
         ))}
       </ul>

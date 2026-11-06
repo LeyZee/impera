@@ -107,8 +107,11 @@
   gap: var(--nv-space-2);
 }
 .mp-correct__field {
-  resize: vertical;
+  /* No native handle: the field grows with what she writes, up to a few lines, then scrolls. */
+  resize: none;
+  field-sizing: content;
   min-height: 88px;
+  max-height: 240px;
 }
 .mp-correct__hint {
   margin: 0;
@@ -125,7 +128,7 @@
 }
 .mp-correct__problem {
   margin: 0;
-  color: var(--nv-danger);
+  color: var(--nv-warning);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
@@ -133,4 +136,11 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--nv-space-2);
+}
+/* Greyed like `.nv-btn:disabled`: an empty field or a send under way keeps its focus (aria-disabled), never its look. */
+.mp-correct__actions .nv-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }

@@ -195,6 +195,22 @@ describe('Moi › Persona (recette CREA-01)', () => {
     expect(within(limits).getByRole('textbox')).toHaveProperty('value', 'Plus de pieds du tout.');
   });
 
+  it('keeps what she typed when Échap closes the form, and drops it on « Annuler »', async () => {
+    renderPage();
+    const life = await screen.findByRole('region', { name: 'Ta vie' });
+    const open = () => {
+      fireEvent.click(within(life).getByRole('button', { name: 'Proposer une correction' }));
+      return within(life).getByRole('textbox');
+    };
+    fireEvent.change(open(), { target: { value: 'J’habite à Annecy.' } });
+    fireEvent.keyDown(within(life).getByRole('textbox'), { key: 'Escape' });
+    expect(within(life).queryByRole('textbox')).toBeNull();
+    expect(open()).toHaveProperty('value', 'J’habite à Annecy.');
+    fireEvent.click(within(life).getByRole('button', { name: 'Annuler' }));
+    expect(open()).toHaveProperty('value', '');
+    expect(sent).toEqual([]);
+  });
+
   it('shows a correction the agency handled as taken', async () => {
     corrections = [
       {

@@ -83,7 +83,7 @@ describe('CorrectionsPanel (recette CREA-01 b)', () => {
 
   it('lets the owner mark one handled, once, and hides the panel when none waits', async () => {
     renderPanel(true);
-    const [first] = await screen.findAllByRole('button', { name: 'Traitée' });
+    const [first] = await screen.findAllByRole('button', { name: 'Marquer traitée' });
     if (first === undefined) throw new Error('no button');
     fireEvent.click(first);
     fireEvent.click(first);
@@ -91,7 +91,7 @@ describe('CorrectionsPanel (recette CREA-01 b)', () => {
     expect(marked).toEqual([FIRST]);
     expect(screen.queryByText('Plutôt le thé que le café.')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Traitée' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Marquer traitée' }));
     await vi.waitFor(() => {
       expect(screen.queryByRole('heading')).toBeNull();
     });
@@ -100,6 +100,6 @@ describe('CorrectionsPanel (recette CREA-01 b)', () => {
   it('shows a manager the corrections without the button', async () => {
     renderPanel(false);
     expect(await screen.findByText('Plus de pieds du tout.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Traitée' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Marquer traitée' })).toBeNull();
   });
 });
