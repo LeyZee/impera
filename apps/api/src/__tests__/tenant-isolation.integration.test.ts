@@ -15,6 +15,7 @@ import { createOwner } from '../auth';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 import { activateDemoPersona } from './support/persona';
+import { MethodSchema, namesOf, routesOf, type Route } from './support/routes';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /**
@@ -24,7 +25,6 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
  * it is said below what it names. Invented data only (ADR 0010).
  */
 
-const MethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const PASSWORD = 'staple battery horse';
 const PERIOD = PayPeriodSchema.parse('2026-11-01');
 
@@ -162,34 +162,6 @@ const KNOWN_REACHED: Readonly<Record<string, string>> = {
   'chatter of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
     'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
 };
-
-/** A route of the server: its method and its path as declared, `:a|:b` where two routes name one segment apart. */
-interface Route {
-  readonly method: string;
-  readonly path: string;
-}
-
-/** The routes `printRoutes` draws as a tree, flattened; HEAD and the CORS preflight are left out. */
-function routesOf(tree: string): Route[] {
-  const stack: string[] = [];
-  const routes: Route[] = [];
-  for (const line of tree.split('\n')) {
-    const found = /^(?<indent>[│ ]*)[├└]── (?<segment>.+?)(?: \((?<methods>[A-Z, ]+)\))?$/u.exec(line);
-    if (found?.groups === undefined) continue;
-    const depth = (found.groups['indent'] ?? '').length / 4;
-    const path = `${depth === 0 ? '' : (stack[depth - 1] ?? '')}${found.groups['segment'] ?? ''}`;
-    stack[depth] = path;
-    stack.length = depth + 1;
-    for (const method of (found.groups['methods'] ?? '').split(', ')) {
-      if (method !== '' && method !== 'HEAD' && method !== 'OPTIONS') routes.push({ method, path });
-    }
-  }
-  return routes;
-}
-
-/** The names a segment may carry: `:creatorId|:id` is one segment, named both ways by two routes. */
-const namesOf = (segment: string): string[] =>
-  segment.startsWith(':') ? segment.split('|').map((name) => name.replace(/^:/u, '')) : [];
 
 /** What B's id a parameter takes in this path, if B has one seeded for it. */
 function seededFor(path: string, name: string): Seeded | undefined {
