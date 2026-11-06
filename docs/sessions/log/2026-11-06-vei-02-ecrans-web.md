@@ -1,0 +1,7 @@
+# 2026-11-06 — VEI-02 lot a, écrans web de la veille — in_progress
+Fait : fiche « Idées du jour » dans Créatrices (propriétaire et managers actifs) : jour par jour sans dépasser aujourd'hui, une carte par idée (catégorie, durée, état en pastille, à tourner, pourquoi, tendance citée avec sa source, son format, sa fin, ses chiffres et le lien Instagram), valider, corriger (titre, catégorie, durée, à tourner, pourquoi ; seuls les champs changés partent), refuser avec motif facultatif ; refus du serveur dits en clair (déjà décidée, garde de ses limites, droits). « Coller un lien » dans la même fiche (adresse lue par `instagramPostOf`, une ligne, un format en pastilles). Panneau « Relier l'extension » dans Sécurité pour le propriétaire et les managers : liste, relier avec un nom proposé d'après le navigateur, code montré une fois avec Copier, délier après confirmation, trois au plus.
+Pas fait : lot b, l'extension elle-même (manifeste, lecteur passif, Veille, marquage, envoi par lots, case « Relier » de la popup).
+Décisions : la veille reste au propriétaire et aux managers (mémoire du projet) même si l'API ouvre la liaison à tout membre ; pas de composant de carton pour une idée (un carton est une image serveur d'étape de script, ADR 0056 § 3).
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : tests web (model, IdeasSection, ExtensionLinksPanel, CreatorsPage), tsc et eslint ✓ ; 52 captures Nuit/Jour, ordinateur et téléphone, dans /mnt/project-files/recette/2026-11-06/extension/vei-02/.
