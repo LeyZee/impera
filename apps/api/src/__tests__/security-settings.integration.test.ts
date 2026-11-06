@@ -201,7 +201,7 @@ describe('Réglages › Sécurité (ADR 0046 § 7, SEC-04)', () => {
       (await generate({ password: pia.password, code: codeFor(pia.email) })).json(),
     );
     const second = BackupCodesSchema.parse(
-      (await generate({ password: pia.password, code: codeFor(pia.email, 1) })).json(),
+      (await generate({ password: pia.password, code: codeFor(pia.email) })).json(),
     );
     expect(second.backupCodes).not.toEqual(first.backupCodes);
 

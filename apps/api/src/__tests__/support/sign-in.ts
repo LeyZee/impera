@@ -36,11 +36,44 @@ function expectOk(response: { statusCode: number; body: string }, step: string):
   }
 }
 
-/** The code the account's authenticator shows now; throws for an account the helpers never activated. */
-export function codeFor(email: string, offset = 0): string {
+/** The codes each account has given, with when the server forgets them (recette SEC-03: a code is taken once). */
+const given = new Map<string, Map<string, number>>();
+/** How long the server remembers a code taken (`SPENT_CODE_SECONDS`, auth.ts), with a margin. */
+const REMEMBERED_MS = 125_000;
+const PERIOD_MS = 30_000;
+
+/** Waits without the event loop: between two requests, nothing of the server runs meanwhile. */
+function pause(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** Takes the first code the server accepts now (this period, the next, the one before) that this account never gave. */
+function freshCode(email: string, secret: string): string {
+  const taken = given.get(email) ?? new Map<string, number>();
+  given.set(email, taken);
+  for (;;) {
+    const now = Date.now();
+    for (const offset of [0, 1, -1]) {
+      const code = totpCode(secret, offset, now);
+      if ((taken.get(code) ?? 0) <= now) {
+        taken.set(code, now + REMEMBERED_MS);
+        return code;
+      }
+    }
+    // As a person would: the three codes accepted now are spent, the next period brings a new one.
+    pause(PERIOD_MS - (now % PERIOD_MS) + 50);
+  }
+}
+
+/**
+ * A code of the account's authenticator it has not given yet, as a person types the one their app shows (recette
+ * SEC-03: the server takes each code once); `offset` asks for the code that many periods away, untracked, for a test
+ * that needs one exact code. Throws for an account the helpers never activated.
+ */
+export function codeFor(email: string, offset?: number): string {
   const secret = secrets.get(email);
   if (secret === undefined) throw new Error(`no authenticator for ${email}`);
-  return totpCode(secret, offset);
+  return offset === undefined ? freshCode(email, secret) : totpCode(secret, offset);
 }
 
 /**
@@ -58,7 +91,7 @@ export async function activateSecondFactor(
   const setup = SetupSchema.parse(enabled.json());
   const secret = secretOf(setup.totpURI);
   secrets.set(email, secret);
-  const verified = await post(server, '/v1/auth/two-factor/verify-totp', { code: totpCode(secret) }, cookie);
+  const verified = await post(server, '/v1/auth/two-factor/verify-totp', { code: codeFor(email) }, cookie);
   expectOk(verified, 'two-factor activation');
   return { cookie: cookiesOf(verified.headers), backupCodes: setup.backupCodes };
 }

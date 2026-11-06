@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { passkey } from '@better-auth/passkey';
 import {
   AuditEntryIdSchema,
@@ -642,15 +644,64 @@ async function passwordMatches(auth: Auth, userId: string, password: string): Pr
 }
 
 /**
+ * How long a code the authenticator gave stays spent: Better Auth takes it in its 30 s step and the ones on either side,
+ * so 90 s at most, and a little more for the clocks.
+ */
+const SPENT_CODE_SECONDS = 120;
+
+/** The `verification` row that says a code of the account was taken: its id, keyed, never the code in clear. */
+const spentCodeId = (userId: string, code: string): string =>
+  `totp-spent-${createHash('sha256').update(`${userId}:${code}`).digest('base64url')}`;
+
+/**
+ * Takes the account's code once (recette SEC-03, RFC 6238 § 5.2): `false` when it was already taken in its window, by
+ * another sign-in or a confirmation, so that a code read over a shoulder or on a lure page never serves twice. The row's
+ * primary key makes two simultaneous claims one. Taken before Better Auth checks it; `releaseCode` gives back a code it
+ * then refused, so that a typo never spends a right code.
+ */
+async function claimCode(db: Database, userId: string, code: string): Promise<boolean> {
+  const id = spentCodeId(userId, code);
+  const expiresAt = sql`now() + make_interval(secs => ${SPENT_CODE_SECONDS})`;
+  const claimed = await db
+    .insert(schema.verification)
+    .values({ id, identifier: id, value: userId, expiresAt })
+    .onConflictDoUpdate({
+      target: schema.verification.id,
+      set: { expiresAt, updatedAt: sql`now()` },
+      setWhere: sql`${schema.verification.expiresAt} <= now()`,
+    })
+    .returning({ id: schema.verification.id });
+  return claimed.length > 0;
+}
+
+async function releaseCode(db: Database, userId: string, code: string): Promise<void> {
+  await db.delete(schema.verification).where(eq(schema.verification.id, spentCodeId(userId, code)));
+}
+
+/**
  * Whether the code is the account's, on the signed-in session: the authenticator's, or a backup code, which is then
  * used up. Better Auth's refusals are a wrong code; anything else (the database, the secret) is an error.
  */
-async function codeMatches(auth: Auth, request: FastifyRequest, code: SecondFactorCode): Promise<boolean> {
+async function codeMatches(
+  auth: Auth,
+  db: Database,
+  request: FastifyRequest,
+  userId: string,
+  code: SecondFactorCode,
+): Promise<boolean> {
   const headers = authHeaders(request);
   try {
     if (isBackupCode(code))
       await auth.api.verifyBackupCode({ headers, body: { code, disableSession: true } });
-    else await auth.api.verifyTOTP({ headers, body: { code } });
+    else {
+      if (!(await claimCode(db, userId, code))) return false;
+      try {
+        await auth.api.verifyTOTP({ headers, body: { code } });
+      } catch (error) {
+        await releaseCode(db, userId, code);
+        throw error;
+      }
+    }
     return true;
   } catch (error) {
     if (isAPIError(error)) return false;
@@ -664,12 +715,15 @@ async function codeMatches(auth: Auth, request: FastifyRequest, code: SecondFact
  */
 export async function identityConfirmed(
   auth: Auth,
+  db: Database,
   request: FastifyRequest,
   userId: string,
   password: string,
   code: SecondFactorCode,
 ): Promise<boolean> {
-  return (await passwordMatches(auth, userId, password)) && (await codeMatches(auth, request, code));
+  return (
+    (await passwordMatches(auth, userId, password)) && (await codeMatches(auth, db, request, userId, code))
+  );
 }
 
 type Membership = Pick<Me, 'team' | 'teamScope'>;
@@ -1124,12 +1178,19 @@ export function createAuthRoutes(
         if (await exceeded(request, reply, codeAccountKey(request, account), false)) {
           throw new CodeLocked();
         }
+        // A code already taken in its window is refused as a wrong one (recette SEC-03).
+        const { code } = request.body;
+        if (account !== null && !(await claimCode(db, account, code))) {
+          await refused(request, account, 'auth.code_refused');
+          throw new WrongCode();
+        }
         const startedAt = new Date();
         return forward(request, reply, {
           onUnauthorized: () => new CodeStepExpired(),
           refusal: secondFactorRefusal,
-          onRefused: async (_status, code) => {
-            if (code === 'INVALID_CODE') await refused(request, account, 'auth.code_refused');
+          onRefused: async (_status, refusal) => {
+            if (account !== null) await releaseCode(db, account, code);
+            if (refusal === 'INVALID_CODE') await refused(request, account, 'auth.code_refused');
           },
           onSuccess:
             session === null
@@ -1202,7 +1263,7 @@ export function createAuthRoutes(
       async (request, reply) => {
         if (request.user === null) throw new SessionUnauthenticated();
         const { password, code } = request.body;
-        if (!(await identityConfirmed(auth, request, request.user.id, password, code))) {
+        if (!(await identityConfirmed(auth, db, request, request.user.id, password, code))) {
           await refused(request, request.user.id, 'auth.reauthentication_refused');
           throw new ReauthenticationRefused();
         }
