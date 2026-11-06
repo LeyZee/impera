@@ -1,4 +1,5 @@
 import {
+  ContractorDocumentIdSchema,
   DraftIdSchema,
   newId,
   PayPeriodSchema,
@@ -48,7 +49,32 @@ const bodiesFor = (
     incident: null,
     signals: [],
   },
+  'PUT /v1/payroll/contractors/:memberId/profile': {
+    legalName: 'Nom inventé',
+    address: '1 rue Inventée, 75000 Paris',
+    taxId: null,
+    businessId: null,
+    vatNumber: null,
+    individualEntrepreneur: false,
+    legalForm: null,
+    shareCapitalMinor: null,
+    rcsCity: null,
+    email: 'facturation@nirvana.test',
+  },
 });
+
+/**
+ * Routes whose request is not a JSON body under `?creatorId=`: their own query, and the body they take as it is. The
+ * creator check runs after them, so only such a request proves it.
+ */
+const REQUESTS: Readonly<Record<string, { query: string; contentType: string; payload: Buffer }>> = {
+  // A PDF's first bytes: the route reads what a file is on them, and refuses the member before it keeps anything.
+  'POST /v1/payroll/contractors/:memberId/documents': {
+    query: `id=${newId(ContractorDocumentIdSchema)}&kind=urssaf_vigilance&issuedOn=2026-10-01`,
+    contentType: 'application/octet-stream',
+    payload: Buffer.from('%PDF-1.4\n%inventé\n'),
+  },
+};
 
 /**
  * What an active manager of A reaches of B, and only that: the whole team, its reports and its pay (ADR 0023, « le
@@ -426,6 +452,8 @@ describe('no route lets the people of one creator reach another one (audit des t
     const reached: string[] = [];
     const shown: string[] = [];
     const agency: string[] = [];
+    // A valid body or request that stops at the schema proves nothing: it fails the test until it is valid again.
+    const invalid: string[] = [];
     const bodies = bodiesFor(ids);
     let swept = 0;
     let asked = 0;
@@ -437,19 +465,27 @@ describe('no route lets the people of one creator reach another one (audit des t
         if (plan.kind !== 'swept' && (withParams || route.method !== 'GET' || route.path.includes('*')))
           continue;
         asked += 1;
-        const url = `${plan.kind === 'swept' ? plan.url : route.path}?creatorId=${ids.creator}`;
+        const special = REQUESTS[`${route.method} ${route.path}`];
+        const url = `${plan.kind === 'swept' ? plan.url : route.path}?${special?.query ?? `creatorId=${ids.creator}`}`;
         const writes = route.method === 'POST' || route.method === 'PUT' || route.method === 'PATCH';
         const response = await team.server.inject({
           method: MethodSchema.parse(route.method),
           url,
-          headers: { cookie: person.cookie, origin: DASHBOARD_ORIGIN },
+          headers: {
+            cookie: person.cookie,
+            origin: DASHBOARD_ORIGIN,
+            ...(special !== undefined && { 'content-type': special.contentType }),
+          },
           // One address per request: the limiter counts by address, and a 429 would hide what the route answers.
           remoteAddress: `10.0.${String(Math.floor(asked / 250))}.${String(asked % 250)}`,
           ...(writes && {
-            payload: bodies[`${route.method} ${route.path}`] ?? { creatorId: ids.creator },
+            payload: special?.payload ??
+              bodies[`${route.method} ${route.path}`] ?? { creatorId: ids.creator },
           }),
         });
         const where = `${person.role}: ${route.method} ${route.path} → ${String(response.statusCode)}`;
+        const key = `${route.method} ${route.path}`;
+        if (response.statusCode === 400 && (key in bodies || key in REQUESTS)) invalid.push(where);
         const leaked = markers.filter((marker) => response.body.includes(marker));
         const sees = (finding: string) =>
           (person.role === 'manager of A' ? agency : finding.includes(' shows ') ? shown : reached).push(
@@ -465,12 +501,14 @@ describe('no route lets the people of one creator reach another one (audit des t
     expect(swept).toBeGreaterThan(100);
     const after = await fingerprintOfB();
     expect({
+      invalid,
       reached,
       shown,
       agency,
       changed: beforeManager,
       changedByManager: Object.keys(after).filter((table) => after[table] !== beforeManager[table]),
     }).toEqual({
+      invalid: [],
       reached: Object.keys(KNOWN_REACHED),
       shown: [],
       agency: AGENCY_SCOPE,

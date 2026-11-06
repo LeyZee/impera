@@ -1,6 +1,6 @@
 {
   "id": "e35c4d11-71d3-4592-a01e-8b687563758d",
-  "prevId": "a6576f30-779e-43a1-9840-dc66d5d7d23a",
+  "prevId": "d75cc7d4-2201-4a10-aebe-13b8f18a12ba",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1447,6 +1447,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "script_number": {
+          "name": "script_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -1481,6 +1487,28 @@
         }
       },
       "indexes": {
+        "content_drops_script_number_unique": {
+          "name": "content_drops_script_number_unique",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "script_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"content_drops\".\"script_number\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "content_drops_request_live_unique": {
           "name": "content_drops_request_live_unique",
           "columns": [
@@ -1587,7 +1615,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_drops\".\"state\" = 'uploading' or (\"content_drops\".\"state\" = 'filling' and \"content_drops\".\"category\" = 'script'))\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_drops\".\"state\" = 'uploading' or (\"content_drops\".\"state\" = 'filling' and \"content_drops\".\"category\" = 'script'))\n        and \"content_drops\".\"corrected_from\" is null and \"content_drops\".\"script_number\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
         },
         "creator_withdraw": {
           "name": "creator_withdraw",
@@ -1609,7 +1637,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'\n        and \"content_drops\".\"corrected_from\" is null and \"content_drops\".\"script_number\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
         },
         "team_update": {
           "name": "team_update",
@@ -1652,6 +1680,10 @@
         "content_drops_script_check": {
           "name": "content_drops_script_check",
           "value": "\"content_drops\".\"category\" <> 'script' or \"content_drops\".\"request_id\" is not null"
+        },
+        "content_drops_script_number_check": {
+          "name": "content_drops_script_number_check",
+          "value": "\"content_drops\".\"script_number\" is null or (\"content_drops\".\"category\" = 'script' and \"content_drops\".\"script_number\" >= 1)"
         }
       },
       "isRLSEnabled": false

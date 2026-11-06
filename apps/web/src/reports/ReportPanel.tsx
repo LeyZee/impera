@@ -9,13 +9,22 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { useAppHold, type HoldResult } from './Hold';
-import { changeReport, makeReport, useRefreshReports, useReportContext, type ReportOutcome } from './api';
+import {
+  changeReport,
+  makeReport,
+  useRefreshReports,
+  useReportContext,
+  useReportEstimate,
+  type ReportOutcome,
+} from './api';
 import {
   amountInput,
   amountText,
   CURRENCY_SIGNS,
   CURRENCY_WORDS,
   currencyTyped,
+  ESTIMATE_LEAVES,
+  estimateLine,
   MEMBER_STATUS,
   parseAmount,
   periodLine,
@@ -60,6 +69,8 @@ export function ReportPanel({
   onClose: () => void;
 }): JSX.Element {
   const context = useReportContext(shiftId);
+  // Held here so that the title says « Corriger » as soon as a correction starts, not only when one is reopened.
+  const [correcting, setCorrecting] = useState(draft?.correcting ?? false);
   const reopen = useReopen();
   const onReopen = (again: ReportDraft): void => {
     reopen({ screen: from, shiftId, memberName: memberName ?? null, draft: again });
@@ -71,7 +82,7 @@ export function ReportPanel({
 
   return (
     <Dialog
-      title={titleOf(data, draft, memberName)}
+      title={titleOf(data, correcting, memberName)}
       lead={
         data === undefined ? undefined : (
           <>
@@ -109,7 +120,11 @@ export function ReportPanel({
         <Body
           data={data}
           draft={draft}
-          agency={memberName === undefined ? null : { canSetRules }}
+          agency={memberName === undefined ? null : { canSetRules, memberName }}
+          correcting={correcting}
+          onCorrect={() => {
+            setCorrecting(true);
+          }}
           onClose={onClose}
           onReopen={onReopen}
         />
@@ -120,11 +135,11 @@ export function ReportPanel({
 
 function titleOf(
   data: ShiftReportContext | undefined,
-  draft: ReportDraft | null,
+  correcting: boolean,
   memberName: string | undefined,
 ): string {
   if (memberName !== undefined) return `Corriger le rapport de ${memberName}`;
-  if (draft?.correcting === true) return 'Corriger mon rapport';
+  if (correcting) return 'Corriger mon rapport';
   const report = data === undefined ? null : reportOf(data.reports, data.shift.id);
   if (report === null) return 'Faire mon rapport';
   if (report.status === 'validated') return 'Mon rapport';
@@ -136,19 +151,23 @@ function Body({
   data,
   draft,
   agency,
+  correcting,
+  onCorrect,
   onClose,
   onReopen,
 }: {
   data: ShiftReportContext;
   draft: ReportDraft | null;
-  /** The agency correcting a member's report, and whether it sets the pay rules; `null` for the member. */
-  agency: { readonly canSetRules: boolean } | null;
+  /** The agency correcting a member's report, whose, and whether it sets the pay rules; `null` for the member. */
+  agency: { readonly canSetRules: boolean; readonly memberName: string } | null;
+  /** A correction is being written, from « Ajouter une correction » or a reopened draft. */
+  correcting: boolean;
+  onCorrect: () => void;
   onClose: () => void;
   onReopen: (draft: ReportDraft) => void;
 }): JSX.Element {
   const now = useNow(15_000);
   const zone = readerZone();
-  const [correcting, setCorrecting] = useState(draft?.correcting ?? false);
   const report = reportOf(data.reports, data.shift.id);
   const corrections = data.reports.filter((one) => one.correctsId !== null);
 
@@ -203,9 +222,7 @@ function Body({
         today={dayOf(now, zone)}
         corrections={corrections}
         total={validatedTotal(data.reports, data.shift.id)}
-        onCorrect={() => {
-          setCorrecting(true);
-        }}
+        onCorrect={onCorrect}
         onClose={onClose}
       />
     );
@@ -215,6 +232,7 @@ function Body({
       data={data}
       report={correcting ? null : report}
       corrected={correcting ? report : null}
+      memberName={agency?.memberName ?? null}
       draft={draft}
       onClose={onClose}
       onReopen={onReopen}
@@ -344,6 +362,7 @@ function Form({
   data,
   report,
   corrected,
+  memberName,
   draft,
   onClose,
   onReopen,
@@ -351,6 +370,8 @@ function Form({
   data: ShiftReportContext;
   report: ShiftReport | null;
   corrected: ShiftReport | null;
+  /** The member whose report the agency corrects; `null` when the member writes their own. */
+  memberName: string | null;
   draft: ReportDraft | null;
   onClose: () => void;
   onReopen: (draft: ReportDraft) => void;
@@ -400,6 +421,8 @@ function Form({
             : null;
   const incidentProblem =
     incidentOn && incident.trim() === '' ? 'Dis en une phrase ce qui s’est passé.' : null;
+  // What the amount brings, computed by the server (reco 19): only for an amount the panel would send.
+  const estimate = useReportEstimate(data.shift.id, amountProblem === null ? minor : null);
   const ready = amountProblem === null && incidentProblem === null && minor !== null;
   const unchanged =
     report !== null &&
@@ -523,7 +546,8 @@ function Form({
             aria-invalid={touched && amountProblem !== null}
             aria-describedby={`${id}-amount-hint`}
             onChange={(event) => {
-              setAmount(event.target.value);
+              // The true minus sign, as in the hint and the estimate: « −15 », never « -15 » (captures of #591).
+              setAmount(event.target.value.replace(/-/gu, '−'));
             }}
             onBlur={() => {
               if (amount !== '') setTouched(true);
@@ -543,6 +567,12 @@ function Form({
               ? 'Une vente oubliée, un remboursement : la correction se valide ensuite comme un rapport.'
               : `Le brut de tes ventes sur ce shift, en ${currency === 'EUR' ? 'euros' : 'dollars'}, comme la plateforme l’affiche.`}
         </p>
+        {estimate === null ? null : (
+          <p className="rp-estimate nv-num nv-swap" aria-live="polite">
+            <span className="rp-estimate__value">{estimateLine(estimate, correcting, memberName)}</span>
+            <span className="rp-estimate__leaves">{ESTIMATE_LEAVES}</span>
+          </p>
+        )}
       </div>
 
       <div className="nv-field tm-field">

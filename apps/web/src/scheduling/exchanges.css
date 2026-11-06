@@ -21,8 +21,9 @@
   font-weight: 500;
   color: var(--nv-ink-faint);
 }
+/* No native grip (captures of #591): the note keeps its rows, and a long one scrolls inside. */
 .sc-note {
-  resize: vertical;
+  resize: none;
   min-height: 64px;
 }
 .sc-empty {

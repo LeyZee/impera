@@ -1,4 +1,11 @@
-import type { CreatorId, CreatorPlanned, PayPeriod, PlatformAccountId } from '@impera/contracts';
+import type {
+  CreatorId,
+  CreatorPlanned,
+  PayPeriod,
+  PlatformAccountId,
+  ShiftId,
+  UserId,
+} from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -13,6 +20,7 @@ import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
 import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, OnShift } from './domain/ports';
+import type { ShiftFactsForPay } from './domain/reports';
 import { calendarDayIn } from './domain/time';
 import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
 import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/agency-share-check';
@@ -56,6 +64,8 @@ export { salesCheckReads } from './infra/sales-check-reads';
 export { createShiftAccessReader, type ShiftCreators } from './infra/access-window';
 /** @public An account the automatic sales check compares: its platform and its rules' currency. */
 export type { DetectedAccountForCheck } from './domain/sales-checks';
+/** @public What pay's estimate of a report reads of its shift (reco 19). */
+export type { ShiftFactsForPay } from './domain/reports';
 
 /** Public entry point of the `scheduling` module (EQ-02, ADR 0002). Other modules import this file only. */
 export interface SchedulingModule {
@@ -110,6 +120,12 @@ export interface SchedulingModule {
       to: Date,
     ) => Promise<ShiftForPay[]>;
     readonly accessMarginMinutes: (tx: Transaction) => Promise<number>;
+    /**
+     * For the estimate of a report (reco 19), in a transaction of its own as `actor`: the shift's member, period and
+     * rules in force, read as the report's panel reads them. The shift's member, the owner or an active manager; 404
+     * `shift_not_found`, 403 `shift_report_forbidden` to anyone else.
+     */
+    readonly shiftFacts: (actor: UserId, shiftId: ShiftId) => Promise<ShiftFactsForPay>;
   };
   readonly jobs: {
     /**
@@ -166,6 +182,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const calendarReads = createDrizzleCalendarReads(deps.db);
   const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf);
+  const reportStore = createDrizzleShiftReportStore(deps.db, deps.adminDb, deps.enqueuePayRecalculation);
   const services = {
     scheduling: createSchedulingService(planning, admin, deps.creators, now),
     calendar: createCalendarService(calendarReads, deps.creators, now),
@@ -188,11 +205,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       deps.creators,
       now,
     ),
-    reports: createShiftReportService(
-      createDrizzleShiftReportStore(deps.db, deps.adminDb, deps.enqueuePayRecalculation),
-      deps.creators,
-      now,
-    ),
+    reports: createShiftReportService(reportStore, deps.creators, now),
     feedback: createShiftFeedbackService(createDrizzleShiftFeedbackStore(deps.db, deps.adminDb), now),
     payRules: createPayRulesService(
       createDrizzlePayRulesStore(deps.db, deps.adminDb, deps.switchFactsOf),
@@ -217,6 +230,10 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       accountSources: accountSourcesForPay,
       shifts: shiftsForPay,
       accessMarginMinutes: accessMarginMinutesForPay,
+      shiftFacts: async (actor, shiftId) => {
+        const { shift, period, rules } = await reportStore.context(actor, shiftId);
+        return { memberId: shift.memberId, period, rules };
+      },
     },
     routes: (requireRole) => async (app, options) => {
       await createSchedulingRoutes(services, requireRole)(app, options);

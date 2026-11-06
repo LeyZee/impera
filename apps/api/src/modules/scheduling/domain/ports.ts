@@ -32,7 +32,7 @@ import type {
 
 import type { CreatorAgent } from './calendar';
 import type { FeedEvent } from './calendar-feed';
-import type { Reader, RulesRow } from './reports';
+import type { RatedRulesRow, Reader } from './reports';
 import type { PlannedCreators, WorkingMember } from './shifts';
 
 /** Who writes, for the policies (`withTenantMember`) and the audit line. */
@@ -503,7 +503,7 @@ export interface ShiftReportStore {
     shift: StoredShift;
     account: StoredAccount;
     period: PayPeriod;
-    rules: RulesRow | null;
+    rules: RatedRulesRow | null;
     reports: StoredShiftReport[];
     reader: Reader;
   }>;

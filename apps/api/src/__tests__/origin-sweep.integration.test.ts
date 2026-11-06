@@ -24,6 +24,15 @@ const NO_ORIGIN_CHECK: Readonly<Record<string, string>> = {
 const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const RefusalSchema = z.object({ error: z.object({ code: z.string() }) });
 
+/** A body read as JSON when it is, else nothing: a route that answers otherwise is named, never a thrown parse. */
+function jsonOf(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
 describe('no write comes from another site (audit des tests d’isolation, 06/11)', () => {
   let test: TestDb;
   let server: Server;
@@ -67,7 +76,7 @@ describe('no write comes from another site (audit des tests d’isolation, 06/11
           remoteAddress: `10.2.${String(Math.floor(asked / 250))}.${String(asked % 250)}`,
           ...(route.method !== 'DELETE' && { payload: {} }),
         });
-        const refusal = RefusalSchema.safeParse(response.json());
+        const refusal = RefusalSchema.safeParse(jsonOf(response.body));
         const refused =
           response.statusCode === 403 && refusal.success && refusal.data.error.code === 'origin_forbidden';
         if (!refused) unchecked.add(`${route.method} ${route.path}`);

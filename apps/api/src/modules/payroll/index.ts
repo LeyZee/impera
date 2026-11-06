@@ -18,6 +18,7 @@ import type { AfterValidation, ContestCorrectionWrite, PayoutGate } from './infr
 import { createPostgresRateAlerts } from './infra/rate-alerts';
 import { createDrizzlePayrollRateStore } from './infra/rate-store';
 import { createDrizzlePayrollReadStore } from './infra/read-store';
+import { createReportEstimate, type ShiftFactsRead } from './infra/report-estimate';
 import { createPayrollRoutes, type RequireRole } from './infra/routes';
 import { createDrizzlePayrollRuleStore } from './infra/rule-store';
 import { createDrizzleSaleDecisionStore } from './infra/sale-decision-store';
@@ -41,6 +42,8 @@ export { payReadsForContractors } from './infra/contractor-reads';
 export type { AfterValidation, ContestCorrectionWrite, PayoutGate } from './infra/ports';
 /** @public What pay reads of the other modules, plugged by the composition root (EQ-04, CRM-03). */
 export type { PayInputReads } from './infra/snapshot';
+/** @public What the estimate of a report reads of the planning, plugged by the composition root (reco 19). */
+export type { ShiftFactsRead } from './infra/report-estimate';
 export type { PayoutVerdict } from './domain/ports';
 /** Refused to a member on their own pay or document: the owner never decides in their own name (`invoicing` too). */
 export { PayrollOwnForbidden } from './domain/errors';
@@ -60,7 +63,10 @@ export type { StatementForInvoicing } from './infra/invoicing-reads';
 /** Public entry point of the `payroll` module (EQ-04, ADR 0002). Other modules import this file only. */
 export interface PayrollModule {
   readonly name: 'payroll';
-  /** Mounted under `/v1` by the server: `/payroll/…` (contracts `payroll.ts`). */
+  /**
+   * Mounted under `/v1` by the server: `/payroll/…` (contracts `payroll.ts`), and the estimate of a shift's report
+   * (`/payroll/shifts/:shiftId/estimate`, contract `shift-reports.ts`, reco 19).
+   */
   routes(requireRole: RequireRole): FastifyPluginAsyncZod;
   /**
    * The newest rate of a currency (ADR 0033), `null` before the first: the last ECB rate known, the one a draft of pay
@@ -97,6 +103,8 @@ export interface PayrollDeps {
   readonly adminDb: Database;
   /** What pay reads of the planning, the team and the creators, from their `index.ts`. */
   readonly reads: PayInputReads;
+  /** The shift of a report as the estimate reads it (reco 19): the `scheduling` module's `pay.shiftFacts`. */
+  readonly shiftFacts: ShiftFactsRead;
   readonly now?: () => Date;
   /** The ECB is reached through it (ADR 0033); the global `fetch` unless a test gives a fake one. */
   readonly fetch?: GetLike;
@@ -146,7 +154,16 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   return {
     name: 'payroll',
     routes: (requireRole) =>
-      createPayrollRoutes(reads, validation, entries, rules, decisions, signals, requireRole),
+      createPayrollRoutes(
+        reads,
+        validation,
+        entries,
+        rules,
+        decisions,
+        signals,
+        createReportEstimate(deps.db, deps.reads.members, deps.shiftFacts),
+        requireRole,
+      ),
     latestRate: createLatestRateRead(deps.db),
     correctContest: (tx, actor, correction) => writeContestCorrection(tx, deps.reads, now, actor, correction),
     jobs: {

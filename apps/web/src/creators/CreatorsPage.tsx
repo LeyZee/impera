@@ -11,6 +11,7 @@ import { SetupCard } from './SetupCard';
 import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
+import { IdeasSection } from './ideas/IdeasSection';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
@@ -146,6 +147,16 @@ export function CreatorsPage({
         />
       );
     }
+    if (shown === 'ideas' && current !== undefined) {
+      return (
+        <IdeasSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          timezone={current.timezone}
+        />
+      );
+    }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
@@ -188,13 +199,14 @@ export function CreatorsPage({
   const labels: Readonly<Record<CreatorSheet, string>> = {
     persona: 'Persona',
     agenda: 'Agenda',
+    ideas: 'Idées du jour',
     hours: 'Heures d’activité',
     access: 'Accès',
     rate: 'Pourcentage',
     profile: 'Profil',
   };
   // Her agenda right after her persona: the sheet a manager opens most (CR-05 lot c).
-  const order: readonly CreatorSheet[] = ['persona', 'agenda', 'hours', 'access', 'rate', 'profile'];
+  const order: readonly CreatorSheet[] = ['persona', 'agenda', 'ideas', 'hours', 'access', 'rate', 'profile'];
 
   return (
     <Page>
@@ -203,9 +215,9 @@ export function CreatorsPage({
         title="Créatrices"
         lead={
           isOwner
-            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.'
+            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses idées du jour, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.'
             : sheets.includes('agenda')
-              ? 'L’agenda de chaque créatrice : ce qu’elle a prévu, et les tâches que l’agence lui propose.'
+              ? 'L’agenda de chaque créatrice, et ses idées du jour : ce qu’elle a prévu, ce que l’agence lui propose.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={

@@ -1,5 +1,5 @@
 # VEI-02 Capture passive dans l'extension, page « Veille » et écran « Idées du jour »
-Statut : todo
+Statut : in_progress
 Phase : veille (ADR 0060)
 Dépend de : VEI-01 (dont la liaison par personne), composant de carton des lots SC
 Branche : task/vei-02-extension-capture
@@ -33,3 +33,4 @@ ADR 0060 § 1, § 2 (source 6) et § 5, ADR 0056 § 3 (rendu du carton), `/mnt/p
 Le relevé sur téléphone (n'existe pas : coller le lien). La génération des idées (VEI-03).
 
 ## Notes de session
+- 06/11/2026, lot a (web, Extension) : « Idées du jour » est une fiche de Créatrices (`?onglet=idees`), ouverte au propriétaire et aux managers actifs à côté de l'agenda : une carte par idée avec la tendance citée, valider tel quel, corriger sur place (seuls les champs changés partent), refuser avec un motif facultatif ; la garde du serveur (422) se dit telle quelle. « Coller un lien » vit dans cette fiche, pour la créatrice affichée. « Relier l'extension » est un panneau de Sécurité (Réglages pour le propriétaire, Moi pour un manager) : trois navigateurs au plus, le code montré une seule fois, délier après confirmation. Pas de « composant de carton » : un carton (ADR 0056 § 3) est une image rendue par le serveur pour une étape de script, rien à réutiliser pour une idée ; la carte reprend les styles de l'agenda. Reste le lot b : l'extension (manifeste, lecteur passif, Veille, marquage, envoi par lots) et la case « Relier » de sa popup qui prend le code.

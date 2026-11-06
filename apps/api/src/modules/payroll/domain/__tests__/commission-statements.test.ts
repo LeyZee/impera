@@ -2,6 +2,7 @@ import { carryOverRank, DomainError } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  commissionOfGross,
   computeCommissionStatements,
   ENGINE_VERSION,
   type AccountEarnings,
@@ -161,6 +162,34 @@ describe('a member’s share, account by account (Imperium’s chain)', () => {
     );
     expect(up.commissionMinor).toBe(1_235);
     expect(down.commissionMinor).toBe(-1_235);
+  });
+
+  it('estimates one gross by the chain of a line (reco 19)', () => {
+    // 150 $ at 0,92 = 138 € ; without 20 % VAT = 115 € ; less 20 % to the platform = 92 € ; at 20 % = 18,40 €.
+    const taken = {
+      rateMicros: USD_AT_092.rateMicros,
+      vatBps: 2_000,
+      platformFeeBps: 2_000,
+      commissionRateBps: 2_000,
+    };
+    expect(commissionOfGross({ grossMinor: 15_000, ...taken })).toBe(1_840);
+    // A correction of −150 $ takes off as much.
+    expect(commissionOfGross({ grossMinor: -15_000, ...taken })).toBe(-1_840);
+    // The same cent as a statement of that gross alone.
+    const one = statementOf(
+      period(
+        [
+          chatter('iris', {
+            accounts: [
+              account({ currency: 'USD', grossMinor: 12_345, vatBps: 2_000, platformFeeBps: 2_000 }),
+            ],
+          }),
+        ],
+        { rates: [USD_AT_092] },
+      ),
+      'iris',
+    );
+    expect(commissionOfGross({ grossMinor: 12_345, ...taken })).toBe(one.commissionMinor);
   });
 
   it('never guesses a rate it was not given', () => {

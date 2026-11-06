@@ -13,6 +13,7 @@ import {
   amountText,
   incidentsOf,
   currencyTyped,
+  estimateLine,
   lateFor,
   MEMBER_STATUS,
   parseAmount,
@@ -114,7 +115,7 @@ describe('an amount typed in a report', () => {
 
   it('shows back what was typed, and reads in its currency', () => {
     expect(amountInput(123_456)).toBe('1234,56');
-    expect(amountInput(-3_005)).toBe('-30,05');
+    expect(amountInput(-3_005)).toBe('−30,05');
     expect(plain(amountText(123_456, 'EUR'))).toBe('1 234,56 €');
     expect(plain(amountText(8_000, 'USD'))).toBe('80,00 $US');
     expect(plain(amountText(-3_000, 'EUR'))).toBe('−30,00 €');
@@ -261,5 +262,15 @@ describe('a refused « Ventes relevées » (CRM-03, ADR 0050 § 8)', () => {
       expect(text).not.toMatch(/reveal|€|\$|\d|clé/iu);
       expect(text).not.toMatch(/pas encore relevées/u);
     }
+  });
+});
+
+describe('the estimate under a report’s amount (reco 19)', () => {
+  it('says whose commission and, for a correction, its sign', () => {
+    const plain = (text: string): string => text.replace(/\s/gu, ' ');
+    expect(plain(estimateLine(803, false, null))).toBe('Ta commission estimée : 8,03 €');
+    expect(plain(estimateLine(-80, true, null))).toBe('Effet estimé sur ta commission : −0,80 €');
+    expect(plain(estimateLine(80, true, 'Théo'))).toBe('Effet estimé sur la commission de Théo : +0,80 €');
+    expect(plain(estimateLine(803, false, 'Théo'))).toBe('Commission estimée de Théo : 8,03 €');
   });
 });

@@ -86,6 +86,7 @@ describe('/v1/creator-space/content/script-drops', () => {
   let ines: CreatorId;
   let requestId: string;
   let versionId: string;
+  let structureId: string;
   const dropId = newId(ContentDropIdSchema);
   const cookies: Record<'nora' | 'ines' | 'owner', string> = { nora: '', ines: '', owner: '' };
   const call = (method: 'GET' | 'POST' | 'PUT', url: string, who: keyof typeof cookies, body?: object) =>
@@ -151,6 +152,7 @@ describe('/v1/creator-space/content/script-drops', () => {
     // Asked by hand, it shoots the version frozen then.
     expect(request.structureVersionId).toBe(library.current.id);
     versionId = library.current.id;
+    structureId = library.id;
   });
 
   afterAll(async () => {
@@ -284,9 +286,51 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(
       ContentDropSchema.parse((await call('POST', `${base}/${dropId}/submit`, 'nora')).json()).state,
     ).toBe('uploading');
+    // Her first script sent: number 1 (SC-03), kept when the tap is replayed.
+    const numbered = await test.admin.db
+      .select({ scriptNumber: schema.contentDrops.scriptNumber })
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, dropId));
+    expect(numbered.map((row) => row.scriptNumber)).toEqual([1]);
     const late = await fill('chambre:B:0', photo());
     expect([late.statusCode, codeOf(late.body).code]).toEqual([409, 'content_drop_file_settled_conflict']);
     expect((await call('GET', `${base}/${dropId}`, 'nora')).statusCode).toBe(200);
+  });
+
+  it('numbers two scripts she sends at once 2 and 3, never the same twice (SC-03)', async () => {
+    const drops = await Promise.all(
+      ['2026-11-26', '2026-12-10'].map(async (dueOn) => {
+        const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
+          id: newId(ContentRequestIdSchema),
+          category: 'script',
+          dueOn,
+          reason: 'Un autre script inventé',
+          structureId,
+        });
+        expect(asked.statusCode, asked.body).toBe(200);
+        const id = newId(ContentDropIdSchema);
+        const started = await call('POST', base, 'nora', {
+          id,
+          requestId: ContentRequestSchema.parse(asked.json()).id,
+        });
+        expect(started.statusCode, started.body).toBe(200);
+        for (const slotKey of ['salon::0', 'chambre:A:0', 'chambre:B:0'])
+          expect((await call('PUT', `${base}/${id}/slots/${slotKey}`, 'nora', photo())).statusCode).toBe(200);
+        return id;
+      }),
+    );
+    const sent = await Promise.all(drops.map((id) => call('POST', `${base}/${id}/submit`, 'nora')));
+    expect(sent.map((one) => one.statusCode)).toEqual([200, 200]);
+    const numbers = await test.admin.db
+      .select({ scriptNumber: schema.contentDrops.scriptNumber })
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.creatorId, nora));
+    expect(
+      numbers
+        .map((row) => row.scriptNumber)
+        .filter((n) => n !== null)
+        .toSorted((a, b) => a - b),
+    ).toEqual([1, 2, 3]);
   });
 
   it('erases a replaced file’s original like a withdrawn drop’s, never a live one', async () => {
