@@ -4,6 +4,8 @@ import { PlatformSchema } from './enums';
 import {
   CommissionStatementIdSchema,
   ContentDropFileIdSchema,
+  ContentDropIdSchema,
+  ContentRequestIdSchema,
   ConversationIdSchema,
   CreatorIdSchema,
   CreatorTaskIdSchema,
@@ -71,6 +73,7 @@ export const JOB_NAMES = [
   'content_drops.receive_file',
   'content_drops.convert_file',
   'content_drops.erase_originals',
+  'content_drops.drop_received',
   'scripts.ask_scripts',
   'providers.check_credentials',
   'connector.read_sales',
@@ -133,6 +136,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.receive_file': 'Réception des fichiers de contenu',
   'content_drops.convert_file': 'Conversion des vidéos',
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
+  'content_drops.drop_received': 'Dépôt reçu pour une idée',
   'scripts.ask_scripts': 'Demandes de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
@@ -364,6 +368,17 @@ export const JOB_PAYLOADS = {
    */
   'content_drops.erase_originals': z.object({}),
   /**
+   * A drop answering a content request has all its bytes (VEI-01 d3): enqueued in the transaction that writes
+   * `content_drop_received`, under the key `content_drops.drop_received:<dropId>`, once per drop. Content drops only
+   * announce it; the trend watch handles it (the idea that asked the request is `deposited`) and does nothing for a
+   * request that no idea asked.
+   */
+  'content_drops.drop_received': z.object({
+    creatorId: CreatorIdSchema,
+    dropId: ContentDropIdSchema,
+    requestId: ContentRequestIdSchema,
+  }),
+  /**
    * Each hour (SC-02, ADR 0056 § 2): each creator whose next script is due within the lead gets her request, with the
    * next structure of her queue that does not touch her limits, frozen. Replayable: one request per due day.
    */
@@ -471,6 +486,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.convert_file': 9,
   // Each hour: the next run is the retry.
   'content_drops.erase_originals': 1,
+  // Replayable: the idea moves only from `suggested`.
+  'content_drops.drop_received': 5,
   // Each hour: the next run is the retry.
   'scripts.ask_scripts': 1,
   'providers.check_credentials': 1,

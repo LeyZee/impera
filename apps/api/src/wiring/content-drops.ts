@@ -8,11 +8,14 @@ import {
   type ScriptVersions,
 } from '../modules/content-drops';
 
-import type { Routes, Shared, TasksOf } from './shared';
+import type { Routes, Shared, TasksNamed } from './shared';
 
 export interface WiredContentDrops {
   readonly module: ContentDropsModule;
-  readonly tasks: TasksOf<'content_drops'>;
+  /** `content_drops.drop_received` is the trend watch's to handle (`wiring/trends.ts`, VEI-01 d3). */
+  readonly tasks: TasksNamed<
+    'content_drops.receive_file' | 'content_drops.convert_file' | 'content_drops.erase_originals'
+  >;
   readonly routes: readonly Routes[];
 }
 
