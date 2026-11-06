@@ -88,7 +88,7 @@ Date : AAAA-MM-JJ
 | 0062 | Le projet s'appelle Impera : un renommage mécanique, en une PR, dans une fenêtre de gel | accepted |
 | 0063 | La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base | accepted (remplace dans 0042 § 2 la phrase « Elle voit tout son compte » ; § 3 en partie remplacé et § 2 précisé par 0065) |
 | 0064 | Cartons de script : la couleur du script et le dessin d'OnlyScript | accepted (remplace dans 0056 § 3 la phrase sur la palette) |
-| 0065 | La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans | accepted (remplace dans 0042 § 2 la phrase sur l'auteur d'un message, dans 0063 § 3 « sans jamais voir qui a écrit un message » ; précise 0063 § 2) |
+| 0065 | La créatrice voit qui a écrit chaque message, et des chiffres sur ses fans | accepted (remplace dans 0042 § 2 la phrase sur l'auteur d'un message, dans 0063 § 3 « sans jamais voir qui a écrit un message » ; précise 0063 § 2) ; nombre au survol du § 2 remplacé par 0074 |
 | 0066 | Le popup de l'extension : la connexion est celle du CRM, l'extension ne garde aucun secret de connexion | accepted (précise 0008 et 0062 § 8) |
 | 0067 | L'équipe installe l'extension depuis le CRM, puis depuis le Chrome Web Store en « non répertoriée » | accepted (précise 0066 et 0027) |
 | 0068 | Mot de passe oublié du propriétaire (Telegram, puis e-mail) et QR code de la validation en deux étapes | accepted (précise 0016, 0020 et 0046) |
