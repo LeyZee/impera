@@ -368,8 +368,9 @@
 }
 
 /* ── Équipe › Planning ── */
-/* The requests to decide, folded to one line until opened (EQ-02): the name of each requester in the summary. */
-.sc-decide > summary .nv-disclosure__title {
+/* The requests to decide, folded to one line until opened (EQ-02): the name of each requester in the summary. Its own
+   class: `.sc-decide` is her « À décider » on Aujourd'hui (#546), a row that would set the summary beside the leaves. */
+.sc-fold--decide > summary .nv-disclosure__title {
   color: var(--nv-warning);
 }
 .sc-row--leave {
