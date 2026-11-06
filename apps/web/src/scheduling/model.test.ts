@@ -65,8 +65,22 @@ const planning = (shifts: Shift[], conflicts: unknown[] = [], away: unknown[] = 
   PlanningSchema.parse({
     settings: settingsOf(),
     accounts: [
-      { id: NORA_REVEAL, creatorId: NORA, creatorName: 'Nora Vidal', platform: 'reveal', handle: 'nora' },
-      { id: LEA_REVEAL, creatorId: LEA, creatorName: 'Léa', platform: 'reveal', handle: 'lea' },
+      {
+        id: NORA_REVEAL,
+        creatorId: NORA,
+        creatorName: 'Nora Vidal',
+        platform: 'reveal',
+        handle: 'nora',
+        archived: false,
+      },
+      {
+        id: LEA_REVEAL,
+        creatorId: LEA,
+        creatorName: 'Léa',
+        platform: 'reveal',
+        handle: 'lea',
+        archived: false,
+      },
     ],
     members: [
       { id: THEO, displayName: 'Théo', color: '#c2410c' },

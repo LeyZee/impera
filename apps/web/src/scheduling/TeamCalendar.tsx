@@ -14,6 +14,7 @@ import {
   monthLabel,
   monthMarks,
   nameFor,
+  shownOn,
   slotLinesOf,
   type CalendarCell,
   type CalendarRow,
@@ -89,7 +90,8 @@ function Slot({
   zone: string;
   now: Date;
 }): JSX.Element {
-  const past = cell.to.getTime() <= now.getTime();
+  // Gone by, or on an archived creator (ADR 0071 § 2): grey, never « Libre ».
+  const past = cell.to.getTime() <= now.getTime() || cell.closed;
   const hours = rangeAt(cell.from.toISOString(), cell.to.toISOString(), zone);
   return (
     <div
@@ -220,6 +222,7 @@ export function TeamWeek({ calendar, days, today, now, me, focus, loading }: Cal
           >
             <span className="sc-grid__account" role="rowheader">
               <span className="sc-grid__creator">{row.creator.name}</span>
+              {row.creator.archived ? <span className="sc-grid__archived">archivée</span> : null}
               <AgentLine row={row} />
             </span>
             {days.map((day, index) => (
@@ -293,7 +296,10 @@ export function TeamMonth({
         {[0, 1, 2, 3, 4, 5].map((week) => (
           <div key={week} className="cal-month__week" role="row">
             {days.slice(week * 7, week * 7 + 7).map((day) => {
-              const marks = rows.map((row) => ({ row, marks: monthMarks(row.days.get(day) ?? [], now) }));
+              // An archived creator only on the days of her shifts: never a line of gaps (ADR 0071 § 2).
+              const marks = rows
+                .filter((row) => shownOn(row, day))
+                .map((row) => ({ row, marks: monthMarks(row.days.get(day) ?? [], now) }));
               const { said, mine } = dayWords(rows, day, me, now, fill);
               return (
                 <div key={day} role="cell" className="cal-month__cell">
@@ -374,24 +380,27 @@ function DayDetail({
       <h3 id="cal-detail-title" className="cal-detail__title">
         {longDay(day)}
       </h3>
-      {rows.map((row) => (
-        <div key={row.creator.id} className="cal-detail__creator">
-          <p className="cal-detail__name">
-            {row.creator.name}
-            <AgentLine row={row} />
-          </p>
-          <ul className="cal-detail__slots">
-            {(row.days.get(day) ?? []).map((cell) => (
-              <li key={cell.from.getTime()} className="cal-detail__slot">
-                <span className="cal-detail__range nv-num">
-                  {rangeAt(cell.from.toISOString(), cell.to.toISOString(), zone)}
-                </span>
-                <span className="cal-detail__who">{cellWho(cell, members, me, zone, now)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {rows
+        .filter((row) => shownOn(row, day))
+        .map((row) => (
+          <div key={row.creator.id} className="cal-detail__creator">
+            <p className="cal-detail__name">
+              {row.creator.name}
+              {row.creator.archived ? <span className="sc-grid__archived">archivée</span> : null}
+              <AgentLine row={row} />
+            </p>
+            <ul className="cal-detail__slots">
+              {(row.days.get(day) ?? []).map((cell) => (
+                <li key={cell.from.getTime()} className="cal-detail__slot">
+                  <span className="cal-detail__range nv-num">
+                    {rangeAt(cell.from.toISOString(), cell.to.toISOString(), zone)}
+                  </span>
+                  <span className="cal-detail__who">{cellWho(cell, members, me, zone, now)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
     </section>
   );
 }

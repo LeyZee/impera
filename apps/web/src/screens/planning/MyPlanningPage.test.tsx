@@ -69,6 +69,7 @@ const account = {
   creatorName: 'Nora Vidal',
   platform: 'reveal',
   handle: 'nora',
+  archived: false,
 };
 const people = [
   { id: THEO, displayName: 'Théo', color: '#c2410c' },
@@ -172,7 +173,7 @@ const calendars: string[] = [];
 const teamCalendar = (from: string, to: string): Record<string, unknown> => ({
   view: 'team',
   settings: settingsOf(),
-  creators: [{ id: NORA, name: 'Nora Vidal' }],
+  creators: [{ id: NORA, name: 'Nora Vidal', archived: false }],
   members: people.slice(0, 2),
   shifts: [
     { memberId: THEO, creatorId: NORA, startsAt: '2026-10-27T22:00:00Z', endsAt: '2026-10-28T04:00:00Z' },

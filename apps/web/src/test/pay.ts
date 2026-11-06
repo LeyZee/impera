@@ -105,6 +105,7 @@ export const NORA_REVEAL = {
   creatorName: 'Nora Vidal',
   platform: 'reveal',
   handle: 'nora',
+  archived: false,
 } as const;
 export const LEA_ONLYFANS = {
   id: payId(12),
@@ -112,6 +113,7 @@ export const LEA_ONLYFANS = {
   creatorName: 'Léa',
   platform: 'onlyfans',
   handle: 'lea',
+  archived: false,
 } as const;
 
 /** The pay rules' list as `/v1/team/pay-rules` gives it: the accounts, no rules needed by pay's screens. */

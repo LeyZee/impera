@@ -3,7 +3,6 @@ import {
   ShiftReportErrorCodeSchema,
   type CreateShiftReportBodySchema,
   type CreatorId,
-  type CreatorSummary,
   type RejectShiftReportBody,
   type ShiftId,
   type ShiftReport,
@@ -19,7 +18,7 @@ import {
 import type { z } from 'zod';
 
 import { ShiftReportForbidden } from '../domain/errors';
-import type { Actor, ShiftReportStore } from '../domain/ports';
+import type { Actor, CreatorDirectory, ListedCreator, ShiftReportStore } from '../domain/ports';
 import { isAgency, reportOpensAt } from '../domain/reports';
 
 import { toPlanningAccount, toPlanningMember, toShiftDto, toShiftReportDto } from './dto';
@@ -48,10 +47,10 @@ export interface ShiftReportService {
 
 export function createShiftReportService(
   store: ShiftReportStore,
-  creators: { list(): Promise<readonly CreatorSummary[]> },
+  creators: CreatorDirectory,
   now: () => Date = () => new Date(),
 ): ShiftReportService {
-  const names = async (): Promise<ReadonlyMap<string, CreatorSummary>> =>
+  const names = async (): Promise<ReadonlyMap<string, ListedCreator>> =>
     new Map((await creators.list()).map((creator) => [creator.id, creator]));
   const everyCreator = async (): Promise<CreatorId[]> => (await creators.list()).map((creator) => creator.id);
 

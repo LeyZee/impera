@@ -41,9 +41,18 @@ export interface Actor {
   readonly ip: string | null;
 }
 
+/** A creator as the planning reads her: her name, and whether she is archived (ADR 0071 § 2). */
+export interface ListedCreator extends CreatorSummary {
+  readonly archived: boolean;
+}
+
 /** The creators that exist, with their names (the `persona` module's directory, injected by the composition root). */
 export interface CreatorDirectory {
-  list(): Promise<readonly CreatorSummary[]>;
+  /**
+   * Every creator, the archived ones included and said so: her past shifts, reports and pay keep her name, and the
+   * planning refuses her anything new (ADR 0071 § 2).
+   */
+  list(): Promise<readonly ListedCreator[]>;
 }
 
 /** A shift as stored, cancelled ones never read. */
