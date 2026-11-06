@@ -8,6 +8,11 @@ Fait :
   - Au-delà, ou au-dessus de Reveal : la validation attend que le chatteur corrige ou explique, 48 h au plus, puis le manager tranche.
   - Jamais de retenue automatique.
 - Elle remplace, pour un compte Reveal en source « déclarée », le contrôle de l'ADR 0043 § 4 (5 % et 10 €, rapprochement ligne par ligne).
+- Relecture de Bilan (#601) intégrée le jour même :
+  - la comparaison n'est complète que quand le registre a été lu jusqu'au bout après la fin du shift (curseur `sales_feed_cursors`), pas seulement à l'horloge ;
+  - le job valide la version qu'il a comparée, avec une clé idempotente par (rapport, version) ;
+  - CHECK `(review_kind = 'automatic') = (reviewed_by is null)`, marque refusée aux membres en `WITH CHECK` ;
+  - bornes du seuil en CHECK, explication validée par Zod et jamais journalisée, port sous les politiques de l'acteur pour les écrans.
 
 Pas fait : le code (CR-09 à réécrire sur cette ADR). Il attend « ok 0073 » et une migration attribuée à l'arrivée sur `main`.
 
