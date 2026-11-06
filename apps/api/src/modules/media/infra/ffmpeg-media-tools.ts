@@ -55,8 +55,49 @@ async function run(
     return await execFileAsync(binary, args, { ...options, killSignal: 'SIGKILL' });
   } catch (error) {
     if (isNotFound(error)) throw new Error(missingMessage(binary), { cause: error });
-    throw error;
+    throw failureOf(binary, error);
   }
+}
+
+// Four lines of 64 stay under the 300 characters `storableError` keeps: none is cut there, the cause included.
+const ERROR_LINES = 4;
+const ERROR_LINE_MAX = 64;
+
+/**
+ * What a failed call says, for the job's retry, its `last_error` and the logs: the binary, its exit code or the signal
+ * that killed it, and ffmpeg's own error lines (« Format not on whitelist », « Invalid data »), the last few. Never the
+ * command, nor the dump of the input ffmpeg prints before (`Input #0 … from '<path>'` and its indented lines): it
+ * holds the file's own metadata (title, comment, device), the creator's (relecture des données gardées, 06/11).
+ * `killed` and `signal` are kept: a timeout is told from a refusal by them.
+ */
+function failureOf(binary: string, error: unknown): Error {
+  const fields = z
+    .object({
+      code: z.union([z.number(), z.string()]).nullish(),
+      signal: z.string().nullish(),
+      killed: z.boolean().optional(),
+      stderr: z.string().optional(),
+    })
+    .safeParse(error);
+  const { code, signal, killed, stderr } = fields.success ? fields.data : {};
+  const how =
+    killed === true ? 'timed out' : signal ? `killed by ${signal}` : `exit ${String(code ?? 'unknown')}`;
+  const said = (stderr ?? '')
+    .split('\n')
+    .filter((line) => line.trim() !== '' && !/^\s/u.test(line) && !/^(Input|Output) #/u.test(line))
+    .slice(-ERROR_LINES)
+    // `[bmp_pipe @ 0x55…]`: the address says nothing, the room is for the cause.
+    .map((line) =>
+      line
+        .trim()
+        .replace(/ @ 0x[0-9a-f]+\]/u, ']')
+        .slice(0, ERROR_LINE_MAX),
+    );
+  const tail = said.length === 0 ? '' : `: ${said.join(' | ')}`;
+  return Object.assign(new Error(`${binary} failed (${how})${tail}`), {
+    killed: killed === true,
+    signal: signal ?? null,
+  });
 }
 
 /** Killed by its `timeout`: the binary started, it was only slow (a machine under load). */

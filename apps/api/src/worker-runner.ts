@@ -6,6 +6,7 @@ import { run, type Runner, type WorkerEvents } from 'graphile-worker';
 
 import type { App } from './composition-root';
 import { parsedCronJobs, type CronJob } from './crontab';
+import { purgeDeadJobs } from './dead-jobs';
 import { workerLoggerFrom, type Logger } from './logger';
 import { releaseOrphanedLocks } from './orphaned-locks';
 import { useFrenchValidationMessages } from './validation-messages';
@@ -18,6 +19,8 @@ export interface WorkerOptions {
   readonly heartbeatIntervalMs?: number;
   /** How often this worker frees the locks of dead workers (`releaseOrphanedLocks`); 60 s in production. */
   readonly unlockIntervalMs?: number;
+  /** How often this worker deletes the jobs given up on long ago (`purgeDeadJobs`); hourly in production. */
+  readonly purgeIntervalMs?: number;
   /** Bound on the graceful stop, under Docker's 30 s before `SIGKILL` (operations.md). */
   readonly shutdownTimeoutMs?: number;
   /** Periodic jobs; tests pass none so that only their own jobs execute. */
@@ -88,12 +91,24 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
   await unlock();
   const unlocking = setInterval(() => void unlock(), options.unlockIntervalMs ?? 60_000);
 
+  const purge = async (): Promise<void> => {
+    try {
+      const purged = await purgeDeadJobs(app.adminDb.db);
+      if (purged > 0) logger.info({ purged }, 'jobs given up on long ago deleted');
+    } catch (error) {
+      logger.warn({ err: error }, 'deleting the jobs given up on long ago failed');
+    }
+  };
+  await purge();
+  const purging = setInterval(() => void purge(), options.purgeIntervalMs ?? 3_600_000);
+
   logger.info({ concurrency: options.concurrency }, 'worker started');
 
   let stopping: Promise<void> | undefined;
   const stop = async (): Promise<void> => {
     clearInterval(heartbeat);
     clearInterval(unlocking);
+    clearInterval(purging);
     const timeoutMs = options.shutdownTimeoutMs ?? 25_000;
     let timer: NodeJS.Timeout | undefined;
     const timedOut = new Promise<'timeout'>((resolve) => {
