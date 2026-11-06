@@ -435,7 +435,7 @@ function ActivityCard({
           </div>
         ))}
       </div>
-      <p className="fi-card__foot">Sur les 30 derniers jours, dans ton heure.</p>
+      <p className="fi-card__foot">Leurs messages des 30 derniers jours, dans ton heure.</p>
     </article>
   );
 }

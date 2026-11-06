@@ -127,8 +127,9 @@ describe('GET /v1/creator-space/fan-insights', () => {
         },
         correlationId: 'seed',
       });
-      // Six of them unlocked a 30 € message.
-      if (i < 6)
+      // Six of them unlocked a 30 € message; a seventh paid in dollars only, which neither the paying share nor
+      // the spending tiers count (euros only, as « Tes fans »).
+      if (i < 7)
         await app.modules.conversations.ingestMessage({
           creatorId: nora,
           platformAccountId: a.accountId,
@@ -142,7 +143,7 @@ describe('GET /v1/creator-space/fan-insights', () => {
             text: 'Un cadeau',
             media: [],
             priceMinor: 3000,
-            currency: 'EUR',
+            currency: i < 6 ? 'EUR' : 'USD',
             isPaid: true,
             createdAt: yesterday.toISOString(),
           },
@@ -249,6 +250,7 @@ describe('GET /v1/creator-space/fan-insights', () => {
     expect(insights.situation).toEqual({ status: 'too_few' });
     expect(insights.spending).toEqual({
       status: 'enough',
+      // 6 of 13 paid in euros; the fan who paid in dollars only is not a paying fan here.
       payingShare: 46,
       averageBasketMinor: null,
       cases: [

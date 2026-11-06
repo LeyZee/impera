@@ -67,7 +67,7 @@ export async function readFanInsights(
                coalesce(sum(m.price_minor) filter (where m.currency = 'EUR'), 0) as eur_minor,
                coalesce(sum(m.price_minor) filter (where m.currency = 'EUR'
                  and m.platform_created_at >= ${at}::timestamptz - interval '30 days'), 0) as eur_30_minor,
-               count(m.id) as unlocked
+               count(m.id) filter (where m.currency = 'EUR') as unlocked
         from fans f
         left join conversations c on c.fan_id = f.id
         left join messages m on m.conversation_id = c.id

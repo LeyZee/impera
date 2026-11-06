@@ -1175,7 +1175,7 @@ export interface FigureInput {
   readonly spentMinor: readonly number[];
   /** What each fan who paid over the last 30 days unlocked over them, in euro cents (> 0). */
   readonly basketsMinor: readonly number[];
-  /** Fans who unlocked at least one message, in any currency. */
+  /** Fans who unlocked at least one message in euros, the only currency the tiers count. */
   readonly payingFans: number;
   /** Her fans' messages over the last 30 days, by day (0 = Monday) and slot of three hours, in her time zone. */
   readonly activity: readonly { readonly day: number; readonly slot: number; readonly messages: number }[];
