@@ -315,6 +315,15 @@ describe('error format (api.md)', () => {
     });
   });
 
+  it('pins the keys of the common error body, now written without a response schema to filter it (BIL-05)', async () => {
+    const app = await server();
+    for (const url of ['/v1/refusal-route', '/v1/boom', '/v1/no-such-route']) {
+      const body = (await app.inject({ method: 'GET', url })).json<{ error: Record<string, unknown> }>();
+      expect(Object.keys(body), url).toEqual(['error']);
+      expect(Object.keys(body.error).sort(), url).toEqual(['code', 'details', 'message', 'requestId']);
+    }
+  });
+
   it('hides the detail of an unexpected error behind a 500', async () => {
     const response = await (await server()).inject({ method: 'GET', url: '/v1/boom' });
     expect(response.statusCode).toBe(500);
