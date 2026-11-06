@@ -4,6 +4,7 @@ import { secretOrNull } from '../config';
 import { createConnectionStatePublisher } from '../connection-state';
 import { defineTask } from '../jobs';
 import { startProvidersModule, type ProvidersModule } from '../modules/providers';
+import { sandboxOf } from '../sandbox';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -15,12 +16,15 @@ export interface WiredProviders {
 
 export async function wireProviders(shared: Shared): Promise<WiredProviders> {
   const { config, adminDb, logger, requireRole, recentLogin } = shared;
+  const sandbox = sandboxOf(config);
   const module = await startProvidersModule({
     adminDb,
     // The `.env.example` placeholder counts as unset: keys stay in memory instead of crashing the start.
     encryptionKeys: secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS) ?? undefined,
+    // ADR 0075: the sandbox reads no key of the environment, only those pasted in the dashboard, checked by the
+    // fake world.
     environmentKeys:
-      config.NODE_ENV === 'production'
+      config.NODE_ENV === 'production' || sandbox !== null
         ? null
         : {
             xai: config.LLM_XAI_API_KEY,
@@ -33,6 +37,7 @@ export async function wireProviders(shared: Shared): Promise<WiredProviders> {
       logger.warn({ err: error }, 'AI service keys not loaded');
     },
     publishConnectionState: createConnectionStatePublisher(adminDb),
+    ...(sandbox !== null && { baseUrls: sandbox.baseUrls }),
   });
   return {
     module,

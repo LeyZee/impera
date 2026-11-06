@@ -284,7 +284,7 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Agenda', 'Idées du jour', 'Scripts']);
+    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts']);
     router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
     expect(await screen.findByText('Ses idées du jour')).toBeDefined();
     for (const onglet of ['pourcentage', 'acces', 'heures']) {

@@ -15,6 +15,7 @@ import { IdeasSection } from './ideas/IdeasSection';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
+import { RequestsSection } from './requests/RequestsSection';
 import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 
@@ -158,6 +159,17 @@ export function CreatorsPage({
         />
       );
     }
+    if (shown === 'requests' && current !== undefined) {
+      return (
+        <RequestsSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          timezone={current.timezone}
+          isOwner={isOwner}
+        />
+      );
+    }
     if (shown === 'scripts' && current !== undefined) {
       return (
         <ScriptsSection
@@ -211,6 +223,7 @@ export function CreatorsPage({
     persona: 'Persona',
     agenda: 'Agenda',
     ideas: 'Idées du jour',
+    requests: 'Demandes',
     scripts: 'Scripts',
     hours: 'Heures d’activité',
     access: 'Accès',
@@ -222,6 +235,7 @@ export function CreatorsPage({
     'persona',
     'agenda',
     'ideas',
+    'requests',
     'scripts',
     'hours',
     'access',
@@ -236,9 +250,9 @@ export function CreatorsPage({
         title="Créatrices"
         lead={
           isOwner
-            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses idées du jour, ses scripts, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.'
+            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses idées du jour, ses demandes, ses scripts, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.'
             : sheets.includes('agenda')
-              ? 'L’agenda de chaque créatrice, ses idées du jour et ses scripts : ce qu’elle a prévu, ce que l’agence lui propose, ce qu’elle a envoyé.'
+              ? 'L’agenda de chaque créatrice, ses idées du jour, ses demandes et ses scripts : ce qu’elle a prévu, ce que l’agence lui propose et lui demande, ce qu’elle a envoyé.'
               : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
         }
         actions={

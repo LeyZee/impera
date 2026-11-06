@@ -17,6 +17,7 @@ import {
 } from '../modules/connectors';
 import { createFfmpegMediaTools, sniffMediaType } from '../modules/media';
 import { salesCheckReads } from '../modules/scheduling';
+import { sandboxOf } from '../sandbox';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -59,9 +60,13 @@ export function wireConnectors(
     credentialKeys:
       credentialKeys === null ? null : parseEncryptionKeys(credentialKeys, 'CREDENTIALS_ENCRYPTION_KEYS'),
     // Nothing is called at Reveal until the owner pastes a key in Réglages.
-    salesFeeds: deps.salesFeeds ?? { reveal: revealSalesFeed(fetch) },
-    // Deliveries come to the address the owner signs in at; over plain HTTP (development) no webhook is registered.
-    publicBaseUrl: config.AUTH_BASE_URL,
+    // In the recette sandbox (ADR 0075), the same adapter reads the fake world's CRM API.
+    salesFeeds: deps.salesFeeds ?? { reveal: revealSalesFeed(fetch, sandboxOf(config)?.baseUrls.revealCrm) },
+    // Deliveries come to the address the owner signs in at; over plain HTTP (development) no webhook is registered,
+    // except in the recette sandbox (ADR 0075), where the fake world posts them to the API on this machine.
+    ...(sandboxOf(config) === null
+      ? { publicBaseUrl: config.AUTH_BASE_URL }
+      : { publicBaseUrl: `http://127.0.0.1:${String(config.PORT)}`, loopbackWebhooks: true }),
     // The automatic sales check compares the accounts the pay rules put on the platform's net (CRM-04 b3).
     detectedAccounts: (period) => withAdmin(adminDb, (tx) => salesCheckReads.detectedAccounts(tx, period)),
     // Reveal's register down or back (Telegram P3-12), told by the Telegram module.

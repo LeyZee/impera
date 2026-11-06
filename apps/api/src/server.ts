@@ -31,6 +31,7 @@ import {
 } from './database-errors';
 import type { Logger } from './logger';
 import type { Readiness } from './readiness';
+import { SANDBOX_HEADER } from './sandbox';
 import { useFrenchValidationMessages } from './validation-messages';
 
 export interface ServerDeps {
@@ -133,6 +134,8 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
 
   server.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
+    // The dashboard shows its « Bac à sable » banner from this (ADR 0075).
+    if (config.IMPERA_SANDBOX) reply.header(SANDBOX_HEADER, '1');
   });
 
   // CSRF (security.md §6): a mutation must come from the dashboard. `SameSite=Lax` cookies plus this check, no

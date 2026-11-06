@@ -181,6 +181,11 @@ export interface ConnectorsDeps {
    */
   readonly publicBaseUrl: string | null;
   /**
+   * The recette sandbox (ADR 0075): `publicBaseUrl` is this machine over plain HTTP, where the fake world posts its
+   * deliveries. Never set outside the sandbox, which the configuration refuses in production.
+   */
+  readonly loopbackWebhooks?: boolean;
+  /**
    * The accounts paid on the platform's net over the whole of a fortnight (CRM-04 b3): the `scheduling` module's
    * `salesCheckReads`, read on the admin connection by the composition root. Never a write of the pay rules.
    */
@@ -224,7 +229,8 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     webhooks:
       deps.credentialKeys === null ? null : createSalesFeedWebhookStore(deps.adminDb, deps.credentialKeys),
     jobs: createSalesFeedJobs(deps.adminDb),
-    webhookUrl: (platform) => salesFeedWebhookUrl(deps.publicBaseUrl, platform),
+    webhookUrl: (platform) =>
+      salesFeedWebhookUrl(deps.publicBaseUrl, platform, deps.loopbackWebhooks === true),
     detectedAccounts: deps.detectedAccounts,
     connectionState: async (platform, signal, correlationId) => {
       const service = connectionServiceOf(platform);
@@ -261,9 +267,13 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
   };
 }
 
-/** Where a platform posts its deliveries; only over HTTPS, the platform would refuse anything else. */
-function salesFeedWebhookUrl(base: string | null, platform: string): string | null {
+/**
+ * Where a platform posts its deliveries; only over HTTPS, the platform would refuse anything else, except this machine
+ * over HTTP in the recette sandbox (`loopback`, ADR 0075).
+ */
+function salesFeedWebhookUrl(base: string | null, platform: string, loopback: boolean): string | null {
   if (base === null) return null;
   const url = new URL(`v1/webhooks/sales-feeds/${platform}`, base.endsWith('/') ? base : `${base}/`);
-  return url.protocol === 'https:' ? url.toString() : null;
+  if (url.protocol === 'https:') return url.toString();
+  return loopback && url.protocol === 'http:' && url.hostname === '127.0.0.1' ? url.toString() : null;
 }
