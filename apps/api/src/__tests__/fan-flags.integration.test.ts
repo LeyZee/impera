@@ -231,6 +231,7 @@ describe('fan flags (GET and PUT /v1/fans/:id/flags) and lines to learn (GET /v1
         role: 'owner',
         creatorIds: [],
         routedCreatorIds: [],
+        shiftCreatorIds: [],
       };
       return Promise.resolve();
     };

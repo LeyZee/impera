@@ -50,6 +50,7 @@ describe('MeSchema', () => {
     role: 'operator',
     creatorIds: [],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
   };
 
   it('carries the team role and the scope, never the session token', () => {

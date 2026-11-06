@@ -8,7 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppRouter } from '@/router';
 
 /* Invented members: no real person. */
-const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds: [], routedCreatorIds: [] };
+const base = {
+  id: 'u1',
+  email: 'membre@example.test',
+  name: 'Nora',
+  creatorIds: [],
+  routedCreatorIds: [],
+  shiftCreatorIds: [],
+};
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 
 beforeEach(() => {

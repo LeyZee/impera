@@ -107,6 +107,7 @@ describe('App without a network (CREA-04)', () => {
     role: 'creator',
     creatorIds: ['01936f00-0000-7000-8000-0000000000aa'],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
     team: null,
     teamScope: 'self',
   };
@@ -165,6 +166,7 @@ describe('App on an invitation link', () => {
     role: 'operator',
     creatorIds: [],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
     team: { role: 'chatter', status: 'active' },
     teamScope: 'self',
   };
@@ -259,6 +261,7 @@ describe('App signing out', () => {
     role: 'owner',
     creatorIds: [],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
     team: null,
     teamScope: 'owner',
   };
@@ -300,6 +303,7 @@ describe('App when the session ends while it is open (recette 05/11, SEC-01)', (
     role: 'owner',
     creatorIds: [],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
     team: null,
     teamScope: 'owner',
   };
@@ -439,6 +443,7 @@ describe('App on the screens of a contractor’s file', () => {
     role: 'operator',
     creatorIds: [],
     routedCreatorIds: [],
+    shiftCreatorIds: [],
     team: { role, status: 'active' },
     teamScope: role === 'chatter' ? 'self' : 'agency',
   });

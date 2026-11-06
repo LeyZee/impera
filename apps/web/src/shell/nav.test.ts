@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import { canOpen, documentTitle, layoutRail, railKindOf, railOf, sectionOf, type Section } from './nav';
 
-const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds: [], routedCreatorIds: [] };
+const base = {
+  id: 'u1',
+  email: 'membre@example.test',
+  name: 'Nora',
+  creatorIds: [],
+  routedCreatorIds: [],
+  shiftCreatorIds: [],
+};
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 const manager: Me = {
   ...base,

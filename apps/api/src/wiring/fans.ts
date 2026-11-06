@@ -6,16 +6,16 @@ import { createFansModule, type FansModule } from '../modules/fans';
 import type { Routes, Shared, TasksOf } from './shared';
 
 type KycSlotsOf = NonNullable<Parameters<FansModule['routes']>[1]>;
-type FanRoutedTo = NonNullable<Parameters<FansModule['routes']>[2]>;
+type FanAccess = NonNullable<Parameters<FansModule['routes']>[2]>;
 
 export interface WiredFans {
   readonly module: FansModule;
   readonly tasks: TasksOf<'fans'>;
   /**
-   * Her canvas lines come from the agent, and who holds a fan's conversation from `conversations`, both wired after:
-   * the routes are built once they exist.
+   * Her canvas lines come from the agent, and who holds a fan's conversation and the trace of a chatter's reading from
+   * `conversations`, both wired after: the routes are built once they exist.
    */
-  routes(kycSlotsOf: KycSlotsOf, fanRoutedTo: FanRoutedTo): Routes;
+  routes(kycSlotsOf: KycSlotsOf, fanAccess: FanAccess): Routes;
 }
 
 export function wireFans(shared: Shared): WiredFans {
@@ -36,6 +36,6 @@ export function wireFans(shared: Shared): WiredFans {
         },
       ),
     },
-    routes: (kycSlotsOf, fanRoutedTo) => module.routes(requireRole, kycSlotsOf, fanRoutedTo),
+    routes: (kycSlotsOf, fanAccess) => module.routes(requireRole, kycSlotsOf, fanAccess),
   };
 }

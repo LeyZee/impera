@@ -59,7 +59,7 @@ export function TrackingPage({
   canDecide,
   canAddCreator,
   offShift,
-  routedOnly = false,
+  selfScope = false,
   nothingListed,
   nav,
 }: {
@@ -78,11 +78,12 @@ export function TrackingPage({
    */
   offShift?: ((holdsHandover: boolean) => ReactNode) | undefined;
   /**
-   * A team member whose scope is `self` (a chatter): he reads only the conversations routed to him, a human hand on one
-   * of them is his, he reads the fan's limits without changing them, and a hand given back leaves his list.
+   * A team member whose scope is `self` (a chatter, ADR 0025): during his shift he reads every conversation of his
+   * creator, outside it only the ones he holds; another person's hand is only said, he reads the fan's limits without
+   * changing them, and a hand he gives back off shift leaves his list.
    */
-  routedOnly?: boolean;
-  /** What a member who reads only his routed conversations sees while none is listed: what to do, never a blank. */
+  selfScope?: boolean;
+  /** What a member whose scope is `self` sees while nothing is listed: what to do, never a blank. */
   nothingListed?: ReactNode;
   /** Suivi's sub-views, for whoever reads the history of the alerts too (P4-01); a chatter has none. */
   nav?: ReactNode;
@@ -102,7 +103,7 @@ export function TrackingPage({
   const [order, setOrder] = useState<ListOrder>(readListOrder);
   const [search, setSearch] = useState('');
   const [allTodos, setAllTodos] = useState(false);
-  /** A hand just given back by a member who reads only his routed conversations: it left his list, said once. */
+  /** A hand just given back by a member whose scope is `self`, the conversation gone from his list: said once. */
   const [released, setReleased] = useState<string | null>(null);
 
   const isLoading = creatorsQuery.isPending || queries.some((q) => q.isPending);
@@ -185,7 +186,7 @@ export function TrackingPage({
       ) : // Off shift with nothing listed: the banner above says it all, never « no conversation yet ».
       offShift !== undefined && lines.length === 0 && todos.length === 0 && !queue.isError ? (
         releasedNote(released)
-      ) : (creators.length === 0 || (routedOnly && lines.length === 0 && isQueueEmpty)) &&
+      ) : (creators.length === 0 || (selfScope && lines.length === 0 && isQueueEmpty)) &&
         nothingListed !== undefined ? (
         <>
           {releasedNote(released)}
@@ -278,7 +279,7 @@ export function TrackingPage({
                   ) : null}
                   {/* Grouped by who acts (CHAT-22): the state is said by the group, not on every line. */}
                   <div role="group" aria-label="Conversations" className="tr-groups">
-                    {groupByHand(shown, routedOnly).map((group) => (
+                    {groupByHand(shown, selfScope).map((group) => (
                       <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
                         <h3 className="tr-group__title">
                           {HAND_TITLES[group.hand]}
@@ -292,7 +293,7 @@ export function TrackingPage({
                               key={conversation.id}
                               conversation={conversation}
                               hand={group.hand}
-                              holdsHand={routedOnly}
+                              selfScope={selfScope}
                               creatorName={showsCreator ? creatorName : undefined}
                               now={now}
                               isOpen={conversation.id === selected}
@@ -335,12 +336,12 @@ export function TrackingPage({
               creatorId={open}
               conversationId={selected}
               canDecide={canDecide}
-              routedOnly={routedOnly}
+              selfScope={selfScope}
               onClose={() => {
                 onSelect(null);
               }}
               onReleased={
-                routedOnly
+                selfScope
                   ? (fan) => {
                       setReleased(fan);
                       onSelect(null);
@@ -462,12 +463,12 @@ function QueueRow({
 /**
  * A conversation of the list: his pseudo first, his messages without an answer and whose fan he is beside it (D-03),
  * when he wrote under it. The state shows only where it tells something: in « À toi », why a person must act; elsewhere
- * the group's title says it, but for a pause (CHAT-22).
+ * the group's title says it, but for a pause and another person's hand (CHAT-22, EQ-13).
  */
 function Row({
   conversation,
   hand,
-  holdsHand,
+  selfScope,
   creatorName,
   now,
   isOpen,
@@ -476,8 +477,8 @@ function Row({
   conversation: ConversationSummary;
   /** The group the line is in: its state is said once, by the group. */
   hand: Hand;
-  /** The reader holds the conversations routed to him: a human hand is his. */
-  holdsHand: boolean;
+  /** A member whose scope is `self`: another person's hand is said beside it, in the quiet ones. */
+  selfScope: boolean;
   /** Shown beside his pseudo when the account sees several creators, never cut. */
   creatorName: string | undefined;
   now: Date;
@@ -486,8 +487,14 @@ function Row({
 }): JSX.Element {
   const name = conversation.fanDisplayName.trim() === '' ? 'Fan sans nom' : conversation.fanDisplayName;
   const line = subline(conversation, now);
-  const situation = situationOf(conversation, holdsHand);
-  const says = hand === 'yours' ? 'pill' : conversation.state === 'paused' ? 'word' : null;
+  const situation = situationOf(conversation, selfScope);
+  // Outside « À toi », only a pause and another person's hand are worth a word: the group says the rest.
+  const says =
+    hand === 'yours'
+      ? 'pill'
+      : conversation.state === 'paused' || conversation.state === 'human'
+        ? 'word'
+        : null;
   return (
     <li className="nv-enter">
       <button

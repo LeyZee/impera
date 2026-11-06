@@ -1,4 +1,5 @@
 import {
+  ConversationHolderSchema,
   ConversationIdSchema,
   ConversationModeSchema,
   ConversationStateSchema,
@@ -20,12 +21,15 @@ import {
   type DraftView,
   type MessageMediaView,
   type ConversationState,
+  type UserId,
 } from '@impera/contracts';
 import { and, eq, schema, SNAPSHOT_READ, sql, withTenant, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '../../domain/ports';
 
+import { heldBy, holderFor } from './holds';
+import { openedLately, writeOpening } from './openings';
 import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toStoredEvent } from './rows';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
@@ -65,6 +69,7 @@ async function summaries(
   where: ReturnType<typeof and>,
   limit: number,
   now: Date,
+  readerId: UserId,
 ): Promise<{ summary: ConversationSummary; cursorAt: string }[]> {
   const rows = await tx
     .select({
@@ -81,6 +86,7 @@ async function summaries(
       updatedAt: schema.conversations.updatedAt,
       desireScore: schema.conversations.desireScore,
       desireAt: schema.conversations.desireAt,
+      heldBy: sql<string | null>`${holderFor(sql`${readerId}`)}`,
       cursorAt: cursorInstant(schema.conversations.updatedAt),
     })
     .from(schema.conversations)
@@ -101,6 +107,7 @@ async function summaries(
       unreadCount: row.unreadCount,
       updatedAt: row.updatedAt.toISOString(),
       desire: desireAt(row.desireScore, row.desireAt, now),
+      heldBy: ConversationHolderSchema.nullable().parse(row.heldBy),
     },
   }));
 }
@@ -155,7 +162,7 @@ export function createDrizzleConversationReader(
   mediaDescriptions: MediaDescriptions,
 ): ConversationReader {
   return {
-    list: (creatorId, page, routedTo) =>
+    list: (creatorId, page, { userId, heldOnly }) =>
       withTenant(db, creatorId, async (tx) => {
         const after = decodeCursor(page.cursor);
         const rows = await summaries(
@@ -164,10 +171,11 @@ export function createDrizzleConversationReader(
             after === null
               ? undefined
               : sql`(${schema.conversations.updatedAt}, ${schema.conversations.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`,
-            routedTo === undefined ? undefined : eq(schema.conversations.routedToUserId, routedTo),
+            heldOnly ? heldBy(sql`${userId}`) : undefined,
           ),
           page.limit + 1,
           clock.now(),
+          userId,
         );
         const { items, nextCursor } = paged(rows, page, (last) =>
           encodeCursor(last.cursorAt, last.summary.id),
@@ -175,32 +183,69 @@ export function createDrizzleConversationReader(
         return { items: items.map((row) => row.summary), nextCursor };
       }),
 
-    isRoutedTo: (creatorId, id, userId) =>
+    isHeldBy: (creatorId, id, userId) =>
       withTenant(db, creatorId, async (tx) => {
         const [row] = await tx
           .select({ id: schema.conversations.id })
           .from(schema.conversations)
-          .where(and(eq(schema.conversations.id, id), eq(schema.conversations.routedToUserId, userId)));
+          .where(and(eq(schema.conversations.id, id), heldBy(sql`${userId}`)));
         return row !== undefined;
       }),
 
-    isFanRoutedTo: (creatorId, fanId, userId) =>
+    holderOf: (creatorId, id, userId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const [row] = await tx
+          .select({ holder: sql<string | null>`${holderFor(sql`${userId}`)}` })
+          .from(schema.conversations)
+          .where(eq(schema.conversations.id, id));
+        return row === undefined ? null : ConversationHolderSchema.nullable().parse(row.holder);
+      }),
+
+    isFanHeldBy: (creatorId, fanId, userId) =>
       withTenant(db, creatorId, async (tx) => {
         const [row] = await tx
           .select({ id: schema.conversations.id })
           .from(schema.conversations)
-          .where(and(eq(schema.conversations.fanId, fanId), eq(schema.conversations.routedToUserId, userId)))
+          .where(and(eq(schema.conversations.fanId, fanId), heldBy(sql`${userId}`)))
           .limit(1);
         return row !== undefined;
       }),
 
+    traceOpening: (creatorId, id, { userId, ip, via }) =>
+      withTenant(db, creatorId, async (tx) => {
+        if (!(await exists(tx, id))) return false;
+        if (!(await openedLately(tx, userId, id)))
+          await writeOpening(tx, {
+            userId,
+            id,
+            ip,
+            creatorId,
+            by: 'chatter',
+            ...(via === undefined ? {} : { via }),
+          });
+        return true;
+      }),
+
+    traceFanOpening: (creatorId, fanId, { userId, ip, via }) =>
+      withTenant(db, creatorId, async (tx) => {
+        const rows = await tx
+          .select({ id: schema.conversations.id })
+          .from(schema.conversations)
+          .where(eq(schema.conversations.fanId, fanId));
+        for (const row of rows) {
+          const id = ConversationIdSchema.parse(row.id);
+          if (!(await openedLately(tx, userId, id)))
+            await writeOpening(tx, { userId, id, ip, creatorId, by: 'chatter', via });
+        }
+      }),
+
     // State and open drafts in one snapshot: read apart, a draft committed in between showed with the old state.
-    get: (creatorId, id) =>
+    get: (creatorId, id, userId) =>
       withTenant(
         db,
         creatorId,
         async (tx) => {
-          const [found] = await summaries(tx, eq(schema.conversations.id, id), 1, clock.now());
+          const [found] = await summaries(tx, eq(schema.conversations.id, id), 1, clock.now(), userId);
           if (found === undefined) return null;
           const { summary } = found;
           const drafts = await tx

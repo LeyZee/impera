@@ -13,15 +13,15 @@ import { useNow } from '@/scheduling/useNow';
 import { Panel } from '@/shell/layout';
 
 /**
- * Suivi of a chatter (ADR 0025): he reads the conversations routed to him (a handover, a draft of the agent to decide).
- * The access to every conversation of his creators during his shift (EQ-13) is not built yet: until it is, Suivi says
- * so plainly instead of an empty list (Charles, « go recos » of 05/11, reco 7; recette CHAT-02, CHAT-14). Outside his
- * shift, it says so too, with his next shift; only a handover he took stays readable, until he gives it back.
+ * Suivi of a chatter (ADR 0025, EQ-13): during his shift, widened by the planning's margin, he reads every conversation
+ * of the creator he is on, decides the agent's drafts and takes over (Charles, « go recos » of 05/11, reco 7). Outside
+ * it, the page says so with his next shift, and only a conversation he holds stays listed, until he gives the hand back.
+ * The window is the server's (`shiftCreatorIds`, `accessStartsAt`): the page only says it.
  */
 export function ChatterTrackingPage({
   away = null,
   ...props
-}: Omit<ComponentProps<typeof TrackingPage>, 'offShift' | 'routedOnly' | 'nothingListed'> & {
+}: Omit<ComponentProps<typeof TrackingPage>, 'offShift' | 'selfScope' | 'nothingListed'> & {
   /** His status when he is away from the team (suspended, on leave…): said first and alone (CHAT-09). */
   away?: MyAwayStatus | null;
 }): JSX.Element {
@@ -31,8 +31,8 @@ export function ChatterTrackingPage({
   return (
     <TrackingPage
       {...props}
-      routedOnly
-      nothingListed={<NothingRouted />}
+      selfScope
+      nothingListed={<NothingListed />}
       offShift={
         away !== null
           ? () => <MyAwayCard status={away} />
@@ -96,21 +96,17 @@ function OffShift({
 }
 
 /**
- * On shift with nothing routed to him: what Suivi holds for now, what he does meanwhile, and where his shift is said.
- * Never a promise of what EQ-13 will open (CHAT-02), never a blank (CHAT-14).
+ * On shift with nothing listed: no fan has written to his creator yet. What arrives here, what he does meanwhile, and
+ * where his shift is said; never a blank (CHAT-14).
  */
-function NothingRouted(): JSX.Element {
+function NothingListed(): JSX.Element {
   return (
     <Panel className="nv-coming">
       <div className="nv-coming__in tr-notice" role="status">
-        <h2>Rien pour toi pour l’instant</h2>
+        <h2>Aucune conversation pour l’instant</h2>
         <p>
-          Tu chattes dans Reveal. Ici arrivent seulement les conversations qu’on te confie : une passation, un
-          brouillon de l’agent à valider.
-        </p>
-        <p>
-          Voir toutes les conversations de ta créatrice pendant ton shift n’est pas encore ouvert dans Impera
-          : en attendant, tout se passe dans Reveal.
+          Pendant ton shift, toutes les conversations de ta créatrice arrivent ici, ce qui attend une réponse
+          en tête. Tu y valides les brouillons de l’agent ; tu réponds aux fans dans Reveal.
         </p>
         <Link to="/aujourdhui" className="nv-btn nv-btn--soft nv-btn--sm">
           Voir mon shift

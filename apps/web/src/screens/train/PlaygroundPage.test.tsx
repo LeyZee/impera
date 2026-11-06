@@ -14,6 +14,7 @@ const owner: Me = {
   name: 'Nora',
   creatorIds: [],
   routedCreatorIds: [],
+  shiftCreatorIds: [],
   role: 'owner',
   team: null,
   teamScope: 'owner',

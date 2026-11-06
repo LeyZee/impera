@@ -207,7 +207,7 @@ export function createSchedulingService(
     myShifts: async (actor) => {
       const at = now();
       const { accessMarginMinutes: margin } = await settingsOf(actor);
-      const mine = await admin.memberShiftsUnscoped(actor, addMinutes(at, -margin));
+      const mine = await store.memberShifts(actor, await everyCreator(), addMinutes(at, -margin));
       if (mine?.status !== 'active') return { current: null, next: null, ended: null };
       const creatorNames = await names();
       const toMine = (shift: (typeof mine.shifts)[number] | null): MyShift | null => {

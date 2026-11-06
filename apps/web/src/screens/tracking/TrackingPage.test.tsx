@@ -44,6 +44,7 @@ function conversation(id: string, patch: Partial<ConversationSummary> = {}): Con
     unreadCount: 0,
     updatedAt: '2026-10-17T20:00:00Z',
     desire: null,
+    heldBy: null,
     ...patch,
   });
 }
@@ -191,7 +192,7 @@ function renderPage(
   at = '/suivi',
   canDecide = true,
   canAddCreator = true,
-  routedOnly = false,
+  selfScope = false,
   nothingListed?: string,
 ): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -210,7 +211,7 @@ function renderPage(
           onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
           canDecide={canDecide}
           canAddCreator={canAddCreator}
-          routedOnly={routedOnly}
+          selfScope={selfScope}
           nothingListed={nothingListed}
         />
       );
@@ -1343,29 +1344,112 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     expect(screen.getAllByRole('button', { name: 'Reprendre la main' })).toHaveLength(1);
   });
 
-  it('closes the reader of a chatter once he gave the hand back, and says it went through (CHAT-08)', async () => {
+  it('closes the reader of a chatter off shift once he gave the hand back, and says it went through (CHAT-08)', async () => {
     let released = false;
-    const routes = {
-      ...withHuman(),
+    serve({
+      ...ONE,
+      // Off shift, the conversation was his only by his hand: given back, the server no longer opens it (EQ-13).
+      detail: () =>
+        released
+          ? { status: 403 }
+          : { status: 200, body: waiting({ state: 'human', heldBy: 'you', openDrafts: [] }) },
       command: (action: string) => {
         if (action === 'release') released = true;
         return { status: 204 };
       },
-    };
-    serve({
-      ...routes,
       conversations: {
-        [LEA.id]: {
-          items: [conversation('1', { state: 'human' })],
-          nextCursor: null,
-        },
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'you' })], nextCursor: null },
       },
     });
     renderPage(OPEN, true, false, true);
     fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent' }));
     expect(await screen.findByText('Main rendue à l’agent pour Fan 1 : ta note est gardée.')).toBeDefined();
     expect(screen.queryByText('Cette conversation n’est pas dans la liste.')).toBeNull();
+    expect(screen.queryByText(/n’est plus ouverte pour toi/u)).toBeNull();
     expect(released).toBe(true);
+  });
+
+  it('keeps the reader of a chatter open in his shift once he gave the hand back (EQ-13)', async () => {
+    let released = false;
+    serve({
+      ...ONE,
+      detail: () => ({
+        status: 200,
+        body: released
+          ? waiting({ state: 'idle', openDrafts: [] })
+          : waiting({ state: 'human', heldBy: 'you', openDrafts: [] }),
+      }),
+      command: (action: string) => {
+        if (action === 'release') released = true;
+        return { status: 204 };
+      },
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'you' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    // His own hand is said to him.
+    expect(await screen.findByText(/Tu as la main\. Tu réponds dans Reveal/u)).toBeDefined();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent' }));
+    expect(await screen.findByRole('button', { name: 'Reprendre la main' })).toBeDefined();
+    expect(screen.queryByText(/Main rendue à l’agent pour/u)).toBeNull();
+    expect(released).toBe(true);
+  });
+
+  it('tells a chatter the hand he holds is his, under « À toi » (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'you' })], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, false, true);
+    const yours = await screen.findByRole('list', { name: 'À toi' });
+    expect(yours.textContent).toContain('Tu as la main');
+  });
+
+  it('shows a chatter another person’s hand without a way to give it back (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      detail: () => ({ status: 200, body: waiting({ state: 'human', heldBy: 'other', openDrafts: [] }) }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'other' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByText(/C’est à lui de la rendre\./u)).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Rendre la main/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reprendre la main' })).toBeNull();
+    // Nothing for him to do: with the quiet ones, still said beside the fan's name.
+    const quiet = screen.getByRole('list', { name: 'Rien à faire' });
+    expect(quiet.textContent).toContain('Un humain répond');
+    expect(screen.queryByRole('list', { name: 'À toi' })).toBeNull();
+  });
+
+  it('lets a chatter give back a handoff nobody took: he is the one on shift (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      detail: () => ({ status: 200, body: waiting({ state: 'human', heldBy: null, openDrafts: [] }) }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: null })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByRole('button', { name: 'Rendre la main à l’agent' })).toBeDefined();
+    expect(screen.queryByText(/C’est à lui de la rendre/u)).toBeNull();
+  });
+
+  it('says a conversation is no longer open to a chatter once his shift ended, and stops reading it (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      detail: () => ({ status: 403 }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByText(/Cette conversation n’est plus ouverte pour toi/u)).toBeDefined();
+    expect(screen.queryByText('Le serveur ne répond pas')).toBeNull();
   });
 
   it('says the emergency stop at the top, in a chatter’s words, and offers to try again (CHAT-07)', async () => {
@@ -1427,10 +1511,3 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     );
   });
 });
-
-function withHuman() {
-  return {
-    ...ONE,
-    detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
-  };
-}

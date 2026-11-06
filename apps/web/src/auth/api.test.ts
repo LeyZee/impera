@@ -20,6 +20,7 @@ const ME = {
   role: 'operator',
   creatorIds: [],
   routedCreatorIds: [],
+  shiftCreatorIds: [],
   team: { role: 'chatter', status: 'active' },
   teamScope: 'self',
 };

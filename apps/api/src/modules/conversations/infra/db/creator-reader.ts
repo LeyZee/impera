@@ -6,8 +6,6 @@ import {
   MediaAssetIdSchema,
   MessageDirectionSchema,
   MessageIdSchema,
-  newId,
-  AuditEntryIdSchema,
   type ConversationId,
   type CreatorFan,
 } from '@impera/contracts';
@@ -16,6 +14,7 @@ import { z } from 'zod';
 
 import type { CreatorSpaceReader, MediaDescriptions, PageRequest } from '../../domain/ports';
 
+import { openedLately, writeOpening } from './openings';
 import { mediaOf } from './reader';
 import { cursorInstant, decodeCursor, encodeCursor } from './rows';
 
@@ -58,46 +57,6 @@ async function conversationOf(tx: Transaction, id: ConversationId) {
     .innerJoin(schema.fans, eq(schema.fans.id, schema.conversations.fanId))
     .where(eq(schema.conversations.id, id));
   return row;
-}
-
-/**
- * How long an opening of hers covers her reads of the same conversation's messages: past it, a read is written as an
- * opening again. The screen reads the messages every 30 s while it is open; a direct call to the messages, with no
- * opening, is written at once (ADR 0042 § 2).
- */
-const CREATOR_READ_TRACE_MINUTES = 15;
-
-/** Her opening of a conversation, in the audit log, in the transaction of the read (ADR 0042 § 2, as a chatter's). */
-async function writeOpening(
-  tx: Transaction,
-  entry: { userId: string; id: ConversationId; ip: string; creatorId: string; via?: 'messages' },
-): Promise<void> {
-  const { via, ...rest } = entry;
-  await tx.insert(schema.auditLog).values({
-    id: newId(AuditEntryIdSchema),
-    userId: rest.userId,
-    action: 'conversation.open',
-    entity: 'conversation',
-    entityId: rest.id,
-    ip: rest.ip,
-    details:
-      via === undefined
-        ? { creatorId: rest.creatorId, by: 'creator' }
-        : { creatorId: rest.creatorId, by: 'creator', via },
-  });
-}
-
-/** Whether she opened that conversation, by either route, in the last `CREATOR_READ_TRACE_MINUTES`. */
-async function openedLately(tx: Transaction, userId: string, id: ConversationId): Promise<boolean> {
-  const result = await tx.execute(sql`
-    select exists (
-      select 1 from ${schema.auditLog}
-       where ${schema.auditLog.userId} = ${userId}
-         and ${schema.auditLog.action} = 'conversation.open'
-         and ${schema.auditLog.entityId} = ${id}
-         and ${schema.auditLog.createdAt} > now() - make_interval(mins => ${CREATOR_READ_TRACE_MINUTES})
-    ) as opened`);
-  return z.array(z.object({ opened: z.boolean() })).parse(result.rows)[0]?.opened === true;
 }
 
 /**
@@ -156,7 +115,7 @@ export function createDrizzleCreatorSpaceReader(
         const row = await conversationOf(tx, id);
         if (row === undefined) return null;
         // Each opening, as a chatter's (ADR 0042 § 2): in the same transaction as the read.
-        await writeOpening(tx, { userId, id, ip, creatorId });
+        await writeOpening(tx, { userId, id, ip, creatorId, by: 'creator' });
         return { row };
       });
       if (opened === null) return null;
@@ -173,7 +132,7 @@ export function createDrizzleCreatorSpaceReader(
         if ((await conversationOf(tx, id)) === undefined) return null;
         // No read of the thread without a trace: one not covered by a recent opening is written as one.
         if (!(await openedLately(tx, userId, id)))
-          await writeOpening(tx, { userId, id, ip, creatorId, via: 'messages' });
+          await writeOpening(tx, { userId, id, ip, creatorId, by: 'creator', via: 'messages' });
         const after = decodeCursor(page.cursor);
         const rows = await tx
           .select({
