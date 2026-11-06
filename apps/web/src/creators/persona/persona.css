@@ -755,9 +755,6 @@
     padding-left: 16px;
     padding-right: 16px;
   }
-  .ps-fold > summary .ps-code {
-    display: none;
-  }
 }
 
 /* A select of several picks: the field holds the picks, the list unfolds under it. */
@@ -927,8 +924,19 @@
     padding-top: 8px;
     padding-bottom: 8px;
   }
+  .ps-moves > summary {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
   .ps-fold > summary > .nv-disclosure__title,
   .ps-moves > summary > .nv-disclosure__title {
+    margin-right: auto;
+  }
+  /* « Règle stricte » stays beside its title, the chevron at the end of the line. */
+  .ps-fold > summary > .nv-disclosure__title:has(+ .ps-code) {
+    margin-right: 0;
+  }
+  .ps-fold > summary > .ps-code {
     margin-right: auto;
   }
   .ps-fold > summary > .nv-disclosure__sum,
@@ -1306,9 +1314,33 @@
 .ps-completion__count {
   font-variant-numeric: tabular-nums;
 }
-/* What the passage to the new sheet moved: each line opens its question. */
+/* What the passage to the new sheet moved: one block, its head and its lines together; each line opens its question.
+   Its chevron turns like the sheet's panels: down when folded, up when open. */
 .ps-moves {
   align-self: stretch;
+  border: 1px solid var(--nv-hairline);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-plate);
+}
+.ps-moves > summary {
+  border-radius: calc(var(--nv-radius-lg) - 1px);
+}
+.ps-moves[open] > summary {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.ps-moves.nv-disclosure > summary::after {
+  margin: 0 2px;
+  transform: translateY(-2px) rotate(45deg);
+}
+.ps-moves.nv-disclosure[open] > summary::after {
+  transform: translateY(2px) rotate(225deg);
+}
+/* A touch screen keeps the last hover: the head of the block never stays lit after a tap. */
+@media (hover: none) {
+  .ps-moves > summary:hover {
+    background: none;
+  }
 }
 .ps-moves__body {
   display: flex;

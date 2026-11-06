@@ -1133,6 +1133,12 @@
     flex-direction: row;
     justify-content: space-around;
     padding: 5px;
+    /* The page scrolls under it: a near-opaque veil, so no line behind can be read through its labels, even where the
+       browser draws no blur (recette persona-fiche v1). */
+    --_blur: var(--nv-blur-thick);
+    background:
+      linear-gradient(180deg, var(--nv-glass-fill-strong) 0%, transparent 46%),
+      color-mix(in srgb, var(--nv-void) 90%, transparent);
   }
   .nv-rail__brand,
   .nv-rail__sp,
