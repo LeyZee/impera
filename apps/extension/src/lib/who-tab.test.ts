@@ -30,12 +30,15 @@ describe('who is signed in', () => {
       'chatter',
       'Chatteur',
     ],
-    [me({ role: 'operator', teamScope: 'self' }), 'operator', 'Équipe'],
+    [me({ role: 'operator', teamScope: 'self' }), 'operator', 'Opérateur'],
     [me({ role: 'creator', teamScope: 'self' }), 'creator', 'Créatrice'],
-  ])('reads the kind as the CRM rail does', (account, kind, label) => {
-    expect(kindOf(account)).toBe(kind);
-    expect(kindLabel(kindOf(account))).toBe(label);
-  });
+  ])(
+    'reads the kind and names it as the CRM account menu does (AppShell roleLabel)',
+    (account, kind, label) => {
+      expect(kindOf(account)).toBe(kind);
+      expect(kindLabel(kindOf(account))).toBe(label);
+    },
+  );
 
   it('takes the initials of the first and last names', () => {
     expect(initialsOf({ name: 'Alex de la Morel', email: 'a@exemple.fr' })).toBe('AM');

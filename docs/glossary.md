@@ -172,6 +172,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Garde d'écriture | `writes` | Réglage d'un compte plateforme (`connector_config.writes`, fermé par défaut) : fermé, aucun envoi ne part, seule la lecture continue. |
 | Interrupteur d'arrêt | `kill_switch` | Arrêt global, par créatrice ou par conversation. |
 | Chatteur | `operator` | Humain qui chatte ou supervise (vocabulaire Imperium : chatteur). |
+| Opérateur | rail `operator` (`railKindOf`) | Compte de l'agence sans fiche d'équipe (ni manager ni chatteur) : rail Dashboard, Suivi, Créatrices. Le menu du compte du CRM et le popup de l'extension l'écrivent ainsi. |
 | Fiche de tâche | `task card` | Une unité de travail pour une session (`docs/sessions/tasks/`). |
 | Fiche proposée | `proposed` | Fiche écrite par une session, sans ID, en attente de l'accord de Charles. |
 | Bulle | `bubble` | Un message envoyé d'un coup ; un draft est une liste de bulles. |

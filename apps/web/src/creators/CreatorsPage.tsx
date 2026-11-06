@@ -4,7 +4,7 @@ import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
 import { ArchivedCreators } from './ArchivedCreators';
-import { ChipFace } from './CreatorFace';
+import { ChipFace, ChipName } from './CreatorFace';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { SetupCard } from './SetupCard';
@@ -271,7 +271,7 @@ export function CreatorsPage({
                     }}
                   >
                     <ChipFace creator={creator} />
-                    {creator.displayName}
+                    <ChipName name={creator.displayName} />
                   </button>
                 ))}
               </div>
