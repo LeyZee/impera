@@ -819,6 +819,42 @@ describe('Équipe › Planning', () => {
     });
   });
 
+  it('lets a manager answer a swap a chatter offers him, with no planning of his own (recette EQP-01)', async () => {
+    const written = serve({
+      swaps: [swap(), swap({ id: id(62), targetMemberId: THEO })],
+      // The reader is Basile, a manager who chats (ADR 0024); Théo offers him a shift (ADR 0031).
+      members: [
+        member({}),
+        member({
+          id: BASILE,
+          userId: OWNER_USER,
+          teamRole: 'manager',
+          firstName: 'Basile',
+          displayName: 'Basile',
+        }),
+      ],
+      write: () => ({ status: 200, body: swap({ status: 'accepted', resolvedAt: '2026-10-27T12:00:00Z' }) }),
+    });
+    renderPage();
+    const answers = (await screen.findByText('Un échange attend ta réponse')).closest('section');
+    if (answers === null) throw new Error('no answers');
+    // Only the one offered to him: the other swap is folded with the team's.
+    expect(text(answers)).toContain('Théo te propose son shift');
+    fireEvent.click(within(answers).getByRole('button', { name: 'Accepter' }));
+    await waitFor(() => {
+      expect(written.map(({ method, path }) => `${method} ${path}`)).toEqual([
+        `POST /v1/scheduling/swap-requests/${id(61)}/answer`,
+      ]);
+    });
+  });
+
+  it('shows no answer to give to the owner, who holds no shift', async () => {
+    serve({ swaps: [swap()] });
+    renderPage();
+    await screen.findByText('Échanges entre chatteurs');
+    expect(screen.queryByText('Un échange attend ta réponse')).toBeNull();
+  });
+
   it('places a shift, and names the one in the way when the member is taken', async () => {
     const written = serve({
       write: () => ({
