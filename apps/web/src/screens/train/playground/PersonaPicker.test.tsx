@@ -226,4 +226,22 @@ describe('PersonaPicker (PRO-21)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Activer cette version' }));
     expect(await screen.findByText(/confirme ton mot de passe et ton code/u)).toBeDefined();
   });
+
+  it('moves with the arrows without starting over, and sends one choice for two quick clicks', async () => {
+    serve();
+    const { chosen } = show(BASE);
+    const mia = await screen.findByRole('radio', { name: 'Mia' });
+    const invented = screen.getByRole('radio', { name: 'Fictive (Elena)' });
+    invented.focus();
+    fireEvent.keyDown(invented, { key: 'ArrowRight' });
+    // The focus is on Mia, nothing chosen: choosing starts the scene over, so it waits for Enter or a click.
+    expect(document.activeElement).toBe(mia);
+    expect(chosen).toEqual([]);
+
+    fireEvent.click(mia);
+    fireEvent.click(screen.getByRole('radio', { name: 'Nina' }));
+    await waitFor(() => {
+      expect(chosen).toEqual([{ kind: 'version', creatorId: MIA, versionId: LIVE }]);
+    });
+  });
 });

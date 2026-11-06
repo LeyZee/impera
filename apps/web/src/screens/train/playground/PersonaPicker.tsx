@@ -50,14 +50,16 @@ function Chips({
     0,
     options.findIndex((option) => option.value === value),
   );
+  // The arrows move the focus only: choosing starts the scene over, so it waits for Enter, Space or a click.
+  const [focused, setFocused] = useState<number | null>(null);
+  const at = focused !== null && focused < options.length ? focused : index;
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const step = STEPS[event.key];
-    if (step === undefined || disabled) return;
+    if (step === undefined) return;
     event.preventDefault();
-    const next = (index + step + options.length) % options.length;
+    const next = (at + step + options.length) % options.length;
+    setFocused(next);
     ref.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
-    const option = options[next];
-    if (option !== undefined && option.value !== value) onChange(option.value);
   };
   return (
     <div className="pg-who__field">
@@ -78,10 +80,14 @@ function Chips({
             role="radio"
             className="nv-chip"
             aria-checked={option.value === value}
-            tabIndex={i === index ? 0 : -1}
-            disabled={disabled}
+            tabIndex={i === at ? 0 : -1}
+            // aria-disabled, not disabled: a greyed chip keeps its focus instead of dropping it on the page.
+            aria-disabled={disabled ? true : undefined}
+            onFocus={() => {
+              setFocused(i);
+            }}
             onClick={() => {
-              if (option.value !== value) onChange(option.value);
+              if (!disabled && option.value !== value) onChange(option.value);
             }}
           >
             {option.label}
@@ -125,7 +131,23 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
   });
   const versions = overview.data?.versions ?? [];
   const current = played === null ? undefined : versions.find((v) => v.id === played.versionId);
-  const disabled = pg.busy || pg.client.isDemo;
+  // One choice at a time, her versions' read included: a second click or key waits for the first to land.
+  const pending = useRef(false);
+  const [choosing, setChoosing] = useState(false);
+  const disabled = pg.busy || pg.client.isDemo || choosing;
+  const once =
+    <A extends unknown[]>(choose: (...args: A) => Promise<void>) =>
+    async (...args: A): Promise<void> => {
+      if (pending.current) return;
+      pending.current = true;
+      setChoosing(true);
+      try {
+        await choose(...args);
+      } finally {
+        pending.current = false;
+        setChoosing(false);
+      }
+    };
 
   const play = async (creatorId: CreatorId, versionId: PersonaVersionId): Promise<void> => {
     setDone(null);
@@ -193,7 +215,7 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
         label="Persona"
         value={played?.creatorId ?? INVENTED}
         disabled={disabled}
-        onChange={(value) => void pickCreator(value)}
+        onChange={(value) => void once(pickCreator)(value)}
         options={[
           { value: INVENTED, label: played === null ? `Fictive (${state.persona.name})` : 'Fictive' },
           ...(creators.data ?? []).map((creator) => ({ value: creator.id, label: creator.displayName })),
@@ -206,7 +228,7 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
           disabled={disabled || versions.length === 0}
           onChange={(value) => {
             const chosen = versions.find((v) => v.id === value);
-            if (chosen !== undefined) void play(played.creatorId, chosen.id);
+            if (chosen !== undefined) void once(play)(played.creatorId, chosen.id);
           }}
           options={
             versions.length === 0
