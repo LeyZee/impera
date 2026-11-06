@@ -31,9 +31,17 @@ export { resealProviderCredentials } from './infra/postgres.store';
 export { nextAction } from './domain/next-action';
 export { createMemoryCredentialStore };
 
+/** The verified services' base addresses, each optional. */
+export type VerifierBaseUrls = Partial<Record<'xai' | 'google' | 'elevenlabs' | 'mistral', string>>;
+
+/** Spreads `{ baseUrl }` only when one is given: the verifiers keep their real address otherwise. */
+const at = (baseUrl: string | undefined): { baseUrl?: string } => (baseUrl === undefined ? {} : { baseUrl });
+
 export interface ProvidersDeps {
   readonly store: CredentialStore;
   readonly fetch: FetchLike;
+  /** Where each service is reached; its real address when absent. The recette sandbox's fake world (ADR 0075). */
+  readonly baseUrls?: VerifierBaseUrls;
   readonly clock?: Clock;
   /** Null in production: there the dashboard is the only source of keys (ADR 0016). */
   readonly environmentKeys: ((provider: AiProvider) => string | undefined) | null;
@@ -74,10 +82,14 @@ export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
     store: deps.store,
     clock: deps.clock ?? { now: () => new Date() },
     verifiers: [
-      createXaiVerifier({ fetch: deps.fetch }),
-      createGoogleVerifier({ fetch: deps.fetch, compareWith: 'gemini-4-argon' }),
-      createElevenLabsVerifier({ fetch: deps.fetch }),
-      createMistralVerifier({ fetch: deps.fetch }),
+      createXaiVerifier({ fetch: deps.fetch, ...at(deps.baseUrls?.xai) }),
+      createGoogleVerifier({
+        fetch: deps.fetch,
+        compareWith: 'gemini-4-argon',
+        ...at(deps.baseUrls?.google),
+      }),
+      createElevenLabsVerifier({ fetch: deps.fetch, ...at(deps.baseUrls?.elevenlabs) }),
+      createMistralVerifier({ fetch: deps.fetch, ...at(deps.baseUrls?.mistral) }),
     ],
     onChange: async (provider) => {
       await cache.reload();
@@ -139,6 +151,8 @@ export interface ProvidersStartOptions {
    */
   readonly onLoadError: (error: unknown) => void;
   readonly publishConnectionState?: ProvidersDeps['publishConnectionState'];
+  /** The recette sandbox's fake world (ADR 0075); the real services when absent. */
+  readonly baseUrls?: VerifierBaseUrls;
 }
 
 const KEY_RELOAD_MS = 30_000;
@@ -179,6 +193,7 @@ export async function startProvidersModule(options: ProvidersStartOptions): Prom
             },
           }),
     fetch,
+    ...(options.baseUrls !== undefined && { baseUrls: options.baseUrls }),
     environmentKeys: environment === null ? null : (provider) => environment[provider],
     reloadEveryMs: KEY_RELOAD_MS,
     onReloadError: options.onLoadError,

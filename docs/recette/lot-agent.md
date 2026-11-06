@@ -55,5 +55,5 @@ Pour chaque garde du code : un cas qui passe, un cas bloqué, un cas limite. À 
 
 ## Sans clé, à préparer
 
-- Mode simulé : une passerelle d'IA à réponses scriptées, branchée seulement hors production, pour que A1 à A20 se jouent à l'écran. Voir [preparation-cles.md](preparation-cles.md) et la fiche proposée `docs/sessions/tasks/PROPOSED-recette-sandbox.md`.
+- Mode simulé : une passerelle d'IA à réponses scriptées, branchée seulement hors production, pour que A1 à A20 se jouent à l'écran. Voir [preparation-cles.md](preparation-cles.md) et la fiche proposée `docs/sessions/tasks/PROPOSED-recette-sandbox.md`. Phase 1 (clés et Reveal CRM simulés) livrée : [bac-a-sable.md](bac-a-sable.md) ; la génération simulée reste à faire.
 - Jour J de la clé xAI : `pnpm probe`, puis `pnpm evals`, puis le Playground, puis Copilote sur le fan « test » seulement.

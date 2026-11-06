@@ -58,6 +58,7 @@ import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-
 import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
+import { installSandboxGuard, sandboxOf, sdkBaseUrlsOf } from './sandbox';
 import { createSecuritySettingsRoutes } from './security-settings';
 import { wireAccounting } from './wiring/accounting';
 import { wireAgent } from './wiring/agent';
@@ -229,6 +230,9 @@ function breachCheckOf(config: Config, logger: Logger): PasswordBreachCheck {
 }
 
 export async function createApp(config: Config, logger: Logger, options: AppOptions = {}): Promise<App> {
+  // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
+  const sandbox = sandboxOf(config);
+  if (sandbox !== null) installSandboxGuard(sandbox, logger);
   const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
   const adminDb = createDbClient(config.DATABASE_ADMIN_URL, { ...POOL_OPTIONS, max: 5 });
   const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
@@ -297,6 +301,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     reportRefusedKey: (provider, kind) => providers.module.reportRefusedKey(provider, kind),
     publishBudget: (crossing) => publishBudgetThreshold(adminDb.db, crossing),
     logger,
+    ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
   const team = wireTeam(shared, {

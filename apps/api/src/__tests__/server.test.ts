@@ -126,6 +126,15 @@ describe('health and readiness', () => {
 });
 
 describe('request id', () => {
+  it('tells the dashboard it runs in the recette sandbox, and says nothing otherwise (ADR 0075)', async () => {
+    const real = await (await server()).inject({ method: 'GET', url: '/health' });
+    expect(real.headers['x-impera-sandbox']).toBeUndefined();
+    const sandbox = await (
+      await server({ env: { IMPERA_SANDBOX: '1' } })
+    ).inject({ method: 'GET', url: '/health' });
+    expect(sandbox.headers['x-impera-sandbox']).toBe('1');
+  });
+
   it('echoes a sane x-request-id and replaces a dangerous one', async () => {
     const app = await server();
     const kept = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': 'req-123' } });

@@ -26,7 +26,8 @@
     "ops:reset-second-factor": "tsx --env-file-if-exists=../../.env src/scripts/ops-reset-second-factor.ts",
     "ops:reencrypt-sessions": "tsx --env-file-if-exists=../../.env src/scripts/ops-reencrypt-sessions.ts",
     "ops:reencrypt-credentials": "tsx --env-file-if-exists=../../.env src/scripts/ops-reencrypt-credentials.ts",
-    "ops:check-keys": "tsx --env-file-if-exists=../../.env src/scripts/ops-check-keys.ts"
+    "ops:check-keys": "tsx --env-file-if-exists=../../.env src/scripts/ops-check-keys.ts",
+    "sandbox:world": "tsx --env-file-if-exists=../../.env src/__tests__/sandbox-world/main.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.7",

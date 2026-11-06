@@ -48,7 +48,7 @@ Chaque lot corrige ce qui est dans sa zone, dans des PR courtes (une par famille
 
 ## Ordre de lancement proposé
 
-1. **Bilan d'abord, 30 minutes avant les autres** : il prépare et publie l'outillage commun (script de pile, script de connexion avec TOTP, jeu de données de recette) dans `.scratch/recette/` du conteneur de chaque fil, ou le décrit pour que chacun le refasse. Voir la fiche proposée `docs/sessions/tasks/PROPOSED-recette-sandbox.md`.
+1. **Bilan d'abord, 30 minutes avant les autres** : il prépare et publie l'outillage commun (script de pile, script de connexion avec TOTP, jeu de données de recette) dans `.scratch/recette/` du conteneur de chaque fil, ou le décrit pour que chacun le refasse. Voir la fiche proposée `docs/sessions/tasks/PROPOSED-recette-sandbox.md` et le mode d'emploi du bac à sable [bac-a-sable.md](bac-a-sable.md).
 2. **Extension, Équipe, Médias, Agent en parallèle**, chacun sur sa pile.
 3. **Parcours transverses** en dernier, joués par le lot qui possède la première étape, avec les autres en relecture.
 4. **Synthèse** par le coordinateur : un tableau des bloquants et majeurs, les questions pour Charles, la liste de ce qu'il doit voir.
