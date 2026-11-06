@@ -30,6 +30,8 @@ import {
 import '@/payroll/pay.css';
 import { amountText, periodLine } from '@/reports/model';
 import '@/reports/reports.css';
+import { DayField } from '@/scheduling/DayField';
+import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { fullDay } from '@/scheduling/time';
 import { useMembers } from '@/screens/team/api';
 import { useBillingSettings } from '@/settings/billing/api';
@@ -406,8 +408,9 @@ function RangeForm({
   const id = useId();
   const [range, setRange] = useState<DayRange>(years.current);
   const [tried, setTried] = useState(false);
+  const { unreadable, onUnreadable } = useUnreadableTimes();
   const checked = periodQuery(range);
-  const wrong = tried && !checked.ok;
+  const wrong = tried && (unreadable || !checked.ok);
   const choose = (next: DayRange): void => {
     setRange(next);
     onChange();
@@ -415,7 +418,7 @@ function RangeForm({
   const onSubmit = (event: SyntheticEvent): void => {
     event.preventDefault();
     setTried(true);
-    if (!checked.ok || busy) return;
+    if (unreadable || !checked.ok || busy) return;
     void onAsk(checked.query);
   };
   const same = (one: DayRange): boolean => one.from === range.from && one.to === range.to;
@@ -444,35 +447,39 @@ function RangeForm({
         </button>
       </div>
       <div className="ex-days">
-        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
+        <div className="nv-field tm-field" data-invalid={tried && !checked.ok ? 'true' : undefined}>
           <label className="nv-field__label" htmlFor={`${id}-from`}>
             Du
           </label>
-          <input
+          <DayField
             id={`${id}-from`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
             value={range.from}
-            aria-invalid={wrong}
-            aria-describedby={`${id}-hint`}
-            onChange={(event) => {
-              choose({ ...range, from: event.target.value });
+            invalid={tried && !checked.ok}
+            describedBy={`${id}-hint`}
+            onChange={(next) => {
+              choose({ ...range, from: next });
+            }}
+            toward="year"
+            onUnreadable={(bad) => {
+              onUnreadable(`${id}-from`, bad);
             }}
           />
         </div>
-        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
+        <div className="nv-field tm-field" data-invalid={tried && !checked.ok ? 'true' : undefined}>
           <label className="nv-field__label" htmlFor={`${id}-to`}>
             Au
           </label>
-          <input
+          <DayField
             id={`${id}-to`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
             value={range.to}
-            aria-invalid={wrong}
-            aria-describedby={`${id}-hint`}
-            onChange={(event) => {
-              choose({ ...range, to: event.target.value });
+            invalid={tried && !checked.ok}
+            describedBy={`${id}-hint`}
+            onChange={(next) => {
+              choose({ ...range, to: next });
+            }}
+            toward="year"
+            onUnreadable={(bad) => {
+              onUnreadable(`${id}-to`, bad);
             }}
           />
         </div>
@@ -481,11 +488,13 @@ function RangeForm({
         </button>
       </div>
       <p id={`${id}-hint`} className={wrong ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-        {checked.ok
-          ? `Du ${fullDay(checked.query.from)} au ${fullDay(checked.query.to)}, les deux compris.`
-          : tried
-            ? checked.reason
-            : 'Deux jours compris, deux ans au plus.'}
+        {tried && unreadable
+          ? 'Deux jours comme 01/01/2026, ou 1/1/26.'
+          : checked.ok
+            ? `Du ${fullDay(checked.query.from)} au ${fullDay(checked.query.to)}, les deux compris.`
+            : tried
+              ? checked.reason
+              : 'Deux jours compris, deux ans au plus.'}
       </p>
     </form>
   );

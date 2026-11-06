@@ -255,11 +255,13 @@ export function minuteOfInput(text: string): number | null {
 /**
  * The day a day field holds, as `YYYY-MM-DD`: « 28/03/2027 », « 28/3/27 », « 28.03.2027 », « 28 3 », digits alone as
  * the phone's number pad types them (« 2803 », « 280327 », « 28032027 »), or the « 2027-03-28 » a paste brings; null
- * while it is empty, half typed or not a day. Without a year, it is the first such day from `today` on. The fields are
- * text (`DayField`), never `<input type="date">`, which Chromium writes in the system's language, « 03/28/2027 » on a
- * machine in English (recette #561), as it does the hours.
+ * while it is empty, half typed or not a day. Without a year, it is the first such day from `today` on, or, for a day
+ * looked back to (`toward: 'past'`: a birth, a validation, a period read), the last one up to `today`. Two digits of a
+ * year are this century, but a past one never lies ahead: « 98 » is 1998 there. The fields are text (`DayField`), never
+ * `<input type="date">`, which Chromium writes in the system's language, « 03/28/2027 » on a machine in English
+ * (recette #561), as it does the hours.
  */
-export function dayOfInput(text: string, today: string): string | null {
+export function dayOfInput(text: string, today: string, toward: DayToward = 'ahead'): string | null {
   const typed = text.trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(typed);
   const parts =
@@ -271,11 +273,14 @@ export function dayOfInput(text: string, today: string): string | null {
   const day = Number(iso?.[3] ?? parts?.[1]);
   const month = Number(iso?.[2] ?? parts?.[2]);
   const typedYear = iso?.[1] ?? parts?.[3];
+  const thisYear = Number(today.slice(0, 4));
+  const century = (short: number): number =>
+    toward === 'past' && 2000 + short > thisYear ? 1900 + short : 2000 + short;
   const year =
     typedYear === undefined
-      ? Number(today.slice(0, 4))
+      ? thisYear
       : typedYear.length === 2
-        ? 2000 + Number(typedYear)
+        ? century(Number(typedYear))
         : Number(typedYear);
   const of = (inYear: number): string | null => {
     const at = new Date(Date.UTC(inYear, month - 1, day));
@@ -284,9 +289,16 @@ export function dayOfInput(text: string, today: string): string | null {
     return at.toISOString().slice(0, 10);
   };
   const found = of(year);
-  if (found === null || typedYear !== undefined || found >= today) return found;
-  return of(year + 1);
+  if (found === null || typedYear !== undefined || toward === 'year') return found;
+  if (toward === 'past') return found <= today ? found : of(year - 1);
+  return found >= today ? found : of(year + 1);
 }
+
+/**
+ * Where a day typed without its year is looked for: from today on (an appointment), up to today (a birth), or in this
+ * year (the bounds of a period, which may end after today and start before it).
+ */
+export type DayToward = 'ahead' | 'past' | 'year';
 
 /** A day into a day field's « 28/03/2027 ». */
 export const inputOfDay = (day: string): string =>

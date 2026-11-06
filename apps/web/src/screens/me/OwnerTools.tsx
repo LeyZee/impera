@@ -20,6 +20,7 @@ import {
   validationText,
 } from '@/contractors/model';
 import { countryName } from '@/lib/country';
+import { DayField } from '@/scheduling/DayField';
 import { fullDay } from '@/scheduling/time';
 import { Loading, Unreachable } from '@/screens/pay/parts';
 import { Dialog } from '@/shell/Dialog';
@@ -317,7 +318,8 @@ function AssignDialog({
   // answer is the same assignment; a choice changed draws a new key.
   const [key, setKey] = useState(() => crypto.randomUUID());
   const chosen = available.find((regime) => regime.id === regimeId) ?? null;
-  const fromOk = /^\d{4}-\d{2}-\d{2}$/u.test(from) && from >= earliest;
+  const [fromUnreadable, setFromUnreadable] = useState(false);
+  const fromOk = !fromUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(from) && from >= earliest;
 
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
@@ -370,25 +372,26 @@ function AssignDialog({
               <label className="nv-field__label" htmlFor={`${id}-from`}>
                 À partir du
               </label>
-              <input
+              <DayField
                 id={`${id}-from`}
-                type="date"
-                className="nv-field__control nv-glass nv-num"
-                min={earliest}
                 value={from}
-                aria-invalid={tried && !fromOk}
-                aria-describedby={`${id}-from-hint`}
-                onChange={(event) => {
-                  setFrom(event.target.value);
+                invalid={tried && !fromOk}
+                describedBy={`${id}-from-hint`}
+                onChange={(next) => {
+                  setFrom(next);
                   setKey(crypto.randomUUID());
                 }}
+                today={earliest}
+                onUnreadable={setFromUnreadable}
               />
               <p id={`${id}-from-hint`} className={tried && !fromOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-                {tried && !fromOk
-                  ? earliest === file.today
-                    ? `Aujourd’hui au plus tôt, le ${fullDay(earliest)}.`
-                    : `Après le régime déjà prévu, le ${fullDay(earliest)} au plus tôt.`
-                  : 'Ses relevés en attente sont repris ce jour-là.'}
+                {tried && fromUnreadable
+                  ? 'Un jour comme 01/12/2026, ou 1/12.'
+                  : tried && !fromOk
+                    ? earliest === file.today
+                      ? `Aujourd’hui au plus tôt, le ${fullDay(earliest)}.`
+                      : `Après le régime déjà prévu, le ${fullDay(earliest)} au plus tôt.`
+                    : 'Ses relevés en attente sont repris ce jour-là.'}
               </p>
             </div>
           </>

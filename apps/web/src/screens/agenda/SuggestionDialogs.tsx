@@ -5,8 +5,9 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 import { acceptSuggestion, AGENDA_KEY, declineSuggestion } from './api';
 import { firstMoment, spanOf } from './draft';
 
+import { DayField } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
-import { addDays, clockOf, dayOf, minuteOf, weekOf } from '@/scheduling/time';
+import { addDays, clockOf, dayOf, longDay, minuteOf, weekOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
@@ -106,9 +107,13 @@ export function PlaceDialog({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const end = (start + minutes) % 1440;
+  // The suggestion's week, from today on: what the day field's own calendar held it to.
+  const lowest = today > suggestion.week ? today : suggestion.week;
+  const highest = addDays(suggestion.week, 6);
+  const dayOk = day >= lowest && day <= highest;
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
-    if (unreadable) return;
+    if (unreadable || !dayOk) return;
     setBusy(true);
     setFailed(null);
     void acceptSuggestion(suggestion.id, { when: { kind: 'timed', ...spanOf(day, start, end, zone) } }).then(
@@ -135,18 +140,22 @@ export function PlaceDialog({
           <label className="nv-field__label" htmlFor={`${id}-day`}>
             Jour
           </label>
-          <input
+          <DayField
             id={`${id}-day`}
-            type="date"
-            className="nv-field__control nv-glass tm-date"
+            className="tm-date"
             value={day}
-            min={today > suggestion.week ? today : suggestion.week}
-            max={addDays(suggestion.week, 6)}
-            data-autofocus
-            onChange={(event) => {
-              setDay(event.target.value);
+            today={lowest}
+            autofocus
+            invalid={!dayOk}
+            describedBy={`${id}-day-hint`}
+            onChange={setDay}
+            onUnreadable={(bad) => {
+              onUnreadable('day', bad);
             }}
           />
+          <p id={`${id}-day-hint`} className={dayOk ? 'tm-hint' : 'tm-hint tm-hint--error'}>
+            Du {longDay(lowest)} au {longDay(highest)}.
+          </p>
         </div>
         <div className="nv-field tm-field">
           <span className="nv-field__label">Début</span>
@@ -168,7 +177,7 @@ export function PlaceDialog({
           <button
             type="submit"
             className="nv-btn nv-btn--neon"
-            disabled={busy || unreadable}
+            disabled={busy || unreadable || !dayOk}
             aria-busy={busy}
           >
             Accepter

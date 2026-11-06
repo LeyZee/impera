@@ -309,6 +309,9 @@
   gap: var(--nv-space-3);
 }
 .bk-field .bk-when {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: var(--nv-space-2);
   max-width: 300px;
 }
 .bk-mono,

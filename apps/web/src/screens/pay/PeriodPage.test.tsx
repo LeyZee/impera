@@ -545,7 +545,6 @@ describe('Paie › Quinzaine', () => {
     fireEvent.change(amount, { target: { value: '288,40' } });
     // Never before the period's first day, never an IBAN in the reference (an invented one, its check digits right).
     const day = within(dialog).getByLabelText('Payé le');
-    expect(day.getAttribute('min')).toBe(OCT2);
     fireEvent.change(day, { target: { value: '2026-10-15' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     expect(within(dialog).getByText('Un jour du vendredi 16 octobre à aujourd’hui.')).toBeTruthy();

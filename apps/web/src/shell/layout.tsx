@@ -132,6 +132,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
   const placed = useRef(false);
   const counts = items.map((item) => item.count ?? 0).join(',');
   const lit = items.findIndex((item) => item.current === true);
+  const tabs = items.map((item) => `${item.to}${item.label}`).join('|');
 
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -196,13 +197,16 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     };
     mark();
     nav.addEventListener('scroll', mark, { passive: true });
+    // The tabs too: a count that arrives, or the font once loaded, widens them without resizing the capped nav, and
+    // the end they push out of view would be cut without its fade (relecture d'Équipe, #567).
     const observer = new ResizeObserver(mark);
     observer.observe(nav);
+    for (const tab of nav.querySelectorAll('a')) observer.observe(tab);
     return () => {
       nav.removeEventListener('scroll', mark);
       observer.disconnect();
     };
-  }, []);
+  }, [tabs]);
 
   return (
     <div className="nv-subnav-pill nv-glass nv-glass--thin">

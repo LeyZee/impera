@@ -623,7 +623,7 @@ describe('the chatter’s Planning', () => {
     expect(text(panel)).toContain('à ton heure (Antananarivo)');
     fireEvent.change(within(panel).getByLabelText('Premier jour'), { target: { value: '2026-11-03' } });
     // The last day follows a first day moved past it.
-    expect(within(panel).getByLabelText('Dernier jour')).toHaveProperty('value', '2026-11-03');
+    expect(within(panel).getByLabelText('Dernier jour')).toHaveProperty('value', '03/11/2026');
     fireEvent.change(within(panel).getByLabelText('Dernier jour'), { target: { value: '2026-11-05' } });
     expect(text(panel)).toContain('Du mar. 3 nov. au jeu. 5 nov., 3 jours.');
     fireEvent.change(within(panel).getByLabelText('Dernier jour'), { target: { value: '2026-12-10' } });

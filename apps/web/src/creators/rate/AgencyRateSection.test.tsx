@@ -79,7 +79,11 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
         'À régler : aucun pourcentage pour Anna, aucune part de l’agence n’est montrée.',
       ),
     ).toBeDefined();
-    expect(screen.getByLabelText('À partir du').getAttribute('min')).toBe(TODAY);
+    // Typed, never the system's calendar: a day before today is refused in words.
+    type('À partir du', '2/11/2026');
+    expect(screen.getByText(/^Le .* au plus tôt\.$/u)).toBeDefined();
+    type('À partir du', TODAY);
+    expect(screen.queryByText(/au plus tôt\.$/u)).toBeNull();
     expect(screen.queryByText('Historique')).toBeNull();
   });
 
@@ -107,7 +111,8 @@ describe('Créatrices › Pourcentage (CR-04)', () => {
     const history = screen.getByRole('list');
     expect(within(history).getByText('En vigueur')).toBeDefined();
     // The next one starts tomorrow at the earliest.
-    expect(screen.getByLabelText('À partir du').getAttribute('min')).toBe('2026-11-04');
+    type('À partir du', TODAY);
+    expect(await screen.findByText('Le 04/11/2026 au plus tôt.')).toBeDefined();
   });
 
   it('turns « Revenir » into nothing sent, and a refused day into its sentence', async () => {

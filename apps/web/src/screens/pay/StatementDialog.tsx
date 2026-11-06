@@ -36,6 +36,7 @@ import {
   previousPeriod,
   signedAmountText,
 } from '@/reports/model';
+import { DayField } from '@/scheduling/DayField';
 import { dayOf, longDay } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
@@ -371,7 +372,8 @@ function PayForm({
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
 
   const sentMinor = parseAmount(amount);
-  const dayValid = /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= firstDay && day <= today;
+  const [dayUnreadable, setDayUnreadable] = useState(false);
+  const dayValid = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= firstDay && day <= today;
   const amountValid = sentMinor === statement.payableMinor;
   const referenceValid = !containsIban(reference);
   const ready = dayValid && amountValid && referenceValid;
@@ -476,18 +478,17 @@ function PayForm({
               <label className="nv-field__label" htmlFor={`${id}-day`}>
                 Payé le
               </label>
-              <input
+              <DayField
                 id={`${id}-day`}
-                type="date"
-                className="nv-field__control nv-glass nv-num"
                 value={day}
-                min={firstDay}
-                max={today}
-                data-autofocus
-                aria-invalid={touched && !dayValid}
-                onChange={(event) => {
-                  setDay(event.target.value);
+                autofocus
+                invalid={touched && !dayValid}
+                onChange={(next) => {
+                  setDay(next);
                 }}
+                today={today}
+                toward="past"
+                onUnreadable={setDayUnreadable}
               />
               {touched && !dayValid ? (
                 <p className="tm-hint tm-hint--error">Un jour du {longDay(firstDay)} à aujourd’hui.</p>

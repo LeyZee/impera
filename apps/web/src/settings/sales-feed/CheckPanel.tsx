@@ -20,6 +20,8 @@ import {
 } from './check';
 import { platformName, shownOf, type Notice } from './shown';
 
+import { DayField } from '@/scheduling/DayField';
+import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 type Choice = 0 | 1 | 'custom';
@@ -92,7 +94,11 @@ export function CheckPanel({
   }, [platform]);
 
   const range: DayRange = choice === 'custom' ? custom : fortnights[choice];
-  const problem = rangeProblem(range, lastOver);
+  const { unreadable, onUnreadable } = useUnreadableTimes();
+  const problem =
+    choice === 'custom' && unreadable
+      ? 'Deux jours comme 01/10/2026, ou 1/10.'
+      : rangeProblem(range, lastOver);
 
   const choose = (file: File | undefined): void => {
     setFileProblem(null);
@@ -206,15 +212,17 @@ export function CheckPanel({
                 <label className="nv-field__label" htmlFor={`${id}-from`}>
                   Du
                 </label>
-                <input
+                <DayField
                   id={`${id}-from`}
-                  type="date"
-                  className="nv-field__control nv-glass"
                   value={custom.from}
-                  max={lastOver}
                   disabled={isBusy}
-                  onChange={(event) => {
-                    setCustom({ ...custom, from: event.target.value });
+                  onChange={(next) => {
+                    setCustom({ ...custom, from: next });
+                  }}
+                  today={lastOver}
+                  toward="past"
+                  onUnreadable={(bad) => {
+                    onUnreadable('from', bad);
                   }}
                 />
               </div>
@@ -222,15 +230,17 @@ export function CheckPanel({
                 <label className="nv-field__label" htmlFor={`${id}-to`}>
                   Au
                 </label>
-                <input
+                <DayField
                   id={`${id}-to`}
-                  type="date"
-                  className="nv-field__control nv-glass"
                   value={custom.to}
-                  max={lastOver}
                   disabled={isBusy}
-                  onChange={(event) => {
-                    setCustom({ ...custom, to: event.target.value });
+                  onChange={(next) => {
+                    setCustom({ ...custom, to: next });
+                  }}
+                  today={lastOver}
+                  toward="past"
+                  onUnreadable={(bad) => {
+                    onUnreadable('to', bad);
                   }}
                 />
               </div>

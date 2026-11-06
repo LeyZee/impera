@@ -29,6 +29,7 @@ import {
   desireHint,
   followUpsSummary,
   hoursLabel,
+  isPlaceholder,
   issuesOf,
   localDay,
   localTime,
@@ -40,6 +41,7 @@ import {
   type FieldIssue,
 } from './model';
 
+import { DayField } from '@/scheduling/DayField';
 import { cityOf } from '@/scheduling/time';
 
 /**
@@ -122,6 +124,7 @@ export function DetailsTab({
   isOwner?: boolean;
 }): JSX.Element {
   const id = useId();
+  const [dobUnreadable, setDobUnreadable] = useState(false);
   const zone = timezone ?? d.timezone;
   const set = <F extends keyof Persona['details']>(field: F, v: Persona['details'][F]): void => {
     onChange({ ...d, [field]: v });
@@ -146,16 +149,20 @@ export function DetailsTab({
           <Field
             label="Date de naissance"
             id={`${id}-dob`}
-            hint={ageLine(d.date_of_birth)}
+            hint={dobUnreadable ? 'Un jour comme 12/05/1998, ou 120598.' : ageLine(d.date_of_birth)}
             path="details.date_of_birth"
           >
-            <TextInput
+            <DayField
               id={`${id}-dob`}
-              type="date"
-              value={d.date_of_birth}
+              className="ps-input"
+              value={isPlaceholder(d.date_of_birth) ? '' : d.date_of_birth}
+              toward="past"
+              optional
               onChange={(v) => {
                 set('date_of_birth', v);
               }}
+              invalid={dobUnreadable}
+              onUnreadable={setDobUnreadable}
             />
           </Field>
         </div>

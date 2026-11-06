@@ -35,6 +35,7 @@ import {
 
 import { localTime } from '@/creators/persona/model';
 import { countryFlag, countryName } from '@/lib/country';
+import { DayField } from '@/scheduling/DayField';
 import { cityOf } from '@/scheduling/time';
 import '@/shell/dialog.css';
 import { Select } from '@/shell/Select';
@@ -57,6 +58,8 @@ interface Draft {
   timeZone: string;
   zoneOpen: boolean;
   joinedOn: string;
+  /** The arrival typed is not a day (« 31/02 »): the step does not go on. */
+  joinedUnreadable: boolean;
   presetId: string | null;
   /** « Autre » picked: the rate is typed by hand. */
   byHand: boolean;
@@ -76,6 +79,7 @@ const EMPTY = (): Draft => ({
   timeZone: suggestedZone('BJ') ?? 'Africa/Porto-Novo',
   zoneOpen: false,
   joinedOn: today(),
+  joinedUnreadable: false,
   presetId: null,
   byHand: false,
   rate: '',
@@ -102,7 +106,8 @@ export function problemsOf(step: number, draft: Draft): Problems {
   if (step === 1) {
     if (!TimezoneSchema.safeParse(draft.timeZone.trim()).success)
       problems.timeZone = 'Ce fuseau n’existe pas. Choisis-en un dans la liste.';
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.joinedOn)) problems.joinedOn = 'Une date d’arrivée.';
+    if (draft.joinedUnreadable) problems.joinedOn = 'Un jour comme 03/11/2026, ou 3/11.';
+    else if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.joinedOn)) problems.joinedOn = 'Une date d’arrivée.';
   }
   if (step === 2) {
     if (draft.presetId === null && parseRate(draft.rate) === null)
@@ -577,14 +582,17 @@ function Where({ id, draft, problems, onChange }: StepProps): JSX.Element {
         ) : null}
       </Field>
       <Field id={`${id}-joined`} label="Dans l’équipe depuis" problem={problems.joinedOn}>
-        <input
+        <DayField
           id={`${id}-joined`}
-          className="nv-field__control nv-glass tm-date"
-          type="date"
+          className="tm-date"
           value={draft.joinedOn}
-          aria-invalid={problems.joinedOn !== undefined}
-          onChange={(event) => {
-            onChange({ joinedOn: event.target.value });
+          toward="year"
+          invalid={problems.joinedOn !== undefined}
+          onChange={(next) => {
+            onChange({ joinedOn: next });
+          }}
+          onUnreadable={(bad) => {
+            onChange({ joinedUnreadable: bad });
           }}
         />
       </Field>

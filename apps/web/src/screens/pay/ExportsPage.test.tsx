@@ -201,8 +201,8 @@ describe('Paie › Exports', () => {
     renderPage();
     const panel = await waitFor(() => panelOf('Journal des prestataires'));
     // The fiscal year in progress by default: the calendar year, as the settings close it in December.
-    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '2026-01-01');
-    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '2026-11-05');
+    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '01/01/2026');
+    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '05/11/2026');
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le journal' }));
     await within(panel).findByText(JOURNAL.fileName);
     expect(reads).toEqual(['/v1/payroll/accounting/journal?from=2026-01-01&to=2026-11-05']);
@@ -252,11 +252,11 @@ describe('Paie › Exports', () => {
     const panel = await waitFor(() => panelOf('Journal des prestataires'));
     // A fiscal year closing in June: the one in progress began on the 1st of July.
     await waitFor(() => {
-      expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '2026-07-01');
+      expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '01/07/2026');
     });
     fireEvent.click(within(panel).getByRole('button', { name: 'Exercice précédent' }));
-    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '2025-07-01');
-    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '2026-06-30');
+    expect(within(panel).getByLabelText('Du')).toHaveProperty('value', '01/07/2025');
+    expect(within(panel).getByLabelText('Au')).toHaveProperty('value', '30/06/2026');
 
     fireEvent.change(within(panel).getByLabelText('Du'), { target: { value: '2024-01-01' } });
     fireEvent.click(within(panel).getByRole('button', { name: 'Préparer le journal' }));
