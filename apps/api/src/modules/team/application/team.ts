@@ -45,7 +45,7 @@ import type {
   TeamStore,
 } from '../domain/ports';
 
-/** A member invited from a proposed match: the fields of Équipe › Membres, and the account (ADR 0076 § 3). */
+/** A member invited from a link proposal: the fields of Équipe › Membres, and the account (ADR 0076 § 3). */
 export type InviteFromPlatform = CreateTeamMemberBody & { readonly account: PlatformAccountRef };
 
 /** Équipe › Membres (EQ-01): reads for the owner and the managers, writes for the owner. */
@@ -54,7 +54,7 @@ export interface TeamService {
   member(actor: UserId, id: TeamMemberId): Promise<TeamMember>;
   addMember(actor: Actor, body: CreateTeamMemberBody): Promise<TeamMember>;
   /**
-   * A member invited from a proposed match (ADR 0076 § 3), by the owner or an active manager within his
+   * A member invited from a link proposal (ADR 0076 § 3), by the owner or an active manager within his
    * bounds, created and linked to his platform account by `invites` in one transaction. A preset is the one in force
    * today, as the screen offers it. Asked again for the same account, the member already invited.
    */

@@ -134,7 +134,7 @@ export interface PlatformAccountRef {
 }
 
 /**
- * The invitation of a member from a proposed match (ADR 0076 § 3), implemented in `infra/` with `withMember`
+ * The invitation of a member from a link proposal (ADR 0076 § 3), implemented in `infra/` with `withMember`
  * and the link of the platform's account (`connectors`' own write), both in one transaction.
  */
 export interface TeamInvites {

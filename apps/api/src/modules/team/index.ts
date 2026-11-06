@@ -29,7 +29,7 @@ export interface TeamModule {
    */
   readonly pay: { readonly members: (tx: Transaction, day: string) => Promise<MemberForPay[]> };
   /**
-   * The invitation of a member from a proposed match (ADR 0076 § 3), for `connectors`' route: given the link
+   * The invitation of a member from a link proposal (ADR 0076 § 3), for `connectors`' route: given the link
    * writes of `connectors` by the composition root, it creates the member and links his account in one transaction,
    * as the owner or an active manager within his bounds (a chatter, a preset in force, creators of his own list).
    */

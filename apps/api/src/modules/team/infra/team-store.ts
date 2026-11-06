@@ -548,7 +548,7 @@ export interface PlatformChatterLinks {
 }
 
 /**
- * The invitation from a proposed match (ADR 0076 § 3), in one transaction as the inviter: the bounds of an
+ * The invitation from a link proposal (ADR 0076 § 3), in one transaction as the inviter: the bounds of an
  * active manager (his own list read here, the rest held again by the policies), the account's lock, the member made
  * as `create` makes him, his link, and the audit line with the platform's identifier, never a name nor an amount.
  */
