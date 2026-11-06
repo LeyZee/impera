@@ -172,12 +172,16 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
 }
 
 /**
- * Her next script's number (SC-03, ADR 0056 § 5): one more than her last, 1 for her first. Her creator row is locked
- * first, so two scripts sent at once take 2 and 3, never 2 twice; `content_drops_script_number_unique` stays the
- * last guard. Given once, when she sends it: a script withdrawn afterwards keeps its number.
+ * Her next script's number (SC-03, ADR 0056 § 5): one more than her last, 1 for her first. A lock of the transaction
+ * on her numbering first, so two scripts sent at once take 2 and 3, never 2 twice; an advisory lock, never her
+ * `creators` row, whose lock would hold every insert that names her (Bilan's review of #602).
+ * `content_drops_script_number_unique` stays the last guard. Given once, when she sends it: a script withdrawn
+ * afterwards keeps its number.
  */
 async function nextScriptNumber(tx: Transaction, creatorId: string): Promise<number> {
-  await tx.execute(sql`select 1 from creators where id = ${creatorId} for update`);
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext('content_drops.script_number:' || ${creatorId}))`,
+  );
   const [row] = await tx
     .select({ last: sql<number | null>`max(${contentDrops.scriptNumber})::int` })
     .from(contentDrops)

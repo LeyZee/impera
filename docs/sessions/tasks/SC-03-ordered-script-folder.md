@@ -25,4 +25,4 @@ Téléversement dans Reveal (SC-06).
 
 ## Notes de session
 - 06/11, lot a : nomenclature pure et ses tests ; le numéro sans trou (migration) et le moment d'une structure « les deux » restent au lot b.
-- 06/11, lot b : `content_drops.script_number`, donné à l'envoi sous le verrou de la créatrice, unique par créatrice ; test de deux envois simultanés (2 et 3).
+- 06/11, lot b : `content_drops.script_number`, donné à l'envoi sous un verrou consultatif, unique par créatrice ; test de deux envois simultanés (2 et 3).
