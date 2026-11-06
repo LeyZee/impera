@@ -1,7 +1,6 @@
 import {
   calendarDayAt,
   CommissionStatementStatusSchema,
-  DomainError,
   newId,
   PayAdjustmentIdSchema,
   payPeriodAt,
@@ -229,7 +228,8 @@ async function assertAboveZeroOnceLeft(
     const { snapshot } = await readSnapshot(tx, reads, period, reports, { kind: 'member', creatorIds });
     totalMinor = statementOf(snapshot, memberId).content.totalMinor;
   } catch (error) {
-    if (error instanceof DomainError) return;
+    // Only the missing rate, as said above: any other refusal of the read stays a refusal.
+    if (error instanceof CommissionRateMissing) return;
     throw error;
   }
   if (totalMinor < 0) throw new PayAdjustmentBelowZero(totalMinor, memberId);

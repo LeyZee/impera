@@ -8966,7 +8966,7 @@
         },
         "commission_statements_written_off_check": {
           "name": "commission_statements_written_off_check",
-          "value": "\"commission_statements\".\"written_off_minor\" <= 0 and (\"commission_statements\".\"written_off_minor\" = 0 or coalesce((\"commission_statements\".\"rules\" ->> 'final')::boolean, false))"
+          "value": "\"commission_statements\".\"written_off_minor\" = 0 or (coalesce((\"commission_statements\".\"rules\" ->> 'final')::boolean, false) and \"commission_statements\".\"total_minor\" < 0 and \"commission_statements\".\"written_off_minor\" = \"commission_statements\".\"total_minor\" and \"commission_statements\".\"carry_over_out_minor\" = 0)"
         },
         "commission_statements_team_share_check": {
           "name": "commission_statements_team_share_check",

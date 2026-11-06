@@ -465,10 +465,11 @@ export const commissionStatements = pgTable(
       'commission_statements_amounts_check',
       sql`${t.payableMinor} >= 0 and ${t.payableMinor} = ${t.totalMinor} - ${t.carryOverOutMinor} - ${t.writtenOffMinor} and ${t.penaltiesMinor} between 0 and greatest(${t.penaltiesRequestedMinor}, 0)`,
     ),
-    // Only a final statement of a member who left writes a balance off, and only one below zero (ADR 0072 § 4).
+    // Only a final statement of a member who left writes its balance off (ADR 0072 § 4): all of a total below zero,
+    // nothing carried, so that it pays nothing; never a part of it, never on a total above zero.
     check(
       'commission_statements_written_off_check',
-      sql`${t.writtenOffMinor} <= 0 and (${t.writtenOffMinor} = 0 or coalesce((${t.rules} ->> 'final')::boolean, false))`,
+      sql`${t.writtenOffMinor} = 0 or (coalesce((${t.rules} ->> 'final')::boolean, false) and ${t.totalMinor} < 0 and ${t.writtenOffMinor} = ${t.totalMinor} and ${t.carryOverOutMinor} = 0)`,
     ),
     check(
       'commission_statements_team_share_check',

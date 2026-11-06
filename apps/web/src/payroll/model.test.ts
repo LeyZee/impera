@@ -326,7 +326,7 @@ describe('a statement’s marks', () => {
     expect(carryWhat(draft)).toBeNull();
     // A final statement under zero carries nothing: its total is written off (ADR 0072 § 4).
     const writtenOff = { totalMinor: -1_200, writtenOffMinor: -1_200, payableMinor: 0 };
-    expect(plain(carryWhat(statement(writtenOff)) ?? '')).toBe('total −12,00 € → serait abandonné');
+    expect(plain(carryWhat(statement(writtenOff)) ?? '')).toBe('total −12,00 € → solde abandonné');
     expect(plain(carryWhat(statement({ ...writtenOff, status: 'validated' })) ?? '')).toBe(
       'total −12,00 € → solde abandonné',
     );
@@ -1062,7 +1062,7 @@ describe('a member’s row', () => {
       'Relevé final sous zéro : les 8,00 € encore dus à l’agence seront abandonnés une fois le relevé validé, rien ne sera reporté.',
     );
     expect(plain(carryLine(statement(writtenOff), false) ?? '')).toBe(
-      'Relevé final sous zéro à ce jour : si la quinzaine finit ainsi, les 8,00 € encore dus à l’agence seront abandonnés.',
+      'Relevé final sous zéro à ce jour : si la quinzaine finit ainsi, les 8,00 € encore dus à l’agence seraient abandonnés.',
     );
   });
 

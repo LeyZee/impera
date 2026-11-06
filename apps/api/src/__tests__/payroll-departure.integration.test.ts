@@ -137,6 +137,26 @@ describe('Équipe › départ : le relevé final d’un membre parti (EQ-14, ADR
       .where(eq(schema.commissionStatements.id, id));
   };
 
+  /**
+   * Writes the amounts of the member's draft of `period` in its next revision, its payable what they leave: only the
+   * check on the written-off balance stands in the way (ADR 0072 § 4).
+   */
+  const amountsInBase = async (
+    member: TeamMember,
+    period: PayPeriod,
+    amounts: { totalMinor: number; carryOverOutMinor: number; writtenOffMinor: number },
+  ) => {
+    const { id } = await team.statementOf(member, period);
+    return db()
+      .update(schema.commissionStatements)
+      .set({
+        ...amounts,
+        payableMinor: amounts.totalMinor - amounts.carryOverOutMinor - amounts.writtenOffMinor,
+        revision: sql`${schema.commissionStatements.revision} + 1`,
+      })
+      .where(eq(schema.commissionStatements.id, id));
+  };
+
   const statementsOf = (member: TeamMember, period: PayPeriod) =>
     db()
       .select({ id: schema.commissionStatements.id })
@@ -372,6 +392,25 @@ describe('Équipe › départ : le relevé final d’un membre parti (EQ-14, ADR
     expect(await failure(writtenOffInBase(theo, period, 100))).toMatch(
       /commission_statements_written_off_check/u,
     );
+    // All of a total below zero, nothing carried: never a part of it, never on a total above zero, which would pay
+    // more than the total.
+    const before = {
+      totalMinor: draft.totalMinor,
+      carryOverOutMinor: draft.carryOverOutMinor,
+      writtenOffMinor: draft.writtenOffMinor,
+    };
+    expect(
+      await failure(
+        amountsInBase(theo, period, { totalMinor: 10_000, carryOverOutMinor: 0, writtenOffMinor: -5_000 }),
+      ),
+    ).toMatch(/commission_statements_written_off_check/u);
+    expect(
+      await failure(
+        amountsInBase(theo, period, { totalMinor: -500, carryOverOutMinor: -300, writtenOffMinor: -200 }),
+      ),
+    ).toMatch(/commission_statements_written_off_check/u);
+    await amountsInBase(theo, period, { totalMinor: -500, carryOverOutMinor: 0, writtenOffMinor: -500 });
+    await amountsInBase(theo, period, before);
   });
 
   it('keeps in the base the day he left with his status, and never moves it while he is gone', async () => {

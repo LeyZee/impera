@@ -282,11 +282,14 @@ export function amountWhat(statement: CommissionStatement, ended: boolean, sameS
   return statement.status === 'draft' && !sameStage ? 'à verser, une fois validé' : 'à verser';
 }
 
-/** A carry-over under a row's amount: its total and where it goes, conditional until the statement is validated. */
+/**
+ * A carry-over under a row's amount: its total and where it goes, conditional until the statement is validated. A
+ * written-off balance says what is written off, the balance, in both states: the statement's line says it is
+ * conditional (ADR 0072 § 4).
+ */
 export function carryWhat(statement: CommissionStatement): string | null {
   const total = `total ${amountText(statement.totalMinor, 'EUR')}`;
-  if (statement.writtenOffMinor !== 0)
-    return statement.status === 'draft' ? `${total} → serait abandonné` : `${total} → solde abandonné`;
+  if (statement.writtenOffMinor !== 0) return `${total} → solde abandonné`;
   if (statement.carryOverOutMinor === 0) return null;
   return statement.status === 'draft' ? `${total} → irait en report` : `${total} → reporté`;
 }
@@ -1117,7 +1120,7 @@ function writtenOffLine(statement: CommissionStatement, ended: boolean): string 
     return `Relevé final sous zéro : les ${owed} encore dus à l’agence sont abandonnés (« Solde abandonné »), rien n’est reporté.`;
   return ended
     ? `Relevé final sous zéro : les ${owed} encore dus à l’agence seront abandonnés une fois le relevé validé, rien ne sera reporté.`
-    : `Relevé final sous zéro à ce jour : si la quinzaine finit ainsi, les ${owed} encore dus à l’agence seront abandonnés.`;
+    : `Relevé final sous zéro à ce jour : si la quinzaine finit ainsi, les ${owed} encore dus à l’agence seraient abandonnés.`;
 }
 
 /**
