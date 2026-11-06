@@ -128,6 +128,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'GET /v1/creator-space/content/script-drops/:dropId': 'creator space: script drops tests',
   'PUT /v1/creator-space/content/script-drops/:dropId/slots/:slotKey': 'creator space: script drops tests',
   'POST /v1/creator-space/content/script-drops/:dropId/submit': 'creator space: script drops tests',
+  'GET /v1/creator-space/content/script-drops/:dropId/cards/:segmentKey': 'creator space: script drops tests',
   'POST /v1/creator-space/suggestions/:id/accept': 'creator space: agenda tests',
   'POST /v1/creator-space/suggestions/:id/decline': 'creator space: agenda tests',
   'DELETE /v1/creator-space/availabilities/:id': 'creator space: agenda tests',

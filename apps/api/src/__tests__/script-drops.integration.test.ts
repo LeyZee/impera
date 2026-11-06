@@ -188,6 +188,18 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(content.requests.find((one) => one.id === requestId)?.dropId).toBe(dropId);
   });
 
+  it('draws her script’s cards from its frozen version, for her alone', async () => {
+    const card = await call('GET', `${base}/${dropId}/cards/salon`, 'nora');
+    expect(card.statusCode, card.body).toBe(200);
+    expect(card.headers['content-type']).toContain('image/svg+xml');
+    expect(card.headers['content-security-policy']).toBe("default-src 'none'");
+    expect(card.body).toContain('Salon');
+    expect((await call('GET', `${base}/${dropId}/cards/chambre?variant=B`, 'nora')).statusCode).toBe(200);
+    const missing = await call('GET', `${base}/${dropId}/cards/cuisine`, 'nora');
+    expect([missing.statusCode, codeOf(missing.body).code]).toEqual([404, 'content_drop_card_not_found']);
+    expect((await call('GET', `${base}/${dropId}/cards/salon`, 'ines')).statusCode).toBe(404);
+  });
+
   it('fills a slot with a file of its kind, refuses another kind and a slot the script does not have', async () => {
     const wrong = await fill('salon::0', {
       id: newId(ContentDropFileIdSchema),

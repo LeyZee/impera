@@ -13,6 +13,7 @@ import type {
   FillScriptSlotBody,
   ScriptSegment,
   ScriptSlot,
+  ScriptVariantLetter,
   SlotLengths,
   StartScriptDropBody,
 } from '@impera/contracts';
@@ -82,6 +83,8 @@ export interface ScriptVersions {
   frozen(
     versionId: string,
   ): Promise<{ readonly name: string; readonly segments: readonly ScriptSegment[] } | null>;
+  /** A card of a frozen version, its SVG; `null` for a segment or series it does not have. */
+  card(versionId: string, segmentKey: string, variant: ScriptVariantLetter | null): Promise<string | null>;
   /**
    * The latest version of a structure frozen for a request the agency asks by hand, by the one who asks; `null` for a
    * structure unknown, archived, or out of reach of that account.
