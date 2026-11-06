@@ -54,6 +54,17 @@
   align-items: center;
   gap: var(--nv-space-1);
 }
+/* « Voir le fichier » reads on the text's edge, its short padding outside it, its focus ring the pill's own outline,
+   as the invoices' actions (#573). */
+.cf-item__main .cf-item__acts .nv-btn--plain {
+  padding-inline: var(--nv-space-2);
+}
+.cf-item__main .cf-item__acts > .nv-btn--plain:first-child {
+  margin-left: calc(-1 * var(--nv-space-2));
+}
+.cf-item__main .cf-item__acts .nv-btn--plain:focus-visible {
+  outline-offset: -2px;
+}
 .cf-remind {
   margin: var(--nv-space-1) 0 0;
 }
@@ -162,11 +173,38 @@
 }
 
 @media (max-width: 560px) {
+  /* On a phone the name shares its line with the chip, and all the rest takes the whole width under them: never a
+     narrow column beside the room the chip keeps (#573). */
   .cf-item {
     grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--nv-space-1);
   }
-  .cf-item__acts--side {
+  .cf-item__main {
+    display: contents;
+  }
+  .cf-item__main > * {
     grid-column: 1 / -1;
+  }
+  .cf-item__main > .cf-item__name {
+    grid-column: 1;
+  }
+  .cf-item__chips {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .cf-item > .cf-item__acts {
+    grid-column: 1 / -1;
+    margin-top: var(--nv-space-2);
+  }
+  /* Under the text, a plain action reads on its edge as « Voir le fichier » does. */
+  .cf-item > .cf-item__acts .nv-btn--plain {
+    padding-inline: var(--nv-space-2);
+  }
+  .cf-item > .cf-item__acts > .nv-btn--plain:first-child {
+    margin-left: calc(-1 * var(--nv-space-2));
+  }
+  .cf-item > .cf-item__acts .nv-btn--plain:focus-visible {
+    outline-offset: -2px;
   }
   .cf-facts > div {
     grid-template-columns: minmax(0, 1fr);
