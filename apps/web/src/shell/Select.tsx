@@ -138,7 +138,7 @@ export function Select<V extends string>({
     if (refocus) trigger.current?.focus();
   };
   const pick = (option: SelectOption<V> | undefined): void => {
-    if (option === undefined || option.disabled === true) return;
+    if (disabled || option === undefined || option.disabled === true) return;
     if (option.value !== value) onChange(option.value);
     close(true);
   };
@@ -308,7 +308,9 @@ export function Select<V extends string>({
         aria-describedby={describedBy}
         aria-label={ariaLabel}
         data-autofocus={autofocus ? true : undefined}
-        disabled={disabled}
+        // aria-disabled, not disabled: a field greyed while its choice is sent keeps the focus it was given back,
+        // where a disabled button drops it on the page (relecture de #568).
+        aria-disabled={disabled ? true : undefined}
         onClick={() => {
           if (open) close(false);
           else openAt(options.findIndex((one) => one.value === value));
