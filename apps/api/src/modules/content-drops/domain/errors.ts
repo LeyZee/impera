@@ -17,6 +17,7 @@ import {
   CONTENT_REQUEST_CLOSED_CONFLICT,
   CONTENT_REQUEST_ID_CONFLICT,
   CONTENT_REQUEST_NOT_FOUND,
+  CONTENT_REQUEST_DUE_UNPROCESSABLE,
   CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE,
   DomainError,
   type ScriptExportRefusal,
@@ -193,5 +194,15 @@ const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
 export class ContentDropExportUnprocessable extends DomainError {
   constructor(reason: ScriptExportRefusal) {
     super(CONTENT_DROP_EXPORT_UNPROCESSABLE, EXPORT_SENTENCES[reason], { details: { reason } });
+  }
+}
+
+/** A request asked for a day already past in her time zone (recette MED-10). */
+export class ContentRequestDueUnprocessable extends DomainError {
+  constructor() {
+    super(
+      CONTENT_REQUEST_DUE_UNPROCESSABLE,
+      'Ce jour est déjà passé pour elle : choisis aujourd’hui ou plus tard',
+    );
   }
 }

@@ -37,6 +37,9 @@ import { buildServer, type Server } from '../server';
 import { testConfig } from './support/config';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
+/** A day ahead of the server's real clock: a request is never asked for a day already past (recette MED-10). */
+const DUE_ON = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+
 /**
  * Her files sent straight to the media storage (CR-06 b, ADR 0055 § 3), against a real object store: MinIO in a
  * container, or the server named by `IMPERA_TEST_S3_URL` where Docker is not available (its user in
@@ -335,7 +338,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       id: requestId,
       creatorId: nora,
       category: 'feed_shoot',
-      dueOn: '2026-11-20',
+      dueOn: DUE_ON,
       reason: 'Idée inventée',
       structureId: null,
       origin: 'idea',

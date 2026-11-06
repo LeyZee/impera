@@ -29,6 +29,10 @@ import { buildServer, type Server } from '../server';
 import { testConfig } from './support/config';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
+/** A day ahead of the server's real clock: a request is never asked for a day already past (recette MED-10). */
+const DUE_ON = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+const LATER_DUE_ON = new Date(Date.now() + 44 * 86_400_000).toISOString().slice(0, 10);
+
 const PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 const MB = 1024 * 1024;
@@ -171,7 +175,7 @@ describe('/v1/creator-space/content/script-drops', () => {
     const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
       id: newId(ContentRequestIdSchema),
       category: 'script',
-      dueOn: '2026-11-12',
+      dueOn: DUE_ON,
       reason: 'Ton prochain script : Soirée inventée',
       structureId: library.id,
     });
@@ -328,7 +332,7 @@ describe('/v1/creator-space/content/script-drops', () => {
 
   it('numbers two scripts she sends at once 2 and 3, never the same twice (SC-03)', async () => {
     const drops = await Promise.all(
-      ['2026-11-26', '2026-12-10'].map(async (dueOn) => {
+      [DUE_ON, LATER_DUE_ON].map(async (dueOn) => {
         const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
           id: newId(ContentRequestIdSchema),
           category: 'script',
@@ -425,7 +429,7 @@ describe('/v1/creator-space/content/script-drops', () => {
       const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
         id: newId(ContentRequestIdSchema),
         category: 'script',
-        dueOn: '2026-12-20',
+        dueOn: DUE_ON,
         reason: 'Un script de jour comme de nuit',
         structureId: both.id,
       });
@@ -463,7 +467,7 @@ describe('/v1/creator-space/content/script-drops', () => {
     const hers = await call('POST', `/v1/creators/${ines}/content-requests`, 'owner', {
       id: newId(ContentRequestIdSchema),
       category: 'script',
-      dueOn: '2026-12-20',
+      dueOn: DUE_ON,
       reason: 'Son premier script',
       structureId: both.id,
     });

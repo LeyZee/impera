@@ -1,0 +1,255 @@
+/*
+ * Créatrices › Demandes (MED-09). The head, the empty plate and the pills are her agenda's (`ps-*`, `aa-*`); the rest
+ * lives here, prefixed `rq-`. A request says what, then for when, then where it stands by a quiet pill: never a
+ * coloured edge. Late is amber, nothing here is red.
+ */
+.rq-notice {
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+
+/* The cadence: what it is on the left, the owner's field on the right, aligned on the same line. */
+.rq-cadence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+.rq-cadence__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--nv-space-3) var(--nv-space-5);
+}
+.rq-cadence__who {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.rq-cadence__title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
+}
+.rq-cadence__line {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rq-cadence__form {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.rq-cadence__label,
+.rq-cadence__unit {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+.rq-cadence__input.nv-field__control {
+  flex: none;
+  width: 64px;
+  text-align: center;
+}
+
+.rq-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rq-group__title {
+  margin: var(--nv-space-2) 0 0;
+  padding-inline: 4px;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+}
+.rq-count {
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  color: var(--nv-ink-muted);
+}
+.rq-none {
+  margin: 0;
+  padding-inline: 4px;
+}
+
+.rq-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rq-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+.rq-card__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  margin-bottom: 2px;
+}
+.rq-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--nv-text-callout);
+  font-weight: 650;
+}
+.rq-due {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rq-due--late {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.rq-state {
+  margin-left: auto;
+}
+.rq-state[data-tone='todo'],
+.rq-state[data-tone='shooting'] {
+  color: var(--nv-ink);
+}
+.rq-state[data-tone='todo']::before {
+  background: var(--nv-ink);
+}
+.rq-state[data-tone='shooting']::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--nv-ink);
+}
+.rq-state[data-tone='dropped'] {
+  color: var(--nv-ink);
+}
+.rq-state[data-tone='dropped']::before {
+  background: var(--nv-success);
+}
+
+.rq-reason {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  overflow-wrap: anywhere;
+}
+.rq-card[data-standing='refused'] .rq-reason,
+.rq-card[data-standing='cancelled'] .rq-reason {
+  color: var(--nv-ink-muted);
+}
+.rq-meta {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rq-note {
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rq-note[data-tone='warn'] {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.rq-card__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3) var(--nv-space-5);
+}
+.rq-card__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rq-card__main > .rq-cancel {
+  flex: none;
+  /* A plain button: its words, not its padding, line up with the pill above. */
+  margin-right: calc(-1 * var(--nv-space-4));
+}
+
+/* The dialog: stacked fields, a hint under each, replaced by the fault when there is one. */
+.rq-ask .tm-dialog__body {
+  gap: var(--nv-space-5);
+}
+.rq-chips {
+  flex-wrap: wrap;
+}
+.rq-chips .nv-chip {
+  gap: 6px;
+}
+.rq-reason-field {
+  resize: none;
+  min-height: 84px;
+}
+.rq-hint,
+.rq-error {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rq-hint {
+  color: var(--nv-ink-muted);
+}
+.rq-error {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.rq-dialog__text {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+
+@media (max-width: 520px) {
+  .rq-card,
+  .rq-cadence {
+    padding: 16px;
+  }
+  /* What and where it stands on the first line, for when on the second: the pill never sits alone on a line. */
+  .rq-card__top {
+    row-gap: 2px;
+  }
+  .rq-due {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .rq-card__main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--nv-space-1);
+  }
+  .rq-card__main > .rq-cancel {
+    align-self: flex-end;
+  }
+}

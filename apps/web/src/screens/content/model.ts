@@ -271,11 +271,18 @@ const daysBetween = (today: string, day: string): number =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS);
 
 /** « Pour aujourd’hui », « Pour demain », « Pour jeudi », « Pour le 12 nov. », « En retard depuis lundi ». */
+/** « le 3 nov. », with its year when it is not this year's (recette MED-10: « le 1 janv. » said no year). */
+export function namedDay(day: string, today: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  const named = `le ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
+  return day.slice(0, 4) === today.slice(0, 4) ? named : `${named} ${day.slice(0, 4)}`;
+}
+
 export function dueOf(dueOn: string, today: string): { readonly text: string; readonly late: boolean } {
   const days = daysBetween(today, dueOn);
   const date = new Date(`${dueOn}T00:00:00Z`);
   const weekday = WEEKDAYS[date.getUTCDay()] ?? '';
-  const named = `le ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
+  const named = namedDay(dueOn, today);
   if (days < 0) return { text: `En retard depuis ${days >= -6 ? weekday : named}`, late: true };
   if (days === 0) return { text: 'Pour aujourd’hui', late: false };
   if (days === 1) return { text: 'Pour demain', late: false };
