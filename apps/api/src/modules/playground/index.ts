@@ -31,7 +31,7 @@ export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
 
 /** One of her stored versions with her name, as `persona.versions.version` answers it (matched by shape). */
-export type PersonaVersionSource = (
+type PersonaVersionSource = (
   creatorId: CreatorId,
   versionId: PersonaVersionId,
 ) => Promise<{
