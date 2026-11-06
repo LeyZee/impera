@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { PersonaSchema } from '@impera/contracts';
+import { StoredPersonaSchema } from '@impera/contracts';
 import { parse } from 'yaml';
 import type { z } from 'zod';
 
@@ -11,11 +11,11 @@ import type { z } from 'zod';
  */
 const fromTypedFolder = (path: string): string => resolve(process.env['INIT_CWD'] ?? process.cwd(), path);
 
-/** Reads a persona YAML and checks it against `PersonaSchema`, for `persona:validate` and `persona:load`. */
+/** Reads a persona YAML and checks it against `StoredPersonaSchema` (format 1 or 2, ADR 0079), for `persona:validate` and `persona:load`. */
 export async function readPersonaYaml(
   path: string,
-): Promise<z.ZodSafeParseResult<z.output<typeof PersonaSchema>>> {
-  return PersonaSchema.safeParse(parse(await readFile(fromTypedFolder(path), 'utf8')));
+): Promise<z.ZodSafeParseResult<z.output<typeof StoredPersonaSchema>>> {
+  return StoredPersonaSchema.safeParse(parse(await readFile(fromTypedFolder(path), 'utf8')));
 }
 
 /** One line per problem: where, and what. Never the value itself (the persona stays out of the logs). */

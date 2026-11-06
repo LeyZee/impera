@@ -1,5 +1,5 @@
 /** Public entry point of the `persona` module (ADR 0002). Other modules import this file only. */
-import type { Persona, PersonaSampleReplyFault } from '@impera/contracts';
+import type { PersonaSampleReplyFault, StoredPersona } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -46,13 +46,13 @@ export interface PersonaDeps {
    * Her sample replies a hard guard of her answers would block (`agent`, P5-01): a version with any is refused, from
    * the dashboard and from `pnpm persona:load` alike. Absent, none is read.
    */
-  readonly sampleReplyFaults?: (persona: Persona) => readonly PersonaSampleReplyFault[];
+  readonly sampleReplyFaults?: (persona: StoredPersona) => readonly PersonaSampleReplyFault[];
 }
 
 /** Refuses a persona whose sample replies teach what a guard of her answers blocks. */
 const sampleReplyCheck =
   (faultsOf: NonNullable<PersonaDeps['sampleReplyFaults']>) =>
-  (persona: Persona): void => {
+  (persona: StoredPersona): void => {
     const faults = faultsOf(persona);
     if (faults.length > 0) throw new PersonaSampleReplyUnprocessable(faults);
   };
@@ -60,7 +60,7 @@ const sampleReplyCheck =
 /** The store, refusing before any write a version whose sample replies teach what a guard blocks. */
 function withSampleReplyCheck(
   store: PersonaVersionStore,
-  check: (persona: Persona) => void,
+  check: (persona: StoredPersona) => void,
 ): PersonaVersionStore {
   return {
     ...store,

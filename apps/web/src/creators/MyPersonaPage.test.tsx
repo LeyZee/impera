@@ -79,7 +79,7 @@ function serve(): void {
         );
       }
       if (url.pathname === `/v1/creators/${CREATOR}/persona/mine`) {
-        return Promise.resolve(new Response(JSON.stringify({ creatorId: CREATOR, sheet })));
+        return Promise.resolve(new Response(JSON.stringify({ creatorId: CREATOR, sheet, answers: null })));
       }
       return Promise.resolve(new Response('{}', { status: 404 }));
     }),

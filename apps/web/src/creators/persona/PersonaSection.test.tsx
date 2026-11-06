@@ -1,3 +1,4 @@
+import { personaSheetFromV1, type Persona } from '@impera/contracts';
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +7,12 @@ import blocksYaml from '../../../../../personas/demo/v0.2.0.yaml?raw';
 
 import { PersonaSection, tabsOutOfView } from './PersonaSection';
 import { parsePersonaYaml } from './source';
+
+/** The format-2 draft the API sends beside a format-1 version (ADR 0079 § 5). */
+const asDraft = (persona: Persona) => {
+  const { persona: draft, moved } = personaSheetFromV1(persona);
+  return { draft, moved };
+};
 
 const CREATOR = '6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b';
 const SUMMARY = {
@@ -39,7 +46,11 @@ async function serve(saved: readonly [number, unknown]) {
       return Promise.resolve(new Response(JSON.stringify(saved[1]), { status: saved[0] }));
     }
     if (url === `/v1/creators/${CREATOR}/persona`) {
-      const overview = { creatorId: CREATOR, latest: { summary: SUMMARY, persona }, versions: [SUMMARY] };
+      const overview = {
+        creatorId: CREATOR,
+        latest: { summary: SUMMARY, persona, ...asDraft(persona) },
+        versions: [SUMMARY],
+      };
       return Promise.resolve(new Response(JSON.stringify(overview), { status: 200 }));
     }
     return Promise.resolve(new Response('{}', { status: 404 }));
@@ -119,7 +130,7 @@ describe('Créatrices › Persona, the P5-01 blocks', () => {
   });
 
   it('says a refusal it cannot read as a failed save', async () => {
-    await serve(refusal([{ index: 99, code: 'ai_disclosure' }]));
+    await serve(refusal([{ index: 999, code: 'ai_disclosure' }]));
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByRole('progressbar', { name: 'Complétude de la persona' });
     fireEvent.click(tab('Elle en détail'));
@@ -141,7 +152,8 @@ async function serveVersions(
       return Promise.resolve(new Response(JSON.stringify(body), { status }));
     }
     if (url === `/v1/creators/${CREATOR}/persona`) {
-      const latest = versions[0] === undefined ? null : { summary: versions[0], persona };
+      const latest =
+        versions[0] === undefined ? null : { summary: versions[0], persona, ...asDraft(persona) };
       return Promise.resolve(
         new Response(JSON.stringify({ creatorId: CREATOR, latest, versions }), { status: 200 }),
       );

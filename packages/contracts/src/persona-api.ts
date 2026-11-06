@@ -7,12 +7,17 @@ import {
   PersonaIntimateSchema,
   PersonaLifestyleSchema,
   PersonaLimitsSchema,
-  PersonaSchema,
   PersonaTastesSchema,
   PersonaWritingStyleSchema,
   SAMPLE_REPLIES_MAX,
   SampleReplySchema,
 } from './persona';
+import {
+  PERSONA_SHEET_SECTION_KEYS,
+  PersonaSheetSchema,
+  PersonaV2Schema,
+  StoredPersonaSchema,
+} from './persona-sheet';
 
 /** Hex SHA-256 of a persona's canonical JSON (keys sorted): two equal personas have the same hash. */
 export const ContentHashSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -28,13 +33,28 @@ export const PersonaVersionSummarySchema = z.strictObject({
 });
 export type PersonaVersionSummary = z.infer<typeof PersonaVersionSummarySchema>;
 
+/** A format-1 answer that found no question of its own in the format-2 draft, and the question it went to (ADR 0079 § 5). */
+export const PersonaMoveSchema = z.strictObject({
+  from: z.string().min(1),
+  to: z.strictObject({ section: z.enum(PERSONA_SHEET_SECTION_KEYS), key: z.string().min(1) }),
+});
+
 /**
- * `GET /v1/creators/:creatorId/persona`: her versions, newest first, and the content of the newest one, the one the
- * dashboard edits. `latest` is null while no version was ever stored.
+ * `GET /v1/creators/:creatorId/persona`: her versions, newest first, and the content of the newest one. `persona` is
+ * that content as stored, in either format; `draft` is the same at format 2, the one the dashboard edits (ADR 0079),
+ * converted when it was stored at format 1, with `moved` saying what the conversion put in a nearby question.
+ * `latest` is null while no version was ever stored.
  */
 export const PersonaOverviewSchema = z.strictObject({
   creatorId: CreatorIdSchema,
-  latest: z.strictObject({ summary: PersonaVersionSummarySchema, persona: PersonaSchema }).nullable(),
+  latest: z
+    .strictObject({
+      summary: PersonaVersionSummarySchema,
+      persona: StoredPersonaSchema,
+      draft: PersonaV2Schema,
+      moved: z.array(PersonaMoveSchema),
+    })
+    .nullable(),
   versions: z.array(PersonaVersionSummarySchema),
 });
 export type PersonaOverview = z.infer<typeof PersonaOverviewSchema>;
@@ -56,10 +76,15 @@ export const CreatorPersonaSheetSchema = z.strictObject({
 });
 export type CreatorPersonaSheet = z.infer<typeof CreatorPersonaSheetSchema>;
 
-/** `GET /v1/creators/:creatorId/persona/mine`, the creator only: her sheet in force, null while she has none. */
+/**
+ * `GET /v1/creators/:creatorId/persona/mine`, the creator only: her sheet in force, null while she has none. `answers`
+ * is that sheet at format 2, Desirali's seven panels (ADR 0079 § 6), never the agent's settings; `sheet` is the
+ * format-1 reading the screen still shows, null when the version in force was written at format 2.
+ */
 export const MyPersonaSchema = z.strictObject({
   creatorId: CreatorIdSchema,
   sheet: CreatorPersonaSheetSchema.nullable(),
+  answers: PersonaSheetSchema.nullable(),
 });
 export type MyPersona = z.infer<typeof MyPersonaSchema>;
 
@@ -69,7 +94,8 @@ export type MyPersona = z.infer<typeof MyPersonaSchema>;
  * `persona.meta.version` is taken, the answer is 409 `persona_version_conflict` and nothing is stored.
  */
 export const CreatePersonaVersionBodySchema = z.strictObject({
-  persona: PersonaSchema,
+  /** Format 2 from the new sheet; format 1 still taken while the screen moves over (ADR 0079 § 5). */
+  persona: StoredPersonaSchema,
   basedOn: ContentHashSchema.nullable(),
 });
 export type CreatePersonaVersionBody = z.infer<typeof CreatePersonaVersionBodySchema>;
@@ -110,12 +136,18 @@ export const PERSONA_ERROR_CODES = [
 ] as const;
 export type PersonaErrorCode = (typeof PERSONA_ERROR_CODES)[number];
 
-/** A refused sample reply: its place in `sample_replies` and the guard's code, never its text. */
+/** Lines of « Réponses typiques » read as sample replies at most: one per line, as many as its length allows. */
+export const TYPICAL_RESPONSES_MAX_LINES = 200;
+
+/**
+ * A refused sample reply, never its text: its place in `sample_replies` (format 1), or its line in « Réponses
+ * typiques », from 0 (format 2), and the guard's code.
+ */
 export const PersonaSampleReplyFaultSchema = z.strictObject({
   index: z
     .int()
     .min(0)
-    .max(SAMPLE_REPLIES_MAX - 1),
+    .max(Math.max(SAMPLE_REPLIES_MAX, TYPICAL_RESPONSES_MAX_LINES) - 1),
   code: GuardCodeSchema,
 });
 export type PersonaSampleReplyFault = z.infer<typeof PersonaSampleReplyFaultSchema>;
@@ -140,7 +172,20 @@ export const PERSONA_CORRECTION_SECTIONS = [
   'intimate',
   'writing_style',
 ] as const;
-export const PersonaCorrectionSectionSchema = z.enum(PERSONA_CORRECTION_SECTIONS);
+/**
+ * The sections a correction names on the format-2 sheet: Desirali's panels (ADR 0079 § 6). `lifestyle` is in both
+ * lists. Stored corrections keep their section, so both lists are read; migration 0134 lets the base take the new ones.
+ */
+export const PERSONA_SHEET_CORRECTION_SECTIONS = PERSONA_SHEET_SECTION_KEYS;
+export const PersonaCorrectionSectionSchema = z.enum([
+  ...PERSONA_CORRECTION_SECTIONS,
+  'identity',
+  'preferences',
+  'conversation',
+  'relationships',
+  'intimacy',
+  'boundaries',
+]);
 export type PersonaCorrectionSection = z.infer<typeof PersonaCorrectionSectionSchema>;
 
 /** `open` until the agency marks it handled (`done`): it then changed her sheet, or talked it over with her. */

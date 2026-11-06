@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Me } from '@impera/contracts';
+import { personaSheetFromV1, type Me, type Persona } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -9,6 +9,12 @@ import blocksYaml from '../../../../personas/demo/v0.2.0.yaml?raw';
 import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
+
+/** The format-2 draft the API sends beside a format-1 version (ADR 0079 § 5). */
+const asDraft = (persona: Persona) => {
+  const { persona: draft, moved } = personaSheetFromV1(persona);
+  return { draft, moved };
+};
 
 /* Invented creators and members: no real data. */
 const ANNA = { id: '0192f3a0-0000-7000-8000-0000000000a1', displayName: 'Anna', timezone: 'Europe/Paris' };
@@ -63,7 +69,7 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
       const index = (creators ?? []).findIndex((c) => url === `/v1/creators/${c.id}/persona`);
       const creator = creators?.[index];
       if (creator !== undefined) {
-        const latest = { summary: summary(index), persona };
+        const latest = { summary: summary(index), persona, ...asDraft(persona) };
         return json({ creatorId: creator.id, latest, versions: [summary(index)] });
       }
       // Her agency percentage (CR-04): none set yet.

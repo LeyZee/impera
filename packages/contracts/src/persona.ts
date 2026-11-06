@@ -524,6 +524,13 @@ export type PersonaIntimate = z.infer<typeof PersonaIntimateSchema>;
 export type PersonaWritingStyle = z.infer<typeof PersonaWritingStyleSchema>;
 export type SampleReply = z.infer<typeof SampleReplySchema>;
 
+/**
+ * The strict rules of « Réglages de l'agent » (ADR 0079 § 4): her limits as lists of words, and the emojis she never
+ * uses. Guards load them; the sheet's free answers (« Zones interdites ») are only read by the model.
+ */
+export const PersonaAgentRulesSchema = PersonaLimitsSchema.extend({ emojis_forbidden: emojiList });
+export type PersonaAgentRules = z.infer<typeof PersonaAgentRulesSchema>;
+
 /** How much of each block she filled, from 0 to 1: a block counts by the share of its fields that hold something. */
 function filled(persona: Persona, block: PersonaBlock): number {
   const share = (values: readonly boolean[]): number =>

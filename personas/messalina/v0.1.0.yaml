@@ -1,0 +1,121 @@
+# Placeholder de persona au format 2 (ADR 0079) : la fiche de Desirali, aucune donnée réelle.
+# La vraie persona est hors dépôt (ADR 0010). Ce fichier doit toujours valider PersonaV2Schema (packages/contracts).
+# Les questions, leurs libellés et leur ordre : docs/reference/persona-schema.md.
+meta:
+  schema: 2
+  version: 0.1.0
+  creator: messalina
+  language: fr
+  created_at: 2026-11-06
+  notes: 'Placeholder. Remplacer chaque <à remplir> dans une copie privée v1.x.'
+
+sheet:
+  identity:
+    physical_description: '<à remplir>'
+    shoe_size: '<à remplir>'
+    birth_date: 2000-01-01
+    height_m: null
+    weight_kg: null
+    country: '<à remplir>'
+    city: '<à remplir>'
+    nickname: '<à remplir>'
+    job: '<à remplir>'
+    eye_color: '<à remplir>'
+    hair_color: '<à remplir>'
+    breast_size: '<à remplir>'
+    place_of_life: '<à remplir>'
+    spoken_languages: [french]
+  lifestyle:
+    smoking_habit: '<à remplir>'
+    drinking_habit: '<à remplir>'
+    traveling: '<à remplir>'
+    routines: '<à remplir>'
+    pets: '<à remplir>'
+    dream_car: '<à remplir>'
+  preferences:
+    favorite_color: '<à remplir>'
+    least_favorite_color: '<à remplir>'
+    passions: '<à remplir>'
+    favorite_dishes: '<à remplir>'
+    least_liked_dishes: '<à remplir>'
+    religion: '<à remplir>'
+    music_genres: '<à remplir>'
+    favorite_movies: '<à remplir>'
+    favorite_celebrities: '<à remplir>'
+    favorite_characters: '<à remplir>'
+    favorite_books: '<à remplir>'
+  conversation:
+    roleplaying_description: '<à remplir>'
+    favourite_emojis: '<à remplir>'
+    conversation_description: '<à remplir>'
+    spelling_description: '<à remplir>'
+    compliment_description: '<à remplir>'
+    flirt_description: '<à remplir>'
+    common_expressions: '<à remplir>'
+    typical_responses: '<à remplir>'
+  relationships:
+    relationship_status: '<à remplir>'
+    kids_status: '<à remplir>'
+    body_count: null
+    turn_ons: '<à remplir>'
+    turn_offs: '<à remplir>'
+    ideal_man: '<à remplir>'
+    ideal_date: '<à remplir>'
+  intimacy:
+    libido_level: '<à remplir>'
+    domination_preference: '<à remplir>'
+    style_in_private: '<à remplir>'
+    sex_toys: '<à remplir>'
+    squirting: '<à remplir>'
+    cum: '<à remplir>'
+    kinks: '<à remplir>'
+    fetichism: '<à remplir>'
+    favorite_positions: '<à remplir>'
+    fantasies: '<à remplir>'
+    no_go_zones: '<à remplir>'
+  boundaries:
+    off_limits: '<à remplir>'
+
+agent:
+  strategies:
+    kyc:
+      {
+        style: default,
+        instructions: null,
+        targets: null,
+        max_messages: 100,
+        max_duration_minutes: 360,
+        min_hours_before_following: 1,
+      }
+    sexualization: { style: default, instructions: null, initiate_after_hours: 24 }
+    script_launch: { style: normal, instructions: null, cooldown_hours: 10 }
+    post_offer: { style: default, instructions: null, delay_days: 7 }
+  follow_ups:
+    enabled: true
+    delays_hours: [12, 23]
+    type: soft
+    text: null
+    nudges:
+      {
+        enabled: false,
+        delay_minutes: 5,
+        max_per_day: 3,
+        min_hours_after_conversation: 3,
+        delete_previous: true,
+      }
+  notifications:
+    sales: true
+    agent_disabled: true
+    no_script_left: true
+    rate_limited: true
+    alert_keywords: ['<à remplir>']
+  behavior:
+    split_messages: true
+    pet_names: ['<à remplir>'] # liste fermée des surnoms qu'elle donne
+    response_delay_minutes: 1
+  rules:
+    never_do: ["<à remplir : ce qu'elle refuse de faire>"]
+    never_show: ["<à remplir : ce qu'elle ne montre jamais>"]
+    never_say: ['<à remplir : mots et sujets interdits>']
+    disgusts: ['<à remplir : liste normalisée, variantes incluses>']
+    emojis_forbidden: []

@@ -46,6 +46,7 @@ import {
   refusedReplyIssues,
   stillRefused,
   TABS,
+  isBlockId,
   tabOf,
   validate,
   UNREADABLE_FILE,
@@ -514,7 +515,8 @@ function Editor({
             creatorName={creatorName}
             canMark={isOwner}
             onShowSection={(section) => {
-              select(tabOf(section));
+              // A panel of the format-2 sheet has no tab on this screen yet (ADR 0079): it stays where it is.
+              if (isBlockId(section)) select(tabOf(section));
             }}
           />
         ) : null}
