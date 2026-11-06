@@ -69,6 +69,7 @@ import {
 
 import { fullDay } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
+import { Dialog } from '@/shell/Dialog';
 import './persona.css';
 
 /**
@@ -496,8 +497,8 @@ function Editor({
           />
         ) : null}
         {reauth === null ? null : (
-          <PasswordPrompt
-            lead={`La version ${reauth.version} parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code.`}
+          <ActivationConfirm
+            version={reauth.version}
             onConfirmed={() => {
               setReauth(null);
               void activate(reauth);
@@ -591,6 +592,38 @@ function Editor({
 const CONFIRM_MS = 4000;
 
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
+
+/**
+ * Her persona speaks to every fan: an activation on a sign-in over 10 minutes old asks the password and the code again
+ * (audit de sécurité du 02/11, M1), in a dialog that names the version it activates, as « Passer en Automatique ».
+ */
+function ActivationConfirm({
+  version,
+  onConfirmed,
+  onCancel,
+}: {
+  version: string;
+  onConfirmed: () => void;
+  onCancel: () => void;
+}): JSX.Element {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Dialog
+      title={`Activer la version ${version}`}
+      lead={`L’agent écrira avec elle à tous ses fans. Pour l’activer, confirme ton mot de passe et ton code.`}
+      busy={busy}
+      onClose={onCancel}
+    >
+      <PasswordPrompt
+        layout="dialog"
+        lead={null}
+        onConfirmed={onConfirmed}
+        onCancel={onCancel}
+        onBusyChange={setBusy}
+      />
+    </Dialog>
+  );
+}
 
 /** What the note under the head says: where this persona comes from and what a save does. */
 function noteOf(ready: PersonaReady, known: boolean, upcoming: string): string {

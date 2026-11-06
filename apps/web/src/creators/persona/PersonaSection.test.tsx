@@ -189,10 +189,10 @@ describe('Créatrices › Persona, recette 28/10', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Activer la version 0.2.0' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer l’activation' }));
 
-    expect(await screen.findByText(/pour l’activer, confirme ton mot de passe/u)).toBeDefined();
+    expect(await screen.findByText(/Pour l’activer, confirme ton mot de passe/u)).toBeDefined();
     expect(screen.queryByText(/Seuls le propriétaire et la créatrice/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
-    expect(screen.queryByText(/pour l’activer, confirme ton mot de passe/u)).toBeNull();
+    expect(screen.queryByText(/Pour l’activer, confirme ton mot de passe/u)).toBeNull();
   });
 
   it('says nothing of the state while nothing waits, and says the changes once there are some (CREA-05)', async () => {
@@ -351,9 +351,7 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
     await screen.findByLabelText('Prénom');
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
-    expect(
-      await screen.findByText(/La version 0.1.0 parlera à tous ses fans : pour l’activer/u),
-    ).toBeDefined();
+    expect(await screen.findByRole('dialog', { name: 'Activer la version 0.1.0' })).toBeDefined();
     const activations = fake.mock.calls.filter(([url]) => url.endsWith('/activate'));
     expect(activations.map(([url]) => url)).toEqual([
       `/v1/creators/${CREATOR}/persona/versions/${PREVIOUS.id}/activate`,
