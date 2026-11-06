@@ -10,7 +10,19 @@ Popup (ADR 0066) : on se connecte dans le CRM, jamais dans l'extension ; le popu
 
 Interface : le popup utilise `@impera/design-system/styles.css` (`docs/design/README.md`, section Extension) ; aucun style injecté dans la page Reveal.
 
-Contraintes : `host_permissions` limitées à `https://*.reveal.me/*` et au CRM local (`localhost`, `127.0.0.1`) ; service worker éphémère (`chrome.alarms`, pas de `setInterval`) ; aucun secret stocké dans l'extension (`chrome.storage.local` ne garde que l'adresse du CRM) ; aucun appel LLM depuis l'extension.
+Contraintes : `host_permissions` limitées à `https://*.reveal.me/*` et au CRM local (`localhost`, `127.0.0.1`) ; service worker éphémère (`chrome.alarms`, pas de `setInterval`) ; aucun secret de connexion stocké dans l'extension (`chrome.storage.local` garde l'adresse du CRM et, pour la veille, le code de liaison décrit plus bas) ; aucun appel LLM depuis l'extension.
+
+## Veille Instagram (VEI-02, ADR 0060 § 2, source 6)
+
+Sur un onglet instagram.com, la popup du propriétaire et des managers montre la carte « Veille Instagram ». Dans l'ordre :
+
+1. **Relier** : on colle une fois le code de « Relier l'extension » (CRM, Sécurité). Il est gardé dans `chrome.storage.local` (clé `watchLink`), lu par le service worker seul (`setAccessLevel TRUSTED_CONTEXTS`), envoyé dans l'en-tête `x-extension-link` avec `credentials: 'omit'`, jamais au lecteur ni à la page. Un 401 le marque retiré et la popup redemande un code.
+2. **Autoriser** : `https://www.instagram.com/*` est une `optional_host_permissions`, demandée au premier clic (« Autoriser et lancer »), jamais à l'installation.
+3. **Lancer la veille** : le service worker enregistre le lecteur (`watch.js`, script « unlisted » de WXT) par `chrome.scripting.registerContentScripts` : monde isolé, `allFrames: false`, `excludeMatches` sur `/direct/*`, `/stories/*`, `/accounts/*`. Ce n'est pas un content script du manifeste : le manifeste construit n'a ni `content_scripts` ni `web_accessible_resources`, et le wrapper des content scripts de WXT (`postMessage`, `dispatchEvent` sur le document) n'est pas embarqué. La veille s'arrête seule à 45 minutes (`chrome.alarms`, état dans `chrome.storage.session`), en quittant Instagram ou en fermant l'onglet.
+
+Le lecteur (`src/lib/watch/`) ne fait que lire : `MutationObserver`, `IntersectionObserver`, et l'adresse lue toutes les 500 ms (pas d'événement de navigation, qui passerait par `dispatchEvent`). Pages lues : `/reels/`, `/reel/…`, `/p/…`, `/explore/`, profils publics ; jamais le fil d'accueil ni les messages. Une valeur absente vaut `null`, jamais 0. Il envoie ses relevés au service worker, qui les poste par lots de 50 (`POST /v1/trends/readings`) ; un test (`src/build.test.ts`) construit l'extension et refuse un `watch.js` qui contiendrait une requête, un défilement, un clic, un `dispatchEvent`, un `postMessage`, une insertion de nœud ou de style.
+
+**Marquer** un post pour une créatrice : puces de la popup, menu contextuel sur le lien d'un post, ou Alt+Maj+M (la dernière créatrice choisie). Depuis la popup ou le raccourci, le service worker prend jusqu'à quatre captures de l'onglet visible (`tabs.captureVisibleTab`, JPEG, 1,5 s d'écart, arrêt dès que le post quitte l'écran) et les envoie à la vision (`POST /v1/trends/readings/captures`), sans les écrire nulle part. Badge : « • » pendant la veille, « ! » ambre quand la page ne donne plus rien ; jamais de rechargement.
 
 Chargement en dev : `pnpm --filter @impera/extension dev` (serveur de dev WXT sur le port 3100, le 3000 étant celui de l'API), puis `chrome://extensions` → mode développeur → charger `.output/chrome-mv3-dev`.
 
