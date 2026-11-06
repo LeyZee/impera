@@ -135,11 +135,17 @@ export interface ScriptRequests {
     readonly structureId: ScriptStructureId;
     readonly structureVersionId: string;
   }): Promise<void>;
-  last(creatorId: CreatorId): Promise<{
-    readonly dueOn: string;
-    readonly structureId: ScriptStructureId;
-    readonly askedAt: Date;
-  } | null>;
+  /** For the hourly job, as the admin role. */
+  last(creatorId: CreatorId): Promise<AskedScript | null>;
+  /** For a member of her team, under row-level security: `null` for anyone outside it. */
+  lastFor(creatorId: CreatorId, userId: string): Promise<AskedScript | null>;
+}
+
+/** Her last script asked by the cadence. */
+export interface AskedScript {
+  readonly dueOn: string;
+  readonly structureId: ScriptStructureId;
+  readonly askedAt: Date;
 }
 
 /** Her persona's limits, from her active version; `null` without one. */
