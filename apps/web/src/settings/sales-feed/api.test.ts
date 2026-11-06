@@ -5,6 +5,11 @@ import { connectKey, connectWebhook, linkModel, SalesFeedRefused } from './api';
 
 import { ReauthRequired, ServicesError } from '@/settings/services/api';
 
+/** A refusal in the common body, its kind in `details` (MOT-13). */
+const refusalBody = (code: string, kind: string, message: string): object => ({
+  error: { code, message, details: { kind }, requestId: 'r' },
+});
+
 const STATUS: SalesFeedStatus = {
   platform: 'reveal',
   state: 'connected',
@@ -42,7 +47,10 @@ describe('sales feed api', () => {
   });
 
   it('gives back the platform’s refusal of a key, worded by the server', async () => {
-    const fetch = answer(422, { kind: 'unauthorized', message: 'Reveal refuse cette clé.' });
+    const fetch = answer(
+      422,
+      refusalBody('sales_feed_platform_unprocessable', 'unauthorized', 'Reveal refuse cette clé.'),
+    );
     await expect(connectKey('reveal', 'rvl_test')).resolves.toEqual({
       ok: false,
       refusal: { kind: 'unauthorized', message: 'Reveal refuse cette clé.' },

@@ -1,9 +1,11 @@
 import {
   AiProviderSchema,
+  PROVIDER_KEY_UNPROCESSABLE,
   ProviderOverviewSchema,
-  ProviderRefusalSchema,
+  ProviderRefusalBodySchema,
   ProviderSettingsSchema,
   ProviderStatusSchema,
+  RefusalError,
   SaveProviderKeyBodySchema,
 } from '@impera/contracts';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
@@ -34,12 +36,14 @@ function actorOf(request: FastifyRequest): KeyActor {
  * saved nor called either way, and the sign-in quota is not spent on it. A body the contract refuses is left to
  * the route’s validation. Not a guard: it never lets anything through that the guards would stop.
  */
-const refuseMalformedKey: preValidationAsyncHookHandler = async (request, reply) => {
+const refuseMalformedKey: preValidationAsyncHookHandler = (request) => {
   const params = ProviderParamsSchema.safeParse(request.params);
   const body = SaveProviderKeyBodySchema.safeParse(request.body);
-  if (!params.success || !body.success) return;
+  if (!params.success || !body.success) return Promise.resolve();
   const checked = checkPastedKey(params.data.provider, body.data.key);
-  if (!checked.ok) await reply.code(422).send(checked.error);
+  return checked.ok
+    ? Promise.resolve()
+    : Promise.reject(new RefusalError(PROVIDER_KEY_UNPROCESSABLE, checked.error));
 };
 
 export interface ProvidersRoutesOptions {
@@ -73,12 +77,13 @@ export function createProvidersRoutes(
         schema: {
           params: ProviderParamsSchema,
           body: SaveProviderKeyBodySchema,
-          response: { 200: ProviderStatusSchema, 422: ProviderRefusalSchema },
+          response: { 200: ProviderStatusSchema, 422: ProviderRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await providers.connect(request.params.provider, request.body.key, actorOf(request));
-        return result.ok ? reply.send(result.value) : reply.code(422).send(result.error);
+        if (!result.ok) throw new RefusalError(PROVIDER_KEY_UNPROCESSABLE, result.error);
+        return result.value;
       },
     );
 

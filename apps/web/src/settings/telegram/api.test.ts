@@ -18,6 +18,11 @@ import {
   saveRoutes,
 } from './api';
 
+/** A refusal in the common body, its kind in `details` (MOT-13). */
+const refusalBody = (code: string, kind: string, message: string): object => ({
+  error: { code, message, details: { kind }, requestId: 'r' },
+});
+
 const bot = {
   id: newId(TelegramBotIdSchema),
   username: 'demo_alertes_bot',
@@ -50,7 +55,10 @@ describe('Telegram API client', () => {
     expect(await addBot('1234567:FAKE')).toEqual({ ok: true, value: bot });
     expect(calls[0]?.url).toBe('/v1/settings/telegram/bots');
     expect(calls[0]?.init?.body).toBe(JSON.stringify({ token: '1234567:FAKE' }));
-    answer(422, { kind: 'token_refused', message: 'Telegram ne reconnaît pas ce jeton.' });
+    answer(
+      422,
+      refusalBody('telegram_token_unprocessable', 'token_refused', 'Telegram ne reconnaît pas ce jeton.'),
+    );
     expect(await addBot('1234567:FAKE')).toEqual({
       ok: false,
       refusal: { kind: 'token_refused', message: 'Telegram ne reconnaît pas ce jeton.' },
@@ -58,7 +66,10 @@ describe('Telegram API client', () => {
   });
 
   it('reads a version conflict on the routes as a refusal', async () => {
-    answer(409, { kind: 'routes_version_conflict', message: 'Quelqu’un a changé ces réglages.' });
+    answer(
+      409,
+      refusalBody('telegram_routes_conflict', 'routes_version_conflict', 'Quelqu’un a changé ces réglages.'),
+    );
     expect(await saveRoutes(2, [])).toMatchObject({
       ok: false,
       refusal: { kind: 'routes_version_conflict' },

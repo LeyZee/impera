@@ -8,8 +8,9 @@ import {
   SalesFeedListSchema,
   SalesFeedNewModelsSchema,
   SalesFeedOverviewSchema,
-  SalesFeedRefusalSchema,
+  SalesFeedRefusalBodySchema,
   SalesFeedStatusSchema,
+  refusalOf,
   type ImportSalesFeedModelsBody,
   type LinkSalesFeedChatterBody,
   type Platform,
@@ -64,27 +65,27 @@ async function call(path: string, init: RequestInit = {}): Promise<Response> {
   const detail = `${what}: ${String(response.status)}`;
   if (response.status === 401) throw new ServicesError('session_expired', detail);
   if (response.status === 429) throw new ServicesError('rate_limited', detail);
-  // A 422 is either the platform's refusal of the key or webhook (its own shape, read by the caller) or a refusal
-  // of ours: told apart by the body, read on a copy.
+  // A 422 is either the platform's refusal of the key or webhook (its kind in `details`, read by the caller) or a
+  // refusal of ours: told apart by the body, read on a copy.
   if (response.status === 422) {
     const body: unknown = await response
       .clone()
       .json()
       .catch(() => null);
-    if (SalesFeedRefusalSchema.safeParse(body).success) return response;
+    if (SalesFeedRefusalBodySchema.safeParse(body).success) return response;
     const error = ApiErrorSchema.safeParse(body);
     if (error.success && SalesFeedErrorCodeSchema.safeParse(error.data.error.code).success) {
       throw new SalesFeedRefused(error.data.error.message);
     }
     throw new ServicesError('unavailable', detail);
   }
-  // The check's refusal by the platform (its statistics or its models) is a 502 with the same shape.
+  // The check's refusal by the platform (its statistics or its models) is a 502 with its kind too.
   if (response.status === 502) {
     const body: unknown = await response
       .clone()
       .json()
       .catch(() => null);
-    if (SalesFeedRefusalSchema.safeParse(body).success) return response;
+    if (SalesFeedRefusalBodySchema.safeParse(body).success) return response;
   }
   const error = await apiError(response);
   if (response.status === 403) {
@@ -135,7 +136,7 @@ export type FeedResult = { ok: true; status: SalesFeedStatus } | { ok: false; re
 async function statusOrRefusal(response: Response): Promise<FeedResult> {
   return parsed(response, (body): FeedResult =>
     response.status === 422
-      ? { ok: false, refusal: SalesFeedRefusalSchema.parse(body) }
+      ? { ok: false, refusal: refusalOf(SalesFeedRefusalBodySchema.parse(body)) }
       : { ok: true, status: SalesFeedStatusSchema.parse(body) },
   );
 }
@@ -212,7 +213,7 @@ export async function runCheck(platform: Platform, body: SalesFeedCheckBody): Pr
   return parsed(response, (json): CheckResult =>
     response.ok
       ? { ok: true, report: SalesFeedCheckReportSchema.parse(json) }
-      : { ok: false, refusal: SalesFeedRefusalSchema.parse(json) },
+      : { ok: false, refusal: refusalOf(SalesFeedRefusalBodySchema.parse(json)) },
   );
 }
 

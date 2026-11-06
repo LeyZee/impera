@@ -115,7 +115,14 @@ describe('/v1/settings/providers', () => {
       payload: { key: 'xai-WRONGWRONGWRONGWRONGWRONG00' },
     });
     expect(response.statusCode).toBe(422);
-    expect(response.json()).toMatchObject({ kind: 'unauthorized' });
+    expect(response.body).toContain(`"requestId":"${String(response.headers['x-request-id'])}"`);
+    // The common body (recette 05/11, MOT-13): the kind in `details`, its sentence as the message.
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'provider_key_unprocessable',
+        details: { kind: 'unauthorized' },
+      },
+    });
     expect(providers.apiKeySource('xai')).toBeUndefined();
   });
 
@@ -125,16 +132,21 @@ describe('/v1/settings/providers', () => {
     const stale = { ...headers, 'x-test-stale': '1' };
     const short = await app.inject({ method: 'PUT', url, headers: stale, payload: { key: 'court' } });
     expect(short.statusCode).toBe(422);
-    expect(short.json()).toMatchObject({ kind: 'too_short' });
+    expect(short.json()).toMatchObject({
+      error: { code: 'provider_key_unprocessable', details: { kind: 'too_short' } },
+    });
     const misplaced = await app.inject({
       method: 'PUT',
       url: '/v1/settings/providers/mistral/key',
       headers: stale,
       payload: { key: 'sk_FAKEFAKEFAKEFAKEFAKEFAKE0000' },
     });
-    expect(misplaced.json()).toEqual({
-      kind: 'wrong_provider',
-      message: 'Cette clé vient d’ElevenLabs : elle va dans ElevenLabs.',
+    expect(misplaced.json()).toMatchObject({
+      error: {
+        code: 'provider_key_unprocessable',
+        message: 'Cette clé vient d’ElevenLabs : elle va dans ElevenLabs.',
+        details: { kind: 'wrong_provider' },
+      },
     });
     // A key that could be right still asks for the password first.
     const plausible = await app.inject({ method: 'PUT', url, headers: stale, payload: { key: XAI_KEY } });
