@@ -48,7 +48,7 @@ function Count({ value, format = String }: { value: number; format?: (n: number)
   return <span ref={ref} />;
 }
 
-const percent = (n: number) => `${String(n)} %`;
+const percent = (n: number) => `${String(n)}\u00a0%`;
 
 /** A ring of cases and its legend; the lit case shows in the middle, the legend lights with it. */
 function RingCard({
@@ -106,8 +106,8 @@ function RingCard({
                   onPointerEnter={() => {
                     setLit(i);
                   }}
-                  onPointerLeave={() => {
-                    setLit(null);
+                  onPointerLeave={(event) => {
+                    if (event.pointerType === 'mouse') setLit(null);
                   }}
                 />
               );
@@ -145,8 +145,8 @@ function RingCard({
                 onPointerEnter={() => {
                   setLit(i);
                 }}
-                onPointerLeave={() => {
-                  setLit(null);
+                onPointerLeave={(event) => {
+                  if (event.pointerType === 'mouse') setLit(null);
                 }}
                 onFocus={() => {
                   setLit(i);
@@ -155,7 +155,7 @@ function RingCard({
                   setLit(null);
                 }}
                 onClick={() => {
-                  setLit((now) => (now === i ? null : i));
+                  setLit(i);
                 }}
               >
                 <i className="fi-legend__key" aria-hidden="true" />
@@ -205,8 +205,8 @@ function BarsCard({
               onPointerEnter={() => {
                 setLit(i);
               }}
-              onPointerLeave={() => {
-                setLit(null);
+              onPointerLeave={(event) => {
+                if (event.pointerType === 'mouse') setLit(null);
               }}
               onFocus={() => {
                 setLit(i);
@@ -215,7 +215,7 @@ function BarsCard({
                 setLit(null);
               }}
               onClick={() => {
-                setLit((now) => (now === i ? null : i));
+                setLit(i);
               }}
             >
               <span className="fi-bar__head">
@@ -336,8 +336,8 @@ function BarsInline({
             onPointerEnter={() => {
               setLit(i);
             }}
-            onPointerLeave={() => {
-              setLit(null);
+            onPointerLeave={(event) => {
+              if (event.pointerType === 'mouse') setLit(null);
             }}
             onFocus={() => {
               setLit(i);
@@ -346,7 +346,7 @@ function BarsInline({
               setLit(null);
             }}
             onClick={() => {
-              setLit((now) => (now === i ? null : i));
+              setLit(i);
             }}
           >
             <span className="fi-bar__head">
@@ -395,7 +395,7 @@ function ActivityCard({
       </p>
       <div
         className="fi-heat"
-        role="img"
+        role="group"
         aria-label="Leurs messages des 30 derniers jours, par jour et par tranche de trois heures"
       >
         <span aria-hidden="true" />
@@ -413,20 +413,29 @@ function ActivityCard({
               const cell = cells.find((c) => c.day === d && c.slot === slot) ?? { day: d, slot, share: 0 };
               const on = lit !== null && lit.day === d && lit.slot === slot;
               return (
-                <span
+                <button
                   key={slot}
+                  type="button"
                   className={on ? 'fi-heat__cell is-on' : 'fi-heat__cell'}
                   style={{
                     '--_h': heatOf(cell.share, busiest),
                     '--_i': d * 8 + slot,
                   }}
+                  aria-label={`${say(cell)} : ${percent(cell.share)}`}
+                  aria-pressed={on}
                   onPointerEnter={() => {
                     setLit(cell);
                   }}
-                  onPointerLeave={() => {
+                  onPointerLeave={(event) => {
+                    if (event.pointerType === 'mouse') setLit(null);
+                  }}
+                  onFocus={() => {
+                    setLit(cell);
+                  }}
+                  onBlur={() => {
                     setLit(null);
                   }}
-                  onPointerDown={() => {
+                  onClick={() => {
                     setLit(cell);
                   }}
                 />
@@ -449,9 +458,10 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
           <span className="fi-stat__few">moins de 10</span>
         ) : (
           <>
-            <span className="fi-stat__about" aria-label="environ">
+            <span className="fi-stat__about" aria-hidden="true">
               ≈
             </span>
+            <span className="sr-only">environ </span>
             <Count value={value} />
           </>
         )}
@@ -510,7 +520,7 @@ export function FanInsights(): JSX.Element {
               cases={age.cases}
               labels={AGE_LABELS}
               aboutFans={age.aboutFans}
-              idle={{ value: `${String(age.averageAge)} ans`, sub: 'en moyenne' }}
+              idle={{ value: `${String(age.averageAge)}\u00a0ans`, sub: 'en moyenne' }}
               index={0}
             />
           ) : (

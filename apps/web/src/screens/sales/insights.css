@@ -192,14 +192,12 @@
   color: var(--nv-ink);
 }
 .fi-ring__sub {
-  display: -webkit-box;
-  overflow: hidden;
   margin-top: 2px;
   font-size: var(--nv-text-caption);
-  line-height: 13px;
+  line-height: 1.15;
   color: var(--nv-ink-faint);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  overflow-wrap: normal;
+  hyphens: manual;
 }
 .fi-ring--empty .fi-ring__track {
   stroke-dasharray: 3 6;
@@ -313,9 +311,7 @@
   line-height: var(--nv-text-footnote-leading);
 }
 .fi-bar__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
 }
 .fi-bar__share {
   font-weight: 600;
@@ -409,8 +405,12 @@
   align-self: center;
 }
 .fi-heat__cell {
+  display: block;
+  width: 100%;
   height: 22px;
-  border-radius: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-xs);
   background: color-mix(in srgb, var(--nv-agent) calc(var(--_h) * 90%), var(--nv-fill-track));
   opacity: 0;
   cursor: pointer;
@@ -419,6 +419,10 @@
   transition:
     transform var(--nv-dur-base) var(--nv-ease-spring),
     box-shadow var(--nv-dur-fast);
+}
+.fi-heat__cell:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
 }
 .fi-heat__cell:hover,
 .fi-heat__cell.is-on {

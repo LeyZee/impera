@@ -105,7 +105,7 @@ const PALETTE = [
   'var(--nv-sale)',
   'var(--nv-success)',
   'var(--nv-data-1)',
-  'color-mix(in srgb, var(--nv-agent) 50%, var(--nv-success))',
+  'color-mix(in srgb, var(--nv-success) 45%, var(--nv-data-1))',
 ] as const;
 
 export function caseColour(key: string, index: number): string {

@@ -49,9 +49,15 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     expect(screen.getByText('en moyenne')).toBeDefined();
     expect(screen.getAllByText('Environ 140 de tes fans l’ont dit')).toHaveLength(1);
     const row = screen.getByRole('button', { name: /Île-de-France/u });
-    expect(row.textContent).toContain('29 %');
+    expect(row.textContent).toContain('29\u00a0%');
+    // A click pins the case, even after the pointer has lit it: it never turns it off under the pointer.
+    fireEvent.pointerEnter(row);
     fireEvent.click(row);
     expect(row.getAttribute('aria-pressed')).toBe('true');
+    // Each cell of « Quand ils t'écrivent » is reachable from the keyboard and says its share.
+    const cell = screen.getByRole('button', { name: 'Vendredi, 18h–21h : 4\u00a0%' });
+    fireEvent.focus(cell);
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
     // A block under ten fans says so in words, with no ring and no number.
     expect(screen.getByText('Leur situation').closest('article')?.textContent).toContain(
       'Pas encore assez de fans pour le dire.',
