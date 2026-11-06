@@ -645,8 +645,9 @@
   border-radius: 4px;
 }
 
-/* A list of entries: removable tints in a field. */
-.ps-entries {
+/* A list of entries: removable tints in a field. Two classes: the field control's own `display: block` would win over
+   one, and the tints would touch with no gap (recette persona Messa 06/11). */
+.nv-field__control.ps-entries {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -696,8 +697,9 @@
   align-items: center;
   max-width: 100%;
   min-width: 0;
-  height: 28px;
-  padding: 0 4px 0 11px;
+  /* A long passion wraps inside its tint, never cut. */
+  min-height: 28px;
+  padding: 3px 4px 3px 11px;
   border-radius: var(--nv-radius-full);
   background: var(--nv-select-strong);
   font-size: var(--nv-text-footnote);
@@ -710,9 +712,8 @@
 }
 .ps-entry__text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 .ps-entry__remove {
   appearance: none;
@@ -735,11 +736,11 @@
     color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
-/* 44px hit area around a small mark (docs/design, « Copilote et raccourcis »). */
+/* A larger hit area around the small mark, kept inside its own tint: never over the next one. */
 .ps-entry__remove::after {
   content: '';
   position: absolute;
-  inset: -11px -6px;
+  inset: -3px -4px -3px -2px;
 }
 .ps-entry__remove:hover {
   color: var(--nv-ink);

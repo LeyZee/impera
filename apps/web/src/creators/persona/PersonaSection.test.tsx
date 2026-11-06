@@ -168,7 +168,7 @@ describe('Créatrices › Persona, recette 28/10', () => {
     ]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Activer la version 0.2.0' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmer l’activation' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
 
     expect(
       await screen.findByText(/Sa version active a changé depuis l’ouverture de cette page/u),
@@ -187,7 +187,7 @@ describe('Créatrices › Persona, recette 28/10', () => {
     ]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Activer la version 0.2.0' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmer l’activation' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
 
     expect(await screen.findByText(/Pour l’activer, confirme ton mot de passe/u)).toBeDefined();
     expect(screen.queryByText(/Seuls le propriétaire et la créatrice/u)).toBeNull();
@@ -317,7 +317,7 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
     return fold;
   };
 
-  it('puts an older version back in service over the active one, after a second click', async () => {
+  it('puts an older version back in service over the active one, once its dialog says « Activer »', async () => {
     const fake = await serveVersions([BAD, PREVIOUS, FIRST], () => [200, { ...PREVIOUS, isActive: true }]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByLabelText('Prénom');
@@ -331,9 +331,12 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
 
     fireEvent.click(within(fold).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
     expect(fake.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
-    fireEvent.click(within(fold).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
+    const dialog = screen.getByRole('dialog', { name: 'Activer la version 0.1.0' });
+    expect(within(dialog).getByText(/à la place de la version 0\.2\.0/u)).toBeDefined();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Activer' }));
 
     expect(await screen.findByText('Version 0.1.0 marquée active')).toBeDefined();
+    expect(screen.queryByRole('dialog')).toBeNull();
     const [url, init] = fake.mock.calls.find(([, i]) => i?.method === 'POST') ?? [];
     expect(url).toBe(`/v1/creators/${CREATOR}/persona/versions/${PREVIOUS.id}/activate`);
     expect(init?.body).toBe(JSON.stringify({ expectedActive: BAD.id }));
@@ -350,7 +353,7 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByLabelText('Prénom');
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
-    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
     expect(await screen.findByRole('dialog', { name: 'Activer la version 0.1.0' })).toBeDefined();
     const activations = fake.mock.calls.filter(([url]) => url.endsWith('/activate'));
     expect(activations.map(([url]) => url)).toEqual([
@@ -363,7 +366,7 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Elenaa' } });
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
-    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
     // The page reads her versions again; the draft, the newest version's content, stays as typed.
     await waitFor(() => {
       expect(fake.mock.calls.filter(([url]) => url === `/v1/creators/${CREATOR}/persona`)).toHaveLength(2);
@@ -387,7 +390,7 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByLabelText('Prénom');
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
-    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
     expect(
       await screen.findByText(/La version 0.1.0 n’est pas activée : une de ses réponses types/u),
     ).toBeDefined();
