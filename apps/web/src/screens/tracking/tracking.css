@@ -555,10 +555,15 @@
     align-items: center;
   }
   /* A creator's long name gives way before the pseudo: cut with « … », her whole name in its title. */
+  .tr-groups .tr-row__pseudo {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
   .tr-groups .tr-row__creator {
-    flex: 0 4 auto;
+    display: block;
+    flex: 0 1 auto;
     min-width: 3em;
-    max-width: 50%;
+    line-height: 22px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

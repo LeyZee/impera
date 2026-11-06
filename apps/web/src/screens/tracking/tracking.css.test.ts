@@ -19,8 +19,9 @@ describe('a conversation in a narrow list (recette 07/11, EXT-02)', () => {
 
   it('cuts a creator’s long name before the pseudo, with « … »', () => {
     const narrow = /@container \(max-width: 480px\) \{([\s\S]*?)\n\}/u.exec(css)?.[1] ?? '';
+    expect(narrow).toMatch(/\.tr-groups \.tr-row__pseudo \{\s*flex: 0 0 auto;/u);
     expect(narrow).toMatch(
-      /\.tr-groups \.tr-row__creator \{[^}]*flex: 0 4 auto;[^}]*max-width: 50%;[^}]*text-overflow: ellipsis/u,
+      /\.tr-groups \.tr-row__creator \{[^}]*display: block;[^}]*flex: 0 1 auto;[^}]*text-overflow: ellipsis/u,
     );
   });
 });
