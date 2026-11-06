@@ -1021,6 +1021,9 @@
 .rp-account--setting .rp-account__who {
   flex: 1 1 auto;
 }
+.rp-account--setting .rp-account__handle {
+  text-wrap: balance;
+}
 .rp-account--setting .rp-account__head > .nv-btn {
   flex-shrink: 0;
 }
