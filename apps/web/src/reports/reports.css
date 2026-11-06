@@ -608,9 +608,12 @@
 .rp-figures__value--warn {
   color: var(--nv-warning);
 }
-/* « Tous mes rapports » on the card's text edge, as « Ta commission… » above it: the summary's own padding (14px)
-   goes outside (recette ADR 0073). */
 .rp-mine__all {
+  margin: 0 calc(-1 * var(--nv-space-2));
+}
+/* « Tous mes rapports » on the card's text edge, as « Ta commission… » above it: the summary's own padding (14px)
+   goes outside (recette ADR 0073). « Renvoyés aux membres », in Équipe › Rapports, keeps its place. */
+.rp-mine .rp-mine__all {
   margin: 0 -14px;
 }
 .rp-lines {
@@ -1268,31 +1271,10 @@ a.sc-sheet__report:focus-visible,
     /* Above the floating tab bar (shell.css, « Phone »). */
     bottom: calc(14px + 64px + 12px + env(safe-area-inset-bottom, 0px));
   }
-}
-@media (max-width: 520px) {
-  .rp-line {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .rp-line .rp-chip {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
-  .rp-amount__input.nv-field__control {
-    height: 64px;
-    font-size: var(--nv-text-title-1);
-  }
-  .rp-review {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .rp-review__side {
-    grid-column: 2;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-  /* On a phone the shift's day is whole on the first line, its action at the end of it; its amount, what qualifies
-     it and its status on the line under, from the same left edge (recette ADR 0073). The period's rows give up their
-     indent for the width it takes. */
+  /* Under the shell's breakpoint (a phone, upright or not, a tablet, a folded rail), where the computer's columns
+     would cut the day: the shift's day is whole on the first line, its action at the end of it; its amount, what
+     qualifies it and its status on the line under, from the same left edge (recette ADR 0073). The period's rows give
+     up their indent for the width it takes. */
   .rp-member .rp-lines {
     display: flex;
     padding-inline: 0;
@@ -1331,6 +1313,28 @@ a.sc-sheet__report:focus-visible,
   }
   .rp-pline .rp-nudge__text {
     grid-row: 3;
+  }
+}
+@media (max-width: 520px) {
+  .rp-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .rp-line .rp-chip {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .rp-amount__input.nv-field__control {
+    height: 64px;
+    font-size: var(--nv-text-title-1);
+  }
+  .rp-review {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .rp-review__side {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
   .rp-account__now,
   .rp-account__next {

@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
 import { useReports } from '@/reports/api';
-import { awaitsDecision } from '@/reports/model';
+import { awaitsDecision, toDecideText } from '@/reports/model';
 import { useNow } from '@/scheduling/useNow';
 import { SubNav } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
@@ -28,7 +28,7 @@ export function TeamNav({
         {
           to: '/equipe/rapports',
           label: screenLabel('/equipe/rapports'),
-          ...(toValidate === 0 ? {} : { count: toValidate }),
+          ...(toValidate === 0 ? {} : { count: toValidate, countLabel: toDecideText(toValidate) }),
         },
         {
           to: '/equipe/membres',

@@ -25,6 +25,7 @@ import {
 import {
   AGENCY_STATUS,
   amountText,
+  awaitsDecision,
   gapWaits,
   hasGap,
   linesOf,
@@ -36,6 +37,7 @@ import {
   REPORT_ERRORS,
   signedAmountText,
   STATUS_TONES,
+  toDecideText,
   lateFor,
   lateLines,
   nudgeText,
@@ -409,6 +411,15 @@ function ToValidate({
   const reviewable = waiting.filter((one) => one.canReview && !held.has(one.id) && !gapWaits(one, now));
   const all = reviewable.length > 0 && reviewable.every((one) => selected.has(one.id));
   const sums = periodSums(waiting);
+  // What the tab counts (ADR 0073): said here too when some of the waiting reports are not the reader's to decide yet
+  // (a gap waiting for its member, a report the automatic check will validate).
+  const toDecide = waiting.filter((one) => awaitsDecision(one, now)).length;
+  const decideLine =
+    waiting.length === 0 || toDecide === waiting.length
+      ? ''
+      : toDecide === 0
+        ? ', aucun à décider maintenant'
+        : `, dont ${toDecideText(toDecide)}`;
   const sentBack = list.reports.filter((one) => one.status === 'rejected');
   const ordered = waiting.toSorted((a, b) =>
     (names.shifts.get(a.shiftId)?.startsAt ?? '').localeCompare(names.shifts.get(b.shiftId)?.startsAt ?? ''),
@@ -423,9 +434,7 @@ function ToValidate({
             <span className="rp-validate__what">
               {waiting.length === 0
                 ? 'Rien à valider'
-                : waiting.length === 1
-                  ? 'rapport attend'
-                  : 'rapports attendent'}
+                : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
             </span>
           </p>
           {sums.length === 0 ? null : (

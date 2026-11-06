@@ -9,6 +9,7 @@ import {
   parsePercent,
   percentText,
   refusalText,
+  thresholdText,
 } from '@/reports/model';
 import '@/reports/reports.css';
 import '@/payroll/pay.css';
@@ -94,19 +95,10 @@ export function ReportGap(): JSX.Element {
       ) : (
         <div className="rp-account__now">
           <span className="rp-chip rp-chip--ok">En vigueur</span>
-          <p className="rp-account__rules nv-num">
-            {data.bps === 0 && data.minor === 0
-              ? 'Aucun écart'
-              : [
-                  data.bps === 0 ? null : percentText(data.bps),
-                  data.minor === 0 ? null : amountText(data.minor, 'EUR'),
-                ]
-                  .filter((part) => part !== null)
-                  .join(' ou ')}
-          </p>
+          <p className="rp-account__rules nv-num">{thresholdText(data)}</p>
           <p className="rp-account__since">
             Sur un compte dont les ventes sont lues, {thresholdSentence(data)} Au-delà, ou au-dessus, il
-            attend que son membre le corrige ou l’explique, 48 heures au plus, puis l’agence décide. Jamais de
+            attend que son membre le corrige ou l’explique, 48 h au plus, puis l’agence décide. Jamais de
             retenue automatique.
           </p>
         </div>

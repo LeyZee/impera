@@ -347,6 +347,9 @@ describe('a report against its platform (ADR 0073)', () => {
   it('says the threshold and why nothing is compared, to the agency or to the member', () => {
     expect(plain(thresholdText({ bps: 100, minor: 500 }))).toBe('1 % ou 5,00 €');
     expect(plain(thresholdText({ bps: 250, minor: 1_000 }, 'USD'))).toBe('2,5 % ou 10,00 $US');
+    expect(plain(thresholdText({ bps: 0, minor: 500 }))).toBe('5,00 €');
+    expect(plain(thresholdText({ bps: 100, minor: 0 }))).toBe('1 %');
+    expect(thresholdText({ bps: 0, minor: 0 })).toBe('Aucun écart');
     expect(uncheckedText('model_unlinked', 'Reveal', true)).toBe(
       'Ce compte n’est relié à aucun modèle de Reveal : relie-le dans Réglages › Ventes pour comparer ses rapports.',
     );

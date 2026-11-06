@@ -357,7 +357,7 @@ export const REPORT_ERRORS: Readonly<Record<ReportRefusalCode, string>> = {
   pay_rules_source_conflict:
     'Ce compte ne peut pas encore être payé sur le net de sa plateforme : sa paie se lit dans les rapports validés.',
   shift_report_gap_conflict:
-    'Ce rapport s’écarte des ventes lues sur la plateforme : son membre a 48 heures après son shift pour le corriger ou l’expliquer.',
+    'Ce rapport s’écarte des ventes lues sur la plateforme : son membre a 48 h après son shift pour le corriger ou l’expliquer.',
   role_forbidden: 'Ton rôle ne permet pas ce geste.',
   request_invalid: 'Ces valeurs ne conviennent pas : vérifie le montant et les textes.',
 };
@@ -465,9 +465,22 @@ export function awaitsDecision(report: ShiftReport, now: Date): boolean {
   return !(report.check?.state === 'complete' && report.check.verdict === 'within');
 }
 
-/** « 1 % ou 5,00 € » : the threshold as Réglages and the screens say it (§ 3). */
+/** « 3 à décider maintenant » : what the tab Équipe › Rapports counts and the page says under its waiting reports. */
+export const toDecideText = (count: number): string => `${String(count)} à décider maintenant`;
+
+/**
+ * « 1 % ou 5,00 € » : the threshold as Réglages and the screens say it (§ 3). A part at zero is not said; both at
+ * zero, « Aucun écart ».
+ */
 export const thresholdText = (threshold: ReportGapThreshold, currency: Currency = 'EUR'): string =>
-  `${percentText(threshold.bps)} ou ${amountText(threshold.minor, currency)}`;
+  threshold.bps === 0 && threshold.minor === 0
+    ? 'Aucun écart'
+    : [
+        threshold.bps === 0 ? null : percentText(threshold.bps),
+        threshold.minor === 0 ? null : amountText(threshold.minor, currency),
+      ]
+        .filter((part) => part !== null)
+        .join(' ou ');
 
 /** The chip of a report whose gap waits for its member (§ 5), wherever its member sees it: amber, what to do. */
 export const GAP_TO_EXPLAIN = 'Écart · À expliquer';

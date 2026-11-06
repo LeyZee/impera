@@ -248,8 +248,15 @@ afterEach(() => {
 describe('Équipe › Rapports', () => {
   it('counts what waits, oldest shift first, says the incident, and keeps out of the batch what the reader may not review', async () => {
     renderPage();
-    const panel = (await screen.findByText('rapports attendent')).closest('section');
+    // Its own shift is not the reader's to decide: the tab counts 2, and the page says why it differs.
+    const panel = (await screen.findByText('rapports attendent, dont 2 à décider maintenant')).closest(
+      'section',
+    );
     expect(panel?.textContent).toContain('3');
+    const tab = within(screen.getByRole('navigation', { name: 'Équipe' })).getByRole('link', {
+      name: /^Rapports/u,
+    });
+    expect(tab.textContent).toContain('2, 2 à décider maintenant');
     expect(screen.getByText('Le compte a été déconnecté une heure')).toBeTruthy();
     expect(screen.getByText('Ton propre shift : un autre membre de l’agence le valide.')).toBeTruthy();
 
@@ -608,7 +615,8 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
       report(3, 2, { check: gapOf(1_300, 12_000, '2026-10-27T22:00:00.000Z') }),
     ];
     renderPage();
-    await screen.findByText('rapports attendent');
+    // The gap still waiting for Théo is not the agency's yet.
+    await screen.findByText('rapports attendent, dont 2 à décider maintenant');
     const [late, waits, explained] = [...document.querySelectorAll<HTMLElement>('.rp-review')];
     if (waits === undefined) throw new Error('No report waiting for its member');
 
@@ -642,7 +650,8 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
       report(3, 2, { canReview: true, check: { state: 'unavailable', reason: 'chatter_unlinked' } }),
     ];
     renderPage();
-    await screen.findByText('rapports attendent');
+    // The matching one validates by itself: not the agency's to decide.
+    await screen.findByText('rapports attendent, dont 2 à décider maintenant');
     const [unlinked, matching, provisional] = [...document.querySelectorAll('.rp-review')];
     expect(text(matching)).toContain('Conforme');
     expect(text(matching)).toContain(

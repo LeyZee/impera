@@ -486,7 +486,7 @@ describe('Paie › Quinzaine', () => {
     renderPage(OWNER);
     const title = await screen.findByText('2 rapports de la quinzaine attendent leur relecture');
     expect(text(title.closest('.rp-notice'))).toContain(
-      'Un rapport en écart attend l’explication de son membre, 48 heures au plus : le renvoyer libère la quinzaine.',
+      'Un rapport en écart attend l’explication de son membre, 48 h au plus : le renvoyer libère la quinzaine.',
     );
   });
 

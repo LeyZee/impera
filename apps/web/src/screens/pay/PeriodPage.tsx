@@ -1214,8 +1214,8 @@ function BlockNotice({
             {explaining === 0
               ? null
               : explaining === 1
-                ? ' Un rapport en écart attend l’explication de son membre, 48 heures au plus : le renvoyer libère la quinzaine.'
-                : ` ${String(explaining)} rapports en écart attendent l’explication de leur membre, 48 heures au plus : les renvoyer libère la quinzaine.`}
+                ? ' Un rapport en écart attend l’explication de son membre, 48 h au plus : le renvoyer libère la quinzaine.'
+                : ` ${String(explaining)} rapports en écart attendent l’explication de leur membre, 48 h au plus : les renvoyer libère la quinzaine.`}
           </p>
         </div>
         <Link to="/equipe/rapports" className="nv-btn nv-btn--neon nv-btn--sm">
