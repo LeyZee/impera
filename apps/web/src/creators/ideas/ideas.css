@@ -1,0 +1,216 @@
+/*
+ * Créatrices › Idées du jour (VEI-02). The head, the day switch and the empty plate are her agenda's (`ps-*`, `aa-*`);
+ * the cards live here, prefixed `iv-`. A card says its category by its emoji and name, where it stands by a quiet
+ * pill: never a coloured edge.
+ */
+.iv-day {
+  min-width: 20ch;
+}
+
+.iv-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+
+.iv-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+.iv-card[data-state='refused'] .iv-title,
+.iv-card[data-state='declined'] .iv-title {
+  color: var(--nv-ink-muted);
+}
+
+.iv-card__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.iv-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.iv-length {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.iv-state {
+  margin-left: auto;
+}
+.iv-state[data-tone='warn']::before {
+  background: var(--nv-warning);
+}
+.iv-state[data-tone='ok'] {
+  color: var(--nv-ink);
+}
+.iv-state[data-tone='ok']::before {
+  background: var(--nv-success);
+}
+
+.iv-title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.iv-shoot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+.iv-label {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--nv-ink-muted);
+}
+.iv-text {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.iv-why {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+/* The trend it cites: under a hairline, quieter than the idea. */
+.iv-signal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+}
+.iv-signal__head,
+.iv-signal__text,
+.iv-signal__foot {
+  margin: 0;
+}
+.iv-signal__head {
+  color: var(--nv-ink-muted);
+}
+.iv-signal__head b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.iv-signal__text {
+  overflow-wrap: anywhere;
+}
+.iv-signal__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  color: var(--nv-ink-muted);
+}
+.iv-signal__link {
+  color: var(--nv-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--nv-ink-faint);
+  text-underline-offset: 3px;
+}
+
+.iv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+.iv-notice,
+.iv-error {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+}
+.iv-notice {
+  font-weight: 600;
+}
+.iv-error {
+  color: var(--nv-warning);
+}
+
+.iv-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.iv-form__row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--nv-space-4);
+}
+.iv-field {
+  min-width: 0;
+}
+.iv-area {
+  min-height: 6.5em;
+  resize: vertical;
+}
+.iv-area--short {
+  min-height: 3.6em;
+}
+.iv-suffix {
+  position: relative;
+  display: block;
+}
+.iv-suffix .nv-field__control {
+  width: 100%;
+  padding-right: 3.2em;
+}
+.iv-suffix__unit {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-muted);
+  pointer-events: none;
+}
+
+.iv-paste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+.iv-paste__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 520px) {
+  .iv-card,
+  .iv-paste {
+    padding: 16px;
+  }
+  .iv-form__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .iv-actions > .nv-btn {
+    flex: 1 1 auto;
+  }
+}

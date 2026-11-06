@@ -101,5 +101,5 @@ export function BackupsPage(): JSX.Element {
 
 /** Réglages › Sécurité (SEC-04): the owner's sessions and backup codes, and every account's second factor. */
 export function SecurityPage({ userId }: { userId: string }): JSX.Element {
-  return <SecuritySection ownerId={userId} />;
+  return <SecuritySection ownerId={userId} extensionLinks />;
 }
