@@ -248,7 +248,7 @@ function RegimeItem({
 }): JSX.Element {
   const asked = askedText(regime);
   return (
-    <li className="bf-regime" data-pending={regime.validatedOn === null ? 'true' : undefined}>
+    <li className="bf-regime">
       <div className="bf-version__head">
         <span className="bf-version__name">{regime.name}</span>
         {regime.validatedOn === null ? (

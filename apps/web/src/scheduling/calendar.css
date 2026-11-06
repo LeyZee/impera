@@ -86,7 +86,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
-/* Nobody but the agent, in Automatique: a solid violet edge, the word said. */
+/* Nobody but the agent, in Automatique: violet, the word said, never a coloured edge (Charles: pastilles only). */
 .cal-alone {
   flex: 1;
   display: flex;
@@ -95,7 +95,6 @@
   padding: 4px 8px;
   border-radius: var(--nv-radius-sm);
   background: var(--nv-agent-soft);
-  box-shadow: inset 3px 0 0 var(--nv-agent);
   color: var(--nv-agent);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);

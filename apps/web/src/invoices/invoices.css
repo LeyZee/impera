@@ -133,16 +133,20 @@
   }
 }
 
-/* A due date past: the chip says it in red, the row's edge too, so it is seen without reading. */
+/* A PDF being read, or lost for good: greyed as a disabled button, but it keeps the focus (`aria-disabled`). */
+.iv-pdf[aria-disabled='true'],
+.iv-pdf[aria-disabled='true']:hover,
+.iv-pdf[aria-disabled='true']:active {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  background: transparent;
+  color: var(--nv-ink-muted);
+}
+/* A due date past: its chip says it in red. Never a coloured edge on the row (Charles: pastilles only). */
 .iv-chip--danger {
   color: var(--nv-danger);
   background: color-mix(in srgb, var(--nv-danger) 12%, transparent);
-}
-.iv-doc[data-due='overdue'] {
-  box-shadow: inset 3px 0 0 var(--nv-danger);
-}
-.iv-doc[data-due='soon'] {
-  box-shadow: inset 3px 0 0 var(--nv-warning);
 }
 
 /* ── Paie › Factures: how the list is read, by quinzaine or by member ── */

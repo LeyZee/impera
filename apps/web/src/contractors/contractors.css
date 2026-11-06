@@ -20,10 +20,6 @@
 .cf-item--doc {
   align-items: start;
 }
-/* A document whose renewal is due: an amber edge, never red (the guide: no emergency). */
-.cf-item[data-remind='true'] {
-  box-shadow: inset 3px 0 0 var(--nv-warning);
-}
 .cf-item--old {
   grid-template-columns: minmax(0, 1fr);
   padding: var(--nv-space-2) var(--nv-space-3);
