@@ -38,7 +38,7 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { debounceFor } from '../domain/rules';
+import { debounceFor, fanAwaitsAnswer } from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -366,6 +366,9 @@ export function createConversationCommands({
               status: 'rejected',
               decidedBy: input.userId,
               ...(input.reason === undefined ? {} : { reason: input.reason }),
+              // Decided here and kept in the event, so a rebuild replays it as it was (recette CHAT-25, ADR 0007):
+              // refused while he waits, the conversation stays with the human; a refused follow-up rests.
+              ...(fanAwaitsAnswer(conversation) && { leavesFanWaiting: true }),
             },
           },
           meta,

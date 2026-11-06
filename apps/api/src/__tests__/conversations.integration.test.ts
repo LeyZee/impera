@@ -16,7 +16,7 @@ import {
   type PlatformAccountId,
   type SendResult,
 } from '@impera/contracts';
-import { eq, schema, sql } from '@impera/db';
+import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { runOnce } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
@@ -276,16 +276,30 @@ describe('conversations module (P0-05)', () => {
     const { conversationId } = await ingest('c-forbidden');
     const draftId = await respond(conversationId);
     await conversations.rejectDraft({ ...command(conversationId), draftId, reason: 'Trop direct' });
+    // The decision is kept in the event, so a rebuild replays it as it was (recette CHAT-25, ADR 0007).
+    const [rejected] = await test.admin.db
+      .select({ payload: schema.conversationEvents.payload })
+      .from(schema.conversationEvents)
+      .where(
+        and(
+          eq(schema.conversationEvents.conversationId, conversationId),
+          eq(schema.conversationEvents.type, 'draft_rejected'),
+        ),
+      );
+    expect(rejected?.payload).toMatchObject({ leavesFanWaiting: true });
     const before = await events(conversationId);
 
     await expect(
       conversations.approveDraft({ ...command(conversationId), draftId, bubbles: ['Coucou'] }),
     ).rejects.toMatchObject({ code: 'draft_conflict' });
+    expect(await events(conversationId)).toEqual(before);
+    // Refused while the fan waits: the conversation stays with the human who refused (recette CHAT-25).
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'human' });
+    await conversations.release(command(conversationId));
+    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
     await expect(conversations.release(command(conversationId))).rejects.toMatchObject({
       code: 'transition_conflict',
     });
-    expect(await events(conversationId)).toEqual(before);
-    expect(await conversationRow(conversationId)).toMatchObject({ state: 'idle' });
   });
 
   it('writes no state without its event: a failure later in the transaction undoes both', async () => {
@@ -458,6 +472,7 @@ describe('conversations module (P0-05)', () => {
     await ingest('c-rebuild');
     let draftId = await respond(conversationId);
     await conversations.rejectDraft({ ...command(conversationId), draftId, reason: 'Non' });
+    await conversations.release(command(conversationId));
     clock.advance(1);
     await ingest('c-rebuild');
     draftId = await respond(conversationId);
