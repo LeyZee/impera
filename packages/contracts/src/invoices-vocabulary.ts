@@ -100,6 +100,11 @@ export type InvoiceEventKind = z.infer<typeof InvoiceEventKindSchema>;
  * The statement stays validated and the owner is told (`invoice_not_issued`).
  */
 export const INVOICE_NOT_ISSUED_REASONS = [
+  /**
+   * The agency has published no mandate yet (Réglages › Facturation): no member can accept one, so the owner is told
+   * this, never `no_mandate` (recette EQP-02).
+   */
+  'mandate_unpublished',
   'no_mandate',
   'no_regime',
   'regime_not_validated',
