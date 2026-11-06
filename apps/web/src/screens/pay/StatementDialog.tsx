@@ -98,7 +98,9 @@ export function StatementDialog({
       }
       lead={
         <>
-          Relevé de commissions · {periodTitle(statement.window.period)}
+          Relevé de commissions ·{' '}
+          {/* The fortnight in one block: a phone never sends its year alone to the next line. */}
+          <span className="whitespace-nowrap">{periodTitle(statement.window.period)}</span>
           <Chip chip={{ label: status.join(' · '), tone: 'neutral' }} />
         </>
       }

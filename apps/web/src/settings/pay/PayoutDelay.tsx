@@ -28,7 +28,7 @@ export function PayoutDelay(): JSX.Element {
   const data = settings.data;
 
   return (
-    <div className="nv-plate rp-account nv-enter">
+    <div className="nv-plate rp-account rp-account--setting nv-enter">
       <div className="rp-account__head">
         <div className="rp-account__who">
           <p className="rp-account__name">Délai de versement</p>

@@ -391,7 +391,7 @@ function PeriodView({
           rate={block?.kind === 'rate_missing'}
         />
         <Panel
-          className="nv-enter"
+          className="py-statements nv-enter"
           eyebrow={
             ended || data.beforeFirstClosing ? 'Relevés de commissions' : 'À ce jour, membre par membre'
           }

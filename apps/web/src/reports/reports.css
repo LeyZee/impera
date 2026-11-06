@@ -1013,6 +1013,17 @@
 .rp-account__who {
   min-width: 0;
 }
+/* A team-wide setting (minimum, payout delay): its « Changer » stays at the right of the title on a phone, its
+   subtitle wraps under the title instead, so that the two cards line up. */
+.rp-account--setting .rp-account__head {
+  flex-wrap: nowrap;
+}
+.rp-account--setting .rp-account__who {
+  flex: 1 1 auto;
+}
+.rp-account--setting .rp-account__head > .nv-btn {
+  flex-shrink: 0;
+}
 .rp-account__name {
   margin: 0;
   font-size: var(--nv-text-headline);

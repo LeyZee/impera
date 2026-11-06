@@ -1370,3 +1370,8 @@
     transition: none;
   }
 }
+
+/* The statements' panel: its title is an eyebrow alone, so « Exporter (CSV) » is centred on it, not on its baseline. */
+.py-statements > .nv-panel__head {
+  align-items: center;
+}
