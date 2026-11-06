@@ -8,10 +8,16 @@ import {
   PlatformAccountIdSchema,
   ShiftIdSchema,
   ShiftReportIdSchema,
+  ShiftReportReviewKindSchema,
   ShiftReportStatusSchema,
   TeamMemberIdSchema,
   UserIdSchema,
+  AuditEntryIdSchema,
+  DomainError,
+  newId,
+  SHIFT_REPORT_CHECK_LATE_MINUTES,
   type PayPeriod,
+  type ReportGapThreshold,
   type ShiftReportId,
   type TeamScope,
 } from '@impera/contracts';
@@ -24,6 +30,7 @@ import {
   schema,
   sql,
   SNAPSHOT_READ,
+  withAdmin,
   withMember,
   withTenantMember,
   type Database,
@@ -32,6 +39,7 @@ import {
 import { z } from 'zod';
 
 import {
+  OwnerOnly,
   PlatformAccountNotFound,
   ShiftNotFound,
   ShiftReportChanged,
@@ -43,6 +51,7 @@ import {
   ShiftReportValidated,
 } from '../domain/errors';
 import type { ShiftReportStore, StoredAccount, StoredShift, StoredShiftReport } from '../domain/ports';
+import { assertGapAnswered, validatesByItself } from '../domain/report-check';
 import {
   assertChanges,
   assertDeclarable,
@@ -56,9 +65,11 @@ import {
   type RatedRulesRow,
   type Reader,
 } from '../domain/reports';
+import { DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
 import { addMinutes, wallClockToInstant } from '../domain/time';
 
 import type { EnqueuePayRecalculation } from './pay-reads';
+import { checkOf, checkSettingsIn, type ShiftSalesReader } from './report-check';
 import {
   agencyTimeZone,
   audit,
@@ -73,7 +84,19 @@ import {
   toShift,
 } from './rows';
 
-const { accountPayRules, platformAccounts, shiftReports, shifts, teamMembers } = schema;
+const {
+  accountPayRules,
+  auditLog,
+  platformAccounts,
+  salesFeedCursors,
+  schedulingSettings,
+  shiftReports,
+  shifts,
+  teamMembers,
+} = schema;
+
+/** The most reports one run of the automatic check looks at: the next run takes the rest. */
+const CHECK_BATCH = 200;
 
 const reportColumns = {
   id: shiftReports.id,
@@ -94,10 +117,13 @@ const reportColumns = {
   submittedAt: shiftReports.submittedAt,
   reviewedAt: shiftReports.reviewedAt,
   reviewNote: shiftReports.reviewNote,
+  reviewKind: shiftReports.reviewKind,
+  explanation: shiftReports.explanation,
+  reviewCheck: shiftReports.reviewCheck,
   createdAt: shiftReports.createdAt,
 };
 
-const StoredShiftReportSchema = z.object({
+const ReportRowSchema = z.object({
   id: ShiftReportIdSchema,
   shiftId: ShiftIdSchema,
   creatorId: CreatorIdSchema,
@@ -116,10 +142,17 @@ const StoredShiftReportSchema = z.object({
   submittedAt: z.date(),
   reviewedAt: z.date().nullable(),
   reviewNote: z.string().nullable(),
+  reviewKind: ShiftReportReviewKindSchema.nullable(),
+  explanation: z.string().nullable(),
+  /** Parsed by `checkOf` through `ReviewCheckSchema`, once validated. */
+  reviewCheck: z.unknown(),
   createdAt: z.date(),
 });
 
-const toReport = (row: unknown): StoredShiftReport => StoredShiftReportSchema.parse(row);
+/** A report as stored, before its check against the platform is attached (`withChecks`). */
+type ReportRow = z.infer<typeof ReportRowSchema>;
+
+const toReport = (row: unknown): ReportRow => ReportRowSchema.parse(row);
 
 const accountColumns = {
   id: platformAccounts.id,
@@ -128,22 +161,24 @@ const accountColumns = {
   handle: platformAccounts.handle,
 };
 
-const byCreation = (a: StoredShiftReport, b: StoredShiftReport): number =>
-  a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+const byCreation = (
+  a: { readonly createdAt: Date; readonly id: string },
+  b: { readonly createdAt: Date; readonly id: string },
+): number => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
 
 /** The report as the policies show it, locked when it is about to change. */
 async function readReport(
   tx: Transaction,
   id: string,
   lock: 'for update' | null = null,
-): Promise<StoredShiftReport | null> {
+): Promise<ReportRow | null> {
   const query = tx.select(reportColumns).from(shiftReports).where(eq(shiftReports.id, id));
   const [row] = lock === null ? await query : await query.for('update');
   return row === undefined ? null : toReport(row);
 }
 
 /** The shift's report and its corrections, oldest first. */
-async function reportsOfShift(tx: Transaction, shiftId: string): Promise<StoredShiftReport[]> {
+async function reportsOfShift(tx: Transaction, shiftId: string): Promise<ReportRow[]> {
   const rows = await tx.select(reportColumns).from(shiftReports).where(eq(shiftReports.shiftId, shiftId));
   return rows.map(toReport).toSorted(byCreation);
 }
@@ -210,6 +245,7 @@ export function createDrizzleShiftReportStore(
   db: Database,
   adminDb: Database,
   enqueuePayRecalculation: EnqueuePayRecalculation,
+  readShiftSales: ShiftSalesReader,
 ): ShiftReportStore {
   /** In the creator of report `id`, as `userId`; `shift_report_not_found` when no such report exists. */
   async function inReportCreator<T>(
@@ -224,14 +260,41 @@ export function createDrizzleShiftReportStore(
     );
   }
 
-  async function reportAfterWrite(tx: Transaction, id: string): Promise<StoredShiftReport> {
+  /**
+   * The reports with their check against the platform (ADR 0073), each against its shift among those given, in `tx`:
+   * the reader's policies govern what the connectors read for a screen.
+   */
+  async function withChecks(
+    tx: Transaction,
+    rows: readonly ReportRow[],
+    shiftsById: ReadonlyMap<string, StoredShift>,
+    now: Date,
+  ): Promise<StoredShiftReport[]> {
+    if (rows.length === 0) return [];
+    const settings = await checkSettingsIn(tx);
+    const checked: StoredShiftReport[] = [];
+    for (const { reviewCheck, ...row } of rows) {
+      const shift = shiftsById.get(row.shiftId);
+      checked.push({
+        ...row,
+        check: await checkOf(tx, { ...row, reviewCheck }, shift, readShiftSales, settings, now),
+      });
+    }
+    return checked;
+  }
+
+  /** One report, read again after a write, with its check against its shift. */
+  async function reportAfterWrite(tx: Transaction, id: string, now: Date): Promise<StoredShiftReport> {
     const report = await readReport(tx, id);
     if (report === null) throw new ShiftReportNotFound();
-    return report;
+    const shift = await shiftOf(tx, report.shiftId);
+    const [checked] = await withChecks(tx, [report], new Map(shift === null ? [] : [[shift.id, shift]]), now);
+    if (checked === undefined) throw new ShiftReportNotFound();
+    return checked;
   }
 
   return {
-    context: async (actor, shiftId) => {
+    context: async (actor, shiftId, now) => {
       const creatorId = await creatorOfUnscoped(adminDb, shifts, shiftId);
       if (creatorId === null) throw new ShiftNotFound();
       return withTenantMember(db, creatorId, actor, async (tx, scope) => {
@@ -255,7 +318,7 @@ export function createDrizzleShiftReportStore(
           account: StoredAccountSchema.parse(account),
           period,
           rules: payRulesFor(await rulesOf(tx, shift.platformAccountId), period),
-          reports,
+          reports: await withChecks(tx, reports, new Map([[shift.id, shift]]), now),
           reader,
         };
       });
@@ -286,7 +349,7 @@ export function createDrizzleShiftReportStore(
             existing.comment === report.comment &&
             existing.incident === report.incident;
           if (!same) throw new ShiftReportConflict();
-          return { report: toReport(existing), created: false, reader };
+          return { report: await reportAfterWrite(tx, existing.id, now), created: false, reader };
         };
         const sent = await replay();
         if (sent !== null) return sent;
@@ -374,7 +437,7 @@ export function createDrizzleShiftReportStore(
           { kind: 'shift_report', id: report.id },
           { period, byAgency },
         );
-        return { report: await reportAfterWrite(tx, report.id), created: true, reader };
+        return { report: await reportAfterWrite(tx, report.id, now), created: true, reader };
       });
     },
 
@@ -390,18 +453,25 @@ export function createDrizzleShiftReportStore(
           throw new ShiftReportChanged();
         }
         assertChanges(report, version, reader);
+        if (change.explanation !== undefined && report.correctsId !== null) {
+          throw new ShiftReportInvalid('Une explication accompagne le rapport, pas une correction');
+        }
         const next = {
           amountMinor: change.amountMinor ?? report.amountMinor,
           comment: change.comment === undefined ? report.comment : change.comment,
           incident: change.incident === undefined ? report.incident : change.incident,
+          explanation: change.explanation === undefined ? report.explanation : change.explanation,
         };
         assertReportValues({ correctsId: report.correctsId, ...next });
         const unchanged =
           next.amountMinor === report.amountMinor &&
           next.comment === report.comment &&
-          next.incident === report.incident;
+          next.incident === report.incident &&
+          next.explanation === report.explanation;
         // A submitted report sent again as it is: nothing to write, the version stays.
-        if (unchanged && report.status === 'submitted') return { report, reader };
+        if (unchanged && report.status === 'submitted') {
+          return { report: await reportAfterWrite(tx, id, now), reader };
+        }
         assertDeclarable(await rulesOf(tx, report.platformAccountId), report.period, report.currency);
         if (report.correctsId !== null) {
           assertTotalHolds(await reportsOfShift(tx, report.shiftId), { ...report, ...next });
@@ -417,9 +487,11 @@ export function createDrizzleShiftReportStore(
             reviewedBy: null,
             reviewedAt: null,
             reviewNote: null,
+            reviewKind: null,
             updatedAt: now,
           })
           .where(eq(shiftReports.id, id));
+        // The explanation is the team's free text: never in the audit, as the comment (ADR 0073 § 5).
         await audit(
           tx,
           actor,
@@ -427,7 +499,7 @@ export function createDrizzleShiftReportStore(
           { kind: 'shift_report', id },
           { version: report.version + 1 },
         );
-        return { report: await reportAfterWrite(tx, id), reader };
+        return { report: await reportAfterWrite(tx, id, now), reader };
       }),
 
     review: (actor, id, version, review, now) =>
@@ -442,10 +514,17 @@ export function createDrizzleShiftReportStore(
         }
         assertReviews(report, version, reader);
         const validating = review.decision === 'validate';
+        let kept: { check: StoredShiftReport['check']; threshold: ReportGapThreshold } | null = null;
         if (validating) {
           // Pay reads it from now on: the rules it was made under, and the shift's total with it, once more.
           assertDeclarable(await rulesOf(tx, report.platformAccountId), report.period, report.currency);
           assertTotalHolds(await reportsOfShift(tx, report.shiftId), report);
+          // Against the platform (ADR 0073 § 5): a gap waits for its member, until they answer or the delay ends.
+          const shift = await shiftOf(tx, report.shiftId);
+          const settings = await checkSettingsIn(tx);
+          const check = await checkOf(tx, report, shift ?? undefined, readShiftSales, settings, now);
+          assertGapAnswered(check, report.explanation, now);
+          kept = check === null ? null : { check, threshold: settings.threshold };
         }
         await tx
           .update(shiftReports)
@@ -455,6 +534,8 @@ export function createDrizzleShiftReportStore(
             reviewedBy: actor.userId,
             reviewedAt: now,
             reviewNote: validating ? null : review.note,
+            reviewKind: 'human',
+            reviewCheck: kept,
             updatedAt: now,
           })
           .where(eq(shiftReports.id, id));
@@ -467,7 +548,7 @@ export function createDrizzleShiftReportStore(
           { kind: 'shift_report', id },
           { version: report.version + 1 },
         );
-        return { report: await reportAfterWrite(tx, id), reader };
+        return { report: await reportAfterWrite(tx, id, now), reader };
       }),
 
     list: (actor, creatorIds, period, now) =>
@@ -529,7 +610,10 @@ export function createDrizzleShiftReportStore(
                     .select(accountColumns)
                     .from(platformAccounts)
                     .where(inArray(platformAccounts.id, accountIds));
-            reports.push(...rows);
+            // In her tenant: the connectors read her register under the reader's policies.
+            reports.push(
+              ...(await withChecks(tx, rows, new Map(creatorShifts.map((shift) => [shift.id, shift])), now)),
+            );
             shiftRows.push(...creatorShifts);
             accounts.push(...creatorAccounts.map((row) => StoredAccountSchema.parse(row)));
           }
@@ -554,5 +638,120 @@ export function createDrizzleShiftReportStore(
       ),
 
     reader: (actor) => withMember(db, actor, (tx, scope) => readerIn(tx, actor, scope)),
+
+    checkCandidatesUnscoped: (now) =>
+      withAdmin(adminDb, async (tx) => {
+        const settings = await checkSettingsIn(tx);
+        // The submitted reports whose window is over plus the quarter of an hour, on an account whose platform's
+        // register was read to its end since: the others cannot be complete yet. The oldest first, a bounded batch.
+        const late = settings.marginMinutes + SHIFT_REPORT_CHECK_LATE_MINUTES;
+        const rows = await tx
+          .select({ ...reportColumns, shift: shiftColumns })
+          .from(shiftReports)
+          .innerJoin(shifts, eq(shifts.id, shiftReports.shiftId))
+          .innerJoin(platformAccounts, eq(platformAccounts.id, shiftReports.platformAccountId))
+          .innerJoin(salesFeedCursors, eq(salesFeedCursors.platform, platformAccounts.platform))
+          .where(
+            and(
+              eq(shiftReports.status, 'submitted'),
+              sql`${shiftReports.correctsId} is null`,
+              sql`${shifts.endsAt} + make_interval(mins => ${late}) <= ${now}`,
+              sql`${salesFeedCursors.caughtUpAt} >= ${shifts.endsAt} + make_interval(mins => ${late})`,
+            ),
+          )
+          .orderBy(shiftReports.submittedAt)
+          .limit(CHECK_BATCH);
+        const due: { id: ShiftReportId; version: number }[] = [];
+        for (const { shift, ...row } of rows) {
+          const report = toReport(row);
+          const check = await checkOf(tx, report, toShift(shift), readShiftSales, settings, now);
+          if (validatesByItself(check)) due.push({ id: report.id, version: report.version });
+        }
+        return due;
+      }),
+
+    autoValidateUnscoped: (id, version, now) =>
+      withAdmin(adminDb, async (tx) => {
+        const seen = await readReport(tx, id);
+        if (seen?.status !== 'submitted' || seen.version !== version || seen.correctsId !== null)
+          return false;
+        await lockMemberPeriod(tx, seen.memberId, seen.period);
+        // Under the lock, the version it was asked for, still submitted: never an amount it did not compare (§ 4).
+        const report = await readReport(tx, id, 'for update');
+        if (report?.status !== 'submitted' || report.version !== version) return false;
+        const shift = await shiftOf(tx, report.shiftId);
+        if (shift === null || shift.cancelled) return false;
+        try {
+          assertDeclarable(await rulesOf(tx, report.platformAccountId), report.period, report.currency);
+          assertTotalHolds(await reportsOfShift(tx, report.shiftId), report);
+        } catch (error) {
+          // The account's rules changed under it: a person decides, as for any refusal of a validation.
+          if (error instanceof DomainError) return false;
+          throw error;
+        }
+        const settings = await checkSettingsIn(tx);
+        const check = await checkOf(tx, report, shift, readShiftSales, settings, now);
+        if (check === null || !validatesByItself(check)) return false;
+        await tx
+          .update(shiftReports)
+          .set({
+            status: 'validated',
+            version: report.version + 1,
+            reviewedBy: null,
+            reviewedAt: now,
+            reviewKind: 'automatic',
+            reviewCheck: { check, threshold: settings.threshold },
+            updatedAt: now,
+          })
+          .where(eq(shiftReports.id, id));
+        await enqueuePayRecalculation(tx, report.period);
+        // In the name of the automatic check, never a person (ADR 0073 § 4); amounts only, never a text.
+        await tx.insert(auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId: null,
+          action: 'shift_report.auto_validate',
+          entity: 'shift_report',
+          entityId: id,
+          details: {
+            version: report.version + 1,
+            ...(check.state === 'complete' && { readMinor: check.readMinor, gapMinor: check.gapMinor }),
+          },
+          ip: null,
+        });
+        return true;
+      }),
+
+    reportGap: (actor) => withMember(db, actor, async (tx) => (await checkSettingsIn(tx)).threshold),
+
+    saveReportGap: (actor, threshold) =>
+      withMember(db, actor.userId, async (tx, scope) => {
+        if (scope !== 'owner') throw new OwnerOnly();
+        const values = {
+          reportGapBps: threshold.bps,
+          reportGapMinor: threshold.minor,
+          updatedBy: actor.userId,
+          updatedAt: new Date(),
+        };
+        // A first save keeps the module's defaults for the rest of the settings, as `saveSettings` does.
+        await tx
+          .insert(schedulingSettings)
+          .values({
+            id: 1,
+            timeZone: DEFAULT_SCHEDULING_SETTINGS.timeZone,
+            accessMarginMinutes: DEFAULT_SCHEDULING_SETTINGS.accessMarginMinutes,
+            slotStartMinute: 0,
+            slotLengthMinutes: 360,
+            ...values,
+          })
+          .onConflictDoUpdate({ target: schedulingSettings.id, set: values });
+        await audit(
+          tx,
+          actor,
+          'scheduling_settings.report_gap',
+          { kind: 'scheduling_settings', id: '1' },
+          { ...threshold },
+        );
+        return (await checkSettingsIn(tx)).threshold;
+      }),
   };
 }

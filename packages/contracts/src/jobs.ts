@@ -53,6 +53,7 @@ export const JOB_NAMES = [
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
+  'scheduling.check_reports',
   'team.apply_roles',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -116,6 +117,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
+  'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'team.apply_roles': 'Rôles de l’équipe',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
@@ -247,6 +249,7 @@ export const JOB_PAYLOADS = {
    * rounding explains. It writes nothing else.
    */
   'scheduling.check_agency_shares': z.object({}),
+  'scheduling.check_reports': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**
@@ -447,6 +450,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
   'scheduling.check_agency_shares': 3,
+  'scheduling.check_reports': 1,
   'team.apply_roles': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
   'payroll.recalculate': 5,

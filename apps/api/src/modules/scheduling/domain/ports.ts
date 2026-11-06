@@ -12,12 +12,15 @@ import type {
   PayPeriod,
   Platform,
   PlatformAccountId,
+  ReportGapThreshold,
   ReportSignal,
   SchedulingSettings,
   SchedulingSettingsInput,
   ShiftFeedbackId,
   ShiftId,
   ShiftReportId,
+  ShiftReportCheck,
+  ShiftReportReviewKind,
   ShiftReportStatus,
   ShiftSlot,
   ShiftSwapRequestId,
@@ -464,6 +467,14 @@ export interface StoredShiftReport {
   readonly submittedAt: Date;
   readonly reviewedAt: Date | null;
   readonly reviewNote: string | null;
+  /** `null` while submitted, and on a review written before ADR 0073 (a person's). */
+  readonly reviewKind: ShiftReportReviewKind | null;
+  readonly explanation: string | null;
+  /**
+   * Against the platform (ADR 0073): read now while it is not validated, as its validation saw it once it is; `null`
+   * for a correction and when its account's sales are not read.
+   */
+  readonly check: ShiftReportCheck | null;
   readonly createdAt: Date;
 }
 
@@ -482,6 +493,7 @@ interface ShiftReportChange {
   readonly amountMinor?: number | undefined;
   readonly comment?: string | null | undefined;
   readonly incident?: string | null | undefined;
+  readonly explanation?: string | null | undefined;
 }
 
 type ShiftReportReview =
@@ -499,6 +511,7 @@ export interface ShiftReportStore {
   context(
     actor: UserId,
     shiftId: ShiftId,
+    now: Date,
   ): Promise<{
     shift: StoredShift;
     account: StoredAccount;
@@ -548,6 +561,21 @@ export interface ShiftReportStore {
   }>;
   /** Who the signed-in account is, for a validation sent by someone who may not review. */
   reader(actor: UserId): Promise<Reader>;
+  /**
+   * The automatic check's candidates (ADR 0073 § 4), as the admin role: the submitted reports, never a correction,
+   * whose comparison may be complete at `now`, each with the version to check.
+   */
+  checkCandidatesUnscoped(now: Date): Promise<{ id: ShiftReportId; version: number }[]>;
+  /**
+   * The automatic check of one report's version (ADR 0073 § 4), as the admin role, under the lock (member, period):
+   * validated in the name of the check when that version is still submitted and its complete comparison is within
+   * the threshold; `false` otherwise, nothing written.
+   */
+  autoValidateUnscoped(id: ShiftReportId, version: number, now: Date): Promise<boolean>;
+  /** The threshold of ADR 0073 § 3: the owner's, or the default. */
+  reportGap(actor: UserId): Promise<ReportGapThreshold>;
+  /** The owner's, `forbidden` to anyone else. */
+  saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
 }
 
 /** An account's pay rules as stored (EQ-03): added only, never changed. */
