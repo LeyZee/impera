@@ -50,6 +50,7 @@ import {
   ContentDropScriptUnprocessable,
   ContentDropSettled,
   ContentRequestClosed,
+  ContentRequestDueUnprocessable,
   ContentRequestIdConflict,
   ContentRequestNotFound,
   ContentRequestStructureUnprocessable,
@@ -502,6 +503,15 @@ async function confirmExportIn(
 }
 
 /** `withTenantMember` for the owner and an active manager; a chatter is refused before any read. */
+/** `now` as her day, `YYYY-MM-DD` in her time zone. */
+const dayIn = (now: Date, timezone: string): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+
 export function createDrizzleAgencyContentStore(db: Database): AgencyContentStore {
   const asTeam = <T>(creatorId: string, userId: string, run: (tx: Transaction) => Promise<T>): Promise<T> =>
     withTenantMember(db, creatorId, userId, async (tx, scope) => {
@@ -568,7 +578,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (updated === undefined) throw new ContentDropNotFound();
         return viewOf(tx, updated);
       }),
-    ask: (creatorId, userId, body: CreateContentRequestBody, freeze) =>
+    ask: (creatorId, userId, body: CreateContentRequestBody, freeze, now) =>
       asTeam(creatorId, userId, async (tx) => {
         const [known] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));
         if (known !== undefined) {
@@ -580,6 +590,13 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
           if (!same) throw new ContentRequestIdConflict();
           return requestOf(known, null);
         }
+        // Never for a day already past where she lives (recette MED-10): it would be late as it is born.
+        const [creator] = await tx
+          .select({ timezone: schema.creators.timezone })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        if (creator !== undefined && body.dueOn < dayIn(now, creator.timezone))
+          throw new ContentRequestDueUnprocessable();
         if (body.structureId !== null) {
           // The library's structure, read by the team's policy: not archived, kept for no other creator.
           const [structure] = await tx

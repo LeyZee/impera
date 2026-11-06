@@ -307,6 +307,7 @@ export interface AgencyContentStore {
     userId: string,
     body: CreateContentRequestBody,
     freeze: (structureId: string) => Promise<string | null>,
+    now: Date,
   ): Promise<ContentRequest>;
   cancel(creatorId: string, userId: string, requestId: string, now: Date): Promise<void>;
   fileTarget(creatorId: string, userId: string, dropId: string, fileId: string): Promise<DropFileTarget>;
