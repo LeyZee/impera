@@ -601,8 +601,8 @@ const CONVERSION_QUEUE = 'content_drops:convert';
 /**
  * The drop follows its live files, as the admin role, the drop locked by the caller: received with
  * `content_drop_received` once none waits for its bytes (and `content_drops.drop_received` for a drop answering a
- * request), then ready when every file is settled and one was kept, blocked
- * when all were refused. A drop still being filled (SC-02 lot b) moves only once she sends it.
+ * request), then ready when every file is settled and one was kept, blocked when all were refused. A drop still being
+ * filled (SC-02 lot b) moves only once she sends it.
  */
 export async function follow(
   tx: Transaction,
