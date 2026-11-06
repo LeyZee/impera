@@ -27,6 +27,7 @@ import { MEMBER_PALETTE, shadeOf } from './palette';
 import { usePlanning } from '@/scheduling/api';
 import { useAgencyToday } from '@/screens/pay/data';
 import { Dialog } from '@/shell/Dialog';
+import { Select } from '@/shell/Select';
 
 /**
  * Changing a member once added (EQ-10, owner only): their team name, colour and creators; their rate from a 1st or a
@@ -469,22 +470,21 @@ export function StatusPanel({ member, onClose }: { member: TeamMember; onClose: 
           });
         }}
       >
-        <div className="tm-choices" role="radiogroup" aria-label="Statut">
-          {TEAM_MEMBER_STATUSES.map((one) => (
-            <button
-              key={one}
-              type="button"
-              role="radio"
-              className="nv-chip"
-              aria-checked={status === one}
-              onClick={() => {
-                setStatus(one);
-                setSure(false);
-              }}
-            >
-              {STATUS_LABELS[one]}
-            </button>
-          ))}
+        {/* Six statuses: a list, not chips, which stop at five choices (recette Équipe 07/11). */}
+        <div className="nv-field tm-field">
+          <label className="nv-field__label" htmlFor={`${id}-status`}>
+            Statut
+          </label>
+          <Select
+            id={`${id}-status`}
+            value={status}
+            autofocus
+            options={TEAM_MEMBER_STATUSES.map((one) => ({ value: one, label: STATUS_LABELS[one] }))}
+            onChange={(one) => {
+              setStatus(one);
+              setSure(false);
+            }}
+          />
         </div>
         {status !== 'active' && !leaving ? (
           <p className="tm-hint nv-swap">{AWAY(member.displayName)}</p>
