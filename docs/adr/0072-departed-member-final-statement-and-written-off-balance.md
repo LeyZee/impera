@@ -22,18 +22,28 @@ Charles a répondu le 06/11, en acceptant les recommandations qui suivent (« Je
 
 **2. Plus de relevé vide après le départ.** La quinzaine qui suit le départ n'a un relevé que si quelque chose y arrive : une correction de contestation (ADR 0039 § 3), une vente ou un remboursement enregistré après la validation de la quinzaine du départ, un ajustement. Ce relevé est final. Une correction va toujours sur la première quinzaine encore ouverte du membre (ADR 0039 § 6), qui peut être celle-là ou une plus tardive.
 
-**3. Un relevé final attend que ses documents soient réglés.** Il ne se valide que quand aucun document du membre n'attend de réponse ou ne reste contesté, comme la quinzaine de clôture aujourd'hui (`keep_final_statement`). La contestation de la facture de la quinzaine du départ arrive après sa validation : sa correction donne un relevé sur la quinzaine suivante (point 2). Le filet de l'ADR 0039 § 6 reste donc, sans relevé fantôme.
+**3. Le relevé final se valide au cycle normal, même si un document attend encore.**
 
-**4. Le total négatif d'un relevé final est ramené à zéro.** Il ne se reporte plus : l'agence abandonne ce que le membre lui doit encore. Le relevé le montre sur une ligne à part, « Solde abandonné », avec le montant. Il ne verse rien, et son report sortant vaut zéro. Les avoirs que l'ADR 0036 émet pour les montants rendus restent émis comme aujourd'hui : ils disent ce qui a été trop versé. L'abandon est ce que l'agence décide de ne pas réclamer, et le journal d'audit le garde.
+- Une facture ou un avoir du membre qui attend une réponse, ou qui reste contesté, ne retient plus son relevé final. Aujourd'hui, la quinzaine de clôture attend que tout soit réglé (`keep_final_statement`). Demain, la quinzaine du départ se valide comme les autres, sans exception au cycle normal.
+- La correction d'une contestation va sur la première quinzaine encore ouverte du membre (point 2). C'est le cas de la contestation d'une facture plus ancienne encore ouverte au départ, et de celle de la facture de la quinzaine du départ, qui arrive toujours après sa validation.
+- Le filet de l'ADR 0039 § 6 reste donc : une correction a toujours une quinzaine où arriver, sans relevé fantôme et sans attente.
+- Si une contestation tranchée après le versement final rend négatif le relevé où va sa correction, le point 4 l'absorbe.
 
-**5. Un ajustement qui rendrait négatif le total d'un membre parti est refusé.** La règle est dans le code, à l'écriture de l'ajustement, contre le brouillon de la quinzaine où il va : 409 avec le total qui resterait, et l'écran le dit avant l'envoi. Une correction de contestation « montant trop haut » (ADR 0039 § 3) suit la même règle : elle va jusqu'à zéro au plus. Un remboursement de plateforme n'est pas un ajustement et n'est jamais refusé : c'est le point 4 qui l'absorbe.
+**4. Le total négatif d'un relevé final est ramené à zéro.** Il ne se reporte plus : l'agence abandonne ce que le membre lui doit encore. Le relevé le montre sur une ligne à part, « Solde abandonné », avec le montant en positif (ce que le membre devait encore). Il ne verse rien, et son report sortant vaut zéro. Seul un relevé final peut porter un abandon : la base le garantit (voir Conséquences). Les avoirs que l'ADR 0036 émet pour les montants rendus restent émis comme aujourd'hui : ils disent ce qui a été trop versé. L'abandon est ce que l'agence décide de ne pas réclamer, et le journal d'audit le garde.
+
+**5. Un ajustement qui rendrait négatif le total d'un membre parti est refusé.** La règle est dans le code, à l'écriture de l'ajustement : 409 avec le total qui resterait, et l'écran le dit avant l'envoi. La vérification et l'écriture se font sous le verrou (membre, quinzaine) que la paie prend déjà pour ses écritures, contre le brouillon recalculé dans cette transaction, jamais contre le total qu'affichait l'écran. Deux ajustements envoyés en même temps ne passent donc jamais tous les deux. Une correction de contestation « montant trop haut » (ADR 0039 § 3) suit la même règle : elle va jusqu'à zéro au plus. Un remboursement de plateforme n'est pas un ajustement et n'est jamais refusé : c'est le point 4 qui l'absorbe.
 
 **6. Rien ne change pour un membre présent.** Son report négatif reste sans limite (ADR 0038), son minimum de versement et ses reports positifs gardent leurs règles. Aucun relevé validé n'est recalculé. La règle vaut pour les brouillons à partir de l'acceptation de cette ADR, avec une nouvelle version du moteur.
 
+- Un relevé déjà validé sous l'ancienne règle reste tel quel, y compris un relevé vide de quinzaine de clôture.
+- Un brouillon de quinzaine de clôture qui existe à la bascule est recalculé par la nouvelle version. S'il ne porte rien, il disparaît. S'il porte une correction, une vente, un remboursement ou un ajustement, il reste, final.
+
 ## Conséquences
 
-- Base (migration attribuée à l'arrivée sur `main`) : `keep_final_statement` lit la quinzaine du départ au lieu de la suivante. Le relevé garde son abandon (`written_off_minor`, nul ou négatif, zéro hors relevé final).
-- Contrat : `CommissionStatement.writtenOffMinor`, et le code du refus de l'ajustement.
+- Base (migration attribuée à l'arrivée sur `main`) :
+  - `keep_final_statement` lit la quinzaine du départ au lieu de la suivante, et ne compte plus les documents ouverts. Il refuse toujours un relevé non final à partir de cette quinzaine, et un relevé final hors départ ;
+  - le relevé garde son abandon (`written_off_minor`), sous un CHECK : `written_off_minor <= 0`, et `written_off_minor = 0` sur tout relevé non final. Un relevé d'un membre présent ne peut donc jamais porter d'abandon, même par erreur du moteur.
+- Contrat : `CommissionStatement.writtenOffMinor`, et le code du refus de l'ajustement. Le 409 `commission_statement_documents_open_conflict` disparaît.
 - Moteur : `finalFor` part de la quinzaine du départ, la quinzaine de clôture ne force plus de relevé vide, un relevé final négatif est ramené à zéro avec son abandon. Nouvelle version du moteur, ce qui recalcule les brouillons.
 - Écrans : la ligne « Solde abandonné » dans le relevé et dans la Paie, le refus de l'ajustement, et la phrase du départ dans la fiche d'un membre (« Son relevé final, celui de la quinzaine de son départ, lui verse tout… »).
 - Question au comptable, à trancher avant la mise en service (EQ-17) : la forme de l'abandon de créance envers un prestataire parti (avoirs déjà émis, puis abandon), et son traitement comptable chez l'agence.
@@ -43,3 +53,4 @@ Charles a répondu le 06/11, en acceptant les recommandations qui suivent (« Je
 - **Supprimer tout relevé après le départ.** Une contestation de la dernière facture n'aurait plus de quinzaine où être corrigée, et l'argent bougerait hors de la paie, ce que l'ADR 0039 exclut.
 - **Garder la créance.** L'agence devrait réclamer quelques euros à un prestataire parti, souvent à l'étranger, et la paie produirait un relevé négatif chaque quinzaine pour toujours.
 - **Interdire seulement l'ajustement, sans abandon.** Un remboursement de plateforme arrivé après le départ rendrait quand même le total négatif.
+- **Faire attendre le relevé final tant qu'une contestation est ouverte.** L'agence garderait la main sur une baisse tranchée plus tard, mais le membre attendrait son dernier versement, ce que Charles exclut (« payée au cycle normal », « il voit tout de suite ce qu'il touche »).

@@ -5,6 +5,11 @@ Fait :
 - Elle écrit les réponses de Charles du 06/11 (« Je suis d'accord avec tout ») :
   - question 15 : le relevé final est celui de la quinzaine du départ, sans relevé vide après ;
   - question 12 : le total négatif d'un relevé final est ramené à zéro (« Solde abandonné »), et un ajustement qui rendrait négatif le total d'un membre parti est refusé.
+- Relecture de Bilan (#600) intégrée le jour même :
+  - § 3 : le relevé final se valide au cycle normal même si un document attend encore, et la correction va sur la quinzaine suivante, plutôt que d'attendre la contestation ;
+  - § 4 : CHECK sur `written_off_minor` (`<= 0`, nul hors relevé final), affiché en positif ;
+  - § 5 : le refus de l'ajustement sous le verrou (membre, quinzaine), contre le brouillon recalculé dans la transaction ;
+  - § 6 : relevés déjà validés gardés, brouillon de quinzaine de clôture recalculé à la bascule.
 
 Pas fait : le code. Il attend « ok 0072 » et une migration attribuée à l'arrivée sur `main`.
 
