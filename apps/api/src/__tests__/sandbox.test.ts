@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { breachCheckOf } from '../composition-root';
 import { createLogger } from '../logger';
 import {
   guardFetch,
@@ -54,9 +55,10 @@ describe('the sandbox configuration', () => {
     ['WEB_ORIGIN', 'https://crm.example.test'],
     ['IMPERA_SANDBOX_URL', 'http://192.168.1.20:4010'],
     ['S3_ENDPOINT', 'https://objects.example.test'],
+    ['INVOICES_S3_ENDPOINT', 'https://invoices.example.test'],
   ])('is refused when %s is not on this machine', (field, value) => {
     const s3 =
-      field === 'S3_ENDPOINT'
+      field === 'S3_ENDPOINT' || field === 'INVOICES_S3_ENDPOINT'
         ? { S3_REGION: 'local', S3_BUCKET: 'media', S3_ACCESS_KEY_ID: 'id', S3_SECRET_ACCESS_KEY: 'secret' }
         : {};
     expect(() => testConfig({ IMPERA_SANDBOX: '1', [field]: value, ...s3 })).toThrow(
@@ -108,5 +110,45 @@ describe('the sandbox guard on fetch', () => {
     await expect(fetch('https://api.pwnedpasswords.com/range/ABCDE')).rejects.toThrow(TypeError);
     remove();
     expect(globalThis.fetch).toBe(original);
+  });
+});
+
+describe('the sandbox and what lives outside this machine', () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+  });
+
+  it('follows a redirect on this machine and refuses one that leaves it', async () => {
+    const inner = vi.fn<typeof fetch>((input) => {
+      const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+      if (url.endsWith('/away')) {
+        return Promise.resolve(
+          new Response(null, { status: 302, headers: { location: 'https://api.x.ai/v1' } }),
+        );
+      }
+      if (url.endsWith('/near')) {
+        return Promise.resolve(new Response(null, { status: 301, headers: { location: '/landed' } }));
+      }
+      return Promise.resolve(new Response('ok'));
+    });
+    const blocked: string[] = [];
+    const guarded = guardFetch(inner, (host) => blocked.push(host));
+    expect(await (await guarded('http://127.0.0.1:4010/near')).text()).toBe('ok');
+    expect(inner).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:4010/landed',
+      expect.objectContaining({ redirect: 'manual' }),
+    );
+    await expect(guarded('http://127.0.0.1:4010/away')).rejects.toThrow(TypeError);
+    expect(blocked).toEqual(['api.x.ai']);
+  });
+
+  it('lets a password be set: the breach list is not asked, even when the check is on', async () => {
+    const logger = createLogger({ LOG_LEVEL: 'silent' });
+    const outside = vi.fn<typeof fetch>(() => Promise.reject(new TypeError('fetch failed')));
+    globalThis.fetch = outside;
+    const check = breachCheckOf(testConfig({ IMPERA_SANDBOX: '1', PASSWORD_BREACH_CHECK: 'on' }), logger);
+    await expect(check('un-mot-de-passe-de-recette')).resolves.toBe(false);
+    expect(outside).not.toHaveBeenCalled();
   });
 });

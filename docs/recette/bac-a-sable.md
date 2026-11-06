@@ -21,7 +21,7 @@ Prérequis : `docker compose up -d` et `pnpm db:migrate` faits.
 3. Terminal 2 : `pnpm dev`. Le journal de l'API commence par « BAC À SABLE (ADR 0075) : rien n'est réel ».
 4. Le CRM affiche en bas la pastille « Bac à sable · rien n'est réel » sur tous les écrans.
 
-La configuration refuse de démarrer si `NODE_ENV=production`, ou si `AUTH_BASE_URL`, `WEB_ORIGIN`, `IMPERA_SANDBOX_URL` ou `S3_ENDPOINT` ne sont pas des adresses de la machine. En bac à sable, les clés du `.env` (`LLM_*`, `SPEECH_*`) ne sont jamais lues : seules comptent celles collées dans le CRM.
+La configuration refuse de démarrer si `NODE_ENV=production`, ou si `AUTH_BASE_URL`, `WEB_ORIGIN`, `IMPERA_SANDBOX_URL`, `S3_ENDPOINT`, `INVOICES_S3_ENDPOINT` ou `INVOICES_COPY_S3_ENDPOINT` ne sont pas des adresses de la machine. Une redirection vers l'extérieur est bloquée comme un appel direct. En bac à sable, les clés du `.env` (`LLM_*`, `SPEECH_*`) ne sont jamais lues : seules comptent celles collées dans le CRM. Lance-le sur une base neuve (les piles de l'outillage de recette utilisent des bases `impera_rN`) : sur une base qui garde une vraie clé collée dans le CRM, cette clé partirait vers le faux monde, local, mais ce n'est pas sa place. Le contrôle des mots de passe compromis est coupé en bac à sable (il interroge un service extérieur), même avec `PASSWORD_BREACH_CHECK=on`.
 
 ## Les fausses clés
 

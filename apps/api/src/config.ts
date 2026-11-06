@@ -124,6 +124,12 @@ const configSchema = z
       WEB_ORIGIN: config.WEB_ORIGIN,
       IMPERA_SANDBOX_URL: config.IMPERA_SANDBOX_URL ?? DEFAULT_SANDBOX_URL,
       ...(secretOrNull(config.S3_ENDPOINT) === null ? {} : { S3_ENDPOINT: config.S3_ENDPOINT ?? '' }),
+      ...(secretOrNull(config.INVOICES_S3_ENDPOINT) === null
+        ? {}
+        : { INVOICES_S3_ENDPOINT: config.INVOICES_S3_ENDPOINT ?? '' }),
+      ...(secretOrNull(config.INVOICES_COPY_S3_ENDPOINT) === null
+        ? {}
+        : { INVOICES_COPY_S3_ENDPOINT: config.INVOICES_COPY_S3_ENDPOINT ?? '' }),
     };
     for (const [field, value] of Object.entries(local)) {
       if (!isLoopbackUrl(value)) {
