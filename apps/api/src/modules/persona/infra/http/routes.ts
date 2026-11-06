@@ -34,7 +34,10 @@ class CreatorNotFound extends DomainError {
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
 /**
- * `GET /v1/creators`: the creators the signed-in user may open, an owner sees them all; `POST`: the owner adds one;
+ * `GET /v1/creators`: the creators the signed-in user may open, an owner sees them all, a team member whose scope is
+ * `self` (a chatter) the creators where conversations are routed to him (`routedCreatorIds`, ADR 0024): their name and
+ * zone only, so that Suivi lists what was routed to him; every route behind still checks his rights (recette 05/11,
+ * CHAT-01). `POST`: the owner adds one;
  * `PATCH /creators/:creatorId`: the owner renames her or moves her to another zone, with a recent sign-in (ADR 0071).
  * `/creators/:id/agent-hours`: her hours (P3-14), the owner's alone, a change with a recent sign-in.
  */
@@ -53,7 +56,12 @@ export function createCreatorRoutes(
       async (request) => {
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
-        const ids = user.role === 'owner' ? 'all' : user.creatorIds.map((id) => CreatorIdSchema.parse(id));
+        const ids =
+          user.role === 'owner'
+            ? 'all'
+            : [...new Set([...user.creatorIds, ...user.routedCreatorIds])].map((id) =>
+                CreatorIdSchema.parse(id),
+              );
         // An archived creator is in no list, the owner's included (ADR 0071 § 2): `/creators/archived` has them.
         return { creators: [...(await directory.unarchived(ids))] };
       },

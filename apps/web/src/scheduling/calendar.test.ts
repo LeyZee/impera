@@ -7,9 +7,12 @@ import {
   agentSlotLabel,
   calendarRows,
   cellAgentWords,
+  cellWho,
+  dayWords,
   monthMarks,
   monthBounds,
   monthWindow,
+  shownOn,
   slotLinesOf,
 } from './calendar';
 import { zonedInstant } from './time';
@@ -31,7 +34,7 @@ const calendarOf = (patch: Partial<z.input<typeof CalendarSchema>> = {}): Calend
   CalendarSchema.parse({
     view: 'team',
     settings: settingsOf(),
-    creators: [{ id: INES, name: 'Inès' }],
+    creators: [{ id: INES, name: 'Inès', archived: false }],
     members: [
       { id: KOFI, displayName: 'Kofi', color: '#7aa2ff' },
       { id: ADA, displayName: 'Ada', color: '#5fd0b5' },
@@ -221,6 +224,42 @@ describe('monthMarks', () => {
     // Past créneaux are no longer gaps to fill.
     const later = at(0, '2026-11-05');
     expect(monthMarks(cellsOf(calendar, later), new Date(later))[0]).toEqual({ kind: 'gap', ahead: false });
+  });
+
+  it('leaves nothing free on an archived creator, ahead or not: her row is her history (ADR 0071 § 2)', () => {
+    const calendar = calendarOf({
+      creators: [{ id: INES, name: 'Inès', archived: true }],
+      shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(360), endsAt: at(720) }],
+    });
+    const now = new Date(at(0, '2026-11-01'));
+    const cells = cellsOf(calendar, now.toISOString());
+    expect(cells.map((cell) => cell.closed)).toEqual([true, true, true, true]);
+    expect(monthMarks(cells, now)).toEqual([
+      { kind: 'gap', ahead: false },
+      { kind: 'shift', memberId: KOFI },
+      { kind: 'gap', ahead: false },
+      { kind: 'gap', ahead: false },
+    ]);
+    const members = new Map(calendar.members.map((member) => [member.id, member]));
+    expect(cells[0] === undefined ? null : cellWho(cells[0], members, null, PARIS, now)).toBe('personne');
+    const rows = calendarRows(calendar, [DAY], now);
+    expect(dayWords(rows, DAY, null, now, true).said).toBe('1 shift');
+  });
+
+  it('shows an archived creator on the days of her shifts alone, any other creator every day (ADR 0071 § 2)', () => {
+    const NEXT = '2026-11-05';
+    const calendar = calendarOf({
+      creators: [
+        { id: INES, name: 'Inès', archived: true },
+        { id: id(2), name: 'Nora', archived: false },
+      ],
+      shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(360), endsAt: at(720) }],
+    });
+    const rows = calendarRows(calendar, [DAY, NEXT], new Date(at(0, '2026-11-01')));
+    const shown = (day: string): string[] =>
+      rows.filter((row) => shownOn(row, day)).map((row) => row.creator.name);
+    expect(shown(DAY)).toEqual(['Nora', 'Inès']);
+    expect(shown(NEXT)).toEqual(['Nora']);
   });
 });
 

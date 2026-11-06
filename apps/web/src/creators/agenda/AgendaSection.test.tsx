@@ -101,7 +101,8 @@ describe('Créatrices › Agenda (CR-05 lot c)', () => {
     expect(posts[0]).toMatchObject({
       title: 'Live du jeudi',
       category: 'shoot',
-      when: { kind: 'timed', startsAt: '2026-11-03T17:00:00.000Z', endsAt: '2026-11-03T18:00:00.000Z' },
+      // It is 18 h 30 in Paris: the form opens on the next half hour, never on an hour already begun.
+      when: { kind: 'timed', startsAt: '2026-11-03T18:00:00.000Z', endsAt: '2026-11-03T19:00:00.000Z' },
       purpose: null,
     });
   });

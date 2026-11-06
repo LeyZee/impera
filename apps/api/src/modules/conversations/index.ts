@@ -1,4 +1,4 @@
-import type { JobPayload } from '@impera/contracts';
+import type { CreatorId, FanId, JobPayload, UserId } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -48,6 +48,11 @@ export interface ConversationsModule extends ConversationCommands {
   readonly name: 'conversations';
   /** Mounted under `/v1` by the server. */
   readonly routes: FastifyPluginAsyncZod;
+  /**
+   * Whether a conversation of this fan is routed to that account (ADR 0024): the `fans` routes let the member who
+   * holds it read the fan's limits and what is left to learn, never write them (ADR 0025, recette 05/11 CHAT-03).
+   */
+  isFanRoutedTo(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
   /** Handlers of the module's jobs; the composition root registers them with Graphile Worker. */
   readonly jobs: {
     respond(payload: JobPayload<'conversation.respond'>, logger: JobLogger): Promise<void>;
@@ -104,18 +109,20 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
     voice: deps.voice,
     guard: deps.guard,
   });
+  const reader = createDrizzleConversationReader(
+    deps.db,
+    clock,
+    deps.mediaDescriptions ?? noMediaDescriptions,
+  );
   return {
     name: 'conversations',
     ...commands,
+    isFanRoutedTo: (creatorId, fanId, userId) => reader.isFanRoutedTo(creatorId, fanId, userId),
     routes: async (app, options) => {
-      await createConversationRoutes(
-        createDrizzleConversationReader(deps.db, clock, deps.mediaDescriptions ?? noMediaDescriptions),
-        commands,
-        {
-          requireRole: deps.requireRole,
-          recentLogin: deps.recentLogin,
-        },
-      )(app, options);
+      await createConversationRoutes(reader, commands, {
+        requireRole: deps.requireRole,
+        recentLogin: deps.recentLogin,
+      })(app, options);
       await createAlertHistoryRoutes(
         createDrizzleAlertHistory(deps.db),
         deps.alertNames ?? noAlertNames,

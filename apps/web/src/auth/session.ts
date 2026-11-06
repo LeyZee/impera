@@ -1,7 +1,6 @@
 import {
   ApiErrorSchema,
-  MeSchema,
-  SECOND_FACTOR_ERROR_CODE,
+  DashboardSessionSchema,
   SecondFactorSetupSchema,
   SignInAnswerSchema,
   type Me,
@@ -35,15 +34,16 @@ export type CurrentSession =
   /** Signed in with the password, the second factor not active yet: the activation is the only screen (ADR 0046). */
   | { readonly kind: 'second_factor_required' };
 
-/** The session as the app opens it: who is signed in, nobody, or an account that must activate its code first. */
+/**
+ * The session as the app opens it: who is signed in, nobody, or an account that must activate its code first. Read
+ * from `GET /v1/session`, which answers 200 in every case: a page opened without a session logs no failed request
+ * (recette 05/11, SEC-13). Throws when the server does not answer, which is not the same as « no session ».
+ */
 export async function readSession(): Promise<CurrentSession> {
-  const response = await fetch('/v1/me', { credentials: 'include' });
-  if (response.status === 401) return { kind: 'signed_out' };
-  if (response.status === 403 && (await errorCodeOf(response)) === SECOND_FACTOR_ERROR_CODE) {
-    return { kind: 'second_factor_required' };
-  }
-  if (!response.ok) throw new Error(`GET /v1/me: ${String(response.status)}`);
-  return { kind: 'signed_in', user: MeSchema.parse(await response.json()) };
+  const response = await fetch('/v1/session', { credentials: 'include' });
+  if (!response.ok) throw new Error(`GET /v1/session: ${String(response.status)}`);
+  const answer = DashboardSessionSchema.parse(await response.json());
+  return answer.state === 'signed_in' ? { kind: 'signed_in', user: answer.me } : { kind: answer.state };
 }
 
 /** The signed-in user with his team role and scope (ADR 0024), or `null` when no session opens the dashboard. */
@@ -69,6 +69,18 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   if (response.status === 401 || response.status === 400) return 'wrong_credentials';
   if (response.status === 429) return 'too_many_attempts';
   return 'unavailable';
+}
+
+/**
+ * A code as the server reads it (recette 05/11, SEC-08): spaces dropped, a dash typed or autocorrected as « – » or « — »
+ * made a plain one, and a backup code typed without its dash given it back (`aB3dE9fGh1` → `aB3dE-9fGh1`). Letters keep
+ * their case: the stored backup codes are compared as they were made.
+ */
+export function normalizeCode(raw: string): string {
+  const code = raw.replace(/\s+/gu, '').replace(/[\u2010-\u2015\u2212_]/gu, '-');
+  return /^[A-Za-z0-9]{10}$/u.test(code) && !/^\d+$/u.test(code)
+    ? `${code.slice(0, 5)}-${code.slice(5)}`
+    : code;
 }
 
 export type CodeResult =
@@ -99,7 +111,7 @@ export async function verifySignInCode(
   options: { readonly backup: boolean; readonly trustDevice: boolean },
 ): Promise<CodeResult> {
   const path = options.backup ? '/v1/auth/two-factor/verify-backup-code' : '/v1/auth/two-factor/verify-totp';
-  const response = await post(path, { code, trustDevice: options.trustDevice });
+  const response = await post(path, { code: normalizeCode(code), trustDevice: options.trustDevice });
   if (response.ok) return 'ok';
   return codeResultOf(response.status, await errorCodeOf(response));
 }
@@ -124,7 +136,7 @@ export async function startActivation(password: string): Promise<ActivationStart
 
 /** The activation, second step: the first code from the app. Right, the account's code is active. */
 export async function confirmActivation(code: string): Promise<CodeResult> {
-  const response = await post('/v1/auth/two-factor/verify-totp', { code });
+  const response = await post('/v1/auth/two-factor/verify-totp', { code: normalizeCode(code) });
   if (response.ok) return 'ok';
   return codeResultOf(response.status, await errorCodeOf(response));
 }
@@ -140,7 +152,7 @@ export type ReauthenticateResult =
 
 /** The password and a code, before a sensitive action (ADR 0046 § 3): the action can be retried for 10 minutes. */
 export async function reauthenticate(password: string, code: string): Promise<ReauthenticateResult> {
-  const response = await post('/v1/auth/reauthenticate', { password, code });
+  const response = await post('/v1/auth/reauthenticate', { password, code: normalizeCode(code) });
   if (response.ok) return 'ok';
   const error = await errorCodeOf(response);
   if (error === 'reauthentication_unauthenticated' || error === 'request_invalid') return 'wrong_credentials';

@@ -22,6 +22,7 @@ import {
 } from 'fastify-type-provider-zod';
 
 import type { Config } from './config';
+import { isDatabaseUnavailable, isMissingReference, jsonWithoutNul, storableError } from './database-errors';
 import type { Logger } from './logger';
 import type { Readiness } from './readiness';
 import { useFrenchValidationMessages } from './validation-messages';
@@ -108,6 +109,16 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     bodyLimit: BODY_LIMIT_BYTES,
     // Behind a proxy every request comes from its address: past the declared hops, `request.ip` is the client's.
     trustProxy: (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS,
+    // Errors raised by the router itself (a path parameter past `maxParamLength`, a malformed URL) skip the error
+    // handler: without this they answer in Fastify's own English body, the URL copied back (recette 05/11, MOT-08).
+    // The reply has no route yet (so no typed codes): the body is written on the raw response.
+    frameworkErrors: (_error, request, reply) => {
+      reply.raw.writeHead(400, {
+        'content-type': 'application/json; charset=utf-8',
+        'x-request-id': request.id,
+      });
+      reply.raw.end(JSON.stringify(errorBody(request, 'request_invalid', 'Requête invalide')));
+    },
   }).withTypeProvider<ZodTypeProvider>();
 
   server.setValidatorCompiler(validatorCompiler);
@@ -125,6 +136,19 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     const origin = request.headers.origin;
     if (origin === undefined || !allowedOrigins.has(origin)) {
       await reply.code(403).send(errorBody(request, 'origin_forbidden', 'Origine non autorisée'));
+    }
+  });
+
+  // U+0000 has no meaning in any text and Postgres refuses it: dropped from a JSON body before validation, refused
+  // in the path and the query, where it can only be a forged request (recette 05/11, MOT-05).
+  server.addHook('preValidation', async (request, reply) => {
+    if (request.url.includes('\u0000') || /%00/iu.test(request.url)) {
+      await reply.code(400).send(errorBody(request, 'request_invalid', 'Requête invalide'));
+      return;
+    }
+    // JSON only: a raw body (signed Reveal sales, logos, contractor documents) keeps its exact bytes.
+    if (request.body !== undefined && request.body !== null && !Buffer.isBuffer(request.body)) {
+      request.body = jsonWithoutNul(request.body);
     }
   });
 
@@ -151,7 +175,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     if (error instanceof DomainError) {
       const status = statusForCode(error.code);
       if (status === 500) {
-        request.log.error({ err: error }, 'unmapped domain error');
+        request.log.error({ err: storableError(error) }, 'unmapped domain error');
         return reply.code(500).send(errorBody(request, 'internal_error', 'Erreur interne'));
       }
       return reply.code(status).send(errorBody(request, error.code, error.message, { ...error.details }));
@@ -182,7 +206,24 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
       // Malformed JSON, unsupported media type and the like: the client's fault, nothing internal to hide.
       return reply.code(400).send(errorBody(request, 'request_invalid', 'Requête invalide'));
     }
-    request.log.error({ err: error }, 'unhandled error');
+    if (isDatabaseUnavailable(error)) {
+      request.log.warn({ err: storableError(error) }, 'database unavailable');
+      return reply
+        .code(503)
+        .send(
+          errorBody(
+            request,
+            'service_unavailable',
+            'Service momentanément indisponible, réessaie dans un instant',
+          ),
+        );
+    }
+    if (isMissingReference(error)) {
+      // An id the client sent points at nothing (MOT-06): the request is wrong, the server is not.
+      request.log.warn({ err: storableError(error) }, 'missing reference');
+      return reply.code(404).send(errorBody(request, 'reference_not_found', 'Élément introuvable'));
+    }
+    request.log.error({ err: storableError(error) }, 'unhandled error');
     return reply.code(500).send(errorBody(request, 'internal_error', 'Erreur interne'));
   });
 

@@ -13,6 +13,8 @@ import {
   type Passkey,
 } from '@impera/contracts';
 
+import { normalizeCode } from '@/auth/session';
+
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's own sessions and backup codes, and for the owner each account's
  * second factor. Every call goes through `/v1` with the session cookie; a refusal becomes a `SecurityError` the screen
@@ -93,7 +95,7 @@ export async function generateBackupCodes(password: string, code: string): Promi
   const response = await call('/auth/two-factor/generate-backup-codes', {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ password, code }),
+    body: JSON.stringify({ password, code: normalizeCode(code) }),
   });
   return read(response, (body) => BackupCodesSchema.parse(body).backupCodes);
 }

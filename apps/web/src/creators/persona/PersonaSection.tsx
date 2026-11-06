@@ -38,6 +38,7 @@ import {
   issueCountByTab,
   isPlaceholder,
   fileRefusal,
+  foreignFileQuestion,
   importedDraft,
   localDay,
   NOTHING_REFUSED,
@@ -213,6 +214,8 @@ function Editor({
   const [refused, setRefused] = useState<RefusedReplies>(NOTHING_REFUSED);
   /** The name of the file the draft was imported from (« Importer un fichier »), until it is saved or undone. */
   const [imported, setImported] = useState<string | null>(null);
+  /** A file read as another creator's, waiting for « L’importer quand même » (PRO-27). */
+  const [foreign, setForeign] = useState<{ persona: Persona; name: string; question: string } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
 
@@ -338,9 +341,17 @@ function Editor({
       });
       return;
     }
-    setDraft(importedDraft(read.persona, creatorId));
-    setImported(file.name);
     setProblem(null);
+    // Another creator's file is asked about first, never put in her draft unseen (recette 05/11, PRO-27).
+    const question = foreignFileQuestion(read.persona, draft, creatorId);
+    if (question === null) take(read.persona, file.name);
+    else setForeign({ persona: read.persona, name: file.name, question });
+  };
+  const take = (persona: Persona, name: string): void => {
+    if (creatorId === null) return;
+    setForeign(null);
+    setDraft(importedDraft(persona, creatorId));
+    setImported(name);
     setRefused(NOTHING_REFUSED);
     onEdit();
   };
@@ -438,6 +449,33 @@ function Editor({
             show(issue.field);
           }}
         />
+        {foreign === null ? null : (
+          <div className="nv-confirm" role="alertdialog" aria-labelledby="ps-foreign-text">
+            <p id="ps-foreign-text">
+              <b>{foreign.question}</b> Rien ne change tant que tu ne l’enregistres pas.
+            </p>
+            <div className="nv-confirm__actions">
+              <button
+                type="button"
+                className="nv-btn nv-btn--soft"
+                onClick={() => {
+                  take(foreign.persona, foreign.name);
+                }}
+              >
+                L’importer quand même
+              </button>
+              <button
+                type="button"
+                className="nv-btn nv-btn--soft"
+                onClick={() => {
+                  setForeign(null);
+                }}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
         {reauth ? (
           <PasswordPrompt
             lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code."

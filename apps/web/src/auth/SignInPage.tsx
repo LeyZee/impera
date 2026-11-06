@@ -12,7 +12,7 @@ import {
   signInWithPasskey,
   type PasskeySignInResult,
 } from './passkeys';
-import { signIn, verifySignInCode, type CodeResult, type SignInResult } from './session';
+import { normalizeCode, signIn, verifySignInCode, type CodeResult, type SignInResult } from './session';
 
 const MESSAGES: Record<Exclude<SignInResult, 'ok' | 'code_required'>, string> = {
   wrong_credentials: 'E-mail ou mot de passe incorrect.',
@@ -26,6 +26,9 @@ const CODE_MESSAGES: Record<Exclude<CodeResult, 'ok' | 'expired'>, string> = {
   too_many_attempts: 'Trop d’essais. Attends une minute avant de réessayer.',
   unavailable: 'Le serveur ne répond pas. Réessaie dans un instant.',
 };
+
+/** A wrong backup code: the clock of a phone she does not have at hand is beside the point. */
+const WRONG_BACKUP_CODE = 'Ce code de secours ne marche pas, ou il a déjà servi. Chacun ne sert qu’une fois.';
 
 const PASSKEY_MESSAGES: Record<Exclude<PasskeySignInResult, 'ok' | 'cancelled'>, string> = {
   refused: 'Cette clé n’ouvre aucun compte. Connecte-toi avec ton e-mail, ton mot de passe et ton code.',
@@ -45,9 +48,17 @@ function fieldOf(form: FormData, name: string): string {
  * gesture also offers a passkey (ADR 0053): one gesture, no password, no code; after a sign-in by the code, a device
  * that holds keys is asked once whether to add one.
  */
-export function SignInPage({ onSignedIn }: { onSignedIn: () => void }): JSX.Element {
+export function SignInPage({
+  onSignedIn,
+  notice = null,
+}: {
+  onSignedIn: () => void;
+  /** Why the page is shown again, when the session ended while the app was open (recette 05/11, SEC-01). */
+  notice?: string | null;
+}): JSX.Element {
   const [step, setStep] = useState<'password' | 'code' | 'offer'>('password');
-  const [error, setError] = useState<string | null>(null);
+  // The notice stands in the error's place until the first try, which says its own.
+  const [error, setError] = useState<string | null>(notice);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [withPasskey] = useState(canUsePasskeys);
 
@@ -160,10 +171,11 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
     const form = new FormData(formElement);
     setIsSubmitting(true);
     setError(null);
-    const code = fieldOf(form, 'code');
+    const code = normalizeCode(fieldOf(form, 'code'));
     // A backup code typed in the app's field is still a backup code: its shape picks the check, not the button.
+    const isBackup = isBackupCode(code);
     const result = await verifySignInCode(code, {
-      backup: isBackupCode(code),
+      backup: isBackup,
       trustDevice: form.get('trust') === 'on',
     }).catch((): CodeResult => 'unavailable');
     setIsSubmitting(false);
@@ -180,7 +192,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
       field.value = '';
       field.focus();
     }
-    setError(CODE_MESSAGES[result]);
+    setError(result === 'wrong_code' && isBackup ? WRONG_BACKUP_CODE : CODE_MESSAGES[result]);
   }
 
   return (
@@ -193,7 +205,7 @@ function CodeStep({ onSignedIn, onExpired }: { onSignedIn: () => void; onExpired
         <h1 className="text-xl font-semibold">{backup ? 'Code de secours' : 'Code de connexion'}</h1>
         <p className="text-sm text-[var(--nv-ink-muted)]">
           {backup
-            ? 'Un des dix codes notés à l’activation. Chacun ne sert qu’une fois.'
+            ? 'Un des dix codes notés à l’activation, recopié avec ses majuscules et ses minuscules. Chacun ne sert qu’une fois.'
             : 'Ouvre ton application d’authentification et recopie le code à 6 chiffres d’Impera.'}
         </p>
       </div>

@@ -2,7 +2,7 @@ import { SUGGESTION_PAST_UNPROCESSABLE, type CreatorSuggestion } from '@impera/c
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
-import { acceptSuggestion, AGENDA_KEY, declineSuggestion } from './api';
+import { acceptSuggestion, AGENDA_KEY, declineSuggestion, NOT_SENT } from './api';
 import { firstMoment, spanOf } from './draft';
 
 import { DayField } from '@/scheduling/DayField';
@@ -12,7 +12,6 @@ import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 
 const REFUSED = 'Cette proposition n’est plus là. Ton agenda est relu.';
-const OFFLINE = 'Pas de réseau : réessaie dans un moment.';
 const PAST = 'Ce moment est déjà passé : choisis-en un à venir.';
 
 /** « Non merci », with a reason if she likes: the agency reads it, and does not suggest it again next week. */
@@ -36,8 +35,8 @@ export function DeclineDialog({
     const trimmed = reason.trim();
     void declineSuggestion(suggestion.id, trimmed === '' ? {} : { reason: trimmed }).then(async (outcome) => {
       setBusy(false);
-      if (outcome.kind === 'failed') {
-        setFailed(OFFLINE);
+      if (outcome.kind === 'offline' || outcome.kind === 'failed') {
+        setFailed(NOT_SENT[outcome.kind]);
         return;
       }
       await client.invalidateQueries({ queryKey: AGENDA_KEY });
@@ -119,8 +118,8 @@ export function PlaceDialog({
     void acceptSuggestion(suggestion.id, { when: { kind: 'timed', ...spanOf(day, start, end, zone) } }).then(
       async (outcome) => {
         setBusy(false);
-        if (outcome.kind === 'failed') {
-          setFailed(OFFLINE);
+        if (outcome.kind === 'offline' || outcome.kind === 'failed') {
+          setFailed(NOT_SENT[outcome.kind]);
           return;
         }
         if (outcome.kind === 'refused' && outcome.code === SUGGESTION_PAST_UNPROCESSABLE) {

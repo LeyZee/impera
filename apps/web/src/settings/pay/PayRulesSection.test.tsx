@@ -16,6 +16,7 @@ const account = (n: number, creatorName: string, handle: string) => ({
   creatorName,
   platform: 'reveal',
   handle,
+  archived: false,
 });
 const rules = (n: number, accountN: number, fromPeriod: string, patch: Record<string, unknown> = {}) => ({
   id: id(500 + n),
@@ -210,6 +211,19 @@ describe('Réglages › Règles de paie', () => {
       path: '/v1/payroll/payout-minimums',
       body: { fromPeriod: '2026-12-01', minimumPayoutMinor: 2_000 },
     });
+  });
+
+  it('says the ceiling of a minimum too large, not decimals (recette 05/11, PRO-09)', async () => {
+    renderSection();
+    const minimum = (await screen.findByText('Minimum de versement')).closest<HTMLElement>('.rp-account');
+    if (minimum === null) throw new Error('No minimum');
+    fireEvent.click(await within(minimum).findByRole('button', { name: 'Changer' }));
+    const dialog = screen.getByRole('dialog', { name: 'Minimum de versement' });
+    fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '60000' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(plain(within(dialog).getByText(/^Au plus/u).textContent)).toBe('Au plus 50 000,00 €.');
+    fireEvent.change(within(dialog).getByLabelText('Minimum'), { target: { value: '12,345' } });
+    expect(within(dialog).getByText('Un montant en euros, deux décimales au plus.')).toBeTruthy();
   });
 
   it('lets the period that starts today take the minimum, and says so, on the 1st', async () => {

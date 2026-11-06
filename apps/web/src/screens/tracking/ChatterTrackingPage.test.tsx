@@ -69,7 +69,9 @@ function serve(shifts: unknown, handover = false): void {
             ? { creators }
             : path === '/v1/conversations'
               ? { items: [taken], nextCursor: null }
-              : null;
+              : path === '/v1/dashboard/todos'
+                ? { items: [], creators: [] }
+                : null;
       return Promise.resolve(new Response(JSON.stringify(body), { status: body === null ? 404 : 200 }));
     }),
   );
@@ -118,8 +120,10 @@ describe('Suivi of a chatter (EQ-13)', () => {
     renderPage();
     const off = await screen.findByRole('heading', { name: 'Tu n’es pas en poste' });
     expect(off.closest('section')?.textContent).toContain(
-      'Prochain shift aujourd’hui, 23 h – 5 h sur Nora Vidal. Ses conversations s’ouvrent ici à 22 h 45.',
+      'Prochain shift aujourd’hui, 23 h – 5 h sur Nora Vidal.',
     );
+    // No promise of what the shift opens: not built yet (CHAT-02).
+    expect(off.closest('section')?.textContent).not.toContain('s’ouvrent');
     expect(screen.getByRole('link', { name: 'Mon planning' }).getAttribute('href')).toBe('/planning');
     expect(screen.queryByText('Rien pour toi pour l’instant')).toBeNull();
   });
@@ -150,6 +154,51 @@ describe('Suivi of a chatter (EQ-13)', () => {
     renderPage();
     expect(await screen.findByText('Rien pour toi pour l’instant')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Tu n’es pas en poste' })).toBeNull();
+  });
+  it('says plainly, on shift with nothing routed, what Suivi holds for now and what to do (CHAT-02, CHAT-14)', async () => {
+    serve({ current: null, next: { ...tomorrow, accessStartsAt: '2026-10-27T23:55:00Z' }, ended: null });
+    renderPage();
+    const empty = (await screen.findByRole('heading', { name: 'Rien pour toi pour l’instant' })).closest(
+      'div',
+    );
+    expect(empty?.textContent).toContain('Tu chattes dans Reveal.');
+    expect(empty?.textContent).toContain('n’est pas encore ouvert dans Impera');
+    expect(screen.getByRole('link', { name: 'Voir mon shift' }).getAttribute('href')).toBe('/aujourdhui');
+  });
+
+  it('says the same, never « dès que le premier fan écrit », when his creators have nothing routed to him', async () => {
+    const creators = [{ id: id(1), displayName: 'Nora Vidal', timezone: 'Europe/Paris' }];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const path = new URL(input, 'http://localhost').pathname;
+        const body =
+          path === '/v1/scheduling/my-shifts'
+            ? { current: null, next: { ...tomorrow, accessStartsAt: '2026-10-27T23:55:00Z' }, ended: null }
+            : path === '/v1/creators'
+              ? { creators }
+              : path === '/v1/conversations'
+                ? { items: [], nextCursor: null }
+                : path === '/v1/dashboard/todos'
+                  ? { items: [], creators: [] }
+                  : null;
+        return Promise.resolve(new Response(JSON.stringify(body), { status: body === null ? 404 : 200 }));
+      }),
+    );
+    renderPage();
+    expect(await screen.findByRole('link', { name: 'Voir mon shift' })).toBeTruthy();
+    expect(screen.queryByText('Aucune conversation pour l’instant')).toBeNull();
+  });
+
+  it('tells him the hand he holds is his, in « À toi » (CHAT-22)', async () => {
+    serve(
+      { current: null, next: { ...tomorrow, accessStartsAt: '2026-10-27T23:55:00Z' }, ended: null },
+      true,
+    );
+    renderPage();
+    const mine = await screen.findByRole('list', { name: 'À toi' });
+    expect(mine.textContent).toContain('Basile');
+    expect(mine.textContent).toContain('Tu as la main');
   });
 
   it('says first and alone that he is suspended, never « Tu n’es pas en poste » (CHAT-09)', async () => {

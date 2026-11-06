@@ -724,12 +724,58 @@ div.db-fan {
 .db-more:hover {
   color: var(--nv-ink);
 }
-/* The sales, until Reveal's purchases are observed: one quiet line, no block (DASH-02). */
-.db-salesnote {
+/* The agency's part of her Dashboard (reco 18, PRO-10): quiet lines, said once, apart from her agent's health. */
+.db-agency {
+  display: grid;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3) var(--nv-space-4);
+}
+.db-agency__title {
   margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
+}
+.db-agency__line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(64px, 120px);
+  align-items: center;
+  column-gap: var(--nv-space-2);
+  row-gap: 2px;
+  min-width: 0;
+}
+.db-agency__label {
+  min-width: 0;
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+}
+.db-agency__line[data-tone='warn'] .db-agency__label {
+  color: var(--nv-warning);
+}
+.db-agency__line[data-tone='bad'] .db-agency__label {
+  color: var(--nv-danger);
+}
+.db-agency__value {
+  color: var(--nv-ink);
+  white-space: nowrap;
+}
+.db-agency__sub {
+  grid-column: 2 / -1;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.db-agency__line:not(:has(.db-agency__gauge)) .db-agency__label {
+  grid-column: 2 / -1;
+}
+@media (max-width: 520px) {
+  .db-agency__line {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .db-agency__gauge {
+    grid-column: 2 / -1;
+  }
 }
 /* Another creator's urgencies, on her chip: red, they are urgencies (DASH-03). */
 .db-creators__grave {

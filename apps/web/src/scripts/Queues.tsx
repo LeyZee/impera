@@ -17,6 +17,8 @@ import { scriptGradient } from './model';
 import { useDragSort } from './useDragSort';
 import { useFlip } from './useFlip';
 
+import { initialOf } from '@/lib/utils';
+
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
 
 /** The time a drag or a run of clicks has to settle before the queue is written. */
@@ -73,7 +75,7 @@ export function Queues({
             }}
           >
             <span className="st-who__initial" aria-hidden="true">
-              {one.displayName.slice(0, 1).toUpperCase()}
+              {initialOf(one.displayName)}
             </span>
             <span className="st-who__name">{one.displayName}</span>
           </button>

@@ -4,7 +4,6 @@ import {
   type CalendarQuery,
   type CalendarSlot,
   type CreatorId,
-  type CreatorSummary,
   type SchedulingSettings,
   type TeamMemberId,
   type UserId,
@@ -22,6 +21,7 @@ import type {
   CalendarReads,
   CalendarRow,
   CreatorDirectory,
+  ListedCreator,
   StoredAccount,
   StoredShift,
 } from '../domain/ports';
@@ -76,16 +76,22 @@ export function createCalendarService(
           }),
         ]),
       );
-      // A member restricted to their own shifts learns of no creator beyond theirs.
+      // A member restricted to their own shifts learns of no creator beyond theirs, and an archived creator is there
+      // for her shifts of the window alone, her history (ADR 0071 § 2).
       const named = new Set(read.shifts.map((row) => row.creatorId));
       const listed = directory.filter(
-        (creator) => askedCreator(creator.id) && (read.view !== 'own' || named.has(creator.id)),
+        (creator) =>
+          askedCreator(creator.id) && ((read.view !== 'own' && !creator.archived) || named.has(creator.id)),
       );
       const agents = read.agents.filter((agent) => askedCreator(agent.creatorId));
       return {
         view: read.view,
         settings,
-        creators: listed.map((creator) => ({ id: creator.id, name: creator.displayName })),
+        creators: listed.map((creator) => ({
+          id: creator.id,
+          name: creator.displayName,
+          archived: creator.archived,
+        })),
         members: [...members.values()],
         shifts: shifts.map((row) => ({
           memberId: row.memberId,
@@ -123,11 +129,14 @@ export function createCalendarService(
     memberId: TeamMemberId | undefined,
     agents: readonly CreatorAgent[],
     settings: SchedulingSettings,
-    directory: readonly CreatorSummary[],
+    directory: readonly ListedCreator[],
     askedCreator: (creatorId: CreatorId) => boolean,
   ): NonNullable<Calendar['agency']> {
     const names = new Map(directory.map((creator) => [creator.id, creator]));
-    const accounts = planned.accounts.filter((account) => askedCreator(account.creatorId));
+    // Who to plan: never an archived creator's account (ADR 0071 § 2), whose créneaux are nobody's to fill.
+    const accounts = planned.accounts.filter(
+      (account) => askedCreator(account.creatorId) && names.get(account.creatorId)?.archived !== true,
+    );
     // A member who is not at work holds no créneau (recette EQP-03): his shifts stay planned, their créneaux are to fill.
     const held = planned.shifts.filter((shift) => !planned.away.has(shift.memberId));
     const { toFill, aiAlone } = slotsToFill({

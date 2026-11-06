@@ -308,9 +308,10 @@
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
 }
-/* A regime the accountant has not validated yet: an amber edge, no invoice leaves under it. */
+/* A regime the accountant has not validated yet: an amber tint (no bar on its side, Charles's rule), no invoice leaves
+   under it. */
 .bf-regime[data-pending='true'] {
-  box-shadow: inset 3px 0 0 var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 10%, var(--nv-glass-fill));
 }
 .bf-version__head {
   display: flex;

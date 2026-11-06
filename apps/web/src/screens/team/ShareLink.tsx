@@ -279,15 +279,17 @@ function PasswordStep({
           void confirm(input.current?.value ?? '', codeInput.current?.value ?? '');
         }}
       >
-        <input
-          ref={input}
-          className="nv-field__control nv-glass"
-          type="password"
-          autoComplete="current-password"
-          aria-label="Ton mot de passe"
-          aria-invalid={failure !== null}
-          disabled={busy}
-        />
+        <label className="nv-field">
+          <span className="nv-field__label">Mot de passe</span>
+          <input
+            ref={input}
+            className="nv-field__control nv-glass"
+            type="password"
+            autoComplete="current-password"
+            aria-invalid={failure !== null}
+            disabled={busy}
+          />
+        </label>
         <CodeInput ref={codeInput} disabled={busy} invalid={failure !== null} />
         <button type="submit" className="nv-btn nv-btn--soft nv-btn--sm" disabled={busy} aria-busy={busy}>
           Confirmer

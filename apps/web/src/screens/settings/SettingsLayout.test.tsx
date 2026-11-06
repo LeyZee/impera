@@ -75,6 +75,28 @@ describe('Réglages tabs', () => {
   });
 });
 
+describe('Pages without a screen (recette 05/11, PRO-25)', () => {
+  it.each([
+    ['/entrainer/corrections', '/entrainer/playground'],
+    ['/entrainer/tests', '/entrainer/playground'],
+    ['/reglages/appareils', '/reglages/modeles-ia'],
+    ['/reglages/mode', '/reglages/modeles-ia'],
+  ])('sends %s to %s instead of an « à venir » page', async (address, home) => {
+    const router = createAppRouter(
+      { user: owner, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: [address] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(router.state.location.pathname).toBe(home);
+    });
+  });
+});
+
 describe('Réglages › Ventes, the creators found and not imported yet (CRM-07 b2, ADR 0069 § 5)', () => {
   const answer = (body: unknown, status = 200): Promise<Response> =>
     Promise.resolve(

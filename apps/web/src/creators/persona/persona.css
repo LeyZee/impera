@@ -49,7 +49,8 @@
 }
 /* A phone: the creators on one line that scrolls, its far edge fading, instead of rows of chips (CREA-19). */
 @media (max-width: 640px) {
-  .cr-creators {
+  /* `.ps-chips` wraps and comes later in this file: the pair outweighs it, or the chips stacked one per row (PRO-22). */
+  .ps-chips.cr-creators {
     flex-wrap: nowrap;
     max-width: 100%;
     overflow-x: auto;

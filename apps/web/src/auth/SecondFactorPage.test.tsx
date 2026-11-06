@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SecondFactorPage, keyOf } from './SecondFactorPage';
+import { chosenPassword, forgetChosenPassword, holdChosenPassword } from './chosen-password';
 
 /** Invented values: a key and ten codes shaped like the server's, nothing real. */
 const URI = 'otpauth://totp/Impera:a%40example.test?secret=JBSWY3DPEHPK3PXPJBSWY3DP&issuer=Impera';
@@ -11,6 +12,7 @@ const BACKUP_CODES = Array.from({ length: 10 }, (_, i) => `code${String(i)}-inve
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  forgetChosenPassword();
 });
 
 function serve(answers: Record<string, () => Response>): string[] {
@@ -65,6 +67,35 @@ describe('SecondFactorPage', () => {
       '/v1/auth/two-factor/enable {"password":"staple battery horse"}',
       '/v1/auth/two-factor/verify-totp {"code":"123456"}',
     ]);
+  });
+
+  it('does not ask again for the password chosen a moment ago on the link page (recette SEC-15)', async () => {
+    const calls = serve({
+      '/v1/auth/two-factor/enable': () => json({ totpURI: URI, backupCodes: BACKUP_CODES }),
+    });
+    holdChosenPassword('staple battery horse');
+    render(<SecondFactorPage onActivated={() => undefined} onSignOut={() => undefined} />);
+    expect(screen.getByText('Installe-la, puis continue.')).toBeDefined();
+    expect(screen.queryByLabelText('Mot de passe')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await screen.findByText('Ajoute Impera dans ton application');
+    expect(calls).toEqual(['/v1/auth/two-factor/enable {"password":"staple battery horse"}']);
+    // Served once, then forgotten.
+    expect(chosenPassword()).toBeNull();
+  });
+
+  it('asks for the password after all when the one kept is refused, and forgets a stale one', async () => {
+    serve({
+      '/v1/auth/two-factor/enable': () =>
+        json({ error: { code: 'password_unauthenticated', message: 'x', details: {}, requestId: 'r' } }, 401),
+    });
+    holdChosenPassword('autre chose');
+    render(<SecondFactorPage onActivated={() => undefined} onSignOut={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    expect(await screen.findByLabelText('Mot de passe')).toBeDefined();
+    expect(screen.queryByRole('alert')).toBeNull();
+    holdChosenPassword('vieux', 0);
+    expect(chosenPassword(2 * 60_000 + 1)).toBeNull();
   });
 
   it('says a wrong password, and a wrong first code, in words', async () => {

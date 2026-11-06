@@ -2,12 +2,11 @@ import type {
   AccountPayRules,
   AccountPayRulesList,
   CreateAccountPayRulesBodySchema,
-  CreatorSummary,
   UserId,
 } from '@impera/contracts';
 import type { z } from 'zod';
 
-import type { Actor, PayRulesStore } from '../domain/ports';
+import type { Actor, CreatorDirectory, PayRulesStore } from '../domain/ports';
 
 import { toPayRulesDto, toPlanningAccount } from './dto';
 
@@ -26,7 +25,7 @@ export interface PayRulesService {
 
 export function createPayRulesService(
   store: PayRulesStore,
-  creators: { list(): Promise<readonly CreatorSummary[]> },
+  creators: CreatorDirectory,
   now: () => Date = () => new Date(),
 ): PayRulesService {
   return {

@@ -41,6 +41,37 @@
 .sc-leave__sum {
   margin-top: calc(var(--nv-space-2) * -1);
 }
+/* His shifts on the days asked: a warning, in amber, each with its way out (recette 05/11, CHAT-28). */
+.sc-leave__clash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-warning) 10%, var(--nv-glass-fill));
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-leave__clash-head {
+  margin: 0;
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.sc-leave__clash-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-leave__clash-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-1) var(--nv-space-3);
+}
 
 /* The colleague to ask, then what comes back: cards that light when picked. */
 .sc-options {
@@ -282,6 +313,9 @@
   max-width: 820px;
   margin-top: var(--nv-space-6);
 }
+.sc-folds[data-wide='true'] {
+  max-width: none;
+}
 .sc-fold {
   overflow: hidden;
 }
@@ -405,9 +439,7 @@
 /* A shift a leave's approval found in its way: an amber ring on the grid, steady, never blinking. */
 .sc-chip[data-flagged='true'],
 .sc-chip[data-flagged='true']:hover {
-  box-shadow:
-    inset 3px 0 0 var(--sc-color),
-    0 0 0 2px var(--nv-warning);
+  box-shadow: 0 0 0 2px var(--nv-warning);
 }
 
 @media (max-width: 520px) {

@@ -9,6 +9,7 @@ import {
   type MinuteRange,
 } from '@impera/contracts';
 
+import { deOf } from '@/lib/utils';
 import { cityOf, clockOf, MINUTES_PER_DAY } from '@/scheduling/time';
 
 /*
@@ -45,12 +46,15 @@ export function slotNote(slot: Pick<AgentSlot, 'startMinute' | 'endMinute'>): st
   return slot.endMinute !== 0 && slot.endMinute < slot.startMinute ? 'jusqu’au lendemain' : null;
 }
 
+/** A time field that holds what is not an hour, said on its line and at the head of the card. */
+export const UNREADABLE_HOUR = 'Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30';
+
 /**
  * The header that says whose clock the page reads: the planning reads at the agency's hour, these hours at hers.
  * Her first name only, like the reader of Suivi.
  */
 export const clockHeader = (name: string, timeZone: string): string =>
-  `À l’heure de ${name.trim().split(/\s+/u)[0] ?? name} (${cityOf(timeZone)})`;
+  `À l’heure ${deOf(name.trim().split(/\s+/u)[0] ?? name)} (${cityOf(timeZone)})`;
 
 /** A slot drawn on one day of the week: an overnight slot is two bars, the second one « continued » the next day. */
 export interface Bar {

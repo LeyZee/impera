@@ -462,8 +462,12 @@
  * Safari mask it; some Firefox versions show it in clear. The exposure is short: a paste is verified and the field
  * emptied at once. TODO(P3-03): a masking that does not depend on -webkit-text-security.
  */
-.sv-key input.sv-key__secret {
+/* Every secret of Réglages alike: masked, read once on « Afficher » (recette 05/11, PRO-29). */
+input.sv-key__secret {
   -webkit-text-security: disc;
+}
+input.sv-key__secret[data-shown='true'] {
+  -webkit-text-security: none;
 }
 .sv-msg {
   margin: 0;

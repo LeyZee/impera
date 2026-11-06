@@ -228,6 +228,23 @@ describe('Notifications, when it rings', () => {
     });
   });
 
+  it('keeps quiet hours on while an hour typed equals the other, and says the range is empty (PRO-01)', async () => {
+    serve();
+    deviceIs('off');
+    renderPage();
+    const start = await screen.findByLabelText('Début des heures calmes');
+    fireEvent.change(start, { target: { value: '8' } });
+    expect(screen.getByRole('switch')).toHaveProperty('checked', true);
+    expect(screen.getByLabelText('Début des heures calmes')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Une plage doit commencer et finir à des heures différentes.',
+    );
+    expect(save()).toHaveProperty('disabled', true);
+    fireEvent.change(start, { target: { value: '08:30' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(save()).toHaveProperty('disabled', false);
+  });
+
   it('never saves an hour that is not one', async () => {
     serve();
     deviceIs('off');

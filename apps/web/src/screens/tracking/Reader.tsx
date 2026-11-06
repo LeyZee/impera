@@ -1,6 +1,6 @@
 import type { DraftView } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 
 import { FanSheet } from './FanSheet';
 import {
@@ -13,9 +13,17 @@ import {
   type ConversationRead,
   type Decision,
 } from './api';
-import { draftsOf, threadOf, whyHuman } from './reader-model';
+import {
+  draftsOf,
+  endsRun,
+  graveHandoffOf,
+  messageTime,
+  stoppedText,
+  threadOf,
+  whyHuman,
+} from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
-import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, statusClass } from './view';
+import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, situationOf } from './view';
 
 import { initialOf } from '@/lib/utils';
 
@@ -34,14 +42,23 @@ export function Reader({
   creatorId,
   conversationId,
   canDecide,
+  routedOnly = false,
   onClose,
+  onReleased,
   backLabel = 'Toutes les conversations',
 }: {
   creatorId: string;
   conversationId: string;
   /** Owners and chatters decide; a creator reads. */
   canDecide: boolean;
+  /** A member who reads only the conversations routed to him (a chatter): see `TrackingPage`. */
+  routedOnly?: boolean;
   onClose: () => void;
+  /**
+   * The hand was given back by a member who reads only what is routed to him: the conversation is no longer his, the
+   * reader closes instead of reading it again (CHAT-08). Told the fan's name for the confirmation.
+   */
+  onReleased?: ((fan: string) => void) | undefined;
   /** Where the phone's back button leads: the list the reader was opened from. */
   backLabel?: string;
 }): JSX.Element {
@@ -61,6 +78,16 @@ export function Reader({
       client.invalidateQueries({ queryKey: ['dashboard'] }),
     ]);
   };
+
+  /** His hand given back, the conversation left his list: the list is read again, never this conversation (403). */
+  const released =
+    onReleased === undefined
+      ? undefined
+      : (fan: string): void => {
+          onReleased(fan);
+          void client.invalidateQueries({ queryKey: ['conversations', creatorId] });
+          void client.invalidateQueries({ queryKey: ['dashboard'] });
+        };
 
   const back = (
     <button type="button" className="nv-btn nv-btn--plain nv-btn--sm tr-back" onClick={onClose}>
@@ -91,7 +118,9 @@ export function Reader({
           stale={query.isError}
           creatorId={creatorId}
           canDecide={canDecide}
+          routedOnly={routedOnly}
           settle={settle}
+          released={released}
         />
       )}
     </section>
@@ -104,7 +133,9 @@ function Loaded({
   stale,
   creatorId,
   canDecide,
+  routedOnly,
   settle,
+  released,
 }: {
   /** The way back to the list, kept with the fan's name at the top of the screen on a phone. */
   back: JSX.Element;
@@ -113,13 +144,30 @@ function Loaded({
   stale: boolean;
   creatorId: string;
   canDecide: boolean;
+  routedOnly: boolean;
   settle: () => Promise<void>;
+  /** Set for a member who reads only his routed conversations: a hand given back closes the reader. */
+  released: ((fan: string) => void) | undefined;
 }): JSX.Element {
   const { detail } = read;
   const name = detail.fanDisplayName.trim() === '' ? 'Fan sans nom' : detail.fanDisplayName;
   const drafts = draftsOf(read);
   const isHuman = drafts.state === 'human';
   const why = isHuman ? whyHuman(read) : null;
+  // The same words as the list and « À traiter »: an idle conversation whose fan waits is « Sans réponse » (PRO-03).
+  const situation = situationOf(
+    { state: drafts.state, lastInboundAt: detail.lastInboundAt, lastOutboundAt: detail.lastOutboundAt },
+    routedOnly,
+  );
+  const pendingDraft = detail.openDrafts.some((draft) => draft.status === 'pending');
+  // Nobody will answer him (a draft refused, the hand given back with nothing new): a person must, in Reveal (CHAT-25).
+  const fanWaits =
+    situation.hand === 'yours' && (drafts.state === 'idle' || drafts.state === 'paused') && !pendingDraft;
+  // The agent stepped back for a reason a person must read: said at the top, in amber (CHAT-24).
+  const handoff = isHuman && latestHandChange(read) === 'handoff_requested';
+  const now = new Date();
+  /** The emergency stop refused a decision: said at the top, in this reader's words (CHAT-07). */
+  const [stopped, setStopped] = useState(false);
   const [hand, setHand] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
@@ -128,14 +176,36 @@ function Loaded({
   const [outdated, setOutdated] = useState<string | null>(null);
 
   const [note, setNote] = useState('');
+  // A grave handoff (minor, consent, distress) is given back only after a second, explicit click (PRO-26).
+  const grave = isHuman ? graveHandoffOf(read) : null;
+  const [confirming, setConfirming] = useState(false);
+  // The focus follows the question: on the safe choice when it opens, back on the button when it closes.
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const handRef = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (confirming) keepRef.current?.focus();
+    else if (wasConfirming.current) handRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
 
   const toggleHand = async (): Promise<void> => {
+    if (grave !== null && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     setHand({ pending: true, error: null });
     setOutdated(null);
     const kept = note.trim();
     const result = await (isHuman
       ? giveBack(creatorId, detail.id, kept === '' ? undefined : kept)
       : takeOver(creatorId, detail.id));
+    // His hand given back, the conversation is no longer routed to him: the reader closes, the list says it (CHAT-08).
+    if (result.ok && isHuman && released !== undefined) {
+      released(name);
+      return;
+    }
     if (result.ok) setNote('');
     // A takeover or a release that came too late: what shows is read again at once, as after a success.
     if (result.ok || result.outdated) await settle();
@@ -145,7 +215,12 @@ function Loaded({
   const decided = async (decision: Decision): Promise<string | null> => {
     if (decision.ok) {
       setOutdated(null);
+      setStopped(false);
       await settle();
+      return null;
+    }
+    if (decision.stopped === true) {
+      setStopped(true);
       return null;
     }
     if (!decision.outdated) return decision.message;
@@ -172,6 +247,7 @@ function Loaded({
 
   const handButton = (
     <button
+      ref={handRef}
       type="button"
       // Taking over is a rare gesture beside the state, quiet so that it is not touched by chance (D-03).
       className={`nv-btn nv-btn--sm ${isHuman ? 'nv-btn--soft' : 'nv-btn--plain'}`}
@@ -199,14 +275,15 @@ function Loaded({
           <span className="tr-reader__who">
             <h2>{name}</h2>
             <span className="tr-reader__state">
-              <span className={`nv-status ${statusClass(drafts.state)}`}>
+              <span className={`nv-status ${situation.pill}`}>
                 <span className="nv-status__dot" />
-                {READER_STATE_LABELS[drafts.state]}
+                {/* The reader has room for what to do about a send that failed (#537, CHAT-12). */}
+                {drafts.state === 'error' ? READER_STATE_LABELS.error : situation.label}
               </span>
               <span className="nv-meta">{MODE_LABELS[detail.mode]}</span>
             </span>
           </span>
-          {canDecide && !isHuman ? handButton : null}
+          {canDecide && !isHuman && !fanWaits ? handButton : null}
         </header>
         {/* With the fan's name, never scrolled away: on a phone the top stays in view above the thread (D-03). */}
         <FanSheet
@@ -215,8 +292,14 @@ function Loaded({
           conversationId={detail.id}
           desire={detail.desire}
           canDecide={canDecide}
+          canSetLimits={canDecide && !routedOnly}
         />
       </div>
+      {stopped ? (
+        <p className="tr-stopped" role="alert">
+          {stoppedText(routedOnly)}
+        </p>
+      ) : null}
       {stale ? (
         <p className="tr-warn tr-line">Le serveur ne répond pas : ce fil peut avoir changé depuis.</p>
       ) : null}
@@ -230,8 +313,17 @@ function Loaded({
           {outdated}
         </p>
       )}
+      {fanWaits ? (
+        <div className="tr-hand tr-hand--alert">
+          <p>
+            Personne n’a répondu à son dernier message, et l’agent n’écrira qu’à son prochain.
+            {canDecide ? ' Reprends la main pour lui répondre dans Reveal.' : ''}
+          </p>
+          {canDecide ? <div className="tr-hand__give">{handButton}</div> : null}
+        </div>
+      ) : null}
       {isHuman ? (
-        <div className="tr-hand">
+        <div className={handoff ? 'tr-hand tr-hand--alert' : 'tr-hand'}>
           <p>
             {why === null ? 'Un humain a la main.' : `${why}.`} Il répond dans Reveal ; l’agent n’écrit plus à
             ce fan jusqu’à ce qu’on lui rende la main.
@@ -251,7 +343,36 @@ function Loaded({
                   }}
                 />
               </label>
-              {handButton}
+              {confirming && grave !== null ? (
+                <div className="tr-hand__confirm" role="alert">
+                  <p>
+                    L’agent a passé la main pour « {grave} ». Rends-la seulement si tu as vérifié : il écrira
+                    à ce fan dès son prochain message.
+                  </p>
+                  <div className="tr-hand__confirm-actions">
+                    <button
+                      ref={keepRef}
+                      type="button"
+                      className="nv-btn nv-btn--plain nv-btn--sm"
+                      onClick={() => {
+                        setConfirming(false);
+                      }}
+                    >
+                      Garder la main
+                    </button>
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--destructive nv-btn--sm"
+                      disabled={hand.pending}
+                      onClick={() => void toggleHand()}
+                    >
+                      J’ai vérifié, rendre la main
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                handButton
+              )}
             </div>
           ) : null}
         </div>
@@ -261,34 +382,41 @@ function Loaded({
           <p className="tr-more">Seuls les derniers messages sont affichés ; le reste se lit dans Reveal.</p>
         ) : null}
         <div className="nv-thread">
-          {threadOf(read).map((item) =>
+          {threadOf(read).map((item, index, items) =>
             item.kind === 'note' ? (
-              <p key={item.id} className="tr-note">
+              <p key={item.id} className={item.strong ? 'tr-note tr-note--strong' : 'tr-note'}>
                 {item.text}
               </p>
             ) : (
-              <div key={item.id} className={`nv-bubble nv-bubble--${item.from}`}>
-                {item.text === '' ? (
-                  item.media.length === 0 ? (
-                    <em>Média</em>
-                  ) : null
-                ) : (
-                  <span className="tr-text">{item.text}</span>
-                )}
-                {item.media.map((media, index) => (
-                  <span key={index} className="tr-media">
-                    <em>{media.label}</em>
-                    {media.description === null ? null : ` · ${media.description}`}
-                  </span>
-                ))}
-                {item.ppv === null ? null : (
-                  <span className="tr-ppv">
-                    Média payant · {item.ppv.price} · {item.ppv.isPaid ? 'acheté' : 'pas encore acheté'}
-                  </span>
-                )}
-                {item.byHuman ? <span className="tr-ppv">Écrit par un humain</span> : null}
-                {item.byAgent ? <span className="tr-ppv">Automatique</span> : null}
-              </div>
+              <Fragment key={item.id}>
+                <div className={`nv-bubble nv-bubble--${item.from}`} title={messageTime(item.at, now)}>
+                  {item.text === '' ? (
+                    item.media.length === 0 ? (
+                      <em>Média</em>
+                    ) : null
+                  ) : (
+                    <span className="tr-text">{item.text}</span>
+                  )}
+                  {item.media.map((media, index) => (
+                    <span key={index} className="tr-media">
+                      <em>{media.label}</em>
+                      {media.description === null ? null : ` · ${media.description}`}
+                    </span>
+                  ))}
+                  {item.ppv === null ? null : (
+                    <span className="tr-ppv">
+                      Média payant · {item.ppv.price} · {item.ppv.isPaid ? 'acheté' : 'pas encore acheté'}
+                    </span>
+                  )}
+                  {item.byHuman ? <span className="tr-ppv">Écrit par un humain</span> : null}
+                  {item.byAgent ? <span className="tr-ppv">Automatique</span> : null}
+                </div>
+                {endsRun(items, index) ? (
+                  <time dateTime={item.at} className={`nv-meta tr-time tr-time--${item.from}`}>
+                    {messageTime(item.at, now)}
+                  </time>
+                ) : null}
+              </Fragment>
             ),
           )}
           {drafts.sending.map((draft) => (
@@ -324,6 +452,7 @@ function Loaded({
             creatorId={creatorId}
             conversationId={detail.id}
             blocked={!canDecide ? 'reader' : isHuman ? 'human' : null}
+            stopped={stopped}
             decided={decided}
           />
         </div>
@@ -379,6 +508,7 @@ function DraftPanel({
   creatorId,
   conversationId,
   blocked,
+  stopped,
   decided,
 }: {
   draft: DraftView;
@@ -386,6 +516,11 @@ function DraftPanel({
   conversationId: string;
   /** Why this person cannot decide now: a human has the hand, or she only reads (a creator); null when she can. */
   blocked: 'human' | 'reader' | null;
+  /**
+   * The emergency stop refused the last decision (said at the top of the reader, CHAT-07): Valider stays, since only
+   * the server knows when it is lifted; its own sentence is not said twice.
+   */
+  stopped: boolean;
   /** What follows a decision: the sentence to show here when it was refused, null when it went through or came late. */
   decided: (decision: Decision) => Promise<string | null>;
 }): JSX.Element {
@@ -507,7 +642,13 @@ function DraftPanel({
               )
             }
           >
-            {pending ? 'Envoi au serveur…' : isChanged ? 'Envoyer la retouche' : 'Valider'}
+            {pending
+              ? 'Envoi au serveur…'
+              : stopped
+                ? 'Réessayer'
+                : isChanged
+                  ? 'Envoyer la retouche'
+                  : 'Valider'}
           </button>
           {step === 'editing' ? (
             <button
@@ -547,4 +688,12 @@ function DraftPanel({
       )}
     </section>
   );
+}
+
+/** The latest change of hand (events come newest first): the agent stepping back, a person taking or giving it. */
+function latestHandChange(read: ConversationRead): string | null {
+  const event = read.events.find(
+    (e) => e.type === 'handoff_requested' || e.type === 'takeover_started' || e.type === 'takeover_ended',
+  );
+  return event?.type ?? null;
 }

@@ -33,6 +33,7 @@ const ACCOUNT = {
   creatorName: 'Nora Vidal',
   platform: 'reveal',
   handle: 'nora',
+  archived: false,
 };
 const MEMBERS = [
   { id: THEO, displayName: 'Théo', color: null },

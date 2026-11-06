@@ -452,7 +452,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         conversations: conversations.module,
       }),
       ...alerts.routes,
-      fans.routes(agent.kycSlotsOf),
+      fans.routes(agent.kycSlotsOf, (creatorId, fanId, userId) =>
+        conversations.module.isFanRoutedTo(creatorId, fanId, userId),
+      ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,

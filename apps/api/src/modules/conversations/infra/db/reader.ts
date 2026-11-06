@@ -184,6 +184,16 @@ export function createDrizzleConversationReader(
         return row !== undefined;
       }),
 
+    isFanRoutedTo: (creatorId, fanId, userId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const [row] = await tx
+          .select({ id: schema.conversations.id })
+          .from(schema.conversations)
+          .where(and(eq(schema.conversations.fanId, fanId), eq(schema.conversations.routedToUserId, userId)))
+          .limit(1);
+        return row !== undefined;
+      }),
+
     // State and open drafts in one snapshot: read apart, a draft committed in between showed with the old state.
     get: (creatorId, id) =>
       withTenant(
