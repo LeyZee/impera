@@ -4,7 +4,7 @@ import {
   instagramPostOf,
   type ContentIdeaOfDay,
   type CreatorId,
-  type DropCategory,
+  type IdeaDropCategory,
   type TrendFormat,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ import {
   IDEA_STATE_LABELS,
   IDEA_STATE_TONES,
   SIGNAL_SOURCE_LABELS,
-  correctableCategories,
+  CORRECTABLE_CATEGORIES,
   correctionOf,
   draftOf,
   draftProblems,
@@ -300,10 +300,10 @@ function IdeaCard({
           </Field>
           <div className="iv-form__row">
             <Field id={`${id}-c`} label="Catégorie">
-              <Select<DropCategory>
+              <Select<IdeaDropCategory>
                 id={`${id}-c`}
                 value={draft.category}
-                options={correctableCategories(idea.category).map((category) => ({
+                options={CORRECTABLE_CATEGORIES.map((category) => ({
                   value: category,
                   label: `${CATEGORY_EMOJIS[category]} ${DROP_CATEGORY_LABELS[category]}`,
                 }))}

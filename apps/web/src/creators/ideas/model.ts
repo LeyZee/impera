@@ -1,7 +1,6 @@
-import { DROP_CATEGORIES } from '@impera/contracts';
+import { IdeaDropCategorySchema, type IdeaDropCategory } from '@impera/contracts';
 import type {
   ContentIdeaCorrection,
-  DropCategory,
   ContentIdeaOfDay,
   ContentIdeaState,
   TrendFormat,
@@ -15,14 +14,10 @@ import type {
  */
 
 /**
- * The categories an idea can be corrected to. Never « Script »: a script always comes from one of the agency's
- * structures with its frozen version (ADR 0056 § 1-2), and an idea turned into one would land as a drop with no cards.
- * An idea that already says « Script » keeps it shown, so the field never reads empty.
+ * The categories an idea can be corrected to: those of its contract, never « Script ». A script always comes from one
+ * of the agency's structures with its frozen version (ADR 0056 § 1-2), and the contract refuses it for an idea.
  */
-export function correctableCategories(current: DropCategory): readonly DropCategory[] {
-  const allowed = DROP_CATEGORIES.filter((category) => category !== 'script');
-  return current === 'script' ? [...allowed, current] : allowed;
-}
+export const CORRECTABLE_CATEGORIES: readonly IdeaDropCategory[] = IdeaDropCategorySchema.options;
 
 /** Where an idea stands, as the agency reads it; she never sees this page. */
 export const IDEA_STATE_LABELS: Readonly<Record<ContentIdeaState, string>> = {

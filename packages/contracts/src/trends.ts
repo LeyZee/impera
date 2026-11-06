@@ -214,11 +214,19 @@ export type ContentIdeaState = z.infer<typeof ContentIdeaStateSchema>;
 /** The morning job's ceiling, per creator and day (ADR 0060 § 4). */
 export const CONTENT_IDEAS_PER_DAY_MAX = 3;
 
+/**
+ * The categories an idea may ask (ADR 0060 § 4): every drop category but `script`. A script is asked with a structure
+ * of the library and its frozen version (ADR 0056), chosen by the team: an idea, written by the model or corrected by
+ * the agency, never asks one.
+ */
+export const IdeaDropCategorySchema = DropCategorySchema.exclude(['script']);
+export type IdeaDropCategory = z.infer<typeof IdeaDropCategorySchema>;
+
 /** What an idea says, as the model writes it and the agency corrects it (ADR 0060 § 4). */
 export const ContentIdeaDraftSchema = z.strictObject({
   /** Her agenda's title (80 at most): a validated idea becomes a suggestion under it, never cut. */
   title: CreatorTaskTitleSchema,
-  category: DropCategorySchema,
+  category: IdeaDropCategorySchema,
   toShoot: z.string().trim().min(1).max(600),
   signalId: TrendSignalIdSchema,
   reason: z.string().trim().min(1).max(200),
