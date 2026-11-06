@@ -9,7 +9,7 @@ Six couches, chacune avec un outil et un but. Une PR touche la couche qui corres
 | Intégration | Vitest + Testcontainers (Postgres) | Repositories, RLS, jobs Graphile, cas d'usage de bout en bout sur une base réelle | s | `pnpm test:integration` (Docker requis), CI |
 | Contrat connecteur | Vitest | La **même suite** tourne contre `FakeConnector`, `FakeReveal` (serveur mock) et, à la main, contre Reveal réel en lecture | s | CI (Fake) ; manuel (réel) |
 | E2E | Playwright | Dashboard (inbox copilote), extension contre `FakeReveal` | min | `pnpm test:e2e`, CI nightly + avant release |
-| Qualité IA | Exécuteur maison (`apps/api/src/scripts/evals.ts`) et juge LLM | Scénarios, rubriques, adversarial, régression de prompts et de modèles, sur le vrai chemin de l’agent | min, coûte des tokens | `pnpm evals` : sous-ensemble en CI nightly ; complet avant changement de persona/modèle |
+| Qualité IA | Exécuteur maison (`apps/api/src/scripts/evals.ts`) et juge LLM | Scénarios, rubriques, adversarial, régression de prompts et de modèles, sur le vrai chemin de l’agent | min, coûte des tokens | `pnpm evals` : sous-ensemble en CI nightly (job `nightly-evals`, sauté sans clé xAI) ; complet avant changement de persona/modèle |
 
 `pnpm check` est statique (typecheck, lint, format, knip, `check-repo`) et ne lance aucun test ; `pnpm test:all` enchaîne unitaire et intégration.
 

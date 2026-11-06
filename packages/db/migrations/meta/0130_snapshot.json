@@ -1,5 +1,5 @@
 {
-  "id": "22329a73-da5d-4dc5-a06d-62e7cbaf9c5e",
+  "id": "4c6465f5-0d63-4239-ba4c-7472303ed00f",
   "prevId": "e35c4d11-71d3-4592-a01e-8b687563758d",
   "version": "7",
   "dialect": "postgresql",
@@ -1453,6 +1453,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "exported_at": {
+          "name": "exported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exported_by": {
+          "name": "exported_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -1562,6 +1574,15 @@
           "tableFrom": "content_drops",
           "tableTo": "user",
           "columnsFrom": ["corrected_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "content_drops_exported_by_user_id_fk": {
+          "name": "content_drops_exported_by_user_id_fk",
+          "tableFrom": "content_drops",
+          "tableTo": "user",
+          "columnsFrom": ["exported_by"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -1684,6 +1705,10 @@
         "content_drops_script_number_check": {
           "name": "content_drops_script_number_check",
           "value": "\"content_drops\".\"script_number\" is null or (\"content_drops\".\"category\" = 'script' and \"content_drops\".\"script_number\" >= 1)"
+        },
+        "content_drops_exported_check": {
+          "name": "content_drops_exported_check",
+          "value": "(\"content_drops\".\"exported_at\" is null) = (\"content_drops\".\"exported_by\" is null) and (\"content_drops\".\"exported_at\" is null or \"content_drops\".\"script_number\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -1731,6 +1756,12 @@
         "structure_version_id": {
           "name": "structure_version_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "moment": {
+          "name": "moment",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1938,6 +1969,14 @@
         "content_requests_author_check": {
           "name": "content_requests_author_check",
           "value": "(\"content_requests\".\"origin\" = 'agency') = (\"content_requests\".\"created_by\" is not null)"
+        },
+        "content_requests_moment_check": {
+          "name": "content_requests_moment_check",
+          "value": "\"content_requests\".\"moment\" in ('day', 'night')"
+        },
+        "content_requests_moment_version_check": {
+          "name": "content_requests_moment_version_check",
+          "value": "\"content_requests\".\"moment\" is null or \"content_requests\".\"structure_version_id\" is not null"
         },
         "content_requests_structure_version_check": {
           "name": "content_requests_structure_version_check",
@@ -11799,12 +11838,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "caught_up_at": {
-          "name": "caught_up_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "paused_until": {
           "name": "paused_until",
           "type": "timestamp with time zone",
@@ -12555,20 +12588,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "report_gap_bps": {
-          "name": "report_gap_bps",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 100
-        },
-        "report_gap_minor": {
-          "name": "report_gap_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 500
-        },
         "updated_by": {
           "name": "updated_by",
           "type": "text",
@@ -12633,10 +12652,6 @@
         "scheduling_settings_margin_check": {
           "name": "scheduling_settings_margin_check",
           "value": "\"scheduling_settings\".\"access_margin_minutes\" between 0 and 120"
-        },
-        "scheduling_settings_report_gap_check": {
-          "name": "scheduling_settings_report_gap_check",
-          "value": "\"scheduling_settings\".\"report_gap_bps\" between 0 and 10000 and \"scheduling_settings\".\"report_gap_minor\" between 0 and 100000"
         }
       },
       "isRLSEnabled": false
@@ -13276,24 +13291,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "review_kind": {
-          "name": "review_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "explanation": {
-          "name": "explanation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_check": {
-          "name": "review_check",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -13506,7 +13503,7 @@
           "for": "UPDATE",
           "to": ["public"],
           "using": "\"shift_reports\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_reports\".\"status\" = 'submitted'",
-          "withCheck": "\"shift_reports\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_reports\".\"status\" in ('validated', 'rejected') and \"shift_reports\".\"reviewed_by\" = nullif(current_setting('app.user_id', true), '') and \"shift_reports\".\"review_kind\" = 'human' and not exists (select 1 from team_members m where m.id = \"shift_reports\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and (nullif(current_setting('app.team_scope', true), '') = 'owner' or \"shift_reports\".\"submitted_by\" <> nullif(current_setting('app.user_id', true), ''))"
+          "withCheck": "\"shift_reports\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_reports\".\"status\" in ('validated', 'rejected') and \"shift_reports\".\"reviewed_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"shift_reports\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and (nullif(current_setting('app.team_scope', true), '') = 'owner' or \"shift_reports\".\"submitted_by\" <> nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {
@@ -13536,27 +13533,15 @@
         },
         "shift_reports_texts_check": {
           "name": "shift_reports_texts_check",
-          "value": "coalesce(char_length(\"shift_reports\".\"comment\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"incident\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"review_note\"), 1) between 1 and 500 and coalesce(char_length(\"shift_reports\".\"explanation\"), 1) between 1 and 1000"
-        },
-        "shift_reports_explanation_check": {
-          "name": "shift_reports_explanation_check",
-          "value": "\"shift_reports\".\"corrects_id\" is null or \"shift_reports\".\"explanation\" is null"
+          "value": "coalesce(char_length(\"shift_reports\".\"comment\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"incident\"), 1) between 1 and 1000 and coalesce(char_length(\"shift_reports\".\"review_note\"), 1) between 1 and 500"
         },
         "shift_reports_version_check": {
           "name": "shift_reports_version_check",
           "value": "\"shift_reports\".\"version\" >= 1"
         },
-        "shift_reports_review_kind_check": {
-          "name": "shift_reports_review_kind_check",
-          "value": "\"shift_reports\".\"review_kind\" in ('human', 'automatic')"
-        },
         "shift_reports_state_check": {
           "name": "shift_reports_state_check",
-          "value": "(\"shift_reports\".\"status\" = 'submitted') = (\"shift_reports\".\"reviewed_at\" is null) and (\"shift_reports\".\"status\" = 'rejected') = (\"shift_reports\".\"review_note\" is not null) and (\"shift_reports\".\"review_kind\" is null or \"shift_reports\".\"reviewed_at\" is not null) and case when \"shift_reports\".\"review_kind\" = 'automatic' then \"shift_reports\".\"reviewed_by\" is null and \"shift_reports\".\"status\" = 'validated' else (\"shift_reports\".\"reviewed_at\" is null) = (\"shift_reports\".\"reviewed_by\" is null) end"
-        },
-        "shift_reports_review_seen_check": {
-          "name": "shift_reports_review_seen_check",
-          "value": "\"shift_reports\".\"review_check\" is null or (\"shift_reports\".\"status\" = 'validated' and jsonb_typeof(\"shift_reports\".\"review_check\") = 'object')"
+          "value": "(\"shift_reports\".\"reviewed_at\" is null) = (\"shift_reports\".\"reviewed_by\" is null) and (\"shift_reports\".\"status\" = 'submitted') = (\"shift_reports\".\"reviewed_at\" is null) and (\"shift_reports\".\"status\" = 'rejected') = (\"shift_reports\".\"review_note\" is not null)"
         }
       },
       "isRLSEnabled": false

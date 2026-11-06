@@ -113,7 +113,12 @@ describe('/v1/creator-space/content/script-drops', () => {
   let structureId: string;
   const dropId = newId(ContentDropIdSchema);
   const cookies: Record<'nora' | 'ines' | 'owner', string> = { nora: '', ines: '', owner: '' };
-  const call = (method: 'GET' | 'POST' | 'PUT', url: string, who: keyof typeof cookies, body?: object) =>
+  const call = (
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    url: string,
+    who: keyof typeof cookies,
+    body?: object,
+  ) =>
     server.inject({
       method,
       url,
@@ -401,6 +406,52 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(version?.frozen).toBe(true);
   });
 
+  it('fixes each script’s moment when it is asked: its structure’s, or for a « both » one the other than her last (« ok alternance »)', async () => {
+    const [first] = await test.admin.db
+      .select({ moment: schema.contentRequests.moment })
+      .from(schema.contentRequests)
+      .where(eq(schema.contentRequests.id, requestId));
+    // A night structure is shot at night.
+    expect(first?.moment).toBe('night');
+    const both = {
+      ...structure(),
+      id: newId(ScriptStructureIdSchema),
+      name: 'Journée inventée',
+      moment: 'both' as const,
+    };
+    const created = await call('POST', '/v1/script-structures', 'owner', both);
+    expect(created.statusCode, created.body).toBe(201);
+    const ask = async () => {
+      const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
+        id: newId(ContentRequestIdSchema),
+        category: 'script',
+        dueOn: '2026-12-20',
+        reason: 'Un script de jour comme de nuit',
+        structureId: both.id,
+      });
+      expect(asked.statusCode, asked.body).toBe(200);
+      return ContentRequestSchema.parse(asked.json());
+    };
+    // Her last scripts were of night: this one is of day, the next of night again.
+    const day = await ask();
+    expect(day.moment).toBe('day');
+    // Cancelled, it is not her last script.
+    expect(
+      (await call('DELETE', `/v1/creators/${nora}/content-requests/${day.id}`, 'owner')).statusCode,
+    ).toBe(204);
+    expect((await ask()).moment).toBe('day');
+    expect((await ask()).moment).toBe('night');
+    // Another creator's turn is her own: Ines's first « both » script is of night.
+    const hers = await call('POST', `/v1/creators/${ines}/content-requests`, 'owner', {
+      id: newId(ContentRequestIdSchema),
+      category: 'script',
+      dueOn: '2026-12-20',
+      reason: 'Son premier script',
+      structureId: both.id,
+    });
+    expect(ContentRequestSchema.parse(hers.json()).moment).toBe('night');
+  });
+
   it('gives the agency her sent script as a ZIP in its order, once every file is settled (SC-03 c)', async () => {
     const url = `/v1/creators/${nora}/drops/${dropId}/script-export`;
     // Still being received: not yet.
@@ -500,5 +551,56 @@ describe('/v1/creator-space/content/script-drops', () => {
       code: 'content_drop_export_unprocessable',
       details: { reason: 'original_erased' },
     });
+  });
+
+  it('confirms her script copied into Reveal once, by the team: her originals of it go 30 days later (SC-03 c)', async () => {
+    // Given back for this test: the archive's own refused an erased original.
+    await test.admin.db
+      .update(schema.mediaAssets)
+      .set({ erasedAt: null })
+      .where(eq(schema.mediaAssets.storageKey, `creators/${nora}/chambre:A:0.jpg`));
+    const url = `/v1/creators/${nora}/drops/${dropId}/script-export/confirm`;
+    expect((await call('POST', url, 'nora')).statusCode).toBe(403);
+    const before = Date.now();
+    const confirmed = await call('POST', url, 'owner');
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    const drop = ContentDropSchema.parse(confirmed.json());
+    expect(drop.scriptNumber).toBe(1);
+    expect(drop.exportedAt).not.toBeNull();
+    const media = await test.admin.db
+      .select({ key: schema.mediaAssets.storageKey, expiresAt: schema.mediaAssets.expiresAt })
+      .from(schema.mediaAssets)
+      .where(eq(schema.mediaAssets.creatorId, nora));
+    const until = (key: string) =>
+      media.find((one) => one.key === `creators/${nora}/${key}`)?.expiresAt?.getTime();
+    const day = 24 * 3600 * 1000;
+    for (const key of ['live.jpg', 'chambre:A:0.jpg', 'chambre:B:0.jpg']) {
+      expect(until(key)).toBeGreaterThanOrEqual(before + 30 * day - 1000);
+      expect(until(key)).toBeLessThanOrEqual(Date.now() + 30 * day + 1000);
+    }
+    // The replaced file's original keeps its own date.
+    expect(until('gone.jpg')).toBe(new Date('2027-11-01T00:00:00Z').getTime());
+    // Replayed: the same confirmation, never moved.
+    const again = ContentDropSchema.parse((await call('POST', url, 'owner')).json());
+    expect(again.exportedAt).toBe(drop.exportedAt);
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.entityId, dropId),
+          eq(schema.auditLog.action, 'content_drop.export_confirmed'),
+        ),
+      );
+    expect(audit).toHaveLength(1);
+    // Confirmed once: never taken back nor moved, even by hand in the base.
+    const moved = await test.admin.db
+      .execute(sql`update content_drops set exported_at = now() where id = ${dropId}`)
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    const cause = moved instanceof Error && moved.cause instanceof Error ? moved.cause.message : '';
+    expect(cause).toContain('confirmed once, by the team');
   });
 });

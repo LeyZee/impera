@@ -45,6 +45,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Mode copilote | `copilot` | Le bot propose, un humain approuve. |
 | Mode auto | `auto` | Le bot envoie seul pour les catégories autorisées. |
 | Fait (mémoire) | `fan_fact` | Une information mémorisée sur un fan, avec source, date, confiance, `kind: declared | inferred`. |
+| Qui sont tes fans | `fanInsights`, `GET /v1/creator-space/fan-insights` | Le panneau de la créatrice en tête de Ventes : des parts sur l'ensemble de ses fans, jamais un nombre par case ni un fan seul, tirées de leurs faits déclarés, arrêtées à minuit, et une case ne s'affiche qu'au-delà du seuil (ADR 0065, ADR 0074). |
+| Famille de métiers | `jobFamily` | La case dans laquelle se range un métier dit par un fan, par des mots-clés écrits dans le code (Santé et soin, Étudiant…) ; ce qui ne se reconnaît pas va dans « Autres » (ADR 0074 § 5). |
 | Note du chatteur | `operator_note` | Ce qu'un chatteur veut qu'elle retienne d'un fan, laissé en rendant la main ; gardé comme un fait de cette catégorie, jamais proposé par un modèle. |
 | Résumé fan | `fan_summary` | Résumé opérationnel régénéré. |
 | Slot KYC | `kyc_slot` | Une information qu'on cherche à apprendre : une ligne du canevas de notes de Reveal (Prénom, Localisation, Âge, Métier, Passions, Envies, Situation), liste fermée `KycSlotSchema`. |
@@ -104,6 +106,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
 | Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
 | Archive d'un script | `script_export` | Le ZIP d'un script envoyé, pour l'agence : son dossier nommé selon la nomenclature, la fiche à recopier `00-fiche.txt`, puis chaque carton et chaque média dans l'ordre du script (SC-03, ADR 0056 § 7). |
+| Moment de tournage | `shot_moment` | Jour ou Nuit, fixé par le code quand un script est demandé : celui de sa structure, ou pour une structure « les deux », l'autre que celui du dernier script demandé à la créatrice (Nuit pour le premier) ; jamais demandé à quelqu'un (« ok alternance », 06/11/2026). |
+| Export confirmé | `exported_at` | Le geste de l'équipe qui dit avoir recopié l'archive d'un script dans Reveal : une seule fois, et les originaux du script partent 30 jours plus tard (ADR 0044 § 2, ADR 0056 § 7). |
 | Catégorie de dépôt | `drop_category` | Ce que la créatrice dit d'un dépôt, liste fermée : séance boudoir, vidéo short, script, relance, story Reveal, story Insta, Reel Insta, photo Insta, Telegram ; elle décide de la sortie (ADR 0055). |
 | Séance boudoir | `feed_shoot` | Chez nous, quelques photos sexy (et de courtes vidéos) d'une même séance pour le feed ; sans rapport avec la section Boudoir de Reveal (ADR 0055). |
 | Relance | `mass_dm` | La catégorie des petits médias (photo, vidéo, vocal) envoyés en Mass DM pour relancer les fans (ADR 0055). |

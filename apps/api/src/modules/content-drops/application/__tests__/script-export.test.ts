@@ -57,6 +57,7 @@ function agencyWith(sent: SentScript): AgencyContentStore {
     fileTarget: refuse('fileTarget'),
     markSent: refuse('markSent'),
     sentScript: () => Promise.resolve(sent),
+    confirmExport: refuse('confirmExport'),
   };
 }
 
@@ -94,6 +95,7 @@ function storageOf(objects: Record<string, string>): DropStorage {
 const sent: SentScript = {
   scriptNumber: 12,
   versionId: 'version',
+  moment: null,
   files: [
     { slotKey: 'chambre:B:0', mime: 'image/heic', bytes: 9, storageKey: 'media/b' },
     { slotKey: 'salon::0', mime: 'image/jpeg', bytes: 9, storageKey: 'media/s' },
@@ -134,7 +136,23 @@ describe('content-drops › a sent script’s archive (SC-03 c)', () => {
     expect(decoded('00-fiche.txt')).toContain('02 · E2 — Chambre (PAYANT)');
   });
 
-  it('refuses a « both » structure before the first byte: its moment is not guessed', async () => {
+  it('names a « both » structure by the moment its request fixed', async () => {
+    const archive = await exportScript(
+      {
+        agency: agencyWith({ ...sent, moment: 'day' }),
+        versions: versionsOf('both'),
+        storage: storageOf(objects),
+      },
+      'creator',
+      'owner',
+      'drop',
+      NOW,
+    );
+    expect(archive.fileName).toBe('S012-jour-soiree-inventee.zip');
+    archive.stream.destroy();
+  });
+
+  it('refuses a « both » structure asked before its moment was fixed: it is not guessed', async () => {
     const refused = exportScript(
       { agency: agencyWith(sent), versions: versionsOf('both'), storage: storageOf(objects) },
       'creator',

@@ -1,6 +1,11 @@
-import { scriptSegmentCodes, type ScriptSegment, type ScriptVariantLetter } from '@impera/contracts';
+import {
+  scriptSegmentCodes,
+  type ScriptSegment,
+  type ScriptVariantLetter,
+  type ShotMoment,
+} from '@impera/contracts';
 
-import { scriptFileName, scriptFolderEntries, scriptFolderName, type ShotMoment } from './script-naming';
+import { scriptFileName, scriptFolderEntries, scriptFolderName } from './script-naming';
 
 /**
  * A sent script's folder as an archive (SC-03, ADR 0056 § 7): what goes in, in the script's order, under the names of
