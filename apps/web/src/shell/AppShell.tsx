@@ -246,6 +246,22 @@ export function RailNav({
     }
   }, [current, isInMore]);
 
+  // The rail grows and shrinks with the window, and Réglages sits at its foot: the lens follows its item there, without
+  // playing, rather than stay where the item was (recette ADR 0073, Réglages after a resize).
+  useEffect(() => {
+    const nav = railRef.current;
+    const lens = lensRef.current;
+    if (nav === null || lens === null || current === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      const item = nav.querySelector<HTMLElement>(`[data-section="${current}"]`);
+      if (item !== null) lens.style.transform = `translateY(${String(item.offsetTop)}px)`;
+    });
+    observer.observe(nav);
+    return () => {
+      observer.disconnect();
+    };
+  }, [current]);
+
   const link = (item: NavItem): JSX.Element => (
     <Link
       key={item.to}

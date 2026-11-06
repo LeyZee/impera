@@ -14,6 +14,7 @@ import {
   incidentsOf,
   currencyTyped,
   estimateLine,
+  awaitsDecision,
   gapWaits,
   hasGap,
   lateFor,
@@ -310,6 +311,24 @@ describe('a report against its platform (ADR 0073)', () => {
     expect(gapWaits(within, BEFORE)).toBe(false);
     expect(gapWaits({ ...made, check: { state: 'provisional', readMinor: 3_000 } }, BEFORE)).toBe(false);
     expect(gapWaits(made, BEFORE)).toBe(false);
+  });
+
+  it('awaits the reader’s decision only when it is theirs now: no gap still waiting, no automatic check coming', () => {
+    const mine = (one: ShiftReport): ShiftReport => ({ ...one, canReview: true });
+    expect(awaitsDecision(mine(made), BEFORE)).toBe(true);
+    expect(awaitsDecision(made, BEFORE)).toBe(false);
+    expect(awaitsDecision(mine(gap()), BEFORE)).toBe(false);
+    expect(awaitsDecision(mine(gap()), AT)).toBe(true);
+    expect(awaitsDecision(mine(gap('Un pourboire noté deux fois.')), BEFORE)).toBe(true);
+    const within: ShiftReport = {
+      ...mine(made),
+      check: { state: 'complete', readMinor: 11_000, gapMinor: 0, verdict: 'within', explainBy: null },
+    };
+    expect(awaitsDecision(within, BEFORE)).toBe(false);
+    expect(awaitsDecision({ ...mine(made), check: { state: 'provisional', readMinor: 3_000 } }, BEFORE)).toBe(
+      true,
+    );
+    expect(awaitsDecision({ ...mine(made), status: 'rejected' }, BEFORE)).toBe(false);
   });
 
   it('counts a gap whatever became of it, and nothing the comparison cannot say', () => {

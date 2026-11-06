@@ -724,7 +724,7 @@ function ReviewCheck({
   if (check.verdict === 'within') {
     return (
       <p className="rp-review__check">
-        {platform} a lu {read} pendant le shift : le rapport se valide tout seul.
+        {platform} a lu {read} pendant le shift : le rapport se valide tout seul dans les cinq minutes.
       </p>
     );
   }
@@ -1039,9 +1039,13 @@ function MemberPeriod({
               <span className="rp-pline__when nv-num">
                 {swapShiftLine(line.shift.startsAt, line.shift.endsAt, account?.creatorName, zone)}
               </span>
+              {/* Amount, status and action: columns shared by the whole period on a computer; on a phone the action
+                  beside the shift's day, the amount and the status on the line under it (recette ADR 0073). */}
               {report === null ? (
                 <>
-                  <span className="rp-chip rp-chip--warn">Sans rapport</span>
+                  <span className="rp-pline__row">
+                    <span className="rp-chip rp-chip--warn rp-pline__status">Sans rapport</span>
+                  </span>
                   <Nudge
                     to={nudging.to(line.shift.memberId)}
                     text={(home) => nudgeText(name, line.shift, account?.creatorName, home)}
@@ -1056,28 +1060,32 @@ function MemberPeriod({
                 </>
               ) : (
                 <>
-                  <span className="rp-pline__amount nv-num">
-                    {amountText(
-                      report.status === 'validated' ? line.validatedMinor : report.amount.amountMinor,
-                      report.amount.currency,
-                    )}
-                    {line.corrections.length === 0 ? null : (
-                      <span className="rp-pline__fix">
-                        {' '}
-                        dont {line.corrections.length} correction{line.corrections.length > 1 ? 's' : ''}
+                  <span className="rp-pline__row">
+                    <span className="rp-pline__amount nv-num">
+                      <span className="rp-pline__sum">
+                        {amountText(
+                          report.status === 'validated' ? line.validatedMinor : report.amount.amountMinor,
+                          report.amount.currency,
+                        )}
                       </span>
-                    )}
-                    {report.check?.state === 'complete' && report.check.verdict === 'gap' ? (
-                      <span className="rp-pline__gap">
-                        {' '}
-                        écart {signedAmountText(report.check.gapMinor, report.amount.currency)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]}`}>
-                    {report.status === 'validated' && report.reviewKind === 'automatic'
-                      ? 'Validé automatiquement'
-                      : AGENCY_STATUS[report.status]}
+                      {line.corrections.length === 0 ? null : ' '}
+                      {line.corrections.length === 0 ? null : (
+                        <span className="rp-pline__fix">
+                          dont {line.corrections.length} correction{line.corrections.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {report.check?.state === 'complete' && report.check.verdict === 'gap' ? ' ' : null}
+                      {report.check?.state === 'complete' && report.check.verdict === 'gap' ? (
+                        <span className="rp-pline__gap">
+                          écart {signedAmountText(report.check.gapMinor, report.amount.currency)}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className={`rp-chip rp-chip--${STATUS_TONES[report.status]} rp-pline__status`}>
+                      {report.status === 'validated' && report.reviewKind === 'automatic'
+                        ? 'Validé automatiquement'
+                        : AGENCY_STATUS[report.status]}
+                    </span>
                   </span>
                   {report.status === 'validated' ? (
                     <button

@@ -646,7 +646,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     const [unlinked, matching, provisional] = [...document.querySelectorAll('.rp-review')];
     expect(text(matching)).toContain('Conforme');
     expect(text(matching)).toContain(
-      'Reveal a lu 110,00 € pendant le shift : le rapport se valide tout seul.',
+      'Reveal a lu 110,00 € pendant le shift : le rapport se valide tout seul dans les cinq minutes.',
     );
     expect(text(provisional)).toContain(
       'Reveal a lu 40,00 € pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.',

@@ -455,6 +455,16 @@ export function gapWaits(report: ShiftReport, now: Date): boolean {
 export const hasGap = (report: ShiftReport): boolean =>
   report.check?.state === 'complete' && report.check.verdict === 'gap';
 
+/**
+ * A sent report the reader decides now (ADR 0073, recette « attaque ça » of 06/11): one they may review, whose gap no
+ * longer waits for its member, and that the automatic check will not validate within five minutes. What the Dashboard
+ * and the tab Équipe › Rapports count, so that nothing stays in the queue unseen.
+ */
+export function awaitsDecision(report: ShiftReport, now: Date): boolean {
+  if (report.status !== 'submitted' || !report.canReview || gapWaits(report, now)) return false;
+  return !(report.check?.state === 'complete' && report.check.verdict === 'within');
+}
+
 /** « 1 % ou 5,00 € » : the threshold as Réglages and the screens say it (§ 3). */
 export const thresholdText = (threshold: ReportGapThreshold, currency: Currency = 'EUR'): string =>
   `${percentText(threshold.bps)} ou ${amountText(threshold.minor, currency)}`;

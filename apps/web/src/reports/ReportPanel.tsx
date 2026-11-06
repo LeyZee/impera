@@ -331,7 +331,8 @@ function CheckNote({
       <div className="rp-notice nv-enter" data-tone="ok">
         <p className="rp-notice__title">Conforme à {platform}</p>
         <p className="rp-notice__text">
-          {platform} a lu {read} pendant ton shift : ton rapport se valide tout seul, sans attendre l’agence.
+          {platform} a lu {read} pendant ton shift : ton rapport se valide tout seul dans les cinq minutes,
+          sans attendre l’agence.
         </p>
       </div>
     );
@@ -347,7 +348,7 @@ function CheckNote({
         {report.explanation !== null
           ? 'Ton explication est envoyée : l’agence décide.'
           : gapWaits(report, now) && check.explainBy !== null
-            ? `Corrige le montant, ou explique l’écart ${beforeWhen(check.explainBy, today, zone)} : l’agence ne peut pas le valider avant.`
+            ? `Corrige le montant, ou explique l’écart ${beforeWhen(check.explainBy, today, zone)}. Sans réponse d’ici là, l’agence tranchera.`
             : 'Le délai pour l’expliquer est passé : l’agence décide.'}
       </p>
     </div>

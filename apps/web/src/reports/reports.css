@@ -608,8 +608,10 @@
 .rp-figures__value--warn {
   color: var(--nv-warning);
 }
+/* « Tous mes rapports » on the card's text edge, as « Ta commission… » above it: the summary's own padding (14px)
+   goes outside (recette ADR 0073). */
 .rp-mine__all {
-  margin: 0 calc(-1 * var(--nv-space-2));
+  margin: 0 -14px;
 }
 .rp-lines {
   margin: 0;
@@ -770,21 +772,29 @@
   /* A member's period on a phone: what it holds goes under the name, whole, on the name's edge, rather than cut
      (« 2 écarts » after the money, ADR 0073). */
   .rp-member.nv-disclosure > summary {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-content: center;
     row-gap: 2px;
     padding-block: var(--nv-space-2);
   }
   .rp-member .nv-disclosure__title {
-    flex: 1;
+    grid-column: 2;
+    grid-row: 1;
     min-width: 0;
   }
+  .rp-member.nv-disclosure > summary > .rp-chip {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  /* The chevron centred on the name and what the period holds (recette ADR 0073). */
   .rp-member.nv-disclosure > summary::after {
-    order: 2;
+    grid-column: 4;
+    grid-row: 1 / span 2;
   }
   .rp-member .nv-disclosure__sum {
-    order: 3;
-    flex-basis: 100%;
-    padding-left: 20px;
+    grid-column: 2 / 4;
+    grid-row: 2;
     text-align: left;
     white-space: normal;
   }
@@ -989,23 +999,34 @@
 .rp-member__late {
   color: var(--nv-warning);
 }
+/* The period's lines on a computer: the same columns for every member, each line taking those of its list
+   (subgrid), so the amounts share one right edge and the statuses one left edge from the first member to the last,
+   whatever the width of a chip (recette ADR 0073). The widths hold « 1 234,56 € », « Validé automatiquement » and
+   « Message copié ». What qualifies an amount (« écart +12,00 € », « dont 1 correction ») goes under it, never
+   against it. */
+.rp-member .rp-lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem 11rem 7.5rem;
+  column-gap: var(--nv-space-3);
+}
 .rp-pline {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: var(--nv-space-3);
   min-height: var(--nv-target-min);
-  padding: 0 var(--nv-space-3);
+  padding: var(--nv-space-1) var(--nv-space-3);
   border-radius: var(--nv-radius-md);
   transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
 }
 .rp-pline:hover {
   background: var(--nv-plate-hover);
 }
-.rp-pline[data-missing='true'] {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+.rp-pline__row {
+  display: contents;
 }
 .rp-pline__when {
+  grid-column: 1;
   overflow: hidden;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
@@ -1013,18 +1034,37 @@
   white-space: nowrap;
 }
 .rp-pline__amount {
+  display: flex;
+  grid-column: 2;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.rp-pline__sum {
   font-weight: 650;
   white-space: nowrap;
+}
+.rp-pline__status {
+  grid-column: 3;
+  justify-self: start;
+}
+.rp-pline__fix-btn,
+.rp-pline > .rp-nudge,
+.rp-pline > .rp-chip {
+  grid-column: 4;
+  justify-self: start;
 }
 .rp-pline__fix {
   color: var(--nv-ink-faint);
   font-size: var(--nv-text-caption);
   font-weight: 500;
+  white-space: nowrap;
 }
 .rp-pline__gap {
   color: var(--nv-warning);
   font-size: var(--nv-text-caption);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ── Réglages › Règles de paie ── */
@@ -1250,21 +1290,47 @@ a.sc-sheet__report:focus-visible,
     align-items: center;
     justify-content: space-between;
   }
+  /* On a phone the shift's day is whole on the first line, its action at the end of it; its amount, what qualifies
+     it and its status on the line under, from the same left edge (recette ADR 0073). The period's rows give up their
+     indent for the width it takes. */
+  .rp-member .rp-lines {
+    display: flex;
+    padding-inline: 0;
+  }
   .rp-pline {
     grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--nv-space-2);
+    row-gap: var(--nv-space-1);
     padding: var(--nv-space-2) var(--nv-space-3);
   }
-  .rp-pline .rp-chip {
-    justify-self: start;
+  .rp-pline__when {
+    grid-row: 1;
+    overflow: visible;
+    white-space: normal;
   }
-  /* The gap under the amount on a phone: the shift's day keeps its width (ADR 0073). The amounts keep one right
-     edge, whether « Corriger » widens their column or not. */
-  .rp-pline__gap {
-    display: block;
+  .rp-pline__fix-btn,
+  .rp-pline > .rp-nudge,
+  .rp-pline > .rp-chip {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .rp-pline__row {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nv-space-1) var(--nv-space-2);
   }
   .rp-pline__amount {
-    justify-self: end;
-    text-align: right;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--nv-space-2);
+    text-align: left;
+  }
+  .rp-pline .rp-nudge__text {
+    grid-row: 3;
   }
   .rp-account__now,
   .rp-account__next {
