@@ -255,7 +255,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
       async (request) => {
         const { userId } = await signedIn(request);
         const { password, code } = request.body;
-        if (!(await identityConfirmed(auth, request, userId, password, code))) {
+        if (!(await identityConfirmed(auth, db, request, userId, password, code))) {
           // Counted for the alert of repeated refusals; a line that cannot be written never changes the answer.
           try {
             await recordRefusal(adminDb, { userId, action: 'auth.reauthentication_refused', ip: request.ip });

@@ -342,6 +342,46 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     ).toBe(200);
   });
 
+  it('takes each code once: seen over a shoulder, it opens nothing more (recette SEC-03)', async () => {
+    const lea = account('lea');
+    const { userId } = await createOwner(app.auth, app.db.db, lea);
+    const session = await signIn(server, lea.email, lea.password);
+    // A code of hers forgotten long ago: the next one taken clears it.
+    await test.admin.db.insert(schema.verification).values({
+      id: 'totp-spent-forgotten',
+      identifier: 'totp-spent-forgotten',
+      value: userId,
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+    const post = from();
+    const code = codeFor(lea.email);
+    const first = await post('/v1/auth/sign-in/email', { email: lea.email, password: lea.password });
+    expect(
+      (await post('/v1/auth/two-factor/verify-totp', { code }, cookiesOf(first.headers))).statusCode,
+    ).toBe(200);
+
+    const forgotten = await test.admin.db
+      .select({ id: schema.verification.id })
+      .from(schema.verification)
+      .where(eq(schema.verification.id, 'totp-spent-forgotten'));
+    expect(forgotten).toEqual([]);
+
+    // The same code again, at sign-in and before a sensitive action: refused as a wrong one.
+    const second = await post('/v1/auth/sign-in/email', { email: lea.email, password: lea.password });
+    const replayed = await post('/v1/auth/two-factor/verify-totp', { code }, cookiesOf(second.headers));
+    expect([replayed.statusCode, codeOf(replayed)]).toEqual([401, 'second_factor_unauthenticated']);
+    const confirmed = await post('/v1/auth/reauthenticate', { password: lea.password, code }, session);
+    expect([confirmed.statusCode, codeOf(confirmed)]).toEqual([401, 'reauthentication_unauthenticated']);
+
+    // A code it has not given passes.
+    const fresh = await post(
+      '/v1/auth/reauthenticate',
+      { password: lea.password, code: codeFor(lea.email) },
+      session,
+    );
+    expect(fresh.statusCode).toBe(204);
+  });
+
   it('writes a login only for a session that opened', async () => {
     const gus = account('gus');
     const { userId } = await createOwner(app.auth, app.db.db, gus);
