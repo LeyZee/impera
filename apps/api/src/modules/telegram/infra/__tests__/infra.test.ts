@@ -101,7 +101,7 @@ describe('Telegram API adapter', () => {
     expect(await api.edit(FAKE_TOKEN, '1', 5, 'x')).toEqual({ ok: true, value: null });
   });
 
-  it('reads membership, migration and title updates, and moves past the rest', async () => {
+  it('reads membership, migration, title and private start updates, and moves past the rest', async () => {
     const api = createTelegramApi({
       fetch: fakeFetch(200, {
         ok: true,
@@ -124,6 +124,15 @@ describe('Telegram API adapter', () => {
             update_id: 15,
             my_chat_member: { chat: { id: 5, type: 'private' }, new_chat_member: { status: 'member' } },
           },
+          // ADR 0068 § 4: `/start <code>` in a private chat only, the code alone kept.
+          { update_id: 16, message: { chat: { id: 5, type: 'private' }, text: '/start ABCDEFGH23' } },
+          {
+            update_id: 17,
+            message: { chat: { id: 6, type: 'private' }, text: '/start@demo_bot XYZW234567' },
+          },
+          { update_id: 18, message: { chat: { id: -1001, type: 'supergroup' }, text: '/start ABCDEFGH23' } },
+          { update_id: 19, message: { chat: { id: 5, type: 'private' }, text: '/start' } },
+          { update_id: 20, message: { chat: { id: 5, type: 'private' }, text: '/start ABC and more' } },
         ],
       }),
     });
@@ -131,12 +140,16 @@ describe('Telegram API adapter', () => {
     expect(result.ok).toBe(true);
     const batch = foldUpdates(0, result.ok ? result.value : []);
     expect(batch).toEqual({
-      nextOffset: 16,
+      nextOffset: 21,
       chats: [
         { telegramChatId: '-100', title: 'Astreinte', kind: 'group', membership: 'member', canPost: true },
       ],
       migrations: [{ fromChatId: '-100', toChatId: '-1001' }],
       titles: [{ telegramChatId: '-1001', title: 'Astreinte nuit' }],
+      starts: [
+        { telegramChatId: '5', code: 'ABCDEFGH23' },
+        { telegramChatId: '6', code: 'XYZW234567' },
+      ],
     });
   });
 });

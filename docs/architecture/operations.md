@@ -4,11 +4,11 @@ Dernière revue : 2026-10-27.
 
 ## Environnements
 
-| Env | Où | Connecteur | LLM | Base |
-|---|---|---|---|---|
-| `dev` | laptop | `FakeConnector` / `FakeReveal` | clés de test, plafonds bas, ou mock | Postgres local (`docker compose up -d`, rôles créés par `packages/db/docker/init.sql`) ou branche Neon |
-| `staging` | VPS, Compose séparé | `FakeReveal` par défaut ; compte Reveal de test si disponible | clés de test | branche Neon `staging` |
-| `prod` | VPS | `RevealApiConnector` | clés prod, plafonds | Neon `main` |
+| Env       | Où                  | Connecteur                                                    | LLM                                 | Base                                                                                                   |
+| --------- | ------------------- | ------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `dev`     | laptop              | `FakeConnector` / `FakeReveal`                                | clés de test, plafonds bas, ou mock | Postgres local (`docker compose up -d`, rôles créés par `packages/db/docker/init.sql`) ou branche Neon |
+| `staging` | VPS, Compose séparé | `FakeReveal` par défaut ; compte Reveal de test si disponible | clés de test                        | branche Neon `staging`                                                                                 |
+| `prod`    | VPS                 | `RevealApiConnector`                                          | clés prod, plafonds                 | Neon `main`                                                                                            |
 
 Règle : le code ne connaît l'environnement que par la config (`apps/api/src/config.ts` : schéma Zod sur `process.env`, chargé par le composition root au démarrage, validé, immuable, échec explicite si une variable manque). Un seul `.env.example` à la racine. Aucune condition `if (env === 'prod')` dans le domaine.
 
@@ -18,6 +18,7 @@ Règle : le code ne connaît l'environnement que par la config (`apps/api/src/co
 - **Migrations** : exécutées par le service `migrate` du compose avant le démarrage de la nouvelle version (`api` et `worker` attendent qu'il ait réussi), jamais au boot de l'API. Pattern expand/contract : on ajoute (colonne nullable, nouvelle table), on déploie le code qui écrit les deux, on migre les données, on retire l'ancien dans une version suivante. Jamais de `DROP`/`ALTER ... NOT NULL` dans la même version que le code qui en dépend.
 - **Arrêt gracieux des workers** : `SIGTERM` → on ne prend plus de job, on finit le job en cours (borné à 25 s, sous le délai de 30 s avant `SIGKILL` de Docker/Coolify), on ferme le pool, on sort avec le code 0.
 - **Verrous d'un worker mort** : un worker tué (`SIGKILL`, plantage, machine perdue) laisse ses jobs et leur file (`conv:…`, `account:…`) verrouillés ; Graphile ne les rendrait qu'au bout de 4 h, et la conversation ou le compte resterait muet d'ici là (recette MOT-02). Chaque worker écrit son battement sous l'identifiant de son pool Graphile, celui que porte `locked_by`, et libère toutes les minutes (`graphile_worker.force_unlock_workers`) les verrous de plus de 5 minutes dont le pool n'a pas battu depuis 5 minutes. `/ready` donne leur nombre (`orphanedJobs`) sans passer « non prêt » : un nombre qui reste au-dessus de 0 dit qu'aucun worker ne tourne pour les libérer. Pendant un déploiement progressif, un worker de l'ancienne version bat sous un autre identifiant : ses jobs de plus de 5 minutes peuvent être rendus et rejoués, ce que leur idempotence permet.
+- **Jobs abandonnés** : Graphile supprime un job qui réussit, jamais un job qui a épuisé ses tentatives. Sa charge utile resterait sans fin dans `graphile_worker._private_jobs`, hors RLS, et elle peut porter ce qu'une personne a écrit (la note d'un chatteur sur un fan, `conversation.record_facts`). Chaque worker supprime donc, au démarrage puis toutes les heures, les jobs abandonnés depuis plus de 30 jours (`purgeDeadJobs`, `apps/api/src/dead-jobs.ts`), jamais un job verrouillé. D'ici là, le Dashboard et `/ready` les montrent.
 - **Image Docker de l'API/worker** : Node 22 + `ffmpeg`, `dist/` construit par tsup avec les paquets du dépôt embarqués (`apps/api/tsup.config.ts`), migrations et prompts copiés là où le code les lit ; le job CI `images` la construit et la démarre à chaque PR (extraction de frames et transcription pour `media`, phase 3). Au démarrage, l'API vérifie que `ffmpeg` et `ffprobe` répondent (`missingMediaBinaries`, module `media`) : s'il en manque un, le journal le dit (« ffmpeg missing ») et l'API démarre quand même ; seules les vidéos et notes vocales des fans ne peuvent pas être lues.
 - **Santé** : `/health` (vivant), `/ready` (base joignable, migrations à jour, worker vu récemment). Coolify redémarre sur échec.
 - **Jobs abandonnés** : chaque job a un nombre d'essais borné, fixé par tâche dans `JOB_MAX_ATTEMPTS` (`packages/contracts/src/jobs.ts`) : 1 pour la plupart des jobs périodiques, 3 pour les jobs de conversation, de connecteur, de fan et de média, 5 pour `payroll.recalculate`, 10 pour `telegram.flush_chat` et 25 pour `telegram.scan` (idempotent, aussi mis en file par le déclencheur de `domain_events`) ; au-delà, Graphile le garde dans `graphile_worker.jobs` avec sa dernière erreur. `/ready` en donne le nombre (`deadJobs`) sans passer « non prêt » ; on les lit avec `select task_identifier, last_error from graphile_worker.jobs where attempts >= max_attempts`. Un contenu de job invalide échoue de la même façon, autant de fois que sa tâche a d'essais. Le Dashboard compte aussi comme bloqués (`jobs.dead`) les jobs en retard de 15 minutes dont aucune tâche du worker ne porte le nom (aujourd'hui `fans.refresh_summary`, `media.describe` : le type `JobWithoutTask` du composition root, que le typage oblige à tenir à jour, une tâche oubliée ne compilant pas) : Graphile les garde en file sans jamais consommer d'essai. Le Dashboard d'une créatrice nomme chaque tâche bloquée par son libellé (`JOB_LABELS`), jamais par son identifiant (recette du 05/11, PRO-10). Seules comptent dans la santé de son agent les siennes et la lecture des comptes Reveal (`AGENT_SYSTEM_JOBS`) ; une autre tâche d'aucune créatrice (paie, Telegram, sauvegardes) n'est montrée qu'au propriétaire, en ligne « Agence · … », sans colorer la carte.
@@ -39,17 +40,17 @@ Trois outils, pas plus :
 
 Et un **tableau de bord opérationnel** dans `apps/web` alimenté par des vues SQL (pas un outil de plus), avec les métriques de la doc §8 :
 
-| Métrique | Source | Cible v1 |
-|---|---|---|
-| Latence de détection (message plateforme → ingéré) | `messages.platform_created_at` vs `created_at` | p95 < 60 s |
-| Latence de génération (job → draft) | `conversation_events` | p95 < 30 s |
-| Latence totale (fan → envoi) | idem | médiane < 2 min en auto |
-| Taux d'envoi vérifié | `message_sent` / `send_attempted` | > 99,5 % |
-| Messages perdus (réconciliation) | job de réconciliation | 0 |
-| Doublons | contrainte unique (compte) | 0 |
-| Taux d'intervention humaine | drafts édités ou rejetés / total | < 30 % en phase 5 |
-| Coût LLM par conversation et par jour | `llm_calls` | suivi, plafond |
-| Qualité conversationnelle | scores du juge (`pnpm evals`) + notes humaines | seuil fixé avec Messa |
+| Métrique                                           | Source                                         | Cible v1                |
+| -------------------------------------------------- | ---------------------------------------------- | ----------------------- |
+| Latence de détection (message plateforme → ingéré) | `messages.platform_created_at` vs `created_at` | p95 < 60 s              |
+| Latence de génération (job → draft)                | `conversation_events`                          | p95 < 30 s              |
+| Latence totale (fan → envoi)                       | idem                                           | médiane < 2 min en auto |
+| Taux d'envoi vérifié                               | `message_sent` / `send_attempted`              | > 99,5 %                |
+| Messages perdus (réconciliation)                   | job de réconciliation                          | 0                       |
+| Doublons                                           | contrainte unique (compte)                     | 0                       |
+| Taux d'intervention humaine                        | drafts édités ou rejetés / total               | < 30 % en phase 5       |
+| Coût LLM par conversation et par jour              | `llm_calls`                                    | suivi, plafond          |
+| Qualité conversationnelle                          | scores du juge (`pnpm evals`) + notes humaines | seuil fixé avec Messa   |
 
 ## Coûts et coupe-circuits
 

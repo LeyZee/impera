@@ -77,6 +77,7 @@ export function statusForCode(code: string): number {
   if (code.endsWith('_gone')) return 410;
   if (code.endsWith('_unprocessable')) return 422;
   if (code.endsWith('_limited')) return 429;
+  if (code.endsWith('_bad_gateway')) return 502;
   if (code.endsWith('_unavailable')) return 503;
   return 500;
 }

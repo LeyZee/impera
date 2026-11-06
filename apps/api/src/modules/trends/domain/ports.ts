@@ -147,4 +147,6 @@ export interface IdeaFollowStore {
   requested(ideaId: string): Promise<void>;
   /** Her shoot declined: the idea is `declined`, its request never asked. */
   declined(ideaId: string): Promise<void>;
+  /** Her drop for the idea's content request has all its bytes: the idea of hers that asked it is `deposited`. */
+  deposited(creatorId: string, requestId: string): Promise<void>;
 }

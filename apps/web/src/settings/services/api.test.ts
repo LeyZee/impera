@@ -13,6 +13,11 @@ import {
   verifyNow,
 } from './api';
 
+/** A refusal in the common body, its kind in `details` (MOT-13). */
+const refusalBody = (code: string, kind: string, message: string): object => ({
+  error: { code, message, details: { kind }, requestId: 'r' },
+});
+
 const status = {
   provider: 'xai',
   state: 'connected',
@@ -54,7 +59,7 @@ describe('Services API client', () => {
   it('reads a connected key and a refusal, never anything else', async () => {
     answer(200, status);
     expect(await connectKey('xai', 'xai-FAKE')).toEqual({ ok: true, status });
-    answer(422, { kind: 'unauthorized', message: 'xAI ne reconnaît pas cette clé.' });
+    answer(422, refusalBody('provider_key_unprocessable', 'unauthorized', 'xAI ne reconnaît pas cette clé.'));
     expect(await connectKey('xai', 'xai-FAKE')).toEqual({
       ok: false,
       refusal: { kind: 'unauthorized', message: 'xAI ne reconnaît pas cette clé.' },

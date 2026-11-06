@@ -309,6 +309,7 @@ describe('error format (api.md)', () => {
     expect(statusForCode('send_limited')).toBe(429);
     expect(statusForCode('invoice_pdf_unavailable')).toBe(503);
     expect(statusForCode('invoice_pdf_gone')).toBe(410);
+    expect(statusForCode('sales_feed_platform_bad_gateway')).toBe(502);
     expect(statusForCode('whatever')).toBe(500);
   });
 });

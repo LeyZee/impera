@@ -11,8 +11,8 @@ import type { Routes, Shared, TasksNamed } from './shared';
 
 export interface WiredTrends {
   readonly module: TrendsModule;
-  /** The agenda announces her gesture; the trend watch is the one that listens (VEI-01 d2). */
-  readonly tasks: TasksNamed<'creator_tasks.suggestion_decided'>;
+  /** The agenda announces her gesture, content drops her drop; the trend watch is the one that listens (VEI-01 d2, d3). */
+  readonly tasks: TasksNamed<'creator_tasks.suggestion_decided' | 'content_drops.drop_received'>;
   readonly routes: readonly Routes[];
 }
 
@@ -47,6 +47,12 @@ export function wireTrends(
         JOB_PAYLOADS['creator_tasks.suggestion_decided'],
         shared.logger,
         (payload) => module.jobs.followDecision(payload),
+      ),
+      'content_drops.drop_received': defineTask(
+        'content_drops.drop_received',
+        JOB_PAYLOADS['content_drops.drop_received'],
+        shared.logger,
+        (payload) => module.jobs.followDeposit(payload),
       ),
     },
     routes: [module.routes],

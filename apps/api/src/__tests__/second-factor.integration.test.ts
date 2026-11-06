@@ -1,5 +1,6 @@
 import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
+import { symmetricEncrypt } from 'better-auth/crypto';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -198,6 +199,41 @@ describe('second factor for every account (ADR 0046, SEC-02)', () => {
     expect(used.statusCode).toBe(200);
     expect((await get('/v1/me', cookiesOf(used.headers))).statusCode).toBe(200);
     expect(codeOf(await signInWith(backup))).toBe('second_factor_unauthenticated');
+  });
+
+  it('draws backup codes without ambiguous letters and reads them whatever their case (SEC-08)', async () => {
+    const lina = account('lina');
+    const { userId } = await createOwner(app.auth, app.db.db, lina);
+    const post = from();
+    const first = await signInWithoutCode(server, lina.email, lina.password);
+    const { backupCodes } = await activateSecondFactor(server, lina.email, lina.password, first);
+    // Crockford's base 32: capitals and digits, no I, L, O nor U.
+    for (const code of backupCodes) expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/u);
+
+    const signInWith = async (code: string) => {
+      const pending = cookiesOf(
+        (await post('/v1/auth/sign-in/email', { email: lina.email, password: lina.password })).headers,
+      );
+      return post('/v1/auth/two-factor/verify-backup-code', { code }, pending);
+    };
+    // Typed in lower case, as a phone keyboard does: accepted, and used up whatever the case of the next try.
+    const backup = backupCodes[0] ?? '';
+    expect((await signInWith(` ${backup.toLowerCase()} `)).statusCode).toBe(200);
+    expect(codeOf(await signInWith(backup))).toBe('second_factor_unauthenticated');
+
+    // A code made before SEC-08 (both cases, I, l, O and 0) keeps working, typed in either case, with O read as 0.
+    const legacy = 'IbIzF-mlhOB';
+    await test.admin.db
+      .update(schema.twoFactor)
+      .set({
+        backupCodes: await symmetricEncrypt({
+          key: testConfig().AUTH_SECRET,
+          data: JSON.stringify([legacy]),
+        }),
+      })
+      .where(eq(schema.twoFactor.userId, userId));
+    expect((await signInWith('ibizf-mlh0b')).statusCode).toBe(200);
+    expect(codeOf(await signInWith(legacy))).toBe('second_factor_unauthenticated');
   });
 
   it('skips the code on a trusted device, never before a sensitive action', async () => {

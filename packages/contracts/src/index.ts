@@ -46,6 +46,7 @@ export * from './scripts';
 export * from './script-starters';
 export * from './scheduling';
 export * from './passkeys';
+export * from './password-reset';
 export * from './security';
 export * from './settings';
 export * from './shift-feedback';

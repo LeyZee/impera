@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { refusalBodySchema } from './errors';
 import { CreatorIdSchema } from './ids';
 
 /**
@@ -127,6 +128,14 @@ export const TelegramRoutesSchema = z.object({
 export const TelegramRefusalSchema = z.object({ kind: TelegramErrorKindSchema, message: z.string().min(1) });
 export type TelegramRefusal = z.infer<typeof TelegramRefusalSchema>;
 
+/** A token Telegram or the shape check refused (422: adding a bot, replacing its token), in the common body (MOT-13). */
+export const TELEGRAM_TOKEN_UNPROCESSABLE = 'telegram_token_unprocessable';
+/** The test message did not reach the group (422). */
+export const TELEGRAM_TEST_UNPROCESSABLE = 'telegram_test_unprocessable';
+/** The routes changed since the page read them (409, `routes_version_conflict`). */
+export const TELEGRAM_ROUTES_CONFLICT = 'telegram_routes_conflict';
+export const TelegramRefusalBodySchema = refusalBodySchema(TelegramErrorKindSchema);
+
 export const TelegramTestResultSchema = z.object({ sentAt: z.iso.datetime() });
 
 export const TelegramDeliveryStatusSchema = z.enum(['pending', 'sending', 'sent', 'failed', 'unknown']);
@@ -212,3 +221,26 @@ export const TELEGRAM_JOB_PAYLOADS = {
   'telegram.connection_reminders': z.object({}),
   'telegram.purge': z.object({}),
 } as const;
+
+/**
+ * `/v1/auth/telegram-link` (SEC-05 lot 2, ADR 0068 § 4): the account's own private chat with the agency's bot, where
+ * its reset link will go. Never the chat's id, only whether it is linked and by which bot.
+ */
+export const TelegramPrivateLinkSchema = z.object({
+  linked: z.boolean(),
+  botUsername: z.string().nullable(),
+  linkedAt: z.iso.datetime().nullable(),
+});
+export type TelegramPrivateLink = z.infer<typeof TelegramPrivateLinkSchema>;
+
+/** The one-time code to send the bot (`/start <code>`), ten minutes; `url` opens the bot with the code already in. */
+export const TelegramLinkCodeSchema = z.object({
+  code: z.string().regex(/^[A-Z2-9]{10}$/),
+  botUsername: z.string().min(1),
+  url: z.url(),
+  expiresAt: z.iso.datetime(),
+});
+export type TelegramLinkCode = z.infer<typeof TelegramLinkCodeSchema>;
+
+/** No active bot can take the code yet (422): one is added first in Réglages › Telegram. */
+export const TELEGRAM_LINK_NO_BOT_UNPROCESSABLE = 'telegram_link_no_bot_unprocessable';

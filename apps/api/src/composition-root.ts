@@ -54,6 +54,7 @@ import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
+import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
 import { checkReadiness, type Readiness } from './readiness';
 import { createSecuritySettingsRoutes } from './security-settings';
@@ -443,6 +444,13 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         requireRole,
         recentLogin: shared.recentLogin,
         passwordBreaches,
+      }),
+      createPasswordResetRoutes({
+        auth,
+        adminDb: adminDb.db,
+        config,
+        passwordBreaches,
+        privateChat: telegram.module?.privateChat ?? null,
       }),
       createSecuritySettingsRoutes({
         auth,

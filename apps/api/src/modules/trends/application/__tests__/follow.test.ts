@@ -1,9 +1,16 @@
-import { CreatorIdSchema, newId, SuggestionIdSchema, type DropCategory } from '@impera/contracts';
+import {
+  ContentDropIdSchema,
+  ContentRequestIdSchema,
+  CreatorIdSchema,
+  newId,
+  SuggestionIdSchema,
+  type DropCategory,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { IdeaContentRequest } from '../../../content-drops';
 import type { IdeaFollowStore } from '../../domain/ports';
-import { followDecision } from '../follow';
+import { followDecision, followDeposit } from '../follow';
 
 const creatorId = newId(CreatorIdSchema);
 const suggestionId = newId(SuggestionIdSchema);
@@ -27,6 +34,10 @@ function fakes(category: DropCategory) {
     },
     declined: (id) => {
       moves.push(`declined:${id}`);
+      return Promise.resolve();
+    },
+    deposited: (creator, requestId) => {
+      moves.push(`deposited:${creator}:${requestId}`);
       return Promise.resolve();
     },
   };
@@ -65,5 +76,14 @@ describe('followDecision (VEI-01 d2)', () => {
       day: '2026-11-12',
     });
     expect([other.asked, other.moves]).toEqual([[], []]);
+  });
+});
+
+describe('followDeposit (VEI-01 d3)', () => {
+  it('moves the idea that asked the request, by the request and the creator', async () => {
+    const { deps, moves } = fakes('feed_shoot');
+    const requestId = newId(ContentRequestIdSchema);
+    await followDeposit(deps, { creatorId, dropId: newId(ContentDropIdSchema), requestId });
+    expect(moves).toEqual([`deposited:${creatorId}:${requestId}`]);
   });
 });

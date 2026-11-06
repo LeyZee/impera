@@ -72,7 +72,7 @@ class InvitationLinkNotFound extends DomainError {
   }
 }
 
-class PasswordInvalid extends DomainError {
+export class PasswordInvalid extends DomainError {
   constructor(reason: PasswordInvalidReason) {
     const message: Record<PasswordInvalidReason, string> = {
       too_short: `Mot de passe trop court (${String(PASSWORD_MIN_LENGTH)} caractères au moins)`,
@@ -102,7 +102,7 @@ function hashOf(token: string): string {
   return createHash('sha256').update(token).digest('base64url');
 }
 
-function passwordProblem(password: string): PasswordInvalidReason | null {
+export function passwordProblem(password: string): PasswordInvalidReason | null {
   if (password.length < PASSWORD_MIN_LENGTH) return 'too_short';
   if (password.length > PASSWORD_MAX_LENGTH) return 'too_long';
   if (isPasswordTooPlain(password)) return 'too_plain';
