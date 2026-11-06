@@ -60,6 +60,8 @@ Construite par `apps/extension` (sortie `.output/chrome-mv3`), chargée non empa
 | X26 | Onglet Reveal ouvert (page locale servie sous un hôte de test) | le popup reconnaît l'onglet ; rien n'est envoyé à l'API faute de capture de session (manque connu) |
 | X27 | Mise à jour de l'extension (nouvelle version chargée) | état gardé, pas de reconnexion forcée |
 
+Non joués lors du premier passage (06/11) : X25, qui demande un onglet `instagram.com` simulé localement ; X26 et X27, qui attendent le bac à sable sur une pile de recette et la capture de session. À reprendre avec `docs/recette/bac-a-sable.md`.
+
 ## Sans clé, à préparer
 
 - La capture de la session du membre « bot » par l'extension n'existe pas (route `POST /v1/connector/sessions` côté API, aucun appel côté extension). À concevoir avec Bilan dès que la capture HAR dira comment Reveal authentifie : [preparation-cles.md](preparation-cles.md).

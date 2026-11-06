@@ -5,7 +5,7 @@ Zone : `packages/contracts`, `packages/db`, `packages/llm` (passerelle), `apps/a
 ## 0. Outillage commun (à livrer en premier)
 
 1. Script de pile par agent (base `impera_rN` migrée, API + worker en ligne, Vite) et script de connexion Playwright avec TOTP.
-2. Jeu de données de recette, inventé : 1 propriétaire, 2 managers, 4 chatteurs (un payé à la commission, un à l'heure, un suspendu, un parti), 1 opérateur, 3 créatrices (« Lina Test » complète, « Maya Démo » sans persona active, « Zoé Archivée » archivée), leurs comptes Reveal fictifs, 2 semaines de shifts, une quinzaine close et une ouverte, 30 fans fictifs. Fiche proposée : `docs/sessions/tasks/PROPOSED-recette-sandbox.md`.
+2. Jeu de données de recette, inventé : 1 propriétaire, 2 managers, 4 chatteurs (tous à la commission, ADR 0023 : un actif, un second actif, un suspendu, un parti), 1 opérateur, 3 créatrices (« Lina Test » complète, « Maya Démo » sans persona active, « Zoé Archivée » archivée), leurs comptes Reveal fictifs, 2 semaines de shifts, une quinzaine close et une ouverte, 30 fans fictifs. Fiche proposée : `docs/sessions/tasks/PROPOSED-recette-sandbox.md`.
 3. Matrice d'accès automatique (reprise du 05/11) : chaque route × chaque profil, attendu 200 / 403 / 404, rejouée sur `main` à jour. Les routes nouvelles depuis le 05/11 (#600 à #615) y entrent.
 
 ## 1. Démarrage, santé, arrêt
