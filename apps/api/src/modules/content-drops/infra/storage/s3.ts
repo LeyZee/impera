@@ -81,10 +81,11 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
     what: string,
     url: string,
     init: RequestInit,
-    timeout = REQUEST_TIMEOUT_MS,
+    timeout: number | AbortSignal = REQUEST_TIMEOUT_MS,
   ): Promise<Response> => {
+    const signal = typeof timeout === 'number' ? AbortSignal.timeout(timeout) : timeout;
     try {
-      return await send(new Request(await client.sign(url, init), { signal: AbortSignal.timeout(timeout) }));
+      return await send(new Request(await client.sign(url, init), { signal }));
     } catch (error) {
       throw new ContentDropStorageUnavailable(`${config.bucket}: no answer to ${what}`, { cause: error });
     }
@@ -234,9 +235,17 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       return true;
     },
 
-    async read(key, bytes) {
+    async read(key) {
       const what = `GET ${key}`;
-      const response = await call(what, urlOf(key), { method: 'GET' }, downloadTimeoutMs(bytes));
+      // A stall of the storage aborts the read, never a slow reader: the clock runs only while a chunk is awaited
+      // (relecture Bilan de #607), the archive's client may take its time between two.
+      const abort = new AbortController();
+      let stalled = setTimeout(() => {
+        abort.abort();
+      }, REQUEST_TIMEOUT_MS);
+      const response = await call(what, urlOf(key), { method: 'GET' }, abort.signal).finally(() => {
+        clearTimeout(stalled);
+      });
       if (response.status === 404) {
         await response.body?.cancel();
         return null;
@@ -244,11 +253,25 @@ export function createS3DropStorage(config: MediaBucketConfig, fetchLike?: Fetch
       if (!response.ok || response.body === null) return refused(what, response);
       const reader = response.body.getReader();
       return (async function* chunks(): AsyncGenerator<Uint8Array> {
+        let done = false;
         try {
-          for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) yield chunk.value;
+          for (;;) {
+            stalled = setTimeout(() => {
+              abort.abort();
+            }, REQUEST_TIMEOUT_MS);
+            const chunk = await reader.read().finally(() => {
+              clearTimeout(stalled);
+            });
+            if (chunk.done) break;
+            yield chunk.value;
+          }
+          done = true;
         } catch (error) {
           throw new ContentDropStorageUnavailable(`${config.bucket}: ${what} cut off`, { cause: error });
         } finally {
+          // The archive stopped before the end (its client went away, or another medium failed): the connection to
+          // the storage is closed now, not left open until a timeout.
+          if (!done) await reader.cancel().catch(() => undefined);
           reader.releaseLock();
         }
       })();

@@ -230,10 +230,11 @@ export interface DropStorage {
    */
   download(key: string, path: string, bytes: number): Promise<boolean>;
   /**
-   * The object at `key`, of `bytes` bytes, read as it comes, for an archive the response pulls (SC-03); `null` when
-   * there is none. A cut stream throws `ContentDropStorageUnavailable`.
+   * The object at `key`, read as it comes, for an archive the response pulls (SC-03); `null` when there is none. A cut
+   * stream, or a storage silent for 30 s while a chunk is awaited, throws `ContentDropStorageUnavailable`; the reader
+   * stopped early closes the connection.
    */
-  read(key: string, bytes: number): Promise<AsyncIterable<Uint8Array> | null>;
+  read(key: string): Promise<AsyncIterable<Uint8Array> | null>;
   /** The local file `path` written at `key`, signed with its fingerprint, in parts when it is large. */
   upload(key: string, path: string, mime: DropMime, sha256: string): Promise<void>;
 }

@@ -8,7 +8,7 @@ import {
   ContentDropStorageUnavailable,
 } from '../domain/errors';
 import type { AgencyContentStore, DropStorage, ScriptVersions } from '../domain/ports';
-import { scriptExportPlan, type ScriptExportPlan } from '../domain/script-export';
+import { fitsInOneArchive, scriptExportPlan, type ScriptExportPlan } from '../domain/script-export';
 
 export interface ScriptExportDeps {
   readonly agency: AgencyContentStore;
@@ -61,7 +61,7 @@ async function* archiveChunks(
       yield* drained();
       continue;
     }
-    const bytes = await deps.storage.read(source.storageKey, source.bytes);
+    const bytes = await deps.storage.read(source.storageKey);
     if (bytes === null)
       throw new ContentDropStorageUnavailable(`${source.storageKey} is gone from the storage`);
     const entry = open(path);
@@ -93,6 +93,7 @@ export async function exportScript(
   if (version === null) throw new ContentDropExportUnprocessable('not_a_script');
   // The request does not say yet which a « both » structure was shot as (question to Charles): refused, not guessed.
   if (version.moment === 'both') throw new ContentDropExportUnprocessable('moment_unknown');
+  if (!fitsInOneArchive(sent.files)) throw new ContentDropExportUnprocessable('too_large');
   const plan = scriptExportPlan({
     number: sent.scriptNumber,
     moment: version.moment,

@@ -58,6 +58,16 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   'audio/x-m4a': 'm4a',
 };
 
+/**
+ * What the media of one archive may weigh (relecture Bilan de #607): the ZIP is written without ZIP64, its sizes and
+ * offsets on 4 bytes, so past 4 Gio it would come out corrupt with a 200. The cards and the headers keep 256 Mio.
+ */
+const SCRIPT_EXPORT_MAX_BYTES = 4 * 1024 ** 3 - 256 * 1024 ** 2;
+
+/** Whether her script's media fit in one archive. */
+export const fitsInOneArchive = (files: readonly ExportedFile[]): boolean =>
+  files.reduce((total, file) => total + file.bytes, 0) <= SCRIPT_EXPORT_MAX_BYTES;
+
 /** A medium's extension by its type; `bin` for a type the drops never keep. */
 export const extensionOf = (mime: string): string => EXTENSIONS[mime] ?? 'bin';
 

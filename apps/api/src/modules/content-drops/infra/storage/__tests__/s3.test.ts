@@ -101,12 +101,12 @@ describe('content-drops › a kept medium read for a script’s archive (SC-03 c
   };
 
   it('streams its bytes, `null` when it is gone, and refuses another answer', async () => {
-    const read = await storageAnswering(() => new Response('des octets inventés')).read('media/a/b', 19);
+    const read = await storageAnswering(() => new Response('des octets inventés')).read('media/a/b');
     expect(read).not.toBeNull();
     if (read !== null) expect(await all(read)).toBe('des octets inventés');
-    expect(await storageAnswering(() => new Response(null, { status: 404 })).read('media/a/b', 1)).toBeNull();
+    expect(await storageAnswering(() => new Response(null, { status: 404 })).read('media/a/b')).toBeNull();
     await expect(
-      storageAnswering(() => new Response('<Error/>', { status: 403 })).read('media/a/b', 1),
+      storageAnswering(() => new Response('<Error/>', { status: 403 })).read('media/a/b'),
     ).rejects.toThrow(ContentDropStorageUnavailable);
   });
 
@@ -117,8 +117,28 @@ describe('content-drops › a kept medium read for a script’s archive (SC-03 c
         controller.error(new Error('connection reset'));
       },
     });
-    const read = await storageAnswering(() => new Response(cut)).read('media/a/b', 100);
+    const read = await storageAnswering(() => new Response(cut)).read('media/a/b');
     expect(read).not.toBeNull();
     if (read !== null) await expect(all(read)).rejects.toThrow(ContentDropStorageUnavailable);
+  });
+
+  it('closes the storage’s connection when the archive stops before the end', async () => {
+    let cancelled = false;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode('encore'));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const read = await storageAnswering(() => new Response(endless)).read('media/a/b');
+    expect(read).not.toBeNull();
+    if (read !== null)
+      for await (const chunk of read) {
+        expect(chunk.byteLength).toBeGreaterThan(0);
+        break;
+      }
+    expect(cancelled).toBe(true);
   });
 });

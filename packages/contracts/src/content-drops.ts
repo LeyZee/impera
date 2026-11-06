@@ -512,7 +512,8 @@ export const CONTENT_DROP_SLOTS_UNPROCESSABLE = 'content_drop_slots_unprocessabl
 export const CONTENT_DROP_CARD_NOT_FOUND = 'content_drop_card_not_found';
 /**
  * A script's archive refused (SC-03 c, ADR 0056 § 7): not a sent script, its files not all settled yet, an original
- * already erased, or a « both » structure whose moment is not fixed. `details.reason` says which.
+ * already erased, a « both » structure whose moment is not fixed, or media past what a ZIP without ZIP64 holds
+ * (4 Gio). `details.reason` says which.
  */
 export const CONTENT_DROP_EXPORT_UNPROCESSABLE = 'content_drop_export_unprocessable';
 export const SCRIPT_EXPORT_REFUSALS = [
@@ -520,6 +521,7 @@ export const SCRIPT_EXPORT_REFUSALS = [
   'not_ready',
   'original_erased',
   'moment_unknown',
+  'too_large',
 ] as const;
 export const ScriptExportRefusalSchema = z.enum(SCRIPT_EXPORT_REFUSALS);
 export type ScriptExportRefusal = z.infer<typeof ScriptExportRefusalSchema>;

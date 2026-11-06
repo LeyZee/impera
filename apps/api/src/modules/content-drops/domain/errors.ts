@@ -186,6 +186,7 @@ const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
   original_erased: 'Un original de ce script a déjà été effacé : l’archive serait incomplète',
   moment_unknown:
     'Cette structure se tourne de jour comme de nuit : le moment de ce script n’est pas encore fixé',
+  too_large: 'Ce script pèse plus de 4 Go : il ne tient pas dans une seule archive',
 };
 
 /** A script's archive refused (SC-03 c): `details.reason` says why, the sentence says it to the agency. */

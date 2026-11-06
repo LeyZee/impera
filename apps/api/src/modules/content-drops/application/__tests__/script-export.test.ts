@@ -146,6 +146,22 @@ describe('content-drops › a sent script’s archive (SC-03 c)', () => {
     await expect(refused).rejects.toMatchObject({ details: { reason: 'moment_unknown' } });
   });
 
+  it('refuses media past 4 Gio before the first byte: a ZIP without ZIP64 would come out corrupt', async () => {
+    const heavy: SentScript = {
+      ...sent,
+      files: sent.files.map((file) => ({ ...file, bytes: 1.5 * 1024 ** 3 })),
+    };
+    await expect(
+      exportScript(
+        { agency: agencyWith(heavy), versions: versionsOf('night'), storage: storageOf(objects) },
+        'creator',
+        'owner',
+        'drop',
+        NOW,
+      ),
+    ).rejects.toMatchObject({ details: { reason: 'too_large' } });
+  });
+
   it('cuts the archive when a medium is gone from the storage', async () => {
     const archive = await exportScript(
       {
