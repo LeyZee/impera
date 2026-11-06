@@ -365,7 +365,8 @@ function Draft({
         : verdict === undefined
           ? 'Proposée, à noter'
           : 'Proposée';
-  const bubbleState = answer.isBlocked ? 'is-blocked' : verdict === undefined ? '' : 'is-set-aside';
+  const bubbleState =
+    unanswered !== null ? '' : answer.isBlocked ? 'is-blocked' : verdict === undefined ? '' : 'is-set-aside';
   return (
     <div className="pg-draft">
       <span className={`nv-draft-label ${answer.isBlocked ? 'pg-blockr' : ''}`}>{label}</span>
