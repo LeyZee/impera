@@ -193,7 +193,6 @@ export function remainingOf(seconds: number): string {
   return `${String(Math.floor(minutes / 60))} h ${String(minutes % 60).padStart(2, '0')}`;
 }
 
-/** What a file's line says, from its state on the server and, while it goes up here, its progress. */
 /**
  * When a script asked of her is shot, as its request fixed (SC-03, « ok alternance »): on her card, before she begins,
  * as the agency reads it in Créatrices › Scripts (recette MED-05). `null` (a script asked before) says nothing.
@@ -212,6 +211,7 @@ export function refusedOf(drop: ContentDrop): ContentDropFile[] {
   return drop.files.filter((file) => file.state === 'refused');
 }
 
+/** What a file's line says, from its state on the server and, while it goes up here, its progress. */
 export function fileLine(file: ContentDropFile, live: LiveSend | undefined): string {
   if (file.state === 'awaiting') {
     if (live === undefined || live.phase === 'failed') return 'Envoi interrompu';
@@ -237,7 +237,8 @@ export function weightOf(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1).replace('.', ',')} Go`;
   if (bytes >= 999_500) return `${String(Math.round(bytes / 1_000_000))} Mo`;
   // Under a megabyte, in Ko: a photo of 9 Ko is not « 1 Mo », an empty file is not either (recette MED-02).
-  return `${String(Math.round(bytes / 1000))} Ko`;
+  if (bytes === 0) return '0 Ko';
+  return `${String(Math.max(1, Math.round(bytes / 1000)))} Ko`;
 }
 
 const DAY_MS = 86_400_000;

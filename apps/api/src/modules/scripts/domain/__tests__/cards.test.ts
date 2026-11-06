@@ -235,6 +235,9 @@ describe('cardSvg', () => {
     expect(cardSvg(named, 'card')).toContain('Soirée 🌗 au salon 💋');
     expect(withoutEmoji('👩🏽‍🦰 Rousse ❤️ 🇫🇷')).toBe('Rousse');
     expect(withoutEmoji('Plein jour')).toBe('Plein jour');
+    expect(withoutEmoji('Marque® ™ ©')).toBe('Marque® ™ ©');
+    expect(withoutEmoji('Étape 1️⃣')).toBe('Étape 1');
+    expect(withoutEmoji('🌗')).toBe('🌗');
   });
 
   it('keeps three hints at least on a full card, and never says « + N » alone (Extension’s review)', () => {

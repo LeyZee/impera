@@ -93,6 +93,7 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     // Under a megabyte, in Ko: never « 1 Mo » for a photo of 9 Ko or an empty file (recette MED-02).
     expect(weightOf(8_894)).toBe('9 Ko');
     expect(weightOf(0)).toBe('0 Ko');
+    expect(weightOf(300)).toBe('1 Ko');
     expect(weightOf(999_600)).toBe('1 Mo');
     expect(remainingOf(42)).toBe('40 s');
     expect(remainingOf(3900)).toBe('1 h 05');

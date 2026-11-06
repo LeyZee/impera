@@ -231,13 +231,16 @@ const escape = (text: string): string =>
  * draws the SVG itself, with the device's emoji: the `card` format keeps them.
  */
 export function withoutEmoji(text: string): string {
-  return text
+  const bare = text
+    // Pictographs only: ©, ® and ™ are text the fonts draw, and stay; a keycap keeps its digit, not its enclosing mark.
     .replace(
-      /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\u{FE0F}|\u{200D}|\p{Emoji_Modifier})+/gu,
-      '',
+      /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\u{FE0F}|\u{200D}|\u{20E3}|\p{Emoji_Modifier})+/gu,
+      (run) => run.replace(/[^©®™]/gu, ''),
     )
     .replace(/ {2,}/gu, ' ')
     .trim();
+  // A name made of emoji alone keeps them: an empty line would read as a card without a name.
+  return bare === '' ? text.trim() : bare;
 }
 
 /**
