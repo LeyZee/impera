@@ -21,6 +21,7 @@ import {
   parsePercent,
   percentText,
   periodLine,
+  periodLineFrom,
   READ_AGAIN,
   refusalText,
   SOURCE_LABELS,
@@ -189,7 +190,9 @@ function AccountRules({
         <div className="rp-account__now">
           <span className="rp-chip rp-chip--ok">En vigueur</span>
           <p className="rp-account__rules nv-num">{rulesLine(inForce)}</p>
-          <p className="rp-account__since">depuis la quinzaine {periodLine(inForce.fromPeriod)}</p>
+          <p className="rp-account__since">
+            depuis la quinzaine {periodLineFrom(inForce.fromPeriod, currentPeriod)}
+          </p>
         </div>
       )}
       {coming.map((rules) => (

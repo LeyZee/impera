@@ -27,7 +27,14 @@ import {
 } from '@/payroll/model';
 import '@/payroll/pay.css';
 import '@/reports/reports.css';
-import { amountText, followingPeriod, percentText, periodLine, signedAmountText } from '@/reports/model';
+import {
+  amountText,
+  followingPeriod,
+  percentText,
+  periodLine,
+  periodLineFrom,
+  signedAmountText,
+} from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
 import '@/screens/team/team.css';
@@ -244,6 +251,7 @@ export function GoalsPage({
           set={data.bonusTiers}
           later={next?.bonusTiers ?? null}
           laterPeriod={next?.period ?? null}
+          current={current}
           owner={owner && tierPeriods.length > 0}
           onChange={() => {
             setEditing({ kind: 'tiers' });
@@ -336,12 +344,15 @@ function TiersPanel({
   set,
   later,
   laterPeriod,
+  current,
   owner,
   onChange,
 }: {
   set: BonusTierSet | null;
   later: BonusTierSet | null;
   laterPeriod: PayPeriod | null;
+  /** The period under way: a set in force since another year says its year. */
+  current: PayPeriod | null;
   owner: boolean;
   onChange: () => void;
 }): JSX.Element {
@@ -354,7 +365,7 @@ function TiersPanel({
       title={
         set === null || tiers.length === 0
           ? 'Aucun palier en vigueur'
-          : `En vigueur depuis la quinzaine ${periodLine(set.fromPeriod)}`
+          : `En vigueur depuis la quinzaine ${periodLineFrom(set.fromPeriod, current)}`
       }
       actions={
         owner ? (
