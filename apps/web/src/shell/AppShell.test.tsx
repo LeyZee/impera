@@ -802,7 +802,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
       [
         '/creatrices',
-        'La fiche de chaque créatrice : sa persona, son agenda, ses idées du jour, ses demandes, ses scripts, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.',
+        'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, heures d’activité, accès, pourcentage et profil.',
       ],
     ] as const) {
       renderApp(owner, path);

@@ -4,14 +4,13 @@ import { useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
 import { ArchivedCreators } from './ArchivedCreators';
-import { ChipFace, ChipName } from './CreatorFace';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
-import { SetupCard } from './SetupCard';
 import { AgendaSection } from './agenda/AgendaSection';
 import { useCreators } from './api';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
+import { CreatorsList } from './overview/CreatorsList';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
@@ -24,11 +23,13 @@ import { Page, PageHeader, SubNav } from '@/shell/layout';
 export type CreatorTab = CreatorSheet;
 
 /**
- * Créatrices: the sheet of each creator, starting with her persona (revue 08: the persona belongs to the creator,
- * not to the settings), then for the owner and an active manager her agenda (CR-05 lot c), and for the owner alone
- * her hours (P3-14), her access to her own space (CR-02) and the agency's percentage (CR-04). With several creators,
- * a row of chips picks one; with one, her name is enough. The owner adds a creator here. The tab and the creator live in the address (`?onglet=heures&creatrice=<id>`). Changes
- * not saved are never lost silently: leaving asks first.
+ * Créatrices: first the list of the creators, one card each with what the agency needs to know of her (« ok
+ * liste-créatrices », Charles, 06/11), where the owner adds one; then, once one is picked, her sheet, starting with her
+ * persona (revue 08: the persona belongs to the creator, not to the settings), then for the owner and an active manager
+ * her agenda (CR-05 lot c), and for the owner alone her hours (P3-14), her access to her own space (CR-02) and the
+ * agency's percentage (CR-04). Always the list first, even with one creator. The tab and the creator live in the
+ * address (`?onglet=heures&creatrice=<id>`): no creator, or one the list does not hold, is the list. Changes not saved
+ * are never lost silently: leaving asks first.
  */
 export function CreatorsPage({
   tab,
@@ -36,7 +37,7 @@ export function CreatorsPage({
   onCreator,
 }: {
   tab: CreatorTab;
-  /** The creator in the address; one the list does not hold reads as the first of the list. */
+  /** The creator in the address; none, or one the list does not hold, shows the list. */
   creatorId: CreatorId | null;
   onCreator: (id: CreatorId) => void;
 }): JSX.Element {
@@ -46,9 +47,7 @@ export function CreatorsPage({
   const [adding, setAdding] = useState(false);
   /** The persona or the hours on screen hold changes not saved. */
   const [dirty, setDirty] = useState(false);
-  /** An action of this page (« Ajouter une créatrice ») waiting for the confirmation that drops those changes. */
-  const [pending, setPending] = useState<(() => void) | null>(null);
-  // Any navigation, a chip, a tab, a link of the menu or a step back included, waits for the same confirmation; a
+  // Any navigation, a tab, « ← Créatrices », a link of the menu or a step back included, waits for the same confirmation; a
   // reload or a closed tab gets the browser's own.
   const blocker = useBlocker({
     shouldBlockFn: () => true,
@@ -57,23 +56,22 @@ export function CreatorsPage({
     withResolver: true,
   });
   const isOwner = user.role === 'owner';
-  // With no creator yet, the owner is asked for one first: the persona needs her.
-  const showForm = isOwner && (adding || (query.isSuccess && creators.length === 0));
-  const current = creators.find((creator) => creator.id === creatorId) ?? creators[0];
+  const current = creators.find((creator) => creator.id === creatorId);
+  // Added from the list; with no creator yet, the owner is asked for one first: the persona needs her.
+  const showForm = isOwner && current === undefined && (adding || (query.isSuccess && creators.length === 0));
   const selected = current?.id ?? null;
+  const listing = current === undefined && !showForm;
   // The router keeps each member to their sheets (`sheetsFor`); here they also need a creator.
   const sheets = sheetsFor(user);
-  const shown: CreatorTab = current !== undefined && sheets.includes(tab) ? tab : (sheets[0] ?? 'persona');
+  /** The sheet a card of the list opens, and the one on screen: the address's, when this member opens it. */
+  const shown: CreatorTab = sheets.includes(tab) ? tab : (sheets[0] ?? 'persona');
 
-  const leaving = blocker.status === 'blocked' || pending !== null;
+  const leaving = blocker.status === 'blocked';
   const stay = (): void => {
     if (blocker.status === 'blocked') blocker.reset();
-    setPending(null);
   };
   const leave = (): void => {
     if (blocker.status === 'blocked') blocker.proceed();
-    pending?.();
-    setPending(null);
   };
 
   const body = (): JSX.Element => {
@@ -139,6 +137,7 @@ export function CreatorsPage({
         </section>
       );
     }
+    if (listing) return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} />;
     if (shown === 'agenda' && current !== undefined) {
       return (
         <AgendaSection
@@ -217,7 +216,7 @@ export function CreatorsPage({
     );
   };
   // Persona · Agenda · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every
-  // section's sub-tabs (NAV-10); they say where one is: the eyebrow then says nothing more (CREA-24).
+  // section's sub-tabs (NAV-10); they say where one is.
   const switchShown = sheets.length > 1 && current !== undefined && !showForm && query.isSuccess;
   const labels: Readonly<Record<CreatorSheet, string>> = {
     persona: 'Persona',
@@ -243,21 +242,52 @@ export function CreatorsPage({
     'profile',
   ];
 
+  const lead = isOwner
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, heures d’activité, accès, pourcentage et profil.'
+    : sheets.includes('agenda')
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes et ses scripts.'
+      : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
+
   return (
     <Page>
-      <PageHeader
-        eyebrow={current === undefined || showForm || switchShown ? undefined : current.displayName}
-        title="Créatrices"
-        lead={
-          isOwner
-            ? 'La fiche de chaque créatrice : sa persona, son agenda, ses idées du jour, ses demandes, ses scripts, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.'
-            : sheets.includes('agenda')
-              ? 'L’agenda de chaque créatrice, ses idées du jour, ses demandes et ses scripts : ce qu’elle a prévu, ce que l’agence lui propose et lui demande, ce qu’elle a envoyé.'
-              : 'La persona de chaque créatrice : ce que l’agent sait d’elle et la façon dont il parle.'
-        }
-        actions={
-          <>
-            {switchShown ? (
+      {current === undefined ? (
+        <PageHeader
+          title="Créatrices"
+          {...(showForm ? {} : { lead })}
+          actions={
+            isOwner && !showForm && query.isSuccess ? (
+              <>
+                {/* The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c). */}
+                <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm">
+                  Structures de script
+                </Link>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--neon nv-btn--sm"
+                  onClick={() => {
+                    setAdding(true);
+                  }}
+                >
+                  Ajouter une créatrice
+                </button>
+              </>
+            ) : undefined
+          }
+        />
+      ) : (
+        <PageHeader
+          eyebrow={
+            <Link
+              to="/creatrices"
+              search={creatorsSearch(shown, null)}
+              className="nv-btn nv-btn--plain nv-btn--sm"
+            >
+              ← Créatrices
+            </Link>
+          }
+          title={current.displayName}
+          actions={
+            switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"
                 items={order
@@ -269,66 +299,16 @@ export function CreatorsPage({
                     label: labels[sheet],
                   }))}
               />
-            ) : null}
-            {/* While a creator is added, only « Annuler » leads back: a chip would change nothing on screen. */}
-            {creators.length > 1 && !showForm ? (
-              <div className="ps-chips cr-creators" role="radiogroup" aria-label="Créatrice">
-                {creators.map((creator) => (
-                  <button
-                    key={creator.id}
-                    type="button"
-                    role="radio"
-                    className="nv-chip"
-                    aria-checked={creator.id === selected}
-                    onClick={() => {
-                      if (creator.id !== selected) onCreator(creator.id);
-                    }}
-                  >
-                    <ChipFace creator={creator} />
-                    <ChipName name={creator.displayName} />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {isOwner && !showForm && query.isSuccess ? (
-              // The script structures are the agency's, asked of every creator: a screen of their own (SC-01 c).
-              <Link to="/creatrices/structures" className="nv-btn nv-btn--soft nv-btn--sm cr-agency-first">
-                Structures de script
-              </Link>
-            ) : null}
-            {isOwner && !showForm && query.isSuccess ? (
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                onClick={() => {
-                  const add = (): void => {
-                    setAdding(true);
-                  };
-                  if (dirty) setPending(() => add);
-                  else add();
-                }}
-              >
-                Ajouter une créatrice
-              </button>
-            ) : null}
-          </>
-        }
-      />
+            ) : undefined
+          }
+        />
+      )}
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
-        {/* What is left to set up, above every tab of her sheet; read again with each tab (CRM-07 b2). */}
-        {isOwner && current !== undefined && !showForm && query.isSuccess ? (
-          <SetupCard
-            key={`${current.id}:${shown}`}
-            creatorId={current.id}
-            creatorName={current.displayName}
-            timezone={current.timezone}
-          />
-        ) : null}
         {body()}
-        {/* The archived creators, folded at the foot of the sheet, the owner's alone (ADR 0071 § 2). */}
-        {isOwner && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
+        {/* The archived creators, folded at the foot of the list, the owner's alone (ADR 0071 § 2). */}
+        {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
   );
