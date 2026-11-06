@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  agencyPeriodOf,
+  agencySearch,
+  agentPeriodOf,
   agentRuns,
   changePercent,
   chartTip,
@@ -268,5 +271,27 @@ describe('the Dashboard’s address (recette 05/11, PRO-28)', () => {
     expect(parseDashboardSearch({ creatrice: 'pas-un-id' })).toEqual({});
     expect(dashboardSearch('day', id)).toEqual({ creatrice: id });
     expect(dashboardSearch('month')).toEqual({ periode: '30j' });
+  });
+});
+
+describe('the agency’s period in the address (ADR 0078)', () => {
+  it('reads 7 days by default, then today, 30 days and 3 months, and writes them back', () => {
+    expect(agencyPeriodOf(parseDashboardSearch({}))).toBe('week');
+    expect(agencyPeriodOf(parseDashboardSearch({ periode: 'jour' }))).toBe('day');
+    expect(agencyPeriodOf(parseDashboardSearch({ periode: '30j' }))).toBe('month');
+    expect(agencyPeriodOf(parseDashboardSearch({ periode: '90j' }))).toBe('quarter');
+    expect(agencyPeriodOf(parseDashboardSearch({ periode: '1an' }))).toBe('week');
+    expect(agencySearch('week')).toEqual({});
+    expect(agencySearch('quarter', '00000000-0000-4000-8000-000000000001')).toEqual({
+      periode: '90j',
+      creatrice: '00000000-0000-4000-8000-000000000001',
+    });
+    expect(agencySearch('day')).toEqual({ periode: 'jour' });
+  });
+
+  it('gives the agent’s blocks three months as 30 days', () => {
+    expect(agentPeriodOf('quarter')).toBe('month');
+    expect(agentPeriodOf('week')).toBe('week');
+    expect(agentPeriodOf('day')).toBe('day');
   });
 });

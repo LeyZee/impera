@@ -5,13 +5,17 @@ import type { AgencyInsights, AgencyPeriod, AgencySaleKind, DashboardSalesSeller
  * leaves as euros; every colour is a series token in a fixed order, following the entity, never its rank.
  */
 
-/** The five categorical series (validated, Nuit and Jour), then the fold of everything after them. */
+/**
+ * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the four categorical
+ * series (validated Nuit and Jour, never violet, gold, red or cyan, the agent's, the sale's and the statuses'), then
+ * « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
+ * creators' bars and the hours' ramp take the data ink alone.
+ */
 export const SERIES = [
   'var(--nv-series-1)',
   'var(--nv-series-2)',
   'var(--nv-series-3)',
   'var(--nv-series-4)',
-  'var(--nv-series-5)',
 ] as const;
 export const OTHER = 'var(--nv-series-other)';
 
@@ -52,9 +56,9 @@ export function changeOf(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 100);
 }
 
-/** « +18 % », « −4 % », « = »: a delta's text, the true minus sign. */
+/** « +18 % », « −4 % », « 0 % »: a delta's text, the true minus sign. */
 export function deltaText(change: number): string {
-  if (change === 0) return '=';
+  if (change === 0) return '0\u00a0%';
   return `${change > 0 ? '+' : '−'}${String(Math.abs(change))}\u00a0%`;
 }
 
@@ -114,9 +118,9 @@ const SELLER_SLICES: readonly {
   readonly label: string;
   readonly colour: string;
 }[] = [
-  { key: 'member', label: 'Chatteurs', colour: SERIES[1] },
-  { key: 'agent', label: 'Agent IA', colour: SERIES[0] },
-  { key: 'unlinked', label: 'Chatteur non relié', colour: SERIES[2] },
+  { key: 'member', label: 'Chatteurs', colour: 'var(--nv-data-1)' },
+  { key: 'agent', label: 'Agent IA', colour: 'var(--nv-agent)' },
+  { key: 'unlinked', label: 'Chatteur non relié', colour: 'var(--nv-data-2)' },
   { key: 'none', label: 'Sans chatteur', colour: OTHER },
 ];
 
@@ -141,61 +145,56 @@ export function sellerSlices(sellers: AgencyInsights['sellers']): Slice[] {
   }).filter((slice) => slice.cents > 0);
 }
 
-/** A creator's colour: her place in the agency's order, the same whatever the period; past five, « Autres ». */
-export function creatorColours(creators: AgencyInsights['creators']): ReadonlyMap<string, string> {
-  return new Map(creators.map((creator, i) => [creator.creatorId, SERIES[i] ?? OTHER] as const));
-}
-
-/** One stack of the daily chart: a series' part of a day. */
+/** One stack of the chart of the period: a kind's part of a day or an hour. */
 export interface Stack {
   readonly key: string;
   readonly label: string;
   readonly colour: string;
 }
 
-/**
- * The series of the daily chart: the creators for the agency (the sixth and after folded in « Autres créatrices »),
- * the kinds for one creator.
- */
-export function stackSeries(insights: AgencyInsights, oneCreator: boolean): Stack[] {
-  if (oneCreator) {
-    return KIND_SLICES.map((slice, i) => ({
-      key: slice.key,
-      label: slice.label,
-      colour: SERIES[i] ?? OTHER,
-    }));
-  }
-  const named = insights.creators.slice(0, SERIES.length).map((creator, i) => ({
-    key: creator.creatorId,
-    label: creator.name,
-    colour: SERIES[i] ?? OTHER,
-  }));
-  return insights.creators.length > SERIES.length
-    ? [...named, { key: 'other', label: 'Autres créatrices', colour: OTHER }]
-    : named;
+/** The stacks of the chart of the period: the kinds, in the ring's order and colours (the agency's as one creator's). */
+export const STACKS: readonly Stack[] = KIND_SLICES.map((slice, i) => ({
+  key: slice.key,
+  label: slice.label,
+  colour: SERIES[i] ?? OTHER,
+}));
+
+/** A day's (or an hour's) amounts by kind, in the stacks' order. */
+export function dayStacks(day: Pick<AgencyInsights['days'][number], 'byKind'>): number[] {
+  return KIND_SLICES.map((slice) =>
+    day.byKind
+      .filter((one) => slice.kinds.includes(one.kind))
+      .reduce((sum, one) => sum + one.revenueMinor, 0),
+  );
 }
 
-/** A day's amounts by stack key, in the stacks' order. */
-export function dayStacks(
-  day: AgencyInsights['days'][number],
-  stacks: readonly Stack[],
-  oneCreator: boolean,
-): number[] {
-  if (oneCreator) {
-    return KIND_SLICES.map((slice) =>
-      day.byKind
-        .filter((one) => slice.kinds.includes(one.kind))
-        .reduce((sum, one) => sum + one.revenueMinor, 0),
-    );
+/**
+ * Three months on a phone: a column a week, a day being too thin to see. The week starts at the first day shown, the
+ * last one may be shorter.
+ */
+export interface Column {
+  readonly key: string;
+  readonly label: string;
+  readonly title: string;
+  readonly parts: readonly number[];
+  readonly total: number;
+}
+
+export function byWeek(columns: readonly Column[]): Column[] {
+  const weeks: Column[] = [];
+  for (let i = 0; i < columns.length; i += 7) {
+    const days = columns.slice(i, i + 7);
+    const first = days[0];
+    if (first === undefined) continue;
+    weeks.push({
+      key: first.key,
+      label: first.label,
+      title: `Semaine du ${first.title}`,
+      parts: first.parts.map((_, s) => days.reduce((sum, day) => sum + (day.parts[s] ?? 0), 0)),
+      total: days.reduce((sum, day) => sum + day.total, 0),
+    });
   }
-  const keys = new Set(stacks.map((stack) => stack.key));
-  return stacks.map((stack) =>
-    stack.key === 'other'
-      ? day.byCreator
-          .filter((one) => !keys.has(one.creatorId))
-          .reduce((sum, one) => sum + one.revenueMinor, 0)
-      : (day.byCreator.find((one) => one.creatorId === stack.key)?.revenueMinor ?? 0),
-  );
+  return weeks;
 }
 
 const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', {
@@ -218,11 +217,6 @@ export function shortDay(day: string): string {
 
 export const WEEKDAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const;
 export const WEEKDAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] as const;
-
-/** Today's row of the hours (Monday 0), for a period of one day. */
-export function weekdayIndex(day: string): number {
-  return (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7;
-}
 
 /** The busiest cell of the hours and where it is, for the sentence above the map; `null` without a sale. */
 export function busiest(hours: AgencyInsights['hours']): { day: number; hour: number; cents: number } | null {
@@ -281,4 +275,10 @@ export function arcs(
     start += length;
     return arc;
   });
+}
+
+/** « heure de Paris » for the platform's zone: the city of an IANA zone, its last part. */
+export function zoneLabel(timeZone: string): string {
+  const city = timeZone.split('/').pop()?.replaceAll('_', ' ') ?? timeZone;
+  return `heure de ${city}`;
 }

@@ -139,7 +139,7 @@ function Offline({
  * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). Whoever can add one is led to
  * Créatrices; anyone else reads who does.
  */
-function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
+export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
   return canAddCreator ? (
     <Alone
       tone="idle"
@@ -338,7 +338,19 @@ function Loaded({
         )}
       </header>
 
-      {agency === undefined ? agentHero : null}
+      {/* A creator chosen from the agency: her figures first, the agency's cards after (recette 06/11). */}
+      {agency === undefined ? (
+        agentHero
+      ) : (
+        <AgencyInsightsPanel
+          period={agency.period}
+          onPeriod={agency.onPeriod}
+          creatorId={creatorId}
+          creatorName={data.creator.name}
+          canOpenSettings={agency.canOpenSettings}
+          tip={tip}
+        />
+      )}
 
       <BackupBanner enabled={forOwner} />
 
@@ -355,19 +367,7 @@ function Loaded({
       {/* The AI budget and the stuck jobs of no creator are the agency's, not her agent's health (reco 18, PRO-10). */}
       <AgencyStrip agency={data.agency} />
 
-      {agency === undefined ? null : (
-        <>
-          <AgencyInsightsPanel
-            period={agency.period}
-            onPeriod={agency.onPeriod}
-            creatorId={creatorId}
-            creatorName={data.creator.name}
-            canOpenSettings={agency.canOpenSettings}
-            tip={tip}
-          />
-          {agentHero}
-        </>
-      )}
+      {agency === undefined ? null : agentHero}
 
       {sales === null ? null : (
         <>
@@ -400,7 +400,7 @@ function Loaded({
         sub={
           agency === undefined
             ? 'ce qu’ils ont dépensé : d’abord la part de l’agent, puis celle des chatteurs'
-            : `ce qu’ils ont dépensé ${AGENT_SPAN[period]} : d’abord la part de l’agent, puis celle des chatteurs`
+            : `les achats vus dans ses conversations ${AGENT_SPAN[period]} : d’abord la part de l’agent, puis celle des chatteurs`
         }
         index={(sales === null ? 2 : 4) + (data.revealSales === null || agency !== undefined ? 0 : 1)}
         control={sales === null && data.revealSales === null ? periodControl : undefined}
@@ -410,6 +410,12 @@ function Loaded({
           tip={tip}
           onOpen={opensTracking ? openFan : undefined}
           usdNote={data.usdNote}
+          {...(agency === undefined
+            ? {}
+            : {
+                empty:
+                  'Aucun achat vu dans ses conversations : elles se lisent une fois la session Reveal capturée. Les ventes du registre sont plus haut.',
+              })}
         />
       </Section>
 

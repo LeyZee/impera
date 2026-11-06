@@ -51,7 +51,7 @@ function creator(
     totals: { from: RANGE.previousFrom, to: RANGE.to, rows: [...rows], refundsWithoutSale: 0 },
     hours: [],
     fans: [],
-    previousPaying: 0,
+    refundsWithoutSale: 0,
     ...more,
   };
 }
@@ -60,7 +60,9 @@ const insights = (
   creators: readonly AgencyCreatorRead[],
   rate: { day: string; rateMicros: number } | null = null,
 ) =>
-  AgencyInsightsSchema.parse(agencyInsights({ period: 'week', range: RANGE, creators, names: NAMES, rate }));
+  AgencyInsightsSchema.parse(
+    agencyInsights({ period: 'week', range: RANGE, creators, names: NAMES, rate, timeZone: 'Europe/Paris' }),
+  );
 
 describe('agencyRange', () => {
   it('counts today in, and puts the period of the same length just before', () => {
@@ -172,14 +174,55 @@ describe('agencyInsights', () => {
     const result = insights([
       creator(LINA, 'Lina', [], {
         hours: [
-          { isoDay: 1, hour: 21, currency: 'EUR', grossMinor: 1500 },
-          { isoDay: 7, hour: 0, currency: 'EUR', grossMinor: 200 },
+          { isoDay: 1, hour: 21, saleType: 'ppv', currency: 'EUR', grossMinor: 1500 },
+          { isoDay: 7, hour: 0, saleType: 'tip', currency: 'EUR', grossMinor: 200 },
         ],
       }),
-      creator(MAYA, 'Maya', [], { hours: [{ isoDay: 1, hour: 21, currency: 'EUR', grossMinor: 500 }] }),
+      creator(MAYA, 'Maya', [], {
+        hours: [{ isoDay: 1, hour: 21, saleType: 'ppv', currency: 'EUR', grossMinor: 500 }],
+      }),
     ]);
     expect(result.hours[0]?.[21]).toBe(2000);
     expect(result.hours[6]?.[0]).toBe(200);
+    // A week has no hour-by-hour chart.
+    expect(result.hourly).toEqual([]);
+  });
+
+  it('splits one day hour by hour, by creator and by kind', () => {
+    const result = AgencyInsightsSchema.parse(
+      agencyInsights({
+        period: 'day',
+        range: RANGE,
+        creators: [
+          creator(LINA, 'Lina', [], {
+            hours: [
+              { isoDay: 4, hour: 21, saleType: 'ppv', currency: 'EUR', grossMinor: 1500 },
+              { isoDay: 4, hour: 21, saleType: 'tip', currency: 'EUR', grossMinor: 300 },
+            ],
+          }),
+          creator(MAYA, 'Maya', [], {
+            hours: [{ isoDay: 4, hour: 21, saleType: 'ppv', currency: 'EUR', grossMinor: 500 }],
+          }),
+        ],
+        names: NAMES,
+        rate: null,
+        timeZone: 'Europe/Paris',
+      }),
+    );
+    expect(result.hourly).toHaveLength(24);
+    expect(result.hourly[20]).toEqual({ hour: 20, revenueMinor: 0, byCreator: [], byKind: [] });
+    expect(result.hourly[21]).toEqual({
+      hour: 21,
+      revenueMinor: 2300,
+      byCreator: [
+        { creatorId: LINA, revenueMinor: 1800 },
+        { creatorId: MAYA, revenueMinor: 500 },
+      ],
+      byKind: [
+        { kind: 'ppv', revenueMinor: 2000 },
+        { kind: 'tips', revenueMinor: 300 },
+      ],
+    });
   });
 
   it('counts paying fans per creator, the new ones, the ten biggest’s share, never a fan by name', () => {
@@ -187,22 +230,62 @@ describe('agencyInsights', () => {
       key: `account:fan_${String(i)}`,
       currency: 'EUR' as const,
       grossMinor: i === 0 ? 10_000 : 1000,
+      previous: false,
       seenBefore: i < 4,
     }));
+    const before = Array.from({ length: 7 }, (_, i) => ({
+      key: `account:fan_${String(i)}`,
+      currency: 'EUR' as const,
+      grossMinor: 500,
+      previous: true,
+      seenBefore: false,
+    }));
     const result = insights([
-      creator(LINA, 'Lina', [], { fans, previousPaying: 7 }),
+      creator(LINA, 'Lina', [], {
+        // Fan 11 was refunded all he spent: he paid nothing.
+        fans: [
+          ...fans.slice(0, 11),
+          {
+            key: 'account:fan_11',
+            currency: 'EUR' as const,
+            grossMinor: 0,
+            previous: false,
+            seenBefore: false,
+          },
+          ...before,
+        ],
+        refundsWithoutSale: 2,
+      }),
       // The same key under another creator is another fan.
-      creator(MAYA, 'Maya', [], { fans: fans.slice(0, 1), previousPaying: 1 }),
+      creator(MAYA, 'Maya', [], { fans: [...fans.slice(0, 1), ...before.slice(0, 1)] }),
     ]);
     expect(result.fans).toEqual({
-      paying: 13,
+      paying: 12,
       previousPaying: 8,
-      newPaying: 8,
-      // Top ten: 10 000 + 10 000 + 8 × 1000 = 28 000 of 31 000.
-      topTenShare: 90,
-      averagePerPayingMinor: Math.round(31_000 / 13),
+      newPaying: 7,
+      // Top ten: 10 000 + 10 000 + 8 × 1000 = 28 000 of 30 000.
+      topTenShare: 93,
+      averagePerPayingMinor: Math.round(30_000 / 12),
     });
+    expect(result.refundsWithoutSale).toBe(2);
     expect(JSON.stringify(result)).not.toContain('fan_');
+  });
+
+  it('counts a fan who paid in dollars alone in neither period without a rate', () => {
+    const dollars = (previous: boolean) => ({
+      key: 'account:fan_usd',
+      currency: 'USD' as const,
+      grossMinor: 1000,
+      previous,
+      seenBefore: false,
+    });
+    const without = insights([creator(LINA, 'Lina', [], { fans: [dollars(false), dollars(true)] })]);
+    expect([without.fans.paying, without.fans.previousPaying]).toEqual([0, 0]);
+    const withRate = insights([creator(LINA, 'Lina', [], { fans: [dollars(false), dollars(true)] })], {
+      day: '2026-11-05',
+      rateMicros: 900_000,
+    });
+    expect([withRate.fans.paying, withRate.fans.previousPaying]).toEqual([1, 1]);
   });
 
   it('leaves dollars out without a rate and says so, converts them with one', () => {

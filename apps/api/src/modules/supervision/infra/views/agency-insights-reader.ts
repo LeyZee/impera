@@ -1,6 +1,7 @@
 import {
   CurrencySchema,
   PlatformSchema,
+  SaleTypeSchema,
   type CreatorId,
   type Platform,
   type UserId,
@@ -35,6 +36,7 @@ const HourSchema = z.array(
   z.object({
     iso_day: z.coerce.number().int().min(1).max(7),
     hour: z.coerce.number().int().min(0).max(23),
+    sale_type: SaleTypeSchema,
     currency: CurrencySchema,
     gross: z.coerce.number().int(),
   }),
@@ -45,10 +47,11 @@ const FanSchema = z.array(
     fan: z.string(),
     currency: CurrencySchema,
     gross: z.coerce.number().int(),
+    previous: z.boolean(),
     seen_before: z.boolean(),
   }),
 );
-const CountSchema = z.array(z.object({ paying: z.coerce.number().int().nonnegative() }));
+const CountSchema = z.array(z.object({ refunds: z.coerce.number().int().nonnegative() }));
 const MemberSchema = z.array(z.object({ id: z.string(), display_name: z.string() }));
 
 /**
@@ -88,39 +91,55 @@ export function createAgencyInsightsReader(
             await tx.execute(sql`
               select extract(isodow from l.occurred_at at time zone ${zone})::int as iso_day,
                      extract(hour from l.occurred_at at time zone ${zone})::int as hour,
-                     l.currency, sum(l.gross_incl_vat_minor)::bigint as gross
+                     l.sale_type, l.currency, sum(l.gross_incl_vat_minor)::bigint as gross
                 from platform_sales l
                where l.creator_id = ${creatorId}::uuid and l.event = 'sale'
                  and l.occurred_at >= ${start} and l.occurred_at < ${end}
-               group by 1, 2, 3`)
+               group by 1, 2, 3, 4`)
           ).rows,
         );
+        // Each fan's sales of the period and of the one before, less their refunds whenever refunded (at most one per
+        // sale: the register is unique by sale and event), and whether he bought before the period.
         const fans = FanSchema.parse(
           (
             await tx.execute(sql`
-              with spent as (
-                select l.platform_account_id::text as account, l.platform_fan_id as fan, l.currency,
-                       sum(l.gross_incl_vat_minor)::bigint as gross
-                  from platform_sales l
-                 where l.creator_id = ${creatorId}::uuid and l.event = 'sale' and l.platform_fan_id is not null
-                   and l.occurred_at >= ${start} and l.occurred_at < ${end}
-                 group by 1, 2, 3)
-              select s.account, s.fan, s.currency, s.gross,
-                     exists (
-                       select 1 from platform_sales p
-                        where p.creator_id = ${creatorId}::uuid and p.event = 'sale'
-                          and p.platform_account_id::text = s.account and p.platform_fan_id = s.fan
-                          and p.occurred_at < ${start}) as seen_before
-                from spent s`)
+              with sold as (
+                select s.platform, s.platform_sale_id, s.platform_account_id as account, s.platform_fan_id as fan,
+                       s.currency, s.gross_incl_vat_minor as gross, s.occurred_at < ${start} as previous
+                  from platform_sales s
+                 where s.creator_id = ${creatorId}::uuid and s.event = 'sale' and s.platform_fan_id is not null
+                   and s.occurred_at >= ${previousStart} and s.occurred_at < ${end}),
+              spent as (
+                select d.account, d.fan, d.currency, d.previous,
+                       (sum(d.gross) - coalesce(sum(r.gross_incl_vat_minor), 0))::bigint as gross
+                  from sold d
+                  left join platform_sales r
+                    on r.creator_id = ${creatorId}::uuid and r.event = 'refund'
+                   and r.platform = d.platform and r.platform_sale_id = d.platform_sale_id
+                 group by 1, 2, 3, 4),
+              first as (
+                select f.platform_account_id as account, f.platform_fan_id as fan, min(f.occurred_at) as first_at
+                  from platform_sales f
+                 where f.creator_id = ${creatorId}::uuid and f.event = 'sale' and f.platform_fan_id is not null
+                 group by 1, 2)
+              select p.account::text as account, p.fan, p.currency, p.gross, p.previous,
+                     f.first_at < ${start} as seen_before
+                from spent p
+                join first f on f.account = p.account and f.fan = p.fan`)
           ).rows,
         );
-        const [previous] = CountSchema.parse(
+        // A refund of the period whose sale the register does not hold: counted apart, as the totals do.
+        const [orphans] = CountSchema.parse(
           (
             await tx.execute(sql`
-              select count(distinct (l.platform_account_id, l.platform_fan_id)) as paying
-                from platform_sales l
-               where l.creator_id = ${creatorId}::uuid and l.event = 'sale' and l.platform_fan_id is not null
-                 and l.occurred_at >= ${previousStart} and l.occurred_at < ${start}`)
+              select count(*) as refunds
+                from platform_sales r
+               where r.creator_id = ${creatorId}::uuid and r.event = 'refund'
+                 and r.occurred_at >= ${start} and r.occurred_at < ${end}
+                 and not exists (
+                   select 1 from platform_sales s
+                    where s.creator_id = ${creatorId}::uuid and s.event = 'sale'
+                      and s.platform = r.platform and s.platform_sale_id = r.platform_sale_id)`)
           ).rows,
         );
         return {
@@ -132,6 +151,7 @@ export function createAgencyInsightsReader(
             hours: hours.map((row) => ({
               isoDay: row.iso_day,
               hour: row.hour,
+              saleType: row.sale_type,
               currency: row.currency,
               grossMinor: row.gross,
             })),
@@ -139,9 +159,10 @@ export function createAgencyInsightsReader(
               key: `${row.account}:${row.fan}`,
               currency: row.currency,
               grossMinor: row.gross,
+              previous: row.previous,
               seenBefore: row.seen_before,
             })),
-            previousPaying: previous?.paying ?? 0,
+            refundsWithoutSale: orphans?.refunds ?? 0,
           },
         };
       }),

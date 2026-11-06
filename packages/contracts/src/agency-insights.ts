@@ -99,17 +99,38 @@ export const AgencyInsightsSchema = z.strictObject({
    * 24 sums in cents.
    */
   hours: z.array(z.array(cents).length(24)).length(7),
+  /**
+   * For a period of one day, its 24 hours in order, their sales (refunds aside) by creator and by kind (only those not
+   * zero); empty for a longer period.
+   */
+  hourly: z.array(
+    z.strictObject({
+      hour: z.number().int().min(0).max(23),
+      revenueMinor: cents,
+      byCreator: z.array(z.strictObject({ creatorId: CreatorIdSchema, revenueMinor: cents })),
+      byKind: z.array(z.strictObject({ kind: AgencySaleKindSchema, revenueMinor: cents })),
+    }),
+  ),
+  /**
+   * What fans spent: a fan's sales of the period less their refunds (whenever refunded, as the register takes a refund
+   * off its sale), once per creator's account. Without a USD rate, a fan who paid in dollars alone is in no figure, in
+   * the period as in the one before.
+   */
   fans: z.strictObject({
-    /** Fans who paid in the period, once per creator's account. */
+    /** Fans who spent more than their refunds took back, in the period. */
     paying: count,
     previousPaying: count,
     /** Of them, those whose first purchase in the register falls in the period. */
     newPaying: count,
-    /** Share of the period's sales made by the ten fans who spent the most, in % rounded; null without a sale. */
+    /** Share of what fans spent made by the ten who spent the most, in % rounded; null without a paying fan. */
     topTenShare: z.number().int().min(0).max(100).nullable(),
     /** What a paying fan spent on average, in cents; null without one. */
     averagePerPayingMinor: cents.nullable(),
   }),
+  /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
+  refundsWithoutSale: count,
+  /** The zone of the platform's days and hours (IANA), the one every day and hour here is read in. */
+  timeZone: z.string().min(1),
   /** A dollar line falls in the period and no rate is known: left out of every figure. */
   dollarsLeftOut: z.boolean(),
 });

@@ -28,6 +28,22 @@ const PASSWORD = 'correct horse battery';
  * only, never for a chatter, an operator of his own scope nor the creator, and never a fan. Everything is invented
  * (ADR 0010).
  */
+
+/** This instant's midnight in Paris, in ms (the hours of a change of time are past at 3h, never in the first minute). */
+function parisMidnight(at: Date): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Paris',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(parts.find((one) => one.type === type)?.value ?? 0);
+  const since = ((part('hour') * 60 + part('minute')) * 60 + part('second')) * 1000 + at.getMilliseconds();
+  return at.getTime() - since;
+}
+
 describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
   let test: TestDb;
   let app: App;
@@ -36,6 +52,7 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
   let accountId: PlatformAccountId;
   let unlinkedCreatorId: CreatorId;
   let theo: TeamMemberId;
+  let maya: TeamMemberId;
   type Who = 'owner' | 'manager' | 'chatter' | 'operator' | 'creator';
   const cookies = new Map<Who, string>();
 
@@ -150,7 +167,11 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       password: PASSWORD,
     });
     cookies.set('owner', await signIn(server, 'owner@example.test', PASSWORD));
-    await member(await person('manager', 'operator', [creatorId, unlinkedCreatorId]), 'manager', 'Maya');
+    maya = await member(
+      await person('manager', 'operator', [creatorId, unlinkedCreatorId]),
+      'manager',
+      'Maya',
+    );
     theo = await member(await person('chatter', 'operator', [creatorId]), 'chatter', 'Théo');
     // An operator of the dashboard with no record in the team: his scope is his own, he reads none of the panel.
     await person('operator', 'operator', [creatorId]);
@@ -160,14 +181,17 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       { platform: 'reveal', platformChatterId: 'bot_test_01', kind: 'agent' },
     ]);
 
-    // Today in Paris, whatever the hour the test runs at: a minute ago, never before her midnight.
-    const now = new Date(Date.now() - 60_000);
+    // Today in Paris, whatever the hour the test runs at: a minute ago, or just after midnight when it runs in the first
+    // minute of the day (the route reads the real clock, up to the end of today).
+    const now = new Date(Math.max(Date.now() - 60_000, parisMidnight(new Date()) + 1000));
     await line('sale_theo', 'chatter_theo', now);
     await line('sale_theo_2', 'chatter_theo', now, { gross: 600 });
     await line('sale_theo_2', 'chatter_theo', now, { event: 'refund', gross: 600 });
     await line('sale_agent', 'bot_test_01', now, { gross: 3000 });
     await line('sale_unlinked', 'chatter_inconnu', now);
     await line('sale_nobody', null, now, { gross: 600 });
+    // A refund whose sale is older than the register: in no figure, counted apart.
+    await line('sale_ghost', 'chatter_theo', now, { event: 'refund', gross: 900 });
     // Ten days ago: in the month, not in the day.
     await line('sale_old', 'chatter_theo', new Date(Date.now() - 10 * 86_400_000), { gross: 2400 });
   });
@@ -199,8 +223,9 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect(result.byCreator.map((one) => [one.creatorId, one.revenueMinor])).toEqual([[creatorId, 6000]]);
     // The hours hold the sales alone, refunds aside: 1200 + 600 + 3000 + 1200 + 600.
     expect(result.hours.flat().reduce((sum, cell) => sum + cell, 0)).toBe(6600);
-    // One fan, who bought ten days ago too: paying, not new.
-    expect(result.fans).toMatchObject({ paying: 1, newPaying: 0 });
+    // One fan, who bought ten days ago too: paying, not new; what he spent less the refund of his sale.
+    expect(result.fans).toMatchObject({ paying: 1, newPaying: 0, averagePerPayingMinor: 6000 });
+    expect(result.refundsWithoutSale).toBe(1);
     // Never the fan: neither his id at the platform nor anything of his.
     expect(JSON.stringify(result)).not.toMatch(/fan_test_01/u);
 
@@ -223,6 +248,21 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect((await get('operator')).statusCode).toBe(403);
     expect((await get('chatter')).statusCode).toBe(403);
     expect((await get('chatter', `period=day&creatorId=${creatorId}`)).statusCode).toBe(403);
+  });
+
+  it('gives a manager on leave nothing: his scope is read at each request', async () => {
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'on_leave' })
+      .where(eq(schema.teamMembers.id, maya));
+    try {
+      expect((await get('manager')).statusCode).toBe(403);
+    } finally {
+      await test.admin.db
+        .update(schema.teamMembers)
+        .set({ status: 'active' })
+        .where(eq(schema.teamMembers.id, maya));
+    }
   });
 
   it('refuses a manager a creator out of his list, and the creator herself (ADR 0042 § 8)', async () => {

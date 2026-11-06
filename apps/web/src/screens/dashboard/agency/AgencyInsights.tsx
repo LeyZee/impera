@@ -6,14 +6,15 @@ import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as Reac
 import { CountUp, Section, type FloatingTip } from '../parts';
 
 import { NotYours, useAgencyInsights } from './api';
+import { useNarrow } from './useNarrow';
 import {
   AGAINST,
   arcs,
   bestSlot,
   busiest,
   changeOf,
-  creatorColours,
   dayLabel,
+  byWeek,
   dayStacks,
   deltaText,
   euros,
@@ -28,10 +29,10 @@ import {
   shortDay,
   shortEuros,
   slotLabel,
-  stackSeries,
-  weekdayIndex,
+  STACKS,
   WEEKDAYS,
   WEEKDAYS_SHORT,
+  zoneLabel,
   type Slice,
 } from './view';
 import './agency.css';
@@ -83,7 +84,7 @@ export function AgencyPeriodControl({
   };
   return (
     <div
-      className="nv-seg nv-glass nv-glass--thin ag-period"
+      className="nv-seg nv-glass nv-glass--thin ins-period"
       role="radiogroup"
       aria-label="Période"
       ref={ref}
@@ -123,7 +124,7 @@ function Delta({
   const change = changeOf(current, previous);
   if (change === null) return null;
   const better = lowerIsBetter ? change < 0 : change > 0;
-  const tone = change === 0 ? '' : better ? ' nv-delta--better' : ' nv-delta--worse';
+  const tone = change === 0 ? ' ins-delta-flat' : better ? ' nv-delta--better' : ' nv-delta--worse';
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
@@ -133,8 +134,8 @@ function Spark({ values }: { values: readonly number[] }): JSX.Element | null {
   const frame = { width: 240, height: 48, padTop: 4, padBottom: 4 };
   const points = chartPoints(values, frame, { min: Math.min(0, ...values) });
   return (
-    <svg className="ag-spark" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true">
-      <path className="ag-spark__line" d={linePath(points)} vectorEffect="non-scaling-stroke" />
+    <svg className="ins-spark" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true">
+      <path className="ins-spark__line" d={linePath(points)} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
@@ -143,12 +144,12 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
   const { current, previous } = insights.totals;
   const { fans } = insights;
   return (
-    <div className="ag-figures">
-      <div className="nv-plate ag-lead nv-enter" style={{ '--nv-i': 1 }}>
+    <div className="ins-figures">
+      <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
         <div className="nv-figure">
           <span className="nv-figure__label">Chiffre d’affaires</span>
           <CountUp
-            className="nv-figure__value ag-lead__value"
+            className="nv-figure__value ins-lead__value"
             value={current.revenueMinor}
             format={formatEuros}
           />
@@ -163,7 +164,7 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
         </div>
         <Spark values={insights.days.map((day) => day.revenueMinor)} />
       </div>
-      <dl className="ag-tiles">
+      <dl className="ins-tiles">
         {(
           [
             {
@@ -211,10 +212,10 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
             },
           ] as const
         ).map((tile, i) => (
-          <div key={tile.label} className="nv-plate ag-tile nv-enter" style={{ '--nv-i': i + 2 }}>
+          <div key={tile.label} className="nv-plate ins-tile nv-enter" style={{ '--nv-i': i + 2 }}>
             <dt>{tile.label}</dt>
             <dd>
-              <span className="ag-tile__value">{tile.value}</span>
+              <span className="ins-tile__value">{tile.value}</span>
               {tile.delta === null ? null : (
                 <Delta
                   current={tile.delta[0]}
@@ -223,7 +224,7 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
                 />
               )}
             </dd>
-            <dd className="ag-tile__note">{tile.note}</dd>
+            <dd className="ins-tile__note">{tile.note}</dd>
           </div>
         ))}
       </dl>
@@ -231,103 +232,128 @@ function Figures({ insights, period }: { insights: AgencyInsights; period: Agenc
   );
 }
 
-/** The revenue day by day (or hour by hour today), stacked by creator for the agency, by kind for one creator. */
-function Daily({
-  insights,
-  oneCreator,
-  tip,
-}: {
-  insights: AgencyInsights;
-  oneCreator: boolean;
-  tip: FloatingTip;
-}): JSX.Element {
+/**
+ * The revenue day by day (hour by hour today, week by week over three months on a phone), stacked by kind of sale, the
+ * ring's colours. One stop for the keyboard, the arrows walk the columns.
+ */
+function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
+  const narrow = useNarrow();
   const today = insights.period === 'day';
-  const stacks = today ? [] : stackSeries(insights, oneCreator);
-  const columns = today
-    ? (insights.hours[weekdayIndex(insights.to)] ?? []).map((cents, hour) => ({
-        key: String(hour),
-        label: `${String(hour)}h`,
-        title: `${String(hour)}h–${String((hour + 1) % 24)}h`,
-        parts: [cents],
-        total: cents,
+  const days = today
+    ? insights.hourly.map((hour) => ({
+        key: String(hour.hour),
+        label: `${String(hour.hour)}h`,
+        title: `${String(hour.hour)}h–${String((hour.hour + 1) % 24)}h`,
+        parts: dayStacks(hour),
+        total: hour.revenueMinor,
       }))
-    : insights.days.map((day) => {
-        const parts = dayStacks(day, stacks, oneCreator);
-        return {
-          key: day.day,
-          label: shortDay(day.day),
-          title: dayLabel(day.day),
-          parts,
-          total: day.revenueMinor,
-        };
-      });
+    : insights.days.map((day) => ({
+        key: day.day,
+        label: shortDay(day.day),
+        title: dayLabel(day.day),
+        parts: dayStacks(day),
+        total: day.revenueMinor,
+      }));
+  const weekly = narrow && insights.period === 'quarter';
+  const columns = weekly ? byWeek(days) : days;
+  const [focus, setFocus] = useState(columns.length - 1);
+  const current = Math.min(Math.max(0, focus), columns.length - 1);
+  const bars = useRef<HTMLDivElement>(null);
   const max = Math.max(
     0,
     ...columns.map((column) => column.parts.reduce((sum, part) => sum + Math.max(0, part), 0)),
   );
   const ticks = niceTicks(max, 3);
   const top = ticks[ticks.length - 1] ?? 1;
-  // A label under one column in every few: a week shows each day, three months one in fifteen.
-  const every = columns.length <= 8 ? 1 : columns.length <= 24 ? 3 : columns.length <= 31 ? 5 : 15;
-  const colours = today ? ['var(--nv-series-1)'] : stacks.map((stack) => stack.colour);
+  // A label under one column in every few: a week shows each day, three months one in fifteen (a week in four).
+  const every =
+    columns.length <= 8
+      ? 1
+      : columns.length <= 14
+        ? 4
+        : columns.length <= 24
+          ? 3
+          : columns.length <= 31
+            ? 5
+            : 15;
+  const used = STACKS.filter((_, s) => columns.some((column) => (column.parts[s] ?? 0) > 0));
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const step =
+      event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    const next = Math.min(Math.max(0, current + step), columns.length - 1);
+    setFocus(next);
+    bars.current?.querySelectorAll<HTMLButtonElement>('.ins-col')[next]?.focus();
+  };
+  const span = today ? 'heure par heure' : weekly ? 'semaine par semaine' : 'jour par jour';
   return (
-    <div className="nv-plate ag-daily">
-      {stacks.length > 1 ? (
-        <ul className="ag-keys" aria-label="Légende">
-          {stacks.map((stack) => (
+    <div className="nv-plate ins-daily">
+      {used.length > 1 ? (
+        <ul className="ins-keys" aria-label="Légende">
+          {used.map((stack) => (
             <li key={stack.key}>
-              <span className="ag-key" style={{ '--_c': stack.colour }} aria-hidden="true" />
+              <span className="ins-key" style={{ '--_c': stack.colour }} aria-hidden="true" />
               {stack.label}
             </li>
           ))}
         </ul>
       ) : null}
-      <div
-        className="ag-daily__plot"
-        role="img"
-        aria-label={`Chiffre d’affaires ${today ? 'heure par heure' : 'jour par jour'}, au plus ${euros(max)}`}
-      >
-        <div className="ag-daily__grid" aria-hidden="true">
+      <div className="ins-daily__plot">
+        <div className="ins-daily__grid" aria-hidden="true">
           {ticks.map((value) => (
             <span key={value} style={{ '--_y': `${String((value / top) * 100)}%` }}>
               <i>{shortEuros(value)}</i>
             </span>
           ))}
         </div>
-        <div className="ag-daily__bars" style={{ '--_n': columns.length }}>
+        <div
+          className="ins-daily__bars"
+          style={{ '--_n': columns.length }}
+          role="group"
+          aria-label={`Chiffre d’affaires ${span}, au plus ${euros(max)} : flèches pour passer d’une colonne à l’autre`}
+          ref={bars}
+          onKeyDown={onKeyDown}
+          onFocus={(event) => {
+            const at = Number(event.target.getAttribute('data-i'));
+            if (Number.isInteger(at)) setFocus(at);
+          }}
+        >
           {columns.map((column, i) => (
             <button
               type="button"
               key={column.key}
-              className="ag-col"
+              className="ins-col"
               style={{ '--_i': i }}
+              tabIndex={i === current ? 0 : -1}
               aria-label={`${column.title} : ${euros(column.total)}`}
+              data-i={i}
               {...tip.bind({
                 title: column.title,
                 rows: [
-                  ...(today
-                    ? []
-                    : stacks
-                        .map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
-                        .filter(([, cents]) => cents !== 0)
-                        .map(([label, cents]) => [label, euros(cents)] as const)),
+                  ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
+                    .filter(([, cents]) => cents !== 0)
+                    .map(([label, cents]) => [label, euros(cents)] as const),
                   ['Total', euros(column.total)],
                 ],
               })}
             >
-              <span className="ag-col__stack">
+              <span className="ins-col__stack">
                 {column.parts.map((cents, s) =>
                   cents <= 0 ? null : (
                     <span
                       // Bottom to top, in the legend's order.
                       key={s}
-                      className="ag-col__part"
-                      style={{ '--_c': colours[s] ?? OTHER, '--_h': `${String((cents / top) * 100)}%` }}
+                      className="ins-col__part"
+                      style={{
+                        '--_c': STACKS[s]?.colour ?? OTHER,
+                        '--_h': `${String((cents / top) * 100)}%`,
+                      }}
                     />
                   ),
                 )}
               </span>
-              <span className="ag-col__label" aria-hidden="true">
+              <span className="ins-col__label" aria-hidden="true">
                 {i % every === 0 ? column.label : ''}
               </span>
             </button>
@@ -360,26 +386,29 @@ function Ring({
   );
   const litSlice = lit === null ? null : shown[lit];
   return (
-    <article className="nv-plate ag-ring-card">
-      <h3 className="ag-card__title">{title}</h3>
+    <article className="nv-plate ins-ring-card">
+      <h3 className="ins-card__title">
+        {title}
+        {total > 0 ? <span className="ins-card__total">{euros(total)}</span> : null}
+      </h3>
       {total <= 0 ? (
-        <p className="ag-empty">Aucune vente sur la période.</p>
+        <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (
-        <div className="ag-ring-row">
+        <div className="ins-ring-row">
           <div
-            className={lit === null ? 'ag-ring' : 'ag-ring is-lit'}
+            className={lit === null ? 'ins-ring' : 'ins-ring is-lit'}
             role="img"
             aria-label={`${title} : ${shown.map((s) => `${s.label} ${String(shareOf(s.cents, total))} %`).join(', ')}`}
           >
             <svg viewBox="0 0 132 132" aria-hidden="true">
-              <circle className="ag-ring__track" cx="66" cy="66" r={radius} />
+              <circle className="ins-ring__track" cx="66" cy="66" r={radius} />
               {shown.map((slice, i) => {
                 const arc = geometry[i];
                 if (arc === undefined) return null;
                 return (
                   <circle
                     key={slice.key}
-                    className={lit === i ? 'ag-ring__arc is-on' : 'ag-ring__arc'}
+                    className={lit === i ? 'ins-ring__arc is-on' : 'ins-ring__arc'}
                     cx="66"
                     cy="66"
                     r={radius}
@@ -395,26 +424,28 @@ function Ring({
                 );
               })}
             </svg>
-            <span className="ag-ring__middle" aria-hidden="true">
+            <span className="ins-ring__middle" aria-hidden="true">
               {litSlice === null || litSlice === undefined ? (
                 <>
-                  <b className="ag-ring__value">{shortEuros(total)}</b>
-                  <span className="ag-ring__sub">au total</span>
+                  <b className="ins-ring__value">
+                    {slices.reduce((sum, one) => sum + one.sales, 0).toLocaleString('fr-FR')}
+                  </b>
+                  <span className="ins-ring__sub">ventes</span>
                 </>
               ) : (
                 <>
-                  <b className="ag-ring__value">{String(shareOf(litSlice.cents, total))}&nbsp;%</b>
-                  <span className="ag-ring__sub">{litSlice.label}</span>
+                  <b className="ins-ring__value">{String(shareOf(litSlice.cents, total))}&nbsp;%</b>
+                  <span className="ins-ring__sub">{litSlice.label}</span>
                 </>
               )}
             </span>
           </div>
-          <ul className="ag-legend">
+          <ul className="ins-legend">
             {shown.map((slice, i) => (
               <li key={slice.key}>
                 <button
                   type="button"
-                  className={lit === i ? 'ag-legend__row is-on' : 'ag-legend__row'}
+                  className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
                   title={slice.key === tipFor ? OTHER_KINDS_NOTE : notes?.[slice.key]}
                   onPointerEnter={() => {
                     setLit(i);
@@ -432,10 +463,10 @@ function Ring({
                     setLit(lit === i ? null : i);
                   }}
                 >
-                  <span className="ag-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                  <span className="ag-legend__label">{slice.label}</span>
-                  <span className="ag-legend__value">{euros(slice.cents)}</span>
-                  <span className="ag-legend__share">{String(shareOf(slice.cents, total))}&nbsp;%</span>
+                  <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                  <span className="ins-legend__label">{slice.label}</span>
+                  <span className="ins-legend__value">{euros(slice.cents)}</span>
+                  <span className="ins-legend__share">{String(shareOf(slice.cents, total))}&nbsp;%</span>
                   <Delta current={slice.cents} previous={slice.previousCents} />
                 </button>
               </li>
@@ -461,16 +492,17 @@ const SELLER_NAME: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
 /** Who sold, one line each, bars from the same start: widths are shares of the best seller's revenue. */
 function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const best = Math.max(0, ...insights.sellers.map((seller) => seller.revenueMinor));
-  if (insights.sellers.length === 0) return <p className="nv-plate ag-empty">Aucune vente sur la période.</p>;
+  if (insights.sellers.length === 0)
+    return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
   return (
-    <ol className="nv-plate ag-rank" aria-label="Classement de qui a vendu">
+    <ol className="nv-plate ins-rank" aria-label="Classement de qui a vendu">
       {insights.sellers.map((one, i) => {
         const name = one.seller.kind === 'member' ? one.seller.name : SELLER_NAME[one.seller.kind];
         const average = one.sales > 0 ? Math.round(one.revenueMinor / one.sales) : null;
         return (
           <li
             key={one.seller.kind === 'member' ? one.seller.memberId : one.seller.kind}
-            className="ag-rank__row nv-enter"
+            className="ins-rank__row nv-enter"
             style={{ '--nv-i': i }}
             data-kind={one.seller.kind}
             tabIndex={0}
@@ -488,27 +520,27 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
               ...(one.seller.kind === 'member' ? {} : { note: SELLER_NOTES[one.seller.kind] }),
             })}
           >
-            <span className="ag-rank__pos" aria-hidden="true">
+            <span className="ins-rank__pos" aria-hidden="true">
               {String(i + 1)}
             </span>
-            <span className="nv-avatar ag-rank__face" aria-hidden="true">
+            <span className="nv-avatar ins-rank__face" aria-hidden="true">
               {one.seller.kind === 'member' ? initialOf(one.seller.name) : SELLER_MARK[one.seller.kind]}
             </span>
-            <span className="ag-rank__who">
-              <span className="ag-rank__name">{name}</span>
-              <span className="ag-rank__line">
+            <span className="ins-rank__who">
+              <span className="ins-rank__name">{name}</span>
+              <span className="ins-rank__line">
                 {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
                 {average === null ? '' : ` · panier moyen ${euros(average)}`}
               </span>
             </span>
-            <span className="ag-rank__bar" aria-hidden="true">
+            <span className="ins-rank__bar" aria-hidden="true">
               <span
                 style={{
                   '--_w': `${String(best > 0 ? Math.max(2, (Math.max(0, one.revenueMinor) / best) * 100) : 0)}%`,
                 }}
               />
             </span>
-            <span className="ag-rank__value">
+            <span className="ins-rank__value">
               {euros(one.revenueMinor)}
               <Delta current={one.revenueMinor} previous={one.previousRevenueMinor} />
             </span>
@@ -529,19 +561,18 @@ function Creators({
   onCreator: ((creatorId: string) => void) | undefined;
   tip: FloatingTip;
 }): JSX.Element {
-  const colours = creatorColours(insights.creators);
   const names = new Map(insights.creators.map((creator) => [creator.creatorId, creator.name] as const));
   const total = insights.totals.current.revenueMinor;
   const best = Math.max(0, ...insights.byCreator.map((one) => one.revenueMinor));
   return (
-    <ul className="nv-plate ag-creators">
+    <ul className="nv-plate ins-creators">
       {insights.byCreator.map((one, i) => {
         const name = names.get(one.creatorId) ?? 'Créatrice';
         return (
           <li key={one.creatorId} className="nv-enter" style={{ '--nv-i': i }}>
             <button
               type="button"
-              className="ag-creator"
+              className="ins-creator"
               disabled={onCreator === undefined}
               onClick={() => onCreator?.(one.creatorId)}
               {...tip.bind({
@@ -555,25 +586,17 @@ function Creators({
                 note: 'Ouvrir son Dashboard',
               })}
             >
-              <span className="ag-creator__name">
-                <span
-                  className="ag-key"
-                  style={{ '--_c': colours.get(one.creatorId) ?? OTHER }}
-                  aria-hidden="true"
-                />
-                {name}
-              </span>
-              <span className="ag-creator__bar" aria-hidden="true">
+              <span className="ins-creator__name">{name}</span>
+              <span className="ins-creator__bar" aria-hidden="true">
                 <span
                   style={{
-                    '--_c': colours.get(one.creatorId) ?? OTHER,
                     '--_w': `${String(best > 0 ? Math.max(1, (Math.max(0, one.revenueMinor) / best) * 100) : 0)}%`,
                   }}
                 />
               </span>
-              <span className="ag-creator__value">{euros(one.revenueMinor)}</span>
-              <span className="ag-creator__share">{String(shareOf(one.revenueMinor, total))}&nbsp;%</span>
-              <span className="ag-creator__delta">
+              <span className="ins-creator__value">{euros(one.revenueMinor)}</span>
+              <span className="ins-creator__share">{String(shareOf(one.revenueMinor, total))}&nbsp;%</span>
+              <span className="ins-creator__delta">
                 <Delta current={one.revenueMinor} previous={one.previousRevenueMinor} />
               </span>
             </button>
@@ -590,10 +613,10 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   const peak = busiest(insights.hours);
   const slot = bestSlot(insights.hours);
   if (peak === null || slot === null)
-    return <p className="nv-plate ag-empty">Aucune vente sur la période.</p>;
+    return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
   return (
-    <div className="nv-plate ag-hours">
-      <p className="ag-hours__lead">
+    <div className="nv-plate ins-hours">
+      <p className="ins-hours__lead">
         Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
         chiffre d’affaires. Le pic :{' '}
         <b>
@@ -601,22 +624,26 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
         </b>
         .
       </p>
-      <div className="ag-heat" role="img" aria-label="Chiffre d’affaires par jour de la semaine et par heure">
+      <div
+        className="ins-heat"
+        role="img"
+        aria-label="Chiffre d’affaires par jour de la semaine et par heure"
+      >
         <span aria-hidden="true" />
         {Array.from({ length: 24 }, (_, hour) => (
-          <span key={hour} className="ag-heat__hour" aria-hidden="true">
+          <span key={hour} className="ins-heat__hour" aria-hidden="true">
             {hour % 3 === 0 ? `${String(hour)}h` : ''}
           </span>
         ))}
         {insights.hours.map((row, day) => (
-          <div key={WEEKDAYS[day]} className="ag-heat__row" role="presentation">
-            <span className="ag-heat__day" aria-hidden="true">
+          <div key={WEEKDAYS[day]} className="ins-heat__row" role="presentation">
+            <span className="ins-heat__day" aria-hidden="true">
               {WEEKDAYS_SHORT[day]}
             </span>
             {row.map((cents, hour) => (
               <span
                 key={hour}
-                className="ag-heat__cell"
+                className="ins-heat__cell"
                 style={{ '--_h': heatOf(cents, max) }}
                 {...tip.bind({
                   title: `${WEEKDAYS[day] ?? ''}, ${String(hour)}h–${String((hour + 1) % 24)}h`,
@@ -638,7 +665,7 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
           </div>
         ))}
       </div>
-      <div className="ag-heat__scale" aria-hidden="true">
+      <div className="ins-heat__scale" aria-hidden="true">
         <span>moins</span>
         <i />
         <span>plus</span>
@@ -650,19 +677,19 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
 /** The paying fans: how many, how many new, and how much the ten biggest weigh. */
 function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   const { fans } = insights;
-  if (fans.paying === 0) return <p className="nv-plate ag-empty">Aucun fan n’a payé sur la période.</p>;
+  if (fans.paying === 0) return <p className="nv-plate ins-empty">Aucun fan n’a payé sur la période.</p>;
   const newShare = shareOf(fans.newPaying, fans.paying);
   const top = fans.topTenShare ?? 0;
   return (
-    <div className="nv-plate ag-fans">
-      <div className="ag-fans__meter">
-        <p className="ag-fans__lead">
+    <div className="nv-plate ins-fans">
+      <div className="ins-fans__meter">
+        <p className="ins-fans__lead">
           Les 10 fans qui dépensent le plus font <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
         </p>
-        <span className="ag-meter" role="img" aria-label={`${String(top)} % fait par les 10 plus gros fans`}>
+        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par les 10 plus gros fans`}>
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
-        <p className="ag-fans__hint">
+        <p className="ins-fans__hint">
           {top >= 60
             ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
             : top >= 35
@@ -670,7 +697,7 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
               : 'Bien réparti : les ventes ne dépendent pas de quelques fans.'}
         </p>
       </div>
-      <dl className="ag-fans__figures">
+      <dl className="ins-fans__figures">
         <div>
           <dt>Fans qui ont payé</dt>
           <dd>
@@ -682,7 +709,7 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
           <dt>Nouveaux payeurs</dt>
           <dd>
             <CountUp value={fans.newPaying} format={formatCount} />
-            <span className="ag-fans__part">{String(newShare)}&nbsp;%</span>
+            <span className="ins-fans__part">{String(newShare)}&nbsp;%</span>
           </dd>
         </div>
         <div>
@@ -696,10 +723,10 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
 
 /** Sections' reading lines, by period. */
 const DAILY_SUB: Readonly<Record<AgencyPeriod, string>> = {
-  day: 'heure par heure depuis minuit, heure de Paris',
+  day: 'heure par heure depuis minuit',
   week: 'jour par jour, les 7 derniers jours',
   month: 'jour par jour, les 30 derniers jours',
-  quarter: 'jour par jour, les 3 derniers mois',
+  quarter: 'les 3 derniers mois, par type de vente',
 };
 
 /**
@@ -742,7 +769,7 @@ export function AgencyInsightsPanel({
           />
         ) : (
           <div
-            className="db-loading nv-plate ag-loading"
+            className="db-loading nv-plate ins-loading"
             aria-label="Chargement des chiffres"
             role="status"
           />
@@ -754,7 +781,7 @@ export function AgencyInsightsPanel({
   if (insights.creators.length === 0) {
     return (
       <Section title={title} sub="lus dans le registre des ventes" index={index} control={control}>
-        <div className="nv-plate ag-none">
+        <div className="nv-plate ins-none">
           <p>
             {oneCreator
               ? 'Aucun de ses comptes n’est relié au registre des ventes : ses chiffres arriveront dès qu’il le sera.'
@@ -769,6 +796,8 @@ export function AgencyInsightsPanel({
       </Section>
     );
   }
+  // While another period loads the last one stays, dimmed, and says its own period, never the one asked.
+  const shown = insights.period;
   const several = !oneCreator && insights.creators.length >= 2;
   const kinds = kindSlices(insights.kinds);
   const sellers = sellerSlices(insights.sellers);
@@ -778,27 +807,38 @@ export function AgencyInsightsPanel({
     return at;
   };
   return (
-    <>
+    <div className="ins-body" aria-busy={query.isPlaceholderData}>
       <Section
         title={title}
-        sub={`${AGAINST[period]}, lus dans le registre des ventes`}
+        sub={`${AGAINST[shown]}, lus dans le registre des ventes`}
         index={at}
         control={control}
       >
-        <Figures insights={insights} period={period} />
+        <Figures insights={insights} period={shown} />
         {insights.dollarsLeftOut ? (
-          <p className="ag-note" role="note">
+          <p className="ins-note" role="note">
             Des ventes en dollars sont laissées de côté : aucun taux de change n’est encore connu (Équipe ›
             Paie).
           </p>
         ) : null}
+        {insights.refundsWithoutSale > 0 ? (
+          <p className="ins-note" role="note">
+            {insights.refundsWithoutSale === 1
+              ? 'Un remboursement de la période porte sur une vente plus ancienne que le registre : il n’est compté dans aucun chiffre.'
+              : `${String(insights.refundsWithoutSale)} remboursements de la période portent sur des ventes plus anciennes que le registre : ils ne sont comptés dans aucun chiffre.`}
+          </p>
+        ) : null}
       </Section>
 
-      <Section title="Chiffre d’affaires" sub={DAILY_SUB[period]} index={next()}>
-        <Daily insights={insights} oneCreator={oneCreator} tip={tip} />
+      <Section
+        title="Chiffre d’affaires"
+        sub={shown === 'day' ? `${DAILY_SUB.day}, ${zoneLabel(insights.timeZone)}` : DAILY_SUB[shown]}
+        index={next()}
+      >
+        <Daily insights={insights} tip={tip} />
       </Section>
 
-      <div className="ag-pair nv-enter" style={{ '--nv-i': next() }}>
+      <div className="ins-pair nv-enter" style={{ '--nv-i': next() }}>
         <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" />
         <Ring title="Qui vend" slices={sellers} notes={SELLER_NOTES} />
       </div>
@@ -819,7 +859,7 @@ export function AgencyInsightsPanel({
 
       <Section
         title="Quand ça vend"
-        sub="jour de la semaine et heure de chaque vente, heure de Paris"
+        sub={`jour de la semaine et heure de chaque vente, ${zoneLabel(insights.timeZone)}`}
         index={next()}
       >
         <Hours insights={insights} tip={tip} />
@@ -832,6 +872,6 @@ export function AgencyInsightsPanel({
       >
         <Fans insights={insights} />
       </Section>
-    </>
+    </div>
   );
 }

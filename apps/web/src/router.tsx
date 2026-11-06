@@ -140,6 +140,7 @@ const dashboard = createRoute({
             onCreator={openCreator}
             forOwner={user.role === 'owner'}
             reviewsReports={canOpen(rail, '/equipe')}
+            canAddCreator={canOpen(rail, '/creatrices')}
           />
         );
       }

@@ -121,6 +121,9 @@ export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
       hour >= 20 || hour < 2 ? 1_500 + day * 200 : hour >= 12 ? 300 : 0,
     ),
   ),
+  hourly: [],
   fans: { paying: 42, previousPaying: 37, newPaying: 9, topTenShare: 58, averagePerPayingMinor: 4_395 },
+  refundsWithoutSale: 0,
+  timeZone: 'Europe/Paris',
   dollarsLeftOut: false,
 });

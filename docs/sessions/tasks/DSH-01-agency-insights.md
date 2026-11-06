@@ -14,7 +14,7 @@ ADR 0078, ADR 0050, ADR 0043 § 7.
 ## À faire
 - [x] Lot A : route `GET /v1/dashboard/agency` (période, créatrice facultative, période d'avant), domaine pur testé, lecteur sous RLS, test d'intégration.
 - [x] Lot A : écran « Toute l'agence » (chiffres, chiffre d'affaires par jour, deux anneaux, classement des vendeurs, créatrices côte à côte, heures, fans) et même écran filtré sur une créatrice au-dessus de son bloc agent.
-- [ ] Lot B : abonnés (instantané de `/v1/stats/daily`), ADR et migration à attribuer.
+- [ ] Lot B : abonnés (instantané de `/v1/stats/daily`), ADR 0080 et migration 0135 réservées.
 
 ## Critères d'acceptation
 - Aucun appel à Reveal depuis l'écran ; aucun chiffre inventé ; opérateur, chatteur et créatrice reçoivent 403.

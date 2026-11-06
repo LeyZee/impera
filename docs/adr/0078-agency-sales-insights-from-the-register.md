@@ -1,6 +1,6 @@
 # 0078. Le Dashboard de l'agence lit ses insights dans le registre des ventes, pour le propriétaire et un manager actif
 
-Statut : proposed (demande de Charles du 06/11/2026, 19 h 25 ; proposition acceptée par « ok dashboard-insights », 19 h 31 ; numéro attribué par le coordinateur le même soir)
+Statut : proposed (demande de Charles du 06/11/2026, 19 h 25 ; proposition acceptée par « ok dashboard-insights », 19 h 31 ; numéro attribué par le coordinateur le même soir ; § 2, § 4 et § 7 précisés après les relectures du 06/11, 20 h 30)
 Date : 2026-11-06
 Précise : l'ADR 0050 (registre des ventes d'une plateforme, § 8 : montants de la plateforme, jamais recalculés) et l'ADR 0043 § 7 (un chatteur ne voit jamais les chiffres d'un autre). Ne remplace rien.
 
@@ -24,24 +24,28 @@ Reveal donne aussi les abonnés, les PPV envoyés et les messages (`/v1/stats/da
 
 1. **Qui le voit.** Le propriétaire, pour toutes les créatrices. Un manager actif, pour les créatrices de sa liste où sa portée est celle de l'équipe (ADR 0024). Personne d'autre : ni un chatteur, ni la créatrice elle-même, ni un opérateur sans fiche d'équipe. Si la portée d'un compte sur une créatrice est « la sienne », elle n'entre dans aucun chiffre : avec le total et sa propre part, il pourrait calculer celle des autres (ADR 0043 § 7). Un compte qui ne voit aucune créatrice avec la portée de l'équipe reçoit un refus (403).
 
-2. **Une seule source : le registre local.** Les chiffres se lisent dans `platform_sales`. Les montants viennent de `salesTotals` : un remboursement est retiré du jour de sa vente, chaque jour est celui de la plateforme. L'écran n'appelle jamais une plateforme. La part de l'agence est celle que la plateforme donne pour chaque vente, jamais un pourcentage écrit dans le code (ADR 0050 § 8). Les dollars sont convertis au dernier taux de la BCE que la paie connaît, comme ailleurs sur le Dashboard. Sans taux, ils sont laissés de côté, et la réponse le signale.
+2. **Une seule source : le registre local.** Les chiffres se lisent dans `platform_sales`. Les montants viennent de `salesTotals` : un remboursement est retiré du jour de sa vente, chaque jour est celui de la plateforme. L'écran n'appelle jamais une plateforme. La part de l'agence est celle que la plateforme donne pour chaque vente, jamais un pourcentage écrit dans le code (ADR 0050 § 8). Les dollars sont convertis au dernier taux de la BCE que la paie connaît, comme ailleurs sur le Dashboard. Sans taux, ils sont laissés de côté partout, et la réponse le signale : un fan qui n'a payé qu'en dollars n'est alors compté payeur ni sur la période ni sur la précédente, pour que la comparaison reste juste. Un remboursement dont la vente est plus ancienne que le registre n'entre dans aucun chiffre, comme dans les totaux de CRM-02 : la réponse en donne le nombre, et l'écran l'écrit.
 
 3. **Les périodes.** Quatre périodes : aujourd'hui, les 7 derniers jours, les 30 derniers jours ou les 90 derniers jours, aujourd'hui compris, en jours de la plateforme (heure de Paris pour Reveal). Chaque période se compare à celle de même longueur juste avant. Le bloc de l'agent d'une créatrice ne connaît pas 90 jours : il lit alors 30 jours et le dit dans sa ligne de lecture.
 
 4. **Ce que la réponse porte, et rien d'autre.**
    - Les totaux de la période et de la précédente : chiffre d'affaires TTC, net, part de l'agence, part des créatrices, ventes, remboursements.
-   - Le chiffre d'affaires de chaque jour, par créatrice et par type de vente.
+   - Le chiffre d'affaires de chaque jour, par créatrice et par type de vente. Pour « aujourd'hui », les 24 heures de la journée, de la même façon (ventes seules).
+   - Le fuseau de la plateforme, celui de tous les jours et toutes les heures de la réponse.
    - Les sommes par type de vente. Les abonnements et leurs renouvellements forment un seul groupe.
    - Les sommes par vendeur : un membre sous son nom, l'agent, « non relié », personne.
    - Les sommes par créatrice.
    - Une carte jour de la semaine × heure, en heure de la plateforme, faite des ventes seules.
-   - Le nombre de fans qui ont payé et le même nombre sur la période précédente, ceux dont c'est le premier achat dans le registre, la part du chiffre d'affaires faite par les dix fans qui ont le plus dépensé (en %, arrondie) et la dépense moyenne par fan payeur.
+   - Le nombre de fans qui ont payé et le même nombre sur la période précédente, ceux dont c'est le premier achat dans le registre, la part de ce que les fans ont dépensé faite par les dix qui ont le plus dépensé (en %, arrondie) et la dépense moyenne par fan payeur. Ce qu'un fan a dépensé est la même règle que le chiffre d'affaires : ses ventes de la période, moins leurs remboursements, quel que soit le jour du remboursement. Un fan entièrement remboursé n'est pas payeur.
+   - Le nombre de remboursements de la période dont la vente est plus ancienne que le registre.
 
    L'identifiant, le pseudo ou le montant d'un fan ne quittent jamais le serveur. Un fan compte une fois par compte de créatrice, comme dans « Tes fans ».
 
 5. **La route.** `GET /v1/dashboard/agency?period=&creatorId=` appartient au module `supervision`. Sans `creatorId`, elle couvre toute la portée du compte. Avec `creatorId`, elle couvre cette créatrice seule, avec la même règle de portée, et une créatrice hors de la liste du compte est refusée. La lecture se fait créatrice par créatrice, sous RLS (`withTenantMember`), une transaction après l'autre. Le contrat est un schéma Zod strict de `packages/contracts`. La route est couverte par le balayage d'isolation des tests.
 
 6. **Hors écran tant que le lot B n'existe pas.** Les abonnés (actifs, nouveaux, désabonnements), le taux d'achat des PPV et les messages n'apparaissent pas du tout, même pas sous la forme d'une place marquée « bientôt ». Il n'y a ni prévision ni objectif.
+
+7. **Couleurs.** Une palette par axe, jamais partagée entre blocs voisins : les types de vente prennent quatre séries catégorielles validées Nuit et Jour, puis un repli neutre ; qui vend prend l'encre de l'équipe, le violet de l'agent et l'or des données ; un total, les créatrices et la rampe des heures prennent l'encre des données seule. Le graphique du chiffre d'affaires est découpé par type de vente, pour l'agence comme pour une créatrice ; les créatrices se comparent dans leur propre bloc. Le détail vit dans `docs/design/README.md`.
 
 ## Conséquences
 
@@ -53,6 +57,7 @@ Positives :
 Négatives, à surveiller :
 - Une lecture sur 90 jours et plusieurs créatrices parcourt beaucoup de lignes. S'il le faut, des sommes quotidiennes en table viendront par une ADR.
 - Les « nouveaux payeurs » se jugent sur le registre, qui commence 31 jours avant la clé. Au début, presque tous les payeurs sont « nouveaux ».
+- Une créatrice archivée sort de la lecture : ses ventes passées ne comptent plus dans les périodes anciennes. Le fuseau vient du connecteur de la plateforme, Paris en repli.
 - Sans le lot B, l'écran ne dit rien des abonnés. C'est ce qui manque le plus pour la stratégie d'abonnement.
 
 ## Alternatives rejetées

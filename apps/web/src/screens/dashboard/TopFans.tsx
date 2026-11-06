@@ -15,12 +15,15 @@ export function TopFans({
   tip,
   onOpen,
   usdNote,
+  empty = 'Aucun achat observé sur la période.',
 }: {
   fans: readonly Fan[];
   tip: FloatingTip;
   onOpen: ((fan: Fan) => void) | undefined;
   /** How their dollars were counted, in one discreet sentence; absent when no dollar sale falls in the period. */
   usdNote?: string | undefined;
+  /** What the empty list says; the agency's view says where the purchases come from. */
+  empty?: string;
 }): JSX.Element {
   const top = fans.filter((fan) => fan.spent > 0).slice(0, 4);
   const max = Math.max(1, ...top.map((fan) => fan.spent));
@@ -28,7 +31,7 @@ export function TopFans({
   if (top.length === 0) {
     return (
       <>
-        <p className="db-pending nv-plate">Aucun achat observé sur la période.</p>
+        <p className="db-pending nv-plate">{empty}</p>
         {note}
       </>
     );

@@ -64,15 +64,21 @@ const KIND_OF: Readonly<Record<SaleType, AgencySaleKind>> = {
 interface HourSum {
   readonly isoDay: number;
   readonly hour: number;
+  readonly saleType: SaleType;
   readonly currency: Currency;
   readonly grossMinor: number;
 }
 
-/** What one paying fan of the period spent (sales only), in one currency; `key` never leaves the server. */
+/**
+ * What one fan spent in the period or the one before, in one currency: his sales of that period less their refunds,
+ * whenever refunded (the register's rule: a refund comes off its sale). `key` never leaves the server.
+ */
 interface FanSum {
   readonly key: string;
   readonly currency: Currency;
   readonly grossMinor: number;
+  /** The period before, not the period. */
+  readonly previous: boolean;
   /** He bought before the period, in the register. */
   readonly seenBefore: boolean;
 }
@@ -85,7 +91,15 @@ export interface AgencyCreatorRead {
   readonly totals: SalesTotals;
   readonly hours: readonly HourSum[];
   readonly fans: readonly FanSum[];
-  readonly previousPaying: number;
+  /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
+  readonly refundsWithoutSale: number;
+}
+
+/** One hour of a day: its sums in euros and dollars, by creator and by kind. */
+interface HourPots {
+  all: [number, number];
+  creator: Map<CreatorId, [number, number]>;
+  kind: Map<AgencySaleKind, [number, number]>;
 }
 
 /** Signed sums kept apart by currency until the end, so each amount is converted once. */
@@ -182,8 +196,10 @@ export function agencyInsights(input: {
   readonly creators: readonly AgencyCreatorRead[];
   readonly names: ReadonlyMap<string, string>;
   readonly rate: UsdRate | null;
+  /** The platform's zone, the days' and hours'. */
+  readonly timeZone: string;
 }): AgencyInsights {
-  const { period, range, creators, names, rate } = input;
+  const { period, range, creators, names, rate, timeZone } = input;
   const total: Pair = { current: pot(), previous: pot() };
   const byDay = new Map<string, { all: Pot; creator: Map<CreatorId, Pot>; kind: Map<AgencySaleKind, Pot> }>();
   const byKind = new Map<AgencySaleKind, Pair>();
@@ -225,36 +241,63 @@ export function agencyInsights(input: {
   }
 
   const hours = Array.from({ length: 7 }, () => Array.from({ length: 24 }, (): [number, number] => [0, 0]));
+  // One day's hours by creator and by kind, for the chart of a period of one day.
+  const hourly = Array.from({ length: 24 }, (): HourPots => ({
+    all: [0, 0],
+    creator: new Map<CreatorId, [number, number]>(),
+    kind: new Map<AgencySaleKind, [number, number]>(),
+  }));
   for (const creator of creators) {
     for (const sum of creator.hours) {
       const cell = hours[sum.isoDay - 1]?.[sum.hour];
       if (cell === undefined) continue;
-      cell[sum.currency === 'USD' ? 1 : 0] += sum.grossMinor;
+      const slot = sum.currency === 'USD' ? 1 : 0;
+      cell[slot] += sum.grossMinor;
       if (sum.currency === 'USD' && sum.grossMinor !== 0) dollarsSeen = true;
+      const hour = hourly[sum.hour];
+      if (period !== 'day' || hour === undefined) continue;
+      hour.all[slot] += sum.grossMinor;
+      const ofCreator = hour.creator.get(creator.creatorId) ?? [0, 0];
+      ofCreator[slot] += sum.grossMinor;
+      hour.creator.set(creator.creatorId, ofCreator);
+      const kind = KIND_OF[sum.saleType];
+      const ofKind = hour.kind.get(kind) ?? [0, 0];
+      ofKind[slot] += sum.grossMinor;
+      hour.kind.set(kind, ofKind);
     }
   }
 
   // A fan is a fan of one creator's account: the reader's key already says whose, the creator is added in case two
   // creators' keys meet.
   const fans = new Map<string, { eur: number; usd: number; seenBefore: boolean }>();
-  let previousPaying = 0;
+  const before = new Map<string, { eur: number; usd: number }>();
+  let refundsWithoutSale = 0;
   for (const creator of creators) {
-    previousPaying += creator.previousPaying;
+    refundsWithoutSale += creator.refundsWithoutSale;
     for (const fan of creator.fans) {
       const key = `${creator.creatorId}:${fan.key}`;
-      const entry = fans.get(key) ?? { eur: 0, usd: 0, seenBefore: false };
+      const entry = fan.previous
+        ? (before.get(key) ?? { eur: 0, usd: 0 })
+        : (fans.get(key) ?? { eur: 0, usd: 0, seenBefore: false });
       if (fan.currency === 'USD') {
         entry.usd += fan.grossMinor;
         if (fan.grossMinor !== 0) dollarsSeen = true;
       } else entry.eur += fan.grossMinor;
-      entry.seenBefore ||= fan.seenBefore;
-      fans.set(key, entry);
+      if (fan.previous) before.set(key, entry);
+      else {
+        const seen = fans.get(key)?.seenBefore ?? false;
+        fans.set(key, { eur: entry.eur, usd: entry.usd, seenBefore: seen || fan.seenBefore });
+      }
     }
   }
-  // Without a rate, a fan who paid in dollars alone is in no figure, as his sales are in none.
+  // A paying fan spent more than his refunds took back; without a rate, a fan who paid in dollars alone is in no
+  // figure, as his sales are in none, in the period as in the one before.
+  const pays = (fan: { eur: number; usd: number }): boolean =>
+    rate === null ? fan.eur > 0 : fan.eur + toEur(fan.usd, rate) > 0;
   const spent = [...fans.values()]
-    .filter((fan) => fan.eur > 0 || (rate !== null && fan.usd > 0))
+    .filter(pays)
     .map((fan) => ({ amount: fan.eur + toEur(fan.usd, rate), seenBefore: fan.seenBefore }));
+  const previousPaying = [...before.values()].filter(pays).length;
   const spentTotal = spent.reduce((sum, fan) => sum + fan.amount, 0);
   const topTen = [...spent]
     .sort((a, b) => b.amount - a.amount)
@@ -331,6 +374,22 @@ export function agencyInsights(input: {
       ),
     byCreator: creatorFigures,
     hours: hours.map((row) => row.map(([eur, usd]) => eur + toEur(usd, rate))),
+    hourly:
+      period === 'day'
+        ? hourly.map((hour, i) => ({
+            hour: i,
+            revenueMinor: hour.all[0] + toEur(hour.all[1], rate),
+            byCreator: [...hour.creator]
+              .map(([creatorId, [eur, usd]]) => ({ creatorId, revenueMinor: eur + toEur(usd, rate) }))
+              .filter((one) => one.revenueMinor !== 0),
+            byKind: AgencySaleKindSchema.options
+              .map((kind) => {
+                const [eur, usd] = hour.kind.get(kind) ?? [0, 0];
+                return { kind, revenueMinor: eur + toEur(usd, rate) };
+              })
+              .filter((one) => one.revenueMinor !== 0),
+          }))
+        : [],
     fans: {
       paying: spent.length,
       previousPaying,
@@ -338,6 +397,8 @@ export function agencyInsights(input: {
       topTenShare: spentTotal > 0 ? Math.round((topTen / spentTotal) * 100) : null,
       averagePerPayingMinor: spent.length > 0 ? Math.round(spentTotal / spent.length) : null,
     },
+    refundsWithoutSale,
+    timeZone,
     dollarsLeftOut: rate === null && dollarsSeen,
   };
 }

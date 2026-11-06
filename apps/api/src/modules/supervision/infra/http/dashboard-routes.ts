@@ -176,7 +176,7 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           first === undefined ? new Map<string, string>() : deps.agency.memberNames(first.creatorId, userId),
           deps.usdRate.latest(userId),
         ]);
-        return agencyInsights({ period, range, creators: reads, names, rate });
+        return agencyInsights({ period, range, creators: reads, names, rate, timeZone: deps.agencyTimeZone });
       },
     );
 

@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
@@ -119,6 +119,32 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(await screen.findByText(/Aucune créatrice n’est encore reliée/u)).toBeTruthy();
     expect(screen.getByRole('link', { name: /Réglages › Ventes/u })).toBeTruthy();
     expect(screen.queryByText('Chiffre d’affaires')).toBeNull();
+  });
+
+  it('says dollars are left out without a rate, and refunds without their sale', async () => {
+    serve(200, { ...AGENCY_WEEK, dollarsLeftOut: true, refundsWithoutSale: 2 });
+    show();
+    expect(await screen.findByText(/Des ventes en dollars sont laissées de côté/u)).toBeTruthy();
+    expect(screen.getByText(/2 remboursements de la période/u)).toBeTruthy();
+  });
+
+  it('says the server is silent and offers to read again', async () => {
+    serve(500, { error: 'internal' });
+    show();
+    expect(await screen.findByText(/Les chiffres reviennent dès qu’il répond/u)).toBeTruthy();
+  });
+
+  it('walks the chart’s columns with the arrows, one stop for the keyboard', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const chart = await screen.findByRole('group', { name: /Chiffre d’affaires jour par jour/u });
+    const columns = within(chart).getAllByRole('button');
+    expect(columns.filter((column) => column.tabIndex === 0)).toHaveLength(1);
+    const last = columns[columns.length - 1];
+    if (last === undefined) throw new Error('no column');
+    last.focus();
+    fireEvent.keyDown(last, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(columns[columns.length - 2]);
   });
 
   it('shows nothing to an account whose scope is its own', async () => {
