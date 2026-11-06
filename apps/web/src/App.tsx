@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
+import { ForgottenPasswordPage, PASSWORD_CHANGED_NOTICE } from './auth/ForgottenPasswordPage';
 import { NewPasswordPage } from './auth/NewPasswordPage';
 import { SecondFactorPage } from './auth/SecondFactorPage';
 import { SignInPage } from './auth/SignInPage';
@@ -50,6 +51,8 @@ export function App(): JSX.Element {
   const [signOutFailed, setSignOutFailed] = useState(false);
   // The session ended while the app was open (closed elsewhere, past its 12 h or 7 days): the sign-in page says so.
   const [hasEnded, setHasEnded] = useState(false);
+  // A new password just chosen from the « mot de passe oublié » link: the sign-in page says so (SEC-05 lot 3).
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const isRechecking = useRef(false);
   // A sign-out she asked for: a screen's 401 in flight meanwhile is not a session that ended (relecture #538).
   const isLeaving = useRef(false);
@@ -64,6 +67,7 @@ export function App(): JSX.Element {
           void refreshPushSubscription();
           keepSession(current.user);
           setHasEnded(false);
+          setPasswordChanged(false);
           isLeaving.current = false;
           // Signed in by now: a password kept for the code's activation has nothing left to do.
           forgetChosenPassword();
@@ -155,6 +159,23 @@ export function App(): JSX.Element {
     };
   }, [session, refresh]);
 
+  if (linkPage === 'forgotten') {
+    const toSignIn = (changed: boolean) => {
+      window.history.replaceState(null, '', '/');
+      setPasswordChanged(changed);
+      setLinkPage(null);
+    };
+    return (
+      <ForgottenPasswordPage
+        onLeave={() => {
+          toSignIn(false);
+        }}
+        onChanged={() => {
+          toSignIn(true);
+        }}
+      />
+    );
+  }
   if (linkPage !== null) {
     const Page = linkPage === 'invitation' ? WelcomePage : NewPasswordPage;
     return (
@@ -185,6 +206,7 @@ export function App(): JSX.Element {
       <SignInPage
         onSignedIn={refresh}
         notice={hasEnded ? 'Ta session a pris fin. Reconnecte-toi pour continuer.' : null}
+        confirmation={passwordChanged ? PASSWORD_CHANGED_NOTICE : null}
       />
     );
   }

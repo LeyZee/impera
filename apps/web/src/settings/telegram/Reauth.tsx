@@ -18,9 +18,12 @@ const MESSAGES = {
 export function Reauth({
   onConfirmed,
   onCancel,
+  hint = 'Pour toucher à un bot, confirme ton mot de passe et ton code.',
 }: {
   onConfirmed: () => void;
   onCancel: () => void;
+  /** What the confirmation is for, above the fields. */
+  hint?: string;
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
   const codeInput = useRef<HTMLInputElement>(null);
@@ -61,7 +64,7 @@ export function Reauth({
         onCancel();
       }}
     >
-      <p className="tg-hint">Pour toucher à un bot, confirme ton mot de passe et ton code.</p>
+      <p className="tg-hint">{hint}</p>
       <form
         className="tg-inline-form"
         onSubmit={(event) => {
