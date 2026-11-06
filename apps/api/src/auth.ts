@@ -649,7 +649,7 @@ async function passwordMatches(auth: Auth, userId: string, password: string): Pr
  */
 const SPENT_CODE_SECONDS = 120;
 
-/** The `verification` row that says a code of the account was taken: its id, keyed, never the code in clear. */
+/** The `verification` row that says a code of the account was taken: its id, hashed, never the code in clear. */
 const spentCodeId = (userId: string, code: string): string =>
   `totp-spent-${createHash('sha256').update(`${userId}:${code}`).digest('base64url')}`;
 
@@ -661,6 +661,17 @@ const spentCodeId = (userId: string, code: string): string =>
  */
 async function claimCode(db: Database, userId: string, code: string): Promise<boolean> {
   const id = spentCodeId(userId, code);
+  // The account's codes forgotten since go with it: nothing purges `verification`, so its rows stay a handful.
+  await db
+    .delete(schema.verification)
+    .where(
+      and(
+        eq(schema.verification.value, userId),
+        sql`${schema.verification.identifier} like 'totp-spent-%'`,
+        sql`${schema.verification.expiresAt} <= now()`,
+        sql`${schema.verification.id} <> ${id}`,
+      ),
+    );
   const expiresAt = sql`now() + make_interval(secs => ${SPENT_CODE_SECONDS})`;
   const claimed = await db
     .insert(schema.verification)
