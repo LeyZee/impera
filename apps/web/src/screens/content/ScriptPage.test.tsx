@@ -80,7 +80,7 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     expect(screen.getByText('De face, le regard vers toi')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Choisir une photo' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Choisir une vidéo' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Précédent' })).toHaveProperty('disabled', true);
+    expect(screen.queryByRole('button', { name: 'Précédent' })).toBeNull();
   });
 
   it('refuses a file of another kind before anything goes up', async () => {
@@ -143,7 +143,7 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     expect(calls.some((call) => call.method === 'POST' && call.url === `${BASE}/submit`)).toBe(true);
   });
 
-  it('keeps « Envoyer le script » off while a slot is missing, and opens the card she taps', async () => {
+  it('shows what is missing first, and leads to it instead of « Envoyer le script »', async () => {
     serve(
       scriptDropOf({
         id: DROP_ID,
@@ -154,8 +154,10 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     expect(await screen.findByText('Carton 4 sur 4')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Voir l’aperçu' }));
     expect(screen.getByText(/Il manque encore 1 média\./u)).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Envoyer le script' })).toHaveProperty('disabled', true);
-    fireEvent.click(screen.getByRole('button', { name: /E2B Chambre/u }));
+    expect(screen.queryByRole('button', { name: 'Envoyer le script' })).toBeNull();
+    const rows = screen.getAllByRole('button', { name: /^E\d/u });
+    expect(rows[0]?.textContent).toContain('E2B');
+    fireEvent.click(screen.getByRole('button', { name: 'Compléter E2B' }));
     expect(screen.getByText('Série B · Plein jour')).toBeDefined();
   });
 });

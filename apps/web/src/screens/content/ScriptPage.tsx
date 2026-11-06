@@ -147,6 +147,7 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
   const progress = progressOf(cards, files);
   const filling = drop.state === 'filling';
   const card = cards[step];
+  const firstMissing = cards.findIndex((one) => !cardDone(one, files));
   const percent = progress.required === 0 ? 100 : Math.round((100 * progress.filled) / progress.required);
 
   return (
@@ -215,16 +216,18 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
               </p>
             )}
             <div className="sk-foot__row">
-              <button
-                type="button"
-                className="nv-btn nv-btn--plain"
-                disabled={step === 0}
-                onClick={() => {
-                  go(step - 1);
-                }}
-              >
-                Précédent
-              </button>
+              {/* No « Précédent » on the first card: hidden, never a faded button (relecture Extension). */}
+              {step === 0 ? null : (
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--plain"
+                  onClick={() => {
+                    go(step - 1);
+                  }}
+                >
+                  Précédent
+                </button>
+              )}
               {card !== undefined ? (
                 <button
                   type="button"
@@ -235,11 +238,22 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
                 >
                   {step === cards.length - 1 ? 'Voir l’aperçu' : 'Suivant'}
                 </button>
+              ) : firstMissing !== -1 ? (
+                // A slot is missing: the way to it, never a disabled « Envoyer le script ».
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--neon"
+                  onClick={() => {
+                    go(firstMissing);
+                  }}
+                >
+                  Compléter {cards[firstMissing]?.code}
+                </button>
               ) : (
                 <button
                   type="button"
                   className="nv-btn nv-btn--neon"
-                  disabled={progress.filled < progress.required || sending}
+                  disabled={sending}
                   onClick={() => {
                     setSending(true);
                     setFailed(null);
@@ -503,39 +517,43 @@ function Preview({
           : `Il manque encore ${String(missing)} média${missing > 1 ? 's' : ''}. Touche un carton pour le compléter.`}
       </p>
       <ul className="sk-preview__list">
-        {cards.map((card, index) => {
-          const done = cardDone(card, files);
-          const meta = cardMeta(card, files);
-          return (
-            <li key={`${card.segmentKey}:${card.variant ?? ''}`}>
-              <button
-                type="button"
-                className="nv-plate sk-row"
-                onClick={() => {
-                  onOpen(index);
-                }}
-              >
-                <img
-                  className="sk-row__image"
-                  src={cardUrl(dropId, card.segmentKey, card.variant)}
-                  width={1080}
-                  height={1080}
-                  alt=""
-                  loading="lazy"
-                />
-                <span className="sk-row__titles">
-                  <span className="sk-row__name">
-                    <span className="sk-code nv-num">{card.code}</span> {card.title}
+        {/* What is missing first: she sees it without looking for it; then the cards ready, in the script's order. */}
+        {cards
+          .map((card, index) => ({ card, index }))
+          .toSorted((a, b) => Number(cardDone(a.card, files)) - Number(cardDone(b.card, files)))
+          .map(({ card, index }) => {
+            const done = cardDone(card, files);
+            const meta = cardMeta(card, files);
+            return (
+              <li key={`${card.segmentKey}:${card.variant ?? ''}`}>
+                <button
+                  type="button"
+                  className="nv-plate sk-row"
+                  onClick={() => {
+                    onOpen(index);
+                  }}
+                >
+                  <img
+                    className="sk-row__image"
+                    src={cardUrl(dropId, card.segmentKey, card.variant)}
+                    width={1080}
+                    height={1080}
+                    alt=""
+                    loading="lazy"
+                  />
+                  <span className="sk-row__titles">
+                    <span className="sk-row__name">
+                      <span className="sk-code nv-num">{card.code}</span> {card.title}
+                    </span>
+                    <span className="sk-row__meta nv-num">{meta}</span>
                   </span>
-                  <span className="sk-row__meta nv-num">{meta}</span>
-                </span>
-                <span className={done ? 'sk-pill sk-pill--ok' : 'sk-pill sk-pill--warn'}>
-                  {done ? 'Prêt' : 'À compléter'}
-                </span>
-              </button>
-            </li>
-          );
-        })}
+                  <span className={done ? 'sk-pill sk-pill--ok' : 'sk-pill sk-pill--warn'}>
+                    {done ? 'Prêt' : 'À compléter'}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
       </ul>
     </section>
   );
