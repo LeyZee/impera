@@ -16,6 +16,8 @@ import {
   occurrenceKey,
   occurrences,
   occurrencesAhead,
+  plannedCreatorsOf,
+  plansCreator,
   type PlanningTemplate,
 } from '../shifts';
 
@@ -39,6 +41,15 @@ describe('who plans, who works', () => {
     expect(codeOf(assertPlans, 'owner')).toBeNull();
     expect(codeOf(assertPlans, 'agency')).toBeNull();
     expect(codeOf(assertPlans, 'self')).toBe('role_forbidden');
+  });
+
+  it('lets the owner plan every creator and a manager those of his list only', () => {
+    const owner = plannedCreatorsOf('owner', []);
+    expect([plansCreator(owner, 'c1'), plansCreator(owner, 'c2')]).toEqual([true, true]);
+    const manager = plannedCreatorsOf('agency', ['c1']);
+    expect([plansCreator(manager, 'c1'), plansCreator(manager, 'c2')]).toEqual([true, false]);
+    expect(plansCreator(plannedCreatorsOf('agency', []), 'c1')).toBe(false);
+    expect(codeOf(plannedCreatorsOf, 'self', ['c1'])).toBe('role_forbidden');
   });
 
   it('gives a shift to an active member of the creator only', () => {
