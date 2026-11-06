@@ -1,4 +1,6 @@
 import {
+  AuditEntryIdSchema,
+  newId,
   PERSONA_CORRECTIONS_OPEN_MAX,
   PersonaCorrectionIdSchema,
   PersonaCorrectionSectionSchema,
@@ -71,13 +73,14 @@ export function createDrizzlePersonaCorrectionStore(db: Database): PersonaCorrec
 
     propose: (userId, body) =>
       withCreatorAccount(db, userId, async (tx, creatorId) => {
+        // One proposal at a time per creator: two tabs cannot both pass the count, and the same id sent twice at once
+        // reads, the second time, the correction the first stored.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`persona-corrections:${creatorId}`}))`);
         const sent = await byId(tx, body.id);
         if (sent !== undefined) {
           if (sent.section !== body.section || sent.text !== body.text) throw new PersonaCorrectionConflict();
           return toCorrection(sent);
         }
-        // One proposal at a time per creator, so that two tabs cannot both pass the count.
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`persona-corrections:${creatorId}`}))`);
         const [open] = await tx
           .select({ count: sql<number>`count(*)::int` })
           .from(t)
@@ -102,7 +105,18 @@ export function createDrizzlePersonaCorrectionStore(db: Database): PersonaCorrec
           .set({ state: 'done', doneBy: userId, doneAt: sql`now()` })
           .where(and(eq(t.id, correctionId), eq(t.state, 'open')))
           .returning(columns);
-        if (done !== undefined) return toCorrection(done);
+        if (done !== undefined) {
+          // Like every gesture on her persona, with who made it; never the words she wrote.
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId,
+            action: 'persona_correction.done',
+            entity: 'persona_correction',
+            entityId: done.id,
+            details: { creatorId, section: done.section },
+          });
+          return toCorrection(done);
+        }
         const already = await byId(tx, correctionId);
         if (already === undefined) throw new PersonaCorrectionNotFound();
         return toCorrection(already);

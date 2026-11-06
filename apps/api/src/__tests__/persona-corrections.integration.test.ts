@@ -151,6 +151,13 @@ describe('persona corrections (recette CREA-01 b)', () => {
     expect(after.state).toBe('done');
     expect(after.doneAt).not.toBeNull();
     expect((await done(annaId, id, owner)).json()).toEqual(after);
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, id));
+    expect(audit).toEqual([
+      { action: 'persona_correction.done', details: { creatorId: annaId, section: 'tastes' } },
+    ]);
     expect((await read(anna))[0]?.state).toBe('done');
 
     const unknown = await done(annaId, newId(PersonaCorrectionIdSchema), owner);
