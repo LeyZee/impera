@@ -22,6 +22,11 @@ export interface PersonaVersionStore {
    * when she has none, or does not exist. A stored content that no longer reads as `Persona` throws: never a guess.
    */
   active(creatorId: CreatorId): Promise<ActivePersonaVersion | null>;
+  /**
+   * One of her versions, active or not (Entraîner › Playground, recette PRO-21: talked to before it is activated);
+   * `null` when she has no version with this id. A content that no longer reads as `Persona` throws.
+   */
+  version(creatorId: CreatorId, versionId: PersonaVersionId): Promise<ActivePersonaVersion | null>;
   overview(creatorId: CreatorId): Promise<PersonaOverview>;
   /** Stores a new version, never active; throws `PersonaVersionConflict` when `basedOn` is stale or the number is taken. */
   create(

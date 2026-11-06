@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { BriefIntentSchema } from './brief';
+import { CreatorIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
 
 /**
@@ -135,10 +136,16 @@ export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
 
 export const PlaygroundStateSchema = z.object({
   /**
-   * The persona the playground plays (`PLAYGROUND_PERSONA_PATH`, the demo's by default): its first name, so that a
-   * trainer never takes it for one of the agency's creators (recette 28/10, M13).
+   * The persona the playground plays: its first name, and `played`, the creator's version chosen at the head of the
+   * screen (recette PRO-21), active or not; `null` for the invented persona (`PLAYGROUND_PERSONA_PATH`, the demo's by
+   * default), so that a trainer never takes it for one of the agency's creators (recette 28/10, M13).
    */
-  persona: z.object({ name: z.string().min(1) }),
+  persona: z.object({
+    name: z.string().min(1),
+    played: z
+      .object({ creatorId: CreatorIdSchema, versionId: PersonaVersionIdSchema, version: z.string().min(1) })
+      .nullable(),
+  }),
   presets: z.array(PlaygroundPresetSchema),
   presetId: z.string().nullable(),
   situation: PlaygroundSituationSchema,
@@ -173,6 +180,20 @@ export const PlaygroundRatingResultSchema = z.object({
 export type PlaygroundRatingResult = z.infer<typeof PlaygroundRatingResultSchema>;
 
 // Request bodies.
+/**
+ * `POST /v1/playground/persona` (recette PRO-21): the persona the trainer talks to, a version of a creator, active or
+ * not, or the invented one. The conversation starts over; the ratings that follow are that creator's. Unknown
+ * version: 404 `playground_persona_not_found`.
+ */
+export const PlaygroundPersonaBodySchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('invented') }),
+  z.strictObject({
+    kind: z.literal('version'),
+    creatorId: CreatorIdSchema,
+    versionId: PersonaVersionIdSchema,
+  }),
+]);
+export type PlaygroundPersonaBody = z.infer<typeof PlaygroundPersonaBodySchema>;
 export const PlaygroundPresetBodySchema = z.object({ presetId: z.string().min(1) });
 export const PlaygroundMessageBodySchema = z
   .object({
@@ -230,5 +251,6 @@ export const PLAYGROUND_ERROR_CODES = [
   'fan_message_not_found',
   'voice_model_invalid',
   'time_zone_invalid',
+  'playground_persona_not_found',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

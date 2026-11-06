@@ -379,7 +379,7 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
     const hour = hourIn(now, timeZone);
     return {
       // The demo persona's first name (`personas/demo`): the screen says whom it plays, here too.
-      persona: { name: 'Elena' },
+      persona: { name: 'Elena', played: null },
       presets: [...PRESETS],
       presetId,
       situation: {
@@ -480,6 +480,8 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
     state: () => later(snapshot),
     choosePreset: (id) => later(() => (choose(id), snapshot())),
     reset: () => later(() => (choose(presetId), snapshot())),
+    // The demo plays its invented persona only: no creator's version without the server.
+    choosePersona: () => later(() => (choose(presetId), snapshot())),
     send: (text, media) =>
       later(() => {
         history.push({

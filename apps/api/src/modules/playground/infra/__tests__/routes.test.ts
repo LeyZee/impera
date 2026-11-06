@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import {
   AlertTestResultSchema,
   ApiErrorSchema,
+  CreatorIdSchema,
+  PersonaSchema,
+  PersonaVersionIdSchema,
   PlaygroundAnswerSchema,
   PlaygroundRatingResultSchema,
   PlaygroundStateSchema,
@@ -14,6 +20,7 @@ import {
 } from '@impera/llm';
 import type { LightMyRequestResponse, preValidationAsyncHookHandler } from 'fastify';
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 
 import { testConfig } from '../../../../__tests__/support/config';
 import { createLogger } from '../../../../logger';
@@ -106,6 +113,18 @@ const ownerOnly: preValidationAsyncHookHandler = async (request, reply) => {
   };
 };
 
+/** The fictional demo persona of the repository, stored as a creator's version (ADR 0010: never a real one). */
+const DEMO = PersonaSchema.parse(
+  parse(
+    readFileSync(
+      fileURLToPath(new URL('../../../../../../../personas/demo/v0.2.0.yaml', import.meta.url)),
+      'utf8',
+    ),
+  ),
+);
+const MIA = CreatorIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c1');
+const DRAFT = PersonaVersionIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e3');
+
 async function server(
   options: { voice?: VoiceOutput; control?: GatewayControl; creatorId?: string | null } = {},
 ) {
@@ -136,6 +155,13 @@ async function server(
     },
     // « Tester » reads her active persona; none here: the words are read, the phrase needs no persona to be refused.
     activePersona: () => Promise.resolve(null),
+    // Her version 0.0.3, not active yet: the one she is talked to before it is activated (PRO-21).
+    personaVersion: (creatorId, versionId) =>
+      Promise.resolve(
+        creatorId === MIA && versionId === DRAFT
+          ? { id: DRAFT, version: '0.0.3', creatorName: 'Mia', persona: DEMO }
+          : null,
+      ),
     store,
     records,
     gateway: gateway(options.voice ?? { bubbles: ['Coucou toi ✨'] }, options.control),
@@ -172,8 +198,45 @@ describe('/v1/playground', () => {
     expect(state).toMatchObject({ pending: null, rate: { rate: null, target: 0.8 }, presetId: null });
     expect(state).toMatchObject({ sessionCostEur: 0, voice: { reachable: true } });
     // The persona it plays, by her first name: never taken for one of the agency's creators.
-    expect(state.persona).toEqual({ name: 'Lina' });
+    expect(state.persona).toEqual({ name: 'Lina', played: null });
     expect(state.situation).toMatchObject({ timeZone: 'Europe/Paris', isNight: false });
+  });
+
+  it('plays a version of hers, active or not, files its ratings under her, and goes back to the invented one (PRO-21)', async () => {
+    const { app, headers, post, stored } = await server({ creatorId: null });
+    await post('/messages', { text: 'Salut' });
+    const chosen = await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    expect(chosen.statusCode, chosen.body).toBe(200);
+    const state = stateOf(chosen);
+    expect(state.persona).toEqual({
+      name: 'Elena',
+      played: { creatorId: MIA, versionId: DRAFT, version: '0.0.3' },
+    });
+    // The conversation starts over with her.
+    expect(state.history).toEqual([]);
+    expect(state.pending).toBeNull();
+    await post('/messages', { text: 'Salut' });
+    expect((await post('/rating', { verdict: { kind: 'validated' } })).statusCode).toBe(200);
+    expect(stored[0]?.creatorId).toBe(MIA);
+
+    const unknown = await post('/persona', {
+      kind: 'version',
+      creatorId: MIA,
+      versionId: PersonaVersionIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e9'),
+    });
+    expect(unknown.statusCode).toBe(404);
+    expect(codeOf(unknown)).toBe('playground_persona_not_found');
+    // Refused, her playground stays as it was.
+    expect(
+      stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers })).persona.played,
+    ).toEqual({
+      creatorId: MIA,
+      versionId: DRAFT,
+      version: '0.0.3',
+    });
+
+    const back = stateOf(await post('/persona', { kind: 'invented' }));
+    expect(back.persona).toEqual({ name: 'Lina', played: null });
   });
 
   it('answers, rates once, and counts the rate', async () => {

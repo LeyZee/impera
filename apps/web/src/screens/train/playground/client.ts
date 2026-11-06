@@ -7,6 +7,7 @@ import {
   type Destination,
   type PlaygroundComparison,
   type PlaygroundMedia,
+  type PlaygroundPersonaBody,
   type PlaygroundState,
   type Verdict,
 } from '@impera/contracts';
@@ -22,6 +23,8 @@ export interface PlaygroundClient {
   readonly isDemo: boolean;
   state(): Promise<PlaygroundState>;
   choosePreset(presetId: string): Promise<PlaygroundState>;
+  /** Whom she speaks as: a creator's version, active or not, or the invented persona; the conversation starts over. */
+  choosePersona(body: PlaygroundPersonaBody): Promise<PlaygroundState>;
   /** Same fan, conversation from zero. */
   reset(): Promise<PlaygroundState>;
   /** His message; her answer comes back as `pending`. */
@@ -94,6 +97,7 @@ export function createHttpClient(): PlaygroundClient {
     isDemo: false,
     state,
     choosePreset: (presetId) => call(PlaygroundStateSchema, '/preset', 'POST', { presetId }),
+    choosePersona: (body) => call(PlaygroundStateSchema, '/persona', 'POST', body),
     reset: () => call(PlaygroundStateSchema, '/reset', 'POST'),
     send: async (text, media) => {
       await call(PlaygroundAnswerSchema, '/messages', 'POST', {

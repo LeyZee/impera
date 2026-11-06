@@ -10,6 +10,7 @@ import {
   PlaygroundCreatorMediaBodySchema,
   PlaygroundMessageBodySchema,
   PlaygroundNotesBodySchema,
+  PlaygroundPersonaBodySchema,
   PlaygroundPresetBodySchema,
   PlaygroundRatingBodySchema,
   PlaygroundRatingResultSchema,
@@ -57,6 +58,19 @@ export function createPlaygroundRoutes(
       '/playground/preset',
       { schema: { body: PlaygroundPresetBodySchema, response: state } },
       (request) => engineOf(request).applyPreset(request.body.presetId),
+    );
+
+    // Recette PRO-21: a creator's version, active or not, or the invented persona; the conversation starts over.
+    app.post(
+      '/playground/persona',
+      { schema: { body: PlaygroundPersonaBodySchema, response: state } },
+      async (request) => {
+        if (request.user === null) throw new Error('playground route reached without a session');
+        const { body } = request;
+        const choice =
+          body.kind === 'invented' ? null : { creatorId: body.creatorId, versionId: body.versionId };
+        return (await service.choose(request.user.id, choice)).state();
+      },
     );
 
     app.post('/playground/reset', { schema: { response: state } }, (request) => engineOf(request).reset());

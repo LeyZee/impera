@@ -97,3 +97,10 @@ export class TimeZoneInvalid extends PlaygroundError {
     super('time_zone_invalid', 'Fuseau horaire inconnu : un nom comme Europe/Paris.');
   }
 }
+
+/** No version of hers under this id (recette PRO-21): another creator's, or one that never was. */
+export class PlaygroundPersonaNotFound extends PlaygroundError {
+  constructor() {
+    super('playground_persona_not_found', 'Cette version de persona n’existe pas pour cette créatrice.');
+  }
+}
