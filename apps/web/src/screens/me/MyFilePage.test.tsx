@@ -240,7 +240,8 @@ describe('Moi › Dossier', () => {
     renderPage();
     const documents = await waitFor(() => panelOf('Tes pièces'));
     const certificate = await waitFor(() => itemOf(documents, 'Attestation de résidence fiscale'));
-    expect(certificate.dataset['remind']).toBe('true');
+    // Said in amber words under it, never a coloured edge on the row (Charles: pastilles only).
+    expect(certificate.querySelector('.tm-warn.cf-remind')).not.toBeNull();
     expect(
       within(certificate).getByText(/^Ton attestation se termine le 31 décembre/u).textContent,
     ).toContain('Sans celle de 2027');
@@ -261,7 +262,8 @@ describe('Moi › Dossier', () => {
     expect(within(certificate).getByText('Échue').className).toBe('rp-chip rp-chip--warn');
     expect(within(certificate).queryByText('Acceptée')).toBeNull();
     expect(certificate.textContent).toContain('Acceptée, échue le 31 décembre 2026');
-    expect(certificate.dataset['remind']).toBe('true');
+    // Said in amber words under it, never a coloured edge on the row (Charles: pastilles only).
+    expect(certificate.querySelector('.tm-warn.cf-remind')).not.toBeNull();
     expect(
       within(certificate).getByText(/^Ton attestation de 2026 s’est terminée le 31 décembre 2026\./u)
         .textContent,

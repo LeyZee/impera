@@ -398,11 +398,7 @@ export function DocumentsPanel({
               const shown = standing.kind === 'missing' ? null : standing.document;
               const reminder = shown === null ? null : reminderText(shown, file.today, reader.self, treaty);
               return (
-                <li
-                  key={kind}
-                  className="cf-item cf-item--doc"
-                  data-remind={reminder === null ? undefined : 'true'}
-                >
+                <li key={kind} className="cf-item cf-item--doc">
                   <div className="cf-item__main">
                     <p className="cf-item__name">{DOCUMENT_NAMES[kind]}</p>
                     {shown === null ? (

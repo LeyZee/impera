@@ -205,10 +205,10 @@ describe('Paie › Factures', () => {
     const dues = panelOf('Échéances proches ou passées');
     const soon = rowIn(dues, BASILE_SOON.number);
     expect(within(soon).getByText('Bientôt due').className).toBe('rp-chip rp-chip--warn');
-    expect(soon.dataset['due']).toBe('soon');
     const late = rowIn(dues, THEO_LATE.number);
     expect(within(late).getByText('En retard').className).toBe('rp-chip iv-chip--danger');
-    expect(late.dataset['due']).toBe('overdue');
+    // Pastilles only: the chip says the due date, never a coloured edge on the row.
+    expect([soon.dataset['due'], late.dataset['due']]).toEqual([undefined, undefined]);
     expect(within(late).getByRole('link', { name: 'Voir le relevé' }).getAttribute('href')).toBe(
       `/paie/quinzaine?quinzaine=${OCT1}&membre=${THEO.id}`,
     );

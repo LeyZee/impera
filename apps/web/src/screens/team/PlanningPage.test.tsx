@@ -605,6 +605,11 @@ describe('Équipe › Planning', () => {
     });
     renderPage();
     const decide = await decideFold();
+    // Never `.sc-decide`, her « À décider » row on Aujourd'hui: it would lay the leaves beside the summary.
+    expect([decide.classList.contains('sc-fold--decide'), decide.classList.contains('sc-decide')]).toEqual([
+      true,
+      false,
+    ]);
     expect(text(decide)).toContain('ThéoDu mer. 28 oct. au ven. 30 oct., 3 jours');
     // Said before Valider, from the planning of the leave's days (EQ-16).
     await waitFor(() => {

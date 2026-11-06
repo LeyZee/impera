@@ -97,7 +97,7 @@ export function InvoiceRow({
   const settling = reader.owner && !reader.contractor && item.acceptance.state === 'contested';
 
   return (
-    <article className="iv-doc" data-due={due === null ? undefined : item.due}>
+    <article className="iv-doc">
       <div className="iv-doc__main">
         <p className="iv-doc__name">
           <span className="nv-num">{item.number}</span>
@@ -291,8 +291,10 @@ function PdfButton({ pdf, className, label }: { pdf: Pdf; className: string; lab
   return (
     <button
       type="button"
-      className={className}
-      disabled={pdf.busy || pdf.gone}
+      className={`${className} iv-pdf`}
+      // Never `disabled`: the button just pressed with Entrée keeps the focus, which a disabled one drops on the page
+      // (Extension on #567). `read` already refuses while it reads, and once the PDF is lost.
+      aria-disabled={pdf.busy || pdf.gone ? true : undefined}
       aria-busy={pdf.busy}
       onClick={pdf.read}
     >

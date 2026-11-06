@@ -93,11 +93,15 @@
   font-weight: 600;
   white-space: nowrap;
 }
-/* Nobody but the agent, in Automatique: its soft violet, the word said, no edge. */
+/* Nobody but the agent, in Automatique: its soft violet, the word said, never a coloured edge (Charles: pastilles
+   only). */
 .cal-alone {
   flex: 1;
   display: flex;
-  align-items: center;
+  /* Its word, then its hours under it: the hierarchy of a shift's chip and of « À pourvoir » beside it (#573). */
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   min-height: 40px;
   padding: 4px 8px;
   border-radius: var(--nv-radius-sm);
@@ -123,8 +127,14 @@
   padding-left: 0;
   color: var(--nv-ink-faint);
 }
+.cal-alone > .cal-hours {
+  margin-left: 0;
+  padding-left: 0;
+}
 .cal-alone--key {
   flex: none;
+  flex-direction: row;
+  align-items: center;
   min-height: 0;
   padding: 1px 8px;
 }
