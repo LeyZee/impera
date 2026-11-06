@@ -538,6 +538,37 @@
 .tr-row__creator {
   flex: none;
 }
+/*
+ * In a narrow list (the side column on a computer, the whole screen on a phone), the state pill and the creator's tag
+ * left the pseudo a few pixels: « f… » (EXT-02). There, the pill goes under the pseudo, and the pseudo keeps the line.
+ */
+.tr-groups .tr-list {
+  container-type: inline-size;
+}
+@container (max-width: 480px) {
+  .tr-groups .tr-row.nv-convo {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .tr-groups .tr-row.nv-convo > .nv-convo__side {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+  }
+  /* A creator's long name gives way before the pseudo: cut with « … », her whole name in its title. */
+  .tr-groups .tr-row__pseudo {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+  .tr-groups .tr-row__creator {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 3em;
+    line-height: 22px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 /* The list grouped by who acts: a quiet title over each group, a count for « À toi » only. */
 .tr-groups {
   display: flex;

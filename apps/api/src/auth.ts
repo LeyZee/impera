@@ -493,6 +493,21 @@ function cookieOf(request: FastifyRequest, name: string): string | undefined {
 }
 
 /**
+ * Better Auth's `getSession`, except that a database that cannot answer throws its own error: Better Auth catches it
+ * and throws a bare 500 « Failed to get session », which would answer every signed-in request with « Erreur interne »
+ * while the database restarts (recette 07/11, BIL-01). On that 500, one `select 1` tells which it was: when it fails,
+ * its connection error goes up and the error handler answers 503; when it passes, Better Auth's error goes up as is.
+ */
+async function readSession(auth: Auth, db: Database, request: FastifyRequest) {
+  try {
+    return await auth.api.getSession({ headers: authHeaders(request) });
+  } catch (error) {
+    if (isAPIError(error) && error.statusCode >= 500) await db.execute(sql`select 1`);
+    throw error;
+  }
+}
+
+/**
  * The session of a request, as Better Auth reads it (12 hours without activity), refused past 7 days from its creation
  * whatever its use (ADR 0046 § 6): the row goes, and the request is answered as without a session.
  */
@@ -502,7 +517,7 @@ export async function sessionOf(
   request: FastifyRequest,
   now: Date = new Date(),
 ): Promise<Awaited<ReturnType<Auth['api']['getSession']>>> {
-  const result = await auth.api.getSession({ headers: authHeaders(request) });
+  const result = await readSession(auth, db, request);
   if (result === null) return null;
   if (now.getTime() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
   await db.delete(schema.session).where(eq(schema.session.id, result.session.id));

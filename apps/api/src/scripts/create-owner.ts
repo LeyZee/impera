@@ -11,8 +11,10 @@ import { createApp } from '../composition-root';
 import { loadConfig } from '../config';
 import { createLogger } from '../logger';
 
+import { requireArguments } from './command-line';
 import { readSecret } from './read-secret';
 
+requireArguments('Usage: pnpm owner:create --email <email> --name <name>', { withValue: ['email', 'name'] });
 const { values } = parseArgs({ options: { email: { type: 'string' }, name: { type: 'string' } } });
 if (values.email === undefined || values.name === undefined) {
   console.error('Usage: pnpm owner:create --email <email> --name <name>');

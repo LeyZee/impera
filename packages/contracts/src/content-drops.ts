@@ -226,6 +226,9 @@ const weightFr = (bytes: number): string =>
 
 /** Why a declared file does not go up for this category, in her words; `null` when it may go. */
 export function declaredFileRefusal(category: DropCategory, file: DeclaredDropFile): string | null {
+  // An empty file (a gallery item not yet downloaded from the cloud, a cut copy) never goes: the server refuses it at
+  // the declaration, and her phone would read that as a lost connection (recette MED-01).
+  if (file.bytes < 1) return 'Ce fichier est vide : choisis-le à nouveau dans ta galerie';
   const kind = kindOfMime(file.mime);
   const { kinds } = DROP_FORMAT_RULES[category];
   if (!kinds.includes(kind)) {

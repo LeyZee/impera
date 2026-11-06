@@ -7,7 +7,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { cardContent, cardSvg, duration, quoteLines, shootSummary, wrap } from '../cards';
+import { cardContent, cardSvg, duration, quoteLines, shootSummary, withoutEmoji, wrap } from '../cards';
 
 const NBSP = ' ';
 const plain = (text: string): string => text.replaceAll(NBSP, ' ');
@@ -212,6 +212,32 @@ describe('cardSvg', () => {
     expect(icon('night')).toContain('<path d="M12 3a6 6 0 0 0 9 9');
     expect(icon('both')).toContain('<path d="M12 8a2.83');
     expect(icon('both')).toContain('>JOUR ET NUIT</text>');
+  });
+
+  it('says the moment her request fixed, never the « both » of the structure (recette MED-05)', () => {
+    const both = { ...version, moment: 'both' as const };
+    const night = cardContent(both, 'canape', { moment: 'night' });
+    const day = cardContent(both, 'canape', { variant: 'B', moment: 'day' });
+    expect(night).toMatchObject({ moment: 'NUIT', momentKey: 'night' });
+    expect(day).toMatchObject({ moment: 'JOUR', momentKey: 'day' });
+    if (night === null) throw new Error('no card');
+    expect(cardSvg(night, 'folder')).toContain('>NUIT</text>');
+    expect(cardSvg(night, 'folder')).not.toContain('JOUR ET NUIT');
+    // Without one (the library, a script asked before SC-03 c2), the structure's own.
+    expect(cardContent(both, 'canape', { moment: null })).toMatchObject({ moment: 'JOUR ET NUIT' });
+  });
+
+  it('draws no emoji on a rasterised card, whose fonts have none, and keeps them on her phone (recette MED-06)', () => {
+    const named = cardContent({ ...version, name: 'Soirée 🌗 au salon 💋' }, 'canape');
+    if (named === null) throw new Error('no card');
+    expect(cardSvg(named, 'folder')).toContain('>Soirée au salon</text>');
+    expect(cardSvg(named, 'thumbnail')).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(cardSvg(named, 'card')).toContain('Soirée 🌗 au salon 💋');
+    expect(withoutEmoji('👩🏽‍🦰 Rousse ❤️ 🇫🇷')).toBe('Rousse');
+    expect(withoutEmoji('Plein jour')).toBe('Plein jour');
+    expect(withoutEmoji('Marque® ™ ©')).toBe('Marque® ™ ©');
+    expect(withoutEmoji('Étape 1️⃣')).toBe('Étape 1');
+    expect(withoutEmoji('🌗')).toBe('🌗');
   });
 
   it('keeps three hints at least on a full card, and never says « + N » alone (Extension’s review)', () => {

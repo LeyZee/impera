@@ -11,10 +11,12 @@ import { createApp } from '../composition-root';
 import { loadConfig } from '../config';
 import { createLogger } from '../logger';
 
+import { requireArguments } from './command-line';
 import { describeIssues, readPersonaYaml } from './persona-file';
 
 const USAGE = 'Usage: pnpm persona:load <fichier.yaml> [--creator <id>] [--activate]';
 
+requireArguments(USAGE, { withValue: ['creator'], alone: ['activate'], positionals: true });
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: { creator: { type: 'string' }, activate: { type: 'boolean', default: false } },

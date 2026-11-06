@@ -65,8 +65,8 @@ function versionsOf(moment: ScriptMoment): ScriptVersions {
   return {
     frozen: () => Promise.resolve({ name: 'Soirée inventée', moment, segments }),
     card: refuse('card'),
-    folderCard: (_versionId, segmentKey, variant) =>
-      Promise.resolve(new TextEncoder().encode(`carton ${segmentKey} ${variant ?? '-'}`)),
+    folderCard: (_versionId, segmentKey, variant, shot) =>
+      Promise.resolve(new TextEncoder().encode(`carton ${segmentKey} ${variant ?? '-'} ${shot ?? '-'}`)),
     freeze: refuse('freeze'),
   };
 }
@@ -132,7 +132,8 @@ describe('content-drops › a sent script’s archive (SC-03 c)', () => {
       '02-E2B-01-photo.heic',
     ]);
     expect(decoded('01-E1-01-photo.jpg')).toBe('photo-sal');
-    expect(decoded('02-E2B-00-carton.png')).toBe('carton chambre B');
+    // Each card says the moment the script is shot as (recette MED-05).
+    expect(decoded('02-E2B-00-carton.png')).toBe('carton chambre B night');
     expect(decoded('00-fiche.txt')).toContain('02 · E2 — Chambre (PAYANT)');
   });
 

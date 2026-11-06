@@ -3,7 +3,7 @@ import { CreatorIdSchema } from '@impera/contracts';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { ChipFace, CreatorFace } from './CreatorFace';
+import { ChipFace, ChipName, CreatorFace } from './CreatorFace';
 
 afterEach(cleanup);
 
@@ -67,5 +67,15 @@ describe('ChipFace', () => {
     fireEvent.error(img);
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('.cr-chip-face--initial')?.getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
+describe('ChipName (recette 07/11, EXT-05)', () => {
+  it('writes her whole name, and gives it as the title once the chip cuts it', () => {
+    const name = 'Anaïs-Morgane de la Recette Très Longue 🌸 نور تجربة Fin';
+    const { container } = render(<ChipName name={name} />);
+    const span = container.querySelector('.cr-chip-name');
+    expect(span?.textContent).toBe(name);
+    expect(span?.getAttribute('title')).toBe(name);
   });
 });

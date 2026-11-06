@@ -80,6 +80,12 @@ interface Posted {
 /** The text of an element with its narrow spaces read as spaces: « 30 % » is written with one. */
 const text = (element: Element): string => element.textContent.replace(/[\u00a0\u202f]/gu, ' ');
 
+/** Picks a status in the dialog's list, which opens outside the dialog (a portal). */
+function choose(panel: HTMLElement, label: string): void {
+  fireEvent.click(within(panel).getByRole('combobox', { name: 'Statut' }));
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: label }));
+}
+
 const apiError = (code: string): unknown => ({
   error: { code, message: code, details: {}, requestId: 'r1' },
 });
@@ -554,7 +560,11 @@ describe('changing a member once added (EQ-10)', () => {
     });
     fireEvent.click(within(await sheet()).getByRole('button', { name: 'Changer le statut' }));
     const panel = await screen.findByRole('dialog', { name: 'Statut de Théo' });
-    fireEvent.click(within(panel).getByRole('radio', { name: 'Parti' }));
+    // Title, then the explanation before any choice (EQP-06).
+    expect(panel.textContent).toContain('Choisis où en est Théo.');
+    // Six statuses: a list under its label, never six chips.
+    expect(within(panel).queryByRole('radio')).toBeNull();
+    choose(panel, 'Parti');
     // A group inside the dialog, not a second modal; the box reads what it confirms.
     const confirm = within(panel).getByRole('group', { name: 'Confirmer le départ' });
     expect(confirm.textContent).toContain('Ce changement est définitif.');
@@ -621,7 +631,7 @@ describe('changing a member once added (EQ-10)', () => {
     });
     fireEvent.click(within(await sheet()).getByRole('button', { name: 'Changer le statut' }));
     const panel = await screen.findByRole('dialog', { name: 'Statut de Théo' });
-    fireEvent.click(within(panel).getByRole('radio', { name: 'Suspendu' }));
+    choose(panel, 'Suspendu');
     expect(panel.textContent).toContain('Théo garde sa connexion et ne voit plus que ses propres shifts');
     const left = await within(panel).findByText(/2 shifts à venir restent à son nom/u);
     // Nobody holds them: the planning shows them to fill, no longer as filled (EQP-03).
@@ -630,7 +640,7 @@ describe('changing a member once added (EQ-10)', () => {
       `/equipe/planning?membre=${THEO.id}`,
     );
     // Gone, the same count sits in the confirmation, beside what Impera does not do yet.
-    fireEvent.click(within(panel).getByRole('radio', { name: 'Parti' }));
+    choose(panel, 'Parti');
     const confirm = within(panel).getByRole('group', { name: 'Confirmer le départ' });
     expect(await within(confirm).findByText(/2 shifts à venir restent à son nom/u)).toBeDefined();
     expect(confirm.textContent).toContain('Son compte membre sur Reveal est à retirer à la main.');
@@ -645,7 +655,7 @@ describe('changing a member once added (EQ-10)', () => {
     serve({ planningDown: true });
     fireEvent.click(within(await sheet()).getByRole('button', { name: 'Changer le statut' }));
     const panel = await screen.findByRole('dialog', { name: 'Statut de Théo' });
-    fireEvent.click(within(panel).getByRole('radio', { name: 'Malade' }));
+    choose(panel, 'Malade');
     const unread = await within(panel).findByText(
       /Ses shifts à venir n’ont pas pu être lus/u,
       {},
