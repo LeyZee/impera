@@ -19,7 +19,7 @@ But : le jour où une clé arrive, tout ce qui ne dépend pas de la clé a déj�
 
 ## Le mode simulé (à construire avant la recette de l'agent)
 
-Sans lui, la boucle « un fan écrit, l'agent répond » ne se voit sur aucun écran. Proposition (fiche `docs/sessions/tasks/PROPOSED-recette-sandbox.md`, ADR à écrire car elle touche plusieurs modules) :
+Sans lui, la boucle « un fan écrit, l'agent répond » ne se voit sur aucun écran. Proposition (fiche `docs/sessions/tasks/PROPOSED-recette-sandbox.md`, ADR 0075 en brouillon) :
 
 1. **Interrupteur de pile** `IMPERA_SANDBOX=1`, refusé au démarrage si `NODE_ENV=production`, affiché en bandeau ambre dans le CRM (« Bac à sable : rien n'est réel »).
 2. **Reveal simulé** : la pile lance FakeReveal (`apps/api/src/__tests__/fake-reveal/server.ts`, prévu pour le développement local) et branche un connecteur sur lui ; l'adaptateur CRM prend une adresse de base de recette (il accepte déjà `baseUrl`). Les routes de contrôle `/__` de FakeReveal servent à faire écrire un fan, acheter, rembourser, avancer l'horloge.

@@ -98,3 +98,4 @@ Date : AAAA-MM-JJ
 | 0072 | Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint | accepted (amende 0039 § 6, précise 0038 et 0023) |
 | 0073 | Rapport déclaré sur Reveal : l'écart avec les ventes lues se voit, s'explique et se tranche par un humain | accepted (remplace dans 0043 § 4 le contrôle d'un compte Reveal en « déclaré », précise 0023, 0050 et 0018) |
 | 0074 | Les chiffres de sa base : quels faits comptent, et comment âge, lieu, métier et situation se rangent en cases | accepted (précise 0063 § 2 et 0065 § 3 et § 4 ; remplace dans 0065 § 2 le nombre au survol) |
+| 0075 | Bac à sable de recette : Reveal et IA simulés, jamais actifs hors développement | proposed (précise 0008, 0009, 0016, 0050, 0027) |
