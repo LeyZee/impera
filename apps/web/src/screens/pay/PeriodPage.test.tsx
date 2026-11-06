@@ -1024,6 +1024,7 @@ describe('Paie › Quinzaine', () => {
       creatorName,
       platform: 'reveal',
       handle: creatorName.toLowerCase(),
+      archived: false,
     }));
     rules = {
       ...PAY_RULES,

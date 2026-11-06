@@ -78,9 +78,12 @@ export function ShiftPanel({
   const refresh = useRefreshPlanning();
   const zone = planning.settings.timeZone;
   const slots = shiftSlotsOf(planning.settings);
-  const accounts = [...planning.accounts].sort(
-    (a, b) => a.creatorName.localeCompare(b.creatorName, 'fr') || a.handle.localeCompare(b.handle, 'fr'),
-  );
+  // Nothing new on an archived creator (ADR 0071 § 2): her account is in the planning for her history alone.
+  const accounts = planning.accounts
+    .filter((one) => !one.archived)
+    .sort(
+      (a, b) => a.creatorName.localeCompare(b.creatorName, 'fr') || a.handle.localeCompare(b.handle, 'fr'),
+    );
   const [accountId, setAccountId] = useState(start.accountId ?? accounts[0]?.id ?? '');
   const account = accounts.find((one) => one.id === accountId) ?? null;
   const fill = start.fill;

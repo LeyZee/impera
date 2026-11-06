@@ -6,7 +6,6 @@ import {
   type CreateShiftBody,
   type CreateShiftTemplateBody,
   type CreatorId,
-  type CreatorSummary,
   type MyShift,
   type MyShifts,
   type OnDuty,
@@ -23,11 +22,12 @@ import {
   type UserId,
 } from '@impera/contracts';
 
-import { CreatorNotFound } from '../domain/errors';
+import { CreatorArchived, CreatorNotFound } from '../domain/errors';
 import { leaveCover } from '../domain/leaves';
 import type {
   Actor,
   CreatorDirectory,
+  ListedCreator,
   PlanningAdmin,
   PlanningClock,
   PlanningStore,
@@ -81,14 +81,17 @@ export function createSchedulingService(
     timeZone: (await settingsOf(actor)).timeZone,
   });
 
-  const names = async (): Promise<ReadonlyMap<string, CreatorSummary>> =>
+  const names = async (): Promise<ReadonlyMap<string, ListedCreator>> =>
     new Map((await creators.list()).map((creator) => [creator.id, creator]));
 
-  /** Every creator there is: the policies narrow what each scope reads of her. */
+  /** Every creator there is, archived ones included for their history: the policies narrow what each scope reads. */
   const everyCreator = async (): Promise<CreatorId[]> => (await creators.list()).map((creator) => creator.id);
 
-  const assertCreatorExists = async (creatorId: CreatorId): Promise<void> => {
-    if (!(await names()).has(creatorId)) throw new CreatorNotFound();
+  /** She exists and is not archived: nothing new is planned on an archived creator (ADR 0071 § 2). */
+  const assertPlannable = async (creatorId: CreatorId): Promise<void> => {
+    const creator = (await names()).get(creatorId);
+    if (creator === undefined) throw new CreatorNotFound();
+    if (creator.archived) throw new CreatorArchived();
   };
 
   return {
@@ -151,11 +154,16 @@ export function createSchedulingService(
         ...templates.map((template) => template.memberId),
       ]);
       const creatorNames = await names();
+      const worked = (account: { readonly id: string }) =>
+        shifts.some((shift) => shift.platformAccountId === account.id);
       const accounts = read.accounts
         .filter((account) =>
           read.scope === 'self'
-            ? shifts.some((shift) => shift.platformAccountId === account.id)
-            : asked(account.creatorId),
+            ? worked(account)
+            : // An archived creator's account is there for her shifts of the window alone, her history (ADR 0071 § 2):
+              // never a row to fill.
+              asked(account.creatorId) &&
+              (creatorNames.get(account.creatorId)?.archived !== true || worked(account)),
         )
         .map((account) => toPlanningAccount(account, creatorNames));
       return {
@@ -219,7 +227,7 @@ export function createSchedulingService(
     },
 
     createShift: async (actor, body) => {
-      await assertCreatorExists(body.creatorId);
+      await assertPlannable(body.creatorId);
       const shift = await store.createShift(
         actor,
         {
@@ -257,7 +265,7 @@ export function createSchedulingService(
     },
 
     createTemplate: async (actor, body) => {
-      await assertCreatorExists(body.creatorId);
+      await assertPlannable(body.creatorId);
       const template = await store.createTemplate(
         actor,
         { id: newId(ShiftTemplateIdSchema), ...body },
