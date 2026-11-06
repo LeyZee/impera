@@ -142,6 +142,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
       await createCreatorSpaceRoutes(
         createDrizzleCreatorSpaceReader(deps.db, deps.mediaDescriptions ?? noMediaDescriptions),
         deps.requireRole,
+        clock,
       )(app, options);
     },
     jobs: {
