@@ -497,7 +497,7 @@ function Editor({
         ) : null}
         {reauth === null ? null : (
           <PasswordPrompt
-            lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code."
+            lead={`La version ${reauth.version} parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code.`}
             onConfirmed={() => {
               setReauth(null);
               void activate(reauth);

@@ -351,11 +351,27 @@ describe('Créatrices › Persona, « Ses versions » (recette AGT-07)', () => {
     await screen.findByLabelText('Prénom');
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
     fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
-    expect(await screen.findByText(/pour l’activer, confirme ton mot de passe/u)).toBeDefined();
+    expect(
+      await screen.findByText(/La version 0.1.0 parlera à tous ses fans : pour l’activer/u),
+    ).toBeDefined();
     const activations = fake.mock.calls.filter(([url]) => url.endsWith('/activate'));
     expect(activations.map(([url]) => url)).toEqual([
       `/v1/creators/${CREATOR}/persona/versions/${PREVIOUS.id}/activate`,
     ]);
+  });
+
+  it('keeps what is typed and not saved when an older version is put back', async () => {
+    const fake = await serveVersions([BAD, PREVIOUS], () => [200, { ...PREVIOUS, isActive: true }]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Elenaa' } });
+    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Réactiver la version 0.1.0' }));
+    fireEvent.click(within(versionsFold()).getByRole('button', { name: 'Confirmer la version 0.1.0' }));
+    // The page reads her versions again; the draft, the newest version's content, stays as typed.
+    await waitFor(() => {
+      expect(fake.mock.calls.filter(([url]) => url === `/v1/creators/${CREATOR}/persona`)).toHaveLength(2);
+    });
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elenaa');
+    expect(screen.getByText('1 modification, prête à enregistrer')).toBeDefined();
   });
 
   it('says why a version stored before a guard changed is not put back', async () => {
