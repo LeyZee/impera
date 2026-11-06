@@ -13,7 +13,7 @@ import type { AgencyCreatorRead } from '../../domain/agency-insights';
 import type { SalesTotalsOf } from './reveal-sales-reader';
 
 /** What the route reads of one creator: nothing out of the account's team scope, nothing before a register is linked. */
-export type AgencyCreatorAnswer =
+type AgencyCreatorAnswer =
   | { readonly kind: 'out_of_scope' }
   | { readonly kind: 'not_linked' }
   | { readonly kind: 'read'; readonly read: AgencyCreatorRead };

@@ -77,6 +77,17 @@
   /* Data: the first series is warm white; the neon only lights the one figure a screen is about. */
   --nv-data-1: #f1e4e8;
   --nv-data-2: #e8c37a;
+  /*
+   * Categorical series of the charts (Dashboard de l'agence, ADR 0078): five hues in a fixed order, validated for
+   * colour-blind separation on the night plate (dataviz validator). A sixth series folds into « Autres »
+   * (`--nv-series-other`). Never the neon, never a status colour.
+   */
+  --nv-series-1: #9085e9;
+  --nv-series-2: #c98500;
+  --nv-series-3: #199e70;
+  --nv-series-4: #3987e5;
+  --nv-series-5: #d55181;
+  --nv-series-other: rgba(246, 238, 241, 0.32);
 
   /* Shadows */
   --nv-shadow-glass:
@@ -153,6 +164,14 @@
 
   --nv-data-1: #3a2630;
   --nv-data-2: #a07a20;
+
+  /* The same five hues stepped for the day plate (below 3:1 for three of them: labels and legends always shown). */
+  --nv-series-1: #6250d6;
+  --nv-series-2: #eda100;
+  --nv-series-3: #1baf7a;
+  --nv-series-4: #2a78d6;
+  --nv-series-5: #e87ba4;
+  --nv-series-other: rgba(60, 10, 30, 0.26);
 
   --nv-shadow-glass:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(80, 10, 30, 0.07),

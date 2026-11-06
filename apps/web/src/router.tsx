@@ -23,7 +23,15 @@ import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
 import { ContentPage } from './screens/content/ContentPage';
 import { ScriptPage } from './screens/content/ScriptPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
-import { dashboardSearch, parseDashboardSearch, periodOf } from './screens/dashboard/logic';
+import { AgencyPage } from './screens/dashboard/agency/AgencyPage';
+import {
+  agencyPeriodOf,
+  agencySearch,
+  agentPeriodOf,
+  dashboardSearch,
+  parseDashboardSearch,
+  periodOf,
+} from './screens/dashboard/logic';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
@@ -118,15 +126,51 @@ const dashboard = createRoute({
     useEffect(() => {
       if (search.creatrice !== undefined) followCreator(search.creatrice);
     }, [search.creatrice]);
+    const rail = railOf(user);
+    // The agency's figures are the owner's and an active manager's (ADR 0078 § 1): the Dashboard opens on them.
+    if (user.role === 'owner' || user.teamScope === 'agency') {
+      const period = agencyPeriodOf(search);
+      const openCreator = (id: string): void =>
+        void navigate({ search: agencySearch(period, id), replace: true });
+      if (search.creatrice === undefined) {
+        return (
+          <AgencyPage
+            period={period}
+            onPeriod={(next) => void navigate({ search: agencySearch(next), replace: true })}
+            onCreator={openCreator}
+            forOwner={user.role === 'owner'}
+            reviewsReports={canOpen(rail, '/equipe')}
+          />
+        );
+      }
+      return (
+        <DashboardPage
+          period={agentPeriodOf(period)}
+          onPeriod={() => undefined}
+          onCreator={openCreator}
+          forOwner={user.role === 'owner'}
+          reviewsReports={canOpen(rail, '/equipe')}
+          opensTracking={canOpen(rail, '/suivi')}
+          canAddCreator={canOpen(rail, '/creatrices')}
+          agency={{
+            period,
+            onPeriod: (next) =>
+              void navigate({ search: agencySearch(next, search.creatrice), replace: true }),
+            onAgency: () => void navigate({ search: agencySearch(period), replace: true }),
+            canOpenSettings: user.role === 'owner',
+          }}
+        />
+      );
+    }
     return (
       <DashboardPage
         period={periodOf(search)}
         onPeriod={(next) => void navigate({ search: dashboardSearch(next, search.creatrice), replace: true })}
         onCreator={(id) => void navigate({ search: dashboardSearch(periodOf(search), id), replace: true })}
-        forOwner={user.role === 'owner'}
-        reviewsReports={canOpen(railOf(user), '/equipe')}
-        opensTracking={canOpen(railOf(user), '/suivi')}
-        canAddCreator={canOpen(railOf(user), '/creatrices')}
+        forOwner={false}
+        reviewsReports={canOpen(rail, '/equipe')}
+        opensTracking={canOpen(rail, '/suivi')}
+        canAddCreator={canOpen(rail, '/creatrices')}
       />
     );
   },

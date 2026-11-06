@@ -61,7 +61,7 @@ const KIND_OF: Readonly<Record<SaleType, AgencySaleKind>> = {
 };
 
 /** The hours of a creator's sales: ISO day of the week (1 Monday … 7 Sunday) and hour, in the platform's zone. */
-export interface HourSum {
+interface HourSum {
   readonly isoDay: number;
   readonly hour: number;
   readonly currency: Currency;
@@ -69,7 +69,7 @@ export interface HourSum {
 }
 
 /** What one paying fan of the period spent (sales only), in one currency; `key` never leaves the server. */
-export interface FanSum {
+interface FanSum {
   readonly key: string;
   readonly currency: Currency;
   readonly grossMinor: number;

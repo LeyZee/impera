@@ -490,6 +490,15 @@
 .db-creators .nv-chip {
   flex: none;
 }
+/* « Toute l'agence » (ADR 0078): the first chip, a ring for the whole instead of a face. */
+.db-creators__agency {
+  gap: 7px;
+}
+.db-creators__agency-mark {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--nv-ink-muted);
+}
 .db-mode .nv-seg__opt {
   height: 36px;
   display: inline-flex;
