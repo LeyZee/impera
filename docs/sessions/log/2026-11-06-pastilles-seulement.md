@@ -25,7 +25,7 @@ Pas fait : la barre d'onglets de Paie sur téléphone montre un bout d'onglet co
 
 Décisions : un état se dit par une pastille, un mot ou un anneau, jamais par un bord coloré. Deux traits restent, parce qu'ils ne portent ni couleur ni état : le trait neutre de la citation (« Désignation de la prestation ») et les filets neutres des étapes d'une facture.
 
-Découvertes : quand l'agent répond aussi pendant un shift, un trait violet de 2 px reste à droite du créneau (`.cal-slot[data-ai]::after`, ADR 0048), pointillé quand il n'en couvre qu'une part. La légende dit l'IA par une pastille, pas par un trait. La question de le remplacer par cette pastille est posée à Charles dans la PR, et rien n'est changé sans sa réponse. Les bordures gauches de `telegram.css` ne sont pas d'Équipe.
+Découvertes : quand l'agent répondait aussi pendant un shift, un trait violet de 2 px restait à droite du créneau (`.cal-slot[data-ai]::after`, ADR 0048). La question de le remplacer par une pastille, posée à Charles dans la PR, est tombée : #538 l'a retiré (CHAT-27). #538 avait aussi mis un fond teinté sur la facture due, la pièce à renouveler et le régime à valider ; la fusion de main garde les pastilles seules, et les captures sont refaites sur cette main. Les bordures gauches de `telegram.css` ne sont pas d'Équipe.
 
 Candidats à suppression : aucun ; le banc de captures de `.scratch/` reste jusqu'à la dernière PR de la série.
 
