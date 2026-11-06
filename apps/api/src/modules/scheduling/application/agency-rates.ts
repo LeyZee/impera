@@ -4,13 +4,12 @@ import {
   type CreatorAgencyRate,
   type CreatorAgencyRateList,
   type CreatorId,
-  type CreatorSummary,
   type UserId,
 } from '@impera/contracts';
 import type { z } from 'zod';
 
 import { CreatorNotFound } from '../domain/errors';
-import type { Actor, AgencyRatesStore } from '../domain/ports';
+import type { Actor, AgencyRatesStore, CreatorDirectory } from '../domain/ports';
 
 import { toAgencyRateDto } from './dto';
 
@@ -30,7 +29,7 @@ export interface AgencyRatesService {
 
 export function createAgencyRatesService(
   store: AgencyRatesStore,
-  creators: { list(): Promise<readonly CreatorSummary[]> },
+  creators: CreatorDirectory,
   now: () => Date = () => new Date(),
 ): AgencyRatesService {
   const assertCreatorExists = async (creatorId: CreatorId): Promise<void> => {

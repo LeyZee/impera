@@ -6,7 +6,9 @@ import {
   FanIdSchema,
   KillSwitchIdSchema,
   newId,
+  PlanningSchema,
   PlatformAccountIdSchema,
+  ShiftIdSchema,
   TeamMemberSchema,
   type CreatorId,
   type PlatformAccountId,
@@ -22,7 +24,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
-import { iso, parisDay, parisInstant } from './support/paris';
+import { iso, parisDay, parisInstant, weekdayOf } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /** Invented people, creators and accounts only (ADR 0010). */
@@ -363,5 +365,102 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
       creator,
     );
     expect(asCreator.statusCode).toBe(403);
+  });
+
+  it('keeps an archived creator for her history alone: no new shift, nothing of hers to fill (ADR 0071 § 2)', async () => {
+    const lou = (await app.modules.persona.creators.create({ displayName: 'Lou' })).id;
+    const louAccount = newId(PlatformAccountIdSchema);
+    await test.admin.db
+      .insert(schema.platformAccounts)
+      .values({ id: louAccount, creatorId: lou, platform: 'reveal', handle: 'lou-inventee' });
+    const [ownerRow] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, OWNER.email));
+    if (ownerRow === undefined) throw new Error('owner missing');
+    // Basile on Lou yesterday, 10 h – 12 h: her history. Then the owner archives her.
+    const yesterday = parisDay(-1);
+    const before = { from: parisInstant(yesterday, 0), to: parisInstant(parisDay(0), 0) };
+    await test.admin.db.insert(schema.shifts).values({
+      id: newId(ShiftIdSchema),
+      creatorId: lou,
+      platformAccountId: louAccount,
+      memberId: basile.id,
+      startsAt: parisInstant(yesterday, 600),
+      endsAt: parisInstant(yesterday, 720),
+      createdBy: ownerRow.id,
+      updatedBy: ownerRow.id,
+    });
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, lou));
+
+    // Nothing new on her: a shift, a weekly template.
+    const write = (url: string, payload: object) =>
+      server.inject({
+        method: 'POST',
+        url: `/v1${url}`,
+        headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+        payload,
+      });
+    const shift = await write('/scheduling/shifts', {
+      memberId: basile.id,
+      creatorId: lou,
+      platformAccountId: louAccount,
+      startsAt: iso(parisInstant(day, 600)),
+      endsAt: iso(parisInstant(day, 720)),
+    });
+    expect([shift.statusCode, ApiErrorSchema.parse(shift.json()).error.code]).toEqual([
+      409,
+      'creator_archived_conflict',
+    ]);
+    const template = await write('/scheduling/shift-templates', {
+      creatorId: lou,
+      platformAccountId: louAccount,
+      memberId: basile.id,
+      weekday: weekdayOf(day),
+      startMinute: 600,
+      endMinute: 720,
+      validFrom: day,
+    });
+    expect([template.statusCode, ApiErrorSchema.parse(template.json()).error.code]).toEqual([
+      409,
+      'creator_archived_conflict',
+    ]);
+
+    // Ahead of her: no row, no account, nothing of hers to fill or to cover, in the agenda as in the planning.
+    const ahead = await calendar(owner);
+    expect(ahead.creators.map((one) => [one.name, one.archived]).toSorted()).toEqual([
+      ['Anna', false],
+      ['Inès', false],
+    ]);
+    expect(ahead.agency?.accounts.some((account) => account.id === louAccount)).toBe(false);
+    expect(ahead.agency?.toFill.some((slot) => slot.platformAccountId === louAccount)).toBe(false);
+    expect(ahead.agency?.coverage.some((one) => one.platformAccountId === louAccount)).toBe(false);
+    const planning = async (window: { from: Date; to: Date }) => {
+      const query = new URLSearchParams({ from: iso(window.from), to: iso(window.to) });
+      const response = await call(`/scheduling/planning?${query.toString()}`, owner);
+      expect(response.statusCode, response.body).toBe(200);
+      return PlanningSchema.parse(response.json());
+    };
+    expect((await planning({ from, to })).accounts.some((account) => account.id === louAccount)).toBe(false);
+
+    // Yesterday: her row, said archived, with Basile's shift and his hours; still none of the agency's figures.
+    const past = await calendar(owner, { from: iso(before.from), to: iso(before.to) });
+    expect(past.creators.find((one) => one.id === lou)).toEqual({ id: lou, name: 'Lou', archived: true });
+    expect(past.shifts.filter((one) => one.creatorId === lou)).toHaveLength(1);
+    expect(past.agency?.accounts.some((account) => account.id === louAccount)).toBe(false);
+    expect(past.agency?.workload).toEqual([{ memberId: basile.id, minutes: 120 }]);
+    const pastPlanning = await planning(before);
+    expect(pastPlanning.accounts.find((account) => account.id === louAccount)).toEqual({
+      id: louAccount,
+      creatorId: lou,
+      creatorName: 'Lou',
+      platform: 'reveal',
+      handle: 'lou-inventee',
+      archived: true,
+    });
+    expect(pastPlanning.accounts.filter((account) => account.archived)).toHaveLength(1);
   });
 });

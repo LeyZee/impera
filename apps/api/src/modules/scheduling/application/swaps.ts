@@ -3,7 +3,6 @@ import {
   SHIFT_TEMPLATE_HORIZON_DAYS,
   type CreateShiftSwapRequestBodySchema,
   type CreatorId,
-  type CreatorSummary,
   type ShiftId,
   type ShiftSwapList,
   type ShiftSwapRequest,
@@ -13,7 +12,7 @@ import {
 } from '@impera/contracts';
 import type { z } from 'zod';
 
-import type { Actor, ColleagueReads, SwapStore } from '../domain/ports';
+import type { Actor, ColleagueReads, CreatorDirectory, ListedCreator, SwapStore } from '../domain/ports';
 import { addMinutes } from '../domain/time';
 
 import { toPlanningAccount, toPlanningMember, toShiftDto, toSwapDto } from './dto';
@@ -37,10 +36,10 @@ export interface SwapService {
 export function createSwapService(
   store: SwapStore,
   colleagues: ColleagueReads,
-  creators: { list(): Promise<readonly CreatorSummary[]> },
+  creators: CreatorDirectory,
   now: () => Date = () => new Date(),
 ): SwapService {
-  const names = async (): Promise<ReadonlyMap<string, CreatorSummary>> =>
+  const names = async (): Promise<ReadonlyMap<string, ListedCreator>> =>
     new Map((await creators.list()).map((creator) => [creator.id, creator]));
   const everyCreator = async (): Promise<CreatorId[]> => (await creators.list()).map((creator) => creator.id);
 

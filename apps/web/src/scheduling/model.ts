@@ -43,6 +43,7 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_template_not_found: 'Ce modèle de shift n’existe plus : le planning est relu.',
   member_not_found: 'Ce membre n’existe plus.',
   creator_not_found: 'Cette créatrice n’existe plus.',
+  creator_archived_conflict: 'Cette créatrice est archivée : on ne la planifie plus. Le planning est relu.',
   platform_account_not_found: 'Ce compte n’est pas celui de cette créatrice.',
   member_left_conflict: 'Seul un membre actif reçoit un shift.',
   member_creator_conflict: 'Ce membre ne travaille pas sur cette créatrice.',
@@ -94,6 +95,7 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
 export const READ_AGAIN: ReadonlySet<SchedulingRefusalCode> = new Set<SchedulingRefusalCode>([
   'shift_not_found',
   'shift_template_not_found',
+  'creator_archived_conflict',
   'leave_request_not_found',
   'leave_request_conflict',
   'leave_decided_conflict',
@@ -357,8 +359,12 @@ export interface GridRow {
 export function gridOf(planning: Planning, days: readonly string[], timeZone: string): GridRow[] {
   const first = days[0];
   const members = new Map(planning.members.map((member) => [member.id, member]));
+  // The accounts one plans first, an archived creator's history after them (ADR 0071 § 2), each by name.
   const accounts = [...planning.accounts].sort(
-    (a, b) => a.creatorName.localeCompare(b.creatorName, 'fr') || a.handle.localeCompare(b.handle, 'fr'),
+    (a, b) =>
+      Number(a.archived) - Number(b.archived) ||
+      a.creatorName.localeCompare(b.creatorName, 'fr') ||
+      a.handle.localeCompare(b.handle, 'fr'),
   );
   const shifts = [...planning.shifts].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   return accounts.map((account) => {
@@ -466,7 +472,10 @@ export function slotRowOf(
     const from = window.from.getTime();
     const to = window.to.getTime();
     const seats = seatsOf(window.version, window.rank, row.account.id);
-    const { open: short, fewest } = shortIn(Math.max(from, ahead), to, spans, seats);
+    // An archived creator's account is there for its history (ADR 0071 § 2): nothing of it is to fill.
+    const { open: short, fewest } = row.account.archived
+      ? { open: null, fewest: seats }
+      : shortIn(Math.max(from, ahead), to, spans, seats);
     const open = short === null ? null : { ...short, now: ahead > from && short.from.getTime() === ahead };
     return {
       slot: window.slot,

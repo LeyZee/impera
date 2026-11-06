@@ -282,6 +282,9 @@
   max-width: 820px;
   margin-top: var(--nv-space-6);
 }
+.sc-folds[data-wide='true'] {
+  max-width: none;
+}
 .sc-fold {
   overflow: hidden;
 }

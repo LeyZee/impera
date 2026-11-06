@@ -47,13 +47,23 @@ export interface CalendarCell {
   readonly agent: AgentInSlot | null;
   /** No chatter on what is left of it (all of it, once gone by) and the agent answers that in Automatique (ADR 0048 § 1). */
   readonly aiAlone: boolean;
+  /** Her creator is archived (ADR 0071 § 2): the row is her history, nothing of it is free or to fill, even ahead. */
+  readonly closed: boolean;
 }
+
+/** Nobody on it yet and still ahead, on a creator one plans: « libre », a créneau to fill. */
+const isFree = (cell: CalendarCell, now: Date): boolean =>
+  !cell.held && !cell.aiAlone && !cell.closed && cell.to.getTime() > now.getTime();
 
 export interface CalendarRow {
   readonly creator: Calendar['creators'][number];
   readonly agent: CalendarAgent | null;
   readonly days: ReadonlyMap<string, readonly CalendarCell[]>;
 }
+
+/** A row on a day of the month: always, but an archived creator's only on the days of her shifts (ADR 0071 § 2). */
+export const shownOn = (row: CalendarRow, day: string): boolean =>
+  !row.creator.archived || (row.days.get(day) ?? []).some((cell) => cell.shifts.length > 0);
 
 const spansOf = (list: readonly { readonly startsAt: string; readonly endsAt: string }[]): Span[] =>
   list.map((one) => ({ from: Date.parse(one.startsAt), to: Date.parse(one.endsAt) }));
@@ -134,7 +144,9 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
       .filter((window) => window.day === day)
       .map((window) => ({ from: window.from.getTime(), to: window.to.getTime() })),
   }));
-  return calendar.creators.map((creator) => {
+  // The creators one plans first, an archived one's history after them (ADR 0071 § 2).
+  const creators = [...calendar.creators].sort((a, b) => Number(a.archived) - Number(b.archived));
+  return creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;
     const theirs = calendar.shifts.filter((shift) => shift.creatorId === creator.id);
     const spans = spansOf(theirs);
@@ -155,6 +167,7 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
             held: over.length > 0,
             agent: inSlot,
             aiAlone,
+            closed: creator.archived,
           };
         }),
       );
@@ -251,7 +264,7 @@ export function monthMarks(cells: readonly CalendarCell[], now: Date): MonthMark
     const [first] = cell.shifts;
     if (first !== undefined) return { kind: 'shift', memberId: first.memberId };
     if (cell.aiAlone) return { kind: 'ai' };
-    return { kind: 'gap', ahead: cell.to.getTime() > now.getTime() };
+    return { kind: 'gap', ahead: isFree(cell, now) };
   });
 }
 
@@ -299,9 +312,9 @@ export function cellWho(
               `${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}${phaseOf(shift, now) === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}`,
           )
           .join(' ; ')
-      : cell.to.getTime() <= now.getTime()
-        ? 'personne'
-        : 'libre';
+      : isFree(cell, now)
+        ? 'libre'
+        : 'personne';
   return `${who}${cellAgentWords(cell.agent, cell, zone)}`;
 }
 
@@ -360,9 +373,7 @@ export function dayWords(
   );
   const mine = me !== null && [...shifts.values()].some((shift) => shift.memberId === me);
   const alone = cells.filter((cell) => cell.aiAlone).length;
-  const free = cells.filter(
-    (cell) => !cell.held && !cell.aiAlone && cell.to.getTime() > now.getTime(),
-  ).length;
+  const free = cells.filter((cell) => isFree(cell, now)).length;
   const said = [
     shifts.size === 0
       ? 'aucun shift'

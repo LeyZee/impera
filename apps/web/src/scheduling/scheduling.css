@@ -386,6 +386,13 @@ button.sc-duty__one:active {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* An archived creator's row (ADR 0071 § 2), her history: her name followed by « archivée », quiet. */
+.sc-grid__archived {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 500;
+  color: var(--nv-ink-faint);
+}
 .sc-grid__cell {
   display: flex;
   flex-direction: column;
@@ -658,9 +665,6 @@ button.sc-duty__one:active {
   color: var(--nv-warning);
   font-weight: 600;
   white-space: nowrap;
-}
-.sc-grid__sep {
-  display: none;
 }
 /* The marks of a shift, said once under the grid (EQ-24). */
 .sc-legend {

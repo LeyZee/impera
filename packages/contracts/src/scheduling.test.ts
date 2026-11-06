@@ -290,7 +290,14 @@ describe('shifts and templates', () => {
     const chatterPlanning = {
       settings,
       accounts: [
-        { id: ACCOUNT, creatorId: CREATOR, creatorName: 'Nora Vidal', platform: 'reveal', handle: 'nora' },
+        {
+          id: ACCOUNT,
+          creatorId: CREATOR,
+          creatorName: 'Nora Vidal',
+          platform: 'reveal',
+          handle: 'nora',
+          archived: false,
+        },
       ],
       members: [{ id: MEMBER, displayName: 'Théo', color: '#c2410c' }],
       shifts: [{ ...shift, stoppedAt: null }],
@@ -300,6 +307,15 @@ describe('shifts and templates', () => {
     const planning = PlanningSchema.parse(chatterPlanning);
     expect(planning.members.map((member) => member.id)).toEqual([MEMBER]);
     expect(planning.shifts.every((one) => one.memberId === MEMBER)).toBe(true);
+    // Whether her creator is archived is always said (ADR 0071 § 2): the screen never guesses it.
+    const unsaid = {
+      id: ACCOUNT,
+      creatorId: CREATOR,
+      creatorName: 'Nora Vidal',
+      platform: 'reveal',
+      handle: 'nora',
+    };
+    expect(PlanningSchema.safeParse({ ...chatterPlanning, accounts: [unsaid] }).success).toBe(false);
   });
 
   it('tells Aujourd’hui which account to open and when the creators open and close', () => {

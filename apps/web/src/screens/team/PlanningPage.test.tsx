@@ -71,7 +71,14 @@ const night = {
 };
 
 const ACCOUNTS = [
-  { id: NORA_REVEAL, creatorId: NORA, creatorName: 'Nora Vidal', platform: 'reveal', handle: 'nora' },
+  {
+    id: NORA_REVEAL,
+    creatorId: NORA,
+    creatorName: 'Nora Vidal',
+    platform: 'reveal',
+    handle: 'nora',
+    archived: false,
+  },
 ];
 
 const planning = (
@@ -142,6 +149,10 @@ const swap = (patch: Record<string, unknown> = {}): Record<string, unknown> => (
 /** Text as read: no-break spaces (« 23 h ») as plain ones. */
 const text = (element: Element | null | undefined): string =>
   (element?.textContent ?? '').replaceAll('\u00a0', ' ');
+
+/** The grid's corner, line by line: the count, then the places to fill on a line of their own (recette #564). */
+const cornerLines = (): string[] =>
+  [...(document.querySelector('.sc-grid__corner > .nv-num')?.children ?? [])].map((line) => text(line));
 
 /** « N congés à valider », folded above the grid (EQ-02): opened, as the owner would. */
 async function decideFold(): Promise<HTMLElement> {
@@ -322,7 +333,7 @@ const agencyCalendar =
   (from: string, to: string): unknown => ({
     view: 'agency',
     settings: settingsOf({ start: slotStartMinute }),
-    creators: [{ id: NORA, name: 'Nora Vidal' }],
+    creators: [{ id: NORA, name: 'Nora Vidal', archived: false }],
     members: [{ id: THEO, displayName: 'Théo', color: '#c2410c' }],
     shifts: [{ memberId: THEO, creatorId: NORA, startsAt: night.startsAt, endsAt: night.endsAt }],
     agent: [
@@ -399,7 +410,7 @@ describe('Équipe › Planning', () => {
     const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
     // Wednesday 28, 1 h in Paris: Théo's night ends at 5 h, so Wednesday's night is left to fill from 5 h to 6 h;
     // 4 + 4 × 4 are ahead.
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 places à pourvoir');
+    expect(cornerLines()).toEqual(['1 shift · 6 h', '20 places à pourvoir']);
     const cells = within(row).getAllByRole('cell');
     const fills = (index: number): HTMLElement[] =>
       within(cells[index] ?? row).queryAllByRole('button', { name: /^À pourvoir/u });
@@ -445,7 +456,7 @@ describe('Équipe › Planning', () => {
     expect(chip.getAttribute('data-away')).toBe('true');
     expect(chip.textContent).toContain('Suspendu');
     // Nobody holds his two shifts: the week has as many places to fill as with none (a held Thursday would make 19).
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('2 shifts · 12 h · 20 places à pourvoir');
+    expect(cornerLines()).toEqual(['2 shifts · 12 h', '20 places à pourvoir']);
     const row = screen.getByRole('row', { name: /Nora Vidal/u });
     const cells = within(row).getAllByRole('cell');
     expect(
@@ -649,7 +660,14 @@ describe('Équipe › Planning', () => {
     const leaves: unknown[] = [long];
     const accounts = [
       ...ACCOUNTS,
-      { id: LEA_REVEAL, creatorId: LEA, creatorName: 'Léa Roux', platform: 'reveal', handle: 'lea' },
+      {
+        id: LEA_REVEAL,
+        creatorId: LEA,
+        creatorName: 'Léa Roux',
+        platform: 'reveal',
+        handle: 'lea',
+        archived: false,
+      },
     ];
     let tries = 0;
     serve({
@@ -1180,6 +1198,49 @@ describe('Équipe › Planning', () => {
     expect(text(panel)).toContain('1 h – 2 h 30 · 1 h 30.');
   });
 
+  it('keeps an archived creator for her history alone: « archivée », nothing to fill or add (ADR 0071 § 2)', async () => {
+    const LEA = id(2);
+    const LEA_REVEAL = id(12);
+    serve({
+      planning: planning(
+        [],
+        [night, { ...night, id: id(103), creatorId: LEA, platformAccountId: LEA_REVEAL, templateId: null }],
+        [
+          ...ACCOUNTS,
+          {
+            id: LEA_REVEAL,
+            creatorId: LEA,
+            creatorName: 'Léa Morel',
+            platform: 'reveal',
+            handle: 'lea',
+            archived: true,
+          },
+        ],
+      ),
+    });
+    renderPage();
+    const hers = await screen.findByRole('row', { name: /Léa Morel/u });
+    expect(text(hers)).toContain('archivée');
+    // Her shift stays drawn; nothing of her row is to fill, nothing is added to it.
+    expect(within(hers).getAllByText('Théo').length).toBeGreaterThan(0);
+    expect(within(hers).queryAllByRole('button', { name: /pourvoir|^Ajouter un shift/u })).toEqual([]);
+    // Her empty créneaux ahead are grey like the ones gone by, never a blank gap on a phone.
+    const ahead = within(hers).getAllByRole('cell')[6];
+    expect(ahead?.querySelectorAll('.sc-slot')).toHaveLength(4);
+    expect(ahead?.querySelectorAll('.sc-slot__gone')).toHaveLength(4);
+    const nora = screen.getByRole('row', { name: /Nora Vidal/u });
+    expect(within(nora).queryAllByRole('button', { name: /^Ajouter un shift/u }).length).toBeGreaterThan(0);
+    // Not a creator to pick out, nor an account for a new shift.
+    expect(screen.queryByRole('radiogroup', { name: 'Créatrice' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un shift' }));
+    const panel = await screen.findByRole('dialog', { name: 'Nouveau shift' });
+    expect(
+      within(within(panel).getByRole('radiogroup', { name: 'Compte' }))
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Nora Vidal@nora sur Reveal']);
+  });
+
   it('chooses the account and the member with chips, and the day as French writes it (recette #561)', async () => {
     const LEA = id(2);
     const LEA_REVEAL = id(12);
@@ -1189,7 +1250,14 @@ describe('Équipe › Planning', () => {
         [night],
         [
           ...ACCOUNTS,
-          { id: LEA_REVEAL, creatorId: LEA, creatorName: 'Léa Morel', platform: 'reveal', handle: 'lea' },
+          {
+            id: LEA_REVEAL,
+            creatorId: LEA,
+            creatorName: 'Léa Morel',
+            platform: 'reveal',
+            handle: 'lea',
+            archived: false,
+          },
         ],
       ),
       members: [
@@ -1371,7 +1439,7 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     });
     // Wednesday's night still has an hour with nobody after Théo (5 h – 6 h): the only one left to fill; the agent
     // holds the 19 others alone (ADR 0048 § 1), as the server's count does.
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 1 place à pourvoir');
+    expect(cornerLines()).toEqual(['1 shift · 6 h', '1 place à pourvoir']);
     expect(within(row).getAllByRole('button', { name: /^À pourvoir/u })).toHaveLength(1);
     expect(within(row).getAllByRole('img', { name: /, l’IA seule$/u })).toHaveLength(19);
     expect(screen.getByRole('region', { name: 'Charge de la semaine' }).textContent).toContain('Théo');
@@ -1409,7 +1477,7 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
       expect(text(row)).toContain('IA automatique · jour et nuit');
     });
     // Wednesday's hour after Théo, and two places on each noon from Wednesday to Sunday; the agent holds the rest.
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 11 places à pourvoir');
+    expect(cornerLines()).toEqual(['1 shift · 6 h', '11 places à pourvoir']);
     expect(within(row).getAllByRole('img', { name: /, l’IA seule$/u })).toHaveLength(14);
   });
 
@@ -1420,7 +1488,7 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     await waitFor(() => {
       expect(text(row)).toContain('IA copilote · jour et nuit');
     });
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('1 shift · 6 h · 20 places à pourvoir');
+    expect(cornerLines()).toEqual(['1 shift · 6 h', '20 places à pourvoir']);
     const fill = within(row).getAllByRole('button', { name: /^À pourvoir/u })[0];
     expect(text(fill ?? null).length).toBeGreaterThan(0);
     expect(fill?.getAttribute('aria-label')).toMatch(/ ; l’IA en copilote$/u);
@@ -1465,7 +1533,7 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     renderPage();
     const row = await screen.findByRole('row', { name: /Nora Vidal/u }, { timeout: 4_000 });
     // 19 single places as before (Thursday's noon held), and one more on each noon from Wednesday to Sunday.
-    expect(text(document.querySelector('.sc-grid__corner'))).toBe('2 shifts · 12 h · 24 places à pourvoir');
+    expect(cornerLines()).toEqual(['2 shifts · 12 h', '24 places à pourvoir']);
     const cells = within(row).getAllByRole('cell');
     const thursday = cells[3]?.querySelectorAll('.sc-slot')[2];
     if (!(thursday instanceof HTMLElement)) throw new Error('no créneau');
@@ -1516,6 +1584,11 @@ describe('Équipe › Planning, the team’s calendar (CR-12)', () => {
     const thursday = within(month).getByRole('button', { name: /^jeudi 29 octobre/u });
     expect(thursday.getAttribute('aria-label')).toBe('jeudi 29 octobre : aucun shift, 4 créneaux à pourvoir');
     expect(screen.getByRole('region', { name: 'Charge sur octobre 2026' }).textContent).toContain('6');
+    // Its legend says the amber créneaux as the agency reads them, never « Libre ».
+    const keys = document.querySelector('.cal-legend__keys');
+    expect(keys?.textContent).toContain('À pourvoir');
+    expect(keys?.textContent).not.toContain('Libre');
+    expect(keys?.querySelector('.cal-free--fill')).not.toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'Semaine' }));
     expect(await screen.findByRole('row', { name: /Nora Vidal/u })).toBeTruthy();
   });
