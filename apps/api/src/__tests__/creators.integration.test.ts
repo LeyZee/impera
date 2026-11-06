@@ -132,7 +132,7 @@ describe('creators (GET /v1/creators, pnpm creator:create)', () => {
     const headers = { cookie: await signIn(server, email, 'correct horse battery') };
     const listed = await server.inject({ method: 'GET', url: '/v1/creators', headers });
     expect(listed.json()).toEqual({
-      creators: [{ id: cara.id, displayName: 'Cara', timezone: 'Europe/Paris' }],
+      creators: [{ id: cara.id, displayName: 'Cara', timezone: 'Europe/Paris', hasAvatar: false }],
     });
     expect(JSON.stringify(listed.json())).not.toContain(dana.id);
     // Her name opens nothing else: the agent's hours stay the owner's.
