@@ -174,7 +174,10 @@ export function createDrizzleIdeaStore(db: Database): IdeaStore {
   };
 }
 
-/** The follow-up of an idea her agenda decided (VEI-01 d2), as the owner role: the job reads under no account. */
+/**
+ * The follow-up of an idea her agenda decided (VEI-01 d2) and of its drop (d3), as the owner role: the jobs read under
+ * no account.
+ */
 export function createDrizzleIdeaFollowStore(adminDb: Database): IdeaFollowStore {
   return {
     ofSuggestion: (suggestionId) =>
@@ -203,6 +206,15 @@ export function createDrizzleIdeaFollowStore(adminDb: Database): IdeaFollowStore
           .update(ideas)
           .set({ state: 'declined', updatedAt: sql`now()` })
           .where(and(eq(ideas.id, ideaId), eq(ideas.state, 'suggested')));
+      }),
+    deposited: (creatorId, requestId) =>
+      withAdmin(adminDb, async (tx) => {
+        await tx
+          .update(ideas)
+          .set({ state: 'deposited', updatedAt: sql`now()` })
+          .where(
+            and(eq(ideas.requestId, requestId), eq(ideas.creatorId, creatorId), eq(ideas.state, 'suggested')),
+          );
       }),
   };
 }

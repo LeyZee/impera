@@ -262,6 +262,20 @@ describe('database (RLS, constraints, migrations)', () => {
     },
   );
 
+  it('every table with row-level security forces it, so a policy holds for its owner too (audit RLS, 06/11)', async () => {
+    const result = await test.admin.db.execute(sql`
+      select c.relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relrowsecurity and not c.relforcerowsecurity
+       order by 1`);
+    expect(result.rows).toEqual([]);
+  });
+
+  it('the application cannot delete a creator: she is archived, never deleted (ADR 0071)', async () => {
+    expect(await failure(test.app.db.delete(s.creators).where(eq(s.creators.id, a.creatorId)))).toMatch(
+      /permission denied/,
+    );
+  });
+
   it('the global kill switch is visible to every creator', async () => {
     const rows = await withTenant(test.app.db, b.creatorId, (tx) => tx.select().from(s.killSwitches));
     expect(rows.map((r) => r.scope).sort()).toEqual(['creator', 'global']);

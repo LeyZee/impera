@@ -63,7 +63,19 @@ describe('database errors (recette 05/11)', () => {
     expect(safe.stack ?? '').not.toContain('secret');
     expect(safe).not.toHaveProperty('params');
 
+    // A query cut by the network has no SQLSTATE: its values are cut all the same (relecture #585).
+    const reset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+    const cut = storableError(new Error('Failed query: select $1\nparams: secret', { cause: reset }));
+    expect(cut.message).toBe('Failed query: select $1');
+    expect(cut.stack ?? '').not.toContain('secret');
+
     expect(storableError(new Error('bad\u0000text')).message).toBe('badtext');
+    // Another message is one short line: `JSON.parse` quotes the start of what it was given.
+    const quoted = storableError(new Error(`Unexpected token\n"${'x'.repeat(400)}" is not valid JSON`));
+    expect(quoted.message.length).toBeLessThanOrEqual(300);
+    expect(quoted.message).not.toContain('\n');
+    expect(quoted.message.startsWith('Unexpected token "xxx')).toBe(true);
+
     const plain = new Error('nothing to hide');
     expect(storableError(plain)).toBe(plain);
   });

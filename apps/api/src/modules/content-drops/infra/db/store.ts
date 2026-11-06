@@ -600,8 +600,9 @@ const CONVERSION_QUEUE = 'content_drops:convert';
 
 /**
  * The drop follows its live files, as the admin role, the drop locked by the caller: received with
- * `content_drop_received` once none waits for its bytes, then ready when every file is settled and one was kept, blocked
- * when all were refused. A drop still being filled (SC-02 lot b) moves only once she sends it.
+ * `content_drop_received` once none waits for its bytes (and `content_drops.drop_received` for a drop answering a
+ * request), then ready when every file is settled and one was kept, blocked when all were refused. A drop still being
+ * filled (SC-02 lot b) moves only once she sends it.
  */
 export async function follow(
   tx: Transaction,
@@ -624,6 +625,16 @@ export async function follow(
       correlationId,
       createdAt: now,
     });
+    // A drop answering a request: the trend watch moves the idea that asked it (VEI-01 d3).
+    if (drop.requestId !== null)
+      await tx.execute(
+        sql`select public.enqueue_job(
+          task => 'content_drops.drop_received',
+          payload => ${JSON.stringify({ creatorId: drop.creatorId, dropId: drop.id, requestId: drop.requestId })}::jsonb,
+          max_attempts => ${JOB_MAX_ATTEMPTS['content_drops.drop_received']}::int,
+          job_key => ${`content_drops.drop_received:${drop.id}`}
+        )`,
+      );
   }
   if (state === 'received' && !states.includes('awaiting') && !states.includes('received')) {
     const kept = states.some((one) => one === 'kept' || one === 'duplicate');

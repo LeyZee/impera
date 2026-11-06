@@ -9,10 +9,12 @@ import {
   ContentDropFileIdSchema,
   ContentDropIdSchema,
   ContentDropSchema,
+  ContentRequestIdSchema,
   CreatorIdSchema,
   DROP_PART_BYTES,
   DROP_KEPT_DAYS,
   DropFileUploadSchema,
+  JOB_PAYLOADS,
   newId,
   TeamMemberIdSchema,
   type CreatorId,
@@ -23,6 +25,7 @@ import { AwsClient } from 'aws4fetch';
 import { runOnce } from 'graphile-worker';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { z } from 'zod';
 
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
@@ -240,6 +243,19 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       taskList: { 'content_drops.receive_file': app.tasks['content_drops.receive_file'] },
     });
 
+  /** The trend watch's announcement of a drop (VEI-01 d3), as the worker would read it. */
+  const dropReceivedJobs = async (dropId: string) => {
+    const result = await test.admin.db.execute(sql`
+      select j.payload from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+       where t.identifier = 'content_drops.drop_received'
+         and j.key = ${`content_drops.drop_received:${dropId}`}`);
+    return z
+      .array(z.object({ payload: JOB_PAYLOADS['content_drops.drop_received'] }))
+      .parse(result.rows)
+      .map((row) => row.payload);
+  };
+
   const rows = async (dropId: string) => {
     const [drop] = await test.admin.db
       .select({ state: schema.contentDrops.state })
@@ -304,11 +320,40 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       .from(schema.domainEvents)
       .where(eq(schema.domainEvents.type, 'content_drop_received'));
     expect(events).toEqual([{ creatorId: nora, payload: { dropId, requestId: null } }]);
+    // A drop that answers no request announces nothing to the trend watch (VEI-01 d3).
+    expect(await dropReceivedJobs(dropId)).toEqual([]);
     // Replayed once kept, « complete » answers the drop as it is.
     const replay = await call('POST', `${base}/complete`, 'nora', { parts });
     expect(replay.statusCode).toBe(200);
     expect(ContentDropSchema.parse(replay.json())).toMatchObject({ state: 'ready' });
     expect((await upload(base, 'nora')).sent).toBe(true);
+  });
+
+  it('announces once to the trend watch a drop that answers a content request (VEI-01 d3)', async () => {
+    const requestId = newId(ContentRequestIdSchema);
+    await test.admin.db.insert(schema.contentRequests).values({
+      id: requestId,
+      creatorId: nora,
+      category: 'feed_shoot',
+      dueOn: '2026-11-20',
+      reason: 'Idée inventée',
+      structureId: null,
+      origin: 'idea',
+      createdBy: null,
+    });
+    const photo = jpegOf(MB, 40, 30, 0x55);
+    const file = { id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes: photo.length };
+    const dropId = newId(ContentDropIdSchema);
+    const created = await call('POST', '/v1/creator-space/drops', 'nora', {
+      id: dropId,
+      category: 'feed_shoot',
+      requestId,
+      files: [file],
+    });
+    expect(created.statusCode, created.body).toBe(200);
+    await sendWhole({ base: `/v1/creator-space/drops/${dropId}/files/${file.id}`, bytes: photo });
+    await receive();
+    expect(await dropReceivedJobs(dropId)).toEqual([{ creatorId: nora, dropId, requestId }]);
   });
 
   it('signs each address for its part’s exact size: a part cut otherwise is refused by the storage', async (context) => {

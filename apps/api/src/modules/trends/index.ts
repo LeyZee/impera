@@ -7,7 +7,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { ContentDropsModule, IdeaContentRequest } from '../content-drops';
 import type { CreatorTasksModule } from '../creator-tasks';
 
-import { followDecision } from './application/follow';
+import { followDecision, followDeposit } from './application/follow';
 import { createDrizzleIdeaFollowStore, createDrizzleIdeaStore } from './infra/db/idea-store';
 import { createDrizzleExtensionLinkStore } from './infra/db/link-store';
 import { createDrizzleReadingStore } from './infra/db/reading-store';
@@ -25,6 +25,8 @@ export interface TrendsModule {
   readonly jobs: {
     /** `creator_tasks.suggestion_decided`: her gesture on an idea's shoot, its content request or its decline (VEI-01 d2). */
     followDecision(decision: JobPayload<'creator_tasks.suggestion_decided'>): Promise<void>;
+    /** `content_drops.drop_received`: her drop for an idea's content request, the idea `deposited` (VEI-01 d3). */
+    followDeposit(received: JobPayload<'content_drops.drop_received'>): Promise<void>;
   };
 }
 
@@ -67,6 +69,7 @@ export function createTrendsModule(deps: TrendsDeps): TrendsModule {
     ),
     jobs: {
       followDecision: (decision) => followDecision(follow, decision),
+      followDeposit: (received) => followDeposit(follow, received),
     },
   };
 }
