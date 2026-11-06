@@ -2620,7 +2620,7 @@
   text-align: left;
   cursor: pointer;
 }
-.nv-select__field:disabled {
+.nv-select__field[aria-disabled='true'] {
   cursor: default;
   opacity: 0.55;
 }
