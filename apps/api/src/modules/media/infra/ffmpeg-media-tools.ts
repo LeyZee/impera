@@ -59,8 +59,9 @@ async function run(
   }
 }
 
+// Four lines of 64 stay under the 300 characters `storableError` keeps: none is cut there, the cause included.
 const ERROR_LINES = 4;
-const ERROR_LINE_MAX = 160;
+const ERROR_LINE_MAX = 64;
 
 /**
  * What a failed call says, for the job's retry, its `last_error` and the logs: the binary, its exit code or the signal
@@ -79,12 +80,19 @@ function failureOf(binary: string, error: unknown): Error {
     })
     .safeParse(error);
   const { code, signal, killed, stderr } = fields.success ? fields.data : {};
-  const how = signal ? `killed by ${signal}` : `exit ${String(code ?? 'unknown')}`;
+  const how =
+    killed === true ? 'timed out' : signal ? `killed by ${signal}` : `exit ${String(code ?? 'unknown')}`;
   const said = (stderr ?? '')
     .split('\n')
     .filter((line) => line.trim() !== '' && !/^\s/u.test(line) && !/^(Input|Output) #/u.test(line))
     .slice(-ERROR_LINES)
-    .map((line) => line.trim().slice(0, ERROR_LINE_MAX));
+    // `[bmp_pipe @ 0x55…]`: the address says nothing, the room is for the cause.
+    .map((line) =>
+      line
+        .trim()
+        .replace(/ @ 0x[0-9a-f]+\]/u, ']')
+        .slice(0, ERROR_LINE_MAX),
+    );
   const tail = said.length === 0 ? '' : `: ${said.join(' | ')}`;
   return Object.assign(new Error(`${binary} failed (${how})${tail}`), {
     killed: killed === true,
