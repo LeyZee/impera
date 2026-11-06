@@ -6,6 +6,7 @@ describe('the tab of Réglages › Telegram in the address', () => {
   it('lands on the tab a link or a reload names, and on the alerts otherwise', () => {
     expect(tabOfSearch(parseTelegramSearch({ onglet: 'ventes' }))).toBe('sales');
     expect(tabOfSearch(parseTelegramSearch({ onglet: 'bots' }))).toBe('bots');
+    expect(tabOfSearch(parseTelegramSearch({ onglet: 'prive' }))).toBe('private');
     expect(tabOfSearch(parseTelegramSearch({ onglet: 'n-importe' }))).toBe('alerts');
     // The old Mots-clés tab is now a line of the alerts tab: an old link lands there.
     expect(parseTelegramSearch({ onglet: 'mots-cles' })).toEqual({});
@@ -16,7 +17,7 @@ describe('the tab of Réglages › Telegram in the address', () => {
   it('leaves the first tab out of the address, and writes the others back as they are read', () => {
     expect(searchOfTab('alerts')).toEqual({});
     expect(parseTelegramSearch({ onglet: 'alertes' })).toEqual({});
-    for (const tab of ['sales', 'validations', 'bots'] as const) {
+    for (const tab of ['sales', 'validations', 'bots', 'private'] as const) {
       expect(tabOfSearch(parseTelegramSearch({ ...searchOfTab(tab) }))).toBe(tab);
     }
   });

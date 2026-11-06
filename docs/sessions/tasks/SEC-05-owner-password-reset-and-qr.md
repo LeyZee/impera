@@ -44,3 +44,4 @@ Plus tard (décision à part) : e-mail par un service d'envoi, clé saisie dans 
 ## Notes de session
 
 - 06/11 (Bilan), lot 2 côté API. Routes `GET /v1/auth/telegram-link` (`{ linked, botUsername, linkedAt }`), `POST /v1/auth/telegram-link/code` (`{ code, botUsername, url, expiresAt }`, 10 par minute, 422 `telegram_link_no_bot_unprocessable` sans bot actif) et `DELETE /v1/auth/telegram-link`. Le code et le délier exigent une connexion récente. Tables `telegram_link_codes` et `telegram_private_links`, réservées au rôle admin. Le bot répond en privé : « C'est fait… » ou « Ce code ne marche plus… ». Il reste l'écran (Extension) et le lot 3.
+- 06/11 (Extension), lot 2 côté écran. Onglet « Mon chat privé » de Réglages › Telegram (propriétaire), et le même bloc dans Moi › Sécurité pour l'équipe, puisque Réglages n'est pas à elle. Il reste le lot 3.
