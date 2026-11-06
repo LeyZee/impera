@@ -143,6 +143,15 @@ describe('popup', () => {
     expect(actions.saveAddress).toHaveBeenCalledWith('crm.exemple.fr');
   });
 
+  it('steps back from the address on Échap, without saving it', () => {
+    const { root, actions } = draw({ kind: 'address', draft: 'localhost:5173', error: null });
+    root
+      .querySelector('#crm-address')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(actions.cancelAddress).toHaveBeenCalledOnce();
+    expect(actions.saveAddress).not.toHaveBeenCalled();
+  });
+
   it('marks a refused address', () => {
     const { root } = draw({ kind: 'address', draft: 'x', error: 'Une adresse en https.' });
     expect(root.querySelector('#crm-address')?.getAttribute('aria-invalid')).toBe('true');

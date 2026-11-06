@@ -316,6 +316,12 @@ function addressForm(screen: { draft: string; error: string | null }, actions: A
     actions.saveAddress(input.value);
   });
   form.querySelector('[data-action="reset"]')?.addEventListener('click', actions.resetAddress);
+  // Échap steps back, as it closes a modal in the CRM: the popup itself stays open.
+  form.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    actions.cancelAddress();
+  });
   return form;
 }
 

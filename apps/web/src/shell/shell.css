@@ -1618,6 +1618,11 @@ label.nv-notif__row {
   align-items: center;
   gap: 10px;
 }
+/* « De » and « à » take one width, so that on a phone, where « à 08:00 » goes under, both hours line up (EXT-06). */
+.nv-notif__hours > .nv-notif__hint:first-child,
+.nv-notif__end > .nv-notif__hint:first-child {
+  min-width: 1.4em;
+}
 .nv-notif__hours .nv-field__control {
   width: 5.5em;
   text-align: center;
