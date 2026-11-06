@@ -13,8 +13,9 @@ Fait :
   - le job valide la version qu'il a comparée, avec une clé idempotente par (rapport, version) ;
   - CHECK `(review_kind = 'automatic') = (reviewed_by is null)`, marque refusée aux membres en `WITH CHECK` ;
   - bornes du seuil en CHECK, explication validée par Zod et jamais journalisée, port sous les politiques de l'acteur pour les écrans.
+- Acceptée par Charles le 06/11 à 12 h 58 (« ok 0073 »).
 
-Pas fait : le code (CR-09 à réécrire sur cette ADR). Il attend « ok 0073 » et une migration attribuée à l'arrivée sur `main`.
+Pas fait : le code (CR-09 à réécrire sur cette ADR), dans une PR à part, avec une migration attribuée à l'arrivée sur `main`.
 
 Décisions :
 - La référence est le brut TTC lu par Reveal (`revenueTtc`), ce que le chatteur déclare, sur les ventes attribuées selon l'ADR 0050 § 5.

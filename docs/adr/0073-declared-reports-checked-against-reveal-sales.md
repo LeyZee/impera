@@ -1,6 +1,6 @@
 # 0073. Rapport déclaré sur Reveal : l'écart avec les ventes lues se voit, s'explique et se tranche par un humain
 
-Statut : proposed (à accepter par Charles : « ok 0073 »)
+Statut : accepted (Charles, 06/11/2026, 12 h 58, « ok 0073 » ; « ok rapprochement » et « ok auto » du même jour ; sur le texte de la tête 08aa0515, relecture de Bilan intégrée)
 Date : 2026-11-06
 Remplace : dans l'ADR 0043 § 4, pour le rapport d'un compte Reveal en source « déclarée », le paragraphe « Dès que le connecteur lit les ventes de Reveal » (seuils de 5 % et 10 €, rapprochement ligne par ligne, ambre « écart »).
 Précise : l'ADR 0023 (« Le rapport de fin de shift reste une déclaration »), l'ADR 0050 § 5 (attribution d'une vente) et § 10 (jusqu'à la bascule), l'ADR 0018 (Reveal fait foi).
