@@ -1,5 +1,13 @@
 import type { InvitationLinkPreview, InvitationLinkPurpose, Me } from '@impera/contracts';
-import { useCallback, useEffect, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type JSX,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react';
 
 import { PublicBrand } from './PublicBrand';
 import { LINK_PAGE_PATHS, inspectInvitationLink, redeemInvitationLink, takeToken } from './api';
@@ -51,7 +59,8 @@ export function LinkPage({
 
   const linkPurpose = step.kind === 'ready' ? step.preview.purpose : purpose;
   const copy = LINK_COPIES[linkPurpose];
-  useEffect(() => {
+  // In the same commit as the page it names, not after it: nothing reads the old address beside the new title.
+  useLayoutEffect(() => {
     // The address follows: a reload or a screenshot names the right page.
     if (linkPurpose !== purpose) window.history.replaceState(null, '', LINK_PAGE_PATHS[linkPurpose]);
   }, [linkPurpose, purpose]);
