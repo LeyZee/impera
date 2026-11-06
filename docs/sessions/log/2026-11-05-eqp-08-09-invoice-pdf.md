@@ -4,13 +4,17 @@ Fait :
 
 - EQP-08 : les trois boutons « PDF » d'une facture (sa ligne, le dialogue « J'accepte » / « Je conteste », l'historique) étaient des liens `<a href download>`. Un 503 du serveur s'enregistrait en « pdf.json », sans un mot à l'écran. Ce sont maintenant des boutons qui lisent le PDF (`readInvoicePdf`), vérifient qu'il est en `application/pdf`, l'enregistrent sous le numéro du document (`MIA-2026-0001.pdf`), et sinon disent pourquoi sous les boutons (`pdfRefusalText`).
 - EQP-09 : en développement, les seaux en mémoire perdent les PDF quand l'API redémarre. Un PDF ainsi perdu ne sera jamais refait (ADR 0037) :
-  - le téléchargement répond `invoice_pdf_gone` (410), « Ce PDF est perdu : le serveur de développement le gardait en mémoire et l'a oublié en redémarrant. Il ne sera pas refait. », au lieu de « momentanément indisponible, réessaie » ;
+  - le téléchargement répond `invoice_pdf_gone` (410), « Ce PDF n’est plus disponible et ne sera pas refait. La facture, elle, reste valable. », avec son bouton grisé, au lieu de « momentanément indisponible, réessaie » ;
   - l'archive du comptable l'écrit dans `manifeste.csv` : « PDF perdu au redémarrage du serveur de développement, jamais refait », au lieu de « hébergeurs injoignables, relancer l'export » ;
   - `readChecked` rend `forgotten` pour un objet absent d'un seau `volatile`. `checkedInvoicePdf` ne dit « perdu » que si aucun seau ne peut plus le rendre : un seau muet garde « hors d'atteinte ».
 - La ligne d'une facture, montrée dans les captures, est mise d'aplomb :
   - sur téléphone, le numéro et la nature (« Facture », « Avoir ») tiennent sur une ligne, sur toute la largeur ; l'état et le montant passent dessous ;
   - les faits (« émise le lun. 2 nov. ») ne se coupent plus au milieu : chacun reste entier, le point avec celui d'avant ;
   - la première action (« PDF ») s'aligne sur le bord gauche du contenu.
+- Fil de captures de #567, trois défauts corrigés :
+  - sur téléphone, le nom du membre a sa propre ligne, sans son point : plus de « Théo · » seul au-dessus du reste ;
+  - les pages de paie ont un en-tête aussi large que leurs cartes : les onglets Relevés/Factures finissent sur le bord droit des cartes, plus sur celui de la page ;
+  - un PDF perdu se dit simplement (« Ce PDF n’est plus disponible et ne sera pas refait. La facture, elle, reste valable. »), et son bouton se grise.
 
 Décisions :
 - 410 `*_gone`, comme `contractor_document_file_gone` : la ressource a existé et ne reviendra pas.

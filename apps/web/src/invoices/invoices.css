@@ -124,6 +124,13 @@
   .iv-doc__acts > .nv-btn--plain:first-child {
     margin-left: calc(-1 * var(--nv-space-2));
   }
+  /* The member on a line of his own, without his dot: never « Théo · » left alone above the rest. */
+  .iv-doc__who {
+    flex-basis: 100%;
+  }
+  .iv-doc__who > .iv-doc__dot {
+    display: none;
+  }
 }
 
 /* A due date past: the chip says it in red, the row's edge too, so it is seen without reading. */

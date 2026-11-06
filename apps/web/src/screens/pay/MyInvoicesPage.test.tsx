@@ -222,6 +222,21 @@ describe('Commissions › Factures', () => {
     });
     expect(created[0]?.type).toBe('application/pdf');
     expect(within(paid).queryByRole('alert')).toBeNull();
+
+    // Lost for good (development's memory, EQP-09): said plainly, and its button goes quiet, nothing left to read.
+    pdfAnswer = {
+      status: 410,
+      type: 'application/json',
+      body: JSON.stringify({
+        error: { code: 'invoice_pdf_gone', message: 'PDF perdu', details: {}, requestId: 'req-2' },
+      }),
+    };
+    fireEvent.click(within(paid).getByRole('button', { name: 'PDF' }));
+    expect((await within(paid).findByRole('alert')).textContent).toBe(
+      'Ce PDF n’est plus disponible et ne sera pas refait. La facture, elle, reste valable.',
+    );
+    expect(within(paid).getByRole('button', { name: 'PDF' })).toHaveProperty('disabled', true);
+    expect(saved).toEqual([`${PAID.number}.pdf`]);
   });
 
   it('accepts a document once said final, then reads the list again', async () => {
