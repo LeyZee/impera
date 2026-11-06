@@ -2,6 +2,7 @@ import {
   DROP_CATEGORY_LABELS,
   DROP_FORMAT_RULES,
   DROP_MIME_TYPES,
+  WITHDRAWABLE_DROP_STATES,
   kindOfMime,
   type ContentDrop,
   type ContentDropFile,
@@ -11,6 +12,8 @@ import {
   type DropMime,
   type DropState,
 } from '@impera/contracts';
+
+import { MOMENT_EMOJIS, MOMENT_LABELS } from '@/creators/scripts/model';
 
 /*
  * Contenu, the creator's (CR-06 d, ADR 0055 § 8): what she is asked for, what she drops, where it is. Pure rules here,
@@ -199,7 +202,12 @@ export function remainingOf(seconds: number): string {
  */
 export function shotMomentOf(request: ContentRequest): string | null {
   if (request.category !== 'script' || request.moment === null) return null;
-  return request.moment === 'night' ? '🌙 Nuit' : '☀️ Jour';
+  return `${MOMENT_EMOJIS[request.moment]} ${MOMENT_LABELS[request.moment]}`;
+}
+
+/** Whether her card offers « Retirer »: a state she may still withdraw, never a script copied into Reveal (MED-08). */
+export function mayWithdrawHere(drop: ContentDrop): boolean {
+  return WITHDRAWABLE_DROP_STATES.has(drop.state) && drop.exportedAt === null;
 }
 
 /**

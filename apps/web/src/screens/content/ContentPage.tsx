@@ -1,6 +1,5 @@
 import {
   DROP_CATEGORY_LABELS,
-  WITHDRAWABLE_DROP_STATES,
   type ContentDrop,
   type ContentDropFile,
   type ContentRequest,
@@ -25,6 +24,7 @@ import {
   onTheirWay,
   openRequests,
   published,
+  mayWithdrawHere,
   refusedOf,
   shotMomentOf,
   stateTone,
@@ -326,6 +326,7 @@ function DropCard({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const tone = stateTone(drop);
+  const refused = refusedOf(drop);
   const sending = drop.files.some((file) => {
     const live = sends.get(file.id);
     return (
@@ -354,11 +355,11 @@ function DropCard({
             <FileLine key={file.id} drop={drop} file={file} live={sends.get(file.id)} onSettled={onSettled} />
           ))}
         </ul>
-      ) : refusedOf(drop).length > 0 ? (
+      ) : refused.length > 0 ? (
         // Ready or blocked, each refused file keeps its line and its reason: she knows what to shoot again and why,
         // never only « Aucun fichier n'a pu être gardé » (recette MED-03).
         <ul className="ct-files">
-          {refusedOf(drop).map((file) => (
+          {refused.map((file) => (
             <FileLine key={file.id} drop={drop} file={file} live={undefined} onSettled={onSettled} />
           ))}
         </ul>
@@ -386,7 +387,7 @@ function DropCard({
             Continuer
           </button>
         </div>
-      ) : WITHDRAWABLE_DROP_STATES.has(drop.state) && drop.exportedAt === null && !sending ? (
+      ) : mayWithdrawHere(drop) && !sending ? (
         <div className="ct-card__actions">
           {confirming ? (
             <>

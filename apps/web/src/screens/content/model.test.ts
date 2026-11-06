@@ -12,6 +12,7 @@ import {
   onTheirWay,
   openRequests,
   published,
+  mayWithdrawHere,
   refusedOf,
   remainingOf,
   sameFile,
@@ -109,6 +110,11 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(refusedOf(dropOf({ state: 'ready', files: [kept, refused] }))).toEqual([refused]);
     expect(refusedOf(dropOf({ state: 'ready', files: [kept] }))).toEqual([]);
     expect(refusedOf(dropOf({ state: 'uploading', files: [refused] }))).toEqual([]);
+  });
+
+  it('offers « Retirer » on a drop she may withdraw, never on a script copied into Reveal (recette MED-08)', () => {
+    expect(mayWithdrawHere(dropOf({ state: 'ready' }))).toBe(true);
+    expect(mayWithdrawHere(dropOf({ state: 'ready', exportedAt: '2026-11-06T17:57:40.993Z' }))).toBe(false);
   });
 
   it('says when a script asked of her is shot, as its request fixed (recette MED-05)', () => {
