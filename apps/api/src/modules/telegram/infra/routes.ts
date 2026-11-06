@@ -1,12 +1,16 @@
 import {
+  RefusalError,
   SaveTelegramRoutesBodySchema,
   SaveTelegramTokenBodySchema,
   TelegramBotIdSchema,
   TelegramBotSchema,
   TelegramChatIdSchema,
   TelegramDeliveriesSchema,
+  TELEGRAM_ROUTES_CONFLICT,
+  TELEGRAM_TEST_UNPROCESSABLE,
+  TELEGRAM_TOKEN_UNPROCESSABLE,
   TelegramOverviewSchema,
-  TelegramRefusalSchema,
+  TelegramRefusalBodySchema,
   TelegramRoutesSchema,
   TelegramSalesSettingsSchema,
   TelegramTestResultSchema,
@@ -56,12 +60,13 @@ export function createTelegramRoutes(
         preValidation: options.recentLogin,
         schema: {
           body: SaveTelegramTokenBodySchema,
-          response: { 201: TelegramBotSchema, 422: TelegramRefusalSchema },
+          response: { 201: TelegramBotSchema, 422: TelegramRefusalBodySchema },
         },
       },
       async (request, reply) => {
         const result = await telegram.addBot(request.body.token);
-        return result.ok ? reply.code(201).send(result.value) : reply.code(422).send(result.error);
+        if (!result.ok) throw new RefusalError(TELEGRAM_TOKEN_UNPROCESSABLE, result.error);
+        return reply.code(201).send(result.value);
       },
     );
 
@@ -72,13 +77,14 @@ export function createTelegramRoutes(
         schema: {
           params: BotParamsSchema,
           body: SaveTelegramTokenBodySchema,
-          response: { 200: TelegramBotSchema, 422: TelegramRefusalSchema },
+          response: { 200: TelegramBotSchema, 422: TelegramRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await telegram.replaceToken(request.params.id, request.body.token);
         if (result === null) throw new TelegramBotNotFound();
-        return result.ok ? reply.send(result.value) : reply.code(422).send(result.error);
+        if (!result.ok) throw new RefusalError(TELEGRAM_TOKEN_UNPROCESSABLE, result.error);
+        return result.value;
       },
     );
 
@@ -108,13 +114,14 @@ export function createTelegramRoutes(
       {
         schema: {
           params: ChatParamsSchema,
-          response: { 200: TelegramTestResultSchema, 422: TelegramRefusalSchema },
+          response: { 200: TelegramTestResultSchema, 422: TelegramRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await telegram.sendTest(request.params.id);
         if (result === null) throw new TelegramChatNotFound();
-        return result.ok ? reply.send(result.value) : reply.code(422).send(result.error);
+        if (!result.ok) throw new RefusalError(TELEGRAM_TEST_UNPROCESSABLE, result.error);
+        return result.value;
       },
     );
 
@@ -152,14 +159,14 @@ export function createTelegramRoutes(
       {
         schema: {
           body: SaveTelegramRoutesBodySchema,
-          response: { 200: TelegramRoutesSchema, 409: TelegramRefusalSchema },
+          response: { 200: TelegramRoutesSchema, 409: TelegramRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await telegram.saveRoutes(request.body.version, request.body.routes);
-        if (result.ok) return reply.send(result.value);
+        if (result.ok) return result.value;
         if (result.error === 'unknown_chat') throw new TelegramChatInvalid();
-        return reply.code(409).send(result.error);
+        throw new RefusalError(TELEGRAM_ROUTES_CONFLICT, result.error);
       },
     );
 

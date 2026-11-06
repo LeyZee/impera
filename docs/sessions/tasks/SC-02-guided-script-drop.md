@@ -1,5 +1,5 @@
 # SC-02 « Ton prochain script » : la créatrice tourne et dépose carton par carton
-Statut : en cours, lot a (cadence, API et job) fait le 05/11/2026 ; lot b (parcours dans la PWA) à faire
+Statut : en cours, lot a (cadence, API et job) fait le 05/11/2026 ; lot b1 (API du dépôt par emplacements) fait le 06/11/2026 ; lot b2 (parcours dans la PWA) à faire
 Phase : scripts (ADR 0056)
 Dépend de : SC-01, CR-06 (amendée par l'ADR 0055), CR-05 (tâches de l'agenda)
 Branche : task/sc-02-guided-script-drop
@@ -13,7 +13,7 @@ ADR 0056 (§ 2 et § 4), ADR 0055 (§ 2 à 4), CR-06, CR-05, prototype créatric
 ## À faire
 - [x] Cadence par créatrice (réglage d'agence, 14 jours par défaut) et job rejouable qui crée la demande `script` avec la prochaine structure de la file ; ambre si la file est vide. (Lot a : `script_cadences`, `GET`/`PUT /v1/creators/:creatorId/script-cadence`, job horaire `scripts.ask_scripts`, une demande par jour d'échéance, demandée 7 jours avant ; file vide : la dernière structure redemandée, `reused`.)
 - [ ] Parcours dans la PWA : pile de cartons, un écran par carton avec ses cadres, vérification du format au fil de l'eau, enregistrement à chaque fichier, reprise sur un autre appareil, progression, aperçu final, « Envoyer le script » seulement quand tout emplacement obligatoire est rempli.
-- [ ] Un fichier remplacé garde sa position ; un dépôt garde la version de structure de son début. (Lot a : la demande porte `structure_version_id`, figée.)
+- [x] Un fichier remplacé garde sa position ; un dépôt garde la version de structure de son début. (Lot a : la demande porte `structure_version_id`, figée. Lot b1 : emplacements `<segment>:<série>:<rang>`, `replaced_at`, « Envoyer le script » refusé tant qu'un emplacement obligatoire est vide ; une demande faite à la main fige aussi sa version.)
 - [ ] Rappels de l'ADR 0055 § 4.
 - [x] Sans persona active, aucune demande (relecture Agent de SC-01 a) : la demande est fermée par défaut, l'écran de la créatrice le dit en ambre à l'agence ; la file, elle, reste consultable (`personaChecked: false`).
 - [x] Refus des limites au moment de figer (relecture Bilan de SC-01 a) : la demande appelle `structures.freeze` seulement si `disgustBlocks` ne trouve rien sur la persona active de ce moment, sinon elle saute la structure et le dit en ambre. La file seule ne suffit pas : une structure modifiée après son entrée en file, ou une persona qui gagne un dégoût après coup, passerait. Le matcher sera `touchesTerm` des gardes de l'agent (exporté par son index, pli du pluriel, #472) dès sa fusion. (Lot a : la structure est relue sur la version figée elle-même ; le matcher reste `disgustBlocks`, le passage à `touchesTerm` change aussi la file de SC-01 et vient en lot à part.)
@@ -28,3 +28,4 @@ Nomenclature et export (SC-03), descriptions (SC-04).
 
 ## Notes de session
 - 05/11/2026, lot a (migration 0121) : cadence, version figée sur la demande, job horaire. Reste : lot b (emplacements du dépôt de script, parcours carton par carton, captures), rappels de l'ADR 0055 § 4, `touchesTerm`, l'écran d'agence de la cadence (ambre).
+- 06/11/2026, lot b1 (migration 0122) : API du dépôt de script par emplacements (début, reprise, remplissage, remplacement, envoi), durée vérifiée sur le fichier nettoyé, original d'un fichier remplacé effacé. Reste : lot b2 (parcours PWA, route créatrice des cartons de sa version figée, captures Nuit et Jour), rappels de l'ADR 0055 § 4, `touchesTerm`, écran d'agence de la cadence.

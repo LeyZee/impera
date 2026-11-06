@@ -1,6 +1,6 @@
 import type {
-  ContentDropFileId,
   ContentDrop,
+  ContentDropFileId,
   ContentRequest,
   CreateContentDropBody,
   CreateContentRequestBody,
@@ -10,6 +10,11 @@ import type {
   DropMediaKind,
   DropMime,
   DropState,
+  FillScriptSlotBody,
+  ScriptSegment,
+  ScriptSlot,
+  SlotLengths,
+  StartScriptDropBody,
 } from '@impera/contracts';
 
 import type { FileFamily } from './sniff';
@@ -33,6 +38,57 @@ export interface CreatorContentStore {
   markSent(userId: string, dropId: string, fileId: string, correlationId: string): Promise<ContentDrop>;
 }
 
+/** Her script drop and the frozen version it shoots. */
+export interface StartedScript {
+  readonly drop: ContentDrop;
+  readonly versionId: string;
+}
+
+/**
+ * Her script filled slot by slot (SC-02 lot b, ADR 0056 § 4), in her own account. Each refusal throws its
+ * `DomainError`; a drop that is not a script, or a request without a frozen version, `ContentDropScriptUnprocessable`.
+ */
+export interface ScriptDropStore {
+  /** Begun empty (`filling`) from her open script request; replayed under its id, the drop as it is. */
+  start(userId: string, body: StartScriptDropBody): Promise<StartedScript>;
+  read(userId: string, dropId: string): Promise<StartedScript>;
+  /**
+   * The file she chose for `slot`, declared before it goes up; the slot's file before it, if any, replaced (it keeps
+   * its row, out of her script). The same file again answers the drop as it is.
+   */
+  fill(
+    userId: string,
+    dropId: string,
+    slot: ScriptSlot,
+    file: FillScriptSlotBody,
+    now: Date,
+  ): Promise<ContentDrop>;
+  /**
+   * « Envoyer le script »: refused with `ContentDropSlotsUnprocessable` while a slot of `slots` she may not leave out is
+   * empty or refused; then the drop goes on as one sent at once. Replayed, the drop as it is.
+   */
+  submit(
+    userId: string,
+    dropId: string,
+    slots: readonly ScriptSlot[],
+    now: Date,
+    correlationId: string,
+  ): Promise<ContentDrop>;
+}
+
+/** The library's versions (`scripts`, wired by the composition root). */
+export interface ScriptVersions {
+  /** A frozen version, as her script shows it; `null` for one that does not exist or is not frozen. */
+  frozen(
+    versionId: string,
+  ): Promise<{ readonly name: string; readonly segments: readonly ScriptSegment[] } | null>;
+  /**
+   * The latest version of a structure frozen for a request the agency asks by hand, by the one who asks; `null` for a
+   * structure unknown, archived, or out of reach of that account.
+   */
+  freeze(structureId: string, userId: string): Promise<string | null>;
+}
+
 /** A file and its drop, as the one who sends its bytes sees them. */
 export interface DropFileTarget {
   readonly creatorId: string;
@@ -42,6 +98,8 @@ export interface DropFileTarget {
   readonly bytes: number;
   readonly fileState: DropFileState;
   readonly dropState: DropState;
+  /** Its video or vocal slot's lengths (SC-02 lot b), checked on the cleaned file; `null` outside such a slot. */
+  readonly lengths: SlotLengths | null;
 }
 
 /** A file cleaned, ready to enter her library: its storage key is named by its fingerprint. */
@@ -210,7 +268,16 @@ export interface AgencyContentStore {
     now: Date,
   ): Promise<ContentDrop>;
   withdraw(creatorId: string, userId: string, dropId: string, now: Date): Promise<void>;
-  ask(creatorId: string, userId: string, body: CreateContentRequestBody): Promise<ContentRequest>;
+  /**
+   * A script names a frozen version of its structure (SC-02 lot b): `freeze` gives it, once the structure is checked
+   * usable for her and before the request is written; `null` refuses it like a structure out of reach.
+   */
+  ask(
+    creatorId: string,
+    userId: string,
+    body: CreateContentRequestBody,
+    freeze: (structureId: string) => Promise<string | null>,
+  ): Promise<ContentRequest>;
   cancel(creatorId: string, userId: string, requestId: string, now: Date): Promise<void>;
   fileTarget(creatorId: string, userId: string, dropId: string, fileId: string): Promise<DropFileTarget>;
   markSent(

@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 
 import { SalesFeedSection } from './SalesFeedSection';
 
+/** A refusal in the common body, its kind in `details` (MOT-13). */
+const refusalBody = (code: string, kind: string, message: string): object => ({
+  error: { code, message, details: { kind }, requestId: 'r' },
+});
+
 /** 3 November 2026 in Paris: the last fortnight over is 16–31 October. */
 const NOW = new Date('2026-11-03T09:00:00.000Z');
 const BASE = '/v1/settings/sales-feeds';
@@ -307,7 +312,11 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
   it('says the platform’s refusal and the server’s sentence for an export it cannot read', async () => {
     let answer: { status: number; body: unknown } = {
       status: 502,
-      body: { kind: 'unreachable', message: 'Reveal ne répond pas pour l’instant.' },
+      body: refusalBody(
+        'sales_feed_platform_bad_gateway',
+        'unreachable',
+        'Reveal ne répond pas pour l’instant.',
+      ),
     };
     page(() => answer);
     const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { refusalBodySchema } from './errors';
 import { CreatorIdSchema } from './ids';
 
 /**
@@ -126,6 +127,14 @@ export const TelegramRoutesSchema = z.object({
 
 export const TelegramRefusalSchema = z.object({ kind: TelegramErrorKindSchema, message: z.string().min(1) });
 export type TelegramRefusal = z.infer<typeof TelegramRefusalSchema>;
+
+/** A token Telegram or the shape check refused (422: adding a bot, replacing its token), in the common body (MOT-13). */
+export const TELEGRAM_TOKEN_UNPROCESSABLE = 'telegram_token_unprocessable';
+/** The test message did not reach the group (422). */
+export const TELEGRAM_TEST_UNPROCESSABLE = 'telegram_test_unprocessable';
+/** The routes changed since the page read them (409, `routes_version_conflict`). */
+export const TELEGRAM_ROUTES_CONFLICT = 'telegram_routes_conflict';
+export const TelegramRefusalBodySchema = refusalBodySchema(TelegramErrorKindSchema);
 
 export const TelegramTestResultSchema = z.object({ sentAt: z.iso.datetime() });
 

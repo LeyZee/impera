@@ -205,6 +205,31 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     await test.admin.db
       .insert(schema.scriptStructures)
       .values({ id: structureId, createdBy: owner?.id ?? '' });
+    const [version] = await test.admin.db
+      .insert(schema.scriptStructureVersions)
+      .values({
+        id: randomUUID(),
+        structureId,
+        version: 1,
+        name: 'La douche',
+        moment: 'night',
+        segments: [
+          {
+            kind: 'stage',
+            key: 'douche',
+            name: 'Douche',
+            intention: 'Elle se dévoile',
+            access: 'paid',
+            mood: null,
+            outfit: null,
+            place: null,
+            mediaSlots: [{ kind: 'image', optional: false, hint: null }],
+            variants: [],
+          },
+        ],
+        updatedBy: owner?.id ?? '',
+      })
+      .returning({ id: schema.scriptStructureVersions.id });
     const noScript = await call('POST', '/v1/creator-space/drops', 'nora', {
       id: newId(ContentDropIdSchema),
       category: 'script',
@@ -221,10 +246,12 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     };
     const created = await call('POST', `/v1/creators/${nora}/content-requests`, 'manager', asked);
     expect(created.statusCode, created.body).toBe(200);
+    // Asked by hand, it shoots its version frozen now (SC-02 lot b).
     expect(ContentRequestSchema.parse(created.json())).toMatchObject({
       state: 'open',
       origin: 'agency',
       dropId: null,
+      structureVersionId: version?.id,
     });
     // A script request names its structure, and only it does.
     expect(

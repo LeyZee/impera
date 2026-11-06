@@ -5,10 +5,11 @@ import {
   TelegramBotSchema,
   TelegramDeliveriesSchema,
   TelegramOverviewSchema,
-  TelegramRefusalSchema,
+  TelegramRefusalBodySchema,
   TelegramRoutesSchema,
   TelegramSalesSettingsSchema,
   TelegramTestResultSchema,
+  refusalOf,
   type TelegramBot,
   type TelegramBotId,
   type TelegramChatId,
@@ -56,7 +57,7 @@ async function outcome<T>(response: Response, parse: (body: unknown) => T): Prom
   const body: unknown = await response.json();
   return response.ok
     ? { ok: true, value: parse(body) }
-    : { ok: false, refusal: TelegramRefusalSchema.parse(body) };
+    : { ok: false, refusal: refusalOf(TelegramRefusalBodySchema.parse(body)) };
 }
 
 export async function fetchOverview(): Promise<TelegramOverview> {

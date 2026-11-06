@@ -96,6 +96,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Lieu | `place` | Où se tourne une étape (« Chambre ») ; `null` quand l'agence la laisse choisir. Le mode tournage regroupe ensuite par lieu (SC-07). |
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
+| Emplacement de script | `script_slot` | Un emplacement d'un dépôt de script, pour une série : nommé `<segment>:<série>:<rang>` (`slot_key`), il garde sa position quand son fichier est remplacé (SC-02, ADR 0056 § 4). |
 | Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |
 | Nomenclature de script | `script_naming` | Les noms donnés par le serveur aux fichiers d'un script pour que l'ordre alphabétique soit l'ordre du script : dossier `S<nnn>-<moment>-<thème>`, fichier `<pp>-<code>-<ii>-<sorte>.<ext>` (ADR 0056). |
