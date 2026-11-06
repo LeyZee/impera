@@ -2,7 +2,7 @@
 
 Statut : proposed
 Phase : 3
-Dépend de : P0-06 (FakeConnector), FakeReveal (P1-02 provisoire), ADR 0075 (proposed)
+Dépend de : P0-06 (FakeConnector), FakeReveal (P1-02 provisoire), ADR 0075 (accepted)
 Branche : task/<id>-recette-sandbox
 
 ## Objectif (1 phrase)
@@ -19,7 +19,7 @@ Pouvoir jouer à l'écran, sans aucune clé ni compte réel, toute la boucle d'I
 
 ## À faire
 
-- [ ] Appliquer l'ADR 0075 une fois acceptée.
+- [ ] Appliquer l'ADR 0075.
 - [ ] Au démarrage en bac à sable : lancer FakeReveal, brancher un connecteur dessus, pointer l'adaptateur CRM sur FakeReveal CRM.
 - [ ] Fournisseur d'IA scripté pour les rôles sens, cerveau, voix et juge, avec coût fictif et réponses piégées pour les gardes.
 - [ ] Commande de jeu de données de recette, idempotente, inventée (comptes de chaque rôle, créatrices, shifts, quinzaines, fans).
