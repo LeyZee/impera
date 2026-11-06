@@ -56,7 +56,7 @@ import type {
   NewMember,
   NewRate,
   NewRole,
-  PlatformChatter,
+  PlatformAccountRef,
   TeamInvites,
   TeamStore,
 } from '../domain/ports';
@@ -542,13 +542,13 @@ type PlatformChatterLink =
  */
 export interface PlatformChatterLinks {
   /** Locks the account until the transaction ends; its link, `null` when it has none. */
-  lockLink(tx: Transaction, account: PlatformChatter): Promise<PlatformChatterLink | null>;
+  lockLink(tx: Transaction, account: PlatformAccountRef): Promise<PlatformChatterLink | null>;
   /** Links the account to the member, signed by the actor, with its own audit line. */
-  link(tx: Transaction, account: PlatformChatter, memberId: TeamMemberId, actor: Actor): Promise<void>;
+  link(tx: Transaction, account: PlatformAccountRef, memberId: TeamMemberId, actor: Actor): Promise<void>;
 }
 
 /**
- * The invitation from a platform's suggestion (ADR 0076 § 3), in one transaction as the inviter: the bounds of an
+ * The invitation from a proposed match (ADR 0076 § 3), in one transaction as the inviter: the bounds of an
  * active manager (his own list read here, the rest held again by the policies), the account's lock, the member made
  * as `create` makes him, his link, and the audit line with the platform's identifier, never a name nor an amount.
  */

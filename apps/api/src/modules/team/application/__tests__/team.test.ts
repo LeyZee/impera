@@ -11,7 +11,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import type { NewMember, PlatformChatter, TeamInvites, TeamStore } from '../../domain/ports';
+import type { NewMember, PlatformAccountRef, TeamInvites, TeamStore } from '../../domain/ports';
 import { createTeamService } from '../team';
 
 /** Invented ids only (ADR 0010). */
@@ -127,7 +127,7 @@ describe('a member’s change of role (Charles, 28/10)', () => {
   });
 });
 
-describe('a member invited from a platform’s suggestion (ADR 0076 § 3)', () => {
+describe('a member invited from a proposed match (ADR 0076 § 3)', () => {
   const STANDARD_OLD = CommissionPresetIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c1');
   const STANDARD = CommissionPresetIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c2');
   const MANAGER = { userId: UserIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e2'), ip: null };
@@ -140,7 +140,7 @@ describe('a member invited from a platform’s suggestion (ADR 0076 § 3)', () =
   ];
 
   function invitedAt(instant: string) {
-    const asked: { member: NewMember; account: PlatformChatter }[] = [];
+    const asked: { member: NewMember; account: PlatformAccountRef }[] = [];
     const store: TeamStore = {
       ...storeKeeping([]),
       presets: () => Promise.resolve(presets),

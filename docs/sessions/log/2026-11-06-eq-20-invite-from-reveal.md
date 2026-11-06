@@ -13,5 +13,5 @@ Fait :
 Reste : brancher sur la route et la migration de Bilan (les politiques d'insertion restent au scope `owner` d'ici là), les tests RLS du § 3 et du § 4, l'affichage de l'alerte de retrait.
 
 Découvertes :
-- « Suggestion » désigne déjà dans le glossaire ce que l'agence propose à l'agenda d'une créatrice (ADR 0042) ; l'ADR 0076 l'emploie pour les comptes Reveal. Signalé à Bilan.
+- « Suggestion » désigne déjà dans le glossaire ce que l'agence propose à l'agenda d'une créatrice (ADR 0042) ; l'ADR 0076 l'emploie pour les comptes Reveal. Bilan prend « rapprochement proposé » au glossaire dans sa PR ; cette branche l'emploie déjà.
 - EXT-10 (Aujourd'hui du chatteur à l'heure de l'appareil, Planning à celle du profil) : confié au fil de recette du lot Équipe.

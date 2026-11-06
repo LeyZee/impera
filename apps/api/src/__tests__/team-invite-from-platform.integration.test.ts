@@ -31,7 +31,7 @@ function agencyDay(days = 0): string {
   return day.toISOString().slice(0, 10);
 }
 
-describe('a member invited from a platform’s suggestion (ADR 0076 § 3)', () => {
+describe('a member invited from a proposed match (ADR 0076 § 3)', () => {
   let test: TestDb;
   let app: App;
   let owner: { userId: UserId; ip: null };

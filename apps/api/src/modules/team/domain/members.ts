@@ -91,7 +91,7 @@ export function assertOwnerScope(scope: TeamScope): void {
   if (scope !== 'owner') throw new OwnerOnly();
 }
 
-/** What a member is invited with from a platform's suggestion, as the bounds of ADR 0076 § 3 read it. */
+/** What a member is invited with from a proposed match, as the bounds of ADR 0076 § 3 read it. */
 interface InviteChoices {
   readonly teamRole: TeamRole;
   readonly teamShareBps: number | null;
@@ -101,7 +101,7 @@ interface InviteChoices {
 }
 
 /**
- * Who invites a member from a platform's suggestion, and with what (ADR 0076 § 3): the owner with every choice he has
+ * Who invites a member from a proposed match, and with what (ADR 0076 § 3): the owner with every choice he has
  * in Équipe › Membres; an active manager a chatter only, at a preset of the owner's, with no share of the team's net,
  * and with creators of his own list only (« ok créatrices-liste-manager », Charles, 06/11). The policies hold the
  * role and the rate too; the list lives in the account, out of RLS, so this check is its only guard.

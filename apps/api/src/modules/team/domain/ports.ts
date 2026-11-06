@@ -128,13 +128,13 @@ export interface TeamStore {
 }
 
 /** A platform's team account, which a member is invited from (ADR 0076 § 3). */
-export interface PlatformChatter {
+export interface PlatformAccountRef {
   readonly platform: Platform;
   readonly platformChatterId: string;
 }
 
 /**
- * The invitation of a member from a platform's suggestion (ADR 0076 § 3), implemented in `infra/` with `withMember`
+ * The invitation of a member from a proposed match (ADR 0076 § 3), implemented in `infra/` with `withMember`
  * and the link of the platform's account (`connectors`' own write), both in one transaction.
  */
 export interface TeamInvites {
@@ -144,7 +144,7 @@ export interface TeamInvites {
    * this e-mail (a double click, a retry), it creates nothing and gives that member. `member_conflict` when the
    * account is linked to another member, or the e-mail is another account's.
    */
-  invite(actor: Actor, member: NewMember, account: PlatformChatter): Promise<TeamMemberId>;
+  invite(actor: Actor, member: NewMember, account: PlatformAccountRef): Promise<TeamMemberId>;
 }
 
 /** The creators that exist, among those asked (the `persona` module's, injected by the composition root). */
