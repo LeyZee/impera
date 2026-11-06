@@ -1,5 +1,5 @@
 {
-  "id": "2bf9027f-e881-4083-951c-4070a787f333",
+  "id": "3bff339b-1134-4616-995e-18f9d13904de",
   "prevId": "809dc81d-3891-454f-8e76-6dfa95e79a91",
   "version": "7",
   "dialect": "postgresql",
@@ -1161,6 +1161,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "slot_key": {
+          "name": "slot_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "min_seconds": {
+          "name": "min_seconds",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_seconds": {
+          "name": "max_seconds",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replaced_at": {
+          "name": "replaced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1177,6 +1201,50 @@
         }
       },
       "indexes": {
+        "content_drop_files_position_unique": {
+          "name": "content_drop_files_position_unique",
+          "columns": [
+            {
+              "expression": "drop_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"content_drop_files\".\"replaced_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "content_drop_files_slot_unique": {
+          "name": "content_drop_files_slot_unique",
+          "columns": [
+            {
+              "expression": "drop_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slot_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"replaced_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "content_drop_files_creator_idx": {
           "name": "content_drop_files_creator_idx",
           "columns": [
@@ -1239,13 +1307,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "content_drop_files_position_unique": {
-          "name": "content_drop_files_position_unique",
-          "nullsNotDistinct": false,
-          "columns": ["drop_id", "position"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {
         "creator_read": {
           "name": "creator_read",
@@ -1259,7 +1321,15 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'uploading'\n      )"
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('uploading', 'filling')\n      )"
+        },
+        "creator_replace": {
+          "name": "creator_replace",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'filling'\n      )",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
         },
         "team_read": {
           "name": "team_read",
@@ -1291,7 +1361,11 @@
         },
         "content_drop_files_position_check": {
           "name": "content_drop_files_position_check",
-          "value": "\"content_drop_files\".\"position\" between 0 and 59"
+          "value": "\"content_drop_files\".\"position\" between 0 and 999"
+        },
+        "content_drop_files_slot_check": {
+          "name": "content_drop_files_slot_check",
+          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))\n        and (\"content_drop_files\".\"replaced_at\" is null or \"content_drop_files\".\"slot_key\" is not null)"
         },
         "content_drop_files_bytes_check": {
           "name": "content_drop_files_bytes_check",
@@ -1513,14 +1587,14 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"content_drops\".\"state\" = 'uploading'\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_drops\".\"state\" = 'uploading' or (\"content_drops\".\"state\" = 'filling' and \"content_drops\".\"category\" = 'script'))\n        and \"content_drops\".\"corrected_from\" is null and (\"content_drops\".\"request_id\" is null or exists (\n          select 1 from content_requests r\n           where r.id = \"content_drops\".\"request_id\" and r.creator_id = \"content_drops\".\"creator_id\" and r.state = 'open' and r.category = \"content_drops\".\"category\"\n        ))"
         },
         "creator_withdraw": {
           "name": "creator_withdraw",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"state\" in ('uploading', 'received', 'ready', 'blocked')",
+          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"state\" in ('filling', 'uploading', 'received', 'ready', 'blocked')",
           "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drops\".\"state\" = 'withdrawn' and \"content_drops\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '')"
         },
         "team_read": {
@@ -1557,7 +1631,7 @@
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
-          "value": "\"content_drops\".\"state\" in ('uploading', 'received', 'ready', 'scheduled', 'published', 'blocked', 'withdrawn')"
+          "value": "\"content_drops\".\"state\" in ('filling', 'uploading', 'received', 'ready', 'scheduled', 'published', 'blocked', 'withdrawn')"
         },
         "content_drops_sentence_check": {
           "name": "content_drops_sentence_check",
@@ -1793,7 +1867,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_requests\".\"origin\" = 'agency' and \"content_requests\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_requests\".\"structure_id\" is null or exists (\n          select 1 from script_structures s\n           where s.id = \"content_requests\".\"structure_id\" and s.archived_at is null\n             and (s.reserved_creator_id is null or s.reserved_creator_id = \"content_requests\".\"creator_id\")\n        ))"
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_requests\".\"origin\" = 'agency' and \"content_requests\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"content_requests\".\"structure_id\" is null or exists (\n          select 1 from script_structures s\n           where s.id = \"content_requests\".\"structure_id\" and s.archived_at is null\n             and (s.reserved_creator_id is null or s.reserved_creator_id = \"content_requests\".\"creator_id\")\n        ))\n        and (\"content_requests\".\"structure_version_id\" is null or exists (\n          select 1 from script_structure_versions v\n           where v.id = \"content_requests\".\"structure_version_id\" and v.structure_id = \"content_requests\".\"structure_id\" and v.frozen_at is not null\n        ))"
         },
         "team_update": {
           "name": "team_update",
@@ -10568,172 +10642,6 @@
         "penalties_cancellation_check": {
           "name": "penalties_cancellation_check",
           "value": "(\"penalties\".\"cancelled_at\" is null) = (\"penalties\".\"cancelled_by\" is null) and (\"penalties\".\"cancelled_at\" is null) = (\"penalties\".\"cancelled_from\" is null) and (\"penalties\".\"cancelled_from\" is null or (extract(day from \"penalties\".\"cancelled_from\") in (1, 16) and \"penalties\".\"cancelled_from\" between \"penalties\".\"from_period\" and \"penalties\".\"to_period\"))"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.persona_corrections": {
-      "name": "persona_corrections",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "section": {
-          "name": "section",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'open'"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "done_by": {
-          "name": "done_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "done_at": {
-          "name": "done_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "persona_corrections_creator_idx": {
-          "name": "persona_corrections_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "persona_corrections_creator_id_creators_id_fk": {
-          "name": "persona_corrections_creator_id_creators_id_fk",
-          "tableFrom": "persona_corrections",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "persona_corrections_created_by_user_id_fk": {
-          "name": "persona_corrections_created_by_user_id_fk",
-          "tableFrom": "persona_corrections",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "persona_corrections_done_by_user_id_fk": {
-          "name": "persona_corrections_done_by_user_id_fk",
-          "tableFrom": "persona_corrections",
-          "tableTo": "user",
-          "columnsFrom": ["done_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "creator_read": {
-          "name": "creator_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_insert": {
-          "name": "creator_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"persona_corrections\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"persona_corrections\".\"state\" = 'open'"
-        },
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "owner_update": {
-          "name": "owner_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"persona_corrections\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"persona_corrections\".\"done_by\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "persona_corrections_section_check": {
-          "name": "persona_corrections_section_check",
-          "value": "\"persona_corrections\".\"section\" in ('details', 'limits', 'lifestyle', 'tastes', 'intimate', 'writing_style')"
-        },
-        "persona_corrections_state_check": {
-          "name": "persona_corrections_state_check",
-          "value": "\"persona_corrections\".\"state\" in ('open', 'done')"
-        },
-        "persona_corrections_text_check": {
-          "name": "persona_corrections_text_check",
-          "value": "char_length(\"persona_corrections\".\"text\") between 1 and 600"
-        },
-        "persona_corrections_done_check": {
-          "name": "persona_corrections_done_check",
-          "value": "(\"persona_corrections\".\"state\" = 'done') = (\"persona_corrections\".\"done_at\" is not null and \"persona_corrections\".\"done_by\" is not null)"
         }
       },
       "isRLSEnabled": false

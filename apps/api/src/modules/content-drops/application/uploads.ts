@@ -3,7 +3,13 @@ import { createReadStream } from 'node:fs';
 import { mkdtemp, open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { DROP_PART_BYTES, kindOfMime, probedFileRefusal, type DropFileUpload } from '@impera/contracts';
+import {
+  DROP_PART_BYTES,
+  kindOfMime,
+  probedFileRefusal,
+  slotDurationRefusal,
+  type DropFileUpload,
+} from '@impera/contracts';
 
 import {
   ContentDropFileSettled,
@@ -35,11 +41,12 @@ const sent = (target: DropFileTarget): DropFileUpload => ({
   stored: [],
 });
 
-/** Only a file still waiting, in a drop still sending, takes bytes; a file already past that answers « sent ». */
+/** Only a file still waiting, in a drop still sending or being filled, takes bytes; a file already past that answers « sent ». */
 function takesBytes(target: DropFileTarget): boolean {
   if (target.dropState === 'withdrawn') throw new ContentDropFileSettled();
   if (target.fileState !== 'awaiting') return false;
-  if (target.dropState !== 'uploading') throw new ContentDropFileSettled();
+  // A script she is still filling takes each slot's file as she chooses it (SC-02 lot b).
+  if (target.dropState !== 'uploading' && target.dropState !== 'filling') throw new ContentDropFileSettled();
   return true;
 }
 
@@ -233,12 +240,13 @@ export async function receiveFile(
       await refuse(NOT_WHAT_IT_SAYS);
       return;
     }
-    const refusal = probedFileRefusal(target.category, {
-      kind,
-      width: cleaned.width,
-      height: cleaned.height,
-      durationMs: cleaned.durationMs,
-    });
+    const refusal =
+      probedFileRefusal(target.category, {
+        kind,
+        width: cleaned.width,
+        height: cleaned.height,
+        durationMs: cleaned.durationMs,
+      }) ?? slotDurationRefusal(target.lengths, cleaned.durationMs);
     if (refusal !== null) {
       await refuse(refusal);
       return;

@@ -747,8 +747,15 @@
     {
       "idx": 106,
       "version": "7",
-      "when": 1793930001909,
-      "tag": "0122_persona_corrections",
+      "when": 1793932376255,
+      "tag": "0122_script_drop_slots",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1793938577328,
+      "tag": "0123_persona_corrections",
       "breakpoints": true
     }
   ]

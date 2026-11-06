@@ -64,6 +64,15 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 - Un bucket qui refuse ou ne répond pas laisse l'original en place et le dit une fois en ambre (`content_media_erase_failed`) ; l'heure suivante réessaie. Aucun événement ne porte de nom ni de contenu, seulement l'identifiant du média.
 - Redonné après son effacement, le même média reprend un original (le fichier nettoyé est réécrit sous sa clé) et une nouvelle date d'un an. Redonné avant, sa date est repoussée à un an à partir du nouveau dépôt.
 
+## Le script déposé emplacement par emplacement (SC-02 lot b1, migration 0122)
+
+Un script se dépose depuis sa demande, qui porte la version figée de sa structure (la cadence la fige ; une demande faite à la main par l'agence la fige aussi, au moment de la demander). Le dépôt commence vide dans l'état `filling` ; ses emplacements sont lus dans la version figée (`scriptSlots`, contrats) : chaque segment dans l'ordre, chaque série d'une étape à variantes en entier (`E2A`, puis `E2B`), chaque emplacement à sa place. Un emplacement se nomme `<segment>:<série>:<rang>` (`slot_key`) et garde sa position dans le script.
+
+- Chaque fichier se déclare quand elle le choisit : son type doit être celui de l'emplacement (« Cet emplacement attend une vidéo »), son poids celui des scripts. Ses octets montent ensuite par les routes de l'envoi, comme ceux d'un dépôt ordinaire. La durée d'une vidéo (entre ses deux bornes) ou d'un vocal (au plus) se vérifie sur le fichier nettoyé : les bornes sont copiées sur la ligne du fichier.
+- Remplacer un fichier garde sa position : l'ancien garde sa ligne avec `replaced_at`, sort du dépôt et de ses envois ; s'il était déjà entré dans sa médiathèque, son original s'efface comme celui d'un dépôt retiré. Le rôle applicatif ne met à jour d'un fichier que `replaced_at` et `updated_at` (droit par colonne).
+- « Envoyer le script » est refusé tant qu'un emplacement obligatoire est vide, ou que son fichier a été refusé (422 `content_drop_slots_unprocessable`, les emplacements dans `details.slotKeys`). Envoyé, le dépôt passe en `uploading` sous le rôle propriétaire et suit le chemin de tout dépôt (reçu, prêt).
+- Elle reprend quand elle veut, depuis n'importe quel appareil : le serveur garde chaque fichier déclaré, jamais un brouillon local. Retirer un dépôt en cours de remplissage est permis.
+
 ## Routes
 
 - `GET /v1/creator-space/content` (créatrice) : ses demandes (la plus proche d'abord) et ses 100 derniers dépôts non retirés.
@@ -71,4 +80,8 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 - `DELETE /v1/creator-space/drops/:id` : retirer deux fois n'est pas une erreur ; un dépôt programmé ou publié répond 409 `content_drop_settled_conflict`.
 - `POST /v1/creator-space/content-requests/:id/refuse` : le même refus rejoué ne change rien ; une demande annulée, ou déjà satisfaite, répond 409 `content_request_closed_conflict`.
 - Une demande de script nomme une structure de la bibliothèque, non archivée, réservée à personne d'autre (contrôlé par le serveur et par la politique `team_insert`), sinon 422 `content_request_structure_unprocessable`.
+- `POST /v1/creator-space/content/script-drops` (créatrice) : `{ id, requestId }`, son script commencé vide depuis sa demande ; rejoué, le même dépôt. Répond le dépôt, le nom et les segments de la version figée (`ScriptDrop`). Une demande sans version figée répond 422 `content_drop_script_unprocessable`.
+- `GET /v1/creator-space/content/script-drops/:dropId` : la reprise.
+- `PUT /v1/creator-space/content/script-drops/:dropId/slots/:slotKey` : le fichier choisi pour un emplacement (`{ id, mime, bytes }`), qui remplace le précédent ; un emplacement absent du script répond 404 `content_drop_slot_not_found`, un dépôt déjà envoyé 409 `content_drop_file_settled_conflict`.
+- `POST /v1/creator-space/content/script-drops/:dropId/submit` : « Envoyer le script ».
 - `GET /v1/creators/:creatorId/content`, `POST /v1/creators/:creatorId/drops`, `PATCH` et `DELETE /v1/creators/:creatorId/drops/:id`, `POST /v1/creators/:creatorId/content-requests`, `DELETE /v1/creators/:creatorId/content-requests/:id` (propriétaire, manager actif ; un chatteur reçoit 403 `content_drop_forbidden`). Une correction qui ne colle pas aux fichiers répond 422 ; un dépôt qui répond à une demande garde la catégorie de la demande.

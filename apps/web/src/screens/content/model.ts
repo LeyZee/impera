@@ -139,6 +139,7 @@ export function published(drops: readonly ContentDrop[]): ContentDrop[] {
 
 /** How a drop's state reads (ADR 0055 § 6). */
 export const STATE_WORDS: Readonly<Record<DropState, string>> = {
+  filling: 'En cours',
   uploading: 'En envoi',
   received: 'Reçu',
   ready: 'Prêt',
