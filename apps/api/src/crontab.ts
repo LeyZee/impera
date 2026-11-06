@@ -7,8 +7,12 @@ export interface CronJob extends CronItem {
   readonly task: JobName;
 }
 
+/** `telegram.scan` from the cron: a safety net retried by the next minute, never by its own attempts. */
+export const SCAN_SAFETY_NET_ATTEMPTS = 1;
+
 /**
- * Periodic jobs (ADR 0006). In code rather than in a Graphile `crontab` file: the text format refuses dots in
+ * Periodic jobs (ADR 0006). Each takes its attempts from the contract (`JOB_MAX_ATTEMPTS`), so a retry a job promises
+ * happens (`crontab.test.ts`). In code rather than in a Graphile `crontab` file: the text format refuses dots in
  * task names (`connector.dispatch`), and here each entry is checked against the contract's job names.
  */
 const CRON_JOBS: readonly CronJob[] = [
@@ -59,21 +63,40 @@ const CRON_JOBS: readonly CronJob[] = [
   // Telegram notifications (ADR 0020). The scan is the trigger's safety net: an event whose trigger could not
   // enqueue is read within the minute. The polls read the groups the bots sit in; the digest decides each hour
   // whether it is morning somewhere; the purge drops the deliveries past their retention.
-  ...(['telegram.scan', 'telegram.dispatch_polls'] as const).map((task) => ({
-    task,
+  // The minute's scan is a safety net: one try, the next minute is its retry (the trigger's own scan keeps the
+  // contract's 25).
+  {
+    task: 'telegram.scan',
     match: '* * * * *',
-    options: { backfillPeriod: 0, maxAttempts: 1 },
-  })),
-  { task: 'telegram.morning_digest', match: '0 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+    options: { backfillPeriod: 0, maxAttempts: SCAN_SAFETY_NET_ATTEMPTS },
+  },
+  {
+    task: 'telegram.dispatch_polls',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.dispatch_polls'] },
+  },
+  {
+    task: 'telegram.morning_digest',
+    match: '0 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.morning_digest'] },
+  },
   // Each hour, acting only in a creator's 23 o'clock hour (CRM-04 lot b); the key of her day makes it once.
-  { task: 'telegram.evening_digest', match: '0 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'telegram.evening_digest',
+    match: '0 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.evening_digest'] },
+  },
   // An outage still open 2 hours after its alert gets its single reminder in red (P3-12).
   {
     task: 'telegram.connection_reminders',
     match: '*/10 * * * *',
-    options: { backfillPeriod: 0, maxAttempts: 1 },
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.connection_reminders'] },
   },
-  { task: 'telegram.purge', match: '30 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'telegram.purge',
+    match: '30 3 * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['telegram.purge'] },
+  },
   // Her drops' originals (CR-06 c, ADR 0044 § 2): unfinished sends refused after 24 h, the agency told 7 days before an
   // original goes, the originals due erased, a withdrawn drop's within the hour. No backfill: the next run finds them.
   {
@@ -89,23 +112,51 @@ const CRON_JOBS: readonly CronJob[] = [
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
   },
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
-  { task: 'fans.purge_facts', match: '45 3 * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'fans.purge_facts',
+    match: '45 3 * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['fans.purge_facts'] },
+  },
   // The rate limiter's ended windows go, and the hashed IPs and accounts they counted with them (ADR 0027).
-  { task: 'rate_limit.purge', match: '*/10 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'rate_limit.purge',
+    match: '*/10 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['rate_limit.purge'] },
+  },
   // A daily export missing for 26 hours alerts the owner (ADR 0028 § 5); the next hour is the retry.
-  { task: 'backups.check', match: '17 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'backups.check',
+    match: '17 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['backups.check'] },
+  },
   // The running templates make their shifts four weeks ahead (EQ-02); each occurrence is made once, so the hour that
   // follows a failure, a member back from leave or a new day simply catches up.
-  { task: 'scheduling.make_shifts', match: '41 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'scheduling.make_shifts',
+    match: '41 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.make_shifts'] },
+  },
   // A swap proposal lapses once one of its shifts started, was cancelled or changed hands or hours (ADR 0031). Each
   // acceptance and revert enqueues it too; the quarter hour catches a shift that started or was changed by hand.
-  { task: 'scheduling.lapse_swaps', match: '*/15 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'scheduling.lapse_swaps',
+    match: '*/15 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.lapse_swaps'] },
+  },
   // A role dated for a 1st or a 16th becomes the member's on that day (Charles, 28/10): each record takes the role in
   // force today, before the hour's recalculation. A run missed is caught up by the next one, no backfill.
-  { task: 'team.apply_roles', match: '3 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'team.apply_roles',
+    match: '3 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['team.apply_roles'] },
+  },
   // Pay's drafts of every open period, computed again each hour (EQ-04): what a report, a rate or a change of period
   // brought, should its own job have been missed. A run that finds nothing new writes nothing.
-  { task: 'payroll.recalculate_open', match: '23 * * * *', options: { backfillPeriod: 0, maxAttempts: 1 } },
+  {
+    task: 'payroll.recalculate_open',
+    match: '23 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['payroll.recalculate_open'] },
+  },
   // The invoices' acceptance (EQ-06 lot 6, ADR 0039): a document unanswered after its deadline is accepted tacitly, an
   // open contest without its alert is said, should their own job have failed or been lost. No backfill: the next hour
   // finds them all anyway.

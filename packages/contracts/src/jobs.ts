@@ -504,7 +504,8 @@ export const JOB_MAX_ATTEMPTS = {
   'telegram.flush_chat': 10,
   'telegram.dispatch_polls': 1,
   'telegram.poll_updates': 1,
-  'telegram.morning_digest': 1,
+  // Its hour is 8 o'clock only: a failed run is retried within it, the key of her day keeps it once.
+  'telegram.morning_digest': 3,
   // Its hour is 23 o'clock only: a failed run is retried within it, the key of her day keeps it once.
   'telegram.evening_digest': 3,
   // Every 10 minutes: the next run is the retry, the reminder's key keeps it once (P3-12).
