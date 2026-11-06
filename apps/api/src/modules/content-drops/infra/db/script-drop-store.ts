@@ -149,9 +149,10 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
           const drop = await viewOf(tx, row);
           const missing = requiredSlotsMissing(slots, drop.files);
           if (missing.length > 0) throw new ContentDropSlotsUnprocessable(missing);
+          const scriptNumber = await nextScriptNumber(tx, creatorId);
           await tx
             .update(contentDrops)
-            .set({ state: 'uploading', updatedAt: now })
+            .set({ state: 'uploading', scriptNumber, updatedAt: now })
             .where(eq(contentDrops.id, dropId));
           await tx.insert(schema.auditLog).values({
             id: newId(AuditEntryIdSchema),
@@ -159,7 +160,7 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
             action: 'content_drop.submit_script',
             entity: 'content_drop',
             entityId: dropId,
-            details: { files: drop.files.length },
+            details: { files: drop.files.length, scriptNumber },
           });
           await follow(tx, { ...row, state: 'uploading' }, now, correlationId);
           const after = await readDrop(tx, dropId);
@@ -168,4 +169,22 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
         }),
       ),
   };
+}
+
+/**
+ * Her next script's number (SC-03, ADR 0056 § 5): one more than her last, 1 for her first. A lock of the transaction
+ * on her numbering first, so two scripts sent at once take 2 and 3, never 2 twice; an advisory lock, never her
+ * `creators` row, whose lock would hold every insert that names her (Bilan's review of #602).
+ * `content_drops_script_number_unique` stays the last guard. Given once, when she sends it: a script withdrawn
+ * afterwards keeps its number.
+ */
+async function nextScriptNumber(tx: Transaction, creatorId: string): Promise<number> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext('content_drops.script_number:' || ${creatorId}))`,
+  );
+  const [row] = await tx
+    .select({ last: sql<number | null>`max(${contentDrops.scriptNumber})::int` })
+    .from(contentDrops)
+    .where(eq(contentDrops.creatorId, creatorId));
+  return (row?.last ?? 0) + 1;
 }

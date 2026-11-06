@@ -154,6 +154,11 @@ export const contentDrops = pgTable(
     state: enumText('state').notNull().default('uploading'),
     blockedReason: text('blocked_reason'),
     requestId: uuid('request_id'),
+    /**
+     * Her script's number (SC-03, ADR 0056 § 5): given when she sends it, 1 for her first, without a gap; the folder's
+     * `S<nnn>`. Null for any other drop and for a script still being filled.
+     */
+    scriptNumber: integer('script_number'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -186,6 +191,13 @@ export const contentDrops = pgTable(
         and (${t.withdrawnAt} is null) = (${t.withdrawnBy} is null)`,
     ),
     check('content_drops_script_check', sql`${t.category} <> 'script' or ${t.requestId} is not null`),
+    check(
+      'content_drops_script_number_check',
+      sql`${t.scriptNumber} is null or (${t.category} = 'script' and ${t.scriptNumber} >= 1)`,
+    ),
+    uniqueIndex('content_drops_script_number_unique')
+      .on(t.creatorId, t.scriptNumber)
+      .where(sql`${t.scriptNumber} is not null`),
     unique('content_drops_creator_unique').on(t.id, t.creatorId),
     foreignKey({
       name: 'content_drops_request_fk',
@@ -198,12 +210,13 @@ export const contentDrops = pgTable(
     index('content_drops_creator_created_idx').on(t.creatorId, t.createdAt),
     pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
     // Her drop, by her, sending; from a request only if it is hers, open, of this category.
-    // A script may begin empty, filled slot by slot (SC-02 lot b): only hers, from her request.
+    // A script may begin empty, filled slot by slot (SC-02 lot b): only hers, from her request. Its number is given
+    // by the server when she sends it, never written by her or her team (no column grant either, SC-03).
     pgPolicy('creator_insert', {
       for: 'insert',
       withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser}
         and (${t.state} = 'uploading' or (${t.state} = 'filling' and ${t.category} = 'script'))
-        and ${t.correctedFrom} is null and (${t.requestId} is null or exists (
+        and ${t.correctedFrom} is null and ${t.scriptNumber} is null and (${t.requestId} is null or exists (
           select 1 from content_requests r
            where r.id = ${t.requestId} and r.creator_id = ${t.creatorId} and r.state = 'open' and r.category = ${t.category}
         ))`,
@@ -217,7 +230,7 @@ export const contentDrops = pgTable(
     pgPolicy('team_insert', {
       for: 'insert',
       withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.state} = 'uploading'
-        and ${t.correctedFrom} is null and (${t.requestId} is null or exists (
+        and ${t.correctedFrom} is null and ${t.scriptNumber} is null and (${t.requestId} is null or exists (
           select 1 from content_requests r
            where r.id = ${t.requestId} and r.creator_id = ${t.creatorId} and r.state = 'open' and r.category = ${t.category}
         ))`,
