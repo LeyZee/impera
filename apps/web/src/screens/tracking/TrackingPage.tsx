@@ -36,6 +36,7 @@ import {
 } from './view';
 import './tracking.css';
 
+import { fansWaiting, queueEntries, type QueueEntry } from '@/agent/queue';
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
@@ -155,12 +156,18 @@ export function TrackingPage({
   const isQueueEmpty = queue.isSuccess && todos.length === 0;
   // The gravest first (the server's order): three lines keep the search and the list above the fold; the one open stays.
   // A fourth line is shown rather than hidden alone, so at least two hide behind « Voir les N autres ».
-  const openIndex = todos.findIndex((t) => t.conversationId === selected);
+  // One line per failure of the agent, sorted by the screen itself (recette AGT-05).
+  const entries = queueEntries(todos);
+  const isOpenEntry = (entry: QueueEntry<CreatorTodo>): boolean =>
+    entry.kind === 'one'
+      ? entry.todo.conversationId === selected
+      : entry.todos.some((t) => t.conversationId === selected);
+  const openIndex = entries.findIndex(isOpenEntry);
   const shownTodos =
-    allTodos || todos.length <= QUEUE_SHOWN + 1 || openIndex >= QUEUE_SHOWN
-      ? todos
-      : todos.slice(0, QUEUE_SHOWN);
-  const hiddenTodos = todos.length - shownTodos.length;
+    allTodos || entries.length <= QUEUE_SHOWN + 1 || openIndex >= QUEUE_SHOWN
+      ? entries
+      : entries.slice(0, QUEUE_SHOWN);
+  const hiddenTodos = entries.length - shownTodos.length;
   const open =
     selected === null
       ? null
@@ -256,17 +263,29 @@ export function TrackingPage({
             {todos.length === 0 ? null : (
               <Panel className="tr-panel" eyebrow="À traiter">
                 <ul className="nv-list tr-list" aria-label="À traiter">
-                  {shownTodos.map((todo) => (
-                    <QueueRow
-                      key={`${todo.creatorId}-${todo.id}`}
-                      todo={todo}
-                      withCreator={showsCreator}
-                      isOpen={todo.conversationId === selected}
-                      onOpen={() => {
-                        onSelect(todo.conversationId);
-                      }}
-                    />
-                  ))}
+                  {shownTodos.map((entry) =>
+                    entry.kind === 'one' ? (
+                      <QueueRow
+                        key={`${entry.todo.creatorId}-${entry.todo.id}`}
+                        todo={entry.todo}
+                        withCreator={showsCreator}
+                        isOpen={isOpenEntry(entry)}
+                        onOpen={() => {
+                          onSelect(entry.todo.conversationId);
+                        }}
+                      />
+                    ) : (
+                      <QueueGroupRow
+                        key={`group-${entry.oldest.creatorId}-${entry.cause}`}
+                        group={entry}
+                        withCreator={showsCreator}
+                        isOpen={isOpenEntry(entry)}
+                        onOpen={() => {
+                          onSelect(entry.latest.conversationId);
+                        }}
+                      />
+                    ),
+                  )}
                 </ul>
                 {hiddenTodos === 0 ? null : (
                   <p className="tr-more tr-more--action">
@@ -510,6 +529,47 @@ function QueueRow({
           <span className="nv-convo__preview tr-why">{todo.why}</span>
         </span>
         <span className="nv-convo__side tr-wait">{duration(todo.waitingMinutes)}</span>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * One failure of the agent behind several fans (recette AGT-05): the cause first, how many fans wait, the sentence and
+ * the longest wait of them; it opens the latest. A missing persona names its creator; the others are everyone's.
+ */
+function QueueGroupRow({
+  group,
+  withCreator,
+  isOpen,
+  onOpen,
+}: {
+  group: Extract<QueueEntry<CreatorTodo>, { kind: 'group' }>;
+  withCreator: boolean;
+  isOpen: boolean;
+  onOpen: () => void;
+}): JSX.Element {
+  const { oldest } = group;
+  return (
+    <li>
+      <button
+        type="button"
+        className="nv-convo tr-row tr-row--open"
+        aria-current={isOpen ? 'true' : undefined}
+        onClick={onOpen}
+      >
+        <span className={`nv-dot nv-tone--${oldest.tone}`} aria-hidden="true" />
+        <span className="nv-convo__main">
+          <span className="nv-convo__name">
+            {todoLabel(oldest)}
+            <span className="tr-cause"> · {fansWaiting(group.todos.length)}</span>
+            {withCreator && group.cause === 'persona_inactive' ? (
+              <span className="tr-cause"> · {oldest.creatorName}</span>
+            ) : null}
+          </span>
+          <span className="nv-convo__preview tr-why">{oldest.why}</span>
+        </span>
+        <span className="nv-convo__side tr-wait">{duration(oldest.waitingMinutes)}</span>
       </button>
     </li>
   );

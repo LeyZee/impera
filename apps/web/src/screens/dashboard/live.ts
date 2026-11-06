@@ -10,6 +10,7 @@ import type { AgencyState, AgentState, Dashboard, Fan, RevealSales, RevealSeller
 
 import { CAUSE_LABELS } from '@/agent/causes';
 import { percent } from '@/agent/mode';
+import { fansWaiting, queueEntries, type QueueEntry } from '@/agent/queue';
 import { platformName } from '@/scheduling/model';
 import { cityOf, clockAt, lengthOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
 import { telegramNightOf } from '@/settings/telegram/NightBanner';
@@ -393,6 +394,18 @@ function todoOf(todo: DashboardTodo, timeZone: string): Todo {
   };
 }
 
+/** One failure of the agent behind several fans, one line (recette AGT-05): the cause, how many, the longest wait. */
+function groupTodoOf(group: Extract<QueueEntry<DashboardTodo>, { kind: 'group' }>, timeZone: string): Todo {
+  const line = todoOf(group.oldest, timeZone);
+  return {
+    ...line,
+    id: `${group.cause}-group`,
+    title: fansWaiting(group.todos.length),
+    // It opens the latest of them: the oldest's conversation is no more his than the others'.
+    conversationId: group.latest.conversationId,
+  };
+}
+
 function fanOf(fan: DashboardFan, now: Date): Fan {
   return {
     id: fan.id,
@@ -534,7 +547,9 @@ export function fromApi(
       now: today(api.creator.now, timeZone, viewerZone),
     },
     agent: agentState(api, now, reader),
-    todos: api.todos.map((todo) => todoOf(todo, timeZone)),
+    todos: queueEntries(api.todos).map((entry) =>
+      entry.kind === 'one' ? todoOf(entry.todo, timeZone) : groupTodoOf(entry, timeZone),
+    ),
     sales: null,
     revealSales: api.revealSales === null ? null : revealSalesOf(api.revealSales),
     telegram: telegramNightOf(api),
