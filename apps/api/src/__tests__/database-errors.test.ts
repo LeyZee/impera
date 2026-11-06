@@ -63,6 +63,12 @@ describe('database errors (recette 05/11)', () => {
     expect(safe.stack ?? '').not.toContain('secret');
     expect(safe).not.toHaveProperty('params');
 
+    // A query cut by the network has no SQLSTATE: its values are cut all the same (relecture #585).
+    const reset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+    const cut = storableError(new Error('Failed query: select $1\nparams: secret', { cause: reset }));
+    expect(cut.message).toBe('Failed query: select $1');
+    expect(cut.stack ?? '').not.toContain('secret');
+
     expect(storableError(new Error('bad\u0000text')).message).toBe('badtext');
     const plain = new Error('nothing to hide');
     expect(storableError(plain)).toBe(plain);

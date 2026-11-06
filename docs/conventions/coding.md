@@ -28,6 +28,7 @@
 - Noms : anglais, explicites, pas d'abréviation sauf `id`, `db`, `llm`. Booléens en `is/has/can`. Fonctions en verbe. Événements au passé (`MessageReceived`), commandes à l'impératif (`IngestMessage`).
 - Commentaires : pourquoi, pas quoi. Un `TODO` porte un identifiant de fiche (`// TODO(P2-03): …`), sinon `scripts/check-repo.mjs` le refuse dans `pnpm check`.
 - Logs : `logger.info({ conversationId, jobId }, 'draft created')`. Objet d'abord, message court en anglais, jamais de contenu de message.
+- Erreurs dans les logs : on passe l'erreur telle quelle sous `err` (`logger.warn({ err: error, creatorId }, '…')`). Le sérialiseur de `apps/api/src/logger.ts` n'en garde que le nom, le message (sans les valeurs d'une requête SQL), le code (SQLSTATE ou code réseau) et les lignes de la pile. La cause, le `detail` d'un pilote et les `params` de Drizzle ne partent jamais, et la charge utile d'un job Graphile non plus (ADR 0010).
 - Corrélation : chaque requête HTTP porte un `x-request-id` (généré s'il manque) ; il devient `correlationId` dans les jobs et les appels LLM qu'elle déclenche et figure dans chaque ligne de log (`requestId`, `correlationId`). Détail dans `docs/architecture/operations.md`.
 
 ## Asynchrone et robustesse
