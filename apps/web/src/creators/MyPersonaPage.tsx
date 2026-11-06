@@ -1,16 +1,20 @@
 import {
+  LANGUAGES,
   PERSONA_OPTIONS,
+  PERSONA_SHEET,
   type CreatorId,
-  type CreatorPersonaSheet,
   type PersonaCorrection,
-  type PersonaCorrectionSection,
+  type PersonaSheet,
+  type SheetQuestion,
+  type SheetSection,
 } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { useCreators, useMyPersona } from './api';
 import { ProposeCorrection } from './persona/ProposeCorrection';
-import { CORRECTION_SECTION_LABELS, useCorrections } from './persona/corrections';
-import { physiqueSummary } from './persona/model';
+import { useCorrections } from './persona/corrections';
+import { panelTitle, type Answer } from './persona/model';
+import { ageLine } from './persona/sheet';
 
 import '@/creators/persona/persona.css';
 import './my-persona.css';
@@ -19,37 +23,52 @@ import { Page, PageHeader } from '@/shell/layout';
 
 const languageLabel = (value: string): string =>
   PERSONA_OPTIONS.languages.find((option) => option.value === value)?.label ?? value;
-const lengthLabel = (value: string): string =>
-  PERSONA_OPTIONS.messageLength.find((option) => option.value === value)?.label ?? value;
-const capitalsLabel = (value: string): string =>
-  PERSONA_OPTIONS.capitals.find((option) => option.value === value)?.label ?? value;
 
-/** One line of a block: what she reads, or `null` when nothing is written there (the line is then left out). */
-interface Row {
-  readonly label: string;
-  readonly value: string | null;
+/** What each panel needs to show her corrections and take a new one (recette CREA-01 b). */
+interface Correcting {
+  readonly creatorId: CreatorId;
+  readonly corrections: readonly PersonaCorrection[];
 }
 
-const list = (entries: readonly string[] | undefined): string | null =>
-  entries === undefined || entries.length === 0 ? null : entries.join(', ');
-const text = (value: string | null | undefined): string | null =>
-  value === null || value === undefined || value.trim() === '' ? null : value;
+/**
+ * One answer as she reads it, or `null` when nothing is written (the line is then left out). Her age, never her date
+ * of birth written back to her; her time zone is not in her sheet, and not shown here.
+ */
+function answerOf(question: SheetQuestion, value: Answer | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value)) {
+    const known = value.filter((one) => LANGUAGES.some((language) => language === one));
+    return known.length === 0 ? null : known.map(languageLabel).join(', ');
+  }
+  if (typeof value === 'number') {
+    const shown = value.toLocaleString('fr-FR');
+    return question.key === 'height_m' ? `${shown} m` : question.key === 'weight_kg' ? `${shown} kg` : shown;
+  }
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  return question.kind === 'date' ? (ageLine(value)?.replace(' aujourd’hui', '') ?? null) : value;
+}
 
 /**
- * A block of her sheet: only the lines written, as a list of terms (label, then value), so that a half-filled sheet
- * never reads « rien d'écrit » ten times over (Extension's review of #531). A block with nothing says it once.
+ * A panel of her sheet, Desirali's title over the lines written, as a list of terms (label, then value), so that a
+ * half-filled sheet never reads « rien d'écrit » ten times over (Extension's review of #531). A panel with nothing
+ * says it once. « Proposer une correction » at its foot.
  */
-function Block({
+function Panel({
   section,
-  rows,
+  sheet,
   correcting,
 }: {
-  section: PersonaCorrectionSection;
-  rows: readonly Row[];
+  section: SheetSection;
+  sheet: PersonaSheet;
   correcting: Correcting;
 }): JSX.Element {
-  const title = CORRECTION_SECTION_LABELS[section].hers;
-  const written = rows.filter((row): row is { label: string; value: string } => row.value !== null);
+  const title = panelTitle(section.key);
+  const answers: Readonly<Record<string, Answer>> = sheet[section.key];
+  const written = section.questions.flatMap((question) => {
+    if (question.kind === 'timezone') return [];
+    const value = answerOf(question, answers[question.key]);
+    return value === null ? [] : [{ label: question.kind === 'date' ? 'Âge' : question.label, value }];
+  });
   return (
     <section className="nv-plate mp-block" aria-label={title}>
       <h2 className="mp-block__title">{title}</h2>
@@ -67,7 +86,7 @@ function Block({
       )}
       <ProposeCorrection
         creatorId={correcting.creatorId}
-        section={section}
+        section={section.key}
         title={title}
         corrections={correcting.corrections}
       />
@@ -75,80 +94,13 @@ function Block({
   );
 }
 
-/** What each block needs to show her corrections and take a new one (recette CREA-01 b). */
-interface Correcting {
-  readonly creatorId: CreatorId;
-  readonly corrections: readonly PersonaCorrection[];
-}
-
-function Sheet({ sheet, correcting }: { sheet: CreatorPersonaSheet; correcting: Correcting }): JSX.Element {
-  const { details, lifestyle, tastes, intimate, writing_style: style, limits } = sheet;
-  const samples = sheet.sample_replies.map((sample, index) => ({
-    label: sample.situation ?? (index === 0 ? 'Comme tu réponds' : `Autre réponse (${String(index + 1)})`),
-    value: `« ${sample.reply} »`,
-  }));
+/** Her seven panels, in Desirali's order (ADR 0079 § 6). */
+function Sheet({ sheet, correcting }: { sheet: PersonaSheet; correcting: Correcting }): JSX.Element {
   return (
     <>
-      <Block
-        section="details"
-        correcting={correcting}
-        rows={[
-          { label: 'Prénom', value: text(details.first_name) },
-          { label: 'Langues', value: list(details.languages.map(languageLabel)) },
-          { label: 'Physique', value: text(physiqueSummary(details)) },
-          { label: 'Loisirs', value: list(details.hobbies) },
-          { label: 'Caractère', value: list(details.personality) },
-        ]}
-      />
-      <Block
-        section="limits"
-        correcting={correcting}
-        rows={[
-          { label: 'Ce que tu ne fais jamais', value: list(limits.never_do) },
-          { label: 'Ce que tu ne montres jamais', value: list(limits.never_show) },
-          { label: 'Ce que tu ne dis jamais', value: list(limits.never_say) },
-          { label: 'Ce qui te dégoûte', value: list(limits.disgusts) },
-        ]}
-      />
-      <Block
-        section="lifestyle"
-        correcting={correcting}
-        rows={[
-          { label: 'Ce que tu fais', value: text(lifestyle?.occupation) },
-          { label: 'Où tu vis', value: text(lifestyle?.area) },
-          { label: 'Tes journées', value: text(lifestyle?.routine) },
-          { label: 'Tes projets', value: text(lifestyle?.goals) },
-        ]}
-      />
-      <Block
-        section="tastes"
-        correcting={correcting}
-        rows={[
-          { label: 'Tu aimes', value: list(tastes?.likes) },
-          { label: 'Tu n’aimes pas', value: list(tastes?.dislikes) },
-        ]}
-      />
-      <Block
-        section="intimate"
-        correcting={correcting}
-        rows={[
-          { label: 'Ce qui t’excite', value: list(intimate?.turn_ons) },
-          { label: 'Tes fantasmes', value: list(intimate?.fantasies) },
-          { label: 'Ta façon de sexter', value: text(intimate?.sexting_style) },
-        ]}
-      />
-      <Block
-        section="writing_style"
-        correcting={correcting}
-        rows={[
-          { label: 'Tes messages', value: style === null ? null : lengthLabel(style.message_length) },
-          { label: 'Les majuscules', value: style === null ? null : capitalsLabel(style.capitals) },
-          { label: 'Tes emojis', value: list(style?.emojis_preferred) },
-          { label: 'Jamais ces emojis', value: list(style?.emojis_forbidden) },
-          { label: 'Ta ponctuation', value: text(style?.punctuation) },
-          ...samples,
-        ]}
-      />
+      {PERSONA_SHEET.map((section) => (
+        <Panel key={section.key} section={section} sheet={sheet} correcting={correcting} />
+      ))}
     </>
   );
 }
@@ -193,10 +145,10 @@ function OwnSheet({ creatorId }: { creatorId: CreatorId }): JSX.Element {
 }
 
 /**
- * Moi › Persona, the creator's own (ADR 0042 § 8), in reading only (recette CREA-01, Charles 05/11 « go recos »): who
- * she is, her limits, her life, her tastes and her way of writing, as the agency wrote them. Never its strategies,
+ * Moi › Persona, the creator's own (ADR 0042 § 8), in reading only (recette CREA-01, Charles 05/11 « go recos »): the
+ * seven panels of her sheet (ADR 0079 § 6), as the agency wrote them. Never its strategies,
  * follow-ups or notifications, never a word about who answers for her (ADR 0063); the agency changes the sheet, she
- * proposes a correction under a block (CREA-01 b).
+ * proposes a correction under a panel (CREA-01 b).
  */
 export function MyPersonaPage(): JSX.Element {
   const creators = useCreators();
@@ -208,7 +160,9 @@ export function MyPersonaPage(): JSX.Element {
       <PageHeader
         eyebrow="Moi"
         title="Persona"
-        lead="Ta fiche : qui tu es, ce que tu aimes, tes limites et ta façon d’écrire. Quelque chose ne te ressemble pas ? Propose une correction sous le bloc concerné, l’agence met ta fiche à jour."
+        lead={
+          'Ta fiche, panneau par panneau\u00a0: qui tu es, ta vie, tes goûts, ta façon de parler, tes relations, l’intime et tes zones interdites. Quelque chose ne te ressemble pas\u00a0? Propose une correction sous le panneau concerné, l’agence met ta fiche à jour.'
+        }
         actions={<MeNav creator />}
       />
       <div className="ps-sheet">

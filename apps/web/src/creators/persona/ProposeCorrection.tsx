@@ -9,13 +9,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { correctionsKey, proposeCorrection } from './corrections';
+import { panelOfCorrection } from './model';
 
 const DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
 
 /** A handled correction still shows this long under its section, so that she sees it was taken. */
 const DONE_SHOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
-/** Hers under one section: the open ones, and those handled lately. */
+/**
+ * Hers under one section: the open ones, and those handled lately. One sent on a block of the format-1 sheet shows
+ * under the panel that took that block over (ADR 0079 § 5).
+ */
 export function sectionCorrections(
   all: readonly PersonaCorrection[],
   section: PersonaCorrectionSection,
@@ -23,7 +27,7 @@ export function sectionCorrections(
 ): PersonaCorrection[] {
   return all.filter(
     (one) =>
-      one.section === section &&
+      panelOfCorrection(one.section) === panelOfCorrection(section) &&
       (one.state === 'open' || (one.doneAt !== null && now - Date.parse(one.doneAt) < DONE_SHOWN_MS)),
   );
 }

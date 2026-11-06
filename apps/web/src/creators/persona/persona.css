@@ -220,62 +220,6 @@
     inset 0 1px 0 var(--nv-glass-edge),
     0 1px 3px rgb(0 0 0 / 0.18);
 }
-/* More tabs past an edge: that edge fades instead of cutting a tab in two, and a chevron sits on it (CREA-01). */
-.ps-tabs[data-more='end'] .ps-tabs__bar {
-  mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
-}
-.ps-tabs[data-more='start'] .ps-tabs__bar {
-  mask-image: linear-gradient(to left, #000 calc(100% - 64px), transparent);
-}
-.ps-tabs[data-more='both'] .ps-tabs__bar {
-  mask-image: linear-gradient(to right, transparent, #000 64px, #000 calc(100% - 64px), transparent);
-}
-.ps-tabs__more {
-  --_radius: var(--nv-radius-full);
-  position: absolute;
-  top: 50%;
-  z-index: 2;
-  width: 34px;
-  height: 34px;
-  margin-top: -17px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  color: var(--nv-ink);
-  cursor: pointer;
-  transition: transform var(--nv-dur-fast) var(--nv-ease-spring);
-}
-.ps-tabs__more[data-side='start'] {
-  left: 0;
-}
-.ps-tabs__more[data-side='end'] {
-  right: 0;
-}
-.ps-tabs__more:hover {
-  transform: scale(1.06);
-}
-.ps-tabs__more:active {
-  transform: scale(0.94);
-}
-.ps-tabs__chevron {
-  width: 8px;
-  height: 8px;
-  border-right: 1.75px solid currentColor;
-  border-bottom: 1.75px solid currentColor;
-  transform: translateX(-2px) rotate(-45deg);
-}
-.ps-tabs__more[data-side='start'] .ps-tabs__chevron {
-  transform: translateX(2px) rotate(135deg);
-}
-/* A hidden tab holds fields to fix: its amber count rides on the chevron that leads to it. */
-.ps-tabs__more .ps-tabs__alert {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  background: var(--nv-warning);
-  color: var(--nv-void);
-}
 .ps-tabs__bar .ps-tabs__item {
   appearance: none;
   border: 0;
@@ -287,7 +231,7 @@
   cursor: pointer;
   white-space: nowrap;
   flex: none;
-  /* Tighter than the shell's sub-nav: the eight tabs hold on one line in the sheet's 820 px (CREA-01). */
+  /* Tighter than the shell’s sub-nav, as the sheet’s other tabs. */
   padding: 0 11px;
 }
 /* What is left to fix counts in amber: the shell's neon count is for what waits on someone. */
@@ -912,16 +856,7 @@
   font-size: var(--nv-text-footnote);
 }
 
-/* ── Elle en détail (CREA-02): the five P5-01 blocks, each folded; the block's own lead opens its body. ── */
-.ps-in-depth__lead {
-  padding: 14px 0 6px;
-}
-.ps-in-depth__body > .ps-block:first-child {
-  border-top: 0;
-  padding-top: 4px;
-}
-
-/* ── Completion (P5-01): how much of her the agent can read. Neutral: a share, not a warning nor an action. ── */
+/* ── Completion (ADR 0079 § 6): how much of her sheet is answered, out of 59. Neutral: a share, not a warning nor an action. ── */
 .ps-completion {
   display: flex;
   flex-direction: column;
@@ -959,9 +894,8 @@
 }
 .ps-completion__missing > .ps-muted {
   display: inline;
-  margin-right: 4px;
 }
-/* A block still to write, as a word of the sentence: it opens its tab. */
+/* A panel still to complete, as a word of the sentence: it opens that panel. */
 .ps-completion__block {
   padding: 0;
   border: 0;
@@ -984,62 +918,21 @@
   border-radius: 4px;
 }
 
-/* ── Sample replies: the fields, then the bubble as a fan would read it. ── */
-.ps-replies {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.ps-reply {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
-  grid-template-areas:
-    'fields preview'
-    'remove preview';
-  gap: 10px 18px;
-  padding: 16px;
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
-  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
-}
-.ps-reply__fields {
-  grid-area: fields;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-.ps-reply__preview {
-  grid-area: preview;
-  align-self: center;
-  min-width: 0;
-}
-.ps-reply > .nv-btn {
-  grid-area: remove;
-  justify-self: start;
-}
 @media (max-width: 640px) {
-  .ps-reply {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'fields'
-      'preview'
-      'remove';
-  }
   /* A phone: the summary of a fold goes under its title, on two lines at most, instead of cut short (CREA-26). */
-  .ps-fold > summary {
+  .ps-fold > summary,
+  .ps-moves > summary {
     flex-wrap: wrap;
     row-gap: 2px;
     padding-top: 8px;
     padding-bottom: 8px;
   }
-  .ps-fold > summary > .nv-disclosure__title {
+  .ps-fold > summary > .nv-disclosure__title,
+  .ps-moves > summary > .nv-disclosure__title {
     margin-right: auto;
   }
-  .ps-fold > summary > .nv-disclosure__sum {
+  .ps-fold > summary > .nv-disclosure__sum,
+  .ps-moves > summary > .nv-disclosure__sum {
     order: 1;
     flex: 1 1 100%;
     text-align: left;
@@ -1054,7 +947,7 @@
 @media (prefers-reduced-motion: reduce) {
   .ps-panel,
   .ps-reveal,
-  .ps-reply,
+  .ps-tabpanel,
   .ps-error,
   .ps-entry,
   .ps-picker__list,
@@ -1247,5 +1140,216 @@
   .ps-versions__item > button.ps-versions__end {
     flex-basis: 100%;
     margin-inline-start: 0;
+  }
+}
+
+/* ── Her sheet (ADR 0079): Desirali's seven panels, each a plate that folds under its own header. ── */
+/* Changing tab slides the whole tab in from the side of the tab picked; its plates no longer play on their own. */
+.ps-tabpanel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  animation: nv-enter var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.ps-tabpanel[data-direction='right'] {
+  animation-name: ps-from-right;
+}
+.ps-tabpanel[data-direction='left'] {
+  animation-name: ps-from-left;
+}
+.ps-tabpanel .ps-panel {
+  animation: none;
+}
+.ps-agent-lead {
+  padding: 14px 0 2px;
+}
+.ps-panels {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ps-sheet-panel {
+  --_radius: var(--nv-radius-xl);
+  min-width: 0;
+}
+.ps-sheet-panel__heading {
+  margin: 0;
+  font: inherit;
+}
+/* The whole header folds the panel: icon, title, then what is left to fix, the share answered and the chevron. */
+.ps-sheet-panel__toggle {
+  appearance: none;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 10px 18px 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: var(--_radius);
+  background: none;
+  font: inherit;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ps-sheet-panel__toggle:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.ps-sheet-panel__icon {
+  flex: none;
+  color: var(--nv-ink-muted);
+}
+.ps-sheet-panel__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-wrap: balance;
+}
+.ps-sheet-panel__meta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* What is left to fix counts in amber, as on the tabs. */
+.ps-sheet-panel__meta .nv-subnav__count {
+  background: var(--nv-warning);
+  color: var(--nv-void);
+}
+.ps-sheet-panel__count {
+  font-size: var(--nv-text-footnote);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink-faint);
+}
+.ps-sheet-panel__chevron {
+  width: 8px;
+  height: 8px;
+  margin: 0 2px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  color: var(--nv-ink-faint);
+  transform: translateY(-2px) rotate(45deg);
+  transition:
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.ps-sheet-panel__toggle:hover .ps-sheet-panel__chevron {
+  color: var(--nv-ink);
+}
+.ps-sheet-panel[data-open='true'] .ps-sheet-panel__chevron {
+  transform: translateY(2px) rotate(225deg);
+}
+/* Desirali's widths: a third, a half or the whole line, on a grid of six. */
+.ps-sheet-panel__body {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 18px 16px;
+  padding: 18px 20px 22px;
+  border-top: 1px solid var(--nv-hairline);
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.ps-sheet-panel__body--bare {
+  border-top: 0;
+  animation: none;
+}
+.ps-q {
+  grid-column: span 6;
+  min-width: 0;
+}
+.ps-q[data-width='half'] {
+  grid-column: span 3;
+}
+.ps-q[data-width='third'] {
+  grid-column: span 2;
+}
+.ps-field__icon {
+  flex: none;
+  color: var(--nv-ink-faint);
+}
+/* A free answer grows with what is written: no handle, no scroll bar, the count under the last line. */
+.ps-answer.nv-field__control {
+  display: block;
+  min-height: var(--nv-target-min);
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+  line-height: 22px;
+}
+/* A long answer starts on three lines, its count under them. */
+.ps-area[data-long='true'] .ps-answer.nv-field__control {
+  min-height: calc(3 * 22px + 11px + 26px);
+}
+.ps-area:has(.ps-area__count) .ps-answer.nv-field__control {
+  padding-bottom: 26px;
+}
+.ps-number__input--free {
+  width: auto;
+  text-align: left;
+}
+/* No steppers around a free number: the text keeps the inset of every other field. */
+.ps-number.nv-field__control:has(.ps-number__input--free) {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+/* A panel still to complete keeps its comma: never a line that starts with one. */
+.ps-completion__missing > span {
+  white-space: nowrap;
+}
+.ps-completion__count {
+  font-variant-numeric: tabular-nums;
+}
+/* What the passage to the new sheet moved: each line opens its question. */
+.ps-moves {
+  align-self: stretch;
+}
+.ps-moves__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ps-moves__list .ps-completion__block {
+  text-align: left;
+}
+.ps-moves__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+@media (max-width: 640px) {
+  .ps-sheet-panel__toggle {
+    padding-left: 16px;
+    padding-right: 14px;
+  }
+  .ps-sheet-panel__body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* A phone: two thirds side by side (sizes), every other answer on its own line. */
+  .ps-q[data-width='half'] {
+    grid-column: span 6;
+  }
+  .ps-q[data-width='third'] {
+    grid-column: span 3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-sheet-panel__body {
+    animation: none;
+  }
+  .ps-sheet-panel__chevron {
+    transition: none;
   }
 }
