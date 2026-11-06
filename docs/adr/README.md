@@ -96,3 +96,4 @@ Date : AAAA-MM-JJ
 | 0070 | Une vidéo déposée pèse jusqu'à 10 Go et vient dans tout format courant ; ce que les plateformes ne lisent pas est converti en MP4 | accepted (précise 0055 § 2 et § 3) |
 | 0071 | Une créatrice se renomme et s'archive, sans rien supprimer, et l'e-mail d'un accès pas encore utilisé se corrige | accepted (précise 0042 § 1 et 0069 § 5) |
 | 0072 | Paie : le relevé final d'un membre parti est celui de la quinzaine de son départ, et son solde négatif s'éteint | accepted (amende 0039 § 6, précise 0038 et 0023) |
+| 0073 | Rapport déclaré sur Reveal : l'écart avec les ventes lues se voit, s'explique et se tranche par un humain | accepted (remplace dans 0043 § 4 le contrôle d'un compte Reveal en « déclaré », précise 0023, 0050 et 0018) |

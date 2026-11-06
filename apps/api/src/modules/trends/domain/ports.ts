@@ -4,7 +4,7 @@ import type {
   ContentIdeaList,
   ContentIdeaState,
   CreatorId,
-  DropCategory,
+  IdeaDropCategory,
   ExtensionLink,
   ExtensionLinkCreated,
   ExtensionLinkId,
@@ -131,7 +131,7 @@ interface FollowedIdea {
   readonly id: string;
   readonly creatorId: string;
   readonly state: ContentIdeaState;
-  readonly category: DropCategory;
+  readonly category: IdeaDropCategory;
   readonly title: string;
   readonly requestId: string | null;
 }

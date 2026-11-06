@@ -2,7 +2,7 @@ import { ContentIdeaOfDaySchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
-  correctableCategories,
+  CORRECTABLE_CATEGORIES,
   correctionOf,
   draftOf,
   draftProblems,
@@ -101,9 +101,7 @@ describe('a corrected idea', () => {
 
 describe('the categories of a correction', () => {
   it('never offers « Script »: a script comes from the agency’s structures (ADR 0056)', () => {
-    expect(correctableCategories('feed_shoot')).not.toContain('script');
-    expect(correctableCategories('feed_shoot')).toContain('feed_shoot');
-    // An idea that already says it keeps it shown.
-    expect(correctableCategories('script')).toContain('script');
+    expect(CORRECTABLE_CATEGORIES).not.toContain('script');
+    expect(CORRECTABLE_CATEGORIES).toContain('feed_shoot');
   });
 });
