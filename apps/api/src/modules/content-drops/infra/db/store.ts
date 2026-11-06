@@ -1,6 +1,7 @@
 import {
   JOB_MAX_ATTEMPTS,
   AuditEntryIdSchema,
+  calendarDayAt,
   EventIdSchema,
   MediaAssetIdSchema,
   type DropFileState,
@@ -50,6 +51,7 @@ import {
   ContentDropScriptUnprocessable,
   ContentDropSettled,
   ContentRequestClosed,
+  ContentRequestDueUnprocessable,
   ContentRequestIdConflict,
   ContentRequestNotFound,
   ContentRequestStructureUnprocessable,
@@ -568,7 +570,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (updated === undefined) throw new ContentDropNotFound();
         return viewOf(tx, updated);
       }),
-    ask: (creatorId, userId, body: CreateContentRequestBody, freeze) =>
+    ask: (creatorId, userId, body: CreateContentRequestBody, freeze, now) =>
       asTeam(creatorId, userId, async (tx) => {
         const [known] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));
         if (known !== undefined) {
@@ -580,6 +582,14 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
           if (!same) throw new ContentRequestIdConflict();
           return requestOf(known, null);
         }
+        // Never for a day already past where she lives (recette MED-10): it would be late as it is born.
+        const [creator] = await tx
+          .select({ timezone: schema.creators.timezone })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        // `asTeam` has read her already: missing here, she is gone, and the request is refused like any other.
+        if (creator === undefined) throw new ContentDropForbidden();
+        if (body.dueOn < calendarDayAt(now, creator.timezone)) throw new ContentRequestDueUnprocessable();
         if (body.structureId !== null) {
           // The library's structure, read by the team's policy: not archived, kept for no other creator.
           const [structure] = await tx

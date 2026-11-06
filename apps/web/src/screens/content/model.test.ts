@@ -131,6 +131,13 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(dueOf('2026-11-09', '2026-11-05')).toEqual({ text: 'Pour lundi', late: false });
     expect(dueOf('2026-11-20', '2026-11-05')).toEqual({ text: 'Pour le 20 nov.', late: false });
     expect(dueOf('2026-11-02', '2026-11-05')).toEqual({ text: 'En retard depuis lundi', late: true });
+    // Another year's day says its year (recette MED-10).
+    expect(dueOf('2026-01-01', '2026-11-05')).toEqual({ text: 'En retard depuis le 1 janv.', late: true });
+    expect(dueOf('2025-01-01', '2026-11-05')).toEqual({
+      text: 'En retard depuis le 1 janv. 2025',
+      late: true,
+    });
+    expect(dueOf('2027-01-08', '2026-11-05')).toEqual({ text: 'Pour le 8 janv. 2027', late: false });
   });
 
   it('says when she dropped it, in her own time', () => {

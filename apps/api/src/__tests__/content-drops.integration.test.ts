@@ -26,6 +26,9 @@ import { buildServer, type Server } from '../server';
 import { testConfig } from './support/config';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
+/** A day ahead of the server's real clock: a request is never asked for a day already past (recette MED-10). */
+const DUE_ON = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+
 const PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 const MB = 1024 * 1024;
@@ -240,7 +243,7 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     const asked = {
       id: newId(ContentRequestIdSchema),
       category: 'script',
-      dueOn: '2026-11-10',
+      dueOn: DUE_ON,
       reason: 'Ton prochain script : la douche',
       structureId,
     };
@@ -279,6 +282,17 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
       expect(refused.statusCode, refused.body).toBe(422);
       expect(refused.json()).toMatchObject({ error: { code: 'content_request_structure_unprocessable' } });
     }
+    // Never for a day already past where she lives (recette MED-10); the same id replayed still answers.
+    const past = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
+      ...asked,
+      id: newId(ContentRequestIdSchema),
+      dueOn: new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10),
+    });
+    expect(past.statusCode, past.body).toBe(422);
+    expect(past.json()).toMatchObject({ error: { code: 'content_request_due_unprocessable' } });
+    expect((await call('POST', `/v1/creators/${nora}/content-requests`, 'manager', asked)).statusCode).toBe(
+      200,
+    );
     const answer = {
       id: newId(ContentDropIdSchema),
       category: 'script',
@@ -350,7 +364,7 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     const asked = {
       id: newId(ContentRequestIdSchema),
       category: 'mass_dm',
-      dueOn: '2026-11-08',
+      dueOn: DUE_ON,
       reason: 'Plus que deux relances en stock',
     };
     expect((await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', asked)).statusCode).toBe(
