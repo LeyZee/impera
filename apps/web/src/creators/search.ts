@@ -5,18 +5,19 @@ import { CreatorIdSchema, type CreatorId, type Me } from '@impera/contracts';
  * reload or a step back lands on the same sheet of the same creator (lessons of #217 and of the recette 28/10).
  */
 export interface CreatorsSearch {
-  readonly onglet?: 'heures' | 'acces' | 'pourcentage' | 'agenda' | 'profil';
+  readonly onglet?: 'heures' | 'acces' | 'pourcentage' | 'agenda' | 'idees' | 'profil';
   readonly creatrice?: CreatorId;
 }
 
 /** The sheets of a creator, and their slug in the address; the persona has none. */
-export type CreatorSheet = 'persona' | 'hours' | 'access' | 'rate' | 'agenda' | 'profile';
+export type CreatorSheet = 'persona' | 'hours' | 'access' | 'rate' | 'agenda' | 'ideas' | 'profile';
 
 const SLUGS = {
   hours: 'heures',
   access: 'acces',
   rate: 'pourcentage',
   agenda: 'agenda',
+  ideas: 'idees',
   profile: 'profil',
 } as const;
 const SHEETS = {
@@ -24,19 +25,28 @@ const SHEETS = {
   acces: 'access',
   pourcentage: 'rate',
   agenda: 'agenda',
+  idees: 'ideas',
   profil: 'profile',
 } as const;
 
-const ALL_SHEETS: readonly CreatorSheet[] = ['persona', 'hours', 'access', 'rate', 'agenda', 'profile'];
+const ALL_SHEETS: readonly CreatorSheet[] = [
+  'persona',
+  'hours',
+  'access',
+  'rate',
+  'agenda',
+  'ideas',
+  'profile',
+];
 
 /**
  * The sheets a member opens: all of them for the owner; her agenda alone for an active manager (CR-05 lot c, Charles,
- * 05/11 17h22: « Ouvrir aux managers », the other sheets stay the owner's); the persona alone for anyone else. The
- * first one is where Créatrices opens.
+ * 05/11 17h22: « Ouvrir aux managers », the other sheets stay the owner's) and her ideas of the day (VEI-02, ADR 0060
+ * § 5: the owner's and the managers'); the persona alone for anyone else. The first one is where Créatrices opens.
  */
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
-  return user.teamScope === 'agency' ? ['agenda'] : ['persona'];
+  return user.teamScope === 'agency' ? ['agenda', 'ideas'] : ['persona'];
 }
 
 /** Anything but a known tab reads as the persona; anything but a creator id, as no creator picked. */
@@ -48,6 +58,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     tab === SLUGS.access ||
     tab === SLUGS.rate ||
     tab === SLUGS.agenda ||
+    tab === SLUGS.ideas ||
     tab === SLUGS.profile
       ? { onglet: tab }
       : {}),

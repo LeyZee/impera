@@ -265,14 +265,21 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
   });
 
-  it('opens on her agenda alone for an active manager, the persona and the other sheets the owner’s', async () => {
+  it('opens on her agenda for an active manager, beside her ideas; the persona and the other sheets the owner’s', async () => {
     await serve([ANNA]);
     const router = renderAt(manager, `/creatrices?creatrice=${ANNA.id}`);
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
     });
     expect(await screen.findByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
-    expect(screen.queryByRole('navigation', { name: 'Fiche de la créatrice' })).toBeNull();
+    const sheets = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
+    expect(
+      within(sheets)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Agenda', 'Idées du jour']);
+    router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
+    expect(await screen.findByText('Ses idées du jour')).toBeDefined();
     for (const onglet of ['pourcentage', 'acces', 'heures']) {
       router.history.push(`/creatrices?onglet=${onglet}&creatrice=${ANNA.id}`);
       await waitFor(() => {

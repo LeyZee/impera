@@ -1,6 +1,7 @@
 import type { AccountSecurity, OpenSession, Passkey } from '@impera/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
+import { ExtensionLinksPanel } from './ExtensionLinksPanel';
 import {
   closeAccountSessions,
   closeOtherSessions,
@@ -40,15 +41,23 @@ const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
  * factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
- * (no geographic base: Charles's choice of 02/11).
+ * (no geographic base: Charles's choice of 02/11). The owner and the managers also link here the browsers where they
+ * watch Instagram (`extensionLinks`, VEI-02): the watch is theirs.
  */
-export function SecuritySection({ ownerId }: { ownerId?: string }): JSX.Element {
+export function SecuritySection({
+  ownerId,
+  extensionLinks = false,
+}: {
+  ownerId?: string;
+  extensionLinks?: boolean;
+}): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <SessionsPanel />
       <PasskeysPanel />
       <BackupCodesPanel />
       {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
+      {extensionLinks ? <ExtensionLinksPanel /> : null}
     </div>
   );
 }

@@ -16,10 +16,14 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
       <PageHeader
         eyebrow="Moi"
         title="Sécurité"
-        lead="Les appareils où ton compte est ouvert, et tes codes de secours."
+        lead={
+          user.teamScope === 'agency'
+            ? 'Les appareils où ton compte est ouvert, tes codes de secours et l’extension de veille.'
+            : 'Les appareils où ton compte est ouvert, et tes codes de secours.'
+        }
         actions={<MeNav manager={user.teamScope === 'agency'} creator={user.role === 'creator'} />}
       />
-      <SecuritySection />
+      <SecuritySection extensionLinks={user.teamScope === 'agency'} />
     </Page>
   );
 }
