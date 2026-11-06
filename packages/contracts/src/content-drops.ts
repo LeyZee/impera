@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
 import { ContentDropFileIdSchema, ContentDropIdSchema, ContentRequestIdSchema } from './ids';
-import { ScriptStructureIdSchema, ScriptStructureVersionIdSchema } from './scripts';
+import {
+  ScriptSegmentSchema,
+  ScriptSlotKeySchema,
+  ScriptStructureIdSchema,
+  ScriptStructureVersionIdSchema,
+  type MediaSlot,
+} from './scripts';
 
 /**
  * The closed list of drop categories (ADR 0055 § 1, glossary « Catégorie de dépôt »): the creator chooses it, the code
@@ -264,6 +270,8 @@ export function probedFileRefusal(category: DropCategory, file: ProbedDropFile):
  * reason, and withdrawn (it leaves her screen, its trace stays).
  */
 export const DROP_STATES = [
+  // A script she is still filling, slot by slot (SC-02 lot b): nothing goes to the agency until she sends it.
+  'filling',
   'uploading',
   'received',
   'ready',
@@ -277,6 +285,7 @@ export type DropState = z.infer<typeof DropStateSchema>;
 
 /** The states she may still withdraw a drop from herself: nothing is scheduled nor out yet. */
 export const WITHDRAWABLE_DROP_STATES: ReadonlySet<DropState> = new Set([
+  'filling',
   'uploading',
   'received',
   'ready',
@@ -302,6 +311,8 @@ export const ContentDropFileSchema = z.strictObject({
   bytes: z.number().int().min(1),
   state: DropFileStateSchema,
   refusal: DropRefusalSchema.nullable(),
+  /** The slot of her script it fills (SC-02 lot b); `null` outside a script. */
+  slotKey: ScriptSlotKeySchema.nullable(),
 });
 export type ContentDropFile = z.infer<typeof ContentDropFileSchema>;
 
@@ -340,6 +351,68 @@ export const CreateContentDropBodySchema = z.strictObject({
   files: z.array(DeclaredDropFileSchema).min(1).max(60),
 });
 export type CreateContentDropBody = z.infer<typeof CreateContentDropBodySchema>;
+
+/** `POST /v1/creator-space/content/script-drops`: her script begun from its request, empty, under her phone's id. */
+export const StartScriptDropBodySchema = z.strictObject({
+  id: ContentDropIdSchema,
+  requestId: ContentRequestIdSchema,
+});
+export type StartScriptDropBody = z.infer<typeof StartScriptDropBodySchema>;
+
+/** `PUT …/script-drops/:dropId/slots/:slotKey`: the file she chose for a slot, declared before it goes up. */
+export const FillScriptSlotBodySchema = DeclaredDropFileSchema.extend({});
+export type FillScriptSlotBody = z.infer<typeof FillScriptSlotBodySchema>;
+
+export const ScriptSlotParamsSchema = z.strictObject({
+  dropId: ContentDropIdSchema,
+  slotKey: ScriptSlotKeySchema,
+});
+
+/**
+ * Her script drop as her flow reads it (ADR 0056 § 4): the drop, and the frozen version she shoots, its segments as the
+ * cards show them. Never the agency's library: only the version of her request.
+ */
+export const ScriptDropSchema = z.strictObject({
+  drop: ContentDropSchema,
+  name: z.string(),
+  segments: z.array(ScriptSegmentSchema),
+});
+export type ScriptDrop = z.infer<typeof ScriptDropSchema>;
+
+/**
+ * Why a file does not go in a slot, in her words; `null` when it goes. Its kind first (a photo in a video slot), then
+ * the script category's rules (weight).
+ */
+export function slotFileRefusal(slot: MediaSlot, file: DeclaredDropFile): string | null {
+  const kind = kindOfMime(file.mime);
+  if (kind !== slot.kind) return `Cet emplacement attend ${KIND_SINGULARS[slot.kind].toLowerCase()}`;
+  return declaredFileRefusal('script', file);
+}
+
+/** A slot's lengths, in seconds: a video's both ends, a vocal's longest (and at least a second). */
+export interface SlotLengths {
+  readonly minSeconds: number;
+  readonly maxSeconds: number;
+}
+
+/** The lengths a file of this slot keeps, `null` for a photo. */
+export function slotLengths(slot: MediaSlot): SlotLengths | null {
+  if (slot.kind === 'video') return { minSeconds: slot.minSeconds, maxSeconds: slot.maxSeconds };
+  if (slot.kind === 'audio') return { minSeconds: 1, maxSeconds: slot.maxSeconds };
+  return null;
+}
+
+/**
+ * Why a video or a vocal does not fit its slot's lengths, read on the cleaned file; `null` when it fits, or for a file
+ * without lengths to keep (a photo, a drop outside a script).
+ */
+export function slotDurationRefusal(lengths: SlotLengths | null, durationMs: number | null): string | null {
+  if (lengths === null || durationMs === null) return null;
+  const seconds = durationMs / 1000;
+  if (seconds < lengths.minSeconds) return `Cet emplacement attend au moins ${String(lengths.minSeconds)} s`;
+  if (seconds > lengths.maxSeconds) return `Cet emplacement attend au plus ${String(lengths.maxSeconds)} s`;
+  return null;
+}
 
 /** `details` of a 422 `content_drop_format_unprocessable`: each refused file with its sentence, or the whole drop. */
 export const ContentDropRefusalsSchema = z.strictObject({
@@ -422,6 +495,10 @@ export const CONTENT_DROP_SCRIPT_UNPROCESSABLE = 'content_drop_script_unprocessa
 export const CONTENT_DROP_REQUEST_UNPROCESSABLE = 'content_drop_request_unprocessable';
 export const CONTENT_DROP_SETTLED_CONFLICT = 'content_drop_settled_conflict';
 export const CONTENT_DROP_FORBIDDEN = 'content_drop_forbidden';
+/** The slot named is not one of her script's (SC-02 lot b). */
+export const CONTENT_DROP_SLOT_NOT_FOUND = 'content_drop_slot_not_found';
+/** « Envoyer le script » with a required slot still empty: `details.slotKeys`. */
+export const CONTENT_DROP_SLOTS_UNPROCESSABLE = 'content_drop_slots_unprocessable';
 export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';

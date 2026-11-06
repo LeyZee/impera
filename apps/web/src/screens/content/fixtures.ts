@@ -40,6 +40,7 @@ export const fileOf = (fields: Partial<ContentDropFile> = {}): ContentDropFile =
     bytes: 4_000_000,
     state: 'kept',
     refusal: null,
+    slotKey: null,
     ...fields,
   });
 

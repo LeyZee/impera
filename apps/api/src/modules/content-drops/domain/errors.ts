@@ -8,6 +8,8 @@ import {
   CONTENT_DROP_REQUEST_UNPROCESSABLE,
   CONTENT_DROP_SCRIPT_UNPROCESSABLE,
   CONTENT_DROP_SETTLED_CONFLICT,
+  CONTENT_DROP_SLOT_NOT_FOUND,
+  CONTENT_DROP_SLOTS_UNPROCESSABLE,
   CONTENT_DROP_STORAGE_UNAVAILABLE,
   CONTENT_DROP_UPLOAD_UNPROCESSABLE,
   CONTENT_REQUEST_CLOSED_CONFLICT,
@@ -147,3 +149,23 @@ export class UnreadableFile extends Error {}
  * (relecture Bilan de #525): thrown, the job's retry finds the medium erased and writes the bytes again.
  */
 export class MediumErasedMeanwhile extends Error {}
+
+/** A slot her script does not have (SC-02 lot b). */
+export class ContentDropSlotNotFound extends DomainError {
+  constructor() {
+    super(CONTENT_DROP_SLOT_NOT_FOUND, 'Cet emplacement n’est pas dans ton script');
+  }
+}
+
+/** « Envoyer le script » with a required slot still empty, or holding a refused file (ADR 0056 § 4). */
+export class ContentDropSlotsUnprocessable extends DomainError {
+  constructor(slotKeys: readonly string[]) {
+    super(
+      CONTENT_DROP_SLOTS_UNPROCESSABLE,
+      'Il reste des emplacements à remplir avant d’envoyer ton script',
+      {
+        details: { slotKeys },
+      },
+    );
+  }
+}

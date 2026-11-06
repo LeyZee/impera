@@ -48,6 +48,7 @@ describe('content-drops › content_drops.receive_file and content_drops.convert
       fileState: 'received',
       dropState: 'received',
       category: 'feed_shoot',
+      lengths: null,
     };
     const refuse = (what: string) => (): Promise<never> => Promise.reject(new Error(`${what} not expected`));
     const storage: DropStorage = {
