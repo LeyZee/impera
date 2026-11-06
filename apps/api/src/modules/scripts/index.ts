@@ -8,7 +8,7 @@ import type { LimitsOf, RasterizeCard, ScriptRequests, ScriptStructureStore } fr
 import { createCardRasterizer } from './infra/card-rasterizer';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
-import { createFrozenVersionReader } from './infra/db/version-reader';
+import { createFrozenVersionReader, createRequestFreezer } from './infra/db/version-reader';
 import { createScriptRoutes, type RequireRole } from './infra/http/routes';
 
 export interface ScriptsModule {
@@ -17,6 +17,8 @@ export interface ScriptsModule {
   readonly structures: ScriptStructureStore;
   /** A frozen version by its id, whoever reads it (SC-02 lot b): what her script drop shoots. `null` when not frozen. */
   frozenVersion(versionId: string): Promise<ScriptStructureVersion | null>;
+  /** The latest version frozen for a script asked by hand (SC-02 lot b), by an owner or a manager; `null` when archived. */
+  freezeForRequest(structureId: string, userId: string): Promise<string | null>;
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
   readonly routes: FastifyPluginAsyncZod;
   readonly jobs: {
@@ -48,6 +50,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
     name: 'scripts',
     structures,
     frozenVersion: createFrozenVersionReader(deps.adminDb),
+    freezeForRequest: createRequestFreezer(deps.adminDb),
     routes: createScriptRoutes(
       structures,
       deps.limitsOf,

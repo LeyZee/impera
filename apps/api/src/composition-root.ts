@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { JOB_PAYLOADS, ScriptStructureIdSchema } from '@impera/contracts';
+import { JOB_PAYLOADS } from '@impera/contracts';
 import { createDbClient, type Database, type DbClient } from '@impera/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -294,10 +294,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const contentDrops = wireContentDrops(shared, {
     scriptVersions: {
       frozen: (versionId) => scripts.module.frozenVersion(versionId),
-      freeze: async (structureId, userId) => {
-        const id = ScriptStructureIdSchema.safeParse(structureId);
-        return id.success ? ((await scripts.module.structures.freeze(id.data, userId))?.id ?? null) : null;
-      },
+      freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
   });
   const scripts = wireScripts(shared, {
