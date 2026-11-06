@@ -924,9 +924,13 @@
     padding-top: 8px;
     padding-bottom: 8px;
   }
-  .ps-moves > summary {
-    padding-top: 12px;
-    padding-bottom: 10px;
+  /* Its head breathes as the sheet's panel heads do: as much room above the title as on its sides. */
+  .ps-moves.nv-disclosure > summary {
+    padding: 14px 14px 10px 16px;
+  }
+  .ps-moves > .nv-disclosure__body {
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .ps-fold > summary > .nv-disclosure__title,
   .ps-moves > summary > .nv-disclosure__title {
