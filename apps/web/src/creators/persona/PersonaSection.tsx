@@ -19,6 +19,7 @@ import {
 import { SaveBar, useOnScreen } from '../SaveBar';
 
 import { CorrectionsPanel } from './CorrectionsPanel';
+import { Versions } from './Versions';
 import {
   InDepthTab,
   IntimateTab,
@@ -68,6 +69,7 @@ import {
 
 import { fullDay } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
+import { Dialog } from '@/shell/Dialog';
 import './persona.css';
 
 /**
@@ -164,6 +166,10 @@ const CONFLICT =
 const ACTIVATION_CONFLICT =
   'Sa version active a changé depuis l’ouverture de cette page, sans doute dans un autre onglet. Rien n’a été activé : recharge pour voir où elle en est.';
 
+/** A version stored before a guard changed: its sample replies teach what the agent may no longer write (P5-01). */
+const activationRefused = (version: string): string =>
+  `La version ${version} n’est pas activée : une de ses réponses types contient ce que l’agent n’a plus le droit d’écrire. Corrige-la dans une nouvelle version.`;
+
 const READ_ONLY = 'Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.';
 
 function Editor({
@@ -202,8 +208,11 @@ function Editor({
   const saved = ready.persona;
   const [draft, setDraft] = useState(saved);
   const [saving, setSaving] = useState(false);
-  /** Activating asked for the password again (a sign-in over 10 minutes old): the prompt shows under the head. */
-  const [reauth, setReauth] = useState(false);
+  /**
+   * The version whose activation asked for the password again (a sign-in over 10 minutes old): the prompt shows under
+   * the head, and activates it once confirmed.
+   */
+  const [reauth, setReauth] = useState<PersonaVersionSummary | null>(null);
   /** Why the last save did not go through, and whether reloading is the way out. */
   const [problem, setProblem] = useState<{ text: string; reload: boolean } | null>(null);
   /** Which way the panel slides in: towards the tab picked, like a page turning. */
@@ -356,8 +365,8 @@ function Editor({
     onEdit();
   };
 
-  const activate = async (): Promise<void> => {
-    const version = ready.versions[0];
+  /** Her newest version from the head, or an older one put back in service from « Ses versions » (AGT-07). */
+  const activate = async (version: PersonaVersionSummary | undefined): Promise<void> => {
     if (creatorId === null || version === undefined) return;
     setSaving(true);
     setProblem(null);
@@ -368,13 +377,14 @@ function Editor({
     );
     setSaving(false);
     if (result === 'activated') onActivated(version.version);
-    else if (result === 'reauth') setReauth(true);
+    else if (result === 'reauth') setReauth(version);
     else if (result === 'conflict') setProblem({ text: ACTIVATION_CONFLICT, reload: true });
+    else if (result === 'refused') setProblem({ text: activationRefused(version.version), reload: false });
     else {
       setProblem({
         text:
           result === 'forbidden'
-            ? 'Seuls le propriétaire et la créatrice peuvent activer sa persona.'
+            ? 'Seul le propriétaire choisit la version avec laquelle l’agent écrit.'
             : 'Rien n’a été activé : Impera ne répond pas. Réessaie dans un instant.',
         reload: false,
       });
@@ -437,7 +447,7 @@ function Editor({
             void save();
           }}
           onActivate={() => {
-            void activate();
+            void activate(ready.versions[0]);
           }}
           onReload={onReload}
           onReset={reset}
@@ -476,18 +486,28 @@ function Editor({
             </div>
           </div>
         )}
-        {reauth ? (
-          <PasswordPrompt
-            lead="Cette version parlera à tous ses fans : pour l’activer, confirme ton mot de passe et ton code."
-            onConfirmed={() => {
-              setReauth(false);
-              void activate();
-            }}
-            onCancel={() => {
-              setReauth(false);
+        {ready.source === 'api' ? (
+          <Versions
+            versions={ready.versions}
+            canActivate={canSave}
+            busy={saving}
+            onActivate={(version) => {
+              void activate(version);
             }}
           />
         ) : null}
+        {reauth === null ? null : (
+          <ActivationConfirm
+            version={reauth.version}
+            onConfirmed={() => {
+              setReauth(null);
+              void activate(reauth);
+            }}
+            onCancel={() => {
+              setReauth(null);
+            }}
+          />
+        )}
         {creatorId !== null && readsCorrections ? (
           <CorrectionsPanel
             creatorId={creatorId}
@@ -572,6 +592,38 @@ function Editor({
 const CONFIRM_MS = 4000;
 
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
+
+/**
+ * Her persona speaks to every fan: an activation on a sign-in over 10 minutes old asks the password and the code again
+ * (audit de sécurité du 02/11, M1), in a dialog that names the version it activates, as « Passer en Automatique ».
+ */
+function ActivationConfirm({
+  version,
+  onConfirmed,
+  onCancel,
+}: {
+  version: string;
+  onConfirmed: () => void;
+  onCancel: () => void;
+}): JSX.Element {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Dialog
+      title={`Activer la version ${version}`}
+      lead={`L’agent écrira avec elle à tous ses fans. Pour l’activer, confirme ton mot de passe et ton code.`}
+      busy={busy}
+      onClose={onCancel}
+    >
+      <PasswordPrompt
+        layout="dialog"
+        lead={null}
+        onConfirmed={onConfirmed}
+        onCancel={onCancel}
+        onBusyChange={setBusy}
+      />
+    </Dialog>
+  );
+}
 
 /** What the note under the head says: where this persona comes from and what a save does. */
 function noteOf(ready: PersonaReady, known: boolean, upcoming: string): string {

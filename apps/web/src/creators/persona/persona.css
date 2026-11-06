@@ -1220,3 +1220,63 @@
     align-items: stretch;
   }
 }
+
+/*
+ * Her versions (recette AGT-07), folded under the head: one line each, its number, its day, then « Active » or
+ * « Réactiver la version N » at its end. On a phone the action goes under the number and the day.
+ */
+.ps-versions {
+  --_radius: var(--nv-radius-xl);
+  padding: 6px 8px;
+}
+.ps-versions__lead {
+  margin: 0;
+}
+.ps-versions__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.ps-versions__item {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--nv-space-3);
+  row-gap: var(--nv-space-1);
+  padding: var(--nv-space-2) 0;
+  border-top: 1px solid var(--nv-plate-edge);
+}
+.ps-versions__name {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ps-versions__when {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+/* Two classes: a button's own margin would win over one. */
+.ps-versions__item > .ps-versions__end {
+  flex: none;
+  margin-inline-start: auto;
+}
+.ps-versions__note {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+@media (max-width: 640px) {
+  .ps-versions {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .ps-versions__item {
+    padding: var(--nv-space-3) 0;
+  }
+  .ps-versions__item > button.ps-versions__end {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+  }
+}
