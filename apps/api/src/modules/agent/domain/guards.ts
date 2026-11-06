@@ -186,7 +186,7 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'off_platform_payment',
     pattern:
-      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|(par|sur|via|avec|mon|ton|en|on|by|through|my|your) wise|wise (transfer|account|compte|tag)|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
+      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|(par|sur|via|avec|mon|ton|en|t'?as|tu as|on|by|through|my|your|got) wise|wise (transfer|account|compte|tag)|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
   },
   // A price is the script's, set in code and carried by the offer itself: never a sum in her words (recette MOT-04,
   // Charles 05/11). Her thanks for a tip (« merci pour les 20 € 🥰 ») pass.

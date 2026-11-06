@@ -204,6 +204,8 @@ describe('voice guards', () => {
       ['Mon P4yP4l c’est mon prénom'],
       ['Tu peux passer par Wise'],
       ['send it with a wise transfer'],
+      ['T’as Wise ?'],
+      ['tu as wise bb ?'],
     ]) {
       expect(codes(bubbles), bubbles.join(' / ')).toContain('off_platform_payment');
     }
@@ -211,6 +213,7 @@ describe('voice guards', () => {
     // « Wise » the word, not the bank, to an English-speaking fan.
     expect(codes(['That’s wise of you 😏'])).toEqual([]);
     expect(codes(['wise choice babe'])).toEqual([]);
+    expect(codes(['you are as wise as you are cute'])).toEqual([]);
   });
 
   it('blocks a price in her words, the offer carries it; her thanks for a tip pass (recette MOT-04)', () => {
