@@ -67,7 +67,7 @@ La prochaine réponse se choisit avec `/__/ai/next` (`GET /__/ai` montre celle q
 | `{"reply":"rate_limited"}`  | Le prochain appel reçoit un 429 avec `retry-after: 1`                 | La passerelle attend et redemande : `rate_limited` puis `ok` au journal                                  |
 | `{"reply":"neutral"}`       | Annule ce qui était prévu                                             | —                                                                                                        |
 
-Chaque réponse piégée ne sert qu'une fois : l'appel suivant redevient calme. Les réponses ne disent rien de la qualité de l'IA (ADR 0075, conséquences) : elle se mesure par `pnpm evals` avec une vraie clé.
+Chaque réponse piégée ne sert qu'une fois : l'appel suivant redevient calme. Le choix vaut pour toute la pile, quelle que soit la créatrice ou la session qui fait l'appel suivant : deux recettes jouées en même temps sur la même pile se prennent leurs pièges. Seul xAI génère : Google et Mistral restent en panne (503), donc les sens passent par leur repli xAI, et la clé « limitée » (429 à 30 s, au-delà du plafond d'attente de 10 s) n'est pas rejouée. Les réponses ne disent rien de la qualité de l'IA (ADR 0075, conséquences) : elle se mesure par `pnpm evals` avec une vraie clé.
 
 ## Pour le lot Agent
 
