@@ -1,0 +1,7 @@
+# 2026-11-06 · SEC-05 lot 3 : mot de passe oublié, le lien envoyé en privé sur Telegram (ADR 0068 §§ 2–5)
+
+- Fil : Bilan. Branche `claude/project-thread-a8l1w6`.
+- Fait : `POST /v1/auth/password-reset` répond toujours 202 avec la même phrase, puis travaille après la réponse. Le travail : un compte propriétaire, ou opérateur encore dans l'équipe, qui a lié son chat privé reçoit un lien de 15 minutes, au plus un toutes les 5 minutes. `inspect` et `redeem` sous `/v1/auth/password-reset/*` ; `redeem` pose le mot de passe et ferme sessions et appareils de confiance, sans toucher au deuxième facteur ni aux clés d'accès. Migration 0124 : `password_reset_links`, rôle admin seul. Le module `telegram` expose `privateChat` (`has`, `send`). Audit de chaque demande, envoi et réinitialisation, sans le lien ni l'adresse tapée.
+- Tests : `password-reset.integration` : même réponse pour une adresse inconnue, invalide ou un compte sans chat ; créatrice et membre parti écartés ; une demande par 5 minutes ; 15 minutes ; mot de passe refusé ou fuité ; sessions fermées ; ancien mot de passe refusé ; code encore demandé ; lien rejoué ou expiré refusé ; rien dans les logs.
+- Décisions : table à part plutôt qu'un nouveau but de `invitation_links` (un but de plus aurait ouvert sa création au propriétaire par la route d'EQ-10 et sa remise à zéro du deuxième facteur) ; page `/mot-de-passe-oublie` (formulaire sans fragment, nouveau mot de passe avec `#t=`), écrans par Extension.
+- Découvertes : aucune.

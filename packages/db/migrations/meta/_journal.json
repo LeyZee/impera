@@ -757,6 +757,13 @@
       "when": 1793940598374,
       "tag": "0123_telegram_private_links",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1793941781656,
+      "tag": "0124_password_reset_links",
+      "breakpoints": true
     }
   ]
 }
