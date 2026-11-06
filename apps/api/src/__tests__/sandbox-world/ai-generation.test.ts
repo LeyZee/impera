@@ -26,11 +26,11 @@ afterAll(async () => {
   await world.app.close();
 });
 
-const next = async (reply: string): Promise<Response> =>
+const next = async (reply: string, extra: Readonly<Record<string, string>> = {}): Promise<Response> =>
   fetch(`${base}/__/ai/next`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ reply }),
+    body: JSON.stringify({ reply, ...extra }),
   });
 
 function gateway(key = 'xai-recette-ok-0000000001'): { llm: AppLlm; log: LlmCallLog } {
@@ -94,6 +94,28 @@ describe('the scripted AI, through the real gateway', () => {
     ]);
   });
 
+  it('opens each reply in her voice differently from the one before, brain calls in between', async () => {
+    const { llm } = gateway();
+    const openings: string[] = [];
+    for (let turn = 0; turn < 4; turn += 1) {
+      await llm.gateway.brain(CONVERSATION);
+      openings.push((await voiceOf(llm))[0] ?? '');
+    }
+    expect(new Set(openings).size).toBe(4);
+  });
+
+  it('reads a risk in his message once when told, then none again', async () => {
+    const { llm } = gateway();
+    expect((await next('risk', { risk: 'self_harm' })).status).toBe(200);
+    const risky = await llm.gateway.brain(CONVERSATION);
+    expect(risky.ok && risky.value.output.risks).toEqual(['self_harm']);
+    const calm = await llm.gateway.brain(CONVERSATION);
+    expect(calm.ok && calm.value.output.risks).toEqual([]);
+    await next('risk');
+    const minor = await llm.gateway.brain(CONVERSATION);
+    expect(minor.ok && minor.value.output.risks).toEqual(['minor_suspected']);
+  });
+
   it('writes a trap in her voice once, then is calm again', async () => {
     const { llm } = gateway();
     for (const [reply, words] of [
@@ -129,5 +151,6 @@ describe('the scripted AI, through the real gateway', () => {
 
   it('takes only the scripts it knows', async () => {
     expect((await next('dis-lui-tout')).status).toBe(400);
+    expect((await next('risk', { risk: 'tout-va-bien' })).status).toBe(400);
   });
 });

@@ -1,3 +1,4 @@
+import { BriefSchema } from '@impera/llm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -9,6 +10,7 @@ import { z } from 'zod';
  * The answer fits the JSON schema the gateway sends with the call, built from that schema: a calm brief for the
  * brain, a short reply in her voice for the voice, middle scores for the judge, a neutral description for the senses.
  * A control route sets the next answer: a reply the guards must stop (an AI disclosure, a payment link, a meeting), a
+ * risk the brain reads in his message (a suspected minor, distress…), a
  * reply out of its schema (the gateway asks once more), or a 429 (the gateway waits and asks again). It uses no token:
  * every call is journaled at 0 $, so a long recette never reaches the daily cap by accident.
  */
@@ -21,6 +23,7 @@ export const SCRIPTED_REPLIES = [
   'meeting',
   'off_schema',
   'rate_limited',
+  'risk',
 ] as const;
 export type ScriptedReply = (typeof SCRIPTED_REPLIES)[number];
 
@@ -51,7 +54,15 @@ const CALM_BRIEF = {
   toneHints: ['joueuse'],
 };
 
-const NextBodySchema = z.strictObject({ reply: z.enum(SCRIPTED_REPLIES) });
+/** A risk the brain can read, as the gateway's own schema names it. */
+const RiskSchema = BriefSchema.shape.risks.element;
+type Risk = z.infer<typeof RiskSchema>;
+
+const NextBodySchema = z.strictObject({
+  reply: z.enum(SCRIPTED_REPLIES),
+  /** With `risk`: the one the next brain reads in his message; a suspected minor when left out. */
+  risk: RiskSchema.optional(),
+});
 
 /** What the world reads of a call: its key, and the schema the answer must fit. Anything else is left alone. */
 const GenerationBodySchema = z.object({
@@ -162,7 +173,10 @@ export function registerGeneration(
   fateOf: (key: string) => 'ok' | 'refused' | 'no_credit' | 'rate_limited' | 'down',
 ): void {
   let next: ScriptedReply = 'neutral';
+  let risk: Risk = 'minor_suspected';
   let calls = 0;
+  // Counted apart from the other roles, so that each reply in her voice opens differently from the one before.
+  let voiceReplies = 0;
 
   app.post('/__/ai/next', (request, reply) => {
     const body = NextBodySchema.safeParse(request.body);
@@ -170,7 +184,8 @@ export function registerGeneration(
       return reply.code(400).send({ error: `reply attendu parmi : ${SCRIPTED_REPLIES.join(', ')}` });
     }
     next = body.data.reply;
-    return { prochaine: next };
+    risk = body.data.risk ?? 'minor_suspected';
+    return next === 'risk' ? { prochaine: next, risque: risk } : { prochaine: next };
   });
 
   app.get('/__/ai', () => ({ prochaine: next, appels: calls }));
@@ -192,6 +207,7 @@ export function registerGeneration(
     const schema = body.data.text?.format?.schema;
     const properties = propertiesOf(schema);
     const isVoice = 'bubbles' in properties;
+    const isBrain = 'replyBrief' in properties;
 
     // The call-wide scripts are used by the next call, whatever its role; a trap by the next reply in her voice.
     const scripted = next;
@@ -206,17 +222,20 @@ export function registerGeneration(
       text = 'désolée, je ne sais pas répondre à ça';
     } else {
       const base = instanceOf(schema);
-      const output: unknown = isVoice
-        ? {
-            bubbles:
-              scripted === 'neutral'
-                ? (NEUTRAL_REPLIES[calls % NEUTRAL_REPLIES.length] ?? ['coucou toi 😊'])
-                : TRAPS[scripted],
-          }
-        : 'replyBrief' in properties && typeof base === 'object' && base !== null
-          ? { ...base, ...CALM_BRIEF }
-          : base;
-      if (isVoice && scripted !== 'neutral') next = 'neutral';
+      let output: unknown = base;
+      if (isVoice) {
+        const trap = scripted === 'neutral' || scripted === 'risk' ? undefined : TRAPS[scripted];
+        if (trap === undefined) voiceReplies += 1;
+        else next = 'neutral';
+        output = {
+          bubbles: trap ?? NEUTRAL_REPLIES[voiceReplies % NEUTRAL_REPLIES.length] ?? ['coucou toi 😊'],
+        };
+      } else if (isBrain && typeof base === 'object' && base !== null) {
+        // The brain only names the risk it reads; what it changes is the policy's, in code.
+        const risks = scripted === 'risk' ? [risk] : [];
+        if (scripted === 'risk') next = 'neutral';
+        output = { ...base, ...CALM_BRIEF, risks };
+      }
       text = JSON.stringify(output);
     }
 
