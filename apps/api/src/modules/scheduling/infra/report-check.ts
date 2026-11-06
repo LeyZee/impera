@@ -54,11 +54,10 @@ export async function checkSettingsIn(tx: Transaction): Promise<CheckSettings> {
 }
 
 /** What a validation keeps of the platform (`shift_reports.review_check`), read back through Zod. */
-export const ReviewCheckSchema = z.object({
+const ReviewCheckSchema = z.object({
   check: ShiftReportCheckSchema,
   threshold: ReportGapThresholdSchema,
 });
-export type ReviewCheck = z.infer<typeof ReviewCheckSchema>;
 
 /** A report as a check reads it: its stored row, before the check is attached. */
 export interface ReportToCheck {
