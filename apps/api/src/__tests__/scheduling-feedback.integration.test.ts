@@ -76,7 +76,12 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
       ...body,
     });
 
-  const addMember = async (email: string, displayName: string, teamRole: 'chatter' | 'manager') => {
+  const addMember = async (
+    email: string,
+    displayName: string,
+    teamRole: 'chatter' | 'manager',
+    creatorIds: readonly CreatorId[] = [anna, ines],
+  ) => {
     const response = await server.inject({
       method: 'POST',
       url: '/v1/team/members',
@@ -85,7 +90,7 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
         email,
         displayName,
         teamRole,
-        creatorIds: [anna, ines],
+        creatorIds,
         firstName: displayName,
         lastName: 'Inventé',
         country: 'FR',
@@ -244,6 +249,18 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
       expect(ShiftFeedbackReadSchema.parse(read.json()).feedback?.shiftId).toBe(onRead);
     }
     expect((await call('GET', `/scheduling/shifts/${onRead}/feedback`, creator)).statusCode).toBe(403);
+  });
+
+  it('answers a shift he does not see as an unknown one, never telling it exists', async () => {
+    // A chatter on Anna alone, and one on both who is not the shift's member: Basile's shift on Inès is not theirs.
+    const { cookie: annaOnly } = await addMember('paul@example.test', 'Paul', 'chatter', [anna]);
+    const { cookie: colleague } = await addMember('lea@example.test', 'Léa', 'chatter');
+    for (const cookie of [annaOnly, colleague]) {
+      for (const shiftId of [onRead, newId(ShiftIdSchema)]) {
+        const read = await call('GET', `/scheduling/shifts/${shiftId}/feedback`, cookie);
+        expect([read.statusCode, codeOf(read)]).toEqual([404, 'shift_not_found']);
+      }
+    }
   });
 
   it('is the shift’s member’s alone, at the end of the shift, on a shift that happened', async () => {
