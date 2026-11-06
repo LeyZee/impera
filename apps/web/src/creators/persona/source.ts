@@ -33,7 +33,6 @@ export interface PersonaReady {
 
 export type PersonaLoad = { readonly kind: 'loading' } | { readonly kind: 'failed' } | PersonaReady;
 
-/** Parses the YAML text of a persona file; throws when it does not pass `PersonaSchema`. */
 /** `GET /v1/creators/:id/persona`: her latest version and every stored one, newest first, the active one marked. */
 export async function fetchPersonaOverview(creatorId: string): Promise<PersonaOverview> {
   const response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/persona`, {
@@ -43,6 +42,7 @@ export async function fetchPersonaOverview(creatorId: string): Promise<PersonaOv
   return PersonaOverviewSchema.parse(await response.json());
 }
 
+/** Parses the YAML text of a persona file; throws when it does not pass `PersonaSchema`. */
 export async function parsePersonaYaml(text: string): Promise<Persona> {
   const { parse } = await import('yaml');
   return PersonaSchema.parse(parse(text));
