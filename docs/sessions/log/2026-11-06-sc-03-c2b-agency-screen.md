@@ -1,0 +1,6 @@
+# 2026-11-06 — SC-03 c2b, l'écran Créatrices › Scripts — done
+
+Fait : un onglet « Scripts » dans la fiche de la créatrice, pour le propriétaire et un manager actif, comme ses idées du jour. Il liste ses scripts envoyés, le plus récent d'abord, avec leur numéro (`S014`), leur moment (Jour ou Nuit, celui de la demande, sinon celui de la structure), leur structure, leurs médias et leur poids. Chaque script dit où il en est : à recopier, en vérification, copié dans Reveal (avec la date où ses originaux partent au plus tard) ou archive impossible (moment inconnu, plus de 4 Go). « Télécharger l'archive » est un lien direct, en flux, jamais tenu en mémoire par la page. « Copié dans Reveal » ouvre une fenêtre de confirmation (titre, explication, actions au pied) ; un refus du serveur s'y affiche tel quel. Aucune migration. `SCRIPT_EXPORT_MAX_BYTES` passe du domaine de l'API aux contrats. Tests : modèle (tri, moment, blocages, 30 jours) et écran (archive, confirmation, refus, « les deux » sans moment, vide, erreur).
+Pas fait : la fiche à cocher étape par étape à l'écran (elle reste dans l'archive) ; le réglage par créatrice des cartons.
+Décisions : l'écran calcule les mêmes blocages que le serveur pour ne jamais proposer un lien qui répondrait une erreur JSON.
+Découvertes : aucune.

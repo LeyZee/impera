@@ -1,0 +1,273 @@
+import type { CreatorId } from '@impera/contracts';
+import { useQueryClient } from '@tanstack/react-query';
+import { useId, useState, type JSX } from 'react';
+
+import { archiveHref, confirmCopied, contentKey, useCreatorContent } from './api';
+import {
+  BLOCKER_TEXTS,
+  MOMENT_EMOJIS,
+  MOMENT_LABELS,
+  dayLabel,
+  mediaLine,
+  sentScripts,
+  type SentScriptRow,
+} from './model';
+import './scripts.css';
+
+import { useStructures } from '@/scripts/api';
+import { Dialog } from '@/shell/Dialog';
+import '@/creators/agenda/agency-agenda.css';
+
+/**
+ * Créatrices › Scripts (SC-03 c2b, ADR 0056 § 7), the owner's and an active manager's: each script she sent, its
+ * archive to download (the sheet first, then each card and each medium in the script's order) and « Copié dans
+ * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2).
+ */
+export function ScriptsSection({
+  creatorId,
+  creatorName,
+  timezone,
+}: {
+  creatorId: CreatorId;
+  creatorName: string;
+  timezone: string;
+}): JSX.Element {
+  const content = useCreatorContent(creatorId);
+  const structures = useStructures();
+  const [confirming, setConfirming] = useState<SentScriptRow | null>(null);
+
+  const list = (): JSX.Element => {
+    if (content.data === undefined) {
+      if (content.isError)
+        return (
+          <div className="nv-plate aa-empty">
+            <p className="aa-empty__title">Ses scripts ne se chargent pas</p>
+            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft ps-self-start"
+              onClick={() => void content.refetch()}
+            >
+              Réessayer
+            </button>
+          </div>
+        );
+      return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
+    }
+    const rows = sentScripts(content.data, structures.data ?? []);
+    if (rows.length === 0)
+      return (
+        <div className="nv-plate aa-empty">
+          <p className="aa-empty__title">Aucun script envoyé</p>
+          <p className="ps-muted">
+            Quand {creatorName} envoie un script depuis son téléphone, il arrive ici avec son numéro, prêt à
+            être recopié dans Reveal.
+          </p>
+        </div>
+      );
+    const waiting = rows.filter((row) => row.exportedAt === null).length;
+    return (
+      <>
+        <p className="aa-summary nv-num">
+          {rows.length === 1 ? '1 script' : `${String(rows.length)} scripts`}
+          {waiting === 0 ? ' · tous copiés dans Reveal' : ` · ${String(waiting)} à recopier`}
+        </p>
+        <ul className="sx-list">
+          {rows.map((row, index) => (
+            <ScriptCard
+              key={row.dropId}
+              row={row}
+              index={index}
+              creatorId={creatorId}
+              timezone={timezone}
+              onConfirm={() => {
+                setConfirming(row);
+              }}
+            />
+          ))}
+        </ul>
+      </>
+    );
+  };
+
+  return (
+    <section className="ps-page aa-page sx-page" aria-label={`Scripts de ${creatorName}`}>
+      <div className="nv-plate ps-head">
+        <div className="ps-head__top">
+          <div className="ps-head__who">
+            <p className="ps-title">Ses scripts</p>
+            <p className="ps-muted">
+              Les scripts envoyés par {creatorName}, le plus récent d’abord. Télécharge l’archive, recopie-la
+              dans Reveal en suivant la fiche, puis confirme la copie.
+            </p>
+          </div>
+        </div>
+      </div>
+      {list()}
+      {confirming === null ? null : (
+        <ConfirmCopy
+          row={confirming}
+          creatorId={creatorId}
+          timezone={timezone}
+          onClose={() => {
+            setConfirming(null);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function stateOf(row: SentScriptRow): {
+  readonly label: string;
+  readonly tone: 'ok' | 'warn' | 'wait' | 'todo';
+} {
+  if (row.exportedAt !== null) return { label: 'Copié dans Reveal', tone: 'ok' };
+  if (row.blocker === 'not_ready') return { label: 'En vérification', tone: 'wait' };
+  if (row.blocker !== null) return { label: 'Archive impossible', tone: 'warn' };
+  return { label: 'À recopier', tone: 'todo' };
+}
+
+function ScriptCard({
+  row,
+  index,
+  creatorId,
+  timezone,
+  onConfirm,
+}: {
+  row: SentScriptRow;
+  index: number;
+  creatorId: CreatorId;
+  timezone: string;
+  onConfirm: () => void;
+}): JSX.Element {
+  const id = useId();
+  const state = stateOf(row);
+  return (
+    <li
+      className="nv-plate sx-card nv-enter"
+      style={{ '--nv-i': index + 1 }}
+      data-exported={row.exportedAt !== null}
+      aria-labelledby={`${id}-title`}
+    >
+      <div className="sx-card__top">
+        <span className="sx-code nv-num">{row.code}</span>
+        {row.moment === null ? null : (
+          <span className="sx-moment">
+            <span aria-hidden="true">{MOMENT_EMOJIS[row.moment]}</span>
+            {MOMENT_LABELS[row.moment]}
+          </span>
+        )}
+        <span className="aa-pill sx-state" data-tone={state.tone}>
+          {state.label}
+        </span>
+      </div>
+      <div className="sx-card__body">
+        <h3 id={`${id}-title`} className="sx-title">
+          {row.name ?? 'Structure retirée de la bibliothèque'}
+        </h3>
+        <p className="sx-meta nv-num">
+          Envoyé le {dayLabel(row.sentAt, timezone)} · {mediaLine(row)}
+        </p>
+      </div>
+      {row.exportedAt !== null && row.originalsUntil !== null ? (
+        <p className="sx-note nv-num">
+          Copié le {dayLabel(row.exportedAt, timezone)}. Ses originaux partent au plus tard le{' '}
+          {dayLabel(row.originalsUntil, timezone)}.
+        </p>
+      ) : row.blocker === null ? null : (
+        <p className="sx-note" data-tone={row.blocker === 'not_ready' ? undefined : 'warn'}>
+          {BLOCKER_TEXTS[row.blocker]}
+        </p>
+      )}
+      {row.blocker === null ? (
+        <div className="sx-actions">
+          <a
+            className={`nv-btn nv-btn--sm ${row.exportedAt === null ? 'nv-btn--soft' : 'nv-btn--plain'}`}
+            href={archiveHref(creatorId, row.dropId)}
+            download
+          >
+            {row.exportedAt === null ? 'Télécharger l’archive' : 'Télécharger à nouveau'}
+          </a>
+          {row.exportedAt === null ? (
+            <button type="button" className="nv-btn nv-btn--neon nv-btn--sm" onClick={onConfirm}>
+              Copié dans Reveal
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+const AFTER_EXPORT_MS = 30 * 86_400_000;
+
+function ConfirmCopy({
+  row,
+  creatorId,
+  timezone,
+  onClose,
+}: {
+  row: SentScriptRow;
+  creatorId: CreatorId;
+  timezone: string;
+  onClose: () => void;
+}): JSX.Element {
+  const client = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const until = dayLabel(new Date(Date.now() + AFTER_EXPORT_MS).toISOString(), timezone);
+
+  const confirm = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    const outcome = await confirmCopied(creatorId, row.dropId);
+    if (outcome.kind === 'ok') {
+      await client.invalidateQueries({ queryKey: contentKey(creatorId) });
+      setBusy(false);
+      onClose();
+      return;
+    }
+    setBusy(false);
+    setError(outcome.message);
+  };
+
+  return (
+    <Dialog
+      title="Copié dans Reveal ?"
+      lead={`${row.code} · ${row.name ?? 'Structure retirée de la bibliothèque'}`}
+      busy={busy}
+      onClose={onClose}
+    >
+      <div className="tm-dialog__body">
+        <p className="sx-dialog__text">
+          Confirme une fois le dossier recopié en entier dans Reveal, chaque étape à sa place, la fiche suivie
+          jusqu’au bout.
+        </p>
+        <p className="sx-dialog__text nv-num">
+          Ses originaux de ce script partent alors dans 30 jours, au plus tard le {until}. La confirmation ne
+          se retire pas.
+        </p>
+        {error === null ? null : (
+          <p className="sx-error nv-swap" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="tm-dialog__foot">
+          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--neon"
+            disabled={busy}
+            data-autofocus
+            onClick={() => void confirm()}
+          >
+            {busy ? 'Confirmation…' : 'Confirmer la copie'}
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
