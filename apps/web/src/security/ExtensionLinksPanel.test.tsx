@@ -18,7 +18,8 @@ const LINK_B = {
   lastUsedAt: new Date(Date.now() - 12 * 60_000).toISOString(),
 };
 const LINK_C = { ...LINK_B, id: '2d9e7e4a-6e3b-4d0a-9c2a-3b4c5d6e7f80', label: 'Firefox' };
-const TOKEN = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123456';
+// Shaped like a token (43 base64url characters), plainly not one: no secret scanner reads it as a key.
+const TOKEN = 'x'.repeat(43);
 
 interface Reply {
   readonly status: number;
