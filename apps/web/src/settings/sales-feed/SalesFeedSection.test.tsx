@@ -14,6 +14,11 @@ import { SalesFeedSection } from './SalesFeedSection';
 
 import { choose, openList } from '@/test/select';
 
+/** A refusal in the common body, its kind in `details` (MOT-13). */
+const refusalBody = (code: string, kind: string, message: string): object => ({
+  error: { code, message, details: { kind }, requestId: 'r' },
+});
+
 const ACCOUNT_LUNE = '00000000-0000-4000-8000-00000000000a';
 const ACCOUNT_SOLEIL = '00000000-0000-4000-8000-00000000000b';
 const MEMBER_ANA = '00000000-0000-4000-8000-0000000000a1';
@@ -172,7 +177,11 @@ describe('Réglages › Ventes', () => {
       [`GET ${BASE}/reveal`]: ok(overview({ status: none, models: [], accounts: [], chatters: [] })),
       [`PUT ${BASE}/reveal/key`]: () => ({
         status: 422,
-        body: { kind: 'unauthorized', message: 'Reveal refuse cette clé : elle est inconnue.' },
+        body: refusalBody(
+          'sales_feed_platform_unprocessable',
+          'unauthorized',
+          'Reveal refuse cette clé : elle est inconnue.',
+        ),
       }),
     });
     renderSection();

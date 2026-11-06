@@ -68,7 +68,9 @@ describe('/v1/settings/providers in the app (P3-03)', () => {
       payload: { key: 'xai-short' },
     });
     expect(cut.statusCode).toBe(422);
-    expect(cut.json()).toMatchObject({ kind: 'too_short' });
+    expect(cut.json()).toMatchObject({
+      error: { code: 'provider_key_unprocessable', details: { kind: 'too_short' } },
+    });
   });
 
   it('refuses a key change from another origin', async () => {

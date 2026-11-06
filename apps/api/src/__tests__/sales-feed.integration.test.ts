@@ -130,10 +130,14 @@ describe('sales feed (CRM-01)', () => {
 
     const malformed = await api('PUT', '/v1/settings/sales-feeds/reveal/key', { key: 'sk-not-a-reveal-key' });
     expect(malformed.statusCode).toBe(422);
-    expect(malformed.json()).toMatchObject({ kind: 'malformed' });
+    expect(malformed.json()).toMatchObject({
+      error: { code: 'sales_feed_platform_unprocessable', details: { kind: 'malformed' } },
+    });
     const refused = await api('PUT', '/v1/settings/sales-feeds/reveal/key', { key: 'rvl_fake_key_revoked' });
     expect(refused.statusCode).toBe(422);
-    expect(refused.json()).toMatchObject({ kind: 'unauthorized' });
+    expect(refused.json()).toMatchObject({
+      error: { code: 'sales_feed_platform_unprocessable', details: { kind: 'unauthorized' } },
+    });
     expect(await count(sql`select count(*)::int as n from sales_feed_credentials`)).toBe(0);
 
     const none = await api('GET', '/v1/settings/sales-feeds');

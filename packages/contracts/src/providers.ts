@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { refusalBodySchema } from './errors';
+
 /**
  * AI services connected from Réglages > Modèles IA (ADR 0016, task P3-03). A key never crosses the API outwards:
  * only its state, its label at the provider and what the verification found.
@@ -76,6 +78,10 @@ export type SaveProviderKeyBody = z.infer<typeof SaveProviderKeyBodySchema>;
 /** A key the provider (or the shape check) turned down, as the sheet shows it under the key field. */
 export const ProviderRefusalSchema = z.object({ kind: ProviderErrorKindSchema, message: z.string().min(1) });
 export type ProviderRefusal = z.infer<typeof ProviderRefusalSchema>;
+
+/** 422 of `PUT /v1/settings/providers/:provider/key`: the refusal in the common body (MOT-13). */
+export const PROVIDER_KEY_UNPROCESSABLE = 'provider_key_unprocessable';
+export const ProviderRefusalBodySchema = refusalBodySchema(ProviderErrorKindSchema);
 
 /** The one thing the top of the Services section asks for, with its single neon button. */
 export const ProviderNextActionSchema = z.discriminatedUnion('kind', [
