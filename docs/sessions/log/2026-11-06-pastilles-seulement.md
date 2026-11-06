@@ -5,9 +5,11 @@ Fait : les derniers traits de 3 px sur le bord d'une carte ou d'un créneau sont
 - Une pièce à renouveler dans Moi › Dossier garde son texte ambre.
 - Un régime de facturation à valider garde « À valider » et « Pas encore notée ».
 - « IA seule » dans l'agenda garde son fond et son mot violets.
-- Un shift qui gêne un congé dans un échange garde son anneau ambre.
+- Sur la grille, un shift qui gêne un congé à valider garde son anneau ambre.
 
 Le bouton PDF d'une facture est `aria-disabled` pendant sa lecture et une fois son PDF perdu, jamais `disabled`. Pressé à l'Entrée, il garde le focus au lieu de le rendre à la page (point d'Extension sur #567).
+
+Le pli « 1 congé à valider » d'Équipe › Planning s'ouvre de nouveau en colonne : le résumé en haut, les congés dessous. Il portait `.sc-decide`, que #546 a donné ensuite à « À décider » sur l'Aujourd'hui de la créatrice, une ligne flexible qui posait le résumé à côté des congés et les coupait sur téléphone. Il prend sa propre classe, `.sc-fold--decide`.
 
 Pas fait : rien.
 
@@ -18,5 +20,5 @@ Découvertes : quand l'agent répond aussi pendant un shift, un trait violet de 
 Candidats à suppression : aucun ; le banc de captures de `.scratch/` reste jusqu'à la dernière PR de la série.
 
 Vérifié :
-- tests : `MyInvoicesPage` (focus gardé, `aria-disabled` sans `disabled`, un clic sur un PDF perdu ne relit rien), `MyFilePage`, `LegalCards` ;
+- tests : `MyInvoicesPage` (focus gardé, `aria-disabled` sans `disabled`, un clic sur un PDF perdu ne relit rien), `MyFilePage`, `LegalCards`, `PlanningPage` (le pli des congés n'a jamais `.sc-decide`) ;
 - captures Nuit et Jour, ordinateur et téléphone, dans `/mnt/project-files/recette/2026-11-05/corrections/equipe/pastilles-seulement/`.
