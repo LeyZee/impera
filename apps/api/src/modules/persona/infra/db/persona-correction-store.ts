@@ -66,7 +66,7 @@ const newestFirst = async (tx: Transaction): Promise<PersonaCorrection[]> =>
 const byId = async (tx: Transaction, id: string): Promise<Row | undefined> =>
   (await tx.select(columns).from(t).where(eq(t.id, id)))[0];
 
-/** Her corrections (recette CREA-01 b), under the policies of `persona_corrections` (migration 0123). */
+/** Her corrections (recette CREA-01 b), under the policies of `persona_corrections` (migration 0124). */
 export function createDrizzlePersonaCorrectionStore(db: Database): PersonaCorrectionStore {
   return {
     mine: (userId) => withCreatorAccount(db, userId, newestFirst),

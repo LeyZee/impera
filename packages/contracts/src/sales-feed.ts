@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { PlatformSchema } from './enums';
+import { refusalBodySchema } from './errors';
 import { CreatorIdSchema, FanIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -245,6 +246,12 @@ export const SalesFeedRefusalSchema = z.object({
   message: z.string().min(1),
 });
 export type SalesFeedRefusal = z.infer<typeof SalesFeedRefusalSchema>;
+
+/** The platform refused the key or the webhook (422), in the common body (MOT-13). */
+export const SALES_FEED_PLATFORM_UNPROCESSABLE = 'sales_feed_platform_unprocessable';
+/** The platform refused or failed the reliability check (502). */
+export const SALES_FEED_PLATFORM_BAD_GATEWAY = 'sales_feed_platform_bad_gateway';
+export const SalesFeedRefusalBodySchema = refusalBodySchema(SalesFeedErrorKindSchema);
 
 export const LinkSalesFeedModelBodySchema = z.object({ platformAccountId: z.uuid().nullable() });
 export type LinkSalesFeedModelBody = z.infer<typeof LinkSalesFeedModelBodySchema>;

@@ -3,6 +3,9 @@ import {
   LinkSalesFeedChatterBodySchema,
   LinkSalesFeedModelBodySchema,
   PlatformSchema,
+  RefusalError,
+  SALES_FEED_PLATFORM_BAD_GATEWAY,
+  SALES_FEED_PLATFORM_UNPROCESSABLE,
   SalesFeedCheckBodySchema,
   SalesFeedCheckReportSchema,
   SalesFeedImportResultSchema,
@@ -10,7 +13,7 @@ import {
   SalesFeedListSchema,
   SalesFeedNewModelsSchema,
   SalesFeedOverviewSchema,
-  SalesFeedRefusalSchema,
+  SalesFeedRefusalBodySchema,
   SalesFeedStatusSchema,
   SaveSalesFeedKeyBodySchema,
 } from '@impera/contracts';
@@ -119,12 +122,13 @@ export function createSalesFeedRoutes(
         schema: {
           params: PlatformParamsSchema,
           body: SaveSalesFeedKeyBodySchema,
-          response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalSchema },
+          response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await feeds.connect(request.params.platform, request.body.key, actorOf(request));
-        return result.ok ? reply.send(result.value) : reply.code(422).send(result.error);
+        if (!result.ok) throw new RefusalError(SALES_FEED_PLATFORM_UNPROCESSABLE, result.error);
+        return result.value;
       },
     );
 
@@ -143,12 +147,13 @@ export function createSalesFeedRoutes(
         preValidation: [options.recentLogin, keyCalls],
         schema: {
           params: PlatformParamsSchema,
-          response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalSchema },
+          response: { 200: SalesFeedStatusSchema, 422: SalesFeedRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await feeds.connectWebhook(request.params.platform, actorOf(request));
-        return result.ok ? reply.send(result.value) : reply.code(422).send(result.error);
+        if (!result.ok) throw new RefusalError(SALES_FEED_PLATFORM_UNPROCESSABLE, result.error);
+        return result.value;
       },
     );
 
@@ -244,12 +249,13 @@ export function createSalesFeedRoutes(
           params: PlatformParamsSchema,
           body: SalesFeedCheckBodySchema,
           // 502: the platform refused or failed (its kind and sentence); 422 is the export's, a domain error.
-          response: { 200: SalesFeedCheckReportSchema, 502: SalesFeedRefusalSchema },
+          response: { 200: SalesFeedCheckReportSchema, 502: SalesFeedRefusalBodySchema },
         },
       },
-      async (request, reply) => {
+      async (request) => {
         const result = await feeds.check(request.params.platform, request.body, request.user?.id ?? null);
-        return result.ok ? reply.send(result.value) : reply.code(502).send(result.error);
+        if (!result.ok) throw new RefusalError(SALES_FEED_PLATFORM_BAD_GATEWAY, result.error);
+        return result.value;
       },
     );
 

@@ -184,7 +184,8 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Enregistreur | `recorder` | Fonction de l'extension qui note les échanges réseau du site d'une plateforme, anonymisés. |
 | Notification Telegram | `telegram_delivery` | Un message que le CRM livre dans un groupe Telegram (alerte, vente, mot-clé, validation). Ne contient jamais de donnée de fan (ADR 0020). |
 | Sujet | `topic` | Ce dont parle une notification Telegram : `urgent`, `important`, `info` (onglet Alertes), `sale`, `keyword`, `validation`, `custom` (les alertes personnalisées, un seul sujet pour toutes). Chaque sujet a son routage. |
-| Bot (Telegram) | `telegram_bot` | Un bot créé par @BotFather, ajouté dans Réglages › Telegram par son jeton, chiffré en base. Il n'agit sur rien, il prévient. |
+| Bot (Telegram) | `telegram_bot` | Un bot créé par @BotFather, ajouté dans Réglages › Telegram par son jeton, chiffré en base. Il n'agit sur rien, il prévient ; la seule chose qu'il lit et à laquelle il répond est un `/start <code>` en privé (liaison privée, ADR 0068). |
+| Liaison privée (Telegram) | `telegram_private_link`, `TelegramPrivateLink` | Le chat privé d'un compte de l'agence avec le bot, trouvé quand ce compte envoie au bot le code à usage unique (10 minutes) montré par le CRM : il ne sert qu'à recevoir le lien de nouveau mot de passe (ADR 0068 § 4, SEC-05). |
 | Groupe (Telegram) | `telegram_chat` | Un groupe où un bot se trouve, découvert automatiquement, jamais saisi à la main. |
 | Routage | `telegram_route` | Quel sujet va dans quel groupe, pour une créatrice ou pour toutes. |
 | Astreinte | `on_call` | Le groupe Telegram qui reçoit l'urgent la nuit. « Personne n'est prévenu la nuit » quand aucune créatrice n'en a un joignable. |

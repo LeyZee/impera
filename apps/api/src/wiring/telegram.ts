@@ -138,6 +138,12 @@ export async function wireTelegram(
         withTelegram((telegram) => telegram.jobs.purge()),
       ),
     },
-    routes: module === null ? [] : [module.routes({ guard: requireRole('owner'), recentLogin })],
+    routes:
+      module === null
+        ? []
+        : [
+            module.routes({ guard: requireRole('owner'), recentLogin }),
+            module.privateLinkRoutes({ guard: requireRole('owner', 'operator'), recentLogin }),
+          ],
   };
 }
