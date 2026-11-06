@@ -339,6 +339,7 @@ export function createDrizzlePayrollReadStore(
               adjustmentsMinor: row.adjustmentsMinor,
               totalMinor: row.totalMinor,
               carryOverOutMinor: row.carryOverOutMinor,
+              writtenOffMinor: row.writtenOffMinor,
               payableMinor: row.payableMinor,
               rules: CommissionStatementRulesSchema.parse(row.rules),
               computedAt: row.computedAt.toISOString(),

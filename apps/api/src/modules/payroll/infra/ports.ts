@@ -23,8 +23,6 @@ export interface PayoutGate {
     statements: readonly { readonly memberId: string; readonly statementId: string }[],
     paidOn: string,
   ): Promise<ReadonlyMap<string, PayoutVerdict>>;
-  /** How many of the member's documents are open: issued and neither accepted, lapsed nor ended (ADR 0039 § 6). */
-  documentsOpen(tx: Transaction, memberId: string): Promise<number>;
   /**
    * Why a document each statement of `statements` makes due is not issued, as the invoicing said it last
    * (`invoice_not_issued`); a statement it said nothing for is left out. Read in an admin transaction: those events are

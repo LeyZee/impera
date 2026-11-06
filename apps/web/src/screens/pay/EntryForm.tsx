@@ -218,6 +218,8 @@ export function EntryForm({
   const reasonValid = trimmed.length > 0;
   const ready = member !== null && period !== null && typed !== null && reasonValid;
   const shown = typed === null ? '' : amountShown(typed);
+  // A member who left never ends under zero (ADR 0072 § 5): said before sending, the server checks it on its total.
+  const leftTaking = kind === 'adjustment' && taking && member?.status === 'left';
 
   const send = async (): Promise<void> => {
     if (member === null || period === null || typed === null || !reasonValid || busy) return;
@@ -281,7 +283,7 @@ export function EntryForm({
           </p>
           <p className="tm-hint">
             {kind === 'adjustment'
-              ? `${corrects === undefined ? '' : `Il corrige son relevé ${periodLine(corrects.window.period)}, qui ne change plus. `}Un ajustement ne s’annule pas : une erreur se corrige par un autre.`
+              ? `${corrects === undefined ? '' : `Il corrige son relevé ${periodLine(corrects.window.period)}, qui ne change plus. `}Un ajustement ne s’annule pas : une erreur se corrige par un autre.${leftTaking ? ` ${name} a quitté l’équipe : si ce retrait faisait passer son total sous zéro, il serait refusé.` : ''}`
               : kind === 'bonus'
                 ? 'Elle s’annule tant que son relevé de la quinzaine n’est pas validé.'
                 : `Plafonné à sa part plus ses primes : son relevé reste au moins à 0${NBSP}€.`}{' '}
@@ -455,7 +457,7 @@ export function EntryForm({
                 : kind === 'bonus'
                   ? 'Ajoutée à son total de la quinzaine.'
                   : kind === 'adjustment'
-                    ? `${taking ? 'Retiré de' : 'Ajouté à'} son total, ${shown === '' ? 'en euros' : shown}.`
+                    ? `${taking ? 'Retiré de' : 'Ajouté à'} son total, ${shown === '' ? 'en euros' : shown}.${leftTaking ? ` ${name} a quitté l’équipe : son total ne peut pas passer sous zéro, un retrait plus grand est refusé.` : ''}`
                     : `Plafonné à sa part plus ses primes${typed?.kind === 'percent' ? ` : ${signedPercentText(-typed.bps)} de son net` : ''}.`}
             </p>
           </div>

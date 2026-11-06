@@ -82,8 +82,8 @@ export function MinimumPayout(): JSX.Element {
           )}
           <p className="rp-account__since">
             Sous ce total, un relevé ne verse rien et reporte tout sur la quinzaine suivante. Un nouveau
-            minimum part d’une quinzaine qui n’a pas commencé ; le relevé final d’un membre qui part verse
-            tout.
+            minimum part d’une quinzaine qui n’a pas commencé ; le relevé final d’un membre qui part, celui de
+            la quinzaine de son départ, verse tout.
           </p>
         </div>
       )}

@@ -1,6 +1,5 @@
 import { EVENT_PAYLOADS, type InvoiceNotIssuedReason } from '@impera/contracts';
-import { and, eq, inArray, schema, sql, type Transaction } from '@impera/db';
-import { z } from 'zod';
+import { and, eq, inArray, schema, sql } from '@impera/db';
 
 import type { AfterValidation, PayoutGate, PayoutVerdict } from '../../payroll';
 import { payoutDecision } from '../domain/payouts';
@@ -31,14 +30,6 @@ export const payoutGate: PayoutGate = {
       );
     }
     return verdicts;
-  },
-
-  // As the base's `keep_final_statement` counts them.
-  async documentsOpen(tx: Transaction, memberId: string) {
-    const [open] = await tx
-      .execute<{ count: number }>(sql`select "member_documents_open"(${memberId}) as count`)
-      .then((result) => z.array(z.object({ count: z.number().int() })).parse(result.rows));
-    return open?.count ?? 0;
   },
 
   // Through the events' partial index, by member: the newest said wins, its invoice's before a credit note's of the same

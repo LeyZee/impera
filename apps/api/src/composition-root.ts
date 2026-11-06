@@ -188,8 +188,8 @@ export interface AppOptions {
    */
   readonly payrollClock?: () => Date;
   /**
-   * Tests set the team's clock here, to make a member leave on a day already past and read his closing fortnight
-   * (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
+   * Tests set the team's clock here, to make a member leave on a day already past and read the fortnight of his
+   * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
   /**

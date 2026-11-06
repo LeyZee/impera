@@ -15,6 +15,8 @@ import { BPS, mulDivRound, RATE_SCALE } from './rounding';
  * - fixed and percent penalties, the percent on the member's net, capped at the member's share plus bonuses;
  * - a manager's share of the team's net;
  * - what comes in from earlier periods (carry-overs, adjustments), and a total under the payout minimum carried over.
+ * The final statement of a member who left (ADR 0072) pays everything, under the minimum too, and writes a total below
+ * zero off instead of carrying it: the agency never runs after a departed member.
  * Three points differ from Imperium's code, as the ADRs and the task sheet decide: a penalty is capped at the member's
  * share plus bonuses, never at the net plus bonuses (a statement is never negative); a manager's share of the team's
  * net leaves out the manager's own net, already paid by the manager's commission; and a positive total is carried twice
@@ -23,7 +25,7 @@ import { BPS, mulDivRound, RATE_SCALE } from './rounding';
  */
 
 /** Bumped with any change that could move a cent; a validated statement keeps the version that made it. */
-export const ENGINE_VERSION = 'nirvana-2';
+export const ENGINE_VERSION = 'nirvana-3';
 
 /** Euros for one unit of `currency`, in millionths, with where and when it was read. */
 interface ExchangeRate {
@@ -72,7 +74,10 @@ export interface MemberPayInput {
   readonly teamShareBps: number | null;
   /** A chatter the collective goal pays when reached (the application says who: not gone). */
   readonly collectiveEligible: boolean;
-  /** The last statement of a member who leaves (EQ-14): no payout minimum, everything is paid. */
+  /**
+   * A statement of a member who left, from his departure fortnight on (ADR 0072): no payout minimum, everything is paid,
+   * a total below zero written off.
+   */
   readonly final: boolean;
   readonly accounts: readonly AccountEarnings[];
   readonly manualBonuses: readonly AmountInput[];
@@ -143,6 +148,8 @@ export interface CommissionStatement {
    * zero.
    */
   readonly carryOverOutMinor: number;
+  /** A final statement's total below zero, written off instead of carried (ADR 0072 § 4); zero everywhere else. */
+  readonly writtenOffMinor: number;
   readonly payableMinor: number;
 }
 
@@ -316,9 +323,11 @@ export function computeCommissionStatements(input: PeriodPayInput): PeriodStatem
     const carryOversInMinor = sum(member.carryOversIn.map((one) => one.amountMinor));
     const adjustmentsMinor = sum(member.adjustments.map((one) => one.amountMinor));
     const totalMinor = shareMinor + bonusesMinor - penaltiesMinor + carryOversInMinor + adjustmentsMinor;
+    // A departed member's debt ends with his final statement: written off, never carried (ADR 0072 § 4).
+    const writtenOffMinor = member.final && totalMinor < 0 ? totalMinor : 0;
     const carryOverOutMinor =
       totalMinor < 0
-        ? totalMinor
+        ? totalMinor - writtenOffMinor
         : !member.final &&
             totalMinor > 0 &&
             totalMinor < input.minimumPayoutMinor &&
@@ -342,7 +351,8 @@ export function computeCommissionStatements(input: PeriodPayInput): PeriodStatem
       adjustmentsMinor,
       totalMinor,
       carryOverOutMinor,
-      payableMinor: totalMinor - carryOverOutMinor,
+      writtenOffMinor,
+      payableMinor: totalMinor - carryOverOutMinor - writtenOffMinor,
     });
   }
   return { engineVersion: ENGINE_VERSION, teamNetMinor, collective, statements };
