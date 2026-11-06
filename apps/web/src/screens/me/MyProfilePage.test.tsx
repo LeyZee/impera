@@ -38,6 +38,7 @@ function serve(members: readonly TeamMember[]): void {
             creators: [NORA_REVEAL, LEA_ONLYFANS].map(({ creatorId, creatorName }) => ({
               id: creatorId,
               name: creatorName,
+              archived: false,
             })),
             members: [],
             shifts: [],

@@ -79,6 +79,7 @@ function serve(): void {
                       creatorName: 'Nora Vidal',
                       platform: 'reveal',
                       handle: 'nora',
+                      archived: false,
                     },
                   ],
                   members: [{ id: THEO, displayName: 'Théo', color: null }],
