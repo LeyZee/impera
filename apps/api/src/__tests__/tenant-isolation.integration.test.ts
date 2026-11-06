@@ -1,4 +1,12 @@
-import { DraftIdSchema, newId, PayPeriodSchema, TeamMemberSchema, type TeamMember } from '@impera/contracts';
+import {
+  DraftIdSchema,
+  newId,
+  PayPeriodSchema,
+  ShiftFeedbackIdSchema,
+  ShiftTemplateIdSchema,
+  TeamMemberSchema,
+  type TeamMember,
+} from '@impera/contracts';
 import { eq, schema, sql } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -24,14 +32,60 @@ const PERIOD = PayPeriodSchema.parse('2026-11-01');
  * A valid body where the minimal one would stop at the schema: these routes check the creator in the handler, after
  * validation, so only a valid body proves it.
  */
-const BODIES: Readonly<Record<string, Record<string, unknown>>> = {
+const bodiesFor = (
+  ids: Readonly<Record<Seeded, string>>,
+): Readonly<Record<string, Record<string, unknown>>> => ({
   'POST /v1/conversations/:id/mode': { mode: 'auto' },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
-};
+  'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
+  'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
+  'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
+  'POST /v1/team/members/:memberId/notes': { body: 'Note inventée' },
+  'PUT /v1/scheduling/shifts/:shiftId/feedback': {
+    id: newId(ShiftFeedbackIdSchema),
+    nothingToReport: true,
+    comment: null,
+    incident: null,
+    signals: [],
+  },
+});
+
+/**
+ * What an active manager of A reaches of B, and only that: the whole team, its reports and its pay (ADR 0023, « le
+ * manager voit en plus toute l'équipe, la validation des rapports et des paies »), never B's fans, conversations nor
+ * persona. Exact: a route of B's content he would reach tomorrow fails the test.
+ */
+const AGENCY_SCOPE: readonly string[] = [
+  'manager of A: GET /v1/scheduling/shifts/:shiftId/report → 200',
+  'manager of A: GET /v1/scheduling/shifts/:shiftId/report → 200 shows Béa, bea-inventee',
+  'manager of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200',
+  'manager of A: DELETE /v1/scheduling/shift-templates/:templateId → 204',
+  'manager of A: GET /v1/team/members → 200 shows Bérénice',
+  'manager of A: GET /v1/team/members/:memberId → 200',
+  'manager of A: GET /v1/team/members/:memberId → 200 shows Bérénice',
+  'manager of A: GET /v1/team/members/:memberId/commission → 200',
+  'manager of A: GET /v1/team/members/:memberId/role → 200',
+  'manager of A: GET /v1/team/members/:memberId/notes → 200',
+  'manager of A: POST /v1/team/members/:memberId/notes → 201',
+  'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
+  'manager of A: GET /v1/payroll/contractors/:memberId/file → 200',
+];
+
+/** B's tables the manager changes through those routes: the planning of the team, never her content. */
+const AGENCY_WRITES: readonly string[] = ['shift_templates'];
 
 /** What B's seeded ids stand for, by the parameter that names them in a path. */
 type Seeded =
-  'creator' | 'conversation' | 'fan' | 'draft' | 'version' | 'member' | 'shift' | 'report' | 'user';
+  | 'creator'
+  | 'conversation'
+  | 'fan'
+  | 'draft'
+  | 'version'
+  | 'member'
+  | 'shift'
+  | 'report'
+  | 'user'
+  | 'template';
 
 /**
  * Path parameters that name no creator's row: the person's own (a session, a passkey), the agency's settings (a
@@ -47,7 +101,6 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
   platformModelId: 'a platform model, owner settings of the sales register',
   platformChatterId: 'a platform chatter, owner settings of the sales register',
   period: 'a pay period, agency-wide',
-  templateId: 'a shift template, agency planning',
   regimeId: 'a billing regime, agency settings',
   bonusId: 'a bonus, agency pay',
   penaltyId: 'a penalty, agency pay',
@@ -155,6 +208,7 @@ function seededFor(path: string, name: string): Seeded | undefined {
     shiftId: 'shift',
     shiftReportId: 'report',
     userId: 'user',
+    templateId: 'template',
   };
   return byName[name];
 }
@@ -246,11 +300,12 @@ describe('no route lets the people of one creator reach another one (audit des t
     email: string,
     displayName: string,
     creatorIds: readonly string[],
+    teamRole: 'chatter' | 'manager' = 'chatter',
   ): Promise<{ readonly member: TeamMember; readonly cookie: string }> {
     const response = await team.call('POST', '/team/members', team.owner, {
       email,
       displayName,
-      teamRole: 'chatter',
+      teamRole,
       creatorIds,
       firstName: displayName,
       lastName: 'Inventé',
@@ -336,6 +391,18 @@ describe('no route lets the people of one creator reach another one (audit des t
       .where(eq(schema.shiftReports.id, report));
     if (shift === undefined) throw new Error('B’s shift was not seeded');
     const accountOfB = await account('bea-compte@example.test', 'creator', [bea]);
+    const template = newId(ShiftTemplateIdSchema);
+    await admin.insert(schema.shiftTemplates).values({
+      id: template,
+      creatorId: bea,
+      platformAccountId: beas,
+      memberId: chatterOfB.id,
+      weekday: 1,
+      startMinute: 600,
+      endMinute: 720,
+      validFrom: '2026-11-02',
+      createdBy: team.ownerId,
+    });
     ids = {
       creator: bea,
       conversation: conversationId,
@@ -346,6 +413,7 @@ describe('no route lets the people of one creator reach another one (audit des t
       shift: shift.id,
       report,
       user: accountOfB.userId,
+      template,
     };
     markers = ['Béa', 'FanDeBea', 'Bérénice', 'bea-inventee', 'Message inventé pour Béa'];
     people = [
@@ -358,6 +426,10 @@ describe('no route lets the people of one creator reach another one (audit des t
         cookie: (await account('anna-compte@example.test', 'creator', [anna])).cookie,
       },
       { role: 'chatter of A', cookie: (await member('aurore@example.test', 'Aurore', [anna])).cookie },
+      {
+        role: 'manager of A',
+        cookie: (await member('maeva@example.test', 'Maéva', [anna], 'manager')).cookie,
+      },
     ];
   });
 
@@ -383,11 +455,15 @@ describe('no route lets the people of one creator reach another one (audit des t
   it('answers none of A’s people with B’s ids, shows them nothing of B, and changes none of B’s rows', async () => {
     const routes = routesOf(team.server.printRoutes({ commonPrefix: false }));
     const before = await fingerprintOfB();
+    let beforeManager = before;
     const reached: string[] = [];
     const shown: string[] = [];
+    const agency: string[] = [];
+    const bodies = bodiesFor(ids);
     let swept = 0;
     let asked = 0;
     for (const person of people) {
+      if (person.role === 'manager of A') beforeManager = await fingerprintOfB();
       for (const route of routes) {
         const plan = planOf(route, ids);
         const withParams = route.path.includes(':');
@@ -403,23 +479,36 @@ describe('no route lets the people of one creator reach another one (audit des t
           // One address per request: the limiter counts by address, and a 429 would hide what the route answers.
           remoteAddress: `10.0.${String(Math.floor(asked / 250))}.${String(asked % 250)}`,
           ...(writes && {
-            payload: BODIES[`${route.method} ${route.path}`] ?? { creatorId: ids.creator },
+            payload: bodies[`${route.method} ${route.path}`] ?? { creatorId: ids.creator },
           }),
         });
         const where = `${person.role}: ${route.method} ${route.path} → ${String(response.statusCode)}`;
+        const leaked = markers.filter((marker) => response.body.includes(marker));
+        const sees = (finding: string) =>
+          (person.role === 'manager of A' ? agency : finding.includes(' shows ') ? shown : reached).push(
+            finding,
+          );
         if (plan.kind === 'swept') {
           swept += 1;
-          if (response.statusCode >= 200 && response.statusCode < 300) reached.push(where);
+          if (response.statusCode >= 200 && response.statusCode < 300) sees(where);
         }
-        const leaked = markers.filter((marker) => response.body.includes(marker));
-        if (leaked.length > 0) shown.push(`${where} shows ${leaked.join(', ')}`);
+        if (leaked.length > 0) sees(`${where} shows ${leaked.join(', ')}`);
       }
     }
     expect(swept).toBeGreaterThan(100);
-    expect({ reached, shown, changed: await fingerprintOfB() }).toEqual({
+    const after = await fingerprintOfB();
+    expect({
+      reached,
+      shown,
+      agency,
+      changed: beforeManager,
+      changedByManager: Object.keys(after).filter((table) => after[table] !== beforeManager[table]),
+    }).toEqual({
       reached: Object.keys(KNOWN_REACHED),
       shown: [],
+      agency: AGENCY_SCOPE,
       changed: before,
+      changedByManager: AGENCY_WRITES,
     });
   });
 });

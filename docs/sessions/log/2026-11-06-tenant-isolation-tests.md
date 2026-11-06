@@ -19,12 +19,15 @@
     - aucune donnée de B dans une réponse ;
     - aucune ligne de B modifiée (toutes les tables à `creator_id`, plus son chatteur et son compte).
   - Un paramètre inconnu fait échouer le test. Les routes non couvertes sont listées une à une avec leur raison.
+- **Relecture Équipe** :
+  - `templateId` est semé chez B, car `shift_templates` porte `creator_id`.
+  - Un manager actif de A (portée agency) est ajouté. Ce qu'il atteint de B est listé exactement dans `AGENCY_SCOPE` (ADR 0023 : l'équipe, ses rapports et sa paie, jamais le contenu de B). Les tables de B qu'il change sont listées dans `AGENCY_WRITES` : seulement `shift_templates`.
 - **D** : les tests existants sont gardés.
 
 ## Reste
 
 - `GET /v1/scheduling/shifts/:shiftId/feedback` répond 200 `{feedback: null}` sur le shift d'une autre créatrice, et 404 sur un id inconnu : c'est un oracle d'existence, sans donnée qui sorte. La route est en liste connue (`KNOWN_REACHED`), et sa correction revient à Équipe (`feedback-store.ts`, `inShiftCreator`). Le test casse quand elle est corrigée, et la ligne doit alors être retirée.
-- Quatorze appels s'arrêtent au schéma (400) avant le contrôle de créatrice : shifts, rapports, notes, profil et documents de prestataire. Un corps valide pour chacun prouverait davantage.
+- Après relecture d'Équipe, cinq routes de planning et d'équipe reçoivent un corps valide : rapport, rejet, shift, note et retour. Le profil et les documents de prestataire s'arrêtent encore au schéma (400). Rejoués à la main par Équipe avec un corps valide, ils répondent 404.
 - Routes non couvertes : la liste `RESIDUAL` (demandes d'échange et de congé, espace créatrice, factures, relevés, documents de prestataire). Chacune est couverte par les tests de son module.
 
 ## Découvertes
