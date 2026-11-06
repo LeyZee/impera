@@ -92,7 +92,7 @@ describe('Créatrices › Persona, Desirali’s sheet (ADR 0079)', () => {
     // The demo leaves her weight and her number of partners unanswered: 57 of 59.
     expect(gauge.getAttribute('aria-valuenow')).toBe('97');
     expect(gauge.getAttribute('aria-valuetext')).toBe('57 questions sur 59');
-    const missing = screen.getByText('À compléter :').parentElement;
+    const missing = screen.getByText(/^À compléter\s:$/u).parentElement;
     if (missing === null) throw new Error('the panels still to complete have a line');
     expect(
       within(missing)
@@ -284,7 +284,7 @@ describe('Créatrices › Persona, recette 28/10', () => {
     await serveVersions([SUMMARY], () => [500, {}]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     const note = await screen.findByText(/C’est avec elle que l’agent écrit ses brouillons/u);
-    expect(note.textContent).toContain('Version active : 0.2.0.');
+    expect(note.textContent).toContain('Version active\u00a0: 0.2.0.');
     expect(note.textContent).not.toMatch(/persona fixée sur le serveur/u);
   });
 

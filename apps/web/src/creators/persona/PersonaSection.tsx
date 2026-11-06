@@ -712,7 +712,7 @@ function noteOf(ready: PersonaReady, known: boolean, upcoming: string): string {
   return `Chaque enregistrement crée une nouvelle version, inactive, et tu actives la nouvelle quand elle est prête. ${
     active === undefined
       ? 'Aucune version n’est active pour l’instant : l’agent n’écrit rien pour elle, et aucun message ne peut partir avant l’activation d’une version.'
-      : `Version active : ${active.version}. C’est avec elle que l’agent écrit ses brouillons.`
+      : `Version active\u00a0: ${active.version}. C’est avec elle que l’agent écrit ses brouillons.`
   }`;
 }
 
@@ -952,10 +952,22 @@ function Moves({
   onShow: (field: string) => void;
 }): JSX.Element {
   const count = moved.moves.length;
+  const placed = plural(count, 'réponse a été placée', 'réponses ont été placées');
+  // « Relis-les » never splits at its hyphen, its colon never starts a line.
+  const reread = <span className="ps-nowrap">Relis-les</span>;
   const lead =
-    moved.file === null
-      ? `Sa dernière version suit l’ancienne fiche. Elle s’ouvre ici dans la nouvelle, et ${plural(count, 'réponse a été placée', 'réponses ont été placées')} dans la question la plus proche. Relis-les : enregistrer en fait la version ${upcoming}.`
-      : `Ce fichier suit l’ancienne fiche : ${plural(count, 'réponse a été placée', 'réponses ont été placées')} dans la question la plus proche. Relis-les avant d’enregistrer.`;
+    moved.file === null ? (
+      <>
+        Sa dernière version suit l’ancienne fiche. Elle s’ouvre ici dans la nouvelle, et {placed} dans la
+        question la plus proche. {reread}
+        {`\u00a0: enregistrer en fait la version ${upcoming}.`}
+      </>
+    ) : (
+      <>
+        {`Ce fichier suit l’ancienne fiche\u00a0: ${placed} dans la question la plus proche. `}
+        {reread} avant d’enregistrer.
+      </>
+    );
   return (
     <details className="nv-disclosure ps-moves">
       <summary>
@@ -1019,7 +1031,7 @@ function Completion({
       </p>
       {missing.length === 0 ? null : (
         <p className="ps-completion__missing">
-          <span className="ps-muted">À compléter :</span>
+          <span className="ps-muted">{'À compléter\u00a0:'}</span>
           {missing.map(({ section, left }, index) => (
             <Fragment key={section}>
               {/* The space between two panels is where the line may break; each keeps its comma. */}{' '}

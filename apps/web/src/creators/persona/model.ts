@@ -571,7 +571,7 @@ export function withIssues(
 /** A move of the conversion in her words: what it was, and the question that holds it now. */
 export function moveLabel(move: PersonaMove): string {
   const question = questionOf(move.to.section, move.to.key)?.label ?? move.to.key;
-  return `${move.from} : dans « ${panelTitle(move.to.section)} › ${question} »`;
+  return `${move.from}\u00a0: dans «\u00a0${panelTitle(move.to.section)}\u00a0› ${question}\u00a0»`;
 }
 
 /** An emoji as two lists compare it: without the variation selector some keyboards add (« ❤ » and « ❤️ »). */

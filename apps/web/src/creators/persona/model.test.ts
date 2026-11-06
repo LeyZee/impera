@@ -269,7 +269,7 @@ describe('Importing a file', () => {
 
   it('says where a conversion put an answer that had no question of its own', () => {
     expect(moveLabel({ from: 'Origine', to: { section: 'identity', key: 'nickname' } })).toBe(
-      'Origine : dans « Identité et informations de base › Surnom »',
+      'Origine\u00a0: dans «\u00a0Identité et informations de base\u00a0› Surnom\u00a0»',
     );
   });
 });

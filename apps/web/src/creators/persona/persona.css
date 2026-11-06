@@ -1346,6 +1346,9 @@
     background: none;
   }
 }
+.ps-nowrap {
+  white-space: nowrap;
+}
 .ps-moves__body {
   display: flex;
   flex-direction: column;
