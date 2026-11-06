@@ -532,7 +532,7 @@ export function createDrizzleTeamStore(
 }
 
 /** How a platform's team account is linked: to a member of the team, or to the agent (ADR 0050 § 5). */
-export type PlatformChatterLink =
+type PlatformChatterLink =
   { readonly kind: 'member'; readonly memberId: TeamMemberId } | { readonly kind: 'agent' };
 
 /**
