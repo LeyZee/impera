@@ -209,7 +209,7 @@
   gap: 6px;
 }
 .rq-reason-field {
-  resize: vertical;
+  resize: none;
   min-height: 84px;
 }
 .rq-hint,
