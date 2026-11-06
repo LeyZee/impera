@@ -65,12 +65,19 @@ export function ScriptsSection({
           </p>
         </div>
       );
-    const waiting = rows.filter((row) => row.exportedAt === null).length;
+    // Only what can be copied now counts: a script being checked or without an archive is not « à recopier ».
+    const toCopy = rows.filter((row) => row.exportedAt === null && row.blocker === null);
+    const waiting = toCopy.length;
+    const pending = rows.filter((row) => row.exportedAt === null).length;
     return (
       <>
         <p className="aa-summary nv-num">
           {rows.length === 1 ? '1 script' : `${String(rows.length)} scripts`}
-          {waiting === 0 ? ' · tous copiés dans Reveal' : ` · ${String(waiting)} à recopier`}
+          {waiting > 0
+            ? ` · ${String(waiting)} à recopier`
+            : pending === 0
+              ? ' · tous copiés dans Reveal'
+              : ' · aucun à recopier pour l’instant'}
         </p>
         <ul className="sx-list">
           {rows.map((row, index) => (
@@ -80,6 +87,8 @@ export function ScriptsSection({
               index={index}
               creatorId={creatorId}
               timezone={timezone}
+              // One neon per screen: the next script to copy carries it, the others say the same thing softly.
+              leading={row.dropId === toCopy[0]?.dropId}
               onConfirm={() => {
                 setConfirming(row);
               }}
@@ -133,12 +142,14 @@ function ScriptCard({
   index,
   creatorId,
   timezone,
+  leading,
   onConfirm,
 }: {
   row: SentScriptRow;
   index: number;
   creatorId: CreatorId;
   timezone: string;
+  leading: boolean;
   onConfirm: () => void;
 }): JSX.Element {
   const id = useId();
@@ -190,7 +201,11 @@ function ScriptCard({
             {row.exportedAt === null ? 'Télécharger l’archive' : 'Télécharger à nouveau'}
           </a>
           {row.exportedAt === null ? (
-            <button type="button" className="nv-btn nv-btn--neon nv-btn--sm" onClick={onConfirm}>
+            <button
+              type="button"
+              className={`nv-btn nv-btn--sm ${leading ? 'nv-btn--neon' : 'nv-btn--soft'}`}
+              onClick={onConfirm}
+            >
               Copié dans Reveal
             </button>
           ) : null}
@@ -245,8 +260,8 @@ function ConfirmCopy({
           jusqu’au bout.
         </p>
         <p className="sx-dialog__text nv-num">
-          Ses originaux de ce script partent alors dans 30 jours, au plus tard le {until}. La confirmation ne
-          se retire pas.
+          Ses originaux de ce script partent alors dans 30{'\u00a0'}jours, au plus tard le {until}. La
+          confirmation ne se retire pas.
         </p>
         {error === null ? null : (
           <p className="sx-error nv-swap" role="alert">

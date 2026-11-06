@@ -78,6 +78,24 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
     expect(screen.getByText('1 script · 1 à recopier')).toBeDefined();
   });
 
+  it('counts « à recopier » only what can be copied now, and gives the neon to the next one alone', async () => {
+    const next = { ...SENT, id: '0192f3a0-0000-7000-8000-000000000d02', scriptNumber: 13 };
+    const checking = {
+      ...SENT,
+      id: '0192f3a0-0000-7000-8000-000000000d03',
+      scriptNumber: 14,
+      state: 'received',
+    };
+    serve({
+      [CONTENT]: () => ({ status: 200, body: { requests: [REQUEST], drops: [SENT, next, checking] } }),
+      [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
+    });
+    show();
+    expect(await screen.findByText('3 scripts · 2 à recopier')).toBeDefined();
+    const confirms = screen.getAllByRole('button', { name: 'Copié dans Reveal' });
+    expect(confirms.map((button) => button.classList.contains('nv-btn--neon'))).toEqual([true, false]);
+  });
+
   it('confirms the copy behind a dialog, then reads it copied with the date her originals go', async () => {
     let copied = false;
     const calls = serve({

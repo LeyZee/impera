@@ -22,7 +22,7 @@ export const BLOCKER_TEXTS: Readonly<Record<ExportBlocker, string>> = {
   not_ready: 'Ses médias sont encore vérifiés : l’archive arrive dès qu’ils sont tous gardés.',
   moment_unknown:
     'Demandé avant que le moment de tournage soit fixé : son archive ne devine pas s’il est de jour ou de nuit.',
-  too_large: 'Ses médias pèsent plus de 4 Go : ils ne tiennent pas dans une seule archive.',
+  too_large: 'Ses médias pèsent plus de 4\u00a0Go : ils ne tiennent pas dans une seule archive.',
 };
 
 export interface SentScriptRow {
@@ -111,8 +111,8 @@ function weightOf(bytes: number): string {
   return `${String(Math.max(1, Math.round(bytes / 1_000_000)))}${NBSP}Mo`;
 }
 
-/** « 6 novembre », in her time zone. */
+/** « 6 novembre », in her time zone, never broken between the day and its month. */
 export const dayLabel = (iso: string, timezone: string): string =>
-  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: timezone }).format(
-    new Date(iso),
-  );
+  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: timezone })
+    .format(new Date(iso))
+    .replace(' ', NBSP);
