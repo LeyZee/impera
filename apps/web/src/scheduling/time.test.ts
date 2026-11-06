@@ -121,6 +121,25 @@ describe('day fields', () => {
     expect(dayOfInput('0/3', today)).toBeNull();
     expect(dayOfInput('28/03/202', today)).toBeNull();
   });
+
+  it('reads a day looked back to up to today, and two digits of a year that would lie ahead as the last century', () => {
+    const today = '2026-11-05';
+    expect(dayOfInput('5/11', today, 'past')).toBe('2026-11-05');
+    expect(dayOfInput('6/11', today, 'past')).toBe('2025-11-06');
+    expect(dayOfInput('12/05/98', today, 'past')).toBe('1998-05-12');
+    expect(dayOfInput('12/05/26', today, 'past')).toBe('2026-05-12');
+    expect(dayOfInput('120598', today, 'past')).toBe('1998-05-12');
+    expect(dayOfInput('12/05/1998', today, 'past')).toBe('1998-05-12');
+    // Ahead, two digits stay this century.
+    expect(dayOfInput('12/05/98', today)).toBe('2098-05-12');
+  });
+
+  it('reads a bound of a period in this year, before today or after it', () => {
+    const today = '2026-11-05';
+    expect(dayOfInput('1/1', today, 'year')).toBe('2026-01-01');
+    expect(dayOfInput('31/12', today, 'year')).toBe('2026-12-31');
+    expect(dayOfInput('30/06/2025', today, 'year')).toBe('2025-06-30');
+  });
 });
 
 describe('time fields', () => {

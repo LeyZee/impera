@@ -24,6 +24,7 @@ import { ACCOUNT_HINTS, ACCOUNT_LABELS } from '@/accounting/model';
 import { TEXT_NAMES } from '@/contractors/model';
 import type { InvoiceRefusal } from '@/invoices/api';
 import { invoiceRefusalText } from '@/invoices/model';
+import { DayField } from '@/scheduling/DayField';
 import { fullDay } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 
@@ -273,7 +274,8 @@ export function ValidateDialog({
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<InvoiceRefusal | null>(null);
-  const ok = /^\d{4}-\d{2}-\d{2}$/u.test(day) && day <= today;
+  const [dayUnreadable, setDayUnreadable] = useState(false);
+  const ok = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day <= today;
 
   const submit = async (event: SyntheticEvent): Promise<void> => {
     event.preventDefault();
@@ -303,22 +305,24 @@ export function ValidateDialog({
           <label className="nv-field__label" htmlFor={`${id}-day`}>
             Validé le
           </label>
-          <input
+          <DayField
             id={`${id}-day`}
-            type="date"
-            className="nv-field__control nv-glass nv-num"
-            max={today}
             value={day}
-            aria-invalid={tried && !ok}
-            aria-describedby={`${id}-day-hint`}
-            onChange={(event) => {
-              setDay(event.target.value);
+            invalid={tried && !ok}
+            describedBy={`${id}-day-hint`}
+            onChange={(next) => {
+              setDay(next);
             }}
+            today={today}
+            toward="past"
+            onUnreadable={setDayUnreadable}
           />
           <p id={`${id}-day-hint`} className={tried && !ok ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {tried && !ok
-              ? `Au plus tard aujourd’hui, le ${fullDay(today)}.`
-              : 'Celui de son écrit ou de son courriel.'}
+            {tried && dayUnreadable
+              ? 'Un jour comme 28/10/2026, ou 28/10.'
+              : tried && !ok
+                ? `Au plus tard aujourd’hui, le ${fullDay(today)}.`
+                : 'Celui de son écrit ou de son courriel.'}
           </p>
         </div>
         <Refusal refusal={refusal} />

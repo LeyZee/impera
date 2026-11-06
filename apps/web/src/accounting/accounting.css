@@ -25,7 +25,7 @@
 .ex-days {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--nv-space-2) var(--nv-space-3);
 }
 .ex-days .nv-field {
@@ -37,9 +37,6 @@
 }
 .ex-ask {
   align-self: flex-start;
-}
-.ex-days .ex-ask {
-  align-self: flex-end;
 }
 
 /* A file ready: its name and weight, then the button that saves its bytes. */

@@ -193,8 +193,7 @@ describe('Équipe › Membres › Dossier', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Attribuer un régime' }));
     const from = within(dialog()).getByLabelText('À partir du');
-    expect(from.getAttribute('min')).toBe('2026-12-02');
-    expect(within(dialog()).getByDisplayValue('2026-12-02')).toBe(from);
+    expect(within(dialog()).getByDisplayValue('02/12/2026')).toBe(from);
     fireEvent.change(from, { target: { value: '2026-12-01' } });
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Attribuer' }));
     expect(

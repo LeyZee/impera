@@ -20,6 +20,7 @@ import {
 import { bpsOfPercent, confirmSentence, dayLabel, earliestDay, percentOf, standing } from './model';
 import './rate.css';
 
+import { DayField } from '@/scheduling/DayField';
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
 
 /**
@@ -109,7 +110,8 @@ function RateSheet({
   const earliest = earliestDay(list);
   const bps = bpsOfPercent(percent);
   const percentWrong = percent.trim() !== '' && bps === null;
-  const dayWrong = fromDay !== '' && fromDay < earliest;
+  const [dayUnreadable, setDayUnreadable] = useState(false);
+  const dayWrong = dayUnreadable || (fromDay !== '' && fromDay < earliest);
   const ready = bps !== null && fromDay !== '' && !dayWrong;
   const dirty = percent.trim() !== '' || fromDay !== '';
   useEffect(() => {
@@ -231,23 +233,25 @@ function RateSheet({
                   : 'Demain au plus tôt : les ventes déjà faites gardent leur pourcentage.'
               }
             >
-              <input
+              <DayField
                 id={`${id}-day`}
-                type="date"
-                className="nv-glass nv-field__control ps-input"
-                min={earliest}
+                className="ps-input"
                 value={fromDay}
                 disabled={saving}
-                aria-invalid={dayWrong}
-                aria-describedby={dayWrong ? `${id}-day-error` : undefined}
-                onChange={(event) => {
-                  setFromDay(event.target.value);
+                invalid={dayWrong}
+                describedBy={dayWrong ? `${id}-day-error` : undefined}
+                onChange={(next) => {
+                  setFromDay(next);
                   edit();
                 }}
+                today={earliest}
+                onUnreadable={setDayUnreadable}
               />
               {dayWrong ? (
                 <p className="ps-error" id={`${id}-day-error`}>
-                  {`Le ${dayLabel(earliest)} au plus tôt.`}
+                  {dayUnreadable
+                    ? 'Un jour comme 28/03/2027, ou 28/3.'
+                    : `Le ${dayLabel(earliest)} au plus tôt.`}
                 </p>
               ) : null}
             </Field>

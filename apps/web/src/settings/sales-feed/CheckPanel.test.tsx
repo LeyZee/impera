@@ -288,6 +288,22 @@ describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
     expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
   });
 
+  // Relecture des captures (#569): a day that is no day is said under its own field, the check waits for it.
+  it('says under its own field a day it cannot read, and does not check', async () => {
+    const fetch = page(ok(report()));
+    const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Autres jours' }));
+    const from = within(panel).getByLabelText('Du');
+    fireEvent.change(from, { target: { value: '31/02' } });
+    const said = within(panel).getByText('Un jour comme 01/10/2026.');
+    expect(from.getAttribute('aria-describedby')).toBe(said.id);
+    expect(within(panel).getByRole('button', { name: 'Vérifier ces jours' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+
   it('says the platform’s refusal and the server’s sentence for an export it cannot read', async () => {
     let answer: { status: number; body: unknown } = {
       status: 502,

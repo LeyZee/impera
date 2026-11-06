@@ -17,9 +17,9 @@ import './agency-agenda.css';
 import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, cityOf, dayOf, mondayOf, readerZone, weekdayOf, weekLabel } from '@/scheduling/time';
 import {
+  AgendaDay,
   Categories,
   Choices,
-  DayField,
   draftWhen,
   Hours,
   Preview,
@@ -360,12 +360,14 @@ function ProposeDialog({
             }}
           />
         ) : (
-          <DayField
+          <AgendaDay
             value={draft.day}
             invalid={tried && problems.includes('day')}
+            tried={tried}
             onChange={(next) => {
               set({ day: next });
             }}
+            onUnreadable={onUnreadable}
           />
         )}
         {draft.kind === 'timed' ? (
