@@ -1,5 +1,4 @@
 import {
-  PersonaOverviewSchema,
   type CreatorId,
   type PersonaOverview,
   type PersonaVersionId,
@@ -11,7 +10,7 @@ import { useId, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardE
 import type { Playground } from './usePlayground';
 
 import { useCreators } from '@/creators/api';
-import { activateVersion } from '@/creators/persona/source';
+import { activateVersion, fetchPersonaOverview } from '@/creators/persona/source';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 
 /** The value of the invented persona in the creators' list: no creator has an empty id. */
@@ -98,15 +97,6 @@ function Chips({
   );
 }
 
-/** `GET /v1/creators/:id/persona`: her versions, newest first, the active one marked. */
-async function fetchOverview(creatorId: CreatorId): Promise<PersonaOverview> {
-  const response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/persona`, {
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`GET persona: ${String(response.status)}`);
-  return PersonaOverviewSchema.parse(await response.json());
-}
-
 /** Her version in force, else her newest: the one a trainer most likely wants to hear first. */
 const firstOf = (overview: PersonaOverview): PersonaVersionId | null =>
   (overview.versions.find((v) => v.isActive) ?? overview.versions[0])?.id ?? null;
@@ -126,7 +116,7 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
   const [reauth, setReauth] = useState(false);
   const overview = useQuery({
     queryKey: played === null ? ['playground-persona', 'none'] : overviewKey(played.creatorId),
-    queryFn: () => (played === null ? Promise.resolve(null) : fetchOverview(played.creatorId)),
+    queryFn: () => (played === null ? Promise.resolve(null) : fetchPersonaOverview(played.creatorId)),
     enabled: played !== null,
   });
   const versions = overview.data?.versions ?? [];
@@ -164,7 +154,7 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
     const creator = creators.data?.find((c) => c.id === value);
     if (creator === undefined) return;
     const hers = await client
-      .query({ queryKey: overviewKey(creator.id), queryFn: () => fetchOverview(creator.id) })
+      .query({ queryKey: overviewKey(creator.id), queryFn: () => fetchPersonaOverview(creator.id) })
       .catch(() => null);
     if (hers === null) {
       setProblem('Ses versions ne se chargent pas. Réessaie dans un instant.');

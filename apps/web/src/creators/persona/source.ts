@@ -6,6 +6,7 @@ import {
   PersonaSampleReplyUnprocessableDetailsSchema,
   PersonaVersionSummarySchema,
   type Persona,
+  type PersonaOverview,
   type PersonaSampleReplyFault,
   type PersonaVersionSummary,
 } from '@impera/contracts';
@@ -33,6 +34,15 @@ export interface PersonaReady {
 export type PersonaLoad = { readonly kind: 'loading' } | { readonly kind: 'failed' } | PersonaReady;
 
 /** Parses the YAML text of a persona file; throws when it does not pass `PersonaSchema`. */
+/** `GET /v1/creators/:id/persona`: her latest version and every stored one, newest first, the active one marked. */
+export async function fetchPersonaOverview(creatorId: string): Promise<PersonaOverview> {
+  const response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/persona`, {
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error(`GET persona: ${String(response.status)}`);
+  return PersonaOverviewSchema.parse(await response.json());
+}
+
 export async function parsePersonaYaml(text: string): Promise<Persona> {
   const { parse } = await import('yaml');
   return PersonaSchema.parse(parse(text));
@@ -84,11 +94,7 @@ async function loadPersona(creatorId: string | null, name: string | null): Promi
     };
   };
   if (creatorId === null) return empty();
-  const response = await fetch(`/v1/creators/${encodeURIComponent(creatorId)}/persona`, {
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error(`GET persona: ${String(response.status)}`);
-  const { latest, versions } = PersonaOverviewSchema.parse(await response.json());
+  const { latest, versions } = await fetchPersonaOverview(creatorId);
   if (latest === null) return empty();
   return {
     kind: 'ready',
