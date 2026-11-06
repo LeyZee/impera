@@ -10,14 +10,7 @@ import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
 import { placeOf } from '../lib/tab';
 import { fetchMarkableCreators, sendCaptures, sendReadings } from '../lib/watch/api';
 import { captureMarked } from '../lib/watch/captures';
-import {
-  forgetLink,
-  linkState,
-  markRevoked,
-  readLink,
-  restrictToTrustedContexts,
-  saveLink,
-} from '../lib/watch/link-store';
+import { forgetLink, linkState, markRevoked, readLink, saveLink } from '../lib/watch/link-store';
 import { postOfHref } from '../lib/watch/pages';
 import {
   FromPopupSchema,
@@ -466,12 +459,10 @@ export default defineBackground(() => {
   });
 
   browser.runtime.onInstalled.addListener(() => {
-    void restrictToTrustedContexts();
     void syncWatchScript();
     void rebuildMenu([]);
   });
   browser.runtime.onStartup.addListener(() => {
-    void restrictToTrustedContexts();
     void syncWatchScript();
   });
   browser.permissions.onAdded.addListener(() => {

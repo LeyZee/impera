@@ -3,20 +3,17 @@ import { browser } from 'wxt/browser';
 
 /**
  * The person's watch link (VEI-01 « Relier l'extension », ADR 0066 § 7): the code pasted once in the popup's « Relier »,
- * kept in `chrome.storage.local` and read by the service worker alone. The popup hands it over and never reads it
- * back; the reader on instagram.com never touches storage. Removing the link in the CRM makes it worthless: the next
- * call answers 401, and the popup offers to paste a new code.
+ * kept in `chrome.storage.local` and read by the service worker alone. The browser does not wall that area off from the
+ * extension's content scripts (`setAccessLevel` applies to `storage.session` only): what keeps it there is that the
+ * extension's only content script, the reader on instagram.com, never touches storage, which `build.test.ts` checks
+ * on the built bundle. The popup hands the code over and never reads it back. Removing the link in the CRM makes it
+ * worthless: the next call answers 401, and the popup offers to paste a new code.
  */
 
 const TOKEN_KEY = 'watchLink';
 const REVOKED_KEY = 'watchLinkRevoked';
 
 export type LinkState = 'none' | 'linked' | 'revoked';
-
-/** Storage of the extension's own pages and worker only, where the browser allows it (Chrome 102+). */
-export async function restrictToTrustedContexts(): Promise<void> {
-  await browser.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }).catch(() => undefined);
-}
 
 export async function readLink(): Promise<string | null> {
   const stored: Record<string, unknown> = await browser.storage.local.get(TOKEN_KEY).catch(() => ({}));
