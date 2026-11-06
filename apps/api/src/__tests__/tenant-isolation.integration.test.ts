@@ -1,8 +1,10 @@
 import {
+  ContractorDocumentIdSchema,
   DraftIdSchema,
   newId,
   PayPeriodSchema,
   ShiftFeedbackIdSchema,
+  ShiftIdSchema,
   ShiftTemplateIdSchema,
   TeamMemberSchema,
   type TeamMember,
@@ -15,6 +17,7 @@ import { createOwner } from '../auth';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 import { activateDemoPersona } from './support/persona';
+import { MethodSchema, namesOf, routesOf, type Route } from './support/routes';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /**
@@ -24,7 +27,6 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
  * it is said below what it names. Invented data only (ADR 0010).
  */
 
-const MethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const PASSWORD = 'staple battery horse';
 const PERIOD = PayPeriodSchema.parse('2026-11-01');
 
@@ -48,7 +50,36 @@ const bodiesFor = (
     incident: null,
     signals: [],
   },
+  'PUT /v1/payroll/contractors/:memberId/profile': {
+    legalName: 'Nom inventé',
+    address: '1 rue Inventée, 75000 Paris',
+    taxId: null,
+    businessId: null,
+    vatNumber: null,
+    individualEntrepreneur: false,
+    legalForm: null,
+    shareCapitalMinor: null,
+    rcsCity: null,
+    email: 'facturation@nirvana.test',
+  },
 });
+
+/**
+ * Routes whose request is not a JSON body under `?creatorId=`: their own query, and the body they take as it is. The
+ * creator check runs after them, so only such a request proves it.
+ */
+const REQUESTS: Readonly<
+  Record<string, { readonly query: string; readonly contentType?: string; readonly payload?: Buffer }>
+> = {
+  // A PDF's first bytes: the route reads what a file is on them, and refuses the member before it keeps anything.
+  'POST /v1/payroll/contractors/:memberId/documents': {
+    query: `id=${newId(ContractorDocumentIdSchema)}&kind=urssaf_vigilance&issuedOn=2026-10-01`,
+    contentType: 'application/octet-stream',
+    payload: Buffer.from('%PDF-1.4\n%inventé\n'),
+  },
+  // Its query is strict: `?creatorId=` alone would stop it at the schema (relecture Équipe de #591).
+  'GET /v1/payroll/shifts/:shiftId/estimate': { query: 'amountMinor=12300' },
+};
 
 /**
  * What an active manager of A reaches of B, and only that: the whole team, its reports and its pay (ADR 0023, « le
@@ -68,7 +99,8 @@ const AGENCY_SCOPE: readonly string[] = [
   'manager of A: GET /v1/team/members/:memberId/notes → 200',
   'manager of A: POST /v1/team/members/:memberId/notes → 201',
   'manager of A: GET /v1/team/pay-rules → 200 shows Béa, bea-inventee',
-  'manager of A: GET /v1/payroll/contractors/:memberId/file → 200',
+  // The commission a report would earn (reco 19): the same reach as the report and the commission above.
+  'manager of A: GET /v1/payroll/shifts/:shiftId/estimate → 200',
 ];
 
 /** B's tables the manager changes through those routes: none, her planning included (Charles, 06/11). */
@@ -129,6 +161,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'GET /v1/creator-space/content/script-drops/:dropId': 'creator space: script drops tests',
   'PUT /v1/creator-space/content/script-drops/:dropId/slots/:slotKey': 'creator space: script drops tests',
   'POST /v1/creator-space/content/script-drops/:dropId/submit': 'creator space: script drops tests',
+  'GET /v1/creator-space/content/script-drops/:dropId/cards/:segmentKey': 'creator space: script drops tests',
   'POST /v1/creator-space/suggestions/:id/accept': 'creator space: agenda tests',
   'POST /v1/creator-space/suggestions/:id/decline': 'creator space: agenda tests',
   'DELETE /v1/creator-space/availabilities/:id': 'creator space: agenda tests',
@@ -156,40 +189,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
  * Answers 2xx with B's ids today, known and owned elsewhere: each says why and who corrects it. The list must stay
  * exact, so the day the route is corrected this test fails until its line is removed.
  */
-const KNOWN_REACHED: Readonly<Record<string, string>> = {
-  'operator of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
-    'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
-  'chatter of A: GET /v1/scheduling/shifts/:shiftId/feedback → 200':
-    'oracle d’existence, correction Équipe: 200 with no feedback for B’s shift, 404 for an unknown one',
-};
-
-/** A route of the server: its method and its path as declared, `:a|:b` where two routes name one segment apart. */
-interface Route {
-  readonly method: string;
-  readonly path: string;
-}
-
-/** The routes `printRoutes` draws as a tree, flattened; HEAD and the CORS preflight are left out. */
-function routesOf(tree: string): Route[] {
-  const stack: string[] = [];
-  const routes: Route[] = [];
-  for (const line of tree.split('\n')) {
-    const found = /^(?<indent>[│ ]*)[├└]── (?<segment>.+?)(?: \((?<methods>[A-Z, ]+)\))?$/u.exec(line);
-    if (found?.groups === undefined) continue;
-    const depth = (found.groups['indent'] ?? '').length / 4;
-    const path = `${depth === 0 ? '' : (stack[depth - 1] ?? '')}${found.groups['segment'] ?? ''}`;
-    stack[depth] = path;
-    stack.length = depth + 1;
-    for (const method of (found.groups['methods'] ?? '').split(', ')) {
-      if (method !== '' && method !== 'HEAD' && method !== 'OPTIONS') routes.push({ method, path });
-    }
-  }
-  return routes;
-}
-
-/** The names a segment may carry: `:creatorId|:id` is one segment, named both ways by two routes. */
-const namesOf = (segment: string): string[] =>
-  segment.startsWith(':') ? segment.split('|').map((name) => name.replace(/^:/u, '')) : [];
+const KNOWN_REACHED: Readonly<Record<string, string>> = {};
 
 /** What B's id a parameter takes in this path, if B has one seeded for it. */
 function seededFor(path: string, name: string): Seeded | undefined {
@@ -264,6 +264,7 @@ describe('no route lets the people of one creator reach another one (audit des t
   let ids: Record<Seeded, string>;
   let markers: string[];
   let people: { readonly role: string; readonly cookie: string }[];
+  let onShift: { readonly member: TeamMember; readonly cookie: string };
 
   /** B's rows as the owner reads them: every table with a `creator_id`, her chatter and her account. */
   async function fingerprintOfB(): Promise<Record<string, string>> {
@@ -415,6 +416,19 @@ describe('no route lets the people of one creator reach another one (audit des t
       user: accountOfB.userId,
       template,
     };
+    onShift = await member('ambre@example.test', 'Ambre', [anna]);
+    // Whole minutes, as the planning writes them (`shifts_whole_minutes_check`).
+    const now = Math.floor(Date.now() / 60_000) * 60_000;
+    await admin.insert(schema.shifts).values({
+      id: newId(ShiftIdSchema),
+      creatorId: anna,
+      platformAccountId: team.annas,
+      memberId: onShift.member.id,
+      startsAt: new Date(now - 3_600_000),
+      endsAt: new Date(now + 3 * 3_600_000),
+      createdBy: team.ownerId,
+      updatedBy: team.ownerId,
+    });
     markers = ['Béa', 'FanDeBea', 'Bérénice', 'bea-inventee', 'Message inventé pour Béa'];
     people = [
       {
@@ -426,6 +440,8 @@ describe('no route lets the people of one creator reach another one (audit des t
         cookie: (await account('anna-compte@example.test', 'creator', [anna])).cookie,
       },
       { role: 'chatter of A', cookie: (await member('aurore@example.test', 'Aurore', [anna])).cookie },
+      // On shift now (ADR 0025, EQ-13): her window opens A's whole list to her, never anything of B.
+      { role: 'chatter of A on shift', cookie: onShift.cookie },
       {
         role: 'manager of A',
         cookie: (await member('maeva@example.test', 'Maéva', [anna], 'manager')).cookie,
@@ -452,6 +468,34 @@ describe('no route lets the people of one creator reach another one (audit des t
     expect(residual.sort()).toEqual(Object.keys(RESIDUAL).sort());
   });
 
+  it('lets the same valid requests through on A’s own rows: the refusals above are about B, never the request', async () => {
+    const bodies = bodiesFor(ids);
+    const own = (path: string) => path.replace(':memberId', onShift.member.id);
+    const profile = 'PUT /v1/payroll/contractors/:memberId/profile';
+    const document = 'POST /v1/payroll/contractors/:memberId/documents';
+    const upload = REQUESTS[document];
+    const details = bodies[profile];
+    if (upload?.payload === undefined || details === undefined)
+      throw new Error('the profile has its body and the document its bytes');
+    const answers = [
+      await team.server.inject({
+        method: 'PUT',
+        url: own(profile.slice(4)),
+        headers: { cookie: team.owner, origin: DASHBOARD_ORIGIN },
+        payload: details,
+      }),
+      await team.server.inject({
+        method: 'POST',
+        url: `${own(document.slice(5))}?${upload.query}`,
+        headers: { cookie: team.owner, origin: DASHBOARD_ORIGIN, 'content-type': 'application/octet-stream' },
+        payload: upload.payload,
+      }),
+    ];
+    expect(
+      answers.map((answer) => [answer.statusCode >= 200 && answer.statusCode < 300, answer.body]),
+    ).toEqual(answers.map((answer) => [true, answer.body]));
+  });
+
   it('answers none of A’s people with B’s ids, shows them nothing of B, and changes none of B’s rows', async () => {
     const routes = routesOf(team.server.printRoutes({ commonPrefix: false }));
     const before = await fingerprintOfB();
@@ -459,6 +503,8 @@ describe('no route lets the people of one creator reach another one (audit des t
     const reached: string[] = [];
     const shown: string[] = [];
     const agency: string[] = [];
+    // A valid body or request that stops at the schema proves nothing: it fails the test until it is valid again.
+    const invalid: string[] = [];
     const bodies = bodiesFor(ids);
     let swept = 0;
     let asked = 0;
@@ -470,19 +516,27 @@ describe('no route lets the people of one creator reach another one (audit des t
         if (plan.kind !== 'swept' && (withParams || route.method !== 'GET' || route.path.includes('*')))
           continue;
         asked += 1;
-        const url = `${plan.kind === 'swept' ? plan.url : route.path}?creatorId=${ids.creator}`;
+        const special = REQUESTS[`${route.method} ${route.path}`];
+        const url = `${plan.kind === 'swept' ? plan.url : route.path}?${special?.query ?? `creatorId=${ids.creator}`}`;
         const writes = route.method === 'POST' || route.method === 'PUT' || route.method === 'PATCH';
         const response = await team.server.inject({
           method: MethodSchema.parse(route.method),
           url,
-          headers: { cookie: person.cookie, origin: DASHBOARD_ORIGIN },
+          headers: {
+            cookie: person.cookie,
+            origin: DASHBOARD_ORIGIN,
+            ...(special?.contentType !== undefined && { 'content-type': special.contentType }),
+          },
           // One address per request: the limiter counts by address, and a 429 would hide what the route answers.
           remoteAddress: `10.0.${String(Math.floor(asked / 250))}.${String(asked % 250)}`,
           ...(writes && {
-            payload: bodies[`${route.method} ${route.path}`] ?? { creatorId: ids.creator },
+            payload: special?.payload ??
+              bodies[`${route.method} ${route.path}`] ?? { creatorId: ids.creator },
           }),
         });
         const where = `${person.role}: ${route.method} ${route.path} → ${String(response.statusCode)}`;
+        const key = `${route.method} ${route.path}`;
+        if (response.statusCode === 400 && (key in bodies || key in REQUESTS)) invalid.push(where);
         const leaked = markers.filter((marker) => response.body.includes(marker));
         const sees = (finding: string) =>
           (person.role === 'manager of A' ? agency : finding.includes(' shows ') ? shown : reached).push(
@@ -498,12 +552,14 @@ describe('no route lets the people of one creator reach another one (audit des t
     expect(swept).toBeGreaterThan(100);
     const after = await fingerprintOfB();
     expect({
+      invalid,
       reached,
       shown,
       agency,
       changed: beforeManager,
       changedByManager: Object.keys(after).filter((table) => after[table] !== beforeManager[table]),
     }).toEqual({
+      invalid: [],
       reached: Object.keys(KNOWN_REACHED),
       shown: [],
       agency: AGENCY_SCOPE,

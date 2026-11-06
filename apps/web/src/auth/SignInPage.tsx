@@ -1,4 +1,4 @@
-import { isBackupCode } from '@impera/contracts';
+import { PASSWORD_RESET_PAGE, isBackupCode } from '@impera/contracts';
 import { useEffect, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { PublicBrand } from './PublicBrand';
@@ -51,20 +51,28 @@ function fieldOf(form: FormData, name: string): string {
 export function SignInPage({
   onSignedIn,
   notice = null,
+  confirmation = null,
+  email = null,
 }: {
   onSignedIn: () => void;
   /** Why the page is shown again, when the session ended while the app was open (recette 05/11, SEC-01). */
   notice?: string | null;
+  /** What just went well before it: a new password chosen from the « mot de passe oublié » link (SEC-05 lot 3). */
+  confirmation?: string | null;
+  /** The account's address when it is already known (that same link): filled in, and the password asked first. */
+  email?: string | null;
 }): JSX.Element {
   const [step, setStep] = useState<'password' | 'code' | 'offer'>('password');
   // The notice stands in the error's place until the first try, which says its own.
   const [error, setError] = useState<string | null>(notice);
+  const [done, setDone] = useState<string | null>(confirmation);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [withPasskey] = useState(canUsePasskeys);
 
   async function passkey(): Promise<void> {
     setIsSubmitting(true);
     setError(null);
+    setDone(null);
     const result = await signInWithPasskey().catch((): PasskeySignInResult => 'unavailable');
     setIsSubmitting(false);
     if (result === 'ok') onSignedIn();
@@ -83,6 +91,7 @@ export function SignInPage({
     const form = new FormData(event.currentTarget);
     setIsSubmitting(true);
     setError(null);
+    setDone(null);
     const result = await signIn(fieldOf(form, 'email'), fieldOf(form, 'password')).catch(
       (): SignInResult => 'unavailable',
     );
@@ -111,6 +120,14 @@ export function SignInPage({
         >
           <PublicBrand page="Connexion" />
           <h1 className="sr-only">Connexion</h1>
+          {/* Said first, before the fields it is about: what just went well, until the first try. */}
+          {done === null ? null : (
+            <p role="status" className="nv-enter flex items-start gap-4 text-sm">
+              {/* The same dot, gap and grey as « Demande reçue », the page she comes from. */}
+              <span className="nv-orb nv-tone--ok mt-1 shrink-0" aria-hidden="true" />
+              <span className="text-[var(--nv-ink-muted)]">{done}</span>
+            </p>
+          )}
           <label className="nv-field">
             <span className="nv-field__label">E-mail</span>
             <input
@@ -119,7 +136,8 @@ export function SignInPage({
               type="email"
               autoComplete="username"
               required
-              autoFocus
+              defaultValue={email ?? undefined}
+              autoFocus={email === null}
             />
           </label>
           <label className="nv-field">
@@ -130,6 +148,7 @@ export function SignInPage({
               type="password"
               autoComplete="current-password"
               required
+              autoFocus={email !== null}
             />
           </label>
           {error === null ? null : (
@@ -150,9 +169,10 @@ export function SignInPage({
               Se connecter avec {gestureName()}
             </button>
           ) : null}
-          <p className="text-center text-sm text-[var(--nv-ink-faint)]">
-            Mot de passe oublié ? Demande un nouveau lien à la personne qui gère ton accès.
-          </p>
+          {/* A page of its own, opened as any address: the link to it can be kept or shared. */}
+          <a className="nv-btn nv-btn--plain nv-btn--sm self-center" href={PASSWORD_RESET_PAGE}>
+            Mot de passe oublié ?
+          </a>
         </form>
       )}
     </main>

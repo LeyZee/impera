@@ -143,6 +143,14 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '*/15 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.lapse_swaps'] },
   },
+  // A declared report against what the platform read during its shift (ADR 0073 § 4): every five minutes, the reports
+  // whose comparison became complete (window over, a quarter of an hour, the register read to its end since) and
+  // within the threshold are validated in the name of the automatic check. No backfill: the next run finds them all.
+  {
+    task: 'scheduling.check_reports',
+    match: '*/5 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_reports'] },
+  },
   // A role dated for a 1st or a 16th becomes the member's on that day (Charles, 28/10): each record takes the role in
   // force today, before the hour's recalculation. A run missed is caught up by the next one, no backfill.
   {

@@ -33,6 +33,8 @@ const rules = (n: number, accountN: number, fromPeriod: string, patch: Record<st
 
 let answer: { status: number; body: unknown };
 let settings: Record<string, unknown>;
+/** The threshold of a report against its platform (ADR 0073 § 3). */
+let threshold: Record<string, unknown>;
 let accounts: unknown[] | null = null;
 const writes: { path: string; body: unknown }[] = [];
 /** What a write waits for before it is answered: resolved, unless a test holds the answer back. */
@@ -54,6 +56,7 @@ function serve(): void {
         return gate.then(() => json(body, status));
       }
       if (url.pathname === '/v1/payroll/settings') return json(settings);
+      if (url.pathname === '/v1/scheduling/report-gap') return json(threshold);
       if (url.pathname === '/v1/scheduling/settings') return json(SCHEDULING_SETTINGS);
       if (url.pathname === '/v1/team/pay-rules') {
         return json({
@@ -86,6 +89,7 @@ beforeEach(() => {
   writes.length = 0;
   gate = Promise.resolve();
   settings = { minimumPayoutMinor: 1_500, nextMinimum: null, payoutDelayBusinessDays: null };
+  threshold = { bps: 100, minor: 500 };
   answer = { status: 201, body: rules(9, 2, '2026-10-16') };
   serve();
 });
@@ -310,6 +314,46 @@ describe('Réglages › Règles de paie', () => {
     );
     await act(() => Promise.resolve());
     expect(writes).toEqual([{ path: '/v1/payroll/settings', body: { payoutDelayBusinessDays: null } }]);
+  });
+
+  it('changes the threshold of a report against the platform after a recap (ADR 0073 § 3)', async () => {
+    renderSection();
+    const card = (await screen.findByText('Seuil d’écart des rapports')).closest<HTMLElement>('.rp-account');
+    if (card === null) throw new Error('No threshold');
+    fireEvent.click(await within(card).findByRole('button', { name: 'Changer' }));
+    expect(plain(card.querySelector('.rp-account__rules')?.textContent)).toBe('1 % ou 5,00 €');
+    expect(plain(card.textContent)).toContain(
+      'Sur un compte dont les ventes sont lues, un rapport se valide tout seul s’il n’est pas au-dessus des ventes lues et s’en écarte de 1 % au plus, ou de 5,00 € au plus.',
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Seuil d’écart' });
+    expect(within(dialog).getByLabelText('Écart en pourcentage')).toHaveProperty('value', '1');
+    fireEvent.change(within(dialog).getByLabelText('Écart en pourcentage'), { target: { value: '120' } });
+    fireEvent.change(within(dialog).getByLabelText('Ou écart en montant'), { target: { value: '1000,01' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(within(dialog).getByText('Un taux entre 0 et 100, comme 1 ou 2,5.')).toBeTruthy();
+    expect(plain(within(dialog).getByText(/^Un montant de 0 à/u).textContent)).toBe(
+      'Un montant de 0 à 1 000,00 €, deux décimales au plus.',
+    );
+
+    fireEvent.change(within(dialog).getByLabelText('Écart en pourcentage'), { target: { value: '2,5' } });
+    fireEvent.change(within(dialog).getByLabelText('Ou écart en montant'), { target: { value: '0' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(plain(within(dialog).getByText(/^À partir de maintenant/u).textContent)).toBe(
+      'À partir de maintenant, un rapport se valide tout seul s’il n’est pas au-dessus des ventes lues et s’en écarte de 2,5 % au plus.',
+    );
+    expect(writes).toEqual([]);
+    answer = { status: 200, body: { bps: 250, minor: 0 } };
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer le seuil' }));
+    await act(() => Promise.resolve());
+    expect(writes).toEqual([{ path: '/v1/scheduling/report-gap', body: { bps: 250, minor: 0 } }]);
+  });
+
+  it('says a threshold at zero lets only a report equal to the platform through', async () => {
+    threshold = { bps: 0, minor: 0 };
+    renderSection();
+    const card = (await screen.findByText('Aucun écart')).closest<HTMLElement>('.rp-account');
+    expect(plain(card?.querySelector('.rp-account__name')?.textContent)).toBe('Seuil d’écart des rapports');
+    expect(plain(card?.textContent)).toContain('seul un rapport égal aux ventes lues se valide tout seul.');
   });
 
   it('starts new rules of an account from its last ones, never from a period that has begun', async () => {

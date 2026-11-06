@@ -127,6 +127,11 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.tg-health__counts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
 .tg-health__sep {
   width: 1px;
   height: 18px;
@@ -806,7 +811,7 @@
   place-items: center;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
-  background: var(--nv-glass-fill);
+  background: var(--nv-select);
   transition:
     background-color var(--nv-dur-slow) var(--nv-ease-out),
     color var(--nv-dur-slow) var(--nv-ease-out);
@@ -926,6 +931,36 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+/* The password and the code under their labels, the actions at the foot (house rule for a confirmation). */
+.tg-reauth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.tg-reauth__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--nv-space-3);
+  align-items: end;
+}
+.tg-reauth__fields .nv-field,
+.tg-reauth__fields .nv-field__control {
+  min-width: 0;
+  width: 100%;
+}
+.tg-reauth__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+@media (max-width: 520px) {
+  .tg-reauth__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tg-reauth__actions > .nv-btn {
+    flex: 1 1 0;
+  }
 }
 .tg-verify {
   display: flex;
@@ -1080,11 +1115,12 @@
   .tg-log em {
     grid-column: 3;
   }
-  .tg-health__sep,
-  .tg-health__count {
+  /* The counts stay on a phone; only the rule between them goes, since the strip may wrap there. */
+  .tg-health__sep {
     display: none;
   }
-  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs wrap instead. */
+  /* Two scrolling bars on top of each other hid tabs off screen: on a phone the tabs wrap like chips, each at its own
+   * width, so none is hidden and none is stretched. */
   .tg-tabs {
     flex-wrap: wrap;
     overflow-x: visible;

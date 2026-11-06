@@ -7,7 +7,9 @@ import {
   type PayPeriod,
   type PayRulesSourceRefusal,
   type Shift,
+  type ReportGapThreshold,
   type ShiftReport,
+  type ShiftReportCheckReason,
   type ShiftReportList,
   type ShiftReportStatus,
 } from '@impera/contracts';
@@ -64,9 +66,29 @@ export const amountText = (minor: number, currency: Currency): string => money(m
 export const signedAmountText = (minor: number, currency: Currency): string =>
   money(minor, currency, 'exceptZero');
 
-/** The figure an amount field shows back, without its currency: « 1234,56 ». */
+/**
+ * The estimate under a report's amount (reco 19), in euros whatever the account declares in: what a report brings its
+ * member, what a correction adds to it or takes off. `memberName` when the agency corrects a member's report.
+ */
+export function estimateLine(
+  commissionMinor: number,
+  correcting: boolean,
+  memberName: string | null,
+): string {
+  if (correcting) {
+    const whose = memberName === null ? 'ta commission' : `la commission de ${memberName}`;
+    return `Effet estimé sur ${whose} : ${signedAmountText(commissionMinor, 'EUR')}`;
+  }
+  const whose = memberName === null ? 'Ta commission estimée' : `Commission estimée de ${memberName}`;
+  return `${whose} : ${amountText(commissionMinor, 'EUR')}`;
+}
+
+/** What the estimate leaves to the statement, said beside it. */
+export const ESTIMATE_LEAVES = 'avant paliers, objectifs, primes et malus';
+
+/** The figure an amount field shows back, without its currency: « 1234,56 », « −30,05 » with the true minus sign. */
 export const amountInput = (minor: number): string =>
-  `${minor < 0 ? '-' : ''}${String(Math.trunc(Math.abs(minor) / 100))},${String(Math.abs(minor) % 100).padStart(2, '0')}`;
+  `${minor < 0 ? '−' : ''}${String(Math.trunc(Math.abs(minor) / 100))},${String(Math.abs(minor) % 100).padStart(2, '0')}`;
 
 /** The symbol beside an amount field. */
 export const CURRENCY_SIGNS: Readonly<Record<Currency, string>> = { EUR: '€', USD: '$' };
@@ -138,11 +160,17 @@ export interface ToDo {
   readonly report: ShiftReport | null;
 }
 
-/** What is left to do in a period's list: the reports to make, then those sent back, oldest shift first. */
-export function toDoOf(list: ShiftReportList): ToDo[] {
+/**
+ * What is left to do in a period's list: the reports to make, those sent back, and, given the hour, those whose gap
+ * with the platform waits for their member (ADR 0073 § 5), oldest shift first.
+ */
+export function toDoOf(list: ShiftReportList, now?: Date): ToDo[] {
   return list.shifts
     .map((shift) => ({ shift, report: reportOf(list.reports, shift.id) }))
-    .filter(({ report }) => report === null || report.status === 'rejected')
+    .filter(
+      ({ report }) =>
+        report === null || report.status === 'rejected' || (now !== undefined && gapWaits(report, now)),
+    )
     .toSorted((a, b) => a.shift.startsAt.localeCompare(b.shift.startsAt));
 }
 
@@ -328,6 +356,8 @@ export const REPORT_ERRORS: Readonly<Record<ReportRefusalCode, string>> = {
     'De nouvelles règles partent d’une quinzaine qui n’a pas commencé ; seules les premières d’un compte partent de celle en cours.',
   pay_rules_source_conflict:
     'Ce compte ne peut pas encore être payé sur le net de sa plateforme : sa paie se lit dans les rapports validés.',
+  shift_report_gap_conflict:
+    'Ce rapport s’écarte des ventes lues sur la plateforme : son membre a 48 h après son shift pour le corriger ou l’expliquer.',
   role_forbidden: 'Ton rôle ne permet pas ce geste.',
   request_invalid: 'Ces valeurs ne conviennent pas : vérifie le montant et les textes.',
 };
@@ -384,3 +414,73 @@ export function currencyTyped(text: string): Currency | null {
 
 /** « en euros », « en dollars »: the currency an account declares in, in a sentence. */
 export const CURRENCY_WORDS: Readonly<Record<Currency, string>> = { EUR: 'en euros', USD: 'en dollars' };
+
+/**
+ * A report against what its platform read during the shift (ADR 0073), said by the screens: the server compares and
+ * decides, this only says it. A correction, or an account whose platform's sales are not read, has no check.
+ */
+
+/** Why a report is not compared (§ 7), to its member or to the agency, who can link what is missing. */
+export function uncheckedText(reason: ShiftReportCheckReason, platform: string, agency: boolean): string {
+  switch (reason) {
+    case 'feed_off':
+      return `Les ventes de ${platform} ne sont pas lues en ce moment : rien n’est comparé, la relecture se fait comme avant.`;
+    case 'model_unlinked':
+      return agency
+        ? `Ce compte n’est relié à aucun modèle de ${platform} : relie-le dans Réglages › Ventes pour comparer ses rapports.`
+        : `Ce compte n’est pas encore comparé aux ventes de ${platform} : l’agence relit ton rapport.`;
+    case 'chatter_unlinked':
+      return agency
+        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Réglages › Ventes pour comparer ses rapports.`
+        : `Ton compte de chatteur sur ${platform} n’est pas encore relié : l’agence relit ton rapport.`;
+  }
+}
+
+/**
+ * Whether a person's validation waits for its member (§ 5): a complete check out of the threshold or above the
+ * platform, neither explained nor past its delay. Correcting the amount sends a new version, compared again.
+ */
+export function gapWaits(report: ShiftReport, now: Date): boolean {
+  const { check } = report;
+  return (
+    check?.state === 'complete' &&
+    check.verdict === 'gap' &&
+    report.explanation === null &&
+    check.explainBy !== null &&
+    now.getTime() < Date.parse(check.explainBy)
+  );
+}
+
+/** A report with a gap, whatever became of it: what the agency counts per member and fortnight (§ 5). */
+export const hasGap = (report: ShiftReport): boolean =>
+  report.check?.state === 'complete' && report.check.verdict === 'gap';
+
+/**
+ * A sent report the reader decides now (ADR 0073, recette « attaque ça » of 06/11): one they may review, whose gap no
+ * longer waits for its member, and that the automatic check will not validate within five minutes. What the Dashboard
+ * and the tab Équipe › Rapports count, so that nothing stays in the queue unseen.
+ */
+export function awaitsDecision(report: ShiftReport, now: Date): boolean {
+  if (report.status !== 'submitted' || !report.canReview || gapWaits(report, now)) return false;
+  return !(report.check?.state === 'complete' && report.check.verdict === 'within');
+}
+
+/** « 3 à décider maintenant » : what the tab Équipe › Rapports counts and the page says under its waiting reports. */
+export const toDecideText = (count: number): string => `${String(count)} à décider maintenant`;
+
+/**
+ * « 1 % ou 5,00 € » : the threshold as Réglages and the screens say it (§ 3). A part at zero is not said; both at
+ * zero, « Aucun écart ».
+ */
+export const thresholdText = (threshold: ReportGapThreshold, currency: Currency = 'EUR'): string =>
+  threshold.bps === 0 && threshold.minor === 0
+    ? 'Aucun écart'
+    : [
+        threshold.bps === 0 ? null : percentText(threshold.bps),
+        threshold.minor === 0 ? null : amountText(threshold.minor, currency),
+      ]
+        .filter((part) => part !== null)
+        .join(' ou ');
+
+/** The chip of a report whose gap waits for its member (§ 5), wherever its member sees it: amber, what to do. */
+export const GAP_TO_EXPLAIN = 'Écart · À expliquer';

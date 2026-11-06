@@ -5,10 +5,12 @@ import {
   type FillScriptSlotBody,
   type ScriptDrop,
   type ScriptSlot,
+  type ScriptVariantLetter,
   type StartScriptDropBody,
 } from '@impera/contracts';
 
 import {
+  ContentDropCardNotFound,
   ContentDropFormatUnprocessable,
   ContentDropScriptUnprocessable,
   ContentDropSlotNotFound,
@@ -81,4 +83,18 @@ export async function submitScriptDrop(
 ): Promise<ContentDrop> {
   const { slots } = await versionOf(deps, await deps.store.read(userId, dropId));
   return deps.store.submit(userId, dropId, slots, now, correlationId);
+}
+
+/** A card of her script, its SVG: from the version her drop shoots, never the library's current one. */
+export async function scriptDropCard(
+  deps: ScriptDropDeps,
+  userId: string,
+  dropId: string,
+  segmentKey: string,
+  variant: ScriptVariantLetter | null,
+): Promise<string> {
+  const { versionId } = await deps.store.read(userId, dropId);
+  const svg = await deps.versions.card(versionId, segmentKey, variant);
+  if (svg === null) throw new ContentDropCardNotFound();
+  return svg;
 }

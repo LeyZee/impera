@@ -1,7 +1,7 @@
 // Tests of scripts/gitleaks-hook.mjs. Run: pnpm test:scripts
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -81,16 +81,24 @@ const noScan =
 
 test('refuses a push that carries an invented secret', { skip: noScan }, () => {
   const repo = mkdtempSync(join(tmpdir(), 'impera-gitleaks-'));
-  const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+  // Without the hook's GIT_DIR and the like: run from a worktree's pre-push, they would point every command below at
+  // the real repository, not at this one (relecture Médias, 06/11).
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')));
+  const git = (...args) => {
+    const run = spawnSync('git', args, { cwd: repo, env, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    return run.stdout;
+  };
   try {
     git('init', '-q');
+    assert.equal(realpathSync(git('rev-parse', '--show-toplevel').trim()), realpathSync(repo));
     git('config', 'user.email', 'test@example.invalid');
     git('config', 'user.name', 'Test');
     git('config', 'commit.gpgsign', 'false');
     writeFileSync(join(repo, 'README.md'), 'rien\n');
     git('add', '.');
     git('commit', '-q', '-m', 'clean');
-    const scan = () => spawnSync(process.execPath, [SCRIPT, 'push'], { cwd: repo, encoding: 'utf8' });
+    const scan = () => spawnSync(process.execPath, [SCRIPT, 'push'], { cwd: repo, env, encoding: 'utf8' });
     assert.equal(scan().status, 0);
     // An invented key in the shape of a real provider's (ADR 0010: nothing real).
     writeFileSync(

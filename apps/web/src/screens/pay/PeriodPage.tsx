@@ -84,6 +84,7 @@ import '@/reports/reports.css';
 import {
   amountText,
   followingPeriod,
+  gapWaits,
   percentText,
   periodLine,
   previousPeriod,
@@ -391,7 +392,7 @@ function PeriodView({
           rate={block?.kind === 'rate_missing'}
         />
         <Panel
-          className="nv-enter"
+          className="py-statements nv-enter"
           eyebrow={
             ended || data.beforeFirstClosing ? 'Relevés de commissions' : 'À ce jour, membre par membre'
           }
@@ -1186,6 +1187,9 @@ function BlockNotice({
     );
   }
   const count = block.reports.length;
+  // A gap still waiting for its member cannot be validated yet, and holds the period too (ADR 0073 § 5): sending it
+  // back frees the period, the report then counts on a later one once validated.
+  const explaining = block.reports.filter((report) => gapWaits(report, now)).length;
   const named = block.reports.slice(0, 3).map((report) => {
     const { name, startsAt } = block.whose(report);
     return startsAt === null || zone === null ? name : `${name}, ${dayMonthText(dayOf(startsAt, zone))}`;
@@ -1207,6 +1211,11 @@ function BlockNotice({
           <p className="rp-notice__text">
             {list} Tant {count === 1 ? 'qu’il attend' : 'qu’ils attendent'}, la quinzaine ne se clôt pas :{' '}
             {count === 1 ? 'il compterait' : 'ils compteraient'} sans avoir été relu{count === 1 ? '' : 's'}.
+            {explaining === 0
+              ? null
+              : explaining === 1
+                ? ' Un rapport en écart attend l’explication de son membre, 48 h au plus : le renvoyer libère la quinzaine.'
+                : ` ${String(explaining)} rapports en écart attendent l’explication de leur membre, 48 h au plus : les renvoyer libère la quinzaine.`}
           </p>
         </div>
         <Link to="/equipe/rapports" className="nv-btn nv-btn--neon nv-btn--sm">

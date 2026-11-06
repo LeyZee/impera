@@ -1044,6 +1044,7 @@ describe('telegram module on Postgres', () => {
         role: 'owner',
         creatorIds: [],
         routedCreatorIds: [],
+        shiftCreatorIds: [],
       };
     };
     const freshOnly: preValidationAsyncHookHandler = async (request, reply) => {

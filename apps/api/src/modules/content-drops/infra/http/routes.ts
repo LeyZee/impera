@@ -14,6 +14,9 @@ import {
   DropFileUploadSchema,
   FillScriptSlotBodySchema,
   RefuseContentRequestBodySchema,
+  SCRIPT_EXPORT_MEDIA_TYPE,
+  ScriptDropCardParamsSchema,
+  ScriptDropCardQuerySchema,
   ScriptDropSchema,
   ScriptSlotParamsSchema,
   StartScriptDropBodySchema,
@@ -27,10 +30,12 @@ import { z } from 'zod';
 import {
   fillScriptSlot,
   readScriptDrop,
+  scriptDropCard,
   startScriptDrop,
   submitScriptDrop,
   type ScriptDropDeps,
 } from '../../application/script-drops';
+import { exportScript } from '../../application/script-export';
 import { finishUpload, uploadOf } from '../../application/uploads';
 import type { AgencyContentStore, CreatorContentStore, DropStorage } from '../../domain/ports';
 
@@ -166,6 +171,33 @@ export function createContentDropRoutes(
       (request) => asCreator(() => readScriptDrop(scripts, signedIn(request.user), request.params.dropId)),
     );
 
+    // A card of her script (SC-02 lot b2), drawn from its frozen version: the same SVG and the same headers as the
+    // library's, what the agency wrote escaped, nothing else allowed by the CSP.
+    app.get(
+      '/creator-space/content/script-drops/:dropId/cards/:segmentKey',
+      {
+        ...creatorOnly,
+        schema: { params: ScriptDropCardParamsSchema, querystring: ScriptDropCardQuerySchema },
+      },
+      async (request, reply) => {
+        const svg = await asCreator(() =>
+          scriptDropCard(
+            scripts,
+            signedIn(request.user),
+            request.params.dropId,
+            request.params.segmentKey,
+            request.query.variant ?? null,
+          ),
+        );
+        return reply
+          .header('cache-control', 'private, no-cache')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-security-policy', "default-src 'none'")
+          .type('image/svg+xml; charset=utf-8')
+          .send(svg);
+      },
+    );
+
     app.put(
       '/creator-space/content/script-drops/:dropId/slots/:slotKey',
       {
@@ -275,6 +307,35 @@ export function createContentDropRoutes(
         );
         return agency.markSent(creatorId, userId, id, fileId, request.id);
       },
+    );
+
+    // A sent script's folder as a ZIP (SC-03 c): streamed as it is zipped, her media in it, never kept by a cache.
+    app.get(
+      '/creators/:creatorId/drops/:id/script-export',
+      { ...team, schema: { params: CreatorDropParamsSchema } },
+      async (request, reply) => {
+        const archive = await exportScript(
+          { agency, versions: scripts.versions, storage },
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          clock(),
+        );
+        return reply
+          .header('content-type', SCRIPT_EXPORT_MEDIA_TYPE)
+          .header('content-disposition', `attachment; filename="${archive.fileName}"`)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .send(archive.stream);
+      },
+    );
+
+    // « Copié dans Reveal » (SC-03 c): her originals of the script go 30 days later.
+    app.post(
+      '/creators/:creatorId/drops/:id/script-export/confirm',
+      { ...team, schema: { params: CreatorDropParamsSchema, response: { 200: ContentDropSchema } } },
+      (request) =>
+        agency.confirmExport(request.params.creatorId, signedIn(request.user), request.params.id, clock()),
     );
 
     app.post(

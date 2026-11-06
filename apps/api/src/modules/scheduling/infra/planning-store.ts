@@ -8,8 +8,8 @@ import {
   TeamMemberIdSchema,
   TeamMemberStatusSchema,
   type CreatorId,
+  type Platform,
   type ShiftId,
-  type UserId,
 } from '@impera/contracts';
 import {
   and,
@@ -450,6 +450,49 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         SNAPSHOT_READ,
       ),
 
+    // His own rows on each creator (`member_read`, `tenant_isolation`), never the admin connection: an owner or a
+    // manager reads every shift of a creator, so the member is named as well (EQ-13, audit RLS of the 06/11).
+    memberShifts: (actor, creatorIds, since) =>
+      withMember(
+        db,
+        actor,
+        async (tx) => {
+          const [member] = await tx
+            .select({ id: teamMembers.id, status: teamMembers.status })
+            .from(teamMembers)
+            .where(eq(teamMembers.userId, actor));
+          if (member === undefined) return null;
+          const mine: (StoredShift & { platform: Platform; handle: string })[] = [];
+          for (const creatorId of creatorIds) {
+            await enterCreator(tx, creatorId, creatorIds);
+            const rows = await tx
+              .select({
+                shift: shiftColumns,
+                platform: platformAccounts.platform,
+                handle: platformAccounts.handle,
+              })
+              .from(shifts)
+              .innerJoin(platformAccounts, eq(platformAccounts.id, shifts.platformAccountId))
+              .where(
+                and(
+                  eq(shifts.memberId, member.id),
+                  sql`${shifts.cancelledAt} is null`,
+                  sql`${shifts.endsAt} > ${since}`,
+                ),
+              );
+            mine.push(
+              ...rows.map((row) => ({
+                ...toShift(row.shift),
+                platform: PlatformSchema.parse(row.platform),
+                handle: row.handle,
+              })),
+            );
+          }
+          return { status: TeamMemberStatusSchema.parse(member.status), shifts: mine };
+        },
+        SNAPSHOT_READ,
+      ),
+
     onDuty: (actor, creatorIds, at) =>
       withMember(
         db,
@@ -623,38 +666,6 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
 /** The reads and the job that cross creators, on the admin connection (BYPASSRLS): named `*Unscoped`. */
 export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
   return {
-    memberShiftsUnscoped: (userId: UserId, since: Date) =>
-      withAdmin(adminDb, async (tx) => {
-        const [member] = await tx
-          .select({ id: teamMembers.id, status: teamMembers.status })
-          .from(teamMembers)
-          .where(eq(teamMembers.userId, userId));
-        if (member === undefined) return null;
-        const rows = await tx
-          .select({
-            shift: shiftColumns,
-            platform: platformAccounts.platform,
-            handle: platformAccounts.handle,
-          })
-          .from(shifts)
-          .innerJoin(platformAccounts, eq(platformAccounts.id, shifts.platformAccountId))
-          .where(
-            and(
-              eq(shifts.memberId, member.id),
-              sql`${shifts.cancelledAt} is null`,
-              sql`${shifts.endsAt} > ${since}`,
-            ),
-          );
-        return {
-          status: TeamMemberStatusSchema.parse(member.status),
-          shifts: rows.map((row) => ({
-            ...toShift(row.shift),
-            platform: PlatformSchema.parse(row.platform),
-            handle: row.handle,
-          })),
-        };
-      }),
-
     onShiftUnscoped: (creatorId, at) =>
       withAdmin(adminDb, async (tx) => {
         const rows = await tx

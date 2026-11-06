@@ -32,6 +32,9 @@ import {
   UpdatePayrollSettingsBodySchema,
   PenaltyIdSchema,
   PenaltySchema,
+  ShiftIdSchema,
+  ShiftReportEstimateQuerySchema,
+  ShiftReportEstimateSchema,
   UserIdSchema,
   ValidateCommissionStatementBodySchema,
   type UserId,
@@ -47,6 +50,8 @@ import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
 import type { PayrollRuleStore, PayrollSaleDecisionStore, PayrollSaleSignalStore } from '../domain/ports';
 
+import type { ReportEstimate } from './report-estimate';
+
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
@@ -54,6 +59,7 @@ const PeriodParamsSchema = z.object({ period: PayPeriodSchema });
 const StatementParamsSchema = z.object({ statementId: CommissionStatementIdSchema });
 const BonusParamsSchema = z.object({ bonusId: BonusIdSchema });
 const PenaltyParamsSchema = z.object({ penaltyId: PenaltyIdSchema });
+const ShiftParamsSchema = z.object({ shiftId: ShiftIdSchema });
 
 function userOf(request: FastifyRequest): UserId {
   if (request.user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
@@ -81,6 +87,7 @@ export function createPayrollRoutes(
   rules: PayrollRuleStore,
   decisions: PayrollSaleDecisionStore,
   signals: PayrollSaleSignalStore,
+  estimate: ReportEstimate,
   requireRole: RequireRole,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
@@ -136,6 +143,20 @@ export function createPayrollRoutes(
         schema: { querystring: MySalesQuerySchema, response: { 200: MySalesSchema } },
       },
       (request) => signals.mySales(userOf(request), request.query),
+    );
+
+    // Reco 19 of the recette (05/11): what the amount typed in a shift's report brings its member, as pay counts it.
+    app.get(
+      '/payroll/shifts/:shiftId/estimate',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: ShiftParamsSchema,
+          querystring: ShiftReportEstimateQuerySchema,
+          response: { 200: ShiftReportEstimateSchema },
+        },
+      },
+      (request) => estimate(userOf(request), request.params.shiftId, request.query.amountMinor),
     );
 
     app.post(

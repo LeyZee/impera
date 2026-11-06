@@ -329,6 +329,8 @@
 .tr-sheet {
   border-radius: var(--nv-radius-md);
   background: var(--nv-glass-fill);
+  /* A hairline holds its edge where the tint is too light to (Jour, recette CHAT-07). */
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
 .tr-sheet > summary {
   gap: var(--nv-space-3);
@@ -716,6 +718,11 @@
 }
 
 /* An empty state or a first read: one shape, the list's own width or a centred notice, as tall as its words. */
+/* A chatter off shift (or away) reads his banner under the title: the banner keeps its own height, and what he still
+ * holds takes the rest of the screen below it, never pushed to its foot by an empty row (EQ-13). */
+.nv-page.tr-page:has(> .sc-off) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
 .tr-page > .nv-coming {
   align-self: start;
   justify-self: center;
@@ -773,4 +780,40 @@
 }
 .tr-draft .nv-draft-panel__actions > .nv-btn--neon {
   flex-grow: 1.6;
+}
+/* The emergency stop, said above the list before any decision (recette CHAT-07): a row of its own, as tall as its
+ * sentence; the list and the reader keep the rest of the screen. */
+.nv-page.tr-page:has(> .tr-stop) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.tr-stop__in {
+  margin: 0;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+/* The owner's way to the lift: the Dashboard, said as a link. */
+.tr-stop__link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* A draft held by the stop: the banner's amber dot beside its sentence. */
+.tr-held {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+}
+.tr-held__dot {
+  flex: none;
+  /* Centred on the first line, however many the sentence takes. */
+  margin-top: calc(0.5lh - 3.5px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nv-warning);
 }

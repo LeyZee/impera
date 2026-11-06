@@ -16,6 +16,7 @@ import {
   RecordBlindTestBodySchema,
   RejectDraftBodySchema,
   SetAgentModeBodySchema,
+  SendingStopSchema,
   SetModeBodySchema,
   ReleaseBodySchema,
   TakeoverBodySchema,
@@ -63,6 +64,14 @@ function readsWholeCreator(user: CurrentUser, creatorId: CreatorId): boolean {
   return user.role === 'owner' || user.creatorIds.includes(creatorId);
 }
 
+/**
+ * Whether the user reads and treats every conversation of this creator: the whole creator, or a chatter whose access
+ * window is open on her (ADR 0025, EQ-13). Never her mode nor her blind tests: those stay `actorFor`'s.
+ */
+function treatsEveryConversation(user: CurrentUser, creatorId: CreatorId): boolean {
+  return readsWholeCreator(user, creatorId) || user.shiftCreatorIds.includes(creatorId);
+}
+
 /** The signed-in user, allowed on the whole creator (her mode, her blind tests): never through routing. */
 export function actorFor(
   request: FastifyRequest,
@@ -82,8 +91,9 @@ export function createConversationRoutes(
   const { requireRole } = guards;
 
   /**
-   * The signed-in user, allowed on this conversation: the whole creator, or (a team member whose scope is `self`,
-   * ADR 0024) only a conversation routed to him; anything else is 403.
+   * The signed-in user, allowed on this conversation: the whole creator, a chatter in his access window on her (ADR
+   * 0025), or (a team member whose scope is `self`, ADR 0024) only a conversation he holds, routed to him or taken
+   * over by him and not given back; anything else is 403.
    */
   const actorOn = async (
     request: FastifyRequest,
@@ -92,9 +102,26 @@ export function createConversationRoutes(
   ): Promise<UserId> => {
     const user = signedIn(request);
     const userId = UserIdSchema.parse(user.id);
-    if (readsWholeCreator(user, creatorId)) return userId;
+    if (treatsEveryConversation(user, creatorId)) return userId;
     if (!user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
-    if (!(await reader.isRoutedTo(creatorId, conversationId, userId))) throw new ConversationForbidden();
+    if (!(await reader.isHeldBy(creatorId, conversationId, userId))) throw new ConversationForbidden();
+    return userId;
+  };
+
+  /**
+   * `actorOn` for a read of the conversation and its fan's sheet: a chatter's is written in the audit log first, never
+   * what he read (ADR 0025), and a conversation the creator does not have answers 404 before anything is read.
+   */
+  const readerOn = async (
+    request: FastifyRequest,
+    creatorId: CreatorId,
+    conversationId: z.infer<typeof ConversationIdSchema>,
+    via?: 'messages' | 'events' | 'desire',
+  ): Promise<UserId> => {
+    const userId = await actorOn(request, creatorId, conversationId);
+    if (readsWholeCreator(signedIn(request), creatorId)) return userId;
+    const trace = { userId, ip: request.ip, ...(via === undefined ? {} : { via }) };
+    if (!(await reader.traceOpening(creatorId, conversationId, trace))) throw new ConversationNotFound();
     return userId;
   };
 
@@ -111,6 +138,21 @@ export function createConversationRoutes(
       if (mode === 'auto') await guards.recentLogin.call(app, request, reply);
     };
 
+    // Whether the emergency stop holds her messages (recette CHAT-07): whoever lists her conversations reads it, a
+    // chatter for a creator routed to him too, so that Suivi says it before a decision.
+    app.get(
+      '/conversations/stop',
+      { ...read, schema: { querystring: CreatorQuerySchema, response: { 200: SendingStopSchema } } },
+      async (request) => {
+        const { creatorId } = request.query;
+        const user = signedIn(request);
+        if (!treatsEveryConversation(user, creatorId) && !user.routedCreatorIds.includes(creatorId)) {
+          throw new CreatorForbidden();
+        }
+        return { stopped: await reader.sendingStopped(creatorId) };
+      },
+    );
+
     app.get(
       '/conversations',
       {
@@ -123,12 +165,13 @@ export function createConversationRoutes(
       async (request) => {
         const { creatorId, limit, cursor } = request.query;
         const user = signedIn(request);
-        let routedTo: UserId | undefined;
-        if (!readsWholeCreator(user, creatorId)) {
-          if (!user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
-          routedTo = UserIdSchema.parse(user.id);
-        }
-        const page = await reader.list(creatorId, { limit, cursor }, routedTo);
+        const heldOnly = !treatsEveryConversation(user, creatorId);
+        if (heldOnly && !user.routedCreatorIds.includes(creatorId)) throw new CreatorForbidden();
+        const page = await reader.list(
+          creatorId,
+          { limit, cursor },
+          { userId: UserIdSchema.parse(user.id), heldOnly },
+        );
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
     );
@@ -144,8 +187,8 @@ export function createConversationRoutes(
         },
       },
       async (request) => {
-        await actorOn(request, request.query.creatorId, request.params.id);
-        const detail = await reader.get(request.query.creatorId, request.params.id);
+        const userId = await readerOn(request, request.query.creatorId, request.params.id);
+        const detail = await reader.get(request.query.creatorId, request.params.id, userId);
         if (detail === null) throw new ConversationNotFound();
         return detail;
       },
@@ -163,7 +206,7 @@ export function createConversationRoutes(
       },
       async (request) => {
         const { creatorId, limit, cursor } = request.query;
-        await actorOn(request, creatorId, request.params.id);
+        await readerOn(request, creatorId, request.params.id, 'messages');
         const page = await reader.messages(creatorId, request.params.id, { limit, cursor });
         if (page === null) throw new ConversationNotFound();
         return { items: [...page.items], nextCursor: page.nextCursor };
@@ -182,14 +225,14 @@ export function createConversationRoutes(
       },
       async (request) => {
         const { creatorId, limit, cursor } = request.query;
-        await actorOn(request, creatorId, request.params.id);
+        await readerOn(request, creatorId, request.params.id, 'events');
         const page = await reader.events(creatorId, request.params.id, { limit, cursor });
         if (page === null) throw new ConversationNotFound();
         return { items: [...page.items], nextCursor: page.nextCursor };
       },
     );
 
-    // His desire curve (P3-12): the conversation's own rights, so a chatter reads it only while it is routed to him.
+    // His desire curve (P3-12): the conversation's own rights, so a chatter reads it in his window or while he holds it.
     app.get(
       '/conversations/:id/desire',
       {
@@ -201,7 +244,7 @@ export function createConversationRoutes(
         },
       },
       async (request) => {
-        await actorOn(request, request.query.creatorId, request.params.id);
+        await readerOn(request, request.query.creatorId, request.params.id, 'desire');
         const curve = await reader.desireCurve(request.query.creatorId, request.params.id);
         if (curve === null) throw new ConversationNotFound();
         return curve;
@@ -281,8 +324,18 @@ export function createConversationRoutes(
         },
       },
       async (request, reply) => {
+        const { creatorId } = request.query;
+        const input = await command(request, creatorId, request.params.id);
+        // A chatter gives back the hand he holds, or in his window a handoff nobody took (he is the one on shift),
+        // never another person's (ADR 0025): the owner and a manager who reads the whole creator give back any.
+        if (
+          !readsWholeCreator(signedIn(request), creatorId) &&
+          (await reader.holderOf(creatorId, request.params.id, input.userId)) === 'other'
+        ) {
+          throw new ConversationForbidden();
+        }
         await commands.release({
-          ...(await command(request, request.query.creatorId, request.params.id)),
+          ...input,
           ...(request.body.note === undefined ? {} : { note: request.body.note }),
         });
         return reply.code(204).send();

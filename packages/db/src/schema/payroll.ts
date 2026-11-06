@@ -437,6 +437,8 @@ export const commissionStatements = pgTable(
     adjustmentsMinor: integer('adjustments_minor').notNull(),
     totalMinor: integer('total_minor').notNull(),
     carryOverOutMinor: integer('carry_over_out_minor').notNull(),
+    /** What a final statement extinguishes (ADR 0072 § 4): its total below zero, zero everywhere else. */
+    writtenOffMinor: integer('written_off_minor').notNull().default(0),
     payableMinor: integer('payable_minor').notNull(),
     teamNetMinor: bigint('team_net_minor', { mode: 'number' }).notNull(),
     collective: jsonb('collective'),
@@ -461,7 +463,13 @@ export const commissionStatements = pgTable(
     check('commission_statements_hash_check', sql`${t.inputsHash} ~ '^[0-9a-f]{64}$'`),
     check(
       'commission_statements_amounts_check',
-      sql`${t.payableMinor} >= 0 and ${t.payableMinor} = ${t.totalMinor} - ${t.carryOverOutMinor} and ${t.penaltiesMinor} between 0 and greatest(${t.penaltiesRequestedMinor}, 0)`,
+      sql`${t.payableMinor} >= 0 and ${t.payableMinor} = ${t.totalMinor} - ${t.carryOverOutMinor} - ${t.writtenOffMinor} and ${t.penaltiesMinor} between 0 and greatest(${t.penaltiesRequestedMinor}, 0)`,
+    ),
+    // Only a final statement of a member who left writes its balance off (ADR 0072 § 4): all of a total below zero,
+    // nothing carried, so that it pays nothing; never a part of it, never on a total above zero.
+    check(
+      'commission_statements_written_off_check',
+      sql`${t.writtenOffMinor} = 0 or (coalesce((${t.rules} ->> 'final')::boolean, false) and ${t.totalMinor} < 0 and ${t.writtenOffMinor} = ${t.totalMinor} and ${t.carryOverOutMinor} = 0)`,
     ),
     check(
       'commission_statements_team_share_check',

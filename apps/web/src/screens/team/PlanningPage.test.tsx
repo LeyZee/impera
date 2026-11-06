@@ -1004,6 +1004,9 @@ describe('Équipe › Planning', () => {
       status: 'submitted',
       version: 1,
       byAgency: false,
+      reviewKind: null,
+      explanation: null,
+      check: null,
       canReview: true,
       submittedAt: '2026-10-26T21:05:00Z',
       reviewedAt: null,
@@ -1061,6 +1064,9 @@ describe('Équipe › Planning', () => {
       status: 'rejected',
       version: 1,
       byAgency: false,
+      reviewKind: null,
+      explanation: null,
+      check: null,
       canReview: false,
       submittedAt: '2026-10-27T21:05:00Z',
       reviewedAt: '2026-10-27T22:00:00Z',
@@ -1098,6 +1104,12 @@ describe('Équipe › Planning', () => {
     const [close] = within(panel).getAllByRole('button', { name: 'Fermer' });
     if (close === undefined) throw new Error('no way to close the panel');
     fireEvent.click(close);
+    // Back on the shift's sheet he came from, then out of it.
+    const back = await screen.findByRole('dialog');
+    expect(within(back).getByRole('button', { name: 'Faire mon rapport' })).toBeTruthy();
+    const [leave] = within(back).getAllByRole('button', { name: 'Fermer' });
+    if (leave === undefined) throw new Error('no way to close the sheet');
+    fireEvent.click(leave);
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });

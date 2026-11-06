@@ -18,7 +18,14 @@ import { createAppRouter, type AppRouter } from '../router';
 import { RailNav } from './AppShell';
 import type { NavItem, Rail } from './nav';
 
-const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds: [], routedCreatorIds: [] };
+const base = {
+  id: 'u1',
+  email: 'membre@example.test',
+  name: 'Nora',
+  creatorIds: [],
+  routedCreatorIds: [],
+  shiftCreatorIds: [],
+};
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 const manager: Me = {
   ...base,
@@ -746,7 +753,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
       [
         '/creatrices',
-        'La fiche de chaque créatrice : sa persona, son agenda, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.',
+        'La fiche de chaque créatrice : sa persona, son agenda, ses idées du jour, ses scripts, ses heures d’activité, son accès, le pourcentage de l’agence et son nom.',
       ],
     ] as const) {
       renderApp(owner, path);

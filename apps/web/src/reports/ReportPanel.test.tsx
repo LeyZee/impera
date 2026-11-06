@@ -69,6 +69,9 @@ const report = (patch: Record<string, unknown>): FakeReport => ({
   status: 'submitted',
   version: 1,
   byAgency: false,
+  reviewKind: null,
+  explanation: null,
+  check: null,
   canReview: false,
   submittedAt: '2026-10-27T00:00:00.000Z',
   reviewedAt: null,
@@ -82,7 +85,12 @@ interface Served {
   rules: unknown;
   /** What `POST`/`PATCH` answer: the status and the body. */
   write: { status: number; body: unknown };
+  /** What the server estimates an amount brings (reco 19); `undefined` answers 404. */
+  estimate?: (amountMinor: number) => number | null;
 }
+
+/** The amounts whose estimate was asked, in order. */
+const estimated: number[] = [];
 
 let served: Served;
 const writes: { method: string; path: string; body: unknown }[] = [];
@@ -101,6 +109,11 @@ function serve(): void {
           body: typeof init.body === 'string' ? JSON.parse(init.body) : null,
         });
         return json(served.write.body, served.write.status);
+      }
+      if (url.pathname === `/v1/payroll/shifts/${SHIFT}/estimate` && served.estimate !== undefined) {
+        const amountMinor = Number(url.searchParams.get('amountMinor'));
+        estimated.push(amountMinor);
+        return json({ commissionMinor: served.estimate(amountMinor) });
       }
       switch (url.pathname) {
         case '/v1/scheduling/my-shifts':
@@ -182,6 +195,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
   writes.length = 0;
+  estimated.length = 0;
   served = {
     reports: [],
     rules: { currency: 'EUR', earningsSource: 'declared' },
@@ -231,6 +245,38 @@ describe('Faire mon rapport', () => {
       },
     });
     expect((await screen.findByText(/en attente de validation/u)).textContent).toContain('120,50');
+  });
+
+  it('says what the amount brings once the typing pauses, as the server computes it (reco 19)', async () => {
+    // 20 % VAT, 20 % to Reveal, 10 %: 120,50 € brings 8,03 €.
+    served.estimate = (amountMinor) => Math.round(((amountMinor / 1.2) * 0.8 * 10) / 100);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    fireEvent.change(amountField(), { target: { value: '12' } });
+    fireEvent.change(amountField(), { target: { value: '120' } });
+    fireEvent.change(amountField(), { target: { value: '120,50' } });
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    const line = await within(dialog).findByText(/^Ta commission estimée/u);
+    expect(line.textContent).toMatch(/^Ta commission estimée : 8,03\s€$/u);
+    expect(within(dialog).getByText('avant paliers, objectifs, primes et malus')).toBeTruthy();
+    // One request when the typing paused, not one a key.
+    expect(estimated).toEqual([12_050]);
+
+    // An amount the panel would not send has no estimate.
+    fireEvent.change(amountField(), { target: { value: '12,5x' } });
+    expect(within(dialog).queryByText(/^Ta commission estimée/u)).toBeNull();
+  });
+
+  it('says nothing when the server cannot estimate', async () => {
+    served.estimate = () => null;
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Faire mon rapport' });
+    fireEvent.change(amountField(), { target: { value: '80' } });
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(estimated).toEqual([8_000]);
+    expect(within(dialog).queryByText(/commission estimée/u)).toBeNull();
   });
 
   it('refuses « 50 € » on an account that declares in dollars, rather than reading it as $50', async () => {
@@ -459,5 +505,118 @@ describe('Mes rapports', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
     const dialog = await screen.findByRole('dialog', { name: 'Mon rapport' });
     expect(dialog.textContent).toMatch(/Validé le lun\. 26 oct\. à 9\sh/u);
+    // A correction started from it is titled as one at once, not only when reopened.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajouter une correction' }));
+    expect(await screen.findByRole('dialog', { name: 'Corriger mon rapport' })).toBeTruthy();
+  });
+
+  it('writes the true minus sign in a correction, as its hint and its estimate do (captures of #591)', async () => {
+    served.reports = [report({ status: 'validated', reviewedAt: '2026-10-26T08:00:00.000Z' })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Mon rapport' })).getByRole('button', {
+        name: 'Ajouter une correction',
+      }),
+    );
+    const correcting = await screen.findByRole('dialog', { name: 'Corriger mon rapport' });
+    const amount = within(correcting).getByLabelText('À ajouter ou retirer');
+    fireEvent.change(amount, { target: { value: '-15' } });
+    expect(amount).toHaveProperty('value', '−15');
+  });
+});
+
+describe('Mon rapport against Reveal (ADR 0073)', () => {
+  /** 80,00 € declared on the shift of the 26th, 70,00 € read: 48 hours after its end, Thursday 0 h in Paris. */
+  const GAP = {
+    state: 'complete',
+    readMinor: 7_000,
+    gapMinor: 1_000,
+    verdict: 'gap',
+    explainBy: '2026-10-28T23:00:00.000Z',
+  };
+
+  it('puts a gap to explain in « À faire », and sends the explanation with the version it read (§ 5)', async () => {
+    served.reports = [report({ check: GAP })];
+    served.write = {
+      status: 200,
+      body: report({ check: GAP, version: 2, explanation: 'Un pourboire noté deux fois.' }),
+    };
+    renderPage();
+
+    const todo = await screen.findByRole('button', { name: /Écart de .* avec Reveal/u });
+    expect(todo.textContent.replaceAll(' ', ' ')).toContain('Écart de +10,00 € avec Reveal');
+    expect(todo.textContent).toContain('Expliquer');
+    fireEvent.click(todo);
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
+    const said = dialog.textContent.replaceAll(' ', ' ');
+    expect(said).toContain('Tu déclares 80,00 €, Reveal a lu 70,00 € pendant ton shift.');
+    expect(said).toMatch(/Corrige le montant, ou explique l’écart avant le jeu\. 29 oct\. à 0 h/u);
+
+    fireEvent.change(within(dialog).getByLabelText(/Pourquoi cet écart/u), {
+      target: { value: '  Un pourboire noté deux fois.  ' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(writes).toEqual([
+      {
+        method: 'PATCH',
+        path: `/v1/scheduling/shift-reports/${id(301)}`,
+        body: {
+          version: 1,
+          amountMinor: 8_000,
+          comment: null,
+          incident: null,
+          explanation: 'Un pourboire noté deux fois.',
+        },
+      },
+    ]);
+  });
+
+  it('says an explanation sent leaves the decision to the agency, and asks for nothing more', async () => {
+    served.reports = [report({ check: GAP, explanation: 'Un pourboire noté deux fois.' })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    const chip = await screen.findByRole('button', { name: /En attente/u });
+    expect(chip.textContent).not.toContain('Écart');
+    expect(screen.queryByRole('button', { name: /Écart de .* avec Reveal/u })).toBe(null);
+    fireEvent.click(chip);
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
+    expect(dialog.textContent).toContain('Ton explication est envoyée : l’agence décide.');
+    expect(within(dialog).getByLabelText(/Pourquoi cet écart/u)).toHaveProperty(
+      'value',
+      'Un pourboire noté deux fois.',
+    );
+  });
+
+  it('says a report that matches Reveal validates by itself, and a validation made by the check', async () => {
+    served.reports = [
+      report({
+        status: 'validated',
+        reviewKind: 'automatic',
+        reviewedAt: '2026-10-26T23:20:00.000Z',
+        check: { state: 'complete', readMinor: 8_000, gapMinor: 0, verdict: 'within', explainBy: null },
+      }),
+    ];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /Validé/u }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mon rapport' });
+    const said = dialog.textContent.replaceAll(' ', ' ');
+    expect(said).toMatch(/Validé automatiquement le mar\. 27 oct\. à 0 h 20/u);
+    expect(said).toContain('Reveal a lu 80,00 € pendant ce shift');
+  });
+
+  it('says why a report is not compared, without holding it (§ 7)', async () => {
+    served.reports = [report({ check: { state: 'unavailable', reason: 'feed_off' } })];
+    renderPage();
+    fireEvent.click(await screen.findByText('Tous mes rapports'));
+    fireEvent.click(await screen.findByRole('button', { name: /En attente/u }));
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier mon rapport' });
+    expect(dialog.textContent).toContain(
+      'Les ventes de Reveal ne sont pas lues en ce moment : rien n’est comparé, la relecture se fait comme avant.',
+    );
+    expect(within(dialog).queryByLabelText(/Pourquoi cet écart/u)).toBe(null);
   });
 });

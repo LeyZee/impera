@@ -1,0 +1,196 @@
+/*
+ * « Mon chat privé » (SEC-05 lot 2): the same block in Réglages › Telegram and in Moi › Sécurité. Its state as a dot,
+ * never a coloured bar; the code in Geist with tabular figures, for whoever types it to the bot.
+ */
+
+.pc-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+.pc-lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.pc-start {
+  align-self: flex-start;
+}
+.pc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+
+/* Linked: the dot and the bot on one line. */
+.pc-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+/* A box one line high, with the line's own size: the dot stays on the first line when the status wraps. */
+.pc-state__dot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--nv-text-body-leading);
+  padding-left: 4px;
+}
+.pc-state__line {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  overflow-wrap: anywhere;
+}
+.pc-state__line b {
+  font-weight: 650;
+}
+.pc-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+
+.pc-notice {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.pc-error {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+
+/* A code waiting: two steps, the button, then the code to type. */
+.pc-code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.pc-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.pc-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.pc-steps__num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-select);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.pc-steps__text {
+  min-width: 0;
+}
+.pc-steps__text b {
+  font-weight: 650;
+}
+.nv-btn.pc-open {
+  align-self: flex-start;
+  text-decoration: none;
+}
+.pc-typed {
+  align-self: flex-start;
+  min-width: min(100%, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+.pc-typed__label,
+.pc-typed__until {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.pc-typed__code {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.pc-wait {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+.pc-wait__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--nv-hairline);
+  border-top-color: var(--nv-ink-muted);
+  animation: pc-spin 0.9s linear infinite;
+}
+@keyframes pc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pc-skeleton {
+  height: 96px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+
+/* The password and the code wrap under each other on a phone. */
+@media (max-width: 560px) {
+  .pc-chat .tg-inline-form {
+    flex-wrap: wrap;
+  }
+  .pc-chat .tg-inline-form > :not(button) {
+    flex-basis: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-wait__spinner {
+    animation: none;
+  }
+}
+
+/* In Réglages › Telegram, the block sits on its own plate under the tab's eyebrow. */
+.pc-plate {
+  padding: var(--nv-space-5);
+}
+
+/* No bot yet: the sentence, then its one way out, spaced like the other blocks. */
+.pc-nobot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}

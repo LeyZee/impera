@@ -24,6 +24,10 @@
     color var(--nv-dur-fast) var(--nv-ease-out),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
+/* In Jour the glass fill is white on a white window: the × takes a tint that shows on it (recette ADR 0073). */
+[data-theme='light'] .tm-close {
+  background: var(--nv-fill-soft);
+}
 /* 36px seen, 44px to touch, as the design system's close (CR-01, passe téléphone). */
 .tm-close::after {
   content: '';

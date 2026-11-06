@@ -2,7 +2,7 @@
 
 ## 0. Couper d'abord, comprendre ensuite
 
-1. **Kill switch global** : dashboard → Supervision → « Tout arrêter », ou `pnpm ops:kill-switch --scope global --on --reason "<raison>"`. Effet : plus aucun appel LLM ni envoi ; le poll continue (on garde les messages entrants).
+1. **Kill switch global** : dashboard → Supervision → « Tout arrêter », ou `pnpm ops:kill-switch --scope global --on --reason "<raison>"`. Effet : plus aucun appel LLM ni envoi ; le poll continue (on garde les messages entrants). La raison est gardée telle quelle en base : décris la cause (« envois en double », « ton hors persona »), ne nomme jamais un fan.
 2. Si les envois seuls sont en cause : « Bloquer les envois » (le bot continue de proposer en copilote).
 3. Note l'heure et l'action dans le canal d'incident (ou `docs/sessions/LOG.md`, section Incidents).
 

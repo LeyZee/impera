@@ -149,6 +149,20 @@ export function accessWindow(shift: ShiftTimes, marginMinutes: number): { starts
 }
 
 /**
+ * The creators a member's access window opens at `at` (ADR 0025, EQ-13): those of a shift whose window holds `at`,
+ * its start included and its end excluded, each once, in the order of the shifts given. On any account of a creator, the
+ * window opens the whole creator. The caller gives an active member's shifts, cancelled ones out.
+ */
+export function creatorsInAccessWindow(
+  shifts: readonly (ShiftTimes & { readonly creatorId: string })[],
+  at: Date,
+  marginMinutes: number,
+): string[] {
+  const open = shifts.filter((shift) => covers(accessWindow(shift, marginMinutes), at));
+  return [...new Set(open.map((shift) => shift.creatorId))];
+}
+
+/**
  * A member's shifts as Aujourd'hui reads them (`MyShifts`): the one they are on, the next to start, and the latest
  * ended one whose end margin is still open. A stopped shift is never `ended`.
  */

@@ -1,4 +1,4 @@
-import { DomainError, type PayPeriod, type SaleDecisionOutcome } from '@impera/contracts';
+import { DomainError, type PayPeriod, type SaleDecisionOutcome, type TeamMemberId } from '@impera/contracts';
 
 import type { PayoutHold } from './ports';
 
@@ -110,20 +110,6 @@ export class CommissionStatementStatusConflict extends DomainError {
 export class CommissionStatementChanged extends DomainError {
   constructor(readonly period: PayPeriod) {
     super('commission_statement_changed_conflict', 'Le relevé a changé depuis son affichage');
-  }
-}
-
-/**
- * A final statement of a member who left while some of his documents still await an answer or stay contested (EQ-14,
- * ADR 0039 § 6): it waits for them, its period carrying their corrections.
- */
-export class CommissionStatementDocumentsOpen extends DomainError {
-  constructor(count: number) {
-    super(
-      'commission_statement_documents_open_conflict',
-      'Ce relevé final attend que ses factures et avoirs soient acceptés ou que leurs contestations soient tranchées',
-      { details: { count } },
-    );
   }
 }
 
@@ -246,6 +232,20 @@ export class PayPeriodClosed extends DomainError {
 export class PenaltyCancelConflict extends DomainError {
   constructor() {
     super('penalty_cancel_conflict', 'Toutes les quinzaines de ce malus sont déjà validées');
+  }
+}
+
+/**
+ * An adjustment that would bring the total of a member who left below zero (ADR 0072 § 5): the agency never runs after
+ * a departed member, so it refuses what it would have to write off. `totalMinor` is the total it would leave.
+ */
+export class PayAdjustmentBelowZero extends DomainError {
+  constructor(totalMinor: number, memberId: TeamMemberId) {
+    super(
+      'pay_adjustment_below_zero_conflict',
+      'Cet ajustement rendrait négatif le total d’un membre parti',
+      { details: { totalMinor, memberId } },
+    );
   }
 }
 

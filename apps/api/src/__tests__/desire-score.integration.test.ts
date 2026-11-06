@@ -148,7 +148,7 @@ describe('conversation.respond with a desire score', () => {
   const respond = (conversationId: ConversationId) =>
     conversations.jobs.respond({ creatorId, conversationId, correlationId: 'test' }, NO_LOG);
 
-  /** The operator rejects the draft, so that the conversation is at rest for his next message. */
+  /** The operator rejects the draft and hands it back, so that the conversation is at rest for his next message. */
   async function reject(conversationId: ConversationId) {
     const [pending] = await test.admin.db
       .select({ id: schema.drafts.id })
@@ -162,6 +162,8 @@ describe('conversation.respond with a desire score', () => {
       userId: USER,
       correlationId: 'test',
     });
+    // Refused while he waits, it stays with the human (recette CHAT-25): handed back, it rests.
+    await conversations.release({ creatorId, conversationId, userId: USER, correlationId: 'test' });
   }
 
   beforeAll(async () => {

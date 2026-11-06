@@ -218,6 +218,10 @@ export function EntryForm({
   const reasonValid = trimmed.length > 0;
   const ready = member !== null && period !== null && typed !== null && reasonValid;
   const shown = typed === null ? '' : amountShown(typed);
+  // A member who left never ends under zero (ADR 0072 § 5): said before sending, the server checks it on its total.
+  // A member who left no longer reads Impera (the departure's sentence): nothing says he will read the reason.
+  const gone = member?.status === 'left';
+  const leftTaking = kind === 'adjustment' && taking && gone;
 
   const send = async (): Promise<void> => {
     if (member === null || period === null || typed === null || !reasonValid || busy) return;
@@ -281,11 +285,11 @@ export function EntryForm({
           </p>
           <p className="tm-hint">
             {kind === 'adjustment'
-              ? `${corrects === undefined ? '' : `Il corrige son relevé ${periodLine(corrects.window.period)}, qui ne change plus. `}Un ajustement ne s’annule pas : une erreur se corrige par un autre.`
+              ? `${corrects === undefined ? '' : `Il corrige son relevé ${periodLine(corrects.window.period)}, qui ne change plus. `}Un ajustement ne s’annule pas : une erreur se corrige par un autre.${leftTaking ? ` ${name} a quitté l’équipe : si ce retrait faisait passer son total sous zéro, il serait refusé.` : ''}`
               : kind === 'bonus'
                 ? 'Elle s’annule tant que son relevé de la quinzaine n’est pas validé.'
                 : `Plafonné à sa part plus ses primes : son relevé reste au moins à 0${NBSP}€.`}{' '}
-            {name} le lira avec son relevé.
+            {gone ? 'Le motif reste sur son relevé.' : `${name} le lira avec son relevé.`}
           </p>
           <div className="tm-dialog__foot">
             <button
@@ -455,7 +459,7 @@ export function EntryForm({
                 : kind === 'bonus'
                   ? 'Ajoutée à son total de la quinzaine.'
                   : kind === 'adjustment'
-                    ? `${taking ? 'Retiré de' : 'Ajouté à'} son total, ${shown === '' ? 'en euros' : shown}.`
+                    ? `${taking ? 'Retiré de' : 'Ajouté à'} son total, ${shown === '' ? 'en euros' : shown}.${leftTaking ? ` ${name} a quitté l’équipe : un retrait qui mettrait son total sous zéro est refusé.` : ''}`
                     : `Plafonné à sa part plus ses primes${typed?.kind === 'percent' ? ` : ${signedPercentText(-typed.bps)} de son net` : ''}.`}
             </p>
           </div>
@@ -484,7 +488,9 @@ export function EntryForm({
             <p className={touched && !reasonValid ? 'tm-hint tm-hint--error' : 'tm-hint'}>
               {touched && !reasonValid
                 ? 'Le motif est obligatoire.'
-                : 'Lu par le membre avec son relevé. Jamais le message ni le nom d’un fan.'}
+                : gone
+                  ? 'Gardé sur son relevé. Jamais le message ni le nom d’un fan.'
+                  : 'Lu par le membre avec son relevé. Jamais le message ni le nom d’un fan.'}
             </p>
           </div>
           {refusal === null ? null : (

@@ -48,6 +48,75 @@ export const SHIFT_REPORT_STATUSES = ['submitted', 'validated', 'rejected'] as c
 export const ShiftReportStatusSchema = z.enum(SHIFT_REPORT_STATUSES);
 export type ShiftReportStatus = z.infer<typeof ShiftReportStatusSchema>;
 
+/**
+ * Who validated or sent back a report (ADR 0073 § 4): a person (`human`), or the automatic check, which only validates
+ * and never names a person (its `reviewedBy` is empty). No member ever sets `automatic`: the base refuses it to the
+ * application's connection.
+ */
+export const SHIFT_REPORT_REVIEW_KINDS = ['human', 'automatic'] as const;
+export const ShiftReportReviewKindSchema = z.enum(SHIFT_REPORT_REVIEW_KINDS);
+export type ShiftReportReviewKind = z.infer<typeof ShiftReportReviewKindSchema>;
+
+/**
+ * ADR 0073 § 2: the quarter of an hour after the end of a shift's access window (ADR 0025) that the platform's late
+ * lines are given before the comparison can be complete.
+ */
+export const SHIFT_REPORT_CHECK_LATE_MINUTES = 15;
+
+/**
+ * ADR 0073 § 5: how long after the end of its shift a report out of the threshold, or above the platform, waits for
+ * its member to correct or explain it before a manager may decide.
+ */
+export const SHIFT_REPORT_EXPLAIN_HOURS = 48;
+
+/**
+ * The threshold of ADR 0073 § 3, an agency setting (Réglages › Règles de paie, `GET` for the owner and an active
+ * manager, `PUT /v1/scheduling/report-gap` for the owner): a gap is within it when it is at most `bps` of what the
+ * platform read (100 = 1 %), or at most `minor` in the report's currency (500 = 5 €). Bounded like the payout minimum,
+ * against a slip: from 0 to 100 %, from 0 to 1 000. A change applies to the checks read from then on; a validation
+ * keeps the threshold it saw.
+ */
+export const ReportGapThresholdSchema = z.strictObject({
+  bps: z.number().int().min(0).max(10_000),
+  minor: z.number().int().min(0).max(100_000),
+});
+export type ReportGapThreshold = z.infer<typeof ReportGapThresholdSchema>;
+export const REPORT_GAP_THRESHOLD_DEFAULT: ReportGapThreshold = { bps: 100, minor: 500 };
+
+/**
+ * Why a report is not compared (ADR 0073 § 7), said on the screen instead of a figure: the platform's feed is cut
+ * (`feed_off`), the account's model is linked to no platform model (`model_unlinked`), or the shift's member to no
+ * platform chatter (`chatter_unlinked`). Nothing is held back then: the report follows the human validation.
+ */
+export const SHIFT_REPORT_CHECK_REASONS = ['feed_off', 'model_unlinked', 'chatter_unlinked'] as const;
+export const ShiftReportCheckReasonSchema = z.enum(SHIFT_REPORT_CHECK_REASONS);
+export type ShiftReportCheckReason = z.infer<typeof ShiftReportCheckReasonSchema>;
+
+/**
+ * A report against what the platform read during its shift (ADR 0073 § 2): the member's sales, attributed to them by
+ * the owner's link of their platform chatter (ADR 0050 § 5), from the start of the shift to its end, access margin
+ * included, gross including VAT, the refunds known so far taken off. Only a report has one, never a correction.
+ *
+ * - `unavailable`: no figure, and why (§ 7).
+ * - `provisional`: the figure read so far, while the window is not over plus `SHIFT_REPORT_CHECK_LATE_MINUTES`, or the
+ *   register was not read to its end since: nothing validates by itself, nothing is held back.
+ * - `complete`: `gapMinor` is the declared amount minus `readMinor`. `within` validates by itself (§ 4); `gap` (out
+ *   of the threshold, or above the platform even by a cent) waits for its member until `explainBy`, its shift's end
+ *   plus `SHIFT_REPORT_EXPLAIN_HOURS` (§ 5).
+ */
+export const ShiftReportCheckSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('unavailable'), reason: ShiftReportCheckReasonSchema }),
+  z.object({ state: z.literal('provisional'), readMinor: z.number().int() }),
+  z.object({
+    state: z.literal('complete'),
+    readMinor: z.number().int(),
+    gapMinor: z.number().int(),
+    verdict: z.enum(['within', 'gap']),
+    explainBy: z.iso.datetime().nullable(),
+  }),
+]);
+export type ShiftReportCheck = z.infer<typeof ShiftReportCheckSchema>;
+
 /** A trimmed free text of 1000 characters at most; empty means none. Never a fan's data. */
 const ReportTextSchema = z
   .string()
@@ -111,6 +180,17 @@ export const ShiftReportSchema = z
     reviewedAt: z.iso.datetime().nullable(),
     /** What the person who sent it back wrote, for the member; `null` otherwise. */
     reviewNote: z.string().nullable(),
+    /** Who validated or sent it back (`automatic`: the check of ADR 0073 § 4); `null` while submitted. */
+    reviewKind: ShiftReportReviewKindSchema.nullable(),
+    /**
+     * Its member's explanation of a gap with the platform (ADR 0073 § 5), team text, never a fan's: `null` when none.
+     */
+    explanation: z.string().nullable(),
+    /**
+     * Against the platform (ADR 0073 § 2): read now while it is not validated, as the validation saw it once it is.
+     * `null` for a correction, and for an account whose platform's sales are not read.
+     */
+    check: ShiftReportCheckSchema.nullable(),
     createdAt: z.iso.datetime(),
   })
   .superRefine((report, context) => {
@@ -133,6 +213,33 @@ export const ShiftReportContextSchema = z.object({
   reports: z.array(ShiftReportSchema),
 });
 export type ShiftReportContext = z.infer<typeof ShiftReportContextSchema>;
+
+/**
+ * `GET /v1/payroll/shifts/:shiftId/estimate?amountMinor=` (the shift's member, the owner, an active manager; reco 19
+ * of the recette, 05/11): what `amountMinor`, typed in the « Faire mon rapport » panel in the currency of the account's
+ * rules, brings the shift's member, by pay's own chain on this amount alone: gross → euros → excluding VAT → net of the
+ * platform's commission → the member's rate for the period. An estimate: pay counts an account's total for the period,
+ * rounded once, and adds tiers, goals, bonuses and penalties on the statement. A correction's amount may be negative.
+ * 404 `shift_not_found`, 403 `shift_report_forbidden` to anyone else.
+ */
+export const ShiftReportEstimateQuerySchema = z.strictObject({
+  /** Digits only, a minus for a correction: an empty value is not 0. */
+  amountMinor: z
+    .string()
+    .regex(/^-?\d+$/u)
+    .transform(Number)
+    .pipe(AmountMinorSchema),
+});
+export type ShiftReportEstimateQuery = z.infer<typeof ShiftReportEstimateQuerySchema>;
+
+export const ShiftReportEstimateSchema = z.object({
+  /**
+   * In euro cents; `null` when it cannot be said: no rules for the period, sales read by the connector, no rate for
+   * the member that period, or no exchange rate for the currency yet.
+   */
+  commissionMinor: z.number().int().nullable(),
+});
+export type ShiftReportEstimate = z.infer<typeof ShiftReportEstimateSchema>;
 
 /**
  * `POST /v1/scheduling/shift-reports` → 201 `ShiftReportSchema`, or 200 when the same `id` was already recorded with
@@ -167,13 +274,16 @@ export type CreateShiftReportBody = z.input<typeof CreateShiftReportBodySchema>;
  * (`shift_report_changed_conflict` otherwise). A submitted report changes and stays submitted; a rejected one changes,
  * or is sent again as it is with no other field, and is submitted again; a validated one answers
  * `shift_report_validated_conflict`: correct it instead. The amount keeps the rules' currency, and the rules of
- * `POST`.
+ * `POST`. `explanation` is a report's alone (`request_invalid` on a correction): it says why the report
+ * differs from the platform (ADR 0073 § 5), and is never written to the logs nor the audit.
  */
 export const UpdateShiftReportBodySchema = z.object({
   version: z.number().int().min(1),
   amountMinor: AmountMinorSchema.optional(),
   comment: ReportTextSchema.optional(),
   incident: ReportTextSchema.optional(),
+  /** A report's only (ADR 0073 § 5), once it is sent: why it differs from the platform. */
+  explanation: ReportTextSchema.optional(),
 });
 export type UpdateShiftReportBody = z.input<typeof UpdateShiftReportBodySchema>;
 
@@ -186,6 +296,8 @@ const ReviewedVersionSchema = z.object({ id: ShiftReportIdSchema, version: z.num
  * the others go through. The validation checks the shift's validated total again (`validatedTotalWith`): two negative
  * corrections can each pass their making and together take it below 0, and the second answers
  * `shift_report_total_conflict`. `mayReviewShiftReport` says who may review (`shift_report_own_review_forbidden`).
+ * A report whose complete check says `gap` is held until its member corrects or explains it, or until `explainBy`
+ * (`shift_report_gap_conflict`, ADR 0073 § 5); then the manager decides, knowing it.
  */
 export const ValidateShiftReportsBodySchema = z.object({
   reports: z
@@ -277,6 +389,8 @@ export type ShiftReportList = z.infer<typeof ShiftReportListSchema>;
  * `shift_report_detected_conflict` 409, the account's source is `detected` for the period ;
  * `shift_report_currency_conflict` 409, another currency than the account's for the period ;
  * `pay_rules_missing_conflict` 409, the account has no pay rules for the period ;
+ * `shift_report_gap_conflict` 409, the report differs from the platform and its member has neither corrected nor
+ * explained it yet (`details.explainBy`, ADR 0073 § 5) ;
  * `shift_report_own_review_forbidden` 403, a report of one's own shift, or a correction one made as a manager ; `shift_report_forbidden` 403, a report of
  * someone else's shift, or a change to what someone else made.
  */
@@ -292,6 +406,7 @@ export const SHIFT_REPORT_ERROR_CODES = [
   'shift_report_detected_conflict',
   'shift_report_currency_conflict',
   'pay_rules_missing_conflict',
+  'shift_report_gap_conflict',
   'shift_report_own_review_forbidden',
   'shift_report_forbidden',
 ] as const;

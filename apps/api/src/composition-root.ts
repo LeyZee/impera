@@ -36,6 +36,7 @@ import type {
   ConnectorsModule,
   SalesFeedRegistry,
 } from './modules/connectors';
+import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
@@ -47,7 +48,7 @@ import { payReadsForContractors, type PayrollModule } from './modules/payroll';
 import type { PersonaModule } from './modules/persona';
 import type { PlaygroundModule } from './modules/playground';
 import type { ProvidersModule } from './modules/providers';
-import type { SchedulingModule } from './modules/scheduling';
+import { createShiftAccessReader, type SchedulingModule } from './modules/scheduling';
 import type { ScriptsModule } from './modules/scripts';
 import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
@@ -188,8 +189,8 @@ export interface AppOptions {
    */
   readonly payrollClock?: () => Date;
   /**
-   * Tests set the team's clock here, to make a member leave on a day already past and read his closing fortnight
-   * (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
+   * Tests set the team's clock here, to make a member leave on a day already past and read the fortnight of his
+   * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
   /**
@@ -198,10 +199,20 @@ export interface AppOptions {
    */
   readonly connectorsClock?: () => Date;
   /**
+   * Tests set the clock of a chatter's access window here, to open or close it without waiting for his shift (ADR 0025,
+   * EQ-13); the system's otherwise.
+   */
+  readonly accessClock?: () => Date;
+  /**
    * Tests plug the photo copy's fetch and store here (CRM-07 a2b): FakeReveal's addresses are invented and MinIO is not
    * started for it; the platform's image server and the media bucket otherwise.
    */
   readonly creatorAvatars?: Pick<AvatarPorts, 'fetch' | 'store'>;
+  /**
+   * Tests plug her content's storage here, to read a script's archive without an object store (SC-03 c); the media
+   * bucket otherwise.
+   */
+  readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
 }
@@ -242,7 +253,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   }
   const jobs = await createJobQueue(adminDb.pool);
   const auth = createAuth(config, db.db, logger);
-  const requireRole = createRequireRole(auth, db.db);
+  // A chatter's shift opens his creators for its length (ADR 0025, EQ-13), read at each of his requests.
+  const shiftCreators = createShiftAccessReader(db.db, {
+    logger,
+    ...(options.accessClock !== undefined && { now: options.accessClock }),
+  });
+  const requireRole = createRequireRole(auth, db.db, shiftCreators);
   const passwordBreaches = options.passwordBreaches ?? breachCheckOf(config, logger);
   const shared: Shared = {
     config,
@@ -295,8 +311,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const contentDrops = wireContentDrops(shared, {
     scriptVersions: {
       frozen: (versionId) => scripts.module.frozenVersion(versionId),
+      card: (versionId, segmentKey, variant) => scripts.module.frozenCard(versionId, segmentKey, variant),
+      folderCard: (versionId, segmentKey, variant) =>
+        scripts.module.frozenFolderCard(versionId, segmentKey, variant),
       freeze: (structureId, userId) => scripts.module.freezeForRequest(structureId, userId),
     },
+    ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
   const scripts = wireScripts(shared, {
     persona: persona.module,
@@ -434,7 +454,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     passwordBreaches,
     requireRole,
     routes: [
-      createAuthRoutes(auth, db.db, adminDb.db, config, requireRole, logger),
+      createAuthRoutes(auth, db.db, adminDb.db, config, requireRole, logger, shiftCreators),
       createInvitationLinkRoutes({
         auth,
         db: db.db,
@@ -443,6 +463,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         requireRole,
         recentLogin: shared.recentLogin,
         passwordBreaches,
+        shiftCreators,
       }),
       createPasswordResetRoutes({
         auth,
@@ -466,9 +487,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         conversations: conversations.module,
       }),
       ...alerts.routes,
-      fans.routes(agent.kycSlotsOf, (creatorId, fanId, userId) =>
-        conversations.module.isFanRoutedTo(creatorId, fanId, userId),
-      ),
+      fans.routes(agent.kycSlotsOf, {
+        holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
+        traceOpening: (creatorId, fanId, trace) =>
+          conversations.module.traceFanOpening(creatorId, fanId, trace),
+      }),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,

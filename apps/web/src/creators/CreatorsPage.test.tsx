@@ -14,7 +14,14 @@ import { parsePersonaYaml } from './persona/source';
 const ANNA = { id: '0192f3a0-0000-7000-8000-0000000000a1', displayName: 'Anna', timezone: 'Europe/Paris' };
 const BEA = { id: '0192f3a0-0000-7000-8000-0000000000b2', displayName: 'Bea', timezone: 'Europe/Paris' };
 const CLEO = { id: '0192f3a0-0000-7000-8000-0000000000c3', displayName: 'Cleo', timezone: 'Europe/Paris' };
-const base = { id: 'u1', email: 'membre@example.test', name: 'Nora', creatorIds: [], routedCreatorIds: [] };
+const base = {
+  id: 'u1',
+  email: 'membre@example.test',
+  name: 'Nora',
+  creatorIds: [],
+  routedCreatorIds: [],
+  shiftCreatorIds: [],
+};
 const owner: Me = { ...base, role: 'owner', team: null, teamScope: 'owner' };
 /** An operator without a team row: the rail that still opens Créatrices, read-only. */
 const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
@@ -265,14 +272,21 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
   });
 
-  it('opens on her agenda alone for an active manager, the persona and the other sheets the owner’s', async () => {
+  it('opens on her agenda for an active manager, beside her ideas; the persona and the other sheets the owner’s', async () => {
     await serve([ANNA]);
     const router = renderAt(manager, `/creatrices?creatrice=${ANNA.id}`);
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
     });
     expect(await screen.findByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
-    expect(screen.queryByRole('navigation', { name: 'Fiche de la créatrice' })).toBeNull();
+    const sheets = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
+    expect(
+      within(sheets)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Agenda', 'Idées du jour', 'Scripts']);
+    router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
+    expect(await screen.findByText('Ses idées du jour')).toBeDefined();
     for (const onglet of ['pourcentage', 'acces', 'heures']) {
       router.history.push(`/creatrices?onglet=${onglet}&creatrice=${ANNA.id}`);
       await waitFor(() => {

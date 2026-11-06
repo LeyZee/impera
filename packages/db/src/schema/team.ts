@@ -49,8 +49,8 @@ export const teamMembers = pgTable(
     joinedOn: date('joined_on').notNull(),
     /**
      * The day he left, in the agency's zone: the day the owner made him `left`, never typed (EQ-14, ADR 0039 § 6). Pay
-     * reads his closing fortnight from it. Set with the status, never moved while he is gone, cleared only with the
-     * status by a return (`team_members_left_check`, `keep_member_departure`, 0051).
+     * reads the fortnight of his departure from it, his final one (ADR 0072). Set with the status, never moved while he
+     * is gone, cleared only with the status by a return (`team_members_left_check`, `keep_member_departure`, 0051).
      */
     leftOn: date('left_on'),
     createdAt: createdAt(),

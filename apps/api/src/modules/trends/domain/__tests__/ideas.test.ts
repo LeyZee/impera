@@ -82,7 +82,7 @@ describe('the code’s filters on the morning ideas (ADR 0060 § 4)', () => {
     const nude = { toShoot: 'Une photo topless de dos, lumière douce.' };
     expect(reasons([idea(nude)], context())).toEqual(['nudity']);
     expect(reasons([idea({ ...nude, category: 'feed_shoot' })], context())).toEqual(['nudity']);
-    expect(filterIdeas([idea({ ...nude, category: 'script' })], context()).kept).toHaveLength(1);
+    expect(filterIdeas([idea({ ...nude, category: 'mass_dm' })], context()).kept).toHaveLength(1);
   });
 
   it('holds the Instagram guard for an Instagram output only', () => {

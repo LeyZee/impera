@@ -8,12 +8,14 @@ import type {
   AgentHours,
   ConversationDetail,
   ConversationEventView,
+  ConversationHolder,
   ConversationId,
   ConversationMode,
   ConversationState,
   ConversationSummary,
   CreatorConversation,
   CreatorFanPage,
+  CreatorFanInsights,
   CreatorId,
   CreatorMessagePage,
   Currency,
@@ -549,15 +551,19 @@ export interface CreatorSpaceReader {
   openConversation(userId: UserId, id: ConversationId, ip: string): Promise<CreatorConversation | null>;
   /**
    * `null` when she has no conversation of that id. A read with no opening of hers of that conversation in the last
-   * `CREATOR_READ_TRACE_MINUTES` is written in the audit log as one (`details.via = 'messages'`): a direct call never
-   * reads the thread without a trace, and the screen's reading every 30 s adds nothing.
+   * 15 minutes is written in the audit log as one (`details.via = 'messages'`): a direct call never reads the thread
+   * without a trace, and the screen's reading every 30 s adds nothing.
    */
   messages(
     userId: UserId,
     id: ConversationId,
     page: PageRequest,
     ip: string,
-  ): Promise<CreatorMessagePage | null>;
+  ): Promise<CreatorMessagePage | null>; /**
+   * « Qui sont tes fans » (CR-15, ADR 0065, ADR 0074): figures on all her fans, at the last midnight in her time zone
+   * before `now`; shares only, never a value a fan wrote nor a case's count.
+   */
+  fanInsights(userId: UserId, now: Date): Promise<CreatorFanInsights>;
 }
 
 export interface PageRequest {
@@ -575,16 +581,55 @@ export interface MediaDescriptions {
 
 /** Read side of the dashboard (no lock, no event): implemented in `infra/db`. */
 export interface ConversationReader {
-  /** Every conversation of the creator, or with `routedTo` only those routed to that account (ADR 0024). */
-  list(creatorId: CreatorId, page: PageRequest, routedTo?: UserId): Promise<Page<ConversationSummary>>;
-  /** Whether the conversation is routed to that account: the only way a member whose scope is `self` reaches it. */
-  isRoutedTo(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<boolean>;
   /**
-   * Whether a conversation of this fan is routed to that account: the fan's sheet (his limits, what is left to learn)
-   * is read, never written, by the member who holds it (ADR 0025, recette 05/11 CHAT-03).
+   * Every conversation of the creator, or with `heldOnly` only those the reader holds: routed to him, or taken over by
+   * him and not given back (ADR 0024, ADR 0025: a handover he took stays his until « Rendre la main »). Each says
+   * whether the reader holds it.
    */
-  isFanRoutedTo(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
-  get(creatorId: CreatorId, id: ConversationId): Promise<ConversationDetail | null>;
+  list(
+    creatorId: CreatorId,
+    page: PageRequest,
+    reader: { readonly userId: UserId; readonly heldOnly: boolean },
+  ): Promise<Page<ConversationSummary>>;
+  /**
+   * Whether that account holds the conversation (routed to it, or its takeover not ended): how a member whose scope is
+   * `self` reaches it outside his access window (ADR 0025).
+   */
+  isHeldBy(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<boolean>;
+  /**
+   * Who holds the conversation, for that account (EQ-13): `'you'`, `'other'` (another person: routed to them, or their
+   * takeover not ended) or `null` (nobody, or no such conversation). A chatter in his window gives back his own hand
+   * or a handoff nobody took, never another person's (ADR 0025).
+   */
+  holderOf(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<ConversationHolder | null>;
+  /**
+   * Whether that account holds a conversation of this fan: the fan's sheet (his limits, what is left to learn) is read,
+   * never written, by the member who holds it (ADR 0025, recette 05/11 CHAT-03).
+   */
+  isFanHeldBy(creatorId: CreatorId, fanId: FanId, userId: UserId): Promise<boolean>;
+  /**
+   * A chatter's opening of the conversation and its fan's sheet, in the audit log, before he reads it (ADR 0025: every
+   * sheet he opens is traced, never its content): written unless he opened it in the last 15 minutes, so that the
+   * screen's reading every 30 s adds nothing and a direct call never reads without a trace. `false` when the creator
+   * has no conversation of that id, and nothing is written.
+   */
+  traceOpening(
+    creatorId: CreatorId,
+    id: ConversationId,
+    trace: { readonly userId: UserId; readonly ip: string; readonly via?: 'messages' | 'events' | 'desire' },
+  ): Promise<boolean>;
+  /**
+   * A chatter's read of a fan's sheet on its own (`/fans/:id/flags`, `/fans/:id/kyc`), written as the opening of each
+   * conversation of that fan unless one covers it (ADR 0025: every sheet he opens is in the audit log, never its
+   * content). Nothing is written for a fan without a conversation: his sheet is then empty to a chatter anyway.
+   */
+  traceFanOpening(
+    creatorId: CreatorId,
+    fanId: FanId,
+    trace: { readonly userId: UserId; readonly ip: string; readonly via: 'flags' | 'kyc' },
+  ): Promise<void>;
+  /** As the reader `userId` sees it: whether he holds it is his own. */
+  get(creatorId: CreatorId, id: ConversationId, userId: UserId): Promise<ConversationDetail | null>;
   /** `null` when the creator has no such conversation, as for `get`: never an empty page that hides it. */
   messages(creatorId: CreatorId, id: ConversationId, page: PageRequest): Promise<Page<MessageView> | null>;
   events(
@@ -597,6 +642,8 @@ export interface ConversationReader {
    * without such a conversation.
    */
   desireCurve(creatorId: CreatorId, id: ConversationId): Promise<DesireCurve | null>;
+  /** Whether the latest global or creator-wide emergency stop of hers is on (recette CHAT-07). */
+  sendingStopped(creatorId: CreatorId): Promise<boolean>;
 }
 
 /** Her own alerts' names, archived ones too (`alerts` module's adapter): the history names an alert as it was. */

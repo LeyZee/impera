@@ -4,13 +4,15 @@ import {
   type ContentDrop,
   type ContentDropFile,
   type ContentRequest,
+  ContentDropIdSchema,
+  type ContentDropId,
   type DropCategory,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { DropSheet } from './DropSheet';
-import { CONTENT_KEY, refuseRequest, useContent, withdrawDrop } from './api';
+import { CONTENT_KEY, refuseRequest, startScriptDrop, useContent, withdrawDrop } from './api';
 import {
   CATEGORY_EMOJIS,
   CATEGORY_HINTS,
@@ -46,7 +48,12 @@ interface Opened {
  * Contenu, the creator's (CR-06 d, ADR 0055 § 8), in the order of what matters to her: À tourner, Déposer, En route,
  * Publié. An empty section is not shown (relecture Extension); amber only where she has something to do.
  */
-export function ContentPage(): JSX.Element {
+export function ContentPage({
+  onOpenScript,
+}: {
+  /** Her script, card by card (SC-02 lot b2). */
+  onOpenScript: (dropId: ContentDropId) => void;
+}): JSX.Element {
   const content = useContent();
   const client = useQueryClient();
   const sends = useLiveSends();
@@ -107,6 +114,7 @@ export function ContentPage(): JSX.Element {
                     onDrop={() => {
                       setOpened({ category: request.category, request });
                     }}
+                    onOpenScript={onOpenScript}
                     onRefuse={() => {
                       setRefusing(request);
                     }}
@@ -158,6 +166,7 @@ export function ContentPage(): JSX.Element {
                     sends={sends}
                     when={droppedOn(drop.createdAt, today, zone)}
                     onSettled={reread}
+                    onOpenScript={onOpenScript}
                   />
                 ))}
               </ul>
@@ -229,13 +238,20 @@ function RequestCard({
   today,
   onDrop,
   onRefuse,
+  onOpenScript,
 }: {
   request: ContentRequest;
   today: string;
   onDrop: () => void;
   onRefuse: () => void;
+  onOpenScript: (dropId: ContentDropId) => void;
 }): JSX.Element {
   const due = dueOf(request.dueOn, today);
+  // A script asked with its version is shot card by card; one asked before (no version) is dropped as before.
+  const scripted = request.category === 'script' && request.structureVersionId !== null;
+  const [dropId] = useState(() => ContentDropIdSchema.parse(crypto.randomUUID()));
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   return (
     <li className="nv-plate ct-card">
       <div className="ct-card__head">
@@ -252,10 +268,38 @@ function RequestCard({
         <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onRefuse}>
           Je ne peux pas
         </button>
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onDrop}>
-          Déposer
-        </button>
+        {scripted ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              setFailed(null);
+              // Its id drawn once: a tap replayed after a cut network answers the same script.
+              startScriptDrop({ id: dropId, requestId: request.id })
+                .then((script) => {
+                  onOpenScript(script.drop.id);
+                })
+                .catch(() => {
+                  setFailed('Ton script n’a pas pu s’ouvrir : réessaie dans un instant.');
+                  setBusy(false);
+                });
+            }}
+          >
+            Commencer
+          </button>
+        ) : (
+          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onDrop}>
+            Déposer
+          </button>
+        )}
       </div>
+      {failed === null ? null : (
+        <p className="ct-card__blocked" role="alert">
+          {failed}
+        </p>
+      )}
     </li>
   );
 }
@@ -265,11 +309,13 @@ function DropCard({
   sends,
   when,
   onSettled,
+  onOpenScript,
 }: {
   drop: ContentDrop;
   sends: ReadonlyMap<string, LiveSend>;
   when: string;
   onSettled: () => void;
+  onOpenScript: (dropId: ContentDropId) => void;
 }): JSX.Element {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -291,7 +337,7 @@ function DropCard({
         <span className={`ct-state ct-state--${tone}`}>{STATE_WORDS[drop.state]}</span>
       </div>
       <p className="ct-card__meta nv-num">
-        {when} · {contentsOf(drop.files)}
+        {when} · {drop.files.length === 0 ? 'Rien d’ajouté encore' : contentsOf(drop.files)}
       </p>
       {drop.state === 'blocked' && drop.blockedReason !== null ? (
         <p className="ct-card__blocked">{drop.blockedReason}</p>
@@ -304,7 +350,30 @@ function DropCard({
           ))}
         </ul>
       ) : null}
-      {WITHDRAWABLE_DROP_STATES.has(drop.state) && !sending ? (
+      {drop.state === 'filling' && !confirming ? (
+        <div className="ct-card__foot">
+          {sending ? null : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              onClick={() => {
+                setConfirming(true);
+              }}
+            >
+              Retirer
+            </button>
+          )}
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            onClick={() => {
+              onOpenScript(drop.id);
+            }}
+          >
+            Continuer
+          </button>
+        </div>
+      ) : WITHDRAWABLE_DROP_STATES.has(drop.state) && !sending ? (
         <div className="ct-card__actions">
           {confirming ? (
             <>

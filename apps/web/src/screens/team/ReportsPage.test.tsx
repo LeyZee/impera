@@ -100,6 +100,9 @@ const report = (n: number, shiftIndex: number, patch: Record<string, unknown> = 
     status: 'submitted',
     version: 1,
     byAgency: false,
+    reviewKind: null,
+    explanation: null,
+    check: null,
     canReview: true,
     submittedAt: '2026-10-27T00:00:00.000Z',
     reviewedAt: null,
@@ -245,8 +248,15 @@ afterEach(() => {
 describe('Équipe › Rapports', () => {
   it('counts what waits, oldest shift first, says the incident, and keeps out of the batch what the reader may not review', async () => {
     renderPage();
-    const panel = (await screen.findByText('rapports attendent')).closest('section');
+    // Its own shift is not the reader's to decide: the tab counts 2, and the page says why it differs.
+    const panel = (await screen.findByText('rapports attendent, dont 2 à décider maintenant')).closest(
+      'section',
+    );
     expect(panel?.textContent).toContain('3');
+    const tab = within(screen.getByRole('navigation', { name: 'Équipe' })).getByRole('link', {
+      name: /^Rapports/u,
+    });
+    expect(tab.textContent).toContain('2, 2 à décider maintenant');
     expect(screen.getByText('Le compte a été déconnecté une heure')).toBeTruthy();
     expect(screen.getByText('Ton propre shift : un autre membre de l’agence le valide.')).toBeTruthy();
 
@@ -578,6 +588,107 @@ describe('Équipe › Rapports', () => {
     expect(alert.textContent).toContain('Correction non envoyée');
     fireEvent.click(within(alert).getByRole('button', { name: 'Rouvrir' }));
     const again = await screen.findByRole('dialog', { name: 'Corriger le rapport de Théo' });
-    expect(within(again).getByDisplayValue('-20')).toBeTruthy();
+    // Typed « -20 », kept with the true minus sign the field writes (captures of #591).
+    expect(within(again).getByDisplayValue('−20')).toBeTruthy();
+  });
+});
+
+describe('Équipe › Rapports against the platform (ADR 0073)', () => {
+  /** A complete check whose gap waits until `explainBy`: the declared amount minus what Reveal read. */
+  const gapOf = (gapMinor: number, readMinor: number, explainBy: string): Record<string, unknown> => ({
+    state: 'complete',
+    readMinor,
+    gapMinor,
+    verdict: 'gap',
+    explainBy,
+  });
+
+  it('keeps a gap out of the batch while its member may answer it, and lets the agency decide once explained or late (§ 5)', async () => {
+    open = [
+      // 110,00 € declared, 100,00 € read, until 23 h tonight in Paris: it waits for Théo.
+      report(1, 0, { check: gapOf(1_000, 10_000, '2026-10-28T22:00:00.000Z') }),
+      report(2, 1, {
+        check: gapOf(-3_000, 15_000, '2026-10-28T22:00:00.000Z'),
+        explanation: 'Un remboursement arrivé après le shift.',
+      }),
+      // Its 48 hours ended last night, unanswered.
+      report(3, 2, { check: gapOf(1_300, 12_000, '2026-10-27T22:00:00.000Z') }),
+    ];
+    renderPage();
+    // The gap still waiting for Théo is not the agency's yet.
+    await screen.findByText('rapports attendent, dont 2 à décider maintenant');
+    const [late, waits, explained] = [...document.querySelectorAll<HTMLElement>('.rp-review')];
+    if (waits === undefined) throw new Error('No report waiting for its member');
+
+    expect(text(waits)).toContain('Écart +10,00 €');
+    expect(text(waits)).toContain('Reveal a lu 100,00 € pendant le shift.');
+    expect(text(waits)).toContain(
+      'Théo peut corriger ou expliquer l’écart jusqu’à 23 h : la validation attend.',
+    );
+    expect(waits.querySelector('input')?.disabled).toBe(true);
+    expect(waits.getAttribute('data-locked')).toBe('true');
+    // « Renvoyer » stays: the agency may still ask for the right amount.
+    expect(within(waits).getByRole('button', { name: 'Renvoyer' })).toBeTruthy();
+
+    expect(text(explained)).toContain('Écart −30,00 €');
+    expect(text(explained)).toContain('Explication « Un remboursement arrivé après le shift. »');
+    expect(explained?.querySelector('input')?.disabled).toBe(false);
+
+    expect(text(late)).toContain('Délai passé sans explication : à toi de décider.');
+    expect(late?.querySelector('input')?.disabled).toBe(false);
+
+    fireEvent.click(screen.getByLabelText('Tout sélectionner'));
+    expect(screen.getByRole('button', { name: 'Valider (2)' })).toBeTruthy();
+  });
+
+  it('says what the platform read, or why nothing is compared, beside the declared amount (§ 2, § 7)', async () => {
+    open = [
+      report(1, 0, {
+        check: { state: 'complete', readMinor: 11_000, gapMinor: 0, verdict: 'within', explainBy: null },
+      }),
+      report(2, 1, { check: { state: 'provisional', readMinor: 4_000 } }),
+      report(3, 2, { canReview: true, check: { state: 'unavailable', reason: 'chatter_unlinked' } }),
+    ];
+    renderPage();
+    // The matching one validates by itself: not the agency's to decide.
+    await screen.findByText('rapports attendent, dont 2 à décider maintenant');
+    const [unlinked, matching, provisional] = [...document.querySelectorAll('.rp-review')];
+    expect(text(matching)).toContain('Conforme');
+    expect(text(matching)).toContain(
+      'Reveal a lu 110,00 € pendant le shift : le rapport se valide tout seul dans les cinq minutes.',
+    );
+    expect(text(provisional)).toContain(
+      'Reveal a lu 40,00 € pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.',
+    );
+    expect(text(unlinked)).toContain(
+      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Réglages › Ventes pour comparer ses rapports.',
+    );
+    // Nothing the comparison cannot say holds a validation back.
+    fireEvent.click(screen.getByLabelText('Tout sélectionner'));
+    expect(screen.getByRole('button', { name: 'Valider (3)' })).toBeTruthy();
+  });
+
+  it('counts a member’s gaps on the period, and says a validation made by the check (§ 4, § 5)', async () => {
+    period = [
+      report(5, 0, {
+        status: 'validated',
+        reviewKind: 'automatic',
+        reviewedAt: '2026-10-26T22:35:00.000Z',
+        check: { state: 'complete', readMinor: 15_000, gapMinor: 0, verdict: 'within', explainBy: null },
+      }),
+      report(6, 2, {
+        status: 'validated',
+        reviewKind: 'human',
+        reviewedAt: '2026-10-27T23:00:00.000Z',
+        check: gapOf(1_200, 14_400, '2026-10-27T22:00:00.000Z'),
+      }),
+    ];
+    renderPage();
+    const theo = await screen.findByText('Théo', { selector: '.nv-disclosure__title' });
+    const summary = theo.closest('summary');
+    expect(text(summary)).toContain('1 écart');
+    const lines = [...(theo.closest('details')?.querySelectorAll('.rp-pline') ?? [])].map(text);
+    expect(lines.find((line) => line.includes('écart +12,00 €'))).toContain('Validé');
+    expect(lines.find((line) => line.includes('150,00 €'))).toContain('Validé automatiquement');
   });
 });

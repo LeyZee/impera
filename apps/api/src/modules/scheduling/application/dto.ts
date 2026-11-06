@@ -106,6 +106,10 @@ export const toShiftReportDto = (report: StoredShiftReport, reader: Reader): Shi
   submittedAt: report.submittedAt.toISOString(),
   reviewedAt: isoOrNull(report.reviewedAt),
   reviewNote: report.reviewNote,
+  // A review written before ADR 0073 has no kind: a person's.
+  reviewKind: report.reviewKind ?? (report.reviewedAt === null ? null : 'human'),
+  explanation: report.explanation,
+  check: report.check,
   createdAt: report.createdAt.toISOString(),
 });
 

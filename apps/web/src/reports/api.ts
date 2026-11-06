@@ -4,10 +4,12 @@ import {
   ApiErrorSchema,
   PAY_RULES_ERROR_CODES,
   PayRulesSourceRefusalSchema,
+  ReportGapThresholdSchema,
   SchedulingSettingsSchema,
   SHIFT_REPORT_BATCH_MAX,
   SHIFT_REPORT_ERROR_CODES,
   ShiftReportContextSchema,
+  ShiftReportEstimateSchema,
   ShiftReportListSchema,
   ShiftReportSchema,
   ValidateShiftReportsResultSchema,
@@ -19,6 +21,7 @@ import {
   type PayRulesErrorCode,
   type PayRulesSourceRefusal,
   type RejectShiftReportBody,
+  type ReportGapThreshold,
   type SchedulingSettings,
   type ShiftReport,
   type ShiftReportContext,
@@ -28,8 +31,14 @@ import {
   type ValidateShiftReportsBody,
   type ValidateShiftReportsResult,
 } from '@impera/contracts';
-import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import {
+  keepPreviousData,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 
 import { mergeLists } from './model';
@@ -70,6 +79,40 @@ export function useReportContext(shiftId: string): UseQueryResult<ShiftReportCon
     queryFn: () =>
       read(`/v1/scheduling/shifts/${shiftId}/report`, (body) => ShiftReportContextSchema.parse(body)),
   });
+}
+
+/** How long the amount rests before its estimate is asked: one request when the typing pauses, not one a key. */
+const ESTIMATE_PAUSE_MS = 300;
+
+/**
+ * What the amount typed brings the shift's member, in euro cents, as the server computes it (reco 19,
+ * `GET /v1/payroll/shifts/:shiftId/estimate`): asked once the typing pauses, the last answer kept while the next one
+ * comes. `null` without an amount, when the server cannot say (no rules, sales read by the connector, no rate yet), or
+ * when it does not answer: the panel then says nothing rather than a figure it cannot back.
+ */
+export function useReportEstimate(shiftId: string, amountMinor: number | null): number | null {
+  const [settled, setSettled] = useState(amountMinor);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSettled(amountMinor);
+    }, ESTIMATE_PAUSE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [amountMinor]);
+  const estimate = useQuery({
+    queryKey: [...REPORTS_KEY, 'estimate', shiftId, settled],
+    queryFn: () =>
+      read(`/v1/payroll/shifts/${shiftId}/estimate?amountMinor=${String(settled)}`, (body) =>
+        ShiftReportEstimateSchema.parse(body),
+      ),
+    enabled: settled !== null,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    retry: false,
+  });
+  if (amountMinor === null || estimate.isError) return null;
+  return estimate.data?.commissionMinor ?? null;
 }
 
 /** A period's reports and the shifts that take one; without a period, what is still open. */
@@ -128,6 +171,19 @@ export function usePayRules(enabled = true): UseQueryResult<AccountPayRulesList>
   });
 }
 
+/**
+ * The threshold a report is compared to its platform with (ADR 0073 § 3), read by the owner and the active managers,
+ * under the planning's key: a change reads the reports again.
+ */
+export function useReportGap(enabled = true): UseQueryResult<ReportGapThreshold> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'report-gap'],
+    queryFn: () => read('/v1/scheduling/report-gap', (body) => ReportGapThresholdSchema.parse(body)),
+    enabled,
+    retry: false,
+  });
+}
+
 /** Besides the reports' and the rules' own: a role guard, and a body the server refuses that the screen let through. */
 export type ReportRefusalCode =
   ShiftReportErrorCode | PayRulesErrorCode | 'role_forbidden' | 'request_invalid';
@@ -177,7 +233,7 @@ async function refusalOf(response: Response): Promise<ReportRefusal> {
 }
 
 async function send<T>(
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'PUT',
   url: string,
   body: unknown,
   parse: (json: unknown) => T,
@@ -247,6 +303,10 @@ export const rejectReport = (
 
 export const addPayRules = (body: CreateAccountPayRulesBody): Promise<ReportOutcome<AccountPayRules>> =>
   send('POST', '/v1/team/pay-rules', body, (json) => AccountPayRulesSchema.parse(json));
+
+/** The owner's threshold, from the next comparisons on; a validation keeps the one it saw. */
+export const saveReportGap = (body: ReportGapThreshold): Promise<ReportOutcome<ReportGapThreshold>> =>
+  send('PUT', '/v1/scheduling/report-gap', body, (json) => ReportGapThresholdSchema.parse(json));
 
 /** After a write, and after a refusal that says the list is read again: the reports and the planning. */
 export function useRefreshReports(): () => Promise<void> {

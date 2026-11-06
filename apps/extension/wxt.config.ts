@@ -20,10 +20,28 @@ export default defineConfig({
     // The public half of a key pair, so the extension keeps one ID wherever its folder lives (ADR 0062 § 8, ADR 0066
     // § 5): chrome.storage survives a move. The private half was never kept: an unpacked extension does not need it.
     key: manifestKey(),
-    permissions: ['storage', 'activeTab'],
+    // alarms: the watch's timers; scripting: its reader, registered once Instagram is allowed; contextMenus: « Marquer
+    // ce post pour… » on a post's link (VEI-02).
+    permissions: ['storage', 'activeTab', 'alarms', 'scripting', 'contextMenus'],
     host_permissions: ['https://*.reveal.me/*', 'http://localhost/*', 'http://127.0.0.1/*'],
-    optional_host_permissions: ['https://*/*'],
+    // Instagram is asked at the first « Veille », never at the install (ADR 0060 § 1); `https://*/*` is a deployed CRM.
+    optional_host_permissions: ['https://www.instagram.com/*', 'https://*/*'],
+    commands: {
+      'mark-post': {
+        suggested_key: { default: 'Alt+Shift+M' },
+        description: 'Marquer le post à l’écran pour la dernière créatrice choisie',
+      },
+    },
   },
+  // The contracts package only declares schemas and constants: what a script does not import is left out of it, so the
+  // reader on instagram.com carries the few schemas it parses and not the whole of `@impera/contracts`.
+  vite: () => ({
+    build: {
+      rollupOptions: {
+        treeshake: { moduleSideEffects: (id: string) => !id.includes('/packages/contracts/') },
+      },
+    },
+  }),
   // The file the CRM serves at /extension/impera.zip (ADR 0067, apps/web/Dockerfile): one name, whatever the version.
   zip: { artifactTemplate: 'impera.zip' },
   // WXT's default dev port is 3000, the API's: under `pnpm dev` the extension took it first and the API never started.

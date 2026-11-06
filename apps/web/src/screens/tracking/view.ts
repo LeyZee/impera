@@ -66,19 +66,24 @@ export interface Situation {
 }
 
 /**
- * The conversation's situation for this reader. `holdsHand`: the reader is the person the conversation is routed to (a
- * chatter), so a human hand is his (« Tu as la main »). An idle or paused conversation whose fan waits is « Sans
- * réponse »: the agent only answers a new message, so a person must (PRO-03, CHAT-25).
+ * The conversation's situation for this reader. A human hand he holds is « Tu as la main » (`heldBy`, EQ-13). For a
+ * member whose scope is `self` (a chatter, ADR 0024), another person's hand is nothing for him to do: it goes with the
+ * quiet ones, still said; whoever reads the whole creator finds every human hand under « À toi » (CHAT-22). An idle or
+ * paused conversation whose fan waits is « Sans réponse »: the agent only answers a new message, so a person must
+ * (PRO-03, CHAT-25).
  */
 export function situationOf(
-  conversation: Pick<ConversationSummary, 'state' | 'lastInboundAt' | 'lastOutboundAt'>,
-  holdsHand = false,
+  conversation: Pick<ConversationSummary, 'state' | 'lastInboundAt' | 'lastOutboundAt' | 'heldBy'>,
+  selfScope = false,
 ): Situation {
   const { state } = conversation;
   const pill = statusClass(state);
   if (state === 'awaiting_approval') return { hand: 'yours', label: STATE_LABELS[state], pill };
-  if (state === 'human')
-    return { hand: 'yours', label: holdsHand ? 'Tu as la main' : STATE_LABELS[state], pill };
+  if (state === 'human') {
+    if (conversation.heldBy === 'you') return { hand: 'yours', label: 'Tu as la main', pill };
+    const theirs = selfScope && conversation.heldBy === 'other';
+    return { hand: theirs ? 'quiet' : 'yours', label: STATE_LABELS[state], pill };
+  }
   if (state === 'error') return { hand: 'yours', label: 'Pas parti', pill };
   if ((state === 'idle' || state === 'paused') && fanWaits(conversation))
     return { hand: 'yours', label: 'Sans réponse', pill: statusClass('awaiting_approval') };
@@ -87,14 +92,21 @@ export function situationOf(
   return { hand: 'quiet', label: STATE_LABELS[state], pill };
 }
 
+/** A draft held by the emergency stop: nothing to decide until it is lifted, said in amber (recette CHAT-07). */
+export const STOP_SITUATION: Situation = {
+  hand: 'yours',
+  label: 'Arrêt actif',
+  pill: statusClass('awaiting_approval'),
+};
+
 /** The lines split by who acts, each group in the order it came; an empty group is left out. */
 export function groupByHand<T extends { readonly conversation: ConversationSummary }>(
   lines: readonly T[],
-  holdsHand = false,
+  selfScope = false,
 ): { readonly hand: Hand; readonly lines: readonly T[] }[] {
   return HANDS.map((hand) => ({
     hand,
-    lines: lines.filter((l) => situationOf(l.conversation, holdsHand).hand === hand),
+    lines: lines.filter((l) => situationOf(l.conversation, selfScope).hand === hand),
   })).filter((group) => group.lines.length > 0);
 }
 

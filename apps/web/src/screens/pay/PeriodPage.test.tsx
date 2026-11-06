@@ -467,6 +467,29 @@ describe('Paie › Quinzaine', () => {
     expect(text(row('Iris'))).toContain('Ton relevé : un autre membre de l’agence le valide.');
   });
 
+  it('says that a gap still waiting for its member holds the period too, and that sending it back frees it (ADR 0073)', async () => {
+    periods[OCT2] = endedOctober({}, false);
+    reports = [
+      { ...report(1, BASILE.id), status: 'submitted' },
+      {
+        ...report(2, LOU.id),
+        status: 'submitted',
+        check: {
+          state: 'complete',
+          readMinor: 17_200,
+          gapMinor: 1_200,
+          verdict: 'gap',
+          explainBy: '2099-01-01T00:00:00.000Z',
+        },
+      },
+    ];
+    renderPage(OWNER);
+    const title = await screen.findByText('2 rapports de la quinzaine attendent leur relecture');
+    expect(text(title.closest('.rp-notice'))).toContain(
+      'Un rapport en écart attend l’explication de son membre, 48 h au plus : le renvoyer libère la quinzaine.',
+    );
+  });
+
   it('says in amber that pay could not compute the period, who lacks a rate, and never shows its figures as true', async () => {
     const blocked = {
       code: 'commission_rate_missing_conflict',
@@ -788,6 +811,54 @@ describe('Paie › Quinzaine', () => {
         },
       },
     ]);
+  });
+
+  it('says to a withdrawal on a member who left that it never brings his total below zero, and never that he will read it (ADR 0072 § 5)', async () => {
+    team = MEMBERS.map((one): TeamMember => (one.id === LOU.id ? { ...one, status: 'left' } : one));
+    const validated = statementOf(LOU, OCT2, { status: 'validated', canValidate: false });
+    periods[OCT2] = periodOf(OCT2, [validated], {
+      closing: {
+        period: OCT2,
+        exchangeRates: [],
+        closedBy: OWNER_USER,
+        closedAt: '2026-11-02T08:41:00.000Z',
+      },
+    });
+    answer = () => ({
+      status: 409,
+      body: {
+        error: {
+          code: 'pay_adjustment_below_zero_conflict',
+          message: 'x',
+          details: { totalMinor: -1_250, memberId: LOU.id },
+          requestId: 'req-1',
+        },
+      },
+    });
+    renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
+    fireEvent.click(await screen.findByRole('button', { name: 'Lou' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajuster' }));
+    fireEvent.click(await within(dialog).findByRole('radio', { name: 'Retirer' }));
+    fireEvent.change(within(dialog).getByLabelText('Montant'), { target: { value: '20' } });
+    expect(text(within(dialog).getByText(/^Retiré de son total/u))).toBe(
+      'Retiré de son total, −20,00 €. Lou a quitté l’équipe : un retrait qui mettrait son total sous zéro est refusé.',
+    );
+    expect(
+      within(dialog).getByText('Gardé sur son relevé. Jamais le message ni le nom d’un fan.'),
+    ).toBeTruthy();
+    expect(within(dialog).queryByText(/Lu par le membre/u)).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Motif'), {
+      target: { value: 'Pack remboursé après son départ.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    const summary = text(await within(dialog).findByText(/^Il corrige/u));
+    expect(summary).toContain('Le motif reste sur son relevé.');
+    expect(summary).not.toContain('le lira');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajouter l’ajustement' }));
+    expect(text(await within(dialog).findByRole('alert'))).toBe(
+      'Ce retrait ferait passer le total de Lou, qui a quitté l’équipe, à −12,50 € : un membre parti ne finit jamais sous zéro, rien n’a été enregistré.',
+    );
   });
 
   it('says a transfer that waits for a tax residence certificate apart, and offers no « Marquer payé » for it (ADR 0041)', async () => {
@@ -1351,6 +1422,9 @@ function report(n: number, memberId: string) {
     incident: null,
     version: 1,
     byAgency: false,
+    reviewKind: null,
+    explanation: null,
+    check: null,
     canReview: true,
     submittedAt: '2026-10-31T22:00:00.000Z',
     reviewedAt: null,

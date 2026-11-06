@@ -1,9 +1,10 @@
 /** Public entry point of the `scripts` module (SC-01, ADR 0056). Other modules import this file only. */
-import type { CreatorId, ScriptStructureVersion } from '@impera/contracts';
+import type { CreatorId, ScriptStructureVersion, ScriptVariantLetter } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { askScripts, type AskScriptsRun } from './application/ask-scripts';
+import { cardContent, cardSvg } from './domain/cards';
 import type { LimitsOf, RasterizeCard, ScriptRequests, ScriptStructureStore } from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
@@ -17,6 +18,24 @@ export interface ScriptsModule {
   readonly structures: ScriptStructureStore;
   /** A frozen version by its id, whoever reads it (SC-02 lot b): what her script drop shoots. `null` when not frozen. */
   frozenVersion(versionId: string): Promise<ScriptStructureVersion | null>;
+  /**
+   * A card of a frozen version, as the SVG her script shows (SC-02 lot b2): the same drawing as the library's, never
+   * rasterised. `null` for a version not frozen, or a segment or series it does not have.
+   */
+  frozenCard(
+    versionId: string,
+    segmentKey: string,
+    variant: ScriptVariantLetter | null,
+  ): Promise<string | null>;
+  /**
+   * A card of a frozen version as the folder's PNG (SC-03, ADR 0056 § 3): the `folder` format, rasterised, which goes
+   * at `00` of its series in the script's folder. `null` like `frozenCard`.
+   */
+  frozenFolderCard(
+    versionId: string,
+    segmentKey: string,
+    variant: ScriptVariantLetter | null,
+  ): Promise<Uint8Array | null>;
   /** The latest version frozen for a script asked by hand (SC-02 lot b), by an owner or a manager; `null` when archived. */
   freezeForRequest(structureId: string, userId: string): Promise<string | null>;
   /** Mounted under `/v1` by the server: `/script-structures` (and their cards), each creator's `/script-queue` and `/script-cadence`. */
@@ -49,18 +68,29 @@ export interface ScriptsDeps {
 export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
   const structures = createDrizzleScriptStructureStore(deps.db);
   const cadences = createDrizzleCadenceStore(deps.db, deps.adminDb);
+  const frozenVersion = createFrozenVersionReader(deps.adminDb);
+  const rasterize = deps.rasterizeCard ?? createCardRasterizer(deps.cardFontsDir);
   return {
     name: 'scripts',
     structures,
-    frozenVersion: createFrozenVersionReader(deps.adminDb),
+    frozenVersion,
+    frozenCard: async (versionId, segmentKey, variant) => {
+      const version = await frozenVersion(versionId);
+      if (version === null) return null;
+      const content = cardContent(version, segmentKey, variant === null ? {} : { variant });
+      return content === null ? null : cardSvg(content, 'card');
+    },
+    frozenFolderCard: async (versionId, segmentKey, variant) => {
+      const version = await frozenVersion(versionId);
+      if (version === null) return null;
+      const content = cardContent(version, segmentKey, variant === null ? {} : { variant });
+      return content === null ? null : rasterize(cardSvg(content, 'folder'));
+    },
     freezeForRequest: createRequestFreezer(deps.adminDb),
-    routes: createScriptRoutes(
-      structures,
-      deps.limitsOf,
-      deps.requireRole,
-      deps.rasterizeCard ?? createCardRasterizer(deps.cardFontsDir),
-      { store: cadences, requests: deps.requests },
-    ),
+    routes: createScriptRoutes(structures, deps.limitsOf, deps.requireRole, rasterize, {
+      store: cadences,
+      requests: deps.requests,
+    }),
     jobs: {
       askScripts: (now, onFailure) =>
         askScripts(

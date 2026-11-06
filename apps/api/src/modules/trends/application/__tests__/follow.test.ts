@@ -4,7 +4,7 @@ import {
   CreatorIdSchema,
   newId,
   SuggestionIdSchema,
-  type DropCategory,
+  type IdeaDropCategory,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -15,7 +15,7 @@ import { followDecision, followDeposit } from '../follow';
 const creatorId = newId(CreatorIdSchema);
 const suggestionId = newId(SuggestionIdSchema);
 
-function fakes(category: DropCategory) {
+function fakes(category: IdeaDropCategory) {
   const asked: IdeaContentRequest[] = [];
   const moves: string[] = [];
   const ideas: IdeaFollowStore = {
@@ -56,12 +56,6 @@ describe('followDecision (VEI-01 d2)', () => {
       { id: 'idea-1', creatorId, category: 'feed_shoot', dueOn: '2026-11-12', reason: 'Robe verte' },
     ]);
     expect(moves).toEqual(['requested:idea-1']);
-  });
-
-  it('never asks a script: a script is asked with a structure of the library', async () => {
-    const { deps, asked, moves } = fakes('script');
-    await followDecision(deps, { creatorId, suggestionId, state: 'accepted', day: '2026-11-12' });
-    expect([asked, moves]).toEqual([[], []]);
   });
 
   it('declines the idea of a declined shoot, and asks nothing for another creator', async () => {

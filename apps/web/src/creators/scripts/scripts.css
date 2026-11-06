@@ -1,0 +1,123 @@
+/*
+ * Créatrices › Scripts (SC-03 c2b). The head and the empty plate are her agenda's (`ps-*`, `aa-*`); the cards live
+ * here, prefixed `sx-`. A card says its number first, in Geist's tabular figures, then its moment and where it stands
+ * by a quiet pill: never a coloured edge.
+ */
+.sx-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+
+.sx-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 20px 22px;
+  border-radius: var(--nv-radius-xl);
+}
+
+.sx-card__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.sx-code {
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.sx-moment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.sx-state {
+  margin-left: auto;
+}
+.sx-state[data-tone='todo'] {
+  color: var(--nv-ink);
+}
+.sx-state[data-tone='todo']::before {
+  background: var(--nv-ink);
+}
+.sx-state[data-tone='warn']::before {
+  background: var(--nv-warning);
+}
+.sx-state[data-tone='ok'] {
+  color: var(--nv-ink);
+}
+.sx-state[data-tone='ok']::before {
+  background: var(--nv-success);
+}
+
+.sx-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sx-title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.sx-card[data-exported='true'] .sx-title {
+  color: var(--nv-ink-muted);
+}
+.sx-meta {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+.sx-note {
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sx-note[data-tone='warn'] {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+
+.sx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+.sx-dialog__text {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.sx-error {
+  margin: 0;
+  color: var(--nv-warning);
+  font-weight: 600;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+
+@media (max-width: 520px) {
+  .sx-card {
+    padding: 16px;
+  }
+  .sx-actions > .nv-btn {
+    flex: 1 1 auto;
+  }
+}

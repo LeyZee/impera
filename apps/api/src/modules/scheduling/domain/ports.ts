@@ -12,12 +12,15 @@ import type {
   PayPeriod,
   Platform,
   PlatformAccountId,
+  ReportGapThreshold,
   ReportSignal,
   SchedulingSettings,
   SchedulingSettingsInput,
   ShiftFeedbackId,
   ShiftId,
   ShiftReportId,
+  ShiftReportCheck,
+  ShiftReportReviewKind,
   ShiftReportStatus,
   ShiftSlot,
   ShiftSwapRequestId,
@@ -32,7 +35,7 @@ import type {
 
 import type { CreatorAgent } from './calendar';
 import type { FeedEvent } from './calendar-feed';
-import type { Reader, RulesRow } from './reports';
+import type { RatedRulesRow, Reader } from './reports';
 import type { PlannedCreators, WorkingMember } from './shifts';
 
 /** Who writes, for the policies (`withTenantMember`) and the audit line. */
@@ -201,6 +204,18 @@ export interface PlanningStore {
     creatorIds: readonly CreatorId[],
     range: { readonly from: Date; readonly to: Date },
   ): Promise<PlanningRead>;
+  /**
+   * The member's own shifts not cancelled whose access window may still be open at `now` (ended after `since`), with
+   * their accounts, read as the member himself creator by creator: `null` for an account with no member row.
+   */
+  memberShifts(
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    since: Date,
+  ): Promise<{
+    status: TeamMemberStatus;
+    shifts: (StoredShift & { platform: Platform; handle: string })[];
+  } | null>;
   /** Owner and active manager: each shift covering `at`, of an active member, with that member, on what he plans. */
   onDuty(
     actor: UserId,
@@ -244,14 +259,6 @@ export interface OnShift {
 
 /** The reads and the job that cross creators, on the admin connection (`*Unscoped`). */
 export interface PlanningAdmin {
-  /** The member's shifts not cancelled whose access window may still be open at `now`, with their accounts. */
-  memberShiftsUnscoped(
-    userId: UserId,
-    since: Date,
-  ): Promise<{
-    status: TeamMemberStatus;
-    shifts: (StoredShift & { platform: Platform; handle: string })[];
-  } | null>;
   /** `onShift` on a creator at `at`, without the margin: her active members whose shift covers it. */
   onShiftUnscoped(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
   /** The settings in force now, for the job (no member behind it). */
@@ -460,6 +467,14 @@ export interface StoredShiftReport {
   readonly submittedAt: Date;
   readonly reviewedAt: Date | null;
   readonly reviewNote: string | null;
+  /** `null` while submitted, and on a review written before ADR 0073 (a person's). */
+  readonly reviewKind: ShiftReportReviewKind | null;
+  readonly explanation: string | null;
+  /**
+   * Against the platform (ADR 0073): read now while it is not validated, as its validation saw it once it is; `null`
+   * for a correction and when its account's sales are not read.
+   */
+  readonly check: ShiftReportCheck | null;
   readonly createdAt: Date;
 }
 
@@ -478,6 +493,7 @@ interface ShiftReportChange {
   readonly amountMinor?: number | undefined;
   readonly comment?: string | null | undefined;
   readonly incident?: string | null | undefined;
+  readonly explanation?: string | null | undefined;
 }
 
 type ShiftReportReview =
@@ -495,11 +511,12 @@ export interface ShiftReportStore {
   context(
     actor: UserId,
     shiftId: ShiftId,
+    now: Date,
   ): Promise<{
     shift: StoredShift;
     account: StoredAccount;
     period: PayPeriod;
-    rules: RulesRow | null;
+    rules: RatedRulesRow | null;
     reports: StoredShiftReport[];
     reader: Reader;
   }>;
@@ -544,6 +561,22 @@ export interface ShiftReportStore {
   }>;
   /** Who the signed-in account is, for a validation sent by someone who may not review. */
   reader(actor: UserId): Promise<Reader>;
+  /**
+   * The automatic check's candidates (ADR 0073 § 4), as the admin role: the submitted reports, never a correction,
+   * whose comparison may be complete at `now` and is within, each with the version to check. All of them, a page at a
+   * time: the reports a person still has to decide never hide a newer one.
+   */
+  checkCandidatesUnscoped(now: Date): Promise<{ id: ShiftReportId; version: number }[]>;
+  /**
+   * The automatic check of one report's version (ADR 0073 § 4), as the admin role, under the lock (member, period):
+   * validated in the name of the check when that version is still submitted and its complete comparison is within
+   * the threshold; `false` otherwise, nothing written.
+   */
+  autoValidateUnscoped(id: ShiftReportId, version: number, now: Date): Promise<boolean>;
+  /** The threshold of ADR 0073 § 3: the owner's, or the default. */
+  reportGap(actor: UserId): Promise<ReportGapThreshold>;
+  /** The owner's, `forbidden` to anyone else. */
+  saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
 }
 
 /** An account's pay rules as stored (EQ-03): added only, never changed. */

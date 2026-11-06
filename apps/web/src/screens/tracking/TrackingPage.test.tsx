@@ -11,7 +11,7 @@ import {
   type FanFlags,
   type KycSlot,
 } from '@impera/contracts';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -44,6 +44,7 @@ function conversation(id: string, patch: Partial<ConversationSummary> = {}): Con
     unreadCount: 0,
     updatedAt: '2026-10-17T20:00:00Z',
     desire: null,
+    heldBy: null,
     ...patch,
   });
 }
@@ -116,6 +117,8 @@ function serve(routes: {
   messages?: unknown[];
   /** « À traiter » across creators; the Dashboard's todos, named after its creator, when not given. */
   todos?: Reply | (() => Reply);
+  /** The emergency stop holds her messages (recette CHAT-07); off when not given, unread when `'down'`. */
+  stopped?: boolean | 'down';
 }): Posted[] {
   const posted: Posted[] = [];
   vi.stubGlobal(
@@ -147,6 +150,11 @@ function serve(routes: {
         reply = routes.flagsRefused === true ? { status: 403 } : flagsView(routes.flags?.before);
       } else if (path === '/v1/creators') {
         reply = typeof routes.creators === 'function' ? routes.creators() : routes.creators;
+      } else if (path === '/v1/conversations/stop') {
+        reply =
+          routes.stopped === 'down'
+            ? { status: 500 }
+            : { status: 200, body: { stopped: routes.stopped ?? false } };
       } else if (path === '/v1/conversations') {
         reply = { status: 200, body: routes.conversations?.[url.searchParams.get('creatorId') ?? ''] };
       } else if (path === '/v1/dashboard/todos') {
@@ -191,7 +199,7 @@ function renderPage(
   at = '/suivi',
   canDecide = true,
   canAddCreator = true,
-  routedOnly = false,
+  selfScope = false,
   nothingListed?: string,
 ): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -210,7 +218,7 @@ function renderPage(
           onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
           canDecide={canDecide}
           canAddCreator={canAddCreator}
-          routedOnly={routedOnly}
+          selfScope={selfScope}
           nothingListed={nothingListed}
         />
       );
@@ -625,6 +633,29 @@ describe('the reader of Suivi', () => {
     await waitFor(() => {
       expect(queueReads()).toBeGreaterThan(before);
     });
+  });
+
+  it('says the emergency stop above the list, and keeps the draft from Valider while it holds (recette CHAT-07)', async () => {
+    const posted = serve({ ...withDraft, stopped: true, detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    expect(
+      (await screen.findByText(/L’arrêt d’urgence est actif\./u)).closest('[role="status"]')?.textContent,
+    ).toContain('Les envois sont en pause\u00a0: préviens ton responsable si ça dure.');
+    const draft = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(draft).getByText(/attend qu’il soit levé/u)).toBeDefined();
+    expect(within(draft).queryByRole('button', { name: 'Valider' })).toBeNull();
+    expect(screen.getAllByText('Arrêt actif')).toHaveLength(2);
+    // Her line says the stop, never « À valider »: nothing can be decided until it is lifted.
+    const list = screen.getByRole('list', { name: 'À toi' });
+    expect(within(list).getByText('Arrêt actif')).toBeDefined();
+    expect(within(list).queryByText('À valider')).toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it('says when the emergency stop could not be read, rather than nothing (relecture #597)', async () => {
+    serve({ ...withDraft, stopped: 'down', detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    expect(await screen.findByText(/L’arrêt d’urgence n’a pas pu être lu\./u)).toBeDefined();
   });
 
   it('sends the retouched bubbles, one per line', async () => {
@@ -1343,29 +1374,145 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     expect(screen.getAllByRole('button', { name: 'Reprendre la main' })).toHaveLength(1);
   });
 
-  it('closes the reader of a chatter once he gave the hand back, and says it went through (CHAT-08)', async () => {
+  it('closes the reader of a chatter off shift once he gave the hand back, and says it went through (CHAT-08)', async () => {
     let released = false;
-    const routes = {
-      ...withHuman(),
+    serve({
+      ...ONE,
+      // Off shift, the conversation was his only by his hand: given back, the server no longer opens it (EQ-13).
+      detail: () =>
+        released
+          ? { status: 403 }
+          : { status: 200, body: waiting({ state: 'human', heldBy: 'you', openDrafts: [] }) },
       command: (action: string) => {
         if (action === 'release') released = true;
         return { status: 204 };
       },
-    };
-    serve({
-      ...routes,
       conversations: {
-        [LEA.id]: {
-          items: [conversation('1', { state: 'human' })],
-          nextCursor: null,
-        },
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'you' })], nextCursor: null },
       },
     });
     renderPage(OPEN, true, false, true);
     fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent' }));
-    expect(await screen.findByText('Main rendue à l’agent pour Fan 1 : ta note est gardée.')).toBeDefined();
+    // A non-breaking space keeps « : » on its word's line (the matcher reads it as a space).
+    const gone = await screen.findByText('Main rendue à l’agent pour Fan 1 : ta note est gardée.');
+    expect(gone.textContent).toContain('Fan 1\u00a0:');
     expect(screen.queryByText('Cette conversation n’est pas dans la liste.')).toBeNull();
+    expect(screen.queryByText(/n’est plus ouverte pour toi/u)).toBeNull();
     expect(released).toBe(true);
+  });
+
+  it('keeps the reader of a chatter open in his shift once he gave the hand back (EQ-13)', async () => {
+    let released = false;
+    serve({
+      ...ONE,
+      detail: () => ({
+        status: 200,
+        body: released
+          ? waiting({ state: 'idle', openDrafts: [] })
+          : waiting({ state: 'human', heldBy: 'you', openDrafts: [] }),
+      }),
+      command: (action: string) => {
+        if (action === 'release') released = true;
+        return { status: 204 };
+      },
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'you' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    // His own hand is said to him.
+    expect(await screen.findByText(/Tu as la main\. Tu réponds dans Reveal/u)).toBeDefined();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent' }));
+    expect(await screen.findByRole('button', { name: 'Reprendre la main' })).toBeDefined();
+    expect(screen.queryByText(/Main rendue à l’agent pour/u)).toBeNull();
+    expect(released).toBe(true);
+  });
+
+  it('tells a chatter the hand he holds is his, under « À toi » (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'you' })], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, false, true);
+    const yours = await screen.findByRole('list', { name: 'À toi' });
+    expect(yours.textContent).toContain('Tu as la main');
+  });
+
+  it('shows a chatter another person’s hand without a way to give it back (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      detail: () => ({ status: 200, body: waiting({ state: 'human', heldBy: 'other', openDrafts: [] }) }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: 'other' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByText(/C’est à lui de la rendre\./u)).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Rendre la main/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reprendre la main' })).toBeNull();
+    // Nothing for him to do: with the quiet ones, still said beside the fan's name.
+    const quiet = screen.getByRole('list', { name: 'Rien à faire' });
+    expect(quiet.textContent).toContain('Un humain répond');
+    expect(screen.queryByRole('list', { name: 'À toi' })).toBeNull();
+  });
+
+  it('lets a chatter give back a handoff nobody took: he is the one on shift (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      detail: () => ({ status: 200, body: waiting({ state: 'human', heldBy: null, openDrafts: [] }) }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'human', heldBy: null })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByRole('button', { name: 'Rendre la main à l’agent' })).toBeDefined();
+    expect(screen.queryByText(/C’est à lui de la rendre/u)).toBeNull();
+  });
+
+  it('says a conversation is no longer open to a chatter once his shift ended, and stops reading it (EQ-13)', async () => {
+    serve({
+      ...ONE,
+      detail: () => ({ status: 403 }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    // Said once above his list, the reader closed: never a reader without its way back on a phone.
+    const closed = await screen.findByText(
+      'Cette conversation n’est plus ouverte pour toi : hors de ton shift, seules celles dont tu as la main restent ici.',
+    );
+    expect(closed.textContent).toContain('toi\u00a0:');
+    expect(screen.queryByText('Le serveur ne répond pas')).toBeNull();
+    expect(document.querySelector('.tr-is-reading')).toBeNull();
+    expect(screen.getByText(/Choisis une conversation à gauche/u)).toBeDefined();
+  });
+
+  it('closes the reader when a chatter’s shift ends while he reads, back to his list with the page’s title (EQ-13)', async () => {
+    let shiftOver = false;
+    serve({
+      ...ONE,
+      detail: () => (shiftOver ? { status: 403 } : { status: 200, body: waiting() }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByRole('button', { name: 'Valider' })).toBeDefined();
+    expect(document.querySelector('.tr-is-reading')).not.toBeNull();
+    // His shift ends: the next read of the conversation is refused.
+    shiftOver = true;
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    expect(await screen.findByText(/Cette conversation n’est plus ouverte pour toi/u)).toBeDefined();
+    focusManager.setFocused(undefined);
+    await waitFor(() => {
+      expect(document.querySelector('.tr-is-reading')).toBeNull();
+    });
+    expect(screen.getByRole('heading', { name: 'Suivi' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
   });
 
   it('says the emergency stop at the top, in a chatter’s words, and offers to try again (CHAT-07)', async () => {
@@ -1383,8 +1530,9 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     renderPage(OPEN, true, false, true);
     fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
     expect(
+      // The matcher reads the no-break space before « : » as a space.
       await screen.findByText(
-        'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
+        'L’arrêt d’urgence est actif : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
       ),
     ).toBeDefined();
     expect(screen.queryByText(/sur le Dashboard/u)).toBeNull();
@@ -1427,10 +1575,3 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     );
   });
 });
-
-function withHuman() {
-  return {
-    ...ONE,
-    detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
-  };
-}

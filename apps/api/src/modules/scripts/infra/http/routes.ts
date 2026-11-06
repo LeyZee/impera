@@ -306,10 +306,10 @@ export function createScriptRoutes(
 
     // Her cadence (SC-02, ADR 0056 § 2): every how many days a script is asked of her, and what the hourly job last
     // found, for the amber of the agency's screen. The owner sets it; the owner and the active managers read it.
-    const cadenceView = async (creatorId: CreatorId, stored: StoredCadence) => ({
+    const cadenceView = async (creatorId: CreatorId, userId: string, stored: StoredCadence) => ({
       creatorId,
       days: stored.days,
-      lastDueOn: (await cadence.requests.last(creatorId))?.dueOn ?? null,
+      lastDueOn: (await cadence.requests.lastFor(creatorId, userId))?.dueOn ?? null,
       outcome: stored.outcome,
       skipped: [...stored.skipped],
       checkedAt: stored.checkedAt?.toISOString() ?? null,
@@ -323,9 +323,10 @@ export function createScriptRoutes(
       },
       async (request) => {
         const { creatorId } = request.params;
-        const stored = await cadence.store.read(creatorId, signedIn(request.user));
+        const userId = signedIn(request.user);
+        const stored = await cadence.store.read(creatorId, userId);
         if (stored === null) throw new ScriptCadenceCreatorNotFound();
-        return cadenceView(creatorId, stored);
+        return cadenceView(creatorId, userId, stored);
       },
     );
 
@@ -341,9 +342,10 @@ export function createScriptRoutes(
       },
       async (request) => {
         const { creatorId } = request.params;
-        const stored = await cadence.store.setDays(creatorId, request.body.days, signedIn(request.user));
+        const userId = signedIn(request.user);
+        const stored = await cadence.store.setDays(creatorId, request.body.days, userId);
         if (stored === null) throw new ScriptCadenceCreatorNotFound();
-        return cadenceView(creatorId, stored);
+        return cadenceView(creatorId, userId, stored);
       },
     );
     return Promise.resolve();

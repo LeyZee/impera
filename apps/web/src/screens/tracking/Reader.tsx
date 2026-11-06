@@ -5,6 +5,7 @@ import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 import { FanSheet } from './FanSheet';
 import {
   approveDraft,
+  ConversationClosed,
   ConversationGone,
   fetchConversation,
   giveBack,
@@ -23,12 +24,23 @@ import {
   whyHuman,
 } from './reader-model';
 import { bringIntoView, useEndInView } from './scroll';
-import { bubblesFromText, bubblesProblem, MODE_LABELS, READER_STATE_LABELS, situationOf } from './view';
+import {
+  bubblesFromText,
+  bubblesProblem,
+  MODE_LABELS,
+  READER_STATE_LABELS,
+  situationOf,
+  STOP_SITUATION,
+} from './view';
 
 import { initialOf } from '@/lib/utils';
 
 /** The reader follows the conversation more closely than the list: a draft or a fan's message shows up quickly. */
 const REFRESH_MS = 10_000;
+
+/** A read that will answer the same until something else changes: gone, or no longer open to this reader. */
+const isFinal = (error: unknown): boolean =>
+  error instanceof ConversationGone || error instanceof ConversationClosed;
 
 /** What `ReleaseBodySchema` accepts for the note left when giving the hand back. */
 const NOTE_MAX = 300;
@@ -42,32 +54,41 @@ export function Reader({
   creatorId,
   conversationId,
   canDecide,
-  routedOnly = false,
+  selfScope = false,
+  stopAhead = false,
   onClose,
   onReleased,
+  onClosedToYou,
   backLabel = 'Toutes les conversations',
 }: {
   creatorId: string;
   conversationId: string;
   /** Owners and chatters decide; a creator reads. */
   canDecide: boolean;
-  /** A member who reads only the conversations routed to him (a chatter): see `TrackingPage`. */
-  routedOnly?: boolean;
+  /** A team member whose scope is `self` (a chatter): see `TrackingPage`. */
+  selfScope?: boolean;
+  /** The stop already holds her messages (recette CHAT-07): Valider waits, the banner above the list says why. */
+  stopAhead?: boolean;
   onClose: () => void;
   /**
-   * The hand was given back by a member who reads only what is routed to him: the conversation is no longer his, the
+   * The hand was given back by a member whose scope is `self` and the conversation left his list (off shift): the
    * reader closes instead of reading it again (CHAT-08). Told the fan's name for the confirmation.
    */
   onReleased?: ((fan: string) => void) | undefined;
+  /**
+   * The conversation is no longer open to this reader (403, a chatter whose shift ended while he read it, EQ-13): the
+   * page closes the reader and says it above the list, so the phone never stays on a screen without its way back.
+   */
+  onClosedToYou?: (() => void) | undefined;
   /** Where the phone's back button leads: the list the reader was opened from. */
-  backLabel?: string;
+  backLabel?: string | undefined;
 }): JSX.Element {
   const key = ['conversation', creatorId, conversationId];
   const query = useQuery({
     queryKey: key,
     queryFn: () => fetchConversation(creatorId, conversationId),
-    refetchInterval: (q) => (q.state.error instanceof ConversationGone ? false : REFRESH_MS),
-    retry: (count, error) => !(error instanceof ConversationGone) && count < 1,
+    refetchInterval: (q) => (isFinal(q.state.error) ? false : REFRESH_MS),
+    retry: (count, error) => !isFinal(error) && count < 1,
   });
   const client = useQueryClient();
   /** After a decision: this conversation, the list and the queue are read again at once. */
@@ -79,16 +100,40 @@ export function Reader({
     ]);
   };
 
-  /** His hand given back, the conversation left his list: the list is read again, never this conversation (403). */
+  /**
+   * His hand given back (a member whose scope is `self`): the conversation, read again, says whether it is still open
+   * to him. In his shift it is, and the reader stays (EQ-13); off shift it answers 403, so the reader closes and the
+   * list says it (CHAT-08). Whether it closed is the answer.
+   */
   const released =
     onReleased === undefined
       ? undefined
-      : (fan: string): void => {
+      : async (fan: string): Promise<boolean> => {
+          const stillOpen = await client
+            .query({
+              queryKey: key,
+              queryFn: () => fetchConversation(creatorId, conversationId),
+              staleTime: 0,
+              retry: false,
+            })
+            .then(
+              () => true,
+              (error: unknown) => !(error instanceof ConversationClosed),
+            );
+          if (stillOpen) return false;
           onReleased(fan);
           void client.invalidateQueries({ queryKey: ['conversations', creatorId] });
           void client.invalidateQueries({ queryKey: ['dashboard'] });
+          return true;
         };
 
+  const closedToYou = query.error instanceof ConversationClosed;
+  useEffect(() => {
+    if (closedToYou) onClosedToYou?.();
+  }, [closedToYou, onClosedToYou]);
+
+  // Whatever replaces the conversation keeps the way back: on a phone the list is hidden behind the reader.
+  const loaded = query.data !== undefined && !isFinal(query.error);
   const back = (
     <button type="button" className="nv-btn nv-btn--plain nv-btn--sm tr-back" onClick={onClose}>
       ← {backLabel}
@@ -97,9 +142,14 @@ export function Reader({
 
   return (
     <section className="nv-plate tr-reader" aria-label="Conversation">
-      {query.data === undefined ? back : null}
+      {loaded ? null : back}
       {query.error instanceof ConversationGone ? (
         <p className="tr-reader__empty">Cette conversation n’existe plus.</p>
+      ) : query.error instanceof ConversationClosed ? (
+        <p className="tr-reader__empty" role="status">
+          Cette conversation n’est plus ouverte pour toi&nbsp;: hors de ton shift, seules celles dont tu as la
+          main restent ici.
+        </p>
       ) : query.isError && query.data === undefined ? (
         <div className="tr-reader__empty" role="status">
           <p className="tr-warn">Le serveur ne répond pas</p>
@@ -118,7 +168,8 @@ export function Reader({
           stale={query.isError}
           creatorId={creatorId}
           canDecide={canDecide}
-          routedOnly={routedOnly}
+          selfScope={selfScope}
+          stopAhead={stopAhead}
           settle={settle}
           released={released}
         />
@@ -133,7 +184,8 @@ function Loaded({
   stale,
   creatorId,
   canDecide,
-  routedOnly,
+  selfScope,
+  stopAhead,
   settle,
   released,
 }: {
@@ -144,21 +196,35 @@ function Loaded({
   stale: boolean;
   creatorId: string;
   canDecide: boolean;
-  routedOnly: boolean;
+  selfScope: boolean;
+  stopAhead: boolean;
   settle: () => Promise<void>;
-  /** Set for a member who reads only his routed conversations: a hand given back closes the reader. */
-  released: ((fan: string) => void) | undefined;
+  /** Set for a member whose scope is `self`: a hand given back closes the reader if the conversation left his list. */
+  released: ((fan: string) => Promise<boolean>) | undefined;
 }): JSX.Element {
   const { detail } = read;
   const name = detail.fanDisplayName.trim() === '' ? 'Fan sans nom' : detail.fanDisplayName;
   const drafts = draftsOf(read);
   const isHuman = drafts.state === 'human';
-  const why = isHuman ? whyHuman(read) : null;
+  // His own hand is said to him (EQ-13): routed to him, or his takeover not given back.
+  const mine = detail.heldBy === 'you';
+  const why = isHuman ? whyHuman(read, mine) : null;
   // The same words as the list and « À traiter »: an idle conversation whose fan waits is « Sans réponse » (PRO-03).
-  const situation = situationOf(
-    { state: drafts.state, lastInboundAt: detail.lastInboundAt, lastOutboundAt: detail.lastOutboundAt },
-    routedOnly,
-  );
+  // A draft the stop holds says so, as its line does (recette CHAT-07, v2).
+  const situation =
+    stopAhead && drafts.state === 'awaiting_approval'
+      ? STOP_SITUATION
+      : situationOf(
+          {
+            state: drafts.state,
+            lastInboundAt: detail.lastInboundAt,
+            lastOutboundAt: detail.lastOutboundAt,
+            heldBy: detail.heldBy,
+          },
+          selfScope,
+        );
+  // A chatter gives back his own hand, or a handoff nobody took; another person's he only reads (EQ-13).
+  const canGiveBack = canDecide && !(selfScope && detail.heldBy === 'other');
   const pendingDraft = detail.openDrafts.some((draft) => draft.status === 'pending');
   // Nobody will answer him (a draft refused, the hand given back with nothing new): a person must, in Reveal (CHAT-25).
   const fanWaits =
@@ -201,11 +267,8 @@ function Loaded({
     const result = await (isHuman
       ? giveBack(creatorId, detail.id, kept === '' ? undefined : kept)
       : takeOver(creatorId, detail.id));
-    // His hand given back, the conversation is no longer routed to him: the reader closes, the list says it (CHAT-08).
-    if (result.ok && isHuman && released !== undefined) {
-      released(name);
-      return;
-    }
+    // His hand given back off shift, the conversation left his list: the reader closes, the list says it (CHAT-08).
+    if (result.ok && isHuman && released !== undefined && (await released(name))) return;
     if (result.ok) setNote('');
     // A takeover or a release that came too late: what shows is read again at once, as after a success.
     if (result.ok || result.outdated) await settle();
@@ -292,12 +355,12 @@ function Loaded({
           conversationId={detail.id}
           desire={detail.desire}
           canDecide={canDecide}
-          canSetLimits={canDecide && !routedOnly}
+          canSetLimits={canDecide && !selfScope}
         />
       </div>
       {stopped ? (
         <p className="tr-stopped" role="alert">
-          {stoppedText(routedOnly)}
+          {stoppedText(selfScope)}
         </p>
       ) : null}
       {stale ? (
@@ -325,10 +388,13 @@ function Loaded({
       {isHuman ? (
         <div className={handoff ? 'tr-hand tr-hand--alert' : 'tr-hand'}>
           <p>
-            {why === null ? 'Un humain a la main.' : `${why}.`} Il répond dans Reveal ; l’agent n’écrit plus à
-            ce fan jusqu’à ce qu’on lui rende la main.
+            {why === null ? (mine ? 'Tu as la main.' : 'Un humain a la main.') : `${why}.`}
+            {mine
+              ? ' Tu réponds dans Reveal ; l’agent n’écrit plus à ce fan jusqu’à ce que tu lui rendes la main.'
+              : ' Il répond dans Reveal ; l’agent n’écrit plus à ce fan jusqu’à ce qu’on lui rende la main.'}
+            {canDecide && !canGiveBack ? ' C’est à lui de la rendre.' : ''}
           </p>
-          {canDecide ? (
+          {canGiveBack ? (
             <div className="tr-hand__give">
               <label className="nv-field">
                 <span className="nv-field__label">Note pour l’agent (facultatif)</span>
@@ -451,7 +517,7 @@ function Loaded({
             draft={pending}
             creatorId={creatorId}
             conversationId={detail.id}
-            blocked={!canDecide ? 'reader' : isHuman ? 'human' : null}
+            blocked={!canDecide ? 'reader' : isHuman ? 'human' : stopAhead ? 'stopped' : null}
             stopped={stopped}
             decided={decided}
           />
@@ -514,8 +580,11 @@ function DraftPanel({
   draft: DraftView;
   creatorId: string;
   conversationId: string;
-  /** Why this person cannot decide now: a human has the hand, or she only reads (a creator); null when she can. */
-  blocked: 'human' | 'reader' | null;
+  /**
+   * Why this person cannot decide now: a human has the hand, she only reads (a creator), or the stop already holds
+   * every message (recette CHAT-07); null when she can.
+   */
+  blocked: 'human' | 'reader' | 'stopped' | null;
   /**
    * The emergency stop refused the last decision (said at the top of the reader, CHAT-07): Valider stays, since only
    * the server knows when it is lifted; its own sentence is not said twice.
@@ -595,6 +664,11 @@ function DraftPanel({
         </p>
       ) : blocked === 'reader' ? (
         <p className="nv-draft-panel__brief">Tu lis seulement : l’équipe décide.</p>
+      ) : blocked === 'stopped' ? (
+        <p className="nv-draft-panel__brief tr-held">
+          <span className="tr-held__dot" aria-hidden="true" />
+          {'L’arrêt est actif\u00a0: ce brouillon attend qu’il soit levé pour être validé.'}
+        </p>
       ) : step === 'rejecting' ? (
         <div className="nv-draft-panel__actions">
           <button

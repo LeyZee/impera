@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ContentIdeaCorrectionSchema,
+  IdeaDropCategorySchema,
   instagramPostOf,
   InstagramPostUrlSchema,
   PasteTrendLinkBodySchema,
@@ -72,5 +74,14 @@ describe('a reading of the extension (VEI-02)', () => {
     expect(TrendReadingInputSchema.parse(reading).soundId).toBe('123456789');
     expect(TrendReadingInputSchema.safeParse({ ...reading, soundId: null }).success).toBe(true);
     expect(TrendReadingInputSchema.safeParse({ ...reading, soundId: 'son-invente' }).success).toBe(false);
+  });
+});
+
+describe('an idea never asks a script (ADR 0056, ADR 0060 § 4)', () => {
+  it('refuses the script category, as written by the model or corrected by the agency', () => {
+    expect(IdeaDropCategorySchema.options).not.toContain('script');
+    expect(IdeaDropCategorySchema.options).toContain('feed_shoot');
+    expect(ContentIdeaCorrectionSchema.safeParse({ category: 'script' }).success).toBe(false);
+    expect(ContentIdeaCorrectionSchema.safeParse({ category: 'mass_dm' }).success).toBe(true);
   });
 });

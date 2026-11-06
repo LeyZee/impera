@@ -66,15 +66,15 @@ const DOCUMENT_BODY_LIMIT_BYTES = 12 * 1_048_576;
 /**
  * The contractors' file under `/v1/payroll` (EQ-06, ADR 0047 § 1): the paths did not move with the module. Réglages ›
  * Facturation (`/payroll/billing-settings`), its accounts (`…/accounts`, lot 7b) and the agency's logo are the owner's
- * alone. A contractor's file (`/payroll/contractors/:memberId/…`) is written by himself or the owner, checked and
- * prefixed by the owner only; the contract's and the mandate's versions (`/payroll/contract-texts`) are added by the
- * owner and accepted by the contractor himself (EQ-06 lot 5a). The billing regimes (`/payroll/billing-regimes`) are read
- * by any member; the owner alone adds one, records its validation by the accountant and gives a contractor his regime
- * from a day on (`…/contractors/:memberId/regimes`, lot 5b). A contractor's documents
- * (`…/contractors/:memberId/documents`, lot 5c) are filed by himself or the owner, read by them and an active manager,
- * and checked once by the owner, never on his own file; the documents waiting for that check
- * (`…/contractors/documents?review=pending`, lot 8) are listed to the owner alone. What each one reads and writes is
- * the database's call (`withMember`).
+ * alone. A contractor's file (`/payroll/contractors/:memberId/…`) is read and written by himself or the owner (an
+ * active manager reads his own only, reco 10 of the recette), checked and prefixed by the owner only; the contract's
+ * and the mandate's versions (`/payroll/contract-texts`) are added by the owner and accepted by the contractor himself
+ * (EQ-06 lot 5a). The billing regimes (`/payroll/billing-regimes`) are read by any member; the owner alone adds one,
+ * records its validation by the accountant and gives a contractor his regime from a day on
+ * (`…/contractors/:memberId/regimes`, lot 5b). A contractor's documents (`…/contractors/:memberId/documents`, lot 5c)
+ * are filed and read by himself or the owner, and checked once by the owner, never on his own file; the documents
+ * waiting for that check (`…/contractors/documents?review=pending`, lot 8) are listed to the owner alone. What each one
+ * reads and writes is the database's call (`withMember`).
  */
 export function createContractorRoutes(
   billing: PayrollBillingSettings,

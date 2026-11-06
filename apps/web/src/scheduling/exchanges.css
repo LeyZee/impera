@@ -21,8 +21,9 @@
   font-weight: 500;
   color: var(--nv-ink-faint);
 }
+/* No native grip (captures of #591): the note keeps its rows, and a long one scrolls inside. */
 .sc-note {
-  resize: vertical;
+  resize: none;
   min-height: 64px;
 }
 .sc-empty {
@@ -466,22 +467,29 @@
     justify-self: start;
     margin-left: calc(var(--nv-space-2) * -1);
   }
-  /* On a phone the summary goes under the title, whole, rather than cut. */
+  /* On a phone the summary goes under the title, whole, rather than cut; the chevron stays centred on the two lines
+     (recette ADR 0073). */
   .sc-fold.nv-disclosure > summary {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-content: center;
     row-gap: 2px;
     padding: var(--nv-space-3) var(--nv-space-4);
   }
   .sc-fold .nv-disclosure__title {
-    flex: 1;
+    grid-column: 1;
     min-width: 0;
   }
   .sc-fold.nv-disclosure > summary::after {
-    order: 2;
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .sc-fold.nv-disclosure > summary:has(> .nv-disclosure__sum)::after {
+    grid-row: 1 / span 2;
   }
   .sc-fold .nv-disclosure__sum {
-    order: 3;
-    flex-basis: 100%;
+    grid-column: 1;
+    grid-row: 2;
     text-align: left;
     white-space: normal;
   }
