@@ -37,3 +37,15 @@ export async function followDecision(
   });
   await deps.ideas.requested(idea.id);
 }
+
+/**
+ * `content_drops.drop_received` (VEI-01 d3): her drop for a content request has all its bytes. The idea of hers that
+ * asked the request (the request carries the idea's id) is `deposited`; a request no idea asked moves nothing.
+ * Replayable: the idea moves only from `suggested`.
+ */
+export async function followDeposit(
+  deps: Pick<FollowDeps, 'ideas'>,
+  received: JobPayload<'content_drops.drop_received'>,
+): Promise<void> {
+  await deps.ideas.deposited(received.creatorId, received.requestId);
+}
