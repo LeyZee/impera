@@ -21,6 +21,7 @@ import {
   parsePercent,
   percentText,
   periodLine,
+  periodLineFrom,
   READ_AGAIN,
   refusalText,
   SOURCE_LABELS,
@@ -189,14 +190,18 @@ function AccountRules({
         <div className="rp-account__now">
           <span className="rp-chip rp-chip--ok">En vigueur</span>
           <p className="rp-account__rules nv-num">{rulesLine(inForce)}</p>
-          <p className="rp-account__since">depuis la quinzaine {periodLine(inForce.fromPeriod)}</p>
+          <p className="rp-account__since">
+            depuis la quinzaine {periodLineFrom(inForce.fromPeriod, currentPeriod)}
+          </p>
         </div>
       )}
       {coming.map((rules) => (
         <div key={rules.id} className="rp-account__next">
           <span className="rp-chip">À venir</span>
           <p className="rp-account__rules nv-num">{rulesLine(rules)}</p>
-          <p className="rp-account__since">à partir de la quinzaine {periodLine(rules.fromPeriod)}</p>
+          <p className="rp-account__since">
+            à partir de la quinzaine {periodLineFrom(rules.fromPeriod, currentPeriod)}
+          </p>
         </div>
       ))}
       {past.length === 0 ? null : (
@@ -211,7 +216,9 @@ function AccountRules({
             {past.map((rules) => (
               <li key={rules.id} className="rp-account__old">
                 <span className="nv-num">{rulesLine(rules)}</span>
-                <span className="rp-account__since">dès la quinzaine {periodLine(rules.fromPeriod)}</span>
+                <span className="rp-account__since">
+                  dès la quinzaine {periodLineFrom(rules.fromPeriod, currentPeriod)}
+                </span>
               </li>
             ))}
           </ul>
@@ -290,7 +297,7 @@ function RulesPanel({
       {step === 'confirm' && ready ? (
         <div className="tm-dialog__body">
           <div className="rp-recap nv-enter">
-            <p className="nv-eyebrow">À partir de la quinzaine {periodLine(fromPeriod)}</p>
+            <p className="nv-eyebrow">À partir de la quinzaine {periodLineFrom(fromPeriod, currentPeriod)}</p>
             <dl className="rp-recap__list">
               <div>
                 <dt>Devise</dt>
@@ -364,7 +371,7 @@ function RulesPanel({
                 autofocus
                 options={periods.map((period) => ({
                   value: period,
-                  label: periodLine(period),
+                  label: periodLineFrom(period, currentPeriod),
                   ...(period === currentPeriod ? { hint: 'en cours' } : {}),
                 }))}
                 onChange={(value) => {

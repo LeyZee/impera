@@ -133,6 +133,19 @@ export const sentimentLabel = (code: string): string => SENTIMENTS[code] ?? code
 export const actionLabel = (code: string): string => ACTIONS[code] ?? code;
 export const riskLabel = (code: string): string => RISKS[code] ?? code;
 
+/**
+ * Nothing was written because no model answered or the day's AI budget is spent, not because a guard stopped a
+ * sentence: said as such in words, the models' error staying in « Détails techniques » (recette AGT 06/11).
+ */
+export function unansweredReason(answer: PlaygroundAnswer | null): string | null {
+  if (answer === null || !answer.isBlocked || answer.failure === undefined) return null;
+  if (answer.violations.some((v) => v.severity === 'blocking') || answer.bubbles.length > 0) return null;
+  // The server's words for the daily cap (playground `session.ts`, pinned by its test).
+  return answer.failure === 'plafond du jour atteint'
+    ? 'le budget IA du jour est atteint, rien ne s’écrit avant demain'
+    : 'aucun modèle IA n’a répondu, régénère dans un instant';
+}
+
 /** A human takes over: a flag on his media, or the brain decided to step back. Nothing was written. */
 export function isHandoff(answer: PlaygroundAnswer | null): boolean {
   if (answer === null) return false;

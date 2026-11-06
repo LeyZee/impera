@@ -2,6 +2,7 @@ import {
   DROP_CATEGORY_LABELS,
   DROP_FORMAT_RULES,
   DROP_MIME_TYPES,
+  WITHDRAWABLE_DROP_STATES,
   kindOfMime,
   type ContentDrop,
   type ContentDropFile,
@@ -11,6 +12,8 @@ import {
   type DropMime,
   type DropState,
 } from '@impera/contracts';
+
+import { MOMENT_EMOJIS, MOMENT_LABELS } from '@/creators/scripts/model';
 
 /*
  * Contenu, the creator's (CR-06 d, ADR 0055 § 8): what she is asked for, what she drops, where it is. Pure rules here,
@@ -193,6 +196,29 @@ export function remainingOf(seconds: number): string {
   return `${String(Math.floor(minutes / 60))} h ${String(minutes % 60).padStart(2, '0')}`;
 }
 
+/**
+ * When a script asked of her is shot, as its request fixed (SC-03, « ok alternance »): on her card, before she begins,
+ * as the agency reads it in Créatrices › Scripts (recette MED-05). `null` (a script asked before) says nothing.
+ */
+export function shotMomentOf(request: ContentRequest): string | null {
+  if (request.category !== 'script' || request.moment === null) return null;
+  return `${MOMENT_EMOJIS[request.moment]} ${MOMENT_LABELS[request.moment]}`;
+}
+
+/** Whether her card offers « Retirer »: a state she may still withdraw, never a script copied into Reveal (MED-08). */
+export function mayWithdrawHere(drop: ContentDrop): boolean {
+  return WITHDRAWABLE_DROP_STATES.has(drop.state) && drop.exportedAt === null;
+}
+
+/**
+ * The files of a settled drop (ready or blocked) that were refused, in their order: each keeps its line and its
+ * reason on her card (recette MED-03). A replaced file is out of the drop and never shown.
+ */
+export function refusedOf(drop: ContentDrop): ContentDropFile[] {
+  if (drop.state !== 'ready' && drop.state !== 'blocked') return [];
+  return drop.files.filter((file) => file.state === 'refused');
+}
+
 /** What a file's line says, from its state on the server and, while it goes up here, its progress. */
 export function fileLine(file: ContentDropFile, live: LiveSend | undefined): string {
   if (file.state === 'awaiting') {
@@ -217,7 +243,10 @@ export const HEAVY_BYTES = 1_000_000_000;
 /** « 1,2 Go », « 340 Mo »: a weight as she reads it. */
 export function weightOf(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1).replace('.', ',')} Go`;
-  return `${String(Math.max(1, Math.round(bytes / 1_000_000)))} Mo`;
+  if (bytes >= 999_500) return `${String(Math.round(bytes / 1_000_000))} Mo`;
+  // Under a megabyte, in Ko: a photo of 9 Ko is not « 1 Mo », an empty file is not either (recette MED-02).
+  if (bytes === 0) return '0 Ko';
+  return `${String(Math.max(1, Math.round(bytes / 1000)))} Ko`;
 }
 
 const DAY_MS = 86_400_000;
@@ -242,11 +271,18 @@ const daysBetween = (today: string, day: string): number =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS);
 
 /** « Pour aujourd’hui », « Pour demain », « Pour jeudi », « Pour le 12 nov. », « En retard depuis lundi ». */
+/** « le 3 nov. », with its year when it is not this year's (recette MED-10: « le 1 janv. » said no year). */
+export function namedDay(day: string, today: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  const named = `le ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
+  return day.slice(0, 4) === today.slice(0, 4) ? named : `${named} ${day.slice(0, 4)}`;
+}
+
 export function dueOf(dueOn: string, today: string): { readonly text: string; readonly late: boolean } {
   const days = daysBetween(today, dueOn);
   const date = new Date(`${dueOn}T00:00:00Z`);
   const weekday = WEEKDAYS[date.getUTCDay()] ?? '';
-  const named = `le ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
+  const named = namedDay(dueOn, today);
   if (days < 0) return { text: `En retard depuis ${days >= -6 ? weekday : named}`, late: true };
   if (days === 0) return { text: 'Pour aujourd’hui', late: false };
   if (days === 1) return { text: 'Pour demain', late: false };

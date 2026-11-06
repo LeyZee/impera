@@ -8,6 +8,7 @@ import {
   MessageViewSchema,
   type ConversationDetail,
   type ConversationSummary,
+  type DashboardTodo,
   type FanFlags,
   type KycSlot,
 } from '@impera/contracts';
@@ -526,6 +527,40 @@ describe('TrackingPage', () => {
     expect(within(queue).getAllByRole('listitem')).toHaveLength(3);
     fireEvent.click(screen.getByRole('button', { name: 'Voir les 2 autres' }));
     expect(within(queue).getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('says one failure of the agent once, below the draft to approve (recette AGT-05)', async () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const down = (n: number): DashboardTodo => ({
+      ...first,
+      tone: 'warn',
+      kind: 'llm_unavailable',
+      id: `down-${String(n)}`,
+      title: `Fan ${String(n)}`,
+      waitingMinutes: 30 + n,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000010${String(n)}`),
+    });
+    const draft: DashboardTodo = {
+      ...first,
+      tone: 'warn',
+      kind: 'awaiting_approval',
+      id: 'draft',
+      waitingMinutes: 1,
+    };
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      dashboard: { status: 200, body: apiDashboard({ todos: [down(1), down(2), down(3), down(4), draft] }) },
+    });
+    renderPage();
+    const queue = await screen.findByRole('list', { name: 'À traiter' });
+    const rows = within(queue).getAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Brouillon à valider'),
+      expect.stringContaining('IA indisponible · 4 fans'),
+    ]);
+    expect(screen.queryByRole('button', { name: /Voir les/u })).toBeNull();
   });
 
   it('says where a conversation opens while none is', async () => {

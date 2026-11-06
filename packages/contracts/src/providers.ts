@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { refusalBodySchema } from './errors';
+import { pastedSecret } from './pasted-secret';
 
 /**
  * AI services connected from Réglages > Modèles IA (ADR 0016, task P3-03). A key never crosses the API outwards:
@@ -72,7 +73,7 @@ export const ProviderStatusSchema = z.object({
 export type ProviderStatus = z.infer<typeof ProviderStatusSchema>;
 
 /** Keys are long random strings; 512 characters leaves room and stops abuse of the route. */
-export const SaveProviderKeyBodySchema = z.object({ key: z.string().trim().min(1).max(512) });
+export const SaveProviderKeyBodySchema = z.object({ key: pastedSecret(512) });
 export type SaveProviderKeyBody = z.infer<typeof SaveProviderKeyBodySchema>;
 
 /** A key the provider (or the shape check) turned down, as the sheet shows it under the key field. */

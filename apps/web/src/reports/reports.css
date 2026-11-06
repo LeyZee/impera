@@ -662,6 +662,14 @@
   justify-content: space-between;
   gap: var(--nv-space-2) var(--nv-space-4);
 }
+/* No sale read on the platform yet (ADR 0073 § 7): quiet, under the count, never a warning. */
+.rp-validate__unread {
+  margin: var(--nv-space-2) 0 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  text-wrap: pretty;
+}
 .rp-validate__count {
   display: flex;
   align-items: baseline;

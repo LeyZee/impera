@@ -29,3 +29,19 @@
   font-weight: 650;
   line-height: 1;
 }
+/* On the chosen chip (ink on void), her initial keeps its disc: the void's colour, her letter in ink (EXT-03). */
+.nv-chip[aria-pressed='true'] .cr-chip-face--initial,
+.nv-chip[aria-checked='true'] .cr-chip-face--initial {
+  background: var(--nv-void);
+  color: var(--nv-ink);
+  box-shadow: none;
+}
+
+/* Her name in a chip: one long name is cut, never the row (EXT-05). */
+.cr-chip-name {
+  min-width: 0;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

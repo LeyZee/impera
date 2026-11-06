@@ -132,6 +132,7 @@ export function payoutBlockText(
  * « ta vérification », a manager « la vérification du propriétaire ».
  */
 const NOT_ISSUED_FOR_AGENCY: Readonly<Record<InvoiceNotIssuedReason, (check: string) => string>> = {
+  mandate_unpublished: () => 'le mandat de facturation n’est pas encore publié dans Réglages › Facturation',
   no_mandate: () => 'le membre n’a pas encore accepté son mandat de facturation',
   no_regime: () => 'aucun régime de facturation ne lui est donné',
   regime_not_validated: () => 'son régime de facturation attend la validation du comptable',
@@ -155,7 +156,8 @@ export function payoutBlockPlace(
   reason: InvoiceNotIssuedReason | null,
 ): 'file' | 'billing' | null {
   if (block.reason !== 'documents_not_issued') return 'file';
-  if (reason === 'agency_missing' || reason === 'regime_not_validated') return 'billing';
+  if (reason === 'agency_missing' || reason === 'mandate_unpublished' || reason === 'regime_not_validated')
+    return 'billing';
   return reason === 'no_invoice_to_credit' ? null : 'file';
 }
 
@@ -171,6 +173,10 @@ export interface MyPayoutHold {
 const NOT_ISSUED_FOR_MEMBER: Readonly<
   Record<InvoiceNotIssuedReason, { readonly text: string; readonly yours: boolean }>
 > = {
+  mandate_unpublished: {
+    text: 'L’agence publie ton mandat de facturation : tu l’acceptes ensuite dans Moi › Dossier, puis elle émet ta facture.',
+    yours: false,
+  },
   no_mandate: {
     text: 'L’agence l’émet pour toi dès que tu acceptes ton mandat de facturation, dans Moi › Dossier.',
     yours: true,

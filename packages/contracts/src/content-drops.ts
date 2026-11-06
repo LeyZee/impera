@@ -226,6 +226,9 @@ const weightFr = (bytes: number): string =>
 
 /** Why a declared file does not go up for this category, in her words; `null` when it may go. */
 export function declaredFileRefusal(category: DropCategory, file: DeclaredDropFile): string | null {
+  // An empty file (a gallery item not yet downloaded from the cloud, a cut copy) never goes: the server refuses it at
+  // the declaration, and her phone would read that as a lost connection (recette MED-01).
+  if (file.bytes < 1) return 'Ce fichier est vide : choisis-le à nouveau dans ta galerie';
   const kind = kindOfMime(file.mime);
   const { kinds } = DROP_FORMAT_RULES[category];
   if (!kinds.includes(kind)) {
@@ -476,7 +479,8 @@ export type ContentRequest = z.infer<typeof ContentRequestSchema>;
 /**
  * `POST /v1/creators/:creatorId/content-requests` (owner, operator): what the agency asks of her, by hand (ADR 0055
  * § 4). A script request names its structure, and only a script request does: one of the library, not archived, kept
- * for no other creator (422 `content_request_structure_unprocessable`). Replayed with the same id, it answers.
+ * for no other creator (422 `content_request_structure_unprocessable`). Its day is today or later in her time zone
+ * (422 `content_request_due_unprocessable`, recette MED-10). Replayed with the same id, it answers.
  */
 export const CreateContentRequestBodySchema = z
   .strictObject({
@@ -544,6 +548,8 @@ export const CONTENT_REQUEST_NOT_FOUND = 'content_request_not_found';
 export const CONTENT_REQUEST_ID_CONFLICT = 'content_request_id_conflict';
 export const CONTENT_REQUEST_CLOSED_CONFLICT = 'content_request_closed_conflict';
 export const CONTENT_REQUEST_STRUCTURE_UNPROCESSABLE = 'content_request_structure_unprocessable';
+/** A request asked for a day already past in her time zone (recette MED-10): it would be late as it is born. */
+export const CONTENT_REQUEST_DUE_UNPROCESSABLE = 'content_request_due_unprocessable';
 
 /**
  * The size of each part a file goes up in (CR-06 b), the last one shorter: 8 Mio, so that a cut on a phone costs at

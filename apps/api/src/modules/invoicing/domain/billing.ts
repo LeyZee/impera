@@ -64,9 +64,9 @@ export interface IssueFacts {
 
 /**
  * Whether the validation of a statement issues its invoice. A period that brings nothing to invoice issues none, and
- * nothing is said to the owner. Otherwise no accepted mandate, no regime, a regime the accountant has not validated or
+ * nothing is said to the owner. Otherwise no identity of the agency or no mandate published yet, no accepted mandate, no regime, a regime the accountant has not validated or
  * not written for the contractor's country as his member record now says it, an identity that lacks a mention the
- * regime prints or that the owner has not checked as it stands, no prefix or no identity of the agency: no invoice, since
+ * regime prints or that the owner has not checked as it stands, or no prefix: no invoice, since
  * an issued invoice never changes. Other documents missing or out of date, or a mandate of an older version: the
  * invoice goes out, with a warning. Under a tax treaty, the tax residence certificate is neither: it gates the
  * transfer, not the invoice (ADR 0041).
@@ -92,6 +92,10 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   }
   const none = (reason: NoInvoiceReason): IssueDecision => ({ kind: 'none', reason, warnings });
   if (facts.exclVatMinor <= 0) return none('nothing_to_invoice');
+  // What only the agency settles comes first (recette EQP-02): until its identity is filled and its mandate published,
+  // no member can do anything, and « he has not accepted his mandate » would send him to a text he cannot accept.
+  if (facts.agency === null) return none('agency_missing');
+  if (currentVersion === 0) return none('mandate_unpublished');
   if (acceptedVersion === null) return none('no_mandate');
   if (regime === null) return none('no_regime');
   if (regime.validatedOn === null || regime.validatedOn > facts.day) return none('regime_not_validated');
@@ -101,6 +105,5 @@ export function issueDecision(facts: IssueFacts): IssueDecision {
   if (!identityComplete(facts.identity, regime)) return none('identity_incomplete');
   if (!facts.identityVerified) return none('identity_unverified');
   if (facts.prefix === null) return none('prefix_missing');
-  if (facts.agency === null) return none('agency_missing');
   return { kind: 'issue', regime, warnings };
 }

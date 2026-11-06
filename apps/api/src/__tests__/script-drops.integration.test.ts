@@ -29,6 +29,10 @@ import { buildServer, type Server } from '../server';
 import { testConfig } from './support/config';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
+/** A day ahead of the server's real clock: a request is never asked for a day already past (recette MED-10). */
+const DUE_ON = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+const LATER_DUE_ON = new Date(Date.now() + 44 * 86_400_000).toISOString().slice(0, 10);
+
 const PASSWORD = 'correct horse battery';
 const PARIS = 'Europe/Paris';
 const MB = 1024 * 1024;
@@ -171,7 +175,7 @@ describe('/v1/creator-space/content/script-drops', () => {
     const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
       id: newId(ContentRequestIdSchema),
       category: 'script',
-      dueOn: '2026-11-12',
+      dueOn: DUE_ON,
       reason: 'Ton prochain script : Soirée inventée',
       structureId: library.id,
     });
@@ -328,7 +332,7 @@ describe('/v1/creator-space/content/script-drops', () => {
 
   it('numbers two scripts she sends at once 2 and 3, never the same twice (SC-03)', async () => {
     const drops = await Promise.all(
-      ['2026-11-26', '2026-12-10'].map(async (dueOn) => {
+      [DUE_ON, LATER_DUE_ON].map(async (dueOn) => {
         const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
           id: newId(ContentRequestIdSchema),
           category: 'script',
@@ -425,7 +429,7 @@ describe('/v1/creator-space/content/script-drops', () => {
       const asked = await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', {
         id: newId(ContentRequestIdSchema),
         category: 'script',
-        dueOn: '2026-12-20',
+        dueOn: DUE_ON,
         reason: 'Un script de jour comme de nuit',
         structureId: both.id,
       });
@@ -440,12 +444,30 @@ describe('/v1/creator-space/content/script-drops', () => {
       (await call('DELETE', `/v1/creators/${nora}/content-requests/${day.id}`, 'owner')).statusCode,
     ).toBe(204);
     expect((await ask()).moment).toBe('day');
-    expect((await ask()).moment).toBe('night');
+    const night = await ask();
+    expect(night.moment).toBe('night');
+    // Begun, her « both » script is drawn as the night its request fixed, never « Jour et nuit » (recette MED-05)…
+    const begun = newId(ContentDropIdSchema);
+    const started = await call('POST', base, 'nora', { id: begun, requestId: night.id });
+    expect(started.statusCode, started.body).toBe(200);
+    const segmentKey = ScriptDropSchema.parse(started.json()).segments[0]?.key ?? 'none';
+    const card = await call('GET', `${base}/${begun}/cards/${segmentKey}`, 'nora');
+    expect(card.statusCode, card.body).toBe(200);
+    expect(card.body).toContain('>NUIT</text>');
+    expect(card.body).not.toContain('JOUR ET NUIT');
+    // …and the agency no longer cancels it under her (recette MED-07): she would go on shooting a request gone.
+    const cancel = await call('DELETE', `/v1/creators/${nora}/content-requests/${night.id}`, 'owner');
+    expect([cancel.statusCode, codeOf(cancel.body).code]).toEqual([409, 'content_request_closed_conflict']);
+    // Withdrawn first, it is the agency's to cancel again.
+    expect((await call('DELETE', `/v1/creator-space/drops/${begun}`, 'nora')).statusCode).toBe(204);
+    expect(
+      (await call('DELETE', `/v1/creators/${nora}/content-requests/${night.id}`, 'owner')).statusCode,
+    ).toBe(204);
     // Another creator's turn is her own: Ines's first « both » script is of night.
     const hers = await call('POST', `/v1/creators/${ines}/content-requests`, 'owner', {
       id: newId(ContentRequestIdSchema),
       category: 'script',
-      dueOn: '2026-12-20',
+      dueOn: DUE_ON,
       reason: 'Son premier script',
       structureId: both.id,
     });
@@ -602,5 +624,10 @@ describe('/v1/creator-space/content/script-drops', () => {
       );
     const cause = moved instanceof Error && moved.cause instanceof Error ? moved.cause.message : '';
     expect(cause).toContain('confirmed once, by the team');
+    // Copied into Reveal, it is out: neither she nor the team withdraws it, its request never reopens (recette MED-08).
+    const hers = await call('DELETE', `/v1/creator-space/drops/${dropId}`, 'nora');
+    expect([hers.statusCode, codeOf(hers.body).code]).toEqual([409, 'content_drop_settled_conflict']);
+    const team = await call('DELETE', `/v1/creators/${nora}/drops/${dropId}`, 'owner');
+    expect([team.statusCode, codeOf(team.body).code]).toEqual([409, 'content_drop_settled_conflict']);
   });
 });

@@ -12,8 +12,11 @@ import {
   onTheirWay,
   openRequests,
   published,
+  mayWithdrawHere,
+  refusedOf,
   remainingOf,
   sameFile,
+  shotMomentOf,
   stateTone,
   weightOf,
 } from './model';
@@ -88,8 +91,37 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
   it('says weights and times as she reads them', () => {
     expect(weightOf(340_000_000)).toBe('340 Mo');
     expect(weightOf(1_200_000_000)).toBe('1,2 Go');
+    // Under a megabyte, in Ko: never « 1 Mo » for a photo of 9 Ko or an empty file (recette MED-02).
+    expect(weightOf(8_894)).toBe('9 Ko');
+    expect(weightOf(0)).toBe('0 Ko');
+    expect(weightOf(300)).toBe('1 Ko');
+    expect(weightOf(999_600)).toBe('1 Mo');
     expect(remainingOf(42)).toBe('40 s');
     expect(remainingOf(3900)).toBe('1 h 05');
+  });
+
+  it('keeps each refused file of a settled drop, with its reason, and only then (recette MED-03)', () => {
+    const refused = fileOf({
+      state: 'refused',
+      refusal: '« Feed · Vidéo short » : la vidéo doit être verticale',
+    });
+    const kept = fileOf({ state: 'kept' });
+    expect(refusedOf(dropOf({ state: 'blocked', files: [refused] }))).toEqual([refused]);
+    expect(refusedOf(dropOf({ state: 'ready', files: [kept, refused] }))).toEqual([refused]);
+    expect(refusedOf(dropOf({ state: 'ready', files: [kept] }))).toEqual([]);
+    expect(refusedOf(dropOf({ state: 'uploading', files: [refused] }))).toEqual([]);
+  });
+
+  it('offers « Retirer » on a drop she may withdraw, never on a script copied into Reveal (recette MED-08)', () => {
+    expect(mayWithdrawHere(dropOf({ state: 'ready' }))).toBe(true);
+    expect(mayWithdrawHere(dropOf({ state: 'ready', exportedAt: '2026-11-06T17:57:40.993Z' }))).toBe(false);
+  });
+
+  it('says when a script asked of her is shot, as its request fixed (recette MED-05)', () => {
+    expect(shotMomentOf(requestOf({ category: 'script', moment: 'night' }))).toBe('🌙 Nuit');
+    expect(shotMomentOf(requestOf({ category: 'script', moment: 'day' }))).toBe('☀️ Jour');
+    expect(shotMomentOf(requestOf({ category: 'script', moment: null }))).toBeNull();
+    expect(shotMomentOf(requestOf({ category: 'feed_shoot', moment: null }))).toBeNull();
   });
 
   it('says when a request is due, and since when it is late', () => {
@@ -99,6 +131,13 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(dueOf('2026-11-09', '2026-11-05')).toEqual({ text: 'Pour lundi', late: false });
     expect(dueOf('2026-11-20', '2026-11-05')).toEqual({ text: 'Pour le 20 nov.', late: false });
     expect(dueOf('2026-11-02', '2026-11-05')).toEqual({ text: 'En retard depuis lundi', late: true });
+    // Another year's day says its year (recette MED-10).
+    expect(dueOf('2026-01-01', '2026-11-05')).toEqual({ text: 'En retard depuis le 1 janv.', late: true });
+    expect(dueOf('2025-01-01', '2026-11-05')).toEqual({
+      text: 'En retard depuis le 1 janv. 2025',
+      late: true,
+    });
+    expect(dueOf('2027-01-08', '2026-11-05')).toEqual({ text: 'Pour le 8 janv. 2027', late: false });
   });
 
   it('says when she dropped it, in her own time', () => {

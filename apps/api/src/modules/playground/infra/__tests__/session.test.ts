@@ -108,6 +108,36 @@ describe('playground session', () => {
   });
 });
 
+describe('playground session, when nothing is written', () => {
+  // The screen reads these words to say « le budget IA du jour est atteint » (web `unansweredReason`, recette AGT-06):
+  // changing them changes what the trainer reads.
+  it('says the daily cap in its own words, and each failed model otherwise', async () => {
+    const failing = (code: 'budget_reached' | 'all_models_failed'): LlmGateway => ({
+      ...fakeGateway({ bubbles: [] }),
+      brain: () =>
+        Promise.resolve({
+          ok: false,
+          error: {
+            code,
+            attempts:
+              code === 'budget_reached'
+                ? []
+                : [{ provider: 'xai', model: 'grok-4.7', outcome: 'unavailable' }],
+          },
+        }),
+    });
+    const ask = (gateway: LlmGateway) =>
+      createPlaygroundSession({
+        gateway,
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: settings,
+      }).handleFanMessage('Coucou');
+    expect((await ask(failing('budget_reached'))).briefFailure).toBe('plafond du jour atteint');
+    expect((await ask(failing('all_models_failed'))).briefFailure).toBe('grok-4.7: unavailable');
+  });
+});
+
 describe('playground session, calibration', () => {
   const make = (deps: Partial<Parameters<typeof createPlaygroundSession>[0]> = {}) =>
     createPlaygroundSession({

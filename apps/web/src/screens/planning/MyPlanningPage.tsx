@@ -361,6 +361,7 @@ export function MyPlanningPage({
             shiftId={open.shiftId}
             draft={open.draft}
             from="/planning"
+            zone={zone}
             onClose={() => {
               setOpen(null);
             }}

@@ -11,6 +11,12 @@ import { resealSalesFeedCredentials } from '../modules/connectors';
 import { resealProviderCredentials } from '../modules/providers';
 import { resealTelegramTokens } from '../modules/telegram';
 
+import { requireArguments } from './command-line';
+
+requireArguments(
+  'Usage: pnpm ops:reencrypt-credentials (avec CREDENTIALS_ENCRYPTION_KEYS=v2:<nouvelle>,v1:<ancienne>)',
+);
+
 const config = loadConfig();
 const keys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
 if (keys === null) {

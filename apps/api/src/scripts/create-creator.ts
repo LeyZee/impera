@@ -10,6 +10,11 @@ import { createApp } from '../composition-root';
 import { loadConfig } from '../config';
 import { createLogger } from '../logger';
 
+import { requireArguments } from './command-line';
+
+requireArguments('Usage: pnpm creator:create --name <nom> [--timezone Europe/Paris]', {
+  withValue: ['name', 'timezone'],
+});
 const { values } = parseArgs({ options: { name: { type: 'string' }, timezone: { type: 'string' } } });
 const input = NewCreatorSchema.safeParse({ displayName: values.name, timezone: values.timezone });
 if (!input.success) {

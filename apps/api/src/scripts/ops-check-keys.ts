@@ -9,7 +9,10 @@ import { z } from 'zod';
 
 import { checkEncryptionKeys, READ_ONLY_POOL_OPTIONS } from '../key-check';
 
+import { requireArguments } from './command-line';
 import { readSecret } from './read-secret';
+
+requireArguments('Usage: pnpm ops:check-keys');
 
 // Only the admin URL is read, not the whole configuration: a restored copy on a PC has no other variable.
 const adminUrl = z.url({ protocol: /^postgres(ql)?$/ }).safeParse(process.env['DATABASE_ADMIN_URL']);

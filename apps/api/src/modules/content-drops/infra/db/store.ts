@@ -1,6 +1,7 @@
 import {
   JOB_MAX_ATTEMPTS,
   AuditEntryIdSchema,
+  calendarDayAt,
   EventIdSchema,
   MediaAssetIdSchema,
   type DropFileState,
@@ -50,6 +51,7 @@ import {
   ContentDropScriptUnprocessable,
   ContentDropSettled,
   ContentRequestClosed,
+  ContentRequestDueUnprocessable,
   ContentRequestIdConflict,
   ContentRequestNotFound,
   ContentRequestStructureUnprocessable,
@@ -291,10 +293,14 @@ async function withdrawIn(
   if (seen === undefined) throw new ContentDropNotFound();
   // Withdrawing twice is no error: her phone may replay it.
   if (seen.state === 'withdrawn') return;
-  if (!mayWithdraw(DropStateSchema.parse(seen.state), by)) throw new ContentDropSettled();
+  // A script the team copied into Reveal is out, as a published drop is (recette MED-08): withdrawn, its request would
+  // reopen for her to shoot again and its originals would go within the hour.
+  if (seen.exportedAt !== null || !mayWithdraw(DropStateSchema.parse(seen.state), by))
+    throw new ContentDropSettled();
   // Locked through the update policy, which hides a drop the job scheduled meanwhile.
   const row = await readDrop(tx, dropId, true);
-  if (row === undefined || !mayWithdraw(DropStateSchema.parse(row.state), by)) throw new ContentDropSettled();
+  if (row?.exportedAt !== null || !mayWithdraw(DropStateSchema.parse(row.state), by))
+    throw new ContentDropSettled();
   await tx
     .update(contentDrops)
     .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, updatedAt: now })
@@ -564,7 +570,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (updated === undefined) throw new ContentDropNotFound();
         return viewOf(tx, updated);
       }),
-    ask: (creatorId, userId, body: CreateContentRequestBody, freeze) =>
+    ask: (creatorId, userId, body: CreateContentRequestBody, freeze, now) =>
       asTeam(creatorId, userId, async (tx) => {
         const [known] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));
         if (known !== undefined) {
@@ -576,6 +582,14 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
           if (!same) throw new ContentRequestIdConflict();
           return requestOf(known, null);
         }
+        // Never for a day already past where she lives (recette MED-10): it would be late as it is born.
+        const [creator] = await tx
+          .select({ timezone: schema.creators.timezone })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        // `asTeam` has read her already: missing here, she is gone, and the request is refused like any other.
+        if (creator === undefined) throw new ContentDropForbidden();
+        if (body.dueOn < calendarDayAt(now, creator.timezone)) throw new ContentRequestDueUnprocessable();
         if (body.structureId !== null) {
           // The library's structure, read by the team's policy: not archived, kept for no other creator.
           const [structure] = await tx
@@ -621,6 +635,13 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         if (request.state === 'cancelled') return;
         if (request.state !== 'open' || (await readRequest(tx, requestId, true)) === undefined)
           throw new ContentRequestClosed();
+        // Answered by a drop not withdrawn (her script begun, her files sent), it is no longer the agency's to cancel:
+        // she would go on shooting a request gone (recette MED-07). Withdrawing that drop first reopens it.
+        const [answer] = await tx
+          .select({ id: contentDrops.id })
+          .from(contentDrops)
+          .where(and(eq(contentDrops.requestId, requestId), sql`${contentDrops.state} <> 'withdrawn'`));
+        if (answer !== undefined) throw new ContentRequestClosed();
         await tx
           .update(contentRequests)
           .set({ state: 'cancelled', decidedAt: now, updatedAt: now })
