@@ -65,6 +65,7 @@ import { wireConnectors } from './wiring/connectors';
 import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
+import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
@@ -445,6 +446,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       }),
       ...conversations.routes,
       ...persona.routes,
+      ...wireCreatorArchive(shared, {
+        persona: persona.module,
+        scheduling: scheduling.module,
+        conversations: conversations.module,
+      }),
       ...alerts.routes,
       fans.routes(agent.kycSlotsOf),
       ...team.routes,

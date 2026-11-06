@@ -421,8 +421,10 @@ describe('Équipe › Rapports', () => {
     );
     // Only the shifts without a report are amber, not the money beside them (EQ-14).
     expect(text(summary?.querySelector('.rp-member__late') ?? null)).toBe(' · 1 sans rapport');
-    expect(screen.getByText(/16 – 31 octobre 2026/u)).toBeTruthy();
+    // The period is the panel's title, as on Paie, its arrows beside it (recette #561).
+    expect(screen.getByRole('heading', { name: '16 – 31 octobre 2026' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Quinzaine suivante' }).matches(':disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Cette quinzaine' })).toBe(null);
 
     fireEvent.click(screen.getByRole('button', { name: 'Corriger' }));
     const dialog = await screen.findByRole('dialog', { name: 'Corriger le rapport de Théo' });

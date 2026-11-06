@@ -251,4 +251,25 @@ describe('her script cadence (SC-02, ADR 0056 § 2)', () => {
     ]);
     expect((await cadence(owner, lina)).outcome).toBe('reused');
   });
+
+  it('asks nothing of an archived creator (ADR 0071 § 2)', async () => {
+    const mila = (
+      await app.modules.persona.creators.create({ displayName: 'Mila', timezone: 'Europe/Paris' })
+    ).id;
+    await activateDemoPersona(app, mila);
+    const kept = await create(structure('Archivée'));
+    await setQueue(mila, [kept.id]);
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date('2026-11-04T10:00:00Z') })
+      .where(eq(schema.creators.id, mila));
+    await run('2026-11-20T10:00:00Z');
+    expect(await requests(mila)).toEqual([]);
+    expect(await queued(mila)).toEqual([kept.id]);
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.scriptCadences)
+      .where(eq(schema.scriptCadences.creatorId, mila));
+    expect(row).toBeUndefined();
+  });
 });

@@ -1,4 +1,4 @@
-import type { CreatorId, PayPeriod, PlatformAccountId } from '@impera/contracts';
+import type { CreatorId, CreatorPlanned, PayPeriod, PlatformAccountId } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -13,6 +13,7 @@ import { createShiftReportService } from './application/reports';
 import { createSchedulingService } from './application/scheduling';
 import { createSwapService } from './application/swaps';
 import type { CreatorAgendaFeed, CreatorDirectory, JobLogger, OnShift } from './domain/ports';
+import { calendarDayIn } from './domain/time';
 import { createDrizzleAgencyRatesStore } from './infra/agency-rates-store';
 import { createDrizzleAgencyShareCheck, type SalesTotalsRead } from './infra/agency-share-check';
 import { createDrizzleCalendarLinkStore } from './infra/calendar-link-store';
@@ -66,6 +67,11 @@ export interface SchedulingModule {
    * is only in their margin.
    */
   onShift(creatorId: CreatorId, at: Date): Promise<OnShift[]>;
+  /**
+   * What still plans someone on her now (ADR 0071 § 2): her shifts not over and her weekly templates still running,
+   * read as the system. She is archived only when both are zero.
+   */
+  planned(creatorId: CreatorId): Promise<CreatorPlanned>;
   /**
    * What pay reads of the planning (EQ-04), in pay's own transaction, given by the composition root: the validated
    * reports up to a period, each with its account's rules for the period it was made in, on every creator (pay's job,
@@ -193,6 +199,11 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   return {
     name: 'scheduling',
     onShift: (creatorId, at) => admin.onShiftUnscoped(creatorId, at),
+    planned: async (creatorId) => {
+      const at = now();
+      const { timeZone } = await admin.settingsUnscoped();
+      return admin.plannedUnscoped(creatorId, at, calendarDayIn(at, timeZone));
+    },
     pay: {
       validatedReportsUnscoped,
       validatedReportsScoped,

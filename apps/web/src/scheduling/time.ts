@@ -251,6 +251,46 @@ export function minuteOfInput(text: string): number | null {
   return hours < 24 && minutes < 60 ? hours * 60 + minutes : null;
 }
 
+/**
+ * The day a day field holds, as `YYYY-MM-DD`: « 28/03/2027 », « 28/3/27 », « 28.03.2027 », « 28 3 », digits alone as
+ * the phone's number pad types them (« 2803 », « 280327 », « 28032027 »), or the « 2027-03-28 » a paste brings; null
+ * while it is empty, half typed or not a day. Without a year, it is the first such day from `today` on. The fields are
+ * text (`DayField`), never `<input type="date">`, which Chromium writes in the system's language, « 03/28/2027 » on a
+ * machine in English (recette #561), as it does the hours.
+ */
+export function dayOfInput(text: string, today: string): string | null {
+  const typed = text.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(typed);
+  const parts =
+    iso === null
+      ? (/^(\d{2})(\d{2})(\d{2}|\d{4})?$/u.exec(typed) ??
+        /^(\d{1,2})[\s./-]+(\d{1,2})(?:[\s./-]+(\d{2}|\d{4}))?$/u.exec(typed))
+      : null;
+  if (iso === null && parts === null) return null;
+  const day = Number(iso?.[3] ?? parts?.[1]);
+  const month = Number(iso?.[2] ?? parts?.[2]);
+  const typedYear = iso?.[1] ?? parts?.[3];
+  const year =
+    typedYear === undefined
+      ? Number(today.slice(0, 4))
+      : typedYear.length === 2
+        ? 2000 + Number(typedYear)
+        : Number(typedYear);
+  const of = (inYear: number): string | null => {
+    const at = new Date(Date.UTC(inYear, month - 1, day));
+    // 31/02 rolls over into March: not a day.
+    if (at.getUTCMonth() !== month - 1 || at.getUTCDate() !== day) return null;
+    return at.toISOString().slice(0, 10);
+  };
+  const found = of(year);
+  if (found === null || typedYear !== undefined || found >= today) return found;
+  return of(year + 1);
+}
+
+/** A day into a day field's « 28/03/2027 ». */
+export const inputOfDay = (day: string): string =>
+  `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+
 /** Minutes of the day into a time field's « 23:30 ». */
 export const inputOf = (minute: number): string =>
   `${pad(Math.floor((minute % MINUTES_PER_DAY) / 60))}:${pad(minute % 60)}`;

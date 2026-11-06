@@ -1,6 +1,7 @@
 import {
   DomainError,
   type CreatorErrorCode,
+  type CreatorPlanned,
   type PersonaErrorCode,
   type PersonaSampleReplyFault,
   type PersonaSampleReplyUnprocessableDetails,
@@ -38,6 +39,20 @@ export class CreatorConflict extends DomainError {
 export class CreatorNameConflict extends DomainError {
   constructor() {
     super('creator_name_conflict' satisfies CreatorErrorCode, 'Une créatrice porte déjà ce nom');
+  }
+}
+
+/**
+ * She is still planned (ADR 0071 § 2, 409): shifts not over or weekly templates still running. Nothing is archived;
+ * `details` says how many of each, for the owner to end them in the agenda first.
+ */
+export class CreatorPlannedConflict extends DomainError {
+  constructor(planned: CreatorPlanned) {
+    super(
+      'creator_planned_conflict' satisfies CreatorErrorCode,
+      'Elle est encore au planning : retire ses shifts à venir et arrête ses shifts réguliers avant de l’archiver',
+      { details: planned },
+    );
   }
 }
 

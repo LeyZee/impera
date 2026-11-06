@@ -421,7 +421,8 @@ describe('Équipe › Planning', () => {
     ).toBe('true');
     const day = within(panel).getByLabelText('Jour');
     if (!(day instanceof HTMLInputElement)) throw new Error('no day field');
-    expect(day.value).toBe('2026-10-29');
+    // Written as French writes it, never by the system's date field (recette #561).
+    expect(day.value).toBe('29/10/2026');
   });
 
   it('leaves a suspended member’s shifts to fill: marked on the grid, counted, and said in the sheet (EQP-03)', async () => {
@@ -450,13 +451,15 @@ describe('Équipe › Planning', () => {
     expect(
       within(cells[3] ?? row).getByRole('button', { name: /^À pourvoir : 12\sh – 18\sh, le jeudi 29/u }),
     ).toBeTruthy();
-    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now.
+    // The night under way is held by nobody either: nobody « en poste », and Wednesday's night is to fill from now,
+    // said « maintenant », never at the minute (recette #564).
     const under = screen.getAllByRole('button', { name: /^Théo, 23\sh – 5\sh, .*suspendu, à pourvoir$/u });
     expect(under.length).toBeGreaterThan(0);
     for (const one of under) expect(one.getAttribute('aria-label')).not.toContain('en poste');
-    expect(
-      within(cells[2] ?? row).getByRole('button', { name: /^À pourvoir : 1\sh – 6\sh, le mercredi 28/u }),
-    ).toBeTruthy();
+    const now = within(cells[2] ?? row).getByRole('button', {
+      name: /^À pourvoir : maintenant – 6\sh, le mercredi 28/u,
+    });
+    expect(text(now.querySelector('.sc-slot__hours'))).toBe('maintenant – 6 h');
 
     fireEvent.click(chip);
     const sheet = await screen.findByRole('dialog', { name: 'Théo' });
@@ -543,9 +546,12 @@ describe('Équipe › Planning', () => {
     const panel = await screen.findByRole('dialog', { name: 'Pourvoir un shift' });
     expect(panel.textContent).toContain('Théo est en congé : choisis qui prend ce shift.');
     // Théo is away: Basile alone is offered, on the template's hours, which are none of the slots.
-    const who = within(panel).getByLabelText('Membre');
-    if (!(who instanceof HTMLSelectElement)) throw new Error('no member list');
-    expect([...who.options].map((option) => option.text)).toEqual(['Basile']);
+    const who = within(panel).getByRole('radiogroup', { name: 'Membre' });
+    expect(
+      within(who)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Basile']);
     // One occurrence, never a template of its own.
     expect(within(panel).queryByRole('radiogroup', { name: 'Fréquence' })).toBe(null);
     expect(within(panel).getByRole('radio', { name: 'Autres heures' }).getAttribute('aria-checked')).toBe(
@@ -1160,10 +1166,96 @@ describe('Équipe › Planning', () => {
     expect(text(within(panel).getByRole('status'))).toBe(
       '2 h 30 n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à 3 h.',
     );
+    // Both ends in the hour skipped: nothing left to work, the panel says so and does not save (relecture #561).
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '02:00' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '02:45' } });
+    expect(text(panel)).toContain('Ces heures n’existent pas cette nuit-là, à cause du changement d’heure.');
+    expect(within(panel).queryByRole('status')).toBeNull();
+    expect(within(panel).getByRole('button', { name: 'Placer Théo' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.change(within(panel).getByLabelText('Début'), { target: { value: '01:00' } });
+    fireEvent.change(within(panel).getByLabelText('Fin'), { target: { value: '02:30' } });
     // Every week, a template keeps its wall-clock hours: nothing moved to say.
     fireEvent.click(within(panel).getByRole('radio', { name: 'Chaque semaine' }));
     expect(within(panel).queryByRole('status')).toBeNull();
     expect(text(panel)).toContain('1 h – 2 h 30 · 1 h 30.');
+  });
+
+  it('chooses the account and the member with chips, and the day as French writes it (recette #561)', async () => {
+    const LEA = id(2);
+    const LEA_REVEAL = id(12);
+    const written = serve({
+      planning: planning(
+        [],
+        [night],
+        [
+          ...ACCOUNTS,
+          { id: LEA_REVEAL, creatorId: LEA, creatorName: 'Léa Morel', platform: 'reveal', handle: 'lea' },
+        ],
+      ),
+      members: [
+        member({}),
+        member({
+          id: BASILE,
+          userId: id(72),
+          firstName: 'Basile',
+          displayName: 'Basile',
+          color: null,
+          creatorIds: [NORA, LEA],
+        }),
+      ],
+      write: (_method, _path, body) => ({
+        status: 201,
+        body: { ...night, ...(typeof body === 'object' ? body : {}), id: id(102), templateId: null },
+      }),
+    });
+    renderPage();
+    await screen.findByRole('row', { name: /Nora Vidal/u });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un shift' }));
+    const panel = await screen.findByRole('dialog', { name: 'Nouveau shift' });
+    // No list of the system anywhere in the panel: its date field, its accounts and members are ours.
+    expect(panel.querySelector('select, input[type="date"], input[type="time"]')).toBe(null);
+    const accounts = within(panel).getByRole('radiogroup', { name: 'Compte' });
+    expect(
+      within(accounts)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Léa Morel@lea sur Reveal', 'Nora Vidal@nora sur Reveal']);
+    const who = () => within(within(panel).getByRole('radiogroup', { name: 'Membre' })).getAllByRole('radio');
+    // Léa's account first, by name: Basile alone works on her.
+    expect(who().map((one) => one.textContent)).toEqual(['Basile']);
+    fireEvent.click(within(accounts).getByRole('radio', { name: /^Nora Vidal/u }));
+    expect(who().map((one) => [one.textContent, one.getAttribute('aria-checked')])).toEqual([
+      ['Basile', 'true'],
+      ['Théo', 'false'],
+    ]);
+    fireEvent.click(within(panel).getByRole('radio', { name: 'Théo' }));
+    // « 29/10 » is the first 29 October from today on; what is not a day keeps the panel from saving.
+    const day = within(panel).getByLabelText('Jour');
+    fireEvent.change(day, { target: { value: '31/02' } });
+    expect(text(panel)).toContain('Un jour comme 28/03/2027, ou 28/3.');
+    expect(within(panel).getByRole('button', { name: 'Placer Théo' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.change(day, { target: { value: '29/10' } });
+    fireEvent.blur(day);
+    expect(day instanceof HTMLInputElement ? day.value : null).toBe('29/10/2026');
+    expect(text(panel)).toContain('Jeudi 29 octobre');
+    fireEvent.click(within(panel).getByRole('radio', { name: /^18\sh – 0\sh$/u }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Placer Théo' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBe(null);
+    });
+    expect(written).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/scheduling/shifts',
+        body: {
+          creatorId: NORA,
+          platformAccountId: NORA_REVEAL,
+          memberId: THEO,
+          startsAt: '2026-10-29T17:00:00.000Z',
+          endsAt: '2026-10-29T23:00:00.000Z',
+        },
+      },
+    ]);
   });
 
   it('refuses a single shift of more than 24 h the night the clocks go back', async () => {
@@ -1219,9 +1311,14 @@ describe('Équipe › Planning', () => {
     });
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: /^Théo, 23\sh\s–\s5\sh, jusqu/u }));
-    const who = within(screen.getByRole('dialog')).getByLabelText('Membre');
-    if (!(who instanceof HTMLSelectElement)) throw new Error('no member list');
-    expect([...who.options].map((option) => option.text)).toEqual(['Basile', 'Théo']);
+    // Chips, never a list of the system (recette #561): Théo holds it, Basile may take it, Iris joins too late.
+    const who = within(screen.getByRole('dialog')).getByRole('radiogroup', { name: 'Membre' });
+    expect(
+      within(who)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Basile', 'Théo']);
+    expect(within(who).getByRole('radio', { name: 'Théo' }).getAttribute('aria-checked')).toBe('true');
   });
 
   it('keeps the week shown in the address, so that a reload or a back finds it', async () => {

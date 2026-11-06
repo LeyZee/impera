@@ -7,7 +7,7 @@ import type {
   UpdateShiftBody,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useId, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { AWAY_WORDS } from './model';
 
@@ -88,7 +88,6 @@ export function ShiftSheet({
   onReport: () => void;
   onClose: () => void;
 }): JSX.Element {
-  const id = useId();
   const refresh = useRefreshPlanning();
   const agency = planning.settings.timeZone;
   const account = planning.accounts.find((one) => one.id === shift.platformAccountId) ?? null;
@@ -337,29 +336,42 @@ export function ShiftSheet({
             }}
           >
             {phase === 'later' ? (
-              <div className="nv-field tm-field">
-                <label className="nv-field__label" htmlFor={`${id}-member`}>
-                  Membre
-                </label>
-                <select
-                  id={`${id}-member`}
-                  className="nv-field__control nv-glass tm-select"
-                  value={memberId}
-                  onChange={(event) => {
-                    const picked = eligible.find((member) => member.id === event.target.value);
-                    setMemberId(picked?.id ?? shift.memberId);
-                  }}
-                >
-                  {eligible.some((member) => member.id === shift.memberId) ? null : (
-                    <option value={shift.memberId}>{shown?.displayName ?? 'Membre actuel'}</option>
-                  )}
-                  {eligible.map((member) => (
-                    <option key={member.id} value={member.id}>
+              <fieldset className="sc-fieldset">
+                <legend className="nv-field__label">Membre</legend>
+                {/* A few members: chips, never a list of the system (recette #561). Whoever holds it stays first. */}
+                <div className="tm-choices" role="radiogroup" aria-label="Membre">
+                  {[
+                    ...(eligible.some((member) => member.id === shift.memberId)
+                      ? []
+                      : [
+                          {
+                            id: shift.memberId,
+                            displayName: shown?.displayName ?? 'Membre actuel',
+                            color: shown?.color ?? null,
+                          },
+                        ]),
+                    ...eligible,
+                  ].map((member) => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      role="radio"
+                      className="nv-chip"
+                      aria-checked={member.id === memberId}
+                      onClick={() => {
+                        setMemberId(member.id);
+                      }}
+                    >
+                      <span
+                        className="sc-swatch"
+                        style={member.color === null ? undefined : { '--sc-color': member.color }}
+                        aria-hidden="true"
+                      />
                       {member.displayName}
-                    </option>
+                    </button>
                   ))}
-                </select>
-              </div>
+                </div>
+              </fieldset>
             ) : null}
             <fieldset className="sc-fieldset">
               <legend className="nv-field__label">

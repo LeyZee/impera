@@ -163,10 +163,14 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
     void refresh();
   }, [refresh]);
 
-  // Each read of the panel (an import, a model set aside or linked, the refresh) reads the tab's count again with it.
+  // Each read of the panel after the first (an import, a model set aside or linked, the refresh) reads the tab's count
+  // again with it; the first one comes with the tab's own read (Bilan, #550).
   const overview = load.kind === 'ready' ? load.value : null;
+  const seenOverview = useRef(false);
   useEffect(() => {
-    if (overview !== null) void client.invalidateQueries({ queryKey: newModelsQuery.queryKey });
+    if (overview === null) return;
+    if (seenOverview.current) void client.invalidateQueries({ queryKey: newModelsQuery.queryKey });
+    seenOverview.current = true;
   }, [overview, client]);
 
   const isIdle = !isKeyOpen && !isConfirmingRemove && pending === null && busy === null;

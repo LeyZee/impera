@@ -131,6 +131,8 @@ export function createDrizzleCadenceStore(db: Database, adminDb: Database): Cade
           await tx
             .select({ id: schema.creators.id, timeZone: schema.creators.timezone })
             .from(schema.creators)
+            // An archived creator is asked nothing (ADR 0071 § 2): she is out of every list.
+            .where(sql`${schema.creators.archivedAt} is null`)
             .orderBy(schema.creators.createdAt)
         ).map((row) => ({ id: CreatorIdSchema.parse(row.id), timeZone: row.timeZone })),
       ),

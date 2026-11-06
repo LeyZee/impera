@@ -108,9 +108,10 @@ export interface ConversationCommands {
   /**
    * The Dashboard's control (Arrêt, Copilote, Automatique) for all her conversations. Returns the mode now in
    * force: Arrêt while the global switch stays on, whatever she asked. Automatique only behind its lock (ADR 0019).
+   * `reason` names a stop that does not come from the Dashboard (her archiving, ADR 0071 § 2).
    */
   setAgentMode(
-    input: Omit<ConversationCommand, 'conversationId'> & { mode: AgentMode },
+    input: Omit<ConversationCommand, 'conversationId'> & { mode: AgentMode; reason?: string },
   ): Promise<{ mode: AgentMode; globalStop: boolean }>;
   /**
    * Whether Automatique may open for her now, what is missing (ADR 0019), and the live rate it was decided on:
@@ -480,7 +481,7 @@ export function createConversationCommands({
         const switches = await tx.switches.isOn();
         if (switches.creator !== stop) {
           const reason = stop
-            ? 'Arrêt depuis le Dashboard'
+            ? (input.reason ?? 'Arrêt depuis le Dashboard')
             : `Reprise en ${target === 'auto' ? 'automatique' : 'copilote'} depuis le Dashboard`;
           await tx.switches.setCreator({ active: stop, reason, setBy: meta.actor });
           await tx.events.publish(

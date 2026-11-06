@@ -102,7 +102,7 @@ export interface CadenceStore {
   read(creatorId: CreatorId, userId: string): Promise<StoredCadence | null>;
   /** Writes `days`, audited; `null` for a creator who does not exist. */
   setDays(creatorId: CreatorId, days: number, userId: string): Promise<StoredCadence | null>;
-  /** Every creator, with her zone. */
+  /** Every creator not archived, with her zone. */
   creators(): Promise<readonly { readonly id: CreatorId; readonly timeZone: string }[]>;
   /** Her `days` (the default without a row). */
   days(creatorId: CreatorId): Promise<number>;
