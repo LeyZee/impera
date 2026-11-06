@@ -33,6 +33,8 @@ const preferencesQuery = {
 } as const;
 
 const DEFAULT_QUIET = { startMinute: 22 * 60, endMinute: 8 * 60 } as const;
+const QUIET_OFF = { startMinute: 0, endMinute: 0 } as const;
+const EMPTY_RANGE = 'Une plage doit commencer et finir à des heures différentes.';
 
 const STATE_WORDS: Readonly<Record<PushState, string>> = {
   on: 'Cet appareil reçoit les notifications d’Impera.',
@@ -175,11 +177,15 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
   const words = creator ? 'creator' : 'team';
   const client = useQueryClient();
   const [draft, setDraft] = useState(saved);
+  // Its own switch (recette 05/11, PRO-01): start equal to end while an hour is typed is a range to correct, never
+  // quiet hours switched off under the user's fingers. Off is written as start = end only when it is saved.
+  const [quietOn, setQuietOn] = useState(saved.quietHours.startMinute !== saved.quietHours.endMinute);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const { unreadable, onUnreadable } = useUnreadableTimes();
-  const quietOn = draft.quietHours.startMinute !== draft.quietHours.endMinute;
-  const changed = JSON.stringify(draft) !== JSON.stringify(saved);
+  const emptyRange = quietOn && draft.quietHours.startMinute === draft.quietHours.endMinute;
+  const toSave: NotificationPreferences = quietOn ? draft : { ...draft, quietHours: QUIET_OFF };
+  const changed = JSON.stringify(toSave) !== JSON.stringify(saved);
 
   const save = async (): Promise<void> => {
     setBusy(true);
@@ -189,7 +195,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
         method: 'PUT',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(NotificationPreferencesSchema.parse(draft)),
+        body: JSON.stringify(NotificationPreferencesSchema.parse(toSave)),
       });
       if (!response.ok) {
         setNote('Pas enregistré. Réessaie dans un instant.');
@@ -224,10 +230,11 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
             checked={quietOn}
             aria-label={`Heures calmes : ${quietOn ? 'actives' : 'coupées'}`}
             onChange={(event) => {
-              setDraft({
-                ...draft,
-                quietHours: event.target.checked ? DEFAULT_QUIET : { startMinute: 0, endMinute: 0 },
-              });
+              setQuietOn(event.target.checked);
+              // Back on after a save that switched them off: the usual night, rather than an empty range.
+              if (event.target.checked && draft.quietHours.startMinute === draft.quietHours.endMinute) {
+                setDraft({ ...draft, quietHours: DEFAULT_QUIET });
+              }
             }}
           />
         </label>
@@ -257,6 +264,11 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
                 <span className="nv-notif__hint">le lendemain</span>
               ) : null}
             </span>
+            {emptyRange ? (
+              <p className="nv-notif__error" role="alert">
+                {EMPTY_RANGE}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </PanelSection>
@@ -310,7 +322,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
         <button
           type="button"
           className="nv-btn nv-btn--neon"
-          disabled={!changed || unreadable || busy}
+          disabled={!changed || unreadable || emptyRange || busy}
           onClick={() => {
             void save();
           }}

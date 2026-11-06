@@ -47,6 +47,7 @@ import {
   nextVersion,
   togglePick,
   fileRefusal,
+  foreignFileQuestion,
   importedDraft,
   schemaIssues,
   UNREADABLE_FILE,
@@ -276,6 +277,29 @@ describe('Importing a draft from a file', () => {
     const mine = importedDraft(persona, '6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b');
     expect(mine.meta.creator).toBe('6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b');
     expect({ ...mine, meta: persona.meta }).toEqual(persona);
+  });
+
+  it('asks before importing a file that reads as another creator’s (recette 05/11, PRO-27)', async () => {
+    const elena = await demo();
+    const hers = '6f1c2a0e-3b4d-4e5f-8a9b-0c1d2e3f4a5b';
+    const other = '7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
+    const named = (first_name: string, creator: string) => ({
+      ...elena,
+      meta: { ...elena.meta, creator },
+      details: { ...elena.details, first_name },
+    });
+    const ines = named('Inès', hers);
+    // Another first name: the slug the file was written under is said with it.
+    expect(foreignFileQuestion(elena, ines, hers)).toBe(
+      'Ce fichier est celui d’Elena (demo) : l’importer sur la fiche d’Inès ?',
+    );
+    // Another creator of Impera, even with her first name.
+    expect(foreignFileQuestion(named('Inès', other), ines, hers)).toBe(
+      'Ce fichier est celui d’Inès : l’importer sur la fiche d’Inès ?',
+    );
+    // Hers: her first name, whatever its case, under a slug or her own id.
+    expect(foreignFileQuestion(named(' inès ', 'ines'), ines, hers)).toBeNull();
+    expect(foreignFileQuestion(named('Inès', hers), ines, hers)).toBeNull();
   });
 
   it('says how many problems a file has, and the first under its tab and its key', async () => {

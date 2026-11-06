@@ -32,14 +32,18 @@ export type LiveDashboard =
  * answer: the screen says the server does not answer until it does again. Suivi's « À traiter » does not read it: it
  * reads every creator followed (`GET /v1/dashboard/todos`, SUIVI-09).
  */
-export function useLiveDashboard(period: DashboardPeriod = 'day'): LiveDashboard {
+export function useLiveDashboard(
+  period: DashboardPeriod = 'day',
+  /** Another creator than the one followed: the one a screen shows (Créatrices' sheet, PRO-28). */
+  shown: string | null = null,
+): LiveDashboard {
   const creators = useQuery({
     ...creatorsQuery,
     // Read again while it fails, so the page comes back on its own once the server does.
     refetchInterval: (query) => (query.state.status === 'error' ? REFRESH_MS : false),
   });
   const { chosen } = useFollowedCreatorId();
-  const creator = followedOf(creators.data ?? [], chosen);
+  const creator = followedOf(creators.data ?? [], shown ?? chosen);
   const dashboard = useQuery({
     queryKey: ['dashboard', creator?.id, period],
     queryFn: () => fetchDashboard(creator?.id ?? '', period),

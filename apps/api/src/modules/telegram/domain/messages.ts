@@ -1,5 +1,7 @@
 import type { TelegramErrorKind } from '@impera/contracts';
 
+import type { ChannelFailure } from './ports';
+
 /**
  * The single translation table: the sheet, the line of a group and the log say the same sentence for the same
  * problem. No HTTP code ever reaches the screen.
@@ -27,4 +29,21 @@ export function describeTelegramError(kind: TelegramErrorKind): string {
     case 'chat_removed':
       return 'Le groupe a été retiré de la liste avant l’envoi : ce message n’est pas parti.';
   }
+}
+
+/**
+ * What a failed check of a pasted token means: refused by Telegram, or not checked. Not checked is not the queue's
+ * « Impera réessaie tout seul »: nothing was kept, so nothing is retried (recette 05/11, PRO-07).
+ */
+export function describeTokenCheckFailure(failure: ChannelFailure['kind']): {
+  readonly kind: TelegramErrorKind;
+  readonly message: string;
+} {
+  return failure === 'unauthorized' || failure === 'bad_request'
+    ? { kind: 'token_refused', message: describeTelegramError('token_refused') }
+    : {
+        kind: 'unreachable',
+        message:
+          'Telegram ne répond pas : le jeton n’a pas pu être vérifié, et rien n’a été gardé. Réessaie dans une minute.',
+      };
 }

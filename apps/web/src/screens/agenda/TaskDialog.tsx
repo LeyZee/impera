@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { ShootBrief } from './ShootBrief';
-import { AGENDA_KEY, archiveTask, moveTask } from './api';
+import { AGENDA_KEY, archiveTask, moveTask, NOT_SENT } from './api';
 import { dayInReach, OUT_OF_REACH, spanOf } from './draft';
 import { whenWords } from './words';
 
@@ -12,8 +12,6 @@ import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf, dayOf, minuteOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
-
-const OFFLINE = 'Pas de réseau : réessaie dans un moment.';
 
 /**
  * One of her tasks, opened: what it is, what it is for, « Changer le moment » (what a drag does in Semaine, by the
@@ -43,8 +41,8 @@ export function TaskDialog({
     setFailed(null);
     void archiveTask(task.id).then(async (outcome) => {
       setBusy(false);
-      if (outcome.kind === 'failed') {
-        setFailed(OFFLINE);
+      if (outcome.kind === 'offline' || outcome.kind === 'failed') {
+        setFailed(NOT_SENT[outcome.kind]);
         return;
       }
       await client.invalidateQueries({ queryKey: AGENDA_KEY });

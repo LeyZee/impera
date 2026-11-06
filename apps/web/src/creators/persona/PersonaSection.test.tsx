@@ -273,6 +273,9 @@ describe('Créatrices › Persona, recette 28/10', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     const birth = await screen.findByLabelText('Date de naissance');
     expect(birth).toHaveProperty('value', '');
+    // Typed day first, never the browser's own order (recette 05/11, PRO-11).
+    expect(birth.getAttribute('type')).toBe('text');
+    expect(birth.getAttribute('placeholder')).toBe('jj/mm/aaaa');
     expect(screen.queryByText(/ans aujourd’hui/u)).toBeNull();
     expect(screen.queryByText(/^Version /u)).toBeNull();
     expect(screen.getByText('Jamais enregistrée')).toBeDefined();
@@ -300,24 +303,24 @@ describe('Créatrices › Persona, her date of birth (recette PRO-04, reco 22)',
   });
 
   it('checks her age on the day of the save, never on the date of the last version', async () => {
-    // The stored version is of 28/10; she turns 18 on 05/11, the day of the save.
+    // The stored version is of 28/10; she turns 18 on 05/11, the day of the save. Typed day first (PRO-11).
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 10, 5, 12));
     await serve([201, {}]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     const birth = await screen.findByLabelText('Date de naissance');
-    fireEvent.change(birth, { target: { value: '2008-11-05' } });
+    fireEvent.change(birth, { target: { value: '05/11/2008' } });
     expect(screen.queryByText(/au moins 18 ans/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Enregistrer une version' })).toHaveProperty('disabled', false);
 
-    fireEvent.change(birth, { target: { value: '2008-11-06' } });
+    fireEvent.change(birth, { target: { value: '06/11/2008' } });
     expect(await screen.findByText(/au moins 18 ans/u)).toBeDefined();
   });
 
   it('says a date of birth 100 years back is a typo', async () => {
     await serve([201, {}]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
-    fireEvent.change(await screen.findByLabelText('Date de naissance'), { target: { value: '1890-01-01' } });
+    fireEvent.change(await screen.findByLabelText('Date de naissance'), { target: { value: '01/01/1920' } });
     expect(await screen.findByText(/vérifie l’année de naissance/u)).toBeDefined();
   });
 });
@@ -333,12 +336,40 @@ const pick = (file: File): void => {
   fireEvent.change(screen.getByLabelText('Fichier de persona'), { target: { files: [file] } });
 };
 
+/** The file names Zoé on Elena's sheet: asked first (PRO-27), then taken. */
+const anyway = async (): Promise<void> => {
+  fireEvent.click(await screen.findByRole('button', { name: 'L’importer quand même' }));
+};
+
 describe('Créatrices › Persona, « Importer un fichier »', () => {
+  it('asks before taking another creator’s file, and changes nothing when told no (recette 05/11, PRO-27)', async () => {
+    await serveVersions([SUMMARY], () => [500, {}]);
+    render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
+    await screen.findByLabelText('Prénom');
+    pick(draftFile(DRAFT_YAML));
+
+    const ask = await screen.findByRole('alertdialog');
+    expect(ask.textContent).toContain(
+      'Ce fichier est celui de Zoé (demo) : l’importer sur la fiche d’Elena ?',
+    );
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elena');
+    fireEvent.click(within(ask).getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Elena');
+    expect(screen.queryByText(/^Importé de/u)).toBeNull();
+
+    // Her own file, renumbered: taken at once.
+    pick(draftFile(blocksYaml.replace('version: 0.2.0', 'version: 1.0.0')));
+    expect(await screen.findByText(/^Importé de « brouillon\.yaml »/u)).toBeDefined();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
   it('puts the file in the draft to read, then saves it under its own number, never active', async () => {
     const fake = await serveVersions([SUMMARY], () => [201, { ...NEWEST, version: '1.0.0' }]);
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByLabelText('Prénom');
     pick(draftFile(DRAFT_YAML));
+    await anyway();
 
     expect(
       await screen.findByText(
@@ -373,6 +404,7 @@ describe('Créatrices › Persona, « Importer un fichier »', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     await screen.findByLabelText('Prénom');
     pick(draftFile(DRAFT_YAML.replace('version: 1.0.0', 'version: 0.1.0')));
+    await anyway();
     expect(await screen.findByText(/Ce sera la version 0\.2\.1,/u)).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tout annuler' }));
@@ -422,6 +454,7 @@ describe('Créatrices › Persona, « Importer un fichier »', () => {
     render(<PersonaSection creatorId={CREATOR} canSave timezone="Europe/Paris" />);
     expect(await screen.findByText(/deviendra sa version 0\.0\.1\./u)).toBeDefined();
     pick(draftFile(DRAFT_YAML));
+    await anyway();
     expect(await screen.findByText(/deviendra sa version 1\.0\.0\./u)).toBeDefined();
     expect(screen.getByLabelText('Prénom')).toHaveProperty('value', 'Zoé');
   });

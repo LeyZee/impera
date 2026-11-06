@@ -1,4 +1,4 @@
-import { DomainError } from '@impera/contracts';
+import { BACKUP_REQUEST_STALE_MINUTES, DomainError } from '@impera/contracts';
 
 import { BACKUP_OVERDUE_HOURS, type BackupRun } from './status';
 
@@ -15,7 +15,7 @@ export interface StoredBackupRequest {
 export interface RequestContext {
   /** The request with this `id`, when it was already made. */
   readonly sameId: StoredBackupRequest | null;
-  /** The oldest request the `backup` service has not picked up yet. */
+  /** The latest request the `backup` service has not picked up yet. */
   readonly pending: StoredBackupRequest | null;
   /** The latest export started, whatever its outcome. */
   readonly latestRun: BackupRun | null;
@@ -34,13 +34,17 @@ const HOUR_MS = 3_600_000;
 
 /**
  * One export at a time, never two requests waiting (REG-24). The same `id` again gives back its request (a retry after
- * a lost answer); a request already waiting is the answer to a second one; an export running now, started less than
- * 26 hours ago, refuses a new one (its outcome will show). A `running` row older than that is a crash, not an export:
- * asking again is the way out of it.
+ * a lost answer); a request already waiting is the answer to a second one, unless the service has left it more than
+ * `BACKUP_REQUEST_STALE_MINUTES` (it is down): then a new one is recorded, and the service, which picks every waiting
+ * request at once, runs one export for both (recette 05/11, PRO-06). An export running now, started less than 26 hours
+ * ago, refuses a new one (its outcome will show). A `running` row older than that is a crash, not an export: asking
+ * again is the way out of it.
  */
 export function decideRequest(context: RequestContext, now: Date): RequestDecision {
   if (context.sameId !== null) return { kind: 'existing', request: context.sameId };
-  if (context.pending !== null) return { kind: 'existing', request: context.pending };
+  if (context.pending !== null && !isStaleRequest(context.pending.requestedAt, now)) {
+    return { kind: 'existing', request: context.pending };
+  }
   const run = context.latestRun;
   if (
     run !== null &&
@@ -51,3 +55,7 @@ export function decideRequest(context: RequestContext, now: Date): RequestDecisi
   }
   return { kind: 'insert' };
 }
+
+/** A request the `backup` service has left waiting longer than it ever should (it checks every 30 seconds). */
+const isStaleRequest = (requestedAt: Date, now: Date): boolean =>
+  now.getTime() - requestedAt.getTime() > BACKUP_REQUEST_STALE_MINUTES * 60_000;

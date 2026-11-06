@@ -24,6 +24,7 @@ type FocusTarget = 'button' | 'asked' | 'landmark';
 
 const FOCUS_OF: Record<RunNowView['kind'], FocusTarget> = {
   offer: 'button',
+  unheard: 'button',
   asked: 'asked',
   running: 'landmark',
 };
@@ -105,6 +106,11 @@ export function RunNow({
 
   return (
     <div className="bk-run">
+      {view.kind === 'unheard' && failure === null ? (
+        <p className="bk-warn nv-swap" role="status">
+          {view.text}
+        </p>
+      ) : null}
       {needsPassword && requestId !== null ? (
         <PasswordStep
           hint="Pour relancer la sauvegarde, confirme ton mot de passe et ton code."

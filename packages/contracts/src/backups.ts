@@ -50,6 +50,13 @@ export const RestoreTestSummarySchema = z.object({
 });
 export type RestoreTestSummary = z.infer<typeof RestoreTestSummarySchema>;
 
+/**
+ * Minutes after which a request to export now that the `backup` service has not picked up is taken as not heard: the
+ * page says so and offers to ask again, and a new request is recorded instead of the old one being given back
+ * (recette 05/11, PRO-06). The service checks every 30 seconds.
+ */
+export const BACKUP_REQUEST_STALE_MINUTES = 5;
+
 /** `GET /v1/backups/status`, owner only. */
 export const BackupStatusSchema = z.object({
   state: BackupStateSchema,
@@ -64,8 +71,8 @@ export const BackupStatusSchema = z.object({
    */
   restoreTestFresh: z.boolean(),
   /**
-   * When the owner asked for an export now (REG-24) and the `backup` service has not picked it up yet; absent when no
-   * request waits. Once picked, the export shows as `lastRun` (`running`, then its outcome).
+   * When the owner last asked for an export now (REG-24) and the `backup` service has not picked it up yet; absent when
+   * no request waits. Once picked, the export shows as `lastRun` (`running`, then its outcome).
    */
   runRequestedAt: z.iso.datetime().exactOptional(),
 });

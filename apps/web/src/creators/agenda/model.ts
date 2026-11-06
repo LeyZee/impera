@@ -7,7 +7,7 @@ import {
   type CreatorTaskWhen,
 } from '@impera/contracts';
 
-import { lengthOf } from '@/scheduling/time';
+import { addDays, dayOf, lengthOf, minuteOf } from '@/scheduling/time';
 import { whenOf, type TaskDraft } from '@/screens/agenda/draft';
 import { whenWords } from '@/screens/agenda/words';
 
@@ -16,6 +16,29 @@ import { whenWords } from '@/screens/agenda/words';
  * agency types in her zone, the server's: a timed suggestion falls at its hour only inside one of her dispos and over
  * none of her tasks, otherwise she places it herself.
  */
+
+const EVENING = 18 * 60;
+const HOUR = 60;
+const STEP = 30;
+
+/**
+ * Where « Proposer une tâche » opens: 18 h to 19 h on the day shown, unless that hour has begun in her zone (it
+ * opened on 18 h to 19 h at 18 h 40, Chantier 7, 05/11): then the next half hour, or tomorrow evening once the hour
+ * would cross midnight. A day already gone moves to today.
+ */
+export function proposalSlotOf(
+  day: string,
+  now: Date,
+  zone: string,
+): { readonly day: string; readonly start: number; readonly end: number } {
+  const today = dayOf(now, zone);
+  const shown = day < today ? today : day;
+  if (shown > today) return { day: shown, start: EVENING, end: EVENING + HOUR };
+  const next = Math.ceil((minuteOf(now, zone) + 1) / STEP) * STEP;
+  if (next < EVENING) return { day: today, start: EVENING, end: EVENING + HOUR };
+  if (next + HOUR > 24 * 60) return { day: addDays(today, 1), start: EVENING, end: EVENING + HOUR };
+  return { day: today, start: next, end: next + HOUR };
+}
 
 /** A suggestion's id, drawn once when the form opens: sent again after a lost answer, it adds nothing. */
 export const newSuggestionId = (): string => newId(SuggestionIdSchema);

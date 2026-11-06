@@ -5,11 +5,14 @@ import {
   bubblesFromText,
   bubblesProblem,
   duration,
+  fanWaits,
+  groupByHand,
   lastMessageAgo,
   mergeConversations,
   orderLines,
   parseTrackingSearch,
   sharedMode,
+  situationOf,
   statusClass,
   subline,
 } from './view';
@@ -69,11 +72,18 @@ describe('lastMessageAgo', () => {
 describe('subline, sharedMode and statusClass', () => {
   it('says when he last wrote in a few words, never the mode', () => {
     expect(subline(conversation('1'), NOW)).toEqual({ text: 'Pas encore écrit', band: null });
-    const auto = conversation('2', { mode: 'auto', lastInboundAt: '2026-10-17T20:55:00Z' });
+    const auto = conversation('2', {
+      mode: 'auto',
+      lastInboundAt: '2026-10-17T20:55:00Z',
+      lastOutboundAt: '2026-10-17T20:56:00Z',
+    });
     expect(subline(auto, NOW)).toEqual({ text: 'Il y a 5 min', band: null });
-    expect(subline(conversation('3', { lastInboundAt: '2026-10-17T20:59:40Z' }), NOW).text).toBe(
-      'À l’instant',
-    );
+    expect(
+      subline(
+        conversation('3', { lastInboundAt: '2026-10-17T20:59:40Z', lastOutboundAt: '2026-10-17T20:59:50Z' }),
+        NOW,
+      ).text,
+    ).toBe('À l’instant');
   });
 
   it('finds the mode all lines share, or none', () => {
@@ -89,6 +99,51 @@ describe('subline, sharedMode and statusClass', () => {
 
   it('maps states to their pill', () => {
     expect(statusClass('awaiting_approval')).toBe('nv-status--awaiting-approval');
+  });
+});
+
+describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
+  const answered = { lastInboundAt: '2026-10-17T20:00:00Z', lastOutboundAt: '2026-10-17T20:05:00Z' };
+  const unanswered = { lastInboundAt: '2026-10-17T20:10:00Z', lastOutboundAt: '2026-10-17T20:05:00Z' };
+
+  it('never says « Rien à faire » while his last message has no answer', () => {
+    expect(situationOf(conversation('1', { state: 'idle', ...unanswered }))).toEqual({
+      hand: 'yours',
+      label: 'Sans réponse',
+      pill: 'nv-status--awaiting-approval',
+    });
+    expect(situationOf(conversation('1', { state: 'idle', ...answered })).label).toBe('Rien à faire');
+    expect(situationOf(conversation('1', { state: 'paused', ...unanswered })).hand).toBe('yours');
+    expect(fanWaits({ lastInboundAt: null, lastOutboundAt: null })).toBe(false);
+  });
+
+  it('says who acts: a person, the agent, or nobody', () => {
+    const hand = (state: ConversationSummary['state']) =>
+      situationOf(conversation('1', { state, ...answered })).hand;
+    expect(hand('awaiting_approval')).toBe('yours');
+    expect(hand('human')).toBe('yours');
+    expect(hand('error')).toBe('yours');
+    expect(hand('pending')).toBe('agent');
+    expect(hand('drafting')).toBe('agent');
+    expect(hand('sending')).toBe('agent');
+    expect(hand('idle')).toBe('quiet');
+    expect(situationOf(conversation('1', { state: 'error' })).label).toBe('Pas parti');
+  });
+
+  it('tells the chatter the hand is his, anyone else that a human answers', () => {
+    expect(situationOf(conversation('1', { state: 'human' }), true).label).toBe('Tu as la main');
+    expect(situationOf(conversation('1', { state: 'human' })).label).toBe('Un humain répond');
+  });
+
+  it('groups the lines in the order À toi, the agent, nothing to do, keeping their order and leaving empty ones out', () => {
+    const line = (id: string, state: ConversationSummary['state']) => ({
+      conversation: conversation(id, { state, ...answered }),
+    });
+    const groups = groupByHand([line('1', 'idle'), line('2', 'awaiting_approval'), line('3', 'human')]);
+    expect(groups.map((g) => [g.hand, g.lines.map((l) => l.conversation.fanDisplayName)])).toEqual([
+      ['yours', ['Fan 2', 'Fan 3']],
+      ['quiet', ['Fan 1']],
+    ]);
   });
 });
 

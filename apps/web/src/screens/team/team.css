@@ -495,8 +495,12 @@
   gap: var(--nv-space-2);
   align-items: center;
 }
-.tm-inline .nv-field__control {
-  flex: 1 1 200px;
+/* The confirmation: two labelled fields side by side, the buttons on their baseline (recette SEC-09). */
+.tm-inline {
+  align-items: flex-end;
+}
+.tm-inline > .nv-field:not(.nv-code) {
+  flex: 1 1 12rem;
   min-width: 0;
 }
 .tm-link {

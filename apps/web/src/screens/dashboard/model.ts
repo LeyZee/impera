@@ -51,6 +51,11 @@ export interface AgentCard {
    * never darkens the fold: the handoffs to a human are the job, and the live rate is a goal, not a fault.
    */
   readonly alarm?: string;
+  /**
+   * The card in a few words, with what it measures, for the fold's one line while it is not green (recette 05/11,
+   * PRO-23): « Reveal pas encore relié », « 1 tâche bloquée ». A green card is only counted there.
+   */
+  readonly brief: string;
 }
 
 export interface AgentState {
@@ -168,4 +173,21 @@ export interface Dashboard {
   readonly usdNote?: string;
   /** Telegram's coverage of her night (`telegramNightOf`); absent on sample data. */
   readonly telegram?: TelegramNight;
+  /** What is the agency's, not hers: said once, apart from her agent's health (`AgencyStrip`). */
+  readonly agency: AgencyState;
+}
+
+/**
+ * The agency's part of the Dashboard (recette 05/11, reco 18): the AI budget of the day, counted for every creator.
+ * Said once, apart from her agent's health, which it is not. The agency's stuck jobs are named in the activity card,
+ * for the owner only (PRO-10).
+ */
+export interface AgencyState {
+  /** Null for whoever the server sends no spend (a creator never reads the agency's). */
+  readonly budget: {
+    readonly tone: Tone;
+    readonly value: string;
+    readonly sub: string;
+    readonly gauge: { readonly value: number; readonly mark: number };
+  } | null;
 }

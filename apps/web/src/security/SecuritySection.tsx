@@ -14,7 +14,16 @@ import {
   SECURITY_ERROR_MESSAGES,
   SecurityError,
 } from './api';
-import { ago, closedText, dayText, passkeysText, ROLE_LABELS, sessionsText } from './view';
+import {
+  ago,
+  closedText,
+  dayText,
+  passkeysText,
+  ROLE_LABELS,
+  sessionGroups,
+  sessionsText,
+  type SessionGroup,
+} from './view';
 
 import { BackupCodesList } from '@/auth/BackupCodesList';
 import { CodeInput } from '@/auth/CodeInput';
@@ -53,12 +62,16 @@ function Outcome({ error, notice }: { error: string | null; notice: string | nul
   );
 }
 
+/** The other devices shown before « Voir les N autres »: the screen keeps room for the keys and the codes. */
+const SHOWN_GROUPS = 3;
+
 function SessionsPanel(): JSX.Element {
   const [sessions, setSessions] = useState<readonly OpenSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -72,17 +85,22 @@ function SessionsPanel(): JSX.Element {
     void load();
   }, [load]);
 
-  async function close(id: string): Promise<void> {
-    setBusy(id);
+  async function close(group: SessionGroup): Promise<void> {
+    setBusy(group.key);
     setNotice(null);
     setError(null);
     try {
-      await closeSession(id);
-      setNotice('Session fermée : cet appareil devra se reconnecter.');
-      await load();
+      for (const id of group.ids) await closeSession(id);
+      setNotice(
+        group.ids.length === 1
+          ? 'Session fermée : cet appareil devra se reconnecter.'
+          : `${sessionsText(group.ids.length).replace(' ouvertes', ' fermées')} : cet appareil devra se reconnecter.`,
+      );
     } catch (failure) {
       setError(messageOf(failure));
     } finally {
+      // What was closed before a refusal is closed all the same: the list says so.
+      await load();
       setBusy(null);
     }
   }
@@ -104,48 +122,17 @@ function SessionsPanel(): JSX.Element {
 
   const now = new Date();
   const others = sessions?.filter((session) => !session.current).length ?? 0;
+  const groups = sessionGroups(sessions ?? []);
+  const currentGroups = groups.filter((group) => group.current);
+  const otherGroups = groups.filter((group) => !group.current);
+  // Folding away a single line saves nothing: the list folds from two hidden lines on.
+  const canFold = otherGroups.length > SHOWN_GROUPS + 1;
+  const hidden = showAll || !canFold ? 0 : otherGroups.length - SHOWN_GROUPS;
+  const shown = [...currentGroups, ...otherGroups.slice(0, otherGroups.length - hidden)];
   return (
     <Panel title="Sessions ouvertes" eyebrow="Tes appareils">
       <PanelSection>
-        {sessions === null && error === null ? <p className={MUTED}>Chargement…</p> : null}
-        {sessions === null ? null : (
-          <ul className={ROWS} aria-label="Sessions ouvertes">
-            {sessions.map((session, index) => (
-              <li
-                key={session.id}
-                className="nv-enter flex items-center gap-4 py-3 first:pt-0"
-                style={{ '--nv-i': index + 1 }}
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
-                    {session.device}
-                    {session.current ? (
-                      <span className="nv-status nv-status--human">
-                        <span className="nv-status__dot" />
-                        Cet appareil
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className={MUTED}>
-                    {session.network === null ? 'Réseau inconnu' : `Réseau ${session.network}`} · dernière
-                    activité {ago(session.lastActiveAt, now)}
-                  </span>
-                </div>
-                {session.current ? null : (
-                  <button
-                    type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm shrink-0"
-                    disabled={busy !== null}
-                    aria-label={`Fermer la session ${session.device}`}
-                    onClick={() => void close(session.id)}
-                  >
-                    {busy === session.id ? 'Fermeture…' : 'Fermer'}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        {/* What matters first: this device, and closing the others, above a list that can be long. */}
         {asking ? (
           <div
             className="nv-glass flex flex-col gap-3 rounded-[var(--nv-radius-md)] p-3"
@@ -178,19 +165,81 @@ function SessionsPanel(): JSX.Element {
             </div>
           </div>
         ) : others > 0 ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm self-start"
-            disabled={busy !== null}
-            onClick={() => {
-              setAsking(true);
-              setNotice(null);
-            }}
-          >
-            Fermer toutes les autres
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={MUTED}>
+              {others === 1 ? '1 autre session' : `${String(others)} autres sessions`}
+            </span>
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              disabled={busy !== null}
+              onClick={() => {
+                setAsking(true);
+                setNotice(null);
+              }}
+            >
+              Fermer toutes les autres
+            </button>
+          </div>
         ) : null}
         <Outcome error={error} notice={notice} />
+        {sessions === null && error === null ? <p className={MUTED}>Chargement…</p> : null}
+        {sessions === null ? null : (
+          <ul className={ROWS} aria-label="Sessions ouvertes">
+            {shown.map((group, index) => (
+              <li
+                key={group.key}
+                className="nv-enter flex items-center gap-4 py-3 first:pt-0"
+                style={{ '--nv-i': index + 1 }}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                    {group.device}
+                    {group.current ? (
+                      <span className="nv-status nv-status--human">
+                        <span className="nv-status__dot" />
+                        Cet appareil
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={MUTED}>
+                    {group.network === null ? 'Réseau inconnu' : `Réseau ${group.network}`}
+                    {group.ids.length > 1 ? ` · ${String(group.ids.length)}\u00a0sessions` : ''} ·{' '}
+                    {/* The device in use is active now: the server writes the activity only now and then (PRO-18). */}
+                    {group.current ? 'actif maintenant' : `dernière activité ${ago(group.lastActiveAt, now)}`}
+                  </span>
+                </div>
+                {group.current ? null : (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--sm shrink-0"
+                    disabled={busy !== null}
+                    aria-label={
+                      group.ids.length === 1
+                        ? `Fermer la session ${group.device}`
+                        : `Fermer les ${String(group.ids.length)} sessions ${group.device}`
+                    }
+                    onClick={() => void close(group)}
+                  >
+                    {busy === group.key ? 'Fermeture…' : 'Fermer'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canFold ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm self-start"
+            aria-expanded={showAll}
+            onClick={() => {
+              setShowAll((value) => !value);
+            }}
+          >
+            {showAll ? 'Voir moins' : `Voir les ${String(hidden)} autres`}
+          </button>
+        ) : null}
       </PanelSection>
     </Panel>
   );
@@ -552,9 +601,11 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
                     </span>
                     <span className={MUTED}>
                       {sessionsText(account.sessions)}
-                      {account.lastActiveAt === null
-                        ? ''
-                        : ` · dernière activité ${ago(account.lastActiveAt, now)}`}
+                      {account.userId === ownerId
+                        ? ' · actif maintenant'
+                        : account.lastActiveAt === null
+                          ? ''
+                          : ` · dernière activité ${ago(account.lastActiveAt, now)}`}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

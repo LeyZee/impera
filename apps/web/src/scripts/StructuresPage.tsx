@@ -13,7 +13,7 @@ import { useState, type JSX } from 'react';
 import { Queues } from './Queues';
 import { Workshop, type WorkshopStart } from './Workshop';
 import { useStarters, useStructures } from './api';
-import { emptyDraft, scriptGradient, slotsSummary } from './model';
+import { emptyDraft, scriptGradient, stackSummary } from './model';
 import './structures.css';
 
 import { LeaveConfirm } from '@/creators/LeaveConfirm';
@@ -23,12 +23,6 @@ import '@/creators/persona/persona.css';
 import { Page, PageHeader } from '@/shell/layout';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
-
-const stagesOf = (segments: ScriptStructure['current']['segments']): string => {
-  const stages = segments.filter((segment) => segment.kind === 'stage');
-  const slots = stages.flatMap((stage) => stage.mediaSlots);
-  return `${String(stages.length)} étape${stages.length > 1 ? 's' : ''} · ${slotsSummary(slots)}`;
-};
 
 /**
  * Créatrices › Structures (SC-01 lot c), the owner's: the agency's library of script structures, the starter to copy,
@@ -167,7 +161,7 @@ export function StructuresPage(): JSX.Element {
                   <span className="st-tile__title">{structure.current.name}</span>
                 </span>
                 <span className="st-tile__body">
-                  <span className="st-tile__sub">{stagesOf(structure.current.segments)}</span>
+                  <span className="st-tile__sub">{stackSummary(structure.current.segments)}</span>
                   <span className="st-tile__sub">
                     {`Version ${String(structure.current.version)}${structure.current.frozen ? ' · déjà demandée' : ''}`}
                   </span>
@@ -186,7 +180,7 @@ export function StructuresPage(): JSX.Element {
                   <span className="st-tile__name">{starter.body.name}</span>
                   <span className="st-tile__sub">{starter.summary}</span>
                   <span className="st-tile__sub">
-                    {`${MOMENT_LABELS[starter.body.moment]} · ${stagesOf(starter.body.segments)}`}
+                    {`${MOMENT_LABELS[starter.body.moment]} · ${stackSummary(starter.body.segments)}`}
                   </span>
                 </span>
                 <button

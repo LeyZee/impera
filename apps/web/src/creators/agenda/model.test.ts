@@ -1,7 +1,7 @@
 import { SuggestionIdSchema, type AgencySuggestion } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { followedOf, groupsOf, suggestionBodyOf, summaryOf } from './model';
+import { followedOf, groupsOf, proposalSlotOf, suggestionBodyOf, summaryOf } from './model';
 
 /* Invented suggestions of an invented creator. */
 const ZONE = 'Europe/Paris';
@@ -117,6 +117,50 @@ describe('the body sent', () => {
       category: 'live',
       title: 'Live',
       purpose: null,
+    });
+  });
+});
+
+describe('proposalSlotOf', () => {
+  // 05/11/2026 in Paris is UTC+1: 17:40 UTC is 18 h 40 there.
+  const at = (utc: string): Date => new Date(`2026-11-05T${utc}:00Z`);
+
+  it('opens on 18 h to 19 h while that hour is still ahead', () => {
+    expect(proposalSlotOf('2026-11-05', at('09:00'), ZONE)).toEqual({
+      day: '2026-11-05',
+      start: 1080,
+      end: 1140,
+    });
+    expect(proposalSlotOf('2026-11-09', at('17:40'), ZONE)).toEqual({
+      day: '2026-11-09',
+      start: 1080,
+      end: 1140,
+    });
+  });
+
+  it('never opens on an hour already begun (Chantier 7, 05/11)', () => {
+    expect(proposalSlotOf('2026-11-05', at('17:40'), ZONE)).toEqual({
+      day: '2026-11-05',
+      start: 1140,
+      end: 1200,
+    });
+    expect(proposalSlotOf('2026-11-05', at('18:00'), ZONE)).toEqual({
+      day: '2026-11-05',
+      start: 1170,
+      end: 1230,
+    });
+  });
+
+  it('moves to tomorrow evening once the hour would cross midnight, and a past day to today', () => {
+    expect(proposalSlotOf('2026-11-05', at('22:10'), ZONE)).toEqual({
+      day: '2026-11-06',
+      start: 1080,
+      end: 1140,
+    });
+    expect(proposalSlotOf('2026-11-02', at('09:00'), ZONE)).toEqual({
+      day: '2026-11-05',
+      start: 1080,
+      end: 1140,
     });
   });
 });

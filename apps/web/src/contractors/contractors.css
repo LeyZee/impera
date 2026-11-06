@@ -20,9 +20,10 @@
 .cf-item--doc {
   align-items: start;
 }
-/* A document whose renewal is due: an amber edge, never red (the guide: no emergency). */
+/* A document whose renewal is due: an amber tint, never red (the guide: no emergency), and no bar on its side
+   (Charles's rule; recette 05/11). */
 .cf-item[data-remind='true'] {
-  box-shadow: inset 3px 0 0 var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 10%, var(--nv-glass-fill));
 }
 .cf-item--old {
   grid-template-columns: minmax(0, 1fr);

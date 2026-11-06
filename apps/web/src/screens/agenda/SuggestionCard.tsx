@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type JSX } from 'react';
 
 import { ShootBrief } from './ShootBrief';
-import { acceptSuggestion, AGENDA_KEY } from './api';
+import { acceptSuggestion, AGENDA_KEY, NOT_SENT } from './api';
 import { CategoryMark } from './category';
 import { undatedOf } from './model';
 import { whenWords } from './words';
@@ -55,11 +55,11 @@ export function SuggestionCard({
         return;
       }
       setFailed(
-        outcome.kind === 'failed'
-          ? 'Pas de réseau : réessaie dans un moment.'
-          : outcome.code === SUGGESTION_PAST_UNPROCESSABLE
+        outcome.kind === 'refused'
+          ? outcome.code === SUGGESTION_PAST_UNPROCESSABLE
             ? 'Ce moment est déjà passé : tu peux répondre « Non merci ».'
-            : 'Cette proposition n’est plus là. Ton agenda est relu.',
+            : 'Cette proposition n’est plus là. Ton agenda est relu.'
+          : NOT_SENT[outcome.kind],
       );
       void client.invalidateQueries({ queryKey: AGENDA_KEY });
     });

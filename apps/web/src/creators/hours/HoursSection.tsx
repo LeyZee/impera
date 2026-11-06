@@ -6,7 +6,7 @@ import {
   type MinuteRange,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { SaveBar, useOnScreen } from '../SaveBar';
 import { ZoneEditor } from '../ZoneEditor';
@@ -33,6 +33,7 @@ import {
   slotsToOffer,
   slotWords,
   sortedHours,
+  UNREADABLE_HOUR,
   WEEK_FULL,
 } from './model';
 import './hours.css';
@@ -195,7 +196,7 @@ function HoursForm({
                 ? `${String(issues.size)} lignes à corriger`
                 : issues.size === 1
                   ? 'Une ligne à corriger'
-                  : 'Une heure à corriger, sur 24 heures : 22, 2230 ou 22:30',
+                  : UNREADABLE_HOUR,
           }
         : stored.invalidStored && sameHours(draft, stored.hours)
           ? {
@@ -542,6 +543,26 @@ function DayLine({
   );
 }
 
+/**
+ * The time fields of one line that hold what is not an hour, told to the form as well: while there is one, the line
+ * says so under its fields instead of its last readable summary (recette 05/11, PRO-15).
+ */
+function useLineTimes(onFormUnreadable: (field: string, unreadable: boolean) => void): {
+  unreadable: boolean;
+  onUnreadable: (field: string, unreadable: boolean) => void;
+} {
+  const line = useUnreadableTimes();
+  const onLineUnreadable = line.onUnreadable;
+  const onUnreadable = useCallback(
+    (field: string, unreadable: boolean) => {
+      onLineUnreadable(field, unreadable);
+      onFormUnreadable(field, unreadable);
+    },
+    [onLineUnreadable, onFormUnreadable],
+  );
+  return { unreadable: line.unreadable, onUnreadable };
+}
+
 function SlotLine({
   slot,
   issue,
@@ -559,14 +580,16 @@ function SlotLine({
   const id = useId();
   const day = DAY_NAMES[slot.day - 1] ?? '';
   const name = `le créneau du ${day}, ${slotWords(slot)}`;
-  const note = slotNote(slot);
+  const times = useLineTimes(onUnreadable);
+  const shown = issue ?? (times.unreadable ? UNREADABLE_HOUR : null);
+  const note = times.unreadable ? null : slotNote(slot);
   return (
     <div
       className="hr-slot"
       role="group"
       aria-label={`Créneau du ${day}, ${slotWords(slot)}`}
       data-off={slot.enabled ? undefined : 'true'}
-      data-invalid={issue === null ? undefined : 'true'}
+      data-invalid={shown === null ? undefined : 'true'}
     >
       <div className="hr-slot__fields">
         <span className="hr-slot__hours">
@@ -577,7 +600,7 @@ function SlotLine({
             onChange={(startMinute) => {
               onChange({ ...slot, startMinute });
             }}
-            onUnreadable={onUnreadable}
+            onUnreadable={times.onUnreadable}
           />
           <span className="ps-hint">à</span>
           <TimeField
@@ -587,7 +610,7 @@ function SlotLine({
             onChange={(endMinute) => {
               onChange({ ...slot, endMinute });
             }}
-            onUnreadable={onUnreadable}
+            onUnreadable={times.onUnreadable}
           />
         </span>
         {/* The two hours say the rest: only what they do not, the next morning or the whole day. */}
@@ -619,7 +642,7 @@ function SlotLine({
           )}
         </span>
       </div>
-      {issue === null ? null : <p className="ps-error">{issue}</p>}
+      {shown === null ? null : <p className="ps-error">{shown}</p>}
     </div>
   );
 }
@@ -638,8 +661,10 @@ function RangeLine({
   onUnreadable: (field: string, unreadable: boolean) => void;
 }): JSX.Element {
   const overnight = range.endMinute < range.startMinute;
+  const times = useLineTimes(onUnreadable);
+  const shown = issue ?? (times.unreadable ? UNREADABLE_HOUR : null);
   return (
-    <div className="hr-range" data-invalid={issue === null ? undefined : 'true'}>
+    <div className="hr-range" data-invalid={shown === null ? undefined : 'true'}>
       <div className="hr-slot__fields">
         <span className="hr-range__label">{label}</span>
         <span className="hr-slot__hours">
@@ -651,7 +676,7 @@ function RangeLine({
             onChange={(startMinute) => {
               onChange({ ...range, startMinute });
             }}
-            onUnreadable={onUnreadable}
+            onUnreadable={times.onUnreadable}
           />
           <span className="ps-hint">à</span>
           <TimeField
@@ -661,17 +686,17 @@ function RangeLine({
             onChange={(endMinute) => {
               onChange({ ...range, endMinute });
             }}
-            onUnreadable={onUnreadable}
+            onUnreadable={times.onUnreadable}
           />
         </span>
-        {issue === null ? (
+        {shown === null ? (
           <span className="ps-hint hr-slot__words">
             {rangeOf(range)}
             {overnight ? ', jusqu’au lendemain' : ''}
           </span>
         ) : null}
       </div>
-      {issue === null ? null : <p className="ps-error">{issue}</p>}
+      {shown === null ? null : <p className="ps-error">{shown}</p>}
     </div>
   );
 }

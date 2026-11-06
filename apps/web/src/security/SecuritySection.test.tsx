@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+import { OpenSessionSchema } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SecuritySection } from './SecuritySection';
-import { ago, closedText, sessionsText } from './view';
+import { ago, closedText, sessionGroups, sessionsText } from './view';
 
 const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
 vi.mock('@/settings/services/api', () => ({
@@ -18,7 +19,8 @@ const SESSIONS = [
     device: 'Chrome sur Windows',
     network: '198.51.100.x',
     createdAt: minutesAgo(600),
-    lastActiveAt: minutesAgo(0),
+    // The server writes the activity at most every so often: the session in use can read 36 min old (PRO-18).
+    lastActiveAt: minutesAgo(36),
     current: true,
   },
   {
@@ -46,7 +48,7 @@ const ACCOUNTS = [
     secondFactor: true,
     sessions: 1,
     passkeys: 0,
-    lastActiveAt: minutesAgo(0),
+    lastActiveAt: minutesAgo(36),
   },
   {
     userId: 'u-team',
@@ -130,6 +132,89 @@ describe('the words of the screen', () => {
   });
 });
 
+/** A browser that signs in often: many sessions on one device and network, and a few other devices. */
+function busyAccount(): unknown[] {
+  const repeated = Array.from({ length: 12 }, (_, index) => ({
+    id: `s-rep-${String(index)}`,
+    device: 'Appareil inconnu',
+    network: '192.0.2.x',
+    createdAt: minutesAgo(700),
+    lastActiveAt: minutesAgo(10 + index),
+    current: false,
+  }));
+  const devices = ['Firefox sur Linux', 'Edge sur Windows', 'Chrome sur Android', 'Safari sur iPad'].map(
+    (device, index) => ({
+      id: `s-dev-${String(index)}`,
+      device,
+      network: '203.0.113.x',
+      createdAt: minutesAgo(900),
+      lastActiveAt: minutesAgo(60 * (index + 1)),
+      current: false,
+    }),
+  );
+  return [SESSIONS[0], ...repeated, ...devices];
+}
+
+describe('a long list of sessions (recette SEC-16)', () => {
+  it('gathers the sessions of one device and network, this device first, the most recent next', () => {
+    const sessions = busyAccount().map((session) => OpenSessionSchema.parse(session));
+    const groups = sessionGroups(sessions);
+    expect(groups.map((group) => [group.device, group.ids.length])).toEqual([
+      ['Chrome sur Windows', 1],
+      ['Appareil inconnu', 12],
+      ['Firefox sur Linux', 1],
+      ['Edge sur Windows', 1],
+      ['Chrome sur Android', 1],
+      ['Safari sur iPad', 1],
+    ]);
+    // A gathered line was last used when its latest session was.
+    expect(groups[1]?.lastActiveAt).toBe(sessions[1]?.lastActiveAt);
+  });
+
+  it('puts « Fermer toutes les autres » first, shows three other devices, and closes a gathered line at once', async () => {
+    let sessions = busyAccount();
+    const calls = serve({
+      'GET /auth/sessions': () => ({ status: 200, body: { sessions } }),
+      ...Object.fromEntries(
+        Array.from({ length: 12 }, (_, index) => [
+          `DELETE /auth/sessions/s-rep-${String(index)}`,
+          () => {
+            sessions = sessions.filter(
+              (session) =>
+                typeof session !== 'object' ||
+                session === null ||
+                !('id' in session) ||
+                session.id !== `s-rep-${String(index)}`,
+            );
+            return { status: 204 };
+          },
+        ]),
+      ),
+    });
+    render(<SecuritySection />);
+
+    const list = await screen.findByRole('list', { name: 'Sessions ouvertes' });
+    const closeAll = screen.getByRole('button', { name: 'Fermer toutes les autres' });
+    // Above the list, never at its far end.
+    expect(closeAll.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('16 autres sessions')).toBeTruthy();
+    expect(within(list).getAllByRole('listitem')).toHaveLength(4);
+    expect(within(list).getByText(/Réseau 192\.0\.2\.x · 12 sessions · dernière activité/u)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voir les 2 autres' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(6);
+    fireEvent.click(screen.getByRole('button', { name: 'Voir moins' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(4);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer les 12 sessions Appareil inconnu' }));
+    expect(await screen.findByText('12 sessions fermées : cet appareil devra se reconnecter.')).toBeTruthy();
+    expect(calls.filter((call) => call.method === 'DELETE')).toHaveLength(12);
+    await waitFor(() => {
+      expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+    });
+  });
+});
+
 describe('SecuritySection (SEC-04)', () => {
   it('lists one’s sessions by device and network, never the address, and closes another one', async () => {
     let sessions = SESSIONS;
@@ -146,7 +231,8 @@ describe('SecuritySection (SEC-04)', () => {
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
     expect(within(present(rows[0])).getByText('Cet appareil')).toBeTruthy();
-    expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · dernière activité à l’instant');
+    // The device in use is active now, whatever the last activity the server wrote (recette 05/11, PRO-18).
+    expect(rows[0]?.textContent).toContain('Réseau 198.51.100.x · actif maintenant');
     expect(rows[1]?.textContent).toContain(
       'Réseau 203.0.113.x · dernière activité il\u00a0y\u00a0a\u00a03\u00a0h',
     );
@@ -283,10 +369,13 @@ describe('SecuritySection (SEC-04)', () => {
     const list = await screen.findByRole('list', { name: 'Comptes de l’agence' });
     const [owner, team] = within(list).getAllByRole('listitem');
     expect(owner?.textContent).toContain('Propriétaire');
+    // The owner reads this page: his account is active now (PRO-18).
+    expect(owner?.textContent).toContain('actif maintenant');
+    expect(owner?.textContent).not.toContain('dernière activité');
     expect(owner?.textContent).toContain('Code à 6 chiffres actif');
     // His own sessions are closed above, one by one.
     expect(within(present(owner)).queryByRole('button')).toBeNull();
-    expect(team?.textContent).toContain('Équipe');
+    expect(team?.textContent).toContain('Membre de l’équipe');
     expect(team?.textContent).toContain('Code à 6 chiffres pas encore activé');
     expect(team?.textContent).toContain(
       '2 sessions ouvertes · dernière activité il\u00a0y\u00a0a\u00a030\u00a0min',

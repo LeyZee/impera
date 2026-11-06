@@ -17,6 +17,7 @@ import type { z } from 'zod';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
 import { GUARD_LABELS } from '@/agent/guards';
+import { deOf } from '@/lib/utils';
 
 /**
  * Rules of the persona screen, without React: its tabs, the validation by `PersonaSchema` with French messages, the
@@ -431,6 +432,24 @@ export const UNREADABLE_FILE =
   'Ce fichier ne se lit pas comme une persona : il faut le fichier YAML de sa fiche. Rien n’a changé.';
 
 const tabLabel = (tab: TabId): string => TABS.find((t) => t.id === tab)?.label ?? tab;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const sameName = (a: string, b: string): boolean =>
+  a.trim().normalize('NFC').toLocaleLowerCase('fr') === b.trim().normalize('NFC').toLocaleLowerCase('fr');
+
+/**
+ * The question to ask before a file replaces her draft, when it reads as another creator's (recette 05/11, PRO-27):
+ * another first name than hers, or another creator of Impera named in `meta.creator`. `null`: the file is hers.
+ * A file written by hand names any slug (`demo`, `lea`): only an Impera id that is not hers counts against it.
+ */
+export function foreignFileQuestion(file: Persona, current: Persona, creatorId: string): string | null {
+  const otherName = !sameName(file.details.first_name, current.details.first_name);
+  const { creator } = file.meta;
+  const otherCreator = UUID.test(creator) && creator !== creatorId;
+  if (!otherName && !otherCreator) return null;
+  const whose = UUID.test(creator) ? file.details.first_name : `${file.details.first_name} (${creator})`;
+  return `Ce fichier est celui ${deOf(whose)} : l’importer sur la fiche ${deOf(current.details.first_name)} ?`;
+}
 
 /** A persona read from a file, made hers: the creator it names is the one whose screen imports it. */
 export function importedDraft(persona: Persona, creatorId: string): Persona {

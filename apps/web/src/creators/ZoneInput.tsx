@@ -26,7 +26,7 @@ const FIRST: readonly { readonly zone: string; readonly city: string }[] = [
 ];
 const FIRST_ZONES: ReadonlySet<string> = new Set(FIRST.map((one) => one.zone));
 
-/** The regions of the zones, in French: « Monterrey · Amérique », never « · America » (recette #566). */
+/** The regions of the zones, in French: « Monterrey · Amérique », never « · America » (recette #566, PRO-13). */
 const REGIONS: ReadonlyMap<string, string> = new Map([
   ['Africa', 'Afrique'],
   ['America', 'Amérique'],
@@ -40,15 +40,24 @@ const REGIONS: ReadonlyMap<string, string> = new Map([
   ['Pacific', 'Pacifique'],
 ]);
 
-/** « Tokyo · Asie »: a city read as one, its region beside it, for every other zone the browser knows. */
-const OTHERS: readonly { readonly zone: string; readonly city: string }[] = Intl.supportedValuesOf('timeZone')
-  .filter((zone) => !FIRST_ZONES.has(zone))
-  .map((zone) => {
-    const region = zone.includes('/') ? zone.split('/')[0] : undefined;
-    const named = region === undefined ? undefined : (REGIONS.get(region) ?? region);
-    return { zone, city: named === undefined ? cityOf(zone) : `${cityOf(zone)} · ${named}` };
-  })
-  .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
+/**
+ * « Tokyo · Asie », « Le Caire · Afrique »: a city in French, its region beside it, for every other zone the browser
+ * knows. Neither aliases (« UTC », « Etc/GMT+1 », « US/Eastern ») nor a country's local zones (« America/Indiana/Knox »,
+ * « America/Argentina/Salta »): a city of a region, once (PRO-13).
+ */
+export function otherZones(
+  zones: readonly string[],
+): readonly { readonly zone: string; readonly city: string }[] {
+  return zones
+    .filter((zone) => !FIRST_ZONES.has(zone))
+    .flatMap((zone) => {
+      const parts = zone.split('/');
+      const region = parts.length === 2 ? REGIONS.get(parts[0] ?? '') : undefined;
+      return region === undefined ? [] : [{ zone, city: `${cityOf(zone)} · ${region}` }];
+    })
+    .toSorted((a, b) => a.city.localeCompare(b.city, 'fr'));
+}
+const OTHERS = otherZones(Intl.supportedValuesOf('timeZone'));
 
 const ZONE_OPTIONS: readonly SelectOption<string>[] = [
   ...FIRST.map((one) => ({ value: one.zone, label: one.city, group: 'Les plus courantes' })),

@@ -3,7 +3,6 @@ import {
   ContractAcceptanceSchema,
   ContractorDocumentSchema,
   ContractorFileSchema,
-  ContractorProfileSchema,
   ContractorRegimeSchema,
   ContractTextsSchema,
   PendingContractorDocumentsSchema,
@@ -13,7 +12,6 @@ import {
   type ContractorDocument,
   type ContractorDocumentReview,
   type ContractorFile,
-  type ContractorProfile,
   type ContractorProfileBody,
   type ContractorRegime,
   type ContractTexts,
@@ -96,26 +94,23 @@ export function useBillingRegimes(): UseQueryResult<BillingRegimes> {
 export const documentFileUrl = (memberId: string, documentId: string): string =>
   `${BASE}/${memberId}/documents/${documentId}/file`;
 
-/** The contractor himself or the owner writes the file; any change of identity clears the owner's check. */
+/**
+ * The contractor himself or the owner writes the file; any change of identity clears the owner's check. The three
+ * writes of the identity answer the whole file, as `GET …/file` gives it (recette 05/11, CHAT-04).
+ */
 export const saveProfile = (
   memberId: string,
   body: ContractorProfileBody,
-): Promise<InvoiceOutcome<ContractorProfile>> =>
-  write(`${BASE}/${memberId}/profile`, 'PUT', { json: body }, ContractorProfileSchema);
+): Promise<InvoiceOutcome<ContractorFile>> =>
+  write(`${BASE}/${memberId}/profile`, 'PUT', { json: body }, ContractorFileSchema);
 
 /** The owner checked the file as he read it, at its `updatedAt`: one changed since is refused, never checked unseen. */
-export const verifyProfile = (
-  memberId: string,
-  updatedAt: string,
-): Promise<InvoiceOutcome<ContractorProfile>> =>
-  write(`${BASE}/${memberId}/profile/verify`, 'POST', { json: { updatedAt } }, ContractorProfileSchema);
+export const verifyProfile = (memberId: string, updatedAt: string): Promise<InvoiceOutcome<ContractorFile>> =>
+  write(`${BASE}/${memberId}/profile/verify`, 'POST', { json: { updatedAt } }, ContractorFileSchema);
 
 /** The owner sets the contractor's prefix, his alone, frozen by his first invoice. */
-export const setPrefix = (
-  memberId: string,
-  invoicePrefix: string,
-): Promise<InvoiceOutcome<ContractorProfile>> =>
-  write(`${BASE}/${memberId}/profile/prefix`, 'PUT', { json: { invoicePrefix } }, ContractorProfileSchema);
+export const setPrefix = (memberId: string, invoicePrefix: string): Promise<InvoiceOutcome<ContractorFile>> =>
+  write(`${BASE}/${memberId}/profile/prefix`, 'PUT', { json: { invoicePrefix } }, ContractorFileSchema);
 
 /** The owner gives the contractor a regime of his country from a day on, today at the earliest. */
 export const assignRegime = (

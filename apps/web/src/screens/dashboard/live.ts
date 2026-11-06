@@ -6,7 +6,7 @@ import {
 } from '@impera/contracts';
 
 import { eur } from './logic';
-import type { AgentCard, AgentState, Dashboard, Fan, RevealSales, RevealSeller, Todo } from './model';
+import type { AgencyState, AgentState, Dashboard, Fan, RevealSales, RevealSeller, Todo } from './model';
 
 import { CAUSE_LABELS } from '@/agent/causes';
 import { percent } from '@/agent/mode';
@@ -118,28 +118,6 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
   const spent = budget.spentToday;
   const budgetTone =
     spent === null ? 'ok' : spent >= budget.cap ? 'bad' : spent >= budget.alertAt ? 'warn' : 'ok';
-  const budgetCard: AgentCard | null =
-    spent === null
-      ? null
-      : {
-          id: 'budget',
-          tone: budgetTone,
-          title: 'Budget IA du jour',
-          value: `${euroCents(spent)} sur ${eur(budget.cap)}`,
-          sub: `alerte à ${eur(budget.alertAt)}, arrêt à ${eur(budget.cap)}`,
-          rows: [
-            ['Compté', 'pour toutes les créatrices'],
-            ['Alerte', `à ${eur(budget.alertAt)}`],
-            [`Au-delà de ${eur(budget.cap)}`, 'l’agent s’arrête'],
-          ],
-          gauge: {
-            kind: 'spend',
-            value: budget.cap > 0 ? Math.min(100, Math.round((spent / budget.cap) * 100)) : 0,
-            mark: budget.cap > 0 ? Math.round((budget.alertAt / budget.cap) * 100) : 0,
-          },
-          alarm:
-            budgetTone === 'bad' ? 'Le budget IA du jour est atteint' : 'Le budget IA approche du plafond',
-        };
   const lastRead = reveal.lastReadAt === null ? null : ago(reveal.lastReadAt, now);
   const waitingLong = replies.fansWaitingOver10Min;
   const dead = jobs.dead ?? 0;
@@ -178,6 +156,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ['Conversations suivies', String(reveal.conversations)],
       ],
       alarm: late ? 'Reveal n’est plus lu' : 'Reveal est déconnecté',
+      brief: `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : unlinked ? 'pas encore relié' : 'déconnecté'}`,
     },
     {
       id: 'voice',
@@ -215,6 +194,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ],
       ],
       alarm: voice.keyMissing ? 'L’IA qui écrit attend sa clé' : 'L’IA qui écrit ne répond plus',
+      brief: voice.ok ? 'IA en service' : voice.keyMissing ? 'IA : clé manquante' : 'IA : ne répond plus',
     },
     {
       id: 'activity',
@@ -244,10 +224,17 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
           : hersStuck.length === 1 && firstStuck !== undefined
             ? `Bloqué : ${firstStuck}`
             : plural(dead, 'tâche est bloquée', 'tâches sont bloquées'),
+      brief:
+        waitingLong > 0
+          ? `${plural(waitingLong, 'fan attend', 'fans attendent')} plus de 10 min`
+          : dead > 0
+            ? plural(dead, 'tâche bloquée', 'tâches bloquées')
+            : plural(reveal.conversations, 'conversation', 'conversations'),
     },
     {
       // The handoffs the guards made, by cause: « Passages à l’humain », the glossary's word, never « gardes » (DASH-16).
       id: 'relays',
+      brief: plural(relays, 'passage à l’humain', 'passages à l’humain'),
       tone: relays > 0 ? 'warn' : 'ok',
       title: 'Passages à l’humain',
       value: relays === 0 ? 'aucun aujourd’hui' : `${String(relays)} aujourd’hui`,
@@ -266,9 +253,13 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ],
       ],
     },
-    ...(budgetCard === null ? [] : [budgetCard]),
     {
       id: 'live-rate',
+      // Said with what it measures and what it aims at: « pas encore mesuré » alone names nothing (DASH-16).
+      brief:
+        liveRate.rate === null
+          ? 'taux en réel pas encore mesuré'
+          : `${rateText}, objectif ${percent(liveRate.target)}`,
       tone: rateOk ? 'ok' : 'warn',
       title: 'Taux en réel',
       value: liveRate.rate === null ? 'pas encore mesuré' : `${percent(liveRate.rate)} sans retouche`,
@@ -285,16 +276,18 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
     },
   ];
 
+  // Folded, only what is not green, each with its word; the rest is counted (recette 05/11, PRO-23).
+  const notGreen = cards.filter((card) => card.tone !== 'ok');
+  const green = cards.length - notGreen.length;
   const summary = [
-    `Reveal ${late ? 'lu en retard' : reveal.connected ? 'connecté' : unlinked ? 'pas encore relié' : 'déconnecté'}`,
-    plural(reveal.conversations, 'conversation', 'conversations'),
-    plural(relays, 'passage à l’humain', 'passages à l’humain'),
-    ...(dead > 0 ? [plural(dead, 'tâche bloquée', 'tâches bloquées')] : []),
-    ...(spent === null ? [] : [`${euroCents(spent)} sur ${eur(budget.cap)}`]),
-    // Said with what it measures and what it aims at: « pas encore mesuré » alone names nothing (DASH-16).
-    liveRate.rate === null
-      ? 'taux en réel pas encore mesuré'
-      : `${rateText}, objectif ${percent(liveRate.target)}`,
+    ...notGreen.map((card) => card.brief),
+    ...(green === 0
+      ? []
+      : [
+          notGreen.length === 0
+            ? `tout va bien sur ${plural(green, 'point', 'points')}`
+            : `le reste va bien (${plural(green, 'point', 'points')})`,
+        ]),
   ].join(' · ');
   const base = {
     eyebrow: plural(reveal.conversations, 'conversation', 'conversations'),
@@ -502,6 +495,29 @@ export function revealSalesOf(sales: ApiRevealSales): RevealSales {
  */
 export type DashboardReader = 'owner' | 'team';
 
+/**
+ * The agency’s part (recette 05/11, reco 18): the day’s AI budget, one for every creator. Never in her agent’s
+ * health, which it is not.
+ */
+function agencyOf({ budget }: ApiDashboard): AgencyState {
+  const spent = budget.spentToday;
+  const tone = spent === null ? 'ok' : spent >= budget.cap ? 'bad' : spent >= budget.alertAt ? 'warn' : 'ok';
+  return {
+    budget:
+      spent === null
+        ? null
+        : {
+            tone,
+            value: `${euroCents(spent)} sur ${eur(budget.cap)}`,
+            sub: `alerte à ${eur(budget.alertAt)}, l’agent s’arrête à ${eur(budget.cap)}`,
+            gauge: {
+              value: budget.cap > 0 ? Math.min(100, Math.round((spent / budget.cap) * 100)) : 0,
+              mark: budget.cap > 0 ? Math.round((budget.alertAt / budget.cap) * 100) : 0,
+            },
+          },
+  };
+}
+
 /** The server's Dashboard as the screen draws it. `sales` is null: nothing is invented in its place. */
 export function fromApi(
   api: ApiDashboard,
@@ -523,6 +539,7 @@ export function fromApi(
     revealSales: api.revealSales === null ? null : revealSalesOf(api.revealSales),
     telegram: telegramNightOf(api),
     fans: api.fans.map((fan) => fanOf(fan, now)),
+    agency: agencyOf(api),
     ...(dollars === undefined ? {} : { usdNote: dollars }),
   };
 }

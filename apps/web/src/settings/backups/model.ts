@@ -1,4 +1,5 @@
 import {
+  BACKUP_REQUEST_STALE_MINUTES,
   RESTORE_TEST_FRESH_DAYS,
   RecordRestoreTestBodySchema,
   type BackupErrorCode,
@@ -139,19 +140,26 @@ export function exportViewOf(status: BackupStatus, now: Date, timeZone?: string)
 
 /**
  * « Relancer la sauvegarde maintenant » (REG-24): what the strip offers. `asked`: a request waits for the service,
- * which picks it up within a minute. `running`: an export runs now, its outcome will show. Otherwise the button.
+ * which picks it up within a minute. `unheard`: it has waited more than `BACKUP_REQUEST_STALE_MINUTES`, so the service
+ * did not take it: said in amber, with the button again (recette 05/11, PRO-06). `running`: an export runs now, its
+ * outcome will show. Otherwise the button.
  */
 export type RunNowView =
   | { readonly kind: 'offer' }
   | { readonly kind: 'asked'; readonly text: string }
+  | { readonly kind: 'unheard'; readonly text: string }
   | { readonly kind: 'running' };
 
-export function runNowOf(status: BackupStatus, timeZone?: string): RunNowView {
+export function runNowOf(status: BackupStatus, timeZone?: string, now: Date = new Date()): RunNowView {
   if (status.runRequestedAt !== undefined) {
-    return {
-      kind: 'asked',
-      text: `Relance demandée à ${clockOf(status.runRequestedAt, timeZone)} : elle démarre dans la minute.`,
-    };
+    const at = clockOf(status.runRequestedAt, timeZone);
+    if (now.getTime() - Date.parse(status.runRequestedAt) > BACKUP_REQUEST_STALE_MINUTES * 60_000) {
+      return {
+        kind: 'unheard',
+        text: `Le service de sauvegarde n’a pas pris la demande de ${at}. Tu peux redemander.`,
+      };
+    }
+    return { kind: 'asked', text: `Relance demandée à ${at} : elle démarre dans la minute.` };
   }
   return status.lastRun?.status === 'running' ? { kind: 'running' } : { kind: 'offer' };
 }

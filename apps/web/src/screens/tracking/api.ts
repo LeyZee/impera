@@ -21,7 +21,7 @@ import {
 import { queryOptions } from '@tanstack/react-query';
 
 import { flagError } from './flags-model';
-import { decisionError, isOutdated } from './reader-model';
+import { decisionError, isOutdated, isStopped } from './reader-model';
 
 const PageSchema = pageOf(ConversationSummarySchema);
 
@@ -101,10 +101,17 @@ export async function fetchDesireCurve(
 
 /**
  * A decision went through, or why not (the draft and the conversation stay as they were). `outdated`: it came too late
- * (decided elsewhere, moved on, gone), and what the reader shows must be read again.
+ * (decided elsewhere, moved on, gone), and what the reader shows must be read again. `stopped`: the emergency stop is
+ * on, nothing leaves (CHAT-07).
  */
 export type Decision =
-  { readonly ok: true } | { readonly ok: false; readonly message: string; readonly outdated: boolean };
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly outdated: boolean;
+      readonly stopped?: boolean;
+    };
 
 async function command(
   creatorId: string,
@@ -127,6 +134,7 @@ async function command(
       ok: false,
       message: decisionError(response.status, answer),
       outdated: isOutdated(response.status, answer),
+      stopped: isStopped(answer),
     };
   } catch {
     return { ok: false, message: decisionError(0, null), outdated: false };

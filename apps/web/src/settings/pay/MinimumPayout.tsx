@@ -1,4 +1,4 @@
-import { newId, PayoutMinimumIdSchema, type PayPeriod } from '@impera/contracts';
+import { newId, PayoutMinimumIdSchema, SHIFT_REPORT_MAX_MINOR, type PayPeriod } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import { addPayoutMinimum, usePayrollSettings, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
@@ -124,6 +124,8 @@ function MinimumDialog({
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
   const minor = parseAmount(amount);
+  // Well written but past the ceiling: said as such, not as a matter of decimals (recette 05/11, PRO-09).
+  const tooLarge = minor === null && parseAmount(amount, false, Number.MAX_SAFE_INTEGER) !== null;
   const step = checking ? 1 : 0;
 
   const send = async (): Promise<void> => {
@@ -255,7 +257,9 @@ function MinimumDialog({
               </div>
               <p className={touched && minor === null ? 'tm-hint tm-hint--error' : 'tm-hint'}>
                 {touched && minor === null
-                  ? 'Un montant en euros, deux décimales au plus.'
+                  ? tooLarge
+                    ? `Au plus ${amountText(SHIFT_REPORT_MAX_MINOR, 'EUR')}.`
+                    : 'Un montant en euros, deux décimales au plus.'
                   : 'À 0, chaque relevé verse son total, même petit.'}
               </p>
             </div>

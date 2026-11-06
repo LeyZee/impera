@@ -110,6 +110,8 @@ describe('Réglages › Sauvegardes', () => {
     const button = await screen.findByRole('button', { name: 'Noter un essai' });
     expect(button).toHaveProperty('disabled', true);
     expect(screen.getByText('Il faut d’abord une sauvegarde réussie à restaurer.')).toBeTruthy();
+    // The missing copy leads the page, the restore test steps back (recette 05/11, PRO-19).
+    expect(button.closest('section')?.getAttribute('data-first')).toBe('copy');
   });
 
   it('says the server does not answer, after one quiet retry, and tries again', async () => {
@@ -261,7 +263,7 @@ describe('Réglages › Sauvegardes', () => {
       status: () => ({ status: 200, body: asked === null ? STATUS : { ...STATUS, runRequestedAt: asked } }),
       post: (body) => {
         if (attempts++ === 0) return { status: 403, body: apiError('reauthentication_forbidden') };
-        asked = '2026-10-27T09:58:00.000Z';
+        asked = new Date().toISOString();
         const { id } = z.object({ id: z.string() }).parse(body);
         return { status: 202, body: { id, requestedAt: asked, pickedAt: null } };
       },
@@ -290,6 +292,20 @@ describe('Réglages › Sauvegardes', () => {
     expect(posted).toHaveLength(2);
     const [first, second] = posted;
     expect(second).toEqual(first);
+  });
+
+  it('says a request the service never took, and offers to ask again (recette 05/11, PRO-06)', async () => {
+    serve({
+      status: () => ({
+        status: 200,
+        body: { ...STATUS, runRequestedAt: new Date(Date.now() - 15 * 60_000).toISOString() },
+      }),
+    });
+    renderPage();
+    expect((await screen.findByRole('status')).textContent).toMatch(
+      /^Le service de sauvegarde n’a pas pris la demande de \d\d:\d\d\. Tu peux redemander\.$/u,
+    );
+    expect(screen.getByRole('button', { name: 'Relancer la sauvegarde maintenant' })).toBeTruthy();
   });
 
   it('says an export already running, and offers nothing while it runs', async () => {
@@ -331,7 +347,7 @@ describe('Réglages › Sauvegardes', () => {
           reads += 1;
           return {
             status: 200,
-            body: reads === 1 ? { ...STATUS, runRequestedAt: '2026-10-27T09:58:00.000Z' } : STATUS,
+            body: reads === 1 ? { ...STATUS, runRequestedAt: new Date().toISOString() } : STATUS,
           };
         },
       });

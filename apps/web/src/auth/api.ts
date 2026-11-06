@@ -66,6 +66,8 @@ export type RedeemResult =
   /** `me` is `null` when the answer cannot be read: the session is open all the same, the app reads it again. */
   | { readonly kind: 'ok'; readonly me: Me | null }
   | { readonly kind: 'password_refused'; readonly reason: PasswordInvalidReason }
+  /** The server is up, the breach check it relies on is not (503 with `reason: 'password_check'`). */
+  | { readonly kind: 'password_check_unavailable' }
   | { readonly kind: Refusal };
 
 async function post(path: string, body: unknown): Promise<Response | null> {
@@ -120,6 +122,9 @@ export async function redeemInvitationLink(token: string, password: string): Pro
   if (error?.code === 'password_invalid' || (error === null && response.status === 400)) {
     const reason = PasswordInvalidReasonSchema.safeParse(error?.details['reason']);
     return { kind: 'password_refused', reason: reason.success ? reason.data : 'refused' };
+  }
+  if (error?.code === 'service_unavailable' && error.details['reason'] === 'password_check') {
+    return { kind: 'password_check_unavailable' };
   }
   return { kind: refusalOf(response.status, error) };
 }

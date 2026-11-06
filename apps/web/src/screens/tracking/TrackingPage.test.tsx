@@ -187,7 +187,13 @@ const kycCalls = (): unknown[] =>
   vi.mocked(fetch).mock.calls.filter(([input]) => typeof input === 'string' && input.includes('/kyc?'));
 
 /** Suivi as the app mounts it: the open conversation lives in the address. */
-function renderPage(at = '/suivi', canDecide = true, canAddCreator = true): void {
+function renderPage(
+  at = '/suivi',
+  canDecide = true,
+  canAddCreator = true,
+  routedOnly = false,
+  nothingListed?: string,
+): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
   const tracking = createRoute({
@@ -204,6 +210,8 @@ function renderPage(at = '/suivi', canDecide = true, canAddCreator = true): void
           onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
           canDecide={canDecide}
           canAddCreator={canAddCreator}
+          routedOnly={routedOnly}
+          nothingListed={nothingListed}
         />
       );
     },
@@ -294,6 +302,17 @@ describe('TrackingPage', () => {
     expect(screen.queryByText(/« À traiter » n’a pas pu être lu/u)).toBeNull();
   });
 
+  it('never tells a chatter there is nothing for him while « À traiter » could not be read (relecture #538)', async () => {
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [], nextCursor: null } },
+      todos: { status: 500 },
+    });
+    renderPage('/suivi', true, false, true, 'Rien à suivre');
+    expect(await screen.findByText(/« À traiter » n’a pas pu être lu/u)).toBeDefined();
+    expect(screen.queryByText('Rien à suivre')).toBeNull();
+  });
+
   it('says the server does not answer, and Réessayer reads again', async () => {
     // The read and its one retry fail (CREA-30); « Réessayer » reads again.
     let calls = 0;
@@ -326,14 +345,16 @@ describe('TrackingPage', () => {
       },
     });
     renderPage();
-    const list = await screen.findByRole('list', { name: 'Conversations' });
+    const list = await screen.findByRole('group', { name: 'Conversations' });
     const rows = within(list).getAllByRole('listitem');
     expect(rows.map((row) => row.querySelector('.tr-row__pseudo')?.textContent)).toEqual([
       'Fan sans nom',
       'Fan 1',
     ]);
     expect(rows[0]?.textContent).toContain('À valider');
-    expect(rows[0]?.querySelector('.tr-unread')?.getAttribute('aria-label')).toBe('3 non lus');
+    // What it counts, never « non lus »: reading does not lower it (CHAT-13).
+    expect(rows[0]?.querySelector('.tr-unread')?.getAttribute('aria-label')).toBe('3 sans réponse');
+    expect(rows[0]?.textContent).not.toContain('non lu');
     // One creator: her name heads the page, not every row.
     expect(screen.getByText('Léa')).toBeDefined();
     expect(rows[1]?.textContent).not.toContain('Léa');
@@ -349,11 +370,11 @@ describe('TrackingPage', () => {
       },
     });
     renderPage();
-    const list = await screen.findByRole('list', { name: 'Conversations' });
+    const list = await screen.findByRole('group', { name: 'Conversations' });
     // Beside his pseudo, apart from the line a narrow row cuts.
     const names = within(list)
       .getAllByRole('listitem')
-      .map((row) => row.querySelector('.tr-row__creator')?.textContent);
+      .map((row) => row.querySelector('.tr-row__creator')?.textContent.replace(' · ', ''));
     expect(names).toContain('Léa');
     expect(names).toContain('Nina');
   });
@@ -452,6 +473,32 @@ describe('TrackingPage', () => {
     expect(screen.getByRole('button', { name: 'Rendre la main à l’agent' })).toBeDefined();
   });
 
+  it('asks before giving back a grave handoff, with the focus on the safe choice (PRO-26)', async () => {
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
+      events: [
+        {
+          seq: 4,
+          actor: 'system',
+          createdAt: '2026-10-17T20:02:00Z',
+          type: 'handoff_requested',
+          payload: { conversationId: conversation('1').id, cause: 'minor' },
+        },
+      ],
+    });
+    renderPage(OPEN);
+    const giveBack = await screen.findByRole('button', { name: 'Rendre la main à l’agent' });
+    fireEvent.click(giveBack);
+    const keep = await screen.findByRole('button', { name: 'Garder la main' });
+    expect(screen.getByRole('button', { name: 'J’ai vérifié, rendre la main' })).toBeDefined();
+    expect(document.activeElement).toBe(keep);
+    fireEvent.click(keep);
+    const back = screen.getByRole('button', { name: 'Rendre la main à l’agent' });
+    expect(document.activeElement).toBe(back);
+  });
+
   it('shows the three gravest of « À traiter », and the others on demand', async () => {
     const [first] = apiDashboard().todos;
     if (first === undefined) throw new Error('the fake dashboard has a todo');
@@ -495,7 +542,7 @@ describe('the list of Suivi', () => {
       },
     });
     renderPage();
-    const list = await screen.findByRole('list', { name: 'Conversations' });
+    const list = await screen.findByRole('group', { name: 'Conversations' });
     const search = screen.getByRole('searchbox', { name: 'Chercher un fan par son pseudo' });
     fireEvent.change(search, { target: { value: 'jero' } });
     expect(
@@ -516,7 +563,7 @@ describe('the list of Suivi', () => {
       detail: () => ({ status: 200, body: waiting({ fanDisplayName: '💋 Max' }) }),
     });
     renderPage(OPEN);
-    const list = await screen.findByRole('list', { name: 'Conversations' });
+    const list = await screen.findByRole('group', { name: 'Conversations' });
     expect(list.querySelector('.nv-avatar')?.textContent).toBe('💋');
     await screen.findByRole('heading', { name: '💋 Max' });
     expect(document.querySelector('.tr-reader__head .nv-avatar')?.textContent).toBe('💋');
@@ -715,7 +762,7 @@ describe('the reader of Suivi', () => {
     expect(document.querySelector('.tr-learn')).toBeNull();
   });
 
-  it('stays folded when a limit blocks: the amber line says it, the thread comes first', async () => {
+  it('says a limit that forbids above the folded sheet, in red, and drops it once lifted (CHAT-23)', async () => {
     const posted = serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting() }),
@@ -725,9 +772,13 @@ describe('the reader of Suivi', () => {
     const lift = await screen.findByRole('switch', { name: /Ne plus lui écrire/u });
     const section = lift.closest('details');
     expect(section).toHaveProperty('open', false);
-    expect(screen.getByText('Ne plus lui écrire', { selector: '.tr-sheet__sum .tr-warn' })).toBeDefined();
+    const banner = screen.getByRole('list', { name: 'Avant de lui écrire' });
+    expect(banner.querySelector('.tr-alert--stop')?.textContent).toContain('Ne plus lui écrire');
+    // Before the sheet, never inside it: read without unfolding anything.
+    expect(banner.closest('details')).toBeNull();
     fireEvent.click(lift);
     expect(await screen.findByText('Aucune', { selector: '.tr-limits__sum' })).toBeDefined();
+    expect(screen.queryByRole('list', { name: 'Avant de lui écrire' })).toBeNull();
     expect(posted).toEqual([{ action: 'flags', body: { flag: 'doNotContact', set: false } }]);
   });
 
@@ -1005,7 +1056,7 @@ describe('the reader of Suivi', () => {
       mayConfirmDisputedAge: true,
     });
     renderPage(OPEN);
-    expect(await screen.findByText('Âge contesté', { selector: '.tr-sheet__sum .tr-warn' })).toBeDefined();
+    expect(await screen.findByText('Âge contesté', { selector: '.tr-alert--stop strong' })).toBeDefined();
     expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-warn');
     expect(screen.getByText(/l’agent a relevé un signe de minorité/u)).toBeDefined();
     expect(screen.queryByText(/Pas encore confirmé/u)).toBeNull();
@@ -1058,7 +1109,7 @@ describe('his desire score in Suivi (P3-12)', () => {
   it('says the band in a word, never a number, and nothing for a fan with no score yet', async () => {
     serve({ ...ONE, conversations: { [LEA.id]: { items: [hot, unscored], nextCursor: null } } });
     renderPage();
-    const list = await screen.findByRole('list', { name: 'Conversations' });
+    const list = await screen.findByRole('group', { name: 'Conversations' });
     const [first, second] = within(list).getAllByRole('listitem');
     expect(second?.querySelector('.nv-convo__preview')?.textContent).toBe('Pas encore écrit · 🔥 chaud');
     expect(second?.textContent).not.toContain('82');
@@ -1069,7 +1120,7 @@ describe('his desire score in Suivi (P3-12)', () => {
   it('keeps the most recent first, and puts the hottest first only when asked, unscored last', async () => {
     serve({ ...ONE, conversations: { [LEA.id]: { items: [hot, playful, unscored], nextCursor: null } } });
     renderPage();
-    const list = await screen.findByRole('list', { name: 'Conversations' });
+    const list = await screen.findByRole('group', { name: 'Conversations' });
     expect(names(list)).toEqual(['Noé', 'Théo', 'Basile']);
     expect(screen.getByRole('radio', { name: 'Récents' }).getAttribute('aria-checked')).toBe('true');
     fireEvent.click(screen.getByRole('radio', { name: 'Chauds d’abord' }));
@@ -1089,7 +1140,7 @@ describe('his desire score in Suivi (P3-12)', () => {
     });
     renderPage();
     const queue = await screen.findByRole('list', { name: 'À traiter' });
-    const list = screen.getByRole('list', { name: 'Conversations' });
+    const list = screen.getByRole('group', { name: 'Conversations' });
     expect(queue.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(names(list)).toEqual(['Basile', 'Théo']);
     expect(
@@ -1100,7 +1151,7 @@ describe('his desire score in Suivi (P3-12)', () => {
   it('offers no order while no fan has a score', async () => {
     serve({ ...ONE, conversations: { [LEA.id]: { items: [unscored], nextCursor: null } } });
     renderPage();
-    await screen.findByRole('list', { name: 'Conversations' });
+    await screen.findByRole('group', { name: 'Conversations' });
     expect(screen.queryByRole('radiogroup', { name: 'Ordre de la liste' })).toBeNull();
   });
 
@@ -1250,3 +1301,136 @@ describe('his desire score in Suivi (P3-12)', () => {
     expect(await screen.findByText('Pas encore assez de messages pour une courbe.')).toBeDefined();
   });
 });
+
+describe('Suivi says who acts, and a chatter reads what concerns him (recette 05/11)', () => {
+  const waitsAt = { lastInboundAt: '2026-10-17T20:10:00Z', lastOutboundAt: '2026-10-17T20:00:00Z' };
+  const fanWaiting = {
+    ...ONE,
+    conversations: {
+      [LEA.id]: {
+        items: [
+          conversation('1', { state: 'idle', ...waitsAt, unreadCount: 2 }),
+          conversation('2', { state: 'drafting' }),
+          conversation('3', { state: 'idle' }),
+        ],
+        nextCursor: null,
+      },
+    },
+  };
+
+  it('groups the list by who acts and never says « Rien à faire » while a fan waits (CHAT-22, PRO-03)', async () => {
+    serve(fanWaiting);
+    renderPage();
+    const mine = await screen.findByRole('list', { name: 'À toi' });
+    expect(mine.textContent).toContain('Fan 1');
+    expect(mine.textContent).toContain('Sans réponse');
+    expect(mine.querySelector('.tr-unread')?.getAttribute('aria-label')).toBe('2 sans réponse');
+    expect(screen.getByRole('list', { name: 'L’agent s’en occupe' }).textContent).toContain('Fan 2');
+    const quiet = screen.getByRole('list', { name: 'Rien à faire' });
+    expect(quiet.textContent).toContain('Fan 3');
+    // The group says the state: no pill repeats it on its lines.
+    expect(quiet.querySelector('.nv-status')).toBeNull();
+  });
+
+  it('says in the reader that nobody will answer him, and offers to take the hand (CHAT-25, PRO-03)', async () => {
+    serve({
+      ...fanWaiting,
+      detail: () => ({ status: 200, body: waiting({ state: 'idle', ...waitsAt, openDrafts: [] }) }),
+    });
+    renderPage(OPEN);
+    expect(await screen.findByText(/Personne n’a répondu à son dernier message/u)).toBeDefined();
+    expect(document.querySelector('.tr-reader__head .nv-status')?.textContent).toBe('Sans réponse');
+    expect(screen.getAllByRole('button', { name: 'Reprendre la main' })).toHaveLength(1);
+  });
+
+  it('closes the reader of a chatter once he gave the hand back, and says it went through (CHAT-08)', async () => {
+    let released = false;
+    const routes = {
+      ...withHuman(),
+      command: (action: string) => {
+        if (action === 'release') released = true;
+        return { status: 204 };
+      },
+    };
+    serve({
+      ...routes,
+      conversations: {
+        [LEA.id]: {
+          items: [conversation('1', { state: 'human' })],
+          nextCursor: null,
+        },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent' }));
+    expect(await screen.findByText('Main rendue à l’agent pour Fan 1 : ta note est gardée.')).toBeDefined();
+    expect(screen.queryByText('Cette conversation n’est pas dans la liste.')).toBeNull();
+    expect(released).toBe(true);
+  });
+
+  it('says the emergency stop at the top, in a chatter’s words, and offers to try again (CHAT-07)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+      detail: () => ({ status: 200, body: waiting() }),
+      command: () => ({
+        status: 409,
+        body: { error: { code: 'kill_switch_conflict', message: 'x', details: {}, requestId: 'r' } },
+      }),
+    });
+    renderPage(OPEN, true, false, true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
+    expect(
+      await screen.findByText(
+        'L’agence a tout arrêté : rien ne part pour l’instant. Préviens ton responsable si ça dure.',
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText(/sur le Dashboard/u)).toBeNull();
+    // Only the server knows when the stop is lifted: the same button tries again.
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toHaveProperty('disabled', false);
+  });
+
+  it('shows a chatter the limits of his fan without a switch to change them (CHAT-03)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+      detail: () => ({ status: 200, body: waiting() }),
+      flags: { before: { doNotContact: true, fragile: true } },
+    });
+    renderPage(OPEN, true, false, true);
+    const banner = await screen.findByRole('list', { name: 'Avant de lui écrire' });
+    expect(banner.textContent).toContain('Ne plus lui écrire');
+    expect(banner.textContent).toContain('Fan fragile');
+    expect(screen.getByRole('switch', { name: /Ne plus lui écrire/u })).toHaveProperty('disabled', true);
+  });
+
+  it('never says « Rien à signaler » when his limits cannot be read (CHAT-03)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+      detail: () => ({ status: 200, body: waiting() }),
+      flagsRefused: true,
+    });
+    renderPage(OPEN, true, false, true);
+    expect(
+      await screen.findByText('Limites non lisibles', { selector: '.tr-sheet__sum .tr-warn' }),
+    ).toBeDefined();
+    expect(screen.queryByText('Rien à signaler')).toBeNull();
+    expect(screen.getByRole('list', { name: 'Avant de lui écrire' }).textContent).toContain(
+      'Demande à ton responsable',
+    );
+  });
+});
+
+function withHuman() {
+  return {
+    ...ONE,
+    detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
+  };
+}
