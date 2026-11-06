@@ -38,6 +38,7 @@ import {
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
 import type { OfferLimits } from '../domain/policy';
+import { safetySigns } from '../domain/safety-net';
 import type { SexualizationLimits } from '../domain/sexualization';
 import { handoffCauseOf } from '../domain/traps';
 
@@ -621,12 +622,24 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         const held: Held = { ...HANDOFF, cause: handoffCauseOf(flags), detail: flags };
         return protect(deps.limits, input, flags, held);
       }
-      // Her active persona, after what safety reads without it (his limits, his media): none, a human answers him.
+      // What he wrote since her last answer: her alerts, the traps and the safety net read it as one message.
+      const fanText = sinceAnswer.map((m) => m.text).join('\n');
+      // He says plainly he is a minor or wants to hurt himself (recette AGT-01): a human answers him before any model,
+      // whatever the brain would have read, and his limits are set until a human decides.
+      const signs = safetySigns(fanText);
+      if (signs.length > 0) {
+        const held: Held = {
+          ...HANDOFF,
+          cause: signs.includes('minor_suspected') ? 'minor' : 'distress',
+          detail: ['safety_net', ...signs],
+        };
+        return protect(deps.limits, input, signs, held);
+      }
+      // Her active persona, after what safety reads without it (his limits, his media, his words): none, a human
+      // answers him.
       const her = await herPersona(deps, input);
       if ('missing' in her) return { ...HANDOFF, cause: 'persona_inactive', detail: [her.missing] };
       const withHer = her.deps;
-      // What he wrote since her last answer: her alerts and the traps read it as one message.
-      const fanText = sinceAnswer.map((m) => m.text).join('\n');
       const read = await alertSettings(deps, input);
       if ('held' in read) return read.held;
       const { settings } = read;

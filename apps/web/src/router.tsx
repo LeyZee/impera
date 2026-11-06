@@ -446,8 +446,9 @@ const teamMemberFile = createRoute({
   path: '/membres/$memberId/dossier',
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
+      // Said as at the rail's door (NAV-21): a pasted link to a file is not a broken page (recette EQP-03).
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/equipe/membres', replace: true });
+      throw redirect({ to: '/equipe/membres', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: function MemberFile() {
@@ -558,8 +559,9 @@ const payExports = createRoute({
   // The owner's alone (EQ-06 lot 8c), as the server serves the exports: a manager is sent to Paie, without a tab.
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'owner') {
+      // Said as at the rail's door (NAV-21): the exports are not a broken page (recette EQP-03).
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/paie', replace: true });
+      throw redirect({ to: '/paie/quinzaine', replace: true, state: { notice: NOT_YOURS } });
     }
   },
   component: function PayExports() {

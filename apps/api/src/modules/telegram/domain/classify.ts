@@ -213,6 +213,7 @@ const countText = (count: number, one: string, many: string): string =>
 
 /** Why a document was not issued, as the owner settles it; the contractor is never named in Telegram. */
 const INVOICE_NOT_ISSUED_TEXT: Record<InvoiceNotIssuedReason, string> = {
+  mandate_unpublished: 'aucun mandat de facturation n’est publié dans Réglages › Facturation',
   no_mandate: 'le prestataire n’a pas accepté de mandat de facturation',
   no_regime: 'aucun régime de facturation n’était attribué au prestataire à la date de la facture',
   regime_not_validated:

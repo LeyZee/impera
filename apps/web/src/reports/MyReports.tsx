@@ -70,14 +70,16 @@ export const reportToDos = (
 export function MyReportsCard({
   reports,
   heroShiftId,
+  zone = readerZone(),
   onOpen,
 }: {
   reports: MyReports;
   heroShiftId: string | null;
+  /** The clock the shifts are read on: the member's own when the screen knows it (recette EXT-10). */
+  zone?: string;
   onOpen: (shiftId: string) => void;
 }): JSX.Element | null {
   const { list, period } = reports;
-  const zone = readerZone();
   const now = useNow();
   if (reports.isError) {
     return (

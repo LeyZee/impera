@@ -31,6 +31,7 @@ import {
   untilOf,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { useMembers } from '@/screens/team/api';
 import { todosAcrossQuery } from '@/screens/tracking/api';
 import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
@@ -38,13 +39,16 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 /**
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
  * rapport » as it ends; then the reports left to do and the period's, then the next shift. Read in the chatter's own
- * time, the browser's. What waits on his invoices follows (EQ-06 lot 8d). The goal and the announcements come with
- * their own cards.
+ * time, his record's as on Planning (recette EXT-10). What waits on his invoices follows (EQ-06 lot 8d). The goal and
+ * the announcements come with their own cards.
  */
 export function TodayPage({ user }: { user: Me }): JSX.Element {
   const mine = useMyShifts();
   const now = useNow();
-  const zone = readerZone();
+  // One clock on the page, the one of his record, as Planning reads it; the device's only while the record is not read
+  // (recette EXT-10, as CHAT-11 for Planning).
+  const members = useMembers();
+  const zone = members.data?.find((member) => member.userId === user.id)?.timeZone ?? readerZone();
   const today = dayOf(now, zone);
   const reports = useMyReports(now);
   const [open, setOpen] = useState<{ readonly shiftId: string; readonly draft: ReportDraft | null } | null>(
@@ -96,6 +100,7 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
           shiftId={open.shiftId}
           draft={open.draft}
           from="/aujourdhui"
+          zone={zone}
           onClose={() => {
             setOpen(null);
           }}
@@ -154,7 +159,7 @@ function Day({
         <MyAwayCard status={away} />
       )}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
-      <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} onOpen={onReport} />
+      <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
       <Link to="/planning" className="sc-more">
         Tout mon planning

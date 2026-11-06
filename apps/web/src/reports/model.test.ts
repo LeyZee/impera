@@ -24,6 +24,7 @@ import {
   percentText,
   periodAt,
   periodLine,
+  periodLineFrom,
   periodSums,
   periodTitle,
   refusalText,
@@ -141,6 +142,12 @@ describe('a period', () => {
     expect(periodLine(period('2026-10-01'))).toBe('du 1er au 15 octobre');
     expect(periodLine(period('2026-02-16'))).toBe('du 16 au 28 février');
     expect(periodTitle(period('2026-10-16'))).toBe('16 – 31 octobre 2026');
+  });
+
+  it('says the year of a period from another year than the one under way (recette EQP-04)', () => {
+    expect(periodLineFrom(period('2020-01-01'), period('2026-11-01'))).toBe('du 1er au 15 janvier 2020');
+    expect(periodLineFrom(period('2026-10-16'), period('2026-11-01'))).toBe('du 16 au 31 octobre');
+    expect(periodLineFrom(period('2026-10-16'), null)).toBe('du 16 au 31 octobre 2026');
   });
 
   it('is the agency’s, read in its zone', () => {

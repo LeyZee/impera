@@ -223,6 +223,23 @@ describe('next action', () => {
     expect(action).toMatchObject({ kind: 'connect', provider: 'xai', lead: 'Connecte Grok' });
   });
 
+  it('asks for a missing Grok before an optional service refused or low on credit (recette AGT 06/11)', () => {
+    expect(
+      nextAction([
+        status('xai', 'not_connected'),
+        status('google', 'not_connected'),
+        status('elevenlabs', 'low_credit'),
+      ]),
+    ).toMatchObject({ kind: 'connect', provider: 'xai', lead: 'Connecte Grok' });
+    expect(nextAction([status('xai', 'not_connected'), status('google', 'needs_reconnect')])).toMatchObject({
+      kind: 'connect',
+      provider: 'xai',
+    });
+    expect(nextAction([status('xai', 'needs_reconnect'), status('google', 'needs_reconnect')])).toMatchObject(
+      { kind: 'replace_key', provider: 'xai' },
+    );
+  });
+
   it('puts a refused key before low credit, and low credit before a missing service', () => {
     expect(
       nextAction([
