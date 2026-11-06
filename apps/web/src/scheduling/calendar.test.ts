@@ -12,6 +12,7 @@ import {
   monthMarks,
   monthBounds,
   monthWindow,
+  shownOn,
   slotLinesOf,
 } from './calendar';
 import { zonedInstant } from './time';
@@ -243,6 +244,22 @@ describe('monthMarks', () => {
     expect(cells[0] === undefined ? null : cellWho(cells[0], members, null, PARIS, now)).toBe('personne');
     const rows = calendarRows(calendar, [DAY], now);
     expect(dayWords(rows, DAY, null, now, true).said).toBe('1 shift');
+  });
+
+  it('shows an archived creator on the days of her shifts alone, any other creator every day (ADR 0071 § 2)', () => {
+    const NEXT = '2026-11-05';
+    const calendar = calendarOf({
+      creators: [
+        { id: INES, name: 'Inès', archived: true },
+        { id: id(2), name: 'Nora', archived: false },
+      ],
+      shifts: [{ memberId: KOFI, creatorId: INES, startsAt: at(360), endsAt: at(720) }],
+    });
+    const rows = calendarRows(calendar, [DAY, NEXT], new Date(at(0, '2026-11-01')));
+    const shown = (day: string): string[] =>
+      rows.filter((row) => shownOn(row, day)).map((row) => row.creator.name);
+    expect(shown(DAY)).toEqual(['Nora', 'Inès']);
+    expect(shown(NEXT)).toEqual(['Nora']);
   });
 });
 
