@@ -11,7 +11,7 @@ import {
   type FanFlags,
   type KycSlot,
 } from '@impera/contracts';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -1363,7 +1363,9 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     });
     renderPage(OPEN, true, false, true);
     fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent' }));
-    expect(await screen.findByText('Main rendue à l’agent pour Fan 1 : ta note est gardée.')).toBeDefined();
+    // A non-breaking space keeps « : » on its word's line (the matcher reads it as a space).
+    const gone = await screen.findByText('Main rendue à l’agent pour Fan 1 : ta note est gardée.');
+    expect(gone.textContent).toContain('Fan 1\u00a0:');
     expect(screen.queryByText('Cette conversation n’est pas dans la liste.')).toBeNull();
     expect(screen.queryByText(/n’est plus ouverte pour toi/u)).toBeNull();
     expect(released).toBe(true);
@@ -1448,8 +1450,39 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
       },
     });
     renderPage(OPEN, true, false, true);
-    expect(await screen.findByText(/Cette conversation n’est plus ouverte pour toi/u)).toBeDefined();
+    // Said once above his list, the reader closed: never a reader without its way back on a phone.
+    const closed = await screen.findByText(
+      'Cette conversation n’est plus ouverte pour toi : hors de ton shift, seules celles dont tu as la main restent ici.',
+    );
+    expect(closed.textContent).toContain('toi\u00a0:');
     expect(screen.queryByText('Le serveur ne répond pas')).toBeNull();
+    expect(document.querySelector('.tr-is-reading')).toBeNull();
+    expect(screen.getByText(/Choisis une conversation à gauche/u)).toBeDefined();
+  });
+
+  it('closes the reader when a chatter’s shift ends while he reads, back to his list with the page’s title (EQ-13)', async () => {
+    let shiftOver = false;
+    serve({
+      ...ONE,
+      detail: () => (shiftOver ? { status: 403 } : { status: 200, body: waiting() }),
+      conversations: {
+        [LEA.id]: { items: [conversation('1', { state: 'awaiting_approval' })], nextCursor: null },
+      },
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByRole('button', { name: 'Valider' })).toBeDefined();
+    expect(document.querySelector('.tr-is-reading')).not.toBeNull();
+    // His shift ends: the next read of the conversation is refused.
+    shiftOver = true;
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    expect(await screen.findByText(/Cette conversation n’est plus ouverte pour toi/u)).toBeDefined();
+    focusManager.setFocused(undefined);
+    await waitFor(() => {
+      expect(document.querySelector('.tr-is-reading')).toBeNull();
+    });
+    expect(screen.getByRole('heading', { name: 'Suivi' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
   });
 
   it('says the emergency stop at the top, in a chatter’s words, and offers to try again (CHAT-07)', async () => {

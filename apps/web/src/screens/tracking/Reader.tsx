@@ -50,6 +50,7 @@ export function Reader({
   selfScope = false,
   onClose,
   onReleased,
+  onClosedToYou,
   backLabel = 'Toutes les conversations',
 }: {
   creatorId: string;
@@ -64,8 +65,13 @@ export function Reader({
    * reader closes instead of reading it again (CHAT-08). Told the fan's name for the confirmation.
    */
   onReleased?: ((fan: string) => void) | undefined;
+  /**
+   * The conversation is no longer open to this reader (403, a chatter whose shift ended while he read it, EQ-13): the
+   * page closes the reader and says it above the list, so the phone never stays on a screen without its way back.
+   */
+  onClosedToYou?: (() => void) | undefined;
   /** Where the phone's back button leads: the list the reader was opened from. */
-  backLabel?: string;
+  backLabel?: string | undefined;
 }): JSX.Element {
   const key = ['conversation', creatorId, conversationId];
   const query = useQuery({
@@ -111,6 +117,13 @@ export function Reader({
           return true;
         };
 
+  const closedToYou = query.error instanceof ConversationClosed;
+  useEffect(() => {
+    if (closedToYou) onClosedToYou?.();
+  }, [closedToYou, onClosedToYou]);
+
+  // Whatever replaces the conversation keeps the way back: on a phone the list is hidden behind the reader.
+  const loaded = query.data !== undefined && !isFinal(query.error);
   const back = (
     <button type="button" className="nv-btn nv-btn--plain nv-btn--sm tr-back" onClick={onClose}>
       ← {backLabel}
@@ -119,13 +132,13 @@ export function Reader({
 
   return (
     <section className="nv-plate tr-reader" aria-label="Conversation">
-      {query.data === undefined ? back : null}
+      {loaded ? null : back}
       {query.error instanceof ConversationGone ? (
         <p className="tr-reader__empty">Cette conversation n’existe plus.</p>
       ) : query.error instanceof ConversationClosed ? (
         <p className="tr-reader__empty" role="status">
-          Cette conversation n’est plus ouverte pour toi : hors de ton shift, seules celles dont tu as la main
-          restent ici.
+          Cette conversation n’est plus ouverte pour toi&nbsp;: hors de ton shift, seules celles dont tu as la
+          main restent ici.
         </p>
       ) : query.isError && query.data === undefined ? (
         <div className="tr-reader__empty" role="status">

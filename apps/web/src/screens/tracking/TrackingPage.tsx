@@ -103,8 +103,11 @@ export function TrackingPage({
   const [order, setOrder] = useState<ListOrder>(readListOrder);
   const [search, setSearch] = useState('');
   const [allTodos, setAllTodos] = useState(false);
-  /** A hand just given back by a member whose scope is `self`, the conversation gone from his list: said once. */
-  const [released, setReleased] = useState<string | null>(null);
+  /**
+   * Said once above the list, for a member whose scope is `self`: a hand he just gave back, the conversation gone from
+   * his list, or a conversation that closed to him while he read it, his shift over (EQ-13).
+   */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const isLoading = creatorsQuery.isPending || queries.some((q) => q.isPending);
   const failed = queries.filter((q) => q.isError);
@@ -153,7 +156,8 @@ export function TrackingPage({
         eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
         title="Suivi"
         // Only what the mode means: the panels say the rest themselves (D-03).
-        lead={mode === null ? undefined : MODE_MEANINGS[mode]}
+        // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
+        lead={mode === null || offShift !== undefined ? undefined : MODE_MEANINGS[mode]}
         actions={nav}
       />
       {offShift?.(lines.length > 0)}
@@ -185,11 +189,11 @@ export function TrackingPage({
         </Notice>
       ) : // Off shift with nothing listed: the banner above says it all, never « no conversation yet ».
       offShift !== undefined && lines.length === 0 && todos.length === 0 && !queue.isError ? (
-        releasedNote(released)
+        noticeOf(notice)
       ) : (creators.length === 0 || (selfScope && lines.length === 0 && isQueueEmpty)) &&
         nothingListed !== undefined ? (
         <>
-          {releasedNote(released)}
+          {noticeOf(notice)}
           {nothingListed}
         </>
       ) : creators.length === 0 && isQueueEmpty ? (
@@ -200,7 +204,7 @@ export function TrackingPage({
       ) : (
         <div className="tr-layout">
           <div className="tr-side">
-            {releasedNote(released)}
+            {noticeOf(notice)}
             {/* An unread queue is never silent: an urgency may be missing from it. */}
             {queue.isError ? (
               <Panel className="tr-panel" eyebrow="À traiter">
@@ -298,7 +302,7 @@ export function TrackingPage({
                               now={now}
                               isOpen={conversation.id === selected}
                               onOpen={() => {
-                                setReleased(null);
+                                setNotice(null);
                                 onSelect(conversation.id);
                               }}
                             />
@@ -337,13 +341,25 @@ export function TrackingPage({
               conversationId={selected}
               canDecide={canDecide}
               selfScope={selfScope}
+              // Off shift, only the conversations he holds are listed: the way back says so.
+              backLabel={offShift === undefined ? undefined : 'Tes conversations'}
               onClose={() => {
                 onSelect(null);
               }}
               onReleased={
                 selfScope
                   ? (fan) => {
-                      setReleased(fan);
+                      setNotice(`Main rendue à l’agent pour ${fan}\u00a0: ta note est gardée.`);
+                      onSelect(null);
+                    }
+                  : undefined
+              }
+              onClosedToYou={
+                selfScope
+                  ? () => {
+                      setNotice(
+                        'Cette conversation n’est plus ouverte pour toi\u00a0: hors de ton shift, seules celles dont tu as la main restent ici.',
+                      );
                       onSelect(null);
                     }
                   : undefined
@@ -543,12 +559,15 @@ function Row({
   );
 }
 
-/** The hand a chatter just gave back: the conversation left his list, so the screen says it went through (CHAT-08). */
-function releasedNote(fan: string | null): JSX.Element | null {
-  if (fan === null) return null;
+/**
+ * What a chatter is told once above his list: the hand he gave back went through (CHAT-08), or the conversation he read
+ * closed to him (EQ-13). A non-breaking space keeps « : » on its word's line.
+ */
+function noticeOf(text: string | null): JSX.Element | null {
+  if (text === null) return null;
   return (
     <p className="tr-released" role="status">
-      Main rendue à l’agent pour {fan} : ta note est gardée.
+      {text}
     </p>
   );
 }

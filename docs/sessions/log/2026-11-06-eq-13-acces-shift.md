@@ -9,7 +9,13 @@ Fait :
 - `fans` : le port `FanAccess` remplace `FanRoutedTo` et trace la fiche lue seule (`via` `flags` ou `kyc`) ;
 - « À traiter » suit les créatrices du shift ;
 - Suivi : « Tu as la main » sur la sienne, la main d'une autre personne avec les conversations sans rien à faire et sans bouton (« C'est à lui de la rendre. »), le lecteur reste ouvert après « Rendre la main » pendant le shift et se ferme hors shift, « Cette conversation n'est plus ouverte pour toi » quand la fenêtre se ferme pendant la lecture, l'écran vide du chatteur en poste ne dit plus que l'accès « n'est pas encore ouvert », le lecteur dit « Tu as la main. Tu réponds dans Reveal… » à celui qui la tient (plus « Un humain… Il répond »), et la carte « Tu n'es pas en poste » ne laisse plus un grand vide au-dessus de la liste ;
-- glossaire : « Qui a la main » (`heldBy`), « Créatrices du shift » (`shiftCreatorIds`).
+- glossaire : « Qui a la main » (`heldBy`), « Créatrices du shift » (`shiftCreatorIds`) ;
+- défauts des captures (#593) et relecture d'Extension, corrigés :
+  - quand le shift finit pendant la lecture, le lecteur se ferme et la note « Cette conversation n'est plus ouverte pour toi » s'affiche une fois au-dessus de sa liste. Le téléphone retrouve donc l'en-tête « Suivi », la liste et la carte « Tu n'es pas en poste », et l'ordinateur son état vide centré ;
+  - un lecteur qui n'affiche pas la conversation garde toujours son bouton retour ;
+  - un espace insécable tient « : » sur la ligne de son mot ;
+  - le sous-titre du mode (« En copilote… ») est caché hors poste ;
+  - le retour du téléphone dit « Tes conversations » hors poste.
 
 Pas fait :
 - ses passations routées en tête de sa file : avec EQ-08.
