@@ -9,6 +9,12 @@ import { createDbClient } from '@impera/db';
 import { loadConfig } from '../config';
 import { revokeDashboardSessions } from '../ops';
 
+import { requireArguments } from './command-line';
+
+requireArguments('Usage: pnpm ops:revoke-sessions --all | --email <email>', {
+  withValue: ['email'],
+  alone: ['all'],
+});
 const { values } = parseArgs({
   options: { all: { type: 'boolean', default: false }, email: { type: 'string' } },
 });

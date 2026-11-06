@@ -11,6 +11,9 @@ import { createDbClient } from '@impera/db';
 import { loadConfig } from '../config';
 import { resetAccountSecondFactor } from '../ops';
 
+import { requireArguments } from './command-line';
+
+requireArguments('Usage: pnpm ops:reset-second-factor --email <email>', { withValue: ['email'] });
 const { values } = parseArgs({ options: { email: { type: 'string' } } });
 if (values.email === undefined) {
   console.error('Usage: pnpm ops:reset-second-factor --email <email>');
