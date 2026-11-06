@@ -146,6 +146,33 @@ describe('Reveal’s CRM API, read by the real adapter', () => {
     await control('/reveal/models', { preset: 'recette' });
   });
 
+  it('changes the team Reveal lists: a removal, an account gone and back, a new one (ADR 0076)', async () => {
+    const reveal = feed('rvl_recette_ok_0005');
+    const ids = async (): Promise<string[]> => {
+      const listed = await reveal.listChatters();
+      if (!listed.ok) throw new Error('no list');
+      return listed.value.map(
+        (one) => `${one.platformChatterId}${one.removedAt === null ? '' : ' (retiré)'}`,
+      );
+    };
+    expect(await ids()).toContain('chatter_test_01');
+    await control('/reveal/chatters', { remove: 'chatter_test_01' });
+    expect(await ids()).toContain('chatter_test_01 (retiré)');
+    await control('/reveal/chatters', { drop: 'chatter_test_01' });
+    expect(await ids()).not.toContain('chatter_test_01 (retiré)');
+    await control('/reveal/chatters', { back: 'chatter_test_01' });
+    expect(await ids()).toContain('chatter_test_01');
+    const added = await control('/reveal/chatters', {
+      add: { firstName: 'Nouvelle', email: 'nouvelle@recette.test' },
+    });
+    expect(added.status).toBe(200);
+    expect(await ids()).toContain('chatter_recette_1');
+    expect((await control('/reveal/chatters', { remove: 'inconnu' })).status).toBe(404);
+    await control('/reveal/chatters', { preset: 'empty' });
+    expect(await ids()).toEqual([]);
+    await control('/reveal/chatters', { preset: 'default' });
+  });
+
   it('lists by default the models of the recette data, and answers the rule of words for a Reveal key', async () => {
     const models = await feed('rvl_recette_ok_0004').listModels();
     expect(JSON.stringify(models)).toContain('lina-test-recette');

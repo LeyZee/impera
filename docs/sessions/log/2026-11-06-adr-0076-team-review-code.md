@@ -10,12 +10,13 @@
 - Base (`infra/db/team-import-store.ts`) : tout passe par `withMember` ; le lien du propriétaire (`PUT …/chatters/:id`) aussi. L'adaptateur `invitationChatterLinks` pour le port d'invitation d'Équipe (#624).
 - Routes : `GET …/team`, `GET …/team/counts`, `POST …/team/links`, `PUT …/team/:platformChatterId/dismissal` (propriétaire et manager actif ; la base décide).
 - Tests : domaine (unitaires), routes contre la liste remplacée de FakeReveal, garde contre soi-même dans la base, retrait et lecture anormale (`sales-feed-team.integration.test.ts`).
+- Bac à sable (après la fusion de #616) : `/__/reveal/chatters` change l'équipe que FakeReveal liste (retrait, absence, retour, nouveau compte, liste vide) ; ligne au guide `docs/recette/bac-a-sable.md`.
+- Revue d'Extension : un prestataire jamais relié à l'agent, actions selon le lien de la ligne, 403 avant toute lecture, 503 si la liste est illisible, première lecture vide non crue, `role` nul accepté ; `teamRemovals` pour Équipe.
 - Glossaire : équipe importée, proposition de lien, compte écarté, retrait de la plateforme, lecture anormale.
 
 ## Reste
 
 - La route d'invitation (`POST …/team/:platformChatterId/invitation`, `recentLogin`) après la fusion de #624.
-- La route de contrôle `/__/reveal/chatters` du bac à sable (FakeCrm `setChatters`, `world.ts` et le guide du bac à sable de la recette) après la fusion de #616.
 - Une lecture périodique de la liste : aujourd'hui elle est relue à l'ouverture de la revue et de Réglages › Flux de ventes, donc un retrait n'apparaît qu'à la prochaine ouverture.
 - Le compte du membre « bot » de la session capturée n'est pas encore connu par son `chatterId` (ADR 0050 § 5) : un compte nommé « bot » est proposé décoché.
 

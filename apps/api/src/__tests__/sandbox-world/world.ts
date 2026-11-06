@@ -4,8 +4,10 @@ import { z } from 'zod';
 import { isLoopbackUrl } from '../../sandbox';
 import {
   createFakeCrm,
+  DEFAULT_CHATTERS,
   DEFAULT_MODELS,
   IMPORT_MODELS,
+  type FakeChatter,
   type FakeCrm,
   type FakeModel,
 } from '../fake-reveal/crm';
@@ -468,6 +470,63 @@ export function createWorld(
       preset === 'import' ? IMPORT_MODELS : preset === 'default' ? DEFAULT_MODELS : RECETTE_MODELS,
     );
     return body.data;
+  });
+
+  // The team Reveal lists (ADR 0076): a member removed, gone from the list, back, or a new one to review.
+  const ChattersBody = z.union([
+    z.object({ preset: z.enum(['default', 'empty']) }),
+    z.object({ remove: z.string().min(1) }),
+    z.object({ drop: z.string().min(1) }),
+    z.object({ back: z.string().min(1) }),
+    z.object({
+      add: z.object({
+        firstName: z.string().min(1).max(64),
+        lastName: z.string().max(64).default(''),
+        email: z.email().nullable().default(null),
+        role: z.enum(['chatter', 'manager']).default('chatter'),
+        isExternal: z.boolean().default(false),
+        modelIds: z.array(z.string().min(1)).default([]),
+      }),
+    }),
+  ]);
+  let added = 0;
+  app.post('/__/reveal/chatters', (request, reply) => {
+    const body = ChattersBody.safeParse(request.body);
+    if (!body.success) {
+      return reply
+        .code(400)
+        .send({ error: 'preset (default, empty), remove, drop ou back (un chatterId), ou add (firstName…)' });
+    }
+    const listed = crm.chatters();
+    const order = body.data;
+    const known = (id: string): boolean =>
+      listed.some((one) => one.chatterId === id) || DEFAULT_CHATTERS.some((one) => one.chatterId === id);
+    let next: readonly FakeChatter[];
+    if ('preset' in order) next = order.preset === 'empty' ? [] : DEFAULT_CHATTERS;
+    else if ('add' in order) {
+      added += 1;
+      next = [
+        ...listed,
+        { chatterId: `chatter_recette_${String(added)}`, isBot: false, removedAt: null, ...order.add },
+      ];
+    } else {
+      const id = 'remove' in order ? order.remove : 'drop' in order ? order.drop : order.back;
+      if (!known(id)) return reply.code(404).send({ error: `aucun compte ${id}` });
+      if ('remove' in order) {
+        const at = now().toISOString();
+        next = listed.map((one) => (one.chatterId === id ? { ...one, removedAt: at } : one));
+      } else if ('drop' in order) next = listed.filter((one) => one.chatterId !== id);
+      else {
+        const back =
+          listed.find((one) => one.chatterId === id) ?? DEFAULT_CHATTERS.find((one) => one.chatterId === id);
+        next =
+          back === undefined
+            ? listed
+            : [...listed.filter((one) => one.chatterId !== id), { ...back, removedAt: null }];
+      }
+    }
+    crm.setChatters(next);
+    return { chatters: next.map((one) => ({ chatterId: one.chatterId, removedAt: one.removedAt })) };
   });
 
   return { app, crm, modes, stop };

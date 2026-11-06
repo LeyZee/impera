@@ -66,6 +66,7 @@ En bac à sable, Impera inscrit son webhook à l'adresse de l'API sur la machine
 | `/__/reveal/webhooks` | `{"failNext":3}` | Les 3 prochains essais échouent ; aussi `outage` (les ventes faites pendant la panne n'auront aucun envoi), `duplicateNext` (envoi en double, même id), `shuffle` (désordre) |
 | `/__/clock` | `{"advanceSeconds":3600}` | Avance l'horloge du monde et envoie ce qui est dû (essais, nuit, jours) |
 | `/__/reveal/models` | `{"preset":"import"}` | Plusieurs modèles à importer ; `recette` (par défaut) : Lina, Maya et Zoé du jeu de recette, avec les pseudos des comptes que crée `seed.ts`, donc reliées toutes seules et sans quarantaine ; `default` : les modèles des tests |
+| `/__/reveal/chatters` | `{"remove":"chatter_test_01"}` | L'équipe que Reveal liste (ADR 0076, Réglages › Ventes › Équipe) : `remove` (retiré par l'agence, `removedAt` à l'heure du monde), `drop` (absent de la liste), `back` (revenu), `add` avec `{"firstName":"Nouvelle","email":"nouvelle@recette.test"}` (aussi `lastName`, `role`, `isExternal`, `modelIds`) ; `{"preset":"empty"}` (liste vide : « lecture anormale ») ou `default` (chatteur, bot de la clé, manager, prestataire, ancien) |
 
 Le faux monde vit en mémoire : un redémarrage remet tout à zéro.
 
