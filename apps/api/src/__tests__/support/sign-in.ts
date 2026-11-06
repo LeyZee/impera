@@ -41,6 +41,8 @@ const given = new Map<string, Map<string, number>>();
 /** How long the server remembers a code taken (`SPENT_CODE_SECONDS`, auth.ts), with a margin. */
 const REMEMBERED_MS = 125_000;
 const PERIOD_MS = 30_000;
+/** Time a code may take to reach the server on a loaded run. */
+const BOUNDARY_MARGIN_MS = 10_000;
 
 /** Waits without the event loop: between two requests, nothing of the server runs meanwhile. */
 function pause(ms: number): void {
@@ -54,6 +56,9 @@ function freshCode(email: string, secret: string): string {
   for (;;) {
     const now = Date.now();
     for (const offset of [0, 1, -1]) {
+      // The period before is refused once the next period starts: never offered in the last seconds of this one, when
+      // a slow run (CI) could reach the server on the other side of the boundary.
+      if (offset === -1 && PERIOD_MS - (now % PERIOD_MS) < BOUNDARY_MARGIN_MS) continue;
       const code = totpCode(secret, offset, now);
       if ((taken.get(code) ?? 0) <= now) {
         taken.set(code, now + REMEMBERED_MS);
