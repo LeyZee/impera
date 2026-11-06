@@ -45,15 +45,23 @@ describe('conversation projection', () => {
     expect(applyEvent(sending, expired(false), at(2)).state).toBe('idle');
   });
 
-  it('keeps a refused answer with the human while he waits, a refused follow-up at rest (recette CHAT-25)', () => {
-    const rejected = EventBodySchema.parse({
-      type: 'draft_rejected',
-      payload: { draftId: DRAFT, status: 'rejected', reason: 'Trop direct' },
-    });
+  it('keeps a refused answer with the human as the event says, a refused follow-up at rest (recette CHAT-25)', () => {
+    const rejected = (leavesFanWaiting: boolean) =>
+      EventBodySchema.parse({
+        type: 'draft_rejected',
+        payload: {
+          draftId: DRAFT,
+          status: 'rejected',
+          reason: 'Trop direct',
+          ...(leavesFanWaiting && { leavesFanWaiting: true }),
+        },
+      });
     const waiting = { ...INITIAL_PROJECTION, state: 'awaiting_approval' as const, lastInboundAt: at(1) };
-    expect(applyEvent(waiting, rejected, at(2)).state).toBe('human');
+    expect(applyEvent(waiting, rejected(true), at(2)).state).toBe('human');
+    expect(applyEvent(waiting, rejected(false), at(2)).state).toBe('idle');
+    // An event written before CHAT-25 replays as it was decided, whatever the state says now (ADR 0007).
     const followUp = { ...waiting, lastOutboundAt: at(2) };
-    expect(applyEvent(followUp, rejected, at(3)).state).toBe('idle');
+    expect(applyEvent(followUp, rejected(false), at(3)).state).toBe('idle');
   });
 
   it('clears the routing when a human hands the conversation back', () => {
