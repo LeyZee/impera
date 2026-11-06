@@ -170,8 +170,11 @@ export async function saveVersion(
   return { kind: 'failed' };
 }
 
-/** `reauth`: her persona speaks to every fan, a sign-in older than 10 minutes asks for the password again (M1). */
-export type ActivateResult = 'activated' | 'conflict' | 'reauth' | 'forbidden' | 'failed';
+/**
+ * `reauth`: her persona speaks to every fan, a sign-in older than 10 minutes asks for the password again (M1).
+ * `refused`: a version stored before a guard changed teaches what it blocks now (P5-01, checked again on activation).
+ */
+export type ActivateResult = 'activated' | 'conflict' | 'reauth' | 'refused' | 'forbidden' | 'failed';
 
 /**
  * `POST /v1/creators/:id/persona/versions/:versionId/activate`. `expectedActive` is her active version as this screen
@@ -193,7 +196,9 @@ export async function activateVersion(
   );
   if (response.ok) return 'activated';
   if (response.status === 409) return 'conflict';
-  if (response.status !== 403) return 'failed';
+  if (response.status !== 403 && response.status !== 422) return 'failed';
   const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
-  return error.success && error.data.error.code === REAUTHENTICATION_ERROR_CODE ? 'reauth' : 'forbidden';
+  const code = error.success ? error.data.error.code : null;
+  if (response.status === 422) return code === 'persona_sample_reply_unprocessable' ? 'refused' : 'failed';
+  return code === REAUTHENTICATION_ERROR_CODE ? 'reauth' : 'forbidden';
 }
