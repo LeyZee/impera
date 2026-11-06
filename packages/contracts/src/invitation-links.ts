@@ -49,9 +49,9 @@ export type InvitationLinkCreated = z.infer<typeof InvitationLinkCreatedSchema>;
 /**
  * `POST /v1/creators/:creatorId/invitation-link` (owner, recent sign-in; CR-02, ADR 0042 § 1): the link of a creator's
  * own account, valid 72 h, a new one cancelling the one before. `invitation` names her e-mail: her account (role
- * `creator`, linked to this creator only) is made with it the first time, and an account already made keeps its own
- * (another e-mail answers 409 `creator_account_conflict`; an e-mail another account has answers 409
- * `account_email_conflict`). `reset` needs her account already made (404 `creator_account_not_found`). Unknown creator:
+ * `creator`, linked to this creator only) is made with it the first time. Another e-mail corrects her account's while
+ * her password is not chosen, the link out revoked (ADR 0071 § 3, audit `creator_account.email`); once it is chosen,
+ * 409 `creator_account_conflict`. An e-mail another account has answers 409 `account_email_conflict`. `reset` needs her account already made (404 `creator_account_not_found`). Unknown creator:
  * 404 `creator_not_found`. Answers `InvitationLinkCreatedSchema`.
  */
 export const CreateCreatorInvitationLinkBodySchema = z.discriminatedUnion('purpose', [

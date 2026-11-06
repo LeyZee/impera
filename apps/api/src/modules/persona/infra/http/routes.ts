@@ -1,5 +1,7 @@
 import {
   AgentHoursViewSchema,
+  ArchivedCreatorListSchema,
+  ArchivedCreatorSchema,
   CreatorIdSchema,
   CreatorListSchema,
   CreatorSummarySchema,
@@ -8,12 +10,15 @@ import {
   SetAgentHoursBodySchema,
   UpdateCreatorBodySchema,
   type CreatorErrorCode,
+  type CreatorId,
+  type CreatorPlanned,
   type UserRole,
 } from '@impera/contracts';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { CreatorPlannedConflict } from '../../domain/errors';
 import type { CreatorDirectory } from '../../domain/ports';
 
 const CreatorParamsSchema = z.object({ id: CreatorIdSchema });
@@ -49,7 +54,8 @@ export function createCreatorRoutes(
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
         const ids = user.role === 'owner' ? 'all' : user.creatorIds.map((id) => CreatorIdSchema.parse(id));
-        return { creators: [...(await directory.list(ids))] };
+        // An archived creator is in no list, the owner's included (ADR 0071 § 2): `/creators/archived` has them.
+        return { creators: [...(await directory.unarchived(ids))] };
       },
     );
 
@@ -126,6 +132,78 @@ export function createCreatorRoutes(
         const view = await directory.agentHours(id);
         if (view === null) throw new CreatorNotFound();
         return view;
+      },
+    );
+    return Promise.resolve();
+  };
+}
+
+/** What her archiving needs from the other modules, given by the composition root (ADR 0071 § 2). */
+export interface CreatorArchiving {
+  /** What still plans someone on her (`scheduling`): she is archived only when both counts are zero. */
+  planned(creatorId: CreatorId): Promise<CreatorPlanned>;
+  /**
+   * Closes what she still has open once she is archived: her links out are revoked, her agent stopped by its switch,
+   * so it stays off when she is reopened. Run again on an archive asked twice, and harmless then.
+   */
+  close(input: { creatorId: CreatorId; userId: string; correlationId: string }): Promise<void>;
+}
+
+/**
+ * `GET /v1/creators/archived`, `POST /v1/creators/:creatorId/archive` and `…/restore` (ADR 0071 § 2): the owner's
+ * alone, a change with a recent sign-in. Nothing of hers is deleted; her history keeps her name.
+ */
+export function createCreatorArchiveRoutes(
+  directory: CreatorDirectory,
+  requireRole: RequireRole,
+  recentLogin: preValidationAsyncHookHandler,
+  archiving: CreatorArchiving,
+): FastifyPluginAsyncZod {
+  return (app) => {
+    app.get(
+      '/creators/archived',
+      {
+        preValidation: requireRole('owner'),
+        schema: { response: { 200: ArchivedCreatorListSchema } },
+      },
+      async () => ({ creators: [...(await directory.archived())] }),
+    );
+
+    app.post(
+      '/creators/:creatorId/archive',
+      {
+        preValidation: [requireRole('owner'), recentLogin],
+        schema: { params: CreatorIdParamsSchema, response: { 200: ArchivedCreatorSchema } },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const { creatorId } = request.params;
+        // Still planned, nothing is archived: the owner ends her shifts in the agenda first, told how many remain.
+        const planned = await archiving.planned(creatorId);
+        if (planned.shiftsAhead > 0 || planned.templatesRunning > 0)
+          throw new CreatorPlannedConflict(planned);
+        const archived = await directory.archive(creatorId, user.id);
+        if (archived === null) throw new CreatorNotFound();
+        await archiving.close({ creatorId, userId: user.id, correlationId: request.id });
+        return archived;
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/restore',
+      {
+        preValidation: [requireRole('owner'), recentLogin],
+        schema: { params: CreatorIdParamsSchema, response: { 200: CreatorSummarySchema } },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        // Listed again, her agent still off and her space closed: the Dashboard resumes the one, a new link opens the
+        // other.
+        const restored = await directory.restore(request.params.creatorId, user.id);
+        if (restored === null) throw new CreatorNotFound();
+        return restored;
       },
     );
     return Promise.resolve();

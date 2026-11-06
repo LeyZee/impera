@@ -42,6 +42,7 @@ type Stale =
   | 'fan_wrote'
   | 'not_answered'
   | 'plan_changed'
+  | 'creator_archived'
   | 'kill_switch'
   | 'session_expired';
 

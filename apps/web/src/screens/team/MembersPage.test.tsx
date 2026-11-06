@@ -391,7 +391,7 @@ describe('adding a member', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter Kofi' }));
 
     expect(await screen.findByRole('heading', { name: 'Kofi est dans l’équipe' })).toBeDefined();
-    expect(screen.getByLabelText<HTMLInputElement>('Lien à envoyer').value).toBe(
+    expect(screen.getByLabelText<HTMLInputElement>('Son lien').value).toBe(
       'https://impera.example.test/bienvenue#t=lien-invente-0001',
     );
     expect(posted[0]).toMatchObject({
@@ -691,7 +691,7 @@ describe('a link from the sheet', () => {
       target: { value: '123456' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
-    expect(await screen.findByLabelText('Lien à envoyer')).toBeDefined();
+    expect(await screen.findByLabelText('Son lien')).toBeDefined();
     expect(confirmIdentity).toHaveBeenCalledWith('mot-de-passe-invente', '123456');
   });
 
@@ -714,7 +714,7 @@ describe('a link from the sheet', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Lien de nouveau mot de passe' }));
     // The list re-read says a link is out; the one just made is still there to send.
     expect(await screen.findByText(/Un lien pour en choisir un nouveau a été créé/u)).toBeDefined();
-    expect(screen.getByLabelText('Lien à envoyer')).toBeDefined();
+    expect(screen.getByLabelText('Son lien')).toBeDefined();
   });
 
   it('calls « Invité » only one still to choose his password, and offers to replace a live link', async () => {

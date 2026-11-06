@@ -85,12 +85,16 @@ function sameAlert(group: CustomAlertGroup, body: CustomAlertBody): boolean {
 const isLocked = (code: SystemAlertCode): boolean => LOCKED_SYSTEM_ALERTS.includes(code);
 
 export function createDrizzleAlertStore(db: Database): AlertStore {
-  /** Every creator's id, by name: `creators` is the tenant root, without RLS. */
+  /**
+   * Every creator's id, by name: `creators` is the tenant root, without RLS. An archived one is out (ADR 0071 § 2): no
+   * alert is set or shown for her.
+   */
   const creatorIds = async (tx: Transaction): Promise<CreatorId[]> =>
     (
       await tx
         .select({ id: schema.creators.id })
         .from(schema.creators)
+        .where(sql`${schema.creators.archivedAt} is null`)
         .orderBy(schema.creators.displayName, schema.creators.id)
     ).map((row) => CreatorIdSchema.parse(row.id));
 

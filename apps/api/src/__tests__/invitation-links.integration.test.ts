@@ -460,7 +460,7 @@ describe('invitation links (EQ-10)', () => {
     await expect(signIn(server, 'nora@example.test', PASSWORD)).resolves.toContain('=');
   });
 
-  it('keeps her one account: a new link replaces the last, another e-mail is refused', async () => {
+  it('keeps her one account: a new link replaces the last, another e-mail corrects it until she signs in', async () => {
     const creatorId = await addCreator('Ines');
     const first = await inviteCreator(creatorId, { purpose: 'invitation', email: 'ines@example.test' });
     const firstToken = new URL(first.json<{ url: string }>().url).hash.slice('#t='.length);
@@ -473,6 +473,33 @@ describe('invitation links (EQ-10)', () => {
       .where(sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`);
     expect(accounts).toHaveLength(1);
 
+    // A typo corrected before her first sign-in (ADR 0071 § 3): the same account, the new e-mail, the link before gone.
+    const secondToken = new URL(second.json<{ url: string }>().url).hash.slice('#t='.length);
+    const taken = await inviteCreator(creatorId, { purpose: 'invitation', email: OWNER.email });
+    expect(codeOf(taken).code).toBe('account_email_conflict');
+    const corrected = await inviteCreator(creatorId, { purpose: 'invitation', email: 'Ines.B@example.test' });
+    expect(corrected.statusCode, corrected.body).toBe(200);
+    expect((await post('/v1/invitation-links/inspect', { token: secondToken })).statusCode).toBe(404);
+    const correctedToken = new URL(corrected.json<{ url: string }>().url).hash.slice('#t='.length);
+    const preview = await post('/v1/invitation-links/inspect', { token: correctedToken });
+    expect(preview.json()).toMatchObject({ email: 'ines.b@example.test' });
+    const after = await test.admin.db
+      .select({ id: schema.user.id, email: schema.user.email })
+      .from(schema.user)
+      .where(sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`);
+    expect(after).toEqual([{ id: accounts[0]?.id, email: 'ines.b@example.test' }]);
+    const [audited] = await test.admin.db
+      .select({ details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'creator_account.email' and ${schema.auditLog.entityId} = ${accounts[0]?.id}`,
+      );
+    expect(audited?.details).toEqual({ creatorId });
+
+    // Once her password is chosen, her e-mail is how she signs in: no longer changed from her sheet.
+    expect(
+      (await post('/v1/invitation-links/redeem', { token: correctedToken, password: PASSWORD })).statusCode,
+    ).toBe(200);
     const other = await inviteCreator(creatorId, { purpose: 'invitation', email: 'autre@example.test' });
     expect(other.statusCode).toBe(409);
     expect(codeOf(other).code).toBe('creator_account_conflict');

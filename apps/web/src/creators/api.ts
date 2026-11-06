@@ -1,5 +1,7 @@
 import {
   ApiErrorSchema,
+  ArchivedCreatorListSchema,
+  ArchivedCreatorSchema,
   CreatorAccountSchema,
   CreatorListSchema,
   CreatorSummarySchema,
@@ -7,11 +9,14 @@ import {
   PersonaOverviewSchema,
   REAUTHENTICATION_ERROR_CODE,
   InvitationLinkCreatedSchema,
+  CreatorPlannedSchema,
+  type ArchivedCreator,
   type CreateCreatorInvitationLinkBody,
   type CreatorAccount,
   type CreatorErrorCode,
   type CreatorId,
   type CreatorPersonaSheet,
+  type CreatorPlanned,
   type CreatorSummary,
   type InvitationLinkErrorCode,
 } from '@impera/contracts';
@@ -202,6 +207,88 @@ export async function renameCreator(creatorId: string, displayName: string): Pro
   return { kind: 'failed' };
 }
 
+/** `GET /v1/creators/archived` (owner only, ADR 0071 § 2): the archived creators, the most recent first. */
+async function fetchArchivedCreators(): Promise<ArchivedCreator[]> {
+  const response = await fetch('/v1/creators/archived', { credentials: 'include' });
+  if (!response.ok) throw new Error(`GET /v1/creators/archived: ${String(response.status)}`);
+  return ArchivedCreatorListSchema.parse(await response.json()).creators;
+}
+
+/** Under `['creators']`: whatever refreshes the creators refreshes the archived ones too. */
+export function useArchivedCreators(enabled: boolean): UseQueryResult<ArchivedCreator[]> {
+  return useQuery({ queryKey: ['creators', 'archived'], queryFn: fetchArchivedCreators, enabled, retry: 1 });
+}
+
+/** The refusals shared by archiving and reopening; her state is unchanged on every one. */
+type ArchiveRefusal =
+  /** 403 `reauthentication_forbidden`: the sign-in is over 10 minutes old, the password is asked again. */
+  | { readonly kind: 'reauth' }
+  /** Any other 403: only the owner archives or reopens a creator. */
+  | { readonly kind: 'forbidden' }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'expired' }
+  | { readonly kind: 'failed' };
+
+export type ArchiveResult =
+  | { readonly kind: 'archived'; readonly creator: ArchivedCreator }
+  /** 409 `creator_planned_conflict`: still planned, with how many shifts ahead and weekly shifts running. */
+  | { readonly kind: 'planned'; readonly planned: CreatorPlanned }
+  | ArchiveRefusal;
+
+export type RestoreResult = { readonly kind: 'restored'; readonly creator: CreatorSummary } | ArchiveRefusal;
+
+/** The refusal a non-OK answer of `/archive` or `/restore` means. */
+async function refusalOf(
+  response: Response,
+): Promise<ArchiveRefusal | { kind: 'planned'; planned: CreatorPlanned }> {
+  if (response.status === 401) return { kind: 'expired' };
+  if (response.status === 404) return { kind: 'not_found' };
+  const error = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  const code = error.data?.error.code;
+  if (response.status === 409 && code === ('creator_planned_conflict' satisfies CreatorErrorCode)) {
+    const planned = CreatorPlannedSchema.safeParse(error.data?.error.details);
+    return planned.success ? { kind: 'planned', planned: planned.data } : { kind: 'failed' };
+  }
+  if (response.status === 403) {
+    return code === REAUTHENTICATION_ERROR_CODE ? { kind: 'reauth' } : { kind: 'forbidden' };
+  }
+  return { kind: 'failed' };
+}
+
+async function post(url: string): Promise<Response | null> {
+  try {
+    return await fetch(url, { method: 'POST', credentials: 'include' });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `POST /v1/creators/:creatorId/archive` (owner only, a recent sign-in, ADR 0071 § 2): nothing of hers is deleted;
+ * she leaves every list, her agent stops and her space closes. Refused while she is still planned.
+ */
+export async function archiveCreator(creatorId: string): Promise<ArchiveResult> {
+  const response = await post(`/v1/creators/${encodeURIComponent(creatorId)}/archive`);
+  if (response === null) return { kind: 'failed' };
+  if (response.ok) {
+    const creator = ArchivedCreatorSchema.safeParse(await response.json().catch(() => null));
+    return creator.success ? { kind: 'archived', creator: creator.data } : { kind: 'failed' };
+  }
+  return refusalOf(response);
+}
+
+/** `POST /v1/creators/:creatorId/restore` (owner only, a recent sign-in): listed again, her agent still off. */
+export async function restoreCreator(creatorId: string): Promise<RestoreResult> {
+  const response = await post(`/v1/creators/${encodeURIComponent(creatorId)}/restore`);
+  if (response === null) return { kind: 'failed' };
+  if (response.ok) {
+    const creator = CreatorSummarySchema.safeParse(await response.json().catch(() => null));
+    return creator.success ? { kind: 'restored', creator: creator.data } : { kind: 'failed' };
+  }
+  const refusal = await refusalOf(response);
+  return refusal.kind === 'planned' ? { kind: 'failed' } : refusal;
+}
+
 /** Her own account, for the Accès tab of her sheet (CR-02): the owner's alone. */
 export const creatorAccountKey = (creatorId: CreatorId) => ['creators', creatorId, 'account'] as const;
 
@@ -222,7 +309,8 @@ export function useCreatorAccount(creatorId: CreatorId): UseQueryResult<CreatorA
 const LINK_REFUSALS: Partial<Record<InvitationLinkErrorCode, string>> = {
   creator_not_found: 'Cette créatrice n’existe plus. Recharge la page.',
   creator_account_not_found: 'Elle n’a pas encore de compte : crée d’abord son lien d’invitation.',
-  creator_account_conflict: 'Son compte existe déjà avec un autre e-mail : son lien garde celui-là.',
+  creator_account_conflict:
+    'Elle a déjà choisi son mot de passe avec son e-mail : il ne se change plus d’ici.',
   account_email_conflict: 'Un autre compte utilise déjà cet e-mail.',
 };
 

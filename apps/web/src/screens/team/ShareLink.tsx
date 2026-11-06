@@ -182,18 +182,25 @@ function Made({
 
   return (
     <div className="tm-share tm-share--made nv-enter">
-      <input
-        ref={field}
-        className="nv-field__control nv-glass tm-link"
-        value={link.url}
-        readOnly
-        aria-label="Lien à envoyer"
-        onFocus={(event) => {
-          event.target.select();
-          // Selected whole, read from its start: the address, not the end of its token (EQ-12).
-          event.target.scrollLeft = 0;
-        }}
-      />
+      {/* Labelled as the e-mail above it is, and told before the button what « Copier le message » copies. */}
+      <label className="nv-field">
+        <span className="nv-field__label">Son lien</span>
+        <input
+          ref={field}
+          className="nv-field__control nv-glass tm-link"
+          value={link.url}
+          readOnly
+          onFocus={(event) => {
+            event.target.select();
+            // Selected whole, read from its start: the address, not the end of its token (EQ-12).
+            event.target.scrollLeft = 0;
+          }}
+        />
+      </label>
+      <p className="tm-hint">
+        Le message : « {welcome} » suivi du lien. Valable jusqu’à {deadline(new Date(link.expiresAt))}, pour
+        un seul usage. Un nouveau lien annule celui-ci.
+      </p>
       <div className="tm-share__actions">
         <button
           type="button"
@@ -216,10 +223,6 @@ function Made({
           </button>
         ) : null}
       </div>
-      <p className="tm-hint">
-        Le message : « {welcome} » suivi du lien. Valable jusqu’à {deadline(new Date(link.expiresAt))}, pour
-        un seul usage. Un nouveau lien annule celui-ci.
-      </p>
     </div>
   );
 }

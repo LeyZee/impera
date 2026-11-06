@@ -17,6 +17,7 @@ function admin(failure: Error, days: string[] = [], clocks: PlanningClock[] = []
   return {
     memberShiftsUnscoped: () => Promise.reject(new Error('not used by the job')),
     onShiftUnscoped: () => Promise.reject(new Error('not used by the job')),
+    plannedUnscoped: () => Promise.reject(new Error('not used by the job')),
     settingsUnscoped: () => Promise.resolve({ ...DEFAULT_SCHEDULING_SETTINGS, timeZone: 'Pacific/Auckland' }),
     runningTemplatesUnscoped: (today) => {
       days.push(today);
