@@ -221,7 +221,9 @@ export function GoalsPage({
             {period === current && next !== undefined && (owner || next.collectiveGoal !== null) ? (
               <details className="nv-disclosure py-fold">
                 <summary>
-                  <span className="nv-disclosure__title">Quinzaine {periodLine(next.period)}</span>
+                  <span className="nv-disclosure__title">
+                    Quinzaine {periodLineFrom(next.period, current)}
+                  </span>
                   <span className="nv-disclosure__sum nv-num">
                     {next.collectiveGoal === null
                       ? 'pas encore d’objectif'
@@ -395,7 +397,7 @@ function TiersPanel({
         {changes ? (
           <div className="rp-notice">
             <p className="rp-notice__text">
-              À partir de la quinzaine {periodLine(laterPeriod)} :{' '}
+              À partir de la quinzaine {periodLineFrom(laterPeriod, current)} :{' '}
               {later === null || later.tiers.length === 0
                 ? 'plus aucun palier.'
                 : `${bonusTiersInOrder(later.tiers)
