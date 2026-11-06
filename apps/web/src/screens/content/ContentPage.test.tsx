@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
-import { ContentDropFileIdSchema, ContentDropIdSchema } from '@impera/contracts';
+import {
+  ContentDropFileIdSchema,
+  ContentDropIdSchema,
+  ScriptStructureIdSchema,
+  ScriptStructureVersionIdSchema,
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { ContentPage } from './ContentPage';
-import { dropOf, fileOf, requestOf } from './fixtures';
+import { dropOf, fileOf, requestOf, scriptDropOf } from './fixtures';
 
 const queueSend = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const openScript = vi.hoisted(() => vi.fn());
 const live = vi.hoisted(() => ({ map: new Map<string, unknown>() }));
 
 vi.mock('./sends', () => ({
@@ -47,7 +53,7 @@ function serve(content: unknown, answers: Record<string, (body: unknown) => Resp
 function show(): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ContentPage />
+      <ContentPage onOpenScript={openScript} />
     </QueryClientProvider>,
   );
 }
@@ -61,6 +67,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
   queueSend.mockClear();
+  openScript.mockClear();
   live.map = new Map();
 });
 
@@ -100,6 +107,46 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const late = within(section).getByText('En retard depuis mardi');
     expect(late.className).toContain('ct-due--late');
     expect(within(section).getByText('Pour lundi').className).not.toContain('late');
+  });
+
+  it('begins a script asked with its version card by card, and opens it (SC-02 lot b2)', async () => {
+    const request = requestOf({
+      category: 'script',
+      structureId: ScriptStructureIdSchema.parse('00000000-0000-4000-8000-0000000000aa'),
+      structureVersionId: ScriptStructureVersionIdSchema.parse('00000000-0000-4000-8000-0000000000bb'),
+    });
+    const calls = serve(
+      { requests: [request], drops: [] },
+      {
+        'POST /v1/creator-space/content/script-drops': (body) => {
+          const sent = z.object({ id: z.string() }).parse(body);
+          return Response.json(
+            scriptDropOf({ id: ContentDropIdSchema.parse(sent.id), requestId: request.id }),
+          );
+        },
+      },
+    );
+    show();
+    expect(screen.queryByRole('button', { name: 'Déposer' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Commencer' }));
+    await waitFor(() => {
+      expect(openScript).toHaveBeenCalledTimes(1);
+    });
+    const start = calls.find((call) => call.method === 'POST');
+    expect(start?.body).toMatchObject({ requestId: request.id });
+    expect(openScript).toHaveBeenCalledWith(z.object({ id: z.string() }).parse(start?.body).id);
+  });
+
+  it('lets her continue a script she began, or withdraw it', async () => {
+    const drop = dropOf({ category: 'script', state: 'filling', files: [] });
+    serve({ requests: [], drops: [drop] });
+    show();
+    expect(await screen.findByText(/Rien d’ajouté encore/u)).toBeDefined();
+    expect(screen.getByText('En cours')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    expect(openScript).toHaveBeenCalledWith(drop.id);
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
+    expect(screen.getByText('Retirer ce dépôt ?')).toBeDefined();
   });
 
   it('refuses before sending a file the category does not take, and says why', async () => {

@@ -1,4 +1,5 @@
 import {
+  CONTENT_DROP_CARD_NOT_FOUND,
   CONTENT_DROP_FILE_NOT_FOUND,
   CONTENT_DROP_FILE_SETTLED_CONFLICT,
   CONTENT_DROP_FORBIDDEN,
@@ -167,5 +168,12 @@ export class ContentDropSlotsUnprocessable extends DomainError {
         details: { slotKeys },
       },
     );
+  }
+}
+
+/** A card her script does not have (SC-02 lot b2). */
+export class ContentDropCardNotFound extends DomainError {
+  constructor() {
+    super(CONTENT_DROP_CARD_NOT_FOUND, 'Ce carton n’est pas dans ton script');
   }
 }

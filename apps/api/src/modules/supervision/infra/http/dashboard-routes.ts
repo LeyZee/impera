@@ -132,12 +132,15 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
       async (request) => {
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
-        // The creators the person follows: every one for the owner, the account's own otherwise. Never the creators
-        // where a member reads only the conversations routed to him: their queue is not his.
+        // The creators the person follows: every one for the owner, the account's own otherwise, and those a chatter's
+        // access window opens now (ADR 0025, EQ-13: he treats their queue during his shift). Never the creators where a
+        // member reads only the conversations he holds: their queue is not his.
         const followed =
           user.role === 'owner'
             ? await deps.allCreatorIds()
-            : user.creatorIds.map((id) => CreatorIdSchema.parse(id));
+            : [...new Set([...user.creatorIds, ...user.shiftCreatorIds])].map((id) =>
+                CreatorIdSchema.parse(id),
+              );
         const now = (deps.now ?? (() => new Date()))();
         // One tenant transaction per creator (RLS): nothing of a creator outside the list is ever read. One after the
         // other, so a refresh holds one connection of the pool, not one per creator.

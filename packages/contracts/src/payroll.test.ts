@@ -30,7 +30,9 @@ import {
   PenaltySchema,
   bonusTiersFor,
   collectiveGoalFor,
+  CreatePayoutMinimumBodySchema,
   nextPayoutMinimum,
+  PAYOUT_MINIMUM_MAX_MINOR,
   payoutMinimumFor,
   PayoutMinimumSchema,
   PayrollSettingsSchema,
@@ -430,6 +432,18 @@ describe('the payout minimum and delay (PAIE-22, PAIE-32)', () => {
     expect(nextPayoutMinimum([c, a, b], period('2026-10-16'))?.minimumPayoutMinor).toBe(2_500);
     expect(nextPayoutMinimum([a, b, c], period('2026-11-01'))?.minimumPayoutMinor).toBe(3_000);
     expect(nextPayoutMinimum([a, b, c], period('2026-12-01'))).toBeNull();
+  });
+
+  it('caps the minimum at 5 000 € (Charles, 06/11)', () => {
+    const body = (minimumPayoutMinor: number) =>
+      CreatePayoutMinimumBodySchema.safeParse({ id: a.id, fromPeriod: '2026-12-01', minimumPayoutMinor })
+        .success;
+    expect(PAYOUT_MINIMUM_MAX_MINOR).toBe(500_000);
+    expect(body(0)).toBe(true);
+    expect(body(500_000)).toBe(true);
+    expect(body(500_001)).toBe(false);
+    // One written before the cap is still read as it was.
+    expect(PayoutMinimumSchema.safeParse({ ...a, minimumPayoutMinor: 600_000 }).success).toBe(true);
   });
 
   it('takes a delay in whole business days, from 1 to 30, or none', () => {

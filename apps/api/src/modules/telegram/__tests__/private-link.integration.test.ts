@@ -40,6 +40,7 @@ describe('private Telegram link on Postgres', () => {
       role: 'operator',
       creatorIds: [],
       routedCreatorIds: [],
+      shiftCreatorIds: [],
     };
     return Promise.resolve();
   };

@@ -1,6 +1,6 @@
 # 0063. La créatrice ne lit aucune note de ses fans, seulement des chiffres sur l'ensemble de sa base
 
-Statut : accepted (Charles, 03/11/2026 13h32, « ok 0063 », sur les mots exacts des trois phrases du § Décision ; décision du même jour à 11h40 et 11h50)
+Statut : accepted (Charles, 03/11/2026 13h32, « ok 0063 », sur les mots exacts des trois phrases du § Décision ; décision du même jour à 11h40 et 11h50) ; § 3, les mots « sans jamais voir qui a écrit un message (ADR 0021) » remplacés par l'ADR 0065, qui précise aussi le § 2
 Date : 2026-11-03
 Remplace : dans l'ADR 0042 § 2, la phrase « **Elle voit tout son compte**, en lecture : ses ventes avec le fan qui a acheté, ses fans (pseudo, dépenses, notes), les conversations de ses comptes, ses médias et leurs descriptions, les publications prévues et passées, qui est en poste sur elle (nom affiché et créneau). »
 L'ADR 0042 reste telle quelle, sauf la mention de son statut ; l'index des ADR renvoie d'elle à celle-ci.

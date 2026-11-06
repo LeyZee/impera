@@ -577,22 +577,38 @@ export async function requestScript(adminDb: Database, request: ScriptContentReq
   });
 }
 
-/** Her last script asked by the cadence, whatever became of it; `null` before the first. */
+async function lastScriptIn(tx: Transaction, creatorId: string): Promise<AskedScript | null> {
+  const [row] = await tx
+    .select({
+      dueOn: contentRequests.dueOn,
+      structureId: contentRequests.structureId,
+      createdAt: contentRequests.createdAt,
+    })
+    .from(contentRequests)
+    .where(and(eq(contentRequests.creatorId, creatorId), eq(contentRequests.origin, 'cadence')))
+    .orderBy(sql`${contentRequests.dueOn} desc`)
+    .limit(1);
+  if (row?.structureId == null) return null;
+  return { dueOn: row.dueOn, structureId: row.structureId, askedAt: row.createdAt };
+}
+
+/** Her last script asked by the cadence, whatever became of it; `null` before the first. For the hourly job. */
 export async function lastScriptRequest(adminDb: Database, creatorId: string): Promise<AskedScript | null> {
-  return withAdmin(adminDb, async (tx) => {
-    const [row] = await tx
-      .select({
-        dueOn: contentRequests.dueOn,
-        structureId: contentRequests.structureId,
-        createdAt: contentRequests.createdAt,
-      })
-      .from(contentRequests)
-      .where(and(eq(contentRequests.creatorId, creatorId), eq(contentRequests.origin, 'cadence')))
-      .orderBy(sql`${contentRequests.dueOn} desc`)
-      .limit(1);
-    if (row?.structureId == null) return null;
-    return { dueOn: row.dueOn, structureId: row.structureId, askedAt: row.createdAt };
-  });
+  return withAdmin(adminDb, (tx) => lastScriptIn(tx, creatorId));
+}
+
+/**
+ * The same, read for a member of her team under row-level security (`withTenantMember`): the owner or an active
+ * manager; `null` for anyone else, who reads no request of hers (audit RLS, 06/11).
+ */
+export async function lastScriptRequestFor(
+  db: Database,
+  creatorId: string,
+  userId: string,
+): Promise<AskedScript | null> {
+  return withTenantMember(db, creatorId, userId, (tx, scope) =>
+    readsTeam(scope) ? lastScriptIn(tx, creatorId) : Promise.resolve(null),
+  );
 }
 
 /** Where conversions pass one at a time (ADR 0070 § 4): a long one never takes the whole machine. */

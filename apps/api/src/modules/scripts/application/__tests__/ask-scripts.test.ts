@@ -97,6 +97,7 @@ function world(options: { readonly limits: PersonaLimits | null; readonly failur
       return Promise.resolve();
     },
     last: () => Promise.resolve(asked.at(-1) ?? null),
+    lastFor: () => Promise.resolve(asked.at(-1) ?? null),
   };
   const add = (name: string, stageName: string): ScriptStructureId => {
     const id = newId(ScriptStructureIdSchema);

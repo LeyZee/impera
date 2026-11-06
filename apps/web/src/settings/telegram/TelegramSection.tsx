@@ -15,6 +15,7 @@ import { ReauthRequired } from '../services/api';
 
 import { BotSheet, type SheetMode } from './BotSheet';
 import { GroupPreview, PreviewMessage } from './Preview';
+import { PrivateChat } from './PrivateChat';
 import { Reauth } from './Reauth';
 import { SalesSettings } from './SalesSettings';
 import {
@@ -74,6 +75,8 @@ const TABS: readonly { key: Tab; label: string }[] = [
   { key: 'sales', label: 'Ventes' },
   { key: 'validations', label: 'Validations' },
   { key: 'bots', label: 'Bots et groupes' },
+  // Where his « mot de passe oublié » link goes (ADR 0068 § 4): his own chat with the bot, nothing else.
+  { key: 'private', label: 'Mon chat privé' },
 ];
 
 /**
@@ -311,13 +314,19 @@ export function TelegramSection({
             onRepair={openBots}
             isExampleOpen={isExampleOpen}
           />
-        ) : (
+        ) : tab === 'bots' ? (
           <BotsTab
             overview={overview}
             now={now}
             onSheet={setSheet}
             onChanged={() => void refresh()}
             onAdd={openAdd}
+          />
+        ) : (
+          <PrivateChat
+            owner
+            onAddBot={openBots}
+            frame={(body) => <div className="nv-plate pc-plate">{body}</div>}
           />
         )}
       </div>
@@ -355,13 +364,15 @@ function HealthStrip({
         <span className="tg-state-dot" data-tone={health.tone} />
         <b>{health.label}</b>
       </span>
-      {/* The counts stay on a wide screen; a phone keeps the state and the last send (telegram.css). */}
-      <span className="tg-health__sep tg-health__count" />
-      <span className="tg-health__item tg-health__count">
-        <b>{health.botCount}</b> {health.botCount > 1 ? 'bots' : 'bot'}
-      </span>
-      <span className="tg-health__item tg-health__count">
-        <b>{health.groupCount}</b> {health.groupCount > 1 ? 'groupes' : 'groupe'}
+      <span className="tg-health__sep" />
+      {/* The two counts move to the next line together when the strip wraps (a phone), never one apart. */}
+      <span className="tg-health__counts">
+        <span className="tg-health__item">
+          <b>{health.botCount}</b> {health.botCount > 1 ? 'bots' : 'bot'}
+        </span>
+        <span className="tg-health__item">
+          <b>{health.groupCount}</b> {health.groupCount > 1 ? 'groupes' : 'groupe'}
+        </span>
       </span>
       {health.lastSentAt === null ? null : (
         <>
@@ -474,6 +485,13 @@ function TabIcon({ tab }: { tab: Tab }): JSX.Element {
       );
     case 'bots':
       return <TelegramGlyph />;
+    case 'private':
+      return (
+        <svg {...common}>
+          <rect x="5" y="10.5" width="14" height="10" rx="3" />
+          <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+        </svg>
+      );
   }
 }
 

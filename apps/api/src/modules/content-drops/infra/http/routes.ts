@@ -14,6 +14,8 @@ import {
   DropFileUploadSchema,
   FillScriptSlotBodySchema,
   RefuseContentRequestBodySchema,
+  ScriptDropCardParamsSchema,
+  ScriptDropCardQuerySchema,
   ScriptDropSchema,
   ScriptSlotParamsSchema,
   StartScriptDropBodySchema,
@@ -27,6 +29,7 @@ import { z } from 'zod';
 import {
   fillScriptSlot,
   readScriptDrop,
+  scriptDropCard,
   startScriptDrop,
   submitScriptDrop,
   type ScriptDropDeps,
@@ -164,6 +167,33 @@ export function createContentDropRoutes(
       '/creator-space/content/script-drops/:dropId',
       { ...creatorOnly, schema: { params: ScriptDropParamsSchema, response: { 200: ScriptDropSchema } } },
       (request) => asCreator(() => readScriptDrop(scripts, signedIn(request.user), request.params.dropId)),
+    );
+
+    // A card of her script (SC-02 lot b2), drawn from its frozen version: the same SVG and the same headers as the
+    // library's, what the agency wrote escaped, nothing else allowed by the CSP.
+    app.get(
+      '/creator-space/content/script-drops/:dropId/cards/:segmentKey',
+      {
+        ...creatorOnly,
+        schema: { params: ScriptDropCardParamsSchema, querystring: ScriptDropCardQuerySchema },
+      },
+      async (request, reply) => {
+        const svg = await asCreator(() =>
+          scriptDropCard(
+            scripts,
+            signedIn(request.user),
+            request.params.dropId,
+            request.params.segmentKey,
+            request.query.variant ?? null,
+          ),
+        );
+        return reply
+          .header('cache-control', 'private, no-cache')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-security-policy', "default-src 'none'")
+          .type('image/svg+xml; charset=utf-8')
+          .send(svg);
+      },
     );
 
     app.put(

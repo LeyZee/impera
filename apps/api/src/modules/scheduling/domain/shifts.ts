@@ -66,6 +66,22 @@ export function assertPlans(scope: TeamScope): void {
   if (scope !== 'owner' && scope !== 'agency') throw new PlanningForbidden();
 }
 
+/** The creators a planner plans: `null` for every creator, else his list. */
+export type PlannedCreators = ReadonlySet<string> | null;
+
+/**
+ * What a planner plans (Charles, 06/11 : « planning de sa liste », since several managers may be assigned to one
+ * model): the owner every creator, an active manager the creators of his list (`creator_ids`), those ADR 0023 says
+ * bound his creators. The team, its reports and its pay stay the agency's whole (ADR 0023).
+ */
+export function plannedCreatorsOf(scope: TeamScope, list: readonly string[]): PlannedCreators {
+  assertPlans(scope);
+  return scope === 'owner' ? null : new Set(list);
+}
+
+export const plansCreator = (planned: PlannedCreators, creatorId: string): boolean =>
+  planned === null || planned.has(creatorId);
+
 /** What decides whether a member can take a shift: their status, their creators, and the day they join. */
 export interface WorkingMember {
   readonly status: TeamMemberStatus;
@@ -130,6 +146,20 @@ export function accessWindow(shift: ShiftTimes, marginMinutes: number): { starts
     startsAt: addMinutes(shift.startsAt, -marginMinutes),
     endsAt: shift.stoppedAt === null ? addMinutes(shift.endsAt, marginMinutes) : shift.endsAt,
   };
+}
+
+/**
+ * The creators a member's access window opens at `at` (ADR 0025, EQ-13): those of a shift whose window holds `at`,
+ * its start included and its end excluded, each once, in the order of the shifts given. On any account of a creator, the
+ * window opens the whole creator. The caller gives an active member's shifts, cancelled ones out.
+ */
+export function creatorsInAccessWindow(
+  shifts: readonly (ShiftTimes & { readonly creatorId: string })[],
+  at: Date,
+  marginMinutes: number,
+): string[] {
+  const open = shifts.filter((shift) => covers(accessWindow(shift, marginMinutes), at));
+  return [...new Set(open.map((shift) => shift.creatorId))];
 }
 
 /**
